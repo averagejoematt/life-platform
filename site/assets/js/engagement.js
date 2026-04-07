@@ -395,6 +395,17 @@
             sparkline: glyphs.movement.sparkline_7d,
           });
         }
+        if (glyphs.water && glyphs.water.liters) {
+          var wPct = Math.round(glyphs.water.liters / (glyphs.water.target || 3.0) * 100);
+          items.push({
+            domain: 'body',
+            date: p.date,
+            headline: 'Water: ' + glyphs.water.liters.toFixed(1) + 'L' + (glyphs.water.target ? ' / ' + glyphs.water.target + 'L' : ''),
+            detail: wPct >= 100 ? 'Target met \u2713' : wPct + '% of daily target',
+            link: '/live/',
+            sparkline: glyphs.water.sparkline_7d,
+          });
+        }
         if (glyphs.journal && glyphs.journal.streak_days) {
           items.push({
             domain: 'mind',

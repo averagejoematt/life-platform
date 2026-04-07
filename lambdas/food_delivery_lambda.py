@@ -1,5 +1,5 @@
 import csv, boto3, json, os, re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from decimal import Decimal
 
@@ -48,7 +48,7 @@ def lambda_handler(event, context):
             'amount': amt,
         })
 
-    import_date = datetime.utcnow().strftime('%Y-%m-%d')
+    import_date = datetime.now(timezone.utc).strftime('%Y-%m-%d')
     written = 0
 
     # Write transaction records
@@ -110,7 +110,7 @@ def lambda_handler(event, context):
                 'orders_per_week': Decimal(str(opw)),
                 'delivery_index': Decimal(str(idx)),
                 'platform_breakdown': {k: Decimal(str(round(v,2))) for k,v in data['platforms'].items()},
-                'computed_at': datetime.utcnow().isoformat(),
+                'computed_at': datetime.now(timezone.utc).isoformat(),
             })
 
     # Compute streak record
@@ -150,7 +150,7 @@ def lambda_handler(event, context):
         'longest_ever_streak': longest,
         'longest_ever_start': longest_start.strftime('%Y-%m-%d') if longest_start else None,
         'longest_ever_end': longest_end.strftime('%Y-%m-%d') if longest_end else None,
-        'updated_at': datetime.utcnow().isoformat(),
+        'updated_at': datetime.now(timezone.utc).isoformat(),
     })
 
     # Write annual summaries
@@ -176,7 +176,7 @@ def lambda_handler(event, context):
                 'clean_days': 365 - data['days'],
                 'orders_per_week': Decimal(str(opw)),
                 'delivery_index': Decimal(str(min(round(opw / 1.55, 1), 10.0))),
-                'computed_at': datetime.utcnow().isoformat(),
+                'computed_at': datetime.now(timezone.utc).isoformat(),
             })
 
     # Write DATE# record for freshness checker

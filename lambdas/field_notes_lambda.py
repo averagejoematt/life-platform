@@ -119,8 +119,8 @@ def gather_week_data(start_date, end_date):
     # Nutrition (MacroFactor)
     nutrition = _query_source("macrofactor", start_date, end_date)
     if nutrition:
-        cals = [float(i["calories"]) for i in nutrition if i.get("calories")]
-        protein = [float(i["protein_g"]) for i in nutrition if i.get("protein_g")]
+        cals = [float(i["total_calories_kcal"]) for i in nutrition if i.get("total_calories_kcal")]
+        protein = [float(i["total_protein_g"]) for i in nutrition if i.get("total_protein_g")]
         data["nutrition"] = {
             "days_tracked": len(nutrition),
             "avg_calories": round(sum(cals) / len(cals)) if cals else None,
@@ -130,7 +130,7 @@ def gather_week_data(start_date, end_date):
     # Training (Strava)
     activities = _query_source("strava", start_date, end_date)
     if activities:
-        total_min = sum(float(a.get("duration_min", 0) or a.get("moving_time_min", 0)) for a in activities)
+        total_min = sum(float(a.get("moving_time_seconds") or a.get("elapsed_time_seconds") or 0) / 60 for a in activities)
         data["training"] = {
             "sessions": len(activities),
             "total_minutes": round(total_min),

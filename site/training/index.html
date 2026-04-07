@@ -1259,7 +1259,6 @@
 <body>
 <div id="amj-nav"></div>
 <div id="amj-hierarchy-nav"></div>
-<p class="obs-subtitle">Training for longevity, not aesthetics. A 12-month movement record.</p>
 <!-- Product Board Item 11: Day X context banner -->
 <div id="day-x-banner" style="
   margin:0 var(--page-padding);
@@ -1284,6 +1283,7 @@
      V3 Section 1: STATUS BAR — rendered by observatory-v3.js
      ════════════════════════════════════════════════════════════ -->
 <div id="obs-v3-status"></div>
+<p class="obs-subtitle">Training for longevity, not aesthetics. A 12-month movement record.</p>
 
 <!-- ════════════════════════════════════════════════════════════
      V3 Section 2: COACH ANALYSIS — rendered by observatory-v3.js
@@ -1625,6 +1625,17 @@
     </div>
   </section>
 
+  <!-- 11g: Heart Rate Recovery Trend (moved inside advanced metrics details) -->
+  <section class="t-hr-section reveal" id="t-hr-section">
+    <div class="t-section-header">Heart rate recovery trend</div>
+    <p class="t-context" style="padding:0 0 var(--space-6) 0;max-width:none">
+      How quickly heart rate drops after peak exertion &mdash; the <strong>strongest exercise-derived mortality predictor</strong>.
+      A faster drop means a fitter autonomic nervous system.
+    </p>
+    <canvas class="t-hr-chart" id="t-hr-canvas"></canvas>
+  </section>
+</details>
+
 <!-- ════════════════════════════════════════════════════════════
      12-WEEK TREND CHART
      ════════════════════════════════════════════════════════════ -->
@@ -1737,137 +1748,211 @@
   </div>
 </section>
 
+<!-- V3.1: Training balance wrapped in details -->
+<details class="obs-depth-section">
+  <summary>Training balance framework <span class="obs-depth-teaser">Attia's 5 pillars: Zone 2, strength, stability, Zone 5, sport</span></summary>
+  <section class="t-radar-section reveal">
+    <div class="t-section-header">Training balance &mdash; Attia pillars</div>
+    <p class="t-context" style="padding:0 0 var(--space-6) 0;max-width:none">
+      Five pillars of physical preparedness. <strong>A balanced pentagon is the goal</strong> &mdash;
+      most people over-index on one or two.
+    </p>
+    <div class="t-radar-wrap">
+      <canvas class="t-radar-canvas" id="t-radar-canvas" width="280" height="280"></canvas>
+      <div class="t-radar-pillars" id="t-radar-pillars">
+        <div class="t-radar-pillar">
+          <div class="t-radar-pillar__name">Zone 2</div>
+          <div class="t-radar-pillar__bar"><div class="t-radar-pillar__fill" id="radar-z2-fill" style="width:0%"></div></div>
+          <div class="t-radar-pillar__pct" id="radar-z2-pct">&mdash;</div>
+        </div>
+        <div class="t-radar-pillar">
+          <div class="t-radar-pillar__name">Strength</div>
+          <div class="t-radar-pillar__bar"><div class="t-radar-pillar__fill" id="radar-str-fill" style="width:0%"></div></div>
+          <div class="t-radar-pillar__pct" id="radar-str-pct">&mdash;</div>
+        </div>
+        <div class="t-radar-pillar">
+          <div class="t-radar-pillar__name">Stability</div>
+          <div class="t-radar-pillar__bar"><div class="t-radar-pillar__fill" id="radar-stab-fill" style="width:0%"></div></div>
+          <div class="t-radar-pillar__pct" id="radar-stab-pct">&mdash;</div>
+        </div>
+        <div class="t-radar-pillar">
+          <div class="t-radar-pillar__name">Zone 5</div>
+          <div class="t-radar-pillar__bar"><div class="t-radar-pillar__fill" id="radar-z5-fill" style="width:0%"></div></div>
+          <div class="t-radar-pillar__pct" id="radar-z5-pct">&mdash;</div>
+        </div>
+        <div class="t-radar-pillar">
+          <div class="t-radar-pillar__name">Sport</div>
+          <div class="t-radar-pillar__bar"><div class="t-radar-pillar__fill" id="radar-sport-fill" style="width:0%"></div></div>
+          <div class="t-radar-pillar__pct" id="radar-sport-pct">&mdash;</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</details>
+
+<!-- V3.1: HR recovery trend moved inside advanced metrics details block -->
+
+<!-- V3.1: Session timing wrapped in details -->
+<details class="obs-depth-section">
+  <summary>Session timing analysis</summary>
+  <section class="t-tod-section reveal">
+    <div class="t-section-header">When I train</div>
+    <p class="t-context" style="padding:0 0 var(--space-4) 0;max-width:none">
+      Distribution of training sessions by hour. As data accumulates, the platform
+      will cross-reference workout timing with sleep and recovery scores.
+    </p>
+    <div class="t-tod-grid" id="t-tod-grid"></div>
+    <div class="t-tod-labels" id="t-tod-labels"></div>
+  </section>
+</details>
+
+<!-- V3.1: GPS routes wrapped in details -->
+<details class="obs-depth-section">
+  <summary>GPS routes</summary>
+  <section class="t-routes-section reveal">
+    <div class="t-section-header">Recent routes</div>
+    <p class="t-context" style="padding:0 0 var(--space-6) 0;max-width:none">
+      GPS traces from Strava activities. <strong>Minimalist outlines</strong> &mdash; distance and duration at a glance.
+    </p>
+    <div class="t-routes-grid" id="t-routes-grid">
+      <div style="grid-column:1/-1;text-align:center;padding:var(--space-8) 0;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);letter-spacing:var(--ls-label)">Pending data &mdash; GPS routes appear here as outdoor activities are logged to Strava.</div>
+    </div>
+  </section>
+</details>
+
+<!-- V3.1: Milestones wrapped in details -->
+<details class="obs-depth-section">
+  <summary>Milestones</summary>
+  <section class="t-milestones-section reveal">
+    <div class="t-section-header">Capability milestones</div>
+    <p class="t-context" style="padding:0 0 var(--space-6) 0;max-width:none">
+      Numbers on a screen mean nothing without real-world proof.
+      <strong>These are the moments the data became tangible.</strong>
+    </p>
+    <div class="t-timeline" id="t-timeline">
+      <div style="text-align:center;padding:var(--space-8) 0;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);letter-spacing:var(--ls-label)">Milestones appear here as benchmarks are crossed and personal records are set.</div>
+    </div>
+  </section>
+</details>
+
+<!-- V3.1: Elena Voss chronicle quote removed (duplicate — already in coach section) -->
+
+<!-- V3.1: Hypotheses wrapped in details -->
+<details class="obs-depth-section">
+  <summary>Hypotheses under test (4) <span class="obs-depth-teaser">Zone 2 volume, rucking yield, back-to-back strain, consistency vs intensity</span></summary>
+  <section class="t-rules-section reveal">
+    <div class="t-section-header">Training Hypotheses Under Test</div>
+    <div class="t-rule-grid">
+      <div class="t-rule">
+        <div class="t-rule__num">H-01</div>
+        <div class="t-rule__finding">Zone 2 volume predicts next-week recovery better than any other variable</div>
+        <div class="t-rule__evidence">Testing: 150+ min/week target &rarr; tracking Whoop recovery correlation</div>
+      </div>
+      <div class="t-rule">
+        <div class="t-rule__num">H-02</div>
+        <div class="t-rule__finding">Back-to-back high strain days suppress HRV</div>
+        <div class="t-rule__evidence">Testing: consecutive strain &gt;18 &rarr; tracking HRV response over 48h</div>
+      </div>
+      <div class="t-rule">
+        <div class="t-rule__num">H-03</div>
+        <div class="t-rule__finding">Morning workouts produce better sleep scores than evening sessions</div>
+        <div class="t-rule__evidence">Testing: workout time &times; Whoop sleep score &rarr; needs 90+ day dataset</div>
+      </div>
+      <div class="t-rule">
+        <div class="t-rule__num">H-04</div>
+        <div class="t-rule__finding">Rucking yields the highest Zone 2 percentage per hour of any modality</div>
+        <div class="t-rule__evidence">Testing: comparing Z2% across Walk, Ruck, Ride, Run from Strava HR data</div>
+      </div>
+    </div>
+  </section>
+</details>
+
 <!-- ════════════════════════════════════════════════════════════
-     11f: Activity Diversity — Attia-Pillar Radar Chart
+     V3.1: COLLAPSED SECTIONS — grouped at bottom of content
      ════════════════════════════════════════════════════════════ -->
-<section class="t-radar-section reveal">
-  <div class="t-section-header">Training balance &mdash; Attia pillars</div>
-  <p class="t-context" style="padding:0 0 var(--space-6) 0;max-width:none">
-    Five pillars of physical preparedness. <strong>A balanced pentagon is the goal</strong> &mdash;
-    most people over-index on one or two.
-  </p>
-  <div class="t-radar-wrap">
-    <canvas class="t-radar-canvas" id="t-radar-canvas" width="280" height="280"></canvas>
-    <div class="t-radar-pillars" id="t-radar-pillars">
-      <div class="t-radar-pillar">
-        <div class="t-radar-pillar__name">Zone 2</div>
-        <div class="t-radar-pillar__bar"><div class="t-radar-pillar__fill" id="radar-z2-fill" style="width:0%"></div></div>
-        <div class="t-radar-pillar__pct" id="radar-z2-pct">&mdash;</div>
+
+<!-- V3.1 Item 1+2+3: About this observatory (moved editorial content) -->
+<details class="obs-depth-section">
+  <summary>About this observatory <span class="obs-depth-teaser">The story behind this page and what training means in this experiment</span></summary>
+  <div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-8) var(--page-padding);">
+    <!-- Matthew's reflection (moved from inline) -->
+    <div class="t-pullquote t-pullquote--dynamic">
+      <div class="t-pullquote__text">
+        When I&rsquo;m in it, I&rsquo;m all in &mdash; 5am sessions, compound lifts, rucking mountains at the weekend.
+        The problem has never been the training. It&rsquo;s always been the fall &mdash; how fast
+        the void fills when routine breaks. The data doesn&rsquo;t stop that from happening.
+        But it makes the absence visible, and <em>visibility shortens the distance back</em>.
       </div>
-      <div class="t-radar-pillar">
-        <div class="t-radar-pillar__name">Strength</div>
-        <div class="t-radar-pillar__bar"><div class="t-radar-pillar__fill" id="radar-str-fill" style="width:0%"></div></div>
-        <div class="t-radar-pillar__pct" id="radar-str-pct">&mdash;</div>
+    </div>
+
+    <!-- Pull-quote #2: Rucking finding (moved from inline) -->
+    <div class="t-pullquote t-pullquote--right" style="border-bottom:1px solid var(--border);">
+      <div class="t-pullquote__watermark">02</div>
+      <div class="t-pullquote__text">
+        Rucking is the highest Zone 2 yield per hour &mdash;
+        <em>92% of ruck time</em> in Zone 2 vs 61% walking. The most efficient <a href="/nutrition/" style="color:var(--t-red);text-decoration:none">calorie burn</a> too.
       </div>
-      <div class="t-radar-pillar">
-        <div class="t-radar-pillar__name">Stability</div>
-        <div class="t-radar-pillar__bar"><div class="t-radar-pillar__fill" id="radar-stab-fill" style="width:0%"></div></div>
-        <div class="t-radar-pillar__pct" id="radar-stab-pct">&mdash;</div>
+      <div class="t-pullquote__attr">
+        <span class="t-pullquote__badge">N=1 &middot; Correlational</span>
+        <span class="t-pullquote__source">Garmin HR zones &times; Strava activity type &mdash; 90+ day dataset</span>
       </div>
-      <div class="t-radar-pillar">
-        <div class="t-radar-pillar__name">Zone 5</div>
-        <div class="t-radar-pillar__bar"><div class="t-radar-pillar__fill" id="radar-z5-fill" style="width:0%"></div></div>
-        <div class="t-radar-pillar__pct" id="radar-z5-pct">&mdash;</div>
+    </div>
+
+    <!-- Pull-quote #3: Back-to-back strain finding (moved from inline) -->
+    <div class="t-pullquote t-pullquote--left" style="border-bottom:1px solid var(--border);">
+      <div class="t-pullquote__watermark">03</div>
+      <div class="t-pullquote__text">
+        Back-to-back strain above 18 <em>tanks HRV for 48 hours</em> &mdash;
+        a 20% drop that erases the <a href="/sleep/" style="color:var(--t-red);text-decoration:none">sleep</a> gains from the night before.
       </div>
-      <div class="t-radar-pillar">
-        <div class="t-radar-pillar__name">Sport</div>
-        <div class="t-radar-pillar__bar"><div class="t-radar-pillar__fill" id="radar-sport-fill" style="width:0%"></div></div>
-        <div class="t-radar-pillar__pct" id="radar-sport-pct">&mdash;</div>
+      <div class="t-pullquote__attr">
+        <span class="t-pullquote__badge">N=1 &middot; Correlational</span>
+        <span class="t-pullquote__source">Whoop strain &times; HRV &mdash; consecutive high-strain day pairs</span>
       </div>
     </div>
   </div>
-</section>
+</details>
 
-<!-- ════════════════════════════════════════════════════════════
-     11g: Heart Rate Recovery Trend
-     ════════════════════════════════════════════════════════════ -->
-<section class="t-hr-section reveal" id="t-hr-section">
-  <div class="t-section-header">Heart rate recovery trend</div>
-  <p class="t-context" style="padding:0 0 var(--space-6) 0;max-width:none">
-    How quickly heart rate drops after peak exertion &mdash; the <strong>strongest exercise-derived mortality predictor</strong>.
-    A faster drop means a fitter autonomic nervous system.
-  </p>
-  <canvas class="t-hr-chart" id="t-hr-canvas"></canvas>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     11h: Time-of-Day Training Distribution
-     ════════════════════════════════════════════════════════════ -->
-<section class="t-tod-section reveal">
-  <div class="t-section-header">When I train</div>
-  <p class="t-context" style="padding:0 0 var(--space-4) 0;max-width:none">
-    Distribution of training sessions by hour. As data accumulates, the platform
-    will cross-reference workout timing with sleep and recovery scores.
-  </p>
-  <div class="t-tod-grid" id="t-tod-grid"></div>
-  <div class="t-tod-labels" id="t-tod-labels"></div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     11i: GPS Route Traces (placeholder)
-     ════════════════════════════════════════════════════════════ -->
-<section class="t-routes-section reveal">
-  <div class="t-section-header">Recent routes</div>
-  <p class="t-context" style="padding:0 0 var(--space-6) 0;max-width:none">
-    GPS traces from Strava activities. <strong>Minimalist outlines</strong> &mdash; distance and duration at a glance.
-  </p>
-  <div class="t-routes-grid" id="t-routes-grid">
-    <div style="grid-column:1/-1;text-align:center;padding:var(--space-8) 0;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);letter-spacing:var(--ls-label)">Pending data &mdash; GPS routes appear here as outdoor activities are logged to Strava.</div>
+<!-- V3.1 Item 4: Running — hidden until first run data exists -->
+<details class="obs-depth-section" id="t-running-section" style="display:none">
+  <summary>Running</summary>
+  <div class="t-coming-soon">
+    <div class="t-coming-soon__title">Running</div>
+    <p class="t-coming-soon__body">
+      The data infrastructure is ready. When the first run happens, this section auto-populates
+      with pace trends, distance progression, and running-specific Zone 2 analysis.
+    </p>
   </div>
-</section>
+</details>
 
-<!-- ════════════════════════════════════════════════════════════
-     11j: Real-World Capability Milestones
-     ════════════════════════════════════════════════════════════ -->
-<section class="t-milestones-section reveal">
-  <div class="t-section-header">Capability milestones</div>
-  <p class="t-context" style="padding:0 0 var(--space-6) 0;max-width:none">
-    Numbers on a screen mean nothing without real-world proof.
-    <strong>These are the moments the data became tangible.</strong>
-  </p>
-  <div class="t-timeline" id="t-timeline">
-    <div style="text-align:center;padding:var(--space-8) 0;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);letter-spacing:var(--ls-label)">Milestones appear here as benchmarks are crossed and personal records are set.</div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     N=1 RULES — left-accent rule cards
-     ════════════════════════════════════════════════════════════ -->
-<div class="t-pullquote t-pullquote--right reveal" style="border-bottom:1px solid var(--border);">
-  <blockquote class="t-pullquote__text">
-    &ldquo;Three walks in four days. Not impressive by any metric. But the system is counting, and that matters more than the mileage.&rdquo;
-  </blockquote>
-  <div class="t-pullquote__attr">
-    <span class="t-pullquote__badge">Chronicle &middot; Elena Voss</span>
-    <span class="t-pullquote__source">AI narrative voice &mdash; <a href="/chronicle/" style="color:var(--t-red);text-decoration:none;">Read the chronicle &rarr;</a></span>
-  </div>
-</div>
-
-<section class="t-rules-section reveal">
-  <div class="t-section-header">Training Hypotheses Under Test</div>
-  <div class="t-rule-grid">
-    <div class="t-rule">
-      <div class="t-rule__num">H-01</div>
-      <div class="t-rule__finding">Zone 2 volume predicts next-week recovery better than any other variable</div>
-      <div class="t-rule__evidence">Testing: 150+ min/week target &rarr; tracking Whoop recovery correlation</div>
-    </div>
-    <div class="t-rule">
-      <div class="t-rule__num">H-02</div>
-      <div class="t-rule__finding">Back-to-back high strain days suppress HRV</div>
-      <div class="t-rule__evidence">Testing: consecutive strain &gt;18 &rarr; tracking HRV response over 48h</div>
-    </div>
-    <div class="t-rule">
-      <div class="t-rule__num">H-03</div>
-      <div class="t-rule__finding">Morning workouts produce better sleep scores than evening sessions</div>
-      <div class="t-rule__evidence">Testing: workout time &times; Whoop sleep score &rarr; needs 90+ day dataset</div>
-    </div>
-    <div class="t-rule">
-      <div class="t-rule__num">H-04</div>
-      <div class="t-rule__finding">Rucking yields the highest Zone 2 percentage per hour of any modality</div>
-      <div class="t-rule__evidence">Testing: comparing Z2% across Walk, Ruck, Ride, Run from Strava HR data</div>
+<!-- V3.1 Item 11: Training protocol -->
+<details class="obs-depth-section">
+  <summary>Training protocol</summary>
+  <div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-8) var(--page-padding);">
+    <div class="t-protocol-list">
+      <div class="t-protocol-item">
+        <div class="t-protocol-num">01</div>
+        <div class="t-protocol-text"><strong>150+ min/week Zone 2</strong> &mdash; walking, cycling, rucking. HR 114&ndash;133. Highest-evidence longevity modality.</div>
+      </div>
+      <div class="t-protocol-item">
+        <div class="t-protocol-num">02</div>
+        <div class="t-protocol-text"><strong>3x/week compound lifts</strong> &mdash; squat, deadlift, bench, OHP. Progressive overload toward centenarian benchmarks.</div>
+      </div>
+      <div class="t-protocol-item">
+        <div class="t-protocol-num">03</div>
+        <div class="t-protocol-text"><strong>ACWR &lt;1.5</strong> &mdash; Acute:Chronic Workload Ratio guards against injury spikes.</div>
+      </div>
+      <div class="t-protocol-item">
+        <div class="t-protocol-num">04</div>
+        <div class="t-protocol-text"><strong>Recovery-gated intensity</strong> &mdash; Whoop &lt;34% triggers deload suggestion in daily brief.</div>
+      </div>
+      <div class="t-protocol-item">
+        <div class="t-protocol-num">05</div>
+        <div class="t-protocol-text"><strong>80/20 polarization</strong> &mdash; 80% low intensity, 20% high. No Zone 3 junk miles.</div>
+      </div>
     </div>
   </div>
-</section>
+</details>
 
 </div><!-- /t-content -->
 

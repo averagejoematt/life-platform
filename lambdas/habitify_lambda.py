@@ -55,7 +55,7 @@ SECRET_NAME = os.environ.get("HABITIFY_SECRET_NAME", "life-platform/habitify")
 BASE_URL = "https://api.habitify.me"
 # ── Config (env vars with backwards-compatible defaults) ──
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
-USER_ID    = os.environ["USER_ID"]
+USER_ID    = os.environ.get("USER_ID", "matthew")
 LOOKBACK_DAYS = int(os.environ.get("LOOKBACK_DAYS", "7"))
 
 PK = f"USER#{USER_ID}#SOURCE#habitify"

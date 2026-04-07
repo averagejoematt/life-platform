@@ -422,8 +422,7 @@
     const w = (d.vitals || {}).weight_lbs || (d.hero || {}).current_weight_lbs;
     if (w) {
       var rounded = Math.round(w * 10) / 10;
-      var el = document.getElementById('about-weight');
-      if (el) el.textContent = rounded;
+      // about-weight shows STARTING weight (307) — don't overwrite it with current weight
       var lostEl = document.getElementById('about-lost');
       if (lostEl) {
         var journeyStarted = Date.now() >= new Date('2026-04-01T00:00:00-07:00').getTime();

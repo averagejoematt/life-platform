@@ -44,7 +44,7 @@ except ImportError:
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET  = os.environ["S3_BUCKET"]
-USER_ID    = os.environ["USER_ID"]
+USER_ID    = os.environ.get("USER_ID", "matthew")
 CF_DIST_ID = os.environ.get("CF_DIST_ID", "E3S424OXQZ8NBE")
 CHRONICLE_EMAIL_SENDER_ARN = os.environ.get("CHRONICLE_EMAIL_SENDER_ARN", "")
 

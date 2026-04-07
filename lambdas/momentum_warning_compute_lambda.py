@@ -38,7 +38,7 @@ import json
 import os
 import logging
 import boto3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 try:
@@ -68,8 +68,8 @@ table    = dynamodb.Table(TABLE_NAME)
 def _check_data_gate():
     """Return (ok: bool, days_available: int)."""
     try:
-        today      = datetime.utcnow().strftime("%Y-%m-%d")
-        gate_start = (datetime.utcnow() - timedelta(days=MIN_DAYS_REQUIRED)).strftime("%Y-%m-%d")
+        today      = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        gate_start = (datetime.now(timezone.utc) - timedelta(days=MIN_DAYS_REQUIRED)).strftime("%Y-%m-%d")
         resp = table.query(
             KeyConditionExpression="pk = :pk AND sk BETWEEN :start AND :end",
             ExpressionAttributeValues={
@@ -207,7 +207,7 @@ def _write_momentum_memory(signals, today):
             "pk":          f"{USER_PREFIX}platform_memory",
             "sk":          f"MEMORY#momentum_warning#{today}",
             "date":        today,
-            "computed_at": datetime.utcnow().isoformat(),
+            "computed_at": datetime.now(timezone.utc).isoformat(),
             "memory_type": "momentum_warning",
             "algo_version": "0.1.0",
             "momentum_score":       signals.get("momentum_score"),
@@ -235,7 +235,7 @@ def _write_momentum_memory(signals, today):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def lambda_handler(event, context):
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     logger.info(f"[IC-5] momentum-warning-compute START date={today}")
 
     # ── Data gate ──────────────────────────────────────────────────────────
@@ -250,7 +250,7 @@ def lambda_handler(event, context):
                 "days_required": MIN_DAYS_REQUIRED, "message": msg}
 
     # ── Data collection ────────────────────────────────────────────────────
-    lookback_start = (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d")
+    lookback_start = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
 
     try:
         def _query(source):

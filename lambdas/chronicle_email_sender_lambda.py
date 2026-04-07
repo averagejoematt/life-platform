@@ -41,7 +41,7 @@ except ImportError:
 
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ["USER_ID"]
+USER_ID    = os.environ.get("USER_ID", "matthew")
 SENDER     = os.environ.get("EMAIL_SENDER", "lifeplatform@mattsusername.com")
 SITE_URL   = os.environ.get("SITE_URL", "https://averagejoematt.com")
 
@@ -141,14 +141,14 @@ BOARD_MEMBERS = {
     "james_okafor":     {"name": "Dr. James Okafor",     "title": "Longevity & Preventive Medicine",   "color": "#f59e0b", "emoji": "\U0001FA7A"},
     "maya_rodriguez":   {"name": "Coach Maya Rodriguez",  "title": "Behavioural Performance Coach",    "color": "#ec4899", "emoji": "\U0001F9E0"},
     "the_chair":        {"name": "The Chair",             "title": "Board Chair \u2014 Verdict & Priority", "color": "#6366f1", "emoji": "\U0001F3AF"},
-    "layne_norton":     {"name": "Dr. Layne Norton",      "title": "Macros, Protein & Adherence",      "color": "#10b981", "emoji": "\U0001F4AA"},
-    "rhonda_patrick":   {"name": "Dr. Rhonda Patrick",    "title": "Micronutrients & Longevity",       "color": "#8b5cf6", "emoji": "\U0001F9EC"},
-    "peter_attia":      {"name": "Dr. Peter Attia",       "title": "Metabolic Health & Longevity",     "color": "#f59e0b", "emoji": "\U0001F4CA"},
-    "andrew_huberman":  {"name": "Dr. Andrew Huberman",   "title": "Neuroscience & Protocols",         "color": "#06b6d4", "emoji": "\U0001F52C"},
+    "layne_norton":     {"name": "Dr. Marcus Webb",       "title": "Macros, Protein & Adherence",      "color": "#10b981", "emoji": "\U0001F4AA"},
+    "rhonda_patrick":   {"name": "Dr. Amara Patel",      "title": "Micronutrients & Longevity",       "color": "#8b5cf6", "emoji": "\U0001F9EC"},
+    "peter_attia":      {"name": "Dr. James Okafor",     "title": "Metabolic Health & Longevity",     "color": "#f59e0b", "emoji": "\U0001F4CA"},
+    "andrew_huberman":  {"name": "Dr. Kai Nakamura",     "title": "Neuroscience & Protocols",         "color": "#06b6d4", "emoji": "\U0001F52C"},
     "elena_voss":       {"name": "Elena Voss",            "title": "Embedded Journalist",              "color": "#94a3b8", "emoji": "\u270D\uFE0F"},
-    "paul_conti":       {"name": "Dr. Paul Conti",        "title": "Psychiatrist \u2014 Self-Structure",    "color": "#7c3aed", "emoji": "\U0001F9E0"},
+    "paul_conti":       {"name": "Dr. Nathan Reeves",     "title": "Psychiatrist \u2014 Self-Structure",    "color": "#7c3aed", "emoji": "\U0001F9E0"},
     "margaret_calloway":{"name": "Margaret Calloway",     "title": "Senior Editor \u2014 Longform",         "color": "#b45309", "emoji": "\u270F\uFE0F"},
-    "vivek_murthy":     {"name": "Dr. Vivek Murthy",      "title": "Social Connection & Loneliness",   "color": "#0891b2", "emoji": "\U0001F91D"},
+    "vivek_murthy":     {"name": "Dr. Daniel Murthy",     "title": "Social Connection & Loneliness",   "color": "#0891b2", "emoji": "\U0001F91D"},
 }
 
 

@@ -41,7 +41,7 @@ _logger_std.setLevel(logging.INFO)
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET  = os.environ["S3_BUCKET"]
-USER_ID    = os.environ["USER_ID"]
+USER_ID    = os.environ.get("USER_ID", "matthew")
 RECIPIENT  = os.environ["EMAIL_RECIPIENT"]
 SENDER     = os.environ["EMAIL_SENDER"]
 
@@ -319,7 +319,7 @@ def build_data_packet(data):
     packet.append(f"Week number: {week_num}")
     packet.append(f"Journey start: {journey_start}")
     # Matthew-specific fallback defaults; only used if profile fetch fails
-    packet.append(f"Journey start weight: {profile.get('journey_start_weight_lbs', 302)} lbs")
+    packet.append(f"Journey start weight: {profile.get('journey_start_weight_lbs', 307)} lbs")
     packet.append(f"Goal weight: {profile.get('goal_weight_lbs', 185)} lbs")
     packet.append(f"Age: {profile.get('age', 37)}")
     packet.append("")
@@ -339,7 +339,7 @@ def build_data_packet(data):
             if earliest_7d:
                 delta = latest[1] - earliest_7d[0][1]
                 packet.append(f"Week change: {delta:+.1f} lbs")
-        journey_start_w = profile.get("journey_start_weight_lbs", 302)  # Matthew-specific fallback
+        journey_start_w = profile.get("journey_start_weight_lbs", 307)  # Matthew-specific fallback
         total_lost = journey_start_w - latest[1]
         packet.append(f"Total journey loss: {total_lost:.1f} lbs")
     packet.append("")
@@ -694,7 +694,17 @@ def _build_elena_prompt_from_config():
 
     # Board interview paragraph
     board_para = f"""BOARD OF DIRECTORS:
-About 2-3 times per month (NOT every week), you include a brief interaction with one of the Board members when noteworthy events warrant expert commentary. {interview_desc} They have opinions and personality. Only include a Board interview if this week's data has a notable event, milestone, or inflection point that warrants it. If the week is quiet, skip the interview entirely."""
+About 2-3 times per month (NOT every week), you include a brief interaction with one of the Board members when noteworthy events warrant expert commentary. {interview_desc} They have opinions and personality. Only include a Board interview if this week's data has a notable event, milestone, or inflection point that warrants it. If the week is quiet, skip the interview entirely.
+
+INTERVIEW TRIGGERS (when to interview whom):
+- Sleep architecture change or recovery milestone → Dr. Lisa Park (warmth, firmness on non-negotiables)
+- Training breakthrough or load management issue → Dr. Sarah Chen (scientific precision, systems view)
+- Nutrition adherence shift or macro pattern → Dr. Layne Norton (practical, food-focused, no-nonsense)
+- Mood shift, emotional pattern, or avoidance signal → Dr. Nathan Reeves (psychiatry lens, reads beneath surface)
+- Meta-question about the platform itself → Margaret Calloway (editor's eye on the narrative)
+- Cross-domain surprise or correlation discovery → Dr. Henning Brandt (N=1 methodologist, excited by unexpected data)
+
+INTERVIEW FORMAT: Keep it natural — a few lines of dialogue or paraphrase, not Q&A. The interview should advance the week's thesis, not just add authority. The expert should say something Elena couldn't."""
 
     prompt = f"""You are {narrator['name']}, {narrator.get('title', 'a freelance journalist')} writing a weekly narrative chronicle called "The Measured Life." {relationship}
 
@@ -1590,7 +1600,7 @@ def build_weekly_signal_data(data, week_num):
     weight_lbs = None
     if withings.get("weight_kg"):
         weight_lbs = round(float(withings["weight_kg"]) * 2.20462, 1)
-    start_weight = float(profile.get("journey_start_weight_lbs", 302))  # Matthew-specific fallback
+    start_weight = float(profile.get("journey_start_weight_lbs", 307))  # Matthew-specific fallback
     weight_delta = round(start_weight - weight_lbs, 1) if weight_lbs else None
 
     # Sleep
@@ -1805,6 +1815,16 @@ def lambda_handler(event, context):
     prev = data["prev_installments"]
     if prev:
         user_parts.append("\n\n=== YOUR PREVIOUS INSTALLMENTS (for continuity) ===")
+
+        # B3: Thesis guardrails — extract recent titles/theses to prevent repetition
+        recent_titles = [inst.get("title", "Untitled") for inst in prev]
+        if recent_titles:
+            user_parts.append("\n=== THESIS GUARDRAILS ===")
+            user_parts.append("RECENT THESES (last 4 weeks — do NOT repeat these angles):")
+            for t in recent_titles:
+                user_parts.append(f'  - "{t}"')
+            user_parts.append("This week's thesis MUST be orthogonal to the above. Don't write about the same theme two weeks in a row, even if the data supports it. Find the new angle.")
+
         for inst in reversed(prev):  # oldest first
             wn = inst.get("week_number", "?")
             t = inst.get("title", "Untitled")
@@ -1814,6 +1834,10 @@ def lambda_handler(event, context):
                 if len(md) > 2000:
                     md = md[:2000] + "\n[...truncated...]"
                 user_parts.append(f"\n--- Week {wn}: \"{t}\" ---\n{md}")
+
+        # B3: Thread tracking — ask Elena to advance/resolve/complicate prior threads
+        user_parts.append("\n=== CONTINUITY INSTRUCTIONS ===")
+        user_parts.append("Read the previous installments above. Identify 2-3 story threads that are still active (unresolved tensions, patterns mentioned, questions raised). Your job: advance, resolve, or complicate these threads. Don't ignore them, but don't force them either. If a thread has been mentioned for 3+ weeks without development, either close it or introduce new tension.")
     else:
         user_parts.append("\n\nThis is the FIRST installment. Establish the story from the beginning. Who is Matthew? Why is he doing this? What are the stakes? Set the scene in Seattle. Introduce the platform, the data, the obsession. Make the reader want to come back next week.")
 
@@ -1834,7 +1858,16 @@ def lambda_handler(event, context):
             prev_ctx = insight_writer.build_insights_context(
                 days=30, max_items=5, label="PLATFORM INSIGHTS (context for narrative)")
             if prev_ctx:
-                user_message = prev_ctx + "\n\n" + user_message
+                # B3: Reframe Field Notes as a hypothesis Elena can agree/disagree with
+                field_notes_framing = (
+                    "\n=== FIELD NOTES (AI LAB NOTEBOOK) ===\n"
+                    "The platform's AI lab notebook produced the following read on this week's data. "
+                    "Treat this as a HYPOTHESIS, not gospel. Do you agree with the system's read? "
+                    "Deepen it, contradict it, or find the nuance the structured analysis misses. "
+                    "The best Chronicle installments emerge from the gap between what the algorithm sees "
+                    "and what the journalist notices.\n\n"
+                )
+                user_message = field_notes_framing + prev_ctx + "\n\n" + user_message
         except Exception as e:
             print(f"[WARN] IC-16 failed: {e}")
 

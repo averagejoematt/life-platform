@@ -28,7 +28,7 @@ import json
 import os
 import logging
 import boto3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 try:
     from platform_logger import get_logger
@@ -60,8 +60,8 @@ table    = dynamodb.Table(TABLE_NAME)
 def _check_data_gate():
     """Return (ok: bool, days_available: int) for the habit_scores partition."""
     try:
-        today      = datetime.utcnow().strftime("%Y-%m-%d")
-        gate_start = (datetime.utcnow() - timedelta(days=MIN_DAYS_REQUIRED)).strftime("%Y-%m-%d")
+        today      = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        gate_start = (datetime.now(timezone.utc) - timedelta(days=MIN_DAYS_REQUIRED)).strftime("%Y-%m-%d")
         resp = table.query(
             KeyConditionExpression="pk = :pk AND sk BETWEEN :start AND :end",
             ExpressionAttributeValues={
@@ -157,7 +157,7 @@ def _write_pattern_memory(patterns, today):
             "pk":             f"{USER_PREFIX}platform_memory",
             "sk":             f"MEMORY#failure_patterns#{today}",
             "date":           today,
-            "computed_at":    datetime.utcnow().isoformat(),
+            "computed_at":    datetime.now(timezone.utc).isoformat(),
             "memory_type":    "failure_patterns",
             "algo_version":   "0.1.0",
             "habit_skip_predictors": json.dumps(patterns.get("habit_skip_predictors", [])),
@@ -182,7 +182,7 @@ def _write_pattern_memory(patterns, today):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def lambda_handler(event, context):
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     logger.info(f"[IC-4] failure-pattern-compute START date={today}")
 
     # ── Data gate check ────────────────────────────────────────────────────
@@ -197,7 +197,7 @@ def lambda_handler(event, context):
                 "days_required": MIN_DAYS_REQUIRED, "message": msg}
 
     # ── Data collection ────────────────────────────────────────────────────
-    lookback_start = (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d")
+    lookback_start = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
 
     try:
         habit_resp = table.query(

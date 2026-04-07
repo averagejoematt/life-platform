@@ -19,7 +19,7 @@ except ImportError:
 # ── Config (env vars with backwards-compatible defaults) ──
 REGION      = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME  = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID     = os.environ["USER_ID"]
+USER_ID     = os.environ.get("USER_ID", "matthew")
 SNS_ARN     = os.environ.get("SNS_ARN", "arn:aws:sns:us-west-2:205930651321:life-platform-alerts")
 STALE_HOURS = int(os.environ.get("STALE_HOURS", "48"))
 

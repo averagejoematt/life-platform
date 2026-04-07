@@ -36,8 +36,11 @@
       body.style.top = '-' + savedScrollY + 'px';
       body.style.left = '0';
       body.style.right = '0';
+      body.style.touchAction = 'none';
+      body.style.overscrollBehavior = 'none';
       html.style.overflow = 'hidden';
       html.style.touchAction = 'none';
+      html.style.overscrollBehavior = 'none';
       document.addEventListener('touchmove', blockBackgroundTouch, { passive: false });
     }
   }
@@ -50,8 +53,11 @@
       body.style.top = '';
       body.style.left = '';
       body.style.right = '';
+      body.style.touchAction = '';
+      body.style.overscrollBehavior = '';
       html.style.overflow = '';
       html.style.touchAction = '';
+      html.style.overscrollBehavior = '';
       document.removeEventListener('touchmove', blockBackgroundTouch);
       window.scrollTo(0, savedScrollY);
       setTimeout(function() {
@@ -65,7 +71,15 @@
   if (hamburger) hamburger.addEventListener('click', openMenu);
   // "More" bottom-nav button also opens the overlay (Decision 1b)
   var moreBtn = document.querySelector('.bottom-nav__more');
-  if (moreBtn) moreBtn.addEventListener('click', openMenu);
+  if (moreBtn) {
+    moreBtn.addEventListener('click', openMenu);
+  } else {
+    // Defensive: bottom nav may render after nav.js on slower devices
+    document.addEventListener('click', function(e) {
+      var btn = e.target.closest('.bottom-nav__more');
+      if (btn) openMenu();
+    });
+  }
   if (overlayClose) overlayClose.addEventListener('click', closeMenu);
   if (overlay) {
     overlay.addEventListener('click', function(e) {

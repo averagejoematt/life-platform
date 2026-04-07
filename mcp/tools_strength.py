@@ -5,7 +5,7 @@ import json
 import math
 import re
 import logging
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from collections import defaultdict
 
 from mcp.config import (
@@ -464,7 +464,7 @@ def tool_get_strength_standards(args):
 
 def tool_get_centenarian_benchmarks(args):
     """Compare compound lift 1RMs against Attia centenarian decathlon targets."""
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     bw_source  = args.get("bodyweight_source", "withings")
 
     # Get bodyweight

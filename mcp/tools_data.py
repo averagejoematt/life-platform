@@ -6,7 +6,7 @@ import math
 import re
 import bisect
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from boto3.dynamodb.conditions import Key
 
@@ -136,7 +136,7 @@ def tool_find_days(args):
 def tool_get_aggregated_summary(args):
     source   = args.get("source")
     period   = args.get("period", "year")
-    end_date = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
 
     if period not in ("month", "year"):
         raise ValueError("'period' must be 'month' or 'year'")
@@ -145,9 +145,9 @@ def tool_get_aggregated_summary(args):
         default_start = "2010-01-01"
     else:
         if period == "year":
-            default_start = (datetime.utcnow() - timedelta(days=365 * 5)).strftime("%Y-%m-%d")
+            default_start = (datetime.now(timezone.utc) - timedelta(days=365 * 5)).strftime("%Y-%m-%d")
         else:
-            default_start = (datetime.utcnow() - timedelta(days=365 * 2)).strftime("%Y-%m-%d")
+            default_start = (datetime.now(timezone.utc) - timedelta(days=365 * 2)).strftime("%Y-%m-%d")
 
     start_date = args.get("start_date", default_start)
     sources_to_query = [source] if source and source in SOURCES else SOURCES
@@ -180,7 +180,7 @@ def tool_get_aggregated_summary(args):
 
 def tool_search_activities(args):
     start_date    = args.get("start_date", "2010-01-01")
-    end_date      = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date      = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     name_contains = args.get("name_contains", "").lower()
     sport_type    = args.get("sport_type", "").lower()
     min_distance  = args.get("min_distance_miles")
@@ -255,7 +255,7 @@ def tool_get_field_stats(args):
     source     = args.get("source")
     field      = args.get("field")
     start_date = args.get("start_date", "2010-01-01")
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
 
     if not source or not field:
         raise ValueError("'source' and 'field' are required")
@@ -383,7 +383,7 @@ def tool_compare_periods(args):
 
 def tool_get_weekly_summary(args):
     start_date = args.get("start_date", "2000-01-01")
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     sort_by    = args.get("sort_by", "total_distance_miles")
     limit      = int(args.get("limit", 52))
     sort_asc   = args.get("sort_ascending", False)

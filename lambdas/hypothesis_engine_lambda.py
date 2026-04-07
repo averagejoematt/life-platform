@@ -57,7 +57,7 @@ except ImportError:
 
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ["USER_ID"]
+USER_ID    = os.environ.get("USER_ID", "matthew")
 S3_BUCKET  = os.environ["S3_BUCKET"]
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
@@ -522,8 +522,14 @@ two things move together. This applies to ANY variable where the desirable direc
 OUTPUT ONLY valid JSON. No preamble, no markdown, no backticks."""
 
 
-def generate_hypotheses(daily_rows, existing_hypotheses, api_key):
+def generate_hypotheses(daily_rows, existing_hypotheses, api_key, profile=None):
     """Run Claude to generate new cross-domain hypotheses from 14 days of data."""
+    p = profile or {}
+    start_w = p.get("journey_start_weight_lbs", 307)
+    goal_w = p.get("goal_weight_lbs", 185)
+    total_loss = round(start_w - goal_w)
+    cal_target = p.get("calorie_target", 1800)
+    pro_target = p.get("protein_target_g", 190)
 
     existing_texts = [h.get("hypothesis", "")[:100] for h in existing_hypotheses]
     existing_block = ""
@@ -535,8 +541,8 @@ def generate_hypotheses(daily_rows, existing_hypotheses, api_key):
 {json.dumps(daily_rows, indent=2)}
 
 Context:
-- 36-year-old male, 14+ weeks into a 117 lb weight loss transformation (started 302 lbs)
-- Calorie target: 1800 cal/day, protein target: 190g/day
+- 36-year-old male, {total_loss} lb weight loss transformation (started {start_w} lbs, goal {goal_w} lbs)
+- Calorie target: {cal_target} cal/day, protein target: {pro_target}g/day
 - 16:8 intermittent fasting (eating window ~11am-7pm)
 - Primary training: walking + strength training, building Zone 2 base
 - Data sources: Whoop (HRV/recovery), Eight Sleep (bed temp), Strava (activities), MacroFactor (nutrition), Habitify (habits), Apple Health (steps/glucose/gait), Notion journal (mood/stress/energy)
@@ -827,10 +833,11 @@ def lambda_handler(event, context):
 
         api_key = get_anthropic_key()
 
-        # 1. Gather data
+        # 1. Gather data + profile
         data = gather_data()
         if not data:
             return {"statusCode": 500, "body": "Failed to gather data"}
+        profile = fetch_profile()
 
         daily_rows = build_data_narrative(data)
         logger.info(f"Built data narrative: {len(daily_rows)} days")
@@ -877,7 +884,7 @@ def lambda_handler(event, context):
             n_to_generate = min(MAX_NEW_HYPOTHESES, slots_available)
             logger.info(f"Generating {n_to_generate} new hypotheses ({slots_available} slots)")
 
-            result = generate_hypotheses(daily_rows, all_hypotheses, api_key)
+            result = generate_hypotheses(daily_rows, all_hypotheses, api_key, profile=profile)
 
             if result and "hypotheses" in result:
                 existing_texts = [h.get("hypothesis", "")[:100] for h in all_hypotheses]

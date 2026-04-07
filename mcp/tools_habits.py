@@ -5,7 +5,7 @@ import json
 import math
 import re
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from decimal import Decimal
 
@@ -32,7 +32,7 @@ def tool_get_habit_adherence(args):
     Returns habits ranked worst-to-best by adherence.
     """
     start_date = args.get("start_date", "2020-01-01")
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     group_filter = (args.get("group") or "").strip()
 
     items = query_chronicling(start_date, end_date)
@@ -109,7 +109,7 @@ def tool_get_habit_streaks(args):
     Returns sorted by current_streak descending.
     """
     start_date   = args.get("start_date", "2020-01-01")
-    end_date     = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date     = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     habit_filter = (args.get("habit_name") or "").strip().lower()
 
     items  = query_chronicling(start_date, end_date)
@@ -191,7 +191,7 @@ def tool_get_keystone_habits(args):
     with overall daily completion_pct — the behavioral levers that lift everything.
     """
     start_date = args.get("start_date", "2020-01-01")
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     top_n      = int(args.get("top_n", 15))
 
     items  = query_chronicling(start_date, end_date)
@@ -258,7 +258,7 @@ def tool_get_habit_health_correlations(args):
     health_source = args.get("health_source")        # e.g. "whoop"
     health_field  = args.get("health_field")         # e.g. "hrv"
     start_date    = args.get("start_date", "2020-01-01")
-    end_date      = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date      = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     lag_days      = int(args.get("lag_days", 0))
 
     if not (habit_name or group_name):
@@ -355,7 +355,7 @@ def tool_get_group_trends(args):
     Returns week-by-week completion % per group, with trend direction across the window.
     """
     start_date    = args.get("start_date", "2020-01-01")
-    end_date      = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date      = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     groups_filter = args.get("groups")  # optional list
 
     items  = query_chronicling(start_date, end_date)
@@ -524,7 +524,7 @@ def tool_get_habit_stacks(args):
     Also returns natural 'stacks' — groups of 3+ habits that co-occur on ≥60% of days.
     """
     start_date = args.get("start_date", "2020-01-01")
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     top_n      = int(args.get("top_n", 20))
     min_pct    = float(args.get("min_pct", 0.1))  # minimum base rate for either habit
 
@@ -613,7 +613,7 @@ def tool_get_habit_dashboard(args):
     - Best and worst groups this week
     - Trend vs previous 7-day window
     """
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     d7_start   = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
     d14_start  = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=14)).strftime("%Y-%m-%d")
     d30_start  = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
@@ -744,8 +744,8 @@ def tool_get_garmin_summary(args):
       avg_respiration   — Waking average respiration rate (breaths/min).
       sleep_respiration — Sleep average respiration (cross-check with Eight Sleep).
     """
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d"))
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
 
     items = query_source("garmin", start_date, end_date)
     if not items:
@@ -827,8 +827,8 @@ def tool_get_device_agreement(args):
       - Flagged disagreement days with context
       - Composite device confidence rating
     """
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d"))
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
 
     whoop_items  = {item["date"]: item for item in query_source("whoop", start_date, end_date)
                     if item.get("date")}
@@ -1038,8 +1038,8 @@ def tool_get_habit_tier_report(args):
     Tier-level adherence trends from the habit_scores partition.
     The key question: 'Are my non-negotiables actually non-negotiable?'
     """
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d"))
-    end_date = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
 
     items = query_source_range("habit_scores", start_date, end_date)
     if not items:
@@ -1121,8 +1121,8 @@ def tool_get_vice_streak_history(args):
     """
     Vice streak trends over time from daily habit_scores snapshots.
     """
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d"))
-    end_date = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     vice_filter = (args.get("vice_name") or "").strip().lower()
 
     items = query_source_range("habit_scores", start_date, end_date)
@@ -1193,7 +1193,7 @@ def tool_get_vice_streaks(args):
     Champions: Goggins (identity), Clear (habit identity).
     """
     days_back  = int(args.get("days_back", 90))
-    end_date   = args.get("end_date", (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"))
     start_date = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=days_back - 1)).strftime("%Y-%m-%d")
     vice_filter = (args.get("vice_name") or "").strip().lower()
 
@@ -1346,7 +1346,7 @@ def tool_get_essential_seven(args):
     Sarah Chen directive: define the surface (Daily Brief HTML + MCP) before building.
     Clear + Attia: 65 habits is too many; Essential Seven is the fix.
     """
-    target_date = args.get("date", (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d"))
+    target_date = args.get("date", (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"))
     days_back   = int(args.get("days_back", 30))
     start_date  = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=days_back - 1)).strftime("%Y-%m-%d")
 

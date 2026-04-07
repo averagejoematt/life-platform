@@ -2,7 +2,7 @@
 
 **Table:** `life-platform` (us-west-2)  
 **Design:** Single-table with composite keys  
-**Last updated:** 2026-04-05 (v5.3.0 — 115 MCP tools, 26 data sources, 63 Lambdas)
+**Last updated:** 2026-04-06 (v6.0.0 — 115 MCP tools, 26 data sources, 71 Lambdas)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -1526,10 +1526,12 @@ Served via `GET /api/journal_analysis` (site API). Displayed on Mind observatory
 
 ---
 
-## AI Analysis Partition (v4.7.0)
+## AI Analysis Partition (v4.7.0) — DEPRECATED
 
 **pk:** `USER#matthew#SOURCE#ai_analysis`
 **sk:** `EXPERT#mind` | `EXPERT#nutrition` | `EXPERT#training` | `EXPERT#physical`
+
+**Status: DEPRECATED (v6.0.0).** Replaced by Coach Intelligence partitions (`COACH#`, `ENSEMBLE#`, `NARRATIVE#`). The `ai-expert-analyzer` Lambda is superseded by `coach-observatory-renderer`. Legacy `/api/ai_analysis` endpoint still functional as fallback. New data is written to `COACH#{coach_id}` partitions.
 
 Cached weekly AI expert voice analyses. Generated Monday 6am PT by `ai-expert-analyzer` Lambda using Claude Sonnet. Auto-expires after 8 days via TTL.
 
@@ -1686,6 +1688,248 @@ DynamoDB TTL is enabled on the `life-platform` table using the `ttl` attribute.
 **How DDB TTL is set:** The `store_cache` function in `mcp_server.py` sets `ttl = int(time.time()) + 93600` (26 hours in seconds). DynamoDB background deletion occurs within ~48 hours of expiry — expired items may still be returned briefly before deletion, so MCP tools should check `ttl` against `time.time()` if freshness is critical.
 
 **Adding TTL to new partitions:** Set `ttl` to a Unix epoch integer on any item you want auto-expired. No schema migration required — DynamoDB TTL operates on a per-item basis.
+
+---
+
+## Coach Intelligence Partitions (v6.0.0)
+
+Eight domain-specific AI coaches with persistent state, voice, and learning. Replaces the legacy `ai_analysis` partition.
+
+### Coach Output & State
+
+**pk:** `USER#matthew#SOURCE#COACH#{coach_id}`
+
+Where `coach_id` is one of: `sleep_coach`, `nutrition_coach`, `training_coach`, `mind_coach`, `physical_coach`, `glucose_coach`, `labs_coach`, `explorer_coach`.
+
+**SK patterns:**
+
+| SK | Purpose | Written By |
+|----|---------|-----------|
+| `OUTPUT#` | Latest coach analysis prose | coach-narrative-orchestrator |
+| `THREAD#{date}` | Daily analysis thread (one per generation cycle) | coach-narrative-orchestrator |
+| `LEARNING#{date}` | What the coach learned from this cycle | coach-state-updater |
+| `PREDICTION#{date}` | Forward predictions with confidence | coach-narrative-orchestrator |
+| `VOICE#state` | Persistent voice calibration state | coach-state-updater |
+| `RELATIONSHIP#state` | Coach-user relationship state (rapport, trust, context) | coach-state-updater |
+| `CONFIDENCE#{subdomain}` | Per-subdomain confidence scores | coach-state-updater |
+| `COMPRESSED#latest` | Compressed history summary (old threads rolled up) | coach-history-summarizer |
+
+**OUTPUT# fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `coach_id` | string | Coach identifier |
+| `analysis` | string | 2-4 paragraphs of coach analysis prose |
+| `generated_at` | string | ISO timestamp |
+| `cycle_date` | string | YYYY-MM-DD of the generation cycle |
+| `lens` | string | Analytical lens used this cycle |
+| `voice_version` | string | Voice spec version used |
+| `quality_score` | number | Quality gate score (0.0-1.0) |
+
+**THREAD#{date} fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `coach_id` | string | Coach identifier |
+| `date` | string | YYYY-MM-DD |
+| `analysis` | string | Full analysis text |
+| `data_snapshot` | string | JSON of input metrics used |
+| `lens` | string | Analytical lens applied |
+| `predictions` | list | Forward-looking predictions |
+| `prior_thread_ref` | string | SK of previous thread for continuity |
+| `generated_at` | string | ISO timestamp |
+
+**VOICE#state fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `coach_id` | string | Coach identifier |
+| `voice_spec_version` | string | S3 config version |
+| `tone_calibration` | map | Adjusted tone parameters |
+| `vocabulary_preferences` | list | Preferred/avoided terms |
+| `updated_at` | string | ISO timestamp |
+
+**RELATIONSHIP#state fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `coach_id` | string | Coach identifier |
+| `rapport_level` | number | 0.0-1.0 relationship strength |
+| `interaction_count` | number | Total generation cycles |
+| `trust_signals` | list | Evidence of prediction accuracy |
+| `context_summary` | string | Compressed relationship context |
+| `updated_at` | string | ISO timestamp |
+
+**CONFIDENCE#{subdomain} fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `coach_id` | string | Coach identifier |
+| `subdomain` | string | Specific metric/area (e.g. `hrv_trends`, `macro_adherence`) |
+| `confidence` | number | 0.0-1.0 confidence in this subdomain |
+| `sample_size` | number | Data points supporting this confidence |
+| `last_prediction_accuracy` | number | Most recent prediction accuracy |
+| `updated_at` | string | ISO timestamp |
+
+**PREDICTION#{date} fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `coach_id` | string | Coach identifier |
+| `date` | string | YYYY-MM-DD prediction was made |
+| `predictions` | list | List of prediction objects with metric, expected_value, confidence, horizon_days |
+| `evaluated` | boolean | Whether this prediction has been scored |
+| `accuracy_score` | number | Prediction accuracy (null until evaluated) |
+| `evaluated_at` | string | ISO timestamp of evaluation (null until evaluated) |
+
+**LEARNING#{date} fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `coach_id` | string | Coach identifier |
+| `date` | string | YYYY-MM-DD |
+| `observations` | list | New patterns or insights detected |
+| `model_updates` | map | Parameter adjustments made |
+| `confidence_changes` | map | Subdomain confidence deltas |
+
+**COMPRESSED#latest fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `coach_id` | string | Coach identifier |
+| `compressed_from` | string | Earliest date in compressed range |
+| `compressed_to` | string | Latest date in compressed range |
+| `thread_count` | number | Number of threads compressed |
+| `summary` | string | Compressed narrative summary |
+| `key_learnings` | list | Distilled insights from compressed threads |
+| `compressed_at` | string | ISO timestamp |
+
+**Example record (OUTPUT#):**
+```json
+{
+  "pk": "USER#matthew#SOURCE#COACH#sleep_coach",
+  "sk": "OUTPUT#",
+  "coach_id": "sleep_coach",
+  "analysis": "Your sleep architecture this week shows a pattern worth noting...",
+  "generated_at": "2026-04-06T14:00:00Z",
+  "cycle_date": "2026-04-06",
+  "lens": "circadian_consistency",
+  "voice_version": "1.0",
+  "quality_score": 0.92
+}
+```
+
+### Ensemble Digest
+
+**pk:** `USER#matthew#SOURCE#ENSEMBLE#digest`
+**sk:** `CYCLE#{date}` (e.g. `CYCLE#2026-04-06`)
+
+Cross-coach synthesis produced by `coach-ensemble-digest` Lambda. Identifies agreements, disagreements, and emergent themes across all 8 coaches.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `cycle_date` | string | YYYY-MM-DD |
+| `coach_count` | number | Coaches contributing to this digest |
+| `consensus_themes` | list | Themes where multiple coaches agree |
+| `disagreements` | list | Active cross-coach disagreements |
+| `influence_scores` | map | Per-coach influence weight this cycle |
+| `emergent_signals` | list | Patterns visible only in cross-coach view |
+| `generated_at` | string | ISO timestamp |
+
+### Ensemble Influence Graph
+
+**pk:** `USER#matthew#SOURCE#ENSEMBLE#influence_graph`
+**sk:** `CONFIG#v1`
+
+Static configuration for how coaches influence each other's analyses. Loaded from `config/coaches/influence_graph.json`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `version` | string | Config version |
+| `edges` | list | Directed influence edges: `{from_coach, to_coach, weight, relationship}` |
+| `updated_at` | string | ISO timestamp |
+
+### Ensemble Disagreements
+
+**pk:** `USER#matthew#SOURCE#ENSEMBLE#disagreements`
+**sk:** `ACTIVE#{slug}` (e.g. `ACTIVE#sleep-vs-training-volume`)
+
+Tracks active cross-coach disagreements until resolved.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `slug` | string | URL-safe disagreement identifier |
+| `coaches_involved` | list | Coach IDs on each side |
+| `topic` | string | What they disagree about |
+| `positions` | map | Per-coach position summary |
+| `evidence` | map | Per-coach supporting evidence |
+| `status` | string | `active` / `resolved` |
+| `opened_date` | string | YYYY-MM-DD first detected |
+| `resolved_date` | string | YYYY-MM-DD resolution (null if active) |
+| `resolution` | string | How it was resolved (null if active) |
+
+### Narrative Arc
+
+**pk:** `USER#matthew#SOURCE#NARRATIVE#arc`
+
+Tracks the overarching narrative arc across coach generations.
+
+| SK | Purpose |
+|----|---------|
+| `STATE#current` | Current arc state (active arc, phase, momentum) |
+| `HISTORY#{date}` | Daily arc state snapshot |
+
+**STATE#current fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `active_arc` | string | Current narrative arc identifier |
+| `arc_phase` | string | Phase within arc (e.g. `rising_action`, `plateau`, `breakthrough`) |
+| `momentum` | number | -1.0 to 1.0 narrative momentum |
+| `arc_start_date` | string | YYYY-MM-DD arc began |
+| `key_themes` | list | Dominant themes in current arc |
+| `updated_at` | string | ISO timestamp |
+
+**HISTORY#{date} fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `date` | string | YYYY-MM-DD |
+| `arc` | string | Arc identifier at this date |
+| `phase` | string | Phase at this date |
+| `momentum` | number | Momentum value |
+| `snapshot_at` | string | ISO timestamp |
+
+### Coach Computation Results
+
+**pk:** `USER#matthew#SOURCE#COACH#computation`
+**sk:** `RESULTS#{date}` (e.g. `RESULTS#2026-04-06`)
+
+Pre-computed metrics written by `coach-computation-engine`. EWMA smoothing, seasonal adjustments, and anomaly detection results consumed by all coach Lambdas.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `date` | string | YYYY-MM-DD |
+| `metrics` | map | Per-coach metric bundles (keyed by coach_id) |
+| `ewma_state` | map | Current EWMA state for each tracked metric |
+| `seasonal_adjustments` | map | Applied seasonal adjustment factors |
+| `anomalies_detected` | list | Metrics flagging as anomalous this cycle |
+| `computation_version` | string | Engine version |
+| `computed_at` | string | ISO timestamp |
+
+**Example record:**
+```json
+{
+  "pk": "USER#matthew#SOURCE#COACH#computation",
+  "sk": "RESULTS#2026-04-06",
+  "date": "2026-04-06",
+  "metrics": {
+    "sleep_coach": {"hrv_ewma": 62.3, "sleep_duration_ewma": 7.1, "anomaly_flags": []},
+    "nutrition_coach": {"protein_ewma": 168.5, "calorie_ewma": 2150, "anomaly_flags": ["fiber_low"]}
+  },
+  "computed_at": "2026-04-06T13:55:00Z"
+}
+```
 
 ---
 
