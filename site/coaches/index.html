@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Eight AI coaching specialists — each with a distinct analytical voice, domain expertise, and persistent memory across the experiment.">
+  <meta property="og:title" content="The Coaching Team — averagejoematt.com">
+  <meta property="og:description" content="Eight AI specialists with distinct voices analyzing sleep, nutrition, training, mind, body composition, glucose, labs, and cross-domain patterns.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/coaches/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="The Coaching Team — averagejoematt.com">
+  <meta name="twitter:description" content="Eight AI specialists with distinct voices analyzing sleep, nutrition, training, mind, body composition, glucose, labs, and cross-domain patterns.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <title>The Coaching Team — averagejoematt.com</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    /* ── Hero ── */
+    .page-header {
+      padding: var(--space-20) var(--page-padding) var(--space-16);
+      border-bottom: 1px solid var(--border);
+      max-width: var(--content-width);
+      margin: 0 auto;
+    }
+    .page-header__kicker {
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-6);
+    }
+    .page-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      line-height: var(--lh-display);
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+      margin-bottom: var(--space-8);
+    }
+    .page-header__title span { color: var(--accent); }
+    .page-header__sub {
+      font-size: var(--text-lg);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      max-width: var(--prose-width);
+    }
+    .page-header__sub-note {
+      font-size: var(--text-sm);
+      color: rgba(255,255,255,0.4);
+      line-height: var(--lh-body);
+      max-width: var(--prose-width);
+      margin-top: var(--space-4);
+    }
+
+    /* ── Coach grid ── */
+    .coaches-section {
+      padding: var(--space-16) var(--page-padding);
+      max-width: var(--content-width);
+      margin: 0 auto;
+    }
+    .coaches-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: var(--space-6);
+    }
+
+    /* ── Coach card ── */
+    .coach-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      padding: var(--space-8);
+      display: flex;
+      gap: var(--space-6);
+      transition: background var(--dur-fast), border-color var(--dur-fast);
+    }
+    .coach-card:hover {
+      background: rgba(255,255,255,0.05);
+      border-color: rgba(255,255,255,0.12);
+    }
+    .coach-card__avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      font-weight: 600;
+      color: #fff;
+      flex-shrink: 0;
+      letter-spacing: 0.05em;
+    }
+    .coach-card__info {
+      flex: 1;
+      min-width: 0;
+    }
+    .coach-card__name {
+      font-family: var(--font-display);
+      font-size: var(--text-lg);
+      color: var(--text);
+      line-height: var(--lh-heading);
+      letter-spacing: var(--ls-display);
+    }
+    .coach-card__title {
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-top: var(--space-1);
+      margin-bottom: var(--space-4);
+    }
+    .coach-card__voice {
+      font-size: var(--text-sm);
+      color: rgba(255,255,255,0.5);
+      line-height: var(--lh-body);
+      margin-bottom: var(--space-3);
+      font-style: italic;
+    }
+    .coach-card__domains {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      margin-bottom: var(--space-4);
+    }
+    .coach-card__link {
+      font-size: var(--text-xs);
+      color: var(--accent);
+      text-decoration: none;
+      letter-spacing: var(--ls-tag);
+      transition: color var(--dur-fast);
+    }
+    .coach-card__link:hover {
+      color: var(--text);
+    }
+
+    /* ── How it works ── */
+    .how-section {
+      padding: var(--space-16) var(--page-padding);
+      max-width: var(--content-width);
+      margin: 0 auto;
+      border-top: 1px solid var(--border);
+    }
+    .how-section .eyebrow {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-4);
+    }
+    .how-section h2 {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      line-height: var(--lh-heading);
+      letter-spacing: var(--ls-display);
+      margin-bottom: var(--space-10);
+    }
+    .how-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-5);
+      max-width: var(--prose-width);
+    }
+    .how-list li {
+      display: flex;
+      gap: var(--space-4);
+      align-items: flex-start;
+    }
+    .how-list__num {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--accent);
+      flex-shrink: 0;
+      width: 20px;
+      padding-top: 2px;
+    }
+    .how-list__text {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .how-list__text strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* ── Elena callout ── */
+    .elena-callout {
+      padding: var(--space-10) var(--page-padding);
+      max-width: var(--content-width);
+      margin: 0 auto;
+      border-top: 1px solid var(--border);
+    }
+    .elena-callout__box {
+      border-left: 2px solid var(--accent);
+      padding: var(--space-5) var(--space-6);
+      background: var(--accent-bg-subtle, rgba(62,207,142,0.04));
+      max-width: var(--prose-width);
+    }
+    .elena-callout__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-3);
+    }
+    .elena-callout__text {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .elena-callout__text a {
+      color: var(--accent);
+      border-bottom: 1px solid var(--accent-dim);
+      text-decoration: none;
+      transition: border-color var(--dur-fast);
+    }
+    .elena-callout__text a:hover {
+      border-color: var(--accent);
+    }
+
+    @media (max-width: 700px) {
+      .coaches-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body class="body-story">
+
+<div id="amj-nav"></div>
+<div id="amj-hierarchy-nav"></div>
+
+<div class="page-header animate-in">
+  <p class="page-header__kicker">Intelligence Layer</p>
+  <h1 class="page-header__title">The <span>Coaching Team</span></h1>
+  <p class="page-header__sub">
+    Eight AI specialists, each with a distinct analytical voice and domain expertise. They communicate with each other, track predictions, and evolve their thinking over time.
+  </p>
+  <p class="page-header__sub-note">
+    Every coach writes in first person, addresses Matthew directly, and maintains persistent memory across the experiment.
+  </p>
+</div>
+
+<section class="coaches-section">
+  <div class="coaches-grid">
+
+    <div class="coach-card animate-in">
+      <div class="coach-card__avatar" style="background:#818cf8">LP</div>
+      <div class="coach-card__info">
+        <div class="coach-card__name">Dr. Lisa Park</div>
+        <div class="coach-card__title">Sleep & Circadian Rhythm Specialist</div>
+        <div class="coach-card__voice">Long analytical sentences punctuated by short conclusions. Systems biology analogies. Explicit confidence levels.</div>
+        <div class="coach-card__domains">Sleep architecture, recovery correlation, circadian timing</div>
+        <a href="/sleep/" class="coach-card__link">View latest analysis &rarr;</a>
+      </div>
+    </div>
+
+    <div class="coach-card animate-in">
+      <div class="coach-card__avatar" style="background:#10b981">MW</div>
+      <div class="coach-card__info">
+        <div class="coach-card__name">Dr. Marcus Webb</div>
+        <div class="coach-card__title">Evidence-Based Nutrition</div>
+        <div class="coach-card__voice">Short, punchy, no-nonsense. Evidence first, then interpretation. Ends with exactly one actionable recommendation.</div>
+        <div class="coach-card__domains">Macro adherence, protein distribution, deficit sustainability</div>
+        <a href="/nutrition/" class="coach-card__link">View latest analysis &rarr;</a>
+      </div>
+    </div>
+
+    <div class="coach-card animate-in">
+      <div class="coach-card__avatar" style="background:#3db88a">SC</div>
+      <div class="coach-card__info">
+        <div class="coach-card__name">Dr. Sarah Chen</div>
+        <div class="coach-card__title">Exercise Physiology & Strength</div>
+        <div class="coach-card__voice">Teaching cadence &mdash; principle then application. Periodization-anchored. Frames setbacks as information.</div>
+        <div class="coach-card__domains">Training load, Zone 2 adequacy, progressive overload, recovery</div>
+        <a href="/training/" class="coach-card__link">View latest analysis &rarr;</a>
+      </div>
+    </div>
+
+    <div class="coach-card animate-in">
+      <div class="coach-card__avatar" style="background:#a78bfa">NR</div>
+      <div class="coach-card__info">
+        <div class="coach-card__name">Dr. Nathan Reeves</div>
+        <div class="coach-card__title">Psychiatrist &mdash; Behavioral Patterns</div>
+        <div class="coach-card__voice">Questions instead of claims. Paragraphs spiral inward. Notices absences. Ends with questions, not recommendations.</div>
+        <div class="coach-card__domains">Emotional regulation, avoidance patterns, journal analysis</div>
+        <a href="/mind/" class="coach-card__link">View latest analysis &rarr;</a>
+      </div>
+    </div>
+
+    <div class="coach-card animate-in">
+      <div class="coach-card__avatar" style="background:#f59e0b">VR</div>
+      <div class="coach-card__info">
+        <div class="coach-card__name">Dr. Victor Reyes</div>
+        <div class="coach-card__title">Longevity & Body Composition</div>
+        <div class="coach-card__voice">Clinical precision on decade-scale timelines. Every data point placed on a 5/10/20-year trajectory.</div>
+        <div class="coach-card__domains">Weight trajectory, lean mass preservation, visceral fat, DEXA benchmarks</div>
+        <a href="/physical/" class="coach-card__link">View latest analysis &rarr;</a>
+      </div>
+    </div>
+
+    <div class="coach-card animate-in">
+      <div class="coach-card__avatar" style="background:#2dd4bf">AP</div>
+      <div class="coach-card__info">
+        <div class="coach-card__name">Dr. Amara Patel</div>
+        <div class="coach-card__title">Metabolic Health & CGM</div>
+        <div class="coach-card__voice">Mechanistic chains &mdash; sentences trace cause through biochemical pathways to effect.</div>
+        <div class="coach-card__domains">Glucose variability, time-in-range, meal response, fasting glucose</div>
+        <a href="/glucose/" class="coach-card__link">View latest analysis &rarr;</a>
+      </div>
+    </div>
+
+    <div class="coach-card animate-in">
+      <div class="coach-card__avatar" style="background:#5ba4cf">JO</div>
+      <div class="coach-card__info">
+        <div class="coach-card__name">Dr. James Okafor</div>
+        <div class="coach-card__title">Clinical Pathology & Preventive Labs</div>
+        <div class="coach-card__voice">Two-phase paragraphs: clinical values first, then plain-language translation. Detective-work analogies.</div>
+        <div class="coach-card__domains">Biomarker interpretation, lifestyle correlation, risk assessment</div>
+        <a href="/labs/" class="coach-card__link">View latest analysis &rarr;</a>
+      </div>
+    </div>
+
+    <div class="coach-card animate-in">
+      <div class="coach-card__avatar" style="background:#e879f9">HB</div>
+      <div class="coach-card__info">
+        <div class="coach-card__name">Dr. Henning Brandt</div>
+        <div class="coach-card__title">Biostatistics & N=1 Research</div>
+        <div class="coach-card__voice">States sample sizes for every claim. Names confounders. Labels speculation as speculation. Enthusiastic about being wrong.</div>
+        <div class="coach-card__domains">Cross-domain correlations, hypothesis generation, signal detection</div>
+        <a href="/explorer/" class="coach-card__link">View latest analysis &rarr;</a>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section class="how-section">
+  <div class="eyebrow">Under the hood</div>
+  <h2>How It <span style="color:var(--accent)">Works</span></h2>
+  <ul class="how-list">
+    <li>
+      <span class="how-list__num">01</span>
+      <span class="how-list__text"><strong>Computation.</strong> Five compute Lambdas run every morning before 11 AM, aggregating metrics from 26 data sources into daily snapshots, character scores, and adaptive mode signals.</span>
+    </li>
+    <li>
+      <span class="how-list__num">02</span>
+      <span class="how-list__text"><strong>Orchestration.</strong> Each coach receives domain-specific data and the previous week's context. They see what the other coaches wrote, enabling cross-domain awareness without cross-domain noise.</span>
+    </li>
+    <li>
+      <span class="how-list__num">03</span>
+      <span class="how-list__text"><strong>Generation.</strong> Coaches write their analyses in first person using Claude Opus, each constrained to their voice profile and analytical style. No generic summaries — every paragraph reflects a distinct perspective.</span>
+    </li>
+    <li>
+      <span class="how-list__num">04</span>
+      <span class="how-list__text"><strong>State update.</strong> Predictions are tracked, confidence levels are recorded, and each coach's memory persists across weeks. When a coach is wrong, the system knows — and so do they.</span>
+    </li>
+  </ul>
+</section>
+
+<section class="elena-callout">
+  <div class="elena-callout__box">
+    <div class="elena-callout__label">The observer</div>
+    <p class="elena-callout__text">
+      There's also <strong style="color:var(--text)">Elena Voss</strong> — an AI journalist with embedded access to all eight coaches, every data source, and every number. She writes weekly long-form narrative about the experiment, synthesizing what the coaches see into stories about what's actually changing.
+      <a href="/chronicle/">Read the Chronicle &rarr;</a>
+    </p>
+  </div>
+</section>
+
+<div id="amj-subscribe"></div>
+<div id="amj-bottom-nav"></div>
+<div id="amj-footer"></div>
+
+<script src="/assets/js/animations.js" defer></script>
+<script src="/assets/js/components.js"></script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>

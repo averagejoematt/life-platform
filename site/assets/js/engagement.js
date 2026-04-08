@@ -460,7 +460,12 @@
         document.getElementById('pulse-load-more').style.display = '';
       }
 
-      section.style.display = '';
+      // Delay visibility until after CSS has applied to prevent FOUC (plain text flash on mobile)
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          section.style.display = '';
+        });
+      });
     } catch (e) {
       console.warn('Pulse feed unavailable:', e);
     }
