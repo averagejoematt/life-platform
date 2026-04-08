@@ -1,3 +1,28 @@
+## v6.6.0 — Intelligence Layer V2.1 Sessions 2-5 Complete (2026-04-07)
+
+### Session 2: Prediction Evaluation + Disagreement Detection
+- Disagreement detection added to integrator synthesis (Nakamura identifies conflicting coach advice)
+- Disagreements stored in integrator DDB record alongside weekly_priority + cross_domain_notes
+
+### Session 3: Coaching Dashboard + Homepage Widgets
+- /coaches/ page rebuilt as full coaching dashboard: weekly priority, open actions, coach panel, prediction ledger
+- /api/coaching-dashboard endpoint assembles all intelligence data
+- Homepage intelligence widgets (priority card + actions strip) via /api/weekly_priority
+
+### Session 4: Validator Mode B + MCP Tools
+- Inline correction: when validator finds error-severity flags, re-prompts coach with corrections (max 1 pass)
+- 5 new MCP tools: get_coach_thread, get_predictions, get_coach_disagreements, evaluate_prediction, get_coaching_summary
+- MCP tool count: 123
+
+### Session 5: Tech Debt
+- Observatory Lambda docstring clarified: NOT deprecated, serves observatory pages (daily brief email is separate pipeline)
+- lambda_map.json deprecated marker removed
+- Observatory Lambda added to CDK compute_stack as documentation (cannot import existing Lambda, manual deploy documented)
+
+### Intelligence Layer V2.1 — All Sessions Complete
+S1: Coach Threads | S2: Predictions + Disagreements | S3: Dashboard + Widgets | S4: Validator Mode B + MCP | S5: Tech Debt
+
+---
 ## v6.5.0 — Intelligence Layer V2.1 Session 1: Coach Threads (2026-04-07)
 
 ### Workstream 1: Coach Persistent Memory — The Thread

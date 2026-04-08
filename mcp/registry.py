@@ -3,6 +3,10 @@ Tool registry: maps tool names to their functions and JSON schemas.
 """
 from mcp.config import SOURCES, RAW_DAY_LIMIT, P40_GROUPS
 from mcp.tools_data import *
+from mcp.tools_coach_intelligence import (
+    tool_get_coach_thread, tool_get_predictions, tool_get_coach_disagreements,
+    tool_evaluate_prediction, tool_get_coaching_summary,
+)
 # tools_calendar retired v3.7.46 (ADR-030) — google_calendar import removed
 from mcp.tools_strength import (
     tool_get_exercise_history, tool_get_strength_prs, tool_get_muscle_volume,
@@ -225,6 +229,46 @@ TOOLS = {
                 },
                 "required": ["action_id"],
             },
+        },
+    },
+    "get_coach_thread": {
+        "fn": tool_get_coach_thread,
+        "schema": {
+            "name": "get_coach_thread",
+            "description": "Read a coach's persistent thread — their running memory of positions, predictions, surprises, and emotional investment. Use for: 'what has Dr. Park been saying?', 'show me the glucose coach's predictions', 'how invested is the training coach?'",
+            "inputSchema": {"type": "object", "properties": {"coach_id": {"type": "string", "description": "Coach domain: sleep, nutrition, training, mind, physical, glucose, labs, explorer"}, "limit": {"type": "number", "description": "Number of thread entries (default 4)"}}, "required": ["coach_id"]},
+        },
+    },
+    "get_predictions": {
+        "fn": tool_get_predictions,
+        "schema": {
+            "name": "get_predictions",
+            "description": "Cross-coach prediction ledger — all predictions from all coaches with statuses (pending/confirmed/refuted). Use for: 'what predictions are pending?', 'which coach is most accurate?', 'prediction scorecard'",
+            "inputSchema": {"type": "object", "properties": {"status": {"type": "string", "enum": ["pending", "confirmed", "refuted"]}, "coach_id": {"type": "string"}, "limit": {"type": "number"}}, "required": []},
+        },
+    },
+    "get_coach_disagreements": {
+        "fn": tool_get_coach_disagreements,
+        "schema": {
+            "name": "get_coach_disagreements",
+            "description": "Find current inter-coach disagreements from Dr. Nakamura's synthesis. Use for: 'do any coaches disagree?', 'what are the current debates?'",
+            "inputSchema": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    "evaluate_prediction": {
+        "fn": tool_evaluate_prediction,
+        "schema": {
+            "name": "evaluate_prediction",
+            "description": "Manually resolve a coach prediction — mark as confirmed or refuted with an outcome note.",
+            "inputSchema": {"type": "object", "properties": {"prediction_id": {"type": "string"}, "status": {"type": "string", "enum": ["confirmed", "refuted"]}, "outcome_note": {"type": "string"}}, "required": ["prediction_id", "status"]},
+        },
+    },
+    "get_coaching_summary": {
+        "fn": tool_get_coaching_summary,
+        "schema": {
+            "name": "get_coaching_summary",
+            "description": "High-level coaching dashboard — all coaches' current positions, emotional investment levels, prediction counts, weekly priority. Use for: 'coaching overview', 'how are the coaches feeling?', 'dashboard summary'",
+            "inputSchema": {"type": "object", "properties": {}, "required": []},
         },
     },
     "search_activities": {

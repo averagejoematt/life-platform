@@ -58,6 +58,11 @@ class ComputeStack(Stack):
             alerts_topic=local_alerts_topic,
         )
 
+        # Observatory Intelligence (ai-expert-analyzer) — manually deployed Lambda
+        # Cannot import to CDK (already exists). Layer updates via deploy script:
+        #   LATEST=$(aws lambda list-layer-versions --layer-name life-platform-shared-utils --query 'LayerVersions[0].Version' --output text)
+        #   aws lambda update-function-configuration --function-name ai-expert-analyzer --layers "arn:aws:lambda:us-west-2:205930651321:layer:life-platform-shared-utils:${LATEST}"
+
         create_platform_lambda(
             self, "AnomalyDetector",
             function_name="anomaly-detector",
