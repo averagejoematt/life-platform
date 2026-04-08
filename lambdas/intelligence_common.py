@@ -287,20 +287,43 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict,
         f"Never refer to yourself in third person.\n"
     )
 
-    # 2. Goals context
-    briefing = goals.get("coach_briefing", "")
-    if briefing:
-        parts.append(f"MATTHEW'S CONTEXT:\n{briefing}\n")
+    # 2. Goals context — V2.2 updated schema
+    # Mission + athlete profile (replaces old coach_briefing)
+    mission = goals.get("mission", goals.get("coach_briefing", ""))
+    if mission:
+        parts.append(f"MATTHEW'S MISSION:\n{mission}\n")
 
+    philosophy = goals.get("philosophy", "")
+    if philosophy:
+        parts.append(f"PHILOSOPHY: {philosophy}\n")
+
+    # Athlete profile (V2.2)
+    profile = goals.get("athlete_profile", {})
+    if profile:
+        prior = profile.get("prior_transformation", {})
+        if prior:
+            parts.append(
+                f"ATHLETE CONTEXT: {profile.get('type', 'unknown')}. "
+                f"Prior transformation: {prior.get('start_weight')}→{prior.get('end_weight')} lbs "
+                f"in {prior.get('duration_months')} months. {prior.get('outcome', '')}\n"
+            )
+        if profile.get("binge_eating_pattern"):
+            parts.append(f"BEHAVIORAL NOTE: {profile['binge_eating_pattern']}\n")
+
+    # Targets
     targets = goals.get("targets", {})
     target_lines = []
     _target_map = {
         "weight.goal_lbs": "Weight goal",
         "body_composition.goal_body_fat_pct": "Body fat goal",
-        "training.weekly_sessions_target": "Training sessions/week",
+        "body_composition.lean_mass_floor_lbs": "Lean mass floor (HARD STOP)",
         "nutrition.daily_calories_target": "Calorie target",
         "nutrition.daily_protein_min_g": "Protein minimum",
+        "nutrition.daily_fiber_min_g": "Fiber minimum",
+        "sleep.target_hours": "Sleep target",
+        "biomarkers.resting_hr_target_bpm": "RHR target",
         "biomarkers.hrv_target_ms": "HRV target",
+        "behavioral.journal_entries_per_week": "Journal entries/week",
     }
     for path, label in _target_map.items():
         keys = path.split(".")
@@ -311,6 +334,53 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict,
                 break
         target_lines.append(f"  - {label}: {val if val is not None else 'not yet set'}")
     parts.append("DEFINED TARGETS:\n" + "\n".join(target_lines) + "\n")
+
+    # Training phase (V2.2)
+    training = targets.get("training", {})
+    if training.get("current_phase"):
+        phases = training.get("phases", [])
+        current = next((p for p in phases if p.get("phase", "").lower() == training["current_phase"].lower()), None)
+        if current:
+            parts.append(
+                f"TRAINING PHASE: {current['phase']} (months {current.get('months', '?')})\n"
+                f"  Structure: {current.get('structure', 'TBD')}\n"
+                f"  Notes: {current.get('notes', '')}\n"
+            )
+
+    # Nutrition specifics (V2.2)
+    nutrition = targets.get("nutrition", {})
+    eating_window = nutrition.get("eating_window", {})
+    if eating_window:
+        parts.append(
+            f"EATING WINDOW: {eating_window.get('type', 'IF')} ({eating_window.get('window', '')}). "
+            f"{eating_window.get('note', '')}\n"
+        )
+
+    # Mental health context — COACHES ONLY (V2.2)
+    # This section is injected into coach prompts but NOT surfaced in public API responses
+    mh = goals.get("mental_health_context", {})
+    if mh and mh.get("drivers"):
+        parts.append(
+            "MENTAL HEALTH CONTEXT (COACHES ONLY — do not reference specifics publicly):\n"
+            + "\n".join(f"  - {d}" for d in mh["drivers"]) + "\n"
+            + f"Coach guidance: {mh.get('coach_guidance', '')}\n"
+        )
+
+    # Failure mode + early warning signals (V2.2)
+    fm = goals.get("failure_mode", {})
+    if fm:
+        parts.append(
+            f"FAILURE MODE PATTERN: {fm.get('pattern', '')}\n"
+            f"Early warning signals:\n"
+            + "\n".join(f"  ⚠️ {s}" for s in fm.get("early_warning_signals", [])) + "\n"
+            + f"Response protocol: {fm.get('coach_response', '')}\n"
+        )
+
+    # Communication directives (V2.2)
+    comm = goals.get("coach_communication", {})
+    do_not = comm.get("do_not", [])
+    if do_not:
+        parts.append("DO NOT:\n" + "\n".join(f"  - {d}" for d in do_not) + "\n")
 
     constraints = goals.get("known_constraints", [])
     if constraints:

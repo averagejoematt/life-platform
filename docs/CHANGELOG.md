@@ -1,3 +1,21 @@
+## v6.7.1 — User Goals Populated + Preamble V2.2 Schema Update (2026-04-07)
+
+### User Goals Populated
+- `config/user_goals.json` populated with real targets from Matthew interview
+- Weight: 307 → 185 lbs (122 lb loss target with interim milestones)
+- Body comp: 42.7% → 25% BF, lean mass floor 155 lbs (hard stop)
+- Training: 4-phase plan (Foundation → Build → Peak → Sustain), 5 gym days/week
+- Nutrition: 1,500 kcal target, 170g protein minimum, 25g fiber target, 16:8 IF
+- Athlete profile: experienced repeat transformer, prior 305→190 cut, weight cycling history
+- Mental health context: COACHES ONLY visibility, binge eating pattern, failure mode early warning signals
+- Failure mode: pattern documented with 6 early warning signals + coach response protocol
+
+### Preamble Schema Update
+- `build_coach_preamble()` updated to handle V2.2 goals schema
+- Injects: mission, philosophy, athlete profile, training phase, eating window, mental health (coaches only), failure mode + early warnings, communication directives
+- Verified: nutrition coach now references "1,506 against a 1,500 target" and discusses protein adherence against real goals
+
+---
 ## v6.7.0 — Intelligence Layer V2.2 Complete (2026-04-07)
 
 ### WS1: Predictions Page + Learning Timeline
