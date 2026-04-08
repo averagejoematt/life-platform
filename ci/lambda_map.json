@@ -98,7 +98,8 @@
       "lambdas/item_size_guard.py",
       "lambdas/digest_utils.py",
       "lambdas/site_writer.py",
-      "lambdas/secret_cache.py"
+      "lambdas/secret_cache.py",
+      "lambdas/intelligence_common.py"
     ],
     "consumers": [
       "daily-brief", "weekly-digest", "monthly-digest",

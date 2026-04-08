@@ -31,6 +31,17 @@ from boto3.dynamodb.conditions import Key
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+# Intelligence Layer V2: shared preamble utilities
+try:
+    from intelligence_common import (
+        build_data_inventory, build_data_maturity,
+        load_goals_config, build_coach_preamble,
+    )
+    _HAS_INTELLIGENCE_COMMON = True
+except ImportError:
+    _HAS_INTELLIGENCE_COMMON = False
+    logger.warning("intelligence_common not available — preamble injection disabled")
+
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
@@ -420,11 +431,33 @@ on {data.get('draw_date', 'unknown')}. Do NOT describe this as "draws during the
 experiment" — these are periodic lab draws over time.
 """
 
+    # Build intelligence preamble (goals, data inventory, data maturity, first-person voice)
+    preamble_block = ""
+    if _HAS_INTELLIGENCE_COMMON:
+        try:
+            _inventory = build_data_inventory()
+            _maturity = build_data_maturity(_inventory)
+            _goals = load_goals_config()
+            preamble_block = build_coach_preamble(
+                coach_name=p['name'],
+                domain=expert_key,
+                goals=_goals,
+                inventory=_inventory,
+                maturity=_maturity,
+            )
+        except Exception as _e:
+            logger.warning("Preamble generation failed: %s — proceeding without", _e)
+            preamble_block = f"VOICE: Write in FIRST PERSON. You ARE {p['name']}. Say \"I\" not \"{p['name']}\". Address Matthew directly as \"you\".\n"
+    else:
+        preamble_block = f"VOICE: Write in FIRST PERSON. You ARE {p['name']}. Say \"I\" not \"{p['name']}\". Address Matthew directly as \"you\".\n"
+
     return f"""You are {p['name']}, {p['title']}.
 
 Your communication style: {p['style']}.
 Your analytical focus: {p['focus']}.
 {p.get('epistemology', '')}
+
+{preamble_block}
 
 You are writing your weekly analysis for Matthew's public health experiment (averagejoematt.com).
 This is Week {week_num} of the experiment (started {EXPERIMENT_START}, now day {days_in_experiment}).
