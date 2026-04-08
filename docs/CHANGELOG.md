@@ -1,3 +1,15 @@
+## v6.5.0 — Intelligence Layer V2.1 Session 1: Coach Threads (2026-04-07)
+
+### Workstream 1: Coach Persistent Memory — The Thread
+- DDB partition `SOURCE#coach_thread#{coach_id}#{date}` — running log of positions, predictions, surprises, emotional investment
+- `write_coach_thread()`, `read_coach_thread()`, `update_prediction_status()` in intelligence_common.py
+- `build_thread_prompt_block()` — formats thread history for prompt injection (includes personality seeds)
+- `extract_thread_from_narrative()` — lightweight Haiku call post-generation to extract structured thread data
+- Wired into observatory Lambda: thread read before generation, thread write after
+- Personality seeds added to all 10 coaches in board_of_directors.json (tendencies, arc_seed, signature_behavior, emotional_range)
+- Verified: glucose coach thread entry created with position, 2 predictions, 2 surprises, investment=invested, 3 open questions
+
+---
 ## v6.4.0 — Intelligence Layer V2 Complete (2026-04-07)
 
 ### Session 6: Builder's Paradox Detection (Workstream 6)

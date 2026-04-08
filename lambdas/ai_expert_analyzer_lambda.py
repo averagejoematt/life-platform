@@ -36,6 +36,8 @@ try:
     from intelligence_common import (
         build_data_inventory, build_data_maturity,
         load_goals_config, build_coach_preamble,
+        build_thread_prompt_block, write_coach_thread,
+        extract_thread_from_narrative,
     )
     _HAS_INTELLIGENCE_COMMON = True
 except ImportError:
@@ -467,6 +469,14 @@ experiment" — these are periodic lab draws over time.
                     preamble_block += bp_block
                 except Exception as _bp_e:
                     logger.warning("Builder's Paradox computation failed: %s", _bp_e)
+            # V2.1: Thread injection — persistent memory for each coach
+            try:
+                _personality = p.get("personality", {})
+                _thread_block = build_thread_prompt_block(expert_key, personality=_personality)
+                if _thread_block:
+                    preamble_block += "\n" + _thread_block
+            except Exception as _th_e:
+                logger.warning("Thread injection failed for %s: %s", expert_key, _th_e)
         except Exception as _e:
             logger.warning("Preamble generation failed: %s — proceeding without", _e)
             preamble_block = f"VOICE: Write in FIRST PERSON. You ARE {p['name']}. Say \"I\" not \"{p['name']}\". Address Matthew directly as \"you\".\n"
@@ -652,6 +662,19 @@ def generate_and_cache(expert_key):
                 )
         except Exception as _ve:
             logger.warning("Intelligence validator failed for %s: %s", expert_key, _ve)
+
+    # V2.1: Thread extraction — extract and write coach thread entry
+    if _HAS_INTELLIGENCE_COMMON and analysis_text:
+        try:
+            thread_data = extract_thread_from_narrative(expert_key, analysis_text, api_key)
+            thread_data["generation_context"] = "observatory"
+            write_coach_thread(expert_key, thread_data)
+            logger.info("Thread entry written for %s: investment=%s, %d predictions",
+                        expert_key,
+                        thread_data.get("emotional_investment", "?"),
+                        len(thread_data.get("predictions", [])))
+        except Exception as _te:
+            logger.warning("Thread extraction/write failed for %s: %s", expert_key, _te)
 
     logger.info(f"Cached analysis for {expert_key}: {len(analysis_text)} chars")
     return analysis_text
