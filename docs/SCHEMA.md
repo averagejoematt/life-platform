@@ -1933,6 +1933,48 @@ Pre-computed metrics written by `coach-computation-engine`. EWMA smoothing, seas
 
 ---
 
+## Intelligence Layer V2 Partitions (v6.4.0)
+
+### Coach Actions (`SOURCE#coach_actions`)
+
+**pk:** `USER#matthew`
+**sk:** `SOURCE#coach_actions#{action_id}` (action_id = `{date}-{domain}`)
+
+Tracks coach-issued actions with lifecycle: open → completed/expired/superseded.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `action_id` | string | Unique action ID (`YYYY-MM-DD-domain`) |
+| `coach_id` | string | Issuing coach (e.g., `glucose`, `physical`) |
+| `domain` | string | Domain (sleep, nutrition, training, etc.) |
+| `issued_date` | string | YYYY-MM-DD |
+| `issued_week` | string | YYYY-WNN |
+| `action_text` | string | The action recommendation |
+| `status` | string | `open` / `completed` / `expired` / `superseded` |
+| `completion_date` | string | When completed (null if open) |
+| `completion_method` | string | `auto_detected` / `manual` / `expired` |
+| `superseded_by` | string | action_id of replacement (null if active) |
+
+### Intelligence Quality (`SOURCE#intelligence_quality`)
+
+**pk:** `USER#matthew`
+**sk:** `SOURCE#intelligence_quality#{date}#{coach_id}`
+
+Post-generation validation results from the intelligence validator.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `date` | string | Generation date |
+| `coach_id` | string | Coach that was validated |
+| `domain` | string | Coach's domain |
+| `checks_run` | number | Number of validation checks executed |
+| `errors` | number | Error-severity flags |
+| `warnings` | number | Warning-severity flags |
+| `flags` | list | `[{check, severity, detail, source_text}]` |
+| `validated_at` | string | ISO timestamp |
+
+---
+
 ## Aggregation Behavior
 
 The MCP server automatically switches from raw daily records to monthly aggregates when a requested date window exceeds 90 days (`RAW_DAY_LIMIT = 90`). This keeps response payloads manageable and costs low.
