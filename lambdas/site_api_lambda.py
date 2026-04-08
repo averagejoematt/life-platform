@@ -6973,6 +6973,7 @@ ROUTES = {
     "/api/journal_analysis":    handle_journal_analysis,
     "/api/ai_analysis":         None,  # GET with ?expert= query param, handled in lambda_handler
     "/api/coach_analysis":      None,  # GET with ?domain= query param, handled in lambda_handler (Coach Intelligence)
+    "/api/weekly_priority":     None,  # GET — integrator synthesis, handled in lambda_handler
     # BL-03: The Ledger / Snake Fund
     "/api/ledger":              handle_ledger,
     # BL-04: Field Notes
@@ -7373,12 +7374,44 @@ def lambda_handler(event, context):
                 "week_number": output.get("week_number"),
                 "days_in_experiment": output.get("days_in_experiment"),
             }
+
+            # Add cross-domain context note from the integrator (if available)
+            try:
+                _int_resp = table.get_item(Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": "EXPERT#integrator"})
+                _int_item = _decimal_to_float(_int_resp.get("Item", {}))
+                _cdn = _int_item.get("cross_domain_notes", {})
+                if isinstance(_cdn, dict) and domain in _cdn:
+                    resp["cross_domain_note"] = _cdn[domain]
+                if _int_item.get("analysis"):
+                    resp["weekly_priority"] = _int_item["analysis"]
+            except Exception:
+                pass
+
             # Strip None values for cleaner JSON
             resp = {k: v for k, v in resp.items() if v is not None}
             return _ok(resp, cache_seconds=300)
         except Exception as _e:
             print(f"[WARN] /api/coach_analysis failed: {_e}")
             return _ok({"coach_id": coach_id, "domain": domain, "analysis": None}, cache_seconds=60)
+
+    # Weekly Priority (GET — integrator synthesis)
+    if path == "/api/weekly_priority":
+        try:
+            _int_resp = table.get_item(Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": "EXPERT#integrator"})
+            _int_item = _decimal_to_float(_int_resp.get("Item", {}))
+            if not _int_item:
+                return _ok({"weekly_priority": None, "cross_domain_notes": {}}, cache_seconds=300)
+            return _ok({
+                "weekly_priority": _int_item.get("analysis", ""),
+                "cross_domain_notes": _int_item.get("cross_domain_notes", {}),
+                "generated_at": _int_item.get("generated_at", ""),
+                "week_number": _int_item.get("week_number"),
+                "coach_name": "Dr. Kai Nakamura",
+                "coach_title": "Integrative Health Director",
+            }, cache_seconds=300)
+        except Exception as _e:
+            print(f"[WARN] /api/weekly_priority failed: {_e}")
+            return _ok({"weekly_priority": None}, cache_seconds=60)
 
     # Special handling: /api/ask accepts POST
     if path == "/api/ask":

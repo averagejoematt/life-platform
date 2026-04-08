@@ -196,6 +196,37 @@ TOOLS = {
             },
         },
     },
+    "list_actions": {
+        "fn": tool_list_actions,
+        "schema": {
+            "name": "list_actions",
+            "description": "List coach-issued actions with status tracking. Shows open, completed, expired, and superseded actions across all coaches.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "domain": {"type": "string", "description": "Filter by domain (e.g., 'sleep', 'nutrition', 'training', 'glucose', 'physical', 'mind')."},
+                    "status": {"type": "string", "description": "Filter by status.", "enum": ["open", "completed", "expired", "superseded"]},
+                    "days":   {"type": "number", "description": "Days to look back (default: 30)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "complete_action": {
+        "fn": tool_complete_action,
+        "schema": {
+            "name": "complete_action",
+            "description": "Manually mark a coach action as completed. Use when Matthew has done something a coach recommended.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "action_id": {"type": "string", "description": "The action ID to complete (format: YYYY-MM-DD-domain)."},
+                    "note":      {"type": "string", "description": "Optional follow-up note about the completion."},
+                },
+                "required": ["action_id"],
+            },
+        },
+    },
     "search_activities": {
         "fn": tool_search_activities,
         "schema": {
