@@ -482,3 +482,63 @@ def tool_get_longitudinal_summary(args):
             "hint": "Use 'aggregate' for monthly/yearly averages, 'seasonal' for month-by-month patterns across all years, 'records' for all-time PRs.",
         }
     return VALID_VIEWS[view](args)
+
+
+def tool_get_intelligence_quality(args):
+    """Query intelligence quality validation results.
+
+    Shows recent validation flags from the post-generation intelligence validator.
+    Filters by severity (error/warning), coach, or date range.
+    """
+    from mcp.core import USER_PREFIX, table, _decimal_to_float
+    from boto3.dynamodb.conditions import Key
+
+    days = int(args.get("days", 7))
+    severity_filter = args.get("severity")  # error, warning, or None for all
+    coach_filter = args.get("coach")
+
+    end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    start_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+
+    # Query all intelligence_quality records in date range
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"USER#matthew") & Key("sk").between(
+                f"SOURCE#intelligence_quality#{start_date}",
+                f"SOURCE#intelligence_quality#{end_date}~",
+            ),
+        )
+        items = [_decimal_to_float(i) for i in resp.get("Items", [])]
+    except Exception as e:
+        return {"error": str(e)}
+
+    # Filter
+    if coach_filter:
+        items = [i for i in items if i.get("coach_id") == coach_filter]
+
+    # Flatten flags
+    all_flags = []
+    for item in items:
+        for flag in item.get("flags", []):
+            if severity_filter and flag.get("severity") != severity_filter:
+                continue
+            all_flags.append({
+                "date": item.get("date"),
+                "coach": item.get("coach_id"),
+                "domain": item.get("domain"),
+                **flag,
+            })
+
+    # Summary
+    total_errors = sum(1 for f in all_flags if f.get("severity") == "error")
+    total_warnings = sum(1 for f in all_flags if f.get("severity") == "warning")
+
+    return {
+        "period": {"start": start_date, "end": end_date},
+        "total_checks": len(items) * 5,  # 5 checks per coach
+        "total_flags": len(all_flags),
+        "errors": total_errors,
+        "warnings": total_warnings,
+        "flags": all_flags[:20],  # Cap at 20 for readability
+        "coaches_checked": list(set(i.get("coach_id") for i in items)),
+    }

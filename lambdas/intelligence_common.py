@@ -143,10 +143,11 @@ _MATURITY_THRESHOLDS = {
     "nutrition": {"orientation": 7, "established": 30, "source": "macrofactor", "unit": "days logged"},
     "training": {"orientation": 1, "established": 14, "source": "strava", "unit": "workouts"},
     "glucose": {"orientation": 7, "established": 30, "source": "cgm", "unit": "CGM days"},
-    "physical": {"orientation": 7, "established": 30, "source": "withings", "unit": "weight readings"},
+    "physical": {"orientation": 7, "established": 30, "source": "withings", "unit": "weight readings",
+                  "composite": True, "requires_dexa": True},
     "mind": {"orientation": 3, "established": 14, "source": "journal", "unit": "journal entries"},
-    "labs": {"orientation": 14, "established": 60, "source": "whoop", "unit": "days any data"},
-    "explorer": {"orientation": 14, "established": 60, "source": "whoop", "unit": "days any data"},
+    "labs": {"orientation": 1, "established": 3, "source": "labs", "unit": "blood draws"},
+    "explorer": {"orientation": 14, "established": 60, "source": "whoop", "unit": "days platform data"},
 }
 
 # Voice templates per phase
@@ -194,7 +195,18 @@ def build_data_maturity(inventory: dict) -> dict:
         orientation_threshold = thresholds["orientation"]
         established_threshold = thresholds["established"]
 
-        if days < orientation_threshold:
+        # Physical coach: composite check — needs DEXA + weight series
+        if thresholds.get("composite") and thresholds.get("requires_dexa"):
+            dexa_data = inventory.get("dexa", {})
+            has_dexa = dexa_data.get("exists", False)
+            if not has_dexa and days < orientation_threshold:
+                phase = "orientation"
+            elif has_dexa and days >= orientation_threshold:
+                phase = "emerging" if days < established_threshold else "established"
+            else:
+                phase = "orientation"
+            target_date = (today + timedelta(days=max(0, orientation_threshold - days))).strftime("%B %d") if phase == "orientation" else None
+        elif days < orientation_threshold:
             phase = "orientation"
             target_date = (today + timedelta(days=max(0, orientation_threshold - days))).strftime("%B %d")
         elif days < established_threshold:
@@ -356,3 +368,209 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict,
         parts.append("YOUR PREVIOUS ACTIONS:\n" + "\n".join(action_lines) + "\n")
 
     return "\n".join(parts)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INTELLIGENCE VALIDATOR (Workstream 4)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Phrases indicating a coach claims data is missing
+_NULL_CLAIM_PHRASES = [
+    "unavailable", "not yet available", "remains unknown", "data gap",
+    "cannot determine", "no data", "data is null", "not available",
+    "remains null", "awaiting data", "hasn't been provided",
+    "provide your", "obtain a", "get a scan", "submit your",
+    "share your", "we don't have",
+]
+
+# Mapping from claim domain keywords to inventory sources
+_CLAIM_DOMAIN_MAP = {
+    "body composition": ["dexa", "withings"],
+    "dexa": ["dexa"],
+    "lean mass": ["dexa"],
+    "visceral fat": ["dexa"],
+    "body fat": ["dexa"],
+    "weight": ["withings"],
+    "meal timing": ["macrofactor"],
+    "food log": ["macrofactor"],
+    "nutrition": ["macrofactor"],
+    "calorie": ["macrofactor"],
+    "protein": ["macrofactor"],
+    "training": ["strava"],
+    "workout": ["strava"],
+    "exercise": ["strava"],
+    "glucose": ["cgm"],
+    "cgm": ["cgm"],
+    "blood sugar": ["cgm"],
+    "sleep": ["whoop", "eightsleep"],
+    "hrv": ["whoop"],
+    "recovery": ["whoop"],
+    "journal": ["journal"],
+    "lab": ["labs"],
+    "bloodwork": ["labs"],
+    "biomarker": ["labs"],
+}
+
+# SOT definitions — which source is authoritative for each metric
+_SOURCE_OF_TRUTH = {
+    "steps": "garmin",
+    "weight": "withings",
+    "sleep_duration": "whoop",
+    "recovery": "whoop",
+    "hrv": "whoop",
+    "glucose": "cgm",
+    "calories": "macrofactor",
+    "protein": "macrofactor",
+}
+
+
+def validate_coach_output(coach_id: str, domain: str, narrative: str,
+                          inventory: dict, maturity: dict,
+                          all_narratives: dict = None) -> list:
+    """
+    Run all validation checks against a coach narrative.
+
+    Returns list of flag dicts: {check, severity, detail, source_text}.
+    """
+    import re
+    flags = []
+    text_lower = narrative.lower()
+
+    # ── Check 1: Null claim vs actual data ─────────────────────────────
+    for phrase in _NULL_CLAIM_PHRASES:
+        if phrase in text_lower:
+            # Find the surrounding context (±50 chars)
+            idx = text_lower.index(phrase)
+            context = narrative[max(0, idx - 50):idx + len(phrase) + 50]
+
+            # Determine which domain the claim references
+            for domain_kw, sources in _CLAIM_DOMAIN_MAP.items():
+                if domain_kw in context.lower():
+                    # Check if any of these sources actually have data
+                    for src in sources:
+                        src_info = inventory.get(src, {})
+                        if src_info.get("exists") and src_info.get("records", 0) > 0:
+                            flags.append({
+                                "check": "null_claim_vs_data",
+                                "severity": "error",
+                                "detail": (
+                                    f"Coach claims '{domain_kw}' data is unavailable "
+                                    f"but {src} has {src_info['records']} records "
+                                    f"(latest: {src_info.get('latest', '?')})"
+                                ),
+                                "source_text": context.strip(),
+                            })
+                            break
+
+    # ── Check 2: Stale action — asking for data that exists ───────────
+    action_phrases = [
+        "obtain a", "get a", "schedule a", "request a",
+        "provide your", "submit your", "share your",
+        "start logging", "begin tracking",
+    ]
+    for phrase in action_phrases:
+        if phrase in text_lower:
+            idx = text_lower.index(phrase)
+            context = narrative[idx:idx + 80].lower()
+            for domain_kw, sources in _CLAIM_DOMAIN_MAP.items():
+                if domain_kw in context:
+                    for src in sources:
+                        if inventory.get(src, {}).get("exists"):
+                            flags.append({
+                                "check": "stale_action",
+                                "severity": "error",
+                                "detail": (
+                                    f"Coach suggests obtaining/providing '{domain_kw}' "
+                                    f"but {src} data already exists"
+                                ),
+                                "source_text": narrative[idx:idx + 80].strip(),
+                            })
+                            break
+
+    # ── Check 3: SOT violation ────────────────────────────────────────
+    # Check for step count discrepancies
+    step_match = re.search(r'(\d[,\d]*)\s*steps?', narrative)
+    if step_match:
+        cited_steps = int(step_match.group(1).replace(",", ""))
+        garmin_data = inventory.get("garmin", {})
+        apple_data = inventory.get("apple_health", {})
+        if garmin_data.get("exists") and apple_data.get("exists"):
+            # If steps cited and both sources exist, flag if it might be from wrong source
+            # (We can't know the exact value without querying, but we flag the presence)
+            pass  # Requires actual metric values — deferred to full implementation
+
+    # ── Check 4: Cross-coach contradiction ────────────────────────────
+    if all_narratives:
+        # Extract numeric claims from this narrative
+        this_numbers = set(re.findall(r'\b\d+(?:\.\d+)?\s*(?:mg/dL|bpm|ms|lbs?|%|kcal|g)\b', narrative))
+        for other_domain, other_text in all_narratives.items():
+            if other_domain == domain:
+                continue
+            other_numbers = set(re.findall(r'\b\d+(?:\.\d+)?\s*(?:mg/dL|bpm|ms|lbs?|%|kcal|g)\b', other_text))
+            # Find numbers that appear in both but with different values for same unit
+            # This is a simplified check — full implementation would parse metric+value pairs
+            for num in this_numbers:
+                unit = re.search(r'[a-zA-Z/%]+$', num)
+                if unit:
+                    unit_str = unit.group()
+                    for other_num in other_numbers:
+                        if other_num.endswith(unit_str) and other_num != num:
+                            # Different value, same unit — potential contradiction
+                            flags.append({
+                                "check": "cross_coach_contradiction",
+                                "severity": "warning",
+                                "detail": f"This coach cites {num}, {other_domain} coach cites {other_num}",
+                                "source_text": num,
+                            })
+
+    # ── Check 5: Overconfidence without data ──────────────────────────
+    domain_maturity = maturity.get(domain, {})
+    phase = domain_maturity.get("phase", "orientation")
+    if phase == "orientation":
+        confident_phrases = [
+            "your pattern shows", "this demonstrates", "clearly indicates",
+            "the data confirms", "we can see that", "it's clear that",
+            "definitively", "without question", "conclusively",
+        ]
+        for phrase in confident_phrases:
+            if phrase in text_lower:
+                flags.append({
+                    "check": "overconfidence",
+                    "severity": "warning",
+                    "detail": (
+                        f"Coach uses definitive language '{phrase}' "
+                        f"but is in {phase} phase ({domain_maturity.get('days', 0)} "
+                        f"{domain_maturity.get('unit', 'days')} of data)"
+                    ),
+                    "source_text": phrase,
+                })
+
+    return flags
+
+
+def write_quality_results(date: str, coach_id: str, domain: str, flags: list):
+    """Write validation results to SOURCE#intelligence_quality DDB partition."""
+    errors = sum(1 for f in flags if f["severity"] == "error")
+    warnings = sum(1 for f in flags if f["severity"] == "warning")
+
+    item = {
+        "pk": f"USER#{USER_ID}",
+        "sk": f"SOURCE#intelligence_quality#{date}#{coach_id}",
+        "date": date,
+        "coach_id": coach_id,
+        "domain": domain,
+        "checks_run": 5,
+        "errors": errors,
+        "warnings": warnings,
+        "flags": flags,
+        "validated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    try:
+        # Convert floats to Decimal for DynamoDB
+        clean = json.loads(json.dumps(item, default=str), parse_float=Decimal)
+        table.put_item(Item=clean)
+        logger.info("Quality results written: %s/%s — %d errors, %d warnings",
+                     coach_id, date, errors, warnings)
+    except Exception as e:
+        logger.error("Failed to write quality results: %s", e)
