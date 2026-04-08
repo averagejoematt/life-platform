@@ -869,3 +869,165 @@ def build_action_history_for_prompt(domain: str) -> str:
         lines.append(f'  - [{week}] "{text}" -- STATUS: {status_str}')
 
     return "YOUR PREVIOUS ACTIONS:\n" + "\n".join(lines) + "\n"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BUILDER'S PARADOX SCORE (Workstream 6)
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def compute_builders_paradox_score(days: int = 7) -> dict:
+    """
+    Compute the Builder's Paradox score — ratio of platform activity to health activity.
+
+    Platform signals (from Todoist):
+      - Tasks completed in platform/engineering projects
+
+    Health signals:
+      - Workouts logged (Strava)
+      - Journal entries written (Notion)
+      - Habit completion rate (Habitify)
+      - Steps (Garmin — SOT)
+
+    Score 0-100:
+      0-30: healthy (health activity >= platform activity)
+      30-60: tipping (platform significantly exceeds health)
+      60-100: displaced (heavy platform work, minimal health execution)
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    start = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+
+    # Platform activity: Todoist tasks completed
+    platform_tasks = 0
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}todoist") & Key("sk").between(
+                f"DATE#{start}", f"DATE#{today}~"
+            ),
+        )
+        for item in resp.get("Items", []):
+            # Count completed tasks — todoist records have task_count or completed_count
+            platform_tasks += int(item.get("tasks_completed", 0) or 0)
+            # Fallback: count items if no aggregate field
+            if platform_tasks == 0:
+                tasks = item.get("tasks", [])
+                if isinstance(tasks, list):
+                    platform_tasks += len(tasks)
+    except Exception as e:
+        logger.warning("Builder's Paradox: Todoist query failed: %s", e)
+
+    # Health signals
+    workouts = 0
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}strava") & Key("sk").between(
+                f"DATE#{start}", f"DATE#{today}~"
+            ),
+            Select="COUNT",
+        )
+        workouts = resp.get("Count", 0)
+    except Exception:
+        pass
+
+    journal_entries = 0
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}notion") & Key("sk").between(
+                f"DATE#{start}", f"DATE#{today}~"
+            ),
+            Select="COUNT",
+        )
+        journal_entries = resp.get("Count", 0)
+    except Exception:
+        pass
+
+    habit_adherence_pct = 0
+    habit_days = 0
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}habitify") & Key("sk").between(
+                f"DATE#{start}", f"DATE#{today}~"
+            ),
+        )
+        items = resp.get("Items", [])
+        pcts = []
+        for item in items:
+            p = item.get("completion_pct") or item.get("tier0_pct")
+            if p is not None:
+                pcts.append(float(p) * (100 if float(p) <= 1 else 1))
+        if pcts:
+            habit_adherence_pct = round(sum(pcts) / len(pcts))
+            habit_days = len(pcts)
+    except Exception:
+        pass
+
+    avg_steps = 0
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}garmin") & Key("sk").between(
+                f"DATE#{start}", f"DATE#{today}~"
+            ),
+        )
+        step_vals = [float(i.get("steps", 0)) for i in resp.get("Items", []) if i.get("steps")]
+        if step_vals:
+            avg_steps = round(sum(step_vals) / len(step_vals))
+    except Exception:
+        pass
+
+    # Compute score
+    # Health score components (each 0-25, total 0-100)
+    workout_score = min(25, workouts * 5)  # 5 workouts/week = max
+    journal_score = min(25, journal_entries * 5)  # 5 entries/week = max
+    habit_score = min(25, habit_adherence_pct * 0.25)  # 100% = 25
+    step_score = min(25, avg_steps / 320)  # 8000 steps = 25
+
+    health_score = workout_score + journal_score + habit_score + step_score
+
+    # Platform intensity (normalized)
+    platform_intensity = min(100, platform_tasks * 3)  # ~33 tasks/week = max intensity
+
+    # Builder's Paradox score: high platform + low health = high score (bad)
+    if health_score + platform_intensity == 0:
+        score = 50  # No data
+    else:
+        # Weighted: platform overpowering health
+        raw = (platform_intensity / max(1, health_score + platform_intensity)) * 100
+        score = round(min(100, raw))
+
+    if score <= 30:
+        label = "healthy"
+    elif score <= 60:
+        label = "tipping"
+    else:
+        label = "displaced"
+
+    interpretation = (
+        f"{platform_tasks} platform tasks completed, {workouts} workouts, "
+        f"{journal_entries} journal entries, {habit_adherence_pct}% habit adherence, "
+        f"{avg_steps} avg steps."
+    )
+    if score > 50:
+        interpretation += (
+            " The platform is consuming the time and energy it was designed to protect."
+        )
+    elif score > 30:
+        interpretation += (
+            " Platform activity is outpacing health behaviors — watch this trend."
+        )
+    else:
+        interpretation += (
+            " Health behaviors are keeping pace with platform work — balanced."
+        )
+
+    return {
+        "score": score,
+        "label": label,
+        "platform_tasks": platform_tasks,
+        "workouts": workouts,
+        "journal_entries": journal_entries,
+        "habit_adherence_pct": habit_adherence_pct,
+        "avg_steps": avg_steps,
+        "health_score": round(health_score),
+        "platform_intensity": round(platform_intensity),
+        "interpretation": interpretation,
+    }
