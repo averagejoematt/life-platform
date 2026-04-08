@@ -542,3 +542,128 @@ def tool_get_intelligence_quality(args):
         "flags": all_flags[:20],  # Cap at 20 for readability
         "coaches_checked": list(set(i.get("coach_id") for i in items)),
     }
+
+
+def tool_list_actions(args):
+    """List coach-issued actions with status tracking.
+
+    Shows open, completed, expired, and superseded actions across all coaches.
+    Supports filtering by domain, status, and time window.
+    """
+    domain_filter = args.get("domain")
+    status_filter = args.get("status")
+    days = int(args.get("days", 30))
+
+    cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    try:
+        resp = table.query(
+            KeyConditionExpression=(
+                Key("pk").eq("USER#matthew")
+                & Key("sk").begins_with("SOURCE#coach_actions#")
+            ),
+        )
+        items = [decimal_to_float(i) for i in resp.get("Items", [])]
+    except Exception as e:
+        return {"error": str(e)}
+
+    # Filter by date window
+    items = [i for i in items if (i.get("issued_date") or "") >= cutoff_date]
+
+    # Filter by domain
+    if domain_filter:
+        items = [i for i in items if i.get("domain") == domain_filter]
+
+    # Check for expired open actions
+    rules_config = {}
+    try:
+        resp_s3 = s3_client.get_object(Bucket=S3_BUCKET, Key="config/action_detection_rules.json")
+        rules_config = json.loads(resp_s3["Body"].read())
+    except Exception:
+        pass
+    expiry_days = rules_config.get("expiry_days", 14)
+
+    for item in items:
+        if item.get("status") == "open" and item.get("issued_date"):
+            try:
+                issued_dt = datetime.strptime(item["issued_date"], "%Y-%m-%d")
+                age = (datetime.strptime(today, "%Y-%m-%d") - issued_dt).days
+                if age > expiry_days:
+                    item["status"] = "expired"
+                    item["age_days"] = age
+                else:
+                    item["age_days"] = age
+            except ValueError:
+                pass
+
+    # Filter by status
+    if status_filter:
+        items = [i for i in items if i.get("status") == status_filter]
+
+    # Sort by issued_date descending
+    items.sort(key=lambda x: x.get("issued_date", ""), reverse=True)
+
+    # Strip pk/sk for cleaner output
+    clean_items = []
+    for item in items:
+        clean = {k: v for k, v in item.items() if k not in ("pk", "sk")}
+        clean_items.append(clean)
+
+    # Summary stats
+    status_counts = defaultdict(int)
+    for item in clean_items:
+        status_counts[item.get("status", "unknown")] += 1
+
+    return {
+        "period": {"start": cutoff_date, "end": today},
+        "total": len(clean_items),
+        "status_summary": dict(status_counts),
+        "actions": clean_items[:30],  # Cap at 30 for readability
+    }
+
+
+def tool_complete_action(args):
+    """Manually mark a coach action as completed.
+
+    Use when Matthew has done something a coach recommended.
+    """
+    action_id = args.get("action_id")
+    if not action_id:
+        raise ValueError("'action_id' is required")
+
+    note = args.get("note")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    update_expr = "SET #st = :completed, completion_date = :cd, completion_method = :cm"
+    attr_names = {"#st": "status"}
+    attr_values = {
+        ":completed": "completed",
+        ":cd": today,
+        ":cm": "manual",
+    }
+
+    if note:
+        update_expr += ", follow_up_note = :fn"
+        attr_values[":fn"] = note
+
+    try:
+        resp = table.update_item(
+            Key={
+                "pk": "USER#matthew",
+                "sk": f"SOURCE#coach_actions#{action_id}",
+            },
+            UpdateExpression=update_expr,
+            ExpressionAttributeNames=attr_names,
+            ExpressionAttributeValues=attr_values,
+            ReturnValues="ALL_NEW",
+        )
+        updated = decimal_to_float(resp.get("Attributes", {}))
+        clean = {k: v for k, v in updated.items() if k not in ("pk", "sk")}
+        return {
+            "status": "success",
+            "message": f"Action '{action_id}' marked as completed.",
+            "action": clean,
+        }
+    except Exception as e:
+        return {"error": f"Failed to complete action: {str(e)}"}
