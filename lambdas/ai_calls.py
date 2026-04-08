@@ -1946,12 +1946,49 @@ AVOID OPENINGS: {json.dumps(voice_guidance.get('avoid_openings', []))}
 
 DECISION CLASS CEILING: {brief.get('decision_class_ceiling', 'observational')}
 EVIDENCE NOTE: {brief.get('evidence_note', 'Early data — use preliminary framing.')}
+
+VOICE: Write in FIRST PERSON. You ARE {voice_spec['display_name']}. Say "I" not "Dr. [Name]". Address Matthew directly as "you". Never refer to yourself in third person.
+
+MATTHEW'S GOALS:
+- Target weight: 185 lbs (starting 307, currently ~295)
+- Body composition: reduce body fat, preserve lean mass
+- Training philosophy: building from walking + Zone 2 base; structured strength training planned but not yet started
+- Timeline: 12-month experiment starting April 1, 2026
+- Key priorities: sleep quality, protein adherence (190g/day target), consistent movement (8,000+ steps/day)
+
+DATA INTERPRETATION RULES:
+- If an activity count or log is ZERO, that means Matthew hasn't done that activity — say "no training logged this week" NOT "provide your training data"
+- If a data source exists but values are null for today, it means today's sync hasn't completed — use the most recent available data
+- NEVER tell Matthew to "obtain" or "get" a scan/test if the data already exists in the payload below
+- Garmin is the step count source of truth (wearable). Ignore Apple Health step counts if Garmin is available.
 {few_shot_block}
 
 Write 2-4 paragraphs of {domain_label} coaching for Matthew. Be specific, reference numbers, and stay within your evidence ceiling. Write in your distinctive voice — not a generic AI coach voice."""
 
+        # Build data inventory — tell the coach what data sources are available
+        _inventory_parts = []
+        for _src_name, _src_val in [
+            ("DEXA body composition", data.get("dexa")),
+            ("Lab bloodwork", data.get("labs")),
+            ("Body measurements", data.get("measurements")),
+            ("MacroFactor nutrition", data.get("macrofactor")),
+            ("Whoop recovery/sleep", data.get("whoop")),
+            ("Garmin steps", data.get("garmin")),
+            ("Strava activities", data.get("strava_7d")),
+            ("Eight Sleep bed temp", data.get("eightsleep")),
+            ("CGM glucose", data.get("apple_health") or data.get("apple")),
+        ]:
+            if _src_val and (not isinstance(_src_val, list) or len(_src_val) > 0):
+                _inventory_parts.append(f"  - {_src_name}: AVAILABLE")
+            else:
+                _inventory_parts.append(f"  - {_src_name}: not available")
+        _data_inventory = "\n".join(_inventory_parts)
+
         user_message = f"""GENERATION BRIEF:
 {json.dumps(brief, indent=2, default=str)}
+
+DATA SOURCES AVAILABLE:
+{_data_inventory}
 
 {domain_label.upper()} DATA:
 {json.dumps(domain_data, indent=2, default=str)}
@@ -2033,7 +2070,7 @@ def _build_training_data(data):
         "recovery_score": _safe_float(whoop, "recovery_score"),
         "strain": _safe_float(whoop, "strain"),
         "hrv": _safe_float(whoop, "hrv"),
-        "steps": _safe_float(apple, "steps") or _safe_float(garmin, "steps"),
+        "steps": _safe_float(garmin, "steps") or _safe_float(apple, "steps"),  # Garmin wearable is SOT for steps
         "recent_activities": [
             {
                 "type": a.get("type") or a.get("sport_type", "unknown"),
@@ -2044,6 +2081,7 @@ def _build_training_data(data):
             for a in strava_7d[:5]
         ],
         "activity_count_7d": len(strava_7d),
+        "training_status": "no_training_logged" if len(strava_7d) == 0 else "active",
     }
 
 

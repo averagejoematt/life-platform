@@ -264,10 +264,21 @@ def assemble_data(yesterday_str):
 # ==============================================================================
 
 def load_previous_state(yesterday_str):
-    """Load the character sheet record from the day before yesterday."""
+    """Load the most recent character sheet record, scanning back up to 7 days.
+
+    Previously only looked back 1 day, which caused level resets when the
+    compute Lambda skipped a day (e.g., missing env var, Lambda failure).
+    Now scans backwards to find the last valid state, preserving level continuity.
+    """
     dt = datetime.strptime(yesterday_str, "%Y-%m-%d")
-    day_before = (dt - timedelta(days=1)).strftime("%Y-%m-%d")
-    return fetch_date("character_sheet", day_before)
+    for days_back in range(1, 8):
+        check_date = (dt - timedelta(days=days_back)).strftime("%Y-%m-%d")
+        state = fetch_date("character_sheet", check_date)
+        if state and state.get("character_level") is not None:
+            if days_back > 1:
+                logger.info(f"[character] Previous state found {days_back} days back ({check_date})")
+            return state
+    return None
 
 
 def load_raw_score_histories(yesterday_str, window=21):

@@ -1,8 +1,8 @@
-# Handover — v6.0.1: Coach Intelligence + Platform Quality Sweep
+# Handover — v6.0.2: Observatory Intelligence Fixes + Coach Bio Page
 
 **Date:** 2026-04-07
-**Session span:** 2026-04-06 → 2026-04-07 (single extended session)
-**Scope:** Coach Intelligence Architecture (Phases 1-6), AI prompt evolution, observatory integration, and full platform quality sweep (AWS architecture, website, code quality).
+**Session span:** 2026-04-06 → 2026-04-07 (continued session)
+**Scope:** Fixed character level display, coach data blindness, voice/goals injection, Pulse rendering, and new /coaches/ bio page.
 
 ## What Changed
 
@@ -141,9 +141,28 @@ Seeded all new partitions for coach intelligence:
 - RUNBOOK.md — coach troubleshooting section
 - ONBOARDING.md — coach mental model + glossary
 
+### Observatory Intelligence Fixes (April 7 — continued session)
+
+**P0 — Data Correctness:**
+- **Character level carry-forward** — `load_previous_state()` now scans back 7 days instead of 1. Level restored to 4 (was dropping to 1 when compute skipped days).
+- **Coach data blindness** — Added DEXA, measurements, labs to daily brief data dict (`_latest_item()` helper). Coaches now see body composition, lab results, and measurement data.
+- **Step count SOT** — Garmin now primary for steps (wearable), Apple Health fallback. Was reversed.
+- **Training interpretation** — `training_status: "no_training_logged"` explicitly signals no training vs missing data.
+- **Data inventory injection** — Every coach prompt now receives a "DATA SOURCES AVAILABLE" block listing which sources have data and which don't. Coaches can no longer claim data is missing when it exists.
+
+**P1 — Voice & Goals:**
+- **First-person directive** — All coaches now instructed to write as "I" not "Dr. [Name]". Verified in regenerated outputs.
+- **Goals injection** — System prompt now includes Matthew's goals (target weight, body comp, training philosophy, timeline, key priorities). Coaches no longer ask "what are your goals?"
+
+**P2 — Rendering:**
+- **Pulse FOUC fix** — Double `requestAnimationFrame` wrap before showing Pulse section to prevent unstyled flash on mobile.
+
+**P3 — New Feature:**
+- **Coach bio page** — `/coaches/` page with card layout for all 8 AI coaching personas. Shows name, title, voice description, domains, and link to latest observatory analysis.
+
 ## Known Issues / Carry Forward
 
-- **Character level drop** — Level went 4→1 because character-sheet-compute didn't run April 5-6 (USER_ID env var issue, now fixed). Will recover once daily pipeline runs with full Whoop data.
+- ~~Character level drop~~ **RESOLVED** — Level carry-forward now scans back 7 days.
 - **Smoke test expectations stale** — `deploy/smoke_test_site.sh` has 15 failing checks for old V2/V3 HTML structures. Tests need updating, not the site.
 - **/coaching/ dashboard page** — standalone coaching dashboard deferred (future sprint)
 - **Coach Intelligence test coverage** — 8 new Lambda files (~300KB) have no unit tests
@@ -165,4 +184,5 @@ Seeded all new partitions for coach intelligence:
 | AI Coaches | 8 |
 | Coach DDB Partitions | 6 partition families |
 | Test Results | 1103 passed, 1 infra-only failure |
-| Version | v6.0.1 |
+| Site Pages | 73 (added /coaches/) |
+| Version | v6.0.2 |
