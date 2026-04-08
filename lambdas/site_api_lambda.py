@@ -7754,7 +7754,7 @@ def lambda_handler(event, context):
             }, cache_seconds=600)
         except Exception as _e:
             print(f"[WARN] /api/coach_timeline failed: {_e}")
-            return _ok({"coach_id": coach_id if 'coach_id' in dir() else "", "coach_name": "", "milestones": []}, cache_seconds=60)
+            return _ok({"coach_id": "", "coach_name": "", "milestones": []}, cache_seconds=60)
 
     # Weekly Priority (GET — integrator synthesis)
     if path == "/api/weekly_priority":
