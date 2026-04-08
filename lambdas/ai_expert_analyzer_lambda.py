@@ -635,11 +635,117 @@ def generate_and_cache(expert_key):
     return analysis_text
 
 
+def generate_synthesis(all_coach_outputs):
+    """
+    Second-pass synthesis: Dr. Kai Nakamura reads all coach outputs and produces
+    a single weekly priority + cross-domain context notes for each observatory page.
+    """
+    if not all_coach_outputs or len(all_coach_outputs) < 2:
+        logger.info("Synthesis skipped — fewer than 2 coach outputs")
+        return None
+
+    try:
+        goals = load_goals_config() if _HAS_INTELLIGENCE_COMMON else {}
+    except Exception:
+        goals = {}
+
+    coach_sections = "\n\n".join(
+        f"--- {domain.upper()} COACH ---\n{text[:800]}"
+        for domain, text in all_coach_outputs.items()
+        if text
+    )
+
+    goals_json = json.dumps({
+        "mission": goals.get("mission", ""),
+        "targets": goals.get("targets", {}),
+        "philosophy": goals.get("philosophy", ""),
+    }, indent=2, default=str)
+
+    prompt = f"""You are Dr. Kai Nakamura, Integrative Health Director. You've just read assessments from all domain coaches. Your job: synthesize, resolve contradictions, and make ONE call.
+
+Matthew's goals: {goals_json}
+
+Coach assessments:
+{coach_sections}
+
+Write in first person. You are Nakamura. Be decisive.
+
+Produce EXACTLY this JSON structure (no markdown, no explanation):
+{{
+  "weekly_priority": "One paragraph. One action. What matters most right now given where Matthew is vs where he's trying to go? If coaches disagree, make the call and say why. Do not hedge.",
+  "cross_domain_notes": {{
+    "sleep": "1-2 sentences connecting sleep to the other domains this week",
+    "nutrition": "1-2 sentences connecting nutrition to the other domains",
+    "training": "1-2 sentences connecting training to the other domains",
+    "glucose": "1-2 sentences connecting glucose to the other domains",
+    "physical": "1-2 sentences connecting physical/body comp to the other domains",
+    "mind": "1-2 sentences connecting mind/behavioral to the other domains"
+  }}
+}}"""
+
+    api_key = _get_api_key()
+    req_body = json.dumps({
+        "model": AI_MODEL,
+        "max_tokens": 1200,
+        "messages": [{"role": "user", "content": prompt}],
+    })
+
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=req_body.encode(),
+        headers={
+            "Content-Type": "application/json",
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            result = json.loads(resp.read())
+
+        text = "".join(
+            b["text"] for b in result.get("content", []) if b.get("type") == "text"
+        )
+
+        # Parse JSON from response (strip markdown fencing if present)
+        cleaned = text.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        synthesis = json.loads(cleaned.strip())
+
+        # Cache synthesis to DDB
+        now = datetime.now(timezone.utc)
+        ttl = int((now + timedelta(days=8)).timestamp())
+        item = {
+            "pk": CACHE_PK,
+            "sk": "EXPERT#integrator",
+            "expert_key": "integrator",
+            "analysis": synthesis.get("weekly_priority", ""),
+            "cross_domain_notes": synthesis.get("cross_domain_notes", {}),
+            "generated_at": now.isoformat(),
+            "week_number": max(1, (now.date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days // 7 + 1),
+            "ttl": ttl,
+        }
+        table.put_item(Item=item)
+        logger.info("Synthesis generated and cached: %d chars priority, %d domain notes",
+                     len(synthesis.get("weekly_priority", "")),
+                     len(synthesis.get("cross_domain_notes", {})))
+        return synthesis
+
+    except Exception as e:
+        logger.error("Synthesis generation failed: %s", e)
+        return None
+
+
 def lambda_handler(event, context):
     try:
         target = event.get("expert", "all")
         experts_to_run = EXPERTS if target == "all" else [target]
         results = {}
+        all_outputs = {}
 
         for expert_key in experts_to_run:
             if expert_key not in EXPERTS:
@@ -648,9 +754,20 @@ def lambda_handler(event, context):
             try:
                 text = generate_and_cache(expert_key)
                 results[expert_key] = {"status": "ok", "chars": len(text)}
+                all_outputs[expert_key] = text
             except Exception as e:
                 logger.error(f"Failed to generate {expert_key}: {e}")
                 results[expert_key] = {"status": "error", "error": str(e)}
+
+        # Synthesis pass — only when running all experts
+        if target == "all" and len(all_outputs) >= 3:
+            try:
+                synthesis = generate_synthesis(all_outputs)
+                if synthesis:
+                    results["integrator"] = {"status": "ok", "chars": len(str(synthesis))}
+            except Exception as e:
+                logger.error(f"Synthesis failed: {e}")
+                results["integrator"] = {"status": "error", "error": str(e)}
 
         return {
             "statusCode": 200,

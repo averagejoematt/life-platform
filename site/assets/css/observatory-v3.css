@@ -543,6 +543,28 @@
   font-family: var(--font-mono);
 }
 
+/* ── Cross-domain context note (Integrator) ───────────────── */
+
+.obs-cross-domain-note {
+  border-top: 1px solid rgba(99, 102, 241, 0.15);
+  background: rgba(99, 102, 241, 0.04);
+  padding: var(--space-3) var(--space-5);
+}
+.obs-cross-domain-note__label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #6366f1;
+  margin-bottom: var(--space-1);
+}
+.obs-cross-domain-note__text {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  font-style: italic;
+}
+
 /* ── Coach Intelligence continuity markers ────────────────── */
 
 .obs-coach-continuity {

@@ -1,0 +1,13 @@
+{
+  "rules": [
+    {"pattern": "DEXA|body composition scan", "source": "dexa", "condition": "record_exists_after_issued_date"},
+    {"pattern": "training|workout|gym|exercise|strength", "source": "strava", "condition": "record_exists_after_issued_date"},
+    {"pattern": "journal|reflect|write about", "source": "journal", "condition": "record_exists_after_issued_date"},
+    {"pattern": "fiber|fibre", "source": "macrofactor", "condition": "metric_check", "metric": "total_fiber_g", "threshold": 20},
+    {"pattern": "step|steps|walk|walking", "source": "garmin", "condition": "record_exists_after_issued_date"},
+    {"pattern": "sleep|bedtime|sleep onset", "source": "whoop", "condition": "record_exists_after_issued_date"},
+    {"pattern": "supplement|vitamin|omega", "source": "supplements", "condition": "record_exists_after_issued_date"}
+  ],
+  "expiry_days": 14,
+  "version": "1.0"
+}

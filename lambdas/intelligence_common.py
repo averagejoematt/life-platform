@@ -13,6 +13,7 @@ v1.0.0 — 2026-04-07 (Intelligence Layer V2 Session 1)
 import json
 import logging
 import os
+import re
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
@@ -574,3 +575,297 @@ def write_quality_results(date: str, coach_id: str, domain: str, flags: list):
                      coach_id, date, errors, warnings)
     except Exception as e:
         logger.error("Failed to write quality results: %s", e)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ACTION COMPLETION LOOP (Workstream 3)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Cache for detection rules
+_detection_rules_cache = None
+_detection_rules_cache_ts = 0
+_DETECTION_RULES_CACHE_TTL = 300  # 5 minutes
+
+
+def _load_detection_rules() -> dict:
+    """Load action detection rules from S3. Cached for Lambda warm instances."""
+    global _detection_rules_cache, _detection_rules_cache_ts
+    import time
+    now = time.time()
+
+    if _detection_rules_cache and (now - _detection_rules_cache_ts) < _DETECTION_RULES_CACHE_TTL:
+        return _detection_rules_cache
+
+    try:
+        resp = s3.get_object(Bucket=S3_BUCKET, Key="config/action_detection_rules.json")
+        _detection_rules_cache = json.loads(resp["Body"].read())
+        _detection_rules_cache_ts = now
+        return _detection_rules_cache
+    except Exception as e:
+        logger.warning("Failed to load action detection rules: %s — using empty ruleset", e)
+        return {"rules": [], "expiry_days": 14, "version": "0"}
+
+
+def _iso_week(date_str: str) -> str:
+    """Convert YYYY-MM-DD to YYYY-WNN format."""
+    dt = datetime.strptime(date_str, "%Y-%m-%d")
+    iso = dt.isocalendar()
+    return f"{iso[0]}-W{iso[1]:02d}"
+
+
+def write_action(coach_id: str, domain: str, action_text: str,
+                 issued_date: str) -> dict:
+    """
+    Write a new coach action to DynamoDB.
+
+    Before writing, supersedes any existing open actions for the same domain
+    by setting their status to 'superseded'.
+
+    Returns the new action item dict.
+    """
+    action_id = f"{issued_date}-{domain}"
+    issued_week = _iso_week(issued_date)
+
+    # Supersede existing open actions for this domain
+    existing_open = get_open_actions(domain=domain)
+    for old_action in existing_open:
+        old_id = old_action.get("action_id", "")
+        if old_id == action_id:
+            continue  # Don't supersede ourselves
+        try:
+            table.update_item(
+                Key={
+                    "pk": f"USER#{USER_ID}",
+                    "sk": f"SOURCE#coach_actions#{old_id}",
+                },
+                UpdateExpression="SET #st = :s, superseded_by = :sb",
+                ExpressionAttributeNames={"#st": "status"},
+                ExpressionAttributeValues={
+                    ":s": "superseded",
+                    ":sb": action_id,
+                },
+            )
+            logger.info("Superseded action %s with %s", old_id, action_id)
+        except Exception as e:
+            logger.warning("Failed to supersede action %s: %s", old_id, e)
+
+    item = {
+        "pk": f"USER#{USER_ID}",
+        "sk": f"SOURCE#coach_actions#{action_id}",
+        "action_id": action_id,
+        "coach_id": coach_id,
+        "domain": domain,
+        "issued_date": issued_date,
+        "issued_week": issued_week,
+        "action_text": action_text,
+        "status": "open",
+        "completion_date": None,
+        "completion_method": None,
+        "follow_up_note": None,
+        "superseded_by": None,
+    }
+
+    try:
+        clean = json.loads(json.dumps(item, default=str), parse_float=Decimal)
+        table.put_item(Item=clean)
+        logger.info("Action written: %s (coach=%s, domain=%s)", action_id, coach_id, domain)
+        return item
+    except Exception as e:
+        logger.error("Failed to write action %s: %s", action_id, e)
+        raise
+
+
+def get_open_actions(domain: str = None) -> list:
+    """
+    Query all open actions, optionally filtered by domain.
+
+    Returns list of action dicts.
+    """
+    try:
+        resp = table.query(
+            KeyConditionExpression=(
+                Key("pk").eq(f"USER#{USER_ID}")
+                & Key("sk").begins_with("SOURCE#coach_actions#")
+            ),
+            FilterExpression="attribute_exists(#st) AND #st = :open",
+            ExpressionAttributeNames={"#st": "status"},
+            ExpressionAttributeValues={":open": "open"},
+        )
+        items = _decimal_to_float(resp.get("Items", []))
+    except Exception as e:
+        logger.error("Failed to query open actions: %s", e)
+        return []
+
+    if domain:
+        items = [i for i in items if i.get("domain") == domain]
+
+    # Sort by issued_date descending
+    items.sort(key=lambda x: x.get("issued_date", ""), reverse=True)
+    return items
+
+
+def get_action_history(domain: str = None, limit: int = 10) -> list:
+    """
+    Query all actions sorted by date, optionally filtered by domain.
+
+    Returns list of action dicts (most recent first), capped at limit.
+    """
+    try:
+        resp = table.query(
+            KeyConditionExpression=(
+                Key("pk").eq(f"USER#{USER_ID}")
+                & Key("sk").begins_with("SOURCE#coach_actions#")
+            ),
+            ScanIndexForward=False,
+        )
+        items = _decimal_to_float(resp.get("Items", []))
+    except Exception as e:
+        logger.error("Failed to query action history: %s", e)
+        return []
+
+    if domain:
+        items = [i for i in items if i.get("domain") == domain]
+
+    # Sort by issued_date descending
+    items.sort(key=lambda x: x.get("issued_date", ""), reverse=True)
+    return items[:limit]
+
+
+def complete_action(action_id: str, method: str = "manual",
+                    note: str = None) -> dict:
+    """
+    Mark an action as completed.
+
+    Returns the updated action item dict.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    update_expr = "SET #st = :completed, completion_date = :cd, completion_method = :cm"
+    attr_names = {"#st": "status"}
+    attr_values = {
+        ":completed": "completed",
+        ":cd": today,
+        ":cm": method,
+    }
+
+    if note:
+        update_expr += ", follow_up_note = :fn"
+        attr_values[":fn"] = note
+
+    try:
+        resp = table.update_item(
+            Key={
+                "pk": f"USER#{USER_ID}",
+                "sk": f"SOURCE#coach_actions#{action_id}",
+            },
+            UpdateExpression=update_expr,
+            ExpressionAttributeNames=attr_names,
+            ExpressionAttributeValues=attr_values,
+            ReturnValues="ALL_NEW",
+        )
+        updated = _decimal_to_float(resp.get("Attributes", {}))
+        logger.info("Action %s completed (method=%s)", action_id, method)
+        return updated
+    except Exception as e:
+        logger.error("Failed to complete action %s: %s", action_id, e)
+        raise
+
+
+def check_action_completion(action: dict, inventory: dict) -> dict:
+    """
+    Check if an action was auto-completed based on detection rules.
+
+    Loads rules from config/action_detection_rules.json, matches the action
+    text against rule patterns, and checks whether the relevant data source
+    has records after the action's issued date.
+
+    Returns {"completed": True, "method": "auto_detected", "detail": "..."}
+    if completion detected, or None if not.
+    """
+    action_text = (action.get("action_text") or "").lower()
+    issued_date = action.get("issued_date", "")
+    if not action_text or not issued_date:
+        return None
+
+    rules_config = _load_detection_rules()
+    rules = rules_config.get("rules", [])
+
+    for rule in rules:
+        pattern = rule.get("pattern", "")
+        if not pattern:
+            continue
+
+        if not re.search(pattern, action_text, re.IGNORECASE):
+            continue
+
+        source = rule.get("source", "")
+        condition = rule.get("condition", "")
+
+        if condition == "record_exists_after_issued_date":
+            src_info = inventory.get(source, {})
+            if not src_info.get("exists"):
+                continue
+            latest = src_info.get("latest", "")
+            if latest and latest >= issued_date:
+                return {
+                    "completed": True,
+                    "method": "auto_detected",
+                    "detail": f"{source} data found after {issued_date} (latest: {latest})",
+                }
+        elif condition == "metric_check":
+            # Metric threshold checks require querying actual values — skip for now
+            continue
+
+    return None
+
+
+def build_action_history_for_prompt(domain: str) -> str:
+    """
+    Build the 'YOUR PREVIOUS ACTIONS' block for coach prompt injection.
+
+    Queries recent actions for the domain, checks expiry, and formats
+    a human-readable summary of action statuses.
+    """
+    actions = get_action_history(domain=domain, limit=5)
+    if not actions:
+        return ""
+
+    today = datetime.now(timezone.utc)
+    rules_config = _load_detection_rules()
+    expiry_days = rules_config.get("expiry_days", 14)
+
+    lines = []
+    for action in actions:
+        week = action.get("issued_week", "")
+        text = action.get("action_text", "")
+        status = action.get("status", "open")
+        issued_date = action.get("issued_date", "")
+
+        if status == "open" and issued_date:
+            try:
+                issued_dt = datetime.strptime(issued_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                age_days = (today - issued_dt).days
+                if age_days > expiry_days:
+                    status_str = f"EXPIRED ({age_days} days, exceeded {expiry_days}-day window)"
+                else:
+                    status_str = f"OPEN ({age_days} days)"
+            except ValueError:
+                status_str = "OPEN"
+        elif status == "completed":
+            method = action.get("completion_method", "")
+            detail = action.get("follow_up_note", "")
+            parts = ["COMPLETED"]
+            if method:
+                parts.append(f"({method}")
+                if detail:
+                    parts[-1] += f": {detail}"
+                parts[-1] += ")"
+            status_str = " ".join(parts)
+        elif status == "superseded":
+            superseded_by = action.get("superseded_by", "")
+            status_str = f"SUPERSEDED (replaced by {superseded_by})" if superseded_by else "SUPERSEDED"
+        else:
+            status_str = status.upper()
+
+        lines.append(f'  - [{week}] "{text}" -- STATUS: {status_str}')
+
+    return "YOUR PREVIOUS ACTIONS:\n" + "\n".join(lines) + "\n"

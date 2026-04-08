@@ -217,6 +217,15 @@ function renderCoachAnalysis(container, expertKey, coachMeta) {
         genEl.innerHTML = '<strong>' + dayName + ', ' + dateFmt + '</strong> \u00b7 Day ' + expDay + ' Observations';
       }
 
+      // Cross-domain context note from Dr. Nakamura (Integrator)
+      if (data.cross_domain_note) {
+        var cdnDiv = _el('div', 'obs-cross-domain-note');
+        cdnDiv.innerHTML =
+          '<div class="obs-cross-domain-note__label">\ud83d\udd2c Cross-Domain Context</div>' +
+          '<div class="obs-cross-domain-note__text">' + data.cross_domain_note + '</div>';
+        el.appendChild(cdnDiv);
+      }
+
       // Continuity markers — subtle footer with thread, revision, cross-coach signals
       var markers = [];
       if (data.thread_reference) {
