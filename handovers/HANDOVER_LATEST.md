@@ -1,4 +1,4 @@
-# Handover — v6.4.0: Intelligence Layer V2 Complete (All 7 Workstreams)
+# Handover — v6.7.0: Intelligence Layer V2 + V2.1 + V2.2 Complete
 
 **Date:** 2026-04-07
 **Session span:** 2026-04-06 → 2026-04-07 (extended multi-session)
@@ -187,8 +187,9 @@ Seeded all new partitions for coach intelligence:
 | Site Pages | 73 (added /coaches/) |
 | Shared Layer Modules | 18 (added intelligence_common.py) |
 | Board Members | 18 (added amara_patel, victor_reyes, nathan_reeves, henning_brandt) |
-| MCP Tools | 118 |
-| Version | v6.4.0 |
+| MCP Tools | 123 |
+| Site Pages | 75 (added /predictions/, updated /coaches/) |
+| Version | v6.7.0 |
 
 ## Intelligence Layer V2 — All Sessions Complete
 
