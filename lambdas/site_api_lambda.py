@@ -7003,6 +7003,9 @@ ROUTES = {
     "/api/observatory_week":    None,  # GET with ?domain= query param
     # Coaching Dashboard
     "/api/coaching-dashboard":  None,  # GET — assembled coaching dashboard data
+    # Prediction Ledger + Coach Timeline
+    "/api/predictions":         None,  # GET with ?status=&coach_id=&limit= query params
+    "/api/coach_timeline":      None,  # GET with ?coach_id= query param
 }
 
 
@@ -7506,6 +7509,252 @@ def lambda_handler(event, context):
         except Exception as _e:
             print(f"[WARN] /api/coaching-dashboard failed: {_e}")
             return _ok({"weekly_priority": {}, "open_actions": [], "coaches": [], "predictions": []}, cache_seconds=60)
+
+    # Prediction Ledger (GET with query params)
+    if path == "/api/predictions":
+        try:
+            qs = event.get("queryStringParameters") or {}
+            status_filter = qs.get("status", "all")
+            coach_filter = qs.get("coach_id", "")
+            limit = min(int(qs.get("limit", "50")), 200)
+
+            _pred_coach_names = {
+                "sleep": "Dr. Lisa Park", "nutrition": "Dr. Marcus Webb",
+                "training": "Dr. Sarah Chen", "mind": "Dr. Nathan Reeves",
+                "physical": "Dr. Victor Reyes", "glucose": "Dr. Amara Patel",
+                "labs": "Dr. James Okafor", "explorer": "Dr. Henning Brandt",
+            }
+            _pred_coach_ids = list(_pred_coach_names.keys())
+            _pred_coach_id_map = {
+                "sleep": "sleep_coach", "nutrition": "nutrition_coach",
+                "training": "training_coach", "mind": "mind_coach",
+                "physical": "physical_coach", "glucose": "glucose_coach",
+                "labs": "labs_coach", "explorer": "explorer_coach",
+            }
+
+            if coach_filter and coach_filter not in _pred_coach_ids:
+                return _error(400, "Invalid coach_id")
+
+            scan_coaches = [coach_filter] if coach_filter else _pred_coach_ids
+            all_predictions = []
+            by_coach = {}
+
+            for cid in scan_coaches:
+                coach_pk = f"COACH#{_pred_coach_id_map[cid]}"
+                by_coach[cid] = {"total": 0, "confirmed": 0, "refuted": 0, "pending": 0}
+
+                try:
+                    out_resp = table.query(
+                        KeyConditionExpression=Key("pk").eq(coach_pk) & Key("sk").begins_with("OUTPUT#"),
+                        ScanIndexForward=False,
+                        Limit=12,
+                    )
+                    for out_item in out_resp.get("Items", []):
+                        out_item = _decimal_to_float(out_item)
+                        preds = out_item.get("predictions", [])
+                        out_date = out_item.get("sk", "").replace("OUTPUT#", "")
+                        if not isinstance(preds, list):
+                            continue
+                        for p in preds:
+                            if not isinstance(p, dict):
+                                continue
+                            p_status = p.get("status", "pending")
+                            by_coach[cid]["total"] += 1
+                            if p_status in ("confirmed", "refuted", "pending"):
+                                by_coach[cid][p_status] += 1
+                            else:
+                                by_coach[cid]["pending"] += 1
+
+                            if status_filter != "all" and p_status != status_filter:
+                                continue
+
+                            all_predictions.append({
+                                "coach_id": cid,
+                                "coach_name": _pred_coach_names[cid],
+                                "text": p.get("text", p.get("prediction", "")),
+                                "confidence": p.get("confidence", "medium"),
+                                "status": p_status,
+                                "date": out_date,
+                                "target_date": p.get("target_date", ""),
+                            })
+                except Exception:
+                    pass
+
+            # Sort predictions by date descending
+            all_predictions.sort(key=lambda x: x.get("date", ""), reverse=True)
+            all_predictions = all_predictions[:limit]
+
+            # Compute overall stats
+            total = sum(c["total"] for c in by_coach.values())
+            confirmed = sum(c["confirmed"] for c in by_coach.values())
+            refuted = sum(c["refuted"] for c in by_coach.values())
+            pending = sum(c["pending"] for c in by_coach.values())
+            resolved = confirmed + refuted
+            accuracy_pct = round(confirmed / resolved * 100, 1) if resolved > 0 else 0
+
+            return _ok({
+                "overall": {
+                    "total": total, "confirmed": confirmed,
+                    "refuted": refuted, "pending": pending,
+                    "accuracy_pct": accuracy_pct,
+                },
+                "by_coach": by_coach,
+                "predictions": all_predictions,
+            }, cache_seconds=300)
+        except Exception as _e:
+            print(f"[WARN] /api/predictions failed: {_e}")
+            return _ok({"overall": {}, "by_coach": {}, "predictions": []}, cache_seconds=60)
+
+    # Coach Learning Timeline (GET with ?coach_id= query param)
+    if path == "/api/coach_timeline":
+        try:
+            qs = event.get("queryStringParameters") or {}
+            coach_id = qs.get("coach_id", "")
+
+            _tl_coach_names = {
+                "sleep": "Dr. Lisa Park", "nutrition": "Dr. Marcus Webb",
+                "training": "Dr. Sarah Chen", "mind": "Dr. Nathan Reeves",
+                "physical": "Dr. Victor Reyes", "glucose": "Dr. Amara Patel",
+                "labs": "Dr. James Okafor", "explorer": "Dr. Henning Brandt",
+            }
+            _tl_coach_id_map = {
+                "sleep": "sleep_coach", "nutrition": "nutrition_coach",
+                "training": "training_coach", "mind": "mind_coach",
+                "physical": "physical_coach", "glucose": "glucose_coach",
+                "labs": "labs_coach", "explorer": "explorer_coach",
+            }
+
+            if coach_id not in _tl_coach_names:
+                return _error(400, "Invalid or missing coach_id")
+
+            coach_pk = f"COACH#{_tl_coach_id_map[coach_id]}"
+            milestones = []
+
+            # Query OUTPUT# records for stance_changes, predictions, surprises, emotional_investment
+            try:
+                out_resp = table.query(
+                    KeyConditionExpression=Key("pk").eq(coach_pk) & Key("sk").begins_with("OUTPUT#"),
+                    ScanIndexForward=False,
+                    Limit=20,
+                )
+                prev_investment = None
+                for out_item in out_resp.get("Items", []):
+                    out_item = _decimal_to_float(out_item)
+                    out_date = out_item.get("sk", "").replace("OUTPUT#", "")
+
+                    # Stance changes
+                    stance_changes = out_item.get("stance_changes", [])
+                    if isinstance(stance_changes, list):
+                        for sc in stance_changes:
+                            if isinstance(sc, dict):
+                                milestones.append({
+                                    "date": out_date,
+                                    "type": "stance_change",
+                                    "text": sc.get("topic", sc.get("text", "Position revised")),
+                                    "detail": sc.get("new_stance", sc.get("detail", "")),
+                                })
+                            elif isinstance(sc, str):
+                                milestones.append({
+                                    "date": out_date,
+                                    "type": "stance_change",
+                                    "text": sc,
+                                    "detail": "",
+                                })
+
+                    # Resolved predictions
+                    preds = out_item.get("predictions", [])
+                    if isinstance(preds, list):
+                        for p in preds:
+                            if isinstance(p, dict) and p.get("status") in ("confirmed", "refuted"):
+                                milestones.append({
+                                    "date": out_date,
+                                    "type": "prediction_resolved",
+                                    "text": p.get("text", p.get("prediction", "")),
+                                    "detail": f"Status: {p['status']}",
+                                })
+
+                    # Surprises
+                    surprises = out_item.get("surprises", [])
+                    if isinstance(surprises, list):
+                        for s in surprises:
+                            if isinstance(s, dict):
+                                milestones.append({
+                                    "date": out_date,
+                                    "type": "surprise",
+                                    "text": s.get("text", s.get("observation", "")),
+                                    "detail": s.get("detail", s.get("significance", "")),
+                                })
+                            elif isinstance(s, str):
+                                milestones.append({
+                                    "date": out_date,
+                                    "type": "surprise",
+                                    "text": s,
+                                    "detail": "",
+                                })
+
+                    # Emotional investment changes
+                    current_investment = out_item.get("emotional_investment", "neutral")
+                    if prev_investment and current_investment != prev_investment:
+                        milestones.append({
+                            "date": out_date,
+                            "type": "investment_change",
+                            "text": f"Investment shifted: {prev_investment} -> {current_investment}",
+                            "detail": "",
+                        })
+                    prev_investment = current_investment
+
+                    # Learning log entries
+                    learning_log = out_item.get("learning_log", [])
+                    if isinstance(learning_log, list):
+                        for entry in learning_log:
+                            if isinstance(entry, dict):
+                                milestones.append({
+                                    "date": out_date,
+                                    "type": "stance_change",
+                                    "text": entry.get("lesson", entry.get("text", "")),
+                                    "detail": entry.get("detail", ""),
+                                })
+            except Exception:
+                pass
+
+            # Also check LEARNING# records
+            try:
+                learn_resp = table.query(
+                    KeyConditionExpression=Key("pk").eq(coach_pk) & Key("sk").begins_with("LEARNING#"),
+                    ScanIndexForward=False,
+                    Limit=20,
+                )
+                for l_item in learn_resp.get("Items", []):
+                    l_item = _decimal_to_float(l_item)
+                    l_date = l_item.get("sk", "").replace("LEARNING#", "")
+                    l_type = l_item.get("type", "stance_change")
+                    milestones.append({
+                        "date": l_date,
+                        "type": l_type if l_type in ("stance_change", "prediction_resolved", "surprise", "investment_change") else "stance_change",
+                        "text": l_item.get("lesson", l_item.get("revised_position", l_item.get("text", ""))),
+                        "detail": l_item.get("detail", l_item.get("evidence", "")),
+                    })
+            except Exception:
+                pass
+
+            # Sort by date descending, deduplicate by text
+            milestones.sort(key=lambda m: m.get("date", ""), reverse=True)
+            seen_texts = set()
+            unique_milestones = []
+            for m in milestones:
+                key = m.get("text", "")[:80]
+                if key and key not in seen_texts:
+                    seen_texts.add(key)
+                    unique_milestones.append(m)
+
+            return _ok({
+                "coach_id": coach_id,
+                "coach_name": _tl_coach_names[coach_id],
+                "milestones": unique_milestones[:50],
+            }, cache_seconds=600)
+        except Exception as _e:
+            print(f"[WARN] /api/coach_timeline failed: {_e}")
+            return _ok({"coach_id": coach_id if 'coach_id' in dir() else "", "coach_name": "", "milestones": []}, cache_seconds=60)
 
     # Weekly Priority (GET — integrator synthesis)
     if path == "/api/weekly_priority":
