@@ -1,8 +1,8 @@
-# Handover — v6.0.2: Observatory Intelligence Fixes + Coach Bio Page
+# Handover — v6.1.0: Intelligence Layer V2 Session 1 (Foundation)
 
 **Date:** 2026-04-07
-**Session span:** 2026-04-06 → 2026-04-07 (continued session)
-**Scope:** Fixed character level display, coach data blindness, voice/goals injection, Pulse rendering, and new /coaches/ bio page.
+**Session span:** 2026-04-06 → 2026-04-07 (extended multi-session)
+**Scope:** Intelligence Layer V2 Session 1 — observatory persona consolidation, goals architecture, shared intelligence utilities (data inventory, data maturity, coach preamble), first-person voice enforcement.
 
 ## What Changed
 
@@ -185,4 +185,12 @@ Seeded all new partitions for coach intelligence:
 | Coach DDB Partitions | 6 partition families |
 | Test Results | 1103 passed, 1 infra-only failure |
 | Site Pages | 73 (added /coaches/) |
-| Version | v6.0.2 |
+| Shared Layer Modules | 18 (added intelligence_common.py) |
+| Board Members | 18 (added amara_patel, victor_reyes, nathan_reeves, henning_brandt) |
+| Version | v6.1.0 |
+
+## Next Session: Intelligence Layer V2 Session 2 (Cold-Start Voice System)
+- Implement three-phase voice (orientation/emerging/established) with per-coach thresholds
+- Wire phase detection into `build_data_maturity()` — already built, needs threshold refinement
+- Inject phase-appropriate prompt templates (orientation = intro mode, emerging = hedged, established = full analytical)
+- See `docs/INTELLIGENCE_LAYER_V2_SPEC.md` Workstream 2 for full design

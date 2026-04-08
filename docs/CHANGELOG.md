@@ -1,3 +1,33 @@
+## v6.1.0 — Intelligence Layer V2 Session 1: Foundation (2026-04-07)
+
+Intelligence Layer V2 foundation — shared utilities, goals architecture, data inventory/maturity, observatory persona consolidation.
+
+### Workstream 0: Observatory Coach Architecture Consolidation
+- Added 4 new members to `board_of_directors.json`: Dr. Amara Patel (glucose), Dr. Victor Reyes (physical), Dr. Nathan Reeves (mind), Dr. Henning Brandt (explorer)
+- Added `observatory` feature key to 5 existing members (sarah_chen, marcus_webb, lisa_park, james_okafor, maya_rodriguez)
+- Fixed remaining real names in board config (paul_conti → Nathan Reeves, rhonda_patrick → Amara Patel, layne_norton → Marcus Webb)
+- Board config v3.0.0 — 18 members total
+
+### Workstream 5: Goals Architecture
+- Created `config/user_goals.json` with mission, targets (null — Matthew fills in), philosophy, constraints, coach briefing
+- Uploaded to S3
+
+### Shared Intelligence Utilities
+- Created `lambdas/intelligence_common.py` — new shared layer module (17→18 modules)
+  - `build_data_inventory()` — queries DynamoDB for existence/recency of all data partitions
+  - `build_data_maturity()` — per-domain phase calculation (orientation/emerging/established)
+  - `load_goals_config()` — cached S3 reader for user goals
+  - `build_coach_preamble()` — standard context block injected into every coach prompt (voice directive, goals, data maturity, inventory, interpretation rules)
+
+### Observatory Lambda Updates
+- `ai_expert_analyzer_lambda.py` now imports and injects intelligence preamble into every coach prompt
+- First-person voice directive enforced: "You ARE Dr. [Name]. Say 'I' not 'Dr. [Name]'."
+- Data inventory block prevents coaches from claiming data is missing when it exists
+- Data maturity phase (orientation/emerging/established) controls voice template
+- Goals context injected with null-safe target display
+
+---
+
 ## v6.0.0 — Coach Intelligence Architecture (2026-04-06)
 
 Major architectural evolution: stateless prompt templates replaced by persistent, stateful AI coaching system with episodic memory, cross-coach communication, prediction tracking, and narrative orchestration.

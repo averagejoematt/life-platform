@@ -1,0 +1,46 @@
+{
+  "version": "1.0",
+  "mission": "12-month body recomposition for longevity",
+  "start_date": "2026-04-01",
+  "end_date": "2027-03-31",
+  "start_weight_lbs": 307,
+
+  "targets": {
+    "weight": {
+      "goal_lbs": null,
+      "interim_milestones": []
+    },
+    "body_composition": {
+      "goal_body_fat_pct": null,
+      "goal_lean_mass_lbs": null
+    },
+    "training": {
+      "weekly_sessions_target": null,
+      "zone2_minutes_per_week": null,
+      "strength_sessions_per_week": null
+    },
+    "nutrition": {
+      "daily_calories_target": null,
+      "daily_protein_min_g": null,
+      "daily_fiber_min_g": null
+    },
+    "biomarkers": {
+      "resting_hr_target_bpm": null,
+      "hrv_target_ms": null
+    },
+    "behavioral": {
+      "journal_entries_per_week": null,
+      "habit_adherence_pct": null
+    }
+  },
+
+  "philosophy": "Training for longevity, not aesthetics. Peter Attia centenarian framework. Progressive, sustainable deficit — no crash dieting.",
+
+  "known_constraints": [
+    "History of sedentary lifestyle",
+    "Starting from high body weight — joint protection matters",
+    "Building the platform simultaneously — time management tension"
+  ],
+
+  "coach_briefing": "Matthew is in the first weeks of a 12-month body recomposition experiment. He started at 307 lbs. He has not yet begun structured training — current movement is walking and daily steps. His current caloric intake is approximately 1,500 kcal/day with ~150g protein. He has a DEXA scan from March 2026. His primary motivation is longevity and health-span, not aesthetics. He is building this health platform simultaneously as both a personal tool and a proof-of-concept, which means he sometimes prioritizes platform development over health behaviors."
+}
