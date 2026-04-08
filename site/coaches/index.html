@@ -320,6 +320,143 @@
       padding: var(--space-4) 0;
     }
 
+    /* ── Coach Timeline ── */
+    .cd-timeline-section {
+      padding: var(--space-12) var(--page-padding);
+      max-width: var(--content-width);
+      margin: 0 auto;
+      border-top: 1px solid var(--border);
+    }
+    .cd-timeline-section__eyebrow {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-4);
+    }
+    .cd-timeline-section__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      line-height: var(--lh-heading);
+      letter-spacing: var(--ls-display);
+      margin-bottom: var(--space-4);
+    }
+    .cd-timeline-section__title span { color: var(--accent); }
+    .cd-timeline-section__sub {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      margin-bottom: var(--space-8);
+    }
+    .cd-timeline-tabs {
+      display: flex;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+      margin-bottom: var(--space-8);
+    }
+    .cd-timeline-tab {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: var(--space-2) var(--space-4);
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .cd-timeline-tab:hover {
+      border-color: rgba(255,255,255,0.15);
+      color: var(--text);
+    }
+    .cd-timeline-tab--active {
+      border-color: rgba(255,255,255,0.2);
+      color: var(--text);
+      background: rgba(255,255,255,0.05);
+    }
+    .cd-timeline-tab__dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .cd-tl-container {
+      position: relative;
+      padding-left: var(--space-8);
+      max-width: var(--prose-width);
+    }
+    .cd-tl-container::before {
+      content: '';
+      position: absolute;
+      left: 3px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--border);
+    }
+    .cd-tl-container[data-accent-color]::before {
+      background: var(--tl-accent, var(--border));
+    }
+    .cd-tl-item {
+      position: relative;
+      padding-bottom: var(--space-6);
+    }
+    .cd-tl-item::before {
+      content: '';
+      position: absolute;
+      left: calc(-1 * var(--space-8) + 0px);
+      top: 6px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--tl-accent, var(--accent));
+      border: 2px solid #080c0a;
+    }
+    .cd-tl-item--stance_change::before { background: #818cf8; }
+    .cd-tl-item--prediction_resolved::before { background: #22c55e; }
+    .cd-tl-item--surprise::before { background: #f59e0b; }
+    .cd-tl-item--investment_change::before { background: #e879f9; }
+    .cd-tl-date {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      margin-bottom: var(--space-1);
+    }
+    .cd-tl-type {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      padding: 1px 6px;
+      border-radius: 3px;
+      display: inline-block;
+      margin-bottom: var(--space-2);
+    }
+    .cd-tl-type--stance_change { background: rgba(129,140,248,0.15); color: #818cf8; }
+    .cd-tl-type--prediction_resolved { background: rgba(34,197,94,0.15); color: #22c55e; }
+    .cd-tl-type--surprise { background: rgba(245,158,11,0.15); color: #f59e0b; }
+    .cd-tl-type--investment_change { background: rgba(232,121,249,0.15); color: #e879f9; }
+    .cd-tl-text {
+      font-size: var(--text-sm);
+      color: var(--text);
+      line-height: var(--lh-body);
+    }
+    .cd-tl-detail {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      margin-top: var(--space-1);
+      line-height: var(--lh-body);
+    }
+    .cd-tl-empty {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      font-style: italic;
+      padding: var(--space-4) 0;
+    }
+
     /* ── How It Works ── */
     .cd-how-list {
       list-style: none;
@@ -462,7 +599,31 @@
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     5. HOW IT WORKS
+     5. COACH LEARNING TIMELINE
+     ═══════════════════════════════════════════════════════════ -->
+<section class="cd-timeline-section">
+  <div class="cd-timeline-section__eyebrow">Epistemic growth</div>
+  <h2 class="cd-timeline-section__title">Coach <span>Timeline</span></h2>
+  <p class="cd-timeline-section__sub">Select a coach to see stance changes, resolved predictions, surprises, and learning milestones.</p>
+
+  <div class="cd-timeline-tabs" id="cd-tl-tabs-mount">
+    <button class="cd-timeline-tab" data-coach="sleep"><div class="cd-timeline-tab__dot" style="background:#818cf8"></div>Sleep</button>
+    <button class="cd-timeline-tab" data-coach="nutrition"><div class="cd-timeline-tab__dot" style="background:#10b981"></div>Nutrition</button>
+    <button class="cd-timeline-tab" data-coach="training"><div class="cd-timeline-tab__dot" style="background:#3db88a"></div>Training</button>
+    <button class="cd-timeline-tab" data-coach="mind"><div class="cd-timeline-tab__dot" style="background:#a78bfa"></div>Mind</button>
+    <button class="cd-timeline-tab" data-coach="physical"><div class="cd-timeline-tab__dot" style="background:#f59e0b"></div>Physical</button>
+    <button class="cd-timeline-tab" data-coach="glucose"><div class="cd-timeline-tab__dot" style="background:#2dd4bf"></div>Glucose</button>
+    <button class="cd-timeline-tab" data-coach="labs"><div class="cd-timeline-tab__dot" style="background:#5ba4cf"></div>Labs</button>
+    <button class="cd-timeline-tab" data-coach="explorer"><div class="cd-timeline-tab__dot" style="background:#e879f9"></div>Explorer</button>
+  </div>
+
+  <div id="cd-tl-mount">
+    <div class="cd-tl-empty">Select a coach above to view their learning timeline.</div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     6. HOW IT WORKS
      ═══════════════════════════════════════════════════════════ -->
 <section class="cd-section">
   <div class="cd-section__eyebrow">Under the hood</div>
@@ -492,7 +653,7 @@
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     6. ELENA CALLOUT
+     7. ELENA CALLOUT
      ═══════════════════════════════════════════════════════════ -->
 <section class="cd-elena">
   <div class="cd-elena__box">
@@ -653,6 +814,63 @@
       predHtml += '</div>';
       predMount.innerHTML = predHtml;
     }
+
+    // 5. Coach Learning Timeline
+    var _tlTypeLabels = {
+      stance_change: 'Stance Change',
+      prediction_resolved: 'Prediction Resolved',
+      surprise: 'Surprise',
+      investment_change: 'Investment Shift'
+    };
+
+    function loadTimeline(coachId) {
+      var mount = document.getElementById('cd-tl-mount');
+      var color = _coachColors[coachId] || 'rgba(255,255,255,0.3)';
+      mount.innerHTML = '<div class="cd-loading">Loading timeline...</div>';
+      mount.style.setProperty('--tl-accent', color);
+
+      fetch('/api/coach_timeline?coach_id=' + encodeURIComponent(coachId))
+        .then(function(r) { if (!r.ok) throw new Error('API error'); return r.json(); })
+        .then(function(tData) {
+          var milestones = tData.milestones || [];
+          if (milestones.length === 0) {
+            mount.innerHTML = '<div class="cd-tl-empty">No milestones recorded yet for ' + _esc(tData.coach_name || coachId) + '.</div>';
+            return;
+          }
+          var html = '<div class="cd-tl-container" style="--tl-accent:' + color + '">';
+          milestones.forEach(function(m) {
+            var typeLabel = _tlTypeLabels[m.type] || m.type;
+            var dateStr = m.date || '';
+            if (dateStr) {
+              try {
+                var d = new Date(dateStr + 'T12:00:00Z');
+                dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+              } catch(e2) {}
+            }
+            html +=
+              '<div class="cd-tl-item cd-tl-item--' + (m.type || 'stance_change') + '">' +
+                '<div class="cd-tl-date">' + _esc(dateStr) + '</div>' +
+                '<span class="cd-tl-type cd-tl-type--' + (m.type || 'stance_change') + '">' + _esc(typeLabel) + '</span>' +
+                '<div class="cd-tl-text">' + _esc(m.text) + '</div>' +
+                (m.detail ? '<div class="cd-tl-detail">' + _esc(m.detail) + '</div>' : '') +
+              '</div>';
+          });
+          html += '</div>';
+          mount.innerHTML = html;
+        })
+        .catch(function() {
+          mount.innerHTML = '<div class="cd-tl-empty">Unable to load timeline data.</div>';
+        });
+    }
+
+    document.getElementById('cd-tl-tabs-mount').addEventListener('click', function(ev) {
+      var btn = ev.target.closest('.cd-timeline-tab');
+      if (!btn) return;
+      var coachId = btn.getAttribute('data-coach');
+      document.querySelectorAll('.cd-timeline-tab').forEach(function(b) { b.classList.remove('cd-timeline-tab--active'); });
+      btn.classList.add('cd-timeline-tab--active');
+      loadTimeline(coachId);
+    });
 
   } catch(e) {
     // Graceful fallback — show static coach bios
