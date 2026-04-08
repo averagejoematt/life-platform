@@ -1,4 +1,4 @@
-# Handover — v6.1.0: Intelligence Layer V2 Session 1 (Foundation)
+# Handover — v6.4.0: Intelligence Layer V2 Complete (All 7 Workstreams)
 
 **Date:** 2026-04-07
 **Session span:** 2026-04-06 → 2026-04-07 (extended multi-session)
@@ -187,10 +187,22 @@ Seeded all new partitions for coach intelligence:
 | Site Pages | 73 (added /coaches/) |
 | Shared Layer Modules | 18 (added intelligence_common.py) |
 | Board Members | 18 (added amara_patel, victor_reyes, nathan_reeves, henning_brandt) |
-| Version | v6.1.0 |
+| MCP Tools | 118 |
+| Version | v6.4.0 |
 
-## Next Session: Intelligence Layer V2 Session 2 (Cold-Start Voice System)
-- Implement three-phase voice (orientation/emerging/established) with per-coach thresholds
-- Wire phase detection into `build_data_maturity()` — already built, needs threshold refinement
-- Inject phase-appropriate prompt templates (orientation = intro mode, emerging = hedged, established = full analytical)
-- See `docs/INTELLIGENCE_LAYER_V2_SPEC.md` Workstream 2 for full design
+## Intelligence Layer V2 — All Sessions Complete
+
+| Session | Workstream | Status |
+|---------|-----------|--------|
+| S1 | W0 Persona Consolidation + W5 Goals | Complete — board v3.0, user_goals.json, intelligence_common.py |
+| S2 | W2 Cold-Start Voice | Complete — 3-phase voice, thresholds refined |
+| S3 | W4 Intelligence Validator | Complete — 5 checks, DDB partition, MCP tool |
+| S4 | W1 Coach Synthesis | Complete — Dr. Nakamura, /api/weekly_priority, cross-domain notes |
+| S5 | W3 Action Completion Loop | Complete — DDB tracking, auto-detection, MCP tools |
+| S6 | W6 Builder's Paradox | Complete — score computation, Maya integration, journal prompt |
+
+## What's Next
+- Tune voice specs and thresholds as data accumulates (Phase 6 refinement)
+- /coaching/ dashboard page (deferred — standalone design session)
+- Inline correction mode for validator (Mode B — re-prompt on errors)
+- Surface "Open Actions" widget on homepage Pulse section

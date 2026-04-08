@@ -445,6 +445,28 @@ experiment" — these are periodic lab draws over time.
                 inventory=_inventory,
                 maturity=_maturity,
             )
+            # Builder's Paradox: inject into mind coach prompt
+            if expert_key == "mind":
+                try:
+                    from intelligence_common import compute_builders_paradox_score
+                    bp = compute_builders_paradox_score(days=7)
+                    bp_block = (
+                        f"\nBUILDER'S PARADOX CHECK:\n"
+                        f"This week's score: {bp['score']}/100 ({bp['label']})\n"
+                        f"Platform tasks completed: {bp['platform_tasks']}\n"
+                        f"Workouts: {bp['workouts']}\n"
+                        f"Journal entries: {bp['journal_entries']}\n"
+                        f"Habit adherence: {bp['habit_adherence_pct']}%\n"
+                        f"Avg daily steps: {bp['avg_steps']}\n"
+                        f"\n{bp['interpretation']}\n"
+                        f"\nIf score > 50: You MUST address this directly. Not as a side note — "
+                        f"as the lead finding. The question to ask: \"Is the building serving "
+                        f"the transformation, or replacing it?\" Be direct. Matthew respects "
+                        f"honesty over comfort.\n"
+                    )
+                    preamble_block += bp_block
+                except Exception as _bp_e:
+                    logger.warning("Builder's Paradox computation failed: %s", _bp_e)
         except Exception as _e:
             logger.warning("Preamble generation failed: %s — proceeding without", _e)
             preamble_block = f"VOICE: Write in FIRST PERSON. You ARE {p['name']}. Say \"I\" not \"{p['name']}\". Address Matthew directly as \"you\".\n"
@@ -506,7 +528,7 @@ FRESHNESS REQUIREMENTS:
 After your analysis, on separate lines write exactly:
 KEY RECOMMENDATION: [One specific behavioral action for this week. 1-2 sentences max. Concrete enough to act on tomorrow.]
 ELENA QUOTE: [One sentence in Elena Voss's voice — third person, literary journalist. Elena sees what YOUR discipline blinds you to. If you focused on sleep architecture, she notices the journal entry about late-night screen time. If you talked macros, she sees the emotional eating pattern. She names the cross-domain observation you would make if you could see outside your own expertise. Example: "Five nights of data and his body is already telling a quieter story than the hours suggest." Never aspirational — just the observation the expert missed.]
-{"JOURNALING PROMPT: [A single reflective question for Matthew — something he can sit with before writing. Make it specific to what the data revealed this week.]" if expert_key == "mind" else ""}
+{"JOURNALING PROMPT: [A single reflective question for Matthew — something he can sit with before writing. Make it specific to what the data revealed this week. If the Builder's Paradox score is above 50, the prompt MUST address the building-vs-doing tension: e.g., 'Is the building serving the transformation this week, or the other way around?']" if expert_key == "mind" else ""}
 
 Write only the analysis — no preamble, no "Here is my analysis:", just paragraphs followed by the tagged lines."""
 
