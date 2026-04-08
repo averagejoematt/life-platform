@@ -344,6 +344,101 @@
       max-width: 600px;
     }
 
+    /* ── Coaching intelligence widgets ──────────────────────── */
+    .h-intel-strip {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-6) var(--page-padding);
+      display: flex;
+      gap: var(--space-4);
+      border-bottom: 1px solid var(--border);
+    }
+    .h-intel-priority {
+      flex: 1;
+      min-width: 0;
+      background: rgba(99, 102, 241, 0.04);
+      border: 1px solid rgba(99, 102, 241, 0.12);
+      border-left: 3px solid #6366f1;
+      padding: var(--space-4) var(--space-5);
+      text-decoration: none;
+      display: block;
+      transition: background var(--dur-fast), border-color var(--dur-fast);
+    }
+    .h-intel-priority:hover {
+      background: rgba(99, 102, 241, 0.08);
+      border-color: rgba(99, 102, 241, 0.2);
+    }
+    .h-intel-priority__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: #6366f1;
+      margin-bottom: var(--space-2);
+    }
+    .h-intel-priority__text {
+      font-size: var(--text-sm);
+      color: var(--text);
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      margin-bottom: var(--space-2);
+    }
+    .h-intel-priority__attr {
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+    }
+    .h-intel-actions {
+      flex: 1;
+      min-width: 0;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      display: flex;
+      gap: var(--space-2);
+      align-items: flex-start;
+      padding: var(--space-2) 0;
+    }
+    .h-intel-actions::-webkit-scrollbar { display: none; }
+    .h-intel-chip {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      padding: var(--space-2) var(--space-3);
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+      white-space: nowrap;
+      text-decoration: none;
+      transition: background var(--dur-fast);
+    }
+    .h-intel-chip:hover { background: rgba(255,255,255,0.06); }
+    .h-intel-chip__dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .h-intel-chip__text {
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .h-intel-chip__age {
+      font-family: var(--font-mono);
+      color: var(--text-faint);
+      font-size: 10px;
+    }
+    .h-intel-done {
+      font-size: var(--text-xs);
+      color: var(--accent);
+      padding: var(--space-4) 0;
+      white-space: nowrap;
+    }
+
     /* ── Responsive ─────────────────────────────────────────── */
     @media (max-width: 900px) {
       .h-hero {
@@ -368,6 +463,7 @@
       }
       .h-pullquote--left  { padding-right: var(--page-padding); }
       .h-pullquote--right { padding-left: var(--page-padding); }
+      .h-intel-strip { flex-direction: column; }
     }
     @media (max-width: 768px) {
       .h-data-spread {
@@ -525,6 +621,20 @@
   <div style="font-size:var(--text-sm);color:var(--text-faint);line-height:1.7;margin-top:var(--space-1);font-style:italic;">Made public because accountability needs an audience.</div>
 </div>
 <div id="amj-since-last-visit"></div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     1c. COACHING INTELLIGENCE WIDGETS
+     ═══════════════════════════════════════════════════════════ -->
+<div class="h-intel-strip" id="h-intel-strip" style="display:none">
+  <a href="/coaches/" class="h-intel-priority" id="h-intel-priority">
+    <div class="h-intel-priority__label">Weekly Priority</div>
+    <div class="h-intel-priority__text" id="h-intel-priority-text">Loading...</div>
+    <div class="h-intel-priority__attr" id="h-intel-priority-attr">Dr. Nakamura &middot; Integrative Health</div>
+  </a>
+  <div class="h-intel-actions" id="h-intel-actions">
+  </div>
+</div>
+
 <section id="amj-pulse-section" style="display:none"><div class="pulse-feed"><div class="pulse-feed__header">The Pulse</div><div class="pulse-feed__list" id="pulse-list"></div><div class="pulse-feed__fade"></div><div class="pulse-feed__load-more" id="pulse-load-more" style="display:none"><button onclick="loadMorePulse()">Load more</button></div></div></section>
 <!-- ═══════════════════════════════════════════════════════════
      4. SECTION HEADER: The experiment
@@ -988,6 +1098,77 @@
   } catch(e) {
     // Silent fail — static fallback content already visible
   }
+})();
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════
+     COACHING INTELLIGENCE WIDGETS — async fetch
+     ═══════════════════════════════════════════════════════════ -->
+<script>
+(async function() {
+  var _coachColors = {
+    sleep:'#818cf8', nutrition:'#10b981', training:'#3db88a',
+    mind:'#a78bfa', physical:'#f59e0b', glucose:'#2dd4bf',
+    labs:'#5ba4cf', explorer:'#e879f9'
+  };
+  function _esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+  function daysAgo(ds) {
+    if (!ds) return '';
+    var diff = Math.floor((Date.now() - new Date(ds + 'T12:00:00Z').getTime()) / 86400000);
+    return diff <= 0 ? '' : diff + 'd';
+  }
+
+  // Widget A: Weekly Priority
+  try {
+    var pr = await fetch('/api/weekly_priority');
+    if (pr.ok) {
+      var pd = await pr.json();
+      if (pd.weekly_priority) {
+        var strip = document.getElementById('h-intel-strip');
+        var txt = document.getElementById('h-intel-priority-text');
+        var attr = document.getElementById('h-intel-priority-attr');
+        txt.textContent = pd.weekly_priority;
+        var attrStr = 'Dr. Nakamura \u00b7 Integrative Health';
+        if (pd.generated_at) {
+          try {
+            var gd = new Date(pd.generated_at);
+            attrStr += ' \u00b7 ' + gd.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+          } catch(e){}
+        }
+        attr.textContent = attrStr;
+        strip.style.display = 'flex';
+      }
+    }
+  } catch(e) {}
+
+  // Widget B: Open Actions Strip
+  try {
+    var ar = await fetch('/api/coaching-dashboard');
+    if (ar.ok) {
+      var ad = await ar.json();
+      var actions = ad.open_actions || [];
+      var actionsEl = document.getElementById('h-intel-actions');
+      var strip = document.getElementById('h-intel-strip');
+
+      if (actions.length === 0) {
+        actionsEl.innerHTML = '<a href="/coaches/" class="h-intel-done">All actions done &#10003;</a>';
+      } else {
+        var html = '';
+        actions.forEach(function(a) {
+          var color = _coachColors[a.coach_id] || 'rgba(255,255,255,0.3)';
+          var age = daysAgo(a.issued_date);
+          html +=
+            '<a href="/coaches/" class="h-intel-chip">' +
+              '<span class="h-intel-chip__dot" style="background:' + color + '"></span>' +
+              '<span class="h-intel-chip__text">' + _esc(a.action_text || '') + '</span>' +
+              (age ? '<span class="h-intel-chip__age">' + age + '</span>' : '') +
+            '</a>';
+        });
+        actionsEl.innerHTML = html;
+      }
+      strip.style.display = 'flex';
+    }
+  } catch(e) {}
 })();
 </script>
 

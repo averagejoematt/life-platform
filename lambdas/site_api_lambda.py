@@ -7001,6 +7001,8 @@ ROUTES = {
     # Phase 1: Reader engagement
     "/api/changes-since":       None,  # GET with ?ts= query param
     "/api/observatory_week":    None,  # GET with ?domain= query param
+    # Coaching Dashboard
+    "/api/coaching-dashboard":  None,  # GET — assembled coaching dashboard data
 }
 
 
@@ -7393,6 +7395,117 @@ def lambda_handler(event, context):
         except Exception as _e:
             print(f"[WARN] /api/coach_analysis failed: {_e}")
             return _ok({"coach_id": coach_id, "domain": domain, "analysis": None}, cache_seconds=60)
+
+    # Coaching Dashboard (GET — assembled dashboard data)
+    if path == "/api/coaching-dashboard":
+        try:
+            _cd_coach_display = {
+                "sleep": {"coach_id": "sleep", "name": "Dr. Lisa Park", "initials": "LP", "title": "Sleep & Circadian Rhythm Specialist", "color": "#818cf8", "observatory_link": "/sleep/"},
+                "nutrition": {"coach_id": "nutrition", "name": "Dr. Marcus Webb", "initials": "MW", "title": "Evidence-Based Nutrition", "color": "#10b981", "observatory_link": "/nutrition/"},
+                "training": {"coach_id": "training", "name": "Dr. Sarah Chen", "initials": "SC", "title": "Exercise Physiology & Strength", "color": "#3db88a", "observatory_link": "/training/"},
+                "mind": {"coach_id": "mind", "name": "Dr. Nathan Reeves", "initials": "NR", "title": "Psychiatrist — Behavioral Patterns", "color": "#a78bfa", "observatory_link": "/mind/"},
+                "physical": {"coach_id": "physical", "name": "Dr. Victor Reyes", "initials": "VR", "title": "Longevity & Body Composition", "color": "#f59e0b", "observatory_link": "/physical/"},
+                "glucose": {"coach_id": "glucose", "name": "Dr. Amara Patel", "initials": "AP", "title": "Metabolic Health & CGM", "color": "#2dd4bf", "observatory_link": "/glucose/"},
+                "labs": {"coach_id": "labs", "name": "Dr. James Okafor", "initials": "JO", "title": "Clinical Pathology & Preventive Labs", "color": "#5ba4cf", "observatory_link": "/labs/"},
+                "explorer": {"coach_id": "explorer", "name": "Dr. Henning Brandt", "initials": "HB", "title": "Biostatistics & N=1 Research", "color": "#e879f9", "observatory_link": "/explorer/"},
+            }
+            _cd_coach_id_map = {
+                "sleep": "sleep_coach", "nutrition": "nutrition_coach", "training": "training_coach",
+                "mind": "mind_coach", "physical": "physical_coach", "glucose": "glucose_coach",
+                "labs": "labs_coach", "explorer": "explorer_coach",
+            }
+
+            # 1. Weekly priority from integrator
+            _cd_priority = {"text": None, "coach_name": "Dr. Kai Nakamura", "generated_at": None}
+            try:
+                _cd_int = table.get_item(Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": "EXPERT#integrator"}).get("Item")
+                if _cd_int:
+                    _cd_int = _decimal_to_float(_cd_int)
+                    _cd_priority["text"] = _cd_int.get("analysis", "")
+                    _cd_priority["generated_at"] = _cd_int.get("generated_at", "")
+            except Exception:
+                pass
+
+            # 2. Open actions from coach_actions source
+            _cd_actions = []
+            try:
+                _cd_act_resp = table.query(
+                    KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}coach_actions"),
+                    Limit=50,
+                )
+                for _act in _cd_act_resp.get("Items", []):
+                    _act = _decimal_to_float(_act)
+                    if _act.get("status") == "open":
+                        _cd_actions.append({
+                            "coach_id": _act.get("coach_id", ""),
+                            "domain": _act.get("domain", ""),
+                            "action_text": _act.get("action_text", _act.get("action", "")),
+                            "issued_date": _act.get("issued_date", _act.get("sk", "").replace("DATE#", "")),
+                            "status": "open",
+                        })
+            except Exception:
+                pass
+
+            # 3. Coach thread summaries + predictions
+            _cd_coaches = []
+            _cd_predictions = []
+            for _cd_domain, _cd_info in _cd_coach_display.items():
+                _cd_coach_pk = f"COACH#{_cd_coach_id_map[_cd_domain]}"
+                coach_entry = dict(_cd_info)
+                coach_entry["position_summary"] = ""
+                coach_entry["emotional_investment"] = "neutral"
+                coach_entry["prediction_count"] = 0
+                coach_entry["data_phase"] = "established"
+
+                # Latest output for position_summary
+                try:
+                    _cd_out = table.query(
+                        KeyConditionExpression=Key("pk").eq(_cd_coach_pk) & Key("sk").begins_with("OUTPUT#"),
+                        ScanIndexForward=False, Limit=1,
+                    )
+                    _cd_out_items = _cd_out.get("Items", [])
+                    if _cd_out_items:
+                        _cd_out_item = _decimal_to_float(_cd_out_items[0])
+                        coach_entry["position_summary"] = (
+                            _cd_out_item.get("position_summary")
+                            or _cd_out_item.get("observatory_summary", "")[:200]
+                            or _cd_out_item.get("content", "")[:200]
+                        )
+                        coach_entry["emotional_investment"] = _cd_out_item.get("emotional_investment", "neutral")
+                        # Count predictions
+                        preds = _cd_out_item.get("predictions", [])
+                        if isinstance(preds, list):
+                            coach_entry["prediction_count"] = len(preds)
+                            for _p in preds[-3:]:
+                                if isinstance(_p, dict):
+                                    _cd_predictions.append({
+                                        "coach_id": _cd_domain,
+                                        "text": _p.get("text", _p.get("prediction", "")),
+                                        "confidence": _p.get("confidence", "medium"),
+                                        "status": _p.get("status", "pending"),
+                                        "date": _cd_out_item.get("sk", "").replace("OUTPUT#", ""),
+                                    })
+                except Exception:
+                    pass
+
+                _cd_coaches.append(coach_entry)
+
+            # Sort coaches: invested/concerned first, then neutral
+            _ei_order = {"concerned": 0, "invested": 1, "curious": 2, "neutral": 3}
+            _cd_coaches.sort(key=lambda c: _ei_order.get(c.get("emotional_investment", "neutral"), 3))
+
+            # Limit predictions to 10 most recent
+            _cd_predictions = _cd_predictions[-10:]
+
+            return _ok({
+                "weekly_priority": _cd_priority,
+                "open_actions": _cd_actions,
+                "coaches": _cd_coaches,
+                "predictions": _cd_predictions,
+            }, cache_seconds=300)
+        except Exception as _e:
+            print(f"[WARN] /api/coaching-dashboard failed: {_e}")
+            return _ok({"weekly_priority": {}, "open_actions": [], "coaches": [], "predictions": []}, cache_seconds=60)
 
     # Weekly Priority (GET — integrator synthesis)
     if path == "/api/weekly_priority":
