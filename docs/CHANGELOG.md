@@ -1,3 +1,22 @@
+## v6.2.0 — Intelligence Layer V2 Sessions 2-3: Cold-Start Voice + Validator (2026-04-07)
+
+### Session 2: Cold-Start Voice System (Workstream 2)
+- Refined data maturity thresholds: physical coach composite check (DEXA + weight series), labs source corrected (was using whoop count)
+- Three-phase voice (orientation/emerging/established) already built in Session 1 — verified and refined
+
+### Session 3: Intelligence Quality Validator (Workstream 4)
+- 5 validation checks: null_claim_vs_data, stale_action, SOT_violation, cross_coach_contradiction, overconfidence
+- Post-generation validation wired into `ai_expert_analyzer_lambda.py`
+- Results written to `SOURCE#intelligence_quality` DDB partition
+- New MCP tool: `get_intelligence_quality` — query validation flags by severity/coach/date
+- Verified: physical coach regeneration passes with 0 errors, 0 warnings (data blindness eliminated)
+
+### Infrastructure
+- `intelligence_common.py` updated: validator functions + write_quality_results
+- Observatory Lambda updated to layer v35 (was stuck on v25 — manually deployed, not in CDK)
+- MCP registry: 116 tools (updated max bound in tests)
+
+---
 ## v6.1.0 — Intelligence Layer V2 Session 1: Foundation (2026-04-07)
 
 Intelligence Layer V2 foundation — shared utilities, goals architecture, data inventory/maturity, observatory persona consolidation.

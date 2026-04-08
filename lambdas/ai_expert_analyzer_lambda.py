@@ -607,6 +607,30 @@ def generate_and_cache(expert_key):
         item["elena_quote"] = elena_quote
     table.put_item(Item=item)
 
+    # Intelligence Validator V2: post-generation quality check
+    if _HAS_INTELLIGENCE_COMMON:
+        try:
+            from intelligence_common import validate_coach_output, write_quality_results
+            _inventory = build_data_inventory()
+            _maturity = build_data_maturity(_inventory)
+            _flags = validate_coach_output(
+                coach_id=expert_key, domain=expert_key,
+                narrative=analysis_text, inventory=_inventory,
+                maturity=_maturity,
+            )
+            today_str = now.strftime("%Y-%m-%d")
+            write_quality_results(today_str, expert_key, expert_key, _flags)
+            if _flags:
+                err_count = sum(1 for f in _flags if f["severity"] == "error")
+                warn_count = sum(1 for f in _flags if f["severity"] == "warning")
+                logger.warning(
+                    "Quality flags for %s: %d errors, %d warnings — %s",
+                    expert_key, err_count, warn_count,
+                    "; ".join(f["detail"] for f in _flags[:3]),
+                )
+        except Exception as _ve:
+            logger.warning("Intelligence validator failed for %s: %s", expert_key, _ve)
+
     logger.info(f"Cached analysis for {expert_key}: {len(analysis_text)} chars")
     return analysis_text
 
