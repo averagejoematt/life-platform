@@ -1,3 +1,16 @@
+## v6.4.0 — Intelligence Layer V2 Complete (2026-04-07)
+
+### Session 6: Builder's Paradox Detection (Workstream 6)
+- Maya Rodriguez config expanded: builder_paradox_detection, "measuring vs improving" principle
+- `compute_builders_paradox_score()`: platform tasks vs health behaviors (score 0-100)
+- Injected into mind coach prompt — if score > 50, becomes lead finding
+- Journaling prompt Builder's Paradox-aware
+
+### Intelligence Layer V2 — All 7 Workstreams Complete
+W0: Persona consolidation | W1: Synthesis/Integrator | W2: Cold-Start Voice | W3: Action Loop | W4: Validator | W5: Goals | W6: Builder's Paradox
+
+---
+
 ## v6.2.0 — Intelligence Layer V2 Sessions 2-3: Cold-Start Voice + Validator (2026-04-07)
 
 ### Session 2: Cold-Start Voice System (Workstream 2)
