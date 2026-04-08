@@ -48,6 +48,7 @@ import os
 import math
 import time
 import boto3
+from boto3.dynamodb.conditions import Key
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -190,6 +191,19 @@ def fetch_date(source, date_str):
     except Exception:
         return None
 
+def _latest_item(source):
+    """Fetch the most recent record for a source (e.g., dexa, labs, measurements)."""
+    try:
+        r = table.query(
+            KeyConditionExpression=Key("pk").eq(USER_PREFIX + source) & Key("sk").begins_with("DATE#"),
+            ScanIndexForward=False, Limit=1,
+        )
+        items = r.get("Items", [])
+        return d2f(items[0]) if items else None
+    except Exception:
+        return None
+
+
 def fetch_range(source, start, end):
     try:
         r = table.query(
@@ -288,6 +302,11 @@ def gather_daily_data(profile, yesterday):
     habitify    = fetch_date("habitify",     yesterday)
     garmin      = fetch_date("garmin",       yesterday)
     whoop_today = fetch_date("whoop", today.isoformat())
+
+    # DEXA, measurements, labs — latest records (not date-specific; periodic data)
+    dexa = _latest_item("dexa")
+    measurements = _latest_item("measurements")
+    labs_latest = _latest_item("labs")
 
     # MacroFactor workouts — exercise-level detail (v2.2)
     mf_workouts = fetch_date("macrofactor_workouts", yesterday)
@@ -471,6 +490,9 @@ def gather_daily_data(profile, yesterday):
         "todoist": todoist_yesterday,
         "computed_insights": computed_insights,
         "computed_metrics": computed_metrics,   # BS-09: ACWR + training load alert
+        "dexa": dexa,
+        "measurements": measurements,
+        "labs": labs_latest,
     }
 
 
