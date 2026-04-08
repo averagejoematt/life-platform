@@ -1,46 +1,174 @@
 {
   "version": "1.0",
-  "mission": "12-month body recomposition for longevity",
-  "start_date": "2026-04-01",
-  "end_date": "2027-03-31",
-  "start_weight_lbs": 307,
+  "last_updated": "2026-04-07",
+  "updated_by": "matthew_interview",
+
+  "mission": "12-month aggressive body recomposition for longevity, mental health, and athletic performance. This is not Matthew's first transformation — he went from 305 to 190 lbs in 8 months approximately a year ago. He knows how to do this. The challenge is sustaining it.",
+
+  "timeline": {
+    "start_date": "2026-04-01",
+    "end_date": "2027-03-31",
+    "start_weight_lbs": 307,
+    "current_weight_lbs": 295.2,
+    "note": "Initial 12 lbs is primarily water/glycogen. Real fat loss trajectory begins ~Week 3."
+  },
 
   "targets": {
     "weight": {
-      "goal_lbs": null,
-      "interim_milestones": []
+      "goal_lbs": 185,
+      "interim_milestones": [
+        {"lbs": 275, "label": "Month 2", "note": "Glycogen flush complete, real deficit confirmed"},
+        {"lbs": 250, "label": "Month 4", "note": "Halfway point by weight. First DEXA recheck."},
+        {"lbs": 225, "label": "Month 7", "note": "Approaching lean territory. Training volume should be peaking."},
+        {"lbs": 200, "label": "Month 10", "note": "Final push. Watch for metabolic adaptation hard."},
+        {"lbs": 185, "label": "Month 12", "note": "Goal weight. DEXA to confirm composition."}
+      ]
     },
     "body_composition": {
-      "goal_body_fat_pct": null,
-      "goal_lean_mass_lbs": null
+      "goal_body_fat_pct": 25,
+      "current_body_fat_pct": 42.7,
+      "current_lean_mass_lbs": 169,
+      "current_ffmi": 25.2,
+      "lean_mass_floor_lbs": 155,
+      "note": "At 185 lbs and 25% BF = ~139 lbs lean mass, which is a 30 lb lean mass loss from current 169. The coaches should monitor DEXA lean mass closely and flag if loss rate exceeds 25% of total weight lost. The lean_mass_floor of 155 lbs is a hard stop — if DEXA shows lean mass below this, the deficit must be reduced regardless of weight target."
     },
     "training": {
-      "weekly_sessions_target": null,
-      "zone2_minutes_per_week": null,
-      "strength_sessions_per_week": null
+      "current_phase": "ramp",
+      "phases": [
+        {
+          "phase": "Foundation",
+          "months": "1-2",
+          "gym_days_per_week": 5,
+          "structure": "Strength training Mon-Fri, walking after work daily (~3 miles)",
+          "weekend": "Rehab/mobility session + walk or easy run",
+          "notes": "Ramping in. Body is heavy. Joint protection matters. Build the habit before building the load."
+        },
+        {
+          "phase": "Build",
+          "months": "3-5",
+          "gym_days_per_week": 5,
+          "structure": "Strength Mon-Fri, walks transition to rucks",
+          "weekend": "Gym rehab + longer cardio",
+          "two_a_days": true,
+          "notes": "Weight coming down, can increase cardio intensity. Rucking adds load without joint impact."
+        },
+        {
+          "phase": "Peak",
+          "months": "6-9",
+          "gym_days_per_week": 5,
+          "structure": "Strength Mon-Fri, rucks transition to jogging/running",
+          "weekend": "Gym + run",
+          "two_a_days": true,
+          "notes": "Body weight should support running safely. Progressive overload on strength. Zone 2 base should be solid."
+        },
+        {
+          "phase": "Sustain",
+          "months": "10-12",
+          "gym_days_per_week": 5,
+          "structure": "Full training program, running established",
+          "weekend": "Active recovery + long run",
+          "notes": "Focus shifts from weight loss to maintenance and performance. This is where the last cut failed."
+        }
+      ],
+      "rest_philosophy": "Rest when the body needs it. Matthew pushes hard but is not reckless. Whoop recovery score should guide rest days — not a rigid schedule.",
+      "zone2_minutes_per_week_target": 150,
+      "daily_movement_target": "3 miles walking minimum (steps will vary by stride length, roughly 6,000-7,000 steps)"
     },
     "nutrition": {
-      "daily_calories_target": null,
-      "daily_protein_min_g": null,
-      "daily_fiber_min_g": null
+      "daily_calories_target": 1500,
+      "calorie_approach": "Heavy deficit to start, guided by MacroFactor adaptive TDEE. Matthew tolerates aggressive deficits well based on prior experience. He does not starve himself — if genuinely hungry, depleted, or struggling, he eats. The 1,500 target is a baseline, not a ceiling on days the body needs more.",
+      "daily_protein_min_g": 170,
+      "protein_note": "Matthew prioritizes protein above all other macros. At 1,500 kcal, hitting 180g is mechanically difficult (~48% of calories from protein). 170g is the realistic floor. Coaches should celebrate days above 180g rather than criticize days at 160g.",
+      "daily_fiber_min_g": 25,
+      "fiber_note": "Currently averaging 17g. This is a known gap. Difficult to hit 25g at 1,500 kcal without deliberate food choices.",
+      "eating_window": {
+        "type": "intermittent_fasting",
+        "window": "11:30am-7:30pm",
+        "morning_exception": "~80 cal smoothie before window opens. Matthew practices IF for restricted eating window benefit, not strict metabolic fasting. The smoothie is acceptable and not a protocol violation.",
+        "note": "This is intentional and preferred. Coaches should not suggest expanding the window unless metabolic data warrants it."
+      }
+    },
+    "sleep": {
+      "target_bedtime": "9:00 PM",
+      "target_wake": "4:30 AM",
+      "target_hours": 7.5,
+      "note": "Matthew naturally lands around 8h. The 9-4:30 schedule is aspirational and supports morning training. Sleep architecture and efficiency matter more than raw duration."
     },
     "biomarkers": {
-      "resting_hr_target_bpm": null,
-      "hrv_target_ms": null
+      "resting_hr_target_bpm": 55,
+      "hrv_target_ms": 50,
+      "ldl_target_mg_dl": 100,
+      "note": "LDL currently 133, genetically elevated (ABCG8 variant). Exercise and weight loss are the primary interventions. Statin risk is elevated (SLCO1B1 variant). Coaches should track LDL trajectory through labs, not suggest pharmacological intervention."
     },
     "behavioral": {
-      "journal_entries_per_week": null,
-      "habit_adherence_pct": null
+      "journal_entries_per_week": 3,
+      "habit_adherence_target_pct": 80,
+      "note": "Behavioral consistency is the make-or-break variable. See failure_mode below."
     }
   },
 
-  "philosophy": "Training for longevity, not aesthetics. Peter Attia centenarian framework. Progressive, sustainable deficit — no crash dieting.",
+  "philosophy": "Training for longevity, mental health, and athletic performance — not aesthetics, though aesthetics are a welcome side effect. Peter Attia centenarian framework. Aggressive but not reckless deficit. Matthew has done this before and knows what works for his body. The coaches' role is to add precision, catch blind spots, and provide the early warning system that was missing last time.",
+
+  "athlete_profile": {
+    "type": "experienced_repeat_transformer",
+    "prior_transformation": {
+      "start_weight": 305,
+      "end_weight": 190,
+      "duration_months": 8,
+      "approximate_dates": "September 2024 to May 2025",
+      "method": "Aggressive deficit + high training volume + walking/running progression",
+      "outcome": "Successful cut. Regained ~100 lbs over subsequent months due to life crisis."
+    },
+    "athletic_background": "Naturally athletic. When committed, trains with high intensity and volume. Not a beginner — knows the gym, knows the movements, knows progressive overload. The challenge is never the training itself, it's protecting the routine from life disruption.",
+    "weight_cycling_history": "Multiple significant gain/loss cycles. This creates real metabolic and psychological risk that coaches should be aware of. Each cycle potentially impairs metabolic adaptation and reinforces the binge-restrict pattern.",
+    "binge_eating_pattern": "Present. Triggered by routine disruption, stress, and emotional regression. DoorDash is the primary delivery mechanism for binge episodes. The platform tracks food delivery orders specifically for this reason. When delivery frequency rises and training drops, that is the crisis signal."
+  },
+
+  "mental_health_context": {
+    "visibility": "COACHES ONLY — do not surface this section verbatim on public-facing pages. Coaches may reference these themes obliquely in their narratives (e.g., 'the psychological dimension of this transformation') but should not detail specifics publicly.",
+    "drivers": [
+      "Body image and self-esteem issues directly tied to weight",
+      "Social anxiety that intensifies when obese — withdraws from social life",
+      "Perception anxiety — constant awareness of how others perceive him",
+      "Tendency to isolate/hide when heavy, re-engage when lean",
+      "At 37, increasing concern about longevity impact of weight cycling",
+      "Binge eating disorder pattern — not formally diagnosed but behaviorally present"
+    ],
+    "coach_guidance": "The physical transformation IS the mental health intervention. Matthew doesn't need the coaches to be therapists. He needs them to understand that when training drops and isolation increases, it's not laziness — it's a psychological cascade. The best thing the coaches can do is: (1) catch routine disruption early, (2) never shame, (3) recognize that getting back to the gym after a bad week is harder for Matthew than it looks from the outside."
+  },
+
+  "failure_mode": {
+    "pattern": "Life crisis → routine disruption → regression → binge eating → rapid weight regain → social withdrawal → months of zero exercise",
+    "last_trigger": "Sister-in-law's death + having to lay off team members. Routine broke. Regression followed.",
+    "early_warning_signals": [
+      "Training frequency drops below 3 sessions/week for 2 consecutive weeks",
+      "Food delivery orders increase (DoorDash frequency tracked by platform)",
+      "Journal entries stop for 5+ days",
+      "Habit adherence drops below 50%",
+      "Weight trend reverses upward for 7+ consecutive days",
+      "Sleep schedule destabilizes (bedtime after 11pm for 3+ nights)"
+    ],
+    "coach_response": "When early warning signals fire, the coaches should NOT pile on with urgent recommendations. The correct response is: (1) Nakamura acknowledges the signal directly and with empathy, (2) Maya addresses the behavioral pattern, (3) the weekly priority shifts to ONE thing: 'Just get to the gym once this week. Everything else can wait.' The enemy is total shutdown, not a bad week.",
+    "what_was_missing_last_time": "There was no early warning system. No platform watching the signals. No coaches noticing the pattern. By the time Matthew noticed, 100 lbs were back. This platform exists specifically to catch the cascade before it becomes a collapse."
+  },
+
+  "coach_communication": {
+    "tone": "Each coach should have their own distinct personality — not uniform corporate voice. Some can be blunt, some warm, some academic, some direct. Matthew responds to honesty and respects expertise. He does not want to be coddled.",
+    "audience": "Remember that other readers are following this journey publicly. Coach narratives should be interesting and engaging for an outside audience, not just clinically useful for Matthew. The coaches are characters in a public story as much as they are advisors.",
+    "do_not": [
+      "Do not treat Matthew like a first-time dieter who needs basic education",
+      "Do not use generic motivational language ('you got this!' / 'great job!')",
+      "Do not suggest he 'take it slow' unless the data specifically warrants it — he has proven he can handle aggressive approaches",
+      "Do not repeatedly reference his mental health drivers in public-facing content"
+    ]
+  },
 
   "known_constraints": [
-    "History of sedentary lifestyle",
-    "Starting from high body weight — joint protection matters",
-    "Building the platform simultaneously — time management tension"
-  ],
-
-  "coach_briefing": "Matthew is in the first weeks of a 12-month body recomposition experiment. He started at 307 lbs. He has not yet begun structured training — current movement is walking and daily steps. His current caloric intake is approximately 1,500 kcal/day with ~150g protein. He has a DEXA scan from March 2026. His primary motivation is longevity and health-span, not aesthetics. He is building this health platform simultaneously as both a personal tool and a proof-of-concept, which means he sometimes prioritizes platform development over health behaviors."
+    "History of sedentary periods — joint protection matters during ramp phase",
+    "Starting from high body weight — running is not safe until ~250 lbs or below",
+    "Building the Life Platform simultaneously — time management tension between building and doing",
+    "Weight cycling metabolic risk — each cut may be slightly harder than the last",
+    "Statin intolerance risk (SLCO1B1 variant) — LDL management must be lifestyle-driven",
+    "Binge eating pattern — the relationship with food is not straightforward"
+  ]
 }
