@@ -358,7 +358,27 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict,
         "- If a target is \"not yet set\", do NOT invent one. You may suggest one with reasoning.\n"
     )
 
-    # 6. Action history (if provided)
+    # 6. Credibility score (V2.2)
+    try:
+        _cred = load_credibility(domain)
+        _cred_label = _cred.get("label", "nascent")
+        _cred_accuracy = _cred.get("accuracy_pct", 0)
+        _cred_resolved = _cred.get("predictions_resolved", 0)
+        _cred_calibration = _cred.get("calibration", "insufficient_data")
+        parts.append(
+            f"YOUR CREDIBILITY:\n"
+            f"Track record: {_cred_label} ({_cred_resolved} predictions resolved, {_cred_accuracy}% accuracy)\n"
+            f"Calibration: {_cred_calibration}\n"
+        )
+        if _cred_calibration == "over-confident":
+            parts.append(
+                "NOTE: Your high-confidence predictions have been wrong frequently. "
+                "Consider being more measured in your confidence levels.\n"
+            )
+    except Exception:
+        pass
+
+    # 7. Action history (if provided)
     if action_history:
         action_lines = []
         for action in action_history[:5]:
@@ -1270,3 +1290,197 @@ Rules:
             "emotional_investment": "observing",
             "open_questions": [],
         }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CREDIBILITY SCORES (V2.2 Workstream 4)
+# ══════════════════════════════════════════════════════════════════════════════
+
+COACH_IDS_ALL = ["sleep", "nutrition", "training", "mind", "physical", "glucose", "labs", "explorer"]
+
+
+def compute_credibility(coach_id: str) -> dict:
+    """Compute credibility score for a coach based on prediction track record.
+
+    Returns: {score, label, accuracy_pct, calibration, predictions_resolved, notable}
+    """
+    entries = read_coach_thread(coach_id, limit=20)
+
+    all_preds = []
+    for entry in entries:
+        for pred in entry.get("predictions", []):
+            all_preds.append(pred)
+
+    resolved = [p for p in all_preds if p.get("status") in ("confirmed", "refuted")]
+    confirmed = [p for p in resolved if p["status"] == "confirmed"]
+    refuted = [p for p in resolved if p["status"] == "refuted"]
+    pending = [p for p in all_preds if p.get("status") == "pending"]
+
+    total_resolved = len(resolved)
+    accuracy_pct = round(len(confirmed) / total_resolved * 100, 1) if total_resolved > 0 else 0
+
+    # Calibration: do high-confidence predictions actually confirm more?
+    high_conf = [p for p in resolved if p.get("confidence") == "high"]
+    high_conf_right = sum(1 for p in high_conf if p["status"] == "confirmed")
+    if len(high_conf) >= 3:
+        high_accuracy = high_conf_right / len(high_conf)
+        if high_accuracy < 0.5:
+            calibration = "over-confident"
+        elif high_accuracy > 0.8:
+            calibration = "well-calibrated"
+        else:
+            calibration = "developing"
+    else:
+        calibration = "insufficient_data"
+
+    # Label
+    if total_resolved < 5:
+        label = "nascent"
+        score = 30
+    elif accuracy_pct >= 80 and total_resolved >= 15:
+        label = "authoritative"
+        score = 90
+    elif accuracy_pct >= 60 and total_resolved >= 10:
+        label = "reliable"
+        score = 70
+    else:
+        label = "developing"
+        score = 50
+
+    return {
+        "score": score,
+        "label": label,
+        "accuracy_pct": accuracy_pct,
+        "calibration": calibration,
+        "predictions_total": len(all_preds),
+        "predictions_resolved": total_resolved,
+        "confirmed": len(confirmed),
+        "refuted": len(refuted),
+        "pending": len(pending),
+    }
+
+
+def compute_all_credibility() -> dict:
+    """Compute and store credibility for all coaches."""
+    results = {}
+    for cid in COACH_IDS_ALL:
+        cred = compute_credibility(cid)
+        results[cid] = cred
+
+        # Store in DDB
+        try:
+            item = {
+                "pk": f"USER#{USER_ID}",
+                "sk": f"SOURCE#coach_credibility#{cid}",
+                "coach_id": cid,
+                **cred,
+                "computed_at": datetime.now(timezone.utc).isoformat(),
+            }
+            clean = json.loads(json.dumps(item, default=str), parse_float=Decimal)
+            table.put_item(Item=clean)
+        except Exception as e:
+            logger.warning("Failed to store credibility for %s: %s", cid, e)
+
+    return results
+
+
+def load_credibility(coach_id: str) -> dict:
+    """Load cached credibility score for a coach."""
+    try:
+        resp = table.get_item(
+            Key={"pk": f"USER#{USER_ID}", "sk": f"SOURCE#coach_credibility#{coach_id}"}
+        )
+        item = resp.get("Item")
+        return _decimal_to_float(item) if item else {"label": "nascent", "score": 30}
+    except Exception:
+        return {"label": "nascent", "score": 30}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# THREAD SUMMARIZATION (V2.2 Workstream 5)
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def summarize_coach_month(coach_id: str, month: str) -> dict:
+    """Summarize a coach's thread entries for a given month.
+
+    Args:
+        coach_id: e.g. "glucose"
+        month: e.g. "2026-04"
+
+    Returns a compressed summary for prompt injection.
+    """
+    # Query all thread entries for this month
+    start_sk = f"SOURCE#coach_thread#{coach_id}#{month}-01"
+    end_sk = f"SOURCE#coach_thread#{coach_id}#{month}-31~"
+
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}") & Key("sk").between(start_sk, end_sk),
+        )
+        entries = [_decimal_to_float(i) for i in resp.get("Items", [])]
+    except Exception as e:
+        logger.warning("Thread query failed for %s/%s: %s", coach_id, month, e)
+        return {}
+
+    if not entries:
+        return {}
+
+    # Extract summary data
+    positions = [e.get("position_summary", "") for e in entries if e.get("position_summary")]
+    all_preds = []
+    for e in entries:
+        all_preds.extend(e.get("predictions", []))
+    all_surprises = []
+    for e in entries:
+        all_surprises.extend(e.get("surprises", []))
+    stance_changes = []
+    for e in entries:
+        stance_changes.extend(e.get("stance_changes", []))
+
+    # Emotional arc
+    investments = [e.get("emotional_investment", "observing") for e in entries]
+    emotional_arc = " → ".join(dict.fromkeys(investments))  # deduplicated ordered
+
+    confirmed = sum(1 for p in all_preds if p.get("status") == "confirmed")
+    refuted = sum(1 for p in all_preds if p.get("status") == "refuted")
+
+    summary = {
+        "month": month,
+        "entries": len(entries),
+        "position_arc": f"{positions[0][:100]}... → ...{positions[-1][:100]}" if len(positions) >= 2 else (positions[0][:200] if positions else ""),
+        "predictions_made": len(all_preds),
+        "predictions_resolved": {"confirmed": confirmed, "refuted": refuted},
+        "key_surprises": all_surprises[:3],
+        "stance_changes": len(stance_changes),
+        "emotional_arc": emotional_arc,
+    }
+
+    # Store summary
+    try:
+        item = {
+            "pk": f"USER#{USER_ID}",
+            "sk": f"SOURCE#coach_thread_summary#{coach_id}#{month}",
+            "coach_id": coach_id,
+            **summary,
+            "summarized_at": datetime.now(timezone.utc).isoformat(),
+        }
+        clean = json.loads(json.dumps(item, default=str), parse_float=Decimal)
+        table.put_item(Item=clean)
+    except Exception as e:
+        logger.warning("Failed to store thread summary for %s/%s: %s", coach_id, month, e)
+
+    return summary
+
+
+def read_thread_summaries(coach_id: str) -> list:
+    """Read all monthly thread summaries for a coach."""
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}") & Key("sk").begins_with(
+                f"SOURCE#coach_thread_summary#{coach_id}#"
+            ),
+        )
+        return [_decimal_to_float(i) for i in resp.get("Items", [])]
+    except Exception:
+        return []

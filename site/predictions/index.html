@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Every week, Matthew's AI coaching panel makes testable predictions. This is their public track record.">
+  <meta property="og:title" content="The Prediction Ledger — averagejoematt.com">
+  <meta property="og:description" content="Public accountability ledger for AI coach predictions — confirmed, refuted, and pending.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/predictions/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="The Prediction Ledger — averagejoematt.com">
+  <meta name="twitter:description" content="Public accountability ledger for AI coach predictions.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <title>The Prediction Ledger — averagejoematt.com</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    /* ── Hero ── */
+    .pl-hero {
+      padding: var(--space-20) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+      max-width: var(--content-width);
+      margin: 0 auto;
+    }
+    .pl-hero__kicker {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #f59e0b;
+      margin-bottom: var(--space-4);
+    }
+    .pl-hero__title {
+      font-family: var(--font-display);
+      font-size: clamp(32px, 5vw, 48px);
+      font-weight: 700;
+      line-height: 1.1;
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+      margin-bottom: var(--space-6);
+    }
+    .pl-hero__title span { color: #f59e0b; }
+    .pl-hero__sub {
+      font-family: var(--font-serif);
+      font-size: clamp(15px, 2vw, 17px);
+      line-height: 1.65;
+      color: var(--text-muted);
+      max-width: 600px;
+    }
+
+    /* ── Stats bar ── */
+    .pl-stats {
+      max-width: var(--content-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-4);
+      border-bottom: 1px solid var(--border);
+    }
+    .pl-stat {
+      text-align: center;
+      padding: var(--space-4);
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+    }
+    .pl-stat__value {
+      font-family: var(--font-mono);
+      font-size: var(--text-h2);
+      color: var(--text);
+      line-height: 1;
+      margin-bottom: var(--space-2);
+    }
+    .pl-stat__label {
+      font-size: var(--text-2xs);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .pl-stat__value--green { color: #22c55e; }
+    .pl-stat__value--red { color: #ef4444; }
+    .pl-stat__value--amber { color: #f59e0b; }
+
+    /* ── Section containers ── */
+    .pl-section {
+      padding: var(--space-12) var(--page-padding);
+      max-width: var(--content-width);
+      margin: 0 auto;
+      border-top: 1px solid var(--border);
+    }
+    .pl-section__eyebrow {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: #f59e0b;
+      margin-bottom: var(--space-4);
+    }
+    .pl-section__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      line-height: var(--lh-heading);
+      letter-spacing: var(--ls-display);
+      margin-bottom: var(--space-8);
+    }
+    .pl-section__title span { color: #f59e0b; }
+
+    /* ── Scoreboard ── */
+    .pl-scoreboard {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: var(--space-4);
+    }
+    .pl-scoreboard th {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      text-align: left;
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--border);
+    }
+    .pl-scoreboard th:not(:first-child) {
+      text-align: center;
+    }
+    .pl-scoreboard td {
+      font-size: var(--text-sm);
+      color: var(--text);
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .pl-scoreboard td:not(:first-child) {
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+    }
+    .pl-scoreboard tr:hover td {
+      background: rgba(255,255,255,0.03);
+    }
+    .pl-scoreboard__name {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+    .pl-scoreboard__avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 600;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .pl-scoreboard__accuracy {
+      font-weight: 600;
+    }
+    .pl-scoreboard__accuracy--green { color: #22c55e; }
+    .pl-scoreboard__accuracy--amber { color: #f59e0b; }
+    .pl-scoreboard__accuracy--red { color: #ef4444; }
+    .pl-scoreboard__accuracy--early { color: var(--text-faint); font-style: italic; font-weight: 400; }
+
+    /* ── Filter bar ── */
+    .pl-filters {
+      display: flex;
+      gap: var(--space-3);
+      margin-bottom: var(--space-8);
+      flex-wrap: wrap;
+    }
+    .pl-filter-btn {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: var(--space-2) var(--space-4);
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .pl-filter-btn:hover {
+      border-color: rgba(255,255,255,0.15);
+      color: var(--text);
+    }
+    .pl-filter-btn--active {
+      background: rgba(245, 158, 11, 0.12);
+      border-color: rgba(245, 158, 11, 0.3);
+      color: #f59e0b;
+    }
+
+    /* ── Prediction timeline ── */
+    .pl-timeline {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+    .pl-pred {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-4);
+      padding: var(--space-5);
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+    .pl-pred:hover {
+      background: rgba(255,255,255,0.05);
+    }
+    .pl-pred__avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .pl-pred__body {
+      flex: 1;
+      min-width: 0;
+    }
+    .pl-pred__coach {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      margin-bottom: var(--space-1);
+    }
+    .pl-pred__text {
+      font-size: var(--text-sm);
+      color: var(--text);
+      line-height: var(--lh-body);
+      margin-bottom: var(--space-3);
+    }
+    .pl-pred__meta {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+    }
+    .pl-badge {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      padding: 2px 8px;
+      border-radius: 3px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .pl-badge--pending {
+      background: rgba(245, 158, 11, 0.15);
+      color: #f59e0b;
+    }
+    .pl-badge--confirmed {
+      background: rgba(34, 197, 94, 0.15);
+      color: #22c55e;
+    }
+    .pl-badge--refuted {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+    }
+    .pl-badge--confidence {
+      background: rgba(255,255,255,0.05);
+      color: var(--text-muted);
+    }
+    .pl-pred__date {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+    }
+    .pl-empty {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      font-style: italic;
+      padding: var(--space-6) 0;
+    }
+
+    /* ── Loading ── */
+    .pl-loading {
+      font-size: var(--text-sm);
+      color: var(--text-faint);
+      padding: var(--space-6) 0;
+      font-style: italic;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      .pl-stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .pl-scoreboard th:nth-child(n+4),
+      .pl-scoreboard td:nth-child(n+4) {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body class="body-story">
+
+<div id="amj-nav"></div>
+<div id="amj-hierarchy-nav"></div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     1. HERO
+     ═══════════════════════════════════════════════════════════ -->
+<div class="pl-hero animate-in">
+  <p class="pl-hero__kicker">Accountability</p>
+  <h1 class="pl-hero__title">The Prediction <span>Ledger</span></h1>
+  <p class="pl-hero__sub">Every week, Matthew's AI coaching panel makes testable predictions. This is their public track record.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     2. STATS BAR
+     ═══════════════════════════════════════════════════════════ -->
+<div class="pl-stats" id="pl-stats-mount">
+  <div class="pl-stat">
+    <div class="pl-stat__value" id="pl-total">--</div>
+    <div class="pl-stat__label">Total Predictions</div>
+  </div>
+  <div class="pl-stat">
+    <div class="pl-stat__value pl-stat__value--green" id="pl-confirmed">--%</div>
+    <div class="pl-stat__label">Confirmed</div>
+  </div>
+  <div class="pl-stat">
+    <div class="pl-stat__value pl-stat__value--red" id="pl-refuted">--%</div>
+    <div class="pl-stat__label">Refuted</div>
+  </div>
+  <div class="pl-stat">
+    <div class="pl-stat__value pl-stat__value--amber" id="pl-pending">--</div>
+    <div class="pl-stat__label">Pending</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     3. SCOREBOARD
+     ═══════════════════════════════════════════════════════════ -->
+<section class="pl-section">
+  <div class="pl-section__eyebrow">By coach</div>
+  <h2 class="pl-section__title">Coach <span>Scoreboard</span></h2>
+  <div id="pl-scoreboard-mount">
+    <div class="pl-loading">Loading scoreboard...</div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     4. PREDICTION TIMELINE
+     ═══════════════════════════════════════════════════════════ -->
+<section class="pl-section">
+  <div class="pl-section__eyebrow">Full record</div>
+  <h2 class="pl-section__title">Prediction <span>Timeline</span></h2>
+
+  <div class="pl-filters" id="pl-filters-mount">
+    <button class="pl-filter-btn pl-filter-btn--active" data-status="all">All</button>
+    <button class="pl-filter-btn" data-status="pending">Pending</button>
+    <button class="pl-filter-btn" data-status="confirmed">Confirmed</button>
+    <button class="pl-filter-btn" data-status="refuted">Refuted</button>
+  </div>
+
+  <div id="pl-timeline-mount">
+    <div class="pl-loading">Loading predictions...</div>
+  </div>
+</section>
+
+<div id="amj-subscribe"></div>
+<div id="amj-bottom-nav"></div>
+<div id="amj-footer"></div>
+
+<script>
+(async function() {
+  var _esc = function(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+
+  var _coachColors = {
+    sleep: '#818cf8', nutrition: '#10b981', training: '#3db88a',
+    mind: '#a78bfa', physical: '#f59e0b', glucose: '#2dd4bf',
+    labs: '#5ba4cf', explorer: '#e879f9'
+  };
+  var _coachInitials = {
+    sleep: 'LP', nutrition: 'MW', training: 'SC', mind: 'NR',
+    physical: 'VR', glucose: 'AP', labs: 'JO', explorer: 'HB'
+  };
+  var _coachNames = {
+    sleep: 'Dr. Lisa Park', nutrition: 'Dr. Marcus Webb', training: 'Dr. Sarah Chen',
+    mind: 'Dr. Nathan Reeves', physical: 'Dr. Victor Reyes', glucose: 'Dr. Amara Patel',
+    labs: 'Dr. James Okafor', explorer: 'Dr. Henning Brandt'
+  };
+
+  var allPredictions = [];
+  var currentFilter = 'all';
+
+  function renderTimeline(filter) {
+    var mount = document.getElementById('pl-timeline-mount');
+    var filtered = filter === 'all' ? allPredictions : allPredictions.filter(function(p) { return p.status === filter; });
+    if (filtered.length === 0) {
+      mount.innerHTML = '<div class="pl-empty">No ' + (filter === 'all' ? '' : filter + ' ') + 'predictions recorded yet.</div>';
+      return;
+    }
+    var html = '<div class="pl-timeline">';
+    filtered.forEach(function(p) {
+      var color = _coachColors[p.coach_id] || '#888';
+      var initials = _coachInitials[p.coach_id] || '??';
+      var statusClass = 'pl-badge--' + (p.status || 'pending');
+      var confText = (p.confidence || 'medium').toLowerCase();
+      var dateStr = p.date || '';
+      if (dateStr) {
+        try {
+          var d = new Date(dateStr + 'T12:00:00Z');
+          dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        } catch(e) {}
+      }
+      html +=
+        '<div class="pl-pred">' +
+          '<div class="pl-pred__avatar" style="background:' + color + '">' + _esc(initials) + '</div>' +
+          '<div class="pl-pred__body">' +
+            '<div class="pl-pred__coach">' + _esc(p.coach_name || _coachNames[p.coach_id] || p.coach_id) + '</div>' +
+            '<div class="pl-pred__text">' + _esc(p.text) + '</div>' +
+            '<div class="pl-pred__meta">' +
+              '<span class="pl-badge pl-badge--confidence">' + _esc(confText) + '</span>' +
+              '<span class="pl-badge ' + statusClass + '">' + _esc(p.status || 'pending') + '</span>' +
+              (dateStr ? '<span class="pl-pred__date">' + _esc(dateStr) + '</span>' : '') +
+            '</div>' +
+          '</div>' +
+        '</div>';
+    });
+    html += '</div>';
+    mount.innerHTML = html;
+  }
+
+  // Filter buttons
+  document.getElementById('pl-filters-mount').addEventListener('click', function(e) {
+    var btn = e.target.closest('.pl-filter-btn');
+    if (!btn) return;
+    currentFilter = btn.getAttribute('data-status');
+    document.querySelectorAll('.pl-filter-btn').forEach(function(b) { b.classList.remove('pl-filter-btn--active'); });
+    btn.classList.add('pl-filter-btn--active');
+    renderTimeline(currentFilter);
+  });
+
+  try {
+    var r = await fetch('/api/predictions');
+    if (!r.ok) throw new Error('API error');
+    var data = await r.json();
+
+    // Stats bar
+    var overall = data.overall || {};
+    document.getElementById('pl-total').textContent = overall.total || 0;
+    var confirmed_pct = overall.total > 0 ? Math.round((overall.confirmed || 0) / overall.total * 100) : 0;
+    var refuted_pct = overall.total > 0 ? Math.round((overall.refuted || 0) / overall.total * 100) : 0;
+    document.getElementById('pl-confirmed').textContent = confirmed_pct + '%';
+    document.getElementById('pl-refuted').textContent = refuted_pct + '%';
+    document.getElementById('pl-pending').textContent = overall.pending || 0;
+
+    // Scoreboard
+    var byCoach = data.by_coach || {};
+    var scoreMount = document.getElementById('pl-scoreboard-mount');
+    var coachOrder = ['sleep','nutrition','training','mind','physical','glucose','labs','explorer'];
+
+    // Build rows with accuracy for sorting
+    var rows = [];
+    coachOrder.forEach(function(cid) {
+      var c = byCoach[cid];
+      if (!c || c.total === 0) return;
+      var resolved = (c.confirmed || 0) + (c.refuted || 0);
+      var accuracy = resolved >= 3 ? Math.round(c.confirmed / resolved * 100) : -1;
+      rows.push({ cid: cid, total: c.total, confirmed: c.confirmed || 0, refuted: c.refuted || 0, pending: c.pending || 0, accuracy: accuracy, resolved: resolved });
+    });
+    rows.sort(function(a, b) { return b.accuracy - a.accuracy; });
+
+    if (rows.length === 0) {
+      scoreMount.innerHTML = '<div class="pl-empty">No predictions recorded yet. Coaches will begin making explicit predictions as data accumulates.</div>';
+    } else {
+      var tHtml = '<table class="pl-scoreboard"><thead><tr>' +
+        '<th>Coach</th><th>Made</th><th>Confirmed</th><th>Refuted</th><th>Pending</th><th>Accuracy</th>' +
+        '</tr></thead><tbody>';
+      rows.forEach(function(row) {
+        var accClass = '';
+        var accText = '';
+        if (row.accuracy < 0) {
+          accClass = 'pl-scoreboard__accuracy--early';
+          accText = 'too early';
+        } else if (row.accuracy >= 70) {
+          accClass = 'pl-scoreboard__accuracy--green';
+          accText = row.accuracy + '%';
+        } else if (row.accuracy >= 40) {
+          accClass = 'pl-scoreboard__accuracy--amber';
+          accText = row.accuracy + '%';
+        } else {
+          accClass = 'pl-scoreboard__accuracy--red';
+          accText = row.accuracy + '%';
+        }
+        tHtml +=
+          '<tr>' +
+            '<td><div class="pl-scoreboard__name">' +
+              '<div class="pl-scoreboard__avatar" style="background:' + (_coachColors[row.cid] || '#888') + '">' + (_coachInitials[row.cid] || '??') + '</div>' +
+              _esc(_coachNames[row.cid] || row.cid) +
+            '</div></td>' +
+            '<td>' + row.total + '</td>' +
+            '<td>' + row.confirmed + '</td>' +
+            '<td>' + row.refuted + '</td>' +
+            '<td>' + row.pending + '</td>' +
+            '<td class="pl-scoreboard__accuracy ' + accClass + '">' + accText + '</td>' +
+          '</tr>';
+      });
+      tHtml += '</tbody></table>';
+      scoreMount.innerHTML = tHtml;
+    }
+
+    // Timeline
+    allPredictions = data.predictions || [];
+    renderTimeline('all');
+
+  } catch(e) {
+    document.getElementById('pl-scoreboard-mount').innerHTML = '<div class="pl-empty">Unable to load prediction data.</div>';
+    document.getElementById('pl-timeline-mount').innerHTML = '<div class="pl-empty">Unable to load prediction data.</div>';
+  }
+})();
+</script>
+
+<script src="/assets/js/animations.js" defer></script>
+<script src="/assets/js/components.js"></script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>

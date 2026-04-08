@@ -1,3 +1,29 @@
+## v6.7.0 — Intelligence Layer V2.2 Complete (2026-04-07)
+
+### WS1: Predictions Page + Learning Timeline
+- `/predictions/` standalone page with scoreboard, timeline, accuracy stats
+- `GET /api/predictions` — filterable prediction ledger
+- `GET /api/coach_timeline` — coach learning milestone timeline
+- Coach timeline component added to `/coaches/` dashboard
+
+### WS2: Chronicle Integration + Credibility Scores
+- `compute_credibility()` — prediction accuracy, calibration, volume → score 0-100
+- Labels: nascent (<5) / developing / reliable / authoritative
+- `compute_all_credibility()` — batch compute + store to `SOURCE#coach_credibility`
+- Credibility injected into every coach prompt via `build_coach_preamble()`
+- Over-confident calibration triggers prompt nudge
+
+### WS3: Thread Summarization
+- `summarize_coach_month()` — compresses month's thread entries into summary
+- `read_thread_summaries()` — loads all monthly summaries for prompt injection
+- Store in `SOURCE#coach_thread_summary#{coach_id}#{month}`
+
+### WS4: Code Quality
+- `tests/test_coach_intelligence.py` — 13 unit tests: data maturity, validator, preamble, credibility
+- Observatory Lambda docstring clarified (v3.0.0 — NOT deprecated)
+- lambda_map.json deprecated marker removed
+
+---
 ## v6.6.0 — Intelligence Layer V2.1 Sessions 2-5 Complete (2026-04-07)
 
 ### Session 2: Prediction Evaluation + Disagreement Detection
