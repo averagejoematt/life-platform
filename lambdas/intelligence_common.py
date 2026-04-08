@@ -1031,3 +1031,242 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
         "platform_intensity": round(platform_intensity),
         "interpretation": interpretation,
     }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COACH THREADS — Persistent Memory (V2.1 Workstream 1)
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def write_coach_thread(coach_id: str, entry: dict) -> bool:
+    """Write a thread entry after coach generation.
+
+    Entry should contain: position_summary, predictions, surprises,
+    stance_changes, emotional_investment, open_questions, learning_log.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    week = _iso_week(today)
+
+    item = {
+        "pk": f"USER#{USER_ID}",
+        "sk": f"SOURCE#coach_thread#{coach_id}#{today}",
+        "coach_id": coach_id,
+        "date": today,
+        "week": week,
+        "generation_context": entry.get("generation_context", "observatory"),
+        "position_summary": entry.get("position_summary", ""),
+        "predictions": entry.get("predictions", []),
+        "surprises": entry.get("surprises", []),
+        "stance_changes": entry.get("stance_changes", []),
+        "emotional_investment": entry.get("emotional_investment", "observing"),
+        "open_questions": entry.get("open_questions", []),
+        "learning_log": entry.get("learning_log", []),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    try:
+        clean = json.loads(json.dumps(item, default=str), parse_float=Decimal)
+        table.put_item(Item=clean)
+        logger.info("Thread entry written for %s on %s", coach_id, today)
+        return True
+    except Exception as e:
+        logger.error("Failed to write thread for %s: %s", coach_id, e)
+        return False
+
+
+def read_coach_thread(coach_id: str, limit: int = 4) -> list:
+    """Read recent thread entries for prompt injection.
+
+    Returns list of thread entries, most recent first.
+    """
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}") & Key("sk").begins_with(
+                f"SOURCE#coach_thread#{coach_id}#"
+            ),
+            ScanIndexForward=False,
+            Limit=limit,
+        )
+        items = resp.get("Items", [])
+        return [_decimal_to_float(i) for i in items]
+    except Exception as e:
+        logger.warning("Failed to read thread for %s: %s", coach_id, e)
+        return []
+
+
+def update_prediction_status(coach_id: str, prediction_id: str, status: str,
+                              outcome_note: str = None) -> bool:
+    """Mark a prediction as confirmed/refuted in the thread entry that contains it.
+
+    Scans recent thread entries to find the prediction and updates its status.
+    """
+    try:
+        entries = read_coach_thread(coach_id, limit=10)
+        for entry in entries:
+            predictions = entry.get("predictions", [])
+            for pred in predictions:
+                if pred.get("prediction_id") == prediction_id:
+                    pred["status"] = status
+                    if outcome_note:
+                        pred["outcome_note"] = outcome_note
+                    pred["evaluated_at"] = datetime.now(timezone.utc).isoformat()
+
+                    # Write back the updated entry
+                    clean = json.loads(json.dumps(entry, default=str), parse_float=Decimal)
+                    table.put_item(Item=clean)
+                    logger.info("Prediction %s updated to %s for %s", prediction_id, status, coach_id)
+                    return True
+        logger.warning("Prediction %s not found in thread for %s", prediction_id, coach_id)
+        return False
+    except Exception as e:
+        logger.error("Failed to update prediction %s: %s", prediction_id, e)
+        return False
+
+
+def build_thread_prompt_block(coach_id: str, personality: dict = None) -> str:
+    """Build the YOUR THREAD block for injection into coach prompts.
+
+    Reads recent thread entries and formats them as a prompt section.
+    """
+    entries = read_coach_thread(coach_id, limit=4)
+    if not entries:
+        # No thread history yet — return personality seeds only
+        if personality:
+            return (
+                "YOUR PERSONALITY TENDENCIES:\n"
+                + "\n".join(f"- {t}" for t in personality.get("tendencies", []))
+                + f"\nArc seed: {personality.get('arc_seed', '')}\n"
+                + f"Signature behavior: {personality.get('signature_behavior', '')}\n"
+                + "\nThis is your first assessment. Establish your voice and initial position.\n"
+            )
+        return ""
+
+    parts = ["YOUR THREAD (what you've said and thought recently):\n"]
+
+    for entry in entries:
+        week = entry.get("week", "?")
+        pos = entry.get("position_summary", "")
+        if pos:
+            parts.append(f"Week {week} position: \"{pos}\"")
+
+        for pred in entry.get("predictions", []):
+            status = pred.get("status", "pending")
+            text = pred.get("text", "")
+            conf = pred.get("confidence", "medium")
+            status_note = f" — {pred.get('outcome_note', '')}" if pred.get("outcome_note") else ""
+            parts.append(f"Week {week} prediction ({conf} confidence): \"{text}\" ({status.upper()}{status_note})")
+
+        for surprise in entry.get("surprises", []):
+            parts.append(f"Week {week} surprise: \"{surprise}\"")
+
+        for change in entry.get("stance_changes", []):
+            parts.append(f"Week {week} stance change: \"{change.get('from', '')}\" → \"{change.get('to', '')}\" (reason: {change.get('reason', '')})")
+
+    # Current emotional investment
+    latest = entries[0] if entries else {}
+    investment = latest.get("emotional_investment", "observing")
+    parts.append(f"\nYour emotional investment level: {investment.upper()}")
+
+    # Open questions
+    questions = latest.get("open_questions", [])
+    if questions:
+        parts.append("\nYOUR OPEN QUESTIONS:")
+        for q in questions:
+            parts.append(f"- {q}")
+
+    # Thread usage rules
+    parts.append(
+        "\nRules for using your thread:\n"
+        "- Reference your previous positions naturally. \"Last week I flagged [X] — here's what happened.\"\n"
+        "- If a prediction resolved: explicitly call it out. \"I predicted [X]. I was [right/wrong].\"\n"
+        "- If your position changed: own it. \"I initially thought [X] but the data now suggests [Y].\"\n"
+        "- Your emotional investment should come through in tone, not stated explicitly.\n"
+        "- Add to your open questions when something puzzles you.\n"
+    )
+
+    # Personality seeds (always include as context)
+    if personality:
+        parts.append(
+            "\nYOUR PERSONALITY:\n"
+            + "\n".join(f"- {t}" for t in personality.get("tendencies", []))
+            + f"\nSignature behavior: {personality.get('signature_behavior', '')}\n"
+        )
+
+    return "\n".join(parts)
+
+
+def extract_thread_from_narrative(coach_id: str, narrative: str, api_key: str) -> dict:
+    """Extract thread data from a coach's generated narrative via a lightweight API call.
+
+    Makes a Haiku-class call to parse: position_summary, predictions, surprises,
+    emotional_investment_level, open_questions.
+    """
+    import urllib.request
+
+    prompt = f"""Extract structured thread data from this coach narrative. Return ONLY valid JSON.
+
+NARRATIVE:
+{narrative[:2000]}
+
+Extract:
+{{
+  "position_summary": "2-3 sentence summary of the coach's current stance/assessment",
+  "predictions": [
+    {{"prediction_id": "pred_YYYYMMDD_slug", "text": "the prediction in natural language", "confidence": "low|medium|high", "metric": "optional metric to check", "target_date": "optional YYYY-MM-DD", "status": "pending"}}
+  ],
+  "surprises": ["things that surprised the coach — empty list if nothing surprising"],
+  "emotional_investment": "detached|observing|engaged|invested|concerned|excited",
+  "open_questions": ["things the coach is curious about or watching"]
+}}
+
+Rules:
+- position_summary: what does the coach believe RIGHT NOW about their domain for Matthew?
+- predictions: only include explicit forward-looking claims. Not observations.
+- emotional_investment: infer from language intensity. Academic/measured = observing. Strong opinions = invested. Worry = concerned.
+- If nothing fits a field, use empty list or "observing" default."""
+
+    try:
+        model = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+        secret_name = os.environ.get("AI_SECRET_NAME", "life-platform/ai-keys")
+
+        # Use provided API key
+        req_body = json.dumps({
+            "model": model,
+            "max_tokens": 500,
+            "messages": [{"role": "user", "content": prompt}],
+        })
+
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=req_body.encode(),
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+            },
+        )
+
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read())
+
+        text = "".join(
+            b["text"] for b in result.get("content", []) if b.get("type") == "text"
+        )
+
+        # Parse JSON
+        cleaned = text.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        return json.loads(cleaned.strip())
+
+    except Exception as e:
+        logger.warning("Thread extraction failed for %s: %s — using defaults", coach_id, e)
+        return {
+            "position_summary": narrative[:200] if narrative else "",
+            "predictions": [],
+            "surprises": [],
+            "emotional_investment": "observing",
+            "open_questions": [],
+        }
