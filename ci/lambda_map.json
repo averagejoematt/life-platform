@@ -58,7 +58,7 @@
     "lambdas/subscriber_onboarding_lambda.py":   { "function": "subscriber-onboarding" },
     "lambdas/pipeline_health_check_lambda.py":   { "function": "pipeline-health-check" },
     "lambdas/measurements_ingestion_lambda.py":  { "function": "measurements-ingestion" },
-    "lambdas/ai_expert_analyzer_lambda.py":      { "function": "ai-expert-analyzer", "deprecated": true, "deprecated_note": "Replaced by Coach Intelligence pipeline (/api/coach_analysis). Safe to delete after 2 weeks of stable operation." },
+    "lambdas/ai_expert_analyzer_lambda.py":      { "function": "ai-expert-analyzer", "_note": "Primary observatory generator. NOT deprecated. Coach Intelligence pipeline (ai_calls.py) serves daily brief email separately." },
     "lambdas/journal_analyzer_lambda.py":        { "function": "journal-analyzer" },
     "lambdas/field_notes_lambda.py":             { "function": "field-notes-generate" },
     "lambdas/coach_computation_engine.py":       { "function": "coach-computation-engine" },

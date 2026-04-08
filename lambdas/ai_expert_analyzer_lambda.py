@@ -1,20 +1,33 @@
 """
-AI Expert Analyzer Lambda — Observatory V3
+AI Expert Analyzer Lambda — Observatory Intelligence Pipeline
 
-Generates weekly AI expert voice analyses for 8 observatory pages.
-Each expert analyzes current data and produces 2-3 paragraphs of prose
-with a rotating analytical lens to prevent repetition.
+Generates AI coach analyses for 8 observatory pages on averagejoematt.com.
+This is the PRIMARY observatory content generator. NOT deprecated.
+
+Two content pipelines exist in the platform:
+  1. THIS Lambda → observatory pages (averagejoematt.com/sleep, /glucose, etc.)
+     Reads: DynamoDB data partitions → generates with Intelligence Layer V2 preamble
+     Writes: USER#matthew#SOURCE#ai_analysis EXPERT#{key} + EXPERT#integrator
+     Served via: /api/ai_analysis and /api/coach_analysis endpoints
+
+  2. Coach Intelligence pipeline (ai_calls.py) → daily brief email
+     Reads: daily brief data dict → generates with voice specs + generation briefs
+     Writes: COACH#{coach_id} OUTPUT# records
+
+Both pipelines share intelligence_common.py utilities (data inventory, maturity,
+goals, coach preamble, threads, validator).
+
+Features (V2.1):
+  - Intelligence preamble: goals, data inventory, data maturity, first-person voice
+  - Thread persistence: position summaries, predictions, surprises, emotional investment
+  - Validator Mode B: inline correction on factual errors
+  - Integrator synthesis: Dr. Nakamura's weekly priority + cross-domain notes + disagreements
+  - Builder's Paradox: injected into mind coach prompt
 
 Trigger: EventBridge cron — weekly, Monday 6am PT (14:00 UTC)
 Can also be invoked manually with {"expert": "mind"} for a single expert.
 
-DynamoDB cache:
-  PK = USER#matthew#SOURCE#ai_analysis
-  SK = EXPERT#mind | EXPERT#nutrition | EXPERT#training | EXPERT#physical
-       | EXPERT#explorer | EXPERT#glucose | EXPERT#labs | EXPERT#sleep
-  TTL = 8 days (auto-expire if Lambda fails to run)
-
-v2.0.0 — 2026-04-05 (V3 Observatory spec — PB-09)
+v3.0.0 — 2026-04-07 (Intelligence Layer V2.1)
 """
 
 import json
@@ -639,7 +652,7 @@ def generate_and_cache(expert_key):
         item["elena_quote"] = elena_quote
     table.put_item(Item=item)
 
-    # Intelligence Validator V2: post-generation quality check
+    # Intelligence Validator V2.1 Mode B: post-generation quality check with inline correction
     if _HAS_INTELLIGENCE_COMMON:
         try:
             from intelligence_common import validate_coach_output, write_quality_results
@@ -651,15 +664,71 @@ def generate_and_cache(expert_key):
                 maturity=_maturity,
             )
             today_str = now.strftime("%Y-%m-%d")
+            errors = [f for f in _flags if f["severity"] == "error"]
+
+            # Mode B: inline correction for error-severity flags (max 1 correction pass)
+            if errors and len(errors) <= 3:
+                logger.info("Mode B correction triggered for %s: %d errors", expert_key, len(errors))
+                correction_parts = ["CORRECTION REQUIRED — the following factual errors were found in your draft:\n"]
+                for i, err in enumerate(errors, 1):
+                    correction_parts.append(f"{i}. {err['detail']}")
+                    if err.get("source_text"):
+                        correction_parts.append(f"   You wrote: \"{err['source_text']}\"")
+                correction_parts.append(
+                    "\nRewrite your analysis incorporating these corrections. "
+                    "Maintain your voice and analytical approach but fix the factual errors. "
+                    "Do not mention that a correction was made."
+                )
+                correction_prompt = prompt + "\n\n" + "\n".join(correction_parts)
+
+                try:
+                    corr_body = json.dumps({
+                        "model": AI_MODEL,
+                        "max_tokens": 1200,
+                        "messages": [{"role": "user", "content": correction_prompt}],
+                    })
+                    corr_req = urllib.request.Request(
+                        "https://api.anthropic.com/v1/messages",
+                        data=corr_body.encode(),
+                        headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
+                    )
+                    with urllib.request.urlopen(corr_req, timeout=60) as corr_resp:
+                        corr_result = json.loads(corr_resp.read())
+                    corrected_text = "".join(
+                        b["text"] for b in corr_result.get("content", []) if b.get("type") == "text"
+                    )
+                    # Re-parse tagged fields from corrected text
+                    if "KEY RECOMMENDATION:" in corrected_text:
+                        _cparts = corrected_text.rsplit("KEY RECOMMENDATION:", 1)
+                        corrected_text = _cparts[0].rstrip()
+                    # Re-validate (don't recurse further)
+                    _new_flags = validate_coach_output(
+                        coach_id=expert_key, domain=expert_key,
+                        narrative=corrected_text, inventory=_inventory, maturity=_maturity,
+                    )
+                    new_errors = sum(1 for f in _new_flags if f["severity"] == "error")
+                    if new_errors < len(errors):
+                        analysis_text = corrected_text
+                        # Update cached item
+                        table.update_item(
+                            Key={"pk": CACHE_PK, "sk": f"EXPERT#{expert_key}"},
+                            UpdateExpression="SET analysis = :a",
+                            ExpressionAttributeValues={":a": analysis_text},
+                        )
+                        logger.info("Mode B correction applied for %s: %d→%d errors", expert_key, len(errors), new_errors)
+                        _flags = _new_flags
+                except Exception as _ce:
+                    logger.warning("Mode B correction call failed for %s: %s", expert_key, _ce)
+
             write_quality_results(today_str, expert_key, expert_key, _flags)
             if _flags:
                 err_count = sum(1 for f in _flags if f["severity"] == "error")
                 warn_count = sum(1 for f in _flags if f["severity"] == "warning")
-                logger.warning(
-                    "Quality flags for %s: %d errors, %d warnings — %s",
-                    expert_key, err_count, warn_count,
-                    "; ".join(f["detail"] for f in _flags[:3]),
-                )
+                if err_count > 0 or warn_count > 0:
+                    logger.warning(
+                        "Quality flags for %s: %d errors, %d warnings",
+                        expert_key, err_count, warn_count,
+                    )
         except Exception as _ve:
             logger.warning("Intelligence validator failed for %s: %s", expert_key, _ve)
 
@@ -725,8 +794,19 @@ Produce EXACTLY this JSON structure (no markdown, no explanation):
     "glucose": "1-2 sentences connecting glucose to the other domains",
     "physical": "1-2 sentences connecting physical/body comp to the other domains",
     "mind": "1-2 sentences connecting mind/behavioral to the other domains"
-  }}
-}}"""
+  }},
+  "disagreements": [
+    {{
+      "topic": "what the disagreement is about",
+      "coaches": ["coach_a", "coach_b"],
+      "position_a": "what coach A recommends",
+      "position_b": "what coach B recommends",
+      "nakamura_call": "your resolution — who is right and why"
+    }}
+  ]
+}}
+
+For disagreements: only flag GENUINE conflicts where two coaches would give Matthew contradictory advice. Do not invent disagreements. Empty list is fine if all coaches are aligned."""
 
     api_key = _get_api_key()
     req_body = json.dumps({
@@ -770,6 +850,7 @@ Produce EXACTLY this JSON structure (no markdown, no explanation):
             "expert_key": "integrator",
             "analysis": synthesis.get("weekly_priority", ""),
             "cross_domain_notes": synthesis.get("cross_domain_notes", {}),
+            "disagreements": synthesis.get("disagreements", []),
             "generated_at": now.isoformat(),
             "week_number": max(1, (now.date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days // 7 + 1),
             "ttl": ttl,
