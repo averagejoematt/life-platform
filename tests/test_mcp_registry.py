@@ -31,7 +31,7 @@ REGISTRY_PATH = os.path.join(MCP_DIR, "registry.py")
 
 # Expected tool count range — update when consolidating or adding tools
 EXPECTED_MIN_TOOLS = 75   # updated for SIMP-1 Phase 1c+1d (86 tools as of v3.7.19)
-EXPECTED_MAX_TOOLS = 115  # upper bound: updated for food delivery + protocols tools
+EXPECTED_MAX_TOOLS = 120  # upper bound: updated for intelligence quality tool
 
 
 def _read(path):

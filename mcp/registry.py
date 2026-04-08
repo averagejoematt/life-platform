@@ -180,6 +180,22 @@ TOOLS = {
             },
         },
     },
+    "get_intelligence_quality": {
+        "fn": tool_get_intelligence_quality,
+        "schema": {
+            "name": "get_intelligence_quality",
+            "description": "Query intelligence quality validation results from the post-generation validator. Shows flags where coaches made claims contradicted by actual data, used overconfident language for early-stage data, or cited wrong source-of-truth values. Use for: 'are the coaches accurate?', 'any quality issues?', 'intelligence validation results'.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "days":     {"type": "number", "description": "Days to look back (default: 7)."},
+                    "severity": {"type": "string", "description": "Filter by severity: 'error' or 'warning'. Default: all.", "enum": ["error", "warning"]},
+                    "coach":    {"type": "string", "description": "Filter by coach ID (e.g., 'glucose', 'physical')."},
+                },
+                "required": [],
+            },
+        },
+    },
     "search_activities": {
         "fn": tool_search_activities,
         "schema": {
