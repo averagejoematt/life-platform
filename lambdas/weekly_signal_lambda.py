@@ -243,6 +243,10 @@ def _build_email(stats, posts_data, insight_text, week_num, unsub_url):
 
 def lambda_handler(event, context):
     try:
+        if os.environ.get("EXTERNAL_EMAILS_ENABLED", "true").lower() != "true":
+            logger.info("[kill-switch] EXTERNAL_EMAILS_ENABLED=false — skipping Weekly Signal subscriber send")
+            return {"statusCode": 200, "body": "skipped: external emails disabled", "sent": 0, "skipped": True}
+
         logger.info("Weekly Signal v1.0.0 — PB-06 — starting")
 
         # Load data (graceful degradation: missing data = skip section, not crash)

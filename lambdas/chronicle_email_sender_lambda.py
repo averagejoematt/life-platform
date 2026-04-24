@@ -347,6 +347,10 @@ def _build_subscriber_email(installment: dict, subscriber: dict) -> tuple[str, s
 
 def lambda_handler(event, context):
     try:
+        if os.environ.get("EXTERNAL_EMAILS_ENABLED", "true").lower() != "true":
+            logger.info("[kill-switch] EXTERNAL_EMAILS_ENABLED=false — skipping Chronicle subscriber send")
+            return {"statusCode": 200, "body": "skipped: external emails disabled", "sent": 0, "skipped": True}
+
         logger.info("Chronicle Email Sender v1.0.0 — BS-03 — starting")
 
         # Viktor guard: is there an installment from this week?
