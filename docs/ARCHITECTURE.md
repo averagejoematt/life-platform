@@ -96,9 +96,11 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 
 **Schedule:** Hourly during active hours (4am–10pm PST) for most sources. Exceptions: Garmin at 4x daily (OAuth rate limits), Weather + Todoist at 2x daily (COST-OPT). Maintenance window: 10pm–4am PST (UTC 6–11 skipped).
 
-**Shared Lambda Layer:** v26 — includes `ai_calls.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`. Rebuild with `bash deploy/build_layer.sh`. 16 dependent Lambdas consume the layer.
+**Shared Lambda Layer:** v41 — includes `ai_calls.py`, `retry_utils.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `intelligence_common.py`, + 11 more. Rebuild with `bash deploy/build_layer.sh`. 18 modules, 16+ dependent Lambdas.
 
 **Secret caching (COST-OPT-1):** 15-min in-memory TTL cache via `secret_cache.py` in shared layer. Reduces Secrets Manager API calls ~90% across 9 Lambdas.
+
+**Prompt caching (COST-OPT-2, ADR-049):** Both `ai_calls.py` and `retry_utils.py` auto-wrap system messages as cached content blocks (`anthropic-beta: prompt-caching-2024-07-31`). 90% discount on repeated system prompt tokens. CloudWatch metrics: `AnthropicCacheWriteTokens`, `AnthropicCacheReadTokens`. Model tiering: structured/templated tasks use Haiku (`AI_MODEL` env var), narrative content stays on Sonnet. All model assignments are env-var configurable for instant rollback.
 
 | Source | Lambda | Schedule | Type |
 |---|---|---|---|
@@ -318,8 +320,8 @@ Target: under $25/month | Current: ~$13/month
 | S3 (~2.5 GB + requests) | ~$0.50 |
 | CloudFront (4 distributions) | ~$1.50 |
 | CloudWatch (66 alarms + logs) | ~$2.00 |
-| Anthropic API (Haiku + Sonnet) | ~$4.00 |
-| **Total** | **~$13** |
+| Anthropic API (Haiku + Sonnet, with prompt caching — ADR-049) | ~$8-12 |
+| **Total** | **~$17-21** |
 
 ---
 
@@ -363,7 +365,8 @@ Target: under $25/month | Current: ~$13/month
     #   brittany_email, mcp_warmer)
     # 2 Lambda@Edge (cf-auth, buddy-auth)
     board_loader.py               ← Shared: Board of Directors config loader
-    ai_calls.py                   ← Shared: AI call utilities
+    ai_calls.py                   ← Shared: AI call utilities (prompt caching, model selection)
+    retry_utils.py                ← Shared: Anthropic retry + caching for bundled Lambdas
     insight_writer.py             ← Shared: Insights ledger writer
     output_writers.py             ← Shared: S3/DDB output utilities
     scoring_engine.py             ← Shared: Day grade scoring
