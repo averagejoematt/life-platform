@@ -43,7 +43,7 @@ from constructs import Construct
 
 from stacks.lambda_helpers import create_platform_lambda
 from stacks import role_policies as rp
-from stacks.constants import REGION, ACCT, S3_BUCKET as _CONSTANTS_BUCKET  # CONF-01
+from stacks.constants import REGION, ACCT, S3_BUCKET as _CONSTANTS_BUCKET, PRIVACY_MODE, CF_AUTH_VERSION_ARN  # CONF-01
 
 BUCKET = _CONSTANTS_BUCKET
 
@@ -459,17 +459,31 @@ class WebStack(Stack):
                     ),
                 ],
                 # Default behaviour: S3 static pages
+                # PRIVACY_MODE: when True, cf-auth Lambda@Edge gates HTML with a cookie.
+                # Cookies must be forwarded so the auth cookie reaches the Lambda@Edge.
                 default_cache_behavior=cloudfront.CfnDistribution.DefaultCacheBehaviorProperty(
                     target_origin_id="S3SiteOrigin",
                     viewer_protocol_policy="redirect-to-https",
                     forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(
                         query_string=False,
-                        cookies=cloudfront.CfnDistribution.CookiesProperty(forward="none"),
+                        cookies=cloudfront.CfnDistribution.CookiesProperty(
+                            forward="whitelist" if PRIVACY_MODE else "none",
+                            whitelisted_names=["__lp_auth"] if PRIVACY_MODE else None,
+                        ),
                     ),
-                    default_ttl=3600,    # 1h for static assets
-                    max_ttl=86400,
+                    default_ttl=0 if PRIVACY_MODE else 3600,  # skip cache while gated so cookie checks always run
+                    max_ttl=0 if PRIVACY_MODE else 86400,
                     min_ttl=0,
+                    allowed_methods=["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"] if PRIVACY_MODE else None,
+                    cached_methods=["GET", "HEAD"] if PRIVACY_MODE else None,
                     response_headers_policy_id=amj_security_headers.ref,  # R17-15
+                    lambda_function_associations=[
+                        cloudfront.CfnDistribution.LambdaFunctionAssociationProperty(
+                            event_type="viewer-request",
+                            lambda_function_arn=CF_AUTH_VERSION_ARN,
+                            include_body=True,  # POST /__auth body carries the password
+                        ),
+                    ] if PRIVACY_MODE else None,
                 ),
                 # Cache behaviors — ORDER MATTERS: most-specific first.
                 cache_behaviors=[

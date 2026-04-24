@@ -72,7 +72,10 @@ class EmailStack(Stack):
 
         create_platform_lambda(self, "MondayCompass", function_name="monday-compass", handler="monday_compass_lambda.lambda_handler", source_file="lambdas/monday_compass_lambda.py", schedule="cron(0 15 ? * MON *)", timeout_seconds=120, memory_mb=512, environment=_email_env, custom_policies=rp.email_monday_compass(), **shared)
 
-        _partner_env = {**_email_env, "PARTNER_EMAIL": "[partner-address-redacted]", "EMAIL_SENDER": "awsdev@mattsusername.com"}
+        # EXTERNAL_EMAILS_ENABLED kill switch — flip to "true" to resume sending to
+        # non-Matthew recipients (Partner, confirmed subscribers). Used by
+        # partner-weekly-email, chronicle-email-sender, weekly-signal.
+        _partner_env = {**_email_env, "PARTNER_EMAIL": "[partner-address-redacted]", "EMAIL_SENDER": "awsdev@mattsusername.com", "EXTERNAL_EMAILS_ENABLED": "false"}
         create_platform_lambda(self, "PartnerWeeklyEmail", function_name="partner-weekly-email", handler="partner_email_lambda.lambda_handler", source_file="lambdas/partner_email_lambda.py", schedule="cron(30 17 ? * 1 *)", timeout_seconds=90, memory_mb=256, environment=_partner_env, custom_policies=rp.email_partner(), **shared)
 
         # R54: Evening nudge — checks supplements/journal/How We Feel completeness at 8 PM PT
@@ -91,8 +94,9 @@ class EmailStack(Stack):
             timeout_seconds=300,
             memory_mb=256,
             environment={
-                "SITE_URL":          "https://averagejoematt.com",
-                "SEND_RATE_PER_SEC": "14.0",
+                "SITE_URL":              "https://averagejoematt.com",
+                "SEND_RATE_PER_SEC":     "14.0",
+                "EXTERNAL_EMAILS_ENABLED": "false",  # privacy mode kill switch
             },
             custom_policies=rp.email_weekly_signal(),
             **shared,
@@ -113,8 +117,9 @@ class EmailStack(Stack):
             timeout_seconds=300,
             memory_mb=256,
             environment={
-                "SITE_URL":          "https://averagejoematt.com",
-                "SEND_RATE_PER_SEC": "14.0",
+                "SITE_URL":              "https://averagejoematt.com",
+                "SEND_RATE_PER_SEC":     "14.0",
+                "EXTERNAL_EMAILS_ENABLED": "false",  # privacy mode kill switch
             },
             custom_policies=rp.email_chronicle_sender(),
             **shared,

@@ -30,7 +30,7 @@ AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 
 # Shared utils layer — update on every layer rebuild (bash deploy/build_layer.sh)
-SHARED_LAYER_VERSION = 26  # v26: current production layer
+SHARED_LAYER_VERSION = 41  # v41: prompt caching + cache metrics
 
 SHARED_LAYER_ARN = (
     f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
@@ -46,4 +46,15 @@ PILLOW_LAYER_ARN = (
 GARTH_LAYER_VERSION = 2
 GARTH_LAYER_ARN = (
     f"arn:aws:lambda:{REGION}:{ACCT}:layer:garth-layer:{GARTH_LAYER_VERSION}"
+)
+
+# ── Privacy mode (averagejoematt.com password gate) ──
+# True  → attach cf-auth Lambda@Edge to AmjDistribution default behavior (HTML pages gated).
+# False → public site, no auth required.
+# Secret: life-platform/cf-auth (us-east-1).
+# Bump CF_AUTH_LAMBDA_VERSION when republishing the cf-auth function code.
+PRIVACY_MODE = os.environ.get("PRIVACY_MODE", "true").lower() == "true"
+CF_AUTH_LAMBDA_VERSION = int(os.environ.get("CF_AUTH_LAMBDA_VERSION", "2"))
+CF_AUTH_VERSION_ARN = (
+    f"arn:aws:lambda:us-east-1:{ACCT}:function:life-platform-cf-auth:{CF_AUTH_LAMBDA_VERSION}"
 )

@@ -741,6 +741,9 @@ def build_html(data, commentary_text):
 
 def lambda_handler(event, context):
     if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+    if os.environ.get("EXTERNAL_EMAILS_ENABLED", "true").lower() != "true":
+        logger.info("[kill-switch] EXTERNAL_EMAILS_ENABLED=false — skipping Partner send")
+        return {"statusCode": 200, "body": "skipped: external emails disabled", "skipped": True}
     logger.info("Partner Weekly Email v1.1.0 starting...")
     data = gather_all()
 
