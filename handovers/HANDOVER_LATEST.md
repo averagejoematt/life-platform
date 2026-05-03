@@ -1,209 +1,85 @@
-# Handover — v6.7.0: Intelligence Layer V2 + V2.1 + V2.2 Complete
+# Handover — v6.8.1: Phase 1 Source Restoration + FH 2026 Ingest
 
-**Date:** 2026-04-07
-**Session span:** 2026-04-06 → 2026-04-07 (extended multi-session)
-**Scope:** Intelligence Layer V2 Session 1 — observatory persona consolidation, goals architecture, shared intelligence utilities (data inventory, data maturity, coach preamble), first-person voice enforcement.
+**Date:** 2026-05-02
+**Scope:** Restore platform pulse after 4-week silence. Ingest Function Health 2026 lab draw (8th draw, 153 biomarkers). Re-auth Garmin. Backfill Apple Health gap. Document accumulated tech debt.
+**Type:** Operational restoration, not feature work.
 
-## What Changed
+See [HANDOVER_v6.8.1.md](HANDOVER_v6.8.1.md) for full details.
 
-### Coach Intelligence Architecture (Phases 1-5) — 8 NEW LAMBDAS
+## Summary
 
-Built and deployed a multi-stage AI coach pipeline with 8 domain-specific coaches and 8 supporting Lambdas.
+- **10 of 11 ingestion sources verified end-to-end.** MacroFactor dormant (no logs during silence — not a pipeline failure).
+- **Function Health 2026 ingested** at `DATE#2026-04-03`. 153 biomarkers across standard panel + Cardio IQ + NfL + Galleri. 26 out-of-range. Validated against `Supplement_Protocol_2026-05_v2.md` reference values (15/15 match). Total draws now: 8.
+- **Headline finding: Cardio IQ Insulin Resistance Score 75** — definitively insulin resistant (>66 cutoff). Combines fasting insulin 14.3 (5.7x rise from 2.5 last year) and elevated C-peptide 2.26.
+- **Garmin re-auth** via `setup/setup_garmin_browser_auth.py` (Playwright/Chromium MFA flow). 7 missing dates backfilled cleanly.
+- **Apple Health 27-day gap closed** via new `backfill/backfill_apple_health_export_v16.py` (v16.1 source-aware — fixes iPhone+Garmin step duplication, mL→fl_oz water).
+- **No Lambda code shipped.** All restoration was DDB writes, S3 uploads, and Secrets Manager rotations.
 
-**Coaches (8):**
+## Critical Finding — TD-19 [HIGH]
 
-| Coach ID | Name | Domain |
-|----------|------|--------|
-| `sleep_coach` | Dr. Lisa Park | Sleep & circadian rhythm |
-| `nutrition_coach` | Dr. Marcus Webb | Nutrition & metabolism |
-| `training_coach` | Dr. Sarah Chen | Training & exercise |
-| `mind_coach` | Dr. Nathan Reeves | Mental health & mindfulness |
-| `physical_coach` | Dr. Victor Reyes | Physical health & body composition |
-| `glucose_coach` | Dr. Amara Patel | Glucose regulation & CGM |
-| `labs_coach` | Dr. James Okafor | Lab biomarkers & blood work |
-| `explorer_coach` | Dr. Henning Brandt | Cross-domain patterns & experiments |
+**Cross-source date partition convention mismatch.** HAE Lambda writes today's data at local-PT-midnight partition; Withings writes at UTC-midnight. Same wall-clock day → two different DDB partitions → daily intelligence aggregation will silently undercount. Highest-priority architectural fix from tonight.
 
-**Pipeline Lambdas (8):**
+## Headline Findings from FH 2026 Draw
 
-| Lambda | Purpose |
-|--------|---------|
-| `coach-computation-engine` | EWMA metrics, seasonal adjustments, anomaly detection per domain |
-| `coach-narrative-orchestrator` | Generates coach prose with voice spec, thread continuity, epistemological framing |
-| `coach-state-updater` | Updates relationship state, confidence scores, learning records |
-| `coach-ensemble-digest` | Cross-coach synthesis, disagreement detection, influence graph |
-| `coach-prediction-evaluator` | Scores past predictions, calibrates confidence |
-| `coach-history-summarizer` | Compresses old threads into COMPRESSED#latest |
-| `coach-quality-gate` | Validates output quality (hallucination, voice drift, repetition checks) |
-| `coach-observatory-renderer` | Renders coach analysis for /api/coach_analysis endpoint |
+- `insulin_resistance_score: 75` (Cardio IQ; >66 = resistant) — **the headline finding**
+- `c_peptide: 2.26` (>2.16 cutoff) — confirms endogenous insulin overproduction
+- `apob: 116` standard panel + `apob_cardio_iq: 111` (different assays, both flagged)
+- `lp_pla2_activity: 137` (>123 cutoff) — vascular inflammation
+- `omega_3_index: 3.3%` (was 7.8% last year) — failed repletion
+- `vitamin_d_25oh: 28` (was 117 last year) — into deficient range
+- `testosterone_total: 361` (was 577) — fell ~37%
+- `nfl: 0.81 pg/mL` — neurodegeneration baseline normal
+- `galleri_signal: NO CANCER SIGNAL DETECTED`
+- Allergy panel: total IgE 339 (3x upper limit), sensitized to dust mites, alder/birch/oak trees, cat/dog dander, timothy grass
 
-**Pipeline flow:** Computation Engine -> Narrative Orchestrator -> Quality Gate -> State Updater -> (async) Ensemble Digest + Prediction Evaluator + History Summarizer.
+## Phase 1 Status
 
-### New DynamoDB Partitions
+| Source | Status |
+|---|---|
+| Whoop, Eight Sleep, Withings, Strava | ✅ |
+| Garmin | ✅ (re-auth + 7-day gap-fill tonight) |
+| Habitify, Todoist | ✅ |
+| Apple Health / HAE | ✅ (32-day backfill + webhook live) |
+| Notion | ✅ ("Failure Test" journal entry verified) |
+| Function Health 2026 | ✅ (8th draw committed) |
+| MacroFactor | 🟡 dormant (no logs to ingest) |
 
-Seeded all new partitions for coach intelligence:
+## Tech Debt Carried Forward
 
-- **COACH#{coach_id}** — per-coach state with SK patterns: OUTPUT#, THREAD#{date}, LEARNING#{date}, PREDICTION#{date}, VOICE#state, RELATIONSHIP#state, CONFIDENCE#{subdomain}, COMPRESSED#latest
-- **ENSEMBLE#digest / CYCLE#{date}** — cross-coach synthesis per generation cycle
-- **ENSEMBLE#influence_graph / CONFIG#v1** — coach influence graph configuration
-- **ENSEMBLE#disagreements / ACTIVE#{slug}** — tracked cross-coach disagreements
-- **NARRATIVE#arc / STATE#current + HISTORY#{date}** — overarching narrative arc tracking
-- **COACH#computation / RESULTS#{date}** — pre-computed EWMA metrics for all coaches
+10 items numbered TD-11 through TD-20. Highest-priority items:
+- **TD-19 [HIGH]** — Cross-source date partition convention mismatch (architectural)
+- **TD-15 [HIGH]** — Live HAE Lambda missing source-priority fix (correctness; iPhone+Garmin step double-count today)
+- **TD-20 [LOW]** — `platform_logger.py:103` TypeError on every error log line (cosmetic but pollutes logs)
 
-### S3 Configuration Files
+Full list in [HANDOVER_v6.8.1.md](HANDOVER_v6.8.1.md#tech-debt-accumulated-this-session).
 
-- `config/coaches/*.json` — 8 voice specification files (one per coach)
-- `config/coaches/influence_graph.json` — directed graph of coach-to-coach influence
-- `config/computation/ewma_params.json` — EWMA smoothing parameters
-- `config/computation/seasonal_adjustments.json` — seasonal adjustment factors
-- `config/narrative/arc_definitions.json` — narrative arc definitions and phase transitions
+## Deferred Work
 
-### Observatory Integration
+For fresh-context handoff (write `docs/specs/FUNCTION_HEALTH_V2_HANDOFF.md` next session):
 
-- `/api/coach_analysis` endpoint on site-api reads from COACH# DynamoDB partitions
-- `observatory-v3.js` updated: tries `/api/coach_analysis?coach=<id>` first, falls back to legacy `/api/ai_analysis?expert=<key>`
-- `ai_expert_analyzer_lambda.py` deprecated — replaced by `coach-observatory-renderer`
+1. Site updates (`site/labs/index.html`) for v2 panels (allergies, NfL, Galleri, Cardio IQ)
+2. Supplements page rendering from `Supplement_Protocol_2026-05_v2.md`
+3. Free-text clinician notes ingestion strategy
+4. Personal + Technical Board consults on FH 2026 findings
+5. MCP tool additions: `get_lab_deltas`, `get_allergies`, NfL/Galleri trending cadence
 
-### Prompt Evolution Work
+Plus pre-existing:
+- Sleep/Glucose Observatory V2 visual overhaul (gated until SIMP-1 Phase 2)
+- Coach Intelligence Architecture Phase 1-2 build
+- Bedrock migration (assess after 30 days cost data)
 
-- Bug fixes in coach prompt generation
-- Epistemological framing: coaches express appropriate uncertainty, distinguish observation from inference
-- Fictitious coach names assigned (Dr. Park, Dr. Webb, Dr. Chen, etc.) for consistent voice identity
-- Coach timestamp formatting: date/day/time prefix on coach analysis cards
-- Timestamp placement refinement: moved under name/title, before prose content
+## Operational Note
 
-## Files Changed
-
-| File | Change |
-|------|--------|
-| `lambdas/coach_computation_engine/` | NEW — EWMA computation engine |
-| `lambdas/coach_narrative_orchestrator/` | NEW — Voice-spec prose generation |
-| `lambdas/coach_state_updater/` | NEW — State/confidence/learning updates |
-| `lambdas/coach_ensemble_digest/` | NEW — Cross-coach synthesis |
-| `lambdas/coach_prediction_evaluator/` | NEW — Prediction scoring |
-| `lambdas/coach_history_summarizer/` | NEW — Thread compression |
-| `lambdas/coach_quality_gate/` | NEW — Output validation |
-| `lambdas/coach_observatory_renderer/` | NEW — Observatory API renderer |
-| `lambdas/site_api_lambda.py` | Added /api/coach_analysis endpoint |
-| `lambdas/ai_expert_analyzer_lambda.py` | DEPRECATED — replaced by coach-observatory-renderer |
-| `site/assets/js/observatory-v3.js` | Coach analysis fallback chain |
-| `cdk/stacks/compute_stack.py` | 8 new coach Lambda definitions |
-| `cdk/stacks/role_policies.py` | 8 new IAM policies for coach Lambdas |
-| `docs/ARCHITECTURE.md` | Lambda count 63->71, Coach Intelligence Layer section |
-| `docs/SCHEMA.md` | Coach Intelligence Partitions section |
-| `CLAUDE.md` | Lambda count 63->71 |
-
-## What to Verify
-
-### Smoke Tests
-- [ ] `curl https://averagejoematt.com/api/coach_analysis?coach=sleep_coach` — returns coach analysis
-- [ ] `curl https://averagejoematt.com/api/ai_analysis?expert=sleep` — legacy fallback still works
-- [ ] Sleep observatory page — coach card renders from new endpoint
-- [ ] All 8 coach DynamoDB partitions have seeded data
-
-### CDK
-- [ ] `cdk diff --all` shows no changes (compute stack deployed)
-
-### Platform Quality Sweep (April 7)
-
-**Critical fixes:**
-- `coach_observatory_renderer.py` handler name mismatch (`handler` → `lambda_handler`)
-- `_date_cls` undefined variable in `daily_brief_lambda.py` (ensemble digest invocation)
-- Shared layer version drift — 7 Lambdas on stale layer versions, synced via full CDK deploy
-- DLQ purged — 9 stale messages from `USER_ID` env var failures
-
-**High-severity fixes:**
-- MacroFactor field name bugs in `field_notes_lambda.py` and `site_api_lambda.py` (`calories` → `total_calories_kcal`)
-- 302 → 307 weight fallbacks in 10+ files
-- `os.environ["USER_ID"]` hard-crash pattern → `.get("USER_ID", "matthew")` in 41 Lambda files
-- Experiment `days_in` off-by-one (`.days` → `.days + 1`)
-
-**Deprecation cleanup:**
-- `datetime.utcnow()` → `datetime.now(timezone.utc)` in 206 occurrences across 39 files (lambdas + mcp)
-- Training "Coming Soon" placeholder hidden
-
-**Website fixes:**
-- Homepage ring label "lost" → "lbs lost"
-- Mission page weight overwrite fix (start weight stays at 307)
-- Pulse water glyph wired (was never rendered)
-- Pulse Whoop query Limit 5 → 20 (workout sub-records flooding window)
-- Homepage character data fallback chain (3 API layers)
-- Observatory subtitle positioning (moved below status bar)
-- Mobile scroll-through fix (overscrollBehavior + touchAction on menu)
-- XP values rounded to 1 decimal place on character page
-- "More" bottom nav button delegated click handler
-
-**Documentation updated:**
-- INTELLIGENCE_LAYER.md — full v6.0.0 rewrite
-- ARCHITECTURE.md — 71 Lambdas, Coach Intelligence section
-- SCHEMA.md — COACH#/ENSEMBLE#/NARRATIVE# partitions
-- DECISIONS.md — ADR-047 (Coach Intelligence) + ADR-048 (Observatory Integration)
-- CHANGELOG.md — v6.0.0 entry
-- RUNBOOK.md — coach troubleshooting section
-- ONBOARDING.md — coach mental model + glossary
-
-### Observatory Intelligence Fixes (April 7 — continued session)
-
-**P0 — Data Correctness:**
-- **Character level carry-forward** — `load_previous_state()` now scans back 7 days instead of 1. Level restored to 4 (was dropping to 1 when compute skipped days).
-- **Coach data blindness** — Added DEXA, measurements, labs to daily brief data dict (`_latest_item()` helper). Coaches now see body composition, lab results, and measurement data.
-- **Step count SOT** — Garmin now primary for steps (wearable), Apple Health fallback. Was reversed.
-- **Training interpretation** — `training_status: "no_training_logged"` explicitly signals no training vs missing data.
-- **Data inventory injection** — Every coach prompt now receives a "DATA SOURCES AVAILABLE" block listing which sources have data and which don't. Coaches can no longer claim data is missing when it exists.
-
-**P1 — Voice & Goals:**
-- **First-person directive** — All coaches now instructed to write as "I" not "Dr. [Name]". Verified in regenerated outputs.
-- **Goals injection** — System prompt now includes Matthew's goals (target weight, body comp, training philosophy, timeline, key priorities). Coaches no longer ask "what are your goals?"
-
-**P2 — Rendering:**
-- **Pulse FOUC fix** — Double `requestAnimationFrame` wrap before showing Pulse section to prevent unstyled flash on mobile.
-
-**P3 — New Feature:**
-- **Coach bio page** — `/coaches/` page with card layout for all 8 AI coaching personas. Shows name, title, voice description, domains, and link to latest observatory analysis.
-
-## Known Issues / Carry Forward
-
-- ~~Character level drop~~ **RESOLVED** — Level carry-forward now scans back 7 days.
-- **Smoke test expectations stale** — `deploy/smoke_test_site.sh` has 15 failing checks for old V2/V3 HTML structures. Tests need updating, not the site.
-- **/coaching/ dashboard page** — standalone coaching dashboard deferred (future sprint)
-- **Coach Intelligence test coverage** — 8 new Lambda files (~300KB) have no unit tests
-- **TDEE tracking** — blocked (MacroFactor doesn't export)
-- **IC-4/IC-5** (failure pattern + momentum warning) — data gate ~May 1
-- **PRE-13 Data Publication Review** — deferred
-- **464 unused imports** — F401 flake8 warnings, cosmetic cleanup
+**Garmin re-auth is a recurring ~30-day chore.** OAuth1 refresh token has ~30 day lifetime. As long as Lambda runs daily and refreshes OAuth2, this stays fresh indefinitely. Danger zone: any silence >2 weeks. **Mitigation pattern:** disable Garmin EventBridge rule before any planned silence to prevent rate-limit accumulation. Same pattern applies to Withings and Strava.
 
 ## Current System State
 
 | Metric | Value |
 |--------|-------|
-| MCP Tools | 115 |
-| Lambdas | 71 |
-| Site Pages | 72 |
-| Lambda Layer | v32 |
-| Architecture Grade | A- (R20) |
-| CDK Stacks | 8 |
-| AI Coaches | 8 |
-| Coach DDB Partitions | 6 partition families |
-| Test Results | 1103 passed, 1 infra-only failure |
-| Site Pages | 73 (added /coaches/) |
-| Shared Layer Modules | 18 (added intelligence_common.py) |
-| Board Members | 18 (added amara_patel, victor_reyes, nathan_reeves, henning_brandt) |
-| MCP Tools | 123 |
-| Site Pages | 75 (added /predictions/, updated /coaches/) |
-| Version | v6.7.0 |
-
-## Intelligence Layer V2 — All Sessions Complete
-
-| Session | Workstream | Status |
-|---------|-----------|--------|
-| S1 | W0 Persona Consolidation + W5 Goals | Complete — board v3.0, user_goals.json, intelligence_common.py |
-| S2 | W2 Cold-Start Voice | Complete — 3-phase voice, thresholds refined |
-| S3 | W4 Intelligence Validator | Complete — 5 checks, DDB partition, MCP tool |
-| S4 | W1 Coach Synthesis | Complete — Dr. Nakamura, /api/weekly_priority, cross-domain notes |
-| S5 | W3 Action Completion Loop | Complete — DDB tracking, auto-detection, MCP tools |
-| S6 | W6 Builder's Paradox | Complete — score computation, Maya integration, journal prompt |
-
-## What's Next
-- Tune voice specs and thresholds as data accumulates (Phase 6 refinement)
-- /coaching/ dashboard page (deferred — standalone design session)
-- Inline correction mode for validator (Mode B — re-prompt on errors)
-- Surface "Open Actions" widget on homepage Pulse section
+| Version | v6.8.1 |
+| Lambda Layer | v41 (unchanged) |
+| Lambdas | 71 (unchanged) |
+| MCP Tools | 123 (unchanged) |
+| Lab Draws in DDB | **8** (was 7) |
+| Total Biomarkers in latest draw | **153** (was 74) |
+| Out-of-range biomarkers in latest draw | 26 |
