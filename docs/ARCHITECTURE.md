@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-05-03 (v6.8.8 — 126 tools, 36-module MCP package, 19 data sources, 66 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed)
+Last updated: 2026-05-03 (v6.8.9 — 126 tools, 36-module MCP package, 19 data sources, 66 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed)
 
 ---
 

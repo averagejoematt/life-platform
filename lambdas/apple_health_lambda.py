@@ -137,7 +137,28 @@ def floats_to_decimal(obj):
 
 
 def parse_date(date_str):
-    return date_str[:10] if date_str else None
+    """Parse Apple Health export.xml date → UTC date string (YYYY-MM-DD).
+
+    TD-19 Phase 2 (PR re-entry, 2026-05-03): see lambdas/health_auto_export_lambda.py
+    parse_date_str() for the full reasoning. Same root issue: pre-fix this stripped
+    the first 10 chars of a TZ-bearing timestamp, partitioning at source-tz date
+    instead of UTC date — silent cross-source aggregation undercount.
+    """
+    if not date_str:
+        return None
+    s = date_str.strip()
+    if len(s) == 10 and s[4] == "-" and s[7] == "-":
+        return s
+    try:
+        normalized = s.replace(" ", "T", 1)
+        if len(normalized) >= 24 and normalized[-5] in ("+", "-") and normalized[-3] != ":":
+            normalized = normalized[:-2] + ":" + normalized[-2:]
+        dt = datetime.fromisoformat(normalized)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc).strftime("%Y-%m-%d")
+    except (ValueError, IndexError):
+        return s[:10]
 
 
 def get_latest_stored_date():

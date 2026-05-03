@@ -1,3 +1,74 @@
+## v6.8.9 — Phase A-D pre-Monday readiness sweep (2026-05-03)
+
+Goal: ensure the platform "just works" when Matthew opens it Monday morning. 4 phases per `~/.claude/plans/proud-humming-scone.md`.
+
+### TD-19 Phase 2 — UTC date partition fix
+- `lambdas/health_auto_export_lambda.py parse_date_str()`, `lambdas/apple_health_lambda.py parse_date()`, `backfill/backfill_apple_health_export_v16.py parse_dt()` all now convert source-tz timestamps to UTC before extracting partition keys.
+- Eliminates the silent cross-source partition undercount documented in `docs/audits/TD-19_DATE_PARTITION_AUDIT.md`. 9pm PT events now correctly partition to UTC date matching every other source.
+- TD-14 parity discipline observed: backfill + live Lambda fixed in same PR.
+- Phase 3 (historical migration) explicitly deferred to its own PR per spec.
+
+### Layer drift bug — 10 Lambdas pinned to old shared layer versions
+- **Root cause**: `cdk/stacks/compute_stack.py` and `cdk/stacks/operational_stack.py` didn't pass `shared_layer=shared_utils_layer` to `create_platform_lambda()`. Lambdas stayed on whatever layer version was attached at first deploy.
+- **Affected**: adaptive-mode-compute (v22), ai-expert-analyzer (v40, manual deploy), anomaly-detector (v22), character-sheet-compute (v25), daily-insight-compute (v22), daily-metrics-compute (v25), hypothesis-engine (v22), weekly-correlation-compute (v22), life-platform-freshness-checker (v19), life-platform-site-api (v25 — but doesn't import shared modules).
+- **Most expensive consequence**: hypothesis-engine + ai-expert-analyzer were missing the COST-OPT-2 prompt caching benefit (~90% Anthropic discount) since COST-OPT-2 shipped.
+- **Fix**: added `shared_utils_layer` to compute_stack `shared` dict + operational_stack freshness-checker + canary; ai-expert-analyzer updated manually via `aws lambda update-function-configuration`. All 10 now on v42.
+
+### MacroFactor pipeline — XLSX support + daily-summary format
+- `lambdas/dropbox_poll_lambda.py` adds `xlsx_to_csv()` (pure stdlib zipfile + xml.etree, no new dep). XLSX files are now auto-converted on ingest. Closes the 22-day stale gap once Matthew does a fresh export.
+- `lambdas/macrofactor_lambda.py` adds `build_summary_day_items()` + `daily_summary` format detection. Handles MacroFactor's current XLSX export shape (one row per day with daily totals, Excel serial dates). `entries_count` + `food_log` placeholders added to satisfy the DATA-2 validator.
+- Successfully ingested existing Dropbox file (4 days written: April 4-10). Pipeline ready for Matthew's next export.
+
+### WR-48 Enhancement 1 — Daily brief stale-source banner
+- `lambdas/daily_brief_lambda.py` queries DDB directly (same logic as `get_freshness_status` MCP tool) before sending the brief. If any source is past threshold, prepends a "⚠️ Data Status — N source(s) stale" block above the brief HTML.
+- Tomorrow's brief tells Matthew upfront if data is incomplete — explains low grades vs. signal-vs-noise.
+- Independent of the freshness-checker Lambda (works even if metric emission silently fails — the failure mode that hid the 30-day silence).
+
+### Two latent bugs caught + fixed in Phase A
+- `mcp/tools_health.py tool_get_health_trajectory` — failing nightly in warmer with `can't compare offset-naive and offset-aware datetimes`. Fixed by parsing Withings dates as tz-aware.
+- `mcp/tools_memory.py tool_capture_baseline` — failing with `tool_write_platform_memory() got an unexpected keyword argument 'category'`. Pre-existing typing bug. Fixed by passing args as dict.
+- (Both shipped earlier in tonight's session in the canary-deploy commit.)
+
+### Site nav
+- `site/assets/js/components.js` — `/supplements/protocol/` added to global nav menu under "The Practice → The System" (mega-nav and bottom-nav). Page is now discoverable from any page.
+
+### Operational
+- Manually triggered nightly warming jobs (dashboard-refresh, site-stats-refresh, character-sheet-compute, daily-metrics-compute, daily-insight-compute, adaptive-mode-compute, MCP warmer) so dashboards / homepage / character sheet are current as of session-end.
+- Re-ran `capture_baseline label=reentry_2026_05_03 force=True` AFTER warming completed. New `MEMORY#baseline_snapshot#2026-05-03` anchors Cycle 2.
+
+### Phase A informational findings (no action needed beyond what was done)
+- Daily-brief Grade 39 (F) is real, not AI failure. macrofactor/strava/supplements all flagged DataPresent=0. Once those refresh, grade recovers.
+- Anomaly-detector flagged Whoop RHR 69 (Z=3.68 high) + Garmin Body Battery 23 (Z=-3.17 low) on May 2 — real physiological stress, anomaly-detector working correctly.
+- chronicling partition still stale at 2025-10-29 (Habitify took over the format). Deprecated artifact; documented; no data deleted.
+- dropbox_poll Lambda was healthy all along — the "null" was misleading; file was XLSX which the prior code couldn't read.
+- freshness-checker SNS:Publish IAM was the root cause of the 30-day silent failure (fixed earlier tonight in v6.8.8).
+
+### Final freshness snapshot
+```
+OVERALL: red | stale=2 fresh=10
+  STALE strava (15d) — Matthew action: open Strava app
+  STALE macrofactor (22d) — Matthew action: re-export from MacroFactor
+```
+
+### Carry-forward Matthew action items (Monday morning priorities)
+1. Open Strava app on phone, force a sync (re-auth if OAuth expired)
+2. Re-export MacroFactor data (XLSX now supported); drop into Dropbox `/life-platform/`
+3. Run PR 0 MCP smoke tests (`create_experiment`, `create_todoist_task`, `get_todoist_projects`)
+4. Write Phase 5 re-entry journal entry in Notion
+5. Disable HAE Tier-2 feeds in iOS Health Auto Export app (TD-17)
+
+### Deploys this wave
+- `cdk deploy LifePlatformCompute` (layer attachment fix)
+- `cdk deploy LifePlatformOperational` (freshness-checker + canary layer)
+- `cdk deploy LifePlatformIngestion` (TD-19 Phase 2 fix)
+- `aws lambda update-function-code dropbox-poll` (XLSX support)
+- `aws lambda update-function-code macrofactor-data-ingestion` (daily_summary format)
+- `aws lambda update-function-code daily-brief` (WR-48 banner)
+- `aws lambda update-function-configuration ai-expert-analyzer --layers v42` (manual layer fix)
+- `bash deploy/sync_site_to_s3.sh` (nav link)
+
+---
+
 ## v6.8.8 — PR re-entry sweep: WR-48 + Re-Entry Protocol + 2 latent bug fixes (2026-05-03)
 
 Re-entry sweep executed against `Downloads/ajm_reentry_plan.md`. Everything that didn't require Matthew's hands-on input.

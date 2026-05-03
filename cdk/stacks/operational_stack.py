@@ -57,6 +57,16 @@ class OperationalStack(Stack):
         local_table        = dynamodb.Table.from_table_name(self, "LifePlatformTable", LIFE_PLATFORM_TABLE)
         local_bucket       = s3.Bucket.from_bucket_name(self, "LifePlatformBucket", LIFE_PLATFORM_BUCKET)
         local_alerts_topic = sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
+        # Phase B re-entry sweep (2026-05-03): shared layer for Lambdas that import
+        # platform_logger (currently freshness-checker + canary). They have a
+        # try/except ImportError fallback to stdlib logging, so the missing layer
+        # was hidden — but TD-20 platform_logger fix never reached freshness-checker
+        # (still pinned at v19). Other operational Lambdas (site-api, key-rotator,
+        # pip-audit, etc.) don't import shared modules so don't need the layer.
+        from stacks.constants import SHARED_LAYER_ARN
+        shared_utils_layer = _lambda.LayerVersion.from_layer_version_arn(
+            self, "SharedUtilsLayer", SHARED_LAYER_ARN,
+        )
 
         # ── 1. Freshness Checker — 9:45 AM PT daily (previously in separate CFn stack)
         freshness = create_platform_lambda(self, "FreshnessChecker",
@@ -73,6 +83,7 @@ class OperationalStack(Stack):
             custom_policies=rp.operational_freshness_checker(),
             table=local_table, bucket=local_bucket, dlq=None, alerts_topic=local_alerts_topic,
             alarm_name="freshness-checker-errors",
+            shared_layer=shared_utils_layer,
         )
 
         # ── 2. DLQ Consumer — every 6 hours
@@ -99,6 +110,7 @@ class OperationalStack(Stack):
             },
             custom_policies=rp.operational_canary(),
             table=local_table, bucket=local_bucket, dlq=None, alerts_topic=None,
+            shared_layer=shared_utils_layer,
         )
 
         # ── 4. Pip Audit — every Monday

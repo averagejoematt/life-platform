@@ -56,6 +56,7 @@
         { href: '/stack/',       text: 'The Stack' },
         { href: '/protocols/',   text: 'Protocols' },
         { href: '/supplements/', text: 'Supplements' },
+        { href: '/supplements/protocol/', text: 'Supp Protocol (v2)' },
       ]},
       { heading: 'The Pipeline', items: [
         { href: '/experiments/', text: 'Experiments' },
@@ -221,6 +222,7 @@
         { href: '/stack/', text: 'The Stack' },
         { href: '/protocols/', text: 'Protocols' },
         { href: '/supplements/', text: 'Supplements' },
+        { href: '/supplements/protocol/', text: 'Supp Protocol (v2)' },
         { href: '/experiments/', text: 'Experiments' },
         { href: '/challenges/',  text: 'Challenges' },
         { href: '/discoveries/', text: 'Discoveries' },
