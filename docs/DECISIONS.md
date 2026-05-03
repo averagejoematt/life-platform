@@ -2,7 +2,7 @@
 
 > Permanent log of significant architectural, design, and operational decisions.
 > Each ADR captures the decision, context, alternatives considered, and outcome.
-> Last updated: 2026-04-06 (v6.0.0)
+> Last updated: 2026-04-09 (v6.7.1)
 
 ---
 
@@ -1031,3 +1031,42 @@ Supporting files: `data_sources.json` (source registry), `lint_site_content.py` 
 **Files changed:** `site_api_lambda.py` (new endpoint), `observatory-v3.js` (new fetch + continuity markers + data_availability), `observatory-v3.css` (marker styles), `coach_state_updater.py` (observatory_summary extraction), `coach_observatory_renderer.py` (standalone reader Lambda).
 
 **Outcome:** Observatory pages serve Coach Intelligence content with stateful memory, cross-coach awareness, and data availability constraints. Legacy endpoint retained as fallback.
+
+---
+
+### ADR-049 — COST-OPT-2: Prompt Caching + Strategic Model Downgrades
+
+**Status:** Active
+**Date:** 2026-04-09 (v6.7.1)
+
+**Context:** Platform spending ~$17-20/month on Anthropic API calls across 22 Lambdas. Two cost levers were completely unused: prompt caching (90% discount on repeated input tokens) and model tiering (Haiku at ~75% less than Sonnet for structured tasks). The API key ran out of credits, surfacing the cost issue. Analysis showed daily brief (4 Sonnet calls/day) and weekly emails (6+ Sonnet calls/week) as the largest drivers, with observatory expert analyzer (9 Sonnet calls/week) as a strong downgrade candidate.
+
+**Decision:** Two-phase optimization:
+
+**Phase 1 — Prompt caching (zero quality risk):**
+- Added `anthropic-beta: prompt-caching-2024-07-31` header and structured system message content blocks with `cache_control: {"type": "ephemeral"}` to all 12 API call sites across 11 files.
+- Two shared utilities updated: `retry_utils.py` (`call_anthropic_api`) and `ai_calls.py` (`call_anthropic`) — both auto-wrap string `system` params as cached content blocks. Callers opt in automatically.
+- Expert analyzer builds a shared system prompt (goals, inventory, format rules — ~2900 chars) once per invocation, cached across all 8 sequential expert calls.
+- New CloudWatch metrics: `AnthropicCacheWriteTokens`, `AnthropicCacheReadTokens` per Lambda.
+
+**Phase 2 — Model downgrades (Sonnet → Haiku for structured tasks):**
+- `ai_expert_analyzer_lambda.py`: Haiku default (observatory page content — templated output with KEY RECOMMENDATION / ELENA QUOTE tags)
+- `ai_calls._run_analysis_pass()`: Haiku (200-token JSON extraction)
+- `hypothesis_engine_lambda.py`: Haiku (structured JSON hypothesis generation)
+- `challenge_generator_lambda.py`: Haiku (structured JSON challenge output)
+- `field_notes_lambda.py`: Haiku (weekly lab notes)
+- All downgrades use `AI_MODEL` env var — instant rollback without code deploy.
+
+**NOT downgraded (quality-critical narrative content):** daily-brief (BoD, TL;DR, training/nutrition, journal coaches), wednesday-chronicle, weekly-plate, nutrition-review, monday-compass, weekly-digest, partner-email.
+
+**Phase 3 — Batch API (deferred):** 50% discount via async batch submission. Evaluated but deferred: $1.11-1.66/month savings doesn't justify the architectural complexity (split monolithic Lambdas into submit/collect pairs, handle batch timeouts, fallback paths). ~$0.04/month additional AWS costs.
+
+**Reasoning:**
+1. **Prompt caching is free money.** Same prompts, same quality, 90% off cached tokens. No downside.
+2. **Model tiering matches task complexity.** Structured JSON extraction and templated observatory content don't need Sonnet's reasoning depth. Haiku follows format constraints reliably when the preamble is well-specified.
+3. **Env var model selection enables safe experimentation.** Can A/B test Haiku vs Sonnet per Lambda without code changes.
+4. **Batch API complexity scales poorly at this spend level.** Engineering time better spent elsewhere when savings are ~$1.50/month.
+
+**Files changed:** `retry_utils.py`, `ai_calls.py`, `ai_expert_analyzer_lambda.py`, `coach_narrative_orchestrator.py`, `coach_ensemble_digest.py`, `coach_state_updater.py`, `coach_quality_gate.py`, `coach_history_summarizer.py`, `journal_enrichment_lambda.py`, `hypothesis_engine_lambda.py`, `challenge_generator_lambda.py`, `field_notes_lambda.py`, `site_api_lambda.py` (AI_UNAVAILABLE fix), `constants.py` (layer v41).
+
+**Projected cost impact:** $17-20/month → $8-12/month (40-60% reduction). Shared layer v41 deployed.

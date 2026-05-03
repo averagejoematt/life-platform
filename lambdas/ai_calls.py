@@ -48,26 +48,38 @@ _CW_NAMESPACE = "LifePlatform/AI"
 _BACKOFF_DELAYS = [5, 15, 45]  # attempts 1→2, 2→3, 3→4
 
 
-def _emit_token_metrics(input_tokens, output_tokens):
+def _emit_token_metrics(input_tokens, output_tokens,
+                        cache_creation_tokens=0, cache_read_tokens=0):
     """Emit per-Lambda Anthropic token usage to CloudWatch (P1.9)."""
     try:
-        _cw.put_metric_data(
-            Namespace=_CW_NAMESPACE,
-            MetricData=[
-                {
-                    "MetricName": "AnthropicInputTokens",
-                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                    "Value": input_tokens,
-                    "Unit": "Count",
-                },
-                {
-                    "MetricName": "AnthropicOutputTokens",
-                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                    "Value": output_tokens,
-                    "Unit": "Count",
-                },
-            ],
-        )
+        metric_data = [
+            {
+                "MetricName": "AnthropicInputTokens",
+                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                "Value": input_tokens,
+                "Unit": "Count",
+            },
+            {
+                "MetricName": "AnthropicOutputTokens",
+                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                "Value": output_tokens,
+                "Unit": "Count",
+            },
+        ]
+        if cache_creation_tokens or cache_read_tokens:
+            metric_data.append({
+                "MetricName": "AnthropicCacheWriteTokens",
+                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                "Value": cache_creation_tokens,
+                "Unit": "Count",
+            })
+            metric_data.append({
+                "MetricName": "AnthropicCacheReadTokens",
+                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                "Value": cache_read_tokens,
+                "Unit": "Count",
+            })
+        _cw.put_metric_data(Namespace=_CW_NAMESPACE, MetricData=metric_data)
     except Exception as e:
         print(f"[WARN] CloudWatch token metric emit failed (non-fatal): {e}")
 
@@ -265,7 +277,7 @@ Output this exact JSON structure:
 {{"key_patterns": ["specific data observation 1", "specific data observation 2"], "likely_connection": "habit/metric X correlates with metric Y result — note this is a pattern, not proven causation", "challenge": "One reason this analysis might be wrong or misleading — e.g. confounding factor, insufficient data, correlation ≠ causation, or the obvious insight hiding a subtler one", "priority": "single most important coaching focus for today", "tone": "celebrate|challenge|support"}}"""
 
     try:
-        raw = call_anthropic(prompt, api_key, max_tokens=200)
+        raw = call_anthropic(prompt, api_key, max_tokens=200, model=AI_MODEL_HAIKU)
         raw = raw.strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
@@ -1092,40 +1104,60 @@ def build_workout_summary(data):
 # ANTHROPIC API
 # ==============================================================================
 
+def _build_system_block(system, cache_system):
+    """Convert system prompt to cached content block format if caching enabled."""
+    if not system:
+        return None
+    if isinstance(system, list):
+        return system  # already structured
+    if cache_system:
+        return [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+    return system
+
+
 def call_anthropic(prompt, api_key, max_tokens=200, system=None,
-                   output_type=None, health_context=None):
+                   output_type=None, health_context=None,
+                   model=None, cache_system=True):
     """Call Anthropic API with exponential backoff (4 attempts: 5s/15s/45s delays).
 
     P1.8: Exponential backoff replaces fixed 2-attempt/5s retry.
     P1.9: Token usage emitted to CloudWatch LifePlatform/AI namespace.
+    COST-OPT: Prompt caching — 90% discount on cached system message tokens.
     AI-3 middleware: validates output when output_type is specified (transparent fail-safe).
-    R17-16: Graceful degradation — returns "" (empty string) after all retries exhausted
-            instead of raising. Callers should check: if not result: handle_ai_unavailable().
+    R17-16: Graceful degradation — returns "[AI_UNAVAILABLE]" after all retries exhausted
+            instead of raising. Callers should check for AI_UNAVAILABLE.
 
     Args:
+        model:          Model ID override — defaults to AI_MODEL env var.
+        cache_system:   Enable prompt caching on system message (default True).
         output_type:    AIOutputType enum value — enables AI-3 output validation.
                         Pass None (default) to skip — used for JSON callers and IC passes.
         health_context: Dict of health metrics for context-aware validation checks
                         (e.g. {"recovery_score": 45, "tsb": -12}).
-    Returns text string, or "" if Anthropic is unavailable after all retries.
+    Returns text string, or "[AI_UNAVAILABLE]" if Anthropic is unavailable after all retries.
     """
     body = {
-        "model": AI_MODEL,
+        "model": model or AI_MODEL,
         "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}],
     }
-    if system:
-        body["system"] = system
+    sys_block = _build_system_block(system, cache_system)
+    if sys_block:
+        body["system"] = sys_block
+
+    headers = {
+        "Content-Type": "application/json",
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+    }
+    if cache_system and system:
+        headers["anthropic-beta"] = "prompt-caching-2024-07-31"
 
     payload = json.dumps(body).encode()
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages",
         data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-        },
+        headers=headers,
         method="POST",
     )
 
@@ -1140,6 +1172,8 @@ def call_anthropic(prompt, api_key, max_tokens=200, system=None,
                     _emit_token_metrics(
                         usage.get("input_tokens", 0),
                         usage.get("output_tokens", 0),
+                        usage.get("cache_creation_input_tokens", 0),
+                        usage.get("cache_read_input_tokens", 0),
                     )
                 text = resp["content"][0]["text"].strip()
                 # AI-3 middleware: validate output when output_type is specified
