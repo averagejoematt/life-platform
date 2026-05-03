@@ -396,10 +396,12 @@ def get_todoist_day(date: str = None):
 
 # ── Write tools ────────────────────────────────────────────────────────────────────
 
-def get_todoist_projects():
+def get_todoist_projects(args=None):
     """
     List all Todoist projects with their IDs and names.
     Required before creating or moving tasks — use project_id from this response.
+
+    args is unused (registry dispatcher passes positional arg to all tools).
     """
     try:
         result = _todoist_request("GET", "/projects")

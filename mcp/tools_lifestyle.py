@@ -6,7 +6,7 @@ import urllib.request
 import math
 import re
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from boto3.dynamodb.conditions import Key
 from decimal import Decimal
@@ -3087,7 +3087,6 @@ def tool_get_field_notes(args):
     existing Matthew response. Used before log_field_note_response so
     Matthew can read the AI notes and write back.
     """
-    from datetime import timezone
     week = args.get("week")
     if not week:
         now = datetime.now(timezone.utc)
@@ -3133,7 +3132,6 @@ def tool_log_field_note_response(args):
     Uses update_item so Matthew's fields never overwrite the AI-generated fields.
     The WEEK# record must already exist with ai_generated_at set.
     """
-    from datetime import timezone
     week = args.get("week", "").strip()
     notes = args.get("notes", "").strip()
     agreement = args.get("agreement")
@@ -3219,7 +3217,6 @@ def tool_log_ledger_entry(args):
     record or ledger.json config defaults. Writes both a LEDGER# transaction
     record and updates the TOTALS#current running totals.
     """
-    from datetime import timezone
     source_type = args.get("source_type", "").strip()
     source_id = args.get("source_id", "").strip()
     outcome = args.get("outcome", "").strip()
