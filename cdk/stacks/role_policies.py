@@ -528,8 +528,21 @@ def compute_coach_orchestrator() -> list[iam.PolicyStatement]:
 
 
 def compute_coach_state_updater() -> list[iam.PolicyStatement]:
-    """Coach state updater: reads S3 voice specs, uses ai-keys for Haiku extraction, writes COACH# state records to DDB."""
-    return _compute_base(needs_kms=True, needs_ai_keys=True, needs_s3_config=True)
+    """Coach state updater: reads S3 voice specs, uses ai-keys for Haiku extraction, writes COACH# state records to DDB.
+
+    Reentry sweep (2026-05-03 v6.8.10): added cloudwatch:PutMetricData. Lambda emits
+    AnthropicInputTokens / AnthropicOutputTokens per coach for cost tracking. Pre-fix
+    every emit failed with AccessDenied (non-fatal — caught as WARNING) which made
+    downstream alarms (ai-tokens-daily-brief-daily) inaccurate.
+    """
+    return _compute_base(
+        needs_kms=True, needs_ai_keys=True, needs_s3_config=True,
+        extra_statements=[iam.PolicyStatement(
+            sid="CloudWatchMetrics",
+            actions=["cloudwatch:PutMetricData"],
+            resources=["*"],
+        )],
+    )
 
 
 # ═════════════════════════════════════════════════════════════════════════
