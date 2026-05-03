@@ -1,3 +1,60 @@
+## v6.8.1 — Phase 1 Source Restoration + FH 2026 Ingest (2026-05-02)
+
+### Function Health 2026 Lab Draw
+- 8th draw committed to DDB at `pk = USER#matthew#SOURCE#labs / sk = DATE#2026-04-03`
+- 153 biomarkers across standard panel + Cardio IQ + NfL + Galleri
+- 26 out-of-range; validated against `Supplement_Protocol_2026-05_v2.md` (15/15 reference values match)
+- Headline finding: Cardio IQ `insulin_resistance_score: 75` — definitively insulin resistant (cutoff >66)
+- 7 source PDFs archived to `s3://matthew-life-platform/raw/matthew/labs/2026-04-03/`
+- New artifacts: `backfill/draw_2026_04_03.py` (1015 lines structured biomarker data), `backfill/ingest_function_health_2026_04_03.py` (293 lines ingest script with validation gate)
+
+### Source Restoration After 4-Week Silence
+- 10 of 11 ingestion sources verified end-to-end (Whoop, Eight Sleep, Withings, Strava, Garmin, Habitify, Todoist, Apple Health, Notion, Function Health)
+- MacroFactor dormant (no food logs to ingest — pipeline architecturally identical to Notion which was verified)
+- Garmin re-auth via `setup/setup_garmin_browser_auth.py` (Playwright/Chromium MFA flow); OAuth1 token had expired during silence, refresh endpoint hit 429 from cron retries
+- 7 missing Garmin dates backfilled via gap-fill mode
+- 32 days of Apple Health data backfilled via new `backfill/backfill_apple_health_export_v16.py` (v16.1 source-aware)
+
+### Critical Architectural Finding — TD-19
+- **HIGH severity:** HAE Lambda writes today's data at local-PT-midnight partition; Withings writes at UTC-midnight. Same wall-clock day → different DDB partitions. Daily aggregation silently undercounts.
+- Discovered while verifying HAE webhook health post-restoration
+- Not fixed in this session; carried forward as TD-19
+
+### Tech Debt Carried Forward
+- TD-11 through TD-20 documented in [handovers/HANDOVER_v6.8.1.md](../handovers/HANDOVER_v6.8.1.md#tech-debt-accumulated-this-session)
+- Highest priority: TD-19 (cross-source partition mismatch), TD-15 (live HAE Lambda missing source-priority fix), TD-20 (platform_logger.py:103 TypeError)
+
+### Operational
+- No Lambda code shipped, no CDK deploy, no CI/CD pipeline runs
+- All restoration was DDB writes, S3 uploads, and Secrets Manager rotations
+- Garmin re-auth identified as recurring ~30-day chore — mitigation pattern documented (disable Garmin EventBridge rule before planned silences)
+
+---
+## v6.8.0 — COST-OPT-2 Prompt Caching + Model Tiering (2026-04-09)
+
+See [handovers/HANDOVER_v6.8.0.md](../handovers/HANDOVER_v6.8.0.md) for full details.
+
+### Observatory `[AI_UNAVAILABLE]` Fix
+- Both `/api/coach_analysis` and `/api/ai_analysis` now nullify analysis text containing the sentinel
+- Frontend's existing graceful fallback ("Analysis generates daily. Check back soon.") kicks in
+- `life-platform-site-api` deployed
+
+### Prompt Caching
+- `retry_utils.py` and `ai_calls.py` auto-wrap system messages as cached content blocks (90% discount)
+- Expert analyzer shares ~2900-char system prompt across 8 calls
+- 8 additional direct-call Lambdas updated
+
+### Model Downgrades
+- Expert analyzer, hypothesis engine, challenge generator, field notes, and daily-brief analysis pass switched from Sonnet to Haiku
+- Env-var rollback supported
+
+### Layer
+- v41 published + deployed across all email/compute Lambdas
+
+### ADR
+- ADR-049 documents the full decision
+
+---
 ## v6.7.1 — User Goals Populated + Preamble V2.2 Schema Update (2026-04-07)
 
 ### User Goals Populated
