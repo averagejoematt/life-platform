@@ -1,3 +1,51 @@
+## v6.8.3 — PR 1: HAE source-priority + platform_logger (TD-15/16/18/20) + MCP outage hotfix (2026-05-03)
+
+### HAE Lambda (TD-15/16/18) — `lambdas/health_auto_export_lambda.py` v1.7.0
+- **TD-15** [HIGH]: ported `SOURCE_PRIORITY` dict + `pick_source_or_all()` helper from `backfill/backfill_apple_health_export_v16.py`. `process_generic_metrics()` now groups readings by `(date, source)` per metric and picks the highest-priority source's readings, instead of summing across all sources.
+- **TD-16** [MED]: subsumed by TD-15 (same fix, viewed through Garmin-via-AppleHealth lens).
+- **TD-18** [LOW]: `weight_body_mass` and `Weight Body Mass` added as aliases for `Body Mass` in METRIC_MAP. iOS HAE export sends this name variant; previously silently unmatched.
+- New `source_audit` dict returned from `process_generic_metrics()` for diagnostic visibility; logged as `source_dedup_count` in the per-request structured line.
+- **Behavioral change:** step counts drop ~50% on iPhone+Garmin overlap days. This is the bug fix making things correct, not a regression.
+
+### platform_logger (TD-20) — `lambdas/platform_logger.py` v1.0.2
+- `_log_with_extras()` now mirrors stdlib `Logger._log()`'s `exc_info` normalization: `True` → `sys.exc_info()`; `BaseException` → `(type, val, tb)`; other non-tuple → `sys.exc_info()`.
+- Pre-fix every error log line emitted a secondary `TypeError: bool object is not subscriptable` from `formatException`.
+
+### Layer v42 — `cdk/stacks/constants.py` SHARED_LAYER_VERSION 41 → 42
+- `cdk deploy LifePlatformCore` published shared layer v42 with TD-20 fix.
+- v41 retained per `RemovalPolicy.RETAIN`.
+- Stack-by-stack `cdk deploy` for Ingestion / Compute / Email / Operational / Web re-attached v42 to all 65 dependent Lambdas.
+
+### Tests added
+- `tests/test_health_auto_export.py` — 16 tests (8 priority resolver, 4 e2e dedup via `process_generic_metrics`, 3 weight_body_mass alias, 1 Tier-2 fallthrough)
+- `tests/test_platform_logger.py` — 5 tests (exc_info=True / BaseException / tuple / None / False forms; all assert no secondary TypeError in log output)
+- All 21 pass; no regressions in the 1131 prior tests.
+
+### MCP outage hotfix
+- Mid-PR-0 deploy window (~22:51 PT 2026-05-02 to ~08:23 PT 2026-05-03), MCP returned 502 Bad Gateway with `Runtime.ImportModuleError: cannot import name '_decimal_to_float' from 'mcp.core'`.
+- Root cause: latent typo from commit `de57c67` (v6.6.0, 2026-04-07) — `mcp/tools_data.py:493` and `mcp/tools_coach_intelligence.py:8` imported `_decimal_to_float` (with underscore) but the function in `mcp/core.py` is `decimal_to_float`.
+- Why it surfaced now: MCP Lambda was last deployed 2026-04-07 19:55 UTC, ~7 hours BEFORE the bad commit landed. Bug was in source for ~3 weeks but never reached production until the PR-0 deploy refreshed the asset.
+- Fix: 7 occurrences across 2 files, all `_decimal_to_float` → `decimal_to_float`.
+- ~9.5h outage, all overnight; caught by canary at 2026-05-03 15:19 UTC; full recovery 3 minutes after detection.
+- Lesson: spot-import check on recently-modified Lambdas before broad CDK deploys (added to PR 1's pre-deploy verification).
+
+### Carry-forward — Matthew action item
+- **Re-run v16.1 backfill for the interim window** (May 2 18:32 PT → May 3 15:53 UTC). Requires fresh Apple Health export from iPhone. ~5 min once exported. Commands in HANDOVER_v6.8.3.md.
+
+### Spec archived
+- `docs/specs/TD_BATCH_HAE_FIXES.md` → `docs/archive/TD_BATCH_HAE_FIXES_2026-05-02.md`
+
+### Deploys (in order)
+1. `cdk deploy LifePlatformCore` — layer v42 (16s)
+2. `deploy/deploy_lambda.sh health-auto-export-webhook` — HAE TD-15/16/18 ship (5s)
+3. `cdk deploy LifePlatformIngestion` — re-attach v42 + re-bundle HAE via CDK (31s)
+4. `cdk deploy LifePlatformCompute` — re-attach v42 to 21 Lambdas (22s)
+5. `cdk deploy LifePlatformEmail` — re-attach v42 to 13 Lambdas (61s)
+6. `cdk deploy LifePlatformOperational` — re-attach v42 to 13 Lambdas (25s)
+7. `cdk deploy LifePlatformWeb` — re-attach v42 to 1 Lambda (28s)
+
+---
+
 ## v6.8.2 — PR 0: MCP Unbreak Batch (TD-21/22/23) (2026-05-03)
 
 ### MCP Production Bugs Fixed
