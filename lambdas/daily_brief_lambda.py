@@ -1882,6 +1882,72 @@ def lambda_handler(event, context):
         today_short = today.isoformat()
     subject = "Morning Brief | " + today_short + " | Grade: " + grade_str + " | " + r_emoji
 
+    # WR-48 Enhancement 1 (PR re-entry, 2026-05-03): if any source is stale, prepend
+    # a "⚠️ Data Status" banner so today's grade has explicit context. Without this,
+    # a low grade could be either real (Matthew's data is bad) or platform-induced
+    # (data is stale and we're scoring a void). Reads the SAME freshness logic the
+    # freshness-checker Lambda + get_freshness_status MCP tool use — direct DDB
+    # query, no CloudWatch dependency (works even if metrics emission silently
+    # fails like it did for 30 days).
+    try:
+        from boto3.dynamodb.conditions import Key as _DDBKey
+        _SOURCES = ["whoop","withings","strava","todoist","apple_health","eightsleep",
+                    "macrofactor","garmin","habitify","food_delivery","measurements","notion"]
+        _STALE_OVERRIDE = {"food_delivery": 90, "measurements": 60}
+        _today_d = datetime.now(timezone.utc).date()
+        _stale = []
+        _user_id = os.environ.get("USER_ID", "matthew")
+        for _src in _SOURCES:
+            _threshold_d = _STALE_OVERRIDE.get(_src, 2)
+            _pk = f"USER#{_user_id}#SOURCE#{_src}"
+            try:
+                _resp = table.query(
+                    KeyConditionExpression=_DDBKey("pk").eq(_pk) & _DDBKey("sk").begins_with("DATE#"),
+                    Limit=1, ScanIndexForward=False,
+                )
+                _items = _resp.get("Items", [])
+                if not _items:
+                    _stale.append({"source": _src, "age_days": None, "label": "no data"})
+                    continue
+                _sk = _items[0].get("sk", "")
+                _date_part = _sk.split("DATE#", 1)[1][:10] if _sk.startswith("DATE#") else ""
+                _last_d = datetime.strptime(_date_part, "%Y-%m-%d").date()
+                _age = (_today_d - _last_d).days
+                if _age >= _threshold_d:
+                    _stale.append({"source": _src, "age_days": _age, "last_date": _last_d.isoformat()})
+            except Exception:
+                pass
+        if _stale:
+            _row_parts = []
+            for _s in _stale:
+                _src_name = _s["source"]
+                _age = _s.get("age_days")
+                if _age is None:
+                    _detail = "no data"
+                else:
+                    _last = _s.get("last_date", "?")
+                    _detail = f"last update {_last} ({_age}d ago)"
+                _row_parts.append(f'<li style="margin:2px 0">{_src_name} — {_detail}</li>')
+            _banner_rows = "".join(_row_parts)
+            _banner = (
+                '<div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:14px 18px;'
+                'margin:0 0 16px;font-family:-apple-system,sans-serif;font-size:13px;color:#78350f">'
+                f'<strong style="color:#92400e">⚠️ Data Status — {len(_stale)} source{"s" if len(_stale)>1 else ""} stale</strong>'
+                f'<ul style="margin:6px 0 0;padding-left:18px;color:#78350f">{_banner_rows}</ul>'
+                '<div style="margin-top:8px;font-size:11px;color:#92400e">'
+                'The intelligence below is based on the data we have. '
+                'Stale sources can pull the day grade down without reflecting your actual behavior.'
+                '</div></div>'
+            )
+            # Inject banner immediately after <body...> tag
+            import re as _re
+            html = _re.sub(
+                r'(<body[^>]*>)', r'\1' + _banner, html, count=1, flags=_re.IGNORECASE,
+            )
+            print(f"[INFO] WR-48 banner prepended: {len(_stale)} stale sources")
+    except Exception as _be:
+        print(f"[WARN] WR-48 banner failed (non-fatal): {_be}")
+
     if demo_mode:
         html = output_writers.sanitize_for_demo(html, data, profile)
         prefix = (profile.get("demo_mode_rules") or {}).get("subject_prefix", "[DEMO]")

@@ -21,6 +21,7 @@ import aws_cdk as cdk
 from aws_cdk import (
     Stack,
     aws_iam as iam,
+    aws_lambda as _lambda,
     aws_sqs as sqs,
     aws_dynamodb as dynamodb,
     aws_s3 as s3,
@@ -32,7 +33,7 @@ from constructs import Construct
 
 from stacks.lambda_helpers import create_platform_lambda
 from stacks import role_policies as rp
-from stacks.constants import ACCT, REGION, TABLE_NAME, S3_BUCKET, AI_MODEL_HAIKU  # CONF-01, CONF-04
+from stacks.constants import ACCT, REGION, TABLE_NAME, S3_BUCKET, AI_MODEL_HAIKU, SHARED_LAYER_ARN  # CONF-01, CONF-04
 
 INGESTION_DLQ_ARN    = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
 LIFE_PLATFORM_TABLE  = TABLE_NAME
@@ -50,12 +51,22 @@ class ComputeStack(Stack):
         local_table        = dynamodb.Table.from_table_name(self, "LifePlatformTable", LIFE_PLATFORM_TABLE)
         local_bucket       = s3.Bucket.from_bucket_name(self, "LifePlatformBucket", LIFE_PLATFORM_BUCKET)
         local_alerts_topic = sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
+        # Phase B re-entry sweep (2026-05-03): attach the shared utils layer to all
+        # Compute Lambdas. Previously these Lambdas were created without a layer
+        # argument, so they pinned to whatever layer version they had at first
+        # one-time deploy (v22 / v25 / v40 — way behind v42). Result: hypothesis-
+        # engine + ai-expert-analyzer + others were missing the COST-OPT-2 prompt
+        # caching benefit, the TD-20 platform_logger fix, etc.
+        shared_utils_layer = _lambda.LayerVersion.from_layer_version_arn(
+            self, "SharedUtilsLayer", SHARED_LAYER_ARN,
+        )
 
         shared = dict(
             table=local_table,
             bucket=local_bucket,
             dlq=local_dlq,
             alerts_topic=local_alerts_topic,
+            shared_layer=shared_utils_layer,
         )
 
         # Observatory Intelligence (ai-expert-analyzer) — manually deployed Lambda

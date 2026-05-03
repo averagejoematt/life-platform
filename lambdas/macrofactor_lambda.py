@@ -433,12 +433,108 @@ def build_workout_day_items(rows):
 
 
 def detect_csv_type(headers):
-    """Detect whether CSV is nutrition diary or workout export."""
+    """Detect whether CSV is nutrition diary, workout export, or daily summary."""
     if "Food Name" in headers:
         return "nutrition"
     if "Exercise" in headers and "Set Type" in headers:
         return "workout"
+    # Reentry sweep (2026-05-03): MacroFactor changed default export to a daily-
+    # summary format (one row per day with Calories/Protein/Fat/Carbs/Weight/
+    # Expenditure). Pre-fix the Lambda silently rejected it as "unknown" — that's
+    # why MacroFactor data was 22-day stale. Detect by Expenditure + Date columns.
+    if "Expenditure" in headers and "Date" in headers and "Calories (kcal)" in headers:
+        return "daily_summary"
     return "unknown"
+
+
+def build_summary_day_items(rows):
+    """Parse MacroFactor daily-summary CSV → DDB items.
+
+    Reentry sweep (2026-05-03): one row per date with daily totals (no per-meal
+    food log). Writes the same DATE# partition as the nutrition format with the
+    same total_* field names. We use UpdateItem patterns implicitly via the
+    standard PutItem path — for days that previously had food_log entries from
+    a diary export, the food_log will be lost. This is acceptable: (a) Matthew
+    rarely uses both formats for the same day, (b) the totals are what
+    daily-metrics-compute consumes, and (c) the spec explicitly removed
+    nutrition diary as MacroFactor's default in favor of summary.
+    """
+    ingested_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    day_items = {}
+    skipped = 0
+    from datetime import timedelta as _td
+    EXCEL_EPOCH = datetime(1899, 12, 30, tzinfo=timezone.utc)  # Excel-1900 system, accounting for 1900 leap-year bug
+    for row in rows:
+        date_str = (row.get("Date") or "").strip()
+        if not date_str:
+            skipped += 1
+            continue
+        # Reentry sweep (2026-05-03): MacroFactor's XLSX export stores dates as
+        # Excel serial numbers (e.g. 46110 = 2026-04-04). Our XLSX→CSV converter
+        # in dropbox-poll preserves the raw value. Detect numeric date values
+        # and convert to YYYY-MM-DD here.
+        try:
+            n = float(date_str)
+            if 30000 < n < 80000:  # Excel serial range covering 1982 → 2119
+                d = EXCEL_EPOCH + _td(days=int(n))
+                date_str = d.strftime("%Y-%m-%d")
+        except (ValueError, TypeError):
+            pass
+        # Normalize MM/DD/YYYY if MacroFactor decides to export human-readable
+        if "/" in date_str:
+            try:
+                parts = date_str.split("/")
+                if len(parts) == 3:
+                    m, d, y = parts
+                    date_str = f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
+            except (ValueError, IndexError):
+                skipped += 1
+                continue
+        # Final sanity: must look like YYYY-MM-DD
+        if len(date_str) < 10 or date_str[4] != "-" or date_str[7] != "-":
+            skipped += 1
+            continue
+
+        cal = safe_float(row.get("Calories (kcal)"))
+        prot = safe_float(row.get("Protein (g)"))
+        fat = safe_float(row.get("Fat (g)"))
+        carbs = safe_float(row.get("Carbs (g)"))
+        weight = safe_float(row.get("Weight (lbs)"))
+        trend_weight = safe_float(row.get("Trend Weight (lbs)"))
+        expenditure = safe_float(row.get("Expenditure"))
+        target_cal = safe_float(row.get("Target Calories (kcal)"))
+        target_prot = safe_float(row.get("Target Protein (g)"))
+
+        # Skip rows with no nutrition data (MacroFactor sometimes exports empty future days)
+        if all(v is None or v == 0 for v in (cal, prot, fat, carbs)):
+            skipped += 1
+            continue
+
+        item = {
+            "pk": PK,
+            "sk": f"DATE#{date_str}",
+            "date": date_str,
+            "source": "macrofactor",
+            "schema_version": 2,  # bumped from 1 to mark summary-format records
+            "_format": "daily_summary",
+            "ingested_at": ingested_at,
+            # Validator (DATA-2) requires entries_count + food_log fields; daily-
+            # summary format has no per-meal data, so emit empty placeholders.
+            "entries_count": 0,
+            "food_log": [],
+        }
+        if cal is not None:    item["total_calories_kcal"] = round(cal, 2)
+        if prot is not None:   item["total_protein_g"]    = round(prot, 2)
+        if fat is not None:    item["total_fat_g"]         = round(fat, 2)
+        if carbs is not None:  item["total_carbs_g"]       = round(carbs, 2)
+        if weight is not None and weight > 0: item["weight_lbs_macrofactor"] = round(weight, 2)
+        if trend_weight is not None and trend_weight > 0: item["trend_weight_lbs"] = round(trend_weight, 2)
+        if expenditure is not None and expenditure > 0:   item["expenditure_kcal"] = round(expenditure, 2)
+        if target_cal is not None and target_cal > 0:     item["target_calories_kcal"] = round(target_cal, 2)
+        if target_prot is not None and target_prot > 0:   item["target_protein_g"] = round(target_prot, 2)
+        day_items[date_str] = item
+    print(f"Summary parser: {len(day_items)} days, skipped {skipped} blank/invalid rows")
+    return day_items
 
 
 def archive_raw(bucket, source_key, content_bytes, subfolder=""):
@@ -488,6 +584,9 @@ def lambda_handler(event, context):
     elif csv_type == "workout":
         archive_raw(bucket, source_key, content_bytes, subfolder="workouts")
         day_items = build_workout_day_items(rows)
+    elif csv_type == "daily_summary":
+        archive_raw(bucket, source_key, content_bytes, subfolder="daily_summary")
+        day_items = build_summary_day_items(rows)
     else:
         print(f"Unknown CSV format. Headers: {list(rows[0].keys())[:10]}")
         return {"statusCode": 200, "body": "Unknown CSV format — skipped"}

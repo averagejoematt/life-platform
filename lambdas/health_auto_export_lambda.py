@@ -158,14 +158,47 @@ def floats_to_decimal(obj):
 
 
 def parse_date_str(date_str):
-    """Parse Health Auto Export date format: 'yyyy-MM-dd HH:mm:ss Z' → date string."""
+    """Parse Health Auto Export date format: 'yyyy-MM-dd HH:mm:ss Z' → UTC date string.
+
+    TD-19 Phase 2 (PR re-entry, 2026-05-03): convert source-tz timestamp to UTC
+    BEFORE extracting the date. Pre-fix this just stripped date_str[:10] which
+    used the original timezone — meaning a 9pm PT workout would land at the
+    PT-local DDB partition while every other source's UTC partition recorded
+    the SAME event one day later. Cross-source aggregation silently undercounted.
+
+    Audit + decision in docs/audits/TD-19_DATE_PARTITION_AUDIT.md.
+    """
     if not date_str:
         return None
-    return date_str[:10]
+    # Try full timestamp parse with TZ. Format examples seen:
+    #   "2026-05-02 21:00:00 -0700"  (HAE webhook standard)
+    #   "2026-05-02"                  (date-only, treat as UTC)
+    s = date_str.strip()
+    # Date-only fast path
+    if len(s) == 10 and s[4] == "-" and s[7] == "-":
+        return s
+    # Try parsing with timezone offset
+    try:
+        # HAE format uses space separator; ISO uses T. Normalize to T for fromisoformat.
+        normalized = s.replace(" ", "T", 1)
+        # fromisoformat accepts +HHMM / +HH:MM / Z; HAE sends +HHMM (no colon).
+        # Handle both forms.
+        if len(normalized) >= 24 and normalized[-5] in ("+", "-") and normalized[-3] != ":":
+            # Insert colon: -0700 → -07:00
+            normalized = normalized[:-2] + ":" + normalized[-2:]
+        dt = datetime.fromisoformat(normalized)
+        if dt.tzinfo is None:
+            # Naive timestamp — assume UTC for safety (cross-source consistency)
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc).strftime("%Y-%m-%d")
+    except (ValueError, IndexError):
+        # Fallback: strip-first-10 (legacy behavior). Better to have something
+        # than to drop the record entirely.
+        return s[:10]
 
 
 def parse_timestamp(date_str):
-    """Parse full timestamp for individual reading storage."""
+    """Parse full timestamp for individual reading storage. NOT used for partition keys."""
     if not date_str:
         return None
     # Format: "2026-02-24 14:30:00 -0800"
