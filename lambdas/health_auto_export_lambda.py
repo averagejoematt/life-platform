@@ -36,6 +36,23 @@ S3 raw storage:
 IAM role: lambda-health-auto-export-role
 Trigger: API Gateway HTTP API (bearer token auth)
 
+v1.7.0 — 2026-05-02 — TD-15/16/18: in-payload source-priority dedup + weight name
+  - Adds SOURCE_PRIORITY dict and pick_source_or_all() helper, ported from
+    backfill_apple_health_export_v16.py. process_generic_metrics() now groups
+    readings by (date, source) per metric and picks the highest-priority source's
+    data for the day, rather than naively summing across all sources.
+  - Fixes the iPhone+Garmin step double-count when Garmin Connect mirrors data
+    into Apple Health, and the MacroFactor+water-app double-count for water/caffeine.
+  - Tier 2 metrics (HR, HRV, RHR, respiratory, SpO2) keep the existing
+    is_apple_device() filter as their first line of defense; SOURCE_PRIORITY
+    only applies if defined for the field.
+  - Adds 'weight_body_mass' to the Body Mass metric name set (TD-18 — iOS
+    export sends this variant name and was previously unmatched).
+  - Returns a third value from process_generic_metrics: source_audit dict,
+    logged in the per-request structured line for diagnostic visibility.
+  - Cross-payload source attribution (same metric, different sources, different
+    payloads on the same day) is NOT addressed here — that intersects with
+    TD-19 (date partition mismatch) and is part of that broader fix.
 v1.6.0 — Workout ingestion (Pliability, Breathwrk, recovery workouts)
   - Processes workouts from HAE payload (previously logged but dropped)
   - Classifies by HealthKit workout type into recovery categories:
@@ -85,7 +102,7 @@ import os
 import boto3
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -251,6 +268,82 @@ def is_apple_device(source_str):
     return any(sub in s for sub in APPLE_DEVICE_SUBSTRINGS)
 
 
+# ── SOURCE PRIORITY (v1.7.0 — TD-15/16) ─────────────────────────────────
+# Apple Health acts as an aggregator — multiple devices/apps can write the same
+# physical phenomenon into HealthKit, and HAE then mirrors all of those into
+# its webhook payload. Naively summing across sources double-counts.
+#
+# For each duplication-prone field, list source-name substrings in priority order
+# (case-insensitive substring match). pick_source_or_all() selects the
+# highest-priority source PRESENT IN THIS PAYLOAD; lower-priority duplicates are
+# ignored. Conservative — minor edge-case loss when the lower-priority source
+# captured readings the higher-priority one missed (e.g. wearing watch without
+# phone) — but eliminates the duplication problem.
+#
+# Mirror of backfill_apple_health_export_v16.py SOURCE_PRIORITY, adjusted for
+# the live Lambda's field names (notably weight_lbs vs weight_lbs_apple).
+SOURCE_PRIORITY = {
+    # Activity — iPhone is canonical (motion coprocessor + Watch sync)
+    "steps":                       ["matt 17", "matt", "iphone", "apple watch", "watch", "connect"],
+    "active_calories":             ["matt 17", "matt", "iphone", "apple watch", "watch", "connect"],
+    "basal_calories":              ["matt 17", "matt", "iphone", "apple watch", "watch", "connect"],
+    "flights_climbed":             ["matt 17", "matt", "iphone", "apple watch", "watch", "connect"],
+    "distance_walk_run_miles":     ["matt 17", "matt", "iphone", "apple watch", "watch", "connect"],
+
+    # Gait — Watch-only typically, iPhone fallback
+    "walking_speed_mph":           ["apple watch", "watch", "matt 17", "matt", "iphone"],
+    "walking_step_length_in":      ["apple watch", "watch", "matt 17", "matt", "iphone"],
+    "walking_double_support_pct":  ["apple watch", "watch", "matt 17", "matt", "iphone"],
+    "walking_asymmetry_pct":       ["apple watch", "watch", "matt 17", "matt", "iphone"],
+
+    # Water — user-facing logging app first; MacroFactor often mirrors
+    "water_intake_raw":            ["my water", "waterminder", "watermind", "matt 17", "iphone", "macrofactor"],
+    # Caffeine — same priority as water
+    "caffeine_mg":                 ["my water", "waterminder", "watermind", "matt 17", "iphone", "macrofactor"],
+
+    # Mindful — meditation/breath apps direct; HAE-style mirrors last
+    "mindful_minutes":             ["balance", "calm", "headspace", "breathwrk", "apple", "matt 17", "iphone"],
+
+    # Audio — iPhone direct (already Tier-1, but priority disambiguates if multiple)
+    "headphone_audio_exposure_db": ["matt 17", "matt", "iphone"],
+
+    # Weight from Apple — fallback when Withings is delayed; Withings name first if it appears
+    "weight_lbs":                  ["withings", "matt 17", "iphone", "apple"],
+
+    # BP — single source typically (cuff via Health); priority mostly cosmetic
+    "blood_pressure_systolic":     ["health", "matt 17", "iphone"],
+    "blood_pressure_diastolic":    ["health", "matt 17", "iphone"],
+
+    # Tier 2 metrics already filtered by is_apple_device — no priority defined,
+    # falls through to all-sources behavior in pick_source_or_all().
+}
+
+
+def pick_source_or_all(field_name, source_counts):
+    """Source-priority resolver for a single (field, date) tuple.
+
+    Args:
+        field_name: the canonical field name in METRIC_MAP (e.g. 'steps').
+        source_counts: Counter({source_name: reading_count}) for this date+field.
+
+    Returns:
+        - str source name if SOURCE_PRIORITY defines an entry for this field;
+          falls back to most_common(1) if priority defined but no source matches.
+        - None if SOURCE_PRIORITY has no entry for this field. Caller should
+          treat None as 'use all sources' (legacy sum/avg behavior).
+    """
+    priority = SOURCE_PRIORITY.get(field_name)
+    if not priority:
+        return None  # No priority → caller combines across all sources
+    available = {src.lower(): src for src in source_counts.keys()}
+    for needle in priority:
+        for low, orig in available.items():
+            if needle in low:
+                return orig
+    # Priority defined but no source matched — fall back to most common.
+    return source_counts.most_common(1)[0][0] if source_counts else None
+
+
 # ── Metric Configuration ───────────────────────────────────────────────────
 # Metrics we want to ingest (beyond blood glucose which has special handling).
 # The app sends BOTH Title Case ("Step Count") and snake_case ("step_count")
@@ -283,7 +376,8 @@ _METRIC_DEFS = [
     # Mindful minutes (meditation/breathwork apps → Apple Health)
     ({"Mindful Minutes", "mindful_minutes", "Apple Mindfulness", "apple_mindfulness"},  {"field": "mindful_minutes",           "agg": "sum",         "tier": 1}),
     # Body weight (Withings scale → Apple Health — v1.4.2 fallback for Withings API delays)
-    ({"Body Mass", "body_mass"},                          {"field": "weight_lbs",                "agg": "avg",         "tier": 1}),
+    # v1.7.0 (TD-18): added 'weight_body_mass' — iOS HAE export sends this name variant.
+    ({"Body Mass", "body_mass", "weight_body_mass", "Weight Body Mass"}, {"field": "weight_lbs",                "agg": "avg",         "tier": 1}),
     # Blood pressure (BP cuff → Apple Health — v1.4.0)
     ({"Blood Pressure Systolic", "blood_pressure_systolic"},   {"field": "blood_pressure_systolic",   "agg": "avg",         "tier": 1}),
     ({"Blood Pressure Diastolic", "blood_pressure_diastolic"}, {"field": "blood_pressure_diastolic",  "agg": "avg",         "tier": 1}),
@@ -360,16 +454,32 @@ _DEDUP_FIELDS = {"water_intake_raw", "caffeine_mg"}
 
 
 def process_generic_metrics(metrics):
-    """Process non-glucose metrics into daily aggregates with source filtering.
-    Returns (daily_data, daily_timestamps) where daily_timestamps tracks
-    individual reading timestamps for dedup-able fields.
+    """Process non-grouped metrics into daily aggregates with source filtering AND
+    source-priority deduplication (v1.7.0 — TD-15/16).
+
+    For each metric, readings are grouped by (date, source). After all readings
+    for a metric are accumulated, pick_source_or_all() picks the highest-priority
+    source for each date. Lower-priority duplicates are excluded from the day's
+    aggregate — this is the fix for the iPhone+Garmin step double-count and the
+    My-Water+MacroFactor water double-count.
+
+    Tier 2 metrics keep the existing is_apple_device() filter (filters non-Apple
+    sources entirely), and SOURCE_PRIORITY is not defined for them — they fall
+    through to all-sources behavior, which is correct because the tier filter
+    already removed the duplication source.
+
+    Returns:
+        daily_data: {date: {field: value}}
+        daily_timestamps: {date: {field: {ts: qty}}} — for water/caffeine reading-level dedup
+        source_audit: {date: {field: {"chosen": src, "rejected": [src, ...]}}} — diagnostic
     """
     daily_data = defaultdict(dict)
-    daily_timestamps = defaultdict(lambda: defaultdict(dict))  # date → field → {ts: qty}
+    daily_timestamps = defaultdict(lambda: defaultdict(dict))
+    source_audit = defaultdict(dict)
     matched = []
     skipped_sot = []
     unmatched = []
-    filtered_counts = {}  # metric → {kept, dropped}
+    filtered_counts = {}  # metric → {kept, dropped} (Tier 2 source filter)
 
     for metric in metrics:
         name = metric.get("name", "")
@@ -389,7 +499,13 @@ def process_generic_metrics(metrics):
         agg = config["agg"]
         tier = config["tier"]
 
-        day_values = defaultdict(list)
+        # Per-date per-source accumulators for THIS metric.
+        # day_per_source[date][source] = {"sum": float, "vals": [floats], "ts": {ts: qty}}
+        day_per_source = defaultdict(lambda: defaultdict(
+            lambda: {"sum": 0.0, "vals": [], "ts": {}}
+        ))
+        day_source_counts = defaultdict(Counter)  # date → Counter({source: count})
+
         kept = 0
         dropped = 0
 
@@ -398,9 +514,10 @@ def process_generic_metrics(metrics):
             if not date:
                 continue
 
-            # Tier 2: filter to Apple device readings only
+            source = reading.get("source", "") or ""
+
+            # Tier 2: filter to Apple device readings only (first line of defense)
             if tier == 2:
-                source = reading.get("source", "")
                 if not is_apple_device(source):
                     dropped += 1
                     continue
@@ -411,24 +528,74 @@ def process_generic_metrics(metrics):
             else:
                 qty = reading.get("qty")
 
-            if qty is not None:
-                day_values[date].append(float(qty))
-                kept += 1
-                # Track individual reading timestamps for dedup-able fields
-                if field in _DEDUP_FIELDS:
-                    ts_key = reading.get("date", "")  # full timestamp string as unique ID
-                    daily_timestamps[date][field][ts_key] = float(qty)
+            if qty is None:
+                continue
+
+            try:
+                qty_f = float(qty)
+            except (ValueError, TypeError):
+                continue
+
+            src_key = source if source else "_unknown"
+            acc = day_per_source[date][src_key]
+            acc["sum"] += qty_f
+            acc["vals"].append(qty_f)
+            day_source_counts[date][src_key] += 1
+            kept += 1
+
+            # Reading-level timestamp dedup for water/caffeine — tracked WITHIN the
+            # source so that source priority resolution preserves the correct dedup map.
+            if field in _DEDUP_FIELDS:
+                ts_key = reading.get("date", "")
+                acc["ts"][ts_key] = qty_f
 
         if tier == 2 and dropped > 0:
             filtered_counts[name] = {"kept": kept, "dropped": dropped}
 
-        for date, values in day_values.items():
-            if not values:
+        # ── Resolve source priority per date for this metric ──
+        for date, src_data in day_per_source.items():
+            chosen = pick_source_or_all(field, day_source_counts[date])
+
+            if chosen is None:
+                # No priority defined — combine across all sources (legacy behavior).
+                # Tier 2 lands here, which is correct: is_apple_device() already
+                # filtered out non-Apple sources, so no double-counting risk.
+                sources_to_use = list(src_data.keys())
+            else:
+                sources_to_use = [chosen]
+                rejected = [s for s in src_data.keys() if s != chosen]
+                if rejected:
+                    source_audit[date][field] = {
+                        "chosen": chosen,
+                        "rejected": rejected,
+                    }
+
+            # Aggregate from chosen source(s)
+            total_sum = 0.0
+            all_vals = []
+            for src in sources_to_use:
+                if src in src_data:
+                    total_sum += src_data[src]["sum"]
+                    all_vals.extend(src_data[src]["vals"])
+
+            if not all_vals:
                 continue
+
             if agg == "sum":
-                daily_data[date][field] = round(sum(values), 2)
+                daily_data[date][field] = round(total_sum, 2)
             elif agg in ("avg", "avg_special", "avg_pct"):
-                daily_data[date][field] = round(sum(values) / len(values), 2)
+                daily_data[date][field] = round(sum(all_vals) / len(all_vals), 2)
+
+            # Carry forward timestamp-level dedup data for water/caffeine.
+            # When multiple sources are combined (no-priority case), merge ts dicts —
+            # entries at identical timestamps will dedupe naturally.
+            if field in _DEDUP_FIELDS:
+                merged_ts = {}
+                for src in sources_to_use:
+                    if src in src_data and src_data[src]["ts"]:
+                        merged_ts.update(src_data[src]["ts"])
+                if merged_ts:
+                    daily_timestamps[date][field] = merged_ts
 
     # ── Compute derived fields ──
     for date, fields in daily_data.items():
@@ -459,8 +626,12 @@ def process_generic_metrics(metrics):
     if filtered_counts:
         for m, counts in filtered_counts.items():
             print(f"Source filter [{m}]: kept {counts['kept']} Apple readings, dropped {counts['dropped']} non-Apple")
+    if source_audit:
+        for date, fields_audit in source_audit.items():
+            for fname, choice in fields_audit.items():
+                print(f"Source dedup [{date} {fname}]: chose {choice['chosen']!r}, rejected {choice['rejected']}")
 
-    return daily_data, dict(daily_timestamps)
+    return daily_data, dict(daily_timestamps), dict(source_audit)
 
 
 # ── DynamoDB Write ─────────────────────────────────────────────────────────────
@@ -1126,7 +1297,7 @@ def lambda_handler(event, context):
         print("No blood glucose data in payload")
 
     # ── Process other metrics ──
-    other_daily, other_timestamps = process_generic_metrics(metrics)
+    other_daily, other_timestamps, source_audit = process_generic_metrics(metrics)
     other_days = 0
     for date_str, fields in other_daily.items():
         ts = other_timestamps.get(date_str)
@@ -1276,6 +1447,7 @@ def lambda_handler(event, context):
         "recovery_days": recovery_days,
         "matched_metrics": len([m for m in metrics if m.get("name") in METRIC_MAP]),
         "skipped_sot": len([m for m in metrics if m.get("name") in SKIP_METRICS]),
+        "source_dedup_count": sum(len(v) for v in source_audit.values()) if source_audit else 0,
         "duration_ms": duration_ms,
         "payload_bytes": len(body) if isinstance(body, str) else 0,
     }
