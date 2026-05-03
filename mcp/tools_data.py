@@ -490,7 +490,7 @@ def tool_get_intelligence_quality(args):
     Shows recent validation flags from the post-generation intelligence validator.
     Filters by severity (error/warning), coach, or date range.
     """
-    from mcp.core import USER_PREFIX, table, _decimal_to_float
+    from mcp.core import USER_PREFIX, table, decimal_to_float
     from boto3.dynamodb.conditions import Key
 
     days = int(args.get("days", 7))
@@ -508,7 +508,7 @@ def tool_get_intelligence_quality(args):
                 f"SOURCE#intelligence_quality#{end_date}~",
             ),
         )
-        items = [_decimal_to_float(i) for i in resp.get("Items", [])]
+        items = [decimal_to_float(i) for i in resp.get("Items", [])]
     except Exception as e:
         return {"error": str(e)}
 

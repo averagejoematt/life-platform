@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
-from mcp.core import USER_PREFIX, table, _decimal_to_float
+from mcp.core import USER_PREFIX, table, decimal_to_float
 from boto3.dynamodb.conditions import Key
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ def tool_get_coach_thread(args):
             ),
             ScanIndexForward=False, Limit=limit,
         )
-        entries = [_decimal_to_float(i) for i in resp.get("Items", [])]
+        entries = [decimal_to_float(i) for i in resp.get("Items", [])]
         return {
             "coach_id": coach_id,
             "coach_name": COACH_NAMES.get(coach_id, coach_id),
@@ -73,7 +73,7 @@ def tool_get_predictions(args):
                 ScanIndexForward=False, Limit=8,
             )
             for item in resp.get("Items", []):
-                entry = _decimal_to_float(item)
+                entry = decimal_to_float(item)
                 for pred in entry.get("predictions", []):
                     if status_filter and pred.get("status") != status_filter:
                         continue
@@ -106,7 +106,7 @@ def tool_get_coach_disagreements(args):
         resp = table.get_item(
             Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": "EXPERT#integrator"}
         )
-        item = _decimal_to_float(resp.get("Item", {}))
+        item = decimal_to_float(resp.get("Item", {}))
         disagreements = item.get("disagreements", [])
         return {
             "count": len(disagreements),
@@ -138,7 +138,7 @@ def tool_evaluate_prediction(args):
                 ScanIndexForward=False, Limit=10,
             )
             for item in resp.get("Items", []):
-                entry = _decimal_to_float(item)
+                entry = decimal_to_float(item)
                 for pred in entry.get("predictions", []):
                     if pred.get("prediction_id") == prediction_id:
                         pred["status"] = status
@@ -175,7 +175,7 @@ def tool_get_coaching_summary(args):
             )
             items = resp.get("Items", [])
             if items:
-                entry = _decimal_to_float(items[0])
+                entry = decimal_to_float(items[0])
                 pred_count = len(entry.get("predictions", []))
                 pending = sum(1 for p in entry.get("predictions", []) if p.get("status") == "pending")
                 coaches.append({
@@ -207,7 +207,7 @@ def tool_get_coaching_summary(args):
     priority = None
     try:
         int_resp = table.get_item(Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": "EXPERT#integrator"})
-        int_item = _decimal_to_float(int_resp.get("Item", {}))
+        int_item = decimal_to_float(int_resp.get("Item", {}))
         if int_item.get("analysis"):
             priority = int_item["analysis"]
     except Exception:
