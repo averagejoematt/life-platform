@@ -66,7 +66,7 @@ s3       = boto3.client("s3", region_name=REGION)
 secrets  = boto3.client("secretsmanager", region_name=REGION)
 
 # AI model constants — read from env so model can be updated without redeployment
-AI_MODEL       = os.environ.get("AI_MODEL",       "claude-sonnet-4-6")
+AI_MODEL       = os.environ.get("AI_MODEL",       "claude-haiku-4-5-20251001")
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 HYPOTHESES_PK = f"USER#{USER_ID}#SOURCE#hypotheses"
@@ -574,14 +574,15 @@ Return ONLY this JSON structure:
     payload = json.dumps({
         "model": AI_MODEL,
         "max_tokens": 2000,
-        "system": HYPOTHESIS_SYSTEM_PROMPT,
+        "system": [{"type": "text", "text": HYPOTHESIS_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
         "messages": [{"role": "user", "content": user_message}],
     }).encode()
 
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages", data=payload,
         headers={"Content-Type": "application/json", "x-api-key": api_key,
-                 "anthropic-version": "2023-06-01"}, method="POST",
+                 "anthropic-version": "2023-06-01",
+                 "anthropic-beta": "prompt-caching-2024-07-31"}, method="POST",
     )
 
     for attempt in range(1, 3):
@@ -721,7 +722,8 @@ Respond ONLY with JSON: {{"verdict": "confirming|refuted|insufficient", "evidenc
         req = urllib.request.Request(
             "https://api.anthropic.com/v1/messages", data=payload,
             headers={"Content-Type": "application/json", "x-api-key": api_key,
-                     "anthropic-version": "2023-06-01"}, method="POST",
+                     "anthropic-version": "2023-06-01",
+                     "anthropic-beta": "prompt-caching-2024-07-31"}, method="POST",
         )
 
         try:

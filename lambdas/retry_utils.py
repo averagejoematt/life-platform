@@ -34,26 +34,38 @@ AI_MODEL       = os.environ.get("AI_MODEL",       "claude-sonnet-4-6")
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 
-def _emit_token_metrics(input_tokens, output_tokens):
+def _emit_token_metrics(input_tokens, output_tokens,
+                        cache_creation_tokens=0, cache_read_tokens=0):
     """Emit per-Lambda token usage to CloudWatch (non-fatal)."""
     try:
-        _cw.put_metric_data(
-            Namespace=_CW_NAMESPACE,
-            MetricData=[
-                {
-                    "MetricName": "AnthropicInputTokens",
-                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                    "Value": input_tokens,
-                    "Unit": "Count",
-                },
-                {
-                    "MetricName": "AnthropicOutputTokens",
-                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                    "Value": output_tokens,
-                    "Unit": "Count",
-                },
-            ],
-        )
+        metric_data = [
+            {
+                "MetricName": "AnthropicInputTokens",
+                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                "Value": input_tokens,
+                "Unit": "Count",
+            },
+            {
+                "MetricName": "AnthropicOutputTokens",
+                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                "Value": output_tokens,
+                "Unit": "Count",
+            },
+        ]
+        if cache_creation_tokens or cache_read_tokens:
+            metric_data.append({
+                "MetricName": "AnthropicCacheWriteTokens",
+                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                "Value": cache_creation_tokens,
+                "Unit": "Count",
+            })
+            metric_data.append({
+                "MetricName": "AnthropicCacheReadTokens",
+                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                "Value": cache_read_tokens,
+                "Unit": "Count",
+            })
+        _cw.put_metric_data(Namespace=_CW_NAMESPACE, MetricData=metric_data)
     except Exception as e:
         print(f"[WARN] CloudWatch token metric emit failed (non-fatal): {e}")
 
@@ -74,6 +86,17 @@ def _emit_failure_metric():
         print(f"[WARN] CloudWatch failure metric emit failed (non-fatal): {e}")
 
 
+def _build_system_block(system, cache_system):
+    """Convert system prompt to cached content block format if caching enabled."""
+    if not system:
+        return None
+    if isinstance(system, list):
+        return system  # already structured
+    if cache_system:
+        return [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+    return system
+
+
 def call_anthropic_api(
     prompt,
     api_key,
@@ -82,17 +105,20 @@ def call_anthropic_api(
     model=None,
     temperature=None,
     timeout=55,
+    cache_system=True,
 ):
     """Call Anthropic /v1/messages with exponential backoff + CloudWatch metrics.
 
     Args:
-        prompt:      User message content (str).
-        api_key:     Anthropic API key.
-        max_tokens:  Max tokens for response.
-        system:      Optional system prompt (str).
-        model:       Model ID — defaults to AI_MODEL env var.
-        temperature: Optional temperature override.
-        timeout:     HTTP timeout in seconds (default 55).
+        prompt:       User message content (str).
+        api_key:      Anthropic API key.
+        max_tokens:   Max tokens for response.
+        system:       Optional system prompt (str or list of content blocks).
+        model:        Model ID — defaults to AI_MODEL env var.
+        temperature:  Optional temperature override.
+        timeout:      HTTP timeout in seconds (default 55).
+        cache_system: Enable prompt caching on system message (default True).
+                      90% discount on cached input tokens.
 
     Returns:
         str: Response text, stripped.
@@ -106,20 +132,25 @@ def call_anthropic_api(
         "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}],
     }
-    if system:
-        body["system"] = system
+    sys_block = _build_system_block(system, cache_system)
+    if sys_block:
+        body["system"] = sys_block
     if temperature is not None:
         body["temperature"] = temperature
+
+    headers = {
+        "Content-Type": "application/json",
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+    }
+    if cache_system and system:
+        headers["anthropic-beta"] = "prompt-caching-2024-07-31"
 
     payload = json.dumps(body).encode()
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages",
         data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-        },
+        headers=headers,
         method="POST",
     )
 
@@ -132,6 +163,8 @@ def call_anthropic_api(
                     _emit_token_metrics(
                         usage.get("input_tokens", 0),
                         usage.get("output_tokens", 0),
+                        usage.get("cache_creation_input_tokens", 0),
+                        usage.get("cache_read_input_tokens", 0),
                     )
                 return resp["content"][0]["text"].strip()
 
@@ -162,6 +195,11 @@ def call_anthropic_raw(req, timeout=55):
     Returns the full parsed JSON response (not just text) — callers extract
     resp["content"][0]["text"] themselves.
     Emits token metrics and failure metric same as call_anthropic_api.
+
+    Note: For prompt caching, callers building their own requests should add
+    the 'anthropic-beta: prompt-caching-2024-07-31' header and structure the
+    system message as content blocks with cache_control. Use
+    _build_system_block() helper or build manually.
     """
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:
@@ -172,6 +210,8 @@ def call_anthropic_raw(req, timeout=55):
                     _emit_token_metrics(
                         usage.get("input_tokens", 0),
                         usage.get("output_tokens", 0),
+                        usage.get("cache_creation_input_tokens", 0),
+                        usage.get("cache_read_input_tokens", 0),
                     )
                 return resp
 

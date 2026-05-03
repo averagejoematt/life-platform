@@ -7209,9 +7209,12 @@ def lambda_handler(event, context):
         if not ai_item:
             return _ok({"expert_key": expert_key, "analysis": None, "generated_at": None}, cache_seconds=300)
         ai_item = _decimal_to_float(ai_item)
+        analysis_val = ai_item.get("analysis", "")
+        if "[AI_UNAVAILABLE]" in (analysis_val or ""):
+            analysis_val = None
         resp_data = {
             "expert_key": expert_key,
-            "analysis": ai_item.get("analysis", ""),
+            "analysis": analysis_val,
             "generated_at": ai_item.get("generated_at", ""),
         }
         if ai_item.get("key_recommendation"):
@@ -7265,6 +7268,8 @@ def lambda_handler(event, context):
             output = _decimal_to_float(out_items[0])
             # Prefer observatory_summary over full content
             analysis_text = output.get("observatory_summary") or output.get("content", "")
+            if "[AI_UNAVAILABLE]" in (analysis_text or ""):
+                analysis_text = None
 
             # 2. Open threads
             thread_reference = None

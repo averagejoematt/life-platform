@@ -212,7 +212,7 @@ def _call_haiku(system, user_message, max_tokens=1500, temperature=0.2):
         "messages": [{"role": "user", "content": user_message}],
     }
     if system:
-        body["system"] = system
+        body["system"] = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
 
     payload = json.dumps(body).encode()
     req = urllib.request.Request(
@@ -222,6 +222,7 @@ def _call_haiku(system, user_message, max_tokens=1500, temperature=0.2):
             "Content-Type": "application/json",
             "x-api-key": api_key,
             "anthropic-version": "2023-06-01",
+            "anthropic-beta": "prompt-caching-2024-07-31",
         },
         method="POST",
     )
@@ -232,6 +233,11 @@ def _call_haiku(system, user_message, max_tokens=1500, temperature=0.2):
                 resp = json.loads(r.read())
                 usage = resp.get("usage", {})
                 if usage:
+                    cache_creation = usage.get("cache_creation_input_tokens", 0)
+                    cache_read = usage.get("cache_read_input_tokens", 0)
+                    logger.info("Token usage — input: %d, output: %d, cache_creation: %d, cache_read: %d",
+                                usage.get("input_tokens", 0), usage.get("output_tokens", 0),
+                                cache_creation, cache_read)
                     _emit_token_metrics(
                         usage.get("input_tokens", 0),
                         usage.get("output_tokens", 0),

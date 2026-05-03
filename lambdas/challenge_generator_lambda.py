@@ -61,7 +61,7 @@ table    = dynamodb.Table(TABLE_NAME)
 s3       = boto3.client("s3", region_name=REGION)
 secrets  = boto3.client("secretsmanager", region_name=REGION)
 
-AI_MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
+AI_MODEL = os.environ.get("AI_MODEL", "claude-haiku-4-5-20251001")
 
 CHALLENGES_PK  = f"USER#{USER_ID}#SOURCE#challenges"
 HYPOTHESES_PK  = f"USER#{USER_ID}#SOURCE#hypotheses"
@@ -364,14 +364,15 @@ If no clear signal exists, return 0 challenges. Quality over quantity."""
     payload = json.dumps({
         "model": AI_MODEL,
         "max_tokens": 2000,
-        "system": SYSTEM_PROMPT,
+        "system": [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
         "messages": [{"role": "user", "content": user_message}],
     }).encode()
 
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages", data=payload,
         headers={"Content-Type": "application/json", "x-api-key": api_key,
-                 "anthropic-version": "2023-06-01"}, method="POST",
+                 "anthropic-version": "2023-06-01",
+                 "anthropic-beta": "prompt-caching-2024-07-31"}, method="POST",
     )
 
     for attempt in range(1, 3):
