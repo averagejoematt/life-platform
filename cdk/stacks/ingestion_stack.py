@@ -134,12 +134,18 @@ class IngestionStack(Stack):
             custom_policies=rp.ingestion_journal_enrichment(),
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
 
-        # ── 8. Todoist — 2x daily (COST-OPT-2: low-frequency source, tasks logged in batches)
+        # ── 8. Todoist — 1x daily (TD-12, 2026-05-03): dropped from 2x to 1x.
+        # Lambda has a no-op gate that returns early if no changes since last run; in
+        # practice most invocations did nothing. Daily cadence is fine for a personal
+        # accountability platform — Matthew isn't refreshing a dashboard hoping for
+        # real-time task additions. Future work: webhook migration alongside other
+        # sources (Notion, Whoop, Habitify).
+        # cron(0 14 * * ? *) = 14:00 UTC = 6 AM PST / 7 AM PDT (UTC-fixed per CLAUDE.md).
         create_platform_lambda(self, "TodoistIngestion",
             function_name="todoist-data-ingestion",
             source_file="lambdas/todoist_lambda.py",
             handler="todoist_lambda.lambda_handler",
-            schedule="cron(15 14,2 * * ? *)",
+            schedule="cron(0 14 * * ? *)",
             timeout_seconds=120, alarm_name="ingestion-error-todoist",
             environment={"SECRET_NAME": "life-platform/ingestion-keys"},
             shared_layer=shared_utils_layer,
