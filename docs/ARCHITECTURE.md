@@ -71,7 +71,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | Lambda Function URL (MCP) | MCP HTTPS endpoint | `https://votqefkra435xwrccmapxxbj6y0jawgn.lambda-url.us-west-2.on.aws/` (AuthType NONE — auth handled in Lambda via API key header) |
 | Lambda Function URL (remote MCP) | Remote MCP HTTPS endpoint | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` (OAuth 2.1 auto-approve + HMAC Bearer) |
 | API Gateway | HTTP endpoint | `health-auto-export-api` (a76xwxt2wa) — webhook ingest |
-| Secrets Manager | Credential store | 10 active secrets: 4 OAuth (`whoop`, `withings`, `strava`, `garmin`) + `eightsleep` + `ai-keys` (Anthropic + MCP) + `ingestion-keys` (Notion/Todoist/Habitify/Dropbox/webhook keys bundle) + `habitify` (dedicated) + `mcp-api-key` + `site-api-ai-key` (R17-04) — **`api-keys` permanently deleted 2026-03-14; `google-calendar` permanently deleted 2026-03-15 (ADR-030); `webhook-key` deleted 2026-03-14** |
+| Secrets Manager | Credential store | 15 active secrets — full list and consumer Lambdas in [SECRETS_MAP.md](SECRETS_MAP.md) (PR 3 / TD-13). Deleted: `api-keys` (2026-03-14), `google-calendar` (2026-03-15 ADR-030), `webhook-key` (2026-03-14). |
 | SNS topic | Alert routing | `life-platform-alerts` |
 | CloudFront (amj) | CDN (public) | `E3S424OXQZ8NBE` (`d2qlzq81ggequb.cloudfront.net`) → site-api Lambda + S3 `/site`, alias `averagejoematt.com` |
 | CloudFront (dash) | CDN + auth | `EM5NPX6NJN095` → S3 `/dashboard`, Lambda@Edge auth, alias `dash.averagejoematt.com` |
