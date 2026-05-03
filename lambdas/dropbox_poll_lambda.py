@@ -279,6 +279,77 @@ def mark_file_processed(filename, file_hash, file_size):
     })
 
 
+def xlsx_to_csv(xlsx_bytes: bytes) -> bytes:
+    """Convert a single-sheet XLSX file to CSV using stdlib only.
+
+    Reentry sweep (2026-05-03): MacroFactor exports XLSX by default; the rest of
+    this pipeline expects CSV. Rather than ask the user to manually re-export,
+    do the conversion in-Lambda. Implementation reads the XLSX as a zip and
+    parses the OOXML SpreadsheetML directly — no openpyxl dependency.
+
+    Limitations: only the first worksheet, only string + numeric cells. Sufficient
+    for MacroFactor's tabular exports. If MacroFactor changes their export shape
+    we'll see a parse error and surface a real CSV re-export request as fallback.
+    """
+    import zipfile
+    import xml.etree.ElementTree as ET
+    import csv as _csv
+    from io import BytesIO, StringIO
+
+    NS = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+
+    with zipfile.ZipFile(BytesIO(xlsx_bytes)) as zf:
+        # Shared strings table
+        shared_strings = []
+        try:
+            with zf.open("xl/sharedStrings.xml") as f:
+                tree = ET.parse(f)
+                for si in tree.getroot().findall("x:si", NS):
+                    # Each string-item contains either a single <t> or multiple <r><t>
+                    parts = [t.text or "" for t in si.findall(".//x:t", NS)]
+                    shared_strings.append("".join(parts))
+        except KeyError:
+            # No shared strings (rare)
+            pass
+
+        # First sheet
+        sheet_name = "xl/worksheets/sheet1.xml"
+        if sheet_name not in zf.namelist():
+            # Try to find any worksheet
+            sheets = [n for n in zf.namelist() if n.startswith("xl/worksheets/") and n.endswith(".xml")]
+            if not sheets:
+                raise ValueError("XLSX has no worksheet")
+            sheet_name = sorted(sheets)[0]
+
+        with zf.open(sheet_name) as f:
+            tree = ET.parse(f)
+
+        rows_data = []
+        for row in tree.getroot().findall(".//x:row", NS):
+            row_cells = []
+            for cell in row.findall("x:c", NS):
+                cell_type = cell.get("t", "n")  # default 'n' for numeric
+                v_elem = cell.find("x:v", NS)
+                value = v_elem.text if v_elem is not None else ""
+                if cell_type == "s":
+                    # Shared-string reference
+                    try:
+                        value = shared_strings[int(value)]
+                    except (ValueError, IndexError):
+                        pass
+                elif cell_type == "inlineStr":
+                    is_elem = cell.find("x:is/x:t", NS)
+                    value = is_elem.text if is_elem is not None else ""
+                row_cells.append(value or "")
+            rows_data.append(row_cells)
+
+    # Write to CSV
+    out = StringIO()
+    writer = _csv.writer(out)
+    writer.writerows(rows_data)
+    return out.getvalue().encode("utf-8")
+
+
 def compute_hash(content_bytes):
     """SHA256 hash of file content for dedup."""
     return hashlib.sha256(content_bytes).hexdigest()[:16]
@@ -357,9 +428,16 @@ def lambda_handler(event, context):
 
             if lower.endswith(".csv"):
                 csv_files.append(f)
-            elif lower.endswith(".xlsx") or lower.endswith(".xls"):
-                skipped.append(f"XLSX skipped (CSV only): {name}")
-                logger.info(f"Skipping XLSX file: {name} — export as CSV from MacroFactor")
+            elif lower.endswith(".xlsx"):
+                # Reentry sweep (2026-05-03): convert XLSX → CSV in-memory so users
+                # don't have to re-export from MacroFactor. Pure-stdlib (zipfile +
+                # xml.etree) — no new layer dependency. Was: 22-day MacroFactor stale
+                # because the only file in Dropbox was XLSX and we silently skipped.
+                f["_convert_xlsx"] = True
+                csv_files.append(f)
+                logger.info(f"XLSX detected; will convert to CSV in-memory: {name}")
+            elif lower.endswith(".xls"):
+                skipped.append(f"XLS (legacy binary, not supported): {name}")
             else:
                 skipped.append(f"unknown extension: {name}")
 
@@ -386,6 +464,21 @@ def lambda_handler(event, context):
 
             # Download to check hash
             content = download_file(access_token, path)
+
+            # Convert XLSX → CSV if needed (reentry sweep 2026-05-03)
+            if f.get("_convert_xlsx"):
+                try:
+                    csv_content = xlsx_to_csv(content)
+                    logger.info(f"  Converted XLSX → CSV: {len(content)}B → {len(csv_content)}B")
+                    content = csv_content
+                    # Replace the .xlsx extension in the upload name with .csv so
+                    # the macrofactor-data-ingestion Lambda picks it up correctly.
+                    if name.lower().endswith(".xlsx"):
+                        name = name[:-5] + ".csv"
+                except Exception as conv_err:
+                    logger.error(f"  XLSX → CSV conversion failed for {name}: {conv_err}")
+                    continue
+
             file_hash = compute_hash(content)
 
             if file_hash in processed_hashes:

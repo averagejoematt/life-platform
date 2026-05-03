@@ -250,9 +250,28 @@ def floats_to_decimal(obj):
 
 
 def parse_dt(date_str):
+    """Parse Apple Health export.xml timestamp → (UTC date string, full timestamp).
+
+    TD-19 Phase 2 + TD-14 parity (PR re-entry, 2026-05-03): mirrors HAE Lambda
+    parse_date_str() — convert source-tz timestamp to UTC before extracting date.
+    Per TD-14 PR template: backfill ↔ live Lambda parity discipline; this fix
+    must ship in lockstep with the HAE + apple_health Lambda fix.
+    """
     if not date_str:
         return None, None
-    return date_str[:10], date_str.strip()
+    s = date_str.strip()
+    if len(s) == 10 and s[4] == "-" and s[7] == "-":
+        return s, s
+    try:
+        normalized = s.replace(" ", "T", 1)
+        if len(normalized) >= 24 and normalized[-5] in ("+", "-") and normalized[-3] != ":":
+            normalized = normalized[:-2] + ":" + normalized[-2:]
+        dt = datetime.fromisoformat(normalized)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc).strftime("%Y-%m-%d"), s
+    except (ValueError, IndexError):
+        return s[:10], s
 
 
 def parse_minutes_between(start_str, end_str):
