@@ -1,3 +1,32 @@
+## v6.8.7 — PR 5 + PR 6: TD-19 + TD-11 audits (2026-05-03)
+
+Two audit-only PRs. Both gate implementation work on Matthew approval.
+
+### PR 5 — TD-19 Phase 1 audit (`docs/audits/TD-19_DATE_PARTITION_AUDIT.md`)
+- 16 ingestion Lambdas + 1 backfill audited for date-keying convention.
+- 8 ✅ UTC: whoop, garmin, withings, strava, todoist, weather, measurements, food-delivery.
+- 2 ❌ PT-local needs fix: `health-auto-export-webhook`, `apple-health-ingestion` — both use `parse_date_str()` returning `date_str[:10]` without TZ conversion. 9pm PT events land at PT date instead of UTC date.
+- 5 ⚪ event-anchored (no fix needed): eightsleep wake-date semantic, habitify, macrofactor, dropbox-poll, function-health.
+- 1 ⚠ Notion: explicit PT, possibly intentional — flagged for Matthew.
+- 🪞 `backfill/backfill_apple_health_export_v16.py` mirrors HAE's pattern; per TD-14, must fix in same PR.
+- Cross-source verification matrix shows the visible 9pm PT discrepancy.
+- Phase 2 preview: fix `parse_date_str` / `parse_date` / `parse_dt` to convert to UTC. Phase 3 (historical migration) is its own PR.
+
+### PR 6 — TD-11 Step 1 audit (`docs/audits/TD-11_HABITIFY_API_AUDIT.md`)
+- Captured 3 days of raw `/journal` responses from Habitify (2026-05-01 final, 2026-05-02 final, 2026-05-03 mid-day) plus `/habits` registry.
+- **Headline**: spec assumed 5-state taxonomy; Matthew's registry only exercises 3 (`completed`, `in_progress` = pending, `failed`). `skipped` and `not_scheduled` not observed.
+- Status distribution shows the practical bug: today at 10:30 AM PT, 64/65 habits are `in_progress` (= the "pending" state). Live Lambda maps both `in_progress` and `failed` to `0.0`, conflating "pending today" with "failed yesterday."
+- Frequency: 65/65 daily, 0 BYDAY-scheduled habits, 1 monthly periodicity (Sauna — edge case).
+- Spec's **Option C (backfill via API) confirmed feasible** — `/journal?target_date=…` accepts arbitrary historical dates. ~70s for 70 days.
+- Pending → failed cutoff: Habitify flips at UTC end-of-day (reference_date `00:00:00.000Z`). Platform inherits free.
+- TD-19 dependency check: Habitify Lambda is already UTC-clean per PR 5 audit. TD-11 can proceed independently.
+- 5 questions surfaced for Matthew to gate Step 2 (schema design).
+
+### No code changed
+Both PRs are pure documentation. Stopped before Phase 2 / Step 2 per spec.
+
+---
+
 ## v6.8.6 — PR 4: Function Health v2 — MCP + supplements page + labs v1.5 (2026-05-03)
 
 ### PR 4a — MCP tools (`mcp/tools_labs.py`, registry)

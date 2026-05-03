@@ -1,24 +1,25 @@
-# Handover — v6.8.6: PR 4 — Function Health v2 (MCP + supplements page + labs v1.5)
+# Handover — v6.8.7: PR 5 + PR 6 — TD-19 + TD-11 audits (doc-only)
 
 **Date:** 2026-05-03
-**Scope:** PR 4 (4a + 4b + 4c) — surface the FH 2026 lab draw through MCP tooling, the public site labs page, and a new private supplements protocol page.
+**Scope:** Audit-only PRs. PR 5 covers TD-19 Phase 1 (date partition convention per Lambda). PR 6 covers TD-11 Step 1 (Habitify API state taxonomy). Both gate implementation phases on Matthew approval.
 
-See [HANDOVER_v6.8.6.md](HANDOVER_v6.8.6.md) for full details.
+See [HANDOVER_v6.8.7.md](HANDOVER_v6.8.7.md) for full details — including the consolidated 7-PR session summary and all carry-forward Matthew action items.
 
 ## Summary
 
-- **PR 4a (MCP):** `get_lab_deltas` + `get_allergies` + `cadence_trackers` augment to `get_labs`. NfL=180d, Galleri=365d. Tool count 123 → 125. Galleri framing reworded per Technical Board ("No signal at 24-mo threshold" instead of raw "NO CANCER SIGNAL DETECTED").
-- **PR 4b (Supplements):** `/supplements/protocol/` — new private page rendering the May 2026 supplement protocol v2 from S3. Auto-gated by site-wide `PRIVACY_MODE=true`. Habitify integration deferred until TD-11 ships.
-- **PR 4c (Labs):** Additive v1.5 section on `site/labs/index.html` — IRS gauge, Cardio IQ panel summary, allergy chips, NfL+Galleri annual sentinel widgets. No refactor of v1 rendering. Trend charts deferred to future workstream.
+- **TD-19 audit**: 16 Lambdas + 1 backfill audited. 8 ✅ UTC, 2 ❌ PT-local needs fix (HAE + apple_health), 5 ⚪ event-anchored (no fix needed), 1 ⚠ Notion (explicit PT — intentional?), 1 🪞 backfill mirrors HAE.
+- **TD-11 audit**: Habitify API exposes 3 of 5 spec-anticipated states (`completed` / `in_progress` (=pending) / `failed`). Matthew's current registry never exercises `skipped` or `not_scheduled`. Spec's Option C (backfill via API) is feasible. TD-11 can proceed independently of TD-19.
 
-## Spec archived
+## All 7 PRs this session
 
-`docs/specs/FUNCTION_HEALTH_V2_HANDOFF.md` → `docs/archive/FUNCTION_HEALTH_V2_HANDOFF_2026-05-02_tonight.md`
+PR 0 (TD-21/22/23 MCP unbreak + hotfix), PR 1 (TD-15/16/18/20 HAE + platform_logger), PR 2 (TD-12/14/17 housekeeping), PR 3 (SECRETS_MAP), PR 4 (FH v2 — MCP + supplements + labs), PR 5 (TD-19 audit), PR 6 (TD-11 audit). Plus a 9.5-hour MCP outage caught by canary and recovered in 3 min.
 
 ## Current State
 
 | Metric | Value |
 |--------|-------|
-| Version | v6.8.6 |
-| MCP Tools | **125** (was 123) |
-| Site pages | +1 |
+| Version | v6.8.7 |
+| Lambda Layer | v42 |
+| Lambdas | 66 |
+| MCP Tools | **125** |
+| Secrets in AWS | 15 |
