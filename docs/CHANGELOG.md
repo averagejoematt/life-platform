@@ -1,3 +1,29 @@
+## v6.8.4 — PR 2: Todoist daily cron + PR template + parity-debt label (TD-12/14/17) (2026-05-03)
+
+### TD-12 [LOW] — Todoist EventBridge schedule
+- `cdk/stacks/ingestion_stack.py` TodoistIngestion schedule changed from `cron(15 14,2 * * ? *)` (2x daily) to `cron(0 14 * * ? *)` (1x daily, 14:00 UTC = 6 AM PST / 7 AM PDT).
+- Spec said "every 4hr / 6 invocations/day" but CDK reality was 2x daily — drift noted; intent (reduce invocation count) preserved.
+- Lambda no-op gate already returned early when no changes since last run; this just removes the redundant invocation.
+- Webhook migration deferred to a future "source-webhook initiative" alongside Notion / Whoop / Habitify (per spec).
+
+### TD-14 [MED] — Backfill ↔ live Lambda parity discipline
+- `.github/PULL_REQUEST_TEMPLATE.md` added with a "Backfill / Lambda parity check" section. Required on any PR touching `backfill/*` or a Lambda with a backfill counterpart.
+- GitHub `parity-debt` label created (amber `#FBCA04`).
+- Naming convention recommended in the spec (shared prefix between Lambda and backfill script) wasn't formally enforced — we already follow it informally for HAE.
+
+### TD-17 [LOW] — Matthew action item
+- Disable Tier-2 feeds (HR / RHR / SpO2 / respiratory rate) in the Health Auto Export iOS app. Whoop is source of truth; HAE Lambda already filters these out, but the app keeps sending them — wastes invocations.
+- Settings → Automations → find active automation → metric list → untoggle the four. Watch CloudWatch invocation count for ~24h to confirm the drop.
+- No code change.
+
+### Spec archived
+- `docs/specs/TD_QUICK_DECISIONS.md` → `docs/archive/TD_QUICK_DECISIONS_2026-05-02.md`
+
+### Deploy
+- `cdk deploy LifePlatformIngestion` — diff was a pure ScheduleExpression update; 15s.
+
+---
+
 ## v6.8.3 — PR 1: HAE source-priority + platform_logger (TD-15/16/18/20) + MCP outage hotfix (2026-05-03)
 
 ### HAE Lambda (TD-15/16/18) — `lambdas/health_auto_export_lambda.py` v1.7.0
