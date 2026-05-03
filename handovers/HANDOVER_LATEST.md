@@ -1,27 +1,24 @@
-# Handover — v6.8.5: PR 3 — SECRETS_MAP verification + KNOWN_SECRETS reconciliation (TD-13)
+# Handover — v6.8.6: PR 4 — Function Health v2 (MCP + supplements page + labs v1.5)
 
 **Date:** 2026-05-03
-**Scope:** Doc-only PR. Reconciles SECRETS_MAP, test KNOWN_SECRETS, and ARCHITECTURE.md against AWS reality (15 secrets).
+**Scope:** PR 4 (4a + 4b + 4c) — surface the FH 2026 lab draw through MCP tooling, the public site labs page, and a new private supplements protocol page.
 
-See [HANDOVER_v6.8.5.md](HANDOVER_v6.8.5.md) for full details.
+See [HANDOVER_v6.8.6.md](HANDOVER_v6.8.6.md) for full details.
 
 ## Summary
 
-- 15 `life-platform/*` secrets verified in AWS, all rows in `docs/SECRETS_MAP.md` flipped from ⚠ to ✅, consumer Lambdas populated.
-- `KNOWN_SECRETS` test list: +eightsleep-client, +anthropic-api-key, −webhook-key. EXPECTED_COUNT 15 → 16.
-- `docs/ARCHITECTURE.md` Secrets section: 9 → 15 active secrets, cost line updated, missing rows added.
-- Stale `webhook-key` comment removed from `cdk/stacks/role_policies.py`.
+- **PR 4a (MCP):** `get_lab_deltas` + `get_allergies` + `cadence_trackers` augment to `get_labs`. NfL=180d, Galleri=365d. Tool count 123 → 125. Galleri framing reworded per Technical Board ("No signal at 24-mo threshold" instead of raw "NO CANCER SIGNAL DETECTED").
+- **PR 4b (Supplements):** `/supplements/protocol/` — new private page rendering the May 2026 supplement protocol v2 from S3. Auto-gated by site-wide `PRIVACY_MODE=true`. Habitify integration deferred until TD-11 ships.
+- **PR 4c (Labs):** Additive v1.5 section on `site/labs/index.html` — IRS gauge, Cardio IQ panel summary, allergy chips, NfL+Galleri annual sentinel widgets. No refactor of v1 rendering. Trend charts deferred to future workstream.
 
-## Action items for Matthew
+## Spec archived
 
-1. **Orphan `life-platform/anthropic-api-key`** — no consumer in source. Delete it, or wire up a consumer. Decision pending.
-2. **Todoist secret consolidation** — ingestion path still reads from `ingestion-keys` bundle; MCP path uses dedicated `life-platform/todoist`. Migrate ingestion later when convenient.
+`docs/specs/FUNCTION_HEALTH_V2_HANDOFF.md` → `docs/archive/FUNCTION_HEALTH_V2_HANDOFF_2026-05-02_tonight.md`
 
 ## Current State
 
 | Metric | Value |
 |--------|-------|
-| Version | v6.8.5 |
-| Lambdas | 66 |
-| MCP Tools | 123 |
-| Secrets in AWS | 15 |
+| Version | v6.8.6 |
+| MCP Tools | **125** (was 123) |
+| Site pages | +1 |
