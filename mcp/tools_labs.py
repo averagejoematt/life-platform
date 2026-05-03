@@ -372,4 +372,415 @@ def tool_get_labs(args):
     if view not in VALID_VIEWS:
         return {"error": f"Unknown view '{view}'.", "valid_views": list(VALID_VIEWS.keys()),
                 "hint": "'results' for latest draws, 'trends' for trajectory, 'out_of_range' for persistent flags."}
-    return VALID_VIEWS[view](args)
+    out = VALID_VIEWS[view](args)
+    # FH v2 augment (PR 4a, 2026-05-03): always attach cadence_trackers for the
+    # annual-or-rarer sentinel panels (NfL, Galleri). Surfaced on every view so
+    # callers don't have to remember a separate query.
+    if isinstance(out, dict) and "cadence_trackers" not in out:
+        try:
+            out["cadence_trackers"] = _build_cadence_trackers()
+        except Exception as e:
+            logger.warning(f"cadence_trackers build failed: {e}")
+    return out
+
+
+# ── FH v2 augments (PR 4a, 2026-05-03) ───────────────────────────────────────
+# Tonight decisions per Matthew's docs/specs/FUNCTION_HEALTH_V2_HANDOFF.md:
+#   NfL cadence = 180 days (sensitive neurodegeneration baseline; warrants
+#                            6-month tracking even though Galleri is annual)
+#   Galleri cadence = 365 days (per GRAIL recommendation)
+# Galleri framing wording borrowed from the Technical Board version:
+#   "No signal detected at 24-month early-detection threshold"
+#   instead of the raw "NO CANCER SIGNAL DETECTED" — Viktor's adversarial
+#   pushback on framing absence-of-evidence as evidence-of-absence.
+
+NFL_CADENCE_DAYS = 180
+GALLERI_CADENCE_DAYS = 365
+
+# ImmunoCAP IgE class boundaries (kU/L). Class 0 = no sensitization; 6 = max.
+_IGE_CLASS_BOUNDARIES = [
+    (0.10, 0),  # < 0.10 → Class 0
+    (0.35, 1),  # 0.10–0.34 → Class 1
+    (0.70, 2),  # 0.35–0.69 → Class 2
+    (3.50, 3),  # 0.70–3.49 → Class 3
+    (17.5, 4),  # 3.50–17.4 → Class 4
+    (50.0, 5),  # 17.5–49.9 → Class 5
+    # ≥ 50.0 → Class 6
+]
+_IGE_CLASS_LABELS = {
+    0: "No detectable", 1: "Low", 2: "Moderate", 3: "High",
+    4: "Very High", 5: "Extremely High", 6: "Maximum",
+}
+
+# Allergen → category map. Categories used in the get_allergies response.
+_ALLERGEN_CATEGORIES = {
+    # dust mite
+    "dust_mite_d_pteronyssinus": "dust_mite",
+    "dust_mite_d_farinae": "dust_mite",
+    # environmental pollen
+    "alder": "environmental_pollen", "birch": "environmental_pollen",
+    "oak": "environmental_pollen", "elm": "environmental_pollen",
+    "mountain_cedar": "environmental_pollen", "cottonwood": "environmental_pollen",
+    "maple_box_elder": "environmental_pollen", "walnut_tree": "environmental_pollen",
+    "white_ash": "environmental_pollen", "sheep_sorrel": "environmental_pollen",
+    "rough_pigweed": "environmental_pollen", "common_ragweed": "environmental_pollen",
+    "nettle": "environmental_pollen", "timothy_grass": "environmental_pollen",
+    # dander
+    "cat_dander": "dander", "dog_dander": "dander",
+    "mouse_urine_proteins": "dander",
+    # mold
+    "aspergillus_fumigatus": "mold", "cladosporium_herbarum": "mold",
+    "penicillium_notatum": "mold", "alternaria_alternata": "mold",
+    # other
+    "cockroach": "other",
+}
+
+
+def _ige_class(value_kU_L):
+    """Map an IgE value (kU/L) to ImmunoCAP class 0–6."""
+    if value_kU_L is None:
+        return None
+    try:
+        v = float(value_kU_L)
+    except (TypeError, ValueError):
+        return None
+    for boundary, cls in _IGE_CLASS_BOUNDARIES:
+        if v < boundary:
+            return cls
+    return 6
+
+
+def _allergen_meta(biomarker_key):
+    """Strip 'allergy_' prefix and look up category."""
+    base = biomarker_key.replace("allergy_", "", 1)
+    return base, _ALLERGEN_CATEGORIES.get(base, "other")
+
+
+def _build_cadence_trackers():
+    """Return cadence-tracker dict for NfL + Galleri. Returns {} if no draws."""
+    draws = _query_all_lab_draws()
+    if not draws:
+        return {}
+    today = datetime.now().date()
+
+    def _latest_for(biomarker_key):
+        """Find the latest draw containing this biomarker; return (date_str, value, unit) or None."""
+        for d in reversed(draws):  # latest-first
+            bms = d.get("biomarkers", {})
+            if biomarker_key in bms:
+                bm = bms[biomarker_key]
+                return (
+                    d.get("draw_date"),
+                    bm.get("value_numeric") or bm.get("value"),
+                    bm.get("unit", ""),
+                )
+        return None
+
+    def _history_for(biomarker_key, value_field):
+        """Return chronological history of a biomarker."""
+        out = []
+        for d in draws:
+            bm = d.get("biomarkers", {}).get(biomarker_key)
+            if bm:
+                entry = {"date": d.get("draw_date")}
+                if value_field == "numeric":
+                    entry["value"] = bm.get("value_numeric") or bm.get("value")
+                    entry["unit"] = bm.get("unit", "")
+                else:
+                    entry["signal"] = bm.get("value")
+                out.append(entry)
+        return out
+
+    out = {}
+
+    # NfL — neurodegeneration baseline; 180-day cadence per Matthew tonight
+    nfl_latest = _latest_for("nfl_neurofilament_light_chain")
+    if nfl_latest:
+        last_date_str, last_value, last_unit = nfl_latest
+        try:
+            last_date = datetime.strptime(last_date_str, "%Y-%m-%d").date()
+            days_since = (today - last_date).days
+            next_due = (last_date + timedelta(days=NFL_CADENCE_DAYS)).strftime("%Y-%m-%d")
+        except (ValueError, TypeError):
+            days_since = None
+            next_due = None
+        out["nfl"] = {
+            "last_drawn": last_date_str,
+            "days_since_last": days_since,
+            "recommended_cadence_days": NFL_CADENCE_DAYS,
+            "next_due": next_due,
+            "history": _history_for("nfl_neurofilament_light_chain", "numeric"),
+        }
+
+    # Galleri — annual cancer screen
+    gal_latest = _latest_for("galleri_cancer_signal")
+    if gal_latest:
+        last_date_str, last_signal, _ = gal_latest
+        try:
+            last_date = datetime.strptime(last_date_str, "%Y-%m-%d").date()
+            days_since = (today - last_date).days
+            next_due = (last_date + timedelta(days=GALLERI_CADENCE_DAYS)).strftime("%Y-%m-%d")
+        except (ValueError, TypeError):
+            days_since = None
+            next_due = None
+        # Reframe per Technical Board (Viktor): absence-of-evidence ≠ evidence-of-absence
+        signal_str = str(last_signal or "").upper()
+        if "NO CANCER" in signal_str or "NO SIGNAL" in signal_str:
+            framed_signal = "No signal detected at 24-month early-detection threshold"
+        else:
+            framed_signal = last_signal
+        out["galleri"] = {
+            "last_drawn": last_date_str,
+            "days_since_last": days_since,
+            "recommended_cadence_days": GALLERI_CADENCE_DAYS,
+            "next_due": next_due,
+            "last_signal": framed_signal,
+            "raw_signal": last_signal,
+            "history": _history_for("galleri_cancer_signal", "signal"),
+        }
+
+    return out
+
+
+def tool_get_lab_deltas(args):
+    """Cross-draw biomarker movement query.
+
+    Args:
+        comparison: "year_over_year" (default) | "since_first" | "latest_two"
+        threshold: float, minimum |ratio−1| to include (default 0.5 = ±50% movement)
+        direction: "any" (default) | "rising" | "falling"
+        panel: optional panel filter (e.g. "lipid_standard")
+        limit: max number of deltas in response (default 50)
+    """
+    comparison = (args.get("comparison") or "year_over_year").lower().strip()
+    threshold = float(args.get("threshold", 0.5))
+    direction = (args.get("direction") or "any").lower().strip()
+    panel_filter = args.get("panel")
+    limit = int(args.get("limit", 50))
+
+    draws = _query_all_lab_draws()
+    if len(draws) < 2:
+        return {"error": "Need at least 2 draws to compute deltas",
+                "total_draws": len(draws)}
+
+    latest = draws[-1]
+    latest_date_str = latest.get("draw_date")
+    latest_date = datetime.strptime(latest_date_str, "%Y-%m-%d").date()
+
+    if comparison == "since_first":
+        baseline = draws[0]
+    elif comparison == "latest_two":
+        baseline = draws[-2]
+    elif comparison == "year_over_year":
+        # Find the draw closest to (latest - 365 days)
+        target = latest_date - timedelta(days=365)
+        baseline = min(
+            draws[:-1],
+            key=lambda d: abs((datetime.strptime(d.get("draw_date"), "%Y-%m-%d").date() - target).days)
+        )
+    else:
+        return {"error": f"Unknown comparison '{comparison}'.",
+                "valid_comparisons": ["year_over_year", "since_first", "latest_two"]}
+
+    baseline_date = baseline.get("draw_date")
+    latest_bms = latest.get("biomarkers", {})
+    baseline_bms = baseline.get("biomarkers", {})
+
+    deltas = []
+    new_biomarkers = []  # in latest but not baseline
+
+    for key, bm in latest_bms.items():
+        if panel_filter and bm.get("panel") != panel_filter:
+            continue
+        # Allergy panel uses ordinal class; exclude from numeric deltas (use get_allergies)
+        if key.startswith("allergy_") and key != "allergy_total_ige":
+            continue
+
+        # Galleri/qualitative: skip if not numeric
+        v_to_raw = bm.get("value_numeric")
+        if v_to_raw is None:
+            continue
+        try:
+            v_to = float(v_to_raw)
+        except (TypeError, ValueError):
+            continue
+
+        if key not in baseline_bms:
+            new_biomarkers.append({
+                "biomarker": key,
+                "to": v_to,
+                "unit": bm.get("unit", ""),
+                "panel": bm.get("panel", ""),
+                "category": bm.get("category", ""),
+                "out_of_range": bm.get("flag") in ("high", "low"),
+            })
+            continue
+
+        v_from_raw = baseline_bms[key].get("value_numeric")
+        if v_from_raw is None:
+            continue
+        try:
+            v_from = float(v_from_raw)
+        except (TypeError, ValueError):
+            continue
+        if v_from == 0:
+            continue  # ratio undefined
+
+        ratio = v_to / v_from
+        pct_change = (ratio - 1) * 100
+        movement = abs(ratio - 1)
+        if movement < threshold:
+            continue
+
+        d_dir = "rising" if v_to > v_from else "falling"
+        if direction != "any" and direction != d_dir:
+            continue
+
+        deltas.append({
+            "biomarker": key,
+            "from": round(v_from, 4),
+            "to": round(v_to, 4),
+            "ratio": round(ratio, 3),
+            "pct_change": round(pct_change, 1),
+            "unit": bm.get("unit", ""),
+            "direction": d_dir,
+            "panel": bm.get("panel", ""),
+            "category": bm.get("category", ""),
+            "out_of_range": bm.get("flag") in ("high", "low"),
+        })
+
+    # Sort by absolute pct_change descending — biggest movers first
+    deltas.sort(key=lambda x: abs(x["pct_change"]), reverse=True)
+    deltas = deltas[:limit]
+
+    rising = sum(1 for d in deltas if d["direction"] == "rising")
+    falling = sum(1 for d in deltas if d["direction"] == "falling")
+    total_compared = sum(
+        1 for k, bm in latest_bms.items()
+        if k in baseline_bms
+        and bm.get("value_numeric") is not None
+        and baseline_bms[k].get("value_numeric") is not None
+        and not (k.startswith("allergy_") and k != "allergy_total_ige")
+    )
+
+    return {
+        "comparison": comparison,
+        "threshold": threshold,
+        "direction_filter": direction,
+        "panel_filter": panel_filter,
+        "from_draw": baseline_date,
+        "to_draw": latest_date_str,
+        "deltas": deltas,
+        "new_biomarkers": new_biomarkers,
+        "summary": {
+            "total_biomarkers_compared": total_compared,
+            "moved_above_threshold": len(deltas),
+            "rising": rising,
+            "falling": falling,
+            "new_in_latest": len(new_biomarkers),
+        },
+    }
+
+
+def tool_get_allergies(args):
+    """Allergy panel surface — ordinal IgE class semantics, grouped by category.
+
+    Args:
+        draw_date: optional YYYY-MM-DD. Default = latest draw with allergy data.
+        min_class: int 0–6 (default 1). Filter out below this class.
+        category: optional str. "dust_mite" | "environmental_pollen" | "dander" |
+                  "mold" | "other" | None=all.
+    """
+    draw_date = args.get("draw_date")
+    min_class = int(args.get("min_class", 1))
+    category_filter = args.get("category")
+
+    draws = _query_all_lab_draws()
+    if not draws:
+        return {"error": "No lab draws found"}
+
+    # Latest draw with allergy data
+    if draw_date:
+        target = next((d for d in draws if d.get("draw_date") == draw_date), None)
+        if not target:
+            return {"error": f"No draw for {draw_date}",
+                    "available_dates": [d.get("draw_date") for d in draws]}
+    else:
+        target = None
+        for d in reversed(draws):
+            if any(k.startswith("allergy_") for k in d.get("biomarkers", {})):
+                target = d
+                break
+        if not target:
+            return {"error": "No draw with allergy panel data found",
+                    "hint": "Function Health 2026 (2026-04-03) was the first draw with the allergy panel."}
+
+    bms = target.get("biomarkers", {})
+    sensitizations = []
+    total_ige_obj = None
+
+    for key, bm in bms.items():
+        if not key.startswith("allergy_"):
+            continue
+        if key == "allergy_total_ige":
+            v = bm.get("value_numeric")
+            ref = bm.get("ref_text", "")
+            ref_max = None
+            try:
+                ref_max = float(ref.replace("<", "").strip()) if ref else None
+            except ValueError:
+                pass
+            x_above = round(float(v) / ref_max, 2) if (v and ref_max and ref_max > 0) else None
+            total_ige_obj = {
+                "value": v,
+                "unit": bm.get("unit", "kU/L"),
+                "ref_max": ref_max,
+                "x_above_max": x_above,
+                "flag": bm.get("flag"),
+            }
+            continue
+
+        v = bm.get("value_numeric")
+        cls = _ige_class(v)
+        if cls is None or cls < min_class:
+            continue
+
+        allergen_name, cat = _allergen_meta(key)
+        if category_filter and cat != category_filter:
+            continue
+
+        sensitizations.append({
+            "allergen": allergen_name,
+            "ige_kU_L": v,
+            "class": cls,
+            "class_label": _IGE_CLASS_LABELS.get(cls, ""),
+            "category": cat,
+        })
+
+    # Sort: highest class first, then by IgE value desc
+    sensitizations.sort(key=lambda x: (-(x["class"] or 0), -(x["ige_kU_L"] or 0)))
+
+    high_class = sum(1 for s in sensitizations if s["class"] >= 3)
+    moderate_class = sum(1 for s in sensitizations if s["class"] == 2)
+    low_class = sum(1 for s in sensitizations if s["class"] == 1)
+    cats_present = sorted(set(s["category"] for s in sensitizations))
+
+    return {
+        "draw_date": target.get("draw_date"),
+        "total_ige": total_ige_obj,
+        "min_class_filter": min_class,
+        "category_filter": category_filter,
+        "sensitizations": sensitizations,
+        "summary": {
+            "total_sensitizations": len(sensitizations),
+            "high_class_count": high_class,    # class >= 3
+            "moderate_class_count": moderate_class,
+            "low_class_count": low_class,
+            "categories_present": cats_present,
+        },
+        "context": (
+            "Allergy results surface for completeness but are not actionable in the "
+            "platform's optimization loop (per the Technical Board consult, 2026-05-02). "
+            "IgE class is ordinal: 0 = no detectable, 6 = maximum. ImmunoCAP scale."
+        ),
+    }
