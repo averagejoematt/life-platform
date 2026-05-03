@@ -3,6 +3,46 @@
 **Source:** v6.8.1 carry-forwards (TD-11 through TD-20) + 2026-05-02 evening session discoveries (TD-21, TD-22, TD-23) + AJM Re-Entry Plan Phase 8 items.
 **Ordering principle:** severity first, then effort.
 
+**Status update (end of 2026-05-03 session — v6.8.9):**
+
+| TD | Status |
+|---|---|
+| TD-11 (Habitify phantom failures) | 🟡 Step 1 audit done (`docs/audits/TD-11_HABITIFY_API_AUDIT.md`); Step 2 schema design pending Matthew approval |
+| TD-12 (Todoist daily cron) | ✅ Closed in PR 2 (v6.8.4) |
+| TD-13 (SECRETS_MAP) | ✅ Closed in PR 3 (v6.8.5) |
+| TD-14 (backfill ↔ Lambda parity) | ✅ Closed in PR 2 (v6.8.4) — PR template + parity-debt label |
+| TD-15 (HAE SOURCE_PRIORITY) | ✅ Closed in PR 1 (v6.8.3) |
+| TD-16 (Apple Health Connect 2x) | ✅ Subsumed by TD-15 closure |
+| TD-17 (HAE Tier-2 feeds) | 🟡 Matthew action — disable in iOS HAE app |
+| TD-18 (weight_body_mass alias) | ✅ Closed in PR 1 (v6.8.3) |
+| TD-19 (date partition mismatch) | 🟡 Phase 1 audit done; Phase 2 fix-forward shipped (v6.8.9); Phase 3 historical migration pending Matthew approval |
+| TD-20 (platform_logger TypeError) | ✅ Closed in PR 1 (v6.8.3) — layer v42 |
+| TD-21 (mcp/tools_lifestyle timezone) | ✅ Closed in PR 0 (v6.8.2) |
+| TD-22 (get_todoist_projects signature) | ✅ Closed in PR 0 (v6.8.2) |
+| TD-23 (MCP IAM Todoist secret) | ✅ Closed in PR 0 (v6.8.2) |
+
+**New TDs surfaced + closed in same session:**
+| TD-24 (latent _decimal_to_float typo from de57c67) | ✅ Hotfixed in v6.8.2 |
+| TD-25 (health_trajectory tz naive/aware mix) | ✅ Closed in v6.8.8 |
+| TD-26 (capture_baseline kwargs typing bug) | ✅ Closed in v6.8.8 |
+| TD-27 (10 Lambdas pinned to old layer versions) | ✅ Closed in v6.8.9 |
+| TD-28 (MacroFactor XLSX silently rejected) | ✅ Closed in v6.8.9 |
+
+**Open TDs going into next session:**
+- TD-11 Step 2+ (Habitify schema design — gated on Matthew approval)
+- TD-19 Phase 3 (historical partition migration — gated on Matthew approval)
+- TD-17 (Matthew action — iOS app config)
+- WR-47 Pause Mode build (specced; not built)
+- WR-49 One-Click Manual Backfill UI (not specced)
+- WR-50 Re-Entry Day Template (gated on WR-47)
+- chronicling partition deprecation decision
+- RSS-while-gated decision
+- orphan `life-platform/anthropic-api-key` decision
+
+For the full carry-forward checklist see `handovers/HANDOVER_v6.8.9.md` "Carry-forward Matthew action items" section.
+
+---
+
 ---
 
 ## HIGH severity — production correctness or major architectural risk

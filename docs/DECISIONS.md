@@ -1070,3 +1070,65 @@ Supporting files: `data_sources.json` (source registry), `lint_site_content.py` 
 **Files changed:** `retry_utils.py`, `ai_calls.py`, `ai_expert_analyzer_lambda.py`, `coach_narrative_orchestrator.py`, `coach_ensemble_digest.py`, `coach_state_updater.py`, `coach_quality_gate.py`, `coach_history_summarizer.py`, `journal_enrichment_lambda.py`, `hypothesis_engine_lambda.py`, `challenge_generator_lambda.py`, `field_notes_lambda.py`, `site_api_lambda.py` (AI_UNAVAILABLE fix), `constants.py` (layer v41).
 
 **Projected cost impact:** $17-20/month → $8-12/month (40-60% reduction). Shared layer v41 deployed.
+
+---
+
+### ADR-050 — TD-19: UTC as the platform-wide DDB partition convention
+
+**Status:** Active (Phase 2 fix-forward shipped 2026-05-03 v6.8.9; Phase 3 historical migration deferred)
+**Date:** 2026-05-03
+**Audit:** `docs/audits/TD-19_DATE_PARTITION_AUDIT.md`
+
+**Context:** Discovered during 2026-05-02 HAE webhook verification that source Lambdas disagree on what "today" means: HAE Lambda was partitioning at the source-tz date (PT-local for an iOS device); Withings + every other source uses UTC. A 9pm PT workout would land at `DATE#2026-05-02` (HAE) but `DATE#2026-05-03` (Withings) — same wall-clock event, two different partitions. Cross-source aggregation silently undercounts; cross-source correlations are systematically wrong rather than visibly missing.
+
+**Decision:** Adopt UTC midnight as the canonical partition convention for every ingestion path.
+
+**Reasoning:**
+1. **Source-of-truth alignment.** Every wearable / API I'm aware of stores timestamps in UTC internally. PT-local was a layer added on the way in.
+2. **Travel + DST are non-issues in UTC.** Matthew travels; PT-local breaks across timezone changes (a "day" becomes 23 or 25 hours).
+3. **Cross-source correlation correctness.** With UTC, two sources observing the same instant always land on the same partition.
+4. **Reversibility.** UTC → PT presentation is a one-line read-time conversion. PT → UTC requires knowing the original timezone, which we don't reliably store.
+
+**Audit results:** 16 Lambdas + 1 backfill. 8 ✅ already UTC, 2 ❌ PT-local needed fix (HAE + apple_health), 5 ⚪ event-anchored (no fix needed), 1 ⚠ Notion intentionally PT-local (user-typed Date in Notion UI), 1 🪞 backfill mirror (v16 — fixed in lockstep with HAE per TD-14).
+
+**Implementation (Phase 2 — shipped 2026-05-03 v6.8.9):**
+- `lambdas/health_auto_export_lambda.py parse_date_str()` converts source-tz timestamp → UTC date string before partition extraction
+- `lambdas/apple_health_lambda.py parse_date()` same fix
+- `backfill/backfill_apple_health_export_v16.py parse_dt()` same fix (TD-14 parity)
+- Notion left as-is (event-anchored to user-typed date — intentional exception)
+
+**Phase 3 (deferred):** Historical migration of existing rows under wrong partitions. DDB cost + idempotency risk warrant a dedicated PR with dry-run + per-item conditional puts. Acceptable interim policy: everything from 2026-05-03 forward is UTC, prior data is on whatever partition it was originally written to.
+
+**Files changed:** `lambdas/health_auto_export_lambda.py`, `lambdas/apple_health_lambda.py`, `backfill/backfill_apple_health_export_v16.py`. Shipped via `cdk deploy LifePlatformIngestion`.
+
+---
+
+### ADR-051 — WR-48: Stale-Source Alerts + Anthropic Canary (observability hardening)
+
+**Status:** Active (shipped 2026-05-03 v6.8.8 + v6.8.9)
+**Date:** 2026-05-03
+**Spec:** `docs/WR_47_48_ARCHITECTURE_SPEC.md`
+
+**Context:** The 30-day silence (April → May 2026) was undetected because the freshness-checker Lambda had a missing IAM grant (`sns:Publish` on `life-platform-alerts`) — it correctly detected 4-5 stale sources every day but every alert silently `AuthorizationError`'d. Separately, on the morning of 2026-05-03 Anthropic disabled the platform's API key for billing reasons and the daily brief silently failed for ~2 hours before the F-grade brief surfaced it.
+
+Both failures share a pattern: **the platform's own monitoring blind spots are themselves silent failure modes.**
+
+**Decision:** Triple-layer observability hardening for ingestion + AI dependencies:
+
+1. **Restore the freshness-checker SNS:Publish IAM** (the immediate root cause of the 30-day silent failure).
+2. **Add a backstop alarm**: `life-platform-freshness-checker-not-emitting` fires if no `StaleSourceCount` metric is emitted in 26h. Closes the "what watches the watcher" gap.
+3. **Add the freshness-status MCP tool**: `get_freshness_status` queries DDB directly (independent of the freshness-checker Lambda) — works even if the Lambda silently fails.
+4. **Add the daily brief stale-source banner** (Enhancement 1): every brief now prepends "⚠️ Data Status — N source(s) stale" if any source is past threshold. Means a low grade is contextualized as data-vs-signal upfront.
+5. **Add an Anthropic canary check**: `lambdas/canary_lambda.py` makes a tiny ($0.0001) Haiku call every 4h and emits `CanaryAnthropicFail` on 401/402/403/429. Detects "API access turned off" / "credits exhausted" within ≤4h.
+
+**Reasoning:**
+- Single-layer alerting (one Lambda, one SNS topic, one email subscription) is brittle. The 30-day failure was a single missing IAM grant.
+- Multi-layer detection (Lambda + backstop + independent MCP read + brief banner + canary) catches different failure modes the others would miss.
+- Cost is negligible (~$0.0006/day for the Anthropic canary; ~$0/yr for the alarms).
+
+**NOT shipped tonight (deferred):**
+- WR-48 Enhancement 2 (escalation tiers in the Lambda) — logic is in `get_freshness_status` MCP tool only
+- WR-48 Enhancement 3 (Pause Mode awareness) — gated on WR-47
+- WR-47 Pause Mode — design spec at `docs/WR_47_48_ARCHITECTURE_SPEC.md`
+
+**Files changed:** `cdk/stacks/role_policies.py` (SNS:Publish for freshness-checker; ai-keys for canary), `cdk/stacks/operational_stack.py` (backstop alarm + canary anthropic alarm), `lambdas/canary_lambda.py` (check_anthropic), `lambdas/daily_brief_lambda.py` (banner), `mcp/tools_labs.py` (get_freshness_status).
