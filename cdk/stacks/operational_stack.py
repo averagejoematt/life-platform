@@ -199,6 +199,27 @@ class OperationalStack(Stack):
         dlq_depth = cloudwatch.Alarm(self, "DlqDepthAlarm", alarm_name="life-platform-dlq-depth-warning", metric=cloudwatch.Metric(namespace="AWS/SQS", metric_name="ApproximateNumberOfMessagesVisible", dimensions_map={"QueueName": "life-platform-ingestion-dlq"}, period=Duration.seconds(300), statistic="Maximum"), evaluation_periods=1, threshold=1, comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD, treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING)
         dlq_depth.add_alarm_action(cw_actions.SnsAction(local_alerts_topic)); dlq_depth.add_ok_action(cw_actions.SnsAction(local_alerts_topic))
 
+        # ── WR-48 Enhancement 5: backstop alarm for the freshness checker itself ──
+        # PR-reentry-4 (2026-05-03): the freshness-checker is the platform's gap-detection
+        # alarm. Without a backstop, if it silently stops emitting (Lambda crashes / schedule
+        # disabled / IAM regression), the platform loses its self-monitoring without anyone
+        # noticing. This alarm fires if no `StaleSourceCount` metric has been emitted in the
+        # last 26 hours (freshness checker runs daily at 9:45 AM PT = ~16:45 UTC).
+        # treat_missing_data=BREACHING is intentional — missing data IS the alarm condition.
+        freshness_backstop = cloudwatch.Alarm(self, "FreshnessCheckerBackstopAlarm",
+            alarm_name="life-platform-freshness-checker-not-emitting",
+            alarm_description="WR-48 backstop: freshness checker has not emitted StaleSourceCount in >26h. Check the Lambda + EventBridge schedule.",
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/Freshness", metric_name="StaleSourceCount",
+                period=Duration.seconds(26 * 3600), statistic="SampleCount",
+            ),
+            evaluation_periods=1, threshold=1,
+            comparison_operator=cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+        )
+        freshness_backstop.add_alarm_action(cw_actions.SnsAction(local_alerts_topic))
+        freshness_backstop.add_ok_action(cw_actions.SnsAction(local_alerts_topic))
+
         # ── 10. Site API Lambda — life-platform-site-api (R17-09: moved from web_stack us-east-1)
         # Read-only. DynamoDB same-region (eliminates cross-region latency).
         # Function URL is a global HTTPS endpoint — CloudFront in us-east-1 can origin to it.

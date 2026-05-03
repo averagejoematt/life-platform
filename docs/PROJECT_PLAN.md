@@ -66,6 +66,17 @@ All P0 items from Architecture Review #8 are resolved.
 | WR-45 | Media kit + speaking page | Sprint 7 Tier 2 | ✅ Done (v3.7.84) |
 | WR-46 | Data export / open data page | Sprint 7 Tier 2 | ✅ Done (v3.7.84) |
 
+### AJM Re-Entry — Resilience Roadmap (2026-05-03, post 30-day silence)
+
+> Source: `Downloads/ajm_reentry_plan.md` Phase 10 ("Build the Repeatable Pattern") + tonight's 7-PR session findings. The 30-day gap exposed that the platform has no first-class concept of "user is paused" vs "data is broken." Four items below; WR-48 is the highest forward-leverage per the plan.
+
+| ID | Item | Priority | Status |
+|----|------|----------|--------|
+| WR-47 | **Pause Mode** — explicit user-declared gap. Suppresses scoring, posts site banner, freezes streak punishment. Spec at `docs/WR_47_48_ARCHITECTURE_SPEC.md`. Also the precedent that unblocks TD-11 (Habitify pending-vs-failed). | Re-entry roadmap | ⬜ Specced; not built |
+| WR-48 | **Stale-Source Alerts** — daily Lambda checks `last_sync` per source; alerts via daily-brief banner OR push if any source > 48h stale. Per the re-entry plan: "by far the highest leverage." Spec at `docs/WR_47_48_ARCHITECTURE_SPEC.md`. **Built and shipped 2026-05-03 in PR-reentry-4 (v6.8.8).** | Re-entry roadmap | ✅ Done (v6.8.8) |
+| WR-49 | **One-Click Manual Backfill UI** — admin page with "force re-sync" buttons per source. Today re-syncs require either CloudWatch console + Lambda invoke, or running deploy_lambda.sh + manual triggers. A simple admin page reduces re-entry time materially. | Re-entry roadmap | ⬜ Not specced; design needed |
+| WR-50 | **Re-Entry Day Template** — when Pause Mode (WR-47) ends, auto-load `docs/RUNBOOK_REENTRY.md` items as an active challenge in Habitify, and seed today's daily brief with the re-entry checklist. Closes the loop with WR-47. | Re-entry roadmap | ⬜ Gated on WR-47 ship |
+
 ### Website Strategy Review #3 (2026-03-23, Expert Panel Redesign)
 
 > Full spec: `docs/WEBSITE_REDESIGN_SPEC.md`

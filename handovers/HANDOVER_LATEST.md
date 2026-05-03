@@ -1,25 +1,30 @@
-# Handover — v6.8.7: PR 5 + PR 6 — TD-19 + TD-11 audits (doc-only)
+# Handover — v6.8.8: PR re-entry sweep — operational fixes + WR-48 (Stale-Source Alerts) + Re-Entry Protocol
 
 **Date:** 2026-05-03
-**Scope:** Audit-only PRs. PR 5 covers TD-19 Phase 1 (date partition convention per Lambda). PR 6 covers TD-11 Step 1 (Habitify API state taxonomy). Both gate implementation phases on Matthew approval.
+**Scope:** Execute everything in `Downloads/ajm_reentry_plan.md` that doesn't need Matthew's hands-on input.
 
-See [HANDOVER_v6.8.7.md](HANDOVER_v6.8.7.md) for full details — including the consolidated 7-PR session summary and all carry-forward Matthew action items.
+See [HANDOVER_v6.8.8.md](HANDOVER_v6.8.8.md) for full details.
 
-## Summary
+## Headlines
 
-- **TD-19 audit**: 16 Lambdas + 1 backfill audited. 8 ✅ UTC, 2 ❌ PT-local needs fix (HAE + apple_health), 5 ⚪ event-anchored (no fix needed), 1 ⚠ Notion (explicit PT — intentional?), 1 🪞 backfill mirrors HAE.
-- **TD-11 audit**: Habitify API exposes 3 of 5 spec-anticipated states (`completed` / `in_progress` (=pending) / `failed`). Matthew's current registry never exercises `skipped` or `not_scheduled`. Spec's Option C (backfill via API) is feasible. TD-11 can proceed independently of TD-19.
+1. **WR-48 root cause found and fixed.** Freshness-checker Lambda was running daily through the 30-day silence and detecting 4-5 stale sources/day, but every SNS publish failed silently with `AuthorizationError` (missing `sns:Publish` IAM). Fix shipped; verified — "Alert sent for 3 stale source(s)" now succeeds.
+2. **Backstop alarm shipped.** `life-platform-freshness-checker-not-emitting` fires if no `StaleSourceCount` in 26h.
+3. **`get_freshness_status` MCP tool live** (tool count 125 → 126). Status `red` right now (Strava 15d, MacroFactor 22d).
+4. **Two more latent bugs caught + fixed in passing:** `health_trajectory` tz-mixing in warmer; `capture_baseline` kwargs typing.
+5. **Re-Entry Protocol runbook** at `docs/RUNBOOK_REENTRY.md` (synthesized from `ajm_reentry_plan.md`).
+6. **WR-47..50 added to PROJECT_PLAN.md.** WR-48 ✅ Done. WR-47/49/50 are future workrolls.
+7. **Memory writes**: 3 cycle markers + 1 baseline (`reentry_2026_05_03`) + 1 re-entry memory entry.
 
-## All 7 PRs this session
+## Carry-forward action items for Matthew (cumulative across all v6.8.x sessions)
 
-PR 0 (TD-21/22/23 MCP unbreak + hotfix), PR 1 (TD-15/16/18/20 HAE + platform_logger), PR 2 (TD-12/14/17 housekeeping), PR 3 (SECRETS_MAP), PR 4 (FH v2 — MCP + supplements + labs), PR 5 (TD-19 audit), PR 6 (TD-11 audit). Plus a 9.5-hour MCP outage caught by canary and recovered in 3 min.
+PR 0..6 carry-forwards (8) plus 3 new from this session: deprecate chronicling partition, decide RSS-while-gated, consider WR-47 Pause Mode as next sprint anchor. See HANDOVER_v6.8.8.md for the full list.
 
 ## Current State
 
 | Metric | Value |
 |--------|-------|
-| Version | v6.8.7 |
+| Version | v6.8.8 |
 | Lambda Layer | v42 |
 | Lambdas | 66 |
-| MCP Tools | **125** |
-| Secrets in AWS | 15 |
+| MCP Tools | **126** |
+| CloudWatch alarms | +1 (backstop) |

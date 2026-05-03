@@ -1,3 +1,48 @@
+## v6.8.8 — PR re-entry sweep: WR-48 + Re-Entry Protocol + 2 latent bug fixes (2026-05-03)
+
+Re-entry sweep executed against `Downloads/ajm_reentry_plan.md`. Everything that didn't require Matthew's hands-on input.
+
+### WR-48 (Stale-Source Alerts) — root cause + ship
+- **Root cause**: freshness-checker Lambda was running daily through the entire 30-day silence and *correctly* detecting 4-5 stale sources every day. Every SNS publish failed silently with `AuthorizationError` because its IAM role was missing `sns:Publish` on `life-platform-alerts`.
+- **IAM fix** in `cdk/stacks/role_policies.py operational_freshness_checker()`. Verified post-deploy: "Alert sent for 3 stale source(s)" + "Partial completeness alert sent for 3 source(s)" published to alerts topic.
+- **New backstop alarm** `life-platform-freshness-checker-not-emitting`: fires if no `StaleSourceCount` metric emitted in 26h. Closes the "what watches the watcher" gap that was the root cause of the 30-day undetected silence.
+- **New MCP tool `get_freshness_status`** (count 125 → 126): independent freshness check that queries DDB directly so it works even if the Lambda silently fails. Returns green/yellow/orange/red + per-source last-date + age. Live result on ship: status=red (Strava 15d stale, MacroFactor 22d stale).
+
+### Two latent bugs caught + fixed in passing
+- `mcp/tools_health.py tool_get_health_trajectory`: failing nightly in warmer with `can't compare offset-naive and offset-aware datetimes`. Withings weight dates parsed tz-naive while `today` was tz-aware. Fixed.
+- `mcp/tools_memory.py tool_capture_baseline`: failing with `tool_write_platform_memory() got an unexpected keyword argument 'category'`. Pre-existing typing bug. Fixed by passing args as dict.
+
+### Operational sweep findings
+- chronicling partition stale at 2025-10-29 — Habitify Lambda took over the format. Documented as deprecated artifact (no data deleted without Matthew's call).
+- dropbox_poll Lambda is ✅ healthy (runs every 30min). The "null" in earlier snapshots was because Matthew exported XLSX from MacroFactor instead of CSV.
+- Nightly warming jobs: 13/14 succeed. health_trajectory was the 14th — fixed in this PR.
+- Journal ingestion: ✅ live (last run 18:00 UTC today, ingested 1 entry from Notion).
+- RSS feed returns cf-auth password page because PRIVACY_MODE=true. Expected.
+
+### Content scaffolding (per re-entry plan items 33/56/57)
+- **3 cycle markers** written to `USER#matthew#MEMORY`: `CYCLE#1#launch` (Apr 1), `CYCLE#1.5#gap_move` (Apr 2 → May 1), `CYCLE#2#reentry` (May 2 →).
+- **`capture_baseline label=reentry_2026_05_03`** stored at `MEMORY#baseline_snapshot#2026-05-03` (3 domains: weight/recovery/nutrition).
+- **`MEMORY#re_entry#2026-05-03`** entry: full re-entry summary with what_broke / what_held / platform_lessons / cycles fields.
+
+### Documentation
+- **`docs/RUNBOOK_REENTRY.md`** (NEW): reusable Re-Entry Protocol synthesized from `ajm_reentry_plan.md`. Trigger: any gap > 7 days. Day 0 / Day 1 morning / Day 1 afternoon / Day 1 evening / Day 2 morning / Day 2 midday / Day 2 afternoon / Day 2 evening / Day 3+.
+- **`docs/PROJECT_PLAN.md`**: WR-47..50 added under "AJM Re-Entry — Resilience Roadmap" header. WR-48 marked ✅ Done. WR-35/36 spec doc renamed to `docs/WR_47_48_ARCHITECTURE_SPEC.md` since 35/36 were already used in PROJECT_PLAN for cost ticker / public architecture review artifact.
+- **`docs/MCP_TOOL_CATALOG.md`**: count 125 → 126; added get_freshness_status row.
+
+### What's NOT shipped (deferred to future sprints)
+- WR-48 Enhancement 1 (daily brief banner) — IAM fix already restored email alerts; daily-brief surface is nicer-to-have
+- WR-48 Enhancement 2 (escalation tiers in Lambda — logic in get_freshness_status only)
+- WR-48 Enhancement 3 (Pause Mode awareness — gated on WR-47)
+- WR-47 (Pause Mode), WR-49 (Manual Backfill UI), WR-50 (Re-Entry Day Template)
+- Backstop alarm subscription to a separate email (e.g., partner's) — topic + alarm exist; Matthew subscribes whoever
+
+### New action items for Matthew (cumulative)
+9. Decide on deprecating the chronicling partition (data deletion needs explicit ok)
+10. Decide RSS-while-gated (excluding /rss.xml from cf-auth) if RSS-public is desired
+11. Consider WR-47 Pause Mode as next sprint anchor (precedent for TD-11 + WR-50)
+
+---
+
 ## v6.8.7 — PR 5 + PR 6: TD-19 + TD-11 audits (2026-05-03)
 
 Two audit-only PRs. Both gate implementation work on Matthew approval.
