@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-05-03 (v6.8.4 — 123 tools, 36-module MCP package, 19 data sources, 66 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed)
+Last updated: 2026-05-03 (v6.8.5 — 123 tools, 36-module MCP package, 19 data sources, 66 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed)
 
 ---
 
@@ -297,12 +297,16 @@ Each Lambda has a **dedicated, least-privilege IAM role** (57 roles total as of 
 | `life-platform/strava` | Strava Lambda — OAuth2 tokens |
 | `life-platform/garmin` | Garmin Lambda — garth OAuth tokens |
 | `life-platform/eightsleep` | Eight Sleep Lambda — username + password |
-| `life-platform/ai-keys` | All email/compute/MCP Lambdas — Anthropic API key + MCP bearer |
+| `life-platform/eightsleep-client` | Eight Sleep Lambda — client credential alongside user creds |
+| `life-platform/ai-keys` | 24 Lambdas — Anthropic API key (main pool) |
+| `life-platform/anthropic-api-key` | **Orphan** — created 2026-03-18, no consumer in source. Candidate for deletion (PR 3 finding). |
 | `life-platform/ingestion-keys` | Notion, Todoist, Habitify, Dropbox, HAE webhook — COST-B bundle |
 | `life-platform/habitify` | Habitify Lambda — dedicated key (ADR-014) |
+| `life-platform/notion` | Notion Lambda — dedicated key (also in ingestion-keys bundle) |
+| `life-platform/dropbox` | Dropbox Lambda — dedicated key (also in ingestion-keys bundle) |
+| `life-platform/todoist` | MCP write tools — Todoist API token (TD-23, added to MCP IAM 2026-05-02) |
 | `life-platform/mcp-api-key` | MCP Key Rotator — bearer token (90-day auto-rotation) |
 | `life-platform/site-api-ai-key` | Site API Lambda — dedicated Anthropic key (R17-04, isolated from main ai-keys) |
-| `life-platform/todoist` | MCP write tools — Todoist API token (TD-23, added to MCP IAM 2026-05-02) |
 | ~~`life-platform/webhook-key`~~ | **DELETED 2026-03-14** |
 | ~~`life-platform/google-calendar`~~ | **DELETED 2026-03-15 (ADR-030)** |
 | ~~`life-platform/api-keys`~~ | **DELETED 2026-03-14** |

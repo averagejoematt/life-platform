@@ -1,3 +1,21 @@
+## v6.8.5 — PR 3: SECRETS_MAP verification + KNOWN_SECRETS reconciliation (TD-13) (2026-05-03)
+
+### Doc reconciliation
+- `docs/SECRETS_MAP.md` rewritten against AWS reality. All 15 `life-platform/*` secrets verified; all ⚠ rows flipped to ✅; consumer Lambdas populated for every secret via `grep -lrn lambdas/ mcp/`.
+- `docs/ARCHITECTURE.md` Secrets Manager section: heading "9 active secrets" → "15 active"; cost line $3.60 → $6.00/mo; added rows for `eightsleep-client`, `anthropic-api-key`, `notion`, `dropbox` that were missing despite existing in AWS.
+- `tests/test_iam_secrets_consistency.py` KNOWN_SECRETS reconciled: +`eightsleep-client`, +`anthropic-api-key`, −`webhook-key` (deleted 2026-03-14). `EXPECTED_COUNT` 15 → 16. `DELETED_SECRETS` list expanded with `webhook-key` and `google-calendar` for forward drift detection.
+- `cdk/stacks/role_policies.py:326` — stale `webhook-key` comment replaced with deletion note.
+
+### Drift surfaced
+- **Orphan: `life-platform/anthropic-api-key`** — created 2026-03-18, exists in AWS, but no consumer in source code or IAM. Candidate for deletion. Filed as Matthew action item in `HANDOVER_v6.8.5.md`.
+- **Stale comment**: `role_policies.py` referenced `webhook-key` (deleted 2026-03-14). Now corrected.
+- **ARCHITECTURE.md heading drift**: said "9 active secrets" but body listed 10. Now reflects AWS reality (15).
+
+### Doc-only — no Lambda code, no CDK deploy, no AWS state changes
+This PR is purely documentation. The next session that touches Secrets Manager IAM (e.g., Todoist ingestion consolidation) should reference this map to avoid recreating the drift.
+
+---
+
 ## v6.8.4 — PR 2: Todoist daily cron + PR template + parity-debt label (TD-12/14/17) (2026-05-03)
 
 ### TD-12 [LOW] — Todoist EventBridge schedule

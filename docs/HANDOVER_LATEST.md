@@ -1,3 +1,3 @@
 **[HANDOVER_LATEST.md](../handovers/HANDOVER_LATEST.md)**
 
-v6.8.4 | 2026-05-03 | PR 2: Todoist daily cron + PR template + parity-debt label (TD-12/14/17)
+v6.8.5 | 2026-05-03 | PR 3: SECRETS_MAP verification + KNOWN_SECRETS reconciliation (TD-13)
