@@ -1309,6 +1309,10 @@ def mcp_server() -> list[iam.PolicyStatement]:
             resources=[
                 _secret_arn("life-platform/mcp-api-key"),
                 _secret_arn("life-platform/ai-keys"),
+                # TD-23 (2026-05-02): MCP write tools for Todoist read this secret
+                # via mcp/tools_todoist.py:22. Without it, all create/update/close
+                # Todoist tools fail with AccessDeniedException.
+                _secret_arn("life-platform/todoist"),
             ],
         ),
         iam.PolicyStatement(

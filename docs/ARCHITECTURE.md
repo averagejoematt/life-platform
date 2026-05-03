@@ -302,6 +302,7 @@ Each Lambda has a **dedicated, least-privilege IAM role** (57 roles total as of 
 | `life-platform/habitify` | Habitify Lambda — dedicated key (ADR-014) |
 | `life-platform/mcp-api-key` | MCP Key Rotator — bearer token (90-day auto-rotation) |
 | `life-platform/site-api-ai-key` | Site API Lambda — dedicated Anthropic key (R17-04, isolated from main ai-keys) |
+| `life-platform/todoist` | MCP write tools — Todoist API token (TD-23, added to MCP IAM 2026-05-02) |
 | ~~`life-platform/webhook-key`~~ | **DELETED 2026-03-14** |
 | ~~`life-platform/google-calendar`~~ | **DELETED 2026-03-15 (ADR-030)** |
 | ~~`life-platform/api-keys`~~ | **DELETED 2026-03-14** |
