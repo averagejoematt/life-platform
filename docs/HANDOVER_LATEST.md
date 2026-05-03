@@ -1,3 +1,3 @@
 **[HANDOVER_LATEST.md](../handovers/HANDOVER_LATEST.md)**
 
-v6.8.2 | 2026-05-03 | PR 0: MCP unbreak batch (TD-21 timezone, TD-22 signature, TD-23 IAM Todoist)
+v6.8.3 | 2026-05-03 | PR 1: HAE source-priority dedup + platform_logger fix (TD-15/16/18/20), layer v42, MCP outage hotfix
