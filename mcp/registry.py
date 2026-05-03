@@ -857,6 +857,71 @@ TOOLS = {
             },
         },
     },
+    "get_lab_deltas": {
+        "fn": tool_get_lab_deltas,
+        "schema": {
+            "name": "get_lab_deltas",
+            "description": (
+                "Cross-draw biomarker movement query (PR 4a, FH v2). Returns biomarkers whose "
+                "ratio between two draws exceeds a threshold. Use for: 'what moved year-over-year', "
+                "'biggest changes since first draw', 'rising biomarkers since last year', "
+                "'falling testosterone over time'. Excludes ordinal allergy panel — use get_allergies "
+                "for those. Includes a `new_biomarkers` list for biomarkers that exist in the latest "
+                "draw but not the comparison draw (Cardio IQ panel + NfL + Galleri were new in the "
+                "2026-04-03 draw)."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "comparison": {
+                        "type": "string",
+                        "description": "year_over_year (default — finds the draw closest to latest-365d), since_first, or latest_two.",
+                        "enum": ["year_over_year", "since_first", "latest_two"],
+                    },
+                    "threshold": {
+                        "type": "number",
+                        "description": "Minimum |ratio−1| to include. 0.5 = ±50% movement. Default 0.5.",
+                    },
+                    "direction": {
+                        "type": "string",
+                        "description": "any (default), rising, or falling.",
+                        "enum": ["any", "rising", "falling"],
+                    },
+                    "panel": {"type": "string", "description": "Optional panel filter (e.g. 'lipid_standard', 'cardio_iq_insulin_resistance')."},
+                    "limit": {"type": "integer", "description": "Max deltas to return (default 50)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "get_allergies": {
+        "fn": tool_get_allergies,
+        "schema": {
+            "name": "get_allergies",
+            "description": (
+                "Allergy panel surface (PR 4a, FH v2). IgE class is ordinal (0–6 ImmunoCAP scale), "
+                "so this tool surfaces class + label + category instead of a raw delta. Total IgE "
+                "is reported separately as a continuous count. "
+                "Use for: 'show my allergies', 'environmental sensitivities', 'dust mite class', "
+                "'high-class allergens only'. "
+                "Note: allergy results are NOT actionable in the platform's optimization loop "
+                "(per the Technical Board consult). Surface for completeness."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "draw_date": {"type": "string", "description": "Optional YYYY-MM-DD. Default = latest draw with allergy data."},
+                    "min_class": {"type": "integer", "description": "Filter out classes below this (0–6). Default 1 (excludes Class 0 / no detectable)."},
+                    "category": {
+                        "type": "string",
+                        "description": "Optional category filter.",
+                        "enum": ["dust_mite", "environmental_pollen", "dander", "mold", "other"],
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
     "search_biomarker": {
         "fn": tool_search_biomarker,
         "schema": {

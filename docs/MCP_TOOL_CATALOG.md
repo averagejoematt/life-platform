@@ -1,6 +1,6 @@
 # Life Platform — MCP Tool Catalog
 
-**Version:** v6.8.5 | **Last updated:** 2026-05-03 | **Total tools:** 123
+**Version:** v6.8.6 | **Last updated:** 2026-05-03 | **Total tools:** 125
 
 > SIMP-1 Phase 1 complete (v3.7.17–19): 116 → 86 tools via 13 view-dispatchers. ADR-030 (v3.7.46): `get_calendar_events` + `get_schedule_load` retired (Google Calendar integration blocked by IT policy).
 > Many previously standalone tools are now `view=` parameters of a parent dispatcher.
@@ -29,7 +29,7 @@
 
 ---
 
-## Quick Reference — All 115 Tools
+## Quick Reference — All 125 Tools
 
 ### Core Data Access
 | Tool | Key Params | Description |
@@ -52,7 +52,9 @@
 | `get_readiness_score` | date= | Unified 0-100 readiness from Whoop recovery (35%), sleep (25%), HRV trend (20%), TSB (10%), Body Battery (10%). GREEN/YELLOW/RED signal. |
 | `get_autonomic_balance` | start_date=, end_date=, days= | BS-MP1: 4-quadrant ANS model (Flow/Stress/Recovery/Burnout). Balance score 0-100, 7d trend, state transitions |
 | `get_daily_metrics` | view= (movement\|energy\|hydration), start_date=, end_date=, step_target= | Daily activity: NEAT/steps / calorie balance / water intake |
-| `get_labs` | view= (results\|trends\|out_of_range), biomarker=, category=, start_date=, end_date= | Lab intelligence: draws / trajectory / chronic flags |
+| `get_labs` | view= (results\|trends\|out_of_range), biomarker=, category=, start_date=, end_date= | Lab intelligence: draws / trajectory / chronic flags. Always returns `cadence_trackers` for NfL (180d) + Galleri (365d) sentinel panels. |
+| `get_lab_deltas` | comparison= (year_over_year\|since_first\|latest_two), threshold=, direction=, panel=, limit= | PR 4a / FH v2: cross-draw biomarker movement query. Skips ordinal allergy panel — use get_allergies. |
+| `get_allergies` | draw_date=, min_class=, category= | PR 4a / FH v2: ordinal IgE class semantics + total IgE + category groupings. Surfaced for completeness; not actionable in optimization loop. |
 | `get_training` | view= (load\|periodization\|recommendation), start_date=, end_date=, date=, weeks= | Training intelligence: CTL/ATL/TSB / mesocycle analysis / today's workout. All warmed nightly. |
 | `get_acwr_status` | date=, days_back= | BS-09: Acute:Chronic Workload Ratio from Whoop strain. Safe zone 0.8–1.3. Gabbett thresholds. |
 | `get_cgm` | view= (dashboard\|fasting), start_date=, end_date=, days= | CGM: time-in-range + variability / fasting glucose validation. Dashboard warmed nightly. |
