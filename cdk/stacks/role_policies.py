@@ -816,6 +816,17 @@ def operational_freshness_checker() -> list[iam.PolicyStatement]:
             resources=[SES_IDENTITY],
         ),
         iam.PolicyStatement(
+            # WR-48 root-cause fix (PR-reentry-4, 2026-05-03): the freshness checker
+            # was running daily and detecting 4-5 stale sources during the Apr 2 →
+            # May 2 silence, but EVERY SNS publish failed with AuthorizationError
+            # because this statement was missing. Result: the platform's own
+            # gap-detection alarm couldn't notify Matthew that the gap existed.
+            # The Lambda code reads SNS_ARN from env (set in operational_stack.py).
+            sid="SnsPublishAlerts",
+            actions=["sns:Publish"],
+            resources=[f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"],
+        ),
+        iam.PolicyStatement(
             sid="DLQ",
             actions=["sqs:SendMessage"],
             resources=[DLQ_ARN],

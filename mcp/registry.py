@@ -857,6 +857,33 @@ TOOLS = {
             },
         },
     },
+    "get_freshness_status": {
+        "fn": tool_get_freshness_status,
+        "schema": {
+            "name": "get_freshness_status",
+            "description": (
+                "Per-source data freshness summary (WR-48 Enhancement 4). "
+                "Returns overall status (green / yellow / orange / red) plus "
+                "per-source last-date / age-days / threshold. Use for: "
+                "'are we OK?', 'what sources are stale?', 'data status check', "
+                "'why isn't my dashboard updating?'. "
+                "Independent of freshness-checker Lambda — reads DDB directly so it "
+                "works even if the Lambda's silently failing (which is what happened "
+                "during the Apr–May 2026 silence)."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "sources": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional list of source keys to restrict to (whoop, withings, strava, garmin, eightsleep, habitify, todoist, apple_health, macrofactor, notion, food_delivery, measurements). Default: all.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
     "get_lab_deltas": {
         "fn": tool_get_lab_deltas,
         "schema": {
