@@ -1,40 +1,37 @@
-# Handover — v6.8.2: PR 0 — MCP unbreak batch (TD-21/22/23)
+# Handover — v6.8.3: PR 1 — HAE source-priority + platform_logger (TD-15/16/18/20) + MCP outage hotfix
 
 **Date:** 2026-05-03
-**Scope:** Three independent MCP bugs discovered in the 2026-05-02 evening session that left ~40 write tools broken in production. All fixes shipped in one batch per `docs/CLAUDE_CODE_PATCH_SPEC_2026_05_03.md`.
-**Type:** Production hotfix.
+**Scope:** TD_BATCH_HAE_FIXES spec end-to-end. Plus a 9.5-hour MCP outage hotfix that fired during the PR 0 deploy window.
 
-See [HANDOVER_v6.8.2.md](HANDOVER_v6.8.2.md) for full details.
+See [HANDOVER_v6.8.3.md](HANDOVER_v6.8.3.md) for full details.
 
 ## Summary
 
-- **TD-21** (HIGH): `mcp/tools_lifestyle.py:9` missing `, timezone` import → ~40 functions raised `NameError` at runtime. Fixed; cleanup of 3 redundant local imports.
-- **TD-22** (LOW): `get_todoist_projects` signature mismatch (0 args, dispatcher passes 1). Changed to `(args=None)`.
-- **TD-23** (HIGH): MCP IAM role missing `secretsmanager:GetSecretValue` on `life-platform/todoist` → all MCP Todoist write tools `AccessDeniedException`. Added via CDK to both McpServerRole and McpWarmerRole.
+- **TD-15/16/18** [HIGH/MED/LOW]: HAE Lambda v1.7.0 with SOURCE_PRIORITY dict + pick_source_or_all() helper, ported from v16.1 backfill. Fixes iPhone+Garmin step double-count and My-Water+MacroFactor water double-count. weight_body_mass alias added.
+- **TD-20** [LOW]: platform_logger.py v1.0.2 normalizes exc_info=True/BaseException to tuple before makeRecord. No more secondary TypeError on error log lines.
+- **Layer v42** published via `cdk deploy LifePlatformCore`. Re-attached to all 65 layer-dependent Lambdas via stack-by-stack cdk deploys.
+- **HAE Lambda** redeployed via `deploy/deploy_lambda.sh` (then re-bundled by CDK to match the kitchen-sink pattern). TD-15/16/18 + TD-20 (via inline platform_logger bundle).
+- **MCP outage hotfix**: latent typo `_decimal_to_float` → `decimal_to_float` in `mcp/tools_data.py` and `mcp/tools_coach_intelligence.py` (from de57c67, v6.6.0, 3 weeks ago). Surfaced when PR 0's CDK deploy re-uploaded the MCP code asset for the first time since the bad commit. ~9.5h outage, caught by canary, recovered in 3 minutes.
 
-## Pre-PR housekeeping
+## Tests added
 
-Cleared a dirty tree carrying two prior unfinished sessions:
+- `tests/test_health_auto_export.py` — 16 tests (priority resolver + e2e dedup + weight alias + Tier-2 fallthrough)
+- `tests/test_platform_logger.py` — 5 tests (exc_info forms; no secondary TypeError leak)
 
-- v6.8.0-retroactive (COST-OPT-2 prompt caching + model tiering — was deployed to AWS via shared layer v41 but never committed)
-- 6 untracked design docs from the 2026-05-02 cowork session (TECH_DEBT_INDEX, alternate FH v2 handoff, Personal Board deliberation, WR-35/36 spec, etc.)
-- Restored `deploy/sync_doc_metadata.py` from archive (silences pre-commit warning; auto-synced 7 docs)
+## Matthew action item
 
-## Sequencing change
+**Re-run v16.1 backfill** for the interim window (May 2 18:32 PT → May 3 15:53 UTC). Requires fresh Apple Health export from iPhone. ~5 min once exported. See HANDOVER_v6.8.3.md for the exact commands.
 
-Inserted TD-21/22/23 as PR 0 ahead of the original PR 1 (TD-15/16/18/20) because the MCP failures are production-broken-right-now while TD-15 is a slow-corrupting correctness bug. Per `docs/CLAUDE_CODE_PATCH_SPEC_2026_05_03.md`, this is the recommended order.
+## Behavioral change
 
-## What's next
-
-- **PR 1 — TD-15/16/18/20.** HAE Lambda + `platform_logger`. Source already written by a prior session in working tree; needs review + tests + layer rebuild + deploy.
-- PR 2 → PR 6 unchanged from original brief, except PR 4 will start by writing a merged v3 FH spec reconciling Matthew's tonight version with the alternate Technical Board version.
+Step counts will drop ~50% on iPhone+Garmin overlap days going forward — this is the bug fix making things correct, not a regression.
 
 ## Current State
 
 | Metric | Value |
 |--------|-------|
-| Version | v6.8.2 |
-| Lambda Layer | v41 (unchanged) |
+| Version | v6.8.3 |
+| Lambda Layer | v42 (was v41) |
 | Lambdas | 66 |
-| MCP Tools | 123 (unchanged) |
-| Secrets in AWS | 15 (`life-platform/*`) |
+| MCP Tools | 123 |
+| Stacks deployed | Core + Mcp + Ingestion + Compute + Email + Operational + Web |
