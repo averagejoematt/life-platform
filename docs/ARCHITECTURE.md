@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-04-07 (v6.7.0 — 123 MCP tools, 35-module MCP package, 26 data sources, 71 Lambdas, 75 site pages, 75+ API endpoints, 8 CDK stacks, shared layer v39)
+Last updated: 2026-05-03 (v6.8.1 — 123 tools, 36-module MCP package, 19 data sources, 66 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed)
 
 ---
 
@@ -79,7 +79,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | CloudFront (buddy) | CDN (public) | `ETTJ44FT0Z4GO` → S3 `/buddy`, alias `buddy.averagejoematt.com` |
 | ACM Certificate | TLS | `arn:aws:acm:us-east-1:205930651321:certificate/e85e4b63-...` — `averagejoematt.com` (DNS-validated) |
 | SES Receipt Rule Set | Inbound email routing | `life-platform-inbound` (active) — rule `insight-capture` routes `insight@aws.mattsusername.com` → S3 |
-| CloudWatch | Alarms + logs | **~66 metric alarms**, all Lambdas monitored |
+| CloudWatch | Alarms + logs | **~49 metric alarms**, all Lambdas monitored |
 | CDK | Infrastructure as Code | `cdk/` — 8 stacks deployed. CDK owns all 71 Lambda IAM roles + ~50 EventBridge rules. |
 | CloudTrail | Audit logging | `life-platform-trail` → S3 |
 | AWS Budget | Cost guardrail | $20/mo cap, alerts at 25%/50%/100% |
@@ -288,7 +288,7 @@ Each Lambda has a **dedicated, least-privilege IAM role** (57 roles total as of 
 
 ## Secrets Manager
 
-**10 active secrets** at $0.40/month each = **~$4.00/month**
+**9 active secrets** at $0.40/month each = **~$3.60/month**
 
 | Secret | Used By |
 |---|---|
@@ -314,7 +314,7 @@ Target: under $25/month | Current: ~$13/month
 
 | Driver | Monthly Cost |
 |---|---|
-| Secrets Manager (10 active secrets) | ~$4.00 |
+| Secrets Manager (9 active secrets) | ~$3.60 |
 | Lambda invocations (~2,000/mo) | ~$0.50 |
 | DynamoDB (on-demand) | ~$1.00 |
 | S3 (~2.5 GB + requests) | ~$0.50 |
@@ -331,7 +331,7 @@ Target: under $25/month | Current: ~$13/month
 ~/Documents/Claude/life-platform/
   mcp_server.py                   ← MCP Lambda entry point
   mcp_bridge.py                   ← Local MCP adapter (Claude Desktop → Lambda HTTPS)
-  mcp/                            ← MCP server package (35 modules)
+  mcp/                            ← MCP server package (36 modules)
     handler.py, config.py, utils.py, core.py, helpers.py, warmer.py
     labs_helpers.py, strength_helpers.py, registry.py
     tools_sleep, tools_health, tools_training, tools_nutrition, tools_habits
