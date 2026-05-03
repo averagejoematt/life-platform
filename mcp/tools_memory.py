@@ -405,12 +405,15 @@ def tool_capture_baseline(args: dict) -> dict:
         snapshot["nutrition_date"] = macro.get("date")
 
     # ── Store the snapshot ────────────────────────────────────
-    result = tool_write_platform_memory(
-        category="baseline_snapshot",
-        content=snapshot,
-        date=date_str,
-        overwrite=force,
-    )
+    # Reentry sweep (2026-05-03): fix latent bug — tool_write_platform_memory takes
+    # args: dict, not kwargs. Pre-existing typing bug; surfaced when capture_baseline
+    # was first invoked since the function landed.
+    result = tool_write_platform_memory({
+        "category": "baseline_snapshot",
+        "content": snapshot,
+        "date": date_str,
+        "overwrite": force,
+    })
 
     return {
         "status": result.get("status", "error"),

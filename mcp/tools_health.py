@@ -1502,7 +1502,11 @@ def tool_get_health_trajectory(args):
             d = item.get("date")
             if w and d:
                 try:
-                    weights.append((datetime.strptime(d, "%Y-%m-%d"), float(w)))
+                    # PR-reentry-1 (2026-05-03): parse as tz-aware so comparison with `today`
+                    # (also tz-aware) doesn't raise "can't compare offset-naive and offset-aware
+                    # datetimes". Was causing health_trajectory step to fail nightly in the
+                    # warmer (silent — partial-failure path swallowed it).
+                    weights.append((datetime.strptime(d, "%Y-%m-%d").replace(tzinfo=timezone.utc), float(w)))
                 except (ValueError, TypeError):
                     pass
 

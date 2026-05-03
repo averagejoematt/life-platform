@@ -33,7 +33,7 @@ import json
 import math
 import re
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
 from mcp.config import (
@@ -679,6 +679,136 @@ def tool_get_lab_deltas(args):
             "falling": falling,
             "new_in_latest": len(new_biomarkers),
         },
+    }
+
+
+def tool_get_freshness_status(args):
+    """Per-source data freshness summary (WR-48 Enhancement 4, PR-reentry-4).
+
+    Independently computes staleness per source by querying the latest DATE# sk
+    from each source partition — does NOT depend on the freshness-checker Lambda
+    having run recently. Returns a status (green / yellow / orange / red) plus
+    per-source last-date / age-days / threshold.
+
+    Mirror of lambdas/freshness_checker_lambda.py SOURCES + SOURCE_STALE_HOURS
+    (kept in sync manually; see TD-14 parity discipline).
+
+    Args (all optional):
+        sources: list[str] — restrict to these source keys; default = all 11
+    """
+    from datetime import date as _date
+    SOURCES = {
+        "whoop": "Whoop recovery/sleep",
+        "withings": "Withings weight/body comp",
+        "strava": "Strava activities",
+        "todoist": "Todoist tasks",
+        "apple_health": "Apple Health",
+        "eightsleep": "Eight Sleep",
+        "macrofactor": "MacroFactor nutrition",
+        "garmin": "Garmin biometrics",
+        "habitify": "Habitify habits",
+        "food_delivery": "Food delivery behavioral signal",
+        "measurements": "Tape measure check-ins",
+        "notion": "Notion journal",
+    }
+    SOURCE_STALE_HOURS = {
+        "food_delivery": 90 * 24,
+        "measurements": 60 * 24,
+    }
+    DEFAULT_STALE_HOURS = 48
+
+    requested = args.get("sources") if args else None
+    if requested:
+        keys = [s for s in requested if s in SOURCES]
+    else:
+        keys = list(SOURCES.keys())
+
+    today = datetime.now(timezone.utc).date()
+    per_source = []
+    stale_count = 0
+    partial_count = 0  # we don't compute partial here — just stale
+
+    for src in keys:
+        threshold_hours = SOURCE_STALE_HOURS.get(src, DEFAULT_STALE_HOURS)
+        threshold_days = threshold_hours / 24
+        # Latest sk for this partition
+        from boto3.dynamodb.conditions import Key as DDBKey
+        pk = f"USER#matthew#SOURCE#{src}"
+        try:
+            resp = table.query(
+                KeyConditionExpression=DDBKey("pk").eq(pk) & DDBKey("sk").begins_with("DATE#"),
+                Limit=1,
+                ScanIndexForward=False,
+            )
+        except Exception as e:
+            per_source.append({
+                "source": src, "label": SOURCES[src],
+                "status": "unknown", "error": str(e),
+            })
+            continue
+        items = resp.get("Items", [])
+        if not items:
+            per_source.append({
+                "source": src, "label": SOURCES[src],
+                "status": "no_data",
+                "threshold_days": threshold_days,
+            })
+            stale_count += 1
+            continue
+        sk = items[0].get("sk", "")
+        if not sk.startswith("DATE#"):
+            continue
+        try:
+            d = datetime.strptime(sk.split("DATE#", 1)[1][:10], "%Y-%m-%d").date()
+        except (ValueError, IndexError):
+            continue
+        age_days = (today - d).days
+        is_stale = age_days >= threshold_days
+        if is_stale:
+            stale_count += 1
+        per_source.append({
+            "source": src,
+            "label": SOURCES[src],
+            "last_date": d.isoformat(),
+            "age_days": age_days,
+            "threshold_days": int(threshold_days),
+            "status": "stale" if is_stale else "fresh",
+        })
+
+    # Status escalation tiers (WR-48 Enhancement 2 logic, used here for reporting only)
+    max_age_stale = max(
+        (s["age_days"] for s in per_source if s.get("status") == "stale"),
+        default=0,
+    )
+    if stale_count == 0:
+        overall = "green"
+    elif stale_count == 1 and max_age_stale < 7:
+        overall = "yellow"
+    elif stale_count >= 3 or max_age_stale > 14:
+        overall = "red"
+    else:
+        overall = "orange"
+
+    stale_sources = [s for s in per_source if s.get("status") in ("stale", "no_data")]
+    fresh_sources = [s for s in per_source if s.get("status") == "fresh"]
+
+    return {
+        "status": overall,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "stale_count": stale_count,
+        "fresh_count": len(fresh_sources),
+        "stale_sources": stale_sources,
+        "fresh_sources": fresh_sources,
+        "thresholds_note": (
+            f"Default threshold {DEFAULT_STALE_HOURS}h. "
+            f"food_delivery={SOURCE_STALE_HOURS['food_delivery']//24}d, "
+            f"measurements={SOURCE_STALE_HOURS['measurements']//24}d. "
+            "Mirrors freshness_checker_lambda.py."
+        ),
+        "context": (
+            "Status tiers: green (all fresh) / yellow (1 stale <7d) / "
+            "orange (mixed) / red (3+ stale OR any >14d)."
+        ),
     }
 
 

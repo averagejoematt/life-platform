@@ -1,4 +1,8 @@
-# Architecture Spec — WR-35 (Pause Mode) + WR-36 (Stale-Source Alerts)
+# Architecture Spec — WR-47 (Pause Mode) + WR-48 (Stale-Source Alerts)
+
+> **Numbering note (PR reentry, 2026-05-03):** This spec was originally drafted as `WR-35 + WR-36` by the prior 2026-05-02 cowork session, but those numbers were already in use in `PROJECT_PLAN.md` (cost ticker + public architecture review artifact). Renumbered to WR-47 + WR-48 to fit the next available slots. Filename also renamed (was `WR_35_36_ARCHITECTURE_SPEC.md`).
+
+---
 
 **Date:** 2026-05-03
 **Source:** AJM Re-Entry Plan, Phase 10 ("Build the Repeatable Pattern") + post-mortem of the Apr 2 → May 2 silence.
