@@ -894,9 +894,19 @@ def operational_canary() -> list[iam.PolicyStatement]:
         ),
         iam.PolicyStatement(
             sid="Secrets",
-            # MCP check needs the Bearer token from life-platform/mcp-api-key
+            # MCP check needs the Bearer token from life-platform/mcp-api-key.
+            # Anthropic check (post-reentry, 2026-05-03) needs the Anthropic API key
+            # from life-platform/ai-keys. Catches the "API access turned off" failure
+            # mode that hit on the morning of 2026-05-03 — Anthropic disabled the
+            # platform's key for billing reasons; daily-brief failed silently for
+            # ~2 hours before Matthew noticed via the Grade-F email. The canary now
+            # makes a tiny ($0.0001) call every 4h and emits CanaryAnthropicFail on
+            # any 4xx/5xx, with a CloudWatch alarm wired to SNS.
             actions=["secretsmanager:GetSecretValue"],
-            resources=[_secret_arn("life-platform/mcp-api-key")],
+            resources=[
+                _secret_arn("life-platform/mcp-api-key"),
+                _secret_arn("life-platform/ai-keys"),
+            ],
         ),
         iam.PolicyStatement(
             sid="SESAlert",
