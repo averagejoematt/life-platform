@@ -62,7 +62,7 @@ USER_ID = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 CACHE_PK = f"{USER_PREFIX}ai_analysis"
 AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/ai-keys")
-AI_MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
+AI_MODEL = os.environ.get("AI_MODEL", "claude-haiku-4-5-20251001")
 
 EXPERTS = ["mind", "nutrition", "training", "physical", "explorer", "glucose", "labs", "sleep"]
 
@@ -556,7 +556,84 @@ ELENA QUOTE: [One sentence in Elena Voss's voice — third person, literary jour
 Write only the analysis — no preamble, no "Here is my analysis:", just paragraphs followed by the tagged lines."""
 
 
-def generate_and_cache(expert_key):
+def _build_shared_system_prompt():
+    """Build the cacheable system prompt shared across all 8 expert calls.
+
+    Contains: goals, data inventory, format instructions — identical per invocation.
+    COST-OPT: Cached by Anthropic across sequential calls (90% discount on cache hits).
+    """
+    parts = []
+
+    # Goals + inventory (shared context for all coaches)
+    if _HAS_INTELLIGENCE_COMMON:
+        try:
+            _goals = load_goals_config()
+            _inventory = build_data_inventory()
+
+            mission = _goals.get("mission", "")
+            if mission:
+                parts.append(f"MATTHEW'S MISSION: {mission}")
+            philosophy = _goals.get("philosophy", "")
+            if philosophy:
+                parts.append(f"PHILOSOPHY: {philosophy}")
+
+            targets = _goals.get("targets", {})
+            _target_map = {
+                "weight.goal_lbs": "Weight goal",
+                "body_composition.goal_body_fat_pct": "Body fat goal",
+                "nutrition.daily_calories_target": "Calorie target",
+                "nutrition.daily_protein_min_g": "Protein minimum",
+                "sleep.target_hours": "Sleep target",
+            }
+            target_lines = []
+            for path, label in _target_map.items():
+                keys = path.split(".")
+                val = targets
+                for k in keys:
+                    val = val.get(k) if isinstance(val, dict) else None
+                    if val is None:
+                        break
+                target_lines.append(f"  - {label}: {val if val is not None else 'not set'}")
+            parts.append("TARGETS:\n" + "\n".join(target_lines))
+
+            constraints = _goals.get("known_constraints", [])
+            if constraints:
+                parts.append("CONSTRAINTS:\n" + "\n".join(f"  - {c}" for c in constraints))
+
+            inv_lines = []
+            for src, info in sorted(_inventory.items()):
+                if info.get("exists"):
+                    inv_lines.append(f"  - {src}: {info.get('records', 0)} records (latest: {info.get('latest', '?')})")
+            parts.append("DATA SOURCES AVAILABLE:\n" + "\n".join(inv_lines))
+        except Exception as _e:
+            logger.warning("Shared system prompt generation failed: %s", _e)
+
+    # Format instructions (identical for all experts)
+    parts.append("""OBSERVATORY ANALYSIS FORMAT:
+Write a 2-3 paragraph analysis (200-300 words).
+
+STRUCTURE:
+- Paragraph 1: Open with ONE specific, concrete observation. Lead with the number that caught your attention.
+- Paragraph 2: Interpret the pattern. Connect to another domain if relevant.
+- Paragraph 3: One specific, actionable suggestion for the coming week.
+
+VOICE:
+- First person as yourself. Reference specific numbers naturally.
+- Do NOT use bullet points, headers, or formatting. Flowing prose only.
+- Vary sentence length.
+
+FRESHNESS: Never open with "Looking at the data..." — be specific immediately.
+
+After your analysis, on separate lines write:
+KEY RECOMMENDATION: [One specific action for this week. 1-2 sentences.]
+ELENA QUOTE: [One sentence in Elena Voss's voice — third person, literary journalist. She names the cross-domain observation the expert missed.]
+
+Write only the analysis — no preamble, just paragraphs followed by tagged lines.""")
+
+    return "\n\n".join(parts)
+
+
+def generate_and_cache(expert_key, shared_system=None):
     logger.info(f"Generating analysis for expert: {expert_key}")
     data = gather_data_for_expert(expert_key)
 
@@ -582,24 +659,34 @@ def generate_and_cache(expert_key):
     prompt = build_prompt(expert_key, data, days_in, week_number)
     api_key = _get_api_key()
 
-    req_body = json.dumps({
+    # COST-OPT: Use system message with prompt caching for shared context
+    body = {
         "model": AI_MODEL,
         "max_tokens": 1200,
         "messages": [{"role": "user", "content": prompt}],
-    })
+    }
+    headers = {
+        "Content-Type": "application/json",
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+    }
+    if shared_system:
+        body["system"] = [{"type": "text", "text": shared_system, "cache_control": {"type": "ephemeral"}}]
+        headers["anthropic-beta"] = "prompt-caching-2024-07-31"
 
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages",
-        data=req_body.encode(),
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-        },
+        data=json.dumps(body).encode(),
+        headers=headers,
     )
 
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        result = json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            result = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8", errors="replace")
+        logger.error("Anthropic API %s: %s", e.code, error_body)
+        raise
 
     analysis_text = "".join(
         b["text"] for b in result.get("content", []) if b.get("type") == "text"
@@ -873,12 +960,16 @@ def lambda_handler(event, context):
         results = {}
         all_outputs = {}
 
+        # COST-OPT: Build shared system prompt once — cached across all expert calls
+        shared_system = _build_shared_system_prompt()
+        logger.info("Shared system prompt built: %d chars", len(shared_system))
+
         for expert_key in experts_to_run:
             if expert_key not in EXPERTS:
                 logger.warning(f"Unknown expert: {expert_key}")
                 continue
             try:
-                text = generate_and_cache(expert_key)
+                text = generate_and_cache(expert_key, shared_system=shared_system)
                 results[expert_key] = {"status": "ok", "chars": len(text)}
                 all_outputs[expert_key] = text
             except Exception as e:

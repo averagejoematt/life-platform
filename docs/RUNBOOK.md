@@ -556,17 +556,59 @@ aws dynamodb get-item --table-name life-platform \
 
 ## Cost Monitoring
 
-Monthly budget target: $15 (current actual ~$13). AWS Budget alert cap: $20.
+Monthly budget target: $20 (AWS ~$13 + Anthropic ~$8-12). AWS Budget alert cap: $20.
 CloudWatch billing alarm fires at: $5
 
-Check current MTD spend:
+Check current MTD AWS spend:
 ```bash
 aws ce get-cost-and-usage \
-  --time-period Start=2026-02-01,End=2026-03-01 \
+  --time-period Start=2026-04-01,End=2026-05-01 \
   --granularity MONTHLY \
   --metrics UnblendedCost \
   --region us-east-1
 ```
+
+### Anthropic API Cost Monitoring (ADR-049)
+
+**Prompt caching metrics** — verify caching is working:
+```bash
+# Cache hit tokens (should be >> cache write tokens after expert analyzer runs)
+aws cloudwatch get-metric-statistics --namespace "LifePlatform/AI" \
+  --metric-name "AnthropicCacheReadTokens" \
+  --dimensions Name=LambdaFunction,Value=ai-expert-analyzer \
+  --start-time "$(date -u -v-1d +%Y-%m-%dT00:00:00Z)" \
+  --end-time "$(date -u +%Y-%m-%dT23:59:59Z)" \
+  --period 86400 --statistics Sum --region us-west-2
+```
+
+**Model assignments** — which Lambdas use Sonnet vs Haiku:
+
+| Lambda | Model | Reason |
+|--------|-------|--------|
+| daily-brief (4 calls) | Sonnet | Core daily coaching voice |
+| wednesday-chronicle | Sonnet | Literary narrative |
+| weekly-plate, nutrition-review | Sonnet | Long-form meal/nutrition analysis |
+| monday-compass, weekly-digest | Sonnet | Weekly intelligence narrative |
+| brittany-email | Sonnet | Partner update |
+| ai-expert-analyzer | **Haiku** | Templated observatory content |
+| hypothesis-engine | **Haiku** | Structured JSON output |
+| challenge-generator | **Haiku** | Structured JSON output |
+| field-notes-generate | **Haiku** | Weekly lab notes |
+| _run_analysis_pass (daily-brief) | **Haiku** | 200-token JSON extraction |
+| Coach pipeline (5 Lambdas) | Haiku | Orchestration/extraction |
+| journal-enrichment | Haiku | Per-entry enrichment |
+| anomaly-detector | Haiku | Daily anomaly narrative |
+
+**Rollback a model downgrade** (no code deploy needed):
+```bash
+# Example: revert expert analyzer to Sonnet
+aws lambda update-function-configuration \
+  --function-name ai-expert-analyzer \
+  --environment "Variables={TABLE_NAME=life-platform,AI_SECRET_NAME=life-platform/ai-keys,AI_MODEL=claude-sonnet-4-6}" \
+  --region us-west-2
+```
+
+**Anthropic credit balance** — check at [console.anthropic.com/settings/billing](https://console.anthropic.com/settings/billing). API key in Secrets Manager (`life-platform/ai-keys`) ends in `cQAA`. All Lambdas return `[AI_UNAVAILABLE]` when credits are exhausted — site API now filters this to show "Check back soon" instead of raw sentinel.
 
 ---
 

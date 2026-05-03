@@ -167,7 +167,7 @@ def call_haiku_defense(raw_text, date, template, mood, stress, themes):
     body = {
         "model": MODEL,
         "max_tokens": 500,
-        "system": DEFENSE_SYSTEM_PROMPT,
+        "system": [{"type": "text", "text": DEFENSE_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
         "messages": [{"role": "user", "content": user_content}],
     }
 
@@ -175,6 +175,7 @@ def call_haiku_defense(raw_text, date, template, mood, stress, themes):
         "x-api-key": api_key,
         "anthropic-version": "2023-06-01",
         "content-type": "application/json",
+        "anthropic-beta": "prompt-caching-2024-07-31",
     })
 
     try:
@@ -284,7 +285,7 @@ def call_haiku(raw_text, date, template, structured_scores):
     body = {
         "model": MODEL,
         "max_tokens": 1000,
-        "system": SYSTEM_PROMPT,
+        "system": [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
         "messages": [{"role": "user", "content": user_content}],
     }
 
@@ -292,6 +293,7 @@ def call_haiku(raw_text, date, template, structured_scores):
         "x-api-key": api_key,
         "anthropic-version": "2023-06-01",
         "content-type": "application/json",
+        "anthropic-beta": "prompt-caching-2024-07-31",
     })
 
     try:

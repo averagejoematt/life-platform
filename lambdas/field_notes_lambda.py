@@ -33,7 +33,7 @@ USER_ID = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 FN_PK = f"{USER_PREFIX}field_notes"
 AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/ai-keys")
-AI_MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
+AI_MODEL = os.environ.get("AI_MODEL", "claude-haiku-4-5-20251001")
 
 dynamodb = boto3.resource("dynamodb", region_name="us-west-2")
 table = dynamodb.Table(TABLE_NAME)
