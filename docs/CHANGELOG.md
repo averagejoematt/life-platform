@@ -1,3 +1,44 @@
+## v6.8.6 — PR 4: Function Health v2 — MCP + supplements page + labs v1.5 (2026-05-03)
+
+### PR 4a — MCP tools (`mcp/tools_labs.py`, registry)
+- **`get_lab_deltas`**: cross-draw biomarker movement query. Comparisons: year_over_year / since_first / latest_two. Threshold-filtered (default ±50%), direction-filtered, panel-filtered. Returns separate `new_biomarkers` list (88 new in 2026-04-03 vs 2025).
+- **`get_allergies`**: ImmunoCAP class 0–6 per allergen, total IgE separately, category groupings (dust_mite / environmental_pollen / dander / mold / other). Context line: "not actionable in optimization loop."
+- **`cadence_trackers`**: auto-attached to every `get_labs` response. NFL_CADENCE_DAYS = 180 (Matthew tonight; sensitive baseline). GALLERI_CADENCE_DAYS = 365 (per GRAIL). Galleri framing borrows Technical Board wording: "No signal detected at 24-month early-detection threshold" (Viktor's adversarial pushback on absence-of-evidence). Raw signal preserved in `raw_signal`.
+- Tool count 123 → 125. `MCP_TOOL_CATALOG.md` updated.
+- Deploy: `aws lambda update-function-code life-platform-mcp`. SHA256 `br09PyotnDeY6kN8emaQbooBrmDrAHVLDIK4gtFmCB4=`.
+
+### PR 4b — Private supplements protocol page (`site/supplements/protocol/index.html`)
+- New path `/supplements/protocol/` — does not disturb existing public `/supplements/` ("The Pharmacy") page.
+- Renders the May 2026 v2 protocol from `s3://matthew-life-platform/raw/matthew/labs/2026-04-03/supplement_protocol_v2.md`: STOP / OPTIONAL / START / CONTINUE tables, daily schedule (6 time-of-day blocks), physician conversation (6 items), 90-day retest panel, decision rules at retest, success criteria.
+- Auth: auto-gated by site-wide `PRIVACY_MODE=true` (cf-auth Lambda@Edge HMAC cookie). If `PRIVACY_MODE` is later flipped off, the page becomes public alongside everything else — per-page gating would need to be added at that point.
+- Habitify completion-tracking integration deferred per Matthew tonight: defer until TD-11 (phantom-failed-habits) ships.
+- Disclaimer prominent at top + bottom.
+- Deploy: `bash deploy/sync_site_to_s3.sh` (CloudFront E3S424OXQZ8NBE invalidated).
+
+### PR 4c — Labs page v1.5 panels (`site/labs/index.html`)
+- Additive section inserted between "What I'm watching" and "Panel summary". 783 → 1102 lines. v1 rendering untouched (per spec: "v1.5 — interim, don't refactor").
+- New section auto-shows only when latest draw contains FH 2026 v2 biomarkers (insulin_resistance_score / nfl_neurofilament_light_chain / galleri_cancer_signal / allergy_total_ige).
+- **Cardio IQ Insulin Resistance Score gauge** — three-band visual (Sensitive / Early IR / Resistant), marker at value, verdict caption.
+- **Cardio IQ panel summary** — Lp-PLA2, ApoB Cardio IQ, C-peptide, fasting insulin.
+- **Allergy panel** — total IgE callout + sensitization chips colored by IgE class (1 amber → 6 red). Framed as "inflammation context, not optimization target" (Technical Board).
+- **Annual sentinel widgets** — NfL (180d cadence) + Galleri (365d cadence) side-by-side cards with last-drawn / days-ago / next-due meta. Galleri framing reworded.
+- **Skipped (future):** per-biomarker Chart.js trend charts (6 biomarkers), clinician notes PDF Haiku extractor, full Section 5 editorial.
+- Deploy: same site sync as PR 4b.
+
+### Spec reconciliation note
+Matthew's tonight spec and the Technical Board version (committed in v6.8.2 housekeeping) had material differences. Per Matthew's "complete all PRs / less approval" direction, skipped writing a formal merged spec and just executed using Matthew's tonight version as primary, taking the better-thought-out wording from the board version (Galleri framing, allergy section placement) where it didn't conflict.
+
+### Spec archived
+`docs/specs/FUNCTION_HEALTH_V2_HANDOFF.md` → `docs/archive/FUNCTION_HEALTH_V2_HANDOFF_2026-05-02_tonight.md`
+
+### Carry-forward (deferred to future workstreams)
+1. Per-biomarker year-over-year trend charts on labs page (6 markers).
+2. Clinician notes PDF Haiku extractor Lambda.
+3. Habitify integration on supplements page (gated on TD-11).
+4. `/supplements/` ↔ `/supplements/protocol/` consolidation decision.
+
+---
+
 ## v6.8.5 — PR 3: SECRETS_MAP verification + KNOWN_SECRETS reconciliation (TD-13) (2026-05-03)
 
 ### Doc reconciliation

@@ -554,6 +554,325 @@
     </div>
   </section>
 
+  <!--
+    ───── FH 2026 v1.5 panels (PR 4c, 2026-05-03) ─────
+    Interim additive section — adds v2 panel rendering alongside the existing v1 page.
+    DO NOT refactor the rest of the page. Full V2 labs page redesign is its own
+    future workstream after SIMP-1 Phase 2.
+
+    What's here:
+      • Headline gauge for Cardio IQ Insulin Resistance Score (the 2026-04-03 finding)
+      • Cardio IQ panel summary (5 biomarkers including IRS)
+      • Allergy panel — total IgE + class-bar chips, framed as "inflammation context" (board)
+      • NfL + Galleri annual-sentinel cadence widgets
+
+    Galleri framing borrowed from PR 4a cadence_trackers (Viktor's adversarial pushback):
+      "No signal detected at 24-month early-detection threshold"
+      instead of raw "NO CANCER SIGNAL DETECTED".
+
+    NfL cadence = 180d (Matthew tonight), Galleri cadence = 365d (per GRAIL).
+
+    Section auto-shows only when the latest draw contains FH 2026 v2 biomarkers
+    (insulin_resistance_score / nfl / galleri / allergy_*). Hidden otherwise.
+  -->
+  <section class="lb-fh2026 reveal" id="lb-fh2026" style="display:none">
+    <style>
+      .lb-fh2026 { padding: var(--space-10) var(--page-padding); max-width: var(--max-width); margin: 0 auto; border-bottom: 1px solid var(--border); }
+      .lb-fh2026__eyebrow { font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: 0.2em; text-transform: uppercase; color: var(--lb-accent); margin-bottom: var(--space-3); }
+      .lb-fh2026__title { font-family: var(--font-display); font-size: clamp(22px, 3.5vw, 30px); margin: 0 0 var(--space-2); color: var(--text); }
+      .lb-fh2026__sub { color: var(--text-muted); font-size: var(--text-sm); line-height: var(--lh-body); max-width: 720px; margin-bottom: var(--space-7); }
+
+      /* IRS gauge */
+      .lb-irs { background: rgba(239,68,68,0.04); border: 1px solid rgba(239,68,68,0.18); border-radius: 12px; padding: var(--space-6); margin-bottom: var(--space-6); }
+      .lb-irs__title { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.12em; text-transform: uppercase; color: var(--lb-red); margin-bottom: var(--space-4); }
+      .lb-irs__bar { position: relative; height: 36px; border-radius: 6px; overflow: hidden; display: flex; margin-bottom: 8px; }
+      .lb-irs__band { flex: 1; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.85); }
+      .lb-irs__band--green { background: linear-gradient(180deg, #2c8f5e, #226f49); flex: 33; }
+      .lb-irs__band--amber { background: linear-gradient(180deg, #c08436, #92602a); flex: 33; }
+      .lb-irs__band--red { background: linear-gradient(180deg, #c54a3a, #8e362b); flex: 34; }
+      .lb-irs__marker { position: absolute; top: -4px; bottom: -4px; width: 3px; background: var(--text); box-shadow: 0 0 0 2px rgba(0,0,0,.4); }
+      .lb-irs__scale { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); margin-bottom: var(--space-3); }
+      .lb-irs__value { font-family: var(--font-display); font-size: clamp(28px, 4vw, 40px); color: var(--lb-red); margin-right: var(--space-2); }
+      .lb-irs__caption { color: var(--text-muted); font-size: var(--text-sm); line-height: 1.5; max-width: 720px; }
+      .lb-irs__caption strong { color: var(--text); }
+      .lb-irs__xref { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid rgba(239,68,68,0.15); font-size: var(--text-xs); color: var(--text-faint); font-family: var(--font-mono); }
+
+      /* v2 panel grid */
+      .lb-v2-grid { display: grid; grid-template-columns: 1fr; gap: var(--space-5); margin-bottom: var(--space-6); }
+      @media (min-width: 720px) { .lb-v2-grid { grid-template-columns: 1fr 1fr; } }
+
+      .lb-v2-card { border: 1px solid var(--border); border-radius: 10px; padding: var(--space-4) var(--space-5); background: rgba(255,255,255,0.02); }
+      .lb-v2-card__head { font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: 0.15em; text-transform: uppercase; color: var(--lb-accent); margin-bottom: var(--space-3); }
+      .lb-v2-card__title { font-family: var(--font-display); font-size: 18px; color: var(--text); margin: 0 0 var(--space-3); }
+
+      .lb-v2-row { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: var(--text-sm); }
+      .lb-v2-row:last-child { border-bottom: none; }
+      .lb-v2-row__name { color: var(--text); }
+      .lb-v2-row__value { font-family: var(--font-mono); color: var(--text-muted); }
+      .lb-v2-row__value--high { color: var(--lb-red); font-weight: 600; }
+
+      /* Allergy chips */
+      .lb-allergy { border: 1px solid var(--border); border-radius: 10px; padding: var(--space-4) var(--space-5); background: rgba(255,255,255,0.02); margin-bottom: var(--space-6); }
+      .lb-allergy__caption { color: var(--text-muted); font-size: var(--text-xs); line-height: 1.5; margin-bottom: var(--space-4); max-width: 680px; }
+      .lb-allergy__total { display: flex; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-4); padding-bottom: var(--space-4); border-bottom: 1px solid var(--border); }
+      .lb-allergy__total-num { font-family: var(--font-display); font-size: 28px; color: var(--lb-red); }
+      .lb-allergy__total-lbl { color: var(--text-muted); font-size: var(--text-sm); }
+      .lb-allergy__chips { display: flex; flex-wrap: wrap; gap: 8px; }
+      .lb-chip { display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px 4px 4px; border-radius: 999px; border: 1px solid var(--border); font-size: var(--text-xs); color: var(--text-muted); background: rgba(255,255,255,0.02); }
+      .lb-chip__class { display: inline-block; width: 22px; height: 22px; border-radius: 999px; text-align: center; line-height: 22px; font-family: var(--font-mono); font-size: 11px; font-weight: 600; }
+      .lb-chip--c1 .lb-chip__class { background: rgba(245,158,11,0.18); color: #f59e0b; }
+      .lb-chip--c2 .lb-chip__class { background: rgba(245,158,11,0.30); color: #f59e0b; }
+      .lb-chip--c3 .lb-chip__class { background: rgba(239,68,68,0.20); color: #ef4444; }
+      .lb-chip--c4 .lb-chip__class { background: rgba(239,68,68,0.34); color: #ef4444; }
+      .lb-chip--c5 .lb-chip__class, .lb-chip--c6 .lb-chip__class { background: rgba(239,68,68,0.5); color: #fff; }
+
+      /* Cadence widgets */
+      .lb-cadence-grid { display: grid; grid-template-columns: 1fr; gap: var(--space-4); }
+      @media (min-width: 720px) { .lb-cadence-grid { grid-template-columns: 1fr 1fr; } }
+      .lb-cadence { border: 1px solid var(--border); border-radius: 10px; padding: var(--space-4) var(--space-5); background: rgba(255,255,255,0.02); }
+      .lb-cadence__head { font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: 0.15em; text-transform: uppercase; color: var(--lb-accent); margin-bottom: 6px; }
+      .lb-cadence__name { font-family: var(--font-display); font-size: 16px; color: var(--text); margin-bottom: 6px; }
+      .lb-cadence__signal { color: var(--text-muted); font-size: var(--text-sm); margin-bottom: var(--space-3); line-height: 1.5; }
+      .lb-cadence__signal strong { color: var(--text); }
+      .lb-cadence__meta { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); display: flex; gap: var(--space-3); flex-wrap: wrap; }
+      .lb-cadence__meta span { white-space: nowrap; }
+    </style>
+
+    <div class="lb-fh2026__eyebrow">Function Health 2026 · v1.5 panels</div>
+    <h2 class="lb-fh2026__title">The 8th draw &mdash; new categories surfaced</h2>
+    <p class="lb-fh2026__sub">
+      The 2026-04-03 draw added five categories the page didn't render under v1: Cardio IQ comprehensive panel, NfL, Galleri, allergy panel, and clinician notes. Below is the v1.5 interim view of the new categories, alongside (not replacing) the v1 rendering above.
+    </p>
+
+    <!-- IRS gauge — headline finding -->
+    <div class="lb-irs" id="lb-irs" style="display:none">
+      <div class="lb-irs__title">Cardio IQ &middot; Insulin Resistance Score &middot; the headline</div>
+      <div class="lb-irs__scale"><span>0</span><span>33</span><span>66</span><span>100</span></div>
+      <div class="lb-irs__bar">
+        <div class="lb-irs__band lb-irs__band--green">Sensitive</div>
+        <div class="lb-irs__band lb-irs__band--amber">Early IR</div>
+        <div class="lb-irs__band lb-irs__band--red">Resistant</div>
+        <div class="lb-irs__marker" id="lb-irs-marker" style="left:0%"></div>
+      </div>
+      <p style="margin:var(--space-3) 0 0">
+        <span class="lb-irs__value" id="lb-irs-value">&mdash;</span>
+        <span class="lb-irs__caption" id="lb-irs-caption"></span>
+      </p>
+      <div class="lb-irs__xref" id="lb-irs-xref"></div>
+    </div>
+
+    <!-- Cardio IQ panel summary -->
+    <div class="lb-v2-grid" id="lb-cardioiq" style="display:none">
+      <div class="lb-v2-card">
+        <div class="lb-v2-card__head">Cardio IQ panel · select markers</div>
+        <h3 class="lb-v2-card__title">Atherogenic + inflammation</h3>
+        <div id="lb-cardioiq-rows"></div>
+      </div>
+      <div class="lb-v2-card">
+        <div class="lb-v2-card__head">Cardio IQ panel · context</div>
+        <h3 class="lb-v2-card__title">What this panel is</h3>
+        <p style="color:var(--text-muted);font-size:var(--text-sm);line-height:1.6;margin:0">
+          Quest's diagnostic-grade lipid + insulin + inflammation suite. Cutoff-based reference ranges (not normal-range-based). The Insulin Resistance Score above is the headline; the rows here are supporting markers for the metabolic constellation.
+        </p>
+      </div>
+    </div>
+
+    <!-- Allergy panel — inflammation context, not headline -->
+    <div class="lb-allergy" id="lb-allergy" style="display:none">
+      <div class="lb-v2-card__head">Inflammation context · allergy panel</div>
+      <h3 class="lb-v2-card__title">Allergy sensitizations</h3>
+      <p class="lb-allergy__caption">
+        These markers describe the inflammatory environment in which the headline findings exist. They&rsquo;re not the optimization target; they&rsquo;re context. IgE class is ordinal (0&ndash;6, ImmunoCAP scale). Surfaced for completeness; not actionable in the platform&rsquo;s optimization loop.
+      </p>
+      <div class="lb-allergy__total" id="lb-allergy-total"></div>
+      <div class="lb-allergy__chips" id="lb-allergy-chips"></div>
+    </div>
+
+    <!-- Annual sentinel cadence widgets -->
+    <div class="lb-cadence-grid" id="lb-cadence" style="display:none">
+      <div class="lb-cadence" id="lb-cadence-nfl" style="display:none">
+        <div class="lb-cadence__head">Annual sentinel · NfL</div>
+        <div class="lb-cadence__name">Neurofilament Light Chain</div>
+        <div class="lb-cadence__signal" id="lb-nfl-signal"></div>
+        <div class="lb-cadence__meta" id="lb-nfl-meta"></div>
+      </div>
+      <div class="lb-cadence" id="lb-cadence-galleri" style="display:none">
+        <div class="lb-cadence__head">Annual sentinel · Galleri</div>
+        <div class="lb-cadence__name">Multi-cancer early detection</div>
+        <div class="lb-cadence__signal" id="lb-galleri-signal"></div>
+        <div class="lb-cadence__meta" id="lb-galleri-meta"></div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    // ── FH 2026 v1.5 panels — interim additive renderer ──
+    // Reads from the same /api/labs response that the v1 page uses. Looks for
+    // FH 2026 v2 biomarkers; renders the section only if any are present in
+    // the latest draw.
+    (function() {
+      'use strict';
+      var NFL_CADENCE_DAYS = 180;
+      var GALLERI_CADENCE_DAYS = 365;
+
+      var IGE_CLASS_LABELS = { 0:'No detectable', 1:'Low', 2:'Moderate', 3:'High', 4:'Very High', 5:'Extremely High', 6:'Maximum' };
+
+      function igeClass(v) {
+        if (v == null) return null;
+        if (v < 0.10) return 0; if (v < 0.35) return 1; if (v < 0.70) return 2;
+        if (v < 3.50) return 3; if (v < 17.5) return 4; if (v < 50.0) return 5;
+        return 6;
+      }
+
+      function findBiomarker(biomarkers, name) {
+        // biomarkers comes from /api/labs as an array; try common shapes
+        if (!biomarkers || !biomarkers.length) return null;
+        return biomarkers.find(function(b) {
+          return (b.key === name) || (b.name === name) || (b.id === name);
+        });
+      }
+
+      function asNumber(v) {
+        if (v == null || v === '') return null;
+        var n = parseFloat(String(v).replace(/[<>≥≤,]/g, ''));
+        return isFinite(n) ? n : null;
+      }
+
+      function daysBetween(dateStr) {
+        if (!dateStr) return null;
+        var d = new Date(dateStr + 'T12:00:00');
+        return Math.floor((new Date() - d) / 86400000);
+      }
+
+      function dateAdd(dateStr, days) {
+        if (!dateStr) return null;
+        var d = new Date(dateStr + 'T12:00:00');
+        d.setDate(d.getDate() + days);
+        return d.toISOString().slice(0, 10);
+      }
+
+      // The page already fetches /api/labs and stores something; rather than
+      // duplicating the fetch, hook into the existing loader by re-fetching
+      // (cheap; same cache headers).
+      fetch('/api/labs').then(function(r) { return r.json(); }).then(function(labs) {
+        if (!labs || !labs.biomarkers) return;
+        var bms = labs.biomarkers;
+        var drawDate = labs.latest_draw_date;
+
+        var hasV2 = ['insulin_resistance_score', 'nfl_neurofilament_light_chain', 'galleri_cancer_signal', 'allergy_total_ige']
+          .some(function(k) { return findBiomarker(bms, k) != null; });
+        if (!hasV2) return;
+
+        document.getElementById('lb-fh2026').style.display = '';
+
+        // ── IRS gauge ──
+        var irs = findBiomarker(bms, 'insulin_resistance_score');
+        if (irs) {
+          var v = asNumber(irs.value || irs.value_numeric);
+          if (v != null) {
+            document.getElementById('lb-irs').style.display = '';
+            document.getElementById('lb-irs-value').textContent = v;
+            // marker position: clamp to 0-100
+            var pct = Math.max(0, Math.min(100, v));
+            document.getElementById('lb-irs-marker').style.left = pct + '%';
+            var verdict = v > 66 ? 'definitively insulin resistant' : (v > 33 ? 'early IR' : 'insulin sensitive');
+            document.getElementById('lb-irs-caption').innerHTML =
+              '<strong>' + verdict + '</strong> (cutoff &gt;66 = resistant). ' +
+              'Cardio IQ\'s composite score combining fasting insulin and C-peptide.';
+            document.getElementById('lb-irs-xref').textContent =
+              'Metabolic constellation context · ApoB · Lp-PLA2 · vitamin D · testosterone — see the v1 panels above.';
+          }
+        }
+
+        // ── Cardio IQ panel summary ──
+        var cardio = ['lp_pla2_activity', 'apob_cardio_iq', 'c_peptide', 'fasting_insulin']
+          .map(function(k) { return findBiomarker(bms, k); })
+          .filter(function(b) { return b != null; });
+        if (cardio.length) {
+          document.getElementById('lb-cardioiq').style.display = '';
+          var rowsHtml = cardio.map(function(b) {
+            var v = b.value != null ? b.value : (b.value_numeric != null ? b.value_numeric : '—');
+            var cls = (b.flag === 'high' || b.flag === 'H') ? ' lb-v2-row__value--high' : '';
+            var name = (b.name || b.key || '').replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+            return '<div class="lb-v2-row"><span class="lb-v2-row__name">' + name + '</span>' +
+                   '<span class="lb-v2-row__value' + cls + '">' + v + (b.unit ? ' ' + b.unit : '') + '</span></div>';
+          }).join('');
+          document.getElementById('lb-cardioiq-rows').innerHTML = rowsHtml;
+        }
+
+        // ── Allergy panel ──
+        var totalIge = findBiomarker(bms, 'allergy_total_ige');
+        var allergens = bms.filter(function(b) {
+          var k = b.key || b.name || '';
+          return k.indexOf('allergy_') === 0 && k !== 'allergy_total_ige';
+        });
+        if (totalIge || allergens.length) {
+          document.getElementById('lb-allergy').style.display = '';
+          if (totalIge) {
+            var tv = asNumber(totalIge.value || totalIge.value_numeric);
+            document.getElementById('lb-allergy-total').innerHTML =
+              '<span class="lb-allergy__total-num">' + (tv != null ? tv : '—') + '</span>' +
+              '<span class="lb-allergy__total-lbl">Total IgE (kU/L)' +
+              ((totalIge.flag === 'high' || totalIge.flag === 'H') ? ' &middot; elevated' : '') + '</span>';
+          }
+          var chipsHtml = allergens.map(function(b) {
+            var v = asNumber(b.value || b.value_numeric);
+            var cls = igeClass(v);
+            if (cls == null || cls < 1) return '';
+            var n = (b.key || b.name || '').replace('allergy_', '').replace(/_/g, ' ');
+            return '<span class="lb-chip lb-chip--c' + cls + '">' +
+                   '<span class="lb-chip__class">' + cls + '</span>' +
+                   n + '</span>';
+          }).filter(function(s) { return s !== ''; }).join('');
+          document.getElementById('lb-allergy-chips').innerHTML = chipsHtml ||
+            '<div style="color:var(--text-faint);font-family:var(--font-mono);font-size:var(--text-xs)">No Class 1+ sensitizations.</div>';
+        }
+
+        // ── Cadence widgets ──
+        var cadenceShown = false;
+        var nfl = findBiomarker(bms, 'nfl_neurofilament_light_chain');
+        if (nfl && drawDate) {
+          cadenceShown = true;
+          document.getElementById('lb-cadence-nfl').style.display = '';
+          var nflV = nfl.value != null ? nfl.value : (nfl.value_numeric != null ? nfl.value_numeric : '—');
+          document.getElementById('lb-nfl-signal').innerHTML =
+            'Last value: <strong>' + nflV + (nfl.unit ? ' ' + nfl.unit : '') + '</strong>. Single-point baseline; ' +
+            'will be re-measured on the cadence below to establish a slope.';
+          var nflDays = daysBetween(drawDate);
+          var nflNext = dateAdd(drawDate, NFL_CADENCE_DAYS);
+          document.getElementById('lb-nfl-meta').innerHTML =
+            '<span>Last drawn ' + drawDate + '</span>' +
+            '<span>' + (nflDays != null ? nflDays + 'd ago' : '—') + '</span>' +
+            '<span>Cadence ' + NFL_CADENCE_DAYS + 'd</span>' +
+            '<span>Next due ' + nflNext + '</span>';
+        }
+        var galleri = findBiomarker(bms, 'galleri_cancer_signal');
+        if (galleri && drawDate) {
+          cadenceShown = true;
+          document.getElementById('lb-cadence-galleri').style.display = '';
+          var raw = String(galleri.value || '').toUpperCase();
+          var framed = (raw.indexOf('NO CANCER') !== -1 || raw.indexOf('NO SIGNAL') !== -1)
+            ? 'No signal detected at 24-month early-detection threshold'
+            : galleri.value;
+          document.getElementById('lb-galleri-signal').innerHTML =
+            '<strong>' + framed + '</strong>. ' +
+            'GRAIL multi-cancer early-detection screen. Reframed from the raw report wording — ' +
+            'absence of evidence at one timepoint is not evidence of absence over time.';
+          var galDays = daysBetween(drawDate);
+          var galNext = dateAdd(drawDate, GALLERI_CADENCE_DAYS);
+          document.getElementById('lb-galleri-meta').innerHTML =
+            '<span>Last drawn ' + drawDate + '</span>' +
+            '<span>' + (galDays != null ? galDays + 'd ago' : '—') + '</span>' +
+            '<span>Cadence ' + GALLERI_CADENCE_DAYS + 'd</span>' +
+            '<span>Next due ' + galNext + '</span>';
+        }
+        if (cadenceShown) document.getElementById('lb-cadence').style.display = 'grid';
+      }).catch(function(e) {
+        console.warn('FH 2026 v1.5 panels: fetch failed', e);
+      });
+    })();
+  </script>
+
   <!-- Summary cards -->
   <section class="lb-summary">
     <div class="lb-section-header">Panel summary</div>
