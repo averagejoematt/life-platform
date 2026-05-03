@@ -10,6 +10,21 @@ os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("S3_REGION", "us-west-2")
 
+# These tests hit real DDB via boto3. Skip in CI where credentials aren't loaded
+# (GitHub Actions test job uses no AWS auth — only the deploy job has OIDC).
+# Reentry sweep (2026-05-03): added skip guard; was breaking CI on every push.
+try:
+    import boto3
+    boto3.client("sts").get_caller_identity()
+    _AWS_AUTH_AVAILABLE = True
+except Exception:
+    _AWS_AUTH_AVAILABLE = False
+
+if not _AWS_AUTH_AVAILABLE:
+    pytestmark = pytest.mark.skip(
+        reason="No AWS credentials — these tests query DDB directly. Run locally."
+    )
+
 from mcp.tools_nutrition import tool_get_nutrition
 
 
