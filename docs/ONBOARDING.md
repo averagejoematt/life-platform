@@ -1,13 +1,15 @@
 # Life Platform — Onboarding Guide
 
 > Start here. For your first day, also read `docs/QUICKSTART.md` (AWS setup, deploy commands, gotchas).
-> Last updated: 2026-04-06 (v5.5.0)
+> Last updated: 2026-05-03 (v6.8.9)
+>
+> **Resuming a Claude chat session?** Read `handovers/HANDOVER_LATEST.md` first — that's the canonical "what's the current state" doc. This file is the slower onboarding for a fresh contributor.
 
 ---
 
 ## What Is This?
 
-A personal health intelligence system built on AWS. It pulls data from 13 API-based sources (wearables, apps, webhooks) plus manual/periodic uploads, stores everything in a single DynamoDB table (26 source partitions total), and makes it queryable by Claude through a Lambda-backed MCP server with 115 tools.
+A personal health intelligence system built on AWS. It pulls data from ~13 API-based sources (wearables, apps, webhooks) plus manual/periodic uploads, stores everything in a single DynamoDB table (19 source partitions in active use), and makes it queryable by Claude through a Lambda-backed MCP server with 126 tools.
 
 The end result: ask Claude a natural-language question about your health, and it queries real data rather than relying on memory or estimates.
 
