@@ -58,7 +58,14 @@ class EmailStack(Stack):
         # Suppressed here to avoid ingestion-error-daily-brief duplicate. COST-A 2026-03-10.
         _email_env = {"ANTHROPIC_SECRET": "life-platform/ai-keys"}
 
-        create_platform_lambda(self, "DailyBrief", function_name="daily-brief", handler="daily_brief_lambda.lambda_handler", source_file="lambdas/daily_brief_lambda.py", schedule="cron(0 17 * * ? *)", timeout_seconds=300, memory_mb=512, environment=_email_env, custom_policies=rp.email_daily_brief(), **{**shared, "alerts_topic": None})
+        # daily-brief timeout bumped 300s → 900s (Lambda max) on 2026-05-03 v6.8.10.
+        # Pre-existing chronic timeout: 6 coach V2 narratives + IC-3 + ensemble work
+        # was sometimes exceeding 5 min, especially when Anthropic was slow. Today's
+        # alarm cascade was triggered when Anthropic recovered after the morning
+        # disable — calls actually completed but blew past the 300s budget. 900s
+        # gives ample headroom; daily-brief typically completes in 4-5 min when
+        # Anthropic is healthy. Memory bumped 512→768 MB for some headroom too.
+        create_platform_lambda(self, "DailyBrief", function_name="daily-brief", handler="daily_brief_lambda.lambda_handler", source_file="lambdas/daily_brief_lambda.py", schedule="cron(0 17 * * ? *)", timeout_seconds=900, memory_mb=768, environment=_email_env, custom_policies=rp.email_daily_brief(), **{**shared, "alerts_topic": None})
 
         create_platform_lambda(self, "WeeklyDigest", function_name="weekly-digest", handler="weekly_digest_lambda.lambda_handler", source_file="lambdas/weekly_digest_lambda.py", schedule="cron(0 16 ? * SUN *)", timeout_seconds=120, memory_mb=256, environment=_email_env, custom_policies=rp.email_weekly_digest(), **shared)
 
