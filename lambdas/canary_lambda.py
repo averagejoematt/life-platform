@@ -59,6 +59,14 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET  = os.environ["S3_BUCKET"]
 MCP_URL    = os.environ.get("MCP_FUNCTION_URL", "")   # set from deploy script
 MCP_SECRET = os.environ.get("MCP_SECRET_NAME", "life-platform/mcp-api-key")
+
+# Reentry sweep (2026-05-03): Anthropic API canary — catches the "API access
+# turned off" failure mode (key disabled for billing) that hit at 9:10 AM PT
+# on 2026-05-03, surfacing only when the daily brief came back Grade F at 10 AM.
+# Tiny call (Haiku, max_tokens=1) ≈ $0.0001/run × 6 runs/day = $0.0006/day.
+ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
+ANTHROPIC_API_BASE = "https://api.anthropic.com/v1/messages"
+ANTHROPIC_CANARY_MODEL = os.environ.get("ANTHROPIC_CANARY_MODEL", "claude-haiku-4-5-20251001")
 SENDER     = os.environ["EMAIL_SENDER"]
 RECIPIENT  = os.environ["EMAIL_RECIPIENT"]
 
@@ -281,6 +289,78 @@ def check_mcp(canary_ts: str) -> tuple[bool, str, float]:
 
 # ── Alerting ───────────────────────────────────────────────────────────────────
 
+# ── Check 4: Anthropic API reachability (reentry sweep, 2026-05-03) ─────────
+
+def get_anthropic_api_key() -> str | None:
+    """Fetch the Anthropic API key from life-platform/ai-keys."""
+    try:
+        resp = secrets.get_secret_value(SecretId=ANTHROPIC_SECRET)
+        secret = json.loads(resp["SecretString"])
+        return (secret.get("anthropic_api_key")
+                or secret.get("api_key")
+                or secret.get("ANTHROPIC_API_KEY"))
+    except Exception as e:
+        print(f"[WARN] Could not fetch Anthropic API key: {e}")
+        return None
+
+
+def check_anthropic(canary_ts: str) -> tuple[bool, str, float]:
+    """Make a tiny ($0.0001) Anthropic call to verify auth + billing + access.
+
+    Catches the failure mode that hit on 2026-05-03 morning: Anthropic disabled
+    the platform's API key for billing reasons, daily-brief silently failed for
+    ~2 hours before the F-grade brief surfaced it.
+
+    Returns (None, msg, 0) if the API key is unavailable (skip — not a failure).
+    """
+    api_key = get_anthropic_api_key()
+    if not api_key:
+        return None, "Anthropic API key unavailable — skipping", 0.0
+
+    payload = json.dumps({
+        "model": ANTHROPIC_CANARY_MODEL,
+        "max_tokens": 1,
+        "messages": [{"role": "user", "content": "."}],
+    }).encode("utf-8")
+
+    t0 = time.monotonic()
+    try:
+        req = urllib.request.Request(
+            ANTHROPIC_API_BASE,
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            status = resp.status
+            body = resp.read()
+        latency = (time.monotonic() - t0) * 1000
+        if status == 200:
+            return True, f"Anthropic OK ({status}, {len(body)}B, {ANTHROPIC_CANARY_MODEL})", latency
+        return False, f"Anthropic returned HTTP {status}", latency
+    except urllib.error.HTTPError as e:
+        latency = (time.monotonic() - t0) * 1000
+        body_preview = ""
+        try:
+            body_preview = e.read().decode("utf-8", errors="replace")[:200]
+        except Exception:
+            pass
+        if e.code in (401, 403):
+            return False, f"Anthropic auth failure HTTP {e.code} (key disabled?): {body_preview}", latency
+        if e.code == 402:
+            return False, f"Anthropic payment required HTTP 402 (credits exhausted?): {body_preview}", latency
+        if e.code == 429:
+            return False, f"Anthropic rate limit HTTP 429: {body_preview}", latency
+        return False, f"Anthropic HTTP {e.code}: {body_preview}", latency
+    except Exception as e:
+        latency = (time.monotonic() - t0) * 1000
+        return False, f"Anthropic error: {e}", latency
+
+
 def send_alert(failures: list[dict], canary_ts: str) -> None:
     rows = ""
     for f in failures:
@@ -377,6 +457,23 @@ def lambda_handler(event, context):
         else:
             results["mcp"] = {"ok": None, "message": mcp_msg, "latency_ms": 0}
             print(f"  MCP:  ⚪ {mcp_msg}")
+
+        # ── Anthropic API check ─────────────────────────────────────────────────
+        # Skip on mcp_only runs (the 15-min MCP probe) — the 4h full pass is
+        # frequent enough for billing/auth detection, and Anthropic per-key rate
+        # limits could theoretically throttle a 15-min cadence.
+        if not mcp_only:
+            ant_ok, ant_msg, ant_ms = check_anthropic(canary_ts)
+            if ant_ok is not None:
+                results["anthropic"] = {"ok": ant_ok, "message": ant_msg, "latency_ms": round(ant_ms)}
+                print(f"  Anthropic: {'✅' if ant_ok else '❌'} {ant_msg}")
+                emit("CanaryAnthropicPass" if ant_ok else "CanaryAnthropicFail", 1)
+                emit("CanaryLatencyAnthropic_ms", ant_ms, "Milliseconds")
+                if not ant_ok:
+                    failures.append({"check": "Anthropic API", "message": ant_msg})
+            else:
+                results["anthropic"] = {"ok": None, "message": ant_msg, "latency_ms": 0}
+                print(f"  Anthropic: ⚪ {ant_msg}")
 
         # ── Alert if any failures ───────────────────────────────────────────────
         if failures:

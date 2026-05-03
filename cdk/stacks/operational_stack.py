@@ -194,6 +194,10 @@ class OperationalStack(Stack):
         _canary_alarm("CanaryDdbFailureAlarm", "life-platform-canary-ddb-failure", "CanaryDDBFail")
         _canary_alarm("CanaryMcpFailureAlarm", "life-platform-canary-mcp-failure", "CanaryMCPFail")
         _canary_alarm("CanaryS3FailureAlarm", "life-platform-canary-s3-failure", "CanaryS3Fail")
+        # Reentry sweep (2026-05-03): catches the "Anthropic API access turned off"
+        # failure mode (key disabled by Anthropic for billing). Canary runs every 4h,
+        # makes a $0.0001 Anthropic call per run, alarm fires within ≤4h of any 4xx.
+        _canary_alarm("CanaryAnthropicFailureAlarm", "life-platform-canary-anthropic-failure", "CanaryAnthropicFail")
 
         # ── DLQ depth alarm ──
         dlq_depth = cloudwatch.Alarm(self, "DlqDepthAlarm", alarm_name="life-platform-dlq-depth-warning", metric=cloudwatch.Metric(namespace="AWS/SQS", metric_name="ApproximateNumberOfMessagesVisible", dimensions_map={"QueueName": "life-platform-ingestion-dlq"}, period=Duration.seconds(300), statistic="Maximum"), evaluation_periods=1, threshold=1, comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD, treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING)
