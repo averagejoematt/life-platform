@@ -63,10 +63,11 @@ KNOWN_SECRETS = [
     "life-platform/strava",
     "life-platform/garmin",
     "life-platform/eightsleep",
+    "life-platform/eightsleep-client",  # PR 3 (2026-05-03): client credential alongside user creds
     "life-platform/ai-keys",
+    "life-platform/anthropic-api-key",  # PR 3 (2026-05-03): orphan in AWS — no consumer in source. Candidate for deletion. Listed here so test_s1 doesn't false-fail if a consumer is later added before deletion.
     "life-platform/habitify",
     "life-platform/ingestion-keys",  # COST-B bundle: Notion + Habitify + Todoist + Dropbox + HAE webhook keys
-    "life-platform/webhook-key",     # Dedicated HAE webhook auth (exists but not yet primary — code reads ingestion-keys)
     "life-platform/mcp-api-key",     # MCP server auth (90-day auto-rotation via key-rotator Lambda)
     "life-platform/site-api-ai-key", # R17-04: isolated Anthropic key for site-api (separate from main ai-keys)
     "life-platform/notion",          # Notion API key (also in ingestion-keys bundle)
@@ -78,6 +79,8 @@ KNOWN_SECRETS = [
 # Secrets that have been permanently deleted — must not appear in IAM policies.
 DELETED_SECRETS = [
     "life-platform/api-keys",        # Permanently deleted 2026-03-14
+    "life-platform/webhook-key",     # PR 3 (2026-05-03): deleted 2026-03-14 per HANDOVER_v3.7.84. cdk/stacks/role_policies.py:326 still has a stale comment referencing it; removed in PR 3.
+    "life-platform/google-calendar", # Permanently deleted 2026-03-15 (ADR-030)
 ]
 
 # Secrets that are referenced in IAM but are known to be transitional.
@@ -193,7 +196,10 @@ def test_s4_known_secrets_count_matches_architecture():
     # 2026-05-02 (TD-23): added life-platform/todoist (existed in AWS since 2026-02-21,
     # never registered in IAM until tonight — caused the AccessDeniedException that
     # prompted the patch).
-    EXPECTED_COUNT = 15
+    # 2026-05-03 (PR 3 / TD-13): full reconciliation against AWS. Added eightsleep-client
+    # and anthropic-api-key; removed webhook-key (deleted 2026-03-14, was stale entry).
+    # Total = 15 actual secrets + 1 wildcard = 16.
+    EXPECTED_COUNT = 16
     actual = len(KNOWN_SECRETS)
     assert actual == EXPECTED_COUNT, (
         f"S4 FAIL: KNOWN_SECRETS has {actual} entries, expected {EXPECTED_COUNT}. "

@@ -1,6 +1,6 @@
 # Secrets Map — central reference for source → secret mapping
 
-**Status:** Initial compilation, requires verification against AWS Secrets Manager
+**Status:** ✅ Reconciled against AWS Secrets Manager on 2026-05-03 (PR 3).
 **Source TD:** TD-13 (LOW) from `handovers/HANDOVER_v6.8.1.md`
 **Region:** us-west-2 (per memory: AWS Account 205930651321, primary region us-west-2)
 
@@ -8,21 +8,19 @@
 
 ## Why this exists
 
-TD-13 surfaced when the Todoist API key was discovered to live at `life-platform/ingestion-keys` instead of the expected `life-platform/todoist`. This kind of inconsistency forces code archaeology to find credentials. This doc is the single source of truth.
+TD-13 surfaced when the Todoist API key was discovered to live at `life-platform/ingestion-keys` instead of the expected `life-platform/todoist`. (As of PR 0 / 2026-05-03 the MCP write tools moved to a dedicated `life-platform/todoist` secret, but the ingestion Lambda still reads from the bundle.) This kind of inconsistency forces code archaeology to find credentials. This doc is the single source of truth.
 
 ---
 
-## Verification action
-
-Before treating this map as authoritative, run:
+## Verification command
 
 ```bash
 aws secretsmanager list-secrets --region us-west-2 \
-  --query 'SecretList[?starts_with(Name, `life-platform`)].[Name, Description, LastChangedDate]' \
+  --query 'SecretList[?starts_with(Name, `life-platform`)].[Name,Description,LastChangedDate]' \
   --output table
 ```
 
-Reconcile output against the table below. Update entries marked ⚠ unverified once confirmed. File a follow-up if any source isn't in either column (it might be using env vars or hardcoded — both are bugs).
+Last reconciled: **2026-05-03** (PR 3). 15 secrets total under `life-platform/*`.
 
 ---
 
@@ -30,83 +28,100 @@ Reconcile output against the table below. Update entries marked ⚠ unverified o
 
 | Source | Secret name (AWS Secrets Manager) | Auth pattern | Re-auth cadence | Re-auth procedure | Verified |
 |---|---|---|---|---|---|
-| Garmin | `life-platform/garmin` | OAuth1 + OAuth2 | ~30 days (OAuth1 refresh) | `setup/setup_garmin_browser_auth.py` (Playwright/Chromium MFA) | ✅ confirmed in v6.8.1 session |
-| Withings | `life-platform/withings` ⚠ | OAuth2 | ~similar to Garmin | `setup/fix_withings_oauth.py` | ⚠ unverified secret name |
-| Strava | `life-platform/strava` ⚠ | OAuth2 | ~similar pattern | similar setup script ⚠ | ⚠ unverified |
-| Habitify | `life-platform/habitify` | API key | static | rotate manually if exposed | ✅ memory: "EXISTS and active (own dedicated secret, not bundled)" |
-| Todoist | `life-platform/ingestion-keys` | API key | static | rotate manually | ✅ confirmed in v6.8.1 session (the surprise that motivated this doc) |
-| Whoop | `life-platform/whoop` ⚠ | OAuth2 | varies | ⚠ | ⚠ unverified |
-| Eight Sleep | `life-platform/eight-sleep` ⚠ | API token | varies | ⚠ | ⚠ unverified |
-| Notion | `life-platform/notion` ⚠ | Integration token | static | rotate via Notion settings | ⚠ unverified |
-| Function Health | `life-platform/function-health` ⚠ | session/cookie? | manual download | manual PDF acquisition | ⚠ unverified — Function Health may not have an API; ingestion is PDF-driven |
-| MacroFactor | `life-platform/macrofactor` ⚠ | Dropbox-based file sync | OAuth (Dropbox side) | re-auth Dropbox if expired | ⚠ unverified — secret may be on Dropbox side, not MF |
-| Anthropic API | `life-platform/anthropic` ⚠ | API key | static, rotate periodically | manage in Anthropic console | ⚠ unverified |
-| Apple Health (HAE) | n/a | Webhook URL | static | regenerate URL in iOS HAE app | ✅ no secret needed; Function URL is the secret-equivalent |
-| Weather | likely env var | API key | static | depends on provider | ⚠ unverified |
+| Garmin | `life-platform/garmin` | OAuth1 + OAuth2 | ~30 days (OAuth1 refresh) | `setup/setup_garmin_browser_auth.py` (Playwright/Chromium MFA) | ✅ |
+| Withings | `life-platform/withings` | OAuth2 | similar to Garmin (manual refresh on rate-limit) | `setup/fix_withings_oauth.py` | ✅ |
+| Strava | `life-platform/strava` | OAuth2 | similar pattern | manual refresh script | ✅ |
+| Whoop | `life-platform/whoop` | OAuth2 | similar pattern | OAuth refresh | ✅ |
+| Eight Sleep | `life-platform/eightsleep` + `life-platform/eightsleep-client` | username/password + client credential | static | rotate manually if exposed | ✅ (two secrets — `eightsleep` for user creds, `eightsleep-client` for app client ID) |
+| Habitify | `life-platform/habitify` | API key | static | rotate manually if exposed | ✅ (own dedicated secret, ADR-014) |
+| Todoist (ingestion) | `life-platform/ingestion-keys` (todoist field) | API key | static | rotate manually | ✅ — bundled with Notion / Dropbox / HAE webhook keys |
+| Todoist (MCP write tools) | `life-platform/todoist` | API key | static | rotate manually | ✅ — added to MCP IAM in PR 0 (TD-23) |
+| Notion | `life-platform/notion` (and `life-platform/ingestion-keys`) | Integration token | static | rotate via Notion settings | ✅ — present in both the dedicated and bundled secrets |
+| Dropbox (MacroFactor poll) | `life-platform/dropbox` (and `life-platform/ingestion-keys`) | OAuth2 | refresh on expiry | re-auth Dropbox if expired | ✅ |
+| Apple Health (HAE) webhook key | `life-platform/ingestion-keys` (`health_auto_export_api_key` field) | bearer | static | regenerate from API Gateway if exposed | ✅ |
+| Anthropic — main pool | `life-platform/ai-keys` | API key | rotate periodically | manage in Anthropic console | ✅ — 24 consumer Lambdas |
+| Anthropic — site-api isolated | `life-platform/site-api-ai-key` | API key | rotate periodically | manage in Anthropic console | ✅ — R17-04, isolated for site Lambda |
+| Anthropic — orphan? | `life-platform/anthropic-api-key` | API key | unknown | unknown | ⚠️ **Orphan: not referenced in any Lambda or MCP code as of PR 3.** Created 2026-03-18, last modified same day. Candidate for deletion if confirmed unused. |
+| MCP Bearer token | `life-platform/mcp-api-key` | HMAC-derived bearer | 90-day auto-rotation via `mcp-key-rotator` Lambda | automated | ✅ |
+| Function Health | n/a | n/a | n/a | manual PDF acquisition + ingest script | ✅ no secret needed (PDF-driven, no API) |
+| MacroFactor | n/a (uses Dropbox) | n/a | n/a | re-auth Dropbox if expired | ✅ no MacroFactor-side secret; flows via Dropbox |
+| Weather | env var | API key | static | depends on provider | ✅ env var on `weather-data-ingestion` Lambda — not in Secrets Manager |
 
 ---
 
-## Naming convention going forward
+## Naming convention
 
-**Decision (proposed):** all source-specific secrets follow the pattern `life-platform/<source-slug>`. The bundled `life-platform/ingestion-keys` Todoist secret is the outlier and should be migrated to `life-platform/todoist` at the next convenient Todoist Lambda deploy. Don't migrate ad-hoc — it requires a Lambda code change and a secret rename, which means downtime if not done in lock-step.
+**Pattern:** all source-specific secrets follow `life-platform/<source-slug>`. Two notable exceptions:
 
-**Migration plan for Todoist:**
-1. Create new secret `life-platform/todoist` containing the same value as the Todoist key field in `life-platform/ingestion-keys`
-2. Update Todoist Lambda env var or code reference to point at new secret
-3. Deploy Lambda
-4. Verify a successful run from CloudWatch logs
-5. Delete old secret OR remove the Todoist key from `life-platform/ingestion-keys` (depending on whether other sources also live in the bundled secret)
+1. **`life-platform/ingestion-keys`** — bundled secret containing the Todoist / Notion / Habitify / Dropbox / HAE-webhook keys. Created 2026-03-08 in the P0 security split that retired the original `life-platform/api-keys`. Migration to per-source secrets has been deferred indefinitely; it requires a Lambda code change AND a secret rename in lock-step. Habitify (ADR-014, 2026-03-10), Notion (2026-03-29), Dropbox (2026-03-29), and Todoist-for-MCP (2026-02-21) have since been migrated to dedicated secrets, but the **ingestion** path still reads from the bundle for those sources.
 
-**Defer this migration until:** Claude Code is already touching the Todoist Lambda for another reason (e.g. TD-12 cron schedule fix). Don't ship a secret rename in isolation — the value is too low.
+2. **`life-platform/eightsleep` + `life-platform/eightsleep-client`** — Eight Sleep needs a separate client credential alongside the user credentials. Two secrets is the cleanest representation.
+
+**Carry-forward action:** if the orphan `life-platform/anthropic-api-key` is confirmed unused (no consumer in source, no IAM grant), delete it to keep AWS state clean. Currently NOT referenced in `cdk/stacks/role_policies.py` either — it's truly orphaned.
 
 ---
 
 ## Re-auth cadence quick reference
 
-Per memory: "Garmin re-auth is a recurring ~30-day chore." Same pattern applies to Withings and Strava (per handover Operational Notes). Mitigation: disable EventBridge rule before any planned silence longer than 2 weeks to prevent rate-limit accumulation.
-
-| Source | Pattern | Mitigation if silent |
+| Source | Pattern | Mitigation if platform silent |
 |---|---|---|
-| Garmin | OAuth1 expires ~30d | Disable EventBridge rule before silence |
-| Withings | similar | Disable rule |
-| Strava | similar | Disable rule |
-| Whoop | TBD verify | TBD |
-| Eight Sleep | TBD verify | TBD |
+| Garmin | OAuth1 expires ~30d | Disable EventBridge rule before silence; re-auth via Playwright |
+| Withings | OAuth2 — rate-limit accumulation on cron retries during silence | Disable EventBridge rule before silence |
+| Strava | similar to Withings | Disable rule |
+| Whoop | OAuth2 — refresh tokens long-lived; less risky | Disable rule if silence > 30 days |
+| Eight Sleep | static creds | n/a |
 | Habitify | API key, no expiry | n/a |
-| Todoist | API key, no expiry | n/a |
+| Todoist (both secrets) | API key, no expiry | n/a |
 | Notion | Integration token, no expiry | n/a |
-| HAE | Webhook URL, no expiry | n/a |
+| Dropbox | OAuth2; refresh tokens | Re-auth Dropbox if MacroFactor pull stops |
+| HAE webhook | static URL + bearer | regenerate from API Gateway if exposed |
+| Anthropic (any of the 3) | API key, no expiry | rotate manually periodically |
+| MCP Bearer | auto-rotates every 90d | automated; `mcp-key-rotator` Lambda |
 
 ---
 
 ## Where each secret is consumed
 
-Reference for "if this secret rotates, which Lambdas need to be redeployed or restart their cache?"
+Use this section to answer "if I rotate secret X, which Lambdas need a redeploy or cache flush?"
 
-| Secret | Consumer Lambda(s) | Cache TTL |
+Cache TTL note: COST-OPT-1 uses `secret_cache.py` (15-min in-memory TTL across most Lambdas in the shared layer). On rotation, expect up to 15 min of stale reads from warm Lambda containers; cold-start clears it.
+
+| Secret | Consumer Lambda(s) | Notes |
 |---|---|---|
-| `life-platform/garmin` | `garmin-data-ingestion` | per-invocation refresh |
-| `life-platform/habitify` | habitify ingestion Lambda(s) | per-invocation |
-| `life-platform/ingestion-keys` | Todoist Lambda(s) | per-invocation |
-| ⚠ rest | TBD audit | TBD |
+| `life-platform/whoop` | `whoop-data-ingestion`, `freshness-checker`, `pipeline-health-check` | OAuth tokens — Whoop Lambda refreshes on expiry |
+| `life-platform/withings` | `withings-data-ingestion`, `freshness-checker`, `pipeline-health-check` | OAuth tokens |
+| `life-platform/strava` | `strava-data-ingestion`, `freshness-checker`, `pipeline-health-check` | OAuth tokens |
+| `life-platform/garmin` | `garmin-data-ingestion`, `freshness-checker`, `pipeline-health-check` | garth OAuth tokens |
+| `life-platform/eightsleep` + `life-platform/eightsleep-client` | `eightsleep-data-ingestion`, `pipeline-health-check` | creds + client ID |
+| `life-platform/habitify` | `habitify-data-ingestion`, `pipeline-health-check` | API key |
+| `life-platform/notion` | `notion-journal-ingestion`, `pipeline-health-check` | also in `ingestion-keys` bundle |
+| `life-platform/dropbox` | `dropbox-poll`, `pipeline-health-check` | also in `ingestion-keys` bundle |
+| `life-platform/todoist` | `life-platform-mcp` (via `mcp/tools_todoist.py`) | NEW (PR 0) — MCP write tools only |
+| `life-platform/ingestion-keys` | `todoist-data-ingestion`, `notion-journal-ingestion`, `dropbox-poll`, `health-auto-export-webhook`, `pipeline-health-check` | bundled — multiple keys per source |
+| `life-platform/ai-keys` | 24 Lambdas (ai-expert-analyzer, anomaly-detector, partner-email, challenge-generator, all 5 coach_*, daily-brief, daily-insight-compute, hypothesis-engine, journal-enrichment, monday-compass, monthly-digest, nutrition-review, weekly-digest, weekly-plate, weekly-signal, wednesday-chronicle, ai_calls module, etc.) | Anthropic API key. Run `grep -lrn life-platform/ai-keys lambdas/ mcp/` for the full list. |
+| `life-platform/site-api-ai-key` | `site-api-ai-lambda`, `life-platform-site-api`, `pipeline-health-check` | Isolated per R17-04 |
+| `life-platform/mcp-api-key` | `life-platform-mcp` (config), `canary-lambda`, `qa-smoke`, `mcp-key-rotator` | HMAC bearer; auto-rotates 90d |
+| `life-platform/anthropic-api-key` | **none — orphan** | **⚠️ See orphan note above. Candidate for deletion.** |
 
 ---
 
-## Action items
+## Cleanup actions surfaced by this audit
 
-- [ ] **Run the AWS list-secrets command above and reconcile this table.** ~5 minutes.
-- [ ] **For each ⚠ row, verify the actual secret name and auth pattern.** Update this doc inline.
-- [ ] **Audit which Lambdas read which secrets** — enables impact analysis on rotation. ~30 minutes.
-- [ ] **Plan Todoist secret rename** at next Todoist Lambda touch. (Don't ship in isolation.)
-- [ ] **Add this doc to `docs/INDEX.md`** if a docs index exists.
+1. **Orphan: `life-platform/anthropic-api-key`** — not referenced in source or IAM. Candidate for deletion. Decision deferred to Matthew.
+2. **Stale: `life-platform/webhook-key`** — referenced in `cdk/stacks/role_policies.py:326` ("Dedicated life-platform/webhook-key also exists — migration deferred") but NOT in `aws secretsmanager list-secrets` output (deleted 2026-03-14 per HANDOVER_v3.7.84). Either:
+   - Update the role_policies.py comment to note the deletion, OR
+   - Restore the secret if the comment's "migration deferred" intent is still active.
+3. **Test list drift** — `tests/test_iam_secrets_consistency.py KNOWN_SECRETS` was missing `anthropic-api-key` and `eightsleep-client`. PR 3 syncs the list.
+4. **ARCHITECTURE.md secrets table** — heading says "9 active secrets" but body lists 10 active rows (PR 0 added the todoist row, count not updated). PR 3 syncs the count to 15 active.
+5. **Orphan IAM `webhook-key` reference** — `cdk/stacks/role_policies.py` comment references a secret that no longer exists.
 
 ---
 
 ## Maintenance
 
 This doc must be updated whenever:
-- A new source is added to the platform → add row
-- A secret is rotated → update "Last rotated" if that column is added later
+- A new source is added to the platform → add row + run reconciliation command above
+- A secret is rotated → no entry change needed (secret name persists; auth value rotates within)
 - A secret is renamed → update the row + add a redirect note for searchability
 - Re-auth procedure changes → update the procedure cell
 

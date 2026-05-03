@@ -323,7 +323,8 @@ def ingestion_hae() -> list[iam.PolicyStatement]:
 
     R8 Finding-2 fix: Added Secrets Manager access for Bearer token auth.
     Code default reads life-platform/ingestion-keys (health_auto_export_api_key).
-    Dedicated life-platform/webhook-key also exists — migration deferred.
+    (Note: a dedicated life-platform/webhook-key existed in early 2026 but was
+    deleted 2026-03-14 per HANDOVER_v3.7.84; ingestion-keys is now the only path.)
     """
     return [
         iam.PolicyStatement(
