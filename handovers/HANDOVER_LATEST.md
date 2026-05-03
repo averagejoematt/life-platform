@@ -1,85 +1,40 @@
-# Handover — v6.8.1: Phase 1 Source Restoration + FH 2026 Ingest
+# Handover — v6.8.2: PR 0 — MCP unbreak batch (TD-21/22/23)
 
-**Date:** 2026-05-02
-**Scope:** Restore platform pulse after 4-week silence. Ingest Function Health 2026 lab draw (8th draw, 153 biomarkers). Re-auth Garmin. Backfill Apple Health gap. Document accumulated tech debt.
-**Type:** Operational restoration, not feature work.
+**Date:** 2026-05-03
+**Scope:** Three independent MCP bugs discovered in the 2026-05-02 evening session that left ~40 write tools broken in production. All fixes shipped in one batch per `docs/CLAUDE_CODE_PATCH_SPEC_2026_05_03.md`.
+**Type:** Production hotfix.
 
-See [HANDOVER_v6.8.1.md](HANDOVER_v6.8.1.md) for full details.
+See [HANDOVER_v6.8.2.md](HANDOVER_v6.8.2.md) for full details.
 
 ## Summary
 
-- **10 of 11 ingestion sources verified end-to-end.** MacroFactor dormant (no logs during silence — not a pipeline failure).
-- **Function Health 2026 ingested** at `DATE#2026-04-03`. 153 biomarkers across standard panel + Cardio IQ + NfL + Galleri. 26 out-of-range. Validated against `Supplement_Protocol_2026-05_v2.md` reference values (15/15 match). Total draws now: 8.
-- **Headline finding: Cardio IQ Insulin Resistance Score 75** — definitively insulin resistant (>66 cutoff). Combines fasting insulin 14.3 (5.7x rise from 2.5 last year) and elevated C-peptide 2.26.
-- **Garmin re-auth** via `setup/setup_garmin_browser_auth.py` (Playwright/Chromium MFA flow). 7 missing dates backfilled cleanly.
-- **Apple Health 27-day gap closed** via new `backfill/backfill_apple_health_export_v16.py` (v16.1 source-aware — fixes iPhone+Garmin step duplication, mL→fl_oz water).
-- **No Lambda code shipped.** All restoration was DDB writes, S3 uploads, and Secrets Manager rotations.
+- **TD-21** (HIGH): `mcp/tools_lifestyle.py:9` missing `, timezone` import → ~40 functions raised `NameError` at runtime. Fixed; cleanup of 3 redundant local imports.
+- **TD-22** (LOW): `get_todoist_projects` signature mismatch (0 args, dispatcher passes 1). Changed to `(args=None)`.
+- **TD-23** (HIGH): MCP IAM role missing `secretsmanager:GetSecretValue` on `life-platform/todoist` → all MCP Todoist write tools `AccessDeniedException`. Added via CDK to both McpServerRole and McpWarmerRole.
 
-## Critical Finding — TD-19 [HIGH]
+## Pre-PR housekeeping
 
-**Cross-source date partition convention mismatch.** HAE Lambda writes today's data at local-PT-midnight partition; Withings writes at UTC-midnight. Same wall-clock day → two different DDB partitions → daily intelligence aggregation will silently undercount. Highest-priority architectural fix from tonight.
+Cleared a dirty tree carrying two prior unfinished sessions:
 
-## Headline Findings from FH 2026 Draw
+- v6.8.0-retroactive (COST-OPT-2 prompt caching + model tiering — was deployed to AWS via shared layer v41 but never committed)
+- 6 untracked design docs from the 2026-05-02 cowork session (TECH_DEBT_INDEX, alternate FH v2 handoff, Personal Board deliberation, WR-35/36 spec, etc.)
+- Restored `deploy/sync_doc_metadata.py` from archive (silences pre-commit warning; auto-synced 7 docs)
 
-- `insulin_resistance_score: 75` (Cardio IQ; >66 = resistant) — **the headline finding**
-- `c_peptide: 2.26` (>2.16 cutoff) — confirms endogenous insulin overproduction
-- `apob: 116` standard panel + `apob_cardio_iq: 111` (different assays, both flagged)
-- `lp_pla2_activity: 137` (>123 cutoff) — vascular inflammation
-- `omega_3_index: 3.3%` (was 7.8% last year) — failed repletion
-- `vitamin_d_25oh: 28` (was 117 last year) — into deficient range
-- `testosterone_total: 361` (was 577) — fell ~37%
-- `nfl: 0.81 pg/mL` — neurodegeneration baseline normal
-- `galleri_signal: NO CANCER SIGNAL DETECTED`
-- Allergy panel: total IgE 339 (3x upper limit), sensitized to dust mites, alder/birch/oak trees, cat/dog dander, timothy grass
+## Sequencing change
 
-## Phase 1 Status
+Inserted TD-21/22/23 as PR 0 ahead of the original PR 1 (TD-15/16/18/20) because the MCP failures are production-broken-right-now while TD-15 is a slow-corrupting correctness bug. Per `docs/CLAUDE_CODE_PATCH_SPEC_2026_05_03.md`, this is the recommended order.
 
-| Source | Status |
-|---|---|
-| Whoop, Eight Sleep, Withings, Strava | ✅ |
-| Garmin | ✅ (re-auth + 7-day gap-fill tonight) |
-| Habitify, Todoist | ✅ |
-| Apple Health / HAE | ✅ (32-day backfill + webhook live) |
-| Notion | ✅ ("Failure Test" journal entry verified) |
-| Function Health 2026 | ✅ (8th draw committed) |
-| MacroFactor | 🟡 dormant (no logs to ingest) |
+## What's next
 
-## Tech Debt Carried Forward
+- **PR 1 — TD-15/16/18/20.** HAE Lambda + `platform_logger`. Source already written by a prior session in working tree; needs review + tests + layer rebuild + deploy.
+- PR 2 → PR 6 unchanged from original brief, except PR 4 will start by writing a merged v3 FH spec reconciling Matthew's tonight version with the alternate Technical Board version.
 
-10 items numbered TD-11 through TD-20. Highest-priority items:
-- **TD-19 [HIGH]** — Cross-source date partition convention mismatch (architectural)
-- **TD-15 [HIGH]** — Live HAE Lambda missing source-priority fix (correctness; iPhone+Garmin step double-count today)
-- **TD-20 [LOW]** — `platform_logger.py:103` TypeError on every error log line (cosmetic but pollutes logs)
-
-Full list in [HANDOVER_v6.8.1.md](HANDOVER_v6.8.1.md#tech-debt-accumulated-this-session).
-
-## Deferred Work
-
-For fresh-context handoff (write `docs/specs/FUNCTION_HEALTH_V2_HANDOFF.md` next session):
-
-1. Site updates (`site/labs/index.html`) for v2 panels (allergies, NfL, Galleri, Cardio IQ)
-2. Supplements page rendering from `Supplement_Protocol_2026-05_v2.md`
-3. Free-text clinician notes ingestion strategy
-4. Personal + Technical Board consults on FH 2026 findings
-5. MCP tool additions: `get_lab_deltas`, `get_allergies`, NfL/Galleri trending cadence
-
-Plus pre-existing:
-- Sleep/Glucose Observatory V2 visual overhaul (gated until SIMP-1 Phase 2)
-- Coach Intelligence Architecture Phase 1-2 build
-- Bedrock migration (assess after 30 days cost data)
-
-## Operational Note
-
-**Garmin re-auth is a recurring ~30-day chore.** OAuth1 refresh token has ~30 day lifetime. As long as Lambda runs daily and refreshes OAuth2, this stays fresh indefinitely. Danger zone: any silence >2 weeks. **Mitigation pattern:** disable Garmin EventBridge rule before any planned silence to prevent rate-limit accumulation. Same pattern applies to Withings and Strava.
-
-## Current System State
+## Current State
 
 | Metric | Value |
 |--------|-------|
-| Version | v6.8.1 |
+| Version | v6.8.2 |
 | Lambda Layer | v41 (unchanged) |
-| Lambdas | 71 (unchanged) |
+| Lambdas | 66 |
 | MCP Tools | 123 (unchanged) |
-| Lab Draws in DDB | **8** (was 7) |
-| Total Biomarkers in latest draw | **153** (was 74) |
-| Out-of-range biomarkers in latest draw | 26 |
+| Secrets in AWS | 15 (`life-platform/*`) |

@@ -1,3 +1,42 @@
+## v6.8.2 — PR 0: MCP Unbreak Batch (TD-21/22/23) (2026-05-03)
+
+### MCP Production Bugs Fixed
+- **TD-21** [HIGH]: `mcp/tools_lifestyle.py:9` was importing `datetime, timedelta` but using `datetime.now(timezone.utc)` in ~40 functions → `NameError: name 'timezone' is not defined` at runtime. Fixed: added `, timezone` to module import. Cleanup: removed 3 redundant local-scope `from datetime import timezone` workarounds at lines 3090/3136/3222.
+- **TD-22** [LOW]: `mcp/tools_todoist.py:399` `get_todoist_projects()` had no positional parameter; MCP dispatcher passes one → `TypeError`. Fixed: signature now `(args=None)` per pattern used by other write tools in the file.
+- **TD-23** [HIGH]: MCP Lambda IAM role missing `secretsmanager:GetSecretValue` on `life-platform/todoist*` → all MCP Todoist write tools `AccessDeniedException`. Fixed via CDK in `cdk/stacks/role_policies.py mcp_server()`. Both `McpServerRole` and `McpWarmerRole` updated.
+
+### Test infrastructure
+- `tests/test_iam_secrets_consistency.py` `KNOWN_SECRETS` gains `life-platform/todoist`; `EXPECTED_COUNT` 14 → 15.
+- `docs/ARCHITECTURE.md` Secrets Manager table gains a `todoist` row.
+
+### Pre-PR housekeeping (not strictly v6.8.2 work but landed in this version's commits)
+- **`852be19` v6.8.0-retroactive**: Recovered the COST-OPT-2 prompt caching + model tiering work from the working tree. Source had been uncommitted for ~3 weeks while prod was already running it via shared layer v41. ADR-049 in DECISIONS.md, RUNBOOK cost monitoring section. 13 Lambdas plus shared `ai_calls.py` / `retry_utils.py` got the diff committed.
+- **`1c2a9f5` design artifacts**: 6 untracked design docs from the 2026-05-02 cowork session committed as historical record (TECH_DEBT_INDEX, CLAUDE_CODE_PATCH_SPEC, alternate FUNCTION_HEALTH_V2_HANDOFF, PERSONAL_BOARD_FH_2026_DELIBERATION, WR_35_36_ARCHITECTURE_SPEC, cowork_handoff).
+- **`d8a63a0` restore sync_doc_metadata.py**: Script was archived in v4.9.0-docs but is still actively referenced by `scripts/update_architecture_header.sh` (the wrapper invoked by `.git/hooks/pre-commit`). Restored to silence the `[WARN] sync_doc_metadata.py not found` that fires on every commit.
+- **`dc0ac14` doc metadata sync**: Side effect of restoring sync_doc_metadata.py — the pre-commit hook auto-applied 14 changes across 7 docs to bring counter values current (66 Lambdas, 123 MCP tools, 36 modules, 9 secrets, 49 alarms). `docs/HANDOVER_LATEST.md` manually fixed to point at v6.8.1 instead of stale v6.8.0.
+
+### Operational findings carried into PR 3
+- AWS has 15 `life-platform/*` secrets but `KNOWN_SECRETS` only listed 13 + wildcard. Newly visible: `todoist` (added in PR 0), `anthropic-api-key` (not yet added), `eightsleep-client` (not yet added). Stale entry: `webhook-key` (deleted 2026-03-14, still in `KNOWN_SECRETS`). Reconciliation is the entire point of PR 3.
+- `docs/ARCHITECTURE.md` heading says "9 active secrets" (auto-synced) but the secrets table lists 10 — header/table drift, not corrected this version.
+
+### Sequencing
+PR 0 was inserted ahead of the original PR 1 (TD-15/16/18/20) because the MCP failures are production-broken-right-now while TD-15 is a slow-corrupting correctness bug. Per `docs/CLAUDE_CODE_PATCH_SPEC_2026_05_03.md`, this is the recommended order.
+
+### Deploy summary
+- `aws lambda update-function-code life-platform-mcp` (Op A — TD-21 + TD-22 hot-fix)
+- `cdk deploy LifePlatformMcp` (Op B — TD-23 IAM + CDK syncs source-tree code on both McpServer and McpWarmer)
+- Final McpServer code SHA256: `Pd6GnTqT5/tKHr2IVgTSKMs1FCvXKf209Y1ZiY5Nl+M=`
+- McpServerRole Secrets policy verified: `life-platform/ai-keys*`, `life-platform/mcp-api-key*`, `life-platform/todoist*`
+
+### Smoke tests (Matthew, after deploy)
+```
+life-platform:create_experiment name="MCP smoke test — delete me" hypothesis="Tool no longer NameErrors"
+life-platform:create_todoist_task content="MCP smoke test — delete me" priority=4
+life-platform:get_todoist_projects
+```
+
+---
+
 ## v6.8.1 — Phase 1 Source Restoration + FH 2026 Ingest (2026-05-02)
 
 ### Function Health 2026 Lab Draw
