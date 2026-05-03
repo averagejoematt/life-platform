@@ -1,3 +1,3 @@
 **[HANDOVER_LATEST.md](../handovers/HANDOVER_LATEST.md)**
 
-v6.8.1 | 2026-05-02 | Phase 1 source restoration + FH 2026 ingest (8th draw, 153 biomarkers, IRS Score 75 headline)
+v6.8.2 | 2026-05-03 | PR 0: MCP unbreak batch (TD-21 timezone, TD-22 signature, TD-23 IAM Todoist)
