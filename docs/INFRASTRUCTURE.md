@@ -1,7 +1,7 @@
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-04-05 (v5.3.0 — 63 Lambdas, 10 active secrets, 115 MCP tools, ~66 alarms)
+> Last updated: 2026-05-03 (v6.8.1 — 66 Lambdas, 9 active secrets, 123 MCP tools, ~49 alarms)
 
 ---
 
@@ -56,7 +56,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Function URL (remote) | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/` |
 | Auth (remote) | HMAC Bearer token via `life-platform/mcp-api-key` secret (auto-rotates every 90 days) |
 | Auth (local) | `mcp_bridge.py` → `.config.json` → Function URL |
-| Tools | 115 across 35 modules |
+| Tools | 123 across 36 modules |
 | Cache warmer | 14 tools pre-computed nightly at 9:00 AM PT |
 
 ---
@@ -108,7 +108,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Field | Value |
 |-------|-------|
 | Alert topic | `life-platform-alerts` → email to `awsdev@mattsusername.com` |
-| CloudWatch alarms | ~66 metric alarms (ALARM-only; base + invocation-count + DDB item size + canary + duration + freshness + pipeline health) |
+| CloudWatch alarms | ~49 metric alarms (ALARM-only; base + invocation-count + DDB item size + canary + duration + freshness + pipeline health) |
 
 ---
 
@@ -133,7 +133,7 @@ All DNS-validated via Route 53 CNAME records.
 
 ---
 
-## Secrets Manager (10 active secrets)
+## Secrets Manager (9 active secrets)
 
 All under prefix `life-platform/`. No values stored in this doc — access via AWS console or CLI.
 
