@@ -42,6 +42,10 @@ BACKWARD COMPATIBILITY:
 
 v1.0.0 — 2026-03-08 (OBS-1)
 v1.0.1 — 2026-03-10 — *args %s compat for all log methods (Bug B fix)
+v1.0.2 — 2026-05-02 — TD-20: normalize exc_info=True / BaseException to tuple before
+                       passing to makeRecord. Previously every error log line emitted
+                       a secondary TypeError in formatException because True was passed
+                       where a (typ, val, tb) tuple was expected.
 """
 
 import json
@@ -184,6 +188,19 @@ class PlatformLogger(logging.Logger):
                 msg = msg % args
             except (TypeError, ValueError):
                 msg = f"{msg} {args}"  # fallback: append args if interpolation fails
+
+        # TD-20: normalize exc_info per stdlib convention before passing to makeRecord.
+        # Stdlib's Logger._log() converts True → sys.exc_info() and BaseException →
+        # (typ, val, tb) automatically; we shadow that path here so we must replicate it.
+        # Without this, formatException() receives True / a bare exception and raises
+        # "TypeError: 'bool' object is not subscriptable" on every error log line.
+        exc_info = kwargs.pop("exc_info", None)
+        if exc_info:
+            if isinstance(exc_info, BaseException):
+                exc_info = (type(exc_info), exc_info, exc_info.__traceback__)
+            elif not isinstance(exc_info, tuple):
+                exc_info = sys.exc_info()
+
         record = self.makeRecord(
             self.name,
             level,
@@ -191,7 +208,7 @@ class PlatformLogger(logging.Logger):
             0,
             msg,
             args=(),
-            exc_info=kwargs.pop("exc_info", None),
+            exc_info=exc_info,
         )
         record.platform_source = self._source
         record.correlation_id = self._correlation_id
