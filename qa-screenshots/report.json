@@ -1,17 +1,98 @@
 {
-  "timestamp": "2026-05-04T00:48:32.700707+00:00",
-  "passed": 0,
-  "failed": 1,
+  "timestamp": "2026-05-04T03:48:36.447167+00:00",
+  "passed": 12,
+  "failed": 0,
+  "warnings": 3,
   "results": [
+    {
+      "page": "Homepage",
+      "path": "/",
+      "status": "PASS",
+      "issues": [],
+      "warnings": []
+    },
+    {
+      "page": "Pulse",
+      "path": "/live/",
+      "status": "PASS",
+      "issues": [],
+      "warnings": []
+    },
     {
       "page": "Sleep",
       "path": "/sleep/",
-      "status": "FAIL",
-      "issues": [
-        "Content container '#s-content' never became visible",
-        "No canvas elements found \u2014 at least one chart has drawn pixels",
-        "Expected 1+ 'canvas', found 0 \u2014 at least one chart canvas present"
+      "status": "PASS",
+      "issues": [],
+      "warnings": [
+        "Known JS issue: TypeError: Cannot set properties of null (setting 'innerHTML')\n    at calcOnsetA \u2014 Sleep page wipes .s-adherence__grid then tries to write to a child id (s-adh-onset-outcome) that no longer exists. Real bug. Tracked separately."
       ]
+    },
+    {
+      "page": "Glucose",
+      "path": "/glucose/",
+      "status": "PASS",
+      "issues": [],
+      "warnings": [
+        "Cycle-pause: chart data doesn't span the gap window (Apr 12 \u2192 May 1). Band correctly absent."
+      ]
+    },
+    {
+      "page": "Nutrition",
+      "path": "/nutrition/",
+      "status": "PASS",
+      "issues": [],
+      "warnings": [
+        "Cycle-pause: chart data doesn't span the gap window (Apr 12 \u2192 May 1). Band correctly absent."
+      ]
+    },
+    {
+      "page": "Training",
+      "path": "/training/",
+      "status": "PASS",
+      "issues": [],
+      "warnings": []
+    },
+    {
+      "page": "Physical",
+      "path": "/physical/",
+      "status": "PASS",
+      "issues": [],
+      "warnings": []
+    },
+    {
+      "page": "Mind / Inner Life",
+      "path": "/mind/",
+      "status": "PASS",
+      "issues": [],
+      "warnings": []
+    },
+    {
+      "page": "Character",
+      "path": "/character/",
+      "status": "PASS",
+      "issues": [],
+      "warnings": []
+    },
+    {
+      "page": "Habits",
+      "path": "/habits/",
+      "status": "PASS",
+      "issues": [],
+      "warnings": []
+    },
+    {
+      "page": "Status",
+      "path": "/status/",
+      "status": "PASS",
+      "issues": [],
+      "warnings": []
+    },
+    {
+      "page": "Story",
+      "path": "/story/",
+      "status": "PASS",
+      "issues": [],
+      "warnings": []
     }
   ]
 }
