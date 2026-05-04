@@ -2278,6 +2278,7 @@
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>
 <script src="/assets/js/observatory-v3.js"></script>
+<script src="/assets/js/cycle-pause.js"></script>
 <script src="/assets/js/nav.js"></script>
 <script src="/assets/js/engagement.js"></script>
 <script>
@@ -2655,6 +2656,11 @@ renderCoachAnalysis('obs-v3-coach', 'nutrition', {
       ctx.setLineDash([4, 4]);
       ctx.beginPath(); ctx.moveTo(pad.l, yOf(180)); ctx.lineTo(W - pad.r, yOf(180)); ctx.stroke();
       ctx.setLineDash([]);
+
+      /* CYCLE PAUSE: overlay band BEFORE data so it sits behind */
+      if (window.CyclePause) {
+        CyclePause.renderCanvasBand(ctx, { trendData: trend, padding: pad, canvasW: W, canvasH: H });
+      }
 
       /* Area fill for calories */
       var calGrad = ctx.createLinearGradient(0, pad.t, 0, pad.t + iH);

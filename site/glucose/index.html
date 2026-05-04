@@ -1499,6 +1499,7 @@
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>
 <script src="/assets/js/observatory-v3.js"></script>
+<script src="/assets/js/cycle-pause.js"></script>
 <script src="/assets/js/nav.js"></script>
 <script src="/assets/js/engagement.js"></script>
 <script>
@@ -1766,6 +1767,11 @@ renderCoachAnalysis('obs-v3-coach', 'glucose', {
         var y120 = yOf(Math.min(120, maxA));
         ctx.fillStyle = 'rgba(45,212,191,0.06)';
         ctx.fillRect(pad.l, y120, iW, y70 - y120);
+      }
+
+      /* CYCLE PAUSE: overlay band BEFORE data so it sits behind */
+      if (window.CyclePause) {
+        CyclePause.renderCanvasBand(ctx, { trendData: trend, padding: pad, canvasW: W, canvasH: H });
       }
 
       /* Area fill */
