@@ -49,6 +49,9 @@ secrets.json
 token*.json
 .config.json
 
+# Visual QA artifacts (regenerated per run; auth cookie is sensitive)
+qa-screenshots/
+
 # Backup files (use git instead)
 *.bak*
 *.sw[po]
