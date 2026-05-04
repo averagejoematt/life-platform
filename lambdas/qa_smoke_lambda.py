@@ -11,6 +11,8 @@ Runtime: python3.12, 256 MB, timeout 120s
 Env vars: TABLE_NAME, S3_BUCKET, EMAIL_RECIPIENT, EMAIL_SENDER
 """
 
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -132,12 +134,15 @@ def check_s3_freshness():
     checks = []
 
     # (s3_key, label, max_age_hours, non_critical)
-    # dashboard/clinical.json and buddy/data.json are non-critical — written by
-    # dashboard-refresh which may not run if no new data arrives.
+    # 2026-05-03: paths corrected from dashboard/{file} → dashboard/matthew/{file}.
+    # The canonical writer (output_writers.py) uses dashboard/{user_id}/data.json
+    # for multi-user prep. qa-smoke had been checking the OLD pre-refactor path
+    # since 2026-03-08, generating false S3-stale failures continuously.
+    # buddy/data.json is still the canonical buddy path (no user prefix there).
     FILES = [
-        ("dashboard/data.json",     "Dashboard JSON",  4,  False),
-        ("dashboard/clinical.json", "Clinical JSON",  26,  True),
-        ("buddy/data.json",         "Buddy JSON",     26,  True),
+        ("dashboard/matthew/data.json",     "Dashboard JSON",  4,  False),
+        ("dashboard/matthew/clinical.json", "Clinical JSON",  26,  True),
+        ("buddy/data.json",                 "Buddy JSON",     26,  True),
     ]
 
     for key, label, max_hours, non_critical in FILES:
@@ -169,10 +174,10 @@ def check_score_sanity():
     checks = []
 
     try:
-        resp = s3.get_object(Bucket=S3_BUCKET, Key="dashboard/data.json")
+        resp = s3.get_object(Bucket=S3_BUCKET, Key="dashboard/matthew/data.json")
         data = json.loads(resp["Body"].read())
     except Exception as e:
-        return [Check("dashboard:parse", "Score Sanity").fail(f"Cannot load dashboard/data.json: {e}")]
+        return [Check("dashboard:parse", "Score Sanity").fail(f"Cannot load dashboard/matthew/data.json: {e}")]
 
     expected_date = yesterday_str()
     actual_date   = data.get("date", "")
@@ -380,6 +385,12 @@ def check_mcp_tool_calls():
     except Exception as e:
         return [Check("mcp:auth", "MCP Integration").fail(f"Cannot fetch MCP API key: {e}")]
 
+    # 2026-05-03: MCP Function URL uses Bearer auth (HMAC-derived from api_key),
+    # not x-api-key. Compute the deterministic Bearer token the same way the MCP
+    # handler does — see mcp/handler.py::_get_bearer_token. Note `lp_` prefix.
+    _sig = hmac.new(api_key.encode(), b"life-platform-bearer-v1", hashlib.sha256).hexdigest()
+    bearer_token = f"lp_{_sig}"
+
     def _mcp_call(tool_name, arguments):
         """Single MCP tools/call. Returns (ok: bool, data_or_error_str)."""
         payload = json.dumps({
@@ -391,7 +402,8 @@ def check_mcp_tool_calls():
         req = urllib.request.Request(
             MCP_FUNCTION_URL,
             data=payload,
-            headers={"Content-Type": "application/json", "x-api-key": api_key},
+            headers={"Content-Type": "application/json",
+                     "Authorization": f"Bearer {bearer_token}"},
             method="POST",
         )
         try:

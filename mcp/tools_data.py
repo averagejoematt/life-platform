@@ -39,8 +39,10 @@ def tool_get_sources(_args):
             KeyConditionExpression=Key("pk").eq(pk), Limit=1, ScanIndexForward=False,
             ProjectionExpression="#dt", ExpressionAttributeNames={"#dt": "date"},
         )
-        first = oldest["Items"][0]["date"] if oldest["Items"] else None
-        last  = newest["Items"][0]["date"] if newest["Items"] else None
+        # 2026-05-03: use .get() — at least one source partition has a record
+        # without a `date` field; was raising KeyError and tanking the whole tool.
+        first = oldest["Items"][0].get("date") if oldest["Items"] else None
+        last  = newest["Items"][0].get("date") if newest["Items"] else None
         result[source] = {"available": first is not None, "first_date": first, "latest_date": last}
     return result
 
