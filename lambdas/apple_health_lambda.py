@@ -347,6 +347,13 @@ def lambda_handler(event, context):
         print("Apple Health Lambda triggered")
         print(f"Event: {json.dumps(event, default=str)}")
 
+        # Guard: this Lambda is S3-triggered only. Test invokes / accidental
+        # invocations without an S3 Records payload should no-op cleanly,
+        # not raise a hard KeyError that fires ingestion-error-apple-health.
+        if not isinstance(event, dict) or not event.get("Records"):
+            logger.warning("apple-health invoked without S3 Records payload — no-op exit")
+            return {"statusCode": 200, "body": "no-op (no Records)"}
+
         # Get S3 trigger info
         record = event["Records"][0]["s3"]
         bucket = record["bucket"]["name"]

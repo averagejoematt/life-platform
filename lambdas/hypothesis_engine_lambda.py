@@ -573,7 +573,10 @@ Return ONLY this JSON structure:
 
     payload = json.dumps({
         "model": AI_MODEL,
-        "max_tokens": 2000,
+        # 2026-05-03: bumped 2000 → 4000 — hypothesis JSON with multiple
+        # patterns + confidence reasons was hitting truncation, then 400 on
+        # retry. Sonnet 4.x supports 8192 in standard mode; 4000 is safe.
+        "max_tokens": 4000,
         "system": [{"type": "text", "text": HYPOTHESIS_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
         "messages": [{"role": "user", "content": user_message}],
     }).encode()
@@ -604,7 +607,13 @@ Return ONLY this JSON structure:
                         logger.warning("[AI-3] generate_hypotheses warnings: %s", val_result.warnings)
                 return json.loads(raw.strip())
         except urllib.error.HTTPError as e:
-            logger.warning(f"Anthropic HTTP {e.code} attempt {attempt}")
+            # Capture response body so 4xx errors (e.g. context_length, max_tokens
+            # too high) surface their actual reason instead of just "400 Bad Request".
+            try:
+                err_body = e.read().decode('utf-8', errors='replace')[:500]
+            except Exception:
+                err_body = "(could not read body)"
+            logger.warning(f"Anthropic HTTP {e.code} attempt {attempt}: {err_body}")
             if attempt < 2 and e.code in (429, 529, 500, 502, 503, 504):
                 time.sleep(5)
             else:

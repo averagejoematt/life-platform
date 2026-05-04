@@ -277,7 +277,11 @@ Output this exact JSON structure:
 {{"key_patterns": ["specific data observation 1", "specific data observation 2"], "likely_connection": "habit/metric X correlates with metric Y result — note this is a pattern, not proven causation", "challenge": "One reason this analysis might be wrong or misleading — e.g. confounding factor, insufficient data, correlation ≠ causation, or the obvious insight hiding a subtler one", "priority": "single most important coaching focus for today", "tone": "celebrate|challenge|support"}}"""
 
     try:
-        raw = call_anthropic(prompt, api_key, max_tokens=200, model=AI_MODEL_HAIKU)
+        # 2026-05-03: bumped 200 → 600. IC-3 JSON has 5 fields (key_patterns
+        # array + likely_connection + challenge + priority + tone). 200 was
+        # truncating mid-string ("Unterminated string starting at... char 670"
+        # in daily-brief logs). 600 gives ample headroom.
+        raw = call_anthropic(prompt, api_key, max_tokens=600, model=AI_MODEL_HAIKU)
         raw = raw.strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
