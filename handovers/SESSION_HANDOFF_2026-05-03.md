@@ -3,10 +3,12 @@
 > **If you're a fresh Claude chat session reading this:** this is the canonical entry point for what was done across the entire 2026-05-03 weekend. Start here, then drill into the specific handover or audit/runbook you need. The platform is in a clean, well-documented state.
 
 **Date:** 2026-05-03 (Sunday evening, end of session)
-**Final version:** v6.8.9
-**Last commit:** `12a690e`
+**Final version:** v6.9.0
+**Last commit:** `bd01a40`
 **Final freshness:** 🔴 red (2 stale sources — both Matthew-action: Strava + MacroFactor)
 **Re-entry status:** Cycle 2 began 2026-05-02; tonight's session closed Phase 1-3 of `Downloads/ajm_reentry_plan.md` + added Phase 8-10 build work.
+
+**Late-evening addendum (v6.9.0):** Cycle Pause visualization shipped — visual gray band on every observatory chart spanning April 12 → May 1 platform pause. Spec at `docs/SPEC_CYCLE_PAUSE_VIZ_2026_05_03.md`, deep handover at `handovers/HANDOVER_v6.9.0.md`. WR-47 phase 1 (visual surface) closed; phase 2 (server-side suppression + public banner) still open. Two commits: `ec09502` (the work) + `bd01a40` (auto version stamps).
 
 ---
 
