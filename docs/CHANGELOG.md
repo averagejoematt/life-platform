@@ -1,3 +1,46 @@
+## v6.9.0 — Cycle Pause visualization on observatory charts (2026-05-03)
+
+Spec: `docs/SPEC_CYCLE_PAUSE_VIZ_2026_05_03.md`. WR-47 surface — visual gray band spanning the April 12 → May 1 platform pause window so first-time visitors immediately see "documented pause" instead of "broken data."
+
+### New shared module
+- `site/assets/js/cycle-pause.js` (NEW) — single source of truth for pause windows + 3 render primitives:
+  - `renderSvgBand(svgEl, opts)` for raw `<svg>` charts (sleep architecture)
+  - `renderCanvasBand(ctx, opts)` for raw `<canvas>` charts (sleep trend, glucose, nutrition, training trend, mind mood)
+  - `chartjsPlugin` for Chart.js charts (physical weight + dual-axis charts, training modality + steps, mind sentiment + vice timeline)
+  - `getPauses()` and `filterTrend()` helpers for future use
+- Idempotent (removes prior band before re-render → safe on time-window toggles).
+- Hardcoded `PAUSES = [cycle_1_5_gap_move (2026-04-12 → 2026-05-01)]`. Future: config or DDB-driven.
+- ISO-week → date adapter inlined in `site/training/index.html` for the weekly-aggregated trend chart (data has `week` not `date`).
+
+### CSS
+- `site/assets/css/observatory-v3.css` — `.cycle-pause-label`, `.cycle-pause-band`, `.cycle-pause-overlay` utility classes. Subtle (matches existing 30d target-zone weight).
+
+### Wired pages (6/6)
+- sleep — SVG architecture chart (initial + on toggle re-render) + Canvas trend chart
+- glucose — Canvas trend chart (g-trend-canvas)
+- nutrition — Canvas trend chart (n-trend-canvas)
+- training — Canvas weekly trend (with week→date adapter) + Chart.js modality + Chart.js daily steps
+- physical — 3 Chart.js charts (weight trajectory + cal dual-axis + training dual-axis)
+- mind — Canvas mood chart + Chart.js sentiment trend + Chart.js vice-timeline
+
+### Acceptance criteria status
+- ✅ Visible gray band spans April 12 → May 1 on every time-series chart
+- ✅ Conditionally hidden when visible window doesn't intersect the gap (7-day mode → no band)
+- ✅ Band sits BEHIND data (z-order: SVG via insertBefore, Canvas via render order)
+- ✅ Native browser tooltip on band hover (SVG `<title>`)
+- ✅ Label only renders if band > 60px (mobile-safe)
+- ✅ JS parses cleanly across all 6 pages (Node syntax check)
+- ⚠️ Visual_qa.py screenshot pass deferred — site is gated by cf-auth, headless tooling can't reach gated pages without auth handshake. Manual visual check required Monday morning.
+
+### Deploy
+- S3 sync via `bash deploy/sync_site_to_s3.sh` (8 HTML pages + 1 new JS + 1 updated CSS).
+- CloudFront invalidation `IE64QQ3BEV6FAWEUOQ1PL0F0BZ`.
+
+### Rollback
+- Purely additive: new file + new CSS classes + opt-in `if (window.CyclePause)` guarded calls. Revert + resync = clean restoration.
+
+---
+
 ## v6.8.9 — Phase A-D pre-Monday readiness sweep (2026-05-03)
 
 Goal: ensure the platform "just works" when Matthew opens it Monday morning. 4 phases per `~/.claude/plans/proud-humming-scone.md`.
