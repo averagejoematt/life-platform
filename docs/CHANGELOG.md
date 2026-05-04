@@ -1,3 +1,41 @@
+## v6.9.1 — Pre-Monday bug paydown sweep (2026-05-03 late evening)
+
+End-of-Sunday cleanup: investigated 13 alarms in ALARM state, fixed 5 real bugs, bumped 2 stale alarm thresholds, published shared layer v43. Goal: tomorrow's 10am PT daily-brief fires clean with no false-positive alarm cascade.
+
+### Lambda fixes
+
+- **`apple_health_lambda.py`** — defensive guard at `lambda_handler` for missing `Records` payload. Test invokes / accidental invocations no longer fire `ingestion-error-apple-health` with a hard `KeyError: 'Records'`. Returns `200 no-op` instead.
+- **`todoist_lambda.py api_get`** — added 3-attempt retry with 2s/8s backoff on transient 429/500/502/503/504 from Todoist API. Today's 503 from Todoist's maintenance window fired `ingestion-error-todoist` on a single transient blip.
+- **`hypothesis_engine_lambda.py`** — `max_tokens` 2000 → 4000 (was truncating multi-pattern JSON, then 400 on retry). Also captures HTTPError response body so future 400s surface their actual reason.
+- **`coach_state_updater.py _call_haiku`** — `max_tokens` default 1500 → 3000 (was hitting truncation on 5-coach state extraction). Also captures HTTPError body.
+- **`ai_calls.py _run_analysis_pass`** (LAYER) — IC-3 chain-of-thought analysis pass: `max_tokens` 200 → 600. The IC-3 JSON has 5 fields (key_patterns array + likely_connection + challenge + priority + tone); 200 was truncating mid-string ("Unterminated string starting at... char 670" in daily-brief logs).
+
+### Layer
+
+- `SHARED_LAYER_VERSION` 42 → **v43** (IC-3 truncation fix). Built via `bash deploy/build_layer.sh`, published via `npx cdk deploy LifePlatformCore`. All consuming Lambdas updated via `cdk deploy --all` (verified: coach-state-updater, hypothesis-engine, daily-brief, apple-health-ingestion, todoist-data-ingestion all on v43).
+
+### Alarm threshold bumps (`monitoring_stack.py`)
+
+- **`daily-brief-duration-high`**: 240000ms (4min) → **720000ms (12min)**. Old threshold was sized for the previous 300s Lambda timeout; new timeout is 900s. 720s = 80% of timeout — still catches genuine runaways.
+- **`ai-tokens-daily-brief-daily`**: 13333 → **18000** tokens. Today's healthy brief used 14414 (above old threshold). With IC-3 max_tokens at 600 + 6 coach narratives + ensemble, healthy budget is ~14-16k. 18k leaves ~25% buffer.
+
+### Operational
+
+- Manually reset 8 alarms to OK (5 historical April single-datapoint alarms with no current emitter; 3 today's transient errors whose root causes are now fixed). Some will re-trigger as historical datapoints remain in evaluation windows; will naturally clear over next 24h.
+
+### Deploy
+
+- `bash deploy/build_layer.sh` (18 modules → cdk/layer-build/python/)
+- `cd cdk && npx cdk deploy --all --require-approval never` (8/8 stacks updated)
+- Layer v43 published 01:35:08 UTC; affected Lambdas re-pointed by 01:37:15 UTC.
+
+### What's still open (deferred)
+
+- The Anthropic 4xx error responses are now visible in logs (we capture body), but if tomorrow's runs still 4xx after the max_tokens bumps, that points to a different root cause (context length, stop_sequences, etc.). Re-investigate Tuesday if alarms fire again.
+- `life-platform-compute-pipeline-stale` alarm has no current emitter — vestigial CDK definition. TODO: either wire up emission or remove the alarm.
+
+---
+
 ## v6.9.0 — Cycle Pause visualization on observatory charts (2026-05-03)
 
 Spec: `docs/SPEC_CYCLE_PAUSE_VIZ_2026_05_03.md`. WR-47 surface — visual gray band spanning the April 12 → May 1 platform pause window so first-time visitors immediately see "documented pause" instead of "broken data."
