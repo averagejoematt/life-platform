@@ -1,3 +1,37 @@
+## v6.9.5 — qa-smoke false-positive sweep + DLQ drain (2026-05-03 late evening)
+
+User showed inbox at 9pm PT with two real signals: CI/CD failed on commit `36bebf1` (DLQ piled up to 90 messages) AND a "🔴 QA: 8 FAILURES" email from the daily qa-smoke Lambda. Investigation:
+
+### 3 real bugs in qa-smoke itself (false positives)
+
+1. **Path mismatch** — `lambdas/qa_smoke_lambda.py` was checking `dashboard/data.json` and `dashboard/clinical.json`, but the canonical writer (`output_writers.py`) moved to `dashboard/{user_id}/data.json` for multi-user prep on 2026-03-08. qa-smoke had been generating false S3-stale failures for ~56 days. **Fixed:** updated to `dashboard/matthew/data.json` + `dashboard/matthew/clinical.json` for both `check_s3_freshness` and `check_score_sanity`.
+
+2. **MCP auth scheme mismatch** — qa-smoke sent `x-api-key: <api_key>` but the MCP Function URL requires `Authorization: Bearer lp_<hmac_sha256(api_key, "life-platform-bearer-v1")>`. Was generating `mcp:get_sources HTTP 401` and `mcp:get_todoist_snapshot HTTP 401` failures every run. **Fixed:** compute the deterministic Bearer token the same way `mcp/handler.py::_get_bearer_token` does (note the `lp_` prefix). Tested live — both tools now return 200.
+
+3. **`tool_get_sources` KeyError** — `mcp/tools_data.py:42-43` did `oldest["Items"][0]["date"]` but at least one source partition has a record without a `date` field, raising `KeyError: 'date'` and tanking the whole tool. **Fixed:** use `.get("date")` to gracefully handle missing field.
+
+### DLQ drain
+
+`life-platform-ingestion-dlq` had 90 messages — all stale EventBridge scheduled events from 2026-04-20+ (during the silence period when Lambdas were broken pre-v6.8.9 layer-drift fix). Test `test_i9_dlq_empty` was correctly flagging this. **Purged.** Queue at 0 messages.
+
+### Deploy
+
+- `bash deploy/deploy_lambda.sh life-platform-qa-smoke lambdas/qa_smoke_lambda.py`
+- Custom MCP package deploy (mcp_server.py + mcp/ package): `aws lambda update-function-code --function-name life-platform-mcp --zip-file fileb:///tmp/mcp-deploy.zip` (codesize 306377 bytes)
+- `aws sqs purge-queue --queue-url ...life-platform-ingestion-dlq`
+
+### Verification
+
+- Manual qa-smoke invoke post-deploy: **8 failures → 5 failures** (3 false positives eliminated). Remaining 5 are known stale Matthew-action sources (Strava, MacroFactor) + DDB:withings (likely yesterday-vs-today timing — Withings record exists for 2026-05-03) + blog:links (5 stale `week-0[0-4].html` references in `blog/index.html` — separate bundle, not in site/ source).
+- `get_sources` curl test returns clean source list (whoop/withings/strava/todoist/apple_health all with first/latest dates).
+
+### Deferred
+
+- **blog/index.html** stale `week-0[0-4].html` refs: those weeks don't exist in S3 (only `week-05.html`). Likely a templating issue — defer until the chronicle redesign work in progress.
+- **DDB:withings false positive**: qa-smoke's `check_data_freshness` checks "yesterday"; an evening run on May 3 fails if Matthew didn't weigh on May 2. Edge case, not urgent.
+
+---
+
 ## v6.9.4 — visual_qa v3.1 + character_stats 503→200 (2026-05-04 very late evening)
 
 Parallel to Claude Code's v6.9.3 (IC-4 detectors). No file overlap.
