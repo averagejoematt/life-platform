@@ -225,8 +225,13 @@ def create_platform_lambda(
     # ── CloudWatch error alarm ──
     if alerts_topic:
         _alarm_name = alarm_name if alarm_name else f"ingestion-error-{function_name}"
+        # 2026-05-03 v6.9.2: period reduced 24h → 1h. Old window kept alarms in
+        # ALARM state for 24h on a single transient error, and re-emailed if
+        # set-alarm-state was overridden during evaluation. 1h window means a
+        # transient blip self-clears within an hour; sustained failures still
+        # re-fire as new errors arrive. Net: less inbox noise, same signal.
         alarm = fn.metric_errors(
-            period=Duration.hours(24),
+            period=Duration.hours(1),
             statistic="Sum",
         ).create_alarm(
             scope, f"{id}ErrorAlarm",

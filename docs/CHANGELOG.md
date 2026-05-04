@@ -1,3 +1,34 @@
+## v6.9.2 — CI unblock + alarm noise reduction (2026-05-03 late evening)
+
+User showed me an inbox flooded with alarm emails. Investigation found two real issues underneath the noise:
+
+### CI was broken on main (blocking future commits)
+
+`tests/test_lambda_sizing.py::test_email_stack_memory_limits` asserted ≤512MB across all email-stack Lambdas. The earlier-today b227b13 commit bumped daily-brief from 512→768MB (legitimate fix; needed headroom for 6-coach narrative pass). Test wasn't updated, so every push since failed CI.
+
+**Fix:** allow 768MB exception for daily-brief specifically (matches by `daily-brief` / `daily_brief` / `DailyBrief` substring in the captured context). All other email-stack Lambdas still capped at 512MB. All 5 sizing tests pass.
+
+### Alarm noise wiring (root cause of tonight's email flood)
+
+`cdk/stacks/lambda_helpers.py` defaulted all `ingestion-error-*` alarms to a 24h evaluation period with single-datapoint trigger. Meant: one transient blip → alarm flips to ALARM → stays ALARM for the full 24h → `set-alarm-state OK` was overridden on next eval and re-flipped → cascade emails.
+
+**Fix:** evaluation period 24h → **1h**. A transient error now self-clears within an hour; sustained failures still re-fire as new errors arrive. Same signal, far less inbox noise. Applied via the shared helper, so all ~30 platform Lambda alarms picked it up via single deploy.
+
+Verified: all 30+ `ingestion-error-*` alarms now show `Period=3600`. Manually OK'd the 8 in-flight ALARM-state alarms; with the new 1h window, historical errors from 16:00-17:00 UTC today are out of the eval window so they stay OK.
+
+### Deploy
+
+- `cd cdk && npx cdk deploy --all --require-approval never` — touched ~30 alarm definitions across LifePlatformIngestion, LifePlatformCompute, LifePlatformEmail, LifePlatformOperational, LifePlatformMcp, LifePlatformWeb.
+- All 8 stacks updated cleanly. Total deploy time ~6 min.
+
+### State as of 8:30pm PT
+
+- Zero alarms in ALARM state
+- CI green-able again
+- Inbox should stop receiving cascade emails
+
+---
+
 ## v6.9.1 — Pre-Monday bug paydown sweep (2026-05-03 late evening)
 
 End-of-Sunday cleanup: investigated 13 alarms in ALARM state, fixed 5 real bugs, bumped 2 stale alarm thresholds, published shared layer v43. Goal: tomorrow's 10am PT daily-brief fires clean with no false-positive alarm cascade.
