@@ -1,6 +1,21 @@
 {
   "posts": [
     {
+      "week": 5,
+      "title": "The Architecture of Absence",
+      "date": "2026-05-03",
+      "stats_line": "Special Edition · Issue 5 · Days off-grid: 19 · April experiments: 5 of 5 failed · Re-entry: May 4, 2026",
+      "url": "/chronicle/posts/issue-05/",
+      "excerpt": "The platform he built to catch him had been awake the whole time. The dashboards refreshed at three in the morning, the way they always do. Whoop and Eight Sleep and Garmin and the rest of them kept transmitting some version of him until the silences spread, source by source, like a power outage moving across a city…",
+      "word_count": 1403,
+      "has_board_interview": false,
+      "phase": "season1",
+      "badges": [
+        "Special Edition"
+      ],
+      "coming_soon": false
+    },
+    {
       "week": -1,
       "title": "The Interview",
       "date": "2026-04-01",
@@ -47,5 +62,5 @@
     }
   ],
   "experiment_start": "2026-04-01",
-  "updated_at": "2026-03-31T17:00:00.000000+00:00"
+  "updated_at": "2026-05-04T01:37:30.281732+00:00"
 }
