@@ -1,35 +1,29 @@
-# Handover — v6.9.4: visual_qa v3.1 + character_stats 503→200 fix
+# Handover — v6.9.5: qa-smoke false-positive sweep + DLQ drain
 
-**Date:** 2026-05-04 (very late evening, after Claude Code's v6.9.3 session)
-**Trigger:** Existing visual_qa couldn't run because the site is gated by cf-auth. Once running, it found a real bug.
-**Scope:** Make visual_qa actually runnable; triage and fix what it surfaced.
+**Date:** 2026-05-03 (very late evening, after v6.9.4)
+**Trigger:** Inbox at 9pm PT showed CI failure (DLQ 90 messages) + "🔴 QA: 8 FAILURES" email. User asked "are we sure we are good?" — no.
+**Scope:** Triage. 3 of 8 QA failures were real bugs in qa-smoke itself; remaining 5 are known Matthew-action or deferred items.
 
-See [HANDOVER_v6.9.4.md](HANDOVER_v6.9.4.md) for full details.
+See [HANDOVER_v6.9.5.md](HANDOVER_v6.9.5.md) for full details.
 
 ## Headlines
 
-1. **visual_qa v3.1.0** — auth handshake + accurate cycle-pause detection (3 render flavors) + collapsed-`<details>` filter + known-issue allowlist + 5xx URL logging. Now runs end-to-end against the cf-auth-gated site.
-2. **`/api/character_stats` 503→200** — Lambda was returning 503 for missing data. Now returns `200 {"computed": false, ...}` with 5-min cache. Homepage already had graceful fallback chain; this just stops the false 5xx alarms.
-3. **Final state: 12/12 visual_qa pages pass** with 3 acceptable warnings (Sleep `calcOnsetAdherence` known bug; Glucose/Nutrition correctly-absent cycle-pause).
+1. **qa-smoke path mismatch** — was checking `dashboard/data.json` (old path); canonical writer moved to `dashboard/matthew/data.json` 2026-03-08. False S3-stale failures for ~56 days. Fixed.
+2. **MCP auth scheme mismatch** — qa-smoke sent `x-api-key` but Function URL needs `Authorization: Bearer lp_<hmac>`. Two MCP checks 401-ing every run. Fixed via deterministic Bearer derivation.
+3. **`tool_get_sources` KeyError** — `oldest["Items"][0]["date"]` raised when one source had a record without `date` field. Fixed via `.get()`.
+4. **DLQ drained** — 90 stale messages from silence period (April 20+). Purged. Test `test_i9_dlq_empty` now passes.
 
-Parallel to but independent of Claude Code's v6.9.3 (IC-4 detectors). No file overlap.
+## Verification
 
-## What's still open (deferred next session)
+Manual qa-smoke invoke post-deploy: **8 failures → 5 failures**. Remaining are Matthew-action stale sources (Strava, MacroFactor) + DDB:withings false-positive timing edge case + blog:links (separate bundle).
 
-| Item | Effort | Why deferred |
-|---|---|---|
-| Sleep `calcOnsetAdherence` real fix | ~10 min | Real bug, low impact, tracked in allowlist |
-| ~15 other `_error(503, ...)` anti-patterns in site_api_lambda.py | 1-2 hr audit | Each needs case-by-case 404 vs 200-with-flag judgment |
-| Actually compute `character_stats.json` on schedule | Multi-session | Overlaps with Coach Intelligence build-out |
-| Glucose/Nutrition default-window eyeball | 30 sec | Cosmetic; verify data sparsity vs window-too-short |
+## State as of 9:15pm PT
 
-## Quick verify (next session)
-
-```bash
-python3 tests/visual_qa.py
-# expect: 12 passed, 0 failed, 3 warning(s) across 12 pages
-```
+✅ Alarms in ALARM: 0
+✅ DLQ messages: 0
+✅ qa-smoke failures: 5 (all real Matthew-action or deferred low-priority)
+✅ MCP `get_sources` and `get_todoist_snapshot` working
 
 ---
 
-**Previous:** [HANDOVER_v6.9.3.md](HANDOVER_v6.9.3.md) — IC-4 failure-pattern detectors implemented (Claude Code session, parallel)
+**Previous:** [HANDOVER_v6.9.4.md](HANDOVER_v6.9.4.md) — visual_qa v3.1 + character_stats 503→200
