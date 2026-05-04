@@ -1689,6 +1689,7 @@
 <script src="/assets/js/nav.js"></script>
 <script src="/assets/js/engagement.js"></script>
 <script src="/assets/js/observatory-v3.js"></script>
+<script src="/assets/js/cycle-pause.js"></script>
 <script>
   // V3: Render coach analysis early (fetches async)
   renderCoachAnalysis('obs-v3-coach', 'sleep', {
@@ -1893,6 +1894,11 @@
       document.getElementById('s-arch-deep').setAttribute('d', deepPath);
       document.getElementById('s-arch-rem').setAttribute('d', remPath);
       document.getElementById('s-arch-light').setAttribute('d', lightPath);
+
+      // CYCLE PAUSE: overlay band on SVG architecture chart
+      if (window.CyclePause) {
+        CyclePause.renderSvgBand(svgEl, { trendData: trend, viewBoxW: W, viewBoxH: H });
+      }
     }
 
     /* ── 8c: Sleep consistency / social jetlag ── */
@@ -2000,6 +2006,11 @@
       if (85 >= minS && 85 <= maxS) {
         ctx.fillStyle = 'rgba(96,165,250,0.06)';
         ctx.fillRect(pad.l, pad.t, iW, yOf(85) - pad.t);
+      }
+
+      /* CYCLE PAUSE: overlay band BEFORE data so it sits behind */
+      if (window.CyclePause) {
+        CyclePause.renderCanvasBand(ctx, { trendData: trendData, padding: pad, canvasW: cW, canvasH: cH });
       }
 
       /* Area fill */
@@ -2151,6 +2162,14 @@
       document.getElementById('s-arch-deep').setAttribute('d', aDeepPath);
       document.getElementById('s-arch-rem').setAttribute('d', aRemPath);
       document.getElementById('s-arch-light').setAttribute('d', aLightPath);
+
+      // CYCLE PAUSE: re-render band with new x-axis mapping
+      if (window.CyclePause) {
+        CyclePause.renderSvgBand(
+          document.getElementById('s-arch-svg'),
+          { trendData: sliced, viewBoxW: aW, viewBoxH: aH }
+        );
+      }
     });
 
     /* ── PB-07: Protocol Adherence — Sleep Onset < 11pm PT ────────── */

@@ -939,6 +939,7 @@
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>
 <script src="/assets/js/observatory-v3.js"></script>
+<script src="/assets/js/cycle-pause.js"></script>
 <script src="/assets/js/nav.js"></script>
 <script src="/assets/js/engagement.js"></script>
 <script src="/assets/js/reveal.js"></script>
@@ -1063,6 +1064,7 @@ renderCoachAnalysis('obs-v3-coach', 'physical', {
       function buildChart(data) {
         var labels = data.map(function(d) { return d.date; });
         var raw = data.map(function(d) { return d.weight_lbs; });
+        var fullDates = data.map(function(d) { return d.date; });
 
         /* 7-day moving average */
         var ma7 = raw.map(function(_, i, arr) {
@@ -1112,10 +1114,12 @@ renderCoachAnalysis('obs-v3-coach', 'physical', {
         return {
           type: 'line',
           data: { labels: labels, datasets: datasets },
+          plugins: window.CyclePause ? [CyclePause.chartjsPlugin] : [],
           options: {
             responsive: true, maintainAspectRatio: false,
             plugins: {
               legend: { display: false },
+              cyclePause: { dates: fullDates },
               tooltip: {
                 callbacks: {
                   label: function(ctx) { return ctx.dataset.label + ': ' + ctx.raw + ' lbs'; }
@@ -1185,6 +1189,7 @@ renderCoachAnalysis('obs-v3-coach', 'physical', {
           var s = 0; for (var k = i - 6; k <= i; k++) s += arr[k]; return Math.round(s / 7 * 10) / 10;
         });
 
+        var calFullDates = alignedCal.map(function(d) { return d.date; });
         new Chart(document.getElementById('p-dual-cal-canvas'), {
           type: 'bar',
           data: {
@@ -1194,9 +1199,10 @@ renderCoachAnalysis('obs-v3-coach', 'physical', {
               { label: 'Weight (7d avg)', type: 'line', data: calWma, borderColor: '#60a5fa', borderWidth: 2.5, pointRadius: 0, fill: false, tension: 0.3, spanGaps: true, yAxisID: 'y', order: 1 }
             ]
           },
+          plugins: window.CyclePause ? [CyclePause.chartjsPlugin] : [],
           options: {
             responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            plugins: { legend: { display: false }, cyclePause: { dates: calFullDates } },
             scales: {
               x: { ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 }, maxRotation: 45 }, grid: { display: false } },
               y: { position: 'left', ticks: { color: '#60a5fa', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.03)' }, title: { display: true, text: 'lbs', color: '#60a5fa', font: { size: 10 } } },
@@ -1221,6 +1227,7 @@ renderCoachAnalysis('obs-v3-coach', 'physical', {
           var s = 0; for (var k = i - 6; k <= i; k++) s += arr[k]; return Math.round(s / 7 * 10) / 10;
         });
 
+        var trainFullDates = alignedTrain.map(function(d) { return d.date; });
         new Chart(document.getElementById('p-dual-train-canvas'), {
           type: 'bar',
           data: {
@@ -1230,9 +1237,10 @@ renderCoachAnalysis('obs-v3-coach', 'physical', {
               { label: 'Weight (7d avg)', type: 'line', data: trainWma, borderColor: '#60a5fa', borderWidth: 2.5, pointRadius: 0, fill: false, tension: 0.3, spanGaps: true, yAxisID: 'y', order: 1 }
             ]
           },
+          plugins: window.CyclePause ? [CyclePause.chartjsPlugin] : [],
           options: {
             responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            plugins: { legend: { display: false }, cyclePause: { dates: trainFullDates } },
             scales: {
               x: { ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 }, maxRotation: 45 }, grid: { display: false } },
               y: { position: 'left', ticks: { color: '#60a5fa', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.03)' }, title: { display: true, text: 'lbs', color: '#60a5fa', font: { size: 10 } } },

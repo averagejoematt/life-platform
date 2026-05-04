@@ -667,3 +667,39 @@
   .obs-detail-card__value { font-size: 16px; }
   .obs-subtitle { padding: 0 var(--page-padding-sm, 24px); }
 }
+
+/* ── Cycle Pause Visualization (WR-47 surface, 2026-05-03) ───────────── */
+
+.cycle-pause-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  fill: var(--text-faint);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.cycle-pause-band rect {
+  pointer-events: all;
+  cursor: help;
+}
+
+/* HTML overlay variant (used when a chart can't accept SVG/Canvas overlay) */
+.cycle-pause-overlay {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 1px dashed rgba(255, 255, 255, 0.10);
+  border-right: 1px dashed rgba(255, 255, 255, 0.10);
+  pointer-events: all;
+  cursor: help;
+}
+
+.cycle-pause-overlay__label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 4px 6px;
+  pointer-events: none;
+}
