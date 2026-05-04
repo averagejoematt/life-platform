@@ -1,30 +1,32 @@
-# Handover — v6.9.1: Pre-Monday bug paydown sweep
+# Handover — v6.9.2: CI unblock + alarm noise reduction
 
-**Date:** 2026-05-03 (late evening, after v6.9.0 Cycle Pause)
-**Scope:** End-of-Sunday cleanup. Investigated 13 alarms in ALARM state, fixed 5 real bugs, bumped 2 stale alarm thresholds, published shared layer v43.
-**Goal:** Tomorrow's 10am PT daily-brief fires clean with no false-positive alarm cascade.
+**Date:** 2026-05-03 (very late evening, after v6.9.1)
+**Trigger:** Inbox flooded with alarm emails at 8:14pm PT.
+**Scope:** Two real bugs found and fixed.
 
-See [HANDOVER_v6.9.1.md](HANDOVER_v6.9.1.md) for full details.
+See [HANDOVER_v6.9.2.md](HANDOVER_v6.9.2.md) for full details.
 
 ## Headlines
 
-1. **5 Lambda fixes** — apple-health defensive guard, todoist 503 retry, hypothesis-engine + coach-state-updater + IC-3 max_tokens bumps (all were truncating outputs and 4xx-ing on retry).
-2. **Layer v43 published** — IC-3 max_tokens 200→600 (truncation fix). All 66 consuming Lambdas re-pointed by 01:37 UTC.
-3. **2 alarm thresholds bumped** — daily-brief-duration-high 4min→12min (matches new 900s timeout); ai-tokens-daily-brief-daily 13333→18000 tokens.
-4. **8 alarms manually reset** to OK (5 historical April + 3 today's transients post-fix). Some will re-trigger as historical datapoints remain in evaluation windows; will naturally clear over 24h.
+1. **CI unblocked** — `test_email_stack_memory_limits` was asserting ≤512MB but daily-brief is now 768MB (per b227b13 fix earlier today). Test updated to allow the 768MB exception for daily-brief specifically.
+2. **Alarm noise reduction** — `lambda_helpers.py` was creating all error alarms with 24h evaluation windows. Single transient errors stayed in ALARM for 24h, generating cascade emails when CloudWatch re-evaluated. Reduced to 1h. ~30 alarms updated via `cdk deploy --all`.
+3. **Manually OK'd 8 in-flight alarms** — historical errors now outside the new 1h window, so OK state sticks. Zero alarms in ALARM as of 8:30pm PT.
 
 ## What's true tomorrow morning
 
-✅ 10am PT daily-brief expected ~5min, ~14-16k tokens — both under new thresholds → no false alarm
-✅ All 4xx errors now log response body for visibility
-✅ Cycle Pause band visible on observatory pages (manual eyeball check still recommended per HANDOVER_v6.9.0)
-✅ Two known stale sources (Strava, MacroFactor) — Matthew action
+✅ Inbox quiet unless something genuinely sustained breaks
+✅ CI green on next push
+✅ Single transient ingestion errors self-clear within 1h
+✅ Cycle pause band visible on observatory pages (per v6.9.0)
+✅ All v6.9.1 max_tokens fixes deployed; tomorrow's natural Lambda runs will exercise them
 
-## Deferred (not blocking Monday)
+## Open items (deferred, properly tracked)
 
-- `life-platform-compute-pipeline-stale` has no current emitter (vestigial CDK definition)
-- If tomorrow's runs still 4xx after max_tokens bumps, response body now visible in logs to diagnose
+- 10 stub TODOs in `failure_pattern_compute_lambda.py` + `momentum_warning_compute_lambda.py` — data gate met (2026-05-01) so now actionable; ~2-4h next session
+- `life-platform-compute-pipeline-stale` vestigial alarm — wire emitter or remove (next session)
+- WR-47 phase 2, WR-49, WR-50 — design work for next session
+- TD-11 step 2, TD-17, TD-19 phase 3 — Matthew action / approval gated
 
 ---
 
-**Previous:** [HANDOVER_v6.9.0.md](HANDOVER_v6.9.0.md) — Cycle Pause viz.
+**Previous:** [HANDOVER_v6.9.1.md](HANDOVER_v6.9.1.md) — paydown sweep
