@@ -1,3 +1,38 @@
+## v6.9.3 — IC-4 failure-pattern detectors implemented (2026-05-03 late evening)
+
+`lambdas/failure_pattern_compute_lambda.py` had 4 stub detectors marked "TODO: Implement when data gate met (~2026-05-01)" since 2026-03-15. Gate is now met (41/42 days as of tonight; will tip over tomorrow). Stubs replaced with real implementations. Downstream `daily_insight_compute_lambda.py:340` reads the `MEMORY#failure_patterns#YYYY-MM-DD` records this Lambda writes — it'll now have real signal instead of empty arrays.
+
+### Detectors
+
+- **`_detect_habit_skip_predictors`** — for each habit ever in `missed_tier0`, computes P(bad day | habit skipped) vs baseline bad-rate; returns top 3 highest-lift habits with `n_skipped >= 3` and `lift > 1.0`.
+- **`_detect_cascade_patterns`** — Whoop sleep_score < 60 → next-day day_grade < 60 conditional probability with lift over baseline. Currently 1 cascade pattern; structure supports adding more.
+- **`_detect_day_of_week_clusters`** — group habit composite_score by weekday, flag DOWs ≥5 points below overall mean as `elevated`, ≥2 points as `mild`.
+- **`_detect_rebound_speed`** — walk dates, find bad-day runs (grade < 60), measure days to recovery (grade ≥ 70). Returns mean / median / p90 / n_episodes.
+
+All detectors:
+- Pure functions (no DDB I/O — handler does that)
+- Decimal-safe (coerce to float)
+- Defensive on empty/missing data (return `{}` or `[]` cleanly)
+- Filter low-N cases (`n >= 3` minimums)
+
+### Tests
+
+`tests/test_failure_pattern_detectors.py` — 12 unit tests covering happy path + low-N filter + empty-input edges. All pass.
+
+### Deploy
+
+- `bash deploy/deploy_lambda.sh failure-pattern-compute lambdas/failure_pattern_compute_lambda.py`
+- Test invoke confirmed end-to-end: returns `data_gate_not_met` (41/42 days) gracefully — exactly what the gate is for. Tomorrow's natural Sunday-11:45-AM-PT cron at `cron(45 18 ? * SUN *)` will run the real path.
+
+### Not in scope (deferred next session)
+
+- **`momentum_warning_compute_lambda.py`** — has 6 similar stubs, but the Lambda is NOT in CDK and not deployed to AWS. Wiring it up requires new IAM role + EventBridge schedule + CloudWatch alarm — not a low-risk autonomous change. Spec the wire-up first.
+- **WR-47 phase 2** (server-side pause-mode behavior) — full spec at `docs/WR_47_48_ARCHITECTURE_SPEC.md` is multi-session work (DDB pause schema + start/end MCP tools + EventBridge programmatic disable + ~10 Lambda short-circuits + subscriber "On Coming Back" email).
+- **WR-49** (one-click manual backfill UI) — needs design.
+- **WR-50** — gated on WR-47 phase 2.
+
+---
+
 ## v6.9.2 — CI unblock + alarm noise reduction (2026-05-03 late evening)
 
 User showed me an inbox flooded with alarm emails. Investigation found two real issues underneath the noise:
