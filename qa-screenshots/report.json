@@ -1,79 +1,17 @@
 {
-  "timestamp": "2026-04-04T04:25:29.648836+00:00",
-  "passed": 12,
-  "failed": 0,
+  "timestamp": "2026-05-04T00:48:32.700707+00:00",
+  "passed": 0,
+  "failed": 1,
   "results": [
-    {
-      "page": "Homepage",
-      "path": "/",
-      "status": "PASS",
-      "issues": []
-    },
-    {
-      "page": "Pulse",
-      "path": "/live/",
-      "status": "PASS",
-      "issues": []
-    },
     {
       "page": "Sleep",
       "path": "/sleep/",
-      "status": "PASS",
-      "issues": []
-    },
-    {
-      "page": "Glucose",
-      "path": "/glucose/",
-      "status": "PASS",
-      "issues": []
-    },
-    {
-      "page": "Nutrition",
-      "path": "/nutrition/",
-      "status": "PASS",
-      "issues": []
-    },
-    {
-      "page": "Training",
-      "path": "/training/",
-      "status": "PASS",
-      "issues": []
-    },
-    {
-      "page": "Physical",
-      "path": "/physical/",
-      "status": "PASS",
-      "issues": []
-    },
-    {
-      "page": "Mind / Inner Life",
-      "path": "/mind/",
-      "status": "PASS",
-      "issues": []
-    },
-    {
-      "page": "Character",
-      "path": "/character/",
-      "status": "PASS",
-      "issues": []
-    },
-    {
-      "page": "Habits",
-      "path": "/habits/",
-      "status": "PASS",
-      "issues": []
-    },
-    {
-      "page": "Status",
-      "path": "/status/",
-      "status": "PASS",
-      "issues": []
-    },
-    {
-      "page": "Story",
-      "path": "/story/",
-      "status": "PASS",
-      "issues": []
+      "status": "FAIL",
+      "issues": [
+        "Content container '#s-content' never became visible",
+        "No canvas elements found \u2014 at least one chart has drawn pixels",
+        "Expected 1+ 'canvas', found 0 \u2014 at least one chart canvas present"
+      ]
     }
   ]
 }
