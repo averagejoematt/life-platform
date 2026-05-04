@@ -79,8 +79,14 @@ def test_email_stack_memory_limits():
         pytest.skip("email_stack.py not found")
     findings = _parse_memory_calls(path)
     for ctx, mb in findings:
-        assert mb <= 512, (
-            f"email_stack.py: memory setting {mb}MB exceeds 512MB cap.\n"
+        # daily-brief is the documented exception (768MB) — bumped 2026-05-03 in
+        # b227b13 because 6 coach V2 narratives + IC-3 ensemble exceeded 512MB
+        # under load. All other email-stack Lambdas should still be <= 512MB.
+        ctx_lower = ctx.lower()
+        is_daily_brief = "daily-brief" in ctx_lower or "daily_brief" in ctx_lower or "DailyBrief" in ctx
+        cap = 768 if is_daily_brief else 512
+        assert mb <= cap, (
+            f"email_stack.py: memory setting {mb}MB exceeds {cap}MB cap.\n"
             f"Context: ...{ctx}..."
         )
 
