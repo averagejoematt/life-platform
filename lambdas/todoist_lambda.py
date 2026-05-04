@@ -1,6 +1,7 @@
 import json
 import os
 import logging
+import time
 import boto3
 import urllib.request
 import urllib.parse
@@ -58,6 +59,12 @@ def get_secret():
 
 
 def api_get(path, api_token, params=None):
+    """GET with retry on transient Todoist outages (429/500/502/503/504).
+
+    3 attempts with 2s/8s backoff. The Todoist API occasionally returns 503
+    during maintenance windows; without this retry, ingestion-error-todoist
+    fires on every transient blip.
+    """
     url = BASE_URL + path
     if params:
         url = url + "?" + urllib.parse.urlencode(params)
@@ -65,8 +72,17 @@ def api_get(path, api_token, params=None):
         url,
         headers={"Authorization": f"Bearer {api_token}"}
     )
-    with urllib.request.urlopen(req) as response:
-        return json.loads(response.read())
+    backoff = [2, 8]  # 3 attempts total: immediate, +2s, +8s
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                return json.loads(response.read())
+        except urllib.error.HTTPError as e:
+            if e.code in (429, 500, 502, 503, 504) and attempt < 2:
+                logger.warning("Todoist HTTP %d on %s — retry %d/2 in %ds", e.code, path, attempt + 1, backoff[attempt])
+                time.sleep(backoff[attempt])
+                continue
+            raise
 
 
 def get_projects(api_token):

@@ -166,11 +166,14 @@ def _emit_failure_metric():
 # ANTHROPIC API CALL
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _call_haiku(system, user_message, max_tokens=1500, temperature=0.1):
+def _call_haiku(system, user_message, max_tokens=3000, temperature=0.1):
     """Call Anthropic Haiku with exponential backoff + CloudWatch metrics.
 
     Returns parsed JSON dict if the response is valid JSON, otherwise raw text.
     Raises on final failure after all retry attempts.
+
+    2026-05-03: bumped default max_tokens 1500 → 3000. Was hitting truncation
+    on 5-coach state extraction; truncation → invalid JSON → fallback to default.
     """
     api_key = _get_api_key()
 
@@ -228,7 +231,11 @@ def _call_haiku(system, user_message, max_tokens=1500, temperature=0.1):
                     return text
 
         except urllib.error.HTTPError as e:
-            logger.warning("Anthropic HTTP %d attempt %d/%d", e.code, attempt, _MAX_ATTEMPTS)
+            try:
+                err_body = e.read().decode('utf-8', errors='replace')[:500]
+            except Exception:
+                err_body = "(could not read body)"
+            logger.warning("Anthropic HTTP %d attempt %d/%d: %s", e.code, attempt, _MAX_ATTEMPTS, err_body)
             if e.code in _RETRYABLE_CODES and attempt < _MAX_ATTEMPTS:
                 delay = _BACKOFF_DELAYS[attempt - 1]
                 logger.info("Retrying in %ds...", delay)

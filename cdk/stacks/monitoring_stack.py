@@ -87,8 +87,12 @@ class MonitoringStack(Stack):
         # ══════════════════════════════════════════════════════════════
         # Daily-brief operational alarms (not in EmailStack)
         # ══════════════════════════════════════════════════════════════
+        # 2026-05-03: bumped threshold 240000 → 720000 ms (4min → 12min).
+        # Lambda timeout is now 900s (was 300s); old 240s threshold fired on
+        # every healthy run that included the full 6-coach narrative pass.
+        # 720s = 80% of timeout — still catches genuine runaways.
         _alarm("DailyBriefDurationHigh",  "daily-brief-duration-high",
-               "AWS/Lambda", "Duration", 86400, None, 240000, GTE,
+               "AWS/Lambda", "Duration", 86400, None, 720000, GTE,
                {"FunctionName": "daily-brief"}, ext_stat="p99")
 
         _alarm("DailyBriefNoInvocations", "daily-brief-no-invocations-24h",
@@ -107,9 +111,13 @@ class MonitoringStack(Stack):
         # Removed 11 per-Lambda alarms ($1.10/mo). Kept: daily-brief
         # (highest-cost Lambda) + platform total (catch-all).
         # ══════════════════════════════════════════════════════════════
+        # 2026-05-03: bumped threshold 13333 → 18000. Today's healthy brief
+        # used 14414 tokens (above old threshold). With IC-3 max_tokens bumped
+        # to 600 + 6 coach narratives + ensemble, healthy budget is ~14-16k.
+        # 18000 leaves ~25% buffer; still alerts on a true cost spike.
         _alarm("AiTokensDailyBriefDaily",
                "ai-tokens-daily-brief-daily",
-               "LifePlatform/AI", "AnthropicOutputTokens", 86400, "Sum", 13333, GTE,
+               "LifePlatform/AI", "AnthropicOutputTokens", 86400, "Sum", 18000, GTE,
                {"LambdaFunction": "daily-brief"})
 
         # Platform-level total (no dims)
