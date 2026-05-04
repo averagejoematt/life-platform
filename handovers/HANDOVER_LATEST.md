@@ -1,32 +1,26 @@
-# Handover — v6.9.2: CI unblock + alarm noise reduction
+# Handover — v6.9.3: IC-4 failure-pattern detectors implemented
 
-**Date:** 2026-05-03 (very late evening, after v6.9.1)
-**Trigger:** Inbox flooded with alarm emails at 8:14pm PT.
-**Scope:** Two real bugs found and fixed.
+**Date:** 2026-05-03 (very late evening, after v6.9.2)
+**Trigger:** User asked to do the open items I'd flagged.
+**Scope:** Replace 4 stub detectors in `failure_pattern_compute_lambda.py` with real implementations + tests + deploy.
 
-See [HANDOVER_v6.9.2.md](HANDOVER_v6.9.2.md) for full details.
+See [HANDOVER_v6.9.3.md](HANDOVER_v6.9.3.md) for full details.
 
 ## Headlines
 
-1. **CI unblocked** — `test_email_stack_memory_limits` was asserting ≤512MB but daily-brief is now 768MB (per b227b13 fix earlier today). Test updated to allow the 768MB exception for daily-brief specifically.
-2. **Alarm noise reduction** — `lambda_helpers.py` was creating all error alarms with 24h evaluation windows. Single transient errors stayed in ALARM for 24h, generating cascade emails when CloudWatch re-evaluated. Reduced to 1h. ~30 alarms updated via `cdk deploy --all`.
-3. **Manually OK'd 8 in-flight alarms** — historical errors now outside the new 1h window, so OK state sticks. Zero alarms in ALARM as of 8:30pm PT.
+1. **4 IC-4 detectors implemented** — `_detect_habit_skip_predictors`, `_detect_cascade_patterns`, `_detect_day_of_week_clusters`, `_detect_rebound_speed`. Pure functions, Decimal-safe, defensive on empty data, low-N filter (`n >= 3`).
+2. **12 unit tests added** — `tests/test_failure_pattern_detectors.py`. All pass without AWS / boto3.
+3. **Deployed** — Lambda live, test-invoked. Data gate at 41/42 days; tips over tomorrow → next Sunday's natural cron exercises the real path.
 
-## What's true tomorrow morning
+## What I investigated but didn't change
 
-✅ Inbox quiet unless something genuinely sustained breaks
-✅ CI green on next push
-✅ Single transient ingestion errors self-clear within 1h
-✅ Cycle pause band visible on observatory pages (per v6.9.0)
-✅ All v6.9.1 max_tokens fixes deployed; tomorrow's natural Lambda runs will exercise them
-
-## Open items (deferred, properly tracked)
-
-- 10 stub TODOs in `failure_pattern_compute_lambda.py` + `momentum_warning_compute_lambda.py` — data gate met (2026-05-01) so now actionable; ~2-4h next session
-- `life-platform-compute-pipeline-stale` vestigial alarm — wire emitter or remove (next session)
-- WR-47 phase 2, WR-49, WR-50 — design work for next session
-- TD-11 step 2, TD-17, TD-19 phase 3 — Matthew action / approval gated
+| Item | Reason |
+|---|---|
+| `compute-pipeline-stale` alarm | Already wired (daily_brief_lambda.py:1519 emits the metric). My earlier "vestigial" claim was wrong. |
+| `momentum_warning_compute_lambda.py` (6 TODOs) | Lambda not in CDK / not deployed. Wiring it = new infra (IAM + schedule + alarm) — not autonomous. Defer next session. |
+| WR-47 phase 2 | Full spec at `docs/WR_47_48_ARCHITECTURE_SPEC.md` (297 lines). Multi-session implementation. |
+| WR-49, WR-50 | Need design conversation / gated on WR-47 phase 2. |
 
 ---
 
-**Previous:** [HANDOVER_v6.9.1.md](HANDOVER_v6.9.1.md) — paydown sweep
+**Previous:** [HANDOVER_v6.9.2.md](HANDOVER_v6.9.2.md) — CI unblock + alarm noise reduction.

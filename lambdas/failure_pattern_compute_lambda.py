@@ -82,67 +82,264 @@ def _check_data_gate():
 # PATTERN DETECTORS
 # ══════════════════════════════════════════════════════════════════════════════
 
+_BAD_GRADE_THRESHOLD = 60   # day_grade.total_score below this → "bad day"
+_GOOD_GRADE_THRESHOLD = 70  # day_grade.total_score at or above this → "rebounded"
+
+
+def _grade_for_date(outcome_records):
+    """Map date → total_score float. Skips records missing fields."""
+    out = {}
+    for r in outcome_records:
+        d = r.get("date")
+        s = r.get("total_score")
+        if d is None or s is None:
+            continue
+        try:
+            out[d] = float(s)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
 def _detect_habit_skip_predictors(habit_records, outcome_records):
     """
     Identify which habit skips most reliably predict bad outcome days.
 
-    Method: For each habit, compute:
+    For each habit name appearing in any day's `missed_tier0` list, compute:
+      - n_skipped: total days the habit was skipped
+      - n_skipped_bad: of those, how many had day_grade < 60
       - skip_bad_rate: P(bad day | habit skipped)
-      - complete_good_rate: P(good day | habit completed)
-      - lift: skip_bad_rate / baseline_bad_rate
+      - lift = skip_bad_rate / baseline_bad_rate
 
-    Returns top 3 highest-lift habits as failure predictors.
+    Returns top 3 highest-lift habits with n_skipped >= 3 (filter rare cases).
 
     IC-4: correlational framing only — AI-2 compliance.
     """
-    # TODO: Implement when data gate met (~2026-05-01)
-    # Pseudocode:
-    #   for each habit in habit_records:
-    #     skip_days = days where habit not completed
-    #     bad_days_after_skip = outcome_records where date in skip_days and day_grade < 60
-    #     skip_bad_rate = bad_days_after_skip / len(skip_days)
-    #     lift = skip_bad_rate / baseline_bad_rate
-    #   return sorted by lift, top 3
-    return []
+    grades = _grade_for_date(outcome_records)
+    if not grades:
+        return []
+
+    n_total = len(grades)
+    n_bad = sum(1 for v in grades.values() if v < _BAD_GRADE_THRESHOLD)
+    if n_total == 0 or n_bad == 0:
+        return []
+    baseline_bad_rate = n_bad / n_total
+
+    habit_skips = {}  # habit_name → list of dates skipped
+    for r in habit_records:
+        d = r.get("date")
+        missed = r.get("missed_tier0") or []
+        if not d or not isinstance(missed, list):
+            continue
+        for h in missed:
+            if not isinstance(h, str):
+                continue
+            habit_skips.setdefault(h, []).append(d)
+
+    predictors = []
+    for habit, dates in habit_skips.items():
+        n_skipped = len(dates)
+        if n_skipped < 3:
+            continue  # not enough data for this habit
+        n_skipped_bad = sum(1 for d in dates if grades.get(d, 100) < _BAD_GRADE_THRESHOLD)
+        skip_bad_rate = n_skipped_bad / n_skipped
+        lift = skip_bad_rate / baseline_bad_rate if baseline_bad_rate > 0 else 0
+        if lift <= 1.0:
+            continue  # skipping this habit doesn't elevate bad-day risk
+        predictors.append({
+            "habit": habit,
+            "n_skipped": n_skipped,
+            "n_skipped_bad": n_skipped_bad,
+            "skip_bad_rate": round(skip_bad_rate, 3),
+            "baseline_bad_rate": round(baseline_bad_rate, 3),
+            "lift": round(lift, 2),
+        })
+
+    predictors.sort(key=lambda x: x["lift"], reverse=True)
+    return predictors[:3]
 
 
 def _detect_cascade_patterns(habit_records, outcome_records, sleep_records):
     """
-    Detect multi-day cascade patterns (e.g. poor sleep → skip workout → overeat).
+    Detect simple 2-day cascade: poor sleep (Whoop sleep_score < 60) → next-day bad outcome.
 
-    Method: Sliding 3-day windows across all metric dimensions.
-    Flag windows where day-1 signal predicts day-2+3 degradation.
+    Method: For each Whoop record with sleep_score < 60, check if the FOLLOWING
+    day's day_grade < 60. Compute conditional probability vs baseline.
 
-    Returns list of (trigger_metric, cascade_sequence, frequency, avg_severity).
+    Returns list of cascade pattern dicts (currently 1 pattern: poor_sleep → bad_day).
     """
-    # TODO: Implement when data gate met (~2026-05-01)
-    return []
+    grades = _grade_for_date(outcome_records)
+    if not grades or not sleep_records:
+        return []
+
+    # Build sleep_score map
+    sleep_scores = {}
+    for r in sleep_records:
+        d = r.get("date")
+        # Whoop records have sleep_score on the day
+        score = r.get("sleep_score")
+        if d is None or score is None:
+            continue
+        try:
+            sleep_scores[d] = float(score)
+        except (TypeError, ValueError):
+            continue
+    if not sleep_scores:
+        return []
+
+    # Baseline bad-day rate
+    n_total = len(grades)
+    n_bad = sum(1 for v in grades.values() if v < _BAD_GRADE_THRESHOLD)
+    baseline = n_bad / n_total if n_total > 0 else 0
+    if baseline == 0:
+        return []
+
+    # Cascade: poor sleep → next-day bad
+    poor_sleep_days = sorted([d for d, s in sleep_scores.items() if s < 60])
+    if len(poor_sleep_days) < 3:
+        return []
+
+    n_followed_by_bad = 0
+    n_with_next_day_data = 0
+    for d in poor_sleep_days:
+        try:
+            dt = datetime.strptime(d, "%Y-%m-%d")
+            next_d = (dt + timedelta(days=1)).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+        if next_d not in grades:
+            continue
+        n_with_next_day_data += 1
+        if grades[next_d] < _BAD_GRADE_THRESHOLD:
+            n_followed_by_bad += 1
+
+    if n_with_next_day_data < 3:
+        return []
+    cascade_rate = n_followed_by_bad / n_with_next_day_data
+    lift = cascade_rate / baseline if baseline > 0 else 0
+    if lift <= 1.0:
+        return []
+
+    return [{
+        "trigger": "poor_sleep_score",
+        "trigger_threshold": "<60",
+        "consequence": "next_day_bad_grade",
+        "consequence_threshold": f"<{_BAD_GRADE_THRESHOLD}",
+        "n_episodes": n_with_next_day_data,
+        "n_followed_by_consequence": n_followed_by_bad,
+        "cascade_rate": round(cascade_rate, 3),
+        "baseline_rate": round(baseline, 3),
+        "lift": round(lift, 2),
+    }]
 
 
 def _detect_day_of_week_clusters(habit_records):
     """
-    Find days of week with elevated failure rates.
+    Find days of week with elevated habit-skip rates.
 
-    Method: For each day of week, compute completion rate vs overall mean.
-    Flag if completion rate < mean - 0.5*SD.
+    Method: For each day of week, compute mean composite_score. Flag DOWs
+    where the mean is at least 5 points below the overall mean.
 
-    Returns dict: {day_name: {completion_rate, delta_from_mean, risk_level}}.
+    Returns dict: {day_name: {mean_score, delta_from_overall, n_days, risk_level}}.
     """
-    # TODO: Implement when data gate met (~2026-05-01)
-    return {}
+    if not habit_records:
+        return {}
+
+    DOWS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    by_dow = {d: [] for d in DOWS}
+    for r in habit_records:
+        d = r.get("date")
+        score = r.get("composite_score")
+        if not d or score is None:
+            continue
+        try:
+            dt = datetime.strptime(d, "%Y-%m-%d")
+            score_f = float(score)
+        except (ValueError, TypeError):
+            continue
+        by_dow[DOWS[dt.weekday()]].append(score_f)
+
+    all_scores = [s for lst in by_dow.values() for s in lst]
+    if not all_scores:
+        return {}
+    overall_mean = sum(all_scores) / len(all_scores)
+
+    out = {}
+    for dow, scores in by_dow.items():
+        if len(scores) < 3:
+            continue  # not enough samples
+        dow_mean = sum(scores) / len(scores)
+        delta = dow_mean - overall_mean
+        if delta <= -5:
+            risk = "elevated"
+        elif delta <= -2:
+            risk = "mild"
+        else:
+            continue  # only flag DOWs with notable downside
+        out[dow] = {
+            "mean_score": round(dow_mean, 1),
+            "delta_from_overall": round(delta, 1),
+            "n_days": len(scores),
+            "risk_level": risk,
+        }
+    return out
 
 
 def _detect_rebound_speed(outcome_records):
     """
     Measure how quickly Matthew recovers after bad days (grade < 60).
 
-    Method: Find all bad-day runs. Measure days to return to grade >= 70.
-    Compute mean, median, p90 rebound time.
+    Method: Walk dates in order. Each time a bad day is followed by ≥1 more
+    bad-or-mediocre day, that's a "bad run." Episode ends when grade >= 70.
+    Days to recover = (date of recovery) - (start of bad run).
 
-    Returns {mean_days: float, median_days: float, p90_days: float, n_episodes: int}.
+    Returns {mean_days, median_days, p90_days, n_episodes}.
     """
-    # TODO: Implement when data gate met (~2026-05-01)
-    return {}
+    grades = _grade_for_date(outcome_records)
+    if not grades:
+        return {}
+
+    sorted_dates = sorted(grades.keys())
+    if len(sorted_dates) < 7:
+        return {}
+
+    rebound_days = []
+    i = 0
+    while i < len(sorted_dates):
+        d = sorted_dates[i]
+        if grades[d] < _BAD_GRADE_THRESHOLD:
+            # found start of bad run; walk forward to find recovery
+            j = i + 1
+            while j < len(sorted_dates) and grades[sorted_dates[j]] < _GOOD_GRADE_THRESHOLD:
+                j += 1
+            if j < len(sorted_dates):
+                # j is the recovery day
+                try:
+                    start = datetime.strptime(d, "%Y-%m-%d")
+                    end = datetime.strptime(sorted_dates[j], "%Y-%m-%d")
+                    rebound_days.append((end - start).days)
+                except ValueError:
+                    pass
+            i = j + 1  # skip past the recovery day
+        else:
+            i += 1
+
+    if not rebound_days:
+        return {}
+
+    rebound_days_sorted = sorted(rebound_days)
+    n = len(rebound_days_sorted)
+    mean = sum(rebound_days_sorted) / n
+    median = rebound_days_sorted[n // 2]
+    p90_idx = max(0, int(n * 0.9) - 1)
+    p90 = rebound_days_sorted[p90_idx]
+
+    return {
+        "mean_days": round(mean, 1),
+        "median_days": median,
+        "p90_days": p90,
+        "n_episodes": n,
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
