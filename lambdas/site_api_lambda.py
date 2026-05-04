@@ -936,7 +936,19 @@ def handle_character_stats() -> dict:
         if record:
             break
     if not record:
-        return _error(503, "Character sheet not computed yet")
+        # Pre-compute / data-not-yet-available is NOT a 5xx situation.
+        # Return 200 with computed=false so:
+        #   - WAF/CloudFront alarms don't fire on a normal "no data yet" state
+        #   - Homepage gauge fallback chain works (cs.level falsy → vitals API)
+        #   - Clients can branch on the flag without parsing magic strings
+        # 5-min cache: short enough that the first compute lands quickly,
+        # long enough that 50k visitors don't hammer DDB.
+        return _ok({
+            "character_stats": None,
+            "pillars": None,
+            "computed": False,
+            "reason": "Character sheet not yet computed for today or yesterday",
+        }, cache_seconds=300)
 
     PILLARS = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
     pillars = {}
