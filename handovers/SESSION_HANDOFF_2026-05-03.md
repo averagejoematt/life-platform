@@ -3,12 +3,14 @@
 > **If you're a fresh Claude chat session reading this:** this is the canonical entry point for what was done across the entire 2026-05-03 weekend. Start here, then drill into the specific handover or audit/runbook you need. The platform is in a clean, well-documented state.
 
 **Date:** 2026-05-03 (Sunday evening, end of session)
-**Final version:** v6.9.0
-**Last commit:** `bd01a40`
+**Final version:** v6.9.1
+**Last commit:** `34aea27`
 **Final freshness:** 🔴 red (2 stale sources — both Matthew-action: Strava + MacroFactor)
 **Re-entry status:** Cycle 2 began 2026-05-02; tonight's session closed Phase 1-3 of `Downloads/ajm_reentry_plan.md` + added Phase 8-10 build work.
 
-**Late-evening addendum (v6.9.0):** Cycle Pause visualization shipped — visual gray band on every observatory chart spanning April 12 → May 1 platform pause. Spec at `docs/SPEC_CYCLE_PAUSE_VIZ_2026_05_03.md`, deep handover at `handovers/HANDOVER_v6.9.0.md`. WR-47 phase 1 (visual surface) closed; phase 2 (server-side suppression + public banner) still open. Two commits: `ec09502` (the work) + `bd01a40` (auto version stamps).
+**Late-evening addenda:**
+- **v6.9.0** — Cycle Pause visualization shipped. Visual gray band on every observatory chart spanning April 12 → May 1 platform pause. Spec at `docs/SPEC_CYCLE_PAUSE_VIZ_2026_05_03.md`, deep handover at `handovers/HANDOVER_v6.9.0.md`. WR-47 phase 1 (visual surface) closed; phase 2 (server-side suppression + public banner) still open. Two commits: `ec09502` (work) + `bd01a40` (auto version stamps).
+- **v6.9.1** — Pre-Monday bug paydown sweep. 5 Lambda fixes (apple-health Records guard; todoist 5xx retry; hypothesis-engine + coach-state-updater + IC-3 max_tokens bumps), 2 alarm threshold bumps (daily-brief duration 4min→12min, tokens 13333→18000), shared layer v42→v43. Goal: tomorrow's 10am PT daily-brief fires clean with no false-positive cascade. Deep handover at `handovers/HANDOVER_v6.9.1.md`. Three commits: `b031747` (work) + `0ce37fc` (stamps) + `34aea27` (parallel chronicle session).
 
 ---
 
@@ -20,10 +22,12 @@ Started v6.8.1 (post-source-restoration after a 30-day move-related silence). Di
 
 | Document | What's in it |
 |---|---|
-| **`handovers/HANDOVER_LATEST.md`** | One-page summary of the latest version (v6.8.9 right now). Always start here. |
-| **`handovers/HANDOVER_v6.8.9.md`** | Full Phase A-D detail — the most recent + most thorough handover from this session. |
+| **`handovers/HANDOVER_LATEST.md`** | One-page summary of the latest version (v6.9.1 right now). Always start here. |
+| **`handovers/HANDOVER_v6.9.1.md`** | Pre-Monday bug paydown sweep — 5 Lambda fixes + 2 alarm bumps + layer v43. |
+| **`handovers/HANDOVER_v6.9.0.md`** | Cycle Pause visualization (WR-47 phase 1). |
+| **`handovers/HANDOVER_v6.8.9.md`** | Phase A-D pre-Monday readiness sweep — the cumulative deep-dive midpoint. |
 | `handovers/HANDOVER_v6.8.0..v6.8.8.md` | Per-PR handovers in chronological order. Read backward if you want the play-by-play. |
-| **`docs/CHANGELOG.md`** | All v6.8.0–v6.8.9 entries are sequential at the top. |
+| **`docs/CHANGELOG.md`** | All v6.8.0–v6.9.1 entries are sequential at the top. |
 | **`docs/RUNBOOK_REENTRY.md`** | NEW reusable Re-Entry Protocol runbook. Trigger: any gap > 7 days. |
 | `docs/audits/TD-19_DATE_PARTITION_AUDIT.md` | Per-Lambda date-partition convention audit. UTC verdict per source. |
 | `docs/audits/TD-11_HABITIFY_API_AUDIT.md` | Habitify API state taxonomy from raw response capture. |
