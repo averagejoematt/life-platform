@@ -406,16 +406,48 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict,
 
     parts.append(f"DATA MATURITY STATUS:\nPhase: {phase} ({days} {unit} of data, threshold: {threshold})\n{voice_tmpl}\n")
 
-    # 4. Data inventory
+    # 4. Data inventory + staleness signals (P5.8)
+    # Days-since-latest computed inline so coaches know NOT to opine on stale
+    # sources. The evaluator's distinction between "no data" and "stale data"
+    # matters here — silent-failure mode was the v7.x audit's #1 cost driver.
+    _today = datetime.now(timezone.utc).date()
     inventory_lines = []
+    stale_sources = []  # sources stale enough to warrant a separate hard warning
     for src, info in sorted(inventory.items()):
         if info.get("exists"):
             latest = info.get("latest", "?")
             count = info.get("records", 0)
-            inventory_lines.append(f"  - {src}: AVAILABLE ({count} records, latest: {latest})")
+            staleness_tag = ""
+            try:
+                latest_dt = datetime.strptime(latest, "%Y-%m-%d").date()
+                days_stale = (_today - latest_dt).days
+                if days_stale >= 7:
+                    staleness_tag = f" ⚠️ STALE — {days_stale} days since last record"
+                    stale_sources.append((src, days_stale))
+                elif days_stale >= 3:
+                    staleness_tag = f" (⚠️ {days_stale} days since last record)"
+            except (ValueError, TypeError):
+                pass  # latest isn't a parseable date — skip staleness check
+            inventory_lines.append(f"  - {src}: AVAILABLE ({count} records, latest: {latest}){staleness_tag}")
         else:
             inventory_lines.append(f"  - {src}: not available")
     parts.append("DATA SOURCES:\n" + "\n".join(inventory_lines) + "\n")
+
+    # Hard staleness directive — if any source is ≥7 days behind, instruct
+    # the coach to avoid claims about it. This is the explicit P5.8 fix:
+    # without it, coaches confidently opine on sources that haven't reported
+    # in weeks (the silent-failure mode from ADR-051).
+    if stale_sources:
+        parts.append(
+            "DATA STALENESS WARNINGS:\n"
+            + "\n".join(
+                f"  - {src} hasn't reported in {days} days. Do NOT make claims about "
+                f"{src}-related patterns or recent behavior using {src}; reference "
+                f"its last-known state explicitly if you must mention it."
+                for src, days in stale_sources
+            )
+            + "\n"
+        )
 
     # 5. Data interpretation rules
     parts.append(
@@ -1336,8 +1368,9 @@ Rules:
             },
         )
 
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            result = json.loads(resp.read())
+        # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
+        from retry_utils import call_anthropic_raw
+        result = call_anthropic_raw(req, timeout=30)
 
         text = "".join(
             b["text"] for b in result.get("content", []) if b.get("type") == "text"
