@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-05-04 (v6.9.5 — 126 tools, 36-module MCP package, 19 data sources, 66 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed)
+Last updated: 2026-05-18 (v7.21.0 — 128 tools, 36-module MCP package, 19 data sources, 68 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed), 27 DDB source partitions, 79 Lambdas across us-west-2 + us-east-1, 14 secrets, ~100 alarms split urgent/digest (ADR-052), 7 CDK stacks deployed, S3 KMS CMK retained but bucket default reverted to AES256 for website-endpoint compatibility (ADR-053/054), pipeline race fixed (P3.1), SIMP-2 framework adopted by 8 of 14 ingestion Lambdas (ADR-056), coach prediction loop closed end-to-end (ADR-055), shared layer v50)
 
 ---
 
@@ -71,7 +71,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | Lambda Function URL (MCP) | MCP HTTPS endpoint | `https://votqefkra435xwrccmapxxbj6y0jawgn.lambda-url.us-west-2.on.aws/` (AuthType NONE — auth handled in Lambda via API key header) |
 | Lambda Function URL (remote MCP) | Remote MCP HTTPS endpoint | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` (OAuth 2.1 auto-approve + HMAC Bearer) |
 | API Gateway | HTTP endpoint | `health-auto-export-api` (a76xwxt2wa) — webhook ingest |
-| Secrets Manager | Credential store | 15 active secrets — full list and consumer Lambdas in [SECRETS_MAP.md](SECRETS_MAP.md) (PR 3 / TD-13). Deleted: `api-keys` (2026-03-14), `google-calendar` (2026-03-15 ADR-030), `webhook-key` (2026-03-14). |
+| Secrets Manager | Credential store | 14 active secrets — full list and consumer Lambdas in [SECRETS_MAP.md](SECRETS_MAP.md). Rotation procedures in [SECRETS_ROTATION.md](SECRETS_ROTATION.md) (P2.6). Deleted: `api-keys` (2026-03-14), `google-calendar` (2026-03-15 ADR-030), `webhook-key` (2026-03-14), `anthropic-api-key` (2026-05-23 — soft-deleted P1.4). |
 | SNS topic | Alert routing | `life-platform-alerts` |
 | CloudFront (amj) | CDN (public) | `E3S424OXQZ8NBE` (`d2qlzq81ggequb.cloudfront.net`) → site-api Lambda + S3 `/site`, alias `averagejoematt.com` |
 | CloudFront (dash) | CDN + auth | `EM5NPX6NJN095` → S3 `/dashboard`, Lambda@Edge auth, alias `dash.averagejoematt.com` |
@@ -96,7 +96,7 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 
 **Schedule:** Hourly during active hours (4am–10pm PST) for most sources. Exceptions: Garmin at 4x daily (OAuth rate limits), Weather + Todoist at 2x daily (COST-OPT). Maintenance window: 10pm–4am PST (UTC 6–11 skipped).
 
-**Shared Lambda Layer:** v41 — includes `ai_calls.py`, `retry_utils.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `intelligence_common.py`, + 11 more. Rebuild with `bash deploy/build_layer.sh`. 18 modules, 16+ dependent Lambdas.
+**Shared Lambda Layer:** v50 — includes `ai_calls.py`, `retry_utils.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `intelligence_common.py` (P5.8 staleness signals in build_coach_preamble), `ingestion_framework.py` (SIMP-2 — see ADR-056), `auth_breaker.py`, `http_retry.py`, `rate_limiter.py`, `request_validator.py`, `compute_metadata.py`, `numeric.py`, `email_framework.py`, + 11 more. Rebuild with `bash deploy/build_layer.sh`. 25 modules, ~30 dependent Lambdas (some still pinned to older versions — survey via `aws lambda get-function-configuration ... Layers`).
 
 **Secret caching (COST-OPT-1):** 15-min in-memory TTL cache via `secret_cache.py` in shared layer. Reduces Secrets Manager API calls ~90% across 9 Lambdas.
 
