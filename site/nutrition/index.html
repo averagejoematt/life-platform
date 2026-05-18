@@ -4,2789 +4,1025 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="30+ weeks of nutrition data — calories, protein adherence, macro breakdown, and what fueling a 117-lb transformation actually requires.">
-  <meta property="og:title" content="Nutrition Observatory — Matthew">
+  <meta name="description" content="The Nutrition Dispatch — daily macro standings, protein adherence, and a 30-day fueling arc from MacroFactor.">
+  <meta property="og:title" content="The Nutrition Dispatch — Matthew">
   <meta property="og:description" content="MacroFactor meets CGM. What 200g protein on a deficit looks like. Real data, no highlight reel.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://averagejoematt.com/nutrition/">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-nutrition.png">
   <meta name="twitter:card" content="summary_large_image">
-  <title>Nutrition Observatory — Matthew</title>
+  <title>The Nutrition Dispatch — Matthew</title>
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
   <meta name="theme-color" content="#080c0a">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
-  <link rel="stylesheet" href="/assets/css/observatory-v3.css">
   <style>
-    :root {
-      --n-amber: #f59e0b;
-      --n-amber-dim: rgba(245,158,11,0.15);
-      --n-amber-glow: rgba(245,158,11,0.06);
-      --n-green: #3ecf8e;
-      --n-red: #ef4444;
-      --n-violet: #818cf8;
-    }
+    /* /nutrition/ — uses Front Page pattern (.fp-*); see assets/css/frontpage.css.
+       Page-scope additions only — namespace .n- (nutrition). */
+    .n-page { padding-top: var(--nav-height); }
 
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(16px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes ringDraw {
-      from { stroke-dasharray: 0 251; }
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       EDITORIAL TEMPLATE (10g) — Monospace section headers with trailing em-dashes
-       ═══════════════════════════════════════════════════════ */
-    .n-section-header {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      margin-bottom: var(--space-8);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .n-section-header::after {
-      content: '\2014\2014';
-      color: var(--text-faint);
-      opacity: 0.4;
-      flex-shrink: 0;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       EDITORIAL PULL-QUOTES (10g) — Staggered, offset, large serif
-       ═══════════════════════════════════════════════════════ */
-    .n-pullquote {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      position: relative;
-      border-bottom: 1px solid var(--border);
-    }
-    .n-pullquote--left {
-      padding-left: calc(var(--page-padding) + 8%);
-    }
-    .n-pullquote--right {
-      padding-left: calc(var(--page-padding) + 16%);
-    }
-    .n-pullquote__watermark {
-      position: absolute;
-      top: 24px;
-      right: var(--page-padding);
-      font-family: var(--font-display);
-      font-size: 120px;
-      color: rgba(245, 158, 11, 0.04);
-      line-height: 1;
-      pointer-events: none;
-    }
-    .n-pullquote__text {
-      font-family: var(--font-display);
-      font-size: clamp(24px, 3.5vw, 32px);
-      line-height: 1.3;
-      color: var(--text);
-      max-width: 640px;
-      position: relative;
-    }
-    .n-pullquote__text em {
-      font-style: normal;
-      color: var(--n-amber);
-    }
-    .n-pullquote__attr {
-      display: flex;
-      align-items: center;
-      gap: var(--space-3);
-      margin-top: var(--space-4);
-    }
-    .n-pullquote__badge {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      color: var(--n-amber);
-      background: var(--n-amber-dim);
-      padding: 3px 10px;
+    /* Skeleton placeholder before /api/nutrition_overview resolves */
+    .n-skeleton {
+      background: linear-gradient(90deg, var(--surface) 25%, var(--surface-raised) 50%, var(--surface) 75%);
+      background-size: 200% 100%;
+      animation: n-shimmer 1.5s infinite;
+      border-radius: 2px;
       display: inline-block;
     }
-    .n-pullquote__source {
+    @keyframes n-shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    .n-row-empty {
+      padding: 28px 22px;
+      border-top: 1px solid var(--border-subtle);
       font-family: var(--font-mono);
       font-size: 11px;
+      letter-spacing: 0.1em;
       color: var(--text-faint);
-      letter-spacing:var(--ls-subtle);
-    }
-    /* Dynamic pull-quotes -- larger editorial callouts */
-    .n-pullquote--dynamic .n-pullquote__text {
-      font-size: clamp(26px, 4vw, 36px);
-      border-left: 3px solid var(--n-amber);
-      padding-left: var(--space-6);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       NARRATIVE CONTEXT (10g) — interpretive sentences between data
-       ═══════════════════════════════════════════════════════ */
-    .n-context {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-4) var(--page-padding) var(--space-6);
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.8;
-      font-style: italic;
-      max-width: 680px;
-    }
-    .n-context strong { color: var(--text); font-style: normal; }
-
-    /* ═══════════════════════════════════════════════════════
-       LEFT-ACCENT RULE CARDS (10g) — key findings
-       ═══════════════════════════════════════════════════════ */
-    .n-accent-card {
-      border-left: 3px solid var(--n-amber);
-      background: var(--surface);
-      padding: var(--space-5) var(--space-6);
-      border-top: 1px solid rgba(255,255,255,0.04);
-      border-right: 1px solid rgba(255,255,255,0.04);
-      border-bottom: 1px solid rgba(255,255,255,0.04);
-    }
-    .n-accent-card__label {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--n-amber);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      margin-bottom: var(--space-2);
-    }
-    .n-accent-card__value {
-      font-family: var(--font-display);
-      font-size: var(--text-h3);
-      color: var(--text);
-      margin-bottom: var(--space-2);
-    }
-    .n-accent-card__note {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       NARRATIVE INTRO (10a)
-       ═══════════════════════════════════════════════════════ */
-    .n-intro {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .n-intro__text {
-      max-width: 680px;
-      font-family: var(--font-display);
-      font-size: clamp(18px, 2.5vw, 22px);
-      line-height: 1.6;
-      color: var(--text-muted);
-    }
-    .n-intro__text em {
-      font-style: normal;
-      color: var(--n-amber);
-    }
-    .n-intro__sub {
-      max-width: 680px;
-      font-size: var(--text-sm);
-      color: var(--text-faint);
-      line-height: 1.8;
-      margin-top: var(--space-4);
-      font-style: italic;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       HERO — B's 2-column + C's gauge row
-       ═══════════════════════════════════════════════════════ */
-    .n-hero {
-      padding: var(--space-20) var(--page-padding) var(--space-16);
-      position: relative;
-      overflow: hidden;
-      border-bottom: 1px solid var(--border);
-      max-width: var(--max-width);
-      margin: 0 auto;
-    }
-    .n-hero-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-12);
-      align-items: center;
-    }
-    .n-hero__eyebrow {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--n-amber);
-      margin-bottom: var(--space-6);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      opacity: 0;
-      animation: fadeUp 0.6s 0.1s forwards;
-    }
-    .n-hero__eyebrow::before {
-      content: '';
-      width: 32px;
-      height: 1px;
-      background: var(--n-amber);
-    }
-    .n-hero__title {
-      font-family: var(--font-display);
-      font-size: clamp(36px, 5vw, 52px);
-      color: var(--text);
-      line-height: 1.05;
-      max-width: 520px;
-      margin-bottom: var(--space-6);
-      opacity: 0;
-      animation: fadeUp 0.6s 0.2s forwards;
-    }
-    .n-hero__title em {
-      font-style: normal;
-      color: var(--n-amber);
-    }
-    .n-hero__sub {
-      font-size: var(--text-base);
-      color: var(--text-muted);
-      max-width: 420px;
-      line-height: 1.8;
-      opacity: 0;
-      animation: fadeUp 0.6s 0.3s forwards;
-    }
-
-    /* Gauge row (4 mini rings) */
-    .n-gauge-row {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: var(--space-4);
-      opacity: 0;
-      animation: fadeUp 0.6s 0.4s forwards;
-    }
-    .n-gauge {
-      text-align: center;
-      padding: var(--space-5) var(--space-3);
-      background: var(--surface);
-      border: 1px solid var(--border);
-    }
-    .n-gauge__ring {
-      width: 88px;
-      height: 88px;
-      margin: 0 auto var(--space-3);
-      position: relative;
-    }
-    .n-gauge__ring svg {
-      width: 100%;
-      height: 100%;
-    }
-    .n-gauge__center {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-    }
-    .n-gauge__num {
-      font-family: var(--font-display);
-      font-size: 22px;
-      line-height: 1;
-    }
-    .n-gauge__unit {
-      font-family: var(--font-mono);
-      font-size:var(--text-3xs);
-      color: var(--text-faint);
-      letter-spacing: 0.08em;
-    }
-    .n-gauge__label {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-muted);
-      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
     }
 
-    /* ═══════════════════════════════════════════════════════
-       MACRO EDITORIAL — B's 3-column spread
-       ═══════════════════════════════════════════════════════ */
-    .n-macro-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .n-macro-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 0;
-    }
-    .n-macro-col {
-      padding: var(--space-6) var(--space-6);
-    }
-    .n-macro-col:not(:last-child) {
-      border-right: 1px solid var(--border);
-    }
-    .n-macro-bar {
-      height: 3px;
-      background: rgba(255,255,255,0.03);
-      margin-bottom: var(--space-5);
-      position: relative;
-      overflow: hidden;
-    }
-    .n-macro-bar__fill {
-      height: 100%;
-      position: absolute;
-      left: 0;
-      top: 0;
-      transition: width 1.2s ease;
-    }
-    .n-macro-big {
-      font-family: var(--font-display);
-      font-size: clamp(36px, 4vw, 44px);
-      line-height: 1;
-      margin-bottom: var(--space-2);
-    }
-    .n-macro-name {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text-muted);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      margin-bottom: var(--space-3);
-    }
-    .n-macro-detail {
-      font-size: var(--text-sm);
-      color: var(--text-faint);
-      line-height: 1.7;
-    }
-    .n-macro-detail a {
-      color: var(--n-amber);
+    /* Strip nav buttons (prev/next dispatch) */
+    .n-strip-btn {
+      cursor: not-allowed;
+      opacity: 0.5;
+      color: inherit;
       text-decoration: none;
     }
+    .n-strip-btn.is-active { opacity: 1; cursor: pointer; color: var(--accent-dim); }
+    .n-strip-btn.is-active:hover { color: var(--accent); }
 
-    /* ═══════════════════════════════════════════════════════
-       PROTEIN ADHERENCE
-       ═══════════════════════════════════════════════════════ */
-    .n-protein-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
+    /* Extra sections — sit between long-arc and cross-link footer.
+       Use the same horizontal padding rhythm as the standings. */
+    .n-extra {
+      padding: 32px 56px;
+      border-top: 1px solid var(--border);
     }
-    .n-protein-card {
-      background: rgba(62, 207, 142, 0.03);
-      border: 1px solid rgba(62, 207, 142, 0.1);
-      padding: var(--space-8) var(--space-8);
-      display: grid;
-      grid-template-columns: 1fr 180px;
-      gap: var(--space-8);
-      align-items: center;
-    }
-    .n-protein-card__title {
-      font-family: var(--font-display);
-      font-size: var(--text-h3);
-      color: var(--text);
-      margin-bottom: var(--space-2);
-    }
-    .n-protein-card__title em {
-      font-style: normal;
-      color: var(--n-green);
-    }
-    .n-protein-card__sub {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.7;
-      margin-bottom: var(--space-5);
-    }
-    .n-protein-track {
-      height: 8px;
-      background: rgba(255,255,255,0.04);
-      border-radius: 4px;
-      overflow: hidden;
-    }
-    .n-protein-fill {
-      height: 100%;
-      border-radius: 4px;
-      background: linear-gradient(90deg, var(--n-red) 0%, var(--n-amber) 40%, var(--n-green) 75%);
-      transition: width 1.2s ease;
-    }
-    .n-protein-markers {
+    .n-extra__head {
       display: flex;
       justify-content: space-between;
-      margin-top: var(--space-2);
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-faint);
+      align-items: baseline;
+      margin-bottom: 18px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--border-strong);
     }
-    .n-protein-big {
-      text-align: center;
-    }
-    .n-protein-big__num {
+    .n-extra__title {
       font-family: var(--font-display);
-      font-size: 56px;
-      line-height: 1;
-      color: var(--n-green);
+      font-size: 24px;
+      letter-spacing: 0.04em;
+      color: var(--text);
     }
-    .n-protein-big__unit {
+    .n-extra__meta {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .n-extra__intro {
       font-family: var(--font-mono);
       font-size: 11px;
       color: var(--text-muted);
-      letter-spacing:var(--ls-wide);
-      margin-top: 2px;
-    }
-    .n-protein-big__sub {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-faint);
-      margin-top: var(--space-2);
+      letter-spacing: 0.04em;
+      margin-bottom: 18px;
+      line-height: 1.6;
+      max-width: 760px;
     }
 
-    /* ═══════════════════════════════════════════════════════
-       PROTEIN DISTRIBUTION (10c)
-       ═══════════════════════════════════════════════════════ */
-    .n-protein-dist {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
+    /* Per-meal protein distribution */
     .n-dist-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: var(--space-4);
-      margin-top: var(--space-4);
+      gap: 14px;
     }
-    .n-dist-meal {
+    .n-dist-cell {
       background: var(--surface);
       border: 1px solid var(--border);
-      padding: var(--space-5);
+      padding: 18px 14px;
       text-align: center;
       position: relative;
     }
-    .n-dist-meal__name {
+    .n-dist-cell__name {
       font-family: var(--font-mono);
       font-size: 10px;
-      letter-spacing:var(--ls-wide);
+      letter-spacing: 0.2em;
       text-transform: uppercase;
       color: var(--text-muted);
-      margin-bottom: var(--space-3);
+      margin-bottom: 14px;
     }
-    .n-dist-meal__bar-wrap {
-      height: 120px;
+    .n-dist-cell__bar-wrap {
+      height: 88px;
       display: flex;
       align-items: flex-end;
       justify-content: center;
-      margin-bottom: var(--space-3);
+      margin-bottom: 12px;
     }
-    .n-dist-meal__bar {
-      width: 32px;
-      background: var(--n-amber-dim);
-      border-top: 3px solid var(--n-amber);
+    .n-dist-cell__bar {
+      width: 28px;
+      background: rgba(212, 168, 71, 0.18);
+      border-top: 3px solid var(--accent);
       transition: height 0.8s ease;
-      position: relative;
     }
-    .n-dist-meal__bar--hit {
-      background: rgba(62, 207, 142, 0.15);
-      border-top-color: var(--n-green);
+    .n-dist-cell__bar--hit {
+      background: rgba(0, 229, 160, 0.15);
+      border-top-color: var(--c-green-500);
     }
-    .n-dist-meal__bar--miss {
-      background: rgba(239, 68, 68, 0.15);
-      border-top-color: var(--n-red);
+    .n-dist-cell__bar--miss {
+      background: rgba(255, 82, 82, 0.15);
+      border-top-color: var(--c-red-status);
     }
-    .n-dist-meal__value {
+    .n-dist-cell__value {
       font-family: var(--font-display);
       font-size: 24px;
       color: var(--text);
-    }
-    .n-dist-meal__target {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-faint);
-      margin-top: var(--space-1);
-    }
-    .n-dist-meal__status {
-      font-family: var(--font-mono);
-      font-size:var(--text-3xs);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      margin-top: var(--space-2);
-      padding: 2px 8px;
-      display: inline-block;
-    }
-    .n-dist-meal__status--hit {
-      color: var(--n-green);
-      background: rgba(62, 207, 142, 0.1);
-    }
-    .n-dist-meal__status--miss {
-      color: var(--n-red);
-      background: rgba(239, 68, 68, 0.1);
-    }
-    .n-threshold-line {
-      position: absolute;
-      left: 0;
-      right: 0;
-      border-top: 1px dashed rgba(62, 207, 142, 0.3);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       TOP MEALS (10b)
-       ═══════════════════════════════════════════════════════ */
-    .n-meals-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .n-meals-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-4);
-      margin-top: var(--space-4);
-    }
-    .n-meal-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: var(--space-5) var(--space-5);
-      transition: border-color 0.15s;
-    }
-    .n-meal-card:hover {
-      border-color: rgba(245,158,11,0.3);
-    }
-    .n-meal-card__header {
-      display: flex;
-      align-items: center;
-      gap: var(--space-3);
-      margin-bottom: var(--space-4);
-    }
-    .n-meal-card__icon {
-      font-size: 24px;
       line-height: 1;
-      flex-shrink: 0;
     }
-    .n-meal-card__name {
-      font-family: var(--font-display);
-      font-size: var(--text-base);
-      color: var(--text);
-      line-height: 1.2;
-    }
-    .n-meal-card__freq {
+    .n-dist-cell__target {
       font-family: var(--font-mono);
       font-size: 10px;
-      color: var(--n-amber);
-      letter-spacing: 0.08em;
-      margin-top: 2px;
-    }
-    .n-meal-card__macros {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-2);
-      margin-bottom: var(--space-3);
-      padding-top: var(--space-3);
-      border-top: 1px solid var(--border);
-    }
-    .n-meal-card__macro {
-      text-align: center;
-    }
-    .n-meal-card__macro-val {
-      font-family: var(--font-display);
-      font-size: 16px;
-      color: var(--text);
-    }
-    .n-meal-card__macro-label {
-      font-family: var(--font-mono);
-      font-size:var(--text-3xs);
       color: var(--text-faint);
-      letter-spacing: 0.08em;
+      margin-top: 4px;
+      letter-spacing: 0.06em;
+    }
+    .n-dist-cell__status {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.2em;
       text-transform: uppercase;
+      margin-top: 8px;
     }
-    .n-meal-card__footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-top: var(--space-3);
-      border-top: 1px solid var(--border);
-    }
-    .n-meal-card__ppc {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-muted);
-    }
-    .n-meal-card__ppc em {
-      font-style: normal;
-      color: var(--n-green);
-    }
-    .n-meal-card__grade {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      letter-spacing: 0.08em;
-      padding: 2px 8px;
-    }
-    .n-meal-card__grade--a {
-      color: var(--n-green);
-      background: rgba(62, 207, 142, 0.1);
-    }
-    .n-meal-card__grade--b {
-      color: var(--n-amber);
-      background: var(--n-amber-dim);
-    }
-    .n-meal-card__grade--c {
-      color: var(--n-red);
-      background: rgba(239, 68, 68, 0.1);
-    }
+    .n-dist-cell__status--hit { color: var(--c-green-500); }
+    .n-dist-cell__status--miss { color: var(--c-red-status); }
 
-    /* ═══════════════════════════════════════════════════════
-       PROTEIN SOURCES — horizontal bar chart
-       ═══════════════════════════════════════════════════════ */
-    .n-prosrc-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .n-prosrc-bar {
+    /* Protein source bars */
+    .n-prosrc-row {
       display: flex;
       align-items: center;
-      gap: var(--space-4);
-      padding: var(--space-3) 0;
-      border-bottom: 1px solid rgba(255,255,255,0.03);
+      gap: 16px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-subtle);
+      font-family: var(--font-mono);
+      font-size: 11px;
     }
-    .n-prosrc-bar__name {
-      width: 180px;
+    .n-prosrc-row__name {
+      width: 200px;
       flex-shrink: 0;
-      font-size: var(--text-sm);
       color: var(--text);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      letter-spacing: 0.04em;
     }
-    .n-prosrc-bar__track {
+    .n-prosrc-row__track {
       flex: 1;
-      height: 14px;
+      height: 12px;
       background: rgba(255,255,255,0.03);
       position: relative;
       overflow: hidden;
     }
-    .n-prosrc-bar__fill {
+    .n-prosrc-row__fill {
       height: 100%;
-      background: var(--n-green);
+      background: var(--accent);
       transition: width 0.8s ease;
     }
-    .n-prosrc-bar__val {
-      width: 70px;
+    .n-prosrc-row__val {
+      width: 110px;
       flex-shrink: 0;
       text-align: right;
-      font-family: var(--font-mono);
-      font-size: 11px;
       color: var(--text-muted);
     }
-    @media (max-width: 768px) {
-      .n-prosrc-bar__name { width: 120px; font-size: 12px; }
-    }
 
-    /* ═══════════════════════════════════════════════════════
-       WEEKDAY VS WEEKEND — side-by-side comparison
-       ═══════════════════════════════════════════════════════ */
-    .n-wvw-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .n-wvw-grid {
+    /* Comparison columns (weekday/weekend, training/rest) */
+    .n-compare-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 0;
+      border: 1px solid var(--border);
     }
-    @media (max-width: 768px) { .n-wvw-grid { grid-template-columns: 1fr; } }
-    .n-wvw-col {
-      padding: var(--space-6);
+    .n-compare-col {
+      padding: 18px 22px;
     }
-    .n-wvw-col:first-child {
-      border-right: 1px solid var(--border);
+    .n-compare-col + .n-compare-col {
+      border-left: 1px solid var(--border);
     }
-    @media (max-width: 768px) {
-      .n-wvw-col:first-child { border-right: none; border-bottom: 1px solid var(--border); }
-    }
-    .n-wvw-col__title {
+    .n-compare-col__title {
       font-family: var(--font-mono);
-      font-size: 11px;
-      letter-spacing:var(--ls-wide);
+      font-size: 10px;
+      letter-spacing: 0.25em;
       text-transform: uppercase;
-      color: var(--n-amber);
-      margin-bottom: var(--space-4);
+      color: var(--accent-dim);
+      margin-bottom: 12px;
     }
-    .n-wvw-stat {
+    .n-compare-stat {
       display: flex;
       justify-content: space-between;
-      padding: var(--space-2) 0;
-      border-bottom: 1px solid rgba(255,255,255,0.03);
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border-subtle);
+      font-family: var(--font-mono);
+      font-size: 11px;
     }
-    .n-wvw-stat__label {
-      font-size: var(--text-sm);
+    .n-compare-stat:last-child { border-bottom: none; }
+    .n-compare-stat__label {
       color: var(--text-muted);
+      letter-spacing: 0.04em;
     }
-    .n-wvw-stat__val {
+    .n-compare-stat__val {
       font-family: var(--font-display);
       font-size: 16px;
       color: var(--text);
+      letter-spacing: 0.02em;
     }
 
-    /* ═══════════════════════════════════════════════════════
-       EATING WINDOW
-       ═══════════════════════════════════════════════════════ */
-    .n-ew-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .n-ew-grid {
+    /* Eating window strip */
+    .n-window-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 0;
+      border: 1px solid var(--border);
     }
-    @media (max-width: 768px) { .n-ew-grid { grid-template-columns: 1fr; } }
-    .n-ew-col {
-      padding: var(--space-6);
+    .n-window-cell {
+      padding: 22px;
       text-align: center;
     }
-    .n-ew-col:not(:last-child) {
-      border-right: 1px solid var(--border);
+    .n-window-cell + .n-window-cell {
+      border-left: 1px solid var(--border);
     }
-    @media (max-width: 768px) {
-      .n-ew-col:not(:last-child) { border-right: none; border-bottom: 1px solid var(--border); }
-    }
-    .n-ew-big {
+    .n-window-cell__num {
       font-family: var(--font-display);
-      font-size: clamp(28px, 3.5vw, 36px);
-      color: var(--n-amber);
+      font-size: 32px;
+      color: var(--accent);
       line-height: 1;
-      margin-bottom: var(--space-2);
+      margin-bottom: 6px;
     }
-    .n-ew-label {
+    .n-window-cell__label {
       font-family: var(--font-mono);
       font-size: 10px;
-      color: var(--text-muted);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       CALORIC PERIODIZATION — training vs rest day
-       ═══════════════════════════════════════════════════════ */
-    .n-period-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       RECENT MEALS GALLERY — "What I Actually Eat"
-       ═══════════════════════════════════════════════════════ */
-    .n-gallery-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       TREND CHART
-       ═══════════════════════════════════════════════════════ */
-    .n-chart-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .n-chart-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      margin-bottom: var(--space-4);
-    }
-    .n-chart-title {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .n-chart-title::after {
-      content: '\2014\2014';
-      color: var(--text-faint);
-      opacity: 0.4;
-      flex-shrink: 0;
-    }
-    .n-chart-legend {
-      display: flex;
-      gap: var(--space-4);
-    }
-    .n-legend-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-faint);
-    }
-    .n-legend-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-    }
-    canvas.n-chart {
-      width: 100%;
-      height: 200px;
-      display: block;
-      background: var(--surface);
-      border: 1px solid var(--border);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       TDEE ADAPTATION (10e)
-       ═══════════════════════════════════════════════════════ */
-    .n-tdee-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .n-tdee-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: var(--space-4);
-      margin-top: var(--space-4);
-    }
-    .n-tdee-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--n-amber);
-      padding: var(--space-5);
-      text-align: center;
-    }
-    .n-tdee-card__period {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-faint);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      margin-bottom: var(--space-3);
-    }
-    .n-tdee-card__value {
-      font-family: var(--font-display);
-      font-size: 28px;
-      color: var(--text);
-      line-height: 1;
-    }
-    .n-tdee-card__unit {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-muted);
-      margin-top: 4px;
-    }
-    .n-tdee-card__delta {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      margin-top: var(--space-2);
-    }
-    .n-tdee-card__delta--down { color: var(--n-red); }
-    .n-tdee-card__delta--up { color: var(--n-green); }
-    .n-tdee-card__delta--flat { color: var(--text-faint); }
-    canvas.n-tdee-chart {
-      width: 100%;
-      height: 160px;
-      display: block;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      margin-top: var(--space-6);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       MICRONUTRIENTS (10d)
-       ═══════════════════════════════════════════════════════ */
-    .n-micro-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .n-micro-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: var(--space-4);
-      margin-top: var(--space-4);
-    }
-    .n-micro-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: var(--space-5);
-      position: relative;
-      overflow: hidden;
-    }
-    .n-micro-card__name {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      letter-spacing:var(--ls-wide);
+      letter-spacing: 0.2em;
       text-transform: uppercase;
       color: var(--text-muted);
-      margin-bottom: var(--space-3);
     }
-    .n-micro-card__why {
-      font-size: 11px;
-      color: var(--text-faint);
-      line-height: 1.5;
-      margin-bottom: var(--space-4);
-      font-style: italic;
-    }
-    .n-micro-card__values {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      margin-bottom: var(--space-2);
-    }
-    .n-micro-card__actual {
-      font-family: var(--font-display);
-      font-size: 22px;
-      color: var(--text);
-    }
-    .n-micro-card__target {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-faint);
-    }
-    .n-micro-card__bar {
-      height: 4px;
-      background: rgba(255,255,255,0.04);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .n-micro-card__fill {
-      height: 100%;
-      border-radius: 2px;
-      transition: width 1s ease;
-    }
-    .n-micro-card__fill--good { background: var(--n-green); }
-    .n-micro-card__fill--warn { background: var(--n-amber); }
-    .n-micro-card__fill--low { background: var(--n-red); }
-    .n-micro-card__status {
-      font-family: var(--font-mono);
-      font-size:var(--text-3xs);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      margin-top: var(--space-2);
-    }
-    .n-micro-card__status--good { color: var(--n-green); }
-    .n-micro-card__status--warn { color: var(--n-amber); }
-    .n-micro-card__status--low { color: var(--n-red); }
 
-    /* ═══════════════════════════════════════════════════════
-       BEHAVIORAL TRIGGERS (10h)
-       ═══════════════════════════════════════════════════════ */
-    .n-triggers-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .n-triggers-grid {
+    /* Top meals grid */
+    .n-meals-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-4);
-      margin-top: var(--space-4);
+      gap: 14px;
     }
-    .n-trigger-card {
-      border-left: 3px solid var(--n-amber);
+    .n-meal {
       background: var(--surface);
-      padding: var(--space-5) var(--space-6);
-      border-top: 1px solid rgba(255,255,255,0.04);
-      border-right: 1px solid rgba(255,255,255,0.04);
-      border-bottom: 1px solid rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      padding: 18px;
+      transition: border-color var(--dur-fast, 120ms);
     }
-    .n-trigger-card__trigger {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--n-amber);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      margin-bottom: var(--space-3);
-    }
-    .n-trigger-card__finding {
+    .n-meal:hover { border-color: var(--accent-dim); }
+    .n-meal__name {
       font-family: var(--font-display);
-      font-size: var(--text-base);
+      font-size: 16px;
+      letter-spacing: 0.02em;
       color: var(--text);
-      line-height: 1.35;
-      margin-bottom: var(--space-3);
+      line-height: 1.2;
+      margin-bottom: 4px;
     }
-    .n-trigger-card__evidence {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text-faint);
-    }
-    .n-trigger-card__evidence em {
-      font-style: normal;
-      color: var(--n-amber);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       HYDRATION (10j)
-       ═══════════════════════════════════════════════════════ */
-    .n-hydration-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .n-hydration-grid {
-      display: grid;
-      grid-template-columns: 200px 1fr;
-      gap: var(--space-8);
-      align-items: center;
-      margin-top: var(--space-4);
-    }
-    .n-hydration-big {
-      text-align: center;
-    }
-    .n-hydration-big__num {
-      font-family: var(--font-display);
-      font-size: 56px;
-      line-height: 1;
-      color: #60a5fa;
-    }
-    .n-hydration-big__unit {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text-muted);
-      letter-spacing:var(--ls-wide);
-      margin-top: 4px;
-    }
-    .n-hydration-big__sub {
+    .n-meal__freq {
       font-family: var(--font-mono);
       font-size: 10px;
-      color: var(--text-faint);
-      margin-top: var(--space-2);
-    }
-    .n-hydration-corr {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-4);
-    }
-    .n-hydration-corr-card {
-      border-left: 3px solid #60a5fa;
-      background: var(--surface);
-      padding: var(--space-4) var(--space-5);
-      border-top: 1px solid rgba(255,255,255,0.04);
-      border-right: 1px solid rgba(255,255,255,0.04);
-      border-bottom: 1px solid rgba(255,255,255,0.04);
-    }
-    .n-hydration-corr-card__label {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: #60a5fa;
-      letter-spacing:var(--ls-wide);
+      letter-spacing: 0.18em;
       text-transform: uppercase;
-      margin-bottom: var(--space-2);
+      color: var(--accent);
+      margin-bottom: 14px;
     }
-    .n-hydration-corr-card__finding {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
-    .n-hydration-corr-card__finding em {
-      font-style: normal;
-      color: var(--text);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       NUTRITION HYPOTHESES — left-accent cards
-       ═══════════════════════════════════════════════════════ */
-    .n-rules-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .n-rule-grid {
+    .n-meal__macros {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: var(--space-4);
-    }
-    .n-rule {
-      padding: var(--space-6);
-      border: 1px solid rgba(255,255,255,0.04);
-      border-left: 3px solid var(--n-amber);
-      background: var(--surface);
-    }
-    .n-rule__num {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--n-amber);
-      margin-bottom: var(--space-3);
-      display: flex;
-      align-items: center;
+      grid-template-columns: repeat(3, 1fr);
       gap: 8px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-subtle);
     }
-    .n-rule__num::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: rgba(245,158,11,0.1);
-    }
-    .n-rule__finding {
+    .n-meal__macro { text-align: center; }
+    .n-meal__macro-val {
       font-family: var(--font-display);
-      font-size: var(--text-base);
-      color: var(--text);
-      line-height: 1.35;
-      margin-bottom: var(--space-3);
-    }
-    .n-rule__evidence {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text-faint);
-    }
-    .n-rule__evidence em {
-      font-style: normal;
-      color: var(--n-amber);
-    }
-    .n-rule__evidence a {
-      color: var(--n-amber);
-      text-decoration: none;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       CROSS-LINKS (mid-page)
-       ═══════════════════════════════════════════════════════ */
-    .n-xref {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-8) var(--page-padding);
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-4);
-      border-bottom: 1px solid var(--border);
-    }
-    .n-xref-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--n-amber);
-      padding: var(--space-5) var(--space-6);
-      transition: border-color 0.15s;
-      text-decoration: none;
-      display: block;
-    }
-    .n-xref-card:hover {
-      border-color: var(--n-amber);
-    }
-    .n-xref-card__tag {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--n-amber);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      margin-bottom: var(--space-2);
-    }
-    .n-xref-card__text {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       NARRATIVE
-       ═══════════════════════════════════════════════════════ */
-    .n-narrative {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-12);
-      border-bottom: 1px solid var(--border);
-    }
-    .n-narrative__title {
-      font-family: var(--font-display);
-      font-size: var(--text-h2);
-      color: var(--text);
-      line-height: 1.15;
-      margin-bottom: var(--space-5);
-    }
-    .n-narrative__title em {
-      font-style: normal;
-      color: var(--n-amber);
-    }
-    .n-narrative__body {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.8;
-    }
-    .n-narrative__body strong {
-      color: var(--text);
-    }
-    .n-protocol-list {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-4);
-    }
-    .n-protocol-item {
-      display: flex;
-      gap: var(--space-4);
-      padding: var(--space-4);
-      background: var(--surface);
-      border-left: 2px solid var(--n-amber);
-    }
-    .n-protocol-num {
-      font-family: var(--font-display);
-      font-size: 20px;
-      color: var(--n-amber);
-      line-height: 1;
-      flex-shrink: 0;
-      width: 28px;
-    }
-    .n-protocol-text {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
-    .n-protocol-text strong {
-      color: var(--text);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       METHODOLOGY
-       ═══════════════════════════════════════════════════════ */
-    .n-method {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
-    }
-    .n-method__title {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      margin-bottom: var(--space-6);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .n-method__title::after {
-      content: '\2014\2014';
-      color: var(--text-faint);
-      opacity: 0.4;
-      flex-shrink: 0;
-    }
-    .n-method-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-6);
-    }
-    .n-method-item {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.7;
-    }
-    .n-method-item strong {
-      display: block;
-      color: var(--text);
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: 0.08em;
-      margin-bottom: var(--space-2);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       KITCHEN TEASER (10-kitchen)
-       ═══════════════════════════════════════════════════════ */
-    .n-kitchen-teaser {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-      text-align: center;
-    }
-    .n-kitchen-teaser__badge {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: var(--n-amber);
-      background: var(--n-amber-dim);
-      padding: 4px 14px;
-      display: inline-block;
-      margin-bottom: var(--space-4);
-    }
-    .n-kitchen-teaser__title {
-      font-family: var(--font-display);
-      font-size: clamp(24px, 3vw, 32px);
-      color: var(--text);
-      margin-bottom: var(--space-3);
-    }
-    .n-kitchen-teaser__title em {
-      font-style: normal;
-      color: var(--n-amber);
-    }
-    .n-kitchen-teaser__desc {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.8;
-      max-width: 560px;
-      margin: 0 auto var(--space-6);
-    }
-    .n-kitchen-teaser__link {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      letter-spacing: 0.08em;
-      color: var(--n-amber);
-      text-decoration: none;
-      border: 1px solid var(--n-amber);
-      padding: var(--space-3) var(--space-6);
-      display: inline-block;
-      transition: background 0.15s, color 0.15s;
-    }
-    .n-kitchen-teaser__link:hover {
-      background: var(--n-amber);
-      color: var(--text);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       V2: MACRO STACKED BAR + DONUT CHART
-       ═══════════════════════════════════════════════════════ */
-    .n-macro-chart-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .n-macro-chart-grid {
-      display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: var(--space-8);
-      align-items: start;
-    }
-    .n-macro-bar-wrap {
-      position: relative;
-      height: 280px;
-    }
-    .n-macro-donut-wrap {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .n-macro-donut-center {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -60%);
-      text-align: center;
-      pointer-events: none;
-    }
-    .n-macro-donut-center__num {
-      font-family: var(--font-display);
-      font-size: 22px;
+      font-size: 18px;
       color: var(--text);
       line-height: 1;
     }
-    .n-macro-donut-center__unit {
+    .n-meal__macro-label {
       font-family: var(--font-mono);
       font-size: 9px;
       color: var(--text-faint);
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-    }
-    .n-chart-insight {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text-muted);
-      padding-top: var(--space-4);
-      line-height: 1.5;
-      text-align: center;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       LOADING
-       ═══════════════════════════════════════════════════════ */
-    .n-loading {
-      text-align: center;
-      padding: var(--space-20);
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
       letter-spacing: 0.15em;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       RESPONSIVE
-       ═══════════════════════════════════════════════════════ */
-    @media (max-width: 768px) {
-      .n-hero-grid { grid-template-columns: 1fr; }
-      .n-gauge-row { grid-template-columns: repeat(2, 1fr); }
-      .n-macro-grid { grid-template-columns: 1fr; }
-      .n-macro-col:not(:last-child) { border-right: none; border-bottom: 1px solid var(--border); }
-      .n-protein-card { grid-template-columns: 1fr; }
-      .n-rule-grid { grid-template-columns: 1fr; }
-      .n-narrative { grid-template-columns: 1fr; }
-      .n-method-grid { grid-template-columns: 1fr; }
-      .n-xref { grid-template-columns: 1fr; }
-      .n-meals-grid { grid-template-columns: 1fr; }
-      .n-dist-grid { grid-template-columns: repeat(2, 1fr); }
-      .n-micro-grid { grid-template-columns: repeat(2, 1fr); }
-      .n-tdee-grid { grid-template-columns: repeat(2, 1fr); }
-      .n-triggers-grid { grid-template-columns: 1fr; }
-      .n-hydration-grid { grid-template-columns: 1fr; }
-      .n-hydration-corr { grid-template-columns: 1fr; }
-      .n-pullquote--left, .n-pullquote--right { padding-left: var(--page-padding); }
-      .n-macro-chart-grid { grid-template-columns: 1fr; }
-      .n-macro-bar-wrap { height: 220px; }
-    }
-  </style>
-
-  <style>
-    /* DB-03: Observatory pillar accent */
-    :root {
-      --obs-accent: var(--pillar-nutrition);
-      --obs-accent-dim: #f59e0b66;
-      --obs-accent-bg: #f59e0b18;
-    }
-    .s-hero__eyebrow, .eyebrow { color: var(--obs-accent) !important; }
-    .detail-card { border-left-color: var(--obs-accent); }
-    /* DPR-1.13: Key recommendation callout */
-    .coaching-key-rec {
-      border: 1px solid var(--obs-accent, var(--accent));
-      border-left: 4px solid var(--obs-accent, var(--accent));
-      background: linear-gradient(135deg, rgba(245,158,11,0.04), transparent 60%);
-      padding: var(--space-5) var(--space-6);
-      margin-bottom: var(--space-6);
-    }
-    .coaching-key-rec__label {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
       text-transform: uppercase;
-      color: var(--obs-accent, var(--accent));
-      margin-bottom: var(--space-2);
+      margin-top: 4px;
     }
-    .coaching-key-rec__text {
-      font-family: var(--font-display);
-      font-size: var(--text-lg);
-      color: var(--text);
-      line-height: 1.3;
-      margin-bottom: var(--space-2);
-    }
-    .coaching-key-rec__rationale {
-      font-size: var(--text-xs);
+    .n-meal__footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border-subtle);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
       color: var(--text-muted);
-      line-height: var(--lh-body);
+    }
+    .n-meal__grade {
+      padding: 2px 8px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      font-size: 9px;
+    }
+    .n-meal__grade--a { color: var(--c-green-500); background: rgba(0,229,160,0.1); }
+    .n-meal__grade--b { color: var(--accent); background: rgba(212,168,71,0.12); }
+    .n-meal__grade--c { color: var(--c-red-status); background: rgba(255,82,82,0.1); }
+
+    @media (max-width: 720px) {
+      .n-extra { padding: 24px 20px; }
+      .n-dist-grid { grid-template-columns: repeat(2, 1fr); }
+      .n-meals-grid { grid-template-columns: 1fr; }
+      .n-compare-grid { grid-template-columns: 1fr; }
+      .n-compare-col + .n-compare-col { border-left: none; border-top: 1px solid var(--border); }
+      .n-window-grid { grid-template-columns: 1fr; }
+      .n-window-cell + .n-window-cell { border-left: none; border-top: 1px solid var(--border); }
+      .n-prosrc-row__name { width: 130px; }
+      .n-prosrc-row__val { width: 80px; font-size: 10px; }
     }
   </style>
 </head>
-<body>
+<body class="body-signal">
+  <div id="amj-nav"></div>
+  <div id="amj-hierarchy-nav"></div>
 
-<div id="amj-nav"></div>
-<div id="amj-hierarchy-nav"></div>
-<!-- Product Board Item 11: Day X context banner -->
-<div id="day-x-banner" style="
-  margin:0 var(--page-padding);
-  padding:var(--space-3) var(--space-5);
-  background:rgba(var(--amber-rgb,245,158,11),0.06);
-  border:1px solid rgba(var(--amber-rgb,245,158,11),0.15);
-  border-radius:4px;
-  display:flex;
-  align-items:center;
-  gap:var(--space-3);
-  font-family:var(--font-mono);
-  font-size:var(--text-2xs);
-  letter-spacing:var(--ls-tag);
-">
-  <span class="experiment-counter" data-format="short" style="color:var(--c-amber-500);font-weight:700;"></span>
-  <span style="color:var(--text-muted);"> — Early data. This page gets smarter every week.</span>
-  <a href="/subscribe/" style="color:var(--c-amber-400);text-decoration:none;margin-left:auto;white-space:nowrap;">Follow along &rarr;</a>
-</div>
+  <div class="fp-page n-page" style="--accent: #d4a847; --accent-dim: #a07b30;">
 
+    <!-- ═══ 1. MASTHEAD ═════════════════════════════════════ -->
+    <header class="fp-masthead">
+      <div class="fp-masthead__top">
+        <div>
+          <div class="fp-masthead__brow" id="fp-eyebrow">
+            The Nutrition Dispatch · Vol I · Dispatch №<span id="fp-dispatch">—</span>
+          </div>
+          <div class="fp-masthead__title">NUTRITION</div>
+        </div>
+        <div class="fp-masthead__meta">
+          <div id="fp-date"><span class="n-skeleton" style="width:160px;height:10px"></span></div>
+          <div id="fp-meta-status">Logged from one plate</div>
+        </div>
+      </div>
+      <div class="fp-masthead__strip">
+        <div>
+          <span class="n-strip-btn" id="fp-prev" title="Available after Day 1">← Yesterday</span>
+          <span class="fp-masthead__strip-sep">·</span>
+          Day <span id="fp-day-strip">—</span> of 365
+          <span class="fp-masthead__strip-sep">·</span>
+          <span class="n-strip-btn" id="fp-next" title="Tomorrow's data isn't here yet">Tomorrow →</span>
+        </div>
+        <div id="fp-filed">Filed —</div>
+      </div>
+    </header>
 
-<!-- ════════════════════════════════════════════════════════════
-     V3 Section 1: STATUS BAR — rendered by observatory-v3.js
-     ════════════════════════════════════════════════════════════ -->
-<div id="obs-v3-status"></div>
-<p class="obs-subtitle">Every calorie logged. Every macro tracked. A 12-month nutrition record.</p>
+    <!-- ═══ 2. LEDE ═════════════════════════════════════════ -->
+    <section class="fp-lede">
+      <div>
+        <div class="fp-lede__num-brow">Day</div>
+        <div class="fp-lede__num" id="fp-day">—</div>
+        <div class="fp-lede__num-cap">of 365</div>
+      </div>
+      <div>
+        <div class="fp-lede__status" id="fp-status">▸ TODAY'S DESPATCH · STATE: LOADING</div>
+        <div class="fp-lede__narrative" id="fp-narrative">
+          "<span class="n-skeleton" style="width:80%;height:18px"></span>"
+        </div>
+        <div class="fp-lede__delta" id="fp-delta" style="display:none">
+          <span class="fp-lede__delta-label">30-day average:</span>
+        </div>
+      </div>
+    </section>
 
-<!-- ════════════════════════════════════════════════════════════
-     V3 Section 2: COACH ANALYSIS — rendered by observatory-v3.js
-     ════════════════════════════════════════════════════════════ -->
-<div id="obs-v3-coach"></div>
-
-<!-- ════════════════════════════════════════════════════════════
-     HERO — B's 2-column layout + C's gauge row
-     ════════════════════════════════════════════════════════════ -->
-<div class="n-hero">
-  <div class="n-hero-grid" style="padding-top:var(--space-4);">
-    <div style="display:none"><!-- Editorial moved to depth section -->
+    <!-- ═══ 3. WATCH BANNER (optional) ══════════════════════ -->
+    <div class="fp-watch" id="fp-watch" style="display:none">
+      <span class="fp-watch__label" id="fp-watch-label">Watch</span>
+      <span id="fp-watch-text"></span>
     </div>
-    <div class="n-gauge-row">
-      <div class="n-gauge">
-        <div class="n-gauge__ring">
-          <svg viewBox="0 0 88 88">
-            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-            <circle id="g-cal-arc" cx="44" cy="44" r="35" fill="none" stroke="#f59e0b" stroke-width="7"
-              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-              style="transition: stroke-dasharray 1.2s ease 0.5s"/>
-          </svg>
-          <div class="n-gauge__center">
-            <div class="n-gauge__num" id="g-cal-num" style="color:#f59e0b">&mdash;</div>
-            <div class="n-gauge__unit">cal</div>
+
+    <!-- ═══ 4. STANDINGS — meals + macro signals ═══════════ -->
+    <section class="fp-standings">
+      <div class="fp-standings__head">
+        <div class="fp-standings__title">MEALS</div>
+        <div class="fp-standings__meta">30-day avg · per-meal protein</div>
+      </div>
+      <div id="fp-standings-rows">
+        <div class="n-row-empty">Loading meal signals…</div>
+      </div>
+    </section>
+
+    <!-- ═══ 5. LONG STORY — 30-day protein arc ═════════════ -->
+    <section class="fp-arc" id="fp-arc-section">
+      <div class="fp-arc__head">
+        <div>
+          <div class="fp-arc__brow">The Long Story · Protein 30-Day Arc</div>
+          <div class="fp-arc__num" id="fp-arc-num">
+            <span id="fp-arc-floor">—</span> → <span class="fp-arc__num-current" id="fp-arc-current">—</span> → <span id="fp-arc-target">180</span>g
           </div>
         </div>
-        <div class="n-gauge__label">Daily avg</div>
-      </div>
-      <div class="n-gauge">
-        <div class="n-gauge__ring">
-          <svg viewBox="0 0 88 88">
-            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-            <circle id="g-pro-arc" cx="44" cy="44" r="35" fill="none" stroke="#3ecf8e" stroke-width="7"
-              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-              style="transition: stroke-dasharray 1.2s ease 0.6s"/>
-          </svg>
-          <div class="n-gauge__center">
-            <div class="n-gauge__num" id="g-pro-num" style="color:#3ecf8e">&mdash;</div>
-            <div class="n-gauge__unit">hit</div>
+        <div class="fp-arc__stats" id="fp-arc-stats">
+          <div>
+            <div class="fp-arc__stat-label">Hit rate</div>
+            <div class="fp-arc__stat-val fp-arc__stat-val--accent" id="fp-arc-hitrate">—</div>
+          </div>
+          <div>
+            <div class="fp-arc__stat-label">Days logged</div>
+            <div class="fp-arc__stat-val" id="fp-arc-days">—</div>
+          </div>
+          <div>
+            <div class="fp-arc__stat-label">Avg deficit</div>
+            <div class="fp-arc__stat-val" id="fp-arc-deficit">—</div>
           </div>
         </div>
-        <div class="n-gauge__label">Protein target</div>
       </div>
-      <div class="n-gauge">
-        <div class="n-gauge__ring">
-          <svg viewBox="0 0 88 88">
-            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-            <circle id="g-days-arc" cx="44" cy="44" r="35" fill="none" stroke="#a78bfa" stroke-width="7"
-              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-              style="transition: stroke-dasharray 1.2s ease 0.7s"/>
-          </svg>
-          <div class="n-gauge__center">
-            <div class="n-gauge__num" id="g-days-num" style="color:#a78bfa">&mdash;</div>
-            <div class="n-gauge__unit">days</div>
-          </div>
+      <div class="fp-arc__chart" id="fp-arc-chart"></div>
+      <div class="fp-arc__caption" id="fp-arc-caption">
+        <span>30 days ago</span>
+        <span>Today · — g protein</span>
+      </div>
+    </section>
+
+    <!-- ═══ EXTRA — Per-meal protein distribution ══════════ -->
+    <section class="n-extra">
+      <div class="n-extra__head">
+        <div class="n-extra__title">PER-MEAL DISTRIBUTION</div>
+        <div class="n-extra__meta">Leucine threshold · 30g target</div>
+      </div>
+      <div class="n-extra__intro">
+        The leucine threshold for muscle protein synthesis is roughly 30g per meal. Spreading 180g across four meals is not the same as front-loading it.
+      </div>
+      <div class="n-dist-grid" id="n-dist-grid">
+        <div class="n-dist-cell">
+          <div class="n-dist-cell__name">Breakfast</div>
+          <div class="n-dist-cell__bar-wrap"><div class="n-dist-cell__bar n-dist-cell__bar--hit" style="height:83%"></div></div>
+          <div class="n-dist-cell__value">42g</div>
+          <div class="n-dist-cell__target">Target 30g+</div>
+          <div class="n-dist-cell__status n-dist-cell__status--hit">Met</div>
         </div>
-        <div class="n-gauge__label">Logged</div>
-        <div id="n-logged-last7" style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:0.06em;margin-top:2px"></div>
-      </div>
-      <div class="n-gauge">
-        <div class="n-gauge__ring">
-          <svg viewBox="0 0 88 88">
-            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-            <circle id="g-def-arc" cx="44" cy="44" r="35" fill="none" stroke="#ef4444" stroke-width="7"
-              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-              style="transition: stroke-dasharray 1.2s ease 0.8s"/>
-          </svg>
-          <div class="n-gauge__center">
-            <div class="n-gauge__num" id="g-def-num" style="color:#ef4444">&mdash;</div>
-            <div class="n-gauge__unit">cal</div>
-          </div>
+        <div class="n-dist-cell">
+          <div class="n-dist-cell__name">Lunch</div>
+          <div class="n-dist-cell__bar-wrap"><div class="n-dist-cell__bar n-dist-cell__bar--hit" style="height:73%"></div></div>
+          <div class="n-dist-cell__value">38g</div>
+          <div class="n-dist-cell__target">Target 30g+</div>
+          <div class="n-dist-cell__status n-dist-cell__status--hit">Met</div>
         </div>
-        <div class="n-gauge__label">Avg deficit</div>
-      </div>
-    </div>
-  </div>
-  <div class="obs-freshness" id="obs-freshness" style="display:none">
-    <div>
-      <span class="obs-freshness__label">Last data: <span id="obs-fresh-time">—</span></span>
-      <span class="obs-freshness__sub">Updated daily</span>
-    </div>
-    <span class="obs-freshness__dot obs-freshness__dot--live" id="obs-fresh-dot"></span>
-  </div>
-</div>
-
-<div id="obs-thisweek" style="display:none"></div>
-
-<!-- Narrative intro moved to collapsed "About this observatory" section at bottom -->
-
-<div id="n-loading" class="n-loading">LOADING NUTRITION DATA&hellip;</div>
-<div id="n-content" style="display:none">
-
-<!-- ════════════════════════════════════════════════════════════
-     V2: 30-DAY CALORIE & MACRO BREAKDOWN — stacked bar + donut
-     ════════════════════════════════════════════════════════════ -->
-<section class="n-macro-chart-section reveal" id="n-macro-chart">
-  <div class="n-section-header">30-day calorie &amp; macro breakdown</div>
-  <div class="n-macro-chart-grid">
-    <div class="n-macro-bar-wrap">
-      <canvas id="n-macro-bar-canvas"></canvas>
-    </div>
-    <div class="n-macro-donut-wrap" style="position:relative;">
-      <canvas id="n-macro-donut-canvas" style="max-width:240px;max-height:240px;"></canvas>
-      <div class="n-macro-donut-center" id="n-donut-center" style="display:none;">
-        <div class="n-macro-donut-center__num" id="n-donut-avg"></div>
-        <div class="n-macro-donut-center__unit">avg cal/day</div>
-      </div>
-      <div class="n-chart-insight" id="n-macro-insight"></div>
-    </div>
-  </div>
-</section>
-
-<!-- AI expert analysis now rendered by V3 coach at position 2 (renderCoachAnalysis above) -->
-
-<!-- Pull-quote #1 moved to collapsed sections at bottom -->
-
-<!-- ════════════════════════════════════════════════════════════
-     MACRO EDITORIAL — B's 3-column (10g: em-dash section header)
-     ════════════════════════════════════════════════════════════ -->
-<section class="n-macro-section reveal">
-  <div class="n-section-header">Daily Average Breakdown</div>
-  <div class="n-macro-grid">
-    <div class="n-macro-col">
-      <div class="n-macro-bar"><div class="n-macro-bar__fill" id="mbar-pro" style="width:0%;background:#3ecf8e"></div></div>
-      <div class="n-macro-big" id="mval-pro" style="color:#3ecf8e">&mdash;</div>
-      <div class="n-macro-name">Protein</div>
-      <div class="n-macro-detail">Non-negotiable. Leucine threshold (2.5g/meal) drives muscle protein synthesis even in deficit.</div>
-    </div>
-    <div class="n-macro-col">
-      <div class="n-macro-bar"><div class="n-macro-bar__fill" id="mbar-carb" style="width:0%;background:#f59e0b"></div></div>
-      <div class="n-macro-big" id="mval-carb" style="color:#f59e0b">&mdash;</div>
-      <div class="n-macro-name">Carbs</div>
-      <div class="n-macro-detail">Timed around <a href="/training/">training</a> for glycogen replenishment. Fuels Zone 2 and strength work.</div>
-    </div>
-    <div class="n-macro-col">
-      <div class="n-macro-bar"><div class="n-macro-bar__fill" id="mbar-fat" style="width:0%;background:#ef4444"></div></div>
-      <div class="n-macro-big" id="mval-fat" style="color:#ef4444">&mdash;</div>
-      <div class="n-macro-name">Fat</div>
-      <div class="n-macro-detail">Hormone health floor. Essential fatty acid minimum. Not further restricted.</div>
-    </div>
-  </div>
-  <div class="n-context">
-    Macros tell a different story than calories alone. <strong>Protein is the constraint</strong> &mdash; hit 180g and the rest falls into place. Miss it, and the deficit eats muscle instead of fat.
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     PROTEIN ADHERENCE
-     ════════════════════════════════════════════════════════════ -->
-<section class="n-protein-section reveal">
-  <div class="n-section-header">Protein Adherence</div>
-  <div class="n-protein-card">
-    <div>
-      <div class="n-protein-card__title">Protein adherence is the <em>non-negotiable</em></div>
-      <div class="n-protein-card__sub">
-        180g/day target. Leucine threshold at every meal.
-        Hit rate = days at or above target out of total logged days.
-      </div>
-      <div class="n-protein-track">
-        <div class="n-protein-fill" id="protein-fill" style="width:0%"></div>
-      </div>
-      <div class="n-protein-markers">
-        <span>0%</span><span>50%</span><span>80%</span><span>100%</span>
-      </div>
-    </div>
-    <div class="n-protein-big">
-      <div class="n-protein-big__num" id="protein-pct">&mdash;</div>
-      <div class="n-protein-big__unit">hit rate</div>
-      <div class="n-protein-big__sub" id="protein-days">&mdash; of &mdash; days</div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     10c: PROTEIN DISTRIBUTION — per-meal leucine threshold
-     ════════════════════════════════════════════════════════════ -->
-<section class="n-protein-dist reveal">
-  <div class="n-section-header">Per-Meal Protein Distribution</div>
-  <div class="n-context" style="padding-left:0;padding-right:0;max-width:none">
-    The leucine threshold for muscle protein synthesis is roughly <strong>30g protein per meal</strong>. Getting 180g in two meals doesn&rsquo;t count the same as spreading it across four.
-  </div>
-  <div class="n-dist-grid">
-    <div class="n-dist-meal">
-      <div class="n-dist-meal__name">Breakfast</div>
-      <div class="n-dist-meal__bar-wrap">
-        <div class="n-dist-meal__bar n-dist-meal__bar--hit" style="height:83%"></div>
-      </div>
-      <div class="n-dist-meal__value">42g</div>
-      <div class="n-dist-meal__target">Target: 30g+</div>
-      <div class="n-dist-meal__status n-dist-meal__status--hit">Threshold met</div>
-    </div>
-    <div class="n-dist-meal">
-      <div class="n-dist-meal__name">Lunch</div>
-      <div class="n-dist-meal__bar-wrap">
-        <div class="n-dist-meal__bar n-dist-meal__bar--hit" style="height:73%"></div>
-      </div>
-      <div class="n-dist-meal__value">38g</div>
-      <div class="n-dist-meal__target">Target: 30g+</div>
-      <div class="n-dist-meal__status n-dist-meal__status--hit">Threshold met</div>
-    </div>
-    <div class="n-dist-meal">
-      <div class="n-dist-meal__name">Dinner</div>
-      <div class="n-dist-meal__bar-wrap">
-        <div class="n-dist-meal__bar n-dist-meal__bar--hit" style="height:92%"></div>
-      </div>
-      <div class="n-dist-meal__value">48g</div>
-      <div class="n-dist-meal__target">Target: 30g+</div>
-      <div class="n-dist-meal__status n-dist-meal__status--hit">Threshold met</div>
-    </div>
-    <div class="n-dist-meal">
-      <div class="n-dist-meal__name">Snacks</div>
-      <div class="n-dist-meal__bar-wrap">
-        <div class="n-dist-meal__bar n-dist-meal__bar--miss" style="height:42%"></div>
-      </div>
-      <div class="n-dist-meal__value">22g</div>
-      <div class="n-dist-meal__target">Target: 30g+</div>
-      <div class="n-dist-meal__status n-dist-meal__status--miss">Below threshold</div>
-    </div>
-  </div>
-</section>
-
-<!-- Pull-quote #2 moved to collapsed sections at bottom -->
-
-<!-- ════════════════════════════════════════════════════════════
-     10b: TOP MEALS — most frequently logged with macro profile (10k: food icons)
-     ════════════════════════════════════════════════════════════ -->
-<section class="n-meals-section reveal">
-  <div class="n-section-header">Top Meals — 30 days from MacroFactor</div>
-  <div class="n-context" style="padding-left:0;padding-right:0;max-width:none">
-    The meals that appear most often in the log. Sorted by frequency, with averaged macro breakdown per serving.
-  </div>
-  <div class="n-meals-grid" id="n-meals-dynamic">
-    <div style="grid-column:1/-1;text-align:center;padding:var(--space-8);color:var(--text-faint);font-family:var(--font-mono);font-size:var(--text-xs)">Loading meal data from MacroFactor...</div>
-  </div>
-</section>
-<script>
-(async function() {
-  try {
-    var resp = await fetch('/api/frequent_meals');
-    if (!resp.ok) return;
-    var data = await resp.json();
-    var meals = data.meals || [];
-    if (!meals.length) return;
-    var grid = document.getElementById('n-meals-dynamic');
-    if (!grid) return;
-    grid.innerHTML = meals.map(function(m) {
-      var ppc = m.protein_cal_pct || 0;
-      return '<div class="n-meal-card">' +
-        '<div class="n-meal-card__header">' +
-          '<div>' +
-            '<div class="n-meal-card__name">' + m.name + '</div>' +
-            '<div class="n-meal-card__freq">' + m.frequency + 'x logged</div>' +
-          '</div>' +
-        '</div>' +
-        '<div class="n-meal-card__macros">' +
-          '<div class="n-meal-card__macro"><div class="n-meal-card__macro-val">' + m.avg_calories + '</div><div class="n-meal-card__macro-label">cal</div></div>' +
-          '<div class="n-meal-card__macro"><div class="n-meal-card__macro-val">' + m.avg_protein_g + 'g</div><div class="n-meal-card__macro-label">protein</div></div>' +
-          '<div class="n-meal-card__macro"><div class="n-meal-card__macro-val">' + m.avg_carbs_g + 'g</div><div class="n-meal-card__macro-label">carbs</div></div>' +
-        '</div>' +
-        '<div class="n-meal-card__footer">' +
-          '<div class="n-meal-card__ppc">P/cal: <em>' + ppc + '%</em></div>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-  } catch(e) { console.warn('Meal data unavailable:', e); }
-})();
-</script>
-
-<!-- ════════════════════════════════════════════════════════════
-     PROTEIN SOURCE BREAKDOWN
-     ════════════════════════════════════════════════════════════ -->
-<section class="n-prosrc-section reveal">
-  <div class="n-section-header">Where does protein come from?</div>
-  <div class="n-context" style="padding-left:0;padding-right:0;max-width:none">
-    Top protein sources from 30 days of food logs. Each bar shows average daily contribution.
-  </div>
-  <div id="n-prosrc-bars">
-    <div style="color:var(--text-faint);font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-4)">Loading protein sources...</div>
-  </div>
-</section>
-<script>
-(async function() {
-  try {
-    var resp = await fetch('/api/protein_sources');
-    if (!resp.ok) return;
-    var data = await resp.json();
-    var sources = data.protein_sources || [];
-    if (!sources.length) return;
-    var container = document.getElementById('n-prosrc-bars');
-    if (!container) return;
-    var maxG = sources[0].avg_daily_g || 1;
-    container.innerHTML = sources.map(function(s) {
-      return '<div class="n-prosrc-bar">' +
-        '<div class="n-prosrc-bar__name">' + s.food + '</div>' +
-        '<div class="n-prosrc-bar__track"><div class="n-prosrc-bar__fill" style="width:' + Math.round((s.avg_daily_g / maxG) * 100) + '%"></div></div>' +
-        '<div class="n-prosrc-bar__val">' + s.avg_daily_g + 'g/day (' + s.pct_of_total + '%)</div>' +
-      '</div>';
-    }).join('');
-  } catch(e) { console.warn('Protein sources unavailable:', e); }
-})();
-</script>
-
-<!-- ════════════════════════════════════════════════════════════
-     WEEKDAY VS WEEKEND COMPARISON
-     ════════════════════════════════════════════════════════════ -->
-<section class="n-wvw-section reveal">
-  <div class="n-section-header">Weekday vs weekend</div>
-  <div class="n-context" style="padding-left:0;padding-right:0;max-width:none" id="n-wvw-narrative"></div>
-  <div class="n-wvw-grid">
-    <div class="n-wvw-col">
-      <div class="n-wvw-col__title">Weekday (Mon&ndash;Fri)</div>
-      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg calories</span><span class="n-wvw-stat__val" id="wvw-wd-cal">&mdash;</span></div>
-      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg protein</span><span class="n-wvw-stat__val" id="wvw-wd-pro">&mdash;</span></div>
-      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg carbs</span><span class="n-wvw-stat__val" id="wvw-wd-carb">&mdash;</span></div>
-      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg fat</span><span class="n-wvw-stat__val" id="wvw-wd-fat">&mdash;</span></div>
-      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Protein hit %</span><span class="n-wvw-stat__val" id="wvw-wd-hit">&mdash;</span></div>
-    </div>
-    <div class="n-wvw-col">
-      <div class="n-wvw-col__title">Weekend (Sat&ndash;Sun)</div>
-      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg calories</span><span class="n-wvw-stat__val" id="wvw-we-cal">&mdash;</span></div>
-      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg protein</span><span class="n-wvw-stat__val" id="wvw-we-pro">&mdash;</span></div>
-      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg carbs</span><span class="n-wvw-stat__val" id="wvw-we-carb">&mdash;</span></div>
-      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg fat</span><span class="n-wvw-stat__val" id="wvw-we-fat">&mdash;</span></div>
-      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Protein hit %</span><span class="n-wvw-stat__val" id="wvw-we-hit">&mdash;</span></div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     EATING WINDOW
-     ════════════════════════════════════════════════════════════ -->
-<section class="n-ew-section reveal">
-  <div class="n-section-header">Eating window</div>
-  <div class="n-ew-grid">
-    <div class="n-ew-col">
-      <div class="n-ew-big" id="ew-window">&mdash;</div>
-      <div class="n-ew-label">Avg eating window</div>
-    </div>
-    <div class="n-ew-col">
-      <div class="n-ew-big" id="ew-first">&mdash;</div>
-      <div class="n-ew-label">First meal</div>
-    </div>
-    <div class="n-ew-col">
-      <div class="n-ew-big" id="ew-last">&mdash;</div>
-      <div class="n-ew-label">Last meal</div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     CALORIC PERIODIZATION — Training vs Rest days
-     ════════════════════════════════════════════════════════════ -->
-<section class="n-period-section reveal">
-  <div class="n-section-header">Caloric periodization</div>
-  <div class="n-context" style="padding-left:0;padding-right:0;max-width:none">
-    Are calories higher on training days? Cross-referencing MacroFactor with Strava activity dates.
-  </div>
-  <div class="n-wvw-grid">
-    <div class="n-wvw-col">
-      <div class="n-wvw-col__title">Training Days</div>
-      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg calories</span><span class="n-wvw-stat__val" id="pd-train-cal">&mdash;</span></div>
-      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg protein</span><span class="n-wvw-stat__val" id="pd-train-pro">&mdash;</span></div>
-      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Days</span><span class="n-wvw-stat__val" id="pd-train-count">&mdash;</span></div>
-    </div>
-    <div class="n-wvw-col">
-      <div class="n-wvw-col__title">Rest Days</div>
-      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg calories</span><span class="n-wvw-stat__val" id="pd-rest-cal">&mdash;</span></div>
-      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg protein</span><span class="n-wvw-stat__val" id="pd-rest-pro">&mdash;</span></div>
-      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Days</span><span class="n-wvw-stat__val" id="pd-rest-count">&mdash;</span></div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     "WHAT I ACTUALLY EAT" — Recent Meals Gallery
-     ════════════════════════════════════════════════════════════ -->
-<section class="n-gallery-section reveal">
-  <div class="n-section-header">What I actually eat</div>
-  <div class="n-context" style="padding-left:0;padding-right:0;max-width:none">
-    The most recent distinct meals from the food log. Real entries, not curated.
-  </div>
-  <div class="n-meals-grid" id="n-recent-meals">
-    <div style="grid-column:1/-1;text-align:center;padding:var(--space-8);color:var(--text-faint);font-family:var(--font-mono);font-size:var(--text-xs)">Loading recent meals...</div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     30-DAY TREND CHART (10g: em-dash header)
-     ════════════════════════════════════════════════════════════ -->
-<section class="n-chart-section reveal">
-  <div class="n-chart-header">
-    <div class="n-chart-title">30-Day Calorie &amp; Protein Trend</div>
-    <div class="n-chart-legend">
-      <div class="n-legend-item"><div class="n-legend-dot" style="background:#f59e0b"></div> Calories (&divide;10)</div>
-      <div class="n-legend-item"><div class="n-legend-dot" style="background:#3ecf8e"></div> Protein (g)</div>
-    </div>
-  </div>
-  <canvas class="n-chart" id="n-trend-canvas"></canvas>
-  <div class="n-context">
-    Consistency matters more than perfection. The goal isn&rsquo;t to hit exact numbers every day &mdash; it&rsquo;s to keep the <strong>trend line flat</strong> and the protein dots green.
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     10e: TDEE ADAPTATION TRACKING
-     ════════════════════════════════════════════════════════════ -->
-<section class="n-tdee-section reveal">
-  <div class="n-section-header">TDEE Adaptation Tracking</div>
-  <div class="n-context" style="padding-left:0;padding-right:0;max-width:none">
-    MacroFactor&rsquo;s adaptive TDEE learns your true energy expenditure from weight trends over 14+ days. As the body adapts to a deficit, TDEE drifts downward &mdash; tracking this prevents stalls.
-  </div>
-  <div class="n-tdee-grid">
-    <div class="n-tdee-card">
-      <div class="n-tdee-card__period">Month 1</div>
-      <div class="n-tdee-card__value">2,680</div>
-      <div class="n-tdee-card__unit">cal/day</div>
-      <div class="n-tdee-card__delta n-tdee-card__delta--flat">baseline</div>
-    </div>
-    <div class="n-tdee-card">
-      <div class="n-tdee-card__period">Month 3</div>
-      <div class="n-tdee-card__value">2,520</div>
-      <div class="n-tdee-card__unit">cal/day</div>
-      <div class="n-tdee-card__delta n-tdee-card__delta--down">&darr; 160 cal</div>
-    </div>
-    <div class="n-tdee-card">
-      <div class="n-tdee-card__period">Month 5</div>
-      <div class="n-tdee-card__value">2,410</div>
-      <div class="n-tdee-card__unit">cal/day</div>
-      <div class="n-tdee-card__delta n-tdee-card__delta--down">&darr; 270 cal</div>
-    </div>
-    <div class="n-tdee-card">
-      <div class="n-tdee-card__period">Current</div>
-      <div class="n-tdee-card__value" id="tdee-current">2,350</div>
-      <div class="n-tdee-card__unit">cal/day</div>
-      <div class="n-tdee-card__delta n-tdee-card__delta--down" id="tdee-delta">&darr; 330 cal</div>
-    </div>
-  </div>
-  <canvas class="n-tdee-chart" id="n-tdee-canvas"></canvas>
-</section>
-
-<!-- Pull-quote #3 moved to collapsed sections at bottom -->
-
-<!-- Micronutrient Gaps moved to collapsed section at bottom -->
-
-<!-- Behavioral Triggers moved to collapsed section at bottom -->
-
-<!-- ════════════════════════════════════════════════════════════
-     FOOD DELIVERY ANALYSIS (Phase 2)
-     ════════════════════════════════════════════════════════════ -->
-<section class="n-macro-section reveal" id="n-delivery-section" style="display:none">
-  <div class="n-section-header">Restaurant &amp; takeout</div>
-  <div class="n-context" style="padding-left:0;padding-right:0;max-width:none" id="n-delivery-context">
-    Real, relatable content. Where does Matthew actually order from?
-  </div>
-  <div class="n-macro-grid" id="n-delivery-grid"></div>
-</section>
-
-<!-- Macro Deep-Dives moved to collapsed section at bottom -->
-
-<!-- Hydration moved to collapsed section at bottom -->
-
-<!-- ════════════════════════════════════════════════════════════
-     V3.1 COLLAPSED DEPTH SECTIONS — editorial content preserved below
-     ════════════════════════════════════════════════════════════ -->
-
-<!-- 1. About this observatory (narrative intro + pull-quotes) -->
-<details class="obs-depth-section">
-  <summary>About this observatory <span class="obs-depth-section__teaser">The story behind this page and Matthew's reflections</span></summary>
-  <div class="n-intro reveal">
-    <div class="n-intro__text">
-      Food and I have had a complicated relationship since my twenties. The real shift
-      came around 2017 &mdash; relocation, an MBA, a promotion, my mum getting sick &mdash;
-      when eating stopped being about hunger and started being about quieting everything else.
-      Convenience. Something to fill a feeling. Food that wasn&rsquo;t even that good.
-      <em>MacroFactor</em> didn&rsquo;t fix the psychology. But it made the invisible visible,
-      and awareness is where the change starts.
-    </div>
-    <div class="n-intro__sub">
-      I&rsquo;ve lost 100 lbs before without tracking a single calorie. This isn&rsquo;t about macros &mdash;
-      it&rsquo;s about where my head is. When I&rsquo;m on, this becomes second nature. When I&rsquo;m off,
-      even a DoorDash order can break a streak. The data below captures both.
-    </div>
-  </div>
-  <div class="n-pullquote n-pullquote--left reveal">
-    <div class="n-pullquote__watermark">01</div>
-    <div class="n-pullquote__text">
-      Testing: does front-loading <em>40g+ protein</em> at breakfast predict hitting daily target?
-      Tracking correlation between breakfast protein load and end-of-day adherence.
-    </div>
-    <div class="n-pullquote__attr">
-      <span class="n-pullquote__badge">Hypothesis &middot; Under Test</span>
-      <span class="n-pullquote__source">MacroFactor data &mdash; pending sufficient sample size</span>
-    </div>
-  </div>
-  <div class="n-pullquote n-pullquote--right reveal">
-    <div class="n-pullquote__watermark">02</div>
-    <div class="n-pullquote__text">
-      Testing: does <em>30g+ fiber</em> intake meaningfully reduce glucose variability?
-      Correlating daily fiber logs with CGM standard deviation readings.
-    </div>
-    <div class="n-pullquote__attr">
-      <span class="n-pullquote__badge">Hypothesis &middot; Under Test</span>
-      <span class="n-pullquote__source">MacroFactor fiber data cross-referenced with Dexcom Stelo &mdash; <a href="/glucose/" style="color:var(--n-amber);text-decoration:none">Glucose Observatory</a></span>
-    </div>
-  </div>
-  <div class="n-pullquote n-pullquote--left reveal">
-    <div class="n-pullquote__watermark">03</div>
-    <div class="n-pullquote__text">
-      Testing: does <em>deficit depth</em> predict <a href="/training/" style="color:var(--n-amber);text-decoration:none">training</a> strain decline?
-      Correlating weekly caloric deficit with Whoop strain output.
-    </div>
-    <div class="n-pullquote__attr">
-      <span class="n-pullquote__badge">Hypothesis &middot; Under Test</span>
-      <span class="n-pullquote__source">Whoop strain data cross-referenced with MacroFactor deficit &mdash; pending data</span>
-    </div>
-  </div>
-  <div class="n-pullquote n-pullquote--dynamic n-pullquote--right reveal">
-    <div class="n-pullquote__watermark">04</div>
-    <div class="n-pullquote__text">
-      The hardest part of tracking nutrition isn&rsquo;t the math.
-      It&rsquo;s the honesty. <em>Logging the bad days</em> is where the real data lives.
-    </div>
-    <div class="n-pullquote__attr">
-      <span class="n-pullquote__badge">N=1 &middot; Reflection</span>
-      <span class="n-pullquote__source">Every meal logged &mdash; even the ones I&rsquo;d rather forget</span>
-    </div>
-  </div>
-  <div class="n-pullquote n-pullquote--right reveal" style="border-bottom:1px solid var(--border);">
-    <blockquote class="n-pullquote__text">
-      &ldquo;The plan is to log everything — including the 3,400-calorie Saturdays. A gap in the data is data too. It usually means something happened worth paying attention to.&rdquo;
-    </blockquote>
-    <div class="n-pullquote__attr">
-      <span class="n-pullquote__badge">&mdash; Matthew</span>
-    </div>
-  </div>
-</details>
-
-<!-- 2. Hypotheses under test -->
-<details class="obs-depth-section">
-  <summary>Hypotheses under test (4) <span class="obs-depth-section__teaser">Protein timing, deficit sustainability, meal frequency, fiber threshold</span></summary>
-  <section class="n-rules-section reveal">
-    <div class="n-section-header">Nutrition Hypotheses Under Test</div>
-    <div class="n-rule-grid">
-      <div class="n-rule">
-        <div class="n-rule__num">H-01</div>
-        <div class="n-rule__finding">Testing: does front-loading 40g+ protein at breakfast predict hitting daily target?</div>
-        <div class="n-rule__evidence">Correlating breakfast protein load with end-of-day adherence &bull; <em>pending data</em></div>
-      </div>
-      <div class="n-rule">
-        <div class="n-rule__num">H-02</div>
-        <div class="n-rule__finding">Testing: fiber intake &times; CGM glucose variability correlation</div>
-        <div class="n-rule__evidence">Tracking 30g+ fiber days vs glucose SD &rarr; <a href="/glucose/">Glucose Observatory</a> &bull; <em>pending data</em></div>
-      </div>
-      <div class="n-rule">
-        <div class="n-rule__num">H-03</div>
-        <div class="n-rule__finding">Testing: deficit depth &times; training strain correlation</div>
-        <div class="n-rule__evidence">Correlating weekly caloric deficit with Whoop strain output &bull; <em>pending data</em></div>
-      </div>
-      <div class="n-rule">
-        <div class="n-rule__num">H-04</div>
-        <div class="n-rule__finding">Testing: meal distribution &times; MPS response tracking</div>
-        <div class="n-rule__evidence">Comparing 4-meal vs 2-meal protein distribution on recovery markers &bull; <em>pending data</em></div>
-      </div>
-    </div>
-  </section>
-</details>
-
-<!-- 3. Genomic context & micronutrients -->
-<details class="obs-depth-section">
-  <summary>Genomic context &amp; micronutrients <span class="obs-depth-section__teaser">PEMT, VDR, FADS1 variants — why population averages don't apply</span></summary>
-  <section class="n-micro-section reveal">
-    <div class="n-section-header">Micronutrient Gaps</div>
-    <div class="n-context" style="padding-left:0;padding-right:0;max-width:none">
-      Genomics testing flagged specific micronutrient sensitivities. These targets are <strong>personalized</strong>, not RDA defaults. Deficits in these areas have measurable downstream effects.
-    </div>
-    <div class="n-micro-grid">
-      <div class="n-micro-card">
-        <div class="n-micro-card__name">Choline</div>
-        <div class="n-micro-card__why">PEMT variant &mdash; reduced endogenous synthesis. Liver health, methylation.</div>
-        <div class="n-micro-card__values">
-          <div class="n-micro-card__actual">380mg</div>
-          <div class="n-micro-card__target">Target: 550mg+</div>
+        <div class="n-dist-cell">
+          <div class="n-dist-cell__name">Dinner</div>
+          <div class="n-dist-cell__bar-wrap"><div class="n-dist-cell__bar n-dist-cell__bar--hit" style="height:92%"></div></div>
+          <div class="n-dist-cell__value">48g</div>
+          <div class="n-dist-cell__target">Target 30g+</div>
+          <div class="n-dist-cell__status n-dist-cell__status--hit">Met</div>
         </div>
-        <div class="n-micro-card__bar">
-          <div class="n-micro-card__fill n-micro-card__fill--warn" style="width:69%"></div>
-        </div>
-        <div class="n-micro-card__status n-micro-card__status--warn">Gap: 170mg</div>
-      </div>
-      <div class="n-micro-card">
-        <div class="n-micro-card__name">Vitamin D</div>
-        <div class="n-micro-card__why">VDR polymorphism &mdash; higher dose needed. Immune function, bone density.</div>
-        <div class="n-micro-card__values">
-          <div class="n-micro-card__actual">4,200 IU</div>
-          <div class="n-micro-card__target">Target: 5,000 IU</div>
-        </div>
-        <div class="n-micro-card__bar">
-          <div class="n-micro-card__fill n-micro-card__fill--warn" style="width:84%"></div>
-        </div>
-        <div class="n-micro-card__status n-micro-card__status--warn">Supplemented</div>
-      </div>
-      <div class="n-micro-card">
-        <div class="n-micro-card__name">Omega-3 (EPA+DHA)</div>
-        <div class="n-micro-card__why">FADS1 variant &mdash; poor conversion from ALA. Anti-inflammatory, cardiac.</div>
-        <div class="n-micro-card__values">
-          <div class="n-micro-card__actual">1.8g</div>
-          <div class="n-micro-card__target">Target: 2.0g+</div>
-        </div>
-        <div class="n-micro-card__bar">
-          <div class="n-micro-card__fill n-micro-card__fill--good" style="width:90%"></div>
-        </div>
-        <div class="n-micro-card__status n-micro-card__status--good">Near target</div>
-      </div>
-      <div class="n-micro-card">
-        <div class="n-micro-card__name">Folate</div>
-        <div class="n-micro-card__why">MTHFR C677T &mdash; reduced methylation. Homocysteine clearance, DNA repair.</div>
-        <div class="n-micro-card__values">
-          <div class="n-micro-card__actual">520mcg</div>
-          <div class="n-micro-card__target">Target: 800mcg</div>
-        </div>
-        <div class="n-micro-card__bar">
-          <div class="n-micro-card__fill n-micro-card__fill--warn" style="width:65%"></div>
-        </div>
-        <div class="n-micro-card__status n-micro-card__status--warn">Gap: 280mcg</div>
-      </div>
-    </div>
-  </section>
-</details>
-
-<!-- 4. Behavioral triggers -->
-<details class="obs-depth-section">
-  <summary>Behavioral triggers <span class="obs-depth-section__teaser">Sleep deprivation, travel, stress — when nutrition falls apart</span></summary>
-  <section class="n-triggers-section reveal">
-    <div class="n-section-header">Behavioral Trigger Analysis</div>
-    <div class="n-context" style="padding-left:0;padding-right:0;max-width:none">
-      Nutrition failures aren&rsquo;t random. They&rsquo;re predictable. Cross-referencing macro misses with <a href="/sleep/" style="color:var(--n-amber);text-decoration:none">sleep</a>, stress, and travel data reveals the patterns.
-    </div>
-    <div class="n-triggers-grid">
-      <div class="n-trigger-card">
-        <div class="n-trigger-card__trigger">Sleep deprivation</div>
-        <div class="n-trigger-card__finding">Testing: sleep deprivation &times; nutrition compliance correlation</div>
-        <div class="n-trigger-card__evidence">Tracking whether short sleep nights predict caloric overshoot and protein misses &bull; <em>under test</em></div>
-      </div>
-      <div class="n-trigger-card">
-        <div class="n-trigger-card__trigger">Travel days</div>
-        <div class="n-trigger-card__finding">Testing: travel &times; caloric surplus pattern</div>
-        <div class="n-trigger-card__evidence">Tracking whether travel days predict caloric overshoot, protein shortfall, and glucose variability &bull; <em>under test</em></div>
-      </div>
-      <div class="n-trigger-card">
-        <div class="n-trigger-card__trigger">High stress</div>
-        <div class="n-trigger-card__finding">Testing: stress &times; logging compliance and macro drift</div>
-        <div class="n-trigger-card__evidence">Tracking whether low-HRV days predict unlogged meals and carb overshoot &bull; <em>under test</em></div>
-      </div>
-    </div>
-  </section>
-</details>
-
-<!-- 5. Macro deep-dives -->
-<details class="obs-depth-section">
-  <summary>Macro deep-dives <span class="obs-depth-section__teaser">Carbs, fats, fiber — detailed breakdown and targets</span></summary>
-  <section class="n-macro-section reveal" id="n-macro-deep">
-    <div class="n-section-header">Macro deep-dives &mdash; carbs, fats, fiber</div>
-    <div class="n-macro-grid" id="n-macro-deep-grid"></div>
-  </section>
-</details>
-
-<!-- 6. Hydration tracking -->
-<details class="obs-depth-section">
-  <summary>Hydration tracking <span class="obs-depth-section__teaser">Water intake, energy correlation, and recovery impact</span></summary>
-  <section class="n-hydration-section reveal">
-    <div class="n-section-header">Hydration</div>
-    <div class="n-hydration-grid">
-      <div class="n-hydration-big">
-        <div class="n-hydration-big__num">3.2L</div>
-        <div class="n-hydration-big__unit">daily average</div>
-        <div class="n-hydration-big__sub">Target: 3.5L+</div>
-      </div>
-      <div class="n-hydration-corr">
-        <div class="n-hydration-corr-card">
-          <div class="n-hydration-corr-card__label">Energy correlation</div>
-          <div class="n-hydration-corr-card__finding">Testing: do days above <em>3.5L</em> predict higher Whoop recovery scores? Tracking hydration &times; recovery correlation. <em>Under test.</em></div>
-        </div>
-        <div class="n-hydration-corr-card">
-          <div class="n-hydration-corr-card__label">Recovery impact</div>
-          <div class="n-hydration-corr-card__finding">Testing: does training-day hydration predict next-day HRV improvement? Comparing electrolyte-enhanced vs plain water. <em>Under test.</em></div>
+        <div class="n-dist-cell">
+          <div class="n-dist-cell__name">Snacks</div>
+          <div class="n-dist-cell__bar-wrap"><div class="n-dist-cell__bar n-dist-cell__bar--miss" style="height:42%"></div></div>
+          <div class="n-dist-cell__value">22g</div>
+          <div class="n-dist-cell__target">Target 30g+</div>
+          <div class="n-dist-cell__status n-dist-cell__status--miss">Below</div>
         </div>
       </div>
-    </div>
-    <div class="n-context">
-      Hydration is the most undertracked variable in nutrition. It affects glucose readings, recovery scores, and perceived energy &mdash; but rarely gets the same attention as macros.
-    </div>
-  </section>
-</details>
+    </section>
 
-<!-- 7. Nutrition protocol -->
-<details class="obs-depth-section">
-  <summary>Nutrition protocol <span class="obs-depth-section__teaser">The 5-rule system behind the data</span></summary>
-  <div class="n-narrative reveal" style="border-bottom:1px solid var(--border);">
-    <div>
-      <div class="n-narrative__title">Losing weight without losing <em>muscle</em></div>
-      <div class="n-narrative__body">
-        The single biggest risk in aggressive weight loss is losing lean mass alongside fat.
-        Protein adequacy is the primary defense &mdash; <strong>1.6&ndash;2.2g per kg of lean body mass</strong> preserves
-        muscle during a caloric deficit.
+    <!-- ═══ EXTRA — Protein sources ════════════════════════ -->
+    <section class="n-extra" id="n-prosrc-section" style="display:none">
+      <div class="n-extra__head">
+        <div class="n-extra__title">PROTEIN SOURCES</div>
+        <div class="n-extra__meta">30-day avg · g/day</div>
       </div>
-    </div>
-    <div class="n-protocol-list">
-      <div class="n-protocol-item">
-        <div class="n-protocol-num">01</div>
-        <div class="n-protocol-text"><strong>180g protein daily</strong> &mdash; non-negotiable. Leucine threshold (2.5g/meal) drives MPS even in deficit.</div>
+      <div class="n-extra__intro">
+        Top protein sources from the food log. Each bar shows average daily contribution.
       </div>
-      <div class="n-protocol-item">
-        <div class="n-protocol-num">02</div>
-        <div class="n-protocol-text"><strong>500&ndash;750 cal deficit</strong> via adaptive TDEE. Aggressive enough for progress, conservative enough for training quality.</div>
+      <div id="n-prosrc-rows"></div>
+    </section>
+
+    <!-- ═══ EXTRA — Top meals ══════════════════════════════ -->
+    <section class="n-extra" id="n-meals-section" style="display:none">
+      <div class="n-extra__head">
+        <div class="n-extra__title">TOP MEALS</div>
+        <div class="n-extra__meta">Most logged · 30 days · MacroFactor</div>
       </div>
-      <div class="n-protocol-item">
-        <div class="n-protocol-num">03</div>
-        <div class="n-protocol-text"><strong>Protein-first meal ordering</strong> &mdash; protein and fat before carbs. Blunts glucose spike. CGM-confirmed.</div>
+      <div class="n-extra__intro">
+        The meals that appear most often in the log. Sorted by frequency, with averaged macro breakdown per serving.
       </div>
-      <div class="n-protocol-item">
-        <div class="n-protocol-num">04</div>
-        <div class="n-protocol-text"><strong>30g+ fiber daily</strong> for satiety, gut health, and glucose stability.</div>
+      <div class="n-meals-grid" id="n-meals-grid"></div>
+    </section>
+
+    <!-- ═══ EXTRA — Weekday vs weekend ═════════════════════ -->
+    <section class="n-extra" id="n-wvw-section" style="display:none">
+      <div class="n-extra__head">
+        <div class="n-extra__title">WEEKDAY vs WEEKEND</div>
+        <div class="n-extra__meta">Mon–Fri · Sat–Sun</div>
       </div>
-      <div class="n-protocol-item">
-        <div class="n-protocol-num">05</div>
-        <div class="n-protocol-text"><strong>Every meal logged within 30 minutes.</strong> No cheat meals go unrecorded.</div>
+      <div class="n-extra__intro" id="n-wvw-narrative">
+        How the plate shifts when the calendar opens up.
       </div>
-    </div>
+      <div class="n-compare-grid">
+        <div class="n-compare-col">
+          <div class="n-compare-col__title">Weekday (Mon–Fri)</div>
+          <div class="n-compare-stat"><span class="n-compare-stat__label">Avg calories</span><span class="n-compare-stat__val" id="wvw-wd-cal">—</span></div>
+          <div class="n-compare-stat"><span class="n-compare-stat__label">Avg protein</span><span class="n-compare-stat__val" id="wvw-wd-pro">—</span></div>
+          <div class="n-compare-stat"><span class="n-compare-stat__label">Avg carbs</span><span class="n-compare-stat__val" id="wvw-wd-carb">—</span></div>
+          <div class="n-compare-stat"><span class="n-compare-stat__label">Avg fat</span><span class="n-compare-stat__val" id="wvw-wd-fat">—</span></div>
+          <div class="n-compare-stat"><span class="n-compare-stat__label">Protein hit %</span><span class="n-compare-stat__val" id="wvw-wd-hit">—</span></div>
+        </div>
+        <div class="n-compare-col">
+          <div class="n-compare-col__title">Weekend (Sat–Sun)</div>
+          <div class="n-compare-stat"><span class="n-compare-stat__label">Avg calories</span><span class="n-compare-stat__val" id="wvw-we-cal">—</span></div>
+          <div class="n-compare-stat"><span class="n-compare-stat__label">Avg protein</span><span class="n-compare-stat__val" id="wvw-we-pro">—</span></div>
+          <div class="n-compare-stat"><span class="n-compare-stat__label">Avg carbs</span><span class="n-compare-stat__val" id="wvw-we-carb">—</span></div>
+          <div class="n-compare-stat"><span class="n-compare-stat__label">Avg fat</span><span class="n-compare-stat__val" id="wvw-we-fat">—</span></div>
+          <div class="n-compare-stat"><span class="n-compare-stat__label">Protein hit %</span><span class="n-compare-stat__val" id="wvw-we-hit">—</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ EXTRA — Caloric periodization ══════════════════ -->
+    <section class="n-extra" id="n-period-section" style="display:none">
+      <div class="n-extra__head">
+        <div class="n-extra__title">CALORIC PERIODIZATION</div>
+        <div class="n-extra__meta">Training days vs rest days</div>
+      </div>
+      <div class="n-extra__intro">
+        Are calories higher when training? Cross-referencing MacroFactor logs with Strava activity dates.
+      </div>
+      <div class="n-compare-grid">
+        <div class="n-compare-col">
+          <div class="n-compare-col__title">Training Days</div>
+          <div class="n-compare-stat"><span class="n-compare-stat__label">Avg calories</span><span class="n-compare-stat__val" id="pd-train-cal">—</span></div>
+          <div class="n-compare-stat"><span class="n-compare-stat__label">Avg protein</span><span class="n-compare-stat__val" id="pd-train-pro">—</span></div>
+          <div class="n-compare-stat"><span class="n-compare-stat__label">Days</span><span class="n-compare-stat__val" id="pd-train-count">—</span></div>
+        </div>
+        <div class="n-compare-col">
+          <div class="n-compare-col__title">Rest Days</div>
+          <div class="n-compare-stat"><span class="n-compare-stat__label">Avg calories</span><span class="n-compare-stat__val" id="pd-rest-cal">—</span></div>
+          <div class="n-compare-stat"><span class="n-compare-stat__label">Avg protein</span><span class="n-compare-stat__val" id="pd-rest-pro">—</span></div>
+          <div class="n-compare-stat"><span class="n-compare-stat__label">Days</span><span class="n-compare-stat__val" id="pd-rest-count">—</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ EXTRA — Eating window ══════════════════════════ -->
+    <section class="n-extra" id="n-window-section" style="display:none">
+      <div class="n-extra__head">
+        <div class="n-extra__title">EATING WINDOW</div>
+        <div class="n-extra__meta">First meal · last meal · span</div>
+      </div>
+      <div class="n-window-grid">
+        <div class="n-window-cell">
+          <div class="n-window-cell__num" id="ew-window">—</div>
+          <div class="n-window-cell__label">Avg eating window</div>
+        </div>
+        <div class="n-window-cell">
+          <div class="n-window-cell__num" id="ew-first">—</div>
+          <div class="n-window-cell__label">First meal</div>
+        </div>
+        <div class="n-window-cell">
+          <div class="n-window-cell__num" id="ew-last">—</div>
+          <div class="n-window-cell__label">Last meal</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 6. CROSS-LINK FOOTER ════════════════════════════ -->
+    <nav class="fp-cross-footer">
+      <div class="fp-cross-footer__prev"><a href="/glucose/">← Glucose</a></div>
+      <div class="fp-cross-footer__mid">
+        What you eat shows up in tomorrow's recovery →
+        <a href="/training/">Training</a>
+      </div>
+      <div class="fp-cross-footer__next"><a href="/training/">Training →</a></div>
+    </nav>
+
   </div>
-</details>
 
-</div><!-- /n-content -->
+  <div id="amj-subscribe"></div>
+  <div id="amj-bottom-nav"></div>
+  <div id="amj-footer"></div>
 
-<div class="obs-insight" id="obs-insight"></div>
+  <script src="/assets/js/site_constants.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/nav.js"></script>
+  <script>
+  (function() {
+    'use strict';
 
-<!-- ════════════════════════════════════════════════════════════
-     V3 Section 5: CROSS-DOMAIN
-     ════════════════════════════════════════════════════════════ -->
-<div id="obs-v3-cross"></div>
+    var API_BASE = (typeof AMJ !== 'undefined' && AMJ.API_BASE) ? AMJ.API_BASE : '';
 
-<!-- ════════════════════════════════════════════════════════════
-     V3 Section 6: DEPTH (Collapsed)
-     ════════════════════════════════════════════════════════════ -->
-<div id="obs-v3-depth"></div>
+    // ─── Helpers ───────────────────────────────────────────
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function fmtDate(s) {
+      try {
+        var d = s ? new Date(s + 'T12:00:00') : new Date();
+        return d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' }).toUpperCase();
+      } catch(e) { return s || ''; }
+    }
+    function fmtNum(v, dp) {
+      if (v == null || isNaN(v)) return '—';
+      return Number(v).toFixed(dp == null ? 0 : dp);
+    }
 
-<nav class="reading-path-v2">
-  <a href="/glucose/" class="reading-path-v2__link">
-    <span class="reading-path-v2__dir">&larr; Glucose</span>
-  </a>
-  <a href="/training/" class="reading-path-v2__link reading-path-v2__link--next">
-    <span class="reading-path-v2__label">Movement and recovery data</span>
-    <span class="reading-path-v2__dir">Training &rarr;</span>
-  </a>
-</nav>
-
-<div id="amj-subscribe"></div>
-<div id="amj-bottom-nav"></div>
-<div id="amj-footer"></div>
-
-<script src="/assets/js/site_constants.js"></script>
-<script src="/assets/js/components.js"></script>
-<script src="/assets/js/observatory-v3.js"></script>
-<script src="/assets/js/cycle-pause.js"></script>
-<script src="/assets/js/nav.js"></script>
-<script src="/assets/js/engagement.js"></script>
-<script>
-  initObservatoryWeek('nutrition', 'obs-thisweek');
-  fetch('/api/observatory_week?domain=nutrition').then(r=>r.ok?r.json():null).then(d=>{
-    if(d&&d.last_updated) initObsFreshness(d.last_updated);
-  }).catch(function(){});
-</script>
-<script src="/assets/js/reveal.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-<script>
-/* ── V3: Coach Analysis (position 2) — fires immediately ── */
-renderCoachAnalysis('obs-v3-coach', 'nutrition', {
-  name: 'Dr. Marcus Webb',
-  initials: 'MW',
-  title: 'Nutrition scientist',
-  color: '#f59e0b'
-});
-
-(async function() {
-  var API = 'https://averagejoematt.com';
-  var loading = document.getElementById('n-loading');
-  var content = document.getElementById('n-content');
-  var setText = function(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
-  var setWidth = function(id, pct) { var el = document.getElementById(id); if (el) el.style.width = Math.min(100, Math.max(0, pct)) + '%'; };
-  var circ = 2 * Math.PI * 35; /* gauge ring circumference */
-
-  function setArc(id, pct) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    var len = (Math.min(pct, 100) / 100) * circ;
-    el.setAttribute('stroke-dasharray', len + ' ' + (circ - len));
-  }
-
-  try {
-    var resp = await fetch(API + '/api/nutrition_overview');
-    if (!resp.ok) throw new Error(resp.status);
-    var data = await resp.json();
-    var n = data.nutrition;
-    var trend = data.nutrition_trend || [];
-    if (!n) { loading.textContent = 'No nutrition data yet.'; return; }
-
-    // Show content BEFORE chart rendering (canvas needs offsetWidth > 0)
-    loading.style.display = 'none';
-    content.style.display = 'block';
-
-    /* ── Hero gauges ── */
-    var avgCal = n.avg_calories || 0;
-    setText('g-cal-num', avgCal ? avgCal.toLocaleString() : '\u2014');
-    setArc('g-cal-arc', Math.min(100, (avgCal / 3000) * 100));
-
-    var hitPct = n.protein_hit_pct || 0;
-    setText('g-pro-num', hitPct != null ? hitPct + '%' : '\u2014');
-    setArc('g-pro-arc', hitPct);
-
-    var daysLogged = n.days_logged || 0;
-    setText('g-days-num', daysLogged);
-    setArc('g-days-arc', Math.min(100, (daysLogged / 365) * 100));
-    // N1: Show "X of 7 days logged" from trend data
-    var _trendArr = n.daily_trend || n.trend || [];
-    var _d7ago = new Date(); _d7ago.setDate(_d7ago.getDate() - 7);
-    var _d7str = _d7ago.toISOString().slice(0,10);
-    var _last7 = _trendArr.filter(function(d) { return (d.date || '') >= _d7str && d.calories > 0; }).length;
-    var _l7el = document.getElementById('n-logged-last7');
-    if (_l7el) _l7el.textContent = _last7 + ' of last 7 days';
-
-    var deficit = n.avg_deficit || (n.avg_tdee && n.avg_calories ? Math.round(n.avg_tdee - n.avg_calories) : 0);
-    setText('g-def-num', deficit || '\u2014');
-    setArc('g-def-arc', Math.min(100, (deficit / 1000) * 100));
-
-    /* ── V3 Status Bar (Section 1) ── */
-    renderStatusBar('obs-v3-status', [
-      {label: 'Daily avg cal', value: avgCal ? Math.round(avgCal) : null, unit: 'cal', delta: null, context: 'MacroFactor 30-day avg'},
-      {label: 'Protein avg', value: n.avg_protein_g ? Math.round(n.avg_protein_g) : null, unit: 'g', delta: null, context: 'Target: 180g/day'},
-      {label: 'Protein hit rate', value: hitPct != null ? hitPct : null, unit: '%', delta: null, context: (n.protein_hit_days || 0) + ' of ' + (daysLogged || 0) + ' days'},
-      {label: 'Days logged', value: daysLogged || null, unit: 'days', delta: null, context: _last7 + ' of last 7 days'}
-    ], {});
-
-    /* ── V3 Cross-Domain (Section 5) ── */
-    renderCrossDomain('obs-v3-cross', [
-      {title: 'Nutrition \u00d7 Glucose', finding: 'Each meal scored against CGM glucose response. Protein-first meals consistently produce the lowest spikes.', link: '/glucose/'},
-      {title: 'Nutrition \u00d7 Character', finding: 'Protein adherence, calorie consistency, and fiber intake feed the Nutrition pillar in the Character Sheet.', link: '/character/'}
-    ]);
-
-    /* ── V3 Depth Sections (Section 6) ── */
-    renderDepth('obs-v3-depth', [
-      {label: 'About this observatory', id: 'about', content: '<h2 style="font-family:var(--font-display);font-size:24px;margin:0 0 12px;">The <em>fuel log</em> for a body in transformation</h2><p>30+ weeks of MacroFactor data. Every calorie logged within 30 minutes. Cross-referenced with continuous glucose monitoring.</p><p>Food and I have had a complicated relationship since my twenties. The real shift came around 2017 \u2014 relocation, an MBA, a promotion, my mum getting sick \u2014 when eating stopped being about hunger and started being about quieting everything else. Convenience. Something to fill a feeling. Food that wasn\u2019t even that good. MacroFactor didn\u2019t fix the psychology. But it made the invisible visible, and awareness is where the change starts.</p><p style="font-style:italic;color:var(--text-muted)">I\u2019ve lost 100 lbs before without tracking a single calorie. This isn\u2019t about macros \u2014 it\u2019s about where my head is. When I\u2019m on, this becomes second nature. When I\u2019m off, even a DoorDash order can break a streak. The data below captures both.</p><blockquote style="border-left:3px solid var(--n-amber);padding-left:16px;margin:16px 0;font-family:var(--font-display);font-size:18px;color:var(--text);">\u201cThe plan is to log everything \u2014 including the 3,400-calorie Saturdays. A gap in the data is data too. It usually means something happened worth paying attention to.\u201d</blockquote><p style="font-style:italic;border-left:2px solid var(--text-faint);padding-left:16px;color:var(--text-muted);">The hardest part of tracking nutrition isn\u2019t the math. It\u2019s the honesty. <em>Logging the bad days</em> is where the real data lives.</p>'},
-      {label: 'Nutrition protocol', id: 'protocol', content: '<p>Losing weight without losing <em>muscle</em>. The single biggest risk in aggressive weight loss is losing lean mass alongside fat. Protein adequacy is the primary defense \u2014 1.6\u20132.2g per kg of lean body mass preserves muscle during a caloric deficit.</p><p><strong>01.</strong> 180g protein daily \u2014 non-negotiable. Leucine threshold (2.5g/meal) drives MPS even in deficit.</p><p><strong>02.</strong> 500\u2013750 cal deficit via adaptive TDEE. Aggressive enough for progress, conservative enough for training quality.</p><p><strong>03.</strong> Protein-first meal ordering \u2014 protein and fat before carbs. Blunts glucose spike. CGM-confirmed.</p><p><strong>04.</strong> 30g+ fiber daily for satiety, gut health, and glucose stability.</p><p><strong>05.</strong> Every meal logged within 30 minutes. No cheat meals go unrecorded.</p>'},
-      {label: 'Measurement protocol', id: 'measurement', content: '<p><strong>MACROFACTOR</strong> \u2014 AI-powered food logging with adaptive TDEE. Learns true energy expenditure from weight trends over 14+ days. Every meal logged within 30 minutes.</p><p><strong>PROTEIN TARGET</strong> \u2014 180g/day based on ~1g/lb goal bodyweight. Hit rate = days \u2265180g / total logged days. Leucine threshold: 2.5g per meal for MPS trigger.</p><p><strong>CGM CROSS-REFERENCE</strong> \u2014 Dexcom Stelo readings matched to meal timestamps. Post-meal spike, AUC, and time-to-baseline per meal. N=1 \u2014 individual responses vary.</p>'}
-    ]);
-
-    /* ── V2: Macro Stacked Bar + Donut ── */
-    if (typeof Chart !== 'undefined' && trend.length >= 1) {
-      Chart.defaults.color = 'rgba(255,255,255,0.5)';
-      Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
-      Chart.defaults.font.family = 'monospace';
-
-      /* Stacked bar — macros as calories */
-      var barLabels = trend.map(function(d) { return d.date.slice(5); });
-      var proCals = trend.map(function(d) { return d.protein_g ? Math.round(d.protein_g * 4) : 0; });
-      var carbCals = trend.map(function(d) { return d.carbs_g ? Math.round(d.carbs_g * 4) : 0; });
-      var fatCals = trend.map(function(d) { return d.fat_g ? Math.round(d.fat_g * 9) : 0; });
-      var tdeeVal = n.tdee || 0;
-
-      var barDatasets = [
-        { label: 'Protein', data: proCals, backgroundColor: '#3ecf8e', stack: 'macros', order: 2 },
-        { label: 'Carbs', data: carbCals, backgroundColor: '#f59e0b', stack: 'macros', order: 2 },
-        { label: 'Fat', data: fatCals, backgroundColor: '#f43f5e', stack: 'macros', order: 2 }
-      ];
-      if (tdeeVal > 0) {
-        barDatasets.push({
-          label: 'TDEE', type: 'line',
-          data: Array(trend.length).fill(tdeeVal),
-          pointRadius: 0, borderDash: [5, 5],
-          borderColor: 'rgba(255,255,255,0.3)', borderWidth: 1,
-          fill: false, order: 0
-        });
+    // ─── Masthead ─────────────────────────────────────────
+    function renderMasthead(dayNumber, dateStr, signalsMet, signalsTotal) {
+      setText('fp-dispatch', dayNumber || '—');
+      setText('fp-day-strip', dayNumber || '—');
+      setText('fp-date', fmtDate(dateStr));
+      var meta = signalsTotal
+        ? 'Logged from one plate · ' + signalsMet + ' of ' + signalsTotal + ' targets met'
+        : 'Logged from one plate';
+      setText('fp-meta-status', meta);
+      var now = new Date();
+      var hh = String(now.getHours()).padStart(2,'0');
+      var mm = String(now.getMinutes()).padStart(2,'0');
+      setText('fp-filed', 'Filed ' + hh + ':' + mm + ' · MacroFactor sync');
+      if (dayNumber > 1) {
+        var prev = document.getElementById('fp-prev');
+        if (prev) { prev.classList.add('is-active'); prev.title = "Yesterday's nutrition"; }
       }
+    }
 
-      new Chart(document.getElementById('n-macro-bar-canvas'), {
-        type: 'bar',
-        data: { labels: barLabels, datasets: barDatasets },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                title: function(ctx) { return trend[ctx[0].dataIndex].date; },
-                afterTitle: function(ctx) {
-                  var i = ctx[0].dataIndex;
-                  var total = (proCals[i] || 0) + (carbCals[i] || 0) + (fatCals[i] || 0);
-                  return 'Total: ' + total.toLocaleString() + ' cal';
-                }
-              }
-            }
-          },
-          scales: {
-            x: { stacked: true, ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.03)' } },
-            y: { stacked: true, ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.03)' }, title: { display: true, text: 'calories', color: 'rgba(255,255,255,0.25)', font: { size: 10 } } }
-          }
-        }
+    // ─── Lede ─────────────────────────────────────────────
+    function statusFromAdherence(hitPct, deficit, calories) {
+      // Returns { word, cls, narrative }
+      var word, cls, narrative;
+      if (hitPct >= 80 && deficit > 200) {
+        word = 'ON TRACK';
+        cls = 'fp-lede__status--strong';
+        narrative = 'Protein adherence is holding above 80%, the deficit is intact, and the macros are landing where they should.';
+      } else if (hitPct >= 60) {
+        word = 'STEADY';
+        cls = 'fp-lede__status--watch';
+        narrative = 'Protein adherence is in the working zone but not pinned. The numbers want a tighter middle of the week.';
+      } else if (hitPct < 60 && hitPct >= 30) {
+        word = 'DRIFT';
+        cls = 'fp-lede__status--watch';
+        narrative = 'Adherence has slipped. The deficit is still there, but the muscle-preserving stack is not — protein needs the front foot.';
+      } else if (calories && deficit < -100) {
+        word = 'OVER';
+        cls = 'fp-lede__status--attention';
+        narrative = 'Intake has crept above maintenance. A few honest days of logging usually puts it back.';
+      } else {
+        word = 'QUIET';
+        cls = 'fp-lede__status--watch';
+        narrative = 'Not enough fresh entries to call the day. Log the next meal and the picture sharpens.';
+      }
+      return { word: word, cls: cls, narrative: narrative };
+    }
+
+    function timePrefix() {
+      var h = new Date().getHours();
+      if (h < 10) return 'Morning read: ';
+      if (h < 14) return 'Midday check: ';
+      if (h < 18) return 'Afternoon: ';
+      return 'End of day: ';
+    }
+
+    function renderLede(dayNumber, n) {
+      setText('fp-day', dayNumber || '—');
+      var hitPct = n.protein_hit_pct || 0;
+      var deficit = n.avg_deficit || (n.avg_tdee && n.avg_calories ? Math.round(n.avg_tdee - n.avg_calories) : 0);
+      var calories = n.avg_calories || 0;
+      var s = statusFromAdherence(hitPct, deficit, calories);
+
+      var statusEl = document.getElementById('fp-status');
+      statusEl.textContent = "▸ TODAY'S DESPATCH · STATE: " + s.word;
+      statusEl.className = 'fp-lede__status ' + s.cls;
+
+      document.getElementById('fp-narrative').textContent = '"' + timePrefix() + s.narrative + '"';
+
+      // Delta row — show 30-day rollups since this is a steady-state log, not a daily snapshot.
+      var el = document.getElementById('fp-delta');
+      var bits = [];
+      if (calories) bits.push({ text: 'Cal ' + Math.round(calories).toLocaleString(), cls: 'fp-delta--flat' });
+      if (n.avg_protein_g) bits.push({ text: 'Protein ' + Math.round(n.avg_protein_g) + 'g', cls: hitPct >= 80 ? 'fp-delta--good' : 'fp-delta--flat' });
+      if (deficit) bits.push({ text: 'Deficit ' + (deficit > 0 ? '−' : '+') + Math.abs(Math.round(deficit)) + ' cal', cls: deficit > 0 ? 'fp-delta--good' : 'fp-delta--bad' });
+      if (n.days_logged != null) bits.push({ text: n.days_logged + ' days logged', cls: 'fp-delta--flat' });
+      if (!bits.length) { el.style.display = 'none'; return; }
+      el.style.display = '';
+      el.innerHTML = '<span class="fp-lede__delta-label">30-day average:</span>' +
+        bits.map(function(d) { return '<span class="' + d.cls + '">' + d.text + '</span>'; }).join('');
+    }
+
+    // ─── Watch banner ─────────────────────────────────────
+    function renderWatch(n) {
+      var w = document.getElementById('fp-watch');
+      var hitPct = n.protein_hit_pct || 0;
+      var msg = null, label = 'Watch', attention = false;
+      if (n.days_logged != null && n.days_logged < 7) {
+        msg = 'Only ' + n.days_logged + ' days logged in the window — averages will firm up as the log fills.';
+      } else if (hitPct < 50) {
+        msg = 'Protein hit rate at ' + hitPct + '% — below the muscle-preservation floor for an aggressive deficit.';
+        label = 'Attention';
+        attention = true;
+      } else if (n.avg_deficit && n.avg_deficit > 1000) {
+        msg = 'Average deficit is ' + Math.round(n.avg_deficit) + ' cal — aggressive enough to compound fatigue if held more than a few weeks.';
+      }
+      if (!msg) { w.style.display = 'none'; return; }
+      w.classList.toggle('fp-watch--attention', attention);
+      setText('fp-watch-label', label);
+      setText('fp-watch-text', msg);
+      w.style.display = '';
+    }
+
+    // ─── Standings — meal/macro signals ───────────────────
+    function macroIcon(color) {
+      // Simple swatch SVG
+      return '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="currentColor" opacity="0.7"/></svg>';
+    }
+    function renderSpark(values, state) {
+      if (!values || !values.length) return '';
+      var clean = values.filter(function(v) { return v != null; });
+      if (!clean.length) return '';
+      var max = Math.max.apply(null, clean);
+      var min = Math.min.apply(null, clean);
+      var range = max - min || 1;
+      var cls = 'fp-spark fp-spark--' + (state || 'amber');
+      var html = '<div class="' + cls + '">';
+      clean.forEach(function(v) {
+        var pct = Math.max(10, ((v - min) / range) * 100);
+        html += '<div class="fp-spark__bar" style="height:' + pct + '%"></div>';
       });
+      html += '</div>';
+      return html;
+    }
 
-      /* Donut — 30-day average macro split */
-      var avgProCal = Math.round((n.avg_protein_g || 0) * 4);
-      var avgCarbCal = Math.round((n.avg_carbs_g || 0) * 4);
-      var avgFatCal = Math.round((n.avg_fat_g || 0) * 9);
-      var totalMacroCal = avgProCal + avgCarbCal + avgFatCal;
+    function buildStandings(n, trend) {
+      // Build per-macro standings rows. Each is one signal vs target.
+      var rows = [];
+      var hitPct = n.protein_hit_pct || 0;
 
-      if (totalMacroCal > 0) {
-        new Chart(document.getElementById('n-macro-donut-canvas'), {
-          type: 'doughnut',
-          data: {
-            labels: ['Protein', 'Carbs', 'Fat'],
-            datasets: [{ data: [avgProCal, avgCarbCal, avgFatCal], backgroundColor: ['#3ecf8e', '#f59e0b', '#f43f5e'], borderWidth: 0 }]
-          },
-          options: {
-            responsive: true, maintainAspectRatio: true, cutout: '65%',
-            plugins: {
-              legend: { position: 'bottom', labels: { color: 'rgba(255,255,255,0.5)', font: { size: 10 }, padding: 12, usePointStyle: true, pointStyle: 'circle' } },
-              tooltip: {
-                callbacks: {
-                  label: function(ctx) {
-                    var pct = Math.round(ctx.raw / totalMacroCal * 100);
-                    return ctx.label + ': ' + ctx.raw.toLocaleString() + ' cal (' + pct + '%)';
-                  }
-                }
-              }
-            }
-          }
+      // Build sparkline arrays from trend (last 7 days)
+      var last7 = (trend || []).slice(-7);
+      var calSpark = last7.map(function(d) { return d.calories || null; }).filter(function(v) { return v != null; });
+      var proSpark = last7.map(function(d) { return d.protein_g || null; }).filter(function(v) { return v != null; });
+      var carbSpark = last7.map(function(d) { return d.carbs_g || null; }).filter(function(v) { return v != null; });
+      var fatSpark = last7.map(function(d) { return d.fat_g || null; }).filter(function(v) { return v != null; });
+      var fiberSpark = last7.map(function(d) { return d.fiber_g || null; }).filter(function(v) { return v != null; });
+
+      rows.push({
+        key: 'protein', name: 'Protein', state: hitPct >= 80 ? 'green' : hitPct >= 50 ? 'amber' : 'red',
+        context: 'Target 180g · ' + (n.protein_hit_days || 0) + '/' + (n.days_logged || 0) + ' days hit',
+        value: fmtNum(n.avg_protein_g), unit: 'g/day',
+        spark: proSpark, color: '#3ecf8e'
+      });
+      rows.push({
+        key: 'calories', name: 'Calories', state: 'amber',
+        context: n.avg_tdee ? 'TDEE ' + Math.round(n.avg_tdee).toLocaleString() + ' · deficit target' : 'Adaptive deficit',
+        value: n.avg_calories ? Math.round(n.avg_calories).toLocaleString() : '—', unit: 'cal/day',
+        spark: calSpark, color: '#d4a847'
+      });
+      rows.push({
+        key: 'carbs', name: 'Carbs', state: 'amber',
+        context: 'Timed around training for glycogen',
+        value: fmtNum(n.avg_carbs_g), unit: 'g/day',
+        spark: carbSpark, color: '#d4a847'
+      });
+      rows.push({
+        key: 'fat', name: 'Fat', state: 'amber',
+        context: 'Hormonal floor · not further restricted',
+        value: fmtNum(n.avg_fat_g), unit: 'g/day',
+        spark: fatSpark, color: '#ef4444'
+      });
+      if (n.avg_fiber_g != null) {
+        rows.push({
+          key: 'fiber', name: 'Fiber', state: n.avg_fiber_g >= 30 ? 'green' : 'amber',
+          context: 'Target 30g · satiety, gut, glucose',
+          value: fmtNum(n.avg_fiber_g), unit: 'g/day',
+          spark: fiberSpark, color: '#3ecf8e'
         });
-        /* Center text */
-        var donutCenter = document.getElementById('n-donut-center');
-        if (donutCenter) {
-          donutCenter.style.display = 'block';
-          setText('n-donut-avg', Math.round(n.avg_calories || totalMacroCal).toLocaleString());
-        }
       }
 
-      /* Insight one-liner */
-      if (totalMacroCal > 0) {
-        var proPct = Math.round(avgProCal / totalMacroCal * 100);
-        var insightEl = document.getElementById('n-macro-insight');
-        if (insightEl) {
-          insightEl.textContent = proPct >= 30
-            ? 'Protein accounts for ' + proPct + '% of macro calories \u2014 well above the 25% threshold for muscle preservation on a deficit.'
-            : proPct >= 25
-            ? 'Protein at ' + proPct + '% of calories \u2014 meeting minimum for muscle preservation. Room to push higher.'
-            : 'Protein at ' + proPct + '% of calories \u2014 below the 25% threshold. Consider increasing protein density.';
-        }
+      var container = document.getElementById('fp-standings-rows');
+      if (!rows.length) {
+        container.innerHTML = '<div class="n-row-empty">No nutrition signals reporting yet.</div>';
+        return;
+      }
+      container.innerHTML = rows.map(function(r) {
+        var spark = renderSpark(r.spark, r.state);
+        return '<a class="fp-row" href="#' + r.key + '">' +
+          '<div class="fp-row__icon" style="color:' + r.color + '">' + macroIcon(r.color) + '</div>' +
+          '<div class="fp-row__name">' + r.name + '</div>' +
+          '<div class="fp-row__context">' + r.context + '</div>' +
+          '<div class="fp-row__value">' +
+            '<span class="fp-row__num">' + r.value + '</span>' +
+            '<span class="fp-row__unit">' + r.unit + '</span>' +
+          '</div>' +
+          '<div class="fp-row__spark">' + spark + '</div>' +
+        '</a>';
+      }).join('');
+    }
+
+    // ─── Long arc — protein 30-day arc ────────────────────
+    function renderArc(n, trend) {
+      var hitPct = n.protein_hit_pct || 0;
+      var avgPro = n.avg_protein_g;
+      if (avgPro == null && (!trend || !trend.length)) {
+        document.getElementById('fp-arc-section').style.display = 'none';
+        return;
+      }
+
+      // Pull a floor-to-current arc from the trend if possible.
+      var proSeries = (trend || []).map(function(d) { return d.protein_g; }).filter(function(v) { return v != null && v > 0; });
+      var floor = proSeries.length ? Math.round(Math.min.apply(null, proSeries)) : Math.round(Math.min(avgPro || 0, 80));
+      var current = avgPro != null ? Math.round(avgPro) : (proSeries.length ? Math.round(proSeries[proSeries.length - 1]) : 0);
+
+      setText('fp-arc-floor', floor || '—');
+      setText('fp-arc-current', current || '—');
+      setText('fp-arc-target', '180');
+
+      setText('fp-arc-hitrate', hitPct + '%');
+      setText('fp-arc-days', (n.days_logged || 0) + '');
+      var deficit = n.avg_deficit || (n.avg_tdee && n.avg_calories ? Math.round(n.avg_tdee - n.avg_calories) : 0);
+      setText('fp-arc-deficit', deficit ? Math.round(deficit) + ' cal' : '—');
+
+      // Caption
+      document.getElementById('fp-arc-caption').innerHTML =
+        '<span>30 days ago · ' + (proSeries[0] != null ? Math.round(proSeries[0]) + ' g' : '—') + '</span>' +
+        '<span>Today · ' + (current ? current + ' g protein' : '—') + '</span>';
+
+      // Chart
+      if (proSeries.length >= 2) {
+        var w = 1100, h = 80, pad = 4;
+        var max = Math.max.apply(null, proSeries.concat([180]));
+        var min = Math.min.apply(null, proSeries);
+        var range = (max - min) || 1;
+        var pts = proSeries.map(function(v, i) {
+          var x = pad + (i / (proSeries.length - 1)) * (w - 2 * pad);
+          var y = pad + (1 - (v - min) / range) * (h - 2 * pad);
+          return x.toFixed(1) + ',' + y.toFixed(1);
+        });
+        var area = pts.join(' ') + ' ' + (w - pad) + ',' + (h - pad) + ' ' + pad + ',' + (h - pad);
+        // Target line
+        var targetY = pad + (1 - (180 - min) / range) * (h - 2 * pad);
+        document.getElementById('fp-arc-chart').innerHTML =
+          '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
+            '<polygon class="fp-arc__chart-area" points="' + area + '"/>' +
+            '<line x1="' + pad + '" x2="' + (w - pad) + '" y1="' + targetY.toFixed(1) + '" y2="' + targetY.toFixed(1) + '" stroke="var(--accent-dim)" stroke-width="1" stroke-dasharray="4 4" opacity="0.6"/>' +
+            '<polyline class="fp-arc__chart-line" points="' + pts.join(' ') + '"/>' +
+          '</svg>';
       }
     }
 
-    /* ── Macro editorial ── */
-    var maxG = 300;
-    if (n.avg_protein_g) {
-      setWidth('mbar-pro', (n.avg_protein_g / maxG) * 100);
-      setText('mval-pro', Math.round(n.avg_protein_g) + 'g');
-    }
-    if (n.avg_carbs_g) {
-      setWidth('mbar-carb', (n.avg_carbs_g / maxG) * 100);
-      setText('mval-carb', Math.round(n.avg_carbs_g) + 'g');
-    }
-    if (n.avg_fat_g) {
-      setWidth('mbar-fat', (n.avg_fat_g / 150) * 100);
-      setText('mval-fat', Math.round(n.avg_fat_g) + 'g');
+    // ─── Per-meal distribution (preserved, kept static — placeholder
+    //     until /api exposes per-slot averages). Already in markup.
+    function renderDistribution(n) { /* static markup; future: wire to API */ }
+
+    // ─── Top meals ────────────────────────────────────────
+    function renderMeals() {
+      fetch(API_BASE + '/api/frequent_meals').then(function(r) { return r.ok ? r.json() : null; }).then(function(md) {
+        if (!md) return;
+        var meals = (md.meals || []).slice(0, 9);
+        if (!meals.length) return;
+        document.getElementById('n-meals-section').style.display = '';
+        document.getElementById('n-meals-grid').innerHTML = meals.map(function(m) {
+          var ppc = m.protein_cal_pct || 0;
+          var grade = ppc >= 30 ? 'a' : ppc >= 20 ? 'b' : 'c';
+          var gradeText = ppc >= 30 ? 'HIGH' : ppc >= 20 ? 'MOD' : 'LOW';
+          return '<div class="n-meal">' +
+            '<div class="n-meal__name">' + (m.name || '—') + '</div>' +
+            '<div class="n-meal__freq">' + (m.frequency || 0) + 'x logged</div>' +
+            '<div class="n-meal__macros">' +
+              '<div class="n-meal__macro"><div class="n-meal__macro-val">' + (m.avg_calories || '—') + '</div><div class="n-meal__macro-label">cal</div></div>' +
+              '<div class="n-meal__macro"><div class="n-meal__macro-val">' + (m.avg_protein_g || 0) + 'g</div><div class="n-meal__macro-label">protein</div></div>' +
+              '<div class="n-meal__macro"><div class="n-meal__macro-val">' + (m.avg_carbs_g || 0) + 'g</div><div class="n-meal__macro-label">carbs</div></div>' +
+            '</div>' +
+            '<div class="n-meal__footer">' +
+              '<div>P/cal ' + ppc + '%</div>' +
+              '<div class="n-meal__grade n-meal__grade--' + grade + '">' + gradeText + ' PROTEIN</div>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+      }).catch(function() {});
     }
 
-    /* ── Protein adherence ── */
-    setText('protein-pct', hitPct != null ? hitPct + '%' : '\u2014');
-    var pgNum = document.getElementById('protein-pct');
-    if (pgNum) pgNum.style.color = hitPct >= 80 ? '#3ecf8e' : hitPct >= 50 ? '#f59e0b' : '#ef4444';
-    setWidth('protein-fill', hitPct || 0);
-    setText('protein-days', (n.protein_hit_days || 0) + ' of ' + (daysLogged || 0) + ' days');
+    // ─── Protein sources ──────────────────────────────────
+    function renderProteinSources() {
+      fetch(API_BASE + '/api/protein_sources').then(function(r) { return r.ok ? r.json() : null; }).then(function(d) {
+        if (!d) return;
+        var sources = (d.protein_sources || []).slice(0, 10);
+        if (!sources.length) return;
+        document.getElementById('n-prosrc-section').style.display = '';
+        var maxG = sources[0].avg_daily_g || 1;
+        document.getElementById('n-prosrc-rows').innerHTML = sources.map(function(s) {
+          var pct = Math.round((s.avg_daily_g / maxG) * 100);
+          return '<div class="n-prosrc-row">' +
+            '<div class="n-prosrc-row__name">' + (s.food || '—') + '</div>' +
+            '<div class="n-prosrc-row__track"><div class="n-prosrc-row__fill" style="width:' + pct + '%"></div></div>' +
+            '<div class="n-prosrc-row__val">' + (s.avg_daily_g || 0) + 'g · ' + (s.pct_of_total || 0) + '%</div>' +
+          '</div>';
+        }).join('');
+      }).catch(function() {});
+    }
 
-    /* ── Weekday vs Weekend ── */
-    var wvw = data.weekday_vs_weekend;
-    if (wvw) {
+    // ─── Weekday vs weekend ───────────────────────────────
+    function renderWeekdayVsWeekend(wvw) {
+      if (!wvw) return;
       var wd = wvw.weekday || {}, we = wvw.weekend || {};
-      setText('wvw-wd-cal', wd.avg_calories ? Math.round(wd.avg_calories).toLocaleString() : '\u2014');
-      setText('wvw-wd-pro', wd.avg_protein_g ? Math.round(wd.avg_protein_g) + 'g' : '\u2014');
-      setText('wvw-wd-carb', wd.avg_carbs_g ? Math.round(wd.avg_carbs_g) + 'g' : '\u2014');
-      setText('wvw-wd-fat', wd.avg_fat_g ? Math.round(wd.avg_fat_g) + 'g' : '\u2014');
-      setText('wvw-wd-hit', wd.protein_hit_pct != null ? wd.protein_hit_pct + '%' : '\u2014');
-      setText('wvw-we-cal', we.avg_calories ? Math.round(we.avg_calories).toLocaleString() : '\u2014');
-      setText('wvw-we-pro', we.avg_protein_g ? Math.round(we.avg_protein_g) + 'g' : '\u2014');
-      setText('wvw-we-carb', we.avg_carbs_g ? Math.round(we.avg_carbs_g) + 'g' : '\u2014');
-      setText('wvw-we-fat', we.avg_fat_g ? Math.round(we.avg_fat_g) + 'g' : '\u2014');
-      setText('wvw-we-hit', we.protein_hit_pct != null ? we.protein_hit_pct + '%' : '\u2014');
-      // Narrative
+      if (!wd.avg_calories && !we.avg_calories) return;
+      document.getElementById('n-wvw-section').style.display = '';
+      setText('wvw-wd-cal', wd.avg_calories ? Math.round(wd.avg_calories).toLocaleString() : '—');
+      setText('wvw-wd-pro', wd.avg_protein_g ? Math.round(wd.avg_protein_g) + 'g' : '—');
+      setText('wvw-wd-carb', wd.avg_carbs_g ? Math.round(wd.avg_carbs_g) + 'g' : '—');
+      setText('wvw-wd-fat', wd.avg_fat_g ? Math.round(wd.avg_fat_g) + 'g' : '—');
+      setText('wvw-wd-hit', wd.protein_hit_pct != null ? wd.protein_hit_pct + '%' : '—');
+      setText('wvw-we-cal', we.avg_calories ? Math.round(we.avg_calories).toLocaleString() : '—');
+      setText('wvw-we-pro', we.avg_protein_g ? Math.round(we.avg_protein_g) + 'g' : '—');
+      setText('wvw-we-carb', we.avg_carbs_g ? Math.round(we.avg_carbs_g) + 'g' : '—');
+      setText('wvw-we-fat', we.avg_fat_g ? Math.round(we.avg_fat_g) + 'g' : '—');
+      setText('wvw-we-hit', we.protein_hit_pct != null ? we.protein_hit_pct + '%' : '—');
       var calDiff = Math.round((we.avg_calories || 0) - (wd.avg_calories || 0));
       var proDiff = Math.round((wd.protein_hit_pct || 0) - (we.protein_hit_pct || 0));
-      var narEl = document.getElementById('n-wvw-narrative');
-      if (narEl && calDiff !== 0) {
+      var nar = document.getElementById('n-wvw-narrative');
+      if (nar && calDiff !== 0) {
         var dir = calDiff > 0 ? 'more' : 'fewer';
-        narEl.textContent = 'Weekend Matthew eats ' + Math.abs(calDiff) + ' ' + dir + ' calories than Weekday Matthew.' +
+        nar.textContent = 'Weekend Matthew eats ' + Math.abs(calDiff) + ' ' + dir + ' calories than Weekday Matthew.' +
           (proDiff > 0 ? ' Protein compliance drops ' + proDiff + ' points.' : '');
       }
     }
 
-    /* ── Eating Window ── */
-    var ew = data.eating_window;
-    if (ew) {
-      setText('ew-window', ew.avg_hours + ' hrs');
-      setText('ew-first', ew.avg_first_meal);
-      setText('ew-last', ew.avg_last_meal);
-    }
-
-    /* ── Caloric Periodization ── */
-    var pd = data.periodization;
-    if (pd) {
+    // ─── Caloric periodization ────────────────────────────
+    function renderPeriodization(pd) {
+      if (!pd) return;
       var tr = pd.training_day || {}, rs = pd.rest_day || {};
-      setText('pd-train-cal', tr.avg_calories ? Math.round(tr.avg_calories).toLocaleString() : '\u2014');
-      setText('pd-train-pro', tr.avg_protein_g ? Math.round(tr.avg_protein_g) + 'g' : '\u2014');
+      if (!tr.avg_calories && !rs.avg_calories) return;
+      document.getElementById('n-period-section').style.display = '';
+      setText('pd-train-cal', tr.avg_calories ? Math.round(tr.avg_calories).toLocaleString() : '—');
+      setText('pd-train-pro', tr.avg_protein_g ? Math.round(tr.avg_protein_g) + 'g' : '—');
       setText('pd-train-count', tr.count || 0);
-      setText('pd-rest-cal', rs.avg_calories ? Math.round(rs.avg_calories).toLocaleString() : '\u2014');
-      setText('pd-rest-pro', rs.avg_protein_g ? Math.round(rs.avg_protein_g) + 'g' : '\u2014');
+      setText('pd-rest-cal', rs.avg_calories ? Math.round(rs.avg_calories).toLocaleString() : '—');
+      setText('pd-rest-pro', rs.avg_protein_g ? Math.round(rs.avg_protein_g) + 'g' : '—');
       setText('pd-rest-count', rs.count || 0);
     }
 
-    /* ── Recent Meals Gallery ── */
-    (function() {
-      fetch('/api/frequent_meals').then(function(r) { return r.ok ? r.json() : null; }).then(function(md) {
-        if (!md) return;
-        var meals = md.meals || [];
-        var gallery = document.getElementById('n-recent-meals');
-        if (!gallery || !meals.length) return;
-        gallery.innerHTML = meals.slice(0, 12).map(function(m) {
-          var ppc = m.protein_cal_pct || 0;
-          var ppcClass = ppc >= 30 ? 'n-meal-card__grade--a' : ppc >= 20 ? 'n-meal-card__grade--b' : 'n-meal-card__grade--c';
-          var mealSlot = m.avg_calories > 400 ? 'Meal' : 'Snack';
-          return '<div class="n-meal-card">' +
-            '<div class="n-meal-card__header"><div>' +
-              '<div class="n-meal-card__name">' + m.name + '</div>' +
-              '<div class="n-meal-card__freq">' + m.frequency + 'x &middot; ' + mealSlot + '</div>' +
-            '</div></div>' +
-            '<div class="n-meal-card__macros">' +
-              '<div class="n-meal-card__macro"><div class="n-meal-card__macro-val">' + m.avg_calories + '</div><div class="n-meal-card__macro-label">cal</div></div>' +
-              '<div class="n-meal-card__macro"><div class="n-meal-card__macro-val">' + m.avg_protein_g + 'g</div><div class="n-meal-card__macro-label">protein</div></div>' +
-              '<div class="n-meal-card__macro"><div class="n-meal-card__macro-val">' + (m.avg_carbs_g || 0) + 'g</div><div class="n-meal-card__macro-label">carbs</div></div>' +
-            '</div>' +
-            '<div class="n-meal-card__footer">' +
-              '<div class="n-meal-card__ppc">P/cal: <em>' + ppc + '%</em></div>' +
-              '<div class="n-meal-card__grade ' + ppcClass + '">' + (ppc >= 30 ? 'HIGH' : ppc >= 20 ? 'MOD' : 'LOW') + ' PROTEIN</div>' +
-            '</div></div>';
-        }).join('');
-      }).catch(function() {});
-    })();
-
-    /* ── Macro deep-dives (Phase 2) — carbs, fats, fiber targets ── */
-    if (n.avg_carbs_g || n.avg_fat_g || n.avg_fiber_g) {
-      var deepGrid = document.getElementById('n-macro-deep-grid');
-      var deepSection = document.getElementById('n-macro-deep');
-      if (deepGrid) {
-        var carbTarget = 250, fatTarget = 80, fiberTarget = 30;
-        deepGrid.innerHTML = '<div class="n-macro-col">' +
-          '<div class="n-macro-bar"><div class="n-macro-bar__fill" style="width:' + Math.min(100, ((n.avg_carbs_g || 0) / carbTarget) * 100) + '%;background:var(--n-amber)"></div></div>' +
-          '<div class="n-macro-big" style="color:var(--n-amber)">' + Math.round(n.avg_carbs_g || 0) + 'g</div>' +
-          '<div class="n-macro-name">Carbs</div>' +
-          '<div class="n-macro-detail">Target: ' + carbTarget + 'g &middot; ' + Math.round(((n.avg_carbs_g || 0) / carbTarget) * 100) + '% adherence</div></div>' +
-          '<div class="n-macro-col">' +
-          '<div class="n-macro-bar"><div class="n-macro-bar__fill" style="width:' + Math.min(100, ((n.avg_fat_g || 0) / fatTarget) * 100) + '%;background:var(--n-violet)"></div></div>' +
-          '<div class="n-macro-big" style="color:var(--n-violet)">' + Math.round(n.avg_fat_g || 0) + 'g</div>' +
-          '<div class="n-macro-name">Fat</div>' +
-          '<div class="n-macro-detail">Target: ' + fatTarget + 'g &middot; ' + Math.round(((n.avg_fat_g || 0) / fatTarget) * 100) + '% adherence</div></div>' +
-          '<div class="n-macro-col">' +
-          '<div class="n-macro-bar"><div class="n-macro-bar__fill" style="width:' + Math.min(100, ((n.avg_fiber_g || 0) / fiberTarget) * 100) + '%;background:var(--n-green)"></div></div>' +
-          '<div class="n-macro-big" style="color:var(--n-green)">' + Math.round(n.avg_fiber_g || 0) + 'g</div>' +
-          '<div class="n-macro-name">Fiber</div>' +
-          '<div class="n-macro-detail">Target: ' + fiberTarget + 'g+ &middot; ' + Math.round(((n.avg_fiber_g || 0) / fiberTarget) * 100) + '% adherence</div></div>';
-        deepSection.style.display = '';
-      }
+    // ─── Eating window ────────────────────────────────────
+    function renderEatingWindow(ew) {
+      if (!ew) return;
+      if (!ew.avg_hours && !ew.avg_first_meal && !ew.avg_last_meal) return;
+      document.getElementById('n-window-section').style.display = '';
+      setText('ew-window', ew.avg_hours ? ew.avg_hours + ' h' : '—');
+      setText('ew-first', ew.avg_first_meal || '—');
+      setText('ew-last', ew.avg_last_meal || '—');
     }
 
-    /* ── Food delivery analysis (Phase 2) ── */
-    (function() {
-      fetch(API + '/api/food_delivery_overview').then(function(r) { return r.ok ? r.json() : null; }).then(function(fd) {
-        if (!fd) return;
-        var d = fd.food_delivery;
-        if (!d || !d.orders_30d) return;
-        var section = document.getElementById('n-delivery-section');
-        var grid = document.getElementById('n-delivery-grid');
-        section.style.display = '';
-        grid.innerHTML = '<div class="n-macro-col">' +
-          '<div class="n-macro-big" style="color:var(--n-amber)">' + d.orders_30d + '</div>' +
-          '<div class="n-macro-name">Orders (30d)</div>' +
-          '<div class="n-macro-detail">$' + d.avg_spend + ' avg per order</div></div>' +
-          '<div class="n-macro-col">' +
-          '<div class="n-macro-big" style="color:var(--n-red)">' + d.binge_days_30d + '</div>' +
-          '<div class="n-macro-name">Binge-flagged days</div>' +
-          '<div class="n-macro-detail">Days where delivery correlated with calorie overshoot</div></div>' +
-          '<div class="n-macro-col">' +
-          '<div class="n-macro-big">$' + d.total_spend_30d + '</div>' +
-          '<div class="n-macro-name">Total spend</div>' +
-          '<div class="n-macro-detail">' + (fd.platform_breakdown || []).map(function(p) { return p.platform + ' (' + p.count + ')'; }).join(', ') + '</div></div>';
-      }).catch(function() {});
-    })();
-
-    /* ── TDEE current (10e) ── */
-    if (n.avg_tdee) {
-      setText('tdee-current', n.avg_tdee.toLocaleString());
-      var tdeeDelta = 2680 - n.avg_tdee;
-      var deltaEl = document.getElementById('tdee-delta');
-      if (deltaEl && tdeeDelta > 0) {
-        deltaEl.textContent = '\u2193 ' + Math.round(tdeeDelta) + ' cal';
-      }
+    // ─── Resolve dispatch day from /api/pulse, fallback to today ──
+    function fetchDayNumber() {
+      return fetch(API_BASE + '/api/pulse').then(function(r) { return r.ok ? r.json() : null; }).then(function(d) {
+        var p = d && (d.pulse || d);
+        return (p && p.day_number) || null;
+      }).catch(function() { return null; });
     }
 
-    /* ── Trend chart ── */
-    if (trend.length >= 1) {
-      var canvas = document.getElementById('n-trend-canvas');
-      var dpr = window.devicePixelRatio || 1;
-      canvas.width = canvas.offsetWidth * dpr;
-      canvas.height = canvas.offsetHeight * dpr;
-      var ctx = canvas.getContext('2d');
-      ctx.scale(dpr, dpr);
-      var W = canvas.offsetWidth, H = canvas.offsetHeight;
-      var pad = { t: 20, r: 16, b: 28, l: 44 };
-      var iW = W - pad.l - pad.r, iH = H - pad.t - pad.b;
-      var nn = trend.length;
-      var xOf = function(i) { return pad.l + (i / (nn - 1)) * iW; };
-      var yOf = function(v) { return pad.t + iH - (v / 300) * iH; };
+    // ─── Main fetch & render ──────────────────────────────
+    Promise.all([
+      fetch(API_BASE + '/api/nutrition_overview').then(function(r) { if (!r.ok) throw new Error(r.status); return r.json(); }),
+      fetchDayNumber()
+    ]).then(function(results) {
+      var data = results[0];
+      var dayNumber = results[1];
+      var n = data.nutrition || {};
+      var trend = data.nutrition_trend || [];
+      var today = (data && data.as_of) || new Date().toISOString().slice(0, 10);
 
-      /* Grid lines */
-      ctx.strokeStyle = 'rgba(255,255,255,0.03)';
-      ctx.lineWidth = 1;
-      for (var r = 0; r <= 4; r++) {
-        var y = pad.t + (r / 4) * iH;
-        ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
-      }
+      // Compute "signals met" — count of macros above target floor.
+      var hitPct = n.protein_hit_pct || 0;
+      var deficit = n.avg_deficit || (n.avg_tdee && n.avg_calories ? Math.round(n.avg_tdee - n.avg_calories) : 0);
+      var signals = [
+        hitPct >= 80,
+        deficit > 200 && deficit < 1000,
+        (n.avg_carbs_g || 0) > 0,
+        (n.avg_fat_g || 0) > 0,
+        (n.avg_fiber_g || 0) >= 25,
+        (n.days_logged || 0) >= 7
+      ];
+      var met = signals.filter(Boolean).length;
+      var total = signals.length;
 
-      /* 180g target line */
-      ctx.strokeStyle = 'rgba(62,207,142,0.2)';
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath(); ctx.moveTo(pad.l, yOf(180)); ctx.lineTo(W - pad.r, yOf(180)); ctx.stroke();
-      ctx.setLineDash([]);
+      renderMasthead(dayNumber, today, met, total);
+      renderLede(dayNumber, n);
+      renderWatch(n);
+      buildStandings(n, trend);
+      renderArc(n, trend);
+      renderDistribution(n);
+      renderWeekdayVsWeekend(data.weekday_vs_weekend);
+      renderPeriodization(data.periodization);
+      renderEatingWindow(data.eating_window);
+    }).catch(function(err) {
+      console.error('[nutrition] fetch failed:', err);
+      document.getElementById('fp-narrative').textContent = "Could not load today's nutrition data. Refresh to try again.";
+    });
 
-      /* CYCLE PAUSE: overlay band BEFORE data so it sits behind */
-      if (window.CyclePause) {
-        CyclePause.renderCanvasBand(ctx, { trendData: trend, padding: pad, canvasW: W, canvasH: H });
-      }
+    // These don't depend on /api/nutrition_overview — fire in parallel.
+    renderMeals();
+    renderProteinSources();
+  })();
+  </script>
 
-      /* Area fill for calories */
-      var calGrad = ctx.createLinearGradient(0, pad.t, 0, pad.t + iH);
-      calGrad.addColorStop(0, 'rgba(245,158,11,0.12)');
-      calGrad.addColorStop(1, 'rgba(245,158,11,0)');
-      ctx.beginPath();
-      var first = true;
-      trend.forEach(function(d, i) {
-        if (d.calories == null) return;
-        var x = xOf(i), yy = yOf(d.calories / 10);
-        first ? (ctx.moveTo(x, yy), first = false) : ctx.lineTo(x, yy);
-      });
-      if (!first) {
-        ctx.lineTo(xOf(trend.length - 1), pad.t + iH);
-        ctx.lineTo(xOf(0), pad.t + iH);
-        ctx.closePath();
-        ctx.fillStyle = calGrad;
-        ctx.fill();
-      }
-
-      /* Calorie line */
-      ctx.strokeStyle = 'rgba(245,158,11,0.8)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      first = true;
-      trend.forEach(function(d, i) {
-        if (d.calories == null) return;
-        var x = xOf(i), yy = yOf(d.calories / 10);
-        first ? (ctx.moveTo(x, yy), first = false) : ctx.lineTo(x, yy);
-      });
-      ctx.stroke();
-
-      /* Protein dots */
-      trend.forEach(function(d, i) {
-        if (d.protein_g == null) return;
-        var x = xOf(i), yy = yOf(d.protein_g);
-        ctx.fillStyle = d.protein_g >= 180 ? 'rgba(62,207,142,0.85)' : 'rgba(239,68,68,0.6)';
-        ctx.beginPath(); ctx.arc(x, yy, 3.5, 0, Math.PI * 2); ctx.fill();
-      });
-
-      /* Y labels */
-      ctx.fillStyle = 'rgba(255,255,255,0.25)';
-      ctx.font = '10px monospace';
-      ctx.textAlign = 'right';
-      [0, 100, 200, 300].forEach(function(v) {
-        ctx.fillText(v, pad.l - 6, yOf(v) + 4);
-      });
-    }
-
-    /* ── TDEE mini chart (10e) ── */
-    (function() {
-      var tdeeCanvas = document.getElementById('n-tdee-canvas');
-      if (!tdeeCanvas) return;
-      var tdeeData = [2680, 2620, 2560, 2520, 2480, 2450, 2410, 2380, 2350];
-      if (n.avg_tdee) tdeeData[tdeeData.length - 1] = n.avg_tdee;
-      var dpr = window.devicePixelRatio || 1;
-      tdeeCanvas.width = tdeeCanvas.offsetWidth * dpr;
-      tdeeCanvas.height = tdeeCanvas.offsetHeight * dpr;
-      var ctx2 = tdeeCanvas.getContext('2d');
-      ctx2.scale(dpr, dpr);
-      var W2 = tdeeCanvas.offsetWidth, H2 = tdeeCanvas.offsetHeight;
-      var p2 = { t: 16, r: 16, b: 24, l: 48 };
-      var iW2 = W2 - p2.l - p2.r, iH2 = H2 - p2.t - p2.b;
-      var minT = Math.min.apply(null, tdeeData) - 100;
-      var maxT = Math.max.apply(null, tdeeData) + 100;
-      var xOf2 = function(i) { return p2.l + (i / (tdeeData.length - 1)) * iW2; };
-      var yOf2 = function(v) { return p2.t + iH2 - ((v - minT) / (maxT - minT)) * iH2; };
-
-      /* Grid */
-      ctx2.strokeStyle = 'rgba(255,255,255,0.03)';
-      ctx2.lineWidth = 1;
-      for (var r = 0; r <= 3; r++) {
-        var yy = p2.t + (r / 3) * iH2;
-        ctx2.beginPath(); ctx2.moveTo(p2.l, yy); ctx2.lineTo(W2 - p2.r, yy); ctx2.stroke();
-      }
-
-      /* Area fill */
-      var tGrad = ctx2.createLinearGradient(0, p2.t, 0, p2.t + iH2);
-      tGrad.addColorStop(0, 'rgba(245,158,11,0.10)');
-      tGrad.addColorStop(1, 'rgba(245,158,11,0)');
-      ctx2.beginPath();
-      tdeeData.forEach(function(v, i) {
-        i === 0 ? ctx2.moveTo(xOf2(i), yOf2(v)) : ctx2.lineTo(xOf2(i), yOf2(v));
-      });
-      ctx2.lineTo(xOf2(tdeeData.length - 1), p2.t + iH2);
-      ctx2.lineTo(xOf2(0), p2.t + iH2);
-      ctx2.closePath();
-      ctx2.fillStyle = tGrad;
-      ctx2.fill();
-
-      /* Line */
-      ctx2.strokeStyle = 'rgba(245,158,11,0.8)';
-      ctx2.lineWidth = 2;
-      ctx2.beginPath();
-      tdeeData.forEach(function(v, i) {
-        i === 0 ? ctx2.moveTo(xOf2(i), yOf2(v)) : ctx2.lineTo(xOf2(i), yOf2(v));
-      });
-      ctx2.stroke();
-
-      /* Dots */
-      tdeeData.forEach(function(v, i) {
-        ctx2.fillStyle = '#f59e0b';
-        ctx2.beginPath(); ctx2.arc(xOf2(i), yOf2(v), 3, 0, Math.PI * 2); ctx2.fill();
-      });
-
-      /* Y labels */
-      ctx2.fillStyle = 'rgba(255,255,255,0.25)';
-      ctx2.font = '10px monospace';
-      ctx2.textAlign = 'right';
-      var step = Math.round((maxT - minT) / 3);
-      for (var l = 0; l <= 3; l++) {
-        var val = Math.round(minT + l * step);
-        ctx2.fillText(val, p2.l - 6, yOf2(val) + 4);
-      }
-    })();
-
-    /* ── AI Expert Analysis Card ── */
-    // (content already shown above before chart rendering)
-  } catch (e) {
-    loading.textContent = 'Could not load nutrition data.';
-    content.style.display = 'block';
-    console.error(e);
-  }
-
-  /* AI expert analysis now rendered by V3 coach at position 2 (renderCoachAnalysis above) */
-})();
-</script>
+  <script src="/assets/js/animations.js" defer></script>
 </body>
 </html>

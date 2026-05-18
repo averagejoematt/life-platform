@@ -18,6 +18,38 @@
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-home.png">
   <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <title>The Measured Life — AI Health Experiment | averagejoematt.com</title>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://averagejoematt.com/#website",
+        "url": "https://averagejoematt.com/",
+        "name": "The Measured Life",
+        "description": "One man's public health transformation — tracked with 26 data sources, analyzed by AI, documented with radical honesty.",
+        "publisher": {"@id": "https://averagejoematt.com/#organization"}
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://averagejoematt.com/#organization",
+        "name": "The Measured Life",
+        "url": "https://averagejoematt.com/",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://averagejoematt.com/assets/icons/apple-touch-icon.png"
+        }
+      },
+      {
+        "@type": "Person",
+        "@id": "https://averagejoematt.com/#matthew",
+        "name": "Matthew Walker",
+        "url": "https://averagejoematt.com/",
+        "description": "Subject of The Measured Life — a public health transformation tracked with 26 data sources and AI analysis."
+      }
+    ]
+  }
+  </script>
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
@@ -496,6 +528,36 @@
 </h1>
 
 <!-- ═══════════════════════════════════════════════════════════
+     0. FRONT PAGE MASTHEAD (Front Page pattern — top of home)
+     ═══════════════════════════════════════════════════════════ -->
+<div class="fp-page" style="padding-top: var(--nav-height);">
+  <header class="fp-masthead">
+    <div class="fp-masthead__top">
+      <div>
+        <div class="fp-masthead__brow" id="fp-eyebrow">
+          The Daily Pulse · Vol I · Dispatch №<span id="fp-dispatch">—</span>
+        </div>
+        <div class="fp-masthead__title">AVERAGEJOEMATT</div>
+      </div>
+      <div class="fp-masthead__meta">
+        <div id="fp-date">—</div>
+        <div id="fp-meta-status">Reporting from one body</div>
+      </div>
+    </div>
+    <div class="fp-masthead__strip">
+      <div>
+        <span style="opacity:0.5">&larr; Yesterday</span>
+        <span class="fp-masthead__strip-sep">·</span>
+        Day <span id="fp-day-strip">—</span> of 365
+        <span class="fp-masthead__strip-sep">·</span>
+        <span style="opacity:0.5">Tomorrow &rarr;</span>
+      </div>
+      <div id="fp-filed">Filed —</div>
+    </div>
+  </header>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
      1. EDITORIAL HERO (2-column)
      ═══════════════════════════════════════════════════════════ -->
 <section class="h-hero">
@@ -776,6 +838,17 @@
     <span class="reading-path-v2__title">The Story &rarr;</span>
   </a>
 </div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     12b. FRONT PAGE CROSS-LINK FOOTER
+     ═══════════════════════════════════════════════════════════ -->
+<nav class="fp-cross-footer">
+  <div class="fp-cross-footer__prev"><a href="/story/">&larr; Story</a></div>
+  <div class="fp-cross-footer__mid">
+    What today's body is reporting &rarr;
+  </div>
+  <div class="fp-cross-footer__next"><a href="/live/">Live &rarr;</a></div>
+</nav>
 
 <!-- ═══════════════════════════════════════════════════════════
      13. Subscribe + footer placeholders
@@ -1119,11 +1192,18 @@
   }
 
   // Widget A: Weekly Priority
+  // Note: the parent strip is shown by Widget B (Open Actions) too, so we hide
+  // the priority anchor itself when there is no priority \u2014 leaving the actions visible.
+  function hidePriority() {
+    var pBlock = document.getElementById('h-intel-priority');
+    if (pBlock) pBlock.style.display = 'none';
+  }
   try {
     var pr = await fetch('/api/weekly_priority');
-    if (pr.ok) {
+    if (!pr.ok) { hidePriority(); }
+    else {
       var pd = await pr.json();
-      if (pd.weekly_priority) {
+      if (pd && pd.weekly_priority) {
         var strip = document.getElementById('h-intel-strip');
         var txt = document.getElementById('h-intel-priority-text');
         var attr = document.getElementById('h-intel-priority-attr');
@@ -1137,9 +1217,11 @@
         }
         attr.textContent = attrStr;
         strip.style.display = 'flex';
+      } else {
+        hidePriority();
       }
     }
-  } catch(e) {}
+  } catch(e) { hidePriority(); }
 
   // Widget B: Open Actions Strip
   try {
@@ -1198,6 +1280,45 @@
     if (window.AMJ_REINIT_COUNTUP) window.AMJ_REINIT_COUNTUP();
   }
   setTimeout(wireCountUp, 1200);
+})();
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════
+     FRONT PAGE MASTHEAD — wire dynamic values from /api/pulse
+     (same source /live/ uses; placeholder gracefully degrades)
+     ═══════════════════════════════════════════════════════════ -->
+<script>
+(function() {
+  function fmtDate(s) {
+    try {
+      var d = new Date(s + 'T12:00:00');
+      return d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' }).toUpperCase();
+    } catch(e) { return s; }
+  }
+  function setText(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; }
+
+  // Default to today's date so the masthead never looks broken
+  var now = new Date();
+  setText('fp-date', now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' }).toUpperCase());
+  var hh = String(now.getHours()).padStart(2,'0');
+  var mm = String(now.getMinutes()).padStart(2,'0');
+  setText('fp-filed', 'Filed ' + hh + ':' + mm + ' · Auto-synthesis');
+
+  var API_BASE = (typeof AMJ !== 'undefined' && AMJ.API_BASE) ? AMJ.API_BASE : '';
+  fetch(API_BASE + '/api/pulse')
+    .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function(data) {
+      var pulse = data.pulse || data;
+      var dispatch = pulse.day_number || '—';
+      setText('fp-dispatch', dispatch);
+      setText('fp-day-strip', dispatch);
+      if (pulse.date) setText('fp-date', fmtDate(pulse.date));
+      var reporting = pulse.signals_reporting != null
+        ? 'Reporting from one body · ' + pulse.signals_reporting + ' of ' + (pulse.signals_total || 8) + ' signals in'
+        : 'Reporting from one body';
+      setText('fp-meta-status', reporting);
+    })
+    .catch(function() { /* leave defaults */ });
 })();
 </script>
 

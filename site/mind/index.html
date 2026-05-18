@@ -4,2437 +4,951 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="The inner life of a health transformation — mood, willpower, connection, vice streaks, and the mental health signals most people never measure.">
-  <meta property="og:title" content="Inner Life — Matthew">
-  <meta property="og:description" content="The hardest pillar. Mood, purpose, connection, willpower — tracked honestly.">
+  <meta name="description" content="The Mind Dispatch — daily inner-life signals: mood, willpower, journal cadence, vice streaks, connection. The pillar most platforms don't measure.">
+  <meta property="og:title" content="The Mind Dispatch — Matthew">
+  <meta property="og:description" content="Mood, willpower, journal cadence, connection — the inner life pillar tracked honestly.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-mind.png">
   <meta name="twitter:card" content="summary_large_image">
-  <title>Inner Life — Matthew</title>
+  <title>The Mind Dispatch — Matthew</title>
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <meta name="theme-color" content="#080c0a">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
-  <link rel="stylesheet" href="/assets/css/observatory-v3.css">
   <style>
-    :root {
-      --m-violet: #a78bfa;
-      --m-violet-dim: rgba(167,139,250,0.12);
-      --m-violet-glow: rgba(167,139,250,0.06);
-      --m-green: #3ecf8e;
-      --m-red: #ef4444;
-      --m-amber: #f59e0b;
-    }
+    /* /mind/ — Front Page pattern (.fp-*); see assets/css/frontpage.css.
+       Mind-specific additions only — namespace .m- (mind page). */
+    .m-page { padding-top: var(--nav-height); }
 
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(16px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       12h: INTIMATE VISUAL LANGUAGE
-       Serif body text, softer grid, more white space,
-       journal-like texture. This page feels different.
-       ═══════════════════════════════════════════════════════ */
-    .mind-page .m-hero__sub,
-    .mind-page .m-narrative__body,
-    .mind-page .m-confessional__body,
-    .mind-page .m-commitment-text,
-    .mind-page .m-sparsity__body,
-    .mind-page .m-connection-intent__text,
-    .mind-page .m-causal-desc,
-    .mind-page .m-intelligence-desc,
-    .mind-page .m-journal-excerpt__body,
-    .mind-page .m-future__body,
-    .mind-page .m-vice-card__why,
-    .mind-page .m-clinical__body,
-    .mind-page .m-building__body,
-    .mind-page .m-method-item {
-      font-family: var(--font-serif);
-    }
-
-    /* Subtle paper-like texture overlay */
-    .mind-page::before {
-      content: '';
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 28px,
-        rgba(167,139,250,0.008) 28px,
-        rgba(167,139,250,0.008) 29px
-      );
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    /* More white space between sections */
-    .mind-page section,
-    .mind-page .m-pullquote,
-    .mind-page .m-confessional,
-    .mind-page .m-commitment-section,
-    .mind-page .m-causal-section,
-    .mind-page .m-connection-section,
-    .mind-page .m-intelligence-section,
-    .mind-page .m-journal-section,
-    .mind-page .m-future-section {
-      position: relative;
-      z-index: 1;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       HERO — 2-column + gauge row
-       ═══════════════════════════════════════════════════════ */
-    .m-hero {
-      padding: var(--space-20) var(--page-padding) var(--space-16);
-      position: relative;
-      overflow: hidden;
-      border-bottom: 1px solid var(--border);
-      max-width: var(--max-width);
-      margin: 0 auto;
-      z-index: 1;
-    }
-    .m-hero-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-12);
-      align-items: center;
-    }
-    .m-hero__eyebrow {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--m-violet);
-      margin-bottom: var(--space-6);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      opacity: 0;
-      animation: fadeUp 0.6s 0.1s forwards;
-    }
-    .m-hero__eyebrow::before {
-      content: '';
-      width: 32px;
-      height: 1px;
-      background: var(--m-violet);
-    }
-    .m-hero__title {
-      font-family: var(--font-display);
-      font-size: clamp(36px, 5vw, 52px);
-      color: var(--text);
-      line-height: 1.05;
-      max-width: 520px;
-      margin-bottom: var(--space-6);
-      opacity: 0;
-      animation: fadeUp 0.6s 0.2s forwards;
-    }
-    .m-hero__title em {
-      font-style: normal;
-      color: var(--m-violet);
-    }
-    .m-hero__sub {
-      font-size: var(--text-base);
-      color: var(--text-muted);
-      max-width: 420px;
-      line-height: 1.8;
-      opacity: 0;
-      animation: fadeUp 0.6s 0.3s forwards;
-    }
-
-    /* Gauge row (4 mini rings) */
-    .m-gauge-row {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: var(--space-4);
-      opacity: 0;
-      animation: fadeUp 0.6s 0.4s forwards;
-    }
-    .m-gauge {
-      text-align: center;
-      padding: var(--space-5) var(--space-3);
-      background: var(--surface);
-      border: 1px solid var(--border);
-    }
-    .m-gauge__ring {
-      width: 88px;
-      height: 88px;
-      margin: 0 auto var(--space-3);
-      position: relative;
-    }
-    .m-gauge__ring svg { width: 100%; height: 100%; }
-    .m-gauge__center {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-    }
-    .m-gauge__num {
-      font-family: var(--font-display);
-      font-size: 22px;
-      line-height: 1;
-    }
-    .m-gauge__unit {
-      font-family: var(--font-mono);
-      font-size:var(--text-3xs);
-      color: var(--text-faint);
-      letter-spacing: 0.08em;
-    }
-    .m-gauge__label {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-muted);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       12a: CONFESSIONAL NARRATIVE — expanded intro
-       ═══════════════════════════════════════════════════════ */
-    .m-confessional {
-      max-width: 680px;
-      margin: 0 auto;
-      padding: var(--space-16) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-      z-index: 1;
-      position: relative;
-    }
-    .m-confessional__body {
-      font-size: var(--text-base);
-      color: var(--text-muted);
-      line-height: 2;
-      letter-spacing: 0.01em;
-    }
-    .m-confessional__body p {
-      margin-bottom: var(--space-6);
-    }
-    .m-confessional__body strong {
-      color: var(--text);
-      font-weight: 600;
-    }
-    .m-confessional__body em {
-      color: var(--m-violet);
-      font-style: italic;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       12m: CAUSAL HIERARCHY CALLOUT
-       ═══════════════════════════════════════════════════════ */
-    .m-hierarchy-callout {
-      max-width: 680px;
-      margin: 0 auto;
-      padding: var(--space-8) var(--page-padding);
-      z-index: 1;
-      position: relative;
-    }
-    .m-hierarchy-callout__inner {
-      padding: var(--space-6) var(--space-8);
-      border-left: 3px solid var(--m-violet);
-      background: var(--m-violet-glow);
-    }
-    .m-hierarchy-callout__text {
-      font-family: var(--font-serif);
-      font-size: clamp(16px, 2.2vw, 20px);
-      color: var(--text);
-      line-height: 1.6;
-      font-style: italic;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       12f: FIVE COMMITMENTS — personal promises
-       ═══════════════════════════════════════════════════════ */
-    .m-commitment-section {
-      max-width: 680px;
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .m-commitment-section__title {
-      font-family: var(--font-display);
-      font-size: var(--text-h3);
-      color: var(--text);
-      margin-bottom: var(--space-8);
-    }
-    .m-commitment-section__title em {
-      font-style: normal;
-      color: var(--m-violet);
-    }
-    .m-commitment-list {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-5);
-    }
-    .m-commitment-item {
-      display: flex;
-      gap: var(--space-5);
-      padding: var(--space-5) var(--space-6);
-      background: var(--surface);
-      border-left: 2px solid var(--m-violet);
-    }
-    .m-commitment-num {
-      font-family: var(--font-display);
-      font-size: 20px;
-      color: var(--m-violet);
-      line-height: 1;
-      flex-shrink: 0;
-      width: 28px;
-    }
-    .m-commitment-text {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.8;
-    }
-    .m-commitment-text strong {
-      color: var(--text);
-      display: block;
-      font-family: var(--font-body);
-      margin-bottom: 2px;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       PULL-QUOTES
-       ═══════════════════════════════════════════════════════ */
-    .m-pullquote {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      position: relative;
-      border-bottom: 1px solid var(--border);
-    }
-    .m-pullquote__watermark {
-      position: absolute;
-      top: 24px;
-      right: var(--page-padding);
-      font-family: var(--font-display);
-      font-size: 120px;
-      color: rgba(167, 139, 250, 0.04);
-      line-height: 1;
-      pointer-events: none;
-    }
-    .m-pullquote__text {
-      font-family: var(--font-display);
-      font-size: clamp(24px, 3.5vw, 32px);
-      line-height: 1.3;
-      color: var(--text);
-      max-width: 640px;
-      position: relative;
-    }
-    .m-pullquote__text em {
-      font-style: normal;
-      color: var(--m-violet);
-    }
-    .m-pullquote__attr {
-      display: flex;
-      align-items: center;
-      gap: var(--space-3);
-      margin-top: var(--space-4);
-    }
-    .m-pullquote__badge {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      color: var(--m-violet);
-      background: var(--m-violet-dim);
-      padding: 3px 10px;
+    /* Skeleton placeholder for pre-fetch state */
+    .m-skeleton {
+      background: linear-gradient(90deg, var(--surface) 25%, var(--surface-raised) 50%, var(--surface) 75%);
+      background-size: 200% 100%;
+      animation: m-shimmer 1.5s infinite;
+      border-radius: 2px;
       display: inline-block;
     }
-    .m-pullquote__source {
+    @keyframes m-shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    .m-row-empty {
+      padding: 28px 22px;
+      border-top: 1px solid var(--border-subtle);
       font-family: var(--font-mono);
       font-size: 11px;
+      letter-spacing: 0.1em;
       color: var(--text-faint);
-      letter-spacing:var(--ls-subtle);
+      text-transform: uppercase;
     }
 
-    /* ═══════════════════════════════════════════════════════
-       VICE STREAKS — editorial grid
-       ═══════════════════════════════════════════════════════ */
-    .m-vice-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
+    /* Strip nav buttons (kept inert; entries don't paginate yet) */
+    .m-strip-btn {
+      cursor: not-allowed;
+      opacity: 0.5;
+      color: inherit;
+      text-decoration: none;
     }
-    .m-section-header {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      margin-bottom: var(--space-6);
+
+    /* ── Extra mind-only sections (after long story, before footer) ── */
+
+    /* Vice streaks card grid */
+    .m-extras {
+      padding: 32px 56px;
+      border-top: 1px solid var(--border);
+    }
+    .m-extras__head {
       display: flex;
-      align-items: center;
-      gap: 12px;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--border-strong);
     }
-    .m-section-header::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
+    .m-extras__title {
+      font-family: var(--font-display);
+      font-size: 24px;
+      letter-spacing: 0.04em;
+      color: var(--text);
     }
+    .m-extras__meta {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
     .m-vice-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: var(--space-4);
+      gap: 14px;
+      margin-top: 18px;
     }
     .m-vice-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-left: 3px solid var(--m-violet);
-      padding: var(--space-5) var(--space-4);
+      border-left: 3px solid var(--accent);
+      padding: 16px 14px 18px;
       text-align: center;
       position: relative;
       overflow: hidden;
     }
-    .m-vice-card.broken {
-      border-left-color: var(--m-red);
-    }
+    .m-vice-card.is-broken { border-left-color: var(--c-red-status); }
     .m-vice-card__name {
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--text-muted);
-      letter-spacing: 0.08em;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
-      margin-bottom: var(--space-2);
+      margin-bottom: 8px;
     }
     .m-vice-card__streak {
       font-family: var(--font-display);
-      font-size: 32px;
+      font-size: 36px;
       line-height: 1;
-      color: var(--m-violet);
+      color: var(--accent);
     }
-    .m-vice-card.broken .m-vice-card__streak { color: var(--m-red); }
+    .m-vice-card.is-broken .m-vice-card__streak { color: var(--c-red-status); }
     .m-vice-card__unit {
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--text-faint);
-      letter-spacing:var(--ls-wide);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      margin-top: 4px;
     }
-    /* 12k: warm why-line under each streak */
     .m-vice-card__why {
+      font-family: var(--font-serif);
       font-size: 11px;
       color: var(--text-faint);
       line-height: 1.5;
-      margin-top: var(--space-3);
-      padding-top: var(--space-3);
-      border-top: 1px solid var(--border);
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border-subtle);
       font-style: italic;
     }
-    .m-vice-card__bottom-bar {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      height: 2px;
-      background: var(--m-violet);
-      transition: width 1s ease;
-    }
-    .m-vice-card.broken .m-vice-card__bottom-bar { background: var(--m-red); }
 
-    /* ═══════════════════════════════════════════════════════
-       12c: DATA SPARSITY — honest framing
-       ═══════════════════════════════════════════════════════ */
-    .m-sparsity {
-      max-width: 640px;
-      margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
-      z-index: 1;
-      position: relative;
-    }
-    .m-sparsity__inner {
-      padding: var(--space-6) var(--space-8);
-      border: 1px dashed rgba(167,139,250,0.2);
-      border-left: 3px solid var(--m-violet);
-      background: var(--m-violet-glow);
-    }
-    .m-sparsity__title {
-      font-family: var(--font-display);
-      font-size: var(--text-h3);
-      color: var(--text);
-      margin-bottom: var(--space-3);
-    }
-    .m-sparsity__body {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.9;
-    }
-    .m-sparsity__body strong {
-      color: var(--text);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       CONNECTION + WILLPOWER — editorial 2-column
-       ═══════════════════════════════════════════════════════ */
-    .m-bars-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
+    /* Connection / Willpower bar pair */
+    .m-bars {
+      padding: 32px 56px;
+      border-top: 1px solid var(--border);
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: var(--space-6);
-      border-bottom: 1px solid var(--border);
+      gap: 24px;
     }
     .m-bar-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      padding: var(--space-6);
+      padding: 22px 22px 18px;
     }
     .m-bar-card__title {
       font-family: var(--font-mono);
-      font-size: var(--text-2xs);
+      font-size: 10px;
       color: var(--text-muted);
-      letter-spacing:var(--ls-wide);
+      letter-spacing: 0.2em;
       text-transform: uppercase;
-      margin-bottom: var(--space-5);
+      margin-bottom: 18px;
     }
-    .m-bar-wrap { display: flex; flex-direction: column; gap: var(--space-4); }
-    .m-bar-row { display: grid; grid-template-columns: 90px 1fr 40px; align-items: center; gap: var(--space-3); }
-    .m-bar-label { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
-    .m-bar-track { height: 6px; background: rgba(255,255,255,0.04); border-radius: 3px; overflow: hidden; }
-    .m-bar-fill { height: 100%; border-radius: 3px; transition: width 1s ease; }
-    .m-bar-val { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); text-align: right; }
-
-    /* ═══════════════════════════════════════════════════════
-       12e: SOCIAL CONNECTION — intention-first redesign
-       ═══════════════════════════════════════════════════════ */
-    .m-connection-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
+    .m-bar-row {
+      display: grid;
+      grid-template-columns: 90px 1fr 50px;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
     }
-    .m-connection-section__title {
-      font-family: var(--font-display);
-      font-size: var(--text-h3);
-      color: var(--text);
-      margin-bottom: var(--space-3);
-    }
-    .m-connection-section__title em {
-      font-style: normal;
-      color: var(--m-violet);
-    }
-    .m-connection-threshold {
+    .m-bar-label {
       font-family: var(--font-mono);
       font-size: 11px;
-      color: var(--text-faint);
-      letter-spacing:var(--ls-subtle);
-      margin-bottom: var(--space-8);
-      padding: var(--space-3) var(--space-4);
-      background: var(--m-violet-glow);
-      border-left: 2px solid var(--m-violet);
-      display: inline-block;
+      color: var(--text-muted);
+      letter-spacing: 0.06em;
     }
-    .m-connection-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: var(--space-4);
+    .m-bar-track {
+      height: 6px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 3px;
+      overflow: hidden;
     }
-    .m-connection-intent {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--m-violet);
-      padding: var(--space-5) var(--space-5);
+    .m-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: var(--accent);
+      transition: width 1s ease;
     }
-    .m-connection-intent__who {
+    .m-bar-fill--good { background: var(--c-green-500, #3ecf8e); }
+    .m-bar-fill--bad  { background: var(--c-red-status); }
+    .m-bar-fill--warn { background: var(--c-yellow-status); }
+    .m-bar-val {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: right;
+    }
+
+    /* Connection list (Murthy threshold) */
+    .m-conn {
+      padding: 32px 56px;
+      border-top: 1px solid var(--border);
+    }
+    .m-conn__threshold {
       font-family: var(--font-mono);
       font-size: 10px;
-      color: var(--m-violet);
-      letter-spacing:var(--ls-wide);
+      color: var(--text-faint);
+      letter-spacing: 0.18em;
       text-transform: uppercase;
-      margin-bottom: var(--space-2);
+      margin: 6px 0 18px;
+      padding: 8px 12px;
+      background: var(--accent-bg-subtle, rgba(167,139,250,0.06));
+      border-left: 2px solid var(--accent);
+      display: inline-block;
     }
-    .m-connection-intent__text {
-      font-size: var(--text-sm);
+    .m-conn__grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 14px;
+    }
+    .m-conn__intent {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      padding: 16px 18px;
+    }
+    .m-conn__who {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--accent);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .m-conn__text {
+      font-family: var(--font-serif);
+      font-size: 13px;
       color: var(--text-muted);
-      line-height: 1.7;
-      margin-bottom: var(--space-3);
+      line-height: 1.6;
+      margin-bottom: 12px;
+      font-style: italic;
     }
-    .m-connection-intent__progress {
+    .m-conn__progress {
       display: flex;
       align-items: center;
-      gap: var(--space-3);
+      gap: 10px;
     }
-    .m-connection-intent__bar {
+    .m-conn__bar {
       flex: 1;
       height: 4px;
       background: rgba(255,255,255,0.04);
       border-radius: 2px;
       overflow: hidden;
     }
-    .m-connection-intent__fill {
+    .m-conn__fill {
       height: 100%;
-      background: var(--m-violet);
+      background: var(--accent);
       border-radius: 2px;
-      transition: width 1s ease;
     }
-    .m-connection-intent__hours {
+    .m-conn__hours {
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--text-faint);
       white-space: nowrap;
     }
 
-    /* ═══════════════════════════════════════════════════════
-       MOOD CHART
-       ═══════════════════════════════════════════════════════ */
-    .m-chart-section {
-      max-width: var(--max-width);
+    /* Confessional pull-out (preserves the page's editorial voice) */
+    .m-confessional {
+      padding: 32px 56px;
+      border-top: 1px solid var(--border);
+      max-width: 760px;
       margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
     }
-    .m-chart-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      margin-bottom: var(--space-4);
-    }
-    .m-chart-title {
+    .m-confessional__brow {
       font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: 0.15em;
+      font-size: 10px;
+      letter-spacing: 0.3em;
       text-transform: uppercase;
-      display: flex;
-      align-items: center;
-      gap: 12px;
+      color: var(--accent-dim);
+      margin-bottom: 12px;
     }
-    .m-chart-title::after {
-      content: '';
-      width: 48px;
-      height: 1px;
-      background: var(--border);
-    }
-    canvas.m-chart {
-      width: 100%;
-      height: 180px;
-      display: block;
-      background: var(--surface);
-      border: 1px solid var(--border);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       12d: CROSS-DOMAIN CAUSAL CONNECTIONS
-       ═══════════════════════════════════════════════════════ */
-    .m-causal-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .m-causal-section__title {
-      font-family: var(--font-display);
-      font-size: var(--text-h3);
-      color: var(--text);
-      margin-bottom: var(--space-3);
-    }
-    .m-causal-section__title em {
-      font-style: normal;
-      color: var(--m-violet);
-    }
-    .m-causal-section__sub {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text-faint);
-      letter-spacing:var(--ls-subtle);
-      margin-bottom: var(--space-8);
-    }
-    .m-causal-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: var(--space-5);
-    }
-    .m-causal-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: var(--space-5) var(--space-6);
-    }
-    .m-causal-arrow {
-      font-family: var(--font-mono);
-      font-size: 12px;
-      color: var(--m-violet);
-      letter-spacing: 0.04em;
-      margin-bottom: var(--space-3);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .m-causal-arrow__from {
-      color: var(--text);
-      font-weight: 600;
-    }
-    .m-causal-arrow__to {
-      color: var(--m-violet);
-      font-weight: 600;
-    }
-    .m-causal-arrow__dir {
-      color: var(--m-violet);
+    .m-confessional__body {
+      font-family: var(--font-serif);
       font-size: 16px;
-    }
-    .m-causal-desc {
-      font-size: var(--text-sm);
       color: var(--text-muted);
-      line-height: 1.7;
+      line-height: 1.85;
     }
-    .m-causal-correlate {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-faint);
-      letter-spacing:var(--ls-subtle);
-      margin-top: var(--space-3);
-      padding-top: var(--space-3);
-      border-top: 1px solid var(--border);
-    }
+    .m-confessional__body p { margin: 0 0 14px; }
+    .m-confessional__body strong { color: var(--text); font-weight: 600; }
+    .m-confessional__body em { color: var(--accent); font-style: italic; }
 
-    /* ═══════════════════════════════════════════════════════
-       12i: CLINICAL REALITY — naming patterns honestly
-       ═══════════════════════════════════════════════════════ */
-    .m-clinical {
-      max-width: 680px;
-      margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
-      border-bottom: 1px solid var(--border);
+    @media (max-width: 720px) {
+      .m-extras { padding: 20px 20px 24px; }
+      .m-bars { padding: 20px; grid-template-columns: 1fr; }
+      .m-conn { padding: 20px; }
+      .m-confessional { padding: 24px 20px; }
     }
-    .m-clinical__inner {
-      padding: var(--space-6) var(--space-8);
-      border-left: 3px solid rgba(167,139,250,0.3);
-      background: var(--m-violet-glow);
-    }
-    .m-clinical__title {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--m-violet);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      margin-bottom: var(--space-3);
-    }
-    .m-clinical__body {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.9;
-    }
-    .m-clinical__body strong {
-      color: var(--text);
-    }
-    .m-clinical__frameworks {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-faint);
-      letter-spacing:var(--ls-subtle);
-      margin-top: var(--space-4);
-      padding-top: var(--space-3);
-      border-top: 1px solid var(--border);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       12g: INTELLIGENCE LAYER PREVIEW
-       ═══════════════════════════════════════════════════════ */
-    .m-intelligence-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .m-intelligence-section__title {
-      font-family: var(--font-display);
-      font-size: var(--text-h3);
-      color: var(--text);
-      margin-bottom: var(--space-3);
-    }
-    .m-intelligence-section__title em {
-      font-style: normal;
-      color: var(--m-violet);
-    }
-    .m-intelligence-section__sub {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text-faint);
-      letter-spacing:var(--ls-subtle);
-      margin-bottom: var(--space-8);
-    }
-    .m-intelligence-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-5);
-    }
-    .m-intelligence-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-top: 2px solid var(--m-violet);
-      padding: var(--space-6);
-      text-align: center;
-    }
-    .m-intelligence-card__title {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      margin-bottom: var(--space-4);
-    }
-    .m-intelligence-placeholder {
-      height: 120px;
-      border: 1px dashed rgba(167,139,250,0.15);
-      background: var(--m-violet-glow);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: var(--space-4);
-    }
-    .m-intelligence-placeholder__label {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-faint);
-      letter-spacing: 0.08em;
-    }
-    .m-intelligence-desc {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
-    /* Radar placeholder animation */
-    .m-intelligence-placeholder svg {
-      opacity: 0.3;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       12l: JOURNAL EXCERPT SECTION
-       ═══════════════════════════════════════════════════════ */
-    .m-journal-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .m-journal-section__title {
-      font-family: var(--font-display);
-      font-size: var(--text-h3);
-      color: var(--text);
-      margin-bottom: var(--space-8);
-    }
-    .m-journal-section__title em {
-      font-style: normal;
-      color: var(--m-violet);
-    }
-    .m-journal-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-5);
-    }
-    .m-journal-excerpt {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: var(--space-6);
-    }
-    .m-journal-excerpt__label {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--m-violet);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      margin-bottom: var(--space-4);
-    }
-    .m-journal-excerpt__body {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.8;
-      font-style: italic;
-    }
-    .m-journal-excerpt__meta {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-faint);
-      letter-spacing:var(--ls-subtle);
-      margin-top: var(--space-4);
-      padding-top: var(--space-3);
-      border-top: 1px solid var(--border);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       12j: WHAT THIS PAGE WILL BECOME
-       ═══════════════════════════════════════════════════════ */
-    .m-future-section {
-      max-width: 680px;
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .m-future-section__title {
-      font-family: var(--font-display);
-      font-size: var(--text-h3);
-      color: var(--text);
-      margin-bottom: var(--space-6);
-    }
-    .m-future-section__title em {
-      font-style: normal;
-      color: var(--m-violet);
-    }
-    .m-future__body {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.9;
-      margin-bottom: var(--space-6);
-    }
-    .m-future__body strong {
-      color: var(--text);
-    }
-    .m-future-list {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-3);
-    }
-    .m-future-item {
-      display: flex;
-      gap: var(--space-4);
-      padding: var(--space-4) var(--space-5);
-      background: var(--surface);
-      border-left: 2px solid var(--m-violet);
-    }
-    .m-future-item__timeline {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--m-violet);
-      letter-spacing: 0.08em;
-      white-space: nowrap;
-      flex-shrink: 0;
-      width: 56px;
-    }
-    .m-future-item__text {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
-    .m-future-item__text strong { color: var(--text); }
-
-    /* ═══════════════════════════════════════════════════════
-       CROSS-LINKS
-       ═══════════════════════════════════════════════════════ */
-    .m-xref {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-8) var(--page-padding);
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-4);
-      border-bottom: 1px solid var(--border);
-    }
-    .m-xref-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--m-violet);
-      padding: var(--space-5) var(--space-6);
-      transition: border-color 0.15s;
-      text-decoration: none;
-      display: block;
-    }
-    .m-xref-card:hover { border-color: var(--m-violet); }
-    .m-xref-card__tag {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--m-violet);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      margin-bottom: var(--space-2);
-    }
-    .m-xref-card__text {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       METHODOLOGY
-       ═══════════════════════════════════════════════════════ */
-    .m-method {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
-    }
-    .m-method__title {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      margin-bottom: var(--space-6);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .m-method__title::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
-    }
-    .m-method-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-6);
-    }
-    .m-method-item {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.7;
-    }
-    .m-method-item strong {
-      display: block;
-      color: var(--text);
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: 0.08em;
-      margin-bottom: var(--space-2);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       V2: STATE OF MIND + MEDITATION
-       ═══════════════════════════════════════════════════════ */
-    .m-som-section,
-    .m-meditation-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .m-som-grid {
-      display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: var(--space-8);
-      align-items: start;
-    }
-    .m-som-spark-wrap {
-      position: relative;
-      height: 160px;
-    }
-    .m-som-dist-wrap {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .m-som-streak {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-top: var(--space-3);
-      text-align: center;
-    }
-    .m-med-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: var(--space-4);
-      margin-bottom: var(--space-6);
-    }
-    .m-med-stat {
-      text-align: center;
-      padding: var(--space-4);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-    }
-    .m-med-stat__num {
-      font-family: var(--font-display);
-      font-size: 24px;
-      color: var(--m-violet);
-      line-height: 1.2;
-    }
-    .m-med-stat__label {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-muted);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      margin-top: var(--space-2);
-    }
-    .m-med-calendar {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 4px;
-    }
-    .m-med-day {
-      aspect-ratio: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 4px;
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-faint);
-      position: relative;
-    }
-    .m-med-day--header {
-      font-size: 9px;
-      color: var(--text-faint);
-      opacity: 0.5;
-    }
-    .m-med-day--empty {
-      background: transparent;
-    }
-    .m-med-day--no-data {
-      background: rgba(255,255,255,0.02);
-    }
-    .m-med-day--has-data {
-      background: var(--m-violet-dim);
-    }
-    .m-med-day__dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--m-violet);
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       LOADING + RESPONSIVE
-       ═══════════════════════════════════════════════════════ */
-    .m-loading {
-      text-align: center;
-      padding: var(--space-20);
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: 0.15em;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       JOURNAL INTELLIGENCE
-       ═══════════════════════════════════════════════════════ */
-    .m-journal-intel-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .m-theme-legend {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-2);
-      margin-bottom: var(--space-6);
-    }
-    .m-legend-item {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: rgba(255,255,255,0.5);
-      letter-spacing: 0.04em;
-    }
-    .m-legend-item::before {
-      content: '';
-      width: 10px;
-      height: 10px;
-      border-radius: 2px;
-      display: inline-block;
-    }
-    .m-legend-item[data-theme="personal_growth"]::before { background: #a78bfa; }
-    .m-legend-item[data-theme="relationships"]::before   { background: #60a5fa; }
-    .m-legend-item[data-theme="health_body"]::before     { background: #3ecf8e; }
-    .m-legend-item[data-theme="work_ambition"]::before   { background: #f59e0b; }
-    .m-legend-item[data-theme="anxiety_stress"]::before  { background: #ef4444; }
-    .m-legend-item[data-theme="gratitude"]::before       { background: #2dd4bf; }
-    .m-legend-item[data-theme="reflection"]::before      { background: #818cf8; }
-    .m-heatmap-grid {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 4px;
-      margin-bottom: var(--space-8);
-    }
-    .m-heatmap-cell {
-      width: 100%;
-      aspect-ratio: 1;
-      max-width: 32px;
-      border-radius: 4px;
-      cursor: default;
-      position: relative;
-    }
-    .m-heatmap-tooltip {
-      position: fixed;
-      background: rgba(0,0,0,0.9);
-      border: 1px solid rgba(255,255,255,0.15);
-      border-radius: 4px;
-      padding: 8px 12px;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: rgba(255,255,255,0.8);
-      pointer-events: none;
-      z-index: 100;
-      max-width: 240px;
-      line-height: 1.5;
-    }
-    .m-themes-chart-wrap {
-      position: relative;
-      height: 200px;
-      margin-bottom: var(--space-8);
-    }
-    .m-sentiment-chart-wrap {
-      position: relative;
-      height: 200px;
-    }
-
-    @media (max-width: 768px) {
-      .m-hero-grid { grid-template-columns: 1fr; }
-      .m-gauge-row { grid-template-columns: repeat(2, 1fr); }
-      .m-bars-section { grid-template-columns: 1fr; }
-      .m-intelligence-grid { grid-template-columns: 1fr; }
-      .m-journal-grid { grid-template-columns: 1fr; }
-      .m-causal-grid { grid-template-columns: 1fr; }
-      .m-connection-grid { grid-template-columns: 1fr; }
-      .m-method-grid { grid-template-columns: 1fr; }
-      .m-xref { grid-template-columns: 1fr; }
-      .m-som-grid { grid-template-columns: 1fr; }
-      .m-som-spark-wrap { height: 120px; }
-      .m-med-grid { grid-template-columns: 1fr; }
-    }
-  </style>
-
-  <style>
-    /* DB-03: Observatory pillar accent */
-    :root {
-      --obs-accent: var(--pillar-mind);
-      --obs-accent-dim: #a78bfa66;
-      --obs-accent-bg: #a78bfa18;
-    }
-    .s-hero__eyebrow, .eyebrow { color: var(--obs-accent) !important; }
-    .detail-card { border-left-color: var(--obs-accent); }
   </style>
 </head>
-<body class="mind-page">
-<div id="amj-nav"></div>
-<div id="amj-hierarchy-nav"></div>
-<!-- Product Board Item 11: Day X context banner -->
-<div id="day-x-banner" style="
-  margin:0 var(--page-padding);
-  padding:var(--space-3) var(--space-5);
-  background:rgba(var(--amber-rgb,245,158,11),0.06);
-  border:1px solid rgba(var(--amber-rgb,245,158,11),0.15);
-  border-radius:4px;
-  display:flex;
-  align-items:center;
-  gap:var(--space-3);
-  font-family:var(--font-mono);
-  font-size:var(--text-2xs);
-  letter-spacing:var(--ls-tag);
-">
-  <span class="experiment-counter" data-format="short" style="color:var(--c-amber-500);font-weight:700;"></span>
-  <span style="color:var(--text-muted);"> — Early data. This page gets smarter every week.</span>
-  <a href="/subscribe/?from=mind" style="color:var(--c-amber-400);text-decoration:none;margin-left:auto;white-space:nowrap;">Follow along →</a>
-</div>
+<body class="body-signal">
+  <div id="amj-nav"></div>
+  <div id="amj-hierarchy-nav"></div>
 
+  <div class="fp-page m-page" style="--accent: #8b7ad8; --accent-dim: #6857b0;">
 
-<!-- ════════════════════════════════════════════════════════════
-     HERO — 12n: GUARDRAIL — title preserved exactly
-     ════════════════════════════════════════════════════════════ -->
-<div class="m-hero">
-  <div class="m-hero-grid">
-    <div>
-      <div class="m-hero__eyebrow">Inner Life</div>
-      <h1 class="m-hero__title">The pillar I <em>avoided building</em></h1>
-      <p class="m-hero__sub">
-        Most health platforms measure what happens to your body. This one tries to measure what's happening underneath it.
-      </p>
+    <!-- ═══ 1. MASTHEAD ═════════════════════════════════════ -->
+    <header class="fp-masthead">
+      <div class="fp-masthead__top">
+        <div>
+          <div class="fp-masthead__brow">
+            The Mind Dispatch · Vol I · Dispatch №<span id="m-dispatch">—</span>
+          </div>
+          <div class="fp-masthead__title">MIND</div>
+        </div>
+        <div class="fp-masthead__meta">
+          <div id="m-date"><span class="m-skeleton" style="width:160px;height:10px"></span></div>
+          <div id="m-meta-status">Reporting from one inner life</div>
+        </div>
+      </div>
+      <div class="fp-masthead__strip">
+        <div>
+          <span class="m-strip-btn" title="Yesterday's entry">← Yesterday</span>
+          <span class="fp-masthead__strip-sep">·</span>
+          Entry day <span id="m-day-strip">—</span> of 365
+          <span class="fp-masthead__strip-sep">·</span>
+          <span class="m-strip-btn" title="Tomorrow's entry isn't here yet">Tomorrow →</span>
+        </div>
+        <div id="m-filed">Filed —</div>
+      </div>
+    </header>
+
+    <!-- ═══ 2. LEDE ═════════════════════════════════════════ -->
+    <section class="fp-lede">
+      <div>
+        <div class="fp-lede__num-brow">Entry day</div>
+        <div class="fp-lede__num" id="m-day">—</div>
+        <div class="fp-lede__num-cap">of 365</div>
+      </div>
+      <div>
+        <div class="fp-lede__status" id="m-status">▸ TODAY'S ENTRY · STATE: LOADING</div>
+        <div class="fp-lede__narrative" id="m-narrative">
+          "<span class="m-skeleton" style="width:80%;height:18px"></span>"
+        </div>
+        <div class="fp-lede__delta" id="m-delta" style="display:none">
+          <span class="fp-lede__delta-label">Since yesterday:</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 3. WATCH BANNER (optional) ══════════════════════ -->
+    <div class="fp-watch" id="m-watch" style="display:none">
+      <span class="fp-watch__label" id="m-watch-label">Watch</span>
+      <span id="m-watch-text"></span>
     </div>
-    <div class="m-gauge-row">
-      <div class="m-gauge">
-        <div class="m-gauge__ring">
-          <svg viewBox="0 0 88 88">
-            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-            <circle id="g-mind-arc" cx="44" cy="44" r="35" fill="none" stroke="#a78bfa" stroke-width="7"
-              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-              style="transition: stroke-dasharray 1.2s ease 0.5s"/>
-          </svg>
-          <div class="m-gauge__center">
-            <div class="m-gauge__num" id="g-mind-num" style="color:#a78bfa">&mdash;</div>
-            <div class="m-gauge__unit">level</div>
+
+    <!-- ═══ 4. STANDINGS ════════════════════════════════════ -->
+    <section class="fp-standings">
+      <div class="fp-standings__head">
+        <div class="fp-standings__title">ENTRIES</div>
+        <div class="fp-standings__meta">7-day trend · last reading</div>
+      </div>
+      <div id="m-standings-rows">
+        <div class="m-row-empty">Loading inner-life signals…</div>
+      </div>
+    </section>
+
+    <!-- ═══ 5. LONG STORY (30-day mood arc) ═════════════════ -->
+    <section class="fp-arc" id="m-arc-section">
+      <div class="fp-arc__head">
+        <div>
+          <div class="fp-arc__brow">The Long Story · 30-day mood valence</div>
+          <div class="fp-arc__num" id="m-arc-num">
+            <span id="m-arc-first">—</span> → <span class="fp-arc__num-current" id="m-arc-current">—</span>
           </div>
         </div>
-        <div class="m-gauge__label">Mind pillar</div>
-      </div>
-      <div class="m-gauge">
-        <div class="m-gauge__ring">
-          <svg viewBox="0 0 88 88">
-            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-            <circle id="g-resist-arc" cx="44" cy="44" r="35" fill="none" stroke="#3ecf8e" stroke-width="7"
-              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-              style="transition: stroke-dasharray 1.2s ease 0.6s"/>
-          </svg>
-          <div class="m-gauge__center">
-            <div class="m-gauge__num" id="g-resist-num" style="color:#3ecf8e">&mdash;</div>
-            <div class="m-gauge__unit">rate</div>
+        <div class="fp-arc__stats" id="m-arc-stats">
+          <div>
+            <div class="fp-arc__stat-label">30d avg</div>
+            <div class="fp-arc__stat-val fp-arc__stat-val--accent" id="m-arc-avg">—</div>
+          </div>
+          <div>
+            <div class="fp-arc__stat-label">Days tracked</div>
+            <div class="fp-arc__stat-val" id="m-arc-tracked">—</div>
+          </div>
+          <div>
+            <div class="fp-arc__stat-label">Pleasant share</div>
+            <div class="fp-arc__stat-val" id="m-arc-pleasant">—</div>
           </div>
         </div>
-        <div class="m-gauge__label">Resist rate</div>
-        <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:0.04em;margin-top:var(--space-1)">Based on logged temptation events</div>
       </div>
-      <div class="m-gauge">
-        <div class="m-gauge__ring">
-          <svg viewBox="0 0 88 88">
-            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-            <circle id="g-journal-arc" cx="44" cy="44" r="35" fill="none" stroke="#f59e0b" stroke-width="7"
-              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-              style="transition: stroke-dasharray 1.2s ease 0.7s"/>
-          </svg>
-          <div class="m-gauge__center">
-            <div class="m-gauge__num" id="g-journal-num" style="color:#f59e0b">&mdash;</div>
-            <div class="m-gauge__unit">entries</div>
-          </div>
+      <div class="fp-arc__chart" id="m-arc-chart"></div>
+      <div class="fp-arc__caption" id="m-arc-caption">
+        <span>30 days ago · —</span>
+        <span>Today · —</span>
+      </div>
+    </section>
+
+    <!-- ═══ EXTRAS — vice streaks, willpower/connection bars,
+            people I'm reconnecting with, confessional voice.
+            All sit AFTER the long story, BEFORE cross-link footer. ═════ -->
+
+    <!-- Vice streak portfolio -->
+    <section class="m-extras">
+      <div class="m-extras__head">
+        <div class="m-extras__title">VICE STREAKS</div>
+        <div class="m-extras__meta">Each day held is a vote · current streak</div>
+      </div>
+      <div class="m-vice-grid" id="m-vice-grid">
+        <div class="m-row-empty">Loading streaks…</div>
+      </div>
+    </section>
+
+    <!-- Connection depth + Willpower (bars) -->
+    <section class="m-bars">
+      <div class="m-bar-card">
+        <div class="m-bar-card__title">Connection depth · 30 days</div>
+        <div class="m-bar-row">
+          <div class="m-bar-label">Deep</div>
+          <div class="m-bar-track"><div class="m-bar-fill" id="bar-deep" style="width:0%"></div></div>
+          <div class="m-bar-val" id="pct-deep">—</div>
         </div>
-        <div class="m-gauge__label">Journal (30d)</div>
-      </div>
-      <div class="m-gauge">
-        <div class="m-gauge__ring">
-          <svg viewBox="0 0 88 88">
-            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-            <circle id="g-vice-arc" cx="44" cy="44" r="35" fill="none" stroke="#ef4444" stroke-width="7"
-              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-              style="transition: stroke-dasharray 1.2s ease 0.8s"/>
-          </svg>
-          <div class="m-gauge__center">
-            <div class="m-gauge__num" id="g-vice-num" style="color:#ef4444">&mdash;</div>
-            <div class="m-gauge__unit">active</div>
-          </div>
+        <div class="m-bar-row">
+          <div class="m-bar-label">Meaningful</div>
+          <div class="m-bar-track"><div class="m-bar-fill m-bar-fill--good" id="bar-meaning" style="width:0%"></div></div>
+          <div class="m-bar-val" id="pct-meaning">—</div>
         </div>
-        <div class="m-gauge__label">Vice streaks</div>
+        <div class="m-bar-row">
+          <div class="m-bar-label">Surface</div>
+          <div class="m-bar-track"><div class="m-bar-fill m-bar-fill--warn" id="bar-surface" style="width:0%"></div></div>
+          <div class="m-bar-val" id="pct-surface">—</div>
+        </div>
       </div>
-    </div>
-  </div>
-  <div class="obs-freshness" id="obs-freshness" style="display:none">
-    <div>
-      <span class="obs-freshness__label">Last data: <span id="obs-fresh-time">—</span></span>
-      <span class="obs-freshness__sub">Updated daily</span>
-    </div>
-    <span class="obs-freshness__dot obs-freshness__dot--live" id="obs-fresh-dot"></span>
-  </div>
-</div>
+      <div class="m-bar-card">
+        <div class="m-bar-card__title">Willpower · 90 days</div>
+        <div class="m-bar-row">
+          <div class="m-bar-label">Resisted</div>
+          <div class="m-bar-track"><div class="m-bar-fill m-bar-fill--good" id="bar-resisted" style="width:0%"></div></div>
+          <div class="m-bar-val" id="pct-resisted">—</div>
+        </div>
+        <div class="m-bar-row">
+          <div class="m-bar-label">Succumbed</div>
+          <div class="m-bar-track"><div class="m-bar-fill m-bar-fill--bad" id="bar-succumbed" style="width:0%"></div></div>
+          <div class="m-bar-val" id="pct-succumbed">—</div>
+        </div>
+      </div>
+    </section>
 
-<p class="obs-subtitle">The pillar most health platforms don't measure. A 12-month inner record.</p>
+    <!-- Connection / people I'm reconnecting with -->
+    <section class="m-conn" id="m-conn-section">
+      <div class="m-extras__head" style="border:none;padding:0;margin-bottom:0">
+        <div class="m-extras__title">PEOPLE</div>
+        <div class="m-extras__meta">Murthy threshold · 150 hrs/year per close friendship</div>
+      </div>
+      <div class="m-conn__threshold">~3 hours/week per person to qualify as close</div>
+      <div class="m-conn__grid" id="m-conn-grid">
+        <div class="m-row-empty">Loading connections…</div>
+      </div>
+    </section>
 
-<!-- ════════════════════════════════════════════════════════════
-     V3 Section 2: COACH ANALYSIS — Dr. Conti (Approach C: after hero, not replacing it)
-     ════════════════════════════════════════════════════════════ -->
-<div id="obs-v3-coach"></div>
+    <!-- Editorial confessional (preserves the page's voice) -->
+    <section class="m-confessional">
+      <div class="m-confessional__brow">Editor's note · why this page exists</div>
+      <div class="m-confessional__body">
+        <p>For most of my adult life, the relapses made sense. I'd get into shape, life would get full — parties, travel, people, things happening — and the discipline would relax into it. That was almost a good problem.</p>
+        <p>What's different about the recent cycles is harder to explain. The disruptions aren't coming from abundance anymore. I can build a platform that measures my cortisol. I find it harder to ask <em>why it's elevated.</em></p>
+        <p><strong>This is the measurement I've been avoiding the longest.</strong> Probably the one that matters the most.</p>
+      </div>
+    </section>
 
-<div id="obs-thisweek" style="display:none"></div>
+    <!-- ═══ 6. CROSS-LINK FOOTER ════════════════════════════ -->
+    <nav class="fp-cross-footer">
+      <div class="fp-cross-footer__prev"><a href="/training/">← Training</a></div>
+      <div class="fp-cross-footer__mid">
+        How a mind feels shows up in tomorrow's writing →
+        <a href="/chronicle/">Chronicle</a>
+      </div>
+      <div class="fp-cross-footer__next"><a href="/physical/">Physical →</a></div>
+    </nav>
 
-<!-- M2: Today's emotional word widget -->
-<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-6) var(--page-padding);text-align:center;border-bottom:1px solid var(--border)">
-  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--pillar-mind,#a78bfa);margin-bottom:var(--space-3)">One word. How are you feeling?</div>
-  <div id="m-emotional-word" style="font-family:var(--font-display);font-size:clamp(28px,4vw,40px);color:var(--text);min-height:48px" contenteditable="true" spellcheck="false" data-placeholder="type here"></div>
-  <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);margin-top:var(--space-2)">This stays in your browser. Nothing is sent anywhere.</div>
-</div>
-<style>
-  #m-emotional-word:empty::before { content: attr(data-placeholder); color: var(--text-faint); }
-  #m-emotional-word:focus { outline: none; border-bottom: 1px solid var(--pillar-mind, #a78bfa); }
-</style>
-
-<!-- ════════════════════════════════════════════════════════════
-     12a: CONFESSIONAL NARRATIVE — vulnerability first
-     ════════════════════════════════════════════════════════════ -->
-<div class="m-confessional reveal">
-  <div class="m-confessional__body">
-    <p>For most of my adult life, the relapses made sense. I&rsquo;d get into shape, life would get full &mdash; parties, travel, people, things happening &mdash; and the discipline would relax into it. That was almost a good problem. It meant there was something worth relaxing into.</p>
-
-    <p>What&rsquo;s different about the recent cycles is harder to explain. The disruptions aren&rsquo;t coming from abundance anymore. Something is driving them that I haven&rsquo;t fully located yet. People offer the familiar frameworks &mdash; unprocessed stuff, stress responses, anxiety &mdash; and the clich&eacute;s ring true. But I&rsquo;m better at intellectualizing them than actually sitting with them. I can build a platform that measures my cortisol. I find it harder to ask why it&rsquo;s elevated.</p>
-
-    <p>I&rsquo;ve never been someone who journals. My method has always been simpler: get back on the horse, work harder, earn the result. That worked for a long time. But the recent cycles &mdash; the ones where powering through stopped being enough &mdash; are making me question things I&rsquo;ve been comfortable not examining. I tend to favor another workout over a difficult conversation. I&rsquo;d rather optimize a system than sit with a feeling. This page is meant to put pressure on exactly that.</p>
-
-    <p>I&rsquo;m not trying to return to who I was. I&rsquo;m trying to figure out who I&rsquo;m becoming &mdash; what I want, what makes me genuinely content, what kind of family member and friend I can actually be. <strong>This is the measurement I&rsquo;ve been avoiding the longest.</strong> Probably the one that matters the most.</p>
-  </div>
-</div>
-
-<!-- ════════════════════════════════════════════════════════════
-     12m: CAUSAL HIERARCHY CALLOUT
-     ════════════════════════════════════════════════════════════ -->
-<div class="m-hierarchy-callout reveal">
-  <div class="m-hierarchy-callout__inner">
-    <div class="m-hierarchy-callout__text">
-      This pillar doesn&rsquo;t sit alongside the others. It determines the trajectory of all of them.
-    </div>
-  </div>
-</div>
-
-<!-- ════════════════════════════════════════════════════════════
-     12f: FIVE COMMITMENTS — personal promises, not protocol
-     ════════════════════════════════════════════════════════════ -->
-<div class="m-commitment-section reveal">
-  <h2 class="m-commitment-section__title">Five <em>promises</em></h2>
-  <div class="m-commitment-list">
-    <div class="m-commitment-item">
-      <div class="m-commitment-num">01</div>
-      <div class="m-commitment-text"><strong>I will journal every day, even when I don&rsquo;t want to.</strong>Morning and evening entries feeding sentiment analysis and burnout early warning. The days I resist writing are the days the data matters most.</div>
-    </div>
-    <div class="m-commitment-item">
-      <div class="m-commitment-num">02</div>
-      <div class="m-commitment-text"><strong>I will name what I&rsquo;m feeling, not just what I&rsquo;m doing.</strong>Mood-energy divergence &mdash; when mood rises but energy falls &mdash; is a burnout precursor. I can&rsquo;t detect it if I won&rsquo;t report it.</div>
-    </div>
-    <div class="m-commitment-item">
-      <div class="m-commitment-num">03</div>
-      <div class="m-commitment-text"><strong>I will invest in relationships, not just track them.</strong>Murthy says 3&ndash;5 close relationships is the wellbeing threshold. I&rsquo;m below that. This page holds me accountable to changing it.</div>
-    </div>
-    <div class="m-commitment-item">
-      <div class="m-commitment-num">04</div>
-      <div class="m-commitment-text"><strong>I will treat vice streaks as identity evidence, not willpower tests.</strong>Day 30 isn&rsquo;t discipline. It&rsquo;s who I&rsquo;m becoming. Each day held is a vote for the person I&rsquo;m building.</div>
-    </div>
-    <div class="m-commitment-item">
-      <div class="m-commitment-num">05</div>
-      <div class="m-commitment-text"><strong>I will look at the cognitive patterns, even the ugly ones.</strong>Catastrophizing, rumination, imposter syndrome &mdash; the data will show which patterns dominate. I commit to reading what it says.</div>
-    </div>
-  </div>
-</div>
-
-<div id="m-loading" class="m-loading">LOADING INNER LIFE DATA&hellip;</div>
-<div id="m-content" style="display:none">
-
-<!-- ════════════════════════════════════════════════════════════
-     JOURNAL INTELLIGENCE
-     ════════════════════════════════════════════════════════════ -->
-<section class="m-journal-intel-section reveal" id="m-journal-intel" style="display:none">
-  <div class="m-section-header">Journal Intelligence</div>
-
-  <div class="m-theme-legend">
-    <span class="m-legend-item" data-theme="personal_growth">Personal Growth</span>
-    <span class="m-legend-item" data-theme="relationships">Relationships</span>
-    <span class="m-legend-item" data-theme="health_body">Health &amp; Body</span>
-    <span class="m-legend-item" data-theme="work_ambition">Work</span>
-    <span class="m-legend-item" data-theme="anxiety_stress">Stress</span>
-    <span class="m-legend-item" data-theme="gratitude">Gratitude</span>
-    <span class="m-legend-item" data-theme="reflection">Reflection</span>
   </div>
 
-  <div class="m-heatmap-grid" id="m-heatmap"></div>
-  <div class="m-heatmap-tooltip" id="m-heatmap-tooltip" style="display:none"></div>
+  <div id="amj-subscribe"></div>
+  <div id="amj-bottom-nav"></div>
+  <div id="amj-footer"></div>
 
-  <div class="m-section-header" style="margin-top:var(--space-8)">Top Themes</div>
-  <div class="m-themes-chart-wrap">
-    <canvas id="m-themes-canvas"></canvas>
-  </div>
+  <script src="/assets/js/site_constants.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/nav.js"></script>
+  <script>
+  (function() {
+    'use strict';
 
-  <div class="m-section-header" style="margin-top:var(--space-8)">Sentiment Trend (90-Day)</div>
-  <div class="m-sentiment-chart-wrap">
-    <canvas id="m-sentiment-canvas"></canvas>
-  </div>
-</section>
+    var API_BASE = (typeof AMJ !== 'undefined' && AMJ.API_BASE) ? AMJ.API_BASE : '';
+    var BLOCKED_KW = ['porn','pornography','marijuana','cannabis','weed','thc'];
+    function isBlocked(t) {
+      if (!t) return false;
+      var l = t.toLowerCase();
+      return BLOCKED_KW.some(function(k){ return l.indexOf(k) !== -1; });
+    }
 
-<!-- ════════════════════════════════════════════════════════════
-     AI EXPERT ANALYSIS
-     ════════════════════════════════════════════════════════════ -->
-<!-- AI expert analysis now rendered by V3 coach at position 2 (after hero per Conti Amendment) -->
+    /* Vice why-lines — preserved from original page */
+    var viceWhyMap = {
+      'alcohol': "Tracking sleep impact on alcohol vs. non-alcohol nights.",
+      'sugar': "Glucose spikes feed the anxiety loop. Stable sugar, stable mood.",
+      'fast food': "Inflammation is the hidden cost. Every skip is a vote for lower CRP.",
+      'social media': "Comparison is the thief of contentment.",
+      'caffeine after 12pm': "Adenosine debt compounds. Afternoon caffeine steals tomorrow's recovery.",
+      'nicotine': "The calm it promises is the calm it stole.",
+      'gambling': "Dopamine hijacking dressed as entertainment.",
+      'junk food': "Gut inflammation feeds brain fog.",
+      'energy drinks': "Borrowed energy with compounding interest.",
+      'vaping': "Lung capacity matters for training.",
+      'soda': "Empty calories, glucose spike, crash.",
+      'late night eating': "Eating after 8pm disrupts sleep architecture."
+    };
+    function getViceWhy(name) {
+      if (!name) return "Each day held is a vote for who I'm becoming.";
+      var key = name.toLowerCase();
+      for (var k in viceWhyMap) {
+        if (key.indexOf(k) !== -1 || k.indexOf(key) !== -1) return viceWhyMap[k];
+      }
+      return "Each day held is a vote for who I'm becoming.";
+    }
 
-<!-- ════════════════════════════════════════════════════════════
-     12c: DATA SPARSITY — the gap IS the data
-     ════════════════════════════════════════════════════════════ -->
-<div class="m-sparsity reveal" id="m-sparsity" style="display:none">
-  <div class="m-sparsity__inner">
-    <div class="m-sparsity__title">The data gap is the data</div>
-    <div class="m-sparsity__body" id="m-sparsity-body">
-      <span id="m-sparsity-journal-count">One</span> journal entry. <span id="m-sparsity-connection-count">Zero</span> logged connections. That&rsquo;s not a bug in the measurement system &mdash; <strong>that&rsquo;s the measurement.</strong> The sparsity on this page is an honest record of the pillar I avoided building. As entries accumulate, every section below transforms from empty framework to working intelligence.
-    </div>
-  </div>
-</div>
+    function fmtDate(s) {
+      try {
+        var d = new Date(s + 'T12:00:00');
+        return d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' }).toUpperCase();
+      } catch(e) { return s; }
+    }
 
-<!-- ════════════════════════════════════════════════════════════
-     PULL-QUOTE #1 — Identity threshold
-     ════════════════════════════════════════════════════════════ -->
-<div class="m-pullquote reveal">
-  <div class="m-pullquote__watermark">01</div>
-  <div class="m-pullquote__text">
-    Day 30 isn&rsquo;t willpower. It&rsquo;s <em>identity</em>. Hypothesis: streaks past
-    30 days become identity-level habits. Tracking hold rates as data accumulates.
-  </div>
-  <div class="m-pullquote__attr">
-    <span class="m-pullquote__badge">Hypothesis &middot; Under test</span>
-    <span class="m-pullquote__source">Habitify streak data &mdash; compounding value model</span>
-  </div>
-</div>
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setWidth(id, p) { var el = document.getElementById(id); if (el) el.style.width = Math.max(0, Math.min(100, p)) + '%'; }
 
-<!-- ════════════════════════════════════════════════════════════
-     VICE STREAKS — 12k: warmer, with why-lines
-     ════════════════════════════════════════════════════════════ -->
-<section class="m-vice-section reveal">
-  <div class="m-section-header">Vice streak portfolio &mdash; each day is a vote</div>
-  <div class="m-vice-grid" id="m-vice-grid"></div>
-</section>
-
-<!-- Vice streak timeline chart -->
-<section style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border)" class="reveal" id="m-vice-timeline-section" style="display:none">
-  <div class="m-section-header">Vice streak timeline (30d)</div>
-  <div style="position:relative;height:240px">
-    <canvas id="m-vice-timeline-canvas"></canvas>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     WILLPOWER — resist/succumb bars
-     ════════════════════════════════════════════════════════════ -->
-<section class="m-bars-section reveal">
-  <div class="m-bar-card">
-    <div class="m-bar-card__title">Connection depth (30d)</div>
-    <div class="m-bar-wrap">
-      <div class="m-bar-row"><div class="m-bar-label">Deep</div><div class="m-bar-track"><div class="m-bar-fill" id="bar-deep" style="width:0%;background:var(--m-violet)"></div></div><div class="m-bar-val" id="pct-deep">&mdash;</div></div>
-      <div class="m-bar-row"><div class="m-bar-label">Meaningful</div><div class="m-bar-track"><div class="m-bar-fill" id="bar-meaning" style="width:0%;background:var(--m-green)"></div></div><div class="m-bar-val" id="pct-meaning">&mdash;</div></div>
-      <div class="m-bar-row"><div class="m-bar-label">Surface</div><div class="m-bar-track"><div class="m-bar-fill" id="bar-surface" style="width:0%;background:var(--m-amber)"></div></div><div class="m-bar-val" id="pct-surface">&mdash;</div></div>
-    </div>
-  </div>
-  <div class="m-bar-card">
-    <div class="m-bar-card__title">Willpower (90d)</div>
-    <div class="m-bar-wrap">
-      <div class="m-bar-row"><div class="m-bar-label">Resisted</div><div class="m-bar-track"><div class="m-bar-fill" id="bar-resisted" style="width:0%;background:var(--m-green)"></div></div><div class="m-bar-val" id="pct-resisted">&mdash;</div></div>
-      <div class="m-bar-row"><div class="m-bar-label">Succumbed</div><div class="m-bar-track"><div class="m-bar-fill" id="bar-succumbed" style="width:0%;background:var(--m-red)"></div></div><div class="m-bar-val" id="pct-succumbed">&mdash;</div></div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     12e: SOCIAL CONNECTION — live from DynamoDB via /api/challenges
-     ════════════════════════════════════════════════════════════ -->
-<section class="m-connection-section reveal">
-  <h2 class="m-connection-section__title">People I&rsquo;m <em>trying to reconnect with</em></h2>
-  <div class="m-connection-threshold">MURTHY THRESHOLD: 150 hours/year for close friendship &mdash; that&rsquo;s ~3 hours/week per person</div>
-  <div class="m-connection-grid" id="m-connection-grid">
-    <div style="grid-column:1/-1;text-align:center;padding:var(--space-8) 0;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">Loading connections&hellip;</div>
-  </div>
-</section>
-<script>
-(function() {
-  fetch('/api/challenges')
-    .then(function(r) { return r.ok ? r.json() : null; })
-    .then(function(data) {
-      if (!data || !data.challenges) return;
-      var connections = data.challenges.filter(function(c) {
-        return c.challenge_type === 'connection' && c.status === 'active';
+    /* ── Spark renderer (vertical bars, last is opaque) ── */
+    function renderSpark(values, state) {
+      if (!values || values.length === 0) return '';
+      var clean = values.filter(function(v) { return v != null; });
+      if (clean.length === 0) return '';
+      var max = Math.max.apply(null, clean);
+      var min = Math.min.apply(null, clean);
+      var range = max - min || 1;
+      var cls = 'fp-spark fp-spark--' + (state || 'green');
+      var html = '<div class="' + cls + '">';
+      clean.forEach(function(v) {
+        var pct = Math.max(10, ((v - min) / range) * 100);
+        html += '<div class="fp-spark__bar" style="height:' + pct + '%"></div>';
       });
-      var grid = document.getElementById('m-connection-grid');
-      if (!grid || connections.length === 0) {
-        if (grid) grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:var(--space-8) 0;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">No active connections tracked yet.</div>';
+      html += '</div>';
+      return html;
+    }
+
+    function moodWord(v) {
+      if (v == null) return 'QUIET';
+      if (v >= 0.5) return 'CENTERED';
+      if (v >= 0.2) return 'STEADY';
+      if (v >= -0.2) return 'MIXED';
+      if (v >= -0.5) return 'TENSE';
+      return 'FOGGY';
+    }
+    function statusClass(word) {
+      if (word === 'CENTERED' || word === 'STEADY') return 'fp-lede__status--strong';
+      if (word === 'TENSE' || word === 'FOGGY')    return 'fp-lede__status--attention';
+      return 'fp-lede__status--watch';
+    }
+    function timePrefix() {
+      var h = new Date().getHours();
+      if (h < 10) return 'Morning read: ';
+      if (h < 14) return 'Midday check: ';
+      if (h < 18) return 'Afternoon: ';
+      return 'End of day: ';
+    }
+
+    /* ── Day-of-year for dispatch number ── */
+    function dayOfYear(d) {
+      d = d || new Date();
+      var start = new Date(d.getFullYear(), 0, 0);
+      var diff = d - start;
+      return Math.floor(diff / (1000 * 60 * 60 * 24));
+    }
+
+    /* ── Render masthead from mood + vices ── */
+    function renderMasthead(latestMood) {
+      var entryDay = dayOfYear();
+      setText('m-dispatch', entryDay);
+      setText('m-day-strip', entryDay);
+      setText('m-day', entryDay);
+      var dateStr = latestMood && latestMood.date ? latestMood.date : new Date().toISOString().slice(0,10);
+      setText('m-date', fmtDate(dateStr));
+      var now = new Date();
+      var hh = String(now.getHours()).padStart(2,'0');
+      var mm = String(now.getMinutes()).padStart(2,'0');
+      setText('m-filed', 'Filed ' + hh + ':' + mm + ' · Auto-synthesis');
+    }
+
+    /* ── Lede ── */
+    function renderLede(payload) {
+      var mood = payload.mood_trend || [];
+      var latest = mood.length ? mood[mood.length - 1] : null;
+      var word = moodWord(latest ? latest.valence : null);
+      var statusEl = document.getElementById('m-status');
+      statusEl.textContent = "▸ TODAY'S ENTRY · STATE: " + word;
+      statusEl.className = 'fp-lede__status ' + statusClass(word);
+
+      var narr;
+      var m = payload.mind || {};
+      var vices = (payload.vice_streaks || []).filter(function(v){ return !isBlocked(v.name); });
+      var holding = vices.filter(function(v){ return v.holding; }).length;
+      var resist = m.resist_rate_pct;
+      var jc = m.journal_entries_30d || 0;
+
+      if (latest && latest.label) {
+        narr = 'Mood read as ' + latest.label.toLowerCase() + '.';
+      } else if (latest && latest.valence != null) {
+        narr = 'Latest mood valence ' + (latest.valence >= 0 ? '+' : '') + latest.valence.toFixed(2) + ' on the pleasant/unpleasant scale.';
+      } else {
+        narr = 'No state-of-mind reading filed today.';
+      }
+      var addons = [];
+      if (vices.length) addons.push(holding + ' of ' + vices.length + ' vice streaks holding');
+      if (resist != null) addons.push('willpower resisting at ' + resist + '%');
+      if (jc) addons.push(jc + ' journal entries in 30 days');
+      if (addons.length) narr += ' ' + addons.join(', ') + '.';
+
+      document.getElementById('m-narrative').textContent = '"' + timePrefix() + narr + '"';
+      renderDelta(payload, latest);
+    }
+
+    function renderDelta(payload, latest) {
+      var el = document.getElementById('m-delta');
+      var mood = payload.mood_trend || [];
+      var prev = mood.length >= 2 ? mood[mood.length - 2] : null;
+      var items = [];
+      if (latest && prev && latest.valence != null && prev.valence != null) {
+        var dv = +(latest.valence - prev.valence).toFixed(2);
+        items.push({ text: 'Mood ' + (dv >= 0 ? '+' : '') + dv, delta: dv, signal: 'mood' });
+      }
+      var m = payload.mind || {};
+      if (m.resist_rate_pct != null && m.resist_rate_pct_prev != null) {
+        var dr = m.resist_rate_pct - m.resist_rate_pct_prev;
+        items.push({ text: 'Resist ' + (dr >= 0 ? '+' : '') + dr + '%', delta: dr, signal: 'resist' });
+      }
+      if (!items.length) { el.style.display = 'none'; return; }
+      el.style.display = '';
+      var html = '<span class="fp-lede__delta-label">Since yesterday:</span>';
+      html += items.map(function(d) {
+        var good = d.delta > 0;
+        var cls = d.delta === 0 ? 'fp-delta--flat' : (good ? 'fp-delta--good' : 'fp-delta--bad');
+        return '<span class="' + cls + '">' + d.text + '</span>';
+      }).join('');
+      el.innerHTML = html;
+    }
+
+    /* ── Watch banner — surface low-mood or broken-streak warnings ── */
+    function renderWatch(payload) {
+      var w = document.getElementById('m-watch');
+      var mood = payload.mood_trend || [];
+      var latest = mood.length ? mood[mood.length - 1] : null;
+      var msg = null, sev = 'watch';
+      if (latest && latest.valence != null && latest.valence <= -0.4) {
+        msg = "Mood valence in the unpleasant range. Consider what's driving it before powering through.";
+        sev = 'attention';
+      } else {
+        var vices = (payload.vice_streaks || []).filter(function(v){ return !isBlocked(v.name); });
+        var brokenToday = vices.filter(function(v){ return !v.holding && v.current_streak === 0; });
+        if (brokenToday.length) {
+          msg = brokenToday.length + ' vice streak' + (brokenToday.length > 1 ? 's' : '') + ' broken. The break is data, not failure.';
+        }
+      }
+      if (!msg) { w.style.display = 'none'; return; }
+      w.style.display = '';
+      w.classList.toggle('fp-watch--attention', sev === 'attention');
+      document.getElementById('m-watch-label').textContent = sev === 'attention' ? 'Attention' : 'Watch';
+      document.getElementById('m-watch-text').textContent = msg;
+    }
+
+    /* ── Standings rows: one per signal ── */
+    function buildStandings(payload) {
+      var m = payload.mind || {};
+      var mood = payload.mood_trend || [];
+      var latestMood = mood.length ? mood[mood.length - 1] : null;
+      var vices = (payload.vice_streaks || []).filter(function(v){ return !isBlocked(v.name); });
+      var holding = vices.filter(function(v){ return v.holding; }).length;
+      var dc = m.depth_counts || {};
+      var totConn = (dc.deep || 0) + (dc.meaningful || 0) + (dc.surface || 0);
+      var med = payload.meditation || {};
+
+      var rows = [];
+
+      // Mood / state of mind
+      if (latestMood && latestMood.valence != null) {
+        var v = latestMood.valence;
+        var state = v >= 0.2 ? 'green' : (v >= -0.2 ? 'amber' : 'red');
+        rows.push({
+          name: 'Mood',
+          context: latestMood.label || moodWord(v).toLowerCase(),
+          value: (v >= 0 ? '+' : '') + v.toFixed(2),
+          unit: 'valence',
+          spark: mood.slice(-7).map(function(d){ return d.valence; }),
+          state: state,
+          href: '#m-arc-section'
+        });
+      }
+
+      // Mind pillar level
+      if (m.mind_pillar && m.mind_pillar.level != null) {
+        var lvl = m.mind_pillar.level;
+        rows.push({
+          name: 'Pillar',
+          context: 'Mind pillar score',
+          value: 'L' + Math.round(lvl),
+          unit: '/ 100',
+          spark: null,
+          state: lvl >= 70 ? 'green' : lvl >= 40 ? 'amber' : 'red',
+          href: '/character/'
+        });
+      }
+
+      // Resist rate
+      if (m.resist_rate_pct != null) {
+        var r = m.resist_rate_pct;
+        rows.push({
+          name: 'Willpower',
+          context: 'Temptations resisted, 90d',
+          value: r,
+          unit: '%',
+          spark: null,
+          state: r >= 80 ? 'green' : r >= 50 ? 'amber' : 'red',
+          href: '#'
+        });
+      }
+
+      // Journal cadence
+      var jc = m.journal_entries_30d || 0;
+      rows.push({
+        name: 'Journal',
+        context: 'Entries in last 30 days',
+        value: jc,
+        unit: '/ 30',
+        spark: null,
+        state: jc >= 20 ? 'green' : jc >= 10 ? 'amber' : 'red',
+        href: '/chronicle/'
+      });
+
+      // Vice streaks holding
+      if (vices.length) {
+        rows.push({
+          name: 'Streaks',
+          context: 'Vice streaks holding',
+          value: holding,
+          unit: '/ ' + vices.length,
+          spark: null,
+          state: holding === vices.length ? 'green' : holding >= vices.length * 0.7 ? 'amber' : 'red',
+          href: '#'
+        });
+      }
+
+      // Connection depth
+      if (totConn > 0) {
+        rows.push({
+          name: 'Connection',
+          context: (dc.deep || 0) + ' deep · ' + (dc.meaningful || 0) + ' meaningful · ' + (dc.surface || 0) + ' surface',
+          value: totConn,
+          unit: 'logged',
+          spark: null,
+          state: (dc.deep || 0) >= 3 ? 'green' : 'amber',
+          href: '#m-conn-section'
+        });
+      }
+
+      // Meditation
+      if (med.sessions_30d != null) {
+        rows.push({
+          name: 'Meditation',
+          context: med.sessions_30d + ' sessions · ' + (med.total_minutes_30d || 0) + ' min',
+          value: med.sessions_30d,
+          unit: 'sessions',
+          spark: null,
+          state: med.sessions_30d >= 15 ? 'green' : med.sessions_30d >= 5 ? 'amber' : 'red',
+          href: '#'
+        });
+      }
+
+      return rows;
+    }
+
+    function renderStandings(payload) {
+      var rows = buildStandings(payload);
+      var el = document.getElementById('m-standings-rows');
+      if (!rows.length) {
+        el.innerHTML = '<div class="m-row-empty">No inner-life signals reporting yet.</div>';
         return;
       }
-      grid.innerHTML = connections.map(function(c) {
-        var target = c.target_hours || 150;
-        var checkins = c.daily_checkins || [];
-        var logged = 0;
-        checkins.forEach(function(ci) { logged += parseFloat(ci.hours || 0); });
-        var pct = Math.min(100, Math.round(logged / target * 100));
-        var label = c.public_label || c.name;
-        var desc = c.description || '';
-        return '<div class="m-connection-intent">' +
-          '<div class="m-connection-intent__who">' + label + '</div>' +
-          '<div class="m-connection-intent__text">' + desc + '</div>' +
-          '<div class="m-connection-intent__progress">' +
-            '<div class="m-connection-intent__bar"><div class="m-connection-intent__fill" style="width:' + pct + '%"></div></div>' +
-            '<div class="m-connection-intent__hours">' + logged + ' / ' + target + ' hrs</div>' +
-          '</div>' +
-        '</div>';
+      el.innerHTML = rows.map(function(r) {
+        var spark = r.spark ? renderSpark(r.spark, r.state) : '';
+        return '<a class="fp-row" href="' + (r.href || '#') + '">' +
+            '<div class="fp-row__icon"></div>' +
+            '<div class="fp-row__name">' + r.name + '</div>' +
+            '<div class="fp-row__context">' + (r.context || '') + '</div>' +
+            '<div class="fp-row__value">' +
+              '<span class="fp-row__num">' + r.value + '</span>' +
+              '<span class="fp-row__unit">' + (r.unit || '') + '</span>' +
+            '</div>' +
+            '<div class="fp-row__spark">' + spark + '</div>' +
+          '</a>';
       }).join('');
-    })
-    .catch(function() {});
-})();
-</script>
-
-<!-- ════════════════════════════════════════════════════════════
-     MOOD CHART
-     ════════════════════════════════════════════════════════════ -->
-<section class="m-chart-section reveal" id="m-mood-section" style="display:none">
-  <div class="m-chart-header">
-    <div class="m-chart-title">Mood valence (30d)</div>
-    <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">-1 unpleasant &rarr; +1 pleasant</div>
-  </div>
-  <canvas class="m-chart" id="m-mood-canvas"></canvas>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     V2: STATE OF MIND — sparkline + distribution
-     ════════════════════════════════════════════════════════════ -->
-<section class="m-som-section reveal" id="m-som-section" style="display:none">
-  <div class="m-section-header">State of mind &mdash; 30 days</div>
-  <div class="m-som-grid">
-    <div class="m-som-spark-wrap">
-      <canvas id="m-som-sparkline"></canvas>
-    </div>
-    <div class="m-som-dist-wrap">
-      <canvas id="m-som-donut" style="max-width:180px;max-height:180px;"></canvas>
-      <div class="m-som-streak" id="m-som-streak"></div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     V2: MEDITATION CALENDAR + METRICS
-     ════════════════════════════════════════════════════════════ -->
-<section class="m-meditation-section reveal" id="m-meditation-section" style="display:none">
-  <div class="m-section-header">Meditation &amp; breathwork</div>
-  <div class="m-med-grid">
-    <div class="m-med-stat">
-      <div class="m-med-stat__num" id="med-sessions">&mdash;</div>
-      <div class="m-med-stat__label">Sessions (30d)</div>
-    </div>
-    <div class="m-med-stat">
-      <div class="m-med-stat__num" id="med-total">&mdash;</div>
-      <div class="m-med-stat__label">Total minutes</div>
-    </div>
-    <div class="m-med-stat">
-      <div class="m-med-stat__num" id="med-avg">&mdash;</div>
-      <div class="m-med-stat__label">Avg session</div>
-    </div>
-  </div>
-  <div class="m-med-calendar" id="m-med-calendar"></div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     12d: CROSS-DOMAIN CAUSAL CONNECTIONS
-     ════════════════════════════════════════════════════════════ -->
-<section class="m-causal-section reveal">
-  <h2 class="m-causal-section__title">How inner life <em>drives</em> everything else</h2>
-  <div class="m-causal-section__sub">Directional arrows &mdash; physiological correlates confirm what journaling reveals</div>
-  <div class="m-causal-grid">
-    <div class="m-causal-card">
-      <div class="m-causal-arrow">
-        <span class="m-causal-arrow__from">Sleep quality</span>
-        <span class="m-causal-arrow__dir">&rarr;</span>
-        <span class="m-causal-arrow__to">Next-day mood</span>
-      </div>
-      <div class="m-causal-desc">Poor sleep (&lt;6.5 hrs or &lt;80% efficiency) predicts next-day mood drops of 0.3&ndash;0.5 on the valence scale. The causal direction is clear: sleep disruption precedes mood deterioration, not the reverse.</div>
-      <div class="m-causal-correlate">Correlate: HRV &mdash; low overnight HRV confirms sympathetic overdrive feeding anxious mood</div>
-    </div>
-    <div class="m-causal-card">
-      <div class="m-causal-arrow">
-        <span class="m-causal-arrow__from">Training load</span>
-        <span class="m-causal-arrow__dir">&rarr;</span>
-        <span class="m-causal-arrow__to">Anxiety reduction</span>
-      </div>
-      <div class="m-causal-desc">Moderate training sessions (&lt;75% max HR) reduce same-day anxiety markers. But over-training after stressful weeks backfires &mdash; the body reads it as more threat, not relief.</div>
-      <div class="m-causal-correlate">Correlate: Respiratory rate &mdash; elevated nighttime RR signals unresolved stress despite training</div>
-    </div>
-    <div class="m-causal-card">
-      <div class="m-causal-arrow">
-        <span class="m-causal-arrow__from">Cortisol patterns</span>
-        <span class="m-causal-arrow__dir">&rarr;</span>
-        <span class="m-causal-arrow__to">Rumination loops</span>
-      </div>
-      <div class="m-causal-desc">Chronic cortisol elevation doesn&rsquo;t just feel bad &mdash; it physically impairs prefrontal function, making rumination harder to interrupt. The biochemistry creates the cognitive trap.</div>
-      <div class="m-causal-correlate">Correlate: Skin temp variability &mdash; stress-related peripheral vasoconstriction visible in wearable data</div>
-    </div>
-    <div class="m-causal-card">
-      <div class="m-causal-arrow">
-        <span class="m-causal-arrow__from">Social isolation</span>
-        <span class="m-causal-arrow__dir">&rarr;</span>
-        <span class="m-causal-arrow__to">Inflammation</span>
-      </div>
-      <div class="m-causal-desc">Loneliness activates the same inflammatory pathways as physical injury. Murthy&rsquo;s research shows social disconnection raises CRP and IL-6 &mdash; measurable in bloodwork, visible in recovery scores.</div>
-      <div class="m-causal-correlate">Correlate: Recovery score &mdash; Whoop recovery trends lower during periods of social withdrawal</div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     12i: CLINICAL REALITY — naming patterns honestly
-     ════════════════════════════════════════════════════════════ -->
-<div class="m-clinical reveal">
-  <div class="m-clinical__inner">
-    <div class="m-clinical__title">Naming what this actually is</div>
-    <div class="m-clinical__body">
-      Anxiety, social withdrawal, and imposter syndrome aren&rsquo;t character flaws. They&rsquo;re <strong>mental health patterns</strong> with established clinical frameworks and evidence-based interventions. This page doesn&rsquo;t pathologize them &mdash; it names them, measures them, and connects them to the physiological data that other observatories collect. Cognitive Behavioral Therapy (CBT) provides the pattern taxonomy. Acceptance and Commitment Therapy (ACT) provides the values alignment framework. The PERMA model provides the wellbeing structure. None of this replaces professional support. It makes the invisible visible so that conversations with professionals &mdash; and with yourself &mdash; can be grounded in evidence rather than guesswork.
-    </div>
-    <div class="m-clinical__frameworks">Frameworks referenced: CBT cognitive distortion categories &middot; ACT values-driven behavior model &middot; Seligman PERMA wellbeing taxonomy</div>
-  </div>
-</div>
-
-<!-- ════════════════════════════════════════════════════════════
-     PULL-QUOTE #2 — Mood-energy divergence
-     ════════════════════════════════════════════════════════════ -->
-<div class="m-pullquote reveal">
-  <div class="m-pullquote__watermark">02</div>
-  <div class="m-pullquote__text">
-    When mood rises but energy falls, that&rsquo;s a <em>burnout precursor</em>.
-    The platform detects this divergence &mdash; often <em>2 weeks before</em> it becomes obvious.
-  </div>
-  <div class="m-pullquote__attr">
-    <span class="m-pullquote__badge">N=1 &middot; Emerging signal</span>
-    <span class="m-pullquote__source">Journal sentiment + How We Feel + <a href="/sleep/" style="color:var(--m-violet);text-decoration:none">Sleep Observatory</a> cross-reference</span>
-  </div>
-</div>
-
-<!-- ════════════════════════════════════════════════════════════
-     12l: JOURNAL EXCERPT SECTION — AI-surfaced themes
-     ════════════════════════════════════════════════════════════ -->
-<section class="m-journal-section reveal">
-  <h2 class="m-journal-section__title">What the journal <em>reveals</em></h2>
-  <div class="m-journal-grid">
-    <div class="m-journal-excerpt">
-      <div class="m-journal-excerpt__label">Emotional weather</div>
-      <div class="m-journal-excerpt__body" id="journal-weather">Awaiting sufficient journal entries to detect emotional weather patterns. The AI surfaces recurring emotional states across entries &mdash; not individual moods, but the climate beneath them.</div>
-      <div class="m-journal-excerpt__meta" id="journal-weather-meta">Source: Haiku sentiment analysis across journal corpus</div>
-    </div>
-    <div class="m-journal-excerpt">
-      <div class="m-journal-excerpt__label">Recurring themes</div>
-      <div class="m-journal-excerpt__body" id="journal-themes">Theme extraction begins after 10+ entries. Early patterns will show what you write about when you&rsquo;re anxious vs. calm &mdash; the topics that surface under stress are often the ones that matter most.</div>
-      <div class="m-journal-excerpt__meta" id="journal-themes-meta">Source: NLP topic clustering across journal entries</div>
-    </div>
-    <div class="m-journal-excerpt">
-      <div class="m-journal-excerpt__label">Growth signals</div>
-      <div class="m-journal-excerpt__body" id="journal-growth">Growth signal detection requires longitudinal data. The system looks for cognitive reframing: moments where the same stressor produces a different response. That shift is measurable.</div>
-      <div class="m-journal-excerpt__meta" id="journal-growth-meta">Source: CBT pattern classification + sentiment trajectory</div>
-    </div>
-  </div>
-</section>
-
-<div class="discord-section-break">
-  <hr class="community-rule">
-  <blockquote class="community-quote">"If any of this resonates &mdash; you're not the only one tracking their way through it."</blockquote>
-  <p class="community-url">&sharp; Average Joe Community &middot; <a href="https://discord.gg/T4Ndt2WsU" target="_blank" rel="noopener">discord.gg/T4Ndt2WsU</a></p>
-  <hr class="community-rule">
-</div>
-
-<!-- ════════════════════════════════════════════════════════════
-     12g: INTELLIGENCE LAYER PREVIEW
-     ════════════════════════════════════════════════════════════ -->
-<section class="m-intelligence-section reveal">
-  <h2 class="m-intelligence-section__title">What the platform will <em>detect</em> as data accumulates</h2>
-  <div class="m-intelligence-section__sub">Empty frameworks &mdash; these populate automatically as journal entries, mood logs, and connection data grow</div>
-  <div class="m-intelligence-grid">
-    <div class="m-intelligence-card">
-      <div class="m-intelligence-card__title">Cognitive pattern radar</div>
-      <div class="m-intelligence-placeholder">
-        <svg width="80" height="80" viewBox="0 0 80 80">
-          <polygon points="40,8 72,24 72,56 40,72 8,56 8,24" fill="none" stroke="rgba(167,139,250,0.15)" stroke-width="1"/>
-          <polygon points="40,16 64,28 64,52 40,64 16,52 16,28" fill="none" stroke="rgba(167,139,250,0.1)" stroke-width="1"/>
-          <polygon points="40,24 56,32 56,48 40,56 24,48 24,32" fill="none" stroke="rgba(167,139,250,0.07)" stroke-width="1"/>
-          <circle cx="40" cy="40" r="2" fill="rgba(167,139,250,0.3)"/>
-        </svg>
-      </div>
-      <div class="m-intelligence-desc">CBT categories: catastrophizing, mind-reading, all-or-nothing, personalization, fortune-telling, rumination. The radar shows which patterns dominate your thinking.</div>
-    </div>
-    <div class="m-intelligence-card">
-      <div class="m-intelligence-card__title">Mood-energy divergence</div>
-      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:0.04em;margin-bottom:var(--space-2)">Energy: derived from journal analysis</div>
-      <div class="m-intelligence-placeholder">
-        <svg width="80" height="80" viewBox="0 0 80 80">
-          <line x1="8" y1="72" x2="72" y2="72" stroke="rgba(167,139,250,0.15)" stroke-width="1"/>
-          <line x1="8" y1="72" x2="8" y2="8" stroke="rgba(167,139,250,0.15)" stroke-width="1"/>
-          <line x1="8" y1="40" x2="72" y2="40" stroke="rgba(167,139,250,0.07)" stroke-width="1" stroke-dasharray="2,3"/>
-          <text x="4" y="76" font-size="6" fill="rgba(167,139,250,0.2)" font-family="monospace">ENERGY</text>
-          <text x="4" y="6" font-size="6" fill="rgba(167,139,250,0.2)" font-family="monospace" transform="rotate(-90, 4, 6)" dx="0" dy="0">MOOD</text>
-        </svg>
-      </div>
-      <div class="m-intelligence-desc">Two axes that should track together. When they diverge &mdash; mood up, energy down &mdash; burnout is approaching. The scatter plot will show your trajectory over 30-day windows.</div>
-    </div>
-    <div class="m-intelligence-card">
-      <div class="m-intelligence-card__title">Sentiment trajectory</div>
-      <div class="m-intelligence-placeholder">
-        <svg width="80" height="80" viewBox="0 0 80 80">
-          <line x1="8" y1="72" x2="72" y2="72" stroke="rgba(167,139,250,0.15)" stroke-width="1"/>
-          <line x1="8" y1="72" x2="8" y2="8" stroke="rgba(167,139,250,0.15)" stroke-width="1"/>
-          <line x1="8" y1="40" x2="72" y2="40" stroke="rgba(167,139,250,0.07)" stroke-width="1" stroke-dasharray="2,3"/>
-          <text x="36" y="78" font-size="5" fill="rgba(167,139,250,0.2)" font-family="monospace">TIME</text>
-          <path d="M8,40 Q20,42 30,38 Q40,34 50,36 Q60,38 72,32" fill="none" stroke="rgba(167,139,250,0.2)" stroke-width="1" stroke-dasharray="3,3"/>
-        </svg>
-      </div>
-      <div class="m-intelligence-desc">Rolling sentiment from journal entries over time. Not daily mood &mdash; the deeper trend line. Are you getting more hopeful, more realistic, more resilient? The curve tells the story.</div>
-    </div>
-  </div>
-</section>
-
-</div><!-- /m-content -->
-
-<div class="obs-insight" id="obs-insight"></div>
-
-<!-- ════════════════════════════════════════════════════════════
-     CROSS-LINKS (mid-page, contextual)
-     ════════════════════════════════════════════════════════════ -->
-<div class="m-xref reveal">
-  <a href="/sleep/" class="m-xref-card">
-    <div class="m-xref-card__tag">Sleep &times; Mood correlation</div>
-    <div class="m-xref-card__text">Poor sleep predicts next-day mood drops. The Sleep Observatory tracks the recovery side of this equation.</div>
-  </a>
-  <a href="/character/" class="m-xref-card">
-    <div class="m-xref-card__tag">Mind Pillar &mdash; 1 of 7</div>
-    <div class="m-xref-card__text">Vice streaks, resist rate, journal consistency, and social connection feed the Mind pillar in the Character Sheet.</div>
-  </a>
-</div>
-
-<!-- ════════════════════════════════════════════════════════════
-     12j: WHAT THIS PAGE WILL BECOME — 6-month vision
-     ════════════════════════════════════════════════════════════ -->
-<section class="m-future-section reveal">
-  <h2 class="m-future-section__title">What this page <em>will become</em></h2>
-  <div class="m-future__body">
-    This is the youngest observatory on the site. Every other page had months of data before it went live. This one launched sparse on purpose &mdash; because waiting until the data was comfortable would have meant waiting forever. <strong>Here is what accumulates over the next six months:</strong>
-  </div>
-  <div class="m-future-list">
-    <div class="m-future-item">
-      <div class="m-future-item__timeline">Month 1-2</div>
-      <div class="m-future-item__text"><strong>Cognitive pattern tracking</strong> &mdash; AI classification of journal entries into CBT categories. The radar chart above begins populating. You see which distortions dominate.</div>
-    </div>
-    <div class="m-future-item">
-      <div class="m-future-item__timeline">Month 2-3</div>
-      <div class="m-future-item__text"><strong>Burnout early warning</strong> &mdash; mood-energy divergence detection goes live. The system alerts when the gap between &ldquo;I feel fine&rdquo; and physiological markers says otherwise.</div>
-    </div>
-    <div class="m-future-item">
-      <div class="m-future-item__timeline">Month 3-4</div>
-      <div class="m-future-item__text"><strong>Social connection trends</strong> &mdash; the Murthy threshold bars above start filling with real data. Anonymized relationship investment tracking shows effort over time.</div>
-    </div>
-    <div class="m-future-item">
-      <div class="m-future-item__timeline">Month 4-6</div>
-      <div class="m-future-item__text"><strong>Cross-pillar integration</strong> &mdash; sleep disruption predicts mood drops. Training load modulates anxiety. Glucose stability affects cognitive performance. All arrows become bidirectional.</div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     METHODOLOGY
-     ════════════════════════════════════════════════════════════ -->
-<!-- Methodology moved to V3 depth section -->
-<div id="obs-v3-depth"></div>
-
-<div class="discord-community-card">
-  <div class="community-card-header">&sharp; COMMUNITY ──────────────</div>
-  <p class="community-card-body">Tracking your own patterns? Want to compare notes on what you're finding? There's a place for that.</p>
-  <a href="https://discord.gg/T4Ndt2WsU" target="_blank" rel="noopener" class="community-card-cta">Join Average Joe Community &rarr;</a>
-</div>
-
-<div class="m-pullquote m-pullquote--left reveal" style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border);">
-  <blockquote style="font-family:var(--font-display);font-size:clamp(24px,3.5vw,32px);line-height:1.3;color:var(--text);max-width:640px;">
-    &ldquo;The journal entries are harder to read than the lab results. That&rsquo;s how you know they&rsquo;re the important ones.&rdquo;
-  </blockquote>
-  <div style="display:flex;align-items:center;gap:var(--space-3);margin-top:var(--space-4);">
-    <span style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-wide);text-transform:uppercase;color:var(--m-violet,#a78bfa);background:rgba(167,139,250,0.12);padding:3px 10px;">Chronicle &middot; Elena Voss</span>
-    <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);">AI narrative voice &mdash; <a href="/chronicle/" style="color:var(--m-violet,#a78bfa);text-decoration:none;">Read the chronicle &rarr;</a></span>
-  </div>
-</div>
-
-<nav class="reading-path-v2">
-  <a href="/training/" class="reading-path-v2__link">
-    <span class="reading-path-v2__dir">&larr; Training</span>
-  </a>
-  <a href="/labs/" class="reading-path-v2__link reading-path-v2__link--next">
-    <span class="reading-path-v2__label">The ground truth</span>
-    <span class="reading-path-v2__dir">Labs &rarr;</span>
-  </a>
-</nav>
-
-<div id="amj-subscribe"></div>
-<div id="amj-bottom-nav"></div>
-<div id="amj-footer"></div>
-<script src="/assets/js/site_constants.js"></script>
-<script src="/assets/js/components.js"></script>
-<script src="/assets/js/observatory-v3.js"></script>
-<script src="/assets/js/cycle-pause.js"></script>
-<script src="/assets/js/nav.js"></script>
-<script src="/assets/js/engagement.js"></script>
-<script>
-  /* V3: Coach Analysis — Dr. Reeves at position 2 (after hero) */
-  renderCoachAnalysis('obs-v3-coach', 'mind', {
-    name: 'Dr. Nathan Reeves',
-    initials: 'NR',
-    title: 'Psychiatrist — internal systems & behavioral patterns',
-    color: '#a78bfa'
-  });
-
-  /* V3: Depth sections */
-  renderDepth('obs-v3-depth', [
-    {label: 'Measurement protocol', id: 'protocol', content: '<p><strong>HOW WE FEEL</strong> — Mood valence via Apple Health. Scale: -1 (very unpleasant) to +1 (very pleasant). Synced via webhook.</p><p><strong>JOURNAL ANALYSIS</strong> — Notion entries enriched by Haiku: mood, energy, stress, cognitive patterns (CBT), themes, emotions, social quality (PERMA).</p><p><strong>VICE STREAKS</strong> — Habitify-tracked behavioral commitments. Compounding value: streak^1.5/10. Identity threshold: day 30. N=1.</p>'}
-  ]);
-
-  initObservatoryWeek('mind', 'obs-thisweek');
-  fetch('/api/observatory_week?domain=mind').then(r=>r.ok?r.json():null).then(d=>{
-    if(d&&d.last_updated) initObsFreshness(d.last_updated);
-  }).catch(function(){});
-</script>
-<script src="/assets/js/reveal.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-<script>
-(async function(){
-  var API = 'https://averagejoematt.com';
-  var loading = document.getElementById('m-loading');
-  var content = document.getElementById('m-content');
-  var setText = function(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
-  var setWidth = function(id, p) { var el = document.getElementById(id); if (el) el.style.width = Math.min(100, Math.max(0, p)) + '%'; };
-  var circ = 2 * Math.PI * 35;
-
-  function setArc(id, pct) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    var len = (Math.min(pct, 100) / 100) * circ;
-    el.setAttribute('stroke-dasharray', len + ' ' + (circ - len));
-  }
-
-  /* 12k: vice streak why-lines — connect each to the reason */
-  var viceWhyMap = {
-    'alcohol': 'Not because it\u2019s forbidden, but because we\u2019re testing: tracking sleep quality impact on alcohol vs non-alcohol nights.',
-    'sugar': 'Glucose spikes feed the anxiety loop. Stable blood sugar, stable mood.',
-    'fast food': 'Inflammation is the hidden cost. Every skip is a vote for lower CRP.',
-    'social media': 'Comparison is the thief of contentment. Every day off is a day the algorithm loses.',
-    'caffeine after 12pm': 'Adenosine debt compounds. Afternoon caffeine steals tomorrow\u2019s recovery.',
-    'nicotine': 'The calm it promises is the calm it stole. Breaking the cycle, not managing it.',
-    'gambling': 'Dopamine hijacking dressed as entertainment. Real stakes are in the other pillars.',
-    'junk food': 'Gut inflammation feeds brain fog. Clean fuel, clear thinking.',
-    'energy drinks': 'Borrowed energy with compounding interest. Sleep is the only real source.',
-    'vaping': 'Lung capacity matters for training. Every day clear is a day the cardiovascular system heals.',
-    'soda': 'Empty calories, glucose spike, crash. Water is the only drink the body actually wants.',
-    'late night eating': 'Eating after 8pm disrupts sleep architecture. The kitchen closes so recovery can start.'
-  };
-
-  function getViceWhy(name) {
-    var key = name.toLowerCase();
-    for (var k in viceWhyMap) {
-      if (key.indexOf(k) !== -1 || k.indexOf(key) !== -1) return viceWhyMap[k];
-    }
-    return 'Each day held is a vote for who I\u2019m becoming.';
-  }
-
-  try {
-    var resp = await fetch(API + '/api/mind_overview');
-    if (!resp.ok) throw new Error(resp.status);
-    var data = await resp.json();
-    var BLOCKED_KW = ['porn','pornography','marijuana','cannabis','weed','thc'];
-    function isBlocked(t){ if(!t)return false; var l=t.toLowerCase(); return BLOCKED_KW.some(function(k){return l.indexOf(k)!==-1}); }
-    var m = data.mind, vices = (data.vice_streaks || []).filter(function(v){ return !isBlocked(v.name); }), mood = data.mood_trend || [];
-    if (!m) { loading.textContent = 'No inner life data yet.'; return; }
-
-    // Show content BEFORE chart rendering (canvas needs offsetWidth > 0)
-    loading.style.display = 'none';
-    content.style.display = 'block';
-
-    /* ── Hero gauges ── */
-    if (m.mind_pillar) {
-      var lvl = m.mind_pillar.level || 0;
-      setText('g-mind-num', 'L' + Math.round(lvl));
-      setArc('g-mind-arc', (lvl / 100) * 100);
     }
 
-    var resistPct = m.resist_rate_pct || 0;
-    setText('g-resist-num', resistPct != null ? resistPct + '%' : '\u2014');
-    var resistEl = document.getElementById('g-resist-num');
-    if (resistEl) resistEl.style.color = resistPct >= 80 ? '#3ecf8e' : resistPct >= 50 ? '#f59e0b' : '#ef4444';
-    setArc('g-resist-arc', resistPct);
+    /* ── Long-arc: 30-day mood valence ── */
+    function renderArc(payload) {
+      var mood = payload.mood_trend || [];
+      var section = document.getElementById('m-arc-section');
+      if (!mood.length) { section.style.display = 'none'; return; }
+      var vals = mood.map(function(d){ return d.valence; }).filter(function(v){ return v != null; });
+      if (!vals.length) { section.style.display = 'none'; return; }
+      var first = vals[0], last = vals[vals.length - 1];
+      var avg = vals.reduce(function(a,b){ return a + b; }, 0) / vals.length;
+      var pleasant = vals.filter(function(v){ return v >= 0.2; }).length;
+      var pleasantPct = Math.round(pleasant / vals.length * 100);
 
-    var journalCount = m.journal_entries_30d || 0;
-    setText('g-journal-num', journalCount);
-    var journalEl = document.getElementById('g-journal-num');
-    if (journalEl) journalEl.style.color = journalCount >= 20 ? '#3ecf8e' : journalCount >= 10 ? '#f59e0b' : '#ef4444';
-    setArc('g-journal-arc', Math.min(100, (journalCount / 30) * 100));
+      function fmtVal(v) { return (v >= 0 ? '+' : '') + v.toFixed(2); }
+      setText('m-arc-first', fmtVal(first));
+      setText('m-arc-current', fmtVal(last));
+      setText('m-arc-avg', fmtVal(avg));
+      setText('m-arc-tracked', vals.length + '/30');
+      setText('m-arc-pleasant', pleasantPct + '%');
 
-    var holdingCount = vices.filter(function(v) { return v.holding; }).length;
-    setText('g-vice-num', holdingCount);
-    setArc('g-vice-arc', vices.length > 0 ? (holdingCount / vices.length) * 100 : 0);
-    var viceEl = document.getElementById('g-vice-num');
-    if (viceEl) viceEl.style.color = holdingCount === vices.length ? '#3ecf8e' : holdingCount >= vices.length * 0.7 ? '#f59e0b' : '#ef4444';
+      // Build SVG line+area chart
+      var w = 1100, h = 80, pad = 4;
+      var max = Math.max.apply(null, vals);
+      var min = Math.min.apply(null, vals);
+      // anchor to ±1 if range is small for context
+      if (max < 1) max = Math.max(max, 0.5);
+      if (min > -1) min = Math.min(min, -0.5);
+      var range = max - min || 1;
+      var pts = vals.map(function(v, i) {
+        var x = pad + (i / (vals.length - 1)) * (w - 2 * pad);
+        var y = pad + (1 - (v - min) / range) * (h - 2 * pad);
+        return x.toFixed(1) + ',' + y.toFixed(1);
+      });
+      var area = pts.join(' ') + ' ' + (w - pad) + ',' + (h - pad) + ' ' + pad + ',' + (h - pad);
+      document.getElementById('m-arc-chart').innerHTML =
+        '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
+          '<polygon class="fp-arc__chart-area" points="' + area + '"/>' +
+          '<polyline class="fp-arc__chart-line" points="' + pts.join(' ') + '"/>' +
+        '</svg>';
 
-    /* ── 12k: Vice streak cards with warm why-lines ── */
-    var vg = document.getElementById('m-vice-grid');
-    if (vices.length) {
-      var maxStreak = Math.max.apply(null, vices.map(function(v) { return v.current_streak; }).concat([30]));
-      vg.innerHTML = vices.map(function(v) {
-        var pct = ((v.current_streak / maxStreak) * 100).toFixed(1);
+      var firstDate = mood[0].date || '';
+      var lastDate = mood[mood.length - 1].date || '';
+      document.getElementById('m-arc-caption').innerHTML =
+        '<span>' + (firstDate || '30 days ago') + ' · ' + fmtVal(first) + '</span>' +
+        '<span>Today · ' + fmtVal(last) + '</span>';
+    }
+
+    /* ── Vice streak cards ── */
+    function renderViceCards(payload) {
+      var vices = (payload.vice_streaks || []).filter(function(v){ return !isBlocked(v.name); });
+      var grid = document.getElementById('m-vice-grid');
+      if (!vices.length) {
+        grid.innerHTML = '<div class="m-row-empty">No vice streaks tracked yet.</div>';
+        return;
+      }
+      grid.innerHTML = vices.map(function(v) {
         var why = getViceWhy(v.name);
-        return '<div class="m-vice-card' + (v.holding ? '' : ' broken') + '">' +
-          '<div class="m-vice-card__name">' + v.name + '</div>' +
-          '<div class="m-vice-card__streak">' + v.current_streak + '</div>' +
-          '<div class="m-vice-card__unit">' + (v.holding ? 'days' : 'broken') + '</div>' +
-          '<div class="m-vice-card__why">' + why + '</div>' +
-          '<div class="m-vice-card__bottom-bar" style="width:' + pct + '%"></div>' +
+        return '<div class="m-vice-card' + (v.holding ? '' : ' is-broken') + '">' +
+            '<div class="m-vice-card__name">' + v.name + '</div>' +
+            '<div class="m-vice-card__streak">' + v.current_streak + '</div>' +
+            '<div class="m-vice-card__unit">' + (v.holding ? 'days' : 'broken') + '</div>' +
+            '<div class="m-vice-card__why">' + why + '</div>' +
           '</div>';
       }).join('');
-    } else {
-      vg.innerHTML = '<div style="color:var(--text-faint);font-family:var(--font-mono);font-size:var(--text-xs)">No vice streaks tracked yet.</div>';
     }
 
-    /* ── Connection + Willpower bars ── */
-    var dc = m.depth_counts || {}, tot = m.total_interactions_30d || 1;
-    setWidth('bar-deep', (dc.deep || 0) / tot * 100); setText('pct-deep', dc.deep || 0);
-    setWidth('bar-meaning', (dc.meaningful || 0) / tot * 100); setText('pct-meaning', dc.meaningful || 0);
-    setWidth('bar-surface', (dc.surface || 0) / tot * 100); setText('pct-surface', dc.surface || 0);
-    if (m.total_temptations_90d > 0) {
-      var tt = m.total_temptations_90d;
-      setWidth('bar-resisted', (m.resisted_90d / tt) * 100); setText('pct-resisted', m.resisted_90d);
-      setWidth('bar-succumbed', ((tt - m.resisted_90d) / tt) * 100); setText('pct-succumbed', tt - m.resisted_90d);
-    }
+    /* ── Connection / willpower bars ── */
+    function renderBars(payload) {
+      var m = payload.mind || {};
+      var dc = m.depth_counts || {};
+      var tot = m.total_interactions_30d || ((dc.deep || 0) + (dc.meaningful || 0) + (dc.surface || 0)) || 1;
+      setWidth('bar-deep', (dc.deep || 0) / tot * 100);
+      setText('pct-deep', dc.deep || 0);
+      setWidth('bar-meaning', (dc.meaningful || 0) / tot * 100);
+      setText('pct-meaning', dc.meaningful || 0);
+      setWidth('bar-surface', (dc.surface || 0) / tot * 100);
+      setText('pct-surface', dc.surface || 0);
 
-    /* ── 12c: Data sparsity — show if sparse data ── */
-    if (journalCount < 15) {
-      var sparsityEl = document.getElementById('m-sparsity');
-      if (sparsityEl) sparsityEl.style.display = '';
-      var jcEl = document.getElementById('m-sparsity-journal-count');
-      if (jcEl) {
-        var countWords = ['Zero','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten'];
-        jcEl.textContent = journalCount <= 10 ? (countWords[journalCount] || journalCount) : journalCount;
-      }
-      var ccEl = document.getElementById('m-sparsity-connection-count');
-      var totalConn = (dc.deep || 0) + (dc.meaningful || 0) + (dc.surface || 0);
-      if (ccEl) {
-        ccEl.textContent = totalConn <= 10 ? (['Zero','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten'][totalConn] || totalConn) : totalConn;
+      if (m.total_temptations_90d > 0) {
+        var tt = m.total_temptations_90d;
+        setWidth('bar-resisted', (m.resisted_90d / tt) * 100);
+        setText('pct-resisted', m.resisted_90d);
+        setWidth('bar-succumbed', ((tt - m.resisted_90d) / tt) * 100);
+        setText('pct-succumbed', tt - m.resisted_90d);
       }
     }
 
-    /* ── Mood chart ── */
-    if (mood.length >= 1) {
-      document.getElementById('m-mood-section').style.display = '';
-      var canvas = document.getElementById('m-mood-canvas');
-      var dpr = window.devicePixelRatio || 1;
-      canvas.width = canvas.offsetWidth * dpr;
-      canvas.height = canvas.offsetHeight * dpr;
-      var ctx = canvas.getContext('2d');
-      ctx.scale(dpr, dpr);
-      var W = canvas.offsetWidth, H = canvas.offsetHeight;
-      var pad = { t: 16, r: 16, b: 24, l: 42 };
-      var iW = W - pad.l - pad.r, iH = H - pad.t - pad.b;
-      var nn = mood.length;
-      var xOf = function(i) { return pad.l + (i / (nn - 1)) * iW; };
-      var yOf = function(v) { return pad.t + iH / 2 - (v * iH / 2); };
-
-      /* Subtle gradient zones */
-      var posGrad = ctx.createLinearGradient(0, pad.t, 0, pad.t + iH / 2);
-      posGrad.addColorStop(0, 'rgba(167,139,250,0.06)');
-      posGrad.addColorStop(1, 'transparent');
-      ctx.fillStyle = posGrad;
-      ctx.fillRect(pad.l, pad.t, iW, iH / 2);
-      var negGrad = ctx.createLinearGradient(0, pad.t + iH / 2, 0, pad.t + iH);
-      negGrad.addColorStop(0, 'transparent');
-      negGrad.addColorStop(1, 'rgba(239,68,68,0.04)');
-      ctx.fillStyle = negGrad;
-      ctx.fillRect(pad.l, pad.t + iH / 2, iW, iH / 2);
-
-      /* Zero line */
-      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath(); ctx.moveTo(pad.l, yOf(0)); ctx.lineTo(W - pad.r, yOf(0)); ctx.stroke();
-      ctx.setLineDash([]);
-
-      /* CYCLE PAUSE: overlay band BEFORE data so it sits behind */
-      if (window.CyclePause) {
-        CyclePause.renderCanvasBand(ctx, { trendData: mood, padding: pad, canvasW: W, canvasH: H });
-      }
-
-      /* Area fill */
-      var areaGrad = ctx.createLinearGradient(0, pad.t, 0, pad.t + iH);
-      areaGrad.addColorStop(0, 'rgba(167,139,250,0.15)');
-      areaGrad.addColorStop(0.5, 'rgba(167,139,250,0.02)');
-      areaGrad.addColorStop(1, 'rgba(239,68,68,0.08)');
-      ctx.beginPath();
-      mood.forEach(function(d, i) {
-        var x = xOf(i), y = yOf(d.valence);
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      });
-      ctx.lineTo(xOf(nn - 1), yOf(0));
-      ctx.lineTo(xOf(0), yOf(0));
-      ctx.closePath();
-      ctx.fillStyle = areaGrad;
-      ctx.fill();
-
-      /* Line */
-      ctx.strokeStyle = 'rgba(167,139,250,0.85)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      mood.forEach(function(d, i) {
-        var x = xOf(i), y = yOf(d.valence);
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      });
-      ctx.stroke();
-
-      /* Dots */
-      mood.forEach(function(d, i) {
-        var x = xOf(i), y = yOf(d.valence);
-        ctx.fillStyle = d.valence >= 0.3 ? 'rgba(62,207,142,0.85)' : d.valence >= -0.3 ? 'rgba(167,139,250,0.85)' : 'rgba(239,68,68,0.85)';
-        ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fill();
-      });
-
-      /* Y labels */
-      ctx.fillStyle = 'rgba(255,255,255,0.25)';
-      ctx.font = '10px monospace';
-      ctx.textAlign = 'right';
-      [{v: 1, l: '+1'}, {v: 0, l: '0'}, {v: -1, l: '-1'}].forEach(function(o) {
-        ctx.fillText(o.l, pad.l - 6, yOf(o.v) + 4);
-      });
-    }
-
-    /* ── V2: State of Mind sparkline + distribution ── */
-    if (typeof Chart !== 'undefined' && mood.length >= 1) {
-      Chart.defaults.color = 'rgba(255,255,255,0.5)';
-      Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
-      Chart.defaults.font.family = 'monospace';
-
-      document.getElementById('m-som-section').style.display = '';
-
-      /* Sparkline */
-      new Chart(document.getElementById('m-som-sparkline'), {
-        type: 'line',
-        data: {
-          labels: mood.map(function(d) { return d.date.slice(5); }),
-          datasets: [{
-            data: mood.map(function(d) { return d.valence; }),
-            borderColor: '#a78bfa', borderWidth: 2, pointRadius: 3,
-            pointBackgroundColor: mood.map(function(d) {
-              return d.valence >= 0.3 ? '#3ecf8e' : d.valence >= -0.3 ? '#a78bfa' : '#ef4444';
-            }),
-            fill: { target: 'origin', above: 'rgba(167,139,250,0.08)', below: 'rgba(239,68,68,0.06)' },
-            tension: 0.3, spanGaps: false
-          }]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: { callbacks: {
-              title: function(ctx) { return mood[ctx[0].dataIndex].date; },
-              label: function(ctx) {
-                var label = mood[ctx.dataIndex].label;
-                return (ctx.raw >= 0 ? '+' : '') + ctx.raw.toFixed(2) + (label ? ' — ' + label : '');
-              }
-            }}
-          },
-          scales: {
-            x: { ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 }, maxRotation: 45 }, grid: { display: false } },
-            y: { min: -1, max: 1, ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 }, stepSize: 0.5, callback: function(v) { return v > 0 ? '+' + v : v; } }, grid: { color: 'rgba(255,255,255,0.03)' } }
+    /* ── Connection challenges (separate endpoint) ── */
+    function renderConnections() {
+      fetch(API_BASE + '/api/challenges')
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) {
+          var grid = document.getElementById('m-conn-grid');
+          if (!grid) return;
+          if (!data || !data.challenges) {
+            grid.innerHTML = '<div class="m-row-empty">No active connections tracked.</div>';
+            return;
           }
-        }
-      });
-
-      /* Distribution donut */
-      var good = 0, neutral = 0, low = 0;
-      mood.forEach(function(d) {
-        if (d.valence >= 0.3) good++;
-        else if (d.valence >= -0.3) neutral++;
-        else low++;
-      });
-      var tracked = mood.length;
-      var untracked = Math.max(0, 30 - tracked);
-
-      new Chart(document.getElementById('m-som-donut'), {
-        type: 'doughnut',
-        data: {
-          labels: ['Good', 'Neutral', 'Low', 'Untracked'],
-          datasets: [{ data: [good, neutral, low, untracked], backgroundColor: ['#3ecf8e', '#a78bfa', '#ef4444', 'rgba(255,255,255,0.05)'], borderWidth: 0 }]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: true, cutout: '60%',
-          plugins: {
-            legend: { position: 'bottom', labels: { color: 'rgba(255,255,255,0.5)', font: { size: 10 }, padding: 8, usePointStyle: true, pointStyle: 'circle' } },
-            tooltip: { callbacks: { label: function(ctx) { var pct = tracked > 0 ? Math.round(ctx.raw / 30 * 100) : 0; return ctx.label + ': ' + ctx.raw + ' days (' + pct + '%)'; } } }
-          }
-        }
-      });
-
-      /* Streak info */
-      var streakEl = document.getElementById('m-som-streak');
-      if (streakEl) {
-        streakEl.textContent = tracked + ' of 30 days tracked' + (untracked > 0 ? ' \u2014 ' + untracked + ' gaps' : ' \u2014 perfect tracking');
-      }
-    }
-
-    /* ── V2: Meditation calendar + metrics ── */
-    var med = data.meditation;
-    if (med && (med.sessions_30d > 0 || (med.daily && med.daily.length > 0))) {
-      document.getElementById('m-meditation-section').style.display = '';
-      setText('med-sessions', med.sessions_30d || 0);
-      setText('med-total', (med.total_minutes_30d || 0) + ' min');
-      setText('med-avg', med.avg_session_min ? med.avg_session_min + ' min' : '\u2014');
-
-      /* Calendar grid — current month */
-      var calEl = document.getElementById('m-med-calendar');
-      if (calEl && med.daily) {
-        var now = new Date();
-        var year = now.getFullYear(), month = now.getMonth();
-        var firstDay = new Date(year, month, 1).getDay();
-        var daysInMonth = new Date(year, month + 1, 0).getDate();
-        var medDates = {};
-        med.daily.forEach(function(d) { medDates[d.date] = d; });
-
-        var dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        var html = dayHeaders.map(function(d) { return '<div class="m-med-day m-med-day--header">' + d + '</div>'; }).join('');
-
-        for (var e = 0; e < firstDay; e++) html += '<div class="m-med-day m-med-day--empty"></div>';
-
-        for (var day = 1; day <= daysInMonth; day++) {
-          var dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
-          var entry = medDates[dateStr];
-          var isPast = new Date(dateStr) <= now;
-          if (entry) {
-            var size = Math.max(6, Math.min(16, entry.minutes * 1.5));
-            html += '<div class="m-med-day m-med-day--has-data" title="' + dateStr + ': ' + entry.minutes + ' min"><div class="m-med-day__dot" style="width:' + size + 'px;height:' + size + 'px"></div>' + day + '</div>';
-          } else if (isPast) {
-            html += '<div class="m-med-day m-med-day--no-data">' + day + '</div>';
-          } else {
-            html += '<div class="m-med-day m-med-day--empty">' + day + '</div>';
-          }
-        }
-        calEl.innerHTML = html;
-      }
-    }
-
-    /* ── Journal Intelligence (heatmap + charts) ── */
-    (function() {
-      var THEME_COLORS = {
-        personal_growth: '#a78bfa',
-        relationships:   '#60a5fa',
-        health_body:     '#3ecf8e',
-        work_ambition:   '#f59e0b',
-        anxiety_stress:  '#ef4444',
-        gratitude:       '#2dd4bf',
-        reflection:      '#818cf8',
-        other:           'rgba(255,255,255,0.15)'
-      };
-
-      fetch(API + '/api/journal_analysis').then(function(r) { return r.ok ? r.json() : null; }).then(function(jData) {
-        if (!jData) return;
-        var dailyThemes = jData.daily_themes || [];
-        var topThemes = jData.top_themes || [];
-        var sentimentTrend = jData.sentiment_trend || [];
-
-        /* Derive top_themes from daily_themes if API didn't compute them */
-        if (topThemes.length === 0 && dailyThemes.length > 0) {
-          var themeCounts = {};
-          dailyThemes.forEach(function(d) {
-            var th = d.dominant_theme || 'other';
-            themeCounts[th] = (themeCounts[th] || 0) + 1;
+          var connections = data.challenges.filter(function(c) {
+            return c.challenge_type === 'connection' && c.status === 'active';
           });
-          var total = dailyThemes.length;
-          topThemes = Object.keys(themeCounts).map(function(k) {
-            return { theme: k, count: themeCounts[k], pct: Math.round((themeCounts[k] / total) * 100) };
-          }).sort(function(a, b) { return b.count - a.count; });
-        }
-
-        /* Derive sentiment_trend from daily_themes if API didn't compute it */
-        if (sentimentTrend.length === 0 && dailyThemes.length > 0) {
-          sentimentTrend = dailyThemes
-            .filter(function(d) { return d.sentiment != null; })
-            .map(function(d) { return { date: d.date, avg_sentiment: d.sentiment }; });
-        }
-
-        if (dailyThemes.length === 0 && topThemes.length === 0) return;
-
-        var journalIntelEl = document.getElementById('m-journal-intel');
-        journalIntelEl.style.display = '';
-        /* Force reveal visibility since section was display:none at page load */
-        journalIntelEl.classList.add('is-visible');
-
-        /* ── 30-day heatmap ── */
-        var heatmapEl = document.getElementById('m-heatmap');
-        var tooltipEl = document.getElementById('m-heatmap-tooltip');
-        var themeByDate = {};
-        dailyThemes.forEach(function(d) { themeByDate[d.date] = d; });
-
-        // Build 30-day grid (most recent 30 days)
-        var today = new Date();
-        var cells = [];
-        for (var i = 29; i >= 0; i--) {
-          var d = new Date(today);
-          d.setDate(d.getDate() - i);
-          var dateStr = d.toISOString().slice(0, 10);
-          var entry = themeByDate[dateStr];
-          var color = entry ? (THEME_COLORS[entry.dominant_theme] || THEME_COLORS.other) : 'rgba(255,255,255,0.04)';
-          var cell = document.createElement('div');
-          cell.className = 'm-heatmap-cell';
-          cell.style.background = color;
-          cell.dataset.date = dateStr;
-          if (entry) {
-            cell.dataset.theme = entry.dominant_theme;
-            cell.dataset.summary = entry.one_line_summary || '';
-            cell.dataset.words = entry.word_count || 0;
+          if (!connections.length) {
+            grid.innerHTML = '<div class="m-row-empty">No active connection challenges yet.</div>';
+            return;
           }
-          heatmapEl.appendChild(cell);
-        }
-
-        // Tooltip
-        heatmapEl.addEventListener('mouseover', function(e) {
-          var cell = e.target.closest('.m-heatmap-cell');
-          if (!cell || !cell.dataset.theme) return;
-          tooltipEl.style.display = '';
-          var _theme = (cell.dataset.theme || '').replace(/_/g, ' ');
-          var _wc = parseInt(cell.dataset.words || '0');
-          var _depth = _wc > 500 ? 'Deep entry' : _wc > 200 ? 'Medium entry' : 'Brief entry';
-          tooltipEl.innerHTML = '<strong>' + _theme + '</strong><br>' + _depth;
-          tooltipEl.style.left = (e.clientX + 12) + 'px';
-          tooltipEl.style.top = (e.clientY - 40) + 'px';
+          grid.innerHTML = connections.map(function(c) {
+            var target = c.target_hours || 150;
+            var checkins = c.daily_checkins || [];
+            var logged = 0;
+            checkins.forEach(function(ci){ logged += parseFloat(ci.hours || 0); });
+            var pct = Math.min(100, Math.round(logged / target * 100));
+            var label = c.public_label || c.name || 'Anonymous';
+            var desc = c.description || '';
+            return '<div class="m-conn__intent">' +
+                '<div class="m-conn__who">' + label + '</div>' +
+                '<div class="m-conn__text">' + desc + '</div>' +
+                '<div class="m-conn__progress">' +
+                  '<div class="m-conn__bar"><div class="m-conn__fill" style="width:' + pct + '%"></div></div>' +
+                  '<div class="m-conn__hours">' + logged + ' / ' + target + ' hrs</div>' +
+                '</div>' +
+              '</div>';
+          }).join('');
+        })
+        .catch(function() {
+          var grid = document.getElementById('m-conn-grid');
+          if (grid) grid.innerHTML = '<div class="m-row-empty">Could not load connections.</div>';
         });
-        heatmapEl.addEventListener('mouseout', function() {
-          tooltipEl.style.display = 'none';
-        });
-
-        /* ── Top Themes bar chart ── */
-        if (typeof Chart !== 'undefined' && topThemes.length > 0) {
-          new Chart(document.getElementById('m-themes-canvas'), {
-            type: 'bar',
-            data: {
-              labels: topThemes.map(function(t) { return t.theme.replace(/_/g, ' '); }),
-              datasets: [{
-                data: topThemes.map(function(t) { return t.pct; }),
-                backgroundColor: topThemes.map(function(t) { return THEME_COLORS[t.theme] || THEME_COLORS.other; }),
-                borderRadius: 3,
-              }]
-            },
-            options: {
-              indexAxis: 'y',
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: { display: false },
-                tooltip: {
-                  callbacks: {
-                    label: function(ctx) {
-                      var t = topThemes[ctx.dataIndex];
-                      return t.count + ' entries (' + t.pct + '%)';
-                    }
-                  }
-                }
-              },
-              scales: {
-                x: {
-                  ticks: { callback: function(v) { return v + '%'; }, color: 'rgba(255,255,255,0.4)', font: { size: 10 } },
-                  max: 100,
-                  grid: { color: 'rgba(255,255,255,0.03)' }
-                },
-                y: { ticks: { color: 'rgba(255,255,255,0.6)', font: { size: 11 } }, grid: { display: false } }
-              }
-            }
-          });
-        } else if (topThemes.length === 0) {
-          var themesCanvas = document.getElementById('m-themes-canvas');
-          if (themesCanvas) {
-            themesCanvas.style.display = 'none';
-            themesCanvas.insertAdjacentHTML('afterend', '<div style="text-align:center;color:var(--text-faint);font-size:var(--text-sm);padding:var(--space-6) 0;font-family:var(--font-mono);letter-spacing:0.04em">Theme distribution builds as journal entries accumulate.</div>');
-          }
-        }
-
-        /* ── Sentiment trend line ── */
-        if (typeof Chart !== 'undefined' && sentimentTrend.length > 0) {
-          var sentLabels = sentimentTrend.map(function(s) { return s.date; });
-          var sentData = sentimentTrend.map(function(s) { return s.avg_sentiment; });
-
-          new Chart(document.getElementById('m-sentiment-canvas'), {
-            type: 'line',
-            data: {
-              labels: sentLabels,
-              datasets: [
-                {
-                  label: 'Sentiment (7d avg)',
-                  data: sentData,
-                  borderColor: '#a78bfa',
-                  borderWidth: 2,
-                  pointRadius: 0,
-                  fill: {
-                    target: { value: 0 },
-                    above: 'rgba(167,139,250,0.08)',
-                    below: 'rgba(239,68,68,0.08)',
-                  },
-                  tension: 0.3,
-                },
-                {
-                  label: 'Zero line',
-                  data: Array(sentLabels.length).fill(0),
-                  borderColor: 'rgba(255,255,255,0.15)',
-                  borderWidth: 1,
-                  borderDash: [4, 4],
-                  pointRadius: 0,
-                  fill: false,
-                }
-              ]
-            },
-            plugins: window.CyclePause ? [CyclePause.chartjsPlugin] : [],
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { legend: { display: false }, cyclePause: { dates: sentLabels } },
-              scales: {
-                x: {
-                  ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 }, maxTicksLimit: 10, maxRotation: 45 },
-                  grid: { color: 'rgba(255,255,255,0.03)' }
-                },
-                y: {
-                  min: -1, max: 1,
-                  ticks: {
-                    color: 'rgba(255,255,255,0.25)',
-                    font: { size: 10 },
-                    stepSize: 0.5,
-                    callback: function(v) { return v.toFixed(1); }
-                  },
-                  grid: { color: 'rgba(255,255,255,0.03)' },
-                  title: { display: true, text: 'sentiment', color: 'rgba(255,255,255,0.25)', font: { size: 10 } }
-                }
-              }
-            }
-          });
-        } else if (sentimentTrend.length === 0) {
-          var sentCanvas = document.getElementById('m-sentiment-canvas');
-          if (sentCanvas) {
-            sentCanvas.style.display = 'none';
-            sentCanvas.insertAdjacentHTML('afterend', '<div style="text-align:center;color:var(--text-faint);font-size:var(--text-sm);padding:var(--space-6) 0;font-family:var(--font-mono);letter-spacing:0.04em">Sentiment trend builds as journal entries accumulate over time.</div>');
-          }
-        }
-
-      }).catch(function(err) { console.warn('Journal analysis not available:', err); });
-    })();
-
-    /* ── Vice Streak Timeline Chart ── */
-    var viceTimeline = data.vice_timeline || [];
-    if (typeof Chart !== 'undefined' && viceTimeline.length >= 1) {
-      var vtSection = document.getElementById('m-vice-timeline-section');
-      if (vtSection) vtSection.style.display = '';
-
-      // Build stacked area: held vs broken per day
-      var vtLabels = viceTimeline.map(function(d) { return d.date.slice(5); });
-      var vtFullDates = viceTimeline.map(function(d) { return d.date; });
-      var vtHeld = viceTimeline.map(function(d) { return d.held || 0; });
-      var vtBroken = viceTimeline.map(function(d) { return (d.total || 0) - (d.held || 0); });
-
-      new Chart(document.getElementById('m-vice-timeline-canvas'), {
-        type: 'bar',
-        data: {
-          labels: vtLabels,
-          datasets: [
-            {
-              label: 'Held',
-              data: vtHeld,
-              backgroundColor: 'rgba(62,207,142,0.6)',
-              borderRadius: 2,
-              stack: 'vices',
-            },
-            {
-              label: 'Broken',
-              data: vtBroken,
-              backgroundColor: 'rgba(239,68,68,0.4)',
-              borderRadius: 2,
-              stack: 'vices',
-            }
-          ]
-        },
-        plugins: window.CyclePause ? [CyclePause.chartjsPlugin] : [],
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              display: true,
-              position: 'bottom',
-              labels: { color: 'rgba(255,255,255,0.4)', font: { size: 10, family: 'monospace' }, boxWidth: 12 }
-            },
-            cyclePause: { dates: vtFullDates }
-          },
-          scales: {
-            x: {
-              stacked: true,
-              ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 }, maxRotation: 45 },
-              grid: { display: false }
-            },
-            y: {
-              stacked: true,
-              ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 }, stepSize: 1 },
-              grid: { color: 'rgba(255,255,255,0.03)' },
-              title: { display: true, text: 'vices', color: 'rgba(255,255,255,0.25)', font: { size: 10 } }
-            }
-          }
-        }
-      });
     }
 
-    // (content already shown above before chart rendering)
-  } catch (e) {
-    loading.textContent = 'Could not load inner life data.';
-    content.style.display = 'block';
-    console.error(e);
-  }
+    /* ── Boot ── */
+    fetch(API_BASE + '/api/mind_overview')
+      .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function(data) {
+        var mood = data.mood_trend || [];
+        var latestMood = mood.length ? mood[mood.length - 1] : null;
+        renderMasthead(latestMood);
+        renderLede(data);
+        renderWatch(data);
+        renderStandings(data);
+        renderArc(data);
+        renderViceCards(data);
+        renderBars(data);
+      })
+      .catch(function(err) {
+        console.error('[mind] fetch failed:', err);
+        renderMasthead(null);
+        document.getElementById('m-narrative').textContent = "Could not load today's inner-life data. Refresh to try again.";
+        document.getElementById('m-standings-rows').innerHTML = '<div class="m-row-empty">No data available.</div>';
+        document.getElementById('m-arc-section').style.display = 'none';
+        document.getElementById('m-vice-grid').innerHTML = '<div class="m-row-empty">No streaks available.</div>';
+      });
 
-  /* AI expert analysis now rendered by V3 coach at position 2 */
-})();
-</script>
+    renderConnections();
+  })();
+  </script>
+
+  <script src="/assets/js/animations.js" defer></script>
 </body>
 </html>
