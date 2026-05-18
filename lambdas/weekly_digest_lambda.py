@@ -1605,6 +1605,8 @@ def lambda_handler(event, context):
             "Subject": {"Data": f"Weekly Report · {dates['this_end']} · Grade: {grade_str}", "Charset": "UTF-8"},
             "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
         }},
+        ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
+        EmailTags=[{"Name": "message_type", "Value": "weekly_digest"}],
     )
     print("[INFO] Sent.")
 

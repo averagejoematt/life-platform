@@ -129,6 +129,30 @@ _METRIC_HINT_NORMALIZERS = (
 )
 
 
+def _parse_confidence(raw) -> float:
+    """V2 P1.3 (2026-05-17): defensively parse Haiku-returned confidence.
+
+    Haiku often returns "40%" or "0.4" or "high" / "medium" / "low". Prior code
+    did naked float(raw) which crashed on "%" suffix → 17% error rate.
+    Returns 0.5 on parse failure (neutral default).
+    """
+    if raw is None or raw == "":
+        return 0.5
+    s = str(raw).strip().lower()
+    word_map = {"high": 0.85, "medium": 0.5, "med": 0.5, "low": 0.2,
+                "very high": 0.95, "very low": 0.1, "unknown": 0.5}
+    if s in word_map:
+        return word_map[s]
+    try:
+        has_pct = s.endswith("%")
+        val = float(s.rstrip("%").strip())
+        if has_pct:
+            val = val / 100.0
+        return max(0.0, min(1.0, val))
+    except (ValueError, TypeError):
+        return 0.5
+
+
 def _normalize_metric_hint(hint: str) -> str | None:
     """Map an LLM-produced metric_hint to a measurable key, or None.
 
@@ -981,7 +1005,7 @@ def lambda_handler(event, context):
                 "null_hypothesis": None,
                 "beats_null_if": None,
             },
-            "confidence": float(confidence_stated) if confidence_stated else 0.5,
+            "confidence": _parse_confidence(confidence_stated),
             "subdomain": subdomain,
             "confounders_noted": [],
             "status": "pending",

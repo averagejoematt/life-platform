@@ -1448,6 +1448,8 @@ def lambda_handler(event, context):
                 "Subject": {"Data": _sb_subject, "Charset": "UTF-8"},
                 "Body":    {"Html": {"Data": _sb_html, "Charset": "UTF-8"}},
             }},
+            ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
+            EmailTags=[{"Name": "message_type", "Value": "daily_brief_sick"}],
         )
         print(f"[INFO] Recovery brief sent: {_sb_subject}")
 
@@ -1976,6 +1978,8 @@ def lambda_handler(event, context):
             "Subject": {"Data": subject, "Charset": "UTF-8"},
             "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
         }},
+        ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
+        EmailTags=[{"Name": "message_type", "Value": "daily_brief"}],
     )
     print("[INFO] Sent: " + subject)
 
