@@ -1010,7 +1010,7 @@ def build_email_html(title, stats_line, body_html, week_num, date_str, blog_url)
 
     return f'''<!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>@media (prefers-color-scheme: dark){{body{{background:#1a1a1f !important;color:#e5e5e5 !important}}div[style*="background:#fafaf9"],div[style*="background:#fff"]{{background:#22222a !important;color:#e5e5e5 !important}}h1,h2,h3,h4{{color:#f5f5f5 !important}}td{{color:#d5d5d5 !important}}}}</style></head>
 <body style="margin:0;padding:0;background:#f5f5f0;font-family:Georgia,'Times New Roman',serif;">
 <div style="max-width:600px;margin:24px auto;background:#fafaf9;border-radius:4px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
 
@@ -1097,6 +1097,35 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
   <meta property="og:description" content="{stats_line}">
   <meta property="og:type" content="article">
   <title>{title} — The Measured Life</title>
+  <script type="application/ld+json">
+  {{
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": "{title}",
+    "description": "Week {week_num} of The Measured Life by Elena Voss",
+    "datePublished": "{datetime.now(timezone.utc).date().isoformat()}",
+    "author": {{"@type": "Person", "name": "Elena Voss"}},
+    "publisher": {{
+      "@type": "Organization",
+      "name": "The Measured Life",
+      "url": "https://averagejoematt.com",
+      "logo": {{
+        "@type": "ImageObject",
+        "url": "https://averagejoematt.com/assets/icons/apple-touch-icon.png"
+      }}
+    }},
+    "mainEntityOfPage": {{
+      "@type": "WebPage",
+      "@id": "https://averagejoematt.com/chronicle/posts/week-{week_num:02d}/"
+    }},
+    "articleSection": "Health Transformation",
+    "isPartOf": {{
+      "@type": "Blog",
+      "name": "The Measured Life",
+      "url": "https://averagejoematt.com/chronicle/"
+    }}
+  }}
+  </script>
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>

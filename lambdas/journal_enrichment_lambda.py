@@ -178,9 +178,10 @@ def call_haiku_defense(raw_text, date, template, mood, stress, themes):
         "anthropic-beta": "prompt-caching-2024-07-31",
     })
 
+    # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
     try:
-        with urlopen(req, timeout=30) as resp:
-            result = json.loads(resp.read().decode())
+        from retry_utils import call_anthropic_raw
+        result = call_anthropic_raw(req, timeout=30)
     except HTTPError as e:
         error_body = e.read().decode() if e.fp else ""
         logger.error(f"Defense Haiku API {e.code}: {error_body}")
@@ -296,9 +297,10 @@ def call_haiku(raw_text, date, template, structured_scores):
         "anthropic-beta": "prompt-caching-2024-07-31",
     })
 
+    # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
     try:
-        with urlopen(req, timeout=30) as resp:
-            result = json.loads(resp.read().decode())
+        from retry_utils import call_anthropic_raw
+        result = call_anthropic_raw(req, timeout=30)
     except HTTPError as e:
         error_body = e.read().decode() if e.fp else ""
         logger.error(f"Anthropic API {e.code}: {error_body}")

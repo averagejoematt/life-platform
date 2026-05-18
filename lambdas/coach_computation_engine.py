@@ -1040,8 +1040,9 @@ def lambda_handler(event, context):
     logger.info("coach-computation-engine START date=%s", today_str)
 
     # Clamp lookback to experiment start
+    # V2 P0.4: normalize both to tz-aware (today_dt is UTC; strptime is naive → TypeError)
     lookback_dt = today_dt - timedelta(days=LOOKBACK_DAYS)
-    experiment_start_dt = datetime.strptime(EXPERIMENT_START, "%Y-%m-%d")
+    experiment_start_dt = datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     if lookback_dt < experiment_start_dt:
         lookback_dt = experiment_start_dt
     start_date = lookback_dt.strftime("%Y-%m-%d")

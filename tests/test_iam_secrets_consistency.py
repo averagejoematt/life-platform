@@ -65,7 +65,6 @@ KNOWN_SECRETS = [
     "life-platform/eightsleep",
     "life-platform/eightsleep-client",  # PR 3 (2026-05-03): client credential alongside user creds
     "life-platform/ai-keys",
-    "life-platform/anthropic-api-key",  # PR 3 (2026-05-03): orphan in AWS — no consumer in source. Candidate for deletion. Listed here so test_s1 doesn't false-fail if a consumer is later added before deletion.
     "life-platform/habitify",
     "life-platform/ingestion-keys",  # COST-B bundle: Notion + Habitify + Todoist + Dropbox + HAE webhook keys
     "life-platform/mcp-api-key",     # MCP server auth (90-day auto-rotation via key-rotator Lambda)
@@ -78,9 +77,10 @@ KNOWN_SECRETS = [
 
 # Secrets that have been permanently deleted — must not appear in IAM policies.
 DELETED_SECRETS = [
-    "life-platform/api-keys",        # Permanently deleted 2026-03-14
-    "life-platform/webhook-key",     # PR 3 (2026-05-03): deleted 2026-03-14 per HANDOVER_v3.7.84. cdk/stacks/role_policies.py:326 still has a stale comment referencing it; removed in PR 3.
-    "life-platform/google-calendar", # Permanently deleted 2026-03-15 (ADR-030)
+    "life-platform/api-keys",          # Permanently deleted 2026-03-14
+    "life-platform/webhook-key",       # PR 3 (2026-05-03): deleted 2026-03-14 per HANDOVER_v3.7.84. cdk/stacks/role_policies.py:326 still has a stale comment referencing it; removed in PR 3.
+    "life-platform/google-calendar",   # Permanently deleted 2026-03-15 (ADR-030)
+    "life-platform/anthropic-api-key", # Phase 1.4 (2026-05-16): orphan in AWS — soft-deleted with 7d recovery window. Permanent deletion 2026-05-23.
 ]
 
 # Secrets that are referenced in IAM but are known to be transitional.
@@ -198,8 +198,9 @@ def test_s4_known_secrets_count_matches_architecture():
     # prompted the patch).
     # 2026-05-03 (PR 3 / TD-13): full reconciliation against AWS. Added eightsleep-client
     # and anthropic-api-key; removed webhook-key (deleted 2026-03-14, was stale entry).
-    # Total = 15 actual secrets + 1 wildcard = 16.
-    EXPECTED_COUNT = 16
+    # 2026-05-16 (Phase 1.4): soft-deleted orphan anthropic-api-key; removed from KNOWN_SECRETS.
+    # Total = 14 actual secrets + 1 wildcard = 15.
+    EXPECTED_COUNT = 15
     actual = len(KNOWN_SECRETS)
     assert actual == EXPECTED_COUNT, (
         f"S4 FAIL: KNOWN_SECRETS has {actual} entries, expected {EXPECTED_COUNT}. "

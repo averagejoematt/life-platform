@@ -163,8 +163,9 @@ Journal entry:
                 },
             )
 
-            with urllib.request.urlopen(req, timeout=30) as resp_ai:
-                result = json.loads(resp_ai.read())
+            # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
+            from retry_utils import call_anthropic_raw
+            result = call_anthropic_raw(req, timeout=30)
 
             text = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
             if not text:

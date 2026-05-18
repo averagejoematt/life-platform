@@ -60,10 +60,10 @@ KNOWN_SECRETS = {
     "life-platform/ai-keys",
     "life-platform/habitify",
     "life-platform/ingestion-keys",
-    "life-platform/webhook-key",
     "life-platform/mcp-api-key",
     "life-platform/notion",
     "life-platform/dropbox",
+    "life-platform/todoist",  # TD-23 (2026-05-02): added to KNOWN; Phase 2.6 (2026-05-16) added to freshness checker monitoring
     "life-platform/site-api-ai-key",
     "life-platform/eightsleep-client",
     # life-platform/google-calendar removed — retired ADR-030 (v3.7.46)
@@ -71,7 +71,9 @@ KNOWN_SECRETS = {
 
 # Secrets permanently deleted — any source reference is an SR2 violation.
 DELETED_SECRETS = {
-    "life-platform/api-keys",   # deleted 2026-03-15 (TB7-4)
+    "life-platform/api-keys",          # deleted 2026-03-15 (TB7-4)
+    "life-platform/webhook-key",       # deleted 2026-03-14 (HANDOVER_v3.7.84)
+    "life-platform/anthropic-api-key", # Phase 1.4 (2026-05-16): orphan soft-deleted, permanent 2026-05-23
 }
 
 # Partial strings that appear in code but are NOT literal secret names.

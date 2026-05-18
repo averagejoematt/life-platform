@@ -1082,9 +1082,15 @@ def compute_character_sheet(data, previous_day_state, raw_score_histories, confi
 # ==============================================================================
 
 def store_character_sheet(table_resource, user_prefix, record):
-    """Write a character_sheet record to DynamoDB."""
+    """Write a character_sheet record to DynamoDB.
+    Phase 3.3 (2026-05-16): tags with run_id + computed_at via compute_metadata."""
     item = {"pk": user_prefix + "character_sheet", "sk": "DATE#" + record["date"]}
     item.update(_to_decimal(record))
+    try:
+        from compute_metadata import tag_record
+        item = tag_record(item, source_id="character_sheet")
+    except ImportError:
+        pass  # Helper not in deploy bundle; fall through to untagged write
     table_resource.put_item(Item=item)
     return item
 

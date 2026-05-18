@@ -7024,6 +7024,34 @@ ROUTES = {
 _COLD_START = True
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 4.5 SCOPED (2026-05-16): router dispatch table
+# ═══════════════════════════════════════════════════════════════════════════
+# Replaces 14 sequential `if path == "..."` / method-check / delegate branches
+# in lambda_handler with a single dict lookup. Each entry is:
+#   path → (allowed_methods, handler_fn)
+# where allowed_methods is a set (or None for "any method").
+#
+# Only "simple delegate" routes are captured here. Complex routes (those that
+# inline query-param logic, multi-step DDB queries, or branch on event shape)
+# stay inline in lambda_handler. Full router-with-handler-extraction is the
+# multi-week P4.5 work; this is the scoped subset that pays for itself today.
+
+_SIMPLE_ROUTES = {
+    "/api/verify_subscriber": ({"GET", "OPTIONS"}, _handle_verify_subscriber),
+    "/api/board_ask":         ({"POST"},           _handle_board_ask),
+    "/api/nudge":             ({"POST"},           _handle_nudge),
+    "/api/submit_finding":    ({"POST"},           _handle_submit_finding),
+    "/api/experiment_vote":   ({"POST"},           _handle_experiment_vote),
+    "/api/experiment_follow": ({"POST"},           _handle_experiment_follow),
+    "/api/experiment_suggest":({"POST"},           _handle_experiment_suggest),
+    "/api/challenge_checkin": ({"POST"},           _handle_challenge_checkin),
+    "/api/challenge_vote":    ({"POST"},           _handle_challenge_vote),
+    "/api/challenge_follow":  ({"POST"},           _handle_challenge_follow),
+    "/api/experiment_detail": (None,               _handle_experiment_detail),
+}
+
+
 def lambda_handler(event, context):
     """
     Main Lambda handler. Supports both API Gateway HTTP API and Function URL events.
@@ -7034,6 +7062,24 @@ def lambda_handler(event, context):
     path   = event.get("rawPath") or event.get("path", "/")
     method = (event.get("requestContext", {}).get("http", {}).get("method") or
               event.get("httpMethod", "GET")).upper()
+
+    # Phase 2.2 (2026-05-16): centralized request envelope validation.
+    # Catches oversized bodies, injection patterns, malformed user_id/date/source
+    # before any handler runs. Returns 4xx for obvious abuse; legit traffic unaffected.
+    try:
+        from request_validator import validate_envelope, ValidationError
+        validate_envelope(event, path=path, method=method)
+    except ImportError:
+        pass  # Validator not yet deployed; fall through to legacy behavior
+    except Exception as _ve:
+        # Imported as ValidationError above when import succeeds
+        if _ve.__class__.__name__ == "ValidationError":
+            return {
+                "statusCode": getattr(_ve, "status", 400),
+                "headers": CORS_HEADERS,
+                "body": json.dumps({"error": getattr(_ve, "message", str(_ve))}),
+            }
+        raise
 
     def _emit_route_log(status_code):
         """Emit structured JSON route metric to CloudWatch Logs (zero cost)."""
@@ -7094,69 +7140,15 @@ def lambda_handler(event, context):
         if not _hmac.compare_digest(incoming, SITE_API_ORIGIN_SECRET):
             return _error(403, "Forbidden")
 
-    # WR-24: Subscriber verification (GET)
-    if path == "/api/verify_subscriber":
-        if method not in ("GET", "OPTIONS"):
-            return _error(405, "Use GET method")
-        return _handle_verify_subscriber(event)
-
-    # S2-T2-2: Board Ask (POST)
-    if path == "/api/board_ask":
-        if method != "POST":
-            return _error(405, "Use POST method")
-        return _handle_board_ask(event)
-
-    # ACCT-2: Nudge (POST)
-    if path == "/api/nudge":
-        if method != "POST":
-            return _error(405, "Use POST method")
-        return _handle_nudge(event)
-
-    # NEW-1: Submit Finding (POST)
-    if path == "/api/submit_finding":
-        if method != "POST":
-            return _error(405, "Use POST method")
-        return _handle_submit_finding(event)
-
-    # EL-3: Experiment Vote (POST)
-    if path == "/api/experiment_vote":
-        if method != "POST":
-            return _error(405, "Use POST method")
-        return _handle_experiment_vote(event)
-
-    # EL-F1: Experiment Follow (POST)
-    if path == "/api/experiment_follow":
-        if method != "POST":
-            return _error(405, "Use POST method")
-        return _handle_experiment_follow(event)
-
-    # Experiment Suggest (POST)
-    if path == "/api/experiment_suggest":
-        if method != "POST":
-            return _error(405, "Use POST method")
-        return _handle_experiment_suggest(event)
-
-    # Challenge Check-in (POST)
-    if path == "/api/challenge_checkin":
-        if method != "POST":
-            return _error(405, "Use POST method")
-        return _handle_challenge_checkin(event)
-
-    # Challenge Vote (POST)
-    if path == "/api/challenge_vote":
-        if method != "POST":
-            return _error(405, "Use POST method")
-        return _handle_challenge_vote(event)
-
-    # Challenge Follow (POST)
-    if path == "/api/challenge_follow":
-        if method != "POST":
-            return _error(405, "Use POST method")
-        return _handle_challenge_follow(event)
-
-    # EL-F2: Experiment Detail (GET with query params)
-    if path == "/api/experiment_detail":
-        return _handle_experiment_detail(event)
+    # Phase 4.5 SCOPED (2026-05-16): single dispatch for 11 simple delegate
+    # routes. The complex inline routes (correlations, changes_since, etc.)
+    # remain below — they include query-param parsing or multi-step logic.
+    _route_entry = _SIMPLE_ROUTES.get(path)
+    if _route_entry:
+        _allowed_methods, _handler_fn = _route_entry
+        if _allowed_methods is not None and method not in _allowed_methods:
+            return _error(405, f"Method not allowed; use {'/'.join(sorted(_allowed_methods))}")
+        return _handler_fn(event)
 
     # HP-06: Correlations with optional ?featured=true&limit=N
     if path == "/api/correlations":

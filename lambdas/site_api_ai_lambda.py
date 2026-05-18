@@ -58,12 +58,24 @@ CORS_HEADERS = {
     "X-Content-Type-Options":       "nosniff",
     "X-Frame-Options":              "DENY",
     "Strict-Transport-Security":    "max-age=31536000; includeSubDomains",
+    # Phase 2.8 (2026-05-16): AI responses are personalized — never cache.
+    # Prevents proxy/browser from serving one user's reply to another.
+    "Cache-Control":                "private, no-store, must-revalidate",
+    "Pragma":                       "no-cache",
 }
 
-# ── In-memory rate limit stores (warm container state) ─────
-_ask_rate_store: dict = {}    # ip_hash -> list of timestamps
-_board_rate_store: dict = {}  # ip_hash -> list of timestamps
+# ── Rate limiting (Phase 2.1, 2026-05-16): DynamoDB-backed ────
+# Replaces in-memory dict which didn't survive warm-container distribution.
+# Old stores kept as fallbacks if rate_limiter import fails.
+_ask_rate_store: dict = {}    # legacy, only used if DDB rate_limiter fails
+_board_rate_store: dict = {}  # legacy, only used if DDB rate_limiter fails
 BOARD_RATE_LIMIT = 5  # 5 req/IP/hr — matches WAF rate limit tier; each call makes up to 6 Haiku calls
+
+try:
+    from rate_limiter import check_rate_limit as _ddb_rate_check
+    _RATE_LIMITER_READY = True
+except ImportError:
+    _RATE_LIMITER_READY = False
 
 # ── Anthropic API key cache ────────────────────────────────
 _anthropic_key_cache = None
@@ -206,7 +218,18 @@ def _emit_rate_limit_metric(endpoint: str) -> None:
 
 
 def _ask_rate_check(ip_hash: str, limit: int = 5) -> tuple:
-    """Rate limit: N questions per IP-hash per hour (in-memory, warm container state)."""
+    """Rate limit: N questions per IP-hash per hour.
+
+    Phase 2.1 (2026-05-16): now uses DynamoDB atomic counters via
+    rate_limiter.check_rate_limit — global enforcement across warm containers.
+    Falls back to legacy in-memory dict if rate_limiter module unavailable.
+    """
+    if _RATE_LIMITER_READY:
+        allowed, remaining, _retry = _ddb_rate_check(
+            table, endpoint="ask", ip_hash=ip_hash, limit=limit, window_seconds=3600,
+        )
+        return allowed, remaining
+    # Legacy fallback (warm-container only)
     now = int(time.time())
     hour_ago = now - 3600
     timestamps = [t for t in _ask_rate_store.get(ip_hash, []) if t > hour_ago]
@@ -391,8 +414,26 @@ PERSONA_PROMPTS = {
 
 # ── Lambda Handler ─────────────────────────────────────────
 
-def lambda_handler(event, context):
+def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
     """Routes /api/ask (POST) and /api/board_ask (POST) only."""
+    # Phase 2.2: centralized request envelope validation (Body size cap +
+    # injection pattern detection + param format checks). Returns 4xx on abuse.
+    try:
+        from request_validator import validate_envelope, ValidationError
+        path = event.get("rawPath") or event.get("path", "/")
+        method = (event.get("requestContext", {}).get("http", {}).get("method") or
+                  event.get("httpMethod", "POST")).upper()
+        validate_envelope(event, path=path, method=method)
+    except ImportError:
+        pass
+    except Exception as _ve:
+        if _ve.__class__.__name__ == "ValidationError":
+            return {
+                "statusCode": getattr(_ve, "status", 400),
+                "headers": CORS_HEADERS,
+                "body": json.dumps({"error": getattr(_ve, "message", str(_ve))}),
+            }
+        raise
     if event.get("healthcheck"):
         return {"statusCode": 200, "body": "ok"}
 
@@ -505,18 +546,33 @@ def _handle_board_ask(event: dict) -> dict:
         or "unknown"
     )
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
-    now = int(time.time())
-    hour_ago = now - 3600
-    board_ts = [t for t in _board_rate_store.get(ip_hash, []) if t > hour_ago]
-    if len(board_ts) >= BOARD_RATE_LIMIT:
-        _emit_rate_limit_metric("board_ask")
-        return {
-            "statusCode": 429,
-            "headers": {**CORS_HEADERS, "Retry-After": "3600"},
-            "body": json.dumps({"error": "Rate limit reached. Try again in an hour."}),
-        }
-    board_ts.append(now)
-    _board_rate_store[ip_hash] = board_ts[-20:]
+    # Phase 2.1: DDB-backed rate limit (was in-memory dict — didn't survive
+    # warm-container distribution). Each board_ask costs ~6 Haiku calls,
+    # so global enforcement is critical to bound the worst-case bill.
+    if _RATE_LIMITER_READY:
+        _board_allowed, _board_remaining, _board_retry = _ddb_rate_check(
+            table, endpoint="board_ask", ip_hash=ip_hash, limit=BOARD_RATE_LIMIT, window_seconds=3600,
+        )
+        if not _board_allowed:
+            _emit_rate_limit_metric("board_ask")
+            return {
+                "statusCode": 429,
+                "headers": {**CORS_HEADERS, "Retry-After": str(_board_retry or 3600)},
+                "body": json.dumps({"error": "Rate limit reached. Try again in an hour."}),
+            }
+    else:
+        now = int(time.time())
+        hour_ago = now - 3600
+        board_ts = [t for t in _board_rate_store.get(ip_hash, []) if t > hour_ago]
+        if len(board_ts) >= BOARD_RATE_LIMIT:
+            _emit_rate_limit_metric("board_ask")
+            return {
+                "statusCode": 429,
+                "headers": {**CORS_HEADERS, "Retry-After": "3600"},
+                "body": json.dumps({"error": "Rate limit reached. Try again in an hour."}),
+            }
+        board_ts.append(now)
+        _board_rate_store[ip_hash] = board_ts[-20:]
 
     try:
         body = json.loads(event.get("body") or "{}")
@@ -536,6 +592,10 @@ def _handle_board_ask(event: dict) -> dict:
     if not api_key:
         return {"statusCode": 503, "headers": CORS_HEADERS, "body": json.dumps({"error": "AI service unavailable"})}
 
+    # P5.2 (2026-05-17): cache the per-persona system prompt as ephemeral so
+    # repeat questions to the same persona within 5 min hit the prompt cache
+    # (90% discount on the system block). Each persona stays a distinct cache
+    # entry — they don't share preamble (voice/focus differ too much).
     responses = {}
     for pid in personas:
         p = PERSONA_PROMPTS[pid]
@@ -543,7 +603,11 @@ def _handle_board_ask(event: dict) -> dict:
             req_body = json.dumps({
                 "model": AI_MODEL_HAIKU,
                 "max_tokens": 300,
-                "system": p["system"],
+                "system": [{
+                    "type": "text",
+                    "text": p["system"],
+                    "cache_control": {"type": "ephemeral"},
+                }],
                 "messages": [{"role": "user", "content": question}],
             })
             req = urllib.request.Request(
@@ -555,6 +619,12 @@ def _handle_board_ask(event: dict) -> dict:
                     "anthropic-version": "2023-06-01",
                 },
             )
+            # NOTE: no retry wrapper here — site-api-ai runs without the shared
+            # layer to keep cold-start fast for public traffic. board_ask makes
+            # 6 calls per request; a transient 5xx on call N would currently
+            # surface as "[name] is temporarily unavailable" for that one
+            # persona, which degrades cleanly. Add retry only if 5xx becomes a
+            # measurable issue (currently <1/month per CloudWatch).
             with urllib.request.urlopen(req, timeout=20) as r:
                 result = json.loads(r.read())
             responses[pid] = _scrub_blocked_terms("".join(b["text"] for b in result.get("content", []) if b.get("type") == "text"))

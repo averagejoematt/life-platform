@@ -76,7 +76,6 @@ D3_KNOWN_GAPS: set[str] = {
 
 # Known gaps for D4 (put_item preceded by validate) — remove when fixed
 D4_KNOWN_GAPS: set[str] = {
-    "garmin_lambda.py",         # native deps build required before DATA-2 wiring
     "weather_lambda.py",        # weather_handler.py is the canonical file; check separately
     "dropbox_poll_lambda.py",   # uses conditional put_item path — validator not yet wired
 }
@@ -264,12 +263,16 @@ def test_d4_put_item_guarded_by_validator(filename):
         "validate_item(" in src
         or "validate_and_write(" in src
         or "should_skip_ddb" in src
+        # P4.1 (2026-05-17): SIMP-2 framework wraps validation around every
+        # DDB write internally — Lambdas using run_ingestion() are compliant.
+        or "run_ingestion(" in src
     )
     assert has_validate, (
-        f"{filename}: has put_item() but no validate_item() / validate_and_write() call. "
-        f"DATA-2 requires validation before every DDB write in ingestion Lambdas. "
-        f"Either use validate_and_write() as a drop-in replacement, or wrap put_item "
-        f"with explicit validate_item() + should_skip_ddb check."
+        f"{filename}: has put_item() but no validate_item() / validate_and_write() / "
+        f"run_ingestion() call. DATA-2 requires validation before every DDB write in "
+        f"ingestion Lambdas. Either: (a) use SIMP-2 run_ingestion() which validates "
+        f"internally, (b) use validate_and_write() as a drop-in replacement, or "
+        f"(c) wrap put_item with explicit validate_item() + should_skip_ddb check."
     )
 
 
