@@ -1,85 +1,221 @@
 {
-  "_comment": "Lambda source file → AWS function name mapping for CI/CD. Used by .github/workflows/ci-cd.yml",
+  "_comment": "Lambda source file \u2192 AWS function name mapping for CI/CD. Used by .github/workflows/ci-cd.yml",
   "_updated": "2026-03-28 v4.3.1",
-
   "lambdas": {
-    "lambdas/strava_lambda.py":              { "function": "strava-data-ingestion" },
-    "lambdas/whoop_lambda.py":               { "function": "whoop-data-ingestion" },
-    "lambdas/garmin_lambda.py":              { "function": "garmin-data-ingestion", "native_deps": true },
-    "lambdas/eightsleep_lambda.py":          { "function": "eightsleep-data-ingestion" },
-    "lambdas/habitify_lambda.py":            { "function": "habitify-data-ingestion" },
-    "lambdas/withings_lambda.py":            { "function": "withings-data-ingestion" },
-    "lambdas/todoist_lambda.py":             { "function": "todoist-data-ingestion" },
-    "lambdas/notion_lambda.py":              { "function": "notion-journal-ingestion" },
-    "lambdas/macrofactor_lambda.py":         { "function": "macrofactor-data-ingestion" },
-    "lambdas/apple_health_lambda.py":        { "function": "apple-health-ingestion" },
-    "lambdas/health_auto_export_lambda.py":  { "function": "health-auto-export-webhook" },
-    "lambdas/dropbox_poll_lambda.py":        { "function": "dropbox-poll" },
-    "lambdas/weather_handler.py":             { "function": "weather-data-ingestion" },
-    "lambdas/enrichment_lambda.py":          { "function": "activity-enrichment" },
-    "lambdas/journal_enrichment_lambda.py":  { "function": "journal-enrichment" },
-    "lambdas/daily_brief_lambda.py":         { "function": "daily-brief" },
-    "lambdas/weekly_digest_lambda.py":       { "function": "weekly-digest" },
-    "lambdas/monthly_digest_lambda.py":      { "function": "monthly-digest" },
-    "lambdas/nutrition_review_lambda.py":    { "function": "nutrition-review" },
-    "lambdas/wednesday_chronicle_lambda.py": { "function": "wednesday-chronicle" },
-    "lambdas/weekly_plate_lambda.py":        { "function": "weekly-plate" },
-    "lambdas/monday_compass_lambda.py":      { "function": "monday-compass" },
-    "lambdas/anomaly_detector_lambda.py":    { "function": "anomaly-detector" },
-    "lambdas/freshness_checker_lambda.py":   { "function": "life-platform-freshness-checker" },
-    "lambdas/insight_email_parser_lambda.py": { "function": "insight-email-parser" },
-    "lambdas/character_sheet_lambda.py":     { "function": "character-sheet-compute" },
-    "lambdas/adaptive_mode_lambda.py":       { "function": "adaptive-mode-compute" },
-    "lambdas/daily_metrics_compute_lambda.py": { "function": "daily-metrics-compute" },
-    "lambdas/daily_insight_compute_lambda.py": { "function": "daily-insight-compute" },
-    "lambdas/hypothesis_engine_lambda.py":   { "function": "hypothesis-engine" },
-    "lambdas/dashboard_refresh_lambda.py":   { "function": "dashboard-refresh" },
-    "lambdas/data_export_lambda.py":         { "function": "data-export" },
-    "lambdas/delete_user_data_lambda.py":    { "function": "life-platform-delete-user-data" },
-    "lambdas/data_reconciliation_lambda.py": { "function": "data-reconciliation" },
-    "lambdas/dlq_consumer_lambda.py":        { "function": "life-platform-dlq-consumer" },
-    "lambdas/alert_digest_lambda.py":        { "function": "life-platform-alert-digest" },
-    "lambdas/canary_lambda.py":              { "function": "life-platform-canary" },
-    "lambdas/qa_smoke_lambda.py":            { "function": "qa-smoke" },
-    "lambdas/key_rotator_lambda.py":         { "function": "mcp-key-rotator" },
-    "lambdas/pip_audit_lambda.py":           { "function": "pip-audit" },
-    "lambdas/brittany_email_lambda.py":      { "function": "brittany-weekly-email" },
-    "lambdas/evening_nudge_lambda.py":        { "function": "evening-nudge" },
-    "lambdas/weekly_correlation_compute_lambda.py": { "function": "weekly-correlation-compute" },
-    "lambdas/failure_pattern_compute_lambda.py": { "function": "failure-pattern-compute" },
-    "lambdas/chronicle_email_sender_lambda.py": { "function": "chronicle-email-sender" },
-    "lambdas/weekly_signal_lambda.py":         { "function": "weekly-signal" },
-    "lambdas/chronicle_approve_lambda.py": { "function": "chronicle-approve" },
-    "lambdas/site_api_lambda.py":              { "function": "life-platform-site-api" },
-    "lambdas/site_stats_refresh_lambda.py":    { "function": "site-stats-refresh" },
-    "lambdas/challenge_generator_lambda.py":     { "function": "challenge-generator" },
-    "lambdas/food_delivery_lambda.py":           { "function": "food-delivery-ingestion" },
-    "lambdas/og_image_lambda.py":                { "function": "og-image-generator" },
-    "lambdas/email_subscriber_lambda.py":        { "function": "email-subscriber" },
-    "lambdas/subscriber_onboarding_lambda.py":   { "function": "subscriber-onboarding" },
-    "lambdas/pipeline_health_check_lambda.py":   { "function": "pipeline-health-check" },
-    "lambdas/measurements_ingestion_lambda.py":  { "function": "measurements-ingestion" },
-    "lambdas/ai_expert_analyzer_lambda.py":      { "function": "ai-expert-analyzer", "_note": "Primary observatory generator. NOT deprecated. Coach Intelligence pipeline (ai_calls.py) serves daily brief email separately." },
-    "lambdas/journal_analyzer_lambda.py":        { "function": "journal-analyzer" },
-    "lambdas/field_notes_lambda.py":             { "function": "field-notes-generate" },
-    "lambdas/coach_computation_engine.py":       { "function": "coach-computation-engine" },
-    "lambdas/coach_narrative_orchestrator.py":   { "function": "coach-narrative-orchestrator" },
-    "lambdas/coach_state_updater.py":            { "function": "coach-state-updater" },
-    "lambdas/coach_ensemble_digest.py":          { "function": "coach-ensemble-digest" },
-    "lambdas/coach_prediction_evaluator.py":     { "function": "coach-prediction-evaluator" },
-    "lambdas/coach_observatory_renderer.py":     { "function": "coach-observatory-renderer" },
-    "lambdas/coach_history_summarizer.py":       { "function": "coach-history-summarizer" },
-    "lambdas/coach_quality_gate.py":             { "function": "coach-quality-gate" }
+    "lambdas/strava_lambda.py": {
+      "function": "strava-data-ingestion"
+    },
+    "lambdas/whoop_lambda.py": {
+      "function": "whoop-data-ingestion"
+    },
+    "lambdas/garmin_lambda.py": {
+      "function": "garmin-data-ingestion",
+      "native_deps": true
+    },
+    "lambdas/eightsleep_lambda.py": {
+      "function": "eightsleep-data-ingestion"
+    },
+    "lambdas/habitify_lambda.py": {
+      "function": "habitify-data-ingestion"
+    },
+    "lambdas/withings_lambda.py": {
+      "function": "withings-data-ingestion"
+    },
+    "lambdas/todoist_lambda.py": {
+      "function": "todoist-data-ingestion"
+    },
+    "lambdas/notion_lambda.py": {
+      "function": "notion-journal-ingestion"
+    },
+    "lambdas/macrofactor_lambda.py": {
+      "function": "macrofactor-data-ingestion"
+    },
+    "lambdas/apple_health_lambda.py": {
+      "function": "apple-health-ingestion"
+    },
+    "lambdas/health_auto_export_lambda.py": {
+      "function": "health-auto-export-webhook"
+    },
+    "lambdas/dropbox_poll_lambda.py": {
+      "function": "dropbox-poll"
+    },
+    "lambdas/weather_handler.py": {
+      "function": "weather-data-ingestion"
+    },
+    "lambdas/enrichment_lambda.py": {
+      "function": "activity-enrichment"
+    },
+    "lambdas/journal_enrichment_lambda.py": {
+      "function": "journal-enrichment"
+    },
+    "lambdas/daily_brief_lambda.py": {
+      "function": "daily-brief"
+    },
+    "lambdas/weekly_digest_lambda.py": {
+      "function": "weekly-digest"
+    },
+    "lambdas/monthly_digest_lambda.py": {
+      "function": "monthly-digest"
+    },
+    "lambdas/nutrition_review_lambda.py": {
+      "function": "nutrition-review"
+    },
+    "lambdas/wednesday_chronicle_lambda.py": {
+      "function": "wednesday-chronicle"
+    },
+    "lambdas/weekly_plate_lambda.py": {
+      "function": "weekly-plate"
+    },
+    "lambdas/monday_compass_lambda.py": {
+      "function": "monday-compass"
+    },
+    "lambdas/anomaly_detector_lambda.py": {
+      "function": "anomaly-detector"
+    },
+    "lambdas/freshness_checker_lambda.py": {
+      "function": "life-platform-freshness-checker"
+    },
+    "lambdas/insight_email_parser_lambda.py": {
+      "function": "insight-email-parser"
+    },
+    "lambdas/character_sheet_lambda.py": {
+      "function": "character-sheet-compute"
+    },
+    "lambdas/adaptive_mode_lambda.py": {
+      "function": "adaptive-mode-compute"
+    },
+    "lambdas/daily_metrics_compute_lambda.py": {
+      "function": "daily-metrics-compute"
+    },
+    "lambdas/daily_insight_compute_lambda.py": {
+      "function": "daily-insight-compute"
+    },
+    "lambdas/hypothesis_engine_lambda.py": {
+      "function": "hypothesis-engine"
+    },
+    "lambdas/dashboard_refresh_lambda.py": {
+      "function": "dashboard-refresh"
+    },
+    "lambdas/data_export_lambda.py": {
+      "function": "data-export"
+    },
+    "lambdas/delete_user_data_lambda.py": {
+      "function": "life-platform-delete-user-data"
+    },
+    "lambdas/data_reconciliation_lambda.py": {
+      "function": "data-reconciliation"
+    },
+    "lambdas/dlq_consumer_lambda.py": {
+      "function": "life-platform-dlq-consumer"
+    },
+    "lambdas/alert_digest_lambda.py": {
+      "function": "life-platform-alert-digest"
+    },
+    "lambdas/canary_lambda.py": {
+      "function": "life-platform-canary"
+    },
+    "lambdas/qa_smoke_lambda.py": {
+      "function": "qa-smoke"
+    },
+    "lambdas/key_rotator_lambda.py": {
+      "function": "mcp-key-rotator"
+    },
+    "lambdas/pip_audit_lambda.py": {
+      "function": "pip-audit"
+    },
+    "lambdas/brittany_email_lambda.py": {
+      "function": "brittany-weekly-email"
+    },
+    "lambdas/evening_nudge_lambda.py": {
+      "function": "evening-nudge"
+    },
+    "lambdas/weekly_correlation_compute_lambda.py": {
+      "function": "weekly-correlation-compute"
+    },
+    "lambdas/failure_pattern_compute_lambda.py": {
+      "function": "failure-pattern-compute"
+    },
+    "lambdas/chronicle_email_sender_lambda.py": {
+      "function": "chronicle-email-sender"
+    },
+    "lambdas/weekly_signal_lambda.py": {
+      "function": "weekly-signal"
+    },
+    "lambdas/chronicle_approve_lambda.py": {
+      "function": "chronicle-approve"
+    },
+    "lambdas/site_api_lambda.py": {
+      "function": "life-platform-site-api"
+    },
+    "lambdas/site_stats_refresh_lambda.py": {
+      "function": "site-stats-refresh"
+    },
+    "lambdas/challenge_generator_lambda.py": {
+      "function": "challenge-generator"
+    },
+    "lambdas/food_delivery_lambda.py": {
+      "function": "food-delivery-ingestion"
+    },
+    "lambdas/og_image_lambda.py": {
+      "function": "og-image-generator"
+    },
+    "lambdas/email_subscriber_lambda.py": {
+      "function": "email-subscriber"
+    },
+    "lambdas/subscriber_onboarding_lambda.py": {
+      "function": "subscriber-onboarding"
+    },
+    "lambdas/pipeline_health_check_lambda.py": {
+      "function": "pipeline-health-check"
+    },
+    "lambdas/measurements_ingestion_lambda.py": {
+      "function": "measurements-ingestion"
+    },
+    "lambdas/ai_expert_analyzer_lambda.py": {
+      "function": "ai-expert-analyzer",
+      "_note": "Primary observatory generator. NOT deprecated. Coach Intelligence pipeline (ai_calls.py) serves daily brief email separately."
+    },
+    "lambdas/journal_analyzer_lambda.py": {
+      "function": "journal-analyzer"
+    },
+    "lambdas/field_notes_lambda.py": {
+      "function": "field-notes-generate"
+    },
+    "lambdas/coach_computation_engine.py": {
+      "function": "coach-computation-engine"
+    },
+    "lambdas/coach_narrative_orchestrator.py": {
+      "function": "coach-narrative-orchestrator"
+    },
+    "lambdas/coach_state_updater.py": {
+      "function": "coach-state-updater"
+    },
+    "lambdas/coach_ensemble_digest.py": {
+      "function": "coach-ensemble-digest"
+    },
+    "lambdas/coach_prediction_evaluator.py": {
+      "function": "coach-prediction-evaluator"
+    },
+    "lambdas/coach_observatory_renderer.py": {
+      "function": "coach-observatory-renderer"
+    },
+    "lambdas/coach_history_summarizer.py": {
+      "function": "coach-history-summarizer"
+    },
+    "lambdas/coach_quality_gate.py": {
+      "function": "coach-quality-gate"
+    }
   },
-
   "mcp": {
-    "_comment": "MCP server is special — requires full mcp/ package; lives at project root not lambdas/",
+    "_comment": "MCP server is special \u2014 requires full mcp/ package; lives at project root not lambdas/",
     "source": "mcp_server.py",
     "function": "life-platform-mcp",
     "package_dir": "mcp/",
-    "triggers": ["mcp_server.py", "mcp/"]
+    "triggers": [
+      "mcp_server.py",
+      "mcp/"
+    ]
   },
-
   "shared_layer": {
     "_comment": "Changes to these files require layer rebuild + consumer redeploy",
     "layer_name": "life-platform-shared-utils",
@@ -103,24 +239,32 @@
       "lambdas/intelligence_common.py"
     ],
     "consumers": [
-      "daily-brief", "weekly-digest", "monthly-digest",
-      "nutrition-review", "wednesday-chronicle", "weekly-plate",
-      "monday-compass", "anomaly-detector", "character-sheet-compute",
-      "daily-metrics-compute", "daily-insight-compute",
-      "adaptive-mode-compute", "hypothesis-engine", "dashboard-refresh",
+      "daily-brief",
+      "weekly-digest",
+      "monthly-digest",
+      "nutrition-review",
+      "wednesday-chronicle",
+      "weekly-plate",
+      "monday-compass",
+      "anomaly-detector",
+      "character-sheet-compute",
+      "daily-metrics-compute",
+      "daily-insight-compute",
+      "adaptive-mode-compute",
+      "hypothesis-engine",
+      "dashboard-refresh",
       "weekly-correlation-compute"
     ]
   },
-
   "lambda_edge": {
-    "_comment": "Lambda@Edge functions — deployed in us-east-1, manually managed outside CDK. NOT auto-deployed via CI/CD pipeline. Metrics aggregated to us-east-1 per AWS requirement.",
+    "_comment": "Lambda@Edge functions \u2014 deployed in us-east-1, manually managed outside CDK. NOT auto-deployed via CI/CD pipeline. Metrics aggregated to us-east-1 per AWS requirement.",
     "functions": {
       "lambdas/cf-auth/index.mjs": {
         "function": "life-platform-cf-auth",
         "region": "us-east-1",
         "cloudfront_distribution": "EM5NPX6NJN095",
         "protects": "dash.averagejoematt.com",
-        "note": "Manually deployed — NOT CDK-managed. Lambda@Edge requires us-east-1 and cannot be deployed from us-west-2 CDK stacks. Secret: life-platform/cf-auth (must exist in us-east-1). Alarm: life-platform-cf-auth-errors (us-east-1 CloudWatch)."
+        "note": "Manually deployed \u2014 NOT CDK-managed. Lambda@Edge requires us-east-1 and cannot be deployed from us-west-2 CDK stacks. Secret: life-platform/cf-auth (must exist in us-east-1). Alarm: life-platform-cf-auth-errors (us-east-1 CloudWatch)."
       },
       "lambdas/site_api_lambda.py": {
         "function": "life-platform-site-api",
@@ -128,16 +272,14 @@
       }
     }
   },
-
   "email_subscriber": {
     "lambdas/email_subscriber_lambda.py": {
       "function": "email-subscriber",
       "handler": "email_subscriber_lambda.lambda_handler",
       "stack": "LifePlatformOperational",
-      "note": "BS-03: subscribe/confirm/unsubscribe. DDB subscribers partition. SES double opt-in. No Function URL — wired to API Gateway /api/subscribe."
+      "note": "BS-03: subscribe/confirm/unsubscribe. DDB subscribers partition. SES double opt-in. No Function URL \u2014 wired to API Gateway /api/subscribe."
     }
   },
-
   "acwr_compute": {
     "lambdas/acwr_compute_lambda.py": {
       "function": "acwr-compute",
@@ -146,25 +288,22 @@
       "note": "BS-09: Whoop strain ACWR. Runs 9:55 AM PT daily. Writes to computed_metrics partition."
     }
   },
-
   "sleep_reconciler": {
     "lambdas/sleep_reconciler_lambda.py": {
       "function": "sleep-reconciler",
       "handler": "sleep_reconciler_lambda.lambda_handler",
       "stack": "LifePlatformCompute",
-      "note": "BS-08: Unified Sleep Record — merges Whoop/Eight Sleep/Apple Health nightly. Runs 7:00 AM PT daily. Writes to sleep_unified partition."
+      "note": "BS-08: Unified Sleep Record \u2014 merges Whoop/Eight Sleep/Apple Health nightly. Runs 7:00 AM PT daily. Writes to sleep_unified partition."
     }
   },
-
   "circadian_compliance": {
     "lambdas/circadian_compliance_lambda.py": {
       "function": "circadian-compliance",
       "handler": "circadian_compliance_lambda.lambda_handler",
       "stack": "LifePlatformCompute",
-      "note": "BS-SL2: Circadian Compliance Score — pre-sleep behavioral score (0-100). Runs 7:00 PM PT daily. Writes to circadian partition. Surfaces in Evening Nudge."
+      "note": "BS-SL2: Circadian Compliance Score \u2014 pre-sleep behavioral score (0-100). Runs 7:00 PM PT daily. Writes to circadian partition. Surfaces in Evening Nudge."
     }
   },
-
   "chronicle_email_sender": {
     "lambdas/chronicle_email_sender_lambda.py": {
       "function": "chronicle-email-sender",
@@ -173,7 +312,6 @@
       "note": "BS-03: Delivers Chronicle installment to confirmed subscribers. Wed 8:10 AM PT. Viktor guard: no-op if no installment this week."
     }
   },
-
   "skip_deploy": {
     "_comment": "Files that are part of the repo but not directly deployable Lambdas (Layer modules or utilities). V2 P0.8: 17 layer-resident shared modules added 2026-05-17.",
     "files": [
@@ -191,7 +329,6 @@
       "lambdas/circadian_compliance_lambda.py",
       "lambdas/sleep_reconciler_lambda.py",
       "lambdas/email_subscriber_lambda.py",
-      "lambdas/podcast_scanner_lambda.py",
       "lambdas/site_api_ai_lambda.py",
       "lambdas/auth_breaker.py",
       "lambdas/compute_metadata.py",
