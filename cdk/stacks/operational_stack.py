@@ -25,6 +25,7 @@ from aws_cdk import (
     Stack, Duration,
     aws_lambda as _lambda, aws_iam as iam, aws_sqs as sqs,
     aws_dynamodb as dynamodb, aws_s3 as s3, aws_sns as sns,
+    aws_sns_subscriptions as sns_subs,
     aws_cloudwatch as cloudwatch, aws_cloudwatch_actions as cw_actions,
     aws_events as events, aws_events_targets as targets,
 )
@@ -48,15 +49,17 @@ INGESTION_DLQ_ARN    = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq
 LIFE_PLATFORM_TABLE  = "life-platform"
 LIFE_PLATFORM_BUCKET = "matthew-life-platform"
 ALERTS_TOPIC_ARN     = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
+DIGEST_TOPIC_ARN     = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
 
 
 class OperationalStack(Stack):
-    def __init__(self, scope, construct_id, table, bucket, dlq, alerts_topic, **kwargs):
+    def __init__(self, scope, construct_id, table, bucket, dlq, alerts_topic, digest_topic=None, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
         local_dlq          = sqs.Queue.from_queue_arn(self, "IngestionDLQ", INGESTION_DLQ_ARN)
         local_table        = dynamodb.Table.from_table_name(self, "LifePlatformTable", LIFE_PLATFORM_TABLE)
         local_bucket       = s3.Bucket.from_bucket_name(self, "LifePlatformBucket", LIFE_PLATFORM_BUCKET)
         local_alerts_topic = sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
+        local_digest_topic = sns.Topic.from_topic_arn(self, "DigestTopic", DIGEST_TOPIC_ARN)
         # Phase B re-entry sweep (2026-05-03): shared layer for Lambdas that import
         # platform_logger (currently freshness-checker + canary). They have a
         # try/except ImportError fallback to stdlib logging, so the missing layer
@@ -69,6 +72,9 @@ class OperationalStack(Stack):
         )
 
         # ── 1. Freshness Checker — 9:45 AM PT daily (previously in separate CFn stack)
+        # ADR-052: SNS_ARN points to the digest topic. The freshness checker's
+        # direct publishes (stale-source / partial-completeness / OAuth-token-stale)
+        # are exactly the "4 stale source(s)" daily emails we want to batch.
         freshness = create_platform_lambda(self, "FreshnessChecker",
             function_name="life-platform-freshness-checker",
             source_file="lambdas/freshness_checker_lambda.py",
@@ -78,10 +84,11 @@ class OperationalStack(Stack):
             environment={
                 "EMAIL_RECIPIENT": "awsdev@mattsusername.com",
                 "EMAIL_SENDER": "awsdev@mattsusername.com",
-                "SNS_ARN": f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts",
+                "SNS_ARN": DIGEST_TOPIC_ARN,
             },
             custom_policies=rp.operational_freshness_checker(),
-            table=local_table, bucket=local_bucket, dlq=None, alerts_topic=local_alerts_topic,
+            table=local_table, bucket=local_bucket, dlq=None,
+            alerts_topic=local_alerts_topic, digest_topic=local_digest_topic, digest=True,
             alarm_name="freshness-checker-errors",
             shared_layer=shared_utils_layer,
         )
@@ -96,6 +103,39 @@ class OperationalStack(Stack):
             custom_policies=rp.operational_dlq_consumer(),
             table=local_table, bucket=local_bucket, dlq=None, alerts_topic=None,
         )
+
+        # ── 2b. Alert Digest (ADR-050) — drains digest queue daily at 8 AM PT
+        # SQS retention is 25h so the daily run never misses a fire that happened
+        # during the previous 24h window. SNS raw message delivery puts the
+        # CloudWatch alarm JSON directly into the SQS body (no envelope).
+        digest_queue = sqs.Queue(self, "AlertDigestQueue",
+            queue_name="life-platform-alerts-digest-queue",
+            retention_period=Duration.hours(25),
+            visibility_timeout=Duration.seconds(120),
+        )
+        # Subscribe the queue to the digest SNS topic (raw delivery for simpler parsing).
+        local_digest_topic.add_subscription(
+            sns_subs.SqsSubscription(digest_queue, raw_message_delivery=True),
+        )
+
+        digest_lambda = create_platform_lambda(self, "AlertDigest",
+            function_name="life-platform-alert-digest",
+            source_file="lambdas/alert_digest_lambda.py",
+            handler="alert_digest_lambda.lambda_handler",
+            # cron(0 15 * * ? *) = 15:00 UTC = 8 AM PT (UTC-fixed, no DST drift).
+            schedule="cron(0 15 * * ? *)",
+            timeout_seconds=60, memory_mb=128,
+            environment={
+                "DIGEST_QUEUE_URL": digest_queue.queue_url,
+                "EMAIL_RECIPIENT":  "awsdev@mattsusername.com",
+                "EMAIL_SENDER":     "awsdev@mattsusername.com",
+            },
+            custom_policies=rp.operational_alert_digest(),
+            table=local_table, bucket=local_bucket, dlq=None, alerts_topic=None,
+            shared_layer=shared_utils_layer,
+        )
+        cdk.CfnOutput(self, "AlertDigestQueueUrl", value=digest_queue.queue_url)
+        cdk.CfnOutput(self, "AlertDigestLambdaArn", value=digest_lambda.function_arn)
 
         # ── 3. Canary — every 4 hours
         canary = create_platform_lambda(self, "Canary",
@@ -150,7 +190,8 @@ class OperationalStack(Stack):
             timeout_seconds=30, memory_mb=128,
             alarm_name="key-rotator-errors",
             custom_policies=rp.operational_key_rotator(),
-            table=local_table, bucket=local_bucket, dlq=None, alerts_topic=local_alerts_topic,
+            table=local_table, bucket=local_bucket, dlq=None,
+            alerts_topic=local_alerts_topic, digest_topic=local_digest_topic, digest=True,
         )
         key_rotator.add_permission("SecretsManagerInvokeKeyRotator",
             principal=iam.ServicePrincipal("secretsmanager.amazonaws.com"),
@@ -165,7 +206,24 @@ class OperationalStack(Stack):
             timeout_seconds=300, memory_mb=512,
             alarm_name="life-platform-data-export-errors",
             custom_policies=rp.operational_data_export(),
-            table=local_table, bucket=local_bucket, dlq=None, alerts_topic=local_alerts_topic,
+            table=local_table, bucket=local_bucket, dlq=None,
+            alerts_topic=local_alerts_topic, digest_topic=local_digest_topic, digest=True,
+        )
+
+        # ── 7b. Delete User Data (P7.3) — on-demand only ──
+        # Phase 7.3 (2026-05-16): right-to-be-forgotten flow. Invoked manually
+        # via `aws lambda invoke --payload '{"user_id":"X","dry_run":true}'`.
+        # Refuses protected users (matthew/admin/system) in code. Writes audit
+        # record to USER#admin#SOURCE#deletion_log on every real run.
+        create_platform_lambda(self, "DeleteUserData",
+            function_name="life-platform-delete-user-data",
+            source_file="lambdas/delete_user_data_lambda.py",
+            handler="delete_user_data_lambda.lambda_handler",
+            timeout_seconds=300, memory_mb=256,
+            alarm_name="life-platform-delete-user-data-errors",
+            custom_policies=rp.operational_delete_user_data(),
+            table=local_table, bucket=local_bucket, dlq=None,
+            alerts_topic=local_alerts_topic, digest_topic=local_digest_topic, digest=True,
         )
 
         # ── 8. Data Reconciliation — Monday 12:30 AM PT
@@ -248,7 +306,7 @@ class OperationalStack(Stack):
             dlq=None,
             alerts_topic=None,
             custom_policies=rp.site_api(),
-            timeout_seconds=15,
+            timeout_seconds=30,  # Phase 1.6 (2026-05-16): 15s→30s. Matches CloudFront default; complex /api/changes-since queries hit 15s ceiling.
             memory_mb=256,
             environment={
                 "USER_ID":        "matthew",
@@ -340,17 +398,22 @@ class OperationalStack(Stack):
             period=Duration.minutes(5), statistic="p50",
         )
 
-        cloudwatch.Alarm(self, "SiteApiErrors", alarm_name="site-api-errors",
+        # ADR-050: site-api alarms route to digest. The canary covers true outages
+        # (CanaryS3Fail / CanaryDDBFail fire urgently); these are degradation signals.
+        _site_api_errors_alarm = cloudwatch.Alarm(self, "SiteApiErrors", alarm_name="site-api-errors",
             metric=site_api_errors, threshold=1, evaluation_periods=1,
             comparison_operator=GTE, treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING)
+        _site_api_errors_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
-        cloudwatch.Alarm(self, "SiteApiLatencyHigh", alarm_name="site-api-p95-latency-high",
+        _site_api_latency_alarm = cloudwatch.Alarm(self, "SiteApiLatencyHigh", alarm_name="site-api-p95-latency-high",
             metric=site_api_duration_p95, threshold=5000, evaluation_periods=1,
             comparison_operator=GTE, treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING)
+        _site_api_latency_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
-        cloudwatch.Alarm(self, "SiteApiInvocationSpike", alarm_name="site-api-invocation-spike",
+        _site_api_spike_alarm = cloudwatch.Alarm(self, "SiteApiInvocationSpike", alarm_name="site-api-invocation-spike",
             metric=site_api_invocations, threshold=200, evaluation_periods=1,
             comparison_operator=GTE, treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING)
+        _site_api_spike_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
         cloudwatch.Dashboard(self, "SiteApiDashboard", dashboard_name="life-platform-site-api",
             widgets=[[
@@ -387,14 +450,29 @@ class OperationalStack(Stack):
         # CDK can manage it. Tracked as R18-F02. Lambda runs fine outside CDK.
 
         # ── 13. Pipeline Health Check — daily at 13:00 UTC (6 AM PT)
-        create_platform_lambda(self, "PipelineHealthCheck",
+        pipeline_health = create_platform_lambda(self, "PipelineHealthCheck",
             function_name="pipeline-health-check",
             source_file="lambdas/pipeline_health_check_lambda.py",
             handler="pipeline_health_check_lambda.lambda_handler",
             schedule="cron(30 2,6,14,18,22 * * ? *)",  # 5x daily, 30 min after ingestion
             timeout_seconds=300, memory_mb=256,
             custom_policies=rp.pipeline_health_check(),
-            table=local_table, bucket=local_bucket, dlq=None, alerts_topic=local_alerts_topic)
+            table=local_table, bucket=local_bucket, dlq=None,
+            alerts_topic=local_alerts_topic, digest_topic=local_digest_topic, digest=True)
+
+        # Phase 3.2 (2026-05-16): second EventBridge schedule for compute-output
+        # verification. Fires at 16:58 UTC = 9:58 AM PT — between the compute
+        # cascade ending at 9:55 and the daily-brief at 10:00. Invokes with
+        # {check_compute_outputs: true} so the Lambda runs the DDB freshness
+        # check instead of the default Lambda-probe path.
+        compute_check_rule = events.Rule(self, "PipelineHealthComputeCheck",
+            schedule=events.Schedule.cron(hour="16", minute="58"),
+            description="Phase 3.2: verify today's compute records exist before daily-brief",
+        )
+        compute_check_rule.add_target(targets.LambdaFunction(
+            pipeline_health,
+            event=events.RuleTargetInput.from_object({"check_compute_outputs": True}),
+        ))
 
         cdk.CfnOutput(self, "FreshnessCheckerArn", value=freshness.function_arn, description="Freshness checker Lambda ARN")
         cdk.CfnOutput(self, "CanaryArn", value=canary.function_arn, description="Canary Lambda ARN")

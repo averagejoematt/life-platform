@@ -15,6 +15,20 @@ MODULES=(
     ingestion_validator.py item_size_guard.py digest_utils.py
     sick_day_checker.py site_writer.py secret_cache.py
     intelligence_common.py
+    # Phase 4.2 (2026-05-16): shared numeric helpers (replaces 8 dup copies)
+    numeric.py
+    # Phase 4.10 (2026-05-16): shared email HTML scaffolding
+    email_framework.py
+    # Phase 3.6 (2026-05-16): standalone auth-failure circuit breaker
+    auth_breaker.py
+    # Phase 3.5 (2026-05-16): generic HTTP retry for non-Anthropic APIs
+    http_retry.py
+    # Phase 3.3 (2026-05-16): compute output run_id + computed_at tagging
+    compute_metadata.py
+    # Phase 2.1 (2026-05-16): DDB-backed rate limiter for site-api
+    rate_limiter.py
+    # Phase 2.2 (2026-05-16): request envelope validator
+    request_validator.py
 )
 
 rm -rf "$PROJ_ROOT/cdk/layer-build"

@@ -142,7 +142,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install test dependencies
-        run: pip install pytest boto3 botocore
+        run: pip install pytest pytest-cov boto3 botocore  # Phase 8.2: pytest-cov for coverage report
 
       - name: Run unit tests
         run: |
@@ -253,6 +253,32 @@ jobs:
           echo "::group::Full pytest suite"
           python3 -m pytest tests/ -v --tb=short --ignore=tests/test_integration_aws.py
           echo "::endgroup::"
+
+      - name: Test coverage report (Phase 8.2)
+        # Coverage report on every CI run. Non-blocking initially — the goal is
+        # visibility into which Lambda modules lack test coverage. Once we have
+        # a coverage baseline established, this step can gate PRs.
+        # Coverage scope: lambdas/ and mcp/ source dirs only (skip tests/, cdk/).
+        run: |
+          echo "::group::Coverage report"
+          python3 -m pytest tests/ \
+              --ignore=tests/test_integration_aws.py \
+              --cov=lambdas --cov=mcp \
+              --cov-report=term-missing:skip-covered \
+              --cov-report=xml:coverage.xml \
+              -q 2>&1 | tail -100 || true
+          echo "::endgroup::"
+          # Phase 8.2: not yet gated. Once a baseline (say 30%) is established,
+          # add: --cov-fail-under=30 to make this blocking on regressions.
+        continue-on-error: true
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 14
+        if: always()
 
   # ════════════════════════════════════════════════════════════════
   # Job 3: Plan — validate map, detect changes, build deploy plan

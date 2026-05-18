@@ -35,8 +35,10 @@
     "lambdas/hypothesis_engine_lambda.py":   { "function": "hypothesis-engine" },
     "lambdas/dashboard_refresh_lambda.py":   { "function": "dashboard-refresh" },
     "lambdas/data_export_lambda.py":         { "function": "data-export" },
+    "lambdas/delete_user_data_lambda.py":    { "function": "life-platform-delete-user-data" },
     "lambdas/data_reconciliation_lambda.py": { "function": "data-reconciliation" },
     "lambdas/dlq_consumer_lambda.py":        { "function": "life-platform-dlq-consumer" },
+    "lambdas/alert_digest_lambda.py":        { "function": "life-platform-alert-digest" },
     "lambdas/canary_lambda.py":              { "function": "life-platform-canary" },
     "lambdas/qa_smoke_lambda.py":            { "function": "qa-smoke" },
     "lambdas/key_rotator_lambda.py":         { "function": "mcp-key-rotator" },
@@ -44,8 +46,7 @@
     "lambdas/brittany_email_lambda.py":      { "function": "brittany-weekly-email" },
     "lambdas/evening_nudge_lambda.py":        { "function": "evening-nudge" },
     "lambdas/weekly_correlation_compute_lambda.py": { "function": "weekly-correlation-compute" },
-    "lambdas/failure_pattern_compute_lambda.py": { "function": "failure-pattern-compute", "not_deployed": true },
-    "lambdas/momentum_warning_compute_lambda.py": { "function": "momentum-warning-compute", "not_deployed": true },
+    "lambdas/failure_pattern_compute_lambda.py": { "function": "failure-pattern-compute" },
     "lambdas/chronicle_email_sender_lambda.py": { "function": "chronicle-email-sender" },
     "lambdas/weekly_signal_lambda.py":         { "function": "weekly-signal" },
     "lambdas/chronicle_approve_lambda.py": { "function": "chronicle-approve" },
@@ -174,7 +175,7 @@
   },
 
   "skip_deploy": {
-    "_comment": "Files that are part of the repo but not directly deployable Lambdas (Layer modules or utilities)",
+    "_comment": "Files that are part of the repo but not directly deployable Lambdas (Layer modules or utilities). V2 P0.8: 17 layer-resident shared modules added 2026-05-17.",
     "files": [
       "lambdas/ingestion_validator.py",
       "lambdas/item_size_guard.py",
@@ -191,7 +192,24 @@
       "lambdas/sleep_reconciler_lambda.py",
       "lambdas/email_subscriber_lambda.py",
       "lambdas/podcast_scanner_lambda.py",
-      "lambdas/site_api_ai_lambda.py"
+      "lambdas/site_api_ai_lambda.py",
+      "lambdas/auth_breaker.py",
+      "lambdas/compute_metadata.py",
+      "lambdas/email_framework.py",
+      "lambdas/http_retry.py",
+      "lambdas/intelligence_common.py",
+      "lambdas/numeric.py",
+      "lambdas/platform_logger.py",
+      "lambdas/rate_limiter.py",
+      "lambdas/request_validator.py",
+      "lambdas/retry_utils.py",
+      "lambdas/secret_cache.py",
+      "lambdas/site_writer.py",
+      "lambdas/character_engine.py",
+      "lambdas/genome_coaching.py",
+      "lambdas/ai_output_validator.py",
+      "lambdas/labs_coaching.py",
+      "lambdas/ingestion_framework.py"
     ]
   }
 }

@@ -39,18 +39,20 @@ INGESTION_DLQ_ARN    = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq
 LIFE_PLATFORM_TABLE  = TABLE_NAME
 LIFE_PLATFORM_BUCKET = S3_BUCKET
 ALERTS_TOPIC_ARN     = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
+DIGEST_TOPIC_ARN     = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
 
 
 class ComputeStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str,
-                 table, bucket, dlq, alerts_topic, **kwargs) -> None:
+                 table, bucket, dlq, alerts_topic, digest_topic=None, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         local_dlq          = sqs.Queue.from_queue_arn(self, "IngestionDLQ", INGESTION_DLQ_ARN)
         local_table        = dynamodb.Table.from_table_name(self, "LifePlatformTable", LIFE_PLATFORM_TABLE)
         local_bucket       = s3.Bucket.from_bucket_name(self, "LifePlatformBucket", LIFE_PLATFORM_BUCKET)
         local_alerts_topic = sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
+        local_digest_topic = sns.Topic.from_topic_arn(self, "DigestTopic", DIGEST_TOPIC_ARN)
         # Phase B re-entry sweep (2026-05-03): attach the shared utils layer to all
         # Compute Lambdas. Previously these Lambdas were created without a layer
         # argument, so they pinned to whatever layer version they had at first
@@ -61,11 +63,16 @@ class ComputeStack(Stack):
             self, "SharedUtilsLayer", SHARED_LAYER_ARN,
         )
 
+        # ADR-050: every compute Lambda's error alarm routes to the digest topic.
+        # Compute Lambdas are background pre-computation; transient errors recover
+        # on the next scheduled run.
         shared = dict(
             table=local_table,
             bucket=local_bucket,
             dlq=local_dlq,
             alerts_topic=local_alerts_topic,
+            digest_topic=local_digest_topic,
+            digest=True,
             shared_layer=shared_utils_layer,
         )
 
@@ -90,7 +97,7 @@ class ComputeStack(Stack):
             function_name="character-sheet-compute",
             handler="character_sheet_lambda.lambda_handler",
             source_file="lambdas/character_sheet_lambda.py",
-            schedule="cron(35 17 * * ? *)",
+            schedule="cron(30 16 * * ? *)",  # Phase 3.1 (2026-05-16): 17:35→16:30 (9:30 AM PT) so character_sheet completes BEFORE daily-brief at 17:00 UTC. Was reading yesterday's sheet.
             timeout_seconds=60, memory_mb=512,
             custom_policies=rp.compute_character_sheet(),
             **shared,
@@ -101,7 +108,7 @@ class ComputeStack(Stack):
             function_name="daily-metrics-compute",
             handler="daily_metrics_compute_lambda.lambda_handler",
             source_file="lambdas/daily_metrics_compute_lambda.py",
-            schedule="cron(40 17 * * ? *)",
+            schedule="cron(40 16 * * ? *)",  # Phase 3.1 (2026-05-16): 17:40→16:40 (9:40 AM PT) so daily-metrics completes BEFORE daily-brief.
             timeout_seconds=120, memory_mb=512,
             custom_policies=rp.compute_daily_metrics(),
             **shared,
@@ -112,7 +119,7 @@ class ComputeStack(Stack):
             function_name="daily-insight-compute",
             handler="daily_insight_compute_lambda.lambda_handler",
             source_file="lambdas/daily_insight_compute_lambda.py",
-            schedule="cron(45 17 * * ? *)",
+            schedule="cron(45 16 * * ? *)",  # Phase 3.1 (2026-05-16): 17:45→16:45 (9:45 AM PT) so daily-insight completes BEFORE daily-brief.
             timeout_seconds=120, memory_mb=512,
             custom_policies=rp.compute_daily_insight(),
             **shared,
@@ -123,7 +130,7 @@ class ComputeStack(Stack):
             function_name="adaptive-mode-compute",
             handler="adaptive_mode_lambda.lambda_handler",
             source_file="lambdas/adaptive_mode_lambda.py",
-            schedule="cron(50 17 * * ? *)",
+            schedule="cron(35 16 * * ? *)",  # Phase 3.1 (2026-05-16): 17:50→16:35 (9:35 AM PT) so adaptive-mode completes BEFORE daily-brief.
             timeout_seconds=120, memory_mb=256,
             custom_policies=rp.compute_adaptive_mode(),
             **shared,
