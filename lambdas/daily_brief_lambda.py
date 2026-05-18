@@ -115,7 +115,7 @@ try:
     _HAS_INSIGHT_WRITER = True
 except ImportError:
     _HAS_INSIGHT_WRITER = False
-    print("[WARN] insight_writer not available — insights will not be persisted")
+    logger.warning("insight_writer not available — insights will not be persisted")
     _emit_module_load_failure("insight_writer")
 
 # AI-3: Output Validator — validates coaching text before delivery
@@ -124,7 +124,7 @@ try:
     _HAS_AI_VALIDATOR = True
 except ImportError:
     _HAS_AI_VALIDATOR = False
-    print("[WARN] ai_output_validator not available — AI output validation skipped")
+    logger.warning("ai_output_validator not available — AI output validation skipped")
     _emit_module_load_failure("ai_output_validator")
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
@@ -254,7 +254,7 @@ def fetch_journal_entries(date_str):
             })
         return [d2f(i) for i in r.get("Items", [])]
     except Exception as e:
-        print("[WARN] fetch_journal_entries: " + str(e))
+        logger.warning("fetch_journal_entries: " + str(e))
         return []
 
 def fetch_profile():
@@ -262,7 +262,7 @@ def fetch_profile():
         r = table.get_item(Key={"pk": PROFILE_PK, "sk": "PROFILE#v1"})
         return d2f(r.get("Item", {}))
     except Exception as e:
-        print("[ERROR] fetch_profile: " + str(e))
+        logger.error("fetch_profile: " + str(e))
         return {}
 
 def get_current_phase(profile, current_weight_lbs):
@@ -442,9 +442,9 @@ def gather_daily_data(profile, yesterday):
     # IC-2: Pre-computed insight context (written by daily-insight-compute Lambda at 9:42 AM)
     computed_insights = fetch_date("computed_insights", yesterday)
     if computed_insights:
-        print("[INFO] Computed insights loaded for " + yesterday)
+        logger.info("Computed insights loaded for " + yesterday)
     else:
-        print("[INFO] No computed_insights for " + yesterday + " — IC-2 Lambda may not have run yet")
+        logger.info("No computed_insights for " + yesterday + " — IC-2 Lambda may not have run yet")
 
     # BS-09: ACWR training load (written by acwr-compute Lambda at 9:55 AM)
     computed_metrics = fetch_date("computed_metrics", yesterday)
@@ -454,7 +454,7 @@ def gather_daily_data(profile, yesterday):
         print("[INFO] ACWR loaded for " + yesterday + ": " + str(round(float(computed_metrics["acwr"]), 3)) +
               " (" + _acwr_zone + ")" + (" \u26a0 ALERT" if _acwr_alert else ""))
     else:
-        print("[INFO] No computed_metrics/ACWR for " + yesterday + " — acwr-compute may not have run yet")
+        logger.info("No computed_metrics/ACWR for " + yesterday + " — acwr-compute may not have run yet")
 
     # OBS-06: Emit per-source data presence metrics to CloudWatch via EMF
     _emit_source_fetch_metrics({
@@ -976,7 +976,7 @@ def dedup_activities(activities):
                 remove.add(j)
                 dev_drop = a_j.get("device_name", "?")
                 dev_keep = a_k.get("device_name", "?")
-            print("[INFO] Dedup: " + sport_j + " overlap — kept " + dev_keep + ", dropped " + dev_drop)
+            logger.info("Dedup: " + sport_j + " overlap — kept " + dev_keep + ", dropped " + dev_drop)
 
     kept = [a for i, (_, a, _) in enumerate(indexed) if i not in remove]
     no_time = [a for a in activities if parse_start(a) is None]
@@ -1044,9 +1044,9 @@ def store_day_grade(date_str, total_score, grade, component_scores, weights, alg
             if score is not None:
                 item["component_" + comp] = Decimal(str(score))
         table.put_item(Item=item)
-        print("[INFO] Day grade stored: " + date_str + " -> " + str(total_score) + " (" + grade + ")")
+        logger.info("Day grade stored: " + date_str + " -> " + str(total_score) + " (" + grade + ")")
     except Exception as e:
-        print("[ERROR] CRITICAL: Failed to store day grade: " + str(e))
+        logger.error("CRITICAL: Failed to store day grade: " + str(e))
         raise  # Re-raise — day grade loss cascades to character sheet + insights
 
 
@@ -1106,9 +1106,9 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
             item["synergy_groups"] = json.loads(json.dumps(sg_pcts), parse_float=Decimal)
         item = {k: v for k, v in item.items() if v is not None}
         table.put_item(Item=item)
-        print("[INFO] Habit scores stored: " + date_str + " T0=" + str(t0.get("done", 0)) + "/" + str(t0.get("total", 0)))
+        logger.info("Habit scores stored: " + date_str + " T0=" + str(t0.get("done", 0)) + "/" + str(t0.get("total", 0)))
     except Exception as e:
-        print("[ERROR] CRITICAL: Failed to store habit scores: " + str(e))
+        logger.error("CRITICAL: Failed to store habit scores: " + str(e))
         raise  # Re-raise — habit score loss corrupts character sheet progression
 
 
@@ -1328,7 +1328,7 @@ def record_email_send(table, lambda_name):
             "ttl": int(_time.time()) + 86400 * 90
         })
     except Exception as e:
-        print(f"[ERROR] Status tracking write failed — monitoring will be blind: {e}")
+        logger.error(f"Status tracking write failed — monitoring will be blind: {e}")
         # Don't re-raise (email already sent) but log as ERROR for CloudWatch alarm
 
 
@@ -1340,17 +1340,17 @@ def lambda_handler(event, context):
     # Regrade mode: recompute day grades without sending email
     regrade_dates = event.get("regrade_dates")
     if regrade_dates:
-        print(f"[INFO] Regrade mode: {len(regrade_dates)} dates")
+        logger.info(f"Regrade mode: {len(regrade_dates)} dates")
         profile = fetch_profile()
         if not profile:
             return {"statusCode": 500, "body": "No profile found"}
         return _regrade_handler(regrade_dates, profile)
 
     demo_mode = event.get("demo_mode", False)
-    print("[INFO] Daily Brief v2.82.0 starting..." + (" [DEMO MODE]" if demo_mode else ""))
+    logger.info("Daily Brief v2.82.0 starting..." + (" [DEMO MODE]" if demo_mode else ""))
     profile = fetch_profile()
     if not profile:
-        print("[ERROR] No profile found")
+        logger.error("No profile found")
         return {"statusCode": 500, "body": "No profile found"}
 
     today = datetime.now(timezone.utc).date()
@@ -1359,7 +1359,7 @@ def lambda_handler(event, context):
     try:
         logger.set_date(yesterday)
     except Exception as e:
-        print(f"[WARN] logger.set_date failed (correlation_id missing for this execution): {e}")
+        logger.warning(f"logger.set_date failed (correlation_id missing for this execution): {e}")
 
     data = gather_daily_data(profile, yesterday)
     print("[INFO] Date: " + yesterday + " | sources: " +
@@ -1376,7 +1376,7 @@ def lambda_handler(event, context):
 
     if _sick_brief_rec:
         _sick_brief_reason = _sick_brief_rec.get("reason") or "sick day"
-        print(f"[INFO] Sick day flagged for {yesterday} ({_sick_brief_reason}) — sending recovery brief")
+        logger.info(f"Sick day flagged for {yesterday} ({_sick_brief_reason}) — sending recovery brief")
 
         _sb_whoop      = fetch_date("whoop", yesterday)
         _sb_sleep_hrs  = safe_float(_sb_whoop, "sleep_duration_hours")
@@ -1451,7 +1451,7 @@ def lambda_handler(event, context):
             ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
             EmailTags=[{"Name": "message_type", "Value": "daily_brief_sick"}],
         )
-        print(f"[INFO] Recovery brief sent: {_sb_subject}")
+        logger.info(f"Recovery brief sent: {_sb_subject}")
 
         try:
             output_writers.write_buddy_json(
@@ -1460,7 +1460,7 @@ def lambda_handler(event, context):
                 profile, yesterday, character_sheet=None,
             )
         except Exception as _sbe:
-            print(f"[WARN] write_buddy_json (sick) failed: {_sbe}")
+            logger.warning(f"write_buddy_json (sick) failed: {_sbe}")
 
         return {"statusCode": 200, "body": f"Recovery brief sent for {yesterday}"}
 
@@ -1474,7 +1474,7 @@ def lambda_handler(event, context):
             strava["activity_count"] = deduped_count
             strava["total_moving_time_seconds"] = sum(
                 float(a.get("moving_time_seconds") or 0) for a in strava["activities"])
-            print("[INFO] Dedup: " + str(orig_count) + " → " + str(deduped_count) + " activities")
+            logger.info("Dedup: " + str(orig_count) + " → " + str(deduped_count) + " activities")
 
     # Try to read pre-computed metrics from daily-metrics-compute Lambda (9:40 AM PT).
     # If the record exists, we skip all inline scoring and stores — they already happened.
@@ -1496,21 +1496,21 @@ def lambda_handler(event, context):
                     if _age_hours > 4:
                         _compute_stale = True
                         _compute_age_msg = f"{_age_hours:.1f}h ago"
-                        print(f"[WARN] REL-1: computed_metrics is stale ({_compute_age_msg}) — metrics may be estimated")
+                        logger.warning(f"REL-1: computed_metrics is stale ({_compute_age_msg}) — metrics may be estimated")
                     else:
-                        print(f"[INFO] Using pre-computed metrics for {yesterday} (age: {_age_hours:.1f}h)")
+                        logger.info(f"Using pre-computed metrics for {yesterday} (age: {_age_hours:.1f}h)")
                 except Exception as _ts_e:
-                    print("[WARN] REL-1: could not parse computed_at: " + str(_ts_e))
+                    logger.warning("REL-1: could not parse computed_at: " + str(_ts_e))
             else:
-                print("[INFO] Using pre-computed metrics for " + yesterday)
+                logger.info("Using pre-computed metrics for " + yesterday)
         else:
             _compute_stale = True
             _compute_age_msg = "not available"
-            print("[WARN] No pre-computed metrics for " + yesterday + " — computing inline (fallback)")
+            logger.warning("No pre-computed metrics for " + yesterday + " — computing inline (fallback)")
     except Exception as _e:
         _compute_stale = True
         _compute_age_msg = "fetch error"
-        print("[WARN] Could not fetch computed_metrics: " + str(_e))
+        logger.warning("Could not fetch computed_metrics: " + str(_e))
 
     # Risk-7: emit CloudWatch metric for compute pipeline staleness monitoring.
     # Alarm: LifePlatformComputeStaleness >= 1 for 1 datapoint within 1 day → alert.
@@ -1525,7 +1525,7 @@ def lambda_handler(event, context):
             }]
         )
     except Exception as _cw_e:
-        print("[WARN] Risk-7: failed to emit compute staleness metric: " + str(_cw_e))
+        logger.warning("Risk-7: failed to emit compute staleness metric: " + str(_cw_e))
 
     if _computed:
         # Read pre-computed values — daily-metrics-compute already stored day_grade + habit_scores
@@ -1543,14 +1543,14 @@ def lambda_handler(event, context):
         if _computed.get("latest_weight"):   data["latest_weight"]   = float(_computed["latest_weight"])
         if _computed.get("week_ago_weight"): data["week_ago_weight"] = float(_computed["week_ago_weight"])
         if _computed.get("avatar_weight"):   data["avatar_weight"]   = float(_computed["avatar_weight"])
-        print("[INFO] Day Grade (pre-computed): " + str(day_grade_score) + " (" + grade + ")")
+        logger.info("Day Grade (pre-computed): " + str(day_grade_score) + " (" + grade + ")")
     else:
         # Fallback: compute inline and store (pre-computed Lambda not yet run)
         try:
             day_grade_score, grade, component_scores, component_details = compute_day_grade(data, profile)
-            print("[INFO] Day Grade (inline): " + str(day_grade_score) + " (" + grade + ")")
+            logger.info("Day Grade (inline): " + str(day_grade_score) + " (" + grade + ")")
         except Exception as e:
-            print("[WARN] compute_day_grade failed, using defaults: " + str(e))
+            logger.warning("compute_day_grade failed, using defaults: " + str(e))
             day_grade_score, grade, component_scores, component_details = None, "—", {}, {}
 
         if day_grade_score is not None and not demo_mode:
@@ -1559,7 +1559,7 @@ def lambda_handler(event, context):
                                 profile.get("day_grade_weights", {}),
                                 profile.get("day_grade_algorithm_version", "1.1"))
             except Exception as e:
-                print("[WARN] store_day_grade failed: " + str(e))
+                logger.warning("store_day_grade failed: " + str(e))
 
     # Fetch pre-computed adaptive mode (computed by adaptive-mode-compute Lambda at 9:36 AM)
     brief_mode = "standard"
@@ -1569,11 +1569,11 @@ def lambda_handler(event, context):
         if adaptive_rec:
             brief_mode = adaptive_rec.get("brief_mode", "standard")
             engagement_score = adaptive_rec.get("engagement_score")
-            print("[INFO] Adaptive mode: " + brief_mode + " (score=" + str(engagement_score) + ")")
+            logger.info("Adaptive mode: " + brief_mode + " (score=" + str(engagement_score) + ")")
         else:
-            print("[INFO] No adaptive mode record for " + yesterday + " — using standard")
+            logger.info("No adaptive mode record for " + yesterday + " — using standard")
     except Exception as _am_e:
-        print("[WARN] adaptive mode fetch failed: " + str(_am_e))
+        logger.warning("adaptive mode fetch failed: " + str(_am_e))
 
     # Fetch pre-computed character sheet (computed by character-sheet-compute Lambda at 9:35 AM)
     character_sheet = None
@@ -1583,11 +1583,11 @@ def lambda_handler(event, context):
             cs_level = character_sheet.get("character_level", "?")
             cs_tier = character_sheet.get("character_tier", "?")
             cs_events = len(character_sheet.get("level_events", []))
-            print("[INFO] Character Sheet: Level " + str(cs_level) + " (" + str(cs_tier) + ") — " + str(cs_events) + " events")
+            logger.info("Character Sheet: Level " + str(cs_level) + " (" + str(cs_tier) + ") — " + str(cs_events) + " events")
         else:
-            print("[WARN] No character sheet record for " + yesterday + " — section will be skipped")
+            logger.warning("No character sheet record for " + yesterday + " — section will be skipped")
     except Exception as e:
-        print("[WARN] character_sheet fetch failed: " + str(e))
+        logger.warning("character_sheet fetch failed: " + str(e))
 
     if _computed:
         _cm_r = _computed.get("readiness_score")
@@ -1597,7 +1597,7 @@ def lambda_handler(event, context):
         try:
             readiness_score, readiness_colour = compute_readiness(data)
         except Exception as e:
-            print("[WARN] compute_readiness failed: " + str(e))
+            logger.warning("compute_readiness failed: " + str(e))
             readiness_score, readiness_colour = None, "gray"
 
     streak_data = None  # FIX: always initialise so write_public_stats_json ref is safe
@@ -1612,14 +1612,14 @@ def lambda_handler(event, context):
             full_streak  = streak_data.get("tier01_streak", 0)
             vice_streaks = streak_data.get("vice_streaks",  {})
         except Exception as e:
-            print("[WARN] compute_habit_streaks failed: " + str(e))
+            logger.warning("compute_habit_streaks failed: " + str(e))
             mvp_streak, full_streak, vice_streaks = 0, 0, {}
 
         if not demo_mode:
             try:
                 store_habit_scores(yesterday, component_details, component_scores, vice_streaks, profile)
             except Exception as e:
-                print("[WARN] store_habit_scores failed: " + str(e))
+                logger.warning("store_habit_scores failed: " + str(e))
 
     # Phase 4: Labs + genome personalization
     _labs_ctx = ""
@@ -1628,16 +1628,16 @@ def lambda_handler(event, context):
         from labs_coaching import build_labs_coaching_context
         _labs_ctx = build_labs_coaching_context(table, USER_PREFIX)
         if _labs_ctx:
-            print(f"[INFO] Phase 4: Labs coaching context loaded ({len(_labs_ctx)} chars)")
+            logger.info(f"Phase 4: Labs coaching context loaded ({len(_labs_ctx)} chars)")
     except Exception as _lc_e:
-        print(f"[WARN] Phase 4: Labs coaching failed (non-fatal): {_lc_e}")
+        logger.warning(f"Phase 4: Labs coaching failed (non-fatal): {_lc_e}")
     try:
         from genome_coaching import build_genome_coaching_context
         _genome_ctx = build_genome_coaching_context(table, USER_PREFIX)
         if _genome_ctx:
-            print(f"[INFO] Phase 4: Genome coaching context loaded ({len(_genome_ctx)} chars)")
+            logger.info(f"Phase 4: Genome coaching context loaded ({len(_genome_ctx)} chars)")
     except Exception as _gc_e:
-        print(f"[WARN] Phase 4: Genome coaching failed (non-fatal): {_gc_e}")
+        logger.warning(f"Phase 4: Genome coaching failed (non-fatal): {_gc_e}")
 
     # Phase 2: Inject additional data sources for richer AI prompts
     data["character_sheet"] = character_sheet or {}
@@ -1661,7 +1661,7 @@ def lambda_handler(event, context):
     try:
         api_key = get_anthropic_key()
     except Exception as e:
-        print("[WARN] Could not get API key: " + str(e))
+        logger.warning("Could not get API key: " + str(e))
 
     bod_insight = ""
     training_nutrition = {}
@@ -1710,11 +1710,11 @@ def lambda_handler(event, context):
                 elif _cid == "explorer":
                     explorer_coach_v2_text = _result
                 if _result:
-                    print(f"[INFO] {_label} Coach V2: {_result[:80]}")
+                    logger.info(f"{_label} Coach V2: {_result[:80]}")
                 else:
-                    print(f"[INFO] {_label} Coach V2 returned None — will use legacy")
+                    logger.info(f"{_label} Coach V2 returned None — will use legacy")
             except Exception as e:
-                print(f"[WARN] {_label} Coach V2 failed (non-blocking): {e}")
+                logger.warning(f"{_label} Coach V2 failed (non-blocking): {e}")
 
         # Invoke ensemble digest (async) after all v2 coaches complete
         try:
@@ -1724,9 +1724,9 @@ def lambda_handler(event, context):
                 InvocationType="Event",
                 Payload=json.dumps({"cycle_date": datetime.now(timezone.utc).strftime("%Y-%m-%d")}).encode(),
             )
-            print("[INFO] Ensemble digest invoked (async)")
+            logger.info("Ensemble digest invoked (async)")
         except Exception as e:
-            print(f"[WARN] Ensemble digest invoke failed (non-blocking): {e}")
+            logger.warning(f"Ensemble digest invoke failed (non-blocking): {e}")
 
         # Phase 3.8 (2026-05-16): build the shared system block ONCE; pass to
         # all 4 AI calls. Anthropic prompt caching reuses the cached system
@@ -1737,23 +1737,23 @@ def lambda_handler(event, context):
                 data, profile, day_grade=day_grade_score, grade=grade)
         except Exception as e:
             shared_system = None
-            print("[WARN] shared_system build failed (proceeding without): " + str(e))
+            logger.warning("shared_system build failed (proceeding without): " + str(e))
 
         try:
             bod_insight = ai_calls.call_board_of_directors(
                 data, profile, day_grade_score, grade, component_scores, api_key,
                 character_sheet=character_sheet, brief_mode=brief_mode,
                 shared_system=shared_system)
-            print("[INFO] BoD: " + bod_insight[:80])
+            logger.info("BoD: " + bod_insight[:80])
         except Exception as e:
-            print("[WARN] BoD failed: " + str(e))
+            logger.warning("BoD failed: " + str(e))
 
         try:
             training_nutrition = ai_calls.call_training_nutrition_coach(
                 data, profile, api_key, shared_system=shared_system)
-            print("[INFO] Training/Nutrition coach returned")
+            logger.info("Training/Nutrition coach returned")
         except Exception as e:
-            print("[WARN] Training/Nutrition coach failed: " + str(e))
+            logger.warning("Training/Nutrition coach failed: " + str(e))
 
         if data.get("journal_entries"):
             try:
@@ -1764,15 +1764,15 @@ def lambda_handler(event, context):
                 # rendered with a graceful no-op rather than a missing block.
                 if not journal_coach_text or len(journal_coach_text.strip()) < 10:
                     n_entries = len(data.get("journal_entries", []))
-                    print(f"[INFO] Journal coach: empty after {n_entries} entries — using stub")
+                    logger.info(f"Journal coach: empty after {n_entries} entries — using stub")
                     journal_coach_text = (
                         "Quieter journal day — no clear pattern surfaced. "
                         "|| One small thing: jot down what you're saving energy for."
                     )
                 else:
-                    print("[INFO] Journal coach: " + journal_coach_text[:80])
+                    logger.info("Journal coach: " + journal_coach_text[:80])
             except Exception as e:
-                print("[WARN] Journal coach failed: " + str(e))
+                logger.warning("Journal coach failed: " + str(e))
 
         try:
             tldr_guidance = ai_calls.call_tldr_and_guidance(
@@ -1780,9 +1780,9 @@ def lambda_handler(event, context):
                 component_scores, component_details,
                 readiness_score, readiness_colour, api_key,
                 shared_system=shared_system)
-            print("[INFO] TL;DR+Guidance: " + str(tldr_guidance.get("tldr", ""))[:80])
+            logger.info("TL;DR+Guidance: " + str(tldr_guidance.get("tldr", ""))[:80])
         except Exception as e:
-            print("[WARN] TL;DR+Guidance failed: " + str(e))
+            logger.warning("TL;DR+Guidance failed: " + str(e))
 
     # Phase 1B: Write guidance_given back to computed_insights for anti-repetition
     try:
@@ -1797,9 +1797,9 @@ def lambda_handler(event, context):
                     UpdateExpression="SET guidance_given = :gg",
                     ExpressionAttributeValues={":gg": _gg_json.dumps(_guidance_given)},
                 )
-                print(f"[INFO] Wrote {len(_guidance_given)} guidance items to computed_insights for anti-repetition")
+                logger.info(f"Wrote {len(_guidance_given)} guidance items to computed_insights for anti-repetition")
     except Exception as _gg_e:
-        print(f"[WARN] guidance_given write failed (non-fatal): {_gg_e}")
+        logger.warning(f"guidance_given write failed (non-fatal): {_gg_e}")
 
     # HP-12: Elena hero line for public_stats.json
     _elena_hero_line = None
@@ -1812,7 +1812,7 @@ def lambda_handler(event, context):
                 cutoff = _tldr[:200].rfind('. ')
                 _elena_hero_line = _tldr[:cutoff + 1] if cutoff > 0 else _tldr[:200] + "\u2026"
     except Exception as _e:
-        print(f"[WARN] HP-12: elena_hero_line generation failed: {_e}")
+        logger.warning(f"HP-12: elena_hero_line generation failed: {_e}")
 
     # AI-3: Validate all AI outputs before delivery
     if api_key and _HAS_AI_VALIDATOR:
@@ -1838,7 +1838,7 @@ def lambda_handler(event, context):
             else:
                 print("[AI-3] All AI outputs passed validation")
         except Exception as _v_e:
-            print(f"[WARN] AI-3 validation failed (non-fatal): {_v_e}")
+            logger.warning(f"AI-3 validation failed (non-fatal): {_v_e}")
 
     # Pre-compute rewards + protocol recs (passed to html_builder as params)
     triggered_rewards = []
@@ -1847,11 +1847,11 @@ def lambda_handler(event, context):
         try:
             triggered_rewards = output_writers.evaluate_rewards(character_sheet)
         except Exception as _e:
-            print("[WARN] evaluate_rewards failed: " + str(_e))
+            logger.warning("evaluate_rewards failed: " + str(_e))
         try:
             protocol_recs = output_writers.get_protocol_recs(character_sheet)
         except Exception as _e:
-            print("[WARN] get_protocol_recs failed: " + str(_e))
+            logger.warning("get_protocol_recs failed: " + str(_e))
 
     # ── S2-T1-10: Weekly Habit Review (Sunday only) ──────────────────────────────
     _weekly_habit_review = None
@@ -1868,11 +1868,11 @@ def lambda_handler(event, context):
             if _whr_habit_7d:
                 from html_builder import _compute_weekly_habit_review
                 _weekly_habit_review = _compute_weekly_habit_review(_whr_habit_7d, profile)
-                print("[INFO] S2-T1-10: Weekly Habit Review computed for Sunday brief")
+                logger.info("S2-T1-10: Weekly Habit Review computed for Sunday brief")
             else:
-                print("[WARN] S2-T1-10: No habit_scores data for weekly review")
+                logger.warning("S2-T1-10: No habit_scores data for weekly review")
     except Exception as _whr_err:
-        print("[WARN] S2-T1-10: Weekly habit review failed (non-fatal): " + str(_whr_err))
+        logger.warning("S2-T1-10: Weekly habit review failed (non-fatal): " + str(_whr_err))
 
     try:
         html = html_builder.build_html(
@@ -1893,7 +1893,7 @@ def lambda_handler(event, context):
             labs_coach_v2_text=labs_coach_v2_text,
             explorer_coach_v2_text=explorer_coach_v2_text)
     except Exception as e:
-        print("[ERROR] build_html crashed, sending minimal brief: " + str(e))
+        logger.error("build_html crashed, sending minimal brief: " + str(e))
         html = ('<!DOCTYPE html><html><body style="font-family:sans-serif;padding:20px;">'
                 '<h2>⚠ Daily Brief — Partial Failure</h2>'
                 '<p>The HTML builder crashed: <code>' + str(e) + '</code></p>'
@@ -1972,15 +1972,15 @@ def lambda_handler(event, context):
             html = _re.sub(
                 r'(<body[^>]*>)', r'\1' + _banner, html, count=1, flags=_re.IGNORECASE,
             )
-            print(f"[INFO] WR-48 banner prepended: {len(_stale)} stale sources")
+            logger.info(f"WR-48 banner prepended: {len(_stale)} stale sources")
     except Exception as _be:
-        print(f"[WARN] WR-48 banner failed (non-fatal): {_be}")
+        logger.warning(f"WR-48 banner failed (non-fatal): {_be}")
 
     if demo_mode:
         html = output_writers.sanitize_for_demo(html, data, profile)
         prefix = (profile.get("demo_mode_rules") or {}).get("subject_prefix", "[DEMO]")
         subject = prefix + " " + subject
-        print("[INFO] Demo mode: sanitization applied")
+        logger.info("Demo mode: sanitization applied")
 
     ses.send_email(
         FromEmailAddress=SENDER,
@@ -1992,7 +1992,7 @@ def lambda_handler(event, context):
         ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
         EmailTags=[{"Name": "message_type", "Value": "daily_brief"}],
     )
-    print("[INFO] Sent: " + subject)
+    logger.info("Sent: " + subject)
 
     if not demo_mode:
         output_writers.write_dashboard_json(
@@ -2016,9 +2016,9 @@ def lambda_handler(event, context):
                     component_scores=component_scores,
                 )
                 written = insight_writer.write_insights_batch(insights_list)
-                print(f"[INFO] IC-15: {written}/{len(insights_list)} insights persisted")
+                logger.info(f"IC-15: {written}/{len(insights_list)} insights persisted")
             except Exception as e:
-                print(f"[WARN] IC-15 insight write failed (non-fatal): {e}")
+                logger.warning(f"IC-15 insight write failed (non-fatal): {e}")
 
     # site_writer: write public_stats.json to S3 for averagejoematt.com
     # Non-fatal — failure here never breaks the Daily Brief
@@ -2103,7 +2103,7 @@ def lambda_handler(event, context):
                 if _rec_vals:
                     _trends["recovery_daily"] = [{"date": d, "pct": round(v, 0)} for d, v in _rec_vals[-14:]]
             except Exception as _te:
-                print(f"[WARN] Trend array build failed (non-fatal): {_te}")
+                logger.warning(f"Trend array build failed (non-fatal): {_te}")
 
             # v1.2.0: Extract AI brief excerpt for homepage widget
             _brief_excerpt = None
@@ -2261,7 +2261,7 @@ def lambda_handler(event, context):
                     "days_active":    (character_sheet or {}).get("days_active"),
                 } if character_sheet else None,
             )
-            print("[INFO] site_writer: public_stats.json written with baseline + character")
+            logger.info("site_writer: public_stats.json written with baseline + character")
 
             # PULSE-A1: Write pulse.json to S3 + DynamoDB for /api/pulse endpoint
             try:
@@ -2302,12 +2302,12 @@ def lambda_handler(event, context):
                     table_client=table,
                     user_id=USER_ID,
                 )
-                print("[INFO] PULSE-A: pulse.json written")
+                logger.info("PULSE-A: pulse.json written")
             except Exception as _pulse_e:
-                print(f"[WARN] PULSE-A: pulse write failed (non-fatal): {_pulse_e}")
+                logger.warning(f"PULSE-A: pulse write failed (non-fatal): {_pulse_e}")
 
         except Exception as _sw_e:
-            print(f"[WARN] site_writer failed (non-fatal): {_sw_e}")
+            logger.warning(f"site_writer failed (non-fatal): {_sw_e}")
 
     record_email_send(table, "daily_brief")
     return {"statusCode": 200, "body": "Daily brief v2.77.0 sent: " + subject}
