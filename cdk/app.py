@@ -55,22 +55,22 @@ core = CoreStack(app, "LifePlatformCore", env=env)
 #
 ingestion = IngestionStack(app, "LifePlatformIngestion", env=env,
     table=core.table, bucket=core.bucket, dlq=core.dlq,
-    alerts_topic=core.alerts_topic)
+    alerts_topic=core.alerts_topic, digest_topic=core.digest_topic)
 # ingestion stack wired ✅
 #
 compute = ComputeStack(app, "LifePlatformCompute", env=env,
     table=core.table, bucket=core.bucket, dlq=core.dlq,
-    alerts_topic=core.alerts_topic)
+    alerts_topic=core.alerts_topic, digest_topic=core.digest_topic)
 # compute stack wired ✅
 #
 email = EmailStack(app, "LifePlatformEmail", env=env,
     table=core.table, bucket=core.bucket, dlq=core.dlq,
-    alerts_topic=core.alerts_topic)
+    alerts_topic=core.alerts_topic, digest_topic=core.digest_topic)
 # email stack wired ✅
 #
 operational = OperationalStack(app, "LifePlatformOperational", env=env,
     table=core.table, bucket=core.bucket, dlq=core.dlq,
-    alerts_topic=core.alerts_topic)
+    alerts_topic=core.alerts_topic, digest_topic=core.digest_topic)
 # operational stack wired ✅
 #
 mcp = McpStack(app, "LifePlatformMcp", env=env,
@@ -82,7 +82,7 @@ web = WebStack(app, "LifePlatformWeb",
 # web stack wired ✅
 #
 monitoring = MonitoringStack(app, "LifePlatformMonitoring", env=env,
-    alerts_topic=core.alerts_topic)
+    alerts_topic=core.alerts_topic, digest_topic=core.digest_topic)
 # monitoring stack wired ✅
 
 app.synth()

@@ -92,6 +92,53 @@ class WebStack(Stack):
         local_alerts = alerts_topic or sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
 
         # ══════════════════════════════════════════════════════════════
+        # Phase 2.3 (2026-05-16): Shared security headers policy for all
+        # subdomain distributions (dash, blog, buddy). Originally only the
+        # main averagejoematt.com distribution had this (R17-15 added below).
+        # Hoisted up here so dash/blog/buddy can reference it via .ref.
+        # ══════════════════════════════════════════════════════════════
+        subdomain_security_headers = cloudfront.CfnResponseHeadersPolicy(
+            self, "SubdomainSecurityHeadersPolicy",
+            response_headers_policy_config=cloudfront.CfnResponseHeadersPolicy.ResponseHeadersPolicyConfigProperty(
+                name="life-platform-subdomain-security-headers",
+                comment="CSP + HSTS + X-Frame-Options for dash/blog/buddy subdomains",
+                security_headers_config=cloudfront.CfnResponseHeadersPolicy.SecurityHeadersConfigProperty(
+                    content_security_policy=cloudfront.CfnResponseHeadersPolicy.ContentSecurityPolicyProperty(
+                        # Dashboard pages fetch only relative paths (/public_stats.json,
+                        # /api/*) — 'self' is sufficient. Allow main domain too for any
+                        # cross-subdomain inclusion (e.g., shared site_api endpoints).
+                        content_security_policy=(
+                            "default-src 'self'; "
+                            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                            "style-src 'self' 'unsafe-inline'; "
+                            "img-src 'self' data: https:; "
+                            "connect-src 'self' https://averagejoematt.com https://*.averagejoematt.com; "
+                            "font-src 'self' data:; "
+                            "frame-ancestors 'none'; "
+                            "base-uri 'self'; "
+                            "form-action 'self'"
+                        ),
+                        override=True,
+                    ),
+                    frame_options=cloudfront.CfnResponseHeadersPolicy.FrameOptionsProperty(
+                        frame_option="DENY", override=True,
+                    ),
+                    content_type_options=cloudfront.CfnResponseHeadersPolicy.ContentTypeOptionsProperty(
+                        override=True,
+                    ),
+                    referrer_policy=cloudfront.CfnResponseHeadersPolicy.ReferrerPolicyProperty(
+                        referrer_policy="strict-origin-when-cross-origin", override=True,
+                    ),
+                    strict_transport_security=cloudfront.CfnResponseHeadersPolicy.StrictTransportSecurityProperty(
+                        access_control_max_age_sec=31536000,
+                        include_subdomains=True,
+                        override=True,
+                    ),
+                ),
+            ),
+        )
+
+        # ══════════════════════════════════════════════════════════════
         # Dashboard — dash.averagejoematt.com  (EM5NPX6NJN095)
         # ══════════════════════════════════════════════════════════════
         cloudfront.CfnDistribution(
@@ -122,6 +169,7 @@ class WebStack(Stack):
                     forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(
                         query_string=False,
                     ),
+                    response_headers_policy_id=subdomain_security_headers.ref,  # Phase 2.3
                 ),
             ),
         )
@@ -157,6 +205,7 @@ class WebStack(Stack):
                     forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(
                         query_string=False,
                     ),
+                    response_headers_policy_id=subdomain_security_headers.ref,  # Phase 2.3
                 ),
             ),
         )
@@ -192,6 +241,7 @@ class WebStack(Stack):
                     forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(
                         query_string=False,
                     ),
+                    response_headers_policy_id=subdomain_security_headers.ref,  # Phase 2.3
                 ),
             ),
         )

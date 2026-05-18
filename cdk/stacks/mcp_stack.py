@@ -31,6 +31,7 @@ ACCT = "205930651321"
 LIFE_PLATFORM_TABLE  = "life-platform"
 LIFE_PLATFORM_BUCKET = "matthew-life-platform"
 ALERTS_TOPIC_ARN     = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
+DIGEST_TOPIC_ARN     = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
 MCP_FUNCTION_NAME    = "life-platform-mcp"
 WARMER_FUNCTION_NAME = "life-platform-mcp-warmer"
 
@@ -43,6 +44,7 @@ class McpStack(Stack):
         local_table        = dynamodb.Table.from_table_name(self, "LifePlatformTable", LIFE_PLATFORM_TABLE)
         local_bucket       = s3.Bucket.from_bucket_name(self, "LifePlatformBucket", LIFE_PLATFORM_BUCKET)
         local_alerts_topic = sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
+        local_digest_topic = sns.Topic.from_topic_arn(self, "DigestTopic", DIGEST_TOPIC_ARN)
 
         # ── MCP code asset ────────────────────────────────────────────────────
         # MCP Lambda lives at repo root (mcp_server.py + mcp/ package), not
@@ -105,7 +107,8 @@ class McpStack(Stack):
             alarm_name="mcp-warmer-error",
             environment={"DEPLOY_VERSION": "2.74.0"},
             custom_policies=rp.mcp_server(),
-            table=local_table, bucket=local_bucket, dlq=None, alerts_topic=local_alerts_topic)
+            table=local_table, bucket=local_bucket, dlq=None,
+            alerts_topic=local_alerts_topic, digest_topic=local_digest_topic, digest=True)
 
         # ── MCP Server alarms ─────────────────────────────────────────────────
         duration_alarm = cloudwatch.Alarm(self, "McpDurationHighAlarm",
@@ -117,7 +120,8 @@ class McpStack(Stack):
             evaluation_periods=1, threshold=240000,
             comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
             treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING)
-        duration_alarm.add_alarm_action(cw_actions.SnsAction(local_alerts_topic))
+        # ADR-050: duration is a degradation signal, not page-worthy → digest.
+        duration_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
         slo_alarm = cloudwatch.Alarm(self, "SloMcpAvailabilityAlarm",
             alarm_name="slo-mcp-availability",
@@ -142,7 +146,8 @@ class McpStack(Stack):
             evaluation_periods=1, threshold=1,
             comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
             treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING)
-        warmer_alarm.add_alarm_action(cw_actions.SnsAction(local_alerts_topic))
+        # ADR-050: warmer failure means stale caches all day, but not user-blocking → digest.
+        warmer_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
         cdk.CfnOutput(self, "McpFunctionArn", value=mcp.function_arn,
             description="MCP server Lambda ARN")

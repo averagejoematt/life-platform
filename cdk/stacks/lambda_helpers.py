@@ -58,6 +58,8 @@ def create_platform_lambda(
     bucket: s3.IBucket,
     dlq: sqs.IQueue = None,
     alerts_topic: sns.ITopic = None,
+    digest_topic: sns.ITopic = None,
+    digest: bool = False,
     alarm_name: str = None,
     secrets: list[str] = None,
     schedule: str = None,
@@ -223,7 +225,16 @@ def create_platform_lambda(
         rule.add_target(targets.LambdaFunction(fn))
 
     # ── CloudWatch error alarm ──
-    if alerts_topic:
+    # ADR-050: alarms route to one of two SNS topics based on `digest` flag.
+    #   digest=False (default) → urgent topic (immediate email)
+    #   digest=True            → digest topic (batched into daily 8am PT email)
+    # Pass `digest_topic` alongside `alerts_topic` to enable digest routing.
+    # NOTE: alerts_topic=None still disables alarms entirely — preserves the
+    # existing opt-out pattern used by sources where no alarm is desired.
+    _selected_topic = None
+    if alerts_topic is not None:
+        _selected_topic = digest_topic if (digest and digest_topic is not None) else alerts_topic
+    if _selected_topic:
         _alarm_name = alarm_name if alarm_name else f"ingestion-error-{function_name}"
         # 2026-05-03 v6.9.2: period reduced 24h → 1h. Old window kept alarms in
         # ALARM state for 24h on a single transient error, and re-emailed if
@@ -241,7 +252,7 @@ def create_platform_lambda(
             comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
             treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
         )
-        alarm.add_alarm_action(cw_actions.SnsAction(alerts_topic))
+        alarm.add_alarm_action(cw_actions.SnsAction(_selected_topic))
         # OK actions intentionally omitted — inbox should only receive actionable alerts
 
     return fn

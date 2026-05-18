@@ -31,10 +31,11 @@ INGESTION_DLQ_ARN    = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq
 LIFE_PLATFORM_TABLE  = TABLE_NAME
 LIFE_PLATFORM_BUCKET = S3_BUCKET
 ALERTS_TOPIC_ARN     = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
+DIGEST_TOPIC_ARN     = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
 
 
 class IngestionStack(Stack):
-    def __init__(self, scope, construct_id, table, bucket, dlq, alerts_topic, **kwargs):
+    def __init__(self, scope, construct_id, table, bucket, dlq, alerts_topic, digest_topic=None, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
         shared_utils_layer = _lambda.LayerVersion.from_layer_version_arn(self, "SharedUtilsLayer", SHARED_LAYER_ARN)
         garth_layer        = _lambda.LayerVersion.from_layer_version_arn(self, "GarthLayer", GARTH_LAYER_ARN)
@@ -42,7 +43,14 @@ class IngestionStack(Stack):
         local_table        = dynamodb.Table.from_table_name(self, "LifePlatformTable", LIFE_PLATFORM_TABLE)
         local_bucket       = s3.Bucket.from_bucket_name(self, "LifePlatformBucket", LIFE_PLATFORM_BUCKET)
         local_alerts_topic = sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
-        shared = dict(table=local_table, bucket=local_bucket, dlq=local_dlq, alerts_topic=local_alerts_topic)
+        local_digest_topic = sns.Topic.from_topic_arn(self, "DigestTopic", DIGEST_TOPIC_ARN)
+        # ADR-050: every ingestion-error-* alarm is routed to the digest topic.
+        # Transient API hiccups and gap-aware backfill recover automatically; one
+        # daily digest is the right pace for these.
+        shared = dict(
+            table=local_table, bucket=local_bucket, dlq=local_dlq,
+            alerts_topic=local_alerts_topic, digest_topic=local_digest_topic, digest=True,
+        )
 
         # ── 1. Whoop — 5x daily ingestion + recovery refresh
         whoop = create_platform_lambda(self, "WhoopIngestion",
@@ -55,8 +63,10 @@ class IngestionStack(Stack):
             custom_policies=rp.ingestion_whoop(), **shared)
         # Second schedule: recovery refresh at 9:30 AM PT
         # OAuth race prevention: max 1 concurrent invocation per OAuth Lambda (ADR-036 fix)
-        # NOTE: Requires account concurrency limit increase from 10 → 50+ before enabling.
-        # Request via AWS Support Console → Service Quotas → Lambda concurrent executions.
+        # BLOCKED 2026-05-17: AWS rejects PutFunctionConcurrency because the account quota
+        # is exactly 10 and minimum unreserved is also 10 — reserving any concurrency would
+        # push unreserved below minimum. Service Quotas request L-B99A9384 raise → 50+ filed.
+        # Re-enable this line once the quota increase is approved.
         # whoop.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
 
         whoop_recovery = events.Rule(self, "WhoopRecoverySchedule",
@@ -229,7 +239,7 @@ class IngestionStack(Stack):
             hae_role.add_to_policy(stmt)
         # NOTE: HAE uses code=from_asset (entire lambdas/ dir), not source_file=.
         # Handler health_auto_export_lambda.lambda_handler → lambdas/health_auto_export_lambda.py  # noqa: CDK_HANDLER_ORPHAN
-        hae = _lambda.Function(self, "HaeWebhook", function_name="health-auto-export-webhook", runtime=_lambda.Runtime.PYTHON_3_12, handler="health_auto_export_lambda.lambda_handler", code=_lambda.Code.from_asset("../lambdas", exclude=_ASSET_EXCLUDES), role=hae_role, timeout=Duration.seconds(60), memory_size=256, environment={"TABLE_NAME": local_table.table_name, "S3_BUCKET": local_bucket.bucket_name, "USER_ID": self.node.try_get_context("user_id") or "matthew"})  # BUG-07: large Apple Health exports need >30s
+        hae = _lambda.Function(self, "HaeWebhook", function_name="health-auto-export-webhook", runtime=_lambda.Runtime.PYTHON_3_12, handler="health_auto_export_lambda.lambda_handler", code=_lambda.Code.from_asset("../lambdas", exclude=_ASSET_EXCLUDES), role=hae_role, timeout=Duration.seconds(300), memory_size=256, environment={"TABLE_NAME": local_table.table_name, "S3_BUCKET": local_bucket.bucket_name, "USER_ID": self.node.try_get_context("user_id") or "matthew"})  # Phase 1.6 (2026-05-16): 60s→300s. Large Apple Health exports (10-50MB) silently 504'd. BUG-07.
         hae.add_permission("ApiGatewayInvoke", principal=iam.ServicePrincipal("apigateway.amazonaws.com"), source_arn=f"arn:aws:execute-api:{self.region}:{self.account}:a76xwxt2wa/*/*/ingest")
 
         # ── 16. Google Calendar — RETIRED (ADR-030, v3.7.46)

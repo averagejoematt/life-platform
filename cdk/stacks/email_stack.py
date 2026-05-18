@@ -35,21 +35,27 @@ INGESTION_DLQ_ARN    = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq
 LIFE_PLATFORM_TABLE  = "life-platform"
 LIFE_PLATFORM_BUCKET = "matthew-life-platform"
 ALERTS_TOPIC_ARN     = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
+DIGEST_TOPIC_ARN     = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
 
 
 class EmailStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str,
-                 table, bucket, dlq, alerts_topic, **kwargs) -> None:
+                 table, bucket, dlq, alerts_topic, digest_topic=None, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         local_dlq          = sqs.Queue.from_queue_arn(self, "IngestionDLQ", INGESTION_DLQ_ARN)
         local_table        = dynamodb.Table.from_table_name(self, "LifePlatformTable", LIFE_PLATFORM_TABLE)
         local_bucket       = s3.Bucket.from_bucket_name(self, "LifePlatformBucket", LIFE_PLATFORM_BUCKET)
         local_alerts_topic = sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
+        local_digest_topic = sns.Topic.from_topic_arn(self, "DigestTopic", DIGEST_TOPIC_ARN)
 
         shared_utils_layer = _lambda.LayerVersion.from_layer_version_arn(self, "SharedUtilsLayer", SHARED_LAYER_ARN)
-        shared = dict(table=local_table, bucket=local_bucket, dlq=local_dlq, alerts_topic=local_alerts_topic,
+        # ADR-050: email Lambda error alarms route to digest. They're recoverable
+        # (next day's run picks up where this one failed) and rarely user-facing.
+        # daily-brief still has its urgent alarm via MonitoringStack.
+        shared = dict(table=local_table, bucket=local_bucket, dlq=local_dlq,
+                      alerts_topic=local_alerts_topic, digest_topic=local_digest_topic, digest=True,
                       shared_layer=shared_utils_layer)
 
         # daily-brief: alerts_topic=None — MonitoringStack owns its alarms
