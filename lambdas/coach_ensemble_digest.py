@@ -137,24 +137,38 @@ def _slugify(text):
     return slug[:80] if slug else "unnamed"
 
 
-def _emit_token_metrics(input_tokens, output_tokens):
-    """Emit per-Lambda token usage to CloudWatch (non-fatal)."""
+def _emit_token_metrics(input_tokens, output_tokens,
+                        cache_creation_tokens=0, cache_read_tokens=0):
+    """Emit per-Lambda token usage to CloudWatch (non-fatal).
+
+    V2 P0.6 (2026-05-17): added cache fields. Prior 2-arg signature dropped them,
+    leaving AnthropicCacheReadTokens with zero datapoints despite caching wired.
+    """
     try:
-        _cw.put_metric_data(
-            Namespace=_CW_NAMESPACE,
-            MetricData=[
-                {
-                    "MetricName": "AnthropicInputTokens",
-                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                    "Value": input_tokens, "Unit": "Count",
-                },
-                {
-                    "MetricName": "AnthropicOutputTokens",
-                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                    "Value": output_tokens, "Unit": "Count",
-                },
-            ],
-        )
+        metric_data = [
+            {
+                "MetricName": "AnthropicInputTokens",
+                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                "Value": input_tokens, "Unit": "Count",
+            },
+            {
+                "MetricName": "AnthropicOutputTokens",
+                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                "Value": output_tokens, "Unit": "Count",
+            },
+        ]
+        if cache_creation_tokens or cache_read_tokens:
+            metric_data.append({
+                "MetricName": "AnthropicCacheWriteTokens",
+                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                "Value": cache_creation_tokens, "Unit": "Count",
+            })
+            metric_data.append({
+                "MetricName": "AnthropicCacheReadTokens",
+                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                "Value": cache_read_tokens, "Unit": "Count",
+            })
+        _cw.put_metric_data(Namespace=_CW_NAMESPACE, MetricData=metric_data)
     except Exception as e:
         logger.warning("CloudWatch token metric emit failed (non-fatal): %s", e)
 
@@ -222,6 +236,8 @@ def _call_haiku(system, user_message, max_tokens=2000, temperature=0.2):
                     _emit_token_metrics(
                         usage.get("input_tokens", 0),
                         usage.get("output_tokens", 0),
+                        cache_creation_tokens=usage.get("cache_creation_input_tokens", 0),
+                        cache_read_tokens=usage.get("cache_read_input_tokens", 0),
                     )
                 text = resp["content"][0]["text"].strip()
                 # Try to parse as JSON
@@ -365,6 +381,15 @@ ENSEMBLE_SYSTEM_PROMPT = (
     "on something, that is SUSPICIOUS — it may indicate groupthink or "
     "a blind spot. Flag any areas of unusual consensus so the user can "
     "apply independent judgment.\n\n"
+    "## Coach Absence Handling (Phase 3.7)\n\n"
+    "If the user message lists coaches WITHOUT data this cycle:\n"
+    "- Do NOT call any agreement 'unanimous' unless ALL expected coaches "
+    "weighed in. Use 'majority' or 'partial consensus' when coaches are "
+    "absent.\n"
+    "- In `unanimous_flags`, only include items where every expected coach "
+    "(including absent ones) is known to agree.\n"
+    "- Mention the absence in the digest if it materially affects the "
+    "interpretation.\n\n"
     "## Important Rules\n\n"
     "- Be precise and literal — do not infer concerns that coaches did not "
     "actually express.\n"
@@ -402,13 +427,31 @@ ENSEMBLE_SYSTEM_PROMPT = (
 )
 
 
-def _build_user_message(coach_data, cycle_date):
-    """Build the user message containing all coaches' data for ensemble analysis."""
+def _build_user_message(coach_data, cycle_date, expected_coach_ids=None):
+    """Build the user message containing all coaches' data for ensemble analysis.
+
+    Phase 3.7 (2026-05-16): explicitly lists absent coaches so the synthesizer
+    doesn't claim "unanimous agreement" when several coaches simply couldn't
+    report. Previously the prompt listed only present coaches; LLM had no
+    visibility into who was missing.
+    """
+    if expected_coach_ids is None:
+        expected_coach_ids = ALL_COACH_IDS
+    present_ids = list(coach_data.keys())
+    absent_ids = [cid for cid in expected_coach_ids if cid not in present_ids]
+
     parts = [
         f"## Ensemble Digest Cycle: {cycle_date}",
-        f"## Coaches with data: {len(coach_data)}/{len(ALL_COACH_IDS)}",
-        "",
+        f"## Coaches with data: {len(coach_data)}/{len(expected_coach_ids)}",
     ]
+    if absent_ids:
+        parts.append(f"## Coaches WITHOUT data this cycle: {', '.join(absent_ids)}")
+        parts.append(
+            "## IMPORTANT: Do NOT claim 'unanimous agreement' on topics where "
+            "these absent coaches would have weighed in. Adjust confidence and "
+            "synthesis to reflect missing voices."
+        )
+    parts.append("")
 
     for coach_id, data in coach_data.items():
         parts.append(f"### Coach: {coach_id}")
@@ -699,7 +742,8 @@ def lambda_handler(event, context):
     )
 
     # Step 2: Call Haiku to produce the ensemble digest
-    user_message = _build_user_message(coach_data, cycle_date)
+    # Phase 3.7: pass expected coach_ids so the synthesizer knows who's absent.
+    user_message = _build_user_message(coach_data, cycle_date, expected_coach_ids=coach_ids)
 
     try:
         result = _call_haiku(

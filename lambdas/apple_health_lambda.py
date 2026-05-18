@@ -126,14 +126,16 @@ AVG_TYPES = {
 }
 
 
-def floats_to_decimal(obj):
-    if isinstance(obj, float):
-        return Decimal(str(obj))
-    elif isinstance(obj, dict):
-        return {k: floats_to_decimal(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [floats_to_decimal(v) for v in obj]
-    return obj
+# Phase 4.2 (2026-05-16): canonical impl in lambdas/numeric.py.
+try:
+    from numeric import floats_to_decimal  # noqa: F401
+except ImportError:
+    def floats_to_decimal(obj):
+        if isinstance(obj, bool): return obj
+        if isinstance(obj, float): return Decimal(str(obj))
+        if isinstance(obj, dict): return {k: floats_to_decimal(v) for k, v in obj.items()}
+        if isinstance(obj, list): return [floats_to_decimal(v) for v in obj]
+        return obj
 
 
 def parse_date(date_str):

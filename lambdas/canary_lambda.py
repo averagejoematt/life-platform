@@ -410,7 +410,7 @@ def send_alert(failures: list[dict], canary_ts: str) -> None:
 
 # ── Handler ────────────────────────────────────────────────────────────────────
 
-def lambda_handler(event, context):
+def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
     try:
         canary_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 

@@ -395,7 +395,10 @@ def lambda_handler(event, context):
                 if isinstance(obj, float): return Decimal(str(obj))
                 if isinstance(obj, int):   return Decimal(str(obj))
                 return obj
-            table.put_item(Item={k: _dec(v) for k, v in _frozen.items() if v is not None})
+            # Phase 3.3 (2026-05-16): tag with run_id + computed_at for double-run observability.
+            from compute_metadata import tag_record
+            _tagged = tag_record({k: _dec(v) for k, v in _frozen.items() if v is not None}, source_id="character_sheet")
+            table.put_item(Item=_tagged)
             logger.info(f"[character] Frozen record stored for {yesterday_str} (from {_frozen.get('frozen_from', '?')})")
             return {
                 "statusCode":   200,

@@ -428,23 +428,14 @@ def build_context(yesterday_str):
     return context
 
 
-def call_anthropic_with_retry(req, timeout=30, max_attempts=2, backoff_s=5):
-    for attempt in range(1, max_attempts + 1):
-        try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                return json.loads(r.read())
-        except urllib.error.HTTPError as e:
-            print(f"[WARN] Anthropic API HTTP {e.code} on attempt {attempt}/{max_attempts}")
-            if attempt < max_attempts and e.code in (429, 529, 500, 502, 503, 504):
-                time.sleep(backoff_s)
-            else:
-                raise
-        except urllib.error.URLError as e:
-            print(f"[WARN] Anthropic API network error on attempt {attempt}/{max_attempts}: {e}")
-            if attempt < max_attempts:
-                time.sleep(backoff_s)
-            else:
-                raise
+def call_anthropic_with_retry(req, timeout=30, max_attempts=None, backoff_s=None):
+    """Phase 3.4 (2026-05-16): delegated to retry_utils.call_anthropic_raw.
+    Was: 2 attempts × 5s fixed backoff. Now: 4 attempts × 5/15/45s exponential.
+    Also emits per-Lambda CloudWatch token + failure metrics.
+    Signature kept for callers; max_attempts/backoff_s args ignored.
+    """
+    from retry_utils import call_anthropic_raw
+    return call_anthropic_raw(req, timeout=timeout)
 
 
 def call_haiku_hypothesis(flagged, context, api_key):

@@ -25,7 +25,7 @@ v1.0.0 — 2026-04-06 (Coach Intelligence)
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
@@ -430,6 +430,42 @@ def _render_coach_card(domain, include_threads=True):
                 revision_signal = "Recently revised position"
             break
 
+    # ── 6b. Prediction track record (v7.18.0) ────────────────────────────────
+    # Aggregate LEARNING# verdicts over a 30-day window so the card can show
+    # "N of M predictions confirmed in last 30 days". Distinct from section 6's
+    # revision_signal query (which is limited to 3 records and matches only
+    # type=position_revision). This query uses an SK-between bound on date.
+    track_record = None
+    try:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+        tr_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(coach_pk)
+                & Key("sk").between(f"LEARNING#{cutoff}", "LEARNING#z"),
+            ProjectionExpression="#s",
+            ExpressionAttributeNames={"#s": "status"},
+        )
+        counts = {"confirmed": 0, "refuted": 0, "inconclusive": 0, "expired": 0}
+        for it in tr_resp.get("Items", []):
+            s = it.get("status", "")
+            if s in counts:
+                counts[s] += 1
+        decided = counts["confirmed"] + counts["refuted"]
+        # Only surface the panel when something useful resolved. Daily-brief
+        # consumers can render absence as "no track record yet."
+        if decided > 0:
+            hit_rate = round(100 * counts["confirmed"] / decided, 0)
+            track_record = {
+                "window_days": 30,
+                "confirmed": counts["confirmed"],
+                "refuted": counts["refuted"],
+                "inconclusive": counts["inconclusive"],
+                "decided_count": decided,
+                "hit_rate_pct": hit_rate,
+                "summary": f"{counts['confirmed']} of {decided} predictions confirmed in last 30 days",
+            }
+    except Exception as e:
+        logger.warning("track_record query failed for %s: %s", coach_id, e)
+
     # ── 7. Assemble the card ─────────────────────────────────────────────────
     week_number, days_in_experiment = _compute_experiment_timing()
 
@@ -447,6 +483,7 @@ def _render_coach_card(domain, include_threads=True):
         "journaling_prompt": journaling_prompt,
         "thread_reference": thread_reference,
         "revision_signal": revision_signal,
+        "track_record": track_record,
         "cross_coach_reference": cross_coach_reference,
         "confidence_language": confidence_language,
         "data_availability": data_availability,
