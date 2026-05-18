@@ -1,0 +1,183 @@
+# Data Governance — PII Classification + Retention Policy
+
+Phase 7 (2026-05-16): single source of truth for what data exists, who can see it, and how long it's kept.
+
+This document covers two cross-cutting concerns:
+1. **PII Classification** (P7.4) — what's personally identifiable and what's safe to expose
+2. **Retention Policy** (P7.2) — per-data-type retention rules
+
+If a clinician, lawyer, or compliance reviewer asks "what data do you hold and for how long," this is the answer.
+
+---
+
+## Data Classification
+
+Every field falls into one of these tiers:
+
+### Tier 0 — Public (no auth required)
+Visible at `averagejoematt.com` to anyone:
+- Daily/weekly aggregate scores (sleep score, recovery, training load — rolled up, no granular timestamps)
+- Habit completion percentages (no per-habit detail)
+- Character sheet level + pillar tier (not raw component values)
+- Public stats (`public_stats.json`): weight, day count, total achievements
+- Blog/chronicle content (written deliberately for public consumption)
+
+### Tier 1 — Subscriber-only (auth via subscriber token)
+- Detailed per-metric trends and correlations
+- Habit-specific completion data
+- AI coaching responses (via `/api/ask`, `/api/board_ask`)
+
+### Tier 2 — Owner-only (Matthew via MCP / dashboard)
+- Raw biometrics: HRV, heart rate, sleep stages, CGM glucose readings
+- Lab results (cholesterol, biomarkers, genome variants)
+- Body composition (DEXA scan details, weight, body fat %)
+- Nutrition logs (every meal, every calorie)
+- Journal entries (full text)
+- State of mind / mood entries
+- Activity GPS traces, workout details
+- Sick day records, supplement logs
+
+### Tier 3 — Never exposed (system internal)
+- OAuth refresh tokens, API keys, secrets
+- Internal coach state (preamble drafts, prediction confidence scores)
+- Raw S3 archives of source API responses
+- DLQ messages, validation errors
+- CloudWatch logs
+- Rate limit counters
+
+### PII Definition (regulatory framing)
+Per typical health-data definitions, the following fields are **PII** regardless of tier:
+- Name (Matthew)
+- Email addresses (subscribers, recipients)
+- Any biometric data tied to identity
+- Journal entries (contain personal narrative)
+- Location data (Strava GPS traces, weather queries by city)
+- Body composition images / DEXA scans
+
+**No PII is in Tier 0.** Public site exposes aggregates only; never raw values tied to identity at granular timestamp resolution.
+
+---
+
+## Retention Policy
+
+### Hot tier (DynamoDB single table)
+
+| Data type | Partition pattern | Retention | Notes |
+|-----------|-------------------|-----------|-------|
+| Computed daily metrics | `USER#matthew#SOURCE#{computed_metrics,daily_insight,character_sheet,adaptive_mode}` | **Forever** | Trend analysis needs full history |
+| Raw daily ingestion | `USER#matthew#SOURCE#{whoop,withings,strava,...}` | **Forever** | Source of truth for analysis |
+| Journal entries | `USER#matthew#SOURCE#notion` | **Forever** | Long-term reflection value |
+| CGM readings | `USER#matthew#SOURCE#apple_health` | **Forever** | Pattern detection across years |
+| Habit scores | `USER#matthew#SOURCE#habit_scores` | **Forever** | Streak + correlation analysis |
+| Coach threads | `COACH#{coach_id}` | **Forever** | Coaching memory |
+| Sick days | `USER#matthew#SOURCE#sick_days` | **Forever** | Analysis context |
+| Rate limit counters | `RATE#{endpoint}#{ip_hash}` | **2 hours (DDB TTL)** | Auto-expire via `ttl` attribute (P1.7) |
+| Auth failure markers | `USER#matthew#SOURCE#{src}` `sk=AUTH_FAILURE` | **24 hours (DDB TTL)** | Circuit breaker; auto-expire (P3.6) |
+| Health check results | `USER#matthew#SOURCE#health_check` | **Forever** | Operational audit trail |
+
+### Warm tier (S3)
+
+| Prefix | Retention | Lifecycle rule |
+|--------|-----------|----------------|
+| `raw/` (per-source archives) | Current: forever; **non-current versions: 7 days** | P1.3 — `raw-expire-noncurrent-versions-7d` |
+| `raw/` (incomplete uploads) | **Abort after 7 days** | P1.3 — `raw-abort-incomplete-multipart-7d` |
+| `uploads/` (HAE webhooks etc.) | **Current: 30 days; non-current: 7 days** | P1.3 — `uploads-expire-30d` |
+| `generated/` (Lambda-written: OG images, dashboard, journals) | **Current: forever; non-current: 7 days (keep 1)** | P1.3 — `generated-expire-noncurrent-7d` |
+| `config/` (platform config: filters, schemas) | **Current: forever; non-current: 30 days (keep 3)** | P1.3 — `config-expire-noncurrent-30d` |
+| `deploys/` (Lambda deploy artifacts) | **30 days** | Pre-existing |
+| `cloudtrail/` (audit logs) | **90 days** | P2.5 / P7 — `cloudtrail-expire-90d` |
+| `dashboard/`, `site/`, `blog/` | **Forever** (static content) | None — long-lived public assets |
+
+### Cold tier (none)
+No Glacier or deep-archive tier is in use today. Could be added if compliance demands long-term retention with reduced costs.
+
+### Logs
+
+| Source | Retention |
+|--------|-----------|
+| Lambda CloudWatch Logs (most) | **30 days** (P1.1) |
+| Lambda CloudWatch Logs (power-tuning) | **14 days** |
+| Lambda CloudWatch Logs (security: canary, key-rotator, dlq-consumer, cf-auth) | **90 days** |
+| CloudTrail events | **90 days** (S3 lifecycle) |
+| DLQ messages | **14 days** (SQS retention) |
+| Validation errors archive (S3) | Forever in `validation-errors/` prefix |
+
+### Secrets
+- **Auto-refreshed on use**: OAuth (Whoop, Withings, Strava, Garmin, Eight Sleep) — rewritten on every successful ingestion
+- **Auto-rotated 90d**: `life-platform/mcp-api-key` via key-rotator Lambda
+- **Manual rotation 90d**: `life-platform/ai-keys` (Anthropic), `life-platform/site-api-ai-key` (Anthropic)
+- **Manual rotation 180d**: Notion, Habitify, Dropbox, Eight Sleep client
+- **Manual rotation 365d**: Todoist
+- Staleness alerts: OAuth >60d, manual-rotation >120d (freshness checker, P2.6)
+
+---
+
+## Data Subject Rights (if ever required)
+
+### Export
+- `lambdas/data_export_lambda.py` exists; on-demand only. Generates a snapshot of all DDB partitions + S3 archive references.
+- **Audit P7.1 still outstanding** — verify output format covers all current source partitions.
+
+### Deletion
+- No automated "delete my data" workflow today.
+- **P7.3 still outstanding** — design + implement `delete_user_data_lambda` for the multi-user readiness phase.
+- Today: manual procedure documented below.
+
+### Access
+- Matthew accesses everything via MCP (Claude Desktop) or `dash.averagejoematt.com`.
+- Subscribers see only Tier 0 + their interaction history (via subscriber token).
+
+---
+
+## Manual Delete Procedure (today, until P7.3 ships)
+
+For a clean wipe of a user's data:
+
+```bash
+USER_ID=test_user_to_delete
+
+# 1. Find every partition for this user
+aws dynamodb scan --table-name life-platform \
+  --filter-expression "begins_with(pk, :p)" \
+  --expression-attribute-values "{\":p\":{\"S\":\"USER#${USER_ID}#\"}}" \
+  --projection-expression "pk,sk" > /tmp/user_items.json
+
+# 2. Delete each item (batches of 25)
+# (script not yet written; tracked as P7.3)
+
+# 3. S3 prefixes
+aws s3 rm s3://matthew-life-platform/raw/${USER_ID}/ --recursive
+aws s3 rm s3://matthew-life-platform/uploads/${USER_ID}/ --recursive
+aws s3 rm s3://matthew-life-platform/dashboard/${USER_ID}/ --recursive
+aws s3 rm s3://matthew-life-platform/generated/${USER_ID}/ --recursive
+
+# 4. Secrets (per-user, only if Phase 6 multi-user shipped)
+aws secretsmanager delete-secret --secret-id life-platform/${USER_ID}/whoop \
+  --recovery-window-in-days 7
+# repeat for each per-user OAuth secret
+
+# 5. CloudTrail confirmation
+# Wait ≤24h for CloudTrail to record the deletions; archive the trail entries
+# as the audit trail of the deletion event.
+```
+
+---
+
+## Compliance Posture (current state)
+
+- **GDPR**: not a GDPR data subject (US-based, no EU users)
+- **HIPAA**: not a covered entity (not a healthcare provider; data is self-tracked)
+- **CCPA**: technically applicable if California user added; delete-account flow (P7.3) is the gap
+- **SOC2 / ISO 27001**: not pursued; would require formal access-control + audit-trail processes
+
+If any of these become relevant (e.g., onboarding a second user from CA, sale of the platform, clinician handoff), Phases 6 + 7 of the audit plan address the remaining gaps.
+
+---
+
+## Audit Trail
+
+| Date | Change | Reference |
+|------|--------|-----------|
+| 2026-05-16 | Initial document; consolidates per-data-type retention scattered across P1.1, P1.3, P1.7, P2.6, P3.6 | This commit |
+| 2026-05-16 | S3 KMS encryption activated for new objects | P2.4 changelog v7.2.0 |
+| 2026-05-16 | CloudTrail multi-region + delivery restored after 3-month outage | P2.5 changelog v7.2.0 |
