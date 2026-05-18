@@ -1590,10 +1590,13 @@ def handle_status() -> dict:
     else:
         overall = "yellow"  # 1-2 failures = degraded, not down
 
-    # ── Cost tracking (cached 1h — Cost Explorer API is slow, 10-15s cross-region) ──
+    # ── Cost tracking (cached 24h — Cost Explorer API is slow + costs $0.01/call) ──
+    # V2 P5.3 (2026-05-17): bumped from 1h → 24h. CE was billing $0.50-0.70/mo
+    # for ~5 calls/day from this endpoint. Cost data changes by the day, not the
+    # hour; 24h refresh preserves the dashboard signal without daily-cost waste.
     global _cost_cache, _cost_cache_ts
     cost_info = {}
-    if _cost_cache and (time.time() - _cost_cache_ts < 3600):
+    if _cost_cache and (time.time() - _cost_cache_ts < 86400):
         cost_info = _cost_cache
     else:
         try:
