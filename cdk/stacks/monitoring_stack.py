@@ -37,6 +37,7 @@ from constructs import Construct
 from stacks.constants import REGION, ACCT, S3_BUCKET, TABLE_NAME  # CONF-01
 
 ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
+DIGEST_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
 
 GTE = cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD
 LT  = cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD
@@ -45,13 +46,17 @@ NB  = cloudwatch.TreatMissingData.NOT_BREACHING
 
 class MonitoringStack(Stack):
 
-    def __init__(self, scope, construct_id: str, alerts_topic: sns.ITopic, **kwargs) -> None:
+    def __init__(self, scope, construct_id: str, alerts_topic: sns.ITopic, digest_topic: sns.ITopic = None, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         topic = sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
+        digest = sns.Topic.from_topic_arn(self, "DigestTopic", DIGEST_TOPIC_ARN)
 
+        # ADR-050: alarms classified urgent (→ topic) or digest (→ digest topic).
+        # Default: urgent. Pass digest=True to route to the daily batched email.
         def _alarm(alarm_id, alarm_name, namespace, metric_name, period_sec,
-                   statistic, threshold, operator, dims=None, ext_stat=None):
+                   statistic, threshold, operator, dims=None, ext_stat=None,
+                   to_digest=False):
             metric = cloudwatch.Metric(
                 namespace=namespace,
                 metric_name=metric_name,
@@ -68,7 +73,7 @@ class MonitoringStack(Stack):
                 comparison_operator=operator,
                 treat_missing_data=NB,
             )
-            a.add_alarm_action(cw_actions.SnsAction(topic))
+            a.add_alarm_action(cw_actions.SnsAction(digest if to_digest else topic))
             return a
 
         # ══════════════════════════════════════════════════════════════
@@ -79,10 +84,13 @@ class MonitoringStack(Stack):
                {"FunctionName": "daily-brief"})
 
         _alarm("SloAiCoachingSuccess",    "slo-ai-coaching-success",
-               "LifePlatform/AI", "AnthropicAPIFailure", 86400, "Sum", 3, GTE)
+               "LifePlatform/AI", "AnthropicAPIFailure", 86400, "Sum", 3, GTE,
+               to_digest=True)
 
+        # Stale-source alerts re-fire daily; perfect digest candidate.
         _alarm("SloSourceFreshness",      "slo-source-freshness",
-               "LifePlatform/Freshness", "StaleSourceCount", 86400, "Maximum", 1, GTE)
+               "LifePlatform/Freshness", "StaleSourceCount", 86400, "Maximum", 1, GTE,
+               to_digest=True)
 
         # ══════════════════════════════════════════════════════════════
         # Daily-brief operational alarms (not in EmailStack)
@@ -93,7 +101,7 @@ class MonitoringStack(Stack):
         # 720s = 80% of timeout — still catches genuine runaways.
         _alarm("DailyBriefDurationHigh",  "daily-brief-duration-high",
                "AWS/Lambda", "Duration", 86400, None, 720000, GTE,
-               {"FunctionName": "daily-brief"}, ext_stat="p99")
+               {"FunctionName": "daily-brief"}, ext_stat="p99", to_digest=True)
 
         _alarm("DailyBriefNoInvocations", "daily-brief-no-invocations-24h",
                "AWS/Lambda", "Invocations", 86400, "Sum", 1, LT,
@@ -118,7 +126,7 @@ class MonitoringStack(Stack):
         _alarm("AiTokensDailyBriefDaily",
                "ai-tokens-daily-brief-daily",
                "LifePlatform/AI", "AnthropicOutputTokens", 86400, "Sum", 18000, GTE,
-               {"LambdaFunction": "daily-brief"})
+               {"LambdaFunction": "daily-brief"}, to_digest=True)
 
         # Platform-level total (no dims)
         _alarm("AiTokensPlatformTotal",   "ai-tokens-platform-daily-total",
@@ -136,7 +144,8 @@ class MonitoringStack(Stack):
         # DynamoDB item-size warning
         # ══════════════════════════════════════════════════════════════
         _alarm("DdbItemSizeWarning",      "life-platform-ddb-item-size-warning",
-               "LifePlatform/DynamoDB", "ItemSizeBytes", 300, "Maximum", 307200, GTE)
+               "LifePlatform/DynamoDB", "ItemSizeBytes", 300, "Maximum", 307200, GTE,
+               to_digest=True)
 
         # ══════════════════════════════════════════════════════════════
         # OBS-09: SQS DLQ message count alarm
@@ -179,7 +188,8 @@ class MonitoringStack(Stack):
             comparison_operator=GTE,
             treat_missing_data=NB,
         )
-        mem_alarm_db.add_alarm_action(cw_actions.SnsAction(topic))
+        # ADR-050: memory-high is a slow degradation signal, not page-worthy.
+        mem_alarm_db.add_alarm_action(cw_actions.SnsAction(digest))
 
         # ══════════════════════════════════════════════════════════════
         # OBS-08: S3 bucket storage size alarm
@@ -188,7 +198,8 @@ class MonitoringStack(Stack):
         # ══════════════════════════════════════════════════════════════
         _alarm("S3BucketSizeHigh",        "life-platform-s3-bucket-size-high",
                "AWS/S3", "BucketSizeBytes", 86400, "Maximum", 50 * 1024 ** 3, GTE,
-               {"BucketName": S3_BUCKET, "StorageType": "StandardStorage"})
+               {"BucketName": S3_BUCKET, "StorageType": "StandardStorage"},
+               to_digest=True)
 
         # NOTE: OBS-07 email-subscriber alarm lives in web_stack.py (us-east-1).
         # email-subscriber Lambda runs in us-east-1; Lambda metrics are regional.
