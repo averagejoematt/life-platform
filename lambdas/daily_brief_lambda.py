@@ -1759,7 +1759,18 @@ def lambda_handler(event, context):
             try:
                 journal_coach_text = ai_calls.call_journal_coach(
                     data, profile, api_key, shared_system=shared_system)
-                print("[INFO] Journal coach: " + (journal_coach_text[:80] if journal_coach_text else "empty"))
+                # V2 P3.5 (2026-05-17): substitute a stub if LLM returned empty
+                # (validator blocks empty + falls through). Stub keeps the section
+                # rendered with a graceful no-op rather than a missing block.
+                if not journal_coach_text or len(journal_coach_text.strip()) < 10:
+                    n_entries = len(data.get("journal_entries", []))
+                    print(f"[INFO] Journal coach: empty after {n_entries} entries — using stub")
+                    journal_coach_text = (
+                        "Quieter journal day — no clear pattern surfaced. "
+                        "|| One small thing: jot down what you're saving energy for."
+                    )
+                else:
+                    print("[INFO] Journal coach: " + journal_coach_text[:80])
             except Exception as e:
                 print("[WARN] Journal coach failed: " + str(e))
 
