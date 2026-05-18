@@ -1132,3 +1132,252 @@ Both failures share a pattern: **the platform's own monitoring blind spots are t
 - WR-47 Pause Mode — design spec at `docs/WR_47_48_ARCHITECTURE_SPEC.md`
 
 **Files changed:** `cdk/stacks/role_policies.py` (SNS:Publish for freshness-checker; ai-keys for canary), `cdk/stacks/operational_stack.py` (backstop alarm + canary anthropic alarm), `lambdas/canary_lambda.py` (check_anthropic), `lambdas/daily_brief_lambda.py` (banner), `mcp/tools_labs.py` (get_freshness_status).
+
+---
+
+### ADR-052 — Two-tier alerting: urgent SNS + daily-batched digest
+
+**Status:** Active (shipped 2026-05-16, PR1 of the alert-noise-reduction series)
+**Date:** 2026-05-16
+
+**Context:** With 58 CloudWatch alarms all publishing to a single SNS topic (`life-platform-alerts` → `awsdev@mattsusername.com`), the inbox receives multiple emails per day even when nothing is genuinely broken. Past attempts to reduce noise (ADR-043 silent-failure hardening, the 24h→1h period reduction, ADR-048 email Lambda suppression) tuned individual thresholds but kept the underlying model: **every alarm → instant email**. The same `stale-data-source` and `ingestion-error-*` alarms keep firing every day because the model never changed.
+
+Root cause analysis on recurring alarms:
+- `slo-source-freshness` re-fires daily until the upstream OAuth/API issue is fixed
+- `ingestion-error-whoop` / `ingestion-error-garmin` fire on transient 5xx that gap-aware backfill recovers automatically on the next hourly invocation
+- Auth failures (expired OAuth) fire 5×/day until manually rotated
+
+In all three cases, the alarm is telling the operator about a problem that **has already self-healed or will heal on its own**. The signal is preserved; the inbox noise is not.
+
+**Decision:** Split alerts into two SNS topics by urgency:
+
+1. **`life-platform-alerts` (urgent, ~7 alarms, real-time):**
+   - `life-platform-daily-brief-errors` (user-facing email delivery)
+   - `slo-daily-brief-delivery` (24h SLO)
+   - `daily-brief-no-invocations-24h` (silent failure)
+   - `life-platform-canary-{ddb,mcp,s3,anthropic}-failure` (site actually broken)
+   - `life-platform-dlq-depth-warning` (failed ingestion accumulating)
+   - `life-platform-freshness-checker-not-emitting` (backstop-on-backstop, ADR-051)
+   - `ai-tokens-platform-daily-total` (cost runaway)
+   - `slo-mcp-availability` (claude.ai integration broken)
+   - `life-platform-ddb-throttled-requests` (silent data loss)
+
+2. **`life-platform-alerts-digest` (~51 alarms, batched into 8 AM PT email):**
+   - All `ingestion-error-*` (16 ingestion + 21 compute Lambdas) — transient errors that gap-fill recovers
+   - All email Lambda errors (the daily brief still has its urgent alarm; the rest are recoverable)
+   - `slo-source-freshness` (re-fires daily until upstream fixed; one digest line suffices)
+   - Duration / latency / memory / item-size warnings (degradation signals, not pages)
+   - S3 bucket size, MCP duration, MCP warmer error
+
+The digest topic feeds an SQS queue (`life-platform-alerts-digest-queue`, 25h retention) which is drained by `lambdas/alert_digest_lambda.py` daily at 8 AM PT via EventBridge. The Lambda dedupes by `AlarmName` (one line per distinct alarm regardless of fire count), formats a single SES email, and sends nothing if the queue is empty (no "all clear" spam).
+
+**Reasoning:**
+- Two-tier model preserves real-time visibility for the small set of alarms where minutes matter, while batching the long tail that doesn't.
+- Personal health/fitness data is daily-granular; nothing actionable about a 2 AM transient Whoop API hiccup.
+- Dedup by `AlarmName` means a flapping source produces one digest line, not N emails.
+- Operator can still see fire count and latest reason in the digest — full signal, less noise.
+- Sets up subsequent PRs (self-healing in PR2, freshness polish in PR3) to also reduce the underlying causes.
+
+**Routing implementation:** `cdk/stacks/lambda_helpers.py` accepts `digest_topic` and `digest=True` params. When both are set, the alarm publishes to the digest topic instead of the urgent topic. `alerts_topic=None` continues to disable alarms entirely (backward compatible). MonitoringStack's `_alarm()` helper accepts a `to_digest=True` kwarg.
+
+**Trade-offs:**
+- A real incident that triggers a digest alarm now waits up to 24h to surface in email. Mitigation: urgent topic still catches user-facing breakage (daily-brief, canary, DLQ depth, cost runaway). The digest is for noise that was already not actionable in real-time.
+- New infrastructure surface area (SQS, SNS subscription, Lambda, EventBridge schedule). All managed via CDK; revertable by deleting the new resources and re-pointing `digest=True` callers.
+
+**Files changed:** `cdk/stacks/core_stack.py` (digest SNS topic), `cdk/stacks/lambda_helpers.py` (digest routing param), `cdk/stacks/{ingestion,compute,email,operational,mcp,monitoring}_stack.py` (alarm classification), `cdk/stacks/role_policies.py` (`operational_alert_digest()`), `cdk/stacks/operational_stack.py` (SQS + Lambda + EventBridge schedule), `lambdas/alert_digest_lambda.py` (new), `ci/lambda_map.json` (registry entry), `tests/test_alert_digest.py` (unit tests).
+
+**Follow-ups (separate PRs):**
+- PR2: Self-healing retries on Whoop/Garmin (currently no retry on transient 5xx); OAuth writeback safety; auth-failure circuit breaker in `ingestion_framework.py`.
+- PR3: Multi-day sick-day suppression; staged staleness thresholds (24h warning → 36h digest → 48h urgent).
+
+---
+
+### ADR-053 — S3 Encryption + CloudFront Website Endpoint Incompatibility
+
+**Status:** Active (decision shipped 2026-05-17, v7.20.0)
+**Date:** 2026-05-17
+
+**Context:** Phase 2.4 of the v7.x audit (ADR-046 era) migrated the platform S3 bucket from `AES256` default encryption to `aws:kms` with a dedicated CMK (`alias/life-platform-s3`). This was intended as a hardening win: customer-managed key, audit-traceable, rotatable. The migration changed only the bucket default; existing 27k AES256 objects were left as-is per the "new only" decision.
+
+On 2026-05-17, a routine `aws s3 cp site/index.html ...` (without `--sse` flag) inherited the bucket default KMS encryption. CloudFront immediately returned HTTP 400 to readers: *"The object was stored using a form of Server Side Encryption. The correct parameters must be provided to retrieve the object."* averagejoematt.com was broken for ~90 seconds.
+
+Root cause: **S3 website endpoints (`bucket.s3-website-{region}.amazonaws.com`) cannot serve KMS-encrypted objects, regardless of IAM permissions.** This is a well-known AWS limitation. All 4 CloudFront origins for the platform site use the website endpoint (path-based routing: `/site`, `/generated`, etc).
+
+**Decision:** Multi-part:
+
+1. **Revert bucket default to AES256** (shipped 2026-05-17 via `aws s3api put-bucket-encryption`). Any future `aws s3 cp` without `--sse` flag now defaults to AES256, which CloudFront serves cleanly.
+2. **Retain the S3 CMK** (`5c50ca02-c187-4338-8704-5b27f1efafca`). Still usable via explicit `--sse aws:kms --sse-kms-key-id <arn>` for sensitive non-website prefixes (e.g., `raw/`, future export archives).
+3. **Add CloudFront grant to the CMK** (CDK-shipped in `cdk/stacks/core_stack.py`): `cloudfront.amazonaws.com` service principal scoped by `aws:SourceAccount`. Permission is in place but only takes effect after the future migration in #4.
+4. **Defer S3-website→REST+OAC migration** (separate ADR-054). KMS-encrypted public content requires this migration; deferred because the cost (4 CloudFront origins repointed, CloudFront Function for directory-→-index.html rewrite, OAC bucket policy migration, extensive regression testing) outweighs the benefit (compliance signaling for a single-user personal platform).
+
+**Reasoning:**
+- The website-endpoint architecture is well-suited to this static site's needs (index docs, error pages, simple path routing) and works correctly with AES256.
+- Phase 2.4's KMS migration was correct in spirit (CMK > S3-managed key for audit/rotation) but didn't account for the existing CloudFront origin architecture.
+- The CMK isn't deleted because explicit-KMS use cases still exist (sensitive `raw/` data, future export bundles). Bucket default is just AES256.
+- Adding the CloudFront grant now means the future REST+OAC migration only requires changing CloudFront, not redoing IAM.
+
+**Trade-offs:**
+- KMS encryption is no longer the platform default for new uploads — slight hardening regression. Mitigated by per-prefix explicit-KMS for any sensitive new content.
+- Future devs may not realize the website-endpoint constraint and re-attempt the KMS default. Mitigation: this ADR + the comment block at `cdk/stacks/core_stack.py:85-93`.
+
+**Files changed:** `cdk/stacks/core_stack.py` (CMK grant for CloudFront), bucket encryption config (manual AWS CLI), `docs/CHANGELOG.md` (v7.20.0 entry).
+
+**Follow-ups:** If real subscribers join the platform (then KMS-on-public has trust value), execute the website→REST+OAC migration per ADR-054.
+
+---
+
+### ADR-054 — CloudFront Origins: S3 Website Endpoint over REST+OAC (Status Quo)
+
+**Status:** Active (decision 2026-05-17, v7.20.0)
+**Date:** 2026-05-17
+
+**Context:** Following the ADR-053 KMS incompatibility, the question was: migrate CloudFront S3 origins from website-endpoint to REST-endpoint + Origin Access Control (OAC)?
+
+REST+OAC is the AWS-recommended modern pattern for CloudFront → private S3. It supports KMS-encrypted objects, restricts S3 access to CloudFront only (no public bucket policy needed), and is HTTPS-native to origin.
+
+Cost of migration:
+- 4 CloudFront distributions to repoint origins (averagejoematt.com, dash, blog, buddy)
+- New CloudFront Function (or Lambda@Edge) to rewrite `/path/` → `/path/index.html` (website endpoint does this automatically; REST does not)
+- CloudFront custom error responses to replicate website-endpoint 404 handling
+- Bucket policy migration from public-anonymous to OAC-only
+- CDK changes across `web_stack.py` and per-distribution stacks
+- Substantial regression testing across 4 distributions and ~30+ HTML files
+
+Benefit:
+- KMS encryption on public-served content (ADR-053 unblocked)
+- Defense-in-depth: S3 not publicly readable (only CloudFront has access)
+- AWS-best-practice alignment
+
+**Decision:** Defer the migration. Keep S3 website endpoints for all 4 CloudFront origins. Document the incompatibility (ADR-053). Re-evaluate when one of the following becomes true:
+- Platform takes on real subscribers (KMS-on-public becomes a trust signal worth the cost)
+- AWS deprecates S3 website endpoints (no current sunset announcement)
+- An OAC-only requirement emerges (regulated content, paid tier, etc.)
+
+**Reasoning:** For a single-user personal health platform with public, intentionally-readable content (averagejoematt.com is a public blog), the actual security model isn't improved by hiding S3 from public reads — the data is meant to be public. The compliance signaling value of KMS-on-public is real but currently abstract.
+
+**Trade-offs:**
+- Stuck with S3-managed AES256 for public content (ADR-053). Modern alternatives unavailable.
+- Cannot easily migrate sensitive prefixes (e.g., `raw/`) to a more restrictive read pattern without breaking the website-endpoint shared bucket.
+
+**Files changed:** None (decision-only ADR). `docs/DECISIONS.md` (this entry).
+
+**Follow-ups:** None scheduled. Revisit per trigger conditions above.
+
+---
+
+### ADR-055 — Coach Prediction Loop Closure: 4-Step Chain
+
+**Status:** Active (v7.15.0–v7.18.0, 2026-05-17)
+**Date:** 2026-05-17
+
+**Context:** ADR-047 promised "stateless prompts → stateful agents" — coaches that make predictions, get evaluated against outcomes, and grow more calibrated over time. The audit assumed P5.7 (the auto-evaluator) was a 982-LOC skeleton needing implementation.
+
+Reality: the evaluator (`lambdas/coach_prediction_evaluator.py`) was already fully built and running daily at 9 AM PT, processing 25-37 predictions per day across 8 coaches. The verdicts were written to two places (PREDICTION# status updates + LEARNING# audit records) — but **no consumer was reading them**. The only LEARNING# consumer (`coach_observatory_renderer.py`) matched only `type=position_revision`, a type the evaluator never wrote. The MCP `tool_get_predictions` queried the legacy `SOURCE#coach_thread#` partition, not the post-ADR-047 `COACH#{coach_id}` partition. The loop was open at the consumer side, not the producer side.
+
+Compounding issue: 100% of recent evaluations resolved `inconclusive` because coaches were predicting against prose metric descriptions ("REM percentage stability and correlation with stress markers") that didn't map to the evaluator's 16-key `METRIC_SOURCES` allowlist.
+
+**Decision:** Close the loop in 4 sequential steps over one session:
+
+1. **v7.15.0 — Expose verdicts via MCP** (`tool_get_coach_track_record`): reads `COACH#{coach_id}/LEARNING#` over configurable window, returns by_outcome + hit_rate_pct + by_subdomain + by_metric + recent_evaluations. Accepts bare or `_coach`-suffixed coach IDs.
+2. **v7.16.0 — Forward fix at extraction time** (`coach_state_updater.py`): added `MEASURABLE_METRICS` allowlist + `_normalize_metric_hint()` helper. Extractor system prompt updated to instruct Haiku to return one of 15 allowlisted keys or null. Write-boundary normalization marks unsalvageable predictions as `evaluation.type="qualitative"` (evaluator already skips qualitative).
+3. **v7.17.0 — Historical backfill** (`deploy/backfill_prediction_metrics_dryrun.py`): walked 504 active machine-type predictions, normalized 319 (prose → allowlisted), demoted 179 to qualitative, left 6 alone. Per-record audit fields (`backfilled_at`, `backfill_action`).
+4. **v7.18.0 — Observatory surface** (`coach_observatory_renderer.py`): per-coach card gains `track_record` field with 30-day decided counts + hit_rate_pct + summary string. Returns null when no decisions yet (avoids misleading 0% display).
+
+**Reasoning:**
+- The plan's "build the evaluator" framing was outdated; the real gap was consumer-side. Reframing was honest and cheaper than building duplicate evaluator infra.
+- The 4 steps map to producer (#2 forward fix, #3 historical) → reader (#1 MCP) → display (#4 observatory). Each step is independently shippable and reversible.
+- The MEASURABLE_METRICS allowlist is duplicated in `coach_state_updater.py` and `coach_prediction_evaluator.py`; documented "keep in sync" in both. Future consolidation possible but not blocking.
+
+**Validation timeline:** The 325 backfilled+forward-fix-eligible predictions need 7-30 days to hit their evaluation windows and produce real `confirmed`/`refuted` counts. Until then the chain is code-complete but functionally unverified end-to-end. `tool_get_coach_track_record` currently returns `decided_count: 0, hit_rate_pct: null` for all coaches (correct — no verdicts yet) but the path is exercised.
+
+**Trade-offs:**
+- Normalizer is heuristic (substring map) — some remaps may be semantically wrong (e.g., a multi-metric prose prediction mapped to one allowlisted key). Acceptable: at-worst-noisy beats current at-worst-daily-inconclusive.
+- The 179 qualitative-demoted predictions will never resolve. Acceptable: they weren't going to resolve usefully under the old path either.
+
+**Files changed:** `mcp/tools_coach_intelligence.py`, `mcp/registry.py`, `lambdas/coach_state_updater.py`, `lambdas/coach_observatory_renderer.py`, `deploy/backfill_prediction_metrics_dryrun.py` (new), `tests/test_wiring_coverage.py` (passive update), `docs/CHANGELOG.md` (v7.15–v7.18).
+
+**Follow-ups:**
+- 7-30 days from now: verify non-zero `decided_count`. If still zero, the evaluator has a separate metric-resolution bug.
+- Wire `track_record` into daily-brief preamble per-coach (Phase 5.8 cousin work).
+- Once hit_rate_pct is meaningful (≥14 days): tie coach quality gate threshold to it.
+
+---
+
+### ADR-056 — SIMP-2 Ingestion Framework: 8 Sources Migrated, 6 Pattern-Exempt
+
+**Status:** Active (v7.10.0–v7.13.0, 2026-05-17)
+**Date:** 2026-05-17
+
+**Context:** The v7.x audit identified the SIMP-2 framework (`lambdas/ingestion_framework.py`) as a major debt-paydown opportunity: 80% of every ingestion Lambda was duplicated boilerplate (auth refresh, gap detection, S3 archival, DDB writes, validation, structured logging). The plan called for migrating all 13 ingestion Lambdas to the framework.
+
+**Decision:** Migrate the 8 Lambdas that fit the framework's per-day-fetch shape. Exempt the 6 that don't, with explicit per-source rationale.
+
+**Migrated (8 / 14):**
+- weather (pre-existing proof of concept, 2026-03-09)
+- todoist (v7.10.0)
+- habitify (v7.11.0) — also added `refresh_today=True` flag to framework for intra-day-updated sources
+- withings (v7.12.0)
+- strava (v7.12.0)
+- eightsleep (v7.13.0) — JWT auth, no refresh-token endpoint, full re-login on each cold start
+- whoop (v7.13.0) — first user of framework's `sk_suffix` for per-workout sub-records; reserved concurrency=1 still pending AWS quota raise
+- garmin (v7.13.0) — most complex, garth library, native deps in separate layer
+
+Cumulative reduction: **5,560 LOC → 3,177 LOC (−2,383 LOC / −43%)** across the 8 migrations.
+
+**Exempt (6 / 14):**
+- notion — date-RANGE fetch with multi-record-per-date via sub-record SKs (`DATE#X#TEMPLATE#journal`). Framework iterates per-date and writes one record. Forcing would require framework changes.
+- macrofactor — S3-triggered CSV import. Date is derived from file, not a schedule.
+- apple_health — S3-triggered XML, parses years of data per upload, multi-record per date.
+- health_auto_export — API Gateway webhook receiving real-time event batches (CGM, BP, state of mind). Framework's polling loop doesn't apply.
+- dropbox_poll — every-30-min poll checking S3 for new uploads. Not date-driven.
+- food_delivery — quarterly CSV import. Framework's gap-detection assumptions don't fit 90-day cadence.
+
+**Reasoning:**
+- Forcing the framework on the 6 exempt sources would have made each Lambda LONGER and uglier than the standalone implementations.
+- The 8 migrated sources all share OAuth + per-day-fetch + DDB-write shape — they're the ones where framework actually reduces complexity.
+- Future Notion migration would require framework features (date-range primitive, multi-record `sk_suffix` factory, bucket-by-date helper) — ~1 week of framework work. Not worth doing unless a second range-fetch source emerges.
+
+**Trade-offs:**
+- 6 ingestion Lambdas remain on the old pattern. Each has its own retry/auth-breaker/validation. Drift risk: a bug fix in the framework doesn't automatically apply to them.
+- Mitigation: shared modules (`http_retry.py`, `auth_breaker.py`, `numeric.py`) are still importable by the standalone Lambdas. They're not isolated, just not orchestrated.
+
+**Files changed:** All 8 migrated `lambdas/*_lambda.py` files (full rewrites or near-full), `lambdas/ingestion_framework.py` (`refresh_today` flag added for habitify), `tests/test_numeric.py` (shim list pruned per migration), `tests/test_ddb_patterns.py` (D4 gap removed for garmin), `docs/CHANGELOG.md` (v7.10–v7.13).
+
+**Follow-ups:**
+- Whoop reserved concurrency=1: blocked on AWS Support raising L-B99A9384 quota from 10 → 50. Manual ticket required (Business+ support plan needed for API path).
+- If a second range-fetch source emerges, extend framework with date-range primitive + multi-record support, then migrate Notion as second user.
+
+---
+
+### ADR-057 — Audit Items Formally Closed With Rationale
+
+**Status:** Active (v7.19.0, 2026-05-17)
+**Date:** 2026-05-17
+
+**Context:** The v7.x audit produced ~130 findings across 8 phases. After 2 days of intensive work shipping ~70 of them, several items remained on the backlog that — on closer inspection — should not be done. Leaving them as "pending" implies future work that won't happen; formal closure with rationale prevents repeat re-discovery.
+
+**Decision:** Close the following items as **"deferred-with-rationale, not actionable as written"**:
+
+| Item | Rationale |
+|---|---|
+| **P4.3 Split `intelligence_common.py`** | 1556 LOC has only 1 active importer (daily_brief). Splitting would multiply imports without reducing complexity for the actual consumer. Revisit only if a second major importer emerges. |
+| **P4.6 HAE handler registry refactor** | 1492 LOC already organized per-data-type. A registry pattern would be cleanup-only with no behavior change. Revisit only if a 6th+ data type is added. |
+| **P8.11 Site-api pagination** | `/api/changes-since` and `/api/observatory_week` already bounded by natural query windows (single-day, single-week). Not a practical risk. Revisit only if a new endpoint surfaces an actually-unbounded query. |
+| **P8.6 Lambda Power Tuning campaign** | Most Lambdas already at 256 MB (minimum effective tier). Only mcp (768) and daily-brief (768) have headroom — but daily-brief sends real emails on invocation, making it unsafe to tune. Realistic savings: $1-3/mo for ~30 min work per safe-to-tune target. Better ROI elsewhere. |
+| **P1.2 Orphaned WAF cleanup** | Audit was wrong. WAF protects HAE webhook, isn't orphaned. Still billing $4.75/mo but it's load-bearing. |
+| **P5.2 board_ask shared preamble caching** | Each persona system prompt is ~80 tokens, below Anthropic's ~1024-token cache minimum. `cache_control` annotation shipped (v7.14.0) but is no-op. Plan's $2/mo savings overestimated. |
+| **P6 Multi-user / Cognito (entire phase)** | ~4 FTE-weeks for a single-user personal platform. Revisit only when a second real user is on the horizon. |
+| **P8.13 Cross-region DR** | Overkill for personal platform. Deferred-as-planned. |
+| **P5.9 Batch API** | Deferred to July 2026 reconsideration per original plan. |
+
+**Reasoning:**
+- A formally-closed item with documented rationale is more useful than an indefinitely-open one. Future audits should not re-surface these without new triggering evidence.
+- Closure ≠ rejection of the underlying concept. Each rationale describes the specific trigger that would re-open the item.
+- Honest accounting: the original audit had ~10% wrong-premise findings (P1.2 WAF, P5.2 caching, P5.7 already-built). That's normal for fast audits; this ADR documents the corrections.
+
+**Trade-offs:**
+- Risk of future "we should split intelligence_common.py" suggestions ignoring this ADR. Mitigation: cite ADR-057 when the suggestion recurs.
+
+**Files changed:** Task list updates (TaskUpdate with rationale on tasks #44, #46, #50), `docs/CHANGELOG.md` (v7.19.0, v7.20.0), this ADR.
+
+**Follow-ups:** None. Closure is final pending the specific trigger conditions per item.
