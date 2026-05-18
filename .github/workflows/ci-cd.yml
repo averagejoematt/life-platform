@@ -41,6 +41,12 @@ on:
         type: boolean
         default: false
 
+# V2 P4.14 (2026-05-17): prevent concurrent deploys racing on the same branch.
+# cancel-in-progress=false because a deploy mid-flight should complete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   AWS_REGION: us-west-2
   AWS_ACCOUNT_ID: "205930651321"  # CONF-03: single place — override via GitHub env var for staging
@@ -64,6 +70,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'  # V2 P4.14: speeds up CI by ~20s per job
 
       - name: Install flake8
         run: pip install flake8
@@ -140,6 +147,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'  # V2 P4.14: speeds up CI by ~20s per job
 
       - name: Install test dependencies
         run: pip install pytest pytest-cov boto3 botocore  # Phase 8.2: pytest-cov for coverage report
@@ -832,6 +840,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'  # V2 P4.14: speeds up CI by ~20s per job
 
       - name: Install boto3 + pytest
         run: pip install boto3 pytest --quiet
