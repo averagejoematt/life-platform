@@ -588,7 +588,9 @@ def test_i10_mcp_lambda_responds():
 # ══════════════════════════════════════════════════════════════════════════════
 
 DRECON_FUNCTION = "life-platform-data-reconciliation"
-DRECON_LOOKBACK_HOURS = 48  # expect it has run within the last 2 days
+# V2 P0.9: Lambda runs WEEKLY (cron(30 7 ? * MON *), see operational_stack.py).
+# 192h = 8 days = 1 weekly cycle + 1 day grace for cron slippage. Was 48h (wrong).
+DRECON_LOOKBACK_HOURS = 192
 
 
 def test_i11_data_reconciliation_running():
@@ -648,7 +650,7 @@ def test_i11_data_reconciliation_running():
         last_run = _dt.datetime.fromtimestamp(last_event_ms / 1000).strftime("%Y-%m-%d %H:%M UTC")
         pytest.fail(
             f"I11 FAIL: {DRECON_FUNCTION} last ran at {last_run} "
-            f"({DRECON_LOOKBACK_HOURS}h+ ago). Expected to run at least every 48h.\n"
+            f"({DRECON_LOOKBACK_HOURS}h+ ago). Expected to run weekly (Mon 07:30 UTC).\n"
             f"Manual trigger: aws lambda invoke --function-name {DRECON_FUNCTION} "
             f"--payload '{{}}' /tmp/recon.json --region {REGION}"
         )

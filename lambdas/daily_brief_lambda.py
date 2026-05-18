@@ -1726,23 +1726,37 @@ def lambda_handler(event, context):
         except Exception as e:
             print(f"[WARN] Ensemble digest invoke failed (non-blocking): {e}")
 
+        # Phase 3.8 (2026-05-16): build the shared system block ONCE; pass to
+        # all 4 AI calls. Anthropic prompt caching reuses the cached system
+        # across calls within ~5 min — first call pays full cost, next 3 pay
+        # 10%. Estimated savings: ~$1.50-2/month.
+        try:
+            shared_system = ai_calls.daily_brief_shared_system(
+                data, profile, day_grade=day_grade_score, grade=grade)
+        except Exception as e:
+            shared_system = None
+            print("[WARN] shared_system build failed (proceeding without): " + str(e))
+
         try:
             bod_insight = ai_calls.call_board_of_directors(
                 data, profile, day_grade_score, grade, component_scores, api_key,
-                character_sheet=character_sheet, brief_mode=brief_mode)
+                character_sheet=character_sheet, brief_mode=brief_mode,
+                shared_system=shared_system)
             print("[INFO] BoD: " + bod_insight[:80])
         except Exception as e:
             print("[WARN] BoD failed: " + str(e))
 
         try:
-            training_nutrition = ai_calls.call_training_nutrition_coach(data, profile, api_key)
+            training_nutrition = ai_calls.call_training_nutrition_coach(
+                data, profile, api_key, shared_system=shared_system)
             print("[INFO] Training/Nutrition coach returned")
         except Exception as e:
             print("[WARN] Training/Nutrition coach failed: " + str(e))
 
         if data.get("journal_entries"):
             try:
-                journal_coach_text = ai_calls.call_journal_coach(data, profile, api_key)
+                journal_coach_text = ai_calls.call_journal_coach(
+                    data, profile, api_key, shared_system=shared_system)
                 print("[INFO] Journal coach: " + (journal_coach_text[:80] if journal_coach_text else "empty"))
             except Exception as e:
                 print("[WARN] Journal coach failed: " + str(e))
@@ -1751,7 +1765,8 @@ def lambda_handler(event, context):
             tldr_guidance = ai_calls.call_tldr_and_guidance(
                 data, profile, day_grade_score, grade,
                 component_scores, component_details,
-                readiness_score, readiness_colour, api_key)
+                readiness_score, readiness_colour, api_key,
+                shared_system=shared_system)
             print("[INFO] TL;DR+Guidance: " + str(tldr_guidance.get("tldr", ""))[:80])
         except Exception as e:
             print("[WARN] TL;DR+Guidance failed: " + str(e))

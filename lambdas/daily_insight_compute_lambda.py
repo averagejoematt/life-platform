@@ -531,13 +531,15 @@ Return ONLY a JSON array, no preamble:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=25) as r:
-            raw = json.loads(r.read())["content"][0]["text"].strip()
-            if raw.startswith("```"):
-                raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-            if raw.endswith("```"):
-                raw = raw[:-3]
-            return json.loads(raw.strip())
+        # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
+        from retry_utils import call_anthropic_raw
+        resp = call_anthropic_raw(req, timeout=25)
+        raw = resp["content"][0]["text"].strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+        if raw.endswith("```"):
+            raw = raw[:-3]
+        return json.loads(raw.strip())
     except Exception as e:
         logger.warning(f"IC-8 Haiku evaluation failed: {e}")
         return []
@@ -1802,6 +1804,12 @@ def store_computed_insights(yesterday_str, payload):
         pass
     except Exception as ve:
         logger.warning("[DATA-2] computed_insights validate_item failed (proceeding): %s", ve)
+    # Phase 3.3 (2026-05-16): tag with run_id + computed_at.
+    try:
+        from compute_metadata import tag_record
+        item = tag_record(item, source_id="computed_insights")
+    except ImportError:
+        pass
     table.put_item(Item=item)
     logger.info(f"Stored computed_insights for {yesterday_str} (momentum={payload.get('momentum_signal')}, declining={len(payload.get('declining_metrics', []))}, improving={len(payload.get('improving_metrics', []))})")
 

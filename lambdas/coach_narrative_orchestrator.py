@@ -137,24 +137,38 @@ def _float_to_decimal(obj):
     return obj
 
 
-def _emit_token_metrics(input_tokens, output_tokens):
-    """Emit per-Lambda token usage to CloudWatch (non-fatal)."""
+def _emit_token_metrics(input_tokens, output_tokens,
+                        cache_creation_tokens=0, cache_read_tokens=0):
+    """Emit per-Lambda token usage to CloudWatch (non-fatal).
+
+    V2 P0.6 (2026-05-17): added cache fields. Prior 2-arg signature dropped them,
+    leaving AnthropicCacheReadTokens with zero datapoints despite caching wired.
+    """
     try:
-        _cw.put_metric_data(
-            Namespace=_CW_NAMESPACE,
-            MetricData=[
-                {
-                    "MetricName": "AnthropicInputTokens",
-                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                    "Value": input_tokens, "Unit": "Count",
-                },
-                {
-                    "MetricName": "AnthropicOutputTokens",
-                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                    "Value": output_tokens, "Unit": "Count",
-                },
-            ],
-        )
+        metric_data = [
+            {
+                "MetricName": "AnthropicInputTokens",
+                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                "Value": input_tokens, "Unit": "Count",
+            },
+            {
+                "MetricName": "AnthropicOutputTokens",
+                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                "Value": output_tokens, "Unit": "Count",
+            },
+        ]
+        if cache_creation_tokens or cache_read_tokens:
+            metric_data.append({
+                "MetricName": "AnthropicCacheWriteTokens",
+                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                "Value": cache_creation_tokens, "Unit": "Count",
+            })
+            metric_data.append({
+                "MetricName": "AnthropicCacheReadTokens",
+                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                "Value": cache_read_tokens, "Unit": "Count",
+            })
+        _cw.put_metric_data(Namespace=_CW_NAMESPACE, MetricData=metric_data)
     except Exception as e:
         logger.warning("CloudWatch token metric emit failed (non-fatal): %s", e)
 
@@ -222,6 +236,8 @@ def _call_haiku(system, user_message, max_tokens=2000, temperature=0.3):
                     _emit_token_metrics(
                         usage.get("input_tokens", 0),
                         usage.get("output_tokens", 0),
+                        cache_creation_tokens=usage.get("cache_creation_input_tokens", 0),
+                        cache_read_tokens=usage.get("cache_read_input_tokens", 0),
                     )
                 text = resp["content"][0]["text"].strip()
                 # Try to parse as JSON

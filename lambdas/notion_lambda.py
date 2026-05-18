@@ -101,7 +101,9 @@ def notion_post(endpoint, api_key, body=None):
         "User-Agent": "LifePlatform/1.0",
     })
     try:
-        with urlopen(req, timeout=30) as resp:
+        # Phase 3.5 (2026-05-16): retry on transient 429/5xx.
+        from http_retry import urlopen_with_retry
+        with urlopen_with_retry(req, timeout=30) as resp:
             return json.loads(resp.read().decode())
     except HTTPError as e:
         error_body = e.read().decode() if e.fp else ""
@@ -118,7 +120,9 @@ def notion_get(endpoint, api_key):
         "User-Agent": "LifePlatform/1.0",
     })
     try:
-        with urlopen(req, timeout=30) as resp:
+        # Phase 3.5 (2026-05-16): retry on transient 429/5xx.
+        from http_retry import urlopen_with_retry
+        with urlopen_with_retry(req, timeout=30) as resp:
             return json.loads(resp.read().decode())
     except HTTPError as e:
         error_body = e.read().decode() if e.fp else ""

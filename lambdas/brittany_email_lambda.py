@@ -474,7 +474,7 @@ def build_commentary(data):
             with urllib.request.urlopen(req, timeout=45) as r:
                 resp = json.loads(r.read())
                 text = resp["content"][0]["text"]
-                print("[DEBUG] Raw response (first 300): " + text[:300])
+                logger.debug("partner_ai_response_excerpt: %s", text[:300])
                 return text
         except urllib.error.HTTPError as e:
             print("[WARN] Anthropic HTTP " + str(e.code) + " attempt " + str(attempt))
@@ -608,8 +608,8 @@ def build_html(data, commentary_text):
     mood = data["mood"]
     dates = data["dates"]
 
-    print("[DEBUG] Parsed sections: " + str(list(sections.keys())))
-    print("[DEBUG] Lede: " + sections.get("lede", "(empty)")[:80])
+    logger.debug("partner_parsed_sections=%s lede_excerpt=%s",
+                 list(sections.keys()), sections.get("lede", "(empty)")[:80])
 
     try:
         start_dt = datetime.strptime(dates["start"], "%Y-%m-%d")
@@ -697,6 +697,7 @@ def build_html(data, commentary_text):
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>@media (prefers-color-scheme: dark){body{background:#1a1a1f !important;color:#e5e5e5 !important}div[style*="background:#fff"],div[style*="background:#fafafa"],div[style*="background:#f8f9fc"]{background:#22222a !important;color:#e5e5e5 !important}h1,h2,h3,h4{color:#f5f5f5 !important}td{color:#d5d5d5 !important}}</style>
 </head>
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
 <div style="max-width:600px;margin:28px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.07);">

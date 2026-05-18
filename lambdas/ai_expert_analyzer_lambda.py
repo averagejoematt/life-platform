@@ -680,9 +680,10 @@ def generate_and_cache(expert_key, shared_system=None):
         headers=headers,
     )
 
+    # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
     try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            result = json.loads(resp.read())
+        from retry_utils import call_anthropic_raw
+        result = call_anthropic_raw(req, timeout=60)
     except urllib.error.HTTPError as e:
         error_body = e.read().decode("utf-8", errors="replace")
         logger.error("Anthropic API %s: %s", e.code, error_body)
@@ -779,8 +780,11 @@ def generate_and_cache(expert_key, shared_system=None):
                         data=corr_body.encode(),
                         headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
                     )
-                    with urllib.request.urlopen(corr_req, timeout=60) as corr_resp:
-                        corr_result = json.loads(corr_resp.read())
+                    # Phase 3.4 + CRIT-AI-01 (2026-05-16): correction call now retries via
+                    # retry_utils (was raw urlopen, no retry — caused silent quality failures
+                    # when Anthropic was briefly unavailable mid-observatory).
+                    from retry_utils import call_anthropic_raw
+                    corr_result = call_anthropic_raw(corr_req, timeout=60)
                     corrected_text = "".join(
                         b["text"] for b in corr_result.get("content", []) if b.get("type") == "text"
                     )
@@ -913,8 +917,9 @@ For disagreements: only flag GENUINE conflicts where two coaches would give Matt
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            result = json.loads(resp.read())
+        # Phase 3.4 (2026-05-16): retry via retry_utils.
+        from retry_utils import call_anthropic_raw
+        result = call_anthropic_raw(req, timeout=60)
 
         text = "".join(
             b["text"] for b in result.get("content", []) if b.get("type") == "text"

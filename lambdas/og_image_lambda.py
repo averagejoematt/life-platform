@@ -302,18 +302,38 @@ def lambda_handler(event, context):
     for name, builder in PAGES:
         try:
             img = builder(stats)
+            # PNG (original — keep for compatibility with crawlers that don't read WebP)
             buf = io.BytesIO()
             img.save(buf, format="PNG", optimize=True)
             buf.seek(0)
+            png_bytes = buf.read()
             s3.put_object(
                 Bucket=S3_BUCKET,
                 Key=f"generated/assets/images/{name}.png",
-                Body=buf.read(),
+                Body=png_bytes,
                 ContentType="image/png",
                 CacheControl="max-age=86400",
             )
+            # Phase 8.7 (2026-05-16): also emit WebP — 50-60% smaller payload
+            # for modern crawlers (Facebook, Twitter, Slack, Discord, iMessage
+            # all prefer WebP when offered). Pillow supports WebP natively.
+            try:
+                wbuf = io.BytesIO()
+                img.save(wbuf, format="WebP", quality=80, method=4)
+                wbuf.seek(0)
+                webp_bytes = wbuf.read()
+                s3.put_object(
+                    Bucket=S3_BUCKET,
+                    Key=f"generated/assets/images/{name}.webp",
+                    Body=webp_bytes,
+                    ContentType="image/webp",
+                    CacheControl="max-age=86400",
+                )
+                _shrink = round(100 * (1 - len(webp_bytes) / max(1, len(png_bytes))))
+                print(f"[OK] Generated {name}.png ({len(png_bytes)} B) + .webp ({len(webp_bytes)} B, -{_shrink}%)")
+            except Exception as we:
+                print(f"[WARN] WebP encode failed for {name} (PNG still saved): {we}")
             generated.append(name)
-            print(f"[OK] Generated {name}.png")
         except Exception as e:
             print(f"[ERROR] Failed to generate {name}: {e}")
 

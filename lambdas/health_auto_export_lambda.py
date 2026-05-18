@@ -95,6 +95,7 @@ v1.1.0 — Three-tier source filtering + expanded metrics
 v1.0.0 — Initial release
 """
 
+import hmac
 import json
 import logging
 import math
@@ -1243,17 +1244,20 @@ def lambda_handler(event, context):
         token = query_params.get("key", "")
 
     if not token:
-        print("ERROR: No authorization token provided")
-        print(json.dumps({"event": "auth_failure", "reason": "no_token", "request_id": context.aws_request_id if context else "local"}))
+        logger.warning("hae_auth_failure reason=no_token request_id=%s",
+                       context.aws_request_id if context else "local")
         return {"statusCode": 401, "body": json.dumps({"error": "Unauthorized"})}
 
+    # Phase 2.7 (2026-05-16): constant-time comparison to prevent timing-attack
+    # token enumeration. hmac.compare_digest also tolerates length differences.
     try:
         expected_key = get_api_key()
-        if token != expected_key:
-            print("ERROR: Invalid API key")
+        if not hmac.compare_digest(token.encode("utf-8"), (expected_key or "").encode("utf-8")):
+            logger.warning("hae_auth_failure reason=invalid_token request_id=%s",
+                           context.aws_request_id if context else "local")
             return {"statusCode": 403, "body": json.dumps({"error": "Forbidden"})}
     except Exception as e:
-        print(f"ERROR: Could not validate API key: {e}")
+        logger.error("hae_auth_error: %s", e)
         return {"statusCode": 500, "body": json.dumps({"error": "Auth error"})}
 
     # ── Parse body ──

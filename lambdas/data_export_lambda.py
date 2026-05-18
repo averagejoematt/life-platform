@@ -45,16 +45,35 @@ dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
 s3 = boto3.client("s3", region_name=REGION)
 
-# All known source partitions
+# All known source partitions for export.
+# Phase 7.1 audit (2026-05-16): reconciled against live DDB scan — was missing
+# 26 partitions, had 6 stale entries (exposures/food_responses/interactions/
+# rewards/ruck_log/temptations no longer exist). List below mirrors actual
+# `USER#matthew#SOURCE#*` partitions, minus operational/internal ones.
 ALL_SOURCES = [
-    "whoop", "withings", "strava", "todoist", "apple_health",
-    "hevy", "eightsleep", "chronicling", "macrofactor", "garmin",
-    "habitify", "notion", "labs", "dexa", "genome", "weather",
-    "supplements", "state_of_mind", "habit_scores", "day_grade",
-    "character_sheet", "insights", "experiments", "travel",
-    "ruck_log", "life_events", "interactions", "temptations",
-    "exposures", "chronicle", "food_responses", "rewards",
+    # ── Raw ingestion sources ──
+    "whoop", "withings", "strava", "garmin", "eightsleep", "apple_health",
+    "macrofactor", "macrofactor_workouts", "habitify", "notion", "todoist",
+    "weather", "food_delivery", "measurements", "dexa", "genome", "labs",
+    "supplements", "google_calendar", "hevy",
+    # ── User-curated / manual ──
+    "chronicle", "chronicling", "journal_analysis", "sick_days",
+    "discovery_annotations", "field_notes", "subscribers",
+    # ── Computed / derived ──
+    "character_sheet", "computed_metrics", "computed_insights",
+    "composite_scores", "day_grade", "habit_scores", "sleep_unified",
+    "centenarian_progress", "circadian", "adaptive_mode", "ai_analysis",
+    # ── Coaching state + analytics ──
+    "anomalies", "insights", "experiments", "challenges", "protocols",
+    "hypotheses", "weekly_correlations", "platform_memory", "nutrition_review",
+    "ledger",
 ]
+
+# Partitions intentionally EXCLUDED from export:
+# - email_log#* (operational records of email sends)
+# - health_check (operational; status of pipeline probes)
+# - dropbox_tracker (operational; not user data)
+# (These are documented to make future audits easy.)
 
 
 class DecimalEncoder(json.JSONEncoder):

@@ -462,6 +462,12 @@ def store_computed_metrics(
         pass  # validator not bundled — proceed without check
     except Exception as ve:
         logger.warning("[DATA-2] validate_item failed (proceeding with write): %s", ve)
+    # Phase 3.3 (2026-05-16): tag with run_id + computed_at.
+    try:
+        from compute_metadata import tag_record
+        item = tag_record(item, source_id="computed_metrics")
+    except ImportError:
+        pass
     try:
         table.put_item(Item=item)
     except Exception as ddb_err:

@@ -97,6 +97,12 @@ def store_adaptive_mode(date_str, result):
         pass
     except Exception as ve:
         logger.warning("[DATA-2] adaptive_mode validate_item failed (proceeding): %s", ve)
+    # Phase 3.3 (2026-05-16): tag with run_id + computed_at.
+    try:
+        from compute_metadata import tag_record
+        item = tag_record(item, source_id="adaptive_mode")
+    except ImportError:
+        pass
     table.put_item(Item=item)
     logger.info(f"Stored adaptive_mode for {date_str}: {result['brief_mode']} (score={result['engagement_score']})")
 

@@ -1,11 +1,20 @@
 """
-Pipeline Health Check Lambda — active probe of all ingestion pipelines.
+Pipeline Health Check Lambda — active probe of all ingestion pipelines + Phase 3.2
+compute-output freshness check.
 
-Invokes each ingestion Lambda and checks if it starts without crashing.
-Catches: dead secrets, expired tokens, missing modules, auth failures.
+Two modes (selected by event):
+  - default ({}):  invokes each Lambda with {"healthcheck":true} and checks it
+                   doesn't crash. Catches dead secrets, expired tokens, missing
+                   modules, auth failures. Schedule: 13:00 UTC daily (6 AM PT,
+                   before morning ingestion crons).
+  - {"check_compute_outputs": true}: queries DDB to verify today's compute
+                   records exist (character_sheet, computed_metrics, daily_insight,
+                   adaptive_mode). Phase 3.2 addition. Schedule: 16:58 UTC daily
+                   (9:58 AM PT, after compute cascade completes by 9:55 PT,
+                   before daily-brief at 10:00 PT). Emits metric + warning if any
+                   today-record is missing so the brief reads stale data silently.
+
 Writes results to DynamoDB for status page consumption.
-
-Schedule: Daily at 6:00 AM PT (13:00 UTC) — before morning ingestion crons.
 """
 
 import json
@@ -83,11 +92,96 @@ def _probe_lambda(fn_name: str) -> dict:
         }
 
 
-def lambda_handler(event, context):
+def _check_compute_outputs(today_str: str) -> dict:
+    """Phase 3.2: Verify the compute cascade wrote its expected records.
+
+    Returns: {missing: [...source_ids...], present: [...], all_present: bool}.
+
+    Designed to run at 9:58 AM PT (after compute cascade 9:30-9:55 PT completes).
+    If any expected partition is missing its expected-date record, daily-brief
+    will read older data silently. Flag it loudly here.
+
+    Each compute Lambda writes for a different reference date — most write
+    YESTERDAY's record (computing metrics for the completed day) but some
+    write TODAY (e.g., adaptive_mode sets today's mode). The EXPECTED list
+    encodes this per-partition.
+    """
+    from datetime import timedelta as _td
+    yesterday_str = (datetime.strptime(today_str, "%Y-%m-%d") - _td(days=1)).strftime("%Y-%m-%d")
+
+    EXPECTED = [
+        # (partition_source_id, display_name, expected_date)
+        ("character_sheet",   "Character Sheet",  yesterday_str),
+        ("computed_metrics",  "Daily Metrics",    yesterday_str),
+        ("computed_insights", "Daily Insights",   yesterday_str),
+        ("adaptive_mode",     "Adaptive Mode",    yesterday_str),
+    ]
+    missing, present = [], []
+    for source_id, display, expected_date in EXPECTED:
+        pk = f"USER#{USER_ID}#SOURCE#{source_id}"
+        sk = f"DATE#{expected_date}"
+        try:
+            resp = table.get_item(Key={"pk": pk, "sk": sk}, ProjectionExpression="sk")
+            if resp.get("Item"):
+                present.append(source_id)
+            else:
+                missing.append({"source_id": source_id, "display": display, "pk": pk, "sk": sk,
+                                "expected_date": expected_date})
+        except Exception as e:
+            missing.append({"source_id": source_id, "display": display, "error": str(e)[:120]})
+
+    # Emit CloudWatch metric so we can graph this over time
+    try:
+        cw = boto3.client("cloudwatch", region_name=REGION)
+        cw.put_metric_data(
+            Namespace="LifePlatform/Pipeline",
+            MetricData=[{
+                "MetricName": "ComputeOutputsMissing",
+                "Value": float(len(missing)),
+                "Unit": "Count",
+            }],
+        )
+    except Exception as e:
+        logger.warning(f"compute_outputs metric emit failed: {e}")
+
+    return {"missing": missing, "present": present, "all_present": not missing}
+
+
+def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
     if hasattr(logger, 'set_date'):
         logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))
 
     now = datetime.now(timezone.utc)
+    today_str = now.strftime("%Y-%m-%d")
+
+    # Phase 3.2: compute-output verification mode
+    if event.get("check_compute_outputs"):
+        result = _check_compute_outputs(today_str)
+        if result["missing"]:
+            missing_names = [m.get("display", m.get("source_id")) for m in result["missing"]]
+            msg = (f"⚠️ Compute pipeline incomplete for {today_str}: "
+                   f"missing {len(result['missing'])} record(s) — {', '.join(missing_names)}. "
+                   f"Daily-brief will read yesterday's data for these.")
+            logger.warning(msg)
+            # Publish to digest SNS so it lands in tomorrow's 8 AM digest.
+            try:
+                sns = boto3.client("sns", region_name=REGION)
+                digest_arn = os.environ.get(
+                    "DIGEST_SNS_ARN",
+                    f"arn:aws:sns:{REGION}:205930651321:life-platform-alerts-digest",
+                )
+                sns.publish(
+                    TopicArn=digest_arn,
+                    Subject=f"Compute pipeline incomplete {today_str}",
+                    Message=msg,
+                )
+            except Exception as e:
+                logger.warning(f"compute_outputs SNS publish failed: {e}")
+        else:
+            logger.info(f"compute_outputs all present for {today_str}")
+        return {"statusCode": 200, "body": json.dumps(result)}
+
+    # Default mode: probe Lambdas + check secrets
     results = []
     pass_count = 0
     fail_count = 0

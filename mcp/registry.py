@@ -5,7 +5,7 @@ from mcp.config import SOURCES, RAW_DAY_LIMIT, P40_GROUPS
 from mcp.tools_data import *
 from mcp.tools_coach_intelligence import (
     tool_get_coach_thread, tool_get_predictions, tool_get_coach_disagreements,
-    tool_evaluate_prediction, tool_get_coaching_summary,
+    tool_evaluate_prediction, tool_get_coaching_summary, tool_get_coach_track_record,
 )
 # tools_calendar retired v3.7.46 (ADR-030) — google_calendar import removed
 from mcp.tools_strength import (
@@ -243,8 +243,16 @@ TOOLS = {
         "fn": tool_get_predictions,
         "schema": {
             "name": "get_predictions",
-            "description": "Cross-coach prediction ledger — all predictions from all coaches with statuses (pending/confirmed/refuted). Use for: 'what predictions are pending?', 'which coach is most accurate?', 'prediction scorecard'",
+            "description": "Cross-coach prediction ledger — all predictions from all coaches with statuses (pending/confirmed/refuted). Use for: 'what predictions are pending?', 'which coach is most accurate?', 'prediction scorecard'. NOTE: reads the legacy SOURCE#coach_thread# partition; for hit-rate analysis on the post-ADR-047 COACH# partition, use get_coach_track_record.",
             "inputSchema": {"type": "object", "properties": {"status": {"type": "string", "enum": ["pending", "confirmed", "refuted"]}, "coach_id": {"type": "string"}, "limit": {"type": "number"}}, "required": []},
+        },
+    },
+    "get_coach_track_record": {
+        "fn": tool_get_coach_track_record,
+        "schema": {
+            "name": "get_coach_track_record",
+            "description": "Hit-rate track record for a single coach over a configurable window — reads the COACH#{coach_id}/LEARNING# audit trail written daily by the prediction evaluator. Returns by_outcome counts (confirmed/refuted/inconclusive/expired), hit_rate_pct (confirmed / decided), per-subdomain and per-metric breakdowns, and 10 most-recent evaluations. Use for: 'how accurate has the glucose coach been?', 'which subdomain does the sleep coach get right most often?', 'show me recent verdicts on metabolic predictions'.",
+            "inputSchema": {"type": "object", "properties": {"coach_id": {"type": "string", "description": "Coach name: sleep, nutrition, training, mind, physical, glucose, labs, explorer (accepts _coach suffix too)"}, "days": {"type": "number", "description": "Lookback window in days (default 30)"}, "subdomain": {"type": "string", "description": "Optional subdomain filter (e.g. 'sleep_quality', 'caloric_intake')"}}, "required": ["coach_id"]},
         },
     },
     "get_coach_disagreements": {
@@ -2907,4 +2915,87 @@ TOOLS = {
         },
     },
 
+    # Phase 4.9 (2026-05-16): meta-tool for tool discoverability across the
+    # 116+ registered tools. Function defined just below the dict, referenced
+    # here via _list_tools_proxy which forwards to the real impl at call time.
+    "list_available_tools": {
+        "fn": "tool_list_available_tools",  # placeholder; rebound below
+        "schema": {
+            "name": "list_available_tools",
+            "description": (
+                "Discover MCP tools by domain or keyword. Use when you're unsure "
+                "which specific tool matches a question. Returns tool names, "
+                "domains, and short descriptions. "
+                "Filter by domain (e.g. 'health', 'training', 'nutrition', 'sleep', "
+                "'journal', 'cgm', 'labs', 'habits', 'lifestyle', 'board', "
+                "'character', 'social', 'memory', 'measurements', 'strength', "
+                "'coach_intelligence', 'decisions', 'hypotheses', 'challenges') "
+                "or keyword (matches tool name + description substring)."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "domain": {"type": "string",
+                               "description": "Optional domain filter (short module name)."},
+                    "keyword": {"type": "string",
+                                "description": "Optional case-insensitive substring "
+                                               "match against name + description."},
+                    "limit": {"type": "integer",
+                              "description": "Max results to return (default 30, max 100).",
+                              "minimum": 1, "maximum": 100, "default": 30},
+                },
+                "required": [],
+            },
+        },
+    },
 }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 4.9 (2026-05-16): list_available_tools — meta-tool implementation
+# ═══════════════════════════════════════════════════════════════════════════
+
+def tool_list_available_tools(domain: str = None, keyword: str = None, limit: int = 30):
+    """List MCP tools, optionally filtered by domain (module short-name) or
+    keyword (substring of tool name or description). Returns at most `limit`
+    items, ordered alphabetically.
+    """
+    if limit is None or limit < 1:
+        limit = 30
+    if limit > 100:
+        limit = 100
+    matches = []
+    kw_lower = (keyword or "").lower().strip()
+    for tool_name, entry in TOOLS.items():
+        fn = entry.get("fn")
+        schema = entry.get("schema", {})
+        description = (schema.get("description") or "")
+        module = getattr(fn, "__module__", "") if fn else ""
+        short_module = module.rsplit(".tools_", 1)[-1] if ".tools_" in module else module
+
+        if domain and short_module != domain:
+            continue
+        if kw_lower:
+            haystack = (tool_name + " " + description).lower()
+            if kw_lower not in haystack:
+                continue
+        matches.append({
+            "name": tool_name,
+            "domain": short_module,
+            "description": description[:200] + ("…" if len(description) > 200 else ""),
+        })
+
+    matches.sort(key=lambda m: m["name"])
+    return {
+        "total_matching": len(matches),
+        "total_registered": len(TOOLS),
+        "tools": matches[:limit],
+        "filter": {"domain": domain, "keyword": keyword, "limit": limit},
+    }
+
+
+# Rebind the placeholder string in the TOOLS dict to the real function now
+# that it's defined. The string was a marker for test_r2_all_fn_references_exist
+# (which looks for tool_* names as fn-refs); rebinding here makes the dispatcher
+# resolve to the callable at runtime.
+TOOLS["list_available_tools"]["fn"] = tool_list_available_tools

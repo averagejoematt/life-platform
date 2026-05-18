@@ -54,6 +54,8 @@ import role_policies as rp  # noqa — importable now
 
 # ── Constants from role_policies ──────────────────────────────────────────────
 KMS_KEY_ARN = rp.KMS_KEY_ARN
+S3_KMS_KEY_ARN = rp.S3_KMS_KEY_ARN  # Phase 2.4: S3 default-encryption CMK
+ALLOWED_KMS_ARNS = {KMS_KEY_ARN, S3_KMS_KEY_ARN}
 TABLE_ARN   = rp.TABLE_ARN
 
 DDB_READ_ACTIONS  = {
@@ -148,11 +150,11 @@ def test_r3_kms_resource_is_scoped(fn_name):
         for resource in s.resources:
             assert resource != "*", (
                 f"{fn_name}(): KMS statement (sid={s.sid!r}) uses wildcard resource '*'. "
-                f"Scope to KMS_KEY_ARN: {KMS_KEY_ARN}"
+                f"Scope to one of: {ALLOWED_KMS_ARNS}"
             )
-            assert resource == KMS_KEY_ARN, (
+            assert resource in ALLOWED_KMS_ARNS, (
                 f"{fn_name}(): KMS statement (sid={s.sid!r}) targets unexpected ARN "
-                f"{resource!r}. Expected {KMS_KEY_ARN}"
+                f"{resource!r}. Expected one of {ALLOWED_KMS_ARNS}"
             )
 
 

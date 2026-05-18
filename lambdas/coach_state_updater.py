@@ -62,6 +62,96 @@ table = dynamodb.Table(TABLE_NAME)
 s3 = boto3.client("s3", region_name=REGION)
 secrets = boto3.client("secretsmanager", region_name=REGION)
 
+# ══════════════════════════════════════════════════════════════════════════════
+# Measurable-metric allowlist for prediction extraction
+# ══════════════════════════════════════════════════════════════════════════════
+# Mirrors METRIC_SOURCES in coach_prediction_evaluator.py. Predictions whose
+# metric_hint does not normalize to one of these keys are stored as
+# evaluation.type="qualitative" (the evaluator skips qualitative predictions
+# rather than churning daily "inconclusive: no data" outcomes).
+#
+# Aggregate suffixes (_7day_avg, _14day_avg, _30day_avg) are valid extensions
+# of any base key — the evaluator computes those on-the-fly.
+#
+# Keep in sync with lambdas/coach_prediction_evaluator.py:65 (METRIC_SOURCES).
+MEASURABLE_METRICS = frozenset({
+    # whoop
+    "hrv", "hrv_7day_avg", "recovery_score", "resting_heart_rate",
+    "sleep_duration_hours", "sleep_score", "deep_pct", "rem_pct",
+    # withings
+    "weight_lbs",
+    # macrofactor
+    "total_calories_kcal", "total_protein_g",
+    # apple_health
+    "steps", "blood_glucose_avg", "blood_glucose_std_dev",
+    # dexa
+    "body_fat_pct",
+})
+
+# Substring → measurable-metric mapping for normalizing prose-y metric hints.
+# Checked in declared order — first match wins, so multi-word/specific patterns
+# come BEFORE single-word ones to avoid wrong-match ordering bugs (e.g.
+# "hours of sleep needed for optimal recovery" must hit sleep before recovery).
+# Tuned for the actual coach-prediction language patterns observed in the
+# LEARNING# audit (see v7.15.0 changelog: 504 predictions, 100% inconclusive,
+# all due to unmapped metrics).
+_METRIC_HINT_NORMALIZERS = (
+    # Multi-word specific patterns first (precedence)
+    ("heart rate variability",          "hrv"),
+    ("resting heart rate",              "resting_heart_rate"),
+    ("resting hr",                      "resting_heart_rate"),
+    ("hours of sleep",                  "sleep_duration_hours"),
+    ("sleep duration",                  "sleep_duration_hours"),
+    ("sleep score",                     "sleep_score"),
+    ("sleep quality",                   "sleep_score"),
+    ("sleep efficiency",                "sleep_score"),
+    ("deep sleep",                      "deep_pct"),
+    ("rem sleep",                       "rem_pct"),
+    ("rem percentage",                  "rem_pct"),
+    ("blood glucose",                   "blood_glucose_avg"),
+    ("glucose variability",             "blood_glucose_std_dev"),
+    ("glucose excursion",               "blood_glucose_avg"),
+    ("postprandial glucose",            "blood_glucose_avg"),
+    ("post-meal glucose",               "blood_glucose_avg"),
+    ("body fat",                        "body_fat_pct"),
+    ("step count",                      "steps"),
+    ("daily steps",                     "steps"),
+    ("recovery score",                  "recovery_score"),
+    ("recovery",                        "recovery_score"),
+    # Single-word fallbacks (checked last)
+    ("hrv",                             "hrv"),
+    ("weight",                          "weight_lbs"),
+    ("calorie",                         "total_calories_kcal"),
+    ("kcal",                            "total_calories_kcal"),
+    ("protein",                         "total_protein_g"),
+    ("glucose",                         "blood_glucose_avg"),
+    ("steps",                           "steps"),
+)
+
+
+def _normalize_metric_hint(hint: str) -> str | None:
+    """Map an LLM-produced metric_hint to a measurable key, or None.
+
+    Used by the post-extraction normalizer in `_write_prediction_records`. If
+    the hint already names an allowlisted key, returns it as-is. Otherwise
+    walks the substring map. Returns None when nothing matches — caller marks
+    the prediction qualitative so the evaluator skips it.
+    """
+    if not hint:
+        return None
+    h = hint.strip().lower()
+    # Direct hit (covers aggregate-suffixed forms too — `hrv_7day_avg` etc.)
+    if h in MEASURABLE_METRICS:
+        return h
+    # Substring map — try with underscores-as-spaces too so snake_case prose
+    # like "sleep_efficiency" matches the "sleep efficiency" needle.
+    h_spaced = h.replace("_", " ")
+    for needle, target in _METRIC_HINT_NORMALIZERS:
+        if needle in h or needle in h_spaced:
+            return target
+    return None
+
+
 # Maximum opening history to keep in voice state
 MAX_RECENT_OPENINGS = 10
 
@@ -125,24 +215,39 @@ def _float_to_decimal(obj):
     return obj
 
 
-def _emit_token_metrics(input_tokens, output_tokens):
-    """Emit per-Lambda token usage to CloudWatch (non-fatal)."""
+def _emit_token_metrics(input_tokens, output_tokens,
+                        cache_creation_tokens=0, cache_read_tokens=0):
+    """Emit per-Lambda token usage to CloudWatch (non-fatal).
+
+    V2 P0.6 (2026-05-17): added cache_creation/cache_read fields. Prior 2-arg
+    signature silently dropped them, leaving AnthropicCacheReadTokens with zero
+    datapoints in 30 days despite caching being wired.
+    """
     try:
-        _cw.put_metric_data(
-            Namespace=_CW_NAMESPACE,
-            MetricData=[
-                {
-                    "MetricName": "AnthropicInputTokens",
-                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                    "Value": input_tokens, "Unit": "Count",
-                },
-                {
-                    "MetricName": "AnthropicOutputTokens",
-                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                    "Value": output_tokens, "Unit": "Count",
-                },
-            ],
-        )
+        metric_data = [
+            {
+                "MetricName": "AnthropicInputTokens",
+                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                "Value": input_tokens, "Unit": "Count",
+            },
+            {
+                "MetricName": "AnthropicOutputTokens",
+                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                "Value": output_tokens, "Unit": "Count",
+            },
+        ]
+        if cache_creation_tokens or cache_read_tokens:
+            metric_data.append({
+                "MetricName": "AnthropicCacheWriteTokens",
+                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                "Value": cache_creation_tokens, "Unit": "Count",
+            })
+            metric_data.append({
+                "MetricName": "AnthropicCacheReadTokens",
+                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                "Value": cache_read_tokens, "Unit": "Count",
+            })
+        _cw.put_metric_data(Namespace=_CW_NAMESPACE, MetricData=metric_data)
     except Exception as e:
         logger.warning("CloudWatch token metric emit failed (non-fatal): %s", e)
 
@@ -213,6 +318,8 @@ def _call_haiku(system, user_message, max_tokens=3000, temperature=0.1):
                     _emit_token_metrics(
                         usage.get("input_tokens", 0),
                         usage.get("output_tokens", 0),
+                        cache_creation_tokens=usage.get("cache_creation_input_tokens", 0),
+                        cache_read_tokens=usage.get("cache_read_input_tokens", 0),
                     )
                 text = resp["content"][0]["text"].strip()
                 # Try to parse as JSON
@@ -355,7 +462,16 @@ EXTRACTION_SYSTEM_PROMPT = (
     "5. **predictions_made**: Any claims about future data or outcomes. "
     "Each needs:\n"
     "   - claim_natural: the prediction in natural language\n"
-    "   - metric_hint: what metric would confirm/refute this\n"
+    "   - metric_hint: which MEASURABLE metric would confirm/refute this. "
+    "MUST be one of these exact strings (or null if none fits — do NOT "
+    "invent prose descriptions): hrv, recovery_score, resting_heart_rate, "
+    "sleep_duration_hours, sleep_score, deep_pct, rem_pct, weight_lbs, "
+    "total_calories_kcal, total_protein_g, steps, blood_glucose_avg, "
+    "blood_glucose_std_dev, body_fat_pct. You may also append _7day_avg, "
+    "_14day_avg, or _30day_avg to any of those (e.g. hrv_7day_avg). If "
+    "the coach's claim doesn't map cleanly to one of these, return null — "
+    "the system will track it as qualitative instead of pretending it can "
+    "be machine-verified.\n"
     "   - timeframe_hint: when the prediction should be evaluable\n"
     "   - confidence_stated: any confidence level the coach expressed "
     "(null if not stated)\n\n"
@@ -800,7 +916,18 @@ def lambda_handler(event, context):
         claim = pred.get("claim_natural", "")
         if not claim:
             continue
-        metric_hint = pred.get("metric_hint", "")
+        raw_metric_hint = pred.get("metric_hint", "") or ""
+        # P5.7 part 2 (v7.16.0): normalize against MEASURABLE_METRICS. The
+        # extractor's updated system prompt asks for allowlisted keys, but
+        # prior coach outputs + LLM drift still produce prose. Normalize once
+        # at the write boundary so the evaluator can resolve them — or fall
+        # back to qualitative to avoid daily "no data" inconclusive churn.
+        metric_hint = _normalize_metric_hint(raw_metric_hint) or ""
+        if raw_metric_hint and not metric_hint:
+            logger.info(
+                "Prediction metric_hint %r did not normalize to MEASURABLE_METRICS — "
+                "marking qualitative for coach=%s", raw_metric_hint, coach_id,
+            )
         timeframe_hint = pred.get("timeframe_hint", "")
         confidence_stated = pred.get("confidence_stated")
 
