@@ -47,6 +47,14 @@ except ImportError:
 
 # ── Config ────────────────────────────────────────────────────────────────────
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
+USER_ID = os.environ.get("USER_ID", "matthew")
+
+# V2 P2.4 (2026-05-17): OAuth circuit breaker for non-framework Lambdas.
+try:
+    from auth_breaker import check_breaker, mark_failure, clear_failure, looks_like_auth_failure
+    _HAS_AUTH_BREAKER = True
+except ImportError:
+    _HAS_AUTH_BREAKER = False
 SECRET_NAME = os.environ.get("NOTION_SECRET_NAME", "life-platform/ingestion-keys")
 NOTION_API = "https://api.notion.com/v1"
 NOTION_VERSION = "2022-06-28"  # Pinned API version -- changing may alter property formats; test thoroughly before updating
@@ -558,6 +566,18 @@ def write_entries(entries_by_date):
 def lambda_handler(event, context):
     if event.get("healthcheck"):
         return {"statusCode": 200, "body": "ok"}
+
+    # V2 P2.4 — auth circuit breaker (short-circuits on prior auth failure for 24h)
+    if _HAS_AUTH_BREAKER:
+        marker = check_breaker(table, source_name="notion", user_id=USER_ID, logger=logger)
+        if marker:
+            logger.warning(f"auth_breaker_skip source=notion marked_at={marker.get('marked_at')} error={marker.get('error','')[:80]}")
+            return {"statusCode": 200, "body": json.dumps({
+                "skipped": "auth_failure_circuit_breaker",
+                "marked_at": marker.get("marked_at"),
+                "error": marker.get("error"),
+            })}
+
     try:
         """
         Lambda entry point.
@@ -631,10 +651,17 @@ def lambda_handler(event, context):
         }
         logger.info(f"Complete: {summary}")
 
+        # V2 P2.4: clear any prior breaker marker on success
+        if _HAS_AUTH_BREAKER:
+            clear_failure(table, source_name="notion", user_id=USER_ID, logger=logger)
+
         return {
             "statusCode": 200,
             "body": json.dumps(summary),
         }
     except Exception as e:
+        # V2 P2.4: mark breaker on auth-shaped failures (suppresses next 24h)
+        if _HAS_AUTH_BREAKER and looks_like_auth_failure(e):
+            mark_failure(table, source_name="notion", user_id=USER_ID, error_msg=e, logger=logger)
         logger.error("lambda_handler failed: %s", e, exc_info=True)
         raise
