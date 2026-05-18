@@ -459,8 +459,11 @@ def build_commentary(data):
         journey_week    = data.get("journey_week", 1),
     )
 
+    # V2 P1.4 + P2.8: route through retry_utils.call_anthropic_raw for
+    # 4-attempt backoff + token telemetry + env-overridable model.
+    model = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
     payload = json.dumps({
-        "model": "claude-sonnet-4-6",
+        "model": model,
         "max_tokens": 1400,
         "messages": [{"role": "user", "content": prompt}],
     }).encode()
@@ -469,20 +472,18 @@ def build_commentary(data):
         headers={"Content-Type": "application/json", "x-api-key": api_key,
                  "anthropic-version": "2023-06-01"}, method="POST")
 
-    for attempt in range(1, 3):
-        try:
-            with urllib.request.urlopen(req, timeout=45) as r:
-                resp = json.loads(r.read())
-                text = resp["content"][0]["text"]
-                logger.debug("brittany_ai_response_excerpt: %s", text[:300])
-                return text
-        except urllib.error.HTTPError as e:
-            print("[WARN] Anthropic HTTP " + str(e.code) + " attempt " + str(attempt))
-            if attempt < 2 and e.code in (429, 529, 500, 502, 503):
-                time.sleep(5)
-            else:
-                raise
-    return ""
+    try:
+        from retry_utils import call_anthropic_raw
+        resp = call_anthropic_raw(req, timeout=45)
+        text = resp["content"][0]["text"]
+        logger.debug("brittany_ai_response_excerpt: %s", text[:300])
+        return text
+    except ImportError:
+        # Layer not attached — fall back to inline single-attempt for safety
+        logger.warning("retry_utils unavailable — single-attempt fallback")
+        with urllib.request.urlopen(req, timeout=45) as r:
+            resp = json.loads(r.read())
+            return resp["content"][0]["text"]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -782,6 +783,8 @@ def lambda_handler(event, context):
             "Subject": {"Data": subject, "Charset": "UTF-8"},
             "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
         }},
+        ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
+        EmailTags=[{"Name": "message_type", "Value": "brittany_weekly"}],
     )
     print("[INFO] Sent to " + RECIPIENT + ": " + subject)
     return {"statusCode": 200, "body": "Brittany email v1.1.0 sent: " + subject}

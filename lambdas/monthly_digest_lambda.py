@@ -907,6 +907,8 @@ def lambda_handler(event, context):
             "Subject": {"Data": f"Monthly Coach's Letter · {month}", "Charset": "UTF-8"},
             "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
         }},
+        ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
+        EmailTags=[{"Name": "message_type", "Value": "monthly_digest"}],
     )
     print(f"[INFO] Sent: Monthly Coach's Letter · {month}")
 
