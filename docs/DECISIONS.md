@@ -1360,7 +1360,7 @@ Cumulative reduction: **5,560 LOC → 3,177 LOC (−2,383 LOC / −43%)** across
 
 | Item | Rationale |
 |---|---|
-| **P4.3 Split `intelligence_common.py`** | 1556 LOC has only 1 active importer (daily_brief). Splitting would multiply imports without reducing complexity for the actual consumer. Revisit only if a second major importer emerges. |
+| **P4.3 Split `intelligence_common.py`** | 1556 LOC has only 1 active importer (ai_expert_analyzer — corrected from "daily_brief" 2026-05-17 per V2 P2.10). Splitting would multiply imports without reducing complexity for the actual consumer. Revisit only if a second major importer emerges. |
 | **P4.6 HAE handler registry refactor** | 1492 LOC already organized per-data-type. A registry pattern would be cleanup-only with no behavior change. Revisit only if a 6th+ data type is added. |
 | **P8.11 Site-api pagination** | `/api/changes-since` and `/api/observatory_week` already bounded by natural query windows (single-day, single-week). Not a practical risk. Revisit only if a new endpoint surfaces an actually-unbounded query. |
 | **P8.6 Lambda Power Tuning campaign** | Most Lambdas already at 256 MB (minimum effective tier). Only mcp (768) and daily-brief (768) have headroom — but daily-brief sends real emails on invocation, making it unsafe to tune. Realistic savings: $1-3/mo for ~30 min work per safe-to-tune target. Better ROI elsewhere. |

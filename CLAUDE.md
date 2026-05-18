@@ -43,12 +43,12 @@ python3 mcp_bridge.py
 
 **Ingest → Store → Serve** pipeline on AWS (us-west-2):
 
-1. **Ingest**: 13 Lambda functions pull from APIs on EventBridge schedules (hourly 4am–10pm PST, except Garmin at 4x daily due to OAuth rate limits, Weather + Todoist at 2x daily). Gap-aware backfill — each ingestion Lambda detects missing `DATE#` records (including today) and only fetches what's absent. HAE webhook sources (CGM, water, BP, State of Mind) are near-real-time with reading-level dedup for cumulative fields.
+1. **Ingest**: 14 Lambda functions pull from APIs on EventBridge schedules (8 SIMP-2 framework + 6 pattern-exempt per ADR-056; hourly 4am–10pm PST, except Garmin at 4x daily due to OAuth rate limits, Weather + Todoist at 2x daily). Gap-aware backfill — each ingestion Lambda detects missing `DATE#` records (including today) and only fetches what's absent. HAE webhook sources (CGM, water, BP, State of Mind) are near-real-time with reading-level dedup for cumulative fields.
 
 2. **Store**: Raw JSON in S3 (`raw/{source}/{datatype}/{YYYY}/{MM}/{DD}.json`), normalized metrics in DynamoDB single-table (`life-platform`, PK `USER#matthew#SOURCE#{source}`, SK `DATE#{YYYY-MM-DD}`).
 
 3. **Serve/Compute**:
-   - **MCP Lambda** — 115 tools across 26 domain modules (`mcp/tools_*.py`), accessed via Claude Desktop and claude.ai
+   - **MCP Lambda** — 135 tools across 26 domain modules (`mcp/tools_*.py`), accessed via Claude Desktop and claude.ai. **Note (V2 P4.1):** only ~11 tools used in last 30 days per EMF telemetry; bulk pruning planned.
    - **Compute Lambdas** (5) — run before 11 AM daily: `character-sheet`, `adaptive-mode`, `daily-metrics-compute`, `daily-insight-compute`, `hypothesis-engine`; store pre-computed results to DynamoDB
    - **Email Lambdas** (7) — daily brief at 11 AM reads pre-computed results
    - **OG Image Lambda** — generates 6 data-driven PNG share cards daily at 11:30 AM PT using Pillow
@@ -74,7 +74,7 @@ python3 mcp_bridge.py
 
 **EventBridge crons use fixed UTC** — no DST drift. All schedules in `cdk/stacks/` must be UTC-fixed.
 
-**Lambda Layer** — shared modules (`ai_calls.py`, `retry_utils.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `site_writer.py`, `character_engine.py`, `intelligence_common.py`, + 9 more) are deployed as a layer (currently v41). Changes here require a layer rebuild (`bash deploy/build_layer.sh`) before deploying dependent functions.
+**Lambda Layer** — shared modules (`ai_calls.py`, `retry_utils.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `site_writer.py`, `character_engine.py`, `intelligence_common.py`, `auth_breaker.py`, `compute_metadata.py`, `email_framework.py`, `http_retry.py`, `numeric.py`, `platform_logger.py`, `rate_limiter.py`, `request_validator.py`, + 8 more) are deployed as a layer (currently **v50**, mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`). Changes here require a layer rebuild (`bash deploy/build_layer.sh`) before deploying dependent functions. Source of truth: `aws lambda list-layer-versions --layer-name life-platform-shared-utils --query 'LayerVersions[0].Version'`.
 
 **Prompt caching (COST-OPT-2)** — `ai_calls.py` and `retry_utils.py` auto-wrap system messages as Anthropic cached content blocks (90% discount). Model tiering: structured tasks use Haiku, narrative content uses Sonnet. All model assignments configurable via `AI_MODEL` env var. See ADR-049.
 
