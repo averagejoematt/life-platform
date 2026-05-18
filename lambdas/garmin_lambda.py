@@ -65,6 +65,7 @@ Schedule: 9:30 AM PT daily (17:30 UTC)
 import json
 import os
 import logging
+import time
 import boto3
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
@@ -94,14 +95,16 @@ table          = dynamodb.Table(DYNAMODB_TABLE)
 
 
 # ── Serialisation ──────────────────────────────────────────────────────────────
-def floats_to_decimal(obj):
-    if isinstance(obj, float):
-        return Decimal(str(obj))
-    if isinstance(obj, dict):
-        return {k: floats_to_decimal(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [floats_to_decimal(v) for v in obj]
-    return obj
+# Phase 4.2 (2026-05-16): canonical impl in lambdas/numeric.py.
+try:
+    from numeric import floats_to_decimal  # noqa: F401
+except ImportError:
+    def floats_to_decimal(obj):
+        if isinstance(obj, bool): return obj
+        if isinstance(obj, float): return Decimal(str(obj))
+        if isinstance(obj, dict): return {k: floats_to_decimal(v) for k, v in obj.items()}
+        if isinstance(obj, list): return [floats_to_decimal(v) for v in obj]
+        return obj
 
 
 def safe_float(val):
@@ -118,10 +121,27 @@ def get_secret():
 
 
 def save_secret(secret: dict):
-    secrets_client.update_secret(
-        SecretId=SECRET_NAME,
-        SecretString=json.dumps(secret),
-    )
+    """Persist refreshed garth tokens. Writeback failures emit a metric but do
+    NOT raise — the next scheduled run will retry refresh from the previous
+    saved tokens. Raising would cascade a transient SM hiccup into a 401 loop.
+    """
+    try:
+        secrets_client.update_secret(
+            SecretId=SECRET_NAME,
+            SecretString=json.dumps(secret),
+        )
+    except Exception as e:
+        print(f"[WARN] Garmin token writeback failed: {e}")
+        try:
+            cw = boto3.client("cloudwatch", region_name=REGION)
+            cw.put_metric_data(
+                Namespace="LifePlatform/OAuth",
+                MetricData=[{"MetricName": "TokenWritebackFailure",
+                             "Dimensions": [{"Name": "Source", "Value": "garmin"}],
+                             "Value": 1.0}],
+            )
+        except Exception:
+            pass
 
 
 # ── Garmin auth ────────────────────────────────────────────────────────────────
@@ -194,21 +214,35 @@ def get_garmin_client(secret: dict):
         pass
 
     # ── Proactive token refresh (hit exchange endpoint at most once) ──
-    try:
-        if garth.client.oauth2_token and garth.client.oauth2_token.expired:
-            print("OAuth2 token expired — attempting single refresh...")
-            garth.client.refresh_oauth2()
-            print("OAuth2 token refreshed successfully.")
-    except Exception as e:
-        err_str = str(e)
-        if "429" in err_str or "Too Many Requests" in err_str:
-            logger.error(
-                "Garmin OAuth refresh rate-limited (429). "
-                "Aborting to avoid hammering exchange endpoint. "
-                "Will retry on next scheduled run."
-            )
-            raise RuntimeError("Garmin OAuth refresh rate-limited (429). Aborting.") from e
-        else:
+    # Retry transient 5xx (server-side hiccups) with 2s/8s backoff before
+    # giving up; the next scheduled run is 6h away so a brief retry here
+    # avoids losing today's data to a momentary server blip.
+    # 429 is NOT retried — that signals hourly rate-limit exhaustion;
+    # backing off in-process won't help and risks getting banned.
+    refresh_backoff = [2, 8]
+    refresh_attempts = 3
+    for refresh_attempt in range(refresh_attempts):
+        try:
+            if garth.client.oauth2_token and garth.client.oauth2_token.expired:
+                print(f"OAuth2 token expired — refresh attempt {refresh_attempt + 1}/{refresh_attempts}...")
+                garth.client.refresh_oauth2()
+                print("OAuth2 token refreshed successfully.")
+            break  # Either non-expired or refreshed successfully — proceed
+        except Exception as e:
+            err_str = str(e)
+            if "429" in err_str or "Too Many Requests" in err_str:
+                logger.error(
+                    "Garmin OAuth refresh rate-limited (429). "
+                    "Aborting to avoid hammering exchange endpoint. "
+                    "Will retry on next scheduled run."
+                )
+                raise RuntimeError("Garmin OAuth refresh rate-limited (429). Aborting.") from e
+            # Retry transient 5xx; everything else (4xx auth, malformed token) raises.
+            is_transient = any(c in err_str for c in ("500", "502", "503", "504", "timeout", "timed out"))
+            if is_transient and refresh_attempt < refresh_attempts - 1:
+                print(f"OAuth refresh transient error: {e} — retry in {refresh_backoff[refresh_attempt]}s")
+                time.sleep(refresh_backoff[refresh_attempt])
+                continue
             raise RuntimeError(
                 f"Garmin OAuth refresh failed ({e}). "
                 "Run setup_garmin_browser_auth.py locally to re-authenticate."
@@ -751,170 +785,78 @@ def extract_activities(api, date_str: str) -> dict:
 # See extract_training_status() above.
 
 
-# ── Gap detection ──────────────────────────────────────────────────────────────
-def find_missing_dates(lookback_days=LOOKBACK_DAYS):
-    """Check DynamoDB for missing dates in the last N days. Returns sorted list of date strings."""
-    from boto3.dynamodb.conditions import Key
-    today = datetime.now(timezone.utc).date()
-    expected_dates = set()
-    for i in range(0, lookback_days + 1):  # includes today
-        expected_dates.add((today - timedelta(days=i)).strftime("%Y-%m-%d"))
+# ══════════════════════════════════════════════════════════════════════════════
+# P4.1 SIMP-2 framework migration (2026-05-17)
+# ══════════════════════════════════════════════════════════════════════════════
 
-    pk = f"USER#{USER_ID}#SOURCE#garmin"
-    oldest = min(expected_dates)
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{oldest}", f"DATE#{today.strftime('%Y-%m-%d')}"),
-        ProjectionExpression="sk, steps",
-    )
-    # Only count records that have steps (critical field). Records without steps
-    # should be re-fetched (Garmin API may not have had full data on first attempt).
-    existing = set()
-    for item in resp.get("Items", []):
-        if item.get("steps") is not None:
-            existing.add(item["sk"][5:])
-        else:
-            print(f"[GAP-FILL] {item['sk'][5:]} exists but missing steps — will re-fetch")
-    missing = sorted(expected_dates - existing)
-    if missing:
-        print(f"[GAP-FILL] Found {len(missing)} missing dates in last {lookback_days} days: {missing}")
-    else:
-        print(f"[GAP-FILL] No gaps in last {lookback_days} days")
-    return missing
+from ingestion_framework import IngestionConfig, run_ingestion
+
+# Cache the garth-backed api client across the gap-fill loop within one
+# invocation. Re-creating it per-day would hit the OAuth refresh endpoint
+# 7+ times per cold invoke (and Garmin rate-limits refresh aggressively).
+_client_cache = {"api": None, "secret": None}
 
 
-# ── Core ingestion ─────────────────────────────────────────────────────────────
-def ingest_day(target_date: str, secret: dict, api=None) -> dict:
+def authenticate(secret_data: dict) -> dict:
+    """Initialize the garth-backed Garmin client. get_garmin_client refreshes
+    OAuth tokens in-place and writes them back to the secret dict, which the
+    framework persists via enable_secret_writeback=True."""
+    secret = dict(secret_data)
+    api = get_garmin_client(secret)
+    _client_cache["api"] = api
+    _client_cache["secret"] = secret
+    return secret
+
+
+def fetch_day(credentials: dict, date_str: str) -> dict | None:
+    """Pull all 13 Garmin endpoints for one day. Per-extractor errors are
+    caught inside each extract_* — partial-record returns are normal."""
+    api = _client_cache["api"]
     if api is None:
-        api = get_garmin_client(secret)
-    print(f"Fetching Garmin data for {target_date}...")
-
+        # Defensive: framework caller mismatch — re-auth.
+        api = get_garmin_client(dict(credentials))
+        _client_cache["api"] = api
     record = {}
-    record.update(extract_user_summary(api, target_date))
-    record.update(extract_hrv(api, target_date))
-    record.update(extract_stress(api, target_date))
-    record.update(extract_body_battery(api, target_date))
-    record.update(extract_respiration(api, target_date))
-    record.update(extract_spo2(api, target_date))
-    record.update(extract_max_metrics(api, target_date))
-    record.update(extract_training_status(api, target_date))
-    record.update(extract_sleep(api, target_date))
-    record.update(extract_hr_zones(api, target_date))
-    record.update(extract_intensity_minutes(api, target_date))
-    record.update(extract_stats(api, target_date))
-    record.update(extract_activities(api, target_date))
+    record.update(extract_user_summary(api, date_str))
+    record.update(extract_hrv(api, date_str))
+    record.update(extract_stress(api, date_str))
+    record.update(extract_body_battery(api, date_str))
+    record.update(extract_respiration(api, date_str))
+    record.update(extract_spo2(api, date_str))
+    record.update(extract_max_metrics(api, date_str))
+    record.update(extract_training_status(api, date_str))
+    record.update(extract_sleep(api, date_str))
+    record.update(extract_hr_zones(api, date_str))
+    record.update(extract_intensity_minutes(api, date_str))
+    record.update(extract_stats(api, date_str))
+    record.update(extract_activities(api, date_str))
+    return record if record else None
 
-    if not record:
-        print(f"No data returned from any Garmin endpoint for {target_date}.")
-        return {}
 
-    print(f"Total fields collected: {len(record)}")
+def transform(raw: dict, date_str: str) -> list[dict]:
+    if not raw:
+        return []
+    return [{"source": "garmin", "date": date_str, **raw}]
 
-    s3_key = f"raw/{USER_ID}/garmin/{target_date[:4]}/{target_date[5:7]}/{target_date[8:10]}.json"
-    s3_client.put_object(
-        Bucket=S3_BUCKET,
-        Key=s3_key,
-        Body=json.dumps({
-            "date":        target_date,
-            "ingested_at": datetime.now(timezone.utc).isoformat(),
-            "parsed":      record,
-        }, default=str),
-        ContentType="application/json",
-    )
-    print(f"S3: s3://{S3_BUCKET}/{s3_key}")
 
-    db_item = {
-        "pk":             f"USER#{USER_ID}#SOURCE#garmin",
-        "sk":             f"DATE#{target_date}",
-        "date":           target_date,
-        "source":         "garmin",
-        "schema_version": 1,
-        "ingested_at":    datetime.now(timezone.utc).isoformat(),
-        **record,
-    }
-    # DATA-2: Validate before write
+_config = IngestionConfig(
+    source_name="garmin",
+    secret_id=SECRET_NAME,
+    s3_archive_prefix=f"raw/{USER_ID}/garmin",
+    schema_version=1,
+    enable_gap_detection=True,
+    lookback_days=LOOKBACK_DAYS,
+    enable_secret_writeback=True,
+    enable_item_size_guard=True,
+    refresh_today=True,
+)
+
+
+def lambda_handler(event: dict, context) -> dict:
     try:
-        from ingestion_validator import validate_item as _validate_item
-        _vr = _validate_item("garmin", floats_to_decimal(db_item), target_date)
-        if _vr.should_skip_ddb:
-            logger.error(f"[DATA-2] CRITICAL: Skipping garmin DDB write for {target_date}: {_vr.errors}")
-            _vr.archive_to_s3(s3_client, bucket=S3_BUCKET, item=db_item)
-        else:
-            if _vr.warnings:
-                logger.warning(f"[DATA-2] Validation warnings for garmin/{target_date}: {_vr.warnings}")
-            table.put_item(Item=floats_to_decimal(db_item))
-            print(f"DynamoDB: DATE#{target_date} → {len(record)} fields written")
-    except ImportError:
-        table.put_item(Item=floats_to_decimal(db_item))
-        print(f"DynamoDB: DATE#{target_date} → {len(record)} fields written")
-
-    return record
-
-
-# ── Lambda handler ─────────────────────────────────────────────────────────────
-def lambda_handler(event, context):
-    if event.get("healthcheck"):
-        return {"statusCode": 200, "body": "ok"}
-    try:
-        import time as _time
-        if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
-
-        secret = get_secret()
-
-        # ── Mode 1: Explicit date override (manual invocation / backfill) ──
-        if event.get("date"):
-            target_date = event["date"]
-            print(f"Garmin ingestion — explicit date={target_date}")
-            result = ingest_day(target_date, secret)
-            if not result:
-                return {"statusCode": 204, "body": json.dumps({"message": f"No Garmin data for {target_date}"})}
-            return {
-                "statusCode": 200,
-                "body": json.dumps({"date": target_date, "fields_written": len(result)}, default=str),
-            }
-
-        # ── Mode 2: Scheduled run — gap-aware lookback ──
-        print(f"Garmin ingestion — gap-aware lookback ({LOOKBACK_DAYS} days)")
-        missing_dates = find_missing_dates()
-
-        if not missing_dates:
-            return {"statusCode": 200, "body": json.dumps({"message": "No gaps to fill", "lookback_days": LOOKBACK_DAYS})}
-
-        # Auth once, reuse across all gap days
-        api = get_garmin_client(secret)
-        results = {}
-        consecutive_failures = 0
-        for i, date_str in enumerate(missing_dates):
-            print(f"[GAP-FILL] Ingesting {date_str} ({i+1}/{len(missing_dates)})")
-            try:
-                result = ingest_day(date_str, secret, api=api)
-                results[date_str] = len(result) if result else 0
-                if result:
-                    consecutive_failures = 0
-                else:
-                    consecutive_failures += 1
-            except Exception as e:
-                print(f"[GAP-FILL] ERROR on {date_str}: {e}")
-                results[date_str] = f"error: {e}"
-                consecutive_failures += 1
-            if consecutive_failures >= 2:
-                print(f"[GAP-FILL] Circuit breaker: {consecutive_failures} consecutive failures — aborting remaining days")
-                break
-            if i < len(missing_dates) - 1:
-                _time.sleep(1)  # Rate limit pacing
-
-        filled = sum(1 for v in results.values() if isinstance(v, int) and v > 0)
-        print(f"[GAP-FILL] Complete: {filled}/{len(missing_dates)} days filled")
-
-        return {
-            "statusCode": 200,
-            "body": json.dumps({
-                "mode": "gap_fill",
-                "lookback_days": LOOKBACK_DAYS,
-                "gaps_found": len(missing_dates),
-                "gaps_filled": filled,
-                "details": results,
-            }, default=str),
-        }
+        if event.get("healthcheck"):
+            return {"statusCode": 200, "body": "ok"}
+        return run_ingestion(_config, authenticate, fetch_day, transform, event, context)
     except Exception as e:
-        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        logger.error("garmin ingestion failed: %s", e, exc_info=True)
         raise

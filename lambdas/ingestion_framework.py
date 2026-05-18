@@ -66,6 +66,101 @@ from decimal import Decimal
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# AUTH-FAILURE CIRCUIT BREAKER (ADR-052)
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# When an OAuth token expires (401) or is revoked (403), the source Lambda
+# would otherwise raise on every scheduled run for days until the operator
+# notices and rotates the credential — flooding the alarm channel even though
+# the failure mode is well-understood and only fixable by a human.
+#
+# The circuit breaker writes a marker to DDB on the first auth failure. While
+# the marker is fresh (<24h), subsequent invocations short-circuit with a
+# statusCode 200 + "skipped" body and never reach the source API. The first
+# failure still surfaces (so the operator knows to act); the next 23 hours of
+# inbox spam are suppressed.
+#
+# The marker auto-expires after 24h via DDB TTL — so if the operator rotates
+# the credential, normal behavior resumes on the next run without manual
+# cleanup. A successful invocation also clears the marker immediately.
+
+_AUTH_FAIL_SK = "AUTH_FAILURE"
+_AUTH_FAIL_TTL_SECONDS = 24 * 3600  # 24 hours
+
+_AUTH_FAIL_HTTP_CODES = ("401", "403")
+_AUTH_FAIL_KEYWORDS = (
+    "unauthorized", "forbidden", "invalid token", "expired token",
+    "token expired", "auth failed", "authentication failed",
+)
+
+
+def _looks_like_auth_failure(exc: Exception) -> bool:
+    """Heuristic: does this exception indicate an OAuth/API auth failure?"""
+    msg = str(exc).lower()
+    if any(code in msg for code in _AUTH_FAIL_HTTP_CODES):
+        return True
+    if any(kw in msg for kw in _AUTH_FAIL_KEYWORDS):
+        return True
+    # urllib.error.HTTPError exposes .code
+    code = getattr(exc, "code", None)
+    if code in (401, 403):
+        return True
+    return False
+
+
+def _auth_breaker_pk(source_name: str, user_id: str) -> str:
+    return f"USER#{user_id}#SOURCE#{source_name}"
+
+
+def _check_auth_breaker(table, source_name: str, user_id: str, logger):
+    """Return the active marker if one exists and is still fresh, else None."""
+    try:
+        resp = table.get_item(Key={"pk": _auth_breaker_pk(source_name, user_id), "sk": _AUTH_FAIL_SK})
+    except Exception as e:
+        logger.warning(f"auth_breaker_lookup_failed: {e}")
+        return None
+    item = resp.get("Item")
+    if not item:
+        return None
+    marked_at_iso = item.get("marked_at")
+    if not marked_at_iso:
+        return None
+    try:
+        marked_at = datetime.fromisoformat(marked_at_iso)
+    except ValueError:
+        return None
+    age = (datetime.now(timezone.utc) - marked_at).total_seconds()
+    if age >= _AUTH_FAIL_TTL_SECONDS:
+        return None
+    return item
+
+
+def _mark_auth_failure(table, source_name: str, user_id: str, error_msg, logger):
+    """Write the auth-failure marker with a 24h DDB TTL."""
+    now = datetime.now(timezone.utc)
+    item = {
+        "pk": _auth_breaker_pk(source_name, user_id),
+        "sk": _AUTH_FAIL_SK,
+        "marked_at": now.isoformat(),
+        "error": str(error_msg)[:500],
+        "ttl": int(now.timestamp()) + _AUTH_FAIL_TTL_SECONDS,
+    }
+    try:
+        table.put_item(Item=item)
+        logger.warning(f"auth_breaker_marked source={source_name} ttl=24h")
+    except Exception as e:
+        logger.warning(f"auth_breaker_mark_failed: {e}")
+
+
+def _clear_auth_failure(table, source_name: str, user_id: str, logger):
+    """Remove the marker after a successful run."""
+    try:
+        table.delete_item(Key={"pk": _auth_breaker_pk(source_name, user_id), "sk": _AUTH_FAIL_SK})
+    except Exception as e:
+        logger.warning(f"auth_breaker_clear_failed: {e}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # CONFIG
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -83,6 +178,7 @@ class IngestionConfig:
         enable_item_size_guard: bool = False,
         enable_secret_writeback: bool = False,
         gap_rate_limit_seconds: float = 1.0,
+        refresh_today: bool = False,
     ):
         self.source_name = source_name
         self.secret_id = secret_id
@@ -93,6 +189,11 @@ class IngestionConfig:
         self.enable_item_size_guard = enable_item_size_guard
         self.enable_secret_writeback = enable_secret_writeback
         self.gap_rate_limit_seconds = gap_rate_limit_seconds
+        # Phase 4.1 / Habitify (2026-05-17): some sources (Habitify: habits
+        # checked throughout the day; Whoop: recovery score updates morning) need
+        # today's record overwritten on every run, not just when missing. Setting
+        # refresh_today=True adds today to the gap-fill check set unconditionally.
+        self.refresh_today = refresh_today
 
         # Environment
         self.region = os.environ.get("AWS_REGION", "us-west-2")
@@ -147,22 +248,32 @@ def _init_aws(config):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _find_missing_dates(table, config, logger):
-    """Query DDB for last N days, return sorted list of missing date strings."""
+    """Query DDB for last N days, return sorted list of missing date strings.
+
+    Phase 4.1 / Habitify: if config.refresh_today is True, today is always
+    included regardless of whether the record exists — sources like Habitify
+    update throughout the day and need overwrites on every hourly run.
+    """
     from boto3.dynamodb.conditions import Key
 
     pk = f"USER#{config.user_id}#SOURCE#{config.source_name}"
     today = datetime.now(timezone.utc).date()
+    today_str = today.strftime("%Y-%m-%d")
     check_dates = set()
     for i in range(1, config.lookback_days + 1):
         check_dates.add((today - timedelta(days=i)).strftime("%Y-%m-%d"))
+    if config.refresh_today:
+        check_dates.add(today_str)
 
     oldest = min(check_dates)
     resp = table.query(
         KeyConditionExpression=Key("pk").eq(pk) &
-            Key("sk").between(f"DATE#{oldest}", f"DATE#{today.strftime('%Y-%m-%d')}"),
+            Key("sk").between(f"DATE#{oldest}", f"DATE#{today_str}"),
         ProjectionExpression="sk",
     )
     existing = {item["sk"][5:] for item in resp.get("Items", [])}
+    if config.refresh_today:
+        existing.discard(today_str)  # force today to be considered "missing"
     missing = sorted(check_dates - existing)
 
     if missing:
@@ -264,6 +375,25 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn,
 
     logger.info(f"Ingestion starting: source={config.source_name}")
 
+    # ── Auth-failure circuit breaker (ADR-052) ──
+    # If a prior run hit 401/403 in the last 24h, skip the API call entirely.
+    # The first failure already produced its alert; further alarms are noise
+    # until the operator rotates the credential. Marker auto-expires after 24h.
+    _active_breaker = _check_auth_breaker(table, config.source_name, config.user_id, logger)
+    if _active_breaker:
+        msg = (f"auth_breaker_active source={config.source_name} "
+               f"marked_at={_active_breaker.get('marked_at')} "
+               f"error={_active_breaker.get('error', '')[:120]}")
+        logger.info(msg)
+        return {
+            "statusCode": 200,
+            "body": json.dumps({
+                "skipped": "auth_failure_circuit_breaker",
+                "source": config.source_name,
+                "marker": {k: str(v) for k, v in _active_breaker.items() if k != "ttl"},
+            }),
+        }
+
     # ── Load secrets + authenticate ──
     credentials = {}
     if config.secret_id and secrets_client:
@@ -278,7 +408,14 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn,
             logger.error(f"Failed to load secret {config.secret_id}: {e}")
             return {"statusCode": 500, "body": json.dumps({"error": f"Secret load failed: {e}"})}
 
-        credentials = authenticate_fn(secret_data)
+        # ADR-052: trip the circuit breaker on auth failures so the next 24h
+        # of runs skip the API instead of re-alerting on the same root cause.
+        try:
+            credentials = authenticate_fn(secret_data)
+        except Exception as auth_exc:
+            if _looks_like_auth_failure(auth_exc):
+                _mark_auth_failure(table, config.source_name, config.user_id, auth_exc, logger)
+            raise
 
         # Write back updated credentials (OAuth token refresh)
         if config.enable_secret_writeback and credentials:
@@ -381,10 +518,22 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn,
             logger.error(f"  {date_str}: ERROR — {e}")
             results[date_str] = f"error: {e}"
             errors += 1
+            # ADR-052: trip the breaker if the per-date error looks like 401/403.
+            if _looks_like_auth_failure(e):
+                _mark_auth_failure(table, config.source_name, config.user_id, e, logger)
+                # No point retrying remaining dates with the same bad credential.
+                break
 
         # Rate limit between gap-fill days
         if i < len(dates_to_ingest) - 1 and config.enable_gap_detection:
             time.sleep(config.gap_rate_limit_seconds)
+
+    # ── Clear circuit breaker on a clean run (ADR-052) ──
+    # If we wrote at least one record successfully and had no errors at all,
+    # the credential is healthy — drop any lingering marker so the next run
+    # behaves normally even before the 24h TTL expires.
+    if errors == 0 and records_written > 0:
+        _clear_auth_failure(table, config.source_name, config.user_id, logger)
 
     # ── Summary ──
     summary = {
