@@ -4,757 +4,104 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Training for longevity — Zone 2 cardio, centenarian benchmarks, training load management across Strava, Hevy, Garmin, and Whoop.">
-  <meta property="og:title" content="Training Observatory — Matthew">
-  <meta property="og:description" content="4 data sources. Zone 2 targets. Centenarian benchmarks. What training for the last decade of life actually looks like.">
+  <meta name="description" content="The Training Dispatch — Zone 2 cardio, compound lifts, centenarian benchmarks. Training for the last decade of life.">
+  <meta property="og:title" content="The Training Dispatch — Matthew">
+  <meta property="og:description" content="Sessions, lifts, Zone 2, ACWR. Four data sources synthesized into one editorial dispatch.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-training.png">
+  <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <title>Training Observatory — Matthew</title>
+  <title>The Training Dispatch — Matthew</title>
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <meta name="theme-color" content="#080c0a">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
-  <link rel="stylesheet" href="/assets/css/observatory-v3.css">
   <style>
-    :root {
-      --t-red: #ef4444;
-      --t-red-dim: rgba(239,68,68,0.12);
-      --t-red-glow: rgba(239,68,68,0.06);
-      --t-green: #3ecf8e;
-      --t-amber: #f59e0b;
-      --t-violet: #818cf8;
-      --t-blue: #60a5fa;
-    }
+    /* /training/ — uses Front Page pattern (.fp-*); see assets/css/frontpage.css.
+       Page-scope additions only — namespace .t- (training). */
+    .t-page { padding-top: var(--nav-height); }
 
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(16px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       EDITORIAL TEMPLATE — 11k: Monospace section headers with trailing em-dashes
-       ═══════════════════════════════════════════════════════ */
-    .t-section-header {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      margin-bottom: var(--space-8);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .t-section-header::after {
-      content: '\2014\2014';
-      color: var(--text-faint);
-      opacity: 0.4;
-      flex-shrink: 0;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       EDITORIAL PULL-QUOTES — 11k: Staggered serif, offset
-       ═══════════════════════════════════════════════════════ */
-    .t-pullquote {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      position: relative;
-      border-bottom: 1px solid var(--border);
-    }
-    .t-pullquote--left {
-      padding-left: calc(var(--page-padding) + 8%);
-    }
-    .t-pullquote--right {
-      padding-left: calc(var(--page-padding) + 16%);
-    }
-    .t-pullquote__watermark {
-      position: absolute;
-      top: 24px;
-      right: var(--page-padding);
-      font-family: var(--font-display);
-      font-size: 120px;
-      color: rgba(239, 68, 68, 0.04);
-      line-height: 1;
-      pointer-events: none;
-    }
-    .t-pullquote__text {
-      font-family: var(--font-display);
-      font-size: clamp(24px, 3.5vw, 32px);
-      line-height: 1.3;
-      color: var(--text);
-      max-width: 640px;
-      position: relative;
-    }
-    .t-pullquote__text em {
-      font-style: normal;
-      color: var(--t-red);
-    }
-    .t-pullquote__attr {
-      display: flex;
-      align-items: center;
-      gap: var(--space-3);
-      margin-top: var(--space-4);
-    }
-    .t-pullquote__badge {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      color: var(--t-red);
-      background: var(--t-red-dim);
-      padding: 3px 10px;
+    /* Skeleton placeholder before /api/training_overview resolves */
+    .t-skeleton {
+      background: linear-gradient(90deg, var(--surface) 25%, var(--surface-raised) 50%, var(--surface) 75%);
+      background-size: 200% 100%;
+      animation: t-shimmer 1.5s infinite;
+      border-radius: 2px;
       display: inline-block;
     }
-    .t-pullquote__source {
+    @keyframes t-shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    .t-row-empty {
+      padding: 28px 22px;
+      border-top: 1px solid var(--border-subtle);
       font-family: var(--font-mono);
       font-size: 11px;
+      letter-spacing: 0.1em;
       color: var(--text-faint);
-      letter-spacing:var(--ls-subtle);
+      text-transform: uppercase;
     }
+    .t-strip-btn {
+      cursor: not-allowed;
+      opacity: 0.5;
+      color: inherit;
+      text-decoration: none;
+    }
+    .t-strip-btn.is-active { opacity: 1; cursor: pointer; color: var(--accent-dim); }
+    .t-strip-btn.is-active:hover { color: var(--accent); }
 
-    /* Dynamic pull-quotes — larger editorial callouts */
-    .t-pullquote--dynamic .t-pullquote__text {
-      font-size: clamp(26px, 4vw, 36px);
-      border-left: 3px solid var(--t-red);
-      padding-left: var(--space-6);
+    /* Extra training-specific sections live AFTER the long story but BEFORE
+       the cross-link footer — they reuse .fp-arc visual language. */
+    .t-extra {
+      padding: 32px 56px;
+      border-top: 1px solid var(--border);
     }
-
-    /* ═══════════════════════════════════════════════════════
-       NARRATIVE CONTEXT — 11k: interpretive sentences between data
-       ═══════════════════════════════════════════════════════ */
-    .t-context {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-4) var(--page-padding) var(--space-6);
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.8;
-      font-style: italic;
-      max-width: 680px;
-    }
-    .t-context strong { color: var(--text); font-style: normal; }
-
-    /* ═══════════════════════════════════════════════════════
-       LEFT-ACCENT RULE CARDS — 11k: key findings
-       ═══════════════════════════════════════════════════════ */
-    .t-rule {
-      padding: var(--space-6);
-      border: 1px solid rgba(255,255,255,0.04);
-      border-left: 3px solid var(--t-red);
-      background: var(--surface);
-    }
-    .t-rule__num {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--t-red);
-      margin-bottom: var(--space-3);
+    .t-extra__head {
       display: flex;
-      align-items: center;
-      gap: 8px;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 18px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--border-strong);
     }
-    .t-rule__num::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: rgba(239,68,68,0.1);
-    }
-    .t-rule__finding {
+    .t-extra__title {
       font-family: var(--font-display);
-      font-size: var(--text-base);
+      font-size: 24px;
+      letter-spacing: 0.04em;
       color: var(--text);
-      line-height: 1.35;
-      margin-bottom: var(--space-3);
     }
-    .t-rule__evidence {
+    .t-extra__meta {
       font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text-faint);
-    }
-    .t-rule__evidence em {
-      font-style: normal;
-      color: var(--t-red);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       HERO — 2-column + gauge row
-       ═══════════════════════════════════════════════════════ */
-    .t-hero {
-      padding: var(--space-20) var(--page-padding) var(--space-16);
-      position: relative;
-      overflow: hidden;
-      border-bottom: 1px solid var(--border);
-      max-width: var(--max-width);
-      margin: 0 auto;
-    }
-    .t-hero-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-12);
-      align-items: center;
-    }
-    .t-hero__eyebrow {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
+      font-size: 9px;
       letter-spacing: 0.2em;
       text-transform: uppercase;
-      color: var(--t-red);
-      margin-bottom: var(--space-6);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      opacity: 0;
-      animation: fadeUp 0.6s 0.1s forwards;
-    }
-    .t-hero__eyebrow::before {
-      content: '';
-      width: 32px;
-      height: 1px;
-      background: var(--t-red);
-    }
-    .t-hero__title {
-      font-family: var(--font-display);
-      font-size: clamp(36px, 5vw, 52px);
-      color: var(--text);
-      line-height: 1.05;
-      max-width: 520px;
-      margin-bottom: var(--space-6);
-      opacity: 0;
-      animation: fadeUp 0.6s 0.2s forwards;
-    }
-    .t-hero__title em {
-      font-style: normal;
-      color: var(--t-red);
-    }
-    .t-hero__sub {
-      font-size: var(--text-base);
       color: var(--text-muted);
-      max-width: 420px;
-      line-height: 1.8;
-      opacity: 0;
-      animation: fadeUp 0.6s 0.3s forwards;
     }
 
-    /* Gauge row */
-    .t-gauge-row {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-4);
-      opacity: 0;
-      animation: fadeUp 0.6s 0.4s forwards;
-    }
-    @media (max-width: 768px) { .t-gauge-row { grid-template-columns: repeat(2, 1fr); } }
-    .t-gauge {
-      text-align: center;
-      padding: var(--space-5) var(--space-3);
-      background: var(--surface);
-      border: 1px solid var(--border);
-    }
-    .t-gauge__ring {
-      width: 88px;
-      height: 88px;
-      margin: 0 auto var(--space-3);
-      position: relative;
-    }
-    .t-gauge__ring svg { width: 100%; height: 100%; }
-    .t-gauge__center {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-    }
-    .t-gauge__num {
-      font-family: var(--font-display);
-      font-size: 22px;
-      line-height: 1;
-    }
-    .t-gauge__unit {
-      font-family: var(--font-mono);
-      font-size:var(--text-3xs);
-      color: var(--text-faint);
-      letter-spacing: 0.08em;
-    }
-    .t-gauge__label {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-muted);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       ZONE 2 DETAIL — editorial 3-column
-       ═══════════════════════════════════════════════════════ */
-    .t-z2-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .t-z2-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 0;
-    }
-    .t-z2-col {
-      padding: var(--space-6);
-    }
-    .t-z2-col:not(:last-child) {
-      border-right: 1px solid var(--border);
-    }
-    .t-z2-bar {
-      height: 3px;
-      background: rgba(255,255,255,0.03);
-      margin-bottom: var(--space-5);
-      position: relative;
-      overflow: hidden;
-    }
-    .t-z2-bar__fill {
-      height: 100%;
-      position: absolute;
-      left: 0;
-      top: 0;
-      transition: width 1.2s ease;
-    }
-    .t-z2-big {
-      font-family: var(--font-display);
-      font-size: clamp(36px, 4vw, 44px);
-      line-height: 1;
-      margin-bottom: var(--space-2);
-    }
-    .t-z2-name {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text-muted);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      margin-bottom: var(--space-3);
-    }
-    .t-z2-detail {
-      font-size: var(--text-sm);
-      color: var(--text-faint);
-      line-height: 1.7;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       ACTIVITY MIX
-       ═══════════════════════════════════════════════════════ */
-    .t-activity-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .t-activity-grid {
-      display: flex;
-      gap: var(--space-3);
-      flex-wrap: wrap;
-    }
-    .t-activity-chip {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--t-red);
-      padding: var(--space-3) var(--space-5);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      display: flex;
-      align-items: center;
-      gap: var(--space-2);
-    }
-    .t-activity-chip__count {
-      font-family: var(--font-display);
-      font-size: 18px;
-      color: var(--t-red);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       MODALITY DEEP-DIVE CARDS
-       ═══════════════════════════════════════════════════════ */
-    .t-modality-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: var(--space-4);
-    }
-    @media (max-width: 768px) { .t-modality-grid { grid-template-columns: 1fr; } }
-    .t-modality-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--t-red);
-      padding: var(--space-5) var(--space-6);
-    }
-    .t-modality-card__header {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      margin-bottom: var(--space-3);
-    }
-    .t-modality-card__name {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      color: var(--t-red);
-    }
-    .t-modality-card__trend {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      letter-spacing:var(--ls-subtle);
-    }
-    .t-modality-card__stats {
-      display: flex;
-      gap: var(--space-6);
-      margin-bottom: var(--space-3);
-    }
-    .t-modality-stat__val {
-      font-family: var(--font-display);
-      font-size: 22px;
-      line-height: 1;
-    }
-    .t-modality-stat__label {
-      font-family: var(--font-mono);
-      font-size:var(--text-3xs);
-      color: var(--text-faint);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-    .t-modality-card__context {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      font-style: italic;
-      line-height: 1.5;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       WALKING SECTION — 3-column editorial
-       ═══════════════════════════════════════════════════════ */
-    .t-walking-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .t-walking-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 0;
-    }
-    @media (max-width: 768px) { .t-walking-grid { grid-template-columns: 1fr; } }
-    .t-walking-col {
-      padding: var(--space-6);
-    }
-    .t-walking-col:not(:last-child) {
-      border-right: 1px solid var(--border);
-    }
-    @media (max-width: 768px) {
-      .t-walking-col:not(:last-child) { border-right: none; border-bottom: 1px solid var(--border); }
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       BREATHWORK SECTION
-       ═══════════════════════════════════════════════════════ */
-    .t-breathwork-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .t-breathwork-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-4);
-    }
-    @media (max-width: 768px) { .t-breathwork-grid { grid-template-columns: 1fr; } }
-    .t-breathwork-card {
-      padding: var(--space-5) var(--space-6);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--t-blue);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       WEEKLY PHYSICAL VOLUME — 7-day heatmap
-       ═══════════════════════════════════════════════════════ */
-    .t-weekly-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .t-weekly-row {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: var(--space-2);
-    }
-    @media (max-width: 768px) { .t-weekly-row { grid-template-columns: repeat(4, 1fr); } }
-    .t-weekly-day {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: var(--space-3) var(--space-3);
-      text-align: center;
-      min-height: 90px;
-    }
-    .t-weekly-day__dow {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-faint);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      margin-bottom: var(--space-2);
-    }
-    .t-weekly-day__total {
-      font-family: var(--font-display);
-      font-size: 18px;
-      color: var(--text);
-      line-height: 1;
-      margin-bottom: var(--space-1);
-    }
-    .t-weekly-day__acts {
-      font-family: var(--font-mono);
-      font-size:var(--text-3xs);
-      color: var(--text-faint);
-      line-height: 1.4;
-    }
-    .t-weekly-day__steps {
-      font-family: var(--font-mono);
-      font-size:var(--text-3xs);
-      color: var(--text-muted);
-      margin-top: var(--space-1);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       RUNNING — COMING SOON TEASER
-       ═══════════════════════════════════════════════════════ */
-    .t-coming-soon {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-      text-align: center;
-    }
-    .t-coming-soon__title {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      margin-bottom: var(--space-3);
-    }
-    .t-coming-soon__body {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      max-width: 480px;
-      margin: 0 auto;
-      line-height: 1.7;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       WEEKLY CHART
-       ═══════════════════════════════════════════════════════ */
-    .t-chart-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .t-chart-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      margin-bottom: var(--space-4);
-    }
-    .t-chart-title {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .t-chart-title::after {
-      content: '\2014\2014';
-      color: var(--text-faint);
-      opacity: 0.4;
-      flex-shrink: 0;
-    }
-    .t-chart-legend {
-      display: flex;
-      gap: var(--space-4);
-    }
-    .t-legend-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-faint);
-    }
-    .t-legend-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-    }
-    canvas.t-chart {
-      width: 100%;
-      height: 200px;
-      display: block;
-      background: var(--surface);
-      border: 1px solid var(--border);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       11a: CTL/ATL/TSB Banister fitness-fatigue model
-       ═══════════════════════════════════════════════════════ */
-    .t-banister-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .t-banister-legend {
-      display: flex;
-      gap: var(--space-5);
-      margin-bottom: var(--space-4);
-    }
-    .t-banister-legend .t-legend-item { font-size: 11px; }
-    .t-banister-cards {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-4);
-      margin-bottom: var(--space-6);
-    }
-    .t-banister-card {
-      padding: var(--space-5) var(--space-6);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--t-red);
-    }
-    .t-banister-card__val {
-      font-family: var(--font-display);
-      font-size: clamp(28px, 3vw, 36px);
-      line-height: 1;
-      margin-bottom: var(--space-1);
-    }
-    .t-banister-card__label {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin-bottom: var(--space-2);
-    }
-    /* 11m: plain-language Banister translations */
-    .t-banister-card__plain {
-      font-size: var(--text-sm);
-      color: var(--text-faint);
-      line-height: 1.5;
-      font-style: italic;
-    }
-    canvas.t-banister-chart {
-      width: 100%;
-      height: 180px;
-      display: block;
-      background: var(--surface);
-      border: 1px solid var(--border);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       11e: ACWR injury risk indicator
-       ═══════════════════════════════════════════════════════ */
-    .t-acwr-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .t-acwr-display {
-      display: flex;
-      align-items: center;
-      gap: var(--space-8);
-    }
-    .t-acwr-light {
-      width: 72px;
-      height: 72px;
-      border-radius: 50%;
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--font-display);
-      font-size: 22px;
-      color: #fff;
-      border: 3px solid rgba(255,255,255,0.06);
-    }
-    .t-acwr-light--green { background: rgba(62,207,142,0.2); border-color: rgba(62,207,142,0.4); color: #3ecf8e; }
-    .t-acwr-light--amber { background: rgba(245,158,11,0.2); border-color: rgba(245,158,11,0.4); color: #f59e0b; }
-    .t-acwr-light--red { background: rgba(239,68,68,0.2); border-color: rgba(239,68,68,0.4); color: #ef4444; }
-    .t-acwr-info { flex: 1; }
-    .t-acwr-info__title {
-      font-family: var(--font-display);
-      font-size: var(--text-lg);
-      color: var(--text);
-      margin-bottom: var(--space-2);
-    }
-    .t-acwr-info__explain {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.7;
-    }
-    .t-acwr-scale {
-      margin-top: var(--space-6);
-      display: flex;
-      gap: 2px;
-      height: 6px;
-    }
-    .t-acwr-scale__seg {
-      flex: 1;
-      border-radius: 3px;
-    }
-    .t-acwr-scale__labels {
-      display: flex;
-      justify-content: space-between;
-      margin-top: var(--space-2);
-      font-family: var(--font-mono);
-      font-size:var(--text-3xs);
-      color: var(--text-faint);
-      letter-spacing: 0.05em;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       11b: Centenarian benchmark tracker
-       ═══════════════════════════════════════════════════════ */
-    .t-centenarian-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
+    /* Centenarian benchmark cards */
     .t-bench-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: var(--space-4);
+      gap: 16px;
     }
     .t-bench-card {
-      padding: var(--space-6);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--t-red);
+      padding: 18px 22px;
+      background: var(--surface-raised);
+      border-left: 3px solid var(--accent);
     }
     .t-bench-card__lift {
       font-family: var(--font-mono);
-      font-size: 11px;
-      letter-spacing:var(--ls-wide);
+      font-size: 10px;
+      letter-spacing: 0.2em;
       text-transform: uppercase;
-      color: var(--t-red);
-      margin-bottom: var(--space-3);
+      color: var(--accent);
+      margin-bottom: 10px;
     }
     .t-bench-card__vals {
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      margin-bottom: var(--space-3);
+      margin-bottom: 10px;
     }
     .t-bench-card__current {
       font-family: var(--font-display);
@@ -763,2073 +110,927 @@
     }
     .t-bench-card__target {
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: 10px;
+      letter-spacing: 0.1em;
       color: var(--text-faint);
     }
     .t-bench-bar {
-      height: 6px;
+      height: 4px;
       background: rgba(255,255,255,0.04);
-      border-radius: 3px;
       overflow: hidden;
-      margin-bottom: var(--space-2);
+      margin-bottom: 6px;
     }
     .t-bench-bar__fill {
       height: 100%;
-      border-radius: 3px;
-      background: var(--t-red);
+      background: var(--accent);
       transition: width 1.2s ease;
     }
     .t-bench-card__pct {
       font-family: var(--font-mono);
-      font-size: 10px;
+      font-size: 9px;
+      letter-spacing: 0.15em;
       color: var(--text-faint);
       text-align: right;
     }
 
-    /* ═══════════════════════════════════════════════════════
-       11d: Compound lift progress charts
-       ═══════════════════════════════════════════════════════ */
-    .t-lifts-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
+    /* Weekly volume strip */
+    .t-week-row {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
     }
-    .t-lifts-grid {
+    .t-week-day {
+      background: var(--surface-raised);
+      padding: 12px 8px;
+      text-align: center;
+      min-height: 88px;
+      border-top: 2px solid transparent;
+    }
+    .t-week-day--today { border-top-color: var(--accent); }
+    .t-week-day__dow {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: 6px;
+    }
+    .t-week-day__total {
+      font-family: var(--font-display);
+      font-size: 20px;
+      color: var(--text);
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .t-week-day__total small { font-size: 10px; color: var(--text-faint); }
+    .t-week-day__acts {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+    .t-week-day__steps {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-faint);
+      margin-top: 4px;
+    }
+
+    /* Modality breakdown rows */
+    .t-mod-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: var(--space-4);
+      gap: 12px;
     }
-    .t-lift-card {
-      padding: var(--space-5);
-      background: var(--surface);
-      border: 1px solid var(--border);
-    }
-    .t-lift-card__name {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin-bottom: var(--space-3);
-    }
-    .t-lift-card svg {
-      width: 100%;
-      height: 80px;
-      display: block;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       11f: Activity diversity radar chart
-       ═══════════════════════════════════════════════════════ */
-    .t-radar-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .t-radar-wrap {
+    .t-mod-card {
+      padding: 14px 18px;
+      background: var(--surface-raised);
+      border-left: 3px solid var(--accent-dim);
       display: grid;
-      grid-template-columns: 280px 1fr;
-      gap: var(--space-8);
-      align-items: center;
+      grid-template-columns: 1fr auto;
+      gap: 8px 16px;
+      align-items: baseline;
     }
-    .t-radar-canvas {
-      width: 280px;
-      height: 280px;
-    }
-    .t-radar-pillars {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-3);
-    }
-    .t-radar-pillar {
-      display: flex;
-      align-items: center;
-      gap: var(--space-4);
-      padding: var(--space-3) var(--space-4);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--t-red);
-    }
-    .t-radar-pillar__name {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      color: var(--text-muted);
-      width: 80px;
-      flex-shrink: 0;
-    }
-    .t-radar-pillar__bar {
-      flex: 1;
-      height: 4px;
-      background: rgba(255,255,255,0.04);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .t-radar-pillar__fill {
-      height: 100%;
-      background: var(--t-red);
-      border-radius: 2px;
-      transition: width 1.2s ease;
-    }
-    .t-radar-pillar__pct {
+    .t-mod-card__name {
       font-family: var(--font-mono);
       font-size: 11px;
-      color: var(--text-faint);
-      width: 36px;
-      text-align: right;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--accent);
     }
-
-    /* ═══════════════════════════════════════════════════════
-       11g: HR recovery trend
-       ═══════════════════════════════════════════════════════ */
-    .t-hr-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    canvas.t-hr-chart {
-      width: 100%;
-      height: 160px;
-      display: block;
-      background: var(--surface);
-      border: 1px solid var(--border);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       11h: Time-of-day training distribution
-       ═══════════════════════════════════════════════════════ */
-    .t-tod-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .t-tod-grid {
-      display: flex;
-      gap: 3px;
-      align-items: flex-end;
-      height: 100px;
-      padding: var(--space-4) 0;
-    }
-    .t-tod-bar {
-      flex: 1;
-      background: var(--t-red-dim);
-      border-radius: 2px 2px 0 0;
-      min-width: 0;
-      position: relative;
-      transition: height 0.8s ease;
-    }
-    .t-tod-bar:hover {
-      background: var(--t-red);
-    }
-    .t-tod-labels {
-      display: flex;
-      gap: 3px;
-    }
-    .t-tod-labels span {
-      flex: 1;
-      text-align: center;
+    .t-mod-card__trend {
       font-family: var(--font-mono);
-      font-size: 8px;
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      color: var(--text-faint);
+    }
+    .t-mod-card__stats {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+    .t-mod-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .t-mod-stat__val {
+      font-family: var(--font-display);
+      font-size: 20px;
+      color: var(--text);
+      line-height: 1;
+    }
+    .t-mod-stat__label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
       color: var(--text-faint);
     }
 
-    /* ═══════════════════════════════════════════════════════
-       11i: GPS route placeholders
-       ═══════════════════════════════════════════════════════ */
-    .t-routes-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
+    /* ACWR mini-block */
+    .t-acwr {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      padding: 18px 22px;
+      background: var(--surface-raised);
+      border-left: 3px solid var(--accent);
     }
-    .t-routes-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-4);
-    }
-    .t-route-card {
-      padding: var(--space-5);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      text-align: center;
-    }
-    .t-route-card__map {
-      height: 100px;
+    .t-acwr__light {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: var(--space-3);
-      border: 1px dashed rgba(255,255,255,0.06);
-      border-radius: 4px;
-    }
-    .t-route-card__map svg {
-      width: 80%;
-      height: 80%;
-      opacity: 0.3;
-    }
-    .t-route-card__label {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-muted);
-      letter-spacing: 0.05em;
-      margin-bottom: var(--space-1);
-    }
-    .t-route-card__stat {
       font-family: var(--font-display);
-      font-size: 16px;
-      color: var(--text-faint);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       11j: Real-world capability milestones timeline
-       ═══════════════════════════════════════════════════════ */
-    .t-milestones-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .t-timeline {
-      position: relative;
-      padding-left: 32px;
-    }
-    .t-timeline::before {
-      content: '';
-      position: absolute;
-      left: 8px;
-      top: 0;
-      bottom: 0;
-      width: 2px;
-      background: rgba(239,68,68,0.15);
-    }
-    .t-milestone {
-      position: relative;
-      padding: var(--space-4) 0 var(--space-6) var(--space-4);
-    }
-    .t-milestone::before {
-      content: '';
-      position: absolute;
-      left: -28px;
-      top: 22px;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: var(--t-red);
-      border: 2px solid var(--bg);
-    }
-    .t-milestone__date {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--t-red);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      margin-bottom: var(--space-2);
-    }
-    .t-milestone__title {
-      font-family: var(--font-display);
-      font-size: var(--text-base);
+      font-size: 22px;
       color: var(--text);
-      margin-bottom: var(--space-1);
+      border: 2px solid var(--border-strong);
     }
-    .t-milestone__detail {
-      font-size: var(--text-sm);
-      color: var(--text-faint);
-      line-height: 1.6;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       N=1 RULES GRID
-       ═══════════════════════════════════════════════════════ */
-    .t-rules-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .t-rule-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: var(--space-4);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       CROSS-LINKS
-       ═══════════════════════════════════════════════════════ */
-    .t-xref {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-8) var(--page-padding);
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-4);
-      border-bottom: 1px solid var(--border);
-    }
-    .t-xref-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--t-red);
-      padding: var(--space-5) var(--space-6);
-      transition: border-color 0.15s;
-      text-decoration: none;
-      display: block;
-    }
-    .t-xref-card:hover { border-color: var(--t-red); }
-    .t-xref-card__tag {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--t-red);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      margin-bottom: var(--space-2);
-    }
-    .t-xref-card__text {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       NARRATIVE
-       ═══════════════════════════════════════════════════════ */
-    .t-narrative {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-12);
-      border-bottom: 1px solid var(--border);
-    }
-    .t-narrative__title {
-      font-family: var(--font-display);
-      font-size: var(--text-h2);
-      color: var(--text);
-      line-height: 1.15;
-      margin-bottom: var(--space-5);
-    }
-    .t-narrative__title em { font-style: normal; color: var(--t-red); }
-    .t-narrative__body {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.8;
-    }
-    .t-narrative__body strong { color: var(--text); }
-    .t-narrative__body a { color: var(--t-red); text-decoration: none; }
-    .t-protocol-list { display: flex; flex-direction: column; gap: var(--space-4); }
-    .t-protocol-item {
-      display: flex;
-      gap: var(--space-4);
-      padding: var(--space-4);
-      background: var(--surface);
-      border-left: 2px solid var(--t-red);
-    }
-    .t-protocol-num {
+    .t-acwr__light--green { background: rgba(0,229,160,0.15); border-color: var(--c-green-500); color: var(--c-green-500); }
+    .t-acwr__light--amber { background: rgba(245,166,35,0.15); border-color: var(--c-yellow-status); color: var(--c-yellow-status); }
+    .t-acwr__light--red   { background: rgba(255,82,82,0.15);  border-color: var(--c-red-status);    color: var(--c-red-status); }
+    .t-acwr__title {
       font-family: var(--font-display);
       font-size: 20px;
-      color: var(--t-red);
-      line-height: 1;
-      flex-shrink: 0;
-      width: 28px;
+      color: var(--text);
+      letter-spacing: 0.02em;
+      margin-bottom: 6px;
     }
-    .t-protocol-text {
-      font-size: var(--text-sm);
+    .t-acwr__explain {
+      font-family: var(--font-mono);
+      font-size: 11px;
       color: var(--text-muted);
       line-height: 1.6;
     }
-    .t-protocol-text strong { color: var(--text); }
-    .t-protocol-text a { color: var(--t-red); text-decoration: none; }
 
-    /* ═══════════════════════════════════════════════════════
-       METHODOLOGY
-       ═══════════════════════════════════════════════════════ */
-    .t-method {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
-    }
-    .t-method-grid {
+    /* Banister CTL/ATL/TSB cards */
+    .t-banister {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-6);
+      gap: 12px;
     }
-    .t-method-item {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.7;
+    .t-banister__card {
+      padding: 14px 18px;
+      background: var(--surface-raised);
+      border-left: 3px solid var(--accent-dim);
     }
-    .t-method-item strong {
-      display: block;
+    .t-banister__val {
+      font-family: var(--font-display);
+      font-size: 28px;
       color: var(--text);
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: 0.08em;
-      margin-bottom: var(--space-2);
+      line-height: 1;
+      margin-bottom: 4px;
     }
-
-    /* ═══════════════════════════════════════════════════════
-       11l: Data source transparency note
-       ═══════════════════════════════════════════════════════ */
-    .t-transparency-note {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-4) var(--page-padding) var(--space-6);
+    .t-banister__label {
       font-family: var(--font-mono);
-      font-size: 10px;
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
       color: var(--text-faint);
-      letter-spacing: 0.04em;
-      line-height: 1.7;
-      opacity: 0.6;
+      margin-bottom: 8px;
     }
-
-    /* ═══════════════════════════════════════════════════════
-       V2: STEP COUNT + MODALITY CHARTS
-       ═══════════════════════════════════════════════════════ */
-    .t-steps-chart-section,
-    .t-modality-chart-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .t-steps-chart-wrap,
-    .t-modality-chart-wrap {
-      position: relative;
-      height: 260px;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       LOADING + RESPONSIVE
-       ═══════════════════════════════════════════════════════ */
-    .t-loading {
-      text-align: center;
-      padding: var(--space-20);
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: 0.15em;
-    }
-
-    @media (max-width: 768px) {
-      .t-hero-grid { grid-template-columns: 1fr; }
-      .t-gauge-row { grid-template-columns: repeat(2, 1fr); }
-      .t-z2-grid { grid-template-columns: 1fr; }
-      .t-z2-col:not(:last-child) { border-right: none; border-bottom: 1px solid var(--border); }
-      .t-rule-grid { grid-template-columns: 1fr; }
-      .t-narrative { grid-template-columns: 1fr; }
-      .t-method-grid { grid-template-columns: 1fr; }
-      .t-xref { grid-template-columns: 1fr; }
-      .t-banister-cards { grid-template-columns: 1fr; }
-      .t-bench-grid { grid-template-columns: 1fr; }
-      .t-lifts-grid { grid-template-columns: 1fr; }
-      .t-radar-wrap { grid-template-columns: 1fr; }
-      .t-radar-canvas { margin: 0 auto; }
-      .t-routes-grid { grid-template-columns: 1fr; }
-    }
-  </style>
-
-  <style>
-    /* DB-03: Observatory pillar accent */
-    :root {
-      --obs-accent: var(--pillar-movement);
-      --obs-accent-dim: #3ecf8e66;
-      --obs-accent-bg: #3ecf8e18;
-    }
-    .s-hero__eyebrow, .eyebrow { color: var(--obs-accent) !important; }
-    .detail-card { border-left-color: var(--obs-accent); }
-    /* DPR-1.12: Awaiting compact placeholder */
-    .awaiting-compact {
-      display: flex;
-      align-items: center;
-      gap: var(--space-4);
-      padding: var(--space-5) var(--space-6);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--border);
-      background: var(--surface);
-      font-size: var(--text-sm);
+    .t-banister__plain {
+      font-family: var(--font-serif);
+      font-size: 13px;
+      font-style: italic;
       color: var(--text-muted);
+      line-height: 1.5;
     }
-    .awaiting-compact__icon { font-size: 20px; flex-shrink: 0; }
+
+    /* Share button (mirrors /live/) */
+    .t-share {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      background: none;
+      border: 1px solid var(--border);
+      padding: 4px 8px;
+      cursor: pointer;
+      transition: color var(--dur-fast), border-color var(--dur-fast);
+      margin-top: 6px;
+    }
+    .t-share:hover { color: var(--accent); border-color: var(--accent-dim); }
+    .t-share.is-copied { color: var(--c-green-500); border-color: var(--c-green-500); }
+
+    @media (max-width: 720px) {
+      .t-extra { padding: 24px 20px; }
+      .t-bench-grid, .t-mod-grid, .t-banister { grid-template-columns: 1fr; }
+      .t-week-row { grid-template-columns: repeat(7, 1fr); gap: 3px; }
+      .t-week-day { padding: 8px 4px; min-height: 72px; }
+      .t-week-day__total { font-size: 16px; }
+      .t-acwr { flex-direction: column; align-items: flex-start; gap: 14px; }
+    }
   </style>
 </head>
-<body>
-<div id="amj-nav"></div>
-<div id="amj-hierarchy-nav"></div>
-<!-- Product Board Item 11: Day X context banner -->
-<div id="day-x-banner" style="
-  margin:0 var(--page-padding);
-  padding:var(--space-3) var(--space-5);
-  background:rgba(var(--amber-rgb,245,158,11),0.06);
-  border:1px solid rgba(var(--amber-rgb,245,158,11),0.15);
-  border-radius:4px;
-  display:flex;
-  align-items:center;
-  gap:var(--space-3);
-  font-family:var(--font-mono);
-  font-size:var(--text-2xs);
-  letter-spacing:var(--ls-tag);
-">
-  <span class="experiment-counter" data-format="short" style="color:var(--c-amber-500);font-weight:700;"></span>
-  <span style="color:var(--text-muted);"> — Early data. This page gets smarter every week.</span>
-  <a href="/subscribe/" style="color:var(--c-amber-400);text-decoration:none;margin-left:auto;white-space:nowrap;">Follow along →</a>
-</div>
+<body class="body-signal">
+  <div id="amj-nav"></div>
+  <div id="amj-hierarchy-nav"></div>
 
+  <div class="fp-page t-page" style="--accent: #e07a3a; --accent-dim: #a85620;">
 
-<!-- ════════════════════════════════════════════════════════════
-     V3 Section 1: STATUS BAR — rendered by observatory-v3.js
-     ════════════════════════════════════════════════════════════ -->
-<div id="obs-v3-status"></div>
-<p class="obs-subtitle">Training for longevity, not aesthetics. A 12-month movement record.</p>
+    <!-- ═══ 1. MASTHEAD ═════════════════════════════════════ -->
+    <header class="fp-masthead">
+      <div class="fp-masthead__top">
+        <div>
+          <div class="fp-masthead__brow">
+            The Training Dispatch · Vol I · Dispatch №<span id="t-dispatch">—</span>
+          </div>
+          <div class="fp-masthead__title">TRAINING</div>
+        </div>
+        <div class="fp-masthead__meta">
+          <div id="t-date"><span class="t-skeleton" style="width:160px;height:10px"></span></div>
+          <div id="t-meta-status">Reporting from one body</div>
+          <button class="t-share" id="t-share" type="button" title="Copy today's training summary">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            <span>Copy session</span>
+          </button>
+        </div>
+      </div>
+      <div class="fp-masthead__strip">
+        <div>
+          <span class="t-strip-btn" id="t-prev" title="Available after Session 1">← Last session</span>
+          <span class="fp-masthead__strip-sep">·</span>
+          Session <span id="t-session-strip">—</span>
+          <span class="fp-masthead__strip-sep">·</span>
+          <span class="t-strip-btn" id="t-next" title="Next session not yet logged">Next session →</span>
+        </div>
+        <div id="t-filed">Filed —</div>
+      </div>
+    </header>
 
-<!-- ════════════════════════════════════════════════════════════
-     V3 Section 2: COACH ANALYSIS — rendered by observatory-v3.js
-     ════════════════════════════════════════════════════════════ -->
-<div id="obs-v3-coach"></div>
+    <!-- ═══ 2. LEDE ═════════════════════════════════════════ -->
+    <section class="fp-lede">
+      <div>
+        <div class="fp-lede__num-brow">Session</div>
+        <div class="fp-lede__num" id="t-session-num">—</div>
+        <div class="fp-lede__num-cap" id="t-session-cap">of the year</div>
+      </div>
+      <div>
+        <div class="fp-lede__status" id="t-status">▸ TODAY'S DESPATCH · STATE: LOADING</div>
+        <div class="fp-lede__narrative" id="t-narrative">
+          "<span class="t-skeleton" style="width:80%;height:18px"></span>"
+        </div>
+        <div class="fp-lede__delta" id="t-delta" style="display:none">
+          <span class="fp-lede__delta-label">This week:</span>
+        </div>
+      </div>
+    </section>
 
-<!-- ════════════════════════════════════════════════════════════
-     HERO — 2-column + gauge row
-     ════════════════════════════════════════════════════════════ -->
-<div class="t-hero">
-  <div class="t-hero-grid">
-    <div style="display:none"><!-- Editorial moved to depth section -->
+    <!-- ═══ 3. WATCH BANNER (optional) ══════════════════════ -->
+    <div class="fp-watch" id="t-watch" style="display:none">
+      <span class="fp-watch__label" id="t-watch-label">Watch</span>
+      <span id="t-watch-text"></span>
     </div>
-    <div class="t-gauge-row">
-      <div class="t-gauge">
-        <div class="t-gauge__ring">
-          <svg viewBox="0 0 88 88">
-            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-            <circle id="g-z2-arc" cx="44" cy="44" r="35" fill="none" stroke="#3ecf8e" stroke-width="7"
-              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-              style="transition: stroke-dasharray 1.2s ease 0.5s"/>
-          </svg>
-          <div class="t-gauge__center">
-            <div class="t-gauge__num" id="g-z2-num" style="color:#3ecf8e">&mdash;</div>
-            <div class="t-gauge__unit">min/wk</div>
+
+    <!-- ═══ 4. STANDINGS — one row per main lift ════════════ -->
+    <section class="fp-standings">
+      <div class="fp-standings__head">
+        <div class="fp-standings__title">LIFTS</div>
+        <div class="fp-standings__meta">Estimated 1RM · % of centenarian target</div>
+      </div>
+      <div id="t-standings-rows">
+        <div class="t-row-empty">Loading lifts…</div>
+      </div>
+    </section>
+
+    <!-- ═══ 5. LONG STORY — 1RM progression arc ═════════════ -->
+    <section class="fp-arc" id="t-arc-section">
+      <div class="fp-arc__head">
+        <div>
+          <div class="fp-arc__brow">The Long Story · Total 1RM</div>
+          <div class="fp-arc__num" id="t-arc-num">
+            <span id="t-arc-start">—</span> →
+            <span class="fp-arc__num-current" id="t-arc-current">—</span> →
+            <span id="t-arc-target">—</span> lb
           </div>
         </div>
-        <div class="t-gauge__label">Zone 2 avg</div>
-      </div>
-      <div class="t-gauge">
-        <div class="t-gauge__ring">
-          <svg viewBox="0 0 88 88">
-            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-            <circle id="g-wk-arc" cx="44" cy="44" r="35" fill="none" stroke="#ef4444" stroke-width="7"
-              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-              style="transition: stroke-dasharray 1.2s ease 0.6s"/>
-          </svg>
-          <div class="t-gauge__center">
-            <div class="t-gauge__num" id="g-wk-num" style="color:#ef4444">&mdash;</div>
-            <div class="t-gauge__unit">sessions</div>
+        <div class="fp-arc__stats">
+          <div>
+            <div class="fp-arc__stat-label">Gained</div>
+            <div class="fp-arc__stat-val fp-arc__stat-val--accent" id="t-arc-gained">—</div>
+          </div>
+          <div>
+            <div class="fp-arc__stat-label">To go</div>
+            <div class="fp-arc__stat-val" id="t-arc-togo">—</div>
+          </div>
+          <div>
+            <div class="fp-arc__stat-label">Zone 2 / wk</div>
+            <div class="fp-arc__stat-val" id="t-arc-z2">—</div>
           </div>
         </div>
-        <div class="t-gauge__label">Workouts (30d)</div>
       </div>
-      <div class="t-gauge">
-        <div class="t-gauge__ring">
-          <svg viewBox="0 0 88 88">
-            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-            <circle id="g-strain-arc" cx="44" cy="44" r="35" fill="none" stroke="#f59e0b" stroke-width="7"
-              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-              style="transition: stroke-dasharray 1.2s ease 0.7s"/>
-          </svg>
-          <div class="t-gauge__center">
-            <div class="t-gauge__num" id="g-strain-num" style="color:#f59e0b">&mdash;</div>
-            <div class="t-gauge__unit">strain</div>
+      <div class="fp-arc__chart" id="t-arc-chart"></div>
+      <div class="fp-arc__caption" id="t-arc-caption">
+        <span>Earliest · — lb</span>
+        <span>Today · — lb</span>
+      </div>
+    </section>
+
+    <!-- ═══ EXTRA: 4 centenarian benchmarks ═════════════════ -->
+    <section class="t-extra">
+      <div class="t-extra__head">
+        <div class="t-extra__title">CENTENARIAN BENCHMARKS</div>
+        <div class="t-extra__meta">What you need at 85 to remain independent</div>
+      </div>
+      <div class="t-bench-grid" id="t-bench-grid">
+        <div class="t-bench-card" data-prefix="dl">
+          <div class="t-bench-card__lift">Deadlift</div>
+          <div class="t-bench-card__vals">
+            <div class="t-bench-card__current" id="t-bench-dl-current">—</div>
+            <div class="t-bench-card__target">Target: <span id="t-bench-dl-target">315</span> lb</div>
           </div>
+          <div class="t-bench-bar"><div class="t-bench-bar__fill" id="t-bench-dl-bar" style="width:0%"></div></div>
+          <div class="t-bench-card__pct" id="t-bench-dl-pct">—</div>
         </div>
-        <div class="t-gauge__label">Avg strain</div>
-      </div>
-      <div class="t-gauge">
-        <div class="t-gauge__ring">
-          <svg viewBox="0 0 88 88">
-            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-            <circle id="g-str-arc" cx="44" cy="44" r="35" fill="none" stroke="#818cf8" stroke-width="7"
-              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-              style="transition: stroke-dasharray 1.2s ease 0.8s"/>
-          </svg>
-          <div class="t-gauge__center">
-            <div class="t-gauge__num" id="g-str-num" style="color:#818cf8">&mdash;</div>
-            <div class="t-gauge__unit">sessions</div>
+        <div class="t-bench-card" data-prefix="sq">
+          <div class="t-bench-card__lift">Squat</div>
+          <div class="t-bench-card__vals">
+            <div class="t-bench-card__current" id="t-bench-sq-current">—</div>
+            <div class="t-bench-card__target">Target: <span id="t-bench-sq-target">265</span> lb</div>
           </div>
+          <div class="t-bench-bar"><div class="t-bench-bar__fill" id="t-bench-sq-bar" style="width:0%"></div></div>
+          <div class="t-bench-card__pct" id="t-bench-sq-pct">—</div>
         </div>
-        <div class="t-gauge__label">Strength (30d)</div>
-      </div>
-      <div class="t-gauge">
-        <div class="t-gauge__ring">
-          <svg viewBox="0 0 88 88">
-            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-            <circle id="g-steps-arc" cx="44" cy="44" r="35" fill="none" stroke="#60a5fa" stroke-width="7"
-              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-              style="transition: stroke-dasharray 1.2s ease 0.9s"/>
-          </svg>
-          <div class="t-gauge__center">
-            <div class="t-gauge__num" id="g-steps-num" style="color:#60a5fa">&mdash;</div>
-            <div class="t-gauge__unit">steps/day</div>
+        <div class="t-bench-card" data-prefix="bp">
+          <div class="t-bench-card__lift">Bench Press</div>
+          <div class="t-bench-card__vals">
+            <div class="t-bench-card__current" id="t-bench-bp-current">—</div>
+            <div class="t-bench-card__target">Target: <span id="t-bench-bp-target">185</span> lb</div>
           </div>
+          <div class="t-bench-bar"><div class="t-bench-bar__fill" id="t-bench-bp-bar" style="width:0%"></div></div>
+          <div class="t-bench-card__pct" id="t-bench-bp-pct">—</div>
         </div>
-        <div class="t-gauge__label">Daily Steps Avg</div>
-      </div>
-      <div class="t-gauge">
-        <div class="t-gauge__ring">
-          <svg viewBox="0 0 88 88">
-            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-            <circle id="g-mod-arc" cx="44" cy="44" r="35" fill="none" stroke="#a78bfa" stroke-width="7"
-              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-              style="transition: stroke-dasharray 1.2s ease 1.0s"/>
-          </svg>
-          <div class="t-gauge__center">
-            <div class="t-gauge__num" id="g-mod-num" style="color:#a78bfa">&mdash;</div>
-            <div class="t-gauge__unit">types</div>
+        <div class="t-bench-card" data-prefix="ohp">
+          <div class="t-bench-card__lift">Overhead Press</div>
+          <div class="t-bench-card__vals">
+            <div class="t-bench-card__current" id="t-bench-ohp-current">—</div>
+            <div class="t-bench-card__target">Target: <span id="t-bench-ohp-target">135</span> lb</div>
           </div>
-        </div>
-        <div class="t-gauge__label">Active Modalities</div>
-      </div>
-    </div>
-  </div>
-  <div class="obs-freshness" id="obs-freshness" style="display:none">
-    <div>
-      <span class="obs-freshness__label">Last data: <span id="obs-fresh-time">—</span></span>
-      <span class="obs-freshness__sub">Updated daily</span>
-    </div>
-    <span class="obs-freshness__dot obs-freshness__dot--live" id="obs-fresh-dot"></span>
-  </div>
-</div>
-
-<div id="obs-thisweek" style="display:none"></div>
-
-<div id="t-loading" class="t-loading">LOADING TRAINING DATA&hellip;</div>
-<div id="t-content" style="display:none">
-
-<!-- ════════════════════════════════════════════════════════════
-     V2: 30-DAY DAILY EXERCISE MINUTES BY MODALITY
-     ════════════════════════════════════════════════════════════ -->
-<section class="t-modality-chart-section reveal" id="t-modality-chart">
-  <div class="t-section-header">Daily exercise minutes &mdash; 30 days</div>
-  <div class="t-modality-chart-wrap">
-    <canvas id="t-modality-canvas"></canvas>
-  </div>
-  <div class="t-chart-legend" id="t-modality-legend" style="display:flex;gap:var(--space-3);margin-top:var(--space-3);flex-wrap:wrap;justify-content:center;"></div>
-</section>
-
-<!-- V3.1: Narrative intro moved to "About this observatory" collapsed section at bottom -->
-
-<!-- ════════════════════════════════════════════════════════════
-     PULL-QUOTE #1 — Zone 2 recovery finding (staggered left)
-     ════════════════════════════════════════════════════════════ -->
-<div class="t-pullquote t-pullquote--left reveal">
-  <div class="t-pullquote__watermark">01</div>
-  <div class="t-pullquote__text">
-    Hypothesis: Zone 2 volume above <em>150 min/week</em> predicts better recovery scores.
-    Tracking with Whoop &times; Strava data.
-  </div>
-  <div class="t-pullquote__attr">
-    <span class="t-pullquote__badge">Hypothesis &middot; Under test</span>
-    <span class="t-pullquote__source">Whoop recovery &times; Strava Zone 2 minutes &mdash; 30+ weeks</span>
-  </div>
-</div>
-
-<p class="t-context reveal">This is the single strongest signal in the dataset. <strong>Zone 2 is the tide that lifts every other metric.</strong></p>
-
-<!-- ════════════════════════════════════════════════════════════
-     ZONE 2 + VOLUME DETAIL — editorial 3-column
-     ════════════════════════════════════════════════════════════ -->
-<section class="t-z2-section reveal">
-  <div class="t-section-header">Training volume breakdown</div>
-  <div class="t-z2-grid">
-    <div class="t-z2-col">
-      <div class="t-z2-bar"><div class="t-z2-bar__fill" id="zbar-z2" style="width:0%;background:#3ecf8e"></div></div>
-      <div class="t-z2-big" id="zval-z2" style="color:#3ecf8e">&mdash;</div>
-      <div class="t-z2-name">Zone 2 min/week</div>
-      <div class="t-z2-detail">Target: 150 min/week (WHO + Attia). HR 114&ndash;133 bpm. Highest-evidence longevity modality.</div>
-    </div>
-    <div class="t-z2-col">
-      <div class="t-z2-bar"><div class="t-z2-bar__fill" id="zbar-total" style="width:0%;background:#ef4444"></div></div>
-      <div class="t-z2-big" id="zval-total" style="color:#ef4444">&mdash;</div>
-      <div class="t-z2-name">Total min (30d)</div>
-      <div class="t-z2-detail">All modalities: cardio, strength, walks, rucks. Four sources merged nightly.</div>
-    </div>
-    <div class="t-z2-col">
-      <div class="t-z2-bar"><div class="t-z2-bar__fill" id="zbar-wavg" style="width:0%;background:#818cf8"></div></div>
-      <div class="t-z2-big" id="zval-wavg" style="color:#818cf8">&mdash;</div>
-      <div class="t-z2-name">Weekly avg sessions</div>
-      <div class="t-z2-detail">Consistency over intensity. The platform flags weeks below 4 sessions.</div>
-    </div>
-  </div>
-</section>
-
-<!-- 11l: Zone 2 data source transparency note -->
-<div class="t-transparency-note reveal">
-  Zone 2 data is derived from Garmin heart rate zones during outdoor activities. No Strava Premium subscription is needed.
-</div>
-
-<!-- AI expert now rendered by V3 coach at position 2 -->
-
-<!-- ════════════════════════════════════════════════════════════
-     ACTIVITY DEEP-DIVE CARDS (replaces simple chips)
-     ════════════════════════════════════════════════════════════ -->
-<section class="t-activity-section reveal">
-  <div class="t-section-header">Activity breakdown (30 days)</div>
-  <div class="t-modality-grid" id="t-modalities"></div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     WALKING & STEPS SECTION — editorial 3-column
-     ════════════════════════════════════════════════════════════ -->
-<section class="t-walking-section reveal">
-  <div class="t-section-header">Walking &amp; steps</div>
-  <div class="t-walking-grid">
-    <div class="t-walking-col">
-      <div class="t-z2-bar"><div class="t-z2-bar__fill" id="wbar-steps" style="width:0%;background:#60a5fa"></div></div>
-      <div class="t-z2-big" id="wval-steps" style="color:#60a5fa">&mdash;</div>
-      <div class="t-z2-name">Avg daily steps</div>
-      <div class="t-z2-detail">From Garmin. WHO recommends 7,000&ndash;10,000 steps/day for longevity benefits.</div>
-    </div>
-    <div class="t-walking-col">
-      <div class="t-z2-bar"><div class="t-z2-bar__fill" id="wbar-walks" style="width:0%;background:#3ecf8e"></div></div>
-      <div class="t-z2-big" id="wval-walks" style="color:#3ecf8e">&mdash;</div>
-      <div class="t-z2-name">Walking sessions (30d)</div>
-      <div class="t-z2-detail">
-        <span id="wval-miles">&mdash;</span> total miles.
-        Avg pace: <span id="wval-pace">&mdash;</span> min/mi.
-      </div>
-    </div>
-    <div class="t-walking-col">
-      <div class="t-z2-bar"><div class="t-z2-bar__fill" id="wbar-rucks" style="width:0%;background:#f59e0b"></div></div>
-      <div class="t-z2-big" id="wval-rucks" style="color:#f59e0b">&mdash;</div>
-      <div class="t-z2-name">Rucking sessions (30d)</div>
-      <div class="t-z2-detail">
-        <span id="wval-z2walk">&mdash;</span> min Zone 2 from walking.
-        Rucking yields the highest Z2 efficiency.
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     V2: 30-DAY DAILY STEP COUNT CHART
-     ════════════════════════════════════════════════════════════ -->
-<section class="t-steps-chart-section reveal" id="t-steps-chart">
-  <div class="t-section-header">Daily steps &mdash; 30 days</div>
-  <div class="t-steps-chart-wrap">
-    <canvas id="t-steps-canvas"></canvas>
-  </div>
-  <div style="display:flex;gap:var(--space-4);margin-top:var(--space-3);justify-content:flex-end;flex-wrap:wrap;">
-    <div style="display:flex;align-items:center;gap:4px;font:10px monospace;color:rgba(255,255,255,0.4)"><div style="width:8px;height:8px;border-radius:2px;background:#60a5fa"></div> Weekday</div>
-    <div style="display:flex;align-items:center;gap:4px;font:10px monospace;color:rgba(255,255,255,0.4)"><div style="width:8px;height:8px;border-radius:2px;background:rgba(96,165,250,0.4)"></div> Weekend</div>
-    <div style="display:flex;align-items:center;gap:4px;font:10px monospace;color:rgba(255,255,255,0.4)"><div style="width:12px;height:2px;background:#f59e0b"></div> 7d avg</div>
-    <div style="display:flex;align-items:center;gap:4px;font:10px monospace;color:rgba(255,255,255,0.4)"><div style="width:12px;height:1px;border-top:1px dashed rgba(245,158,11,0.3)"></div> 7.5k</div>
-    <div style="display:flex;align-items:center;gap:4px;font:10px monospace;color:rgba(255,255,255,0.4)"><div style="width:12px;height:1px;border-top:1px dashed rgba(62,207,142,0.3)"></div> 10k</div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     BREATHWORK & RESPIRATORY SECTION
-     ════════════════════════════════════════════════════════════ -->
-<section class="t-breathwork-section reveal">
-  <div class="t-section-header">Breathwork</div>
-  <div class="t-breathwork-grid" id="t-breathwork-grid">
-    <div class="t-breathwork-card">
-      <div class="t-z2-bar"><div class="t-z2-bar__fill" id="bbar-sessions" style="width:0%;background:#60a5fa"></div></div>
-      <div class="t-z2-big" id="bval-sessions" style="color:#60a5fa">&mdash;</div>
-      <div class="t-z2-name">Sessions (30d)</div>
-      <div class="t-z2-detail">Captured via Apple Health breathwork integration.</div>
-    </div>
-    <div class="t-breathwork-card">
-      <div class="t-z2-bar"><div class="t-z2-bar__fill" id="bbar-minutes" style="width:0%;background:#60a5fa"></div></div>
-      <div class="t-z2-big" id="bval-minutes" style="color:#60a5fa">&mdash;</div>
-      <div class="t-z2-name">Total minutes (30d)</div>
-      <div class="t-z2-detail">Avg session: <span id="bval-avg">&mdash;</span> min.</div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     WEEKLY PHYSICAL VOLUME SUMMARY — 7-day heatmap
-     ════════════════════════════════════════════════════════════ -->
-<section class="t-weekly-section reveal">
-  <div class="t-section-header">This week&rsquo;s movement</div>
-  <div class="t-weekly-row" id="t-weekly-days"></div>
-</section>
-
-<!-- V3.1: Running Coming Soon + Pull-quote #2 moved to collapsed sections at bottom -->
-
-<!-- V3.1: Advanced metrics wrapped in details -->
-<details class="obs-depth-section" id="t-advanced-details">
-  <summary>Advanced metrics (populates at week 4+)</summary>
-  <!-- ADVANCED METRICS COLLAPSED PLACEHOLDER (shown when all 3 need 4+ weeks) -->
-  <section class="t-banister-section reveal" id="t-advanced-collapsed" style="display:none">
-    <div class="t-section-header">Advanced Training Metrics</div>
-    <p class="t-context" style="padding:0 0 var(--space-4) 0;max-width:none;color:var(--text-muted)">
-      CTL/ATL/TSB, ACWR, and HR recovery trend require 4+ weeks of training data. These sections will populate automatically.
-    </p>
-  </section>
-
-  <!-- 11a: CTL/ATL/TSB — Banister Fitness-Fatigue Model -->
-  <section class="t-banister-section reveal" id="t-banister-section">
-    <div class="t-section-header">Fitness-fatigue model (Banister)</div>
-    <p class="t-context" style="padding:0 0 var(--space-4) 0;max-width:none">
-      The Banister model separates training load into <strong>fitness</strong> (slow-building, long-lasting) and
-      <strong>fatigue</strong> (fast-accumulating, fast-decaying). The difference is <strong>form</strong> &mdash; when
-      it is positive, performance rises.
-    </p>
-    <div class="t-banister-cards">
-      <div class="t-banister-card" style="border-left-color:#60a5fa">
-        <div class="t-banister-card__val" id="ctl-val" style="color:#60a5fa">&mdash;</div>
-        <div class="t-banister-card__label">CTL &middot; Fitness</div>
-        <div class="t-banister-card__plain" id="ctl-plain">Loading...</div>
-      </div>
-      <div class="t-banister-card" style="border-left-color:#ef4444">
-        <div class="t-banister-card__val" id="atl-val" style="color:#ef4444">&mdash;</div>
-        <div class="t-banister-card__label">ATL &middot; Fatigue</div>
-        <div class="t-banister-card__plain" id="atl-plain">Loading...</div>
-      </div>
-      <div class="t-banister-card" style="border-left-color:#3ecf8e">
-        <div class="t-banister-card__val" id="tsb-val" style="color:#3ecf8e">&mdash;</div>
-        <div class="t-banister-card__label">TSB &middot; Form</div>
-        <div class="t-banister-card__plain" id="tsb-plain">Loading...</div>
-      </div>
-    </div>
-    <div class="t-banister-legend">
-      <div class="t-legend-item"><div class="t-legend-dot" style="background:#60a5fa"></div> CTL (fitness)</div>
-      <div class="t-legend-item"><div class="t-legend-dot" style="background:#ef4444"></div> ATL (fatigue)</div>
-      <div class="t-legend-item"><div class="t-legend-dot" style="background:#3ecf8e"></div> TSB (form)</div>
-    </div>
-    <canvas class="t-banister-chart" id="t-banister-canvas"></canvas>
-  </section>
-
-  <!-- 11e: ACWR Injury Risk Indicator -->
-  <section class="t-acwr-section reveal" id="t-acwr-section">
-    <div class="t-section-header">Acute:Chronic workload ratio</div>
-    <p class="t-context" style="padding:0 0 var(--space-6) 0;max-width:none">
-      ACWR compares this week's training load to the 4-week rolling average.
-      <strong>Below 1.2 is the sweet spot.</strong> Above 1.5 means injury risk climbs sharply.
-    </p>
-    <div class="t-acwr-display">
-      <div class="t-acwr-light" id="acwr-light">&mdash;</div>
-      <div class="t-acwr-info">
-        <div class="t-acwr-info__title" id="acwr-title">Loading workload ratio...</div>
-        <div class="t-acwr-info__explain" id="acwr-explain">Calculating acute and chronic training loads.</div>
-      </div>
-    </div>
-    <div class="t-acwr-scale">
-      <div class="t-acwr-scale__seg" style="background:rgba(62,207,142,0.3)"></div>
-      <div class="t-acwr-scale__seg" style="background:rgba(245,158,11,0.3)"></div>
-      <div class="t-acwr-scale__seg" style="background:rgba(239,68,68,0.3)"></div>
-    </div>
-    <div class="t-acwr-scale__labels">
-      <span>0.0</span><span>0.8</span><span>1.2</span><span>1.5</span><span>2.0+</span>
-    </div>
-  </section>
-
-  <!-- 11g: Heart Rate Recovery Trend (moved inside advanced metrics details) -->
-  <section class="t-hr-section reveal" id="t-hr-section">
-    <div class="t-section-header">Heart rate recovery trend</div>
-    <p class="t-context" style="padding:0 0 var(--space-6) 0;max-width:none">
-      How quickly heart rate drops after peak exertion &mdash; the <strong>strongest exercise-derived mortality predictor</strong>.
-      A faster drop means a fitter autonomic nervous system.
-    </p>
-    <canvas class="t-hr-chart" id="t-hr-canvas"></canvas>
-  </section>
-</details>
-
-<!-- ════════════════════════════════════════════════════════════
-     12-WEEK TREND CHART
-     ════════════════════════════════════════════════════════════ -->
-<section class="t-chart-section reveal">
-  <div class="t-chart-header">
-    <div class="t-chart-title">12-week training volume</div>
-    <div class="t-chart-legend">
-      <div class="t-legend-item"><div class="t-legend-dot" style="background:var(--t-red)"></div> Total min</div>
-      <div class="t-legend-item"><div class="t-legend-dot" style="background:var(--t-green)"></div> Zone 2 min</div>
-    </div>
-  </div>
-  <canvas class="t-chart" id="t-trend-canvas"></canvas>
-</section>
-
-<!-- V3.1: Pull-quote #3 moved to "About this observatory" collapsed section at bottom -->
-
-<!-- ════════════════════════════════════════════════════════════
-     11b: Centenarian Benchmark Tracker
-     ════════════════════════════════════════════════════════════ -->
-<section class="t-centenarian-section reveal">
-  <div class="t-section-header">Centenarian decade targets</div>
-  <p class="t-context" style="padding:0 0 var(--space-6) 0;max-width:none">
-    Peter Attia's framework: what strength do you need at 85 to remain independent?
-    <strong>Work backwards from that number</strong> to find today's targets.
-  </p>
-  <div class="t-bench-grid" id="t-bench-grid">
-    <div class="t-bench-card">
-      <div class="t-bench-card__lift">Deadlift</div>
-      <div class="t-bench-card__vals">
-        <div class="t-bench-card__current" id="bench-dl-current">&mdash;</div>
-        <div class="t-bench-card__target">Target: <span id="bench-dl-target">315</span> lb</div>
-      </div>
-      <div class="t-bench-bar"><div class="t-bench-bar__fill" id="bench-dl-bar" style="width:0%"></div></div>
-      <div class="t-bench-card__pct" id="bench-dl-pct">&mdash;</div>
-    </div>
-    <div class="t-bench-card">
-      <div class="t-bench-card__lift">Squat</div>
-      <div class="t-bench-card__vals">
-        <div class="t-bench-card__current" id="bench-sq-current">&mdash;</div>
-        <div class="t-bench-card__target">Target: <span id="bench-sq-target">265</span> lb</div>
-      </div>
-      <div class="t-bench-bar"><div class="t-bench-bar__fill" id="bench-sq-bar" style="width:0%"></div></div>
-      <div class="t-bench-card__pct" id="bench-sq-pct">&mdash;</div>
-    </div>
-    <div class="t-bench-card">
-      <div class="t-bench-card__lift">Bench Press</div>
-      <div class="t-bench-card__vals">
-        <div class="t-bench-card__current" id="bench-bp-current">&mdash;</div>
-        <div class="t-bench-card__target">Target: <span id="bench-bp-target">185</span> lb</div>
-      </div>
-      <div class="t-bench-bar"><div class="t-bench-bar__fill" id="bench-bp-bar" style="width:0%"></div></div>
-      <div class="t-bench-card__pct" id="bench-bp-pct">&mdash;</div>
-    </div>
-    <div class="t-bench-card">
-      <div class="t-bench-card__lift">Overhead Press</div>
-      <div class="t-bench-card__vals">
-        <div class="t-bench-card__current" id="bench-ohp-current">&mdash;</div>
-        <div class="t-bench-card__target">Target: <span id="bench-ohp-target">135</span> lb</div>
-      </div>
-      <div class="t-bench-bar"><div class="t-bench-bar__fill" id="bench-ohp-bar" style="width:0%"></div></div>
-      <div class="t-bench-card__pct" id="bench-ohp-pct">&mdash;</div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     11d: Compound Lift Progress Charts
-     ════════════════════════════════════════════════════════════ -->
-<section class="t-lifts-section reveal">
-  <div class="t-section-header">1RM progress over time</div>
-  <p class="t-context" style="padding:0 0 var(--space-6) 0;max-width:none">
-    Estimated 1-rep max via Brzycki formula, tracked from Hevy workout logs.
-    <strong>The slope matters more than the number.</strong>
-  </p>
-  <div class="t-lifts-grid" id="t-lifts-grid">
-    <div class="t-lift-card">
-      <div class="t-lift-card__name">Deadlift 1RM</div>
-      <svg id="lift-svg-dl" viewBox="0 0 300 80" preserveAspectRatio="none"><text x="150" y="45" text-anchor="middle" fill="rgba(255,255,255,0.15)" font-size="11" font-family="monospace">Awaiting data</text></svg>
-    </div>
-    <div class="t-lift-card">
-      <div class="t-lift-card__name">Squat 1RM</div>
-      <svg id="lift-svg-sq" viewBox="0 0 300 80" preserveAspectRatio="none"><text x="150" y="45" text-anchor="middle" fill="rgba(255,255,255,0.15)" font-size="11" font-family="monospace">Awaiting data</text></svg>
-    </div>
-    <div class="t-lift-card">
-      <div class="t-lift-card__name">Bench Press 1RM</div>
-      <svg id="lift-svg-bp" viewBox="0 0 300 80" preserveAspectRatio="none"><text x="150" y="45" text-anchor="middle" fill="rgba(255,255,255,0.15)" font-size="11" font-family="monospace">Awaiting data</text></svg>
-    </div>
-    <div class="t-lift-card">
-      <div class="t-lift-card__name">OHP 1RM</div>
-      <svg id="lift-svg-ohp" viewBox="0 0 300 80" preserveAspectRatio="none"><text x="150" y="45" text-anchor="middle" fill="rgba(255,255,255,0.15)" font-size="11" font-family="monospace">Awaiting data</text></svg>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     STRENGTH DEEP-DIVE (Phase 2)
-     ════════════════════════════════════════════════════════════ -->
-<section class="t-activity-section reveal" id="t-strength-dive" style="display:none">
-  <div class="t-section-header">Strength deep-dive</div>
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-4);" id="t-strength-stats"></div>
-  <div style="margin-top:var(--space-8);">
-    <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-wide);text-transform:uppercase;margin-bottom:var(--space-4);">Weekly volume load &mdash; 12 weeks</div>
-    <div style="position:relative;height:220px;">
-      <canvas id="t-volume-canvas"></canvas>
-    </div>
-  </div>
-  <div style="margin-top:var(--space-6);">
-    <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-wide);text-transform:uppercase;margin-bottom:var(--space-4);">Top exercises (30d)</div>
-    <div id="t-strength-exercises"></div>
-  </div>
-</section>
-
-<!-- V3.1: Training balance wrapped in details -->
-<details class="obs-depth-section">
-  <summary>Training balance framework <span class="obs-depth-teaser">Attia's 5 pillars: Zone 2, strength, stability, Zone 5, sport</span></summary>
-  <section class="t-radar-section reveal">
-    <div class="t-section-header">Training balance &mdash; Attia pillars</div>
-    <p class="t-context" style="padding:0 0 var(--space-6) 0;max-width:none">
-      Five pillars of physical preparedness. <strong>A balanced pentagon is the goal</strong> &mdash;
-      most people over-index on one or two.
-    </p>
-    <div class="t-radar-wrap">
-      <canvas class="t-radar-canvas" id="t-radar-canvas" width="280" height="280"></canvas>
-      <div class="t-radar-pillars" id="t-radar-pillars">
-        <div class="t-radar-pillar">
-          <div class="t-radar-pillar__name">Zone 2</div>
-          <div class="t-radar-pillar__bar"><div class="t-radar-pillar__fill" id="radar-z2-fill" style="width:0%"></div></div>
-          <div class="t-radar-pillar__pct" id="radar-z2-pct">&mdash;</div>
-        </div>
-        <div class="t-radar-pillar">
-          <div class="t-radar-pillar__name">Strength</div>
-          <div class="t-radar-pillar__bar"><div class="t-radar-pillar__fill" id="radar-str-fill" style="width:0%"></div></div>
-          <div class="t-radar-pillar__pct" id="radar-str-pct">&mdash;</div>
-        </div>
-        <div class="t-radar-pillar">
-          <div class="t-radar-pillar__name">Stability</div>
-          <div class="t-radar-pillar__bar"><div class="t-radar-pillar__fill" id="radar-stab-fill" style="width:0%"></div></div>
-          <div class="t-radar-pillar__pct" id="radar-stab-pct">&mdash;</div>
-        </div>
-        <div class="t-radar-pillar">
-          <div class="t-radar-pillar__name">Zone 5</div>
-          <div class="t-radar-pillar__bar"><div class="t-radar-pillar__fill" id="radar-z5-fill" style="width:0%"></div></div>
-          <div class="t-radar-pillar__pct" id="radar-z5-pct">&mdash;</div>
-        </div>
-        <div class="t-radar-pillar">
-          <div class="t-radar-pillar__name">Sport</div>
-          <div class="t-radar-pillar__bar"><div class="t-radar-pillar__fill" id="radar-sport-fill" style="width:0%"></div></div>
-          <div class="t-radar-pillar__pct" id="radar-sport-pct">&mdash;</div>
+          <div class="t-bench-bar"><div class="t-bench-bar__fill" id="t-bench-ohp-bar" style="width:0%"></div></div>
+          <div class="t-bench-card__pct" id="t-bench-ohp-pct">—</div>
         </div>
       </div>
-    </div>
-  </section>
-</details>
+    </section>
 
-<!-- V3.1: HR recovery trend moved inside advanced metrics details block -->
-
-<!-- V3.1: Session timing wrapped in details -->
-<details class="obs-depth-section">
-  <summary>Session timing analysis</summary>
-  <section class="t-tod-section reveal">
-    <div class="t-section-header">When I train</div>
-    <p class="t-context" style="padding:0 0 var(--space-4) 0;max-width:none">
-      Distribution of training sessions by hour. As data accumulates, the platform
-      will cross-reference workout timing with sleep and recovery scores.
-    </p>
-    <div class="t-tod-grid" id="t-tod-grid"></div>
-    <div class="t-tod-labels" id="t-tod-labels"></div>
-  </section>
-</details>
-
-<!-- V3.1: GPS routes wrapped in details -->
-<details class="obs-depth-section">
-  <summary>GPS routes</summary>
-  <section class="t-routes-section reveal">
-    <div class="t-section-header">Recent routes</div>
-    <p class="t-context" style="padding:0 0 var(--space-6) 0;max-width:none">
-      GPS traces from Strava activities. <strong>Minimalist outlines</strong> &mdash; distance and duration at a glance.
-    </p>
-    <div class="t-routes-grid" id="t-routes-grid">
-      <div style="grid-column:1/-1;text-align:center;padding:var(--space-8) 0;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);letter-spacing:var(--ls-label)">Pending data &mdash; GPS routes appear here as outdoor activities are logged to Strava.</div>
-    </div>
-  </section>
-</details>
-
-<!-- V3.1: Milestones wrapped in details -->
-<details class="obs-depth-section">
-  <summary>Milestones</summary>
-  <section class="t-milestones-section reveal">
-    <div class="t-section-header">Capability milestones</div>
-    <p class="t-context" style="padding:0 0 var(--space-6) 0;max-width:none">
-      Numbers on a screen mean nothing without real-world proof.
-      <strong>These are the moments the data became tangible.</strong>
-    </p>
-    <div class="t-timeline" id="t-timeline">
-      <div style="text-align:center;padding:var(--space-8) 0;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);letter-spacing:var(--ls-label)">Milestones appear here as benchmarks are crossed and personal records are set.</div>
-    </div>
-  </section>
-</details>
-
-<!-- V3.1: Elena Voss chronicle quote removed (duplicate — already in coach section) -->
-
-<!-- V3.1: Hypotheses wrapped in details -->
-<details class="obs-depth-section">
-  <summary>Hypotheses under test (4) <span class="obs-depth-teaser">Zone 2 volume, rucking yield, back-to-back strain, consistency vs intensity</span></summary>
-  <section class="t-rules-section reveal">
-    <div class="t-section-header">Training Hypotheses Under Test</div>
-    <div class="t-rule-grid">
-      <div class="t-rule">
-        <div class="t-rule__num">H-01</div>
-        <div class="t-rule__finding">Zone 2 volume predicts next-week recovery better than any other variable</div>
-        <div class="t-rule__evidence">Testing: 150+ min/week target &rarr; tracking Whoop recovery correlation</div>
+    <!-- ═══ EXTRA: this week's movement (heatmap row) ═══════ -->
+    <section class="t-extra" id="t-week-section" style="display:none">
+      <div class="t-extra__head">
+        <div class="t-extra__title">THIS WEEK</div>
+        <div class="t-extra__meta">Active minutes · sessions · steps</div>
       </div>
-      <div class="t-rule">
-        <div class="t-rule__num">H-02</div>
-        <div class="t-rule__finding">Back-to-back high strain days suppress HRV</div>
-        <div class="t-rule__evidence">Testing: consecutive strain &gt;18 &rarr; tracking HRV response over 48h</div>
-      </div>
-      <div class="t-rule">
-        <div class="t-rule__num">H-03</div>
-        <div class="t-rule__finding">Morning workouts produce better sleep scores than evening sessions</div>
-        <div class="t-rule__evidence">Testing: workout time &times; Whoop sleep score &rarr; needs 90+ day dataset</div>
-      </div>
-      <div class="t-rule">
-        <div class="t-rule__num">H-04</div>
-        <div class="t-rule__finding">Rucking yields the highest Zone 2 percentage per hour of any modality</div>
-        <div class="t-rule__evidence">Testing: comparing Z2% across Walk, Ruck, Ride, Run from Strava HR data</div>
-      </div>
-    </div>
-  </section>
-</details>
+      <div class="t-week-row" id="t-week-days"></div>
+    </section>
 
-<!-- ════════════════════════════════════════════════════════════
-     V3.1: COLLAPSED SECTIONS — grouped at bottom of content
-     ════════════════════════════════════════════════════════════ -->
+    <!-- ═══ EXTRA: modality breakdown (30d) ═════════════════ -->
+    <section class="t-extra" id="t-mod-section" style="display:none">
+      <div class="t-extra__head">
+        <div class="t-extra__title">ACTIVITY MIX</div>
+        <div class="t-extra__meta">30-day modality breakdown · Strava · Garmin</div>
+      </div>
+      <div class="t-mod-grid" id="t-mod-grid"></div>
+    </section>
 
-<!-- V3.1 Item 1+2+3: About this observatory (moved editorial content) -->
-<details class="obs-depth-section">
-  <summary>About this observatory <span class="obs-depth-teaser">The story behind this page and what training means in this experiment</span></summary>
-  <div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-8) var(--page-padding);">
-    <!-- Matthew's reflection (moved from inline) -->
-    <div class="t-pullquote t-pullquote--dynamic">
-      <div class="t-pullquote__text">
-        When I&rsquo;m in it, I&rsquo;m all in &mdash; 5am sessions, compound lifts, rucking mountains at the weekend.
-        The problem has never been the training. It&rsquo;s always been the fall &mdash; how fast
-        the void fills when routine breaks. The data doesn&rsquo;t stop that from happening.
-        But it makes the absence visible, and <em>visibility shortens the distance back</em>.
+    <!-- ═══ EXTRA: ACWR + Banister load model ═══════════════ -->
+    <section class="t-extra" id="t-load-section" style="display:none">
+      <div class="t-extra__head">
+        <div class="t-extra__title">TRAINING LOAD</div>
+        <div class="t-extra__meta">Acute:Chronic ratio · Banister fitness-fatigue model</div>
       </div>
-    </div>
+      <div class="t-acwr" id="t-acwr-block" style="margin-bottom:16px">
+        <div class="t-acwr__light" id="t-acwr-light">—</div>
+        <div>
+          <div class="t-acwr__title" id="t-acwr-title">Calculating workload ratio…</div>
+          <div class="t-acwr__explain" id="t-acwr-explain">ACWR compares this week to the 4-week base. Below 1.2 is the sweet spot.</div>
+        </div>
+      </div>
+      <div class="t-banister">
+        <div class="t-banister__card">
+          <div class="t-banister__val" id="t-ctl-val">—</div>
+          <div class="t-banister__label">CTL · Fitness</div>
+          <div class="t-banister__plain" id="t-ctl-plain">Loading…</div>
+        </div>
+        <div class="t-banister__card">
+          <div class="t-banister__val" id="t-atl-val">—</div>
+          <div class="t-banister__label">ATL · Fatigue</div>
+          <div class="t-banister__plain" id="t-atl-plain">Loading…</div>
+        </div>
+        <div class="t-banister__card">
+          <div class="t-banister__val" id="t-tsb-val">—</div>
+          <div class="t-banister__label">TSB · Form</div>
+          <div class="t-banister__plain" id="t-tsb-plain">Loading…</div>
+        </div>
+      </div>
+    </section>
 
-    <!-- Pull-quote #2: Rucking finding (moved from inline) -->
-    <div class="t-pullquote t-pullquote--right" style="border-bottom:1px solid var(--border);">
-      <div class="t-pullquote__watermark">02</div>
-      <div class="t-pullquote__text">
-        Rucking is the highest Zone 2 yield per hour &mdash;
-        <em>92% of ruck time</em> in Zone 2 vs 61% walking. The most efficient <a href="/nutrition/" style="color:var(--t-red);text-decoration:none">calorie burn</a> too.
+    <!-- ═══ 6. CROSS-LINK FOOTER ════════════════════════════ -->
+    <nav class="fp-cross-footer">
+      <div class="fp-cross-footer__prev"><a href="/nutrition/">← Nutrition</a></div>
+      <div class="fp-cross-footer__mid">
+        Strength is the long story →
+        <a href="/character/">Character</a>
       </div>
-      <div class="t-pullquote__attr">
-        <span class="t-pullquote__badge">N=1 &middot; Correlational</span>
-        <span class="t-pullquote__source">Garmin HR zones &times; Strava activity type &mdash; 90+ day dataset</span>
-      </div>
-    </div>
+      <div class="fp-cross-footer__next"><a href="/mind/">Mind →</a></div>
+    </nav>
 
-    <!-- Pull-quote #3: Back-to-back strain finding (moved from inline) -->
-    <div class="t-pullquote t-pullquote--left" style="border-bottom:1px solid var(--border);">
-      <div class="t-pullquote__watermark">03</div>
-      <div class="t-pullquote__text">
-        Back-to-back strain above 18 <em>tanks HRV for 48 hours</em> &mdash;
-        a 20% drop that erases the <a href="/sleep/" style="color:var(--t-red);text-decoration:none">sleep</a> gains from the night before.
-      </div>
-      <div class="t-pullquote__attr">
-        <span class="t-pullquote__badge">N=1 &middot; Correlational</span>
-        <span class="t-pullquote__source">Whoop strain &times; HRV &mdash; consecutive high-strain day pairs</span>
-      </div>
-    </div>
   </div>
-</details>
 
-<!-- V3.1 Item 4: Running — hidden until first run data exists -->
-<details class="obs-depth-section" id="t-running-section" style="display:none">
-  <summary>Running</summary>
-  <div class="t-coming-soon">
-    <div class="t-coming-soon__title">Running</div>
-    <p class="t-coming-soon__body">
-      The data infrastructure is ready. When the first run happens, this section auto-populates
-      with pace trends, distance progression, and running-specific Zone 2 analysis.
-    </p>
-  </div>
-</details>
+  <div id="amj-subscribe"></div>
+  <div id="amj-bottom-nav"></div>
+  <div id="amj-footer"></div>
 
-<!-- V3.1 Item 11: Training protocol -->
-<details class="obs-depth-section">
-  <summary>Training protocol</summary>
-  <div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-8) var(--page-padding);">
-    <div class="t-protocol-list">
-      <div class="t-protocol-item">
-        <div class="t-protocol-num">01</div>
-        <div class="t-protocol-text"><strong>150+ min/week Zone 2</strong> &mdash; walking, cycling, rucking. HR 114&ndash;133. Highest-evidence longevity modality.</div>
-      </div>
-      <div class="t-protocol-item">
-        <div class="t-protocol-num">02</div>
-        <div class="t-protocol-text"><strong>3x/week compound lifts</strong> &mdash; squat, deadlift, bench, OHP. Progressive overload toward centenarian benchmarks.</div>
-      </div>
-      <div class="t-protocol-item">
-        <div class="t-protocol-num">03</div>
-        <div class="t-protocol-text"><strong>ACWR &lt;1.5</strong> &mdash; Acute:Chronic Workload Ratio guards against injury spikes.</div>
-      </div>
-      <div class="t-protocol-item">
-        <div class="t-protocol-num">04</div>
-        <div class="t-protocol-text"><strong>Recovery-gated intensity</strong> &mdash; Whoop &lt;34% triggers deload suggestion in daily brief.</div>
-      </div>
-      <div class="t-protocol-item">
-        <div class="t-protocol-num">05</div>
-        <div class="t-protocol-text"><strong>80/20 polarization</strong> &mdash; 80% low intensity, 20% high. No Zone 3 junk miles.</div>
-      </div>
-    </div>
-  </div>
-</details>
+  <script src="/assets/js/site_constants.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/nav.js"></script>
+  <script>
+  (function() {
+    'use strict';
 
-</div><!-- /t-content -->
+    var API_BASE = (typeof AMJ !== 'undefined' && AMJ.API_BASE) ? AMJ.API_BASE : 'https://averagejoematt.com';
+    var pulseCache = null;
 
-<div class="obs-insight" id="obs-insight"></div>
-
-<!-- ════════════════════════════════════════════════════════════
-     V3 Section 5: CROSS-DOMAIN
-     ════════════════════════════════════════════════════════════ -->
-<div id="obs-v3-cross"></div>
-
-<!-- ════════════════════════════════════════════════════════════
-     V3 Section 6: DEPTH (Collapsed)
-     ════════════════════════════════════════════════════════════ -->
-<div id="obs-v3-depth"></div>
-
-<nav class="reading-path-v2">
-  <a href="/nutrition/" class="reading-path-v2__link">
-    <span class="reading-path-v2__dir">&larr; Nutrition</span>
-  </a>
-  <a href="/mind/" class="reading-path-v2__link reading-path-v2__link--next">
-    <span class="reading-path-v2__label">The hardest pillar to measure</span>
-    <span class="reading-path-v2__dir">Inner Life &rarr;</span>
-  </a>
-</nav>
-
-<div id="amj-subscribe"></div>
-<div id="amj-bottom-nav"></div>
-<div id="amj-footer"></div>
-<script src="/assets/js/site_constants.js"></script>
-<script src="/assets/js/components.js"></script>
-<script src="/assets/js/observatory-v3.js"></script>
-<script src="/assets/js/cycle-pause.js"></script>
-<script src="/assets/js/nav.js"></script>
-<script src="/assets/js/engagement.js"></script>
-<script>
-  initObservatoryWeek('training', 'obs-thisweek');
-  fetch('/api/observatory_week?domain=training').then(r=>r.ok?r.json():null).then(d=>{
-    if(d&&d.last_updated) initObsFreshness(d.last_updated);
-  }).catch(function(){});
-</script>
-<script src="/assets/js/reveal.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-<script>
-/* ── V3: Coach Analysis (position 2) — fires immediately ── */
-renderCoachAnalysis('obs-v3-coach', 'training', {
-  name: 'Dr. Sarah Chen',
-  initials: 'SC',
-  title: 'Exercise physiologist & strength coach',
-  color: '#ef4444'
-});
-
-(async function(){
-  var API = 'https://averagejoematt.com';
-  var loading = document.getElementById('t-loading');
-  var content = document.getElementById('t-content');
-  var setText = function(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
-  var setWidth = function(id, p) { var el = document.getElementById(id); if (el) el.style.width = Math.min(100, Math.max(0, p)) + '%'; };
-  var circ = 2 * Math.PI * 35;
-
-  function setArc(id, pct) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    var len = (Math.min(pct, 100) / 100) * circ;
-    el.setAttribute('stroke-dasharray', len + ' ' + (circ - len));
-  }
-
-  /* ── Helper: draw SVG sparkline into a lift card ── */
-  function drawLiftSpark(svgId, points, color) {
-    var svg = document.getElementById(svgId);
-    if (!svg || !points || points.length < 2) return;
-    var vals = points.map(function(p) { return p.value; });
-    var minV = Math.min.apply(null, vals);
-    var maxV = Math.max.apply(null, vals);
-    var range = maxV - minV || 1;
-    var W = 300, H = 80, padY = 8;
-    var pts = points.map(function(p, i) {
-      var x = (i / (points.length - 1)) * W;
-      var y = padY + (1 - (p.value - minV) / range) * (H - padY * 2);
-      return x.toFixed(1) + ',' + y.toFixed(1);
-    });
-    svg.innerHTML = '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linecap="round"/>' +
-      '<text x="4" y="14" fill="rgba(255,255,255,0.3)" font-size="10" font-family="monospace">' + maxV + ' lb</text>' +
-      '<text x="4" y="' + (H - 4) + '" fill="rgba(255,255,255,0.2)" font-size="10" font-family="monospace">' + minV + ' lb</text>';
-  }
-
-  /* ── Helper: draw radar chart ── */
-  function drawRadar(canvasId, values, labels) {
-    var canvas = document.getElementById(canvasId);
-    if (!canvas) return;
-    var ctx = canvas.getContext('2d');
-    var W = 280, H = 280, cx = W / 2, cy = H / 2, r = 110;
-    var n = values.length;
-    ctx.clearRect(0, 0, W, H);
-
-    // Grid rings
-    [0.25, 0.5, 0.75, 1.0].forEach(function(frac) {
-      ctx.beginPath();
-      for (var i = 0; i <= n; i++) {
-        var angle = (Math.PI * 2 * (i % n) / n) - Math.PI / 2;
-        var x = cx + Math.cos(angle) * r * frac;
-        var y = cy + Math.sin(angle) * r * frac;
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      }
-      ctx.closePath();
-      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    });
-
-    // Axis lines + labels
-    ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    ctx.font = '10px monospace';
-    ctx.textAlign = 'center';
-    for (var i = 0; i < n; i++) {
-      var angle = (Math.PI * 2 * i / n) - Math.PI / 2;
-      var ax = cx + Math.cos(angle) * r;
-      var ay = cy + Math.sin(angle) * r;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(ax, ay);
-      ctx.strokeStyle = 'rgba(255,255,255,0.04)';
-      ctx.stroke();
-      var lx = cx + Math.cos(angle) * (r + 16);
-      var ly = cy + Math.sin(angle) * (r + 16);
-      ctx.fillText(labels[i], lx, ly + 4);
+    /* ─── Helpers ────────────────────────────────────────── */
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setWidth(id, pct) { var el = document.getElementById(id); if (el) el.style.width = Math.max(0, Math.min(100, pct)) + '%'; }
+    function fmtDate(s) {
+      try {
+        var d = new Date(s + 'T12:00:00');
+        return d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' }).toUpperCase();
+      } catch(e) { return s; }
+    }
+    function timePrefix() {
+      var h = new Date().getHours();
+      if (h < 10) return 'Morning read: ';
+      if (h < 14) return 'Midday check: ';
+      if (h < 18) return 'Afternoon: ';
+      return 'End of day: ';
     }
 
-    // Data polygon
-    ctx.beginPath();
-    for (var i = 0; i <= n; i++) {
-      var angle = (Math.PI * 2 * (i % n) / n) - Math.PI / 2;
-      var val = Math.min(1, Math.max(0, values[i % n] / 100));
-      var x = cx + Math.cos(angle) * r * val;
-      var y = cy + Math.sin(angle) * r * val;
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    }
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(239,68,68,0.12)';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(239,68,68,0.6)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Data points
-    for (var i = 0; i < n; i++) {
-      var angle = (Math.PI * 2 * i / n) - Math.PI / 2;
-      var val = Math.min(1, Math.max(0, values[i] / 100));
-      var x = cx + Math.cos(angle) * r * val;
-      var y = cy + Math.sin(angle) * r * val;
-      ctx.beginPath();
-      ctx.arc(x, y, 4, 0, Math.PI * 2);
-      ctx.fillStyle = '#ef4444';
-      ctx.fill();
-    }
-  }
-
-  /* ── Helper: draw time-of-day histogram ── */
-  function drawTOD(data) {
-    var grid = document.getElementById('t-tod-grid');
-    var labels = document.getElementById('t-tod-labels');
-    if (!grid || !data) return;
-    var maxCount = Math.max.apply(null, data.map(function(d) { return d.count; })) || 1;
-    grid.innerHTML = '';
-    labels.innerHTML = '';
-    data.forEach(function(d) {
-      var pct = (d.count / maxCount) * 100;
-      var bar = document.createElement('div');
-      bar.className = 't-tod-bar';
-      bar.style.height = Math.max(4, pct) + '%';
-      bar.title = d.hour + ':00 — ' + d.count + ' sessions';
-      grid.appendChild(bar);
-      var lbl = document.createElement('span');
-      lbl.textContent = d.hour;
-      labels.appendChild(lbl);
-    });
-  }
-
-  /* ── Helper: draw canvas line chart ── */
-  function drawLineChart(canvasId, series, yMax) {
-    var canvas = document.getElementById(canvasId);
-    if (!canvas) return;
-    var dpr = window.devicePixelRatio || 1;
-    canvas.width = canvas.offsetWidth * dpr;
-    canvas.height = canvas.offsetHeight * dpr;
-    var ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
-    var W = canvas.offsetWidth, H = canvas.offsetHeight;
-    var pad = { t: 16, r: 12, b: 8, l: 40 };
-    var iW = W - pad.l - pad.r, iH = H - pad.t - pad.b;
-
-    // Grid
-    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
-    ctx.lineWidth = 1;
-    for (var r = 0; r <= 3; r++) {
-      var y = pad.t + (r / 3) * iH;
-      ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
-    }
-
-    series.forEach(function(s) {
-      if (!s.data || s.data.length < 2) return;
-      var n = s.data.length;
-      ctx.beginPath();
-      ctx.strokeStyle = s.color;
-      ctx.lineWidth = 2;
-      s.data.forEach(function(v, i) {
-        var x = pad.l + (i / (n - 1)) * iW;
-        var y = pad.t + (1 - (v - (s.yMin || 0)) / ((yMax || Math.max.apply(null, s.data)) - (s.yMin || 0))) * iH;
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    /* ─── Sparkline renderer (mirrors /live/) ────────────── */
+    function renderSpark(values, state) {
+      if (!values || !values.length) return '';
+      var clean = values.filter(function(v) { return v != null; });
+      if (!clean.length) return '';
+      var max = Math.max.apply(null, clean);
+      var min = Math.min.apply(null, clean);
+      var range = max - min || 1;
+      var cls = 'fp-spark fp-spark--' + (state || 'amber');
+      var html = '<div class="' + cls + '">';
+      clean.forEach(function(v) {
+        var pct = Math.max(10, ((v - min) / range) * 100);
+        html += '<div class="fp-spark__bar" style="height:' + pct + '%"></div>';
       });
-      ctx.stroke();
-      // Fill area if requested
-      if (s.fill) {
-        ctx.lineTo(pad.l + iW, pad.t + iH);
-        ctx.lineTo(pad.l, pad.t + iH);
-        ctx.closePath();
-        ctx.fillStyle = s.fill;
-        ctx.fill();
-      }
-    });
-  }
-
-  try {
-    var resp = await fetch(API + '/api/training_overview');
-    if (!resp.ok) throw new Error(resp.status);
-    var data = await resp.json();
-    var t = data.training, trend = data.weekly_trend || [];
-    if (!t) { loading.textContent = 'No training data yet.'; return; }
-
-    // Show content BEFORE chart rendering (canvas needs offsetWidth > 0)
-    loading.style.display = 'none';
-    content.style.display = 'block';
-
-    /* ── Hero gauges ── */
-    var z2Avg = t.z2_weekly_avg_min || 0;
-    setText('g-z2-num', z2Avg);
-    var z2El = document.getElementById('g-z2-num');
-    if (z2El) z2El.style.color = z2Avg >= 150 ? '#3ecf8e' : z2Avg >= 90 ? '#f59e0b' : '#ef4444';
-    setArc('g-z2-arc', Math.min(100, (z2Avg / 200) * 100));
-
-    var wk30 = t.workouts_30d || 0;
-    setText('g-wk-num', wk30);
-    setArc('g-wk-arc', Math.min(100, (wk30 / 30) * 100));
-
-    var avgStrain = t.avg_strain;
-    setText('g-strain-num', avgStrain != null ? avgStrain.toFixed(1) : '\u2014');
-    setArc('g-strain-arc', avgStrain != null ? (avgStrain / 21) * 100 : 0);
-
-    var strSessions = t.strength_sessions_30d || 0;
-    setText('g-str-num', strSessions);
-    setArc('g-str-arc', Math.min(100, (strSessions / 15) * 100));
-
-    // Daily steps gauge
-    var avgSteps = t.avg_daily_steps || 0;
-    setText('g-steps-num', avgSteps >= 1000 ? (avgSteps / 1000).toFixed(1) + 'k' : avgSteps);
-    setArc('g-steps-arc', Math.min(100, (avgSteps / 10000) * 100));
-
-    // Active modalities gauge
-    var activeMod = t.active_modalities || 0;
-    setText('g-mod-num', activeMod);
-    setArc('g-mod-arc', Math.min(100, (activeMod / 8) * 100));
-
-    /* ── V3 Status Bar (Section 1) ── */
-    renderStatusBar('obs-v3-status', [
-      {label: 'Zone 2 min/wk', value: z2Avg || null, unit: 'min', delta: null, context: 'Target: 150 min/wk'},
-      {label: 'Sessions (30d)', value: wk30 || null, unit: '', delta: null, context: 'All modalities'},
-      {label: 'Avg strain', value: avgStrain != null ? avgStrain.toFixed(1) : null, unit: '', delta: null, context: 'Whoop daily strain'},
-      {label: 'Daily steps avg', value: avgSteps ? (avgSteps >= 1000 ? (avgSteps / 1000).toFixed(1) + 'k' : avgSteps) : null, unit: 'steps', delta: null, context: 'Garmin daily'}
-    ], {});
-
-    /* ── V3 Cross-Domain (Section 5) ── */
-    renderCrossDomain('obs-v3-cross', [
-      {title: 'Training \u2192 Recovery', finding: 'Zone 2 volume above 150 min/week predicts better recovery scores. Back-to-back high strain days suppress HRV for 48 hours.', link: '/sleep/'},
-      {title: 'Training \u2192 Nutrition', finding: 'Testing whether deficit depth impacts training quality. Cross-referencing MacroFactor intake with Whoop strain.', link: '/nutrition/'}
-    ]);
-
-    /* ── V3 Depth Sections (Section 6) ── */
-    renderDepth('obs-v3-depth', [
-      {label: 'About this observatory', id: 'about', content: '<h2 style="font-family:var(--font-display);font-size:24px;margin:0 0 12px;">Training for <em>80</em>, not for 30</h2><p>Zone 2 cardio, compound strength, centenarian benchmarks. Four data sources synthesized into one training intelligence layer.</p><p>Most programs optimize for aesthetics at 30. This one optimizes for <strong>carrying groceries, climbing stairs, and getting off the floor at 85</strong>. You lose 8\u201312% of strength per decade after 40. To deadlift your bodyweight at 85, you need <strong>~2x bodyweight now</strong>. Four data sources \u2014 Strava, Hevy, Garmin, Whoop \u2014 feed a single training load model that cross-references with nutrition and sleep data.</p><p style="font-style:italic;border-left:2px solid var(--text-faint);padding-left:16px;color:var(--text-muted);">When I\u2019m in it, I\u2019m all in \u2014 5am sessions, compound lifts, rucking mountains at the weekend. The problem has never been the training. It\u2019s always been the fall \u2014 how fast the void fills when routine breaks. The data doesn\u2019t stop that from happening. But it makes the absence visible, and <em>visibility shortens the distance back</em>.</p><p style="font-style:italic;border-left:2px solid var(--text-faint);padding-left:16px;color:var(--text-muted);">Rucking is the highest Zone 2 yield per hour \u2014 92% of ruck time in Zone 2 vs 61% walking.</p><div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;"><div style="display:flex;gap:12px;padding:8px 12px;background:var(--surface);border-left:2px solid var(--t-red);"><span style="font-family:var(--font-display);font-size:18px;color:var(--t-red);flex-shrink:0;width:24px;">01</span><span style="font-size:var(--text-sm);color:var(--text-muted);"><strong>150+ min/week Zone 2</strong> \u2014 walking, cycling, rucking. HR 114\u2013133. Highest-evidence longevity modality.</span></div><div style="display:flex;gap:12px;padding:8px 12px;background:var(--surface);border-left:2px solid var(--t-red);"><span style="font-family:var(--font-display);font-size:18px;color:var(--t-red);flex-shrink:0;width:24px;">02</span><span style="font-size:var(--text-sm);color:var(--text-muted);"><strong>3x/week compound lifts</strong> \u2014 squat, deadlift, bench, OHP. Progressive overload toward centenarian benchmarks.</span></div><div style="display:flex;gap:12px;padding:8px 12px;background:var(--surface);border-left:2px solid var(--t-red);"><span style="font-family:var(--font-display);font-size:18px;color:var(--t-red);flex-shrink:0;width:24px;">03</span><span style="font-size:var(--text-sm);color:var(--text-muted);"><strong>ACWR &lt;1.5</strong> \u2014 Acute:Chronic Workload Ratio guards against injury spikes.</span></div><div style="display:flex;gap:12px;padding:8px 12px;background:var(--surface);border-left:2px solid var(--t-red);"><span style="font-family:var(--font-display);font-size:18px;color:var(--t-red);flex-shrink:0;width:24px;">04</span><span style="font-size:var(--text-sm);color:var(--text-muted);"><strong>Recovery-gated intensity</strong> \u2014 Whoop &lt;34% triggers deload suggestion in daily brief.</span></div><div style="display:flex;gap:12px;padding:8px 12px;background:var(--surface);border-left:2px solid var(--t-red);"><span style="font-family:var(--font-display);font-size:18px;color:var(--t-red);flex-shrink:0;width:24px;">05</span><span style="font-size:var(--text-sm);color:var(--text-muted);"><strong>80/20 polarization</strong> \u2014 80% low intensity, 20% high. No Zone 3 junk miles.</span></div></div>'},
-      {label: 'Measurement protocol', id: 'protocol', content: '<p><strong>Strava</strong> \u2014 All cardio: runs, rides, walks, rucks. GPS + HR from Garmin. Duration, distance, avg HR synced daily.</p><p><strong>Hevy</strong> \u2014 All strength: sets, reps, weight. 1RM via Brzycki. Volume load = sets \u00d7 reps \u00d7 weight.</p><p><strong>Zone 2</strong> \u2014 HR 60\u201370% max (114\u2013133 bpm). Target: 150 min/week (WHO + Attia). N=1 thresholds.</p>'}
-    ]);
-
-    /* ── Zone 2 editorial 3-col ── */
-    setText('zval-z2', z2Avg + ' min');
-    setWidth('zbar-z2', Math.min(100, (z2Avg / 200) * 100));
-
-    var totalMin = t.total_minutes_30d || 0;
-    setText('zval-total', totalMin.toLocaleString() + ' min');
-    setWidth('zbar-total', Math.min(100, (totalMin / 2000) * 100));
-
-    var weeklyAvg = t.weekly_avg || 0;
-    var expDays = Math.min(7, Math.max(1, Math.floor((Date.now() - new Date('2026-04-01').getTime()) / 86400000) + 1));
-    setText('zval-wavg', weeklyAvg);
-    setWidth('zbar-wavg', Math.min(100, (weeklyAvg / expDays) * 100));
-
-    /* ── V2: Daily Exercise Minutes by Modality Chart ── */
-    var dailyMod = data.daily_modality_minutes_30d || [];
-    if (typeof Chart !== 'undefined' && dailyMod.length >= 1) {
-      if (!window._chartDefaultsSet) {
-        Chart.defaults.color = 'rgba(255,255,255,0.5)';
-        Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
-        Chart.defaults.font.family = 'monospace';
-        window._chartDefaultsSet = true;
-      }
-      var MOD_COLORS = {
-        strength: '#dc2626', walking: '#38bdf8', cycling: '#f59e0b', stretching: '#14b8a6',
-        soccer: '#fb923c', hiking: '#22c55e', breathwork: '#8b5cf6', other: '#6b7280'
-      };
-      var MOD_LABELS = {
-        strength: 'Strength', walking: 'Walking', cycling: 'Cycling', stretching: 'Stretching',
-        soccer: 'Soccer', hiking: 'Hiking', breathwork: 'Breathwork', other: 'Other'
-      };
-      var modKeys = ['strength', 'walking', 'cycling', 'stretching', 'soccer', 'hiking', 'breathwork', 'other'];
-      var activeModKeys = modKeys.filter(function(k) {
-        return dailyMod.some(function(d) { return d[k + '_min'] > 0; });
-      });
-      var modDatasets = activeModKeys.map(function(k) {
-        return {
-          label: MOD_LABELS[k],
-          data: dailyMod.map(function(d) { return d[k + '_min']; }),
-          backgroundColor: MOD_COLORS[k],
-          stack: 'modality', order: 2
-        };
-      });
-      modDatasets.push({
-        label: '60 min target', type: 'line',
-        data: Array(dailyMod.length).fill(60),
-        borderColor: 'rgba(255,255,255,0.2)', borderWidth: 1, borderDash: [4, 4],
-        pointRadius: 0, fill: false, order: 0
-      });
-
-      new Chart(document.getElementById('t-modality-canvas'), {
-        type: 'bar',
-        data: {
-          labels: dailyMod.map(function(d) { return d.date.slice(5); }),
-          datasets: modDatasets
-        },
-        plugins: window.CyclePause ? [CyclePause.chartjsPlugin] : [],
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            cyclePause: { dates: dailyMod.map(function(d) { return d.date; }) },
-            tooltip: {
-              callbacks: {
-                title: function(ctx) { return dailyMod[ctx[0].dataIndex].date; },
-                afterTitle: function(ctx) { return 'Total: ' + dailyMod[ctx[0].dataIndex].total_min + ' min'; }
-              }
-            }
-          },
-          scales: {
-            x: { stacked: true, ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 }, maxRotation: 45 }, grid: { display: false } },
-            y: { stacked: true, ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.03)' }, title: { display: true, text: 'minutes', color: 'rgba(255,255,255,0.25)', font: { size: 10 } } }
-          }
-        }
-      });
-
-      var modLegendEl = document.getElementById('t-modality-legend');
-      if (modLegendEl) {
-        modLegendEl.innerHTML = activeModKeys.map(function(k) {
-          return '<div style="display:flex;align-items:center;gap:4px;font:10px monospace;color:rgba(255,255,255,0.4)"><div style="width:8px;height:8px;border-radius:2px;background:' + MOD_COLORS[k] + '"></div> ' + MOD_LABELS[k] + '</div>';
-        }).join('');
-      }
+      html += '</div>';
+      return html;
     }
 
-    /* ── Modality deep-dive cards ── */
-    var modGrid = document.getElementById('t-modalities');
-    var modalities = data.modality_breakdown || [];
-    if (modalities.length) {
-      var totalActs = modalities.reduce(function(s, m) { return s + m.count_30d; }, 0);
-      modGrid.innerHTML = modalities.map(function(m) {
-        var pct = totalActs > 0 ? Math.round(m.count_30d / totalActs * 100) : 0;
-        var trendStr = m.trend_vs_prior_30d > 0 ? '+' + m.trend_vs_prior_30d : m.trend_vs_prior_30d < 0 ? '' + m.trend_vs_prior_30d : '—';
-        var trendColor = m.trend_vs_prior_30d > 0 ? '#3ecf8e' : m.trend_vs_prior_30d < 0 ? '#ef4444' : 'var(--text-faint)';
-        var context = pct >= 30 ? 'Your highest-volume modality — ' + pct + '% of all sessions.'
-          : pct >= 15 ? 'A regular part of the rotation — ' + pct + '% of sessions.'
-          : 'Occasional modality — ' + pct + '% of sessions.';
-        return '<div class="t-modality-card">' +
-          '<div class="t-modality-card__header">' +
-            '<span class="t-modality-card__name">' + m.type + '</span>' +
-            '<span class="t-modality-card__trend" style="color:' + trendColor + '">' + trendStr + ' vs prior 30d</span>' +
-          '</div>' +
-          '<div class="t-modality-card__stats">' +
-            '<div><div class="t-modality-stat__val" style="color:var(--t-red)">' + m.count_30d + '</div><div class="t-modality-stat__label">sessions</div></div>' +
-            '<div><div class="t-modality-stat__val">' + m.total_minutes_30d + '</div><div class="t-modality-stat__label">total min</div></div>' +
-            '<div><div class="t-modality-stat__val">' + m.avg_duration_min + '</div><div class="t-modality-stat__label">avg min</div></div>' +
-            (m.avg_hr ? '<div><div class="t-modality-stat__val">' + m.avg_hr + '</div><div class="t-modality-stat__label">avg hr</div></div>' : '') +
-            (m.total_distance_mi > 0 ? '<div><div class="t-modality-stat__val">' + m.total_distance_mi + '</div><div class="t-modality-stat__label">miles</div></div>' : '') +
-          '</div>' +
-          '<div class="t-modality-card__context">' + context + '</div>' +
-        '</div>';
-      }).join('');
-    } else {
-      modGrid.innerHTML = '<div style="color:var(--text-faint);font-family:var(--font-mono);font-size:var(--text-xs)">No activity data</div>';
-    }
+    /* ─── Lift icon (dumbbell) ───────────────────────────── */
+    var LIFT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="2" y="9" width="2.5" height="6" rx="0.5"/><rect x="5" y="7" width="2.5" height="10" rx="0.5"/><line x1="7.5" y1="12" x2="16.5" y2="12"/><rect x="16.5" y="7" width="2.5" height="10" rx="0.5"/><rect x="19.5" y="9" width="2.5" height="6" rx="0.5"/></svg>';
 
-    /* ── Walking section ── */
-    var w = data.walking || {};
-    if (w.avg_daily_steps) {
-      setText('wval-steps', w.avg_daily_steps.toLocaleString());
-      setWidth('wbar-steps', Math.min(100, (w.avg_daily_steps / 10000) * 100));
-    }
-    setText('wval-walks', w.total_walks_30d || 0);
-    setWidth('wbar-walks', Math.min(100, ((w.total_walks_30d || 0) / 20) * 100));
-    setText('wval-rucks', w.total_rucks_30d || 0);
-    setWidth('wbar-rucks', Math.min(100, ((w.total_rucks_30d || 0) / 10) * 100));
-    setText('wval-miles', (w.total_miles_30d || 0) + ' mi');
-    setText('wval-pace', w.avg_pace_min_per_mi || '\u2014');
-    setText('wval-z2walk', (w.z2_minutes_walking || 0) + ' min');
-
-    /* ── V2: Daily Step Count Chart ── */
-    var stepsData = (w.daily_steps_trend || []);
-    if (typeof Chart !== 'undefined' && stepsData.length >= 1) {
-      if (!window._chartDefaultsSet) {
-        Chart.defaults.color = 'rgba(255,255,255,0.5)';
-        Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
-        Chart.defaults.font.family = 'monospace';
-        window._chartDefaultsSet = true;
-      }
-      var stepVals = stepsData.map(function(d) { return d.steps; });
-      var stepsMa7 = stepVals.map(function(_, i, arr) {
-        if (i < 6) return null;
-        var sum = 0;
-        for (var j = i - 6; j <= i; j++) sum += arr[j];
-        return Math.round(sum / 7);
-      });
-      var barColors = stepsData.map(function(d) {
-        if (d.steps < 7500) return 'rgba(239,68,68,0.5)';
-        return d.is_weekend ? 'rgba(96,165,250,0.4)' : '#60a5fa';
-      });
-
-      new Chart(document.getElementById('t-steps-canvas'), {
-        type: 'bar',
-        data: {
-          labels: stepsData.map(function(d) { return d.date.slice(5); }),
-          datasets: [
-            { label: 'Daily Steps', data: stepVals, backgroundColor: barColors, borderRadius: 2, order: 2 },
-            { label: '7-Day Average', type: 'line', data: stepsMa7, borderColor: '#f59e0b', borderWidth: 2, pointRadius: 0, fill: false, tension: 0.3, spanGaps: true, order: 1 },
-            { label: '7,500', type: 'line', data: Array(stepsData.length).fill(7500), borderColor: 'rgba(245,158,11,0.2)', borderWidth: 1, borderDash: [4, 4], pointRadius: 0, fill: false, order: 0 },
-            { label: '10,000', type: 'line', data: Array(stepsData.length).fill(10000), borderColor: 'rgba(62,207,142,0.2)', borderWidth: 1, borderDash: [4, 4], pointRadius: 0, fill: false, order: 0 }
-          ]
-        },
-        plugins: window.CyclePause ? [CyclePause.chartjsPlugin] : [],
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false }, cyclePause: { dates: stepsData.map(function(d) { return d.date; }) }, tooltip: { callbacks: { title: function(ctx) { return stepsData[ctx[0].dataIndex].date; } } } },
-          scales: {
-            x: { ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 }, maxRotation: 45 }, grid: { display: false } },
-            y: { ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k' : v; } }, grid: { color: 'rgba(255,255,255,0.03)' }, beginAtZero: true }
-          }
-        }
-      });
-    }
-
-    /* ── Breathwork section ── */
-    var bw = data.breathwork || {};
-    setText('bval-sessions', bw.sessions_30d || 0);
-    setWidth('bbar-sessions', Math.min(100, ((bw.sessions_30d || 0) / 30) * 100));
-    setText('bval-minutes', (bw.total_minutes_30d || 0) + ' min');
-    setWidth('bbar-minutes', Math.min(100, ((bw.total_minutes_30d || 0) / 150) * 100));
-    setText('bval-avg', bw.avg_session_min || '\u2014');
-
-    /* ── Weekly physical volume ── */
-    (function loadWeekly() {
-      fetch(API + '/api/weekly_physical_summary').then(function(r) { return r.ok ? r.json() : null; }).then(function(wd) {
-        if (!wd) return;
-        var days = wd.days || [];
-        var weekGrid = document.getElementById('t-weekly-days');
-        if (!weekGrid || !days.length) return;
-        weekGrid.innerHTML = days.map(function(d) {
-          var actList = (d.activities || []).map(function(a) {
-            return a.type + ' ' + a.minutes + 'm';
-          }).join('<br>');
-          return '<div class="t-weekly-day">' +
-            '<div class="t-weekly-day__dow">' + d.day_of_week + '</div>' +
-            '<div class="t-weekly-day__total">' + (d.total_active_minutes || 0) + '<span style="font-size:var(--text-2xs);color:var(--text-faint)">m</span></div>' +
-            '<div class="t-weekly-day__acts">' + (actList || '—') + '</div>' +
-            (d.steps ? '<div class="t-weekly-day__steps">' + d.steps.toLocaleString() + ' steps</div>' : '') +
-          '</div>';
-        }).join('');
-      }).catch(function() {});
-    })();
-
-    /* ── Strength deep-dive (Phase 2) ── */
-    (function() {
-      fetch(API + '/api/strength_deep_dive').then(function(r) { return r.ok ? r.json() : null; }).then(function(sd) {
-        if (!sd) return;
-        var s = sd.strength;
-        if (!s || !s.sessions_30d) return;
-        var section = document.getElementById('t-strength-dive');
-        section.style.display = '';
-        var statsHtml = '<div class="t-modality-card" style="border-left-color:var(--t-violet);">' +
-          '<div class="t-modality-stat__val" style="color:var(--t-violet)">' + s.sessions_30d + '</div><div class="t-modality-stat__label">Sessions (30d)</div></div>' +
-          '<div class="t-modality-card" style="border-left-color:var(--t-violet);">' +
-          '<div class="t-modality-stat__val">' + s.distinct_exercises_30d + '</div><div class="t-modality-stat__label">Exercises</div></div>' +
-          '<div class="t-modality-card" style="border-left-color:var(--t-violet);">' +
-          '<div class="t-modality-stat__val">' + s.total_sets_30d + '</div><div class="t-modality-stat__label">Total sets</div></div>';
-        document.getElementById('t-strength-stats').innerHTML = statsHtml;
-        var exHtml = (sd.top_exercises || []).map(function(e) {
-          return '<div style="display:flex;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid rgba(255,255,255,0.03);font-size:var(--text-sm);color:var(--text-muted);">' +
-            '<span>' + e.name + '</span><span style="color:var(--text)">' + e.frequency + 'x</span></div>';
-        }).join('');
-        document.getElementById('t-strength-exercises').innerHTML = exHtml || '<div style="color:var(--text-faint);font-size:var(--text-xs)">No exercise data</div>';
-
-        /* V2: Volume trend line chart */
-        var volTrend = sd.volume_trend || [];
-        if (typeof Chart !== 'undefined' && volTrend.length < 1) {
-          var volCanvas = document.getElementById('t-volume-canvas');
-          if (volCanvas) {
-            volCanvas.style.display = 'none';
-            volCanvas.insertAdjacentHTML('afterend', '<div style="text-align:center;color:var(--text-faint);font-size:var(--text-sm);padding:var(--space-6) 0;font-family:var(--font-mono);letter-spacing:0.04em">Requires 3+ weeks of volume data.</div>');
-          }
-        }
-        if (typeof Chart !== 'undefined' && volTrend.length >= 1) {
-          var volLabels = volTrend.map(function(d) { return d.week; });
-          var volData = volTrend.map(function(d) { return d.volume_lbs || 0; });
-          new Chart(document.getElementById('t-volume-canvas'), {
-            type: 'bar',
-            data: {
-              labels: volLabels,
-              datasets: [{
-                label: 'Volume (lbs)',
-                data: volData,
-                backgroundColor: 'rgba(129,140,248,0.6)',
-                borderRadius: 3,
-              }]
-            },
-            options: {
-              responsive: true, maintainAspectRatio: false,
-              plugins: {
-                legend: { display: false },
-                tooltip: { callbacks: { label: function(ctx) { return ctx.raw.toLocaleString() + ' lbs'; } } }
-              },
-              scales: {
-                x: { ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 }, maxRotation: 45 }, grid: { display: false } },
-                y: { ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 }, callback: function(v) { return v >= 1000 ? Math.round(v/1000) + 'k' : v; } }, grid: { color: 'rgba(255,255,255,0.03)' }, beginAtZero: true }
-              }
-            }
-          });
-        }
-      }).catch(function() {});
-    })();
-
-    /* ── 11a: CTL/ATL/TSB Banister model ── */
-    var ctl = t.ctl_fitness, atl = t.atl_fatigue, tsb = t.tsb_form;
-    if (ctl != null) {
-      setText('ctl-val', ctl.toFixed(1));
-      // 11m: plain-language translations
-      if (ctl < 10) setText('ctl-plain', 'Fitness base is still building. Early days.');
-      else if (ctl < 30) setText('ctl-plain', 'Fitness base is building steadily.');
-      else if (ctl < 60) setText('ctl-plain', 'Solid fitness foundation in place.');
-      else setText('ctl-plain', 'Strong aerobic base established.');
-    } else {
-      setText('ctl-plain', 'Requires 4+ weeks of training data.');
-    }
-    if (atl != null) {
-      setText('atl-val', atl.toFixed(1));
-      if (atl < 10) setText('atl-plain', 'Fatigue is low. Room to push harder.');
-      else if (atl < 30) setText('atl-plain', 'Moderate fatigue. Training load is manageable.');
-      else if (atl < 50) setText('atl-plain', 'Significant fatigue accumulating. Watch recovery.');
-      else setText('atl-plain', 'High fatigue. Consider a deload week.');
-    } else {
-      setText('atl-plain', 'Requires 4+ weeks of training data.');
-    }
-    if (tsb != null) {
-      setText('tsb-val', tsb.toFixed(1));
-      if (tsb > 10) setText('tsb-plain', 'Fresh and ready to perform. Good time to test.');
-      else if (tsb > 0) setText('tsb-plain', 'Slightly positive form. Balanced load.');
-      else if (tsb > -10) setText('tsb-plain', 'Slightly fatigued but adapting. Normal training.');
-      else setText('tsb-plain', 'Accumulated fatigue. Performance may dip short-term.');
-    } else {
-      setText('tsb-plain', 'Requires 4+ weeks of training data.');
-    }
-
-    // Banister chart: draw CTL/ATL/TSB lines if trend data has them
-    var banisterData = (data.banister_trend || []);
-    if (banisterData.length >= 1) {
-      var ctlVals = banisterData.map(function(d) { return d.ctl || 0; });
-      var atlVals = banisterData.map(function(d) { return d.atl || 0; });
-      var tsbVals = banisterData.map(function(d) { return d.tsb || 0; });
-      var allVals = ctlVals.concat(atlVals).concat(tsbVals);
-      var bMin = Math.min.apply(null, allVals);
-      var bMax = Math.max.apply(null, allVals);
-      drawLineChart('t-banister-canvas', [
-        { data: ctlVals, color: '#60a5fa', yMin: bMin },
-        { data: atlVals, color: '#ef4444', yMin: bMin },
-        { data: tsbVals, color: '#3ecf8e', fill: 'rgba(62,207,142,0.08)', yMin: bMin }
-      ], bMax);
-    }
-
-    /* ── 11e: ACWR injury risk indicator ── */
-    var acwr = t.acwr;
-    var acwrLight = document.getElementById('acwr-light');
-    var acwrTitle = document.getElementById('acwr-title');
-    var acwrExplain = document.getElementById('acwr-explain');
-    if (acwr != null) {
-      acwrLight.textContent = acwr.toFixed(2);
-      if (acwr < 1.2) {
-        acwrLight.className = 't-acwr-light t-acwr-light--green';
-        acwrTitle.textContent = 'Sweet spot — safe training zone';
-        acwrExplain.textContent = 'Your acute load is well-matched to your chronic base. This is where adaptation happens without injury risk. Keep building.';
-      } else if (acwr < 1.5) {
-        acwrLight.className = 't-acwr-light t-acwr-light--amber';
-        acwrTitle.textContent = 'Caution — training spike detected';
-        acwrExplain.textContent = 'You have ramped up faster than your 4-week base supports. Not dangerous yet, but one more big week could push into the red zone.';
-      } else {
-        acwrLight.className = 't-acwr-light t-acwr-light--red';
-        acwrTitle.textContent = 'Danger zone — injury risk elevated';
-        acwrExplain.textContent = 'Your acute load significantly exceeds your chronic base. Research shows injury probability climbs sharply above 1.5. Consider scaling back this week.';
-      }
-    } else {
-      acwrTitle.textContent = 'Requires 4+ weeks of data';
-      acwrExplain.textContent = 'ACWR compares acute (1-week) load to chronic (4-week) average. More training history needed to compute the ratio.';
-    }
-
-    /* ── 11b: Centenarian benchmark tracker ── */
-    var benchmarks = t.centenarian_benchmarks || {};
-    var lifts = [
-      { key: 'deadlift', prefix: 'dl', defaultTarget: 315 },
-      { key: 'squat', prefix: 'sq', defaultTarget: 265 },
-      { key: 'bench_press', prefix: 'bp', defaultTarget: 185 },
-      { key: 'overhead_press', prefix: 'ohp', defaultTarget: 135 }
+    /* ─── 4. Standings rows — one per main lift ──────────── */
+    var LIFTS = [
+      { key: 'deadlift',       prefix: 'dl',  label: 'Deadlift',       defaultTarget: 315, color: '#ef4444' },
+      { key: 'squat',          prefix: 'sq',  label: 'Squat',          defaultTarget: 265, color: '#f59e0b' },
+      { key: 'bench_press',    prefix: 'bp',  label: 'Bench',          defaultTarget: 185, color: '#818cf8' },
+      { key: 'overhead_press', prefix: 'ohp', label: 'OHP',            defaultTarget: 135, color: '#3ecf8e' },
+      { key: 'row',            prefix: 'rw',  label: 'Row',            defaultTarget: 185, color: '#a78bfa' }
     ];
 
-    // Try strength_benchmarks API for live Hevy data
-    function populateBenchmarks(data) {
-      var liftMap = { 'Deadlift': 'dl', 'Squat': 'sq', 'Bench Press': 'bp', 'Overhead Press': 'ohp' };
-      (data || []).forEach(function(b) {
-        var prefix = liftMap[b.lift];
-        if (!prefix) return;
-        setText('bench-' + prefix + '-current', b.current_1rm > 0 ? b.current_1rm + ' lb' : '\u2014');
-        setText('bench-' + prefix + '-target', b.target);
-        setWidth('bench-' + prefix + '-bar', Math.min(100, b.progress_pct));
-        setText('bench-' + prefix + '-pct', b.progress_pct > 0 ? b.progress_pct + '% of target' : '\u2014');
+    function liftState(pct) {
+      if (pct >= 90) return 'green';
+      if (pct >= 60) return 'amber';
+      return 'red';
+    }
+
+    function renderStandings(t) {
+      var benchmarks = (t && t.centenarian_benchmarks) || {};
+      var liftHistory = (t && t.lift_history) || {};
+      var rows = document.getElementById('t-standings-rows');
+      var any = false;
+      var html = '';
+      LIFTS.forEach(function(lift) {
+        var b = benchmarks[lift.key] || {};
+        var current = b.current_1rm || 0;
+        var target = b.target || lift.defaultTarget;
+        var hist = liftHistory[lift.key];
+        if (!current && (!hist || !hist.length) && lift.key === 'row') return; // hide row if no data at all
+        any = true;
+        var pct = target > 0 ? Math.round((current / target) * 100) : 0;
+        var sparkVals = (hist || []).map(function(p) { return p.value; });
+        var spark = renderSpark(sparkVals, liftState(pct));
+        var ctx = current > 0
+          ? pct + '% of ' + target + ' lb target'
+          : 'No 1RM logged yet';
+        html +=
+          '<a class="fp-row" href="/training/#lift-' + lift.prefix + '">' +
+            '<div class="fp-row__icon">' + LIFT_ICON + '</div>' +
+            '<div class="fp-row__name">' + lift.label + '</div>' +
+            '<div class="fp-row__context">' + ctx + '</div>' +
+            '<div class="fp-row__value">' +
+              '<span class="fp-row__num">' + (current > 0 ? current : '—') + '</span>' +
+              '<span class="fp-row__unit">' + (current > 0 ? 'lb' : '') + '</span>' +
+            '</div>' +
+            '<div class="fp-row__spark">' + spark + '</div>' +
+          '</a>';
       });
+      rows.innerHTML = any ? html : '<div class="t-row-empty">No lifts logged in Hevy yet.</div>';
     }
 
-    // Use training_overview data first, then fallback to strength_benchmarks API
-    var hasBenchData = false;
-    lifts.forEach(function(lift) {
-      var b = benchmarks[lift.key] || {};
-      var current = b.current_1rm || 0;
-      if (current > 0) hasBenchData = true;
-      var target = b.target || lift.defaultTarget;
-      var pct = target > 0 ? Math.round((current / target) * 100) : 0;
-      setText('bench-' + lift.prefix + '-current', current > 0 ? current + ' lb' : '\u2014');
-      setText('bench-' + lift.prefix + '-target', target);
-      setWidth('bench-' + lift.prefix + '-bar', Math.min(100, pct));
-      setText('bench-' + lift.prefix + '-pct', pct > 0 ? pct + '% of target' : '\u2014');
-    });
-    if (!hasBenchData) {
-      fetch('/api/strength_benchmarks').then(function(r) { return r.ok ? r.json() : null; })
-        .then(function(d) { if (d && d.benchmarks) populateBenchmarks(d.benchmarks); })
-        .catch(function() {});
+    /* ─── Masthead + lede ────────────────────────────────── */
+    function renderMasthead(t, pulse) {
+      var sessionNum = (t && t.workouts_alltime) || (t && t.workouts_30d) || (pulse && pulse.day_number) || '—';
+      setText('t-dispatch', sessionNum);
+      setText('t-session-strip', sessionNum);
+      var today = new Date().toISOString().slice(0, 10);
+      setText('t-date', fmtDate((pulse && pulse.date) || today));
+      var z2 = (t && t.z2_weekly_avg_min);
+      var status = z2 != null
+        ? (z2 + ' min Z2/wk · ' + ((t && t.workouts_30d) || 0) + ' sessions in 30d')
+        : 'Reporting from one body';
+      setText('t-meta-status', status);
+      var now = new Date();
+      var hh = String(now.getHours()).padStart(2,'0');
+      var mm = String(now.getMinutes()).padStart(2,'0');
+      setText('t-filed', 'Filed ' + hh + ':' + mm + ' · Strava · Hevy · Garmin · Whoop');
     }
 
-    /* ── 11d: Compound lift progress sparklines ── */
-    var liftHistory = t.lift_history || {};
-    drawLiftSpark('lift-svg-dl', liftHistory.deadlift, '#ef4444');
-    drawLiftSpark('lift-svg-sq', liftHistory.squat, '#f59e0b');
-    drawLiftSpark('lift-svg-bp', liftHistory.bench_press, '#818cf8');
-    drawLiftSpark('lift-svg-ohp', liftHistory.overhead_press, '#3ecf8e');
-
-    /* ── DPR-1.12: Collapse empty sections into compact placeholders ── */
-    var hasLiftHistory = Object.values(liftHistory).some(function(arr) { return arr && arr.length > 0; });
-    function collapseEmpty(selector, icon, title, description) {
-      var el = document.querySelector(selector);
-      if (!el) return;
-      el.innerHTML = '<div class="awaiting-compact"><div class="awaiting-compact__icon">' + icon + '</div><div class="awaiting-compact__text"><strong>' + title + '</strong> \u2014 ' + description + '</div></div>';
-    }
-    if (!hasBenchData) {
-      collapseEmpty('.t-centenarian-section', '\uD83C\uDFCB\uFE0F', 'Centenarian Benchmarks', 'Deadlift, squat, bench, and OHP targets auto-populate after first logged strength session in Hevy.');
-    }
-    if (!hasLiftHistory) {
-      collapseEmpty('.t-lifts-section', '\uD83D\uDCC8', '1RM Progress', 'Lift progress charts appear after 2+ logged sessions per exercise.');
+    function statusWordFor(t) {
+      var tsb = t && t.tsb_form;
+      var acwr = t && t.acwr;
+      var z2 = t && t.z2_weekly_avg_min;
+      if (acwr != null && acwr >= 1.5) return { word: 'OVERREACHED', cls: 'fp-lede__status--attention' };
+      if (acwr != null && acwr >= 1.2) return { word: 'PUSHING',     cls: 'fp-lede__status--watch' };
+      if (tsb != null && tsb > 10)     return { word: 'TAPER',       cls: 'fp-lede__status--strong' };
+      if (z2 != null && z2 >= 150)     return { word: 'STRONG',      cls: 'fp-lede__status--strong' };
+      if (z2 != null && z2 < 60)       return { word: 'UNDERLOADED', cls: 'fp-lede__status--watch' };
+      return { word: 'STEADY', cls: 'fp-lede__status--watch' };
     }
 
-    /* ── 11f: Activity diversity radar ── */
-    var pillars = t.training_pillars || {};
-    var pillarNames = ['zone2', 'strength', 'stability', 'zone5', 'sport'];
-    var pillarLabels = ['Z2', 'STR', 'STAB', 'Z5', 'SPORT'];
-    var pillarIds = ['z2', 'str', 'stab', 'z5', 'sport'];
-    var radarVals = pillarNames.map(function(name) { return pillars[name] || 0; });
-    drawRadar('t-radar-canvas', radarVals, pillarLabels);
-    pillarIds.forEach(function(id, i) {
-      setWidth('radar-' + id + '-fill', radarVals[i]);
-      setText('radar-' + id + '-pct', radarVals[i] + '%');
-    });
+    function buildNarrative(t, pulse) {
+      // Prefer pulse narrative if present and lift-relevant; otherwise synthesize.
+      if (pulse && pulse.narrative) return pulse.narrative;
+      var z2 = t && t.z2_weekly_avg_min;
+      var wk30 = t && t.workouts_30d;
+      var str = t && t.strength_sessions_30d;
+      var bits = [];
+      if (z2 != null) bits.push('Zone 2 averaging ' + z2 + ' min/week against a 150-min target.');
+      if (wk30 != null) bits.push(wk30 + ' sessions logged in the last 30 days');
+      if (str != null) bits.push('— ' + str + ' of them strength.');
+      if (!bits.length) return 'No training data has reported yet.';
+      return bits.join(' ').trim();
+    }
 
-    /* ── 11g: HR recovery trend ── */
-    var hrRecovery = t.hr_recovery_trend || [];
-    if (hrRecovery.length >= 1) {
-      var hrVals = hrRecovery.map(function(d) { return d.bpm_drop || d.value || 0; });
-      var hrMax = Math.max.apply(null, hrVals);
-      drawLineChart('t-hr-canvas', [
-        { data: hrVals, color: '#ef4444', fill: 'rgba(239,68,68,0.06)', yMin: 0 }
-      ], hrMax * 1.2);
-    } else {
-      var hrCanvas = document.getElementById('t-hr-canvas');
-      if (hrCanvas) {
-        hrCanvas.style.display = 'none';
-        hrCanvas.insertAdjacentHTML('afterend', '<div style="text-align:center;color:var(--text-faint);font-size:var(--text-sm);padding:var(--space-8) 0;font-family:var(--font-mono);letter-spacing:0.04em">Requires 3+ data points. Populates as training sessions accumulate.</div>');
+    function renderLede(t, pulse) {
+      var sessionNum = (t && t.workouts_alltime) || (t && t.workouts_30d) || '—';
+      setText('t-session-num', sessionNum);
+      setText('t-session-cap', (t && t.workouts_alltime) ? 'logged sessions' : 'sessions in 30d');
+      var sw = statusWordFor(t);
+      var statusEl = document.getElementById('t-status');
+      statusEl.textContent = "▸ TODAY'S DESPATCH · STATE: " + sw.word;
+      statusEl.className = 'fp-lede__status ' + sw.cls;
+      var narr = buildNarrative(t, pulse);
+      document.getElementById('t-narrative').textContent = '"' + timePrefix() + narr + '"';
+      renderDelta(t);
+    }
+
+    function renderDelta(t) {
+      var el = document.getElementById('t-delta');
+      var items = [];
+      if (t && t.z2_weekly_avg_min != null) {
+        items.push({ text: 'Zone 2 ' + t.z2_weekly_avg_min + ' min', cls: t.z2_weekly_avg_min >= 150 ? 'fp-delta--good' : t.z2_weekly_avg_min >= 90 ? 'fp-delta--flat' : 'fp-delta--bad' });
       }
-    }
-
-    /* ── Collapse advanced metrics if all three lack data ── */
-    var banisterHasData = (ctl != null || atl != null || tsb != null);
-    var acwrHasData = (acwr != null);
-    var hrHasData = (hrRecovery.length >= 1);
-    if (!banisterHasData && !acwrHasData && !hrHasData) {
-      var bSec = document.getElementById('t-banister-section');
-      var aSec = document.getElementById('t-acwr-section');
-      var hSec = document.getElementById('t-hr-section');
-      var cSec = document.getElementById('t-advanced-collapsed');
-      if (bSec) bSec.style.display = 'none';
-      if (aSec) aSec.style.display = 'none';
-      if (hSec) hSec.style.display = 'none';
-      if (cSec) cSec.style.display = '';
-    }
-
-    /* ── 11h: Time-of-day distribution ── */
-    var todData = t.time_of_day || [];
-    if (todData.length > 0) {
-      drawTOD(todData);
-    } else {
-      // Generate placeholder hours 5am-10pm
-      var placeholder = [];
-      for (var h = 5; h <= 22; h++) {
-        placeholder.push({ hour: h, count: 0 });
+      if (t && t.strength_sessions_30d != null) {
+        items.push({ text: 'Strength ' + t.strength_sessions_30d + ' sess', cls: t.strength_sessions_30d >= 12 ? 'fp-delta--good' : 'fp-delta--flat' });
       }
-      drawTOD(placeholder);
+      if (t && t.avg_strain != null) {
+        items.push({ text: 'Strain ' + t.avg_strain.toFixed(1), cls: t.avg_strain >= 14 ? 'fp-delta--good' : 'fp-delta--flat' });
+      }
+      if (t && t.avg_daily_steps != null) {
+        var steps = t.avg_daily_steps >= 1000 ? (t.avg_daily_steps / 1000).toFixed(1) + 'k' : t.avg_daily_steps;
+        items.push({ text: 'Steps ' + steps + '/d', cls: t.avg_daily_steps >= 7500 ? 'fp-delta--good' : 'fp-delta--bad' });
+      }
+      if (!items.length) { el.style.display = 'none'; return; }
+      el.style.display = '';
+      el.innerHTML = '<span class="fp-lede__delta-label">This week:</span>' +
+        items.map(function(d) { return '<span class="' + d.cls + '">' + d.text + '</span>'; }).join('');
     }
 
-    /* ── Weekly chart ── */
-    if (trend.length < 1) {
-      var trendCanvas = document.getElementById('t-trend-canvas');
-      if (trendCanvas) {
-        trendCanvas.style.display = 'none';
-        trendCanvas.insertAdjacentHTML('afterend', '<div style="text-align:center;color:var(--text-faint);font-size:var(--text-sm);padding:var(--space-8) 0;font-family:var(--font-mono);letter-spacing:0.04em">Requires 3+ weeks of data. Chart populates as training weeks accumulate.</div>');
+    /* ─── Watch banner ───────────────────────────────────── */
+    function renderWatch(t) {
+      var w = document.getElementById('t-watch');
+      var msg = null;
+      var attention = false;
+      if (t && t.acwr != null && t.acwr >= 1.5) {
+        msg = 'ACWR ' + t.acwr.toFixed(2) + ' — acute load significantly above 4-week base. Injury risk elevated; consider scaling back this week.';
+        attention = true;
+      } else if (t && t.acwr != null && t.acwr >= 1.2) {
+        msg = 'ACWR ' + t.acwr.toFixed(2) + ' — training spike detected. One more big week pushes into the red zone.';
+      } else if (t && t.z2_weekly_avg_min != null && t.z2_weekly_avg_min < 60) {
+        msg = 'Zone 2 averaging ' + t.z2_weekly_avg_min + ' min/week — well below the 150-min longevity threshold.';
       }
+      if (!msg) { w.style.display = 'none'; return; }
+      w.classList.toggle('fp-watch--attention', attention);
+      document.getElementById('t-watch-label').textContent = attention ? 'Attention' : 'Watch';
+      document.getElementById('t-watch-text').textContent = msg;
+      w.style.display = '';
     }
-    if (trend.length >= 1) {
-      var canvas = document.getElementById('t-trend-canvas');
-      var dpr = window.devicePixelRatio || 1;
-      canvas.width = canvas.offsetWidth * dpr;
-      canvas.height = canvas.offsetHeight * dpr;
-      var ctx = canvas.getContext('2d');
-      ctx.scale(dpr, dpr);
-      var W = canvas.offsetWidth, H = canvas.offsetHeight;
-      var pad = { t: 20, r: 16, b: 28, l: 44 };
-      var iW = W - pad.l - pad.r, iH = H - pad.t - pad.b;
-      var nn = trend.length, barW = Math.max(10, (iW / nn) - 6);
-      var maxMin = Math.max.apply(null, trend.map(function(w) { return w.minutes; }).concat([300]));
 
-      /* Grid lines */
-      ctx.strokeStyle = 'rgba(255,255,255,0.03)';
-      ctx.lineWidth = 1;
-      for (var r = 0; r <= 4; r++) {
-        var y = pad.t + (r / 4) * iH;
-        ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+    /* ─── 5. Long-arc — total 1RM progression ────────────── */
+    function renderArc(t) {
+      var liftHistory = (t && t.lift_history) || {};
+      var benchmarks = (t && t.centenarian_benchmarks) || {};
+
+      // Compute total 1RM history by summing the four mains across aligned dates.
+      var mainKeys = ['deadlift','squat','bench_press','overhead_press'];
+      var perLift = mainKeys.map(function(k) { return liftHistory[k] || []; });
+      var hasAny = perLift.some(function(arr) { return arr && arr.length; });
+
+      var section = document.getElementById('t-arc-section');
+      if (!hasAny) {
+        // Fall back to a status line; keep section visible with placeholder copy.
+        setText('t-arc-num', 'Awaiting first 1RM');
+        setText('t-arc-current', '—');
+        setText('t-arc-start', '—');
+        setText('t-arc-target', '900');
+        setText('t-arc-gained', '—');
+        setText('t-arc-togo', '—');
+        var z2 = t && t.z2_weekly_avg_min;
+        setText('t-arc-z2', z2 != null ? z2 + ' min' : '—');
+        document.getElementById('t-arc-chart').innerHTML =
+          '<div style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);padding:24px 0;letter-spacing:0.1em">Lift history populates as Hevy sessions are logged.</div>';
+        return;
       }
 
-      /* CYCLE PAUSE: overlay band BEFORE bars so it sits behind */
-      if (window.CyclePause) {
-        // Convert ISO week ("2026-W17") to Monday date for band x-axis mapping
-        var trendWithDates = trend.map(function(w) {
-          var p = (w.week || '').split('-W');
-          if (p.length !== 2) return w;
-          var y = parseInt(p[0], 10), wk = parseInt(p[1], 10);
-          var jan4 = new Date(Date.UTC(y, 0, 4));
-          var dow = jan4.getUTCDay() || 7;
-          var monday = new Date(jan4);
-          monday.setUTCDate(jan4.getUTCDate() - dow + 1 + (wk - 1) * 7);
-          var mm = String(monday.getUTCMonth() + 1).padStart(2, '0');
-          var dd = String(monday.getUTCDate()).padStart(2, '0');
-          return Object.assign({}, w, { date: monday.getUTCFullYear() + '-' + mm + '-' + dd });
+      // Build a unified date axis from the union of per-lift dates.
+      var dateSet = {};
+      perLift.forEach(function(arr) { arr.forEach(function(p) { if (p.date) dateSet[p.date] = true; }); });
+      var dates = Object.keys(dateSet).sort();
+
+      // For each date, sum the most recent 1RM value at-or-before that date for each lift.
+      function valAt(arr, date) {
+        var v = 0;
+        for (var i = 0; i < arr.length; i++) {
+          if (!arr[i].date || arr[i].date <= date) v = arr[i].value || v;
+        }
+        return v;
+      }
+      var totals = dates.map(function(d) {
+        var sum = 0;
+        perLift.forEach(function(arr) { sum += valAt(arr, d); });
+        return sum;
+      }).filter(function(v) { return v > 0; });
+
+      if (totals.length < 1) totals = [0];
+
+      var startTotal = totals[0];
+      var currentTotal = totals[totals.length - 1];
+      var targetTotal = mainKeys.reduce(function(s, k) {
+        var b = benchmarks[k] || {};
+        var lift = LIFTS.find(function(L) { return L.key === k; });
+        return s + (b.target || (lift && lift.defaultTarget) || 0);
+      }, 0);
+
+      setText('t-arc-start', startTotal);
+      setText('t-arc-current', currentTotal);
+      setText('t-arc-target', targetTotal);
+      setText('t-arc-gained', (currentTotal - startTotal >= 0 ? '+' : '') + (currentTotal - startTotal) + ' lb');
+      setText('t-arc-togo', Math.max(0, targetTotal - currentTotal) + ' lb');
+      var z2 = t && t.z2_weekly_avg_min;
+      setText('t-arc-z2', z2 != null ? z2 + ' min' : '—');
+
+      // Chart: use totals as series (already chronological).
+      if (totals.length >= 2) {
+        var w = 1100, h = 80, pad = 4;
+        var max = Math.max.apply(null, totals);
+        var min = Math.min.apply(null, totals);
+        var range = max - min || 1;
+        var pts = totals.map(function(v, i) {
+          var x = pad + (i / (totals.length - 1)) * (w - 2 * pad);
+          var y = pad + (1 - (v - min) / range) * (h - 2 * pad);
+          return x.toFixed(1) + ',' + y.toFixed(1);
         });
-        CyclePause.renderCanvasBand(ctx, { trendData: trendWithDates, padding: pad, canvasW: W, canvasH: H });
+        var area = pts.join(' ') + ' ' + (w - pad) + ',' + (h - pad) + ' ' + pad + ',' + (h - pad);
+        document.getElementById('t-arc-chart').innerHTML =
+          '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
+            '<polygon class="fp-arc__chart-area" points="' + area + '"/>' +
+            '<polyline class="fp-arc__chart-line" points="' + pts.join(' ') + '"/>' +
+          '</svg>';
+      } else {
+        document.getElementById('t-arc-chart').innerHTML =
+          '<div style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);padding:24px 0;letter-spacing:0.1em">Need 2+ logged sessions to chart progression.</div>';
+      }
+      setText('t-arc-caption', '');
+      document.getElementById('t-arc-caption').innerHTML =
+        '<span>Earliest · ' + startTotal + ' lb</span>' +
+        '<span>Today · ' + currentTotal + ' lb</span>';
+    }
+
+    /* ─── EXTRA: Centenarian benchmark cards ─────────────── */
+    function renderBenchmarks(t) {
+      var benchmarks = (t && t.centenarian_benchmarks) || {};
+      var hasAny = false;
+      LIFTS.slice(0, 4).forEach(function(lift) {
+        var b = benchmarks[lift.key] || {};
+        var current = b.current_1rm || 0;
+        if (current > 0) hasAny = true;
+        var target = b.target || lift.defaultTarget;
+        var pct = target > 0 ? Math.round((current / target) * 100) : 0;
+        setText('t-bench-' + lift.prefix + '-current', current > 0 ? current + ' lb' : '—');
+        setText('t-bench-' + lift.prefix + '-target', target);
+        setWidth('t-bench-' + lift.prefix + '-bar', Math.min(100, pct));
+        setText('t-bench-' + lift.prefix + '-pct', pct > 0 ? pct + '% of target' : '—');
+      });
+      if (!hasAny) {
+        // Fall back to /api/strength_benchmarks (Hevy live).
+        fetch(API_BASE + '/api/strength_benchmarks').then(function(r) { return r.ok ? r.json() : null; }).then(function(d) {
+          if (!d || !d.benchmarks) return;
+          var liftMap = { 'Deadlift': 'dl', 'Squat': 'sq', 'Bench Press': 'bp', 'Overhead Press': 'ohp' };
+          d.benchmarks.forEach(function(b) {
+            var prefix = liftMap[b.lift];
+            if (!prefix) return;
+            setText('t-bench-' + prefix + '-current', b.current_1rm > 0 ? b.current_1rm + ' lb' : '—');
+            setText('t-bench-' + prefix + '-target', b.target);
+            setWidth('t-bench-' + prefix + '-bar', Math.min(100, b.progress_pct));
+            setText('t-bench-' + prefix + '-pct', b.progress_pct > 0 ? b.progress_pct + '% of target' : '—');
+          });
+        }).catch(function() {});
+      }
+    }
+
+    /* ─── EXTRA: This week's movement ────────────────────── */
+    function renderWeek() {
+      fetch(API_BASE + '/api/weekly_physical_summary').then(function(r) { return r.ok ? r.json() : null; }).then(function(wd) {
+        if (!wd || !wd.days || !wd.days.length) return;
+        var todayIso = new Date().toISOString().slice(0, 10);
+        var grid = document.getElementById('t-week-days');
+        grid.innerHTML = wd.days.map(function(d) {
+          var actList = (d.activities || []).slice(0, 3).map(function(a) {
+            return a.type + ' ' + a.minutes + 'm';
+          }).join('<br>');
+          var isToday = d.date === todayIso;
+          return '<div class="t-week-day' + (isToday ? ' t-week-day--today' : '') + '">' +
+            '<div class="t-week-day__dow">' + (d.day_of_week || '').slice(0, 3) + '</div>' +
+            '<div class="t-week-day__total">' + (d.total_active_minutes || 0) + '<small>m</small></div>' +
+            '<div class="t-week-day__acts">' + (actList || '—') + '</div>' +
+            (d.steps ? '<div class="t-week-day__steps">' + (d.steps >= 1000 ? (d.steps / 1000).toFixed(1) + 'k' : d.steps) + '</div>' : '') +
+          '</div>';
+        }).join('');
+        document.getElementById('t-week-section').style.display = '';
+      }).catch(function() {});
+    }
+
+    /* ─── EXTRA: Modality breakdown ──────────────────────── */
+    function renderModalities(data) {
+      var modalities = (data && data.modality_breakdown) || [];
+      if (!modalities.length) return;
+      var grid = document.getElementById('t-mod-grid');
+      var totalActs = modalities.reduce(function(s, m) { return s + (m.count_30d || 0); }, 0);
+      grid.innerHTML = modalities.map(function(m) {
+        var pct = totalActs > 0 ? Math.round((m.count_30d / totalActs) * 100) : 0;
+        var trendNum = m.trend_vs_prior_30d;
+        var trendStr = trendNum > 0 ? '+' + trendNum + ' vs prior' : trendNum < 0 ? trendNum + ' vs prior' : 'flat vs prior';
+        return '<div class="t-mod-card">' +
+          '<div class="t-mod-card__name">' + m.type + '</div>' +
+          '<div class="t-mod-card__trend">' + trendStr + ' · ' + pct + '% of mix</div>' +
+          '<div class="t-mod-card__stats">' +
+            '<div class="t-mod-stat"><div class="t-mod-stat__val">' + (m.count_30d || 0) + '</div><div class="t-mod-stat__label">Sessions</div></div>' +
+            '<div class="t-mod-stat"><div class="t-mod-stat__val">' + (m.total_minutes_30d || 0) + '</div><div class="t-mod-stat__label">Total min</div></div>' +
+            '<div class="t-mod-stat"><div class="t-mod-stat__val">' + (m.avg_duration_min || 0) + '</div><div class="t-mod-stat__label">Avg min</div></div>' +
+            (m.avg_hr ? '<div class="t-mod-stat"><div class="t-mod-stat__val">' + m.avg_hr + '</div><div class="t-mod-stat__label">Avg HR</div></div>' : '') +
+            (m.total_distance_mi > 0 ? '<div class="t-mod-stat"><div class="t-mod-stat__val">' + m.total_distance_mi + '</div><div class="t-mod-stat__label">Miles</div></div>' : '') +
+          '</div>' +
+        '</div>';
+      }).join('');
+      document.getElementById('t-mod-section').style.display = '';
+    }
+
+    /* ─── EXTRA: Training load (ACWR + Banister) ─────────── */
+    function renderLoad(t) {
+      var acwr = t && t.acwr;
+      var ctl = t && t.ctl_fitness;
+      var atl = t && t.atl_fatigue;
+      var tsb = t && t.tsb_form;
+
+      if (acwr == null && ctl == null && atl == null && tsb == null) return;
+
+      // ACWR
+      var light = document.getElementById('t-acwr-light');
+      var title = document.getElementById('t-acwr-title');
+      var explain = document.getElementById('t-acwr-explain');
+      if (acwr != null) {
+        light.textContent = acwr.toFixed(2);
+        if (acwr < 1.2) {
+          light.className = 't-acwr__light t-acwr__light--green';
+          title.textContent = 'Sweet spot — safe training zone';
+          explain.textContent = 'Acute load is well-matched to chronic base. This is where adaptation happens without injury risk.';
+        } else if (acwr < 1.5) {
+          light.className = 't-acwr__light t-acwr__light--amber';
+          title.textContent = 'Caution — training spike detected';
+          explain.textContent = 'Ramped up faster than the 4-week base supports. One more big week pushes into the red zone.';
+        } else {
+          light.className = 't-acwr__light t-acwr__light--red';
+          title.textContent = 'Danger zone — injury risk elevated';
+          explain.textContent = 'Acute load significantly exceeds chronic base. Research shows injury probability climbs sharply above 1.5.';
+        }
+      } else {
+        title.textContent = 'Requires 4+ weeks of data';
+        explain.textContent = 'ACWR compares acute (1-week) load to chronic (4-week) average. More history needed to compute the ratio.';
       }
 
-      /* Bars */
-      trend.forEach(function(w, i) {
-        var x = pad.l + (i / nn) * iW + 3;
-        var hTotal = (w.minutes / maxMin) * iH;
-        var hZ2 = (w.z2_min / maxMin) * iH;
-        ctx.fillStyle = 'rgba(239,68,68,0.35)';
-        ctx.fillRect(x, pad.t + iH - hTotal, barW, hTotal);
-        ctx.fillStyle = 'rgba(62,207,142,0.65)';
-        ctx.fillRect(x, pad.t + iH - hZ2, barW, hZ2);
-      });
+      // Banister
+      if (ctl != null) {
+        setText('t-ctl-val', ctl.toFixed(1));
+        setText('t-ctl-plain',
+          ctl < 10 ? 'Fitness base is still building. Early days.' :
+          ctl < 30 ? 'Fitness base is building steadily.' :
+          ctl < 60 ? 'Solid fitness foundation in place.' :
+                     'Strong aerobic base established.');
+      } else { setText('t-ctl-plain', 'Requires 4+ weeks of training data.'); }
 
-      /* Y labels */
-      ctx.fillStyle = 'rgba(255,255,255,0.25)';
-      ctx.font = '10px monospace';
-      ctx.textAlign = 'right';
-      [0, Math.round(maxMin / 2), maxMin].forEach(function(v) {
-        var yy = pad.t + iH - (v / maxMin) * iH;
-        ctx.fillText(v + 'm', pad.l - 6, yy + 4);
+      if (atl != null) {
+        setText('t-atl-val', atl.toFixed(1));
+        setText('t-atl-plain',
+          atl < 10 ? 'Fatigue is low. Room to push harder.' :
+          atl < 30 ? 'Moderate fatigue. Training load is manageable.' :
+          atl < 50 ? 'Significant fatigue accumulating. Watch recovery.' :
+                     'High fatigue. Consider a deload week.');
+      } else { setText('t-atl-plain', 'Requires 4+ weeks of training data.'); }
+
+      if (tsb != null) {
+        setText('t-tsb-val', tsb.toFixed(1));
+        setText('t-tsb-plain',
+          tsb >  10 ? 'Fresh and ready to perform. Good time to test.' :
+          tsb >   0 ? 'Slightly positive form. Balanced load.' :
+          tsb > -10 ? 'Slightly fatigued but adapting. Normal training.' :
+                      'Accumulated fatigue. Performance may dip short-term.');
+      } else { setText('t-tsb-plain', 'Requires 4+ weeks of training data.'); }
+
+      document.getElementById('t-load-section').style.display = '';
+    }
+
+    /* ─── Share button ───────────────────────────────────── */
+    function setupShare(t) {
+      var btn = document.getElementById('t-share');
+      btn.addEventListener('click', function() {
+        var lines = ['Training — Session ' + ((t && (t.workouts_alltime || t.workouts_30d)) || '?')];
+        var sw = statusWordFor(t);
+        lines.push('State: ' + sw.word);
+        if (t && t.z2_weekly_avg_min != null) lines.push('Zone 2: ' + t.z2_weekly_avg_min + ' min/wk');
+        if (t && t.workouts_30d != null) lines.push('Sessions (30d): ' + t.workouts_30d);
+        if (t && t.acwr != null) lines.push('ACWR: ' + t.acwr.toFixed(2));
+        var benchmarks = (t && t.centenarian_benchmarks) || {};
+        LIFTS.slice(0, 4).forEach(function(lift) {
+          var b = benchmarks[lift.key] || {};
+          if (b.current_1rm) lines.push(lift.label + ': ' + b.current_1rm + ' lb');
+        });
+        lines.push('', 'averagejoematt.com/training/');
+        navigator.clipboard.writeText(lines.join('\n')).then(function() {
+          btn.classList.add('is-copied');
+          var sp = btn.querySelector('span'); if (sp) sp.textContent = 'Copied!';
+          setTimeout(function() {
+            btn.classList.remove('is-copied');
+            if (sp) sp.textContent = 'Copy session';
+          }, 2000);
+        });
       });
     }
 
-    // (content already shown above before chart rendering)
+    /* ─── Fetch + render ─────────────────────────────────── */
+    Promise.all([
+      fetch(API_BASE + '/api/training_overview').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; }),
+      fetch(API_BASE + '/api/pulse').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; })
+    ]).then(function(results) {
+      var data = results[0] || {};
+      var pulse = (results[1] && (results[1].pulse || results[1])) || null;
+      pulseCache = pulse;
+      var t = data.training || {};
 
-    /* ── Auto-populate milestones from benchmarks + activity firsts ── */
-    (function loadMilestones() {
-      var milestones = [];
+      renderMasthead(t, pulse);
+      renderLede(t, pulse);
+      renderWatch(t);
+      renderStandings(t);
+      renderArc(t);
+      renderBenchmarks(t);
+      renderModalities(data);
+      renderLoad(t);
+      renderWeek();
+      setupShare(t);
+    }).catch(function(err) {
+      console.error('[training] fetch failed:', err);
+      document.getElementById('t-narrative').textContent = "Could not load training data. Refresh to try again.";
+    });
+  })();
+  </script>
 
-      // Strength benchmark milestones (any lift at 100%+ of target)
-      fetch('/api/strength_benchmarks').then(function(r) { return r.ok ? r.json() : null; })
-        .then(function(d) {
-          if (d && d.benchmarks) {
-            d.benchmarks.forEach(function(b) {
-              if (b.progress_pct >= 100) {
-                milestones.push({
-                  date: b.achieved_date || 'Recent',
-                  title: b.lift + ' — target reached',
-                  detail: b.current_1rm + ' lb (target: ' + b.target + '). Centenarian benchmark crossed.'
-                });
-              }
-            });
-          }
-
-          // Activity distance milestones from training overview
-          if (data.modality_breakdown) {
-            data.modality_breakdown.forEach(function(m) {
-              if (m.total_distance_mi >= 5 && m.type === 'Run') {
-                milestones.push({ date: 'Recent', title: 'First 5K+ run logged', detail: m.total_distance_mi + ' total miles running in 30 days.' });
-              }
-              if (m.total_distance_mi >= 20 && m.type === 'Ride') {
-                milestones.push({ date: 'Recent', title: '20+ mile cycling milestone', detail: m.total_distance_mi + ' total miles cycling in 30 days.' });
-              }
-            });
-          }
-
-          // Zone 2 milestone
-          if (z2Avg >= 150) {
-            milestones.push({ date: 'Current', title: 'Zone 2 target: 150 min/week', detail: z2Avg + ' min/week average. WHO + Attia longevity threshold met.' });
-          }
-
-          // Render
-          var tl = document.getElementById('t-timeline');
-          if (milestones.length > 0) {
-            tl.innerHTML = milestones.map(function(m) {
-              return '<div class="t-milestone">' +
-                '<div class="t-milestone__date">' + m.date + '</div>' +
-                '<div class="t-milestone__title">' + m.title + '</div>' +
-                '<div class="t-milestone__detail">' + m.detail + '</div>' +
-              '</div>';
-            }).join('');
-          }
-          // else: keep the "Milestones appear here..." placeholder
-        }).catch(function() {});
-
-      // Auto-populate GPS routes from Strava activities with polylines
-      if (data.modality_breakdown) {
-        fetch('/api/training_overview').then(function(r) { return r.ok ? r.json() : null; }).then(function(td) {
-          if (!td) return;
-          var routes = (td.recent_routes || []).slice(0, 6);
-          if (!routes.length) return;
-          var grid = document.getElementById('t-routes-grid');
-          grid.innerHTML = routes.map(function(rt) {
-            var svg = rt.polyline_svg || '';
-            return '<div class="t-route-card">' +
-              '<div class="t-route-card__map">' + (svg || '<svg viewBox="0 0 100 60"></svg>') + '</div>' +
-              '<div class="t-route-card__label">' + (rt.name || rt.type) + '</div>' +
-              '<div class="t-route-card__stat">' + (rt.distance_mi || '?') + ' mi &middot; ' + (rt.duration_min || '?') + ' min</div>' +
-            '</div>';
-          }).join('');
-        }).catch(function() {});
-      }
-    })();
-
-    /* AI expert analysis now rendered by V3 coach at position 2 (renderCoachAnalysis above) */
-  } catch (e) {
-    loading.textContent = 'Could not load training data.';
-    console.error(e);
-  }
-})();
-</script>
+  <script src="/assets/js/animations.js" defer></script>
 </body>
 </html>

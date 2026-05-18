@@ -16,8 +16,8 @@
   <meta name="twitter:title" content="The Story — Matthew">
   <meta name="twitter:description" content="Multiple relapses. One question: why does it keep coming back? The story behind the measured life experiment.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
-  <title>The Story — Matthew</title>
-    <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <title>Story — averagejoematt.com</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
@@ -25,132 +25,53 @@
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
-    /* ── Story header ── */
-    .story-header {
-      min-height: 60vh;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
-      padding: var(--space-20) var(--page-padding) var(--space-16);
-      border-bottom: 1px solid var(--border);
-      position: relative;
-      overflow: hidden;
-    }
-    .story-header::before {
-      content: '';
-      position: absolute;
-      top: -100px; left: 50%;
-      transform: translateX(-50%);
-      width: 800px; height: 600px;
-      background: radial-gradient(ellipse, rgba(0,229,160,0.04) 0%, transparent 70%);
-      pointer-events: none;
-    }
-    .story-header__kicker {
-      font-size: var(--text-xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent-dim);
-      margin-bottom: var(--space-6);
-      animation: fadeUp 0.5s ease forwards 0.1s;
-      opacity: 0;
-    }
-    .story-header__title {
-      font-family: var(--font-display);
-      font-size: var(--text-h1);
-      line-height: var(--lh-display);
-      color: var(--text);
-      letter-spacing: var(--ls-display);
-      margin-bottom: var(--space-8);
+    /* /story/ — partial Front Page pattern. Page-scope additions only,
+       namespace .st- (story; .s- collides with sleep). */
+    .st-page { padding-top: var(--nav-height); }
+
+    .st-prose {
       max-width: 900px;
-      animation: fadeUp 0.5s ease forwards 0.2s;
-      opacity: 0;
-    }
-    .story-header__title span { color: var(--accent); }
-    .story-header__lede {
-      font-size: var(--text-xl);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-      max-width: var(--prose-width);
-      border-left: 2px solid var(--accent-dim);
-      padding-left: var(--space-5);
-      animation: fadeUp 0.5s ease forwards 0.3s;
-      opacity: 0;
-    }
-    .story-header__lede strong { color: var(--text); }
-
-    /* ── Milestone bar ── */
-    .milestones {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1px;
-      background: var(--border);
-      border: 1px solid var(--border);
-      border-top: none;
-    }
-    .milestone {
-      background: var(--surface);
-      padding: var(--space-6);
-    }
-    .milestone__date {
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent-dim);
-      margin-bottom: var(--space-2);
-    }
-    .milestone__value {
-      font-family: var(--font-display);
-      font-size: 32px;
-      color: var(--text);
-      line-height: 1;
-      letter-spacing: var(--ls-display);
-    }
-    .milestone__label {
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      margin-top: var(--space-2);
-    }
-
-    /* ── Prose sections (editorial feel — Tyrell) ── */
-    .story-body {
-      max-width: var(--prose-width);
       margin: 0 auto;
-      padding: var(--space-16) var(--page-padding);
+      padding: 40px 56px;
     }
-    .story-chapter {
-      margin-bottom: var(--space-16);
-    }
-    .story-chapter:last-child { margin-bottom: 0; }
-    .chapter-num {
+    .st-chapter { margin-bottom: var(--space-16); }
+    .st-chapter:last-child { margin-bottom: 0; }
+    .st-chapter__num {
+      font-family: var(--font-mono);
       font-size: var(--text-2xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
       color: var(--accent-dim);
-      margin-bottom: var(--space-4);
+      margin-bottom: var(--space-3);
     }
-    .chapter-title {
+    .st-chapter__title {
       font-family: var(--font-display);
       font-size: var(--text-h3);
       color: var(--text);
       letter-spacing: var(--ls-display);
       margin-bottom: var(--space-6);
     }
-    .chapter-body {
+    .st-chapter__body {
       font-family: var(--font-serif);
       font-size: 18px;
       color: var(--text-muted);
       line-height: 1.9;
     }
-    .chapter-body p { margin-bottom: var(--space-6); }
-    .chapter-body p:last-child { margin-bottom: 0; }
-    .chapter-body strong { color: var(--text); font-weight: 600; }
-    .chapter-body em { color: var(--text); font-style: italic; }
+    .st-chapter__body p { margin-bottom: var(--space-5); }
+    .st-chapter__body p:last-child { margin-bottom: 0; }
+    .st-chapter__body strong { color: var(--text); font-weight: 600; }
+    .st-chapter__body em { color: var(--text); font-style: italic; }
+    .st-chapter__body a {
+      color: var(--accent);
+      border-bottom: 1px solid var(--accent-dim);
+      transition: border-color var(--dur-fast);
+    }
+    .st-chapter__body a:hover { border-color: var(--accent); }
 
-    /* ── Pull quote ── */
-    .pull-quote {
+    .st-pullquote {
       border-left: 3px solid var(--accent);
-      padding: var(--space-6) var(--space-8);
-      margin: var(--space-10) 0;
+      padding: var(--space-5) var(--space-7);
+      margin: var(--space-8) 0;
       font-family: var(--font-serif);
       font-size: 22px;
       font-style: italic;
@@ -158,273 +79,35 @@
       line-height: 1.5;
     }
 
-    /* ── Data moment ── */
-    .data-moment {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: var(--space-6) var(--space-8);
-      margin: var(--space-8) 0;
-      font-family: var(--font-mono);
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-    }
-    .data-moment__label {
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent-dim);
-      margin-bottom: var(--space-3);
-    }
-    .data-moment .highlight { color: var(--accent); font-weight: 700; }
-
-    /* ── Throughline callout ── */
-    .throughline {
-      margin: var(--space-10) 0;
-      padding: var(--space-5) var(--space-6);
-      border: 1px solid var(--border);
-      background: var(--surface);
-      display: flex;
-      align-items: center;
-      gap: var(--space-4);
-    }
-    .throughline__text {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      flex: 1;
-    }
-    .throughline__link {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--accent);
-      text-decoration: none;
-      white-space: nowrap;
-      letter-spacing: var(--ls-tag);
-    }
-    .throughline__link:hover { text-decoration: underline; }
-
-    /* ── Chapter divider ── */
-    .chapter-divider {
+    .st-divider {
       border: none;
       border-top: 1px solid var(--border-subtle);
-      margin: var(--space-16) 0;
+      margin: var(--space-12) 0;
     }
 
-    /* ── Next / prev ── */
-    .story-nav {
-      padding: var(--space-12) var(--page-padding);
-      border-top: 1px solid var(--border);
-      display: flex;
-      justify-content: center;
-      gap: var(--space-4);
-    }
-
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(16px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    /* ── Journey Timeline (STORY-3) ── */
-    .jtl-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-16) var(--page-padding) var(--space-4);
-    }
-    .jtl-heading {
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent-dim);
-      font-family: var(--font-mono);
-      margin-bottom: var(--space-8);
-    }
-    .jtl-list {
-      position: relative;
-      padding-left: 28px;
-    }
-    .jtl-list::before {
-      content: '';
-      position: absolute;
-      left: 7px;
-      top: 8px;
-      bottom: 8px;
-      width: 2px;
-      background: var(--border);
-    }
-    .jtl-node {
-      position: relative;
-      margin-bottom: var(--space-6);
-    }
-    .jtl-node::before {
-      content: '';
-      position: absolute;
-      left: -24px;
-      top: 6px;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
+    .st-throughline {
+      margin: var(--space-8) 0;
+      padding: var(--space-4) var(--space-5);
+      border: 1px solid var(--border);
       background: var(--surface);
-      border: 2px solid var(--border-strong);
-      z-index: 1;
-    }
-    .jtl-node--milestone::before { border-color: var(--accent); background: var(--accent); }
-    .jtl-node--weight::before    { border-color: var(--c-amber-400); background: var(--c-amber-050); }
-    .jtl-node--level_up::before  { border-color: #5ba4cf; background: rgba(91,164,207,0.15); }
-    .jtl-node--experiment::before{ border-color: var(--accent-dim); background: var(--accent-bg-subtle); }
-    .jtl-node--discovery::before { border-color: #a78bfa; background: rgba(167,139,250,0.1); }
-    .jtl-date {
-      font-size: var(--text-2xs);
-      font-family: var(--font-mono);
-      color: var(--text-faint);
-      letter-spacing: var(--ls-label);
-      margin-bottom: 2px;
-    }
-    .jtl-title {
-      font-size: var(--text-sm);
-      color: var(--text);
-      font-weight: 500;
-      margin-bottom: 2px;
-      line-height: 1.35;
-    }
-    .jtl-body {
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-    }
-    .jtl-link {
-      font-size: var(--text-2xs);
-      color: var(--accent-dim);
-      font-family: var(--font-mono);
-      text-decoration: none;
-      letter-spacing: var(--ls-label);
-    }
-    .jtl-link:hover { color: var(--accent); }
-    .jtl-skeleton { opacity: 0.4; animation: pulse 1.5s ease-in-out infinite; }
-    .jtl-skel-line { height: 10px; background: var(--surface-raised); margin-bottom: var(--space-3); border-radius: 2px; }
-
-    /* STORY-4: Emotional waveform */
-    .waveform-section {
-      padding: var(--space-16) var(--page-padding);
-      border-top: 1px solid var(--border);
-    }
-    .waveform-label {
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: var(--space-3);
-    }
-    .waveform-heading {
-      font-family: var(--font-display);
-      font-size: var(--text-h3);
-      color: var(--text);
-      margin-bottom: var(--space-2);
-    }
-    .waveform-sub {
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      margin-bottom: var(--space-8);
-    }
-    .waveform-chart {
-      display: flex;
-      align-items: flex-end;
-      gap: 3px;
-      height: 80px;
-      padding-bottom: var(--space-2);
-    }
-    .waveform-bar {
-      flex: 1;
-      min-width: 4px;
-      border-radius: 2px 2px 0 0;
-      transition: opacity 0.15s;
-      cursor: default;
-    }
-    .waveform-bar:hover { opacity: 0.7; }
-    .waveform-bar--green  { background: var(--c-green-status, #22c55e); }
-    .waveform-bar--amber  { background: var(--c-amber-400, #f59e0b); }
-    .waveform-bar--red    { background: var(--c-red-status, #ef4444); }
-    .waveform-bar--gray   { background: var(--surface-raised, #2a2a2a); height: 4px !important; }
-    .waveform-legend {
-      display: flex;
-      gap: var(--space-6);
-      margin-top: var(--space-4);
-      flex-wrap: wrap;
-    }
-    .waveform-legend__item {
       display: flex;
       align-items: center;
-      gap: var(--space-2);
-      font-size: var(--text-2xs);
-      color: var(--text-muted);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-    }
-    .waveform-legend__dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-    }
-
-    /* STORY-5: Tech / Life intersection cards */
-    .intersection-section {
-      padding: var(--space-16) var(--page-padding);
-      border-top: 1px solid var(--border);
-    }
-    .intersection-label {
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: var(--space-3);
-    }
-    .intersection-heading {
-      font-family: var(--font-display);
-      font-size: var(--text-h3);
-      color: var(--text);
-      margin-bottom: var(--space-8);
-    }
-    .intersection-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-6);
-    }
-    .intersection-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: var(--space-6);
-    }
-    .intersection-card__tech {
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: var(--space-3);
-    }
-    .intersection-card__arrow {
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      margin: var(--space-3) 0;
-    }
-    .intersection-card__life {
-      font-family: var(--font-display);
-      font-size: var(--text-base);
-      color: var(--text);
-      margin-bottom: var(--space-3);
-    }
-    .intersection-card__body {
+      gap: var(--space-4);
+      font-family: var(--font-mono);
       font-size: var(--text-xs);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
     }
+    .st-throughline__text { color: var(--text-muted); flex: 1; }
+    .st-throughline__link {
+      color: var(--accent);
+      text-decoration: none;
+      letter-spacing: var(--ls-tag);
+      white-space: nowrap;
+    }
+    .st-throughline__link:hover { text-decoration: underline; }
 
-    @media (max-width: 900px) {
-      .milestones { grid-template-columns: repeat(2, 1fr); }
-      .story-body { padding: var(--space-12) var(--page-padding); }
-      .intersection-grid { grid-template-columns: 1fr; }
-    }
-    @media (max-width: 600px) {
-      .milestones { grid-template-columns: 1fr 1fr; }
+    @media (max-width: 720px) {
+      .st-prose { padding: 28px 20px; }
+      .st-chapter__body { font-size: 16px; line-height: 1.75; }
     }
   </style>
 </head>
@@ -433,580 +116,267 @@
 <div id="amj-nav"></div>
 <div id="amj-hierarchy-nav"></div>
 
+<div class="fp-page st-page">
 
-
-
-
-
-
-<!-- Header -->
-<header class="story-header">
-  <p class="story-header__kicker">The Story <span style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-left:var(--space-4);">&middot; ~10 min read</span></p>
-  <h1 class="story-header__title"><span data-const="journey.start_weight">307</span> pounds.<br>One <span>decision</span>.</h1>
-  <p class="story-header__lede">
-    Most people optimize in the dark &mdash; gut feelings, Instagram advice, someone's podcast take.
-    I decided to build the infrastructure to <strong>know</strong>.
-    This is what that actually looks like.
-  </p>
-</header>
-
-<!-- Share mechanic (25d) -->
-<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-3) var(--page-padding);display:flex;gap:var(--space-4);align-items:center;">
-  <button onclick="navigator.clipboard.writeText(window.location.href);this.textContent='Link copied!';setTimeout(()=>this.textContent='Share this story',2000)" style="background:none;border:1px solid var(--border);color:var(--text-muted);font-family:var(--font-mono);font-size:var(--text-2xs);padding:var(--space-1) var(--space-3);cursor:pointer;letter-spacing:var(--ls-tag);">Share this story</button>
-  <a href="https://twitter.com/intent/tweet?url=https://averagejoematt.com/story/&text=307%20pounds.%20One%20decision.%2026%20data%20sources.%20Everything%20public." target="_blank" rel="noopener" style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);text-decoration:none;letter-spacing:var(--ls-tag);">Share on X</a>
-</div>
-
-<!-- Milestone bar (live data) -->
-<div class="milestones">
-  <div class="milestone">
-    <div class="milestone__date">April 2026</div>
-    <div class="milestone__value" data-const="journey.start_weight">307</div>
-    <div class="milestone__label">Starting weight (lbs)</div>
-  </div>
-  <div class="milestone">
-    <div class="milestone__date">Today</div>
-    <div class="milestone__value" id="story-weight">&mdash;</div>
-    <div class="milestone__label">Current weight (lbs)</div>
-  </div>
-  <div class="milestone">
-    <div class="milestone__date">The goal</div>
-    <div class="milestone__value" data-const="journey.goal_weight">185</div>
-    <div class="milestone__label">Target weight (lbs)</div>
-  </div>
-  <div class="milestone">
-    <div class="milestone__date">The experiment</div>
-    <div class="milestone__value" id="story-day-x">&mdash;</div>
-    <div class="milestone__label">Days in &mdash; and counting</div>
-  </div>
-</div>
-
-<!-- Story body -->
-<div class="story-body">
-
-  <!-- Chapter 1 -->
-  <div class="story-chapter">
-    <p class="chapter-num">Chapter 01</p>
-    <h2 class="chapter-title">The Moment</h2>
-    <div class="chapter-body">
-      <p>
-        I've lost 100 pounds before. Multiple times. I know how to do it. I know the meal prep, the progressive overload, the morning walks that turn into rucks that turn into mountain trails. I know what it feels like when people start noticing. When old clothes fit again. When strangers at the gym nod at you like you belong there.
-      </p>
-      <p>
-        In May 2025, I was there. I'd spent nine months being ruthless &mdash; daily 5am gym sessions, clean eating for months on end, rucking Washington mountains with 25 pounds on my back, running 10-mile Saturday sessions and then lifting afterwards. I was stretching every day, doing everything right. I was down to 190 and felt like a different person. An old man at the gym came up to me and told me how determined I was. My girlfriend's dad said he couldn't recognize me. I bought myself a Rolex &mdash; not because I'm flashy, but because I'd never let myself have something like that, and I wanted a permanent reminder that I'd done it. I threw out every piece of large clothing I owned.
-      </p>
-      <p>
-        And then life happened. Within a few months, I lost a family member to cancer &mdash; the second time cancer had taken someone close to me. Work became uncertain in ways that affected not just me but people I was responsible for. The travel, the grief, the stress &mdash; each one alone might have been manageable. Together, they dismantled everything.
-      </p>
-      <p>
-        The slide didn't happen all at once. It never does. I was back home with my family after the loss, away from my routine, away from the gym that had anchored everything. The structure that held it all together was thousands of miles away. Coming back, I told myself I'd pick it up again. One DoorDash order &mdash; a gentleman's agreement with myself that it would be the last. Or I'd start Monday. Then the next Monday. Then the Mondays stopped meaning anything, and by the time I noticed, it wasn't five months that had gone by &mdash; it was a hundred pounds.
-      </p>
-      <p>
-        By March 2026, I stepped on the scale and saw 307.
-      </p>
-      <p>
-        The disappointment wasn't new. But this time there was something else underneath it &mdash; something heavier. I'd made promises to myself about this for years. Dozens of them. Too many to count, too many to trust. But the last one had been different &mdash; or I'd convinced myself it was. I'd bought the Rolex not as a reward but as a covenant: this time I meant it more than I'd ever meant anything I'd said to myself. And I still broke it.
-      </p>
-      <p>
-        If the most sincere, most deliberate promise I'd ever made to myself couldn't hold &mdash; how could I ever trust my own word again?
-      </p>
-      <p>
-        That's the real question this platform is trying to answer. Not &ldquo;how do I lose weight again?&rdquo; I know how. The question is: <strong>why does it keep coming back &mdash; and can a system catch what willpower can't?</strong>
-      </p>
+  <!-- ═══ MASTHEAD ═══ -->
+  <header class="fp-masthead">
+    <div class="fp-masthead__top">
+      <div>
+        <div class="fp-masthead__brow">The Story · Vol I · Dispatch №01</div>
+        <div class="fp-masthead__title">STORY</div>
+      </div>
+      <div class="fp-masthead__meta">
+        <div id="st-date">—</div>
+        <div>~10 min read · Five chapters</div>
+      </div>
     </div>
-  </div>
+    <div class="fp-masthead__strip">
+      <div>
+        <a href="/about/" style="color:inherit;text-decoration:none">← About</a>
+        <span class="fp-masthead__strip-sep">·</span>
+        Where this began
+        <span class="fp-masthead__strip-sep">·</span>
+        <a href="/character/" style="color:var(--accent-dim);text-decoration:none">Character →</a>
+      </div>
+      <div>Filed March 2026</div>
+    </div>
+  </header>
 
-  <hr class="chapter-divider">
+  <!-- ═══ LEDE ═══ -->
+  <section class="fp-lede">
+    <div>
+      <div class="fp-lede__num-brow">Year</div>
+      <div class="fp-lede__num">2026</div>
+      <div class="fp-lede__num-cap">the experiment begins</div>
+    </div>
+    <div>
+      <div class="fp-lede__status fp-lede__status--strong">▸ The Origin · State: Ongoing</div>
+      <div class="fp-lede__narrative">
+        "Most people optimize in the dark — gut feelings, Instagram advice, someone's podcast take. I decided to build the infrastructure to know. This is what that actually looks like."
+      </div>
+      <div class="fp-lede__delta">
+        <span class="fp-lede__delta-label">The arc:</span>
+        <span class="fp-delta--bad">Start: <span data-const="journey.start_weight">307</span> lbs</span>
+        <span class="fp-delta--flat">Today: <span id="st-current-weight">—</span> lbs</span>
+        <span class="fp-delta--good">Goal: <span data-const="journey.goal_weight">185</span> lbs</span>
+        <span class="fp-delta--flat">Day <span id="st-day-x">—</span></span>
+      </div>
+    </div>
+  </section>
 
-  <!-- STORY-4: Emotional waveform (moved here for visual impact) -->
-  <div class="waveform-section reveal" style="margin-bottom:var(--space-16)">
-    <div class="waveform-label">The pulse of the journey</div>
-    <div class="waveform-heading">The Pattern</div>
-    <p class="waveform-sub">Each bar is one day. Height = combined pillar score across sleep, movement, nutrition, metabolic health, mind, consistency, and relationships.</p>
-    <div class="waveform-chart" id="waveform-chart">
-      <div id="waveform-empty" style="width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--space-3);">
-        <div style="display:flex;align-items:flex-end;gap:3px;height:80px;opacity:0.12;">
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:35%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:55%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:40%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:70%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:45%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:60%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:30%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:80%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:50%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:65%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:45%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:75%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:35%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:55%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:90%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:60%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:40%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:70%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:50%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:85%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:45%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:60%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:30%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:75%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:55%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:40%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:65%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:50%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:80%"></div>
-      <div style="flex:1;background:var(--surface-raised);border-radius:2px 2px 0 0;height:35%"></div>
+  <!-- ═══ PROSE BODY (chapters preserved from prior content) ═══ -->
+  <section class="st-prose">
+
+    <!-- Chapter 1 -->
+    <div class="st-chapter">
+      <p class="st-chapter__num">Chapter 01</p>
+      <h2 class="st-chapter__title">The Moment</h2>
+      <div class="st-chapter__body">
+        <p>
+          I've lost 100 pounds before. Multiple times. I know how to do it. I know the meal prep, the progressive overload, the morning walks that turn into rucks that turn into mountain trails. I know what it feels like when people start noticing. When old clothes fit again. When strangers at the gym nod at you like you belong there.
+        </p>
+        <p>
+          In May 2025, I was there. I'd spent nine months being ruthless — daily 5am gym sessions, clean eating for months on end, rucking Washington mountains with 25 pounds on my back, running 10-mile Saturday sessions and then lifting afterwards. I was stretching every day, doing everything right. I was down to 190 and felt like a different person. An old man at the gym came up to me and told me how determined I was. My girlfriend's dad said he couldn't recognize me. I bought myself a Rolex — not because I'm flashy, but because I'd never let myself have something like that, and I wanted a permanent reminder that I'd done it. I threw out every piece of large clothing I owned.
+        </p>
+        <p>
+          And then life happened. Within a few months, I lost a family member to cancer — the second time cancer had taken someone close to me. Work became uncertain in ways that affected not just me but people I was responsible for. The travel, the grief, the stress — each one alone might have been manageable. Together, they dismantled everything.
+        </p>
+        <p>
+          The slide didn't happen all at once. It never does. I was back home with my family after the loss, away from my routine, away from the gym that had anchored everything. The structure that held it all together was thousands of miles away. Coming back, I told myself I'd pick it up again. One DoorDash order — a gentleman's agreement with myself that it would be the last. Or I'd start Monday. Then the next Monday. Then the Mondays stopped meaning anything, and by the time I noticed, it wasn't five months that had gone by — it was a hundred pounds.
+        </p>
+        <p>
+          By March 2026, I stepped on the scale and saw 307.
+        </p>
+        <p>
+          The disappointment wasn't new. But this time there was something else underneath it — something heavier. I'd made promises to myself about this for years. Dozens of them. Too many to count, too many to trust. But the last one had been different — or I'd convinced myself it was. I'd bought the Rolex not as a reward but as a covenant: this time I meant it more than I'd ever meant anything I'd said to myself. And I still broke it.
+        </p>
+        <p>
+          If the most sincere, most deliberate promise I'd ever made to myself couldn't hold — how could I ever trust my own word again?
+        </p>
+        <p>
+          That's the real question this platform is trying to answer. Not "how do I lose weight again?" I know how. The question is: <strong>why does it keep coming back — and can a system catch what willpower can't?</strong>
+        </p>
+      </div>
+    </div>
+
+    <hr class="st-divider">
+
+    <!-- Chapter 2 -->
+    <div class="st-chapter">
+      <p class="st-chapter__num">Chapter 02</p>
+      <h2 class="st-chapter__title">The Problem With Previous Attempts</h2>
+      <div class="st-chapter__body">
+        <p>
+          The pattern goes back to my teens. I've cycled through this more times than I can count — months of relentless discipline followed by months of nothing. And within those good stretches, it wasn't just "eating well and going for walks." I was lifting 300+ pounds. Running 16 miles on a Saturday morning for fun. Playing sports at a competitive level. I thrive when I'm in that mode — physically, socially, mentally, everything clicks.
+        </p>
+        <p>
+          The trigger used to be the good times — beers, parties, the social gravity of being in your twenties. Now it's the opposite. The collapses come from isolation and eating alone at home. The mechanism changed, but the pattern didn't.
+        </p>
+        <p>
+          The worst chapter came when a promotion, a relocation to a city where I knew nobody, and my mum's stage 4 cancer diagnosis all landed at the same time. That was when the eating stopped being about hunger or convenience and became something else. A release. A way to feel something good in the middle of something terrible.
+        </p>
+
+        <div class="st-pullquote">
+          "Every previous attempt treated this as a weight problem. Calories in, calories out. But the weight was never the root issue. It was the coping mechanism."
         </div>
-        <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);color:var(--text-faint);text-transform:uppercase;">Signal emerging &mdash; data accumulates from April 1</div>
+
+        <p>
+          Here's the pattern, if I'm honest about it: I can do the work. That's never been the issue. When I'm locked in, I'm relentless — 5am gym sessions, two-hour workouts, eating clean every day, no alcohol, running mountains on weekends. And maybe the fitness isn't just fitness. Maybe it's purpose. Maybe it puts everything else — the stress, the noise in my head — on standby. Because I don't notice it when I'm moving.
+        </p>
+        <p>
+          But the moment something disrupts that, it's not just the routine that breaks — it's like a switch flips. The prefrontal cortex goes offline and the limbic system takes over. Suddenly it's DoorDash at midnight, evenings lost to video games instead of reading, later and later nights — anything that delivers instant relief from whatever I was outrunning. The gym doesn't disappear because I'm lazy. It disappears because the thing it was holding at bay comes flooding back, and the dopamine hits are the only thing that quiets it.
+        </p>
+        <p>
+          The cruelest part is the embarrassment. When you've been visibly in shape — when people have congratulated you, when you've bought the watch and thrown out the clothes — regaining everything doesn't just feel like failure. It feels like fraud. The gap between who you were and who you are now becomes deafening. You don't want anyone who remembers the other version to see this one.
+        </p>
       </div>
     </div>
-    <div class="waveform-legend">
-      <div class="waveform-legend__item"><div class="waveform-legend__dot" style="background:var(--c-green-status,#22c55e)"></div>Momentum</div>
-      <div class="waveform-legend__item"><div class="waveform-legend__dot" style="background:var(--c-amber-400,#f59e0b)"></div>Building</div>
-      <div class="waveform-legend__item"><div class="waveform-legend__dot" style="background:var(--c-red-status,#ef4444)"></div>Setback</div>
-      <div class="waveform-legend__item"><div class="waveform-legend__dot" style="background:var(--surface-raised,#2a2a2a)"></div>No data</div>
-    </div>
-  </div>
 
-  <hr class="chapter-divider">
+    <hr class="st-divider">
 
-  <!-- Chapter 2 -->
-  <div class="story-chapter">
-    <p class="chapter-num">Chapter 02</p>
-    <h2 class="chapter-title">The Problem With Previous Attempts</h2>
-    <div class="chapter-body">
-      <p>
-        The pattern goes back to my teens. I've cycled through this more times than I can count &mdash; months of relentless discipline followed by months of nothing. And within those good stretches, it wasn't just &ldquo;eating well and going for walks.&rdquo; I was lifting 300+ pounds. Running 16 miles on a Saturday morning for fun. Playing sports at a competitive level. I thrive when I'm in that mode &mdash; physically, socially, mentally, everything clicks.
-      </p>
-      <p>
-        The trigger used to be the good times &mdash; beers, parties, the social gravity of being in your twenties. Now it's the opposite. The collapses come from isolation and eating alone at home. The mechanism changed, but the pattern didn't.
-      </p>
-      <p>
-        The worst chapter came when a promotion, a relocation to a city where I knew nobody, and my mum's stage 4 cancer diagnosis all landed at the same time. That was when the eating stopped being about hunger or convenience and became something else. A release. A way to feel something good in the middle of something terrible.
-      </p>
-
-      <div class="pull-quote">
-        &ldquo;Every previous attempt treated this as a weight problem. Calories in, calories out. But the weight was never the root issue. It was the coping mechanism.&rdquo;
-      </div>
-
-      <p>
-        Here's the pattern, if I'm honest about it: I can do the work. That's never been the issue. When I'm locked in, I'm relentless &mdash; 5am gym sessions, two-hour workouts, eating clean every day, no alcohol, running mountains on weekends. And maybe the fitness isn't just fitness. Maybe it's purpose. Maybe it puts everything else &mdash; the stress, the noise in my head &mdash; on standby. Because I don't notice it when I'm moving.
-      </p>
-      <p>
-        But the moment something disrupts that, it's not just the routine that breaks &mdash; it's like a switch flips. The prefrontal cortex goes offline and the limbic system takes over. Suddenly it's DoorDash at midnight, evenings lost to video games instead of reading, later and later nights &mdash; anything that delivers instant relief from whatever I was outrunning. The gym doesn't disappear because I'm lazy. It disappears because the thing it was holding at bay comes flooding back, and the dopamine hits are the only thing that quiets it.
-      </p>
-      <p>
-        The cruelest part is the embarrassment. When you've been visibly in shape &mdash; when people have congratulated you, when you've bought the watch and thrown out the clothes &mdash; regaining everything doesn't just feel like failure. It feels like fraud. The gap between who you were and who you are now becomes deafening. You don't want anyone who remembers the other version to see this one.
-      </p>
-    </div>
-  </div>
-
-  <hr class="chapter-divider">
-
-  <!-- Chapter 3 -->
-  <div class="story-chapter">
-    <p class="chapter-num">Chapter 03</p>
-    <h2 class="chapter-title">The Build</h2>
-    <div class="chapter-body">
-      <p>
-        The first thing I built had nothing to do with a website.
-      </p>
-      <p>
-        I'd been using AI for a while &mdash; first as something like a thinking partner, working through things alongside real therapy. Then for optimization: sleep protocols, supplement stacks, training plans. I've always been a systems person, someone who likes to understand how things connect.
-      </p>
-      <p>
-        But I noticed the same limitation every time. My prompts were getting more ambitious, but the feedback was still based on general evidence. I'd try to tailor it to my circumstances, but I was filtering everything through memory &mdash; which meant I was rationalizing before the AI even had a chance to help.
-      </p>
-      <p>
-        That’s when the real insight landed. Every tracker I was already using had its own AI. Whoop analyzed my sleep. My CGM analyzed my glucose. MacroFactor analyzed my nutrition. But each one saw only its own slice &mdash; completely blind to what the other ten were picking up. And none of them touched the part that might matter most: the mental health layer. What I was writing in my journal. The emotional weight sitting underneath every other number. <strong>What if I could take those words &mdash; raw, what I actually felt &mdash; and cross-reference them with biometric data from ten different sources, then anchor all of it in scientific evidence? Not generic health advice. Something built specifically for me, from everything I am.</strong>
-      </p>
-      <p>
-        Once that door opened, my mind started spiraling. What about connecting my sleep data? My glucose? What if someone could read my journal entries and find patterns I couldn't see? What could we correlate between different domains? When I slip &mdash; and I always slip eventually &mdash; could the data tell me why?
-      </p>
-
-      <p>
-        Today it's <span id="story-lambda-count" data-const="platform.lambdas">62</span> Lambda functions, <span id="story-data-sources-stat" data-const="platform.data_sources">26</span> data sources, <span id="story-tools-count" data-const="platform.mcp_tools">121</span> intelligence tools &mdash; the whole thing runs on AWS for about <span data-const="platform.monthly_cost">$19</span> a month.
-      </p>
-
-      <p>
-        I've been in IT my entire career &mdash; applications, data, operations, startups. I understand how systems fit together, even if it's been a long time since I built something myself. Claude handled the code. I handled the architecture, the product decisions, and every single deploy.
-      </p>
-      <p>
-        What I bring is the thing no language model can simulate: I know what it's like to be me. I know which patterns matter and which are noise. I know that my relationship with food isn't about macros &mdash; it's about coping. The platform I'm building isn't something a prompt could decode, because the person it's designed for is too specific, too contradictory, and too stubborn to fit in a template.
-      </p>
-
-      <div class="throughline">
-        <span class="throughline__text">See exactly how the platform is built &mdash; architecture, data flow, cost breakdown.</span>
-        <a href="/platform/" class="throughline__link">The Platform &rarr;</a>
+    <!-- Chapter 3 -->
+    <div class="st-chapter">
+      <p class="st-chapter__num">Chapter 03</p>
+      <h2 class="st-chapter__title">The Build</h2>
+      <div class="st-chapter__body">
+        <p>The first thing I built had nothing to do with a website.</p>
+        <p>
+          I'd been using AI for a while — first as something like a thinking partner, working through things alongside real therapy. Then for optimization: sleep protocols, supplement stacks, training plans. I've always been a systems person, someone who likes to understand how things connect.
+        </p>
+        <p>
+          But I noticed the same limitation every time. My prompts were getting more ambitious, but the feedback was still based on general evidence. I'd try to tailor it to my circumstances, but I was filtering everything through memory — which meant I was rationalizing before the AI even had a chance to help.
+        </p>
+        <p>
+          That's when the real insight landed. Every tracker I was already using had its own AI. Whoop analyzed my sleep. My CGM analyzed my glucose. MacroFactor analyzed my nutrition. But each one saw only its own slice — completely blind to what the other ten were picking up. And none of them touched the part that might matter most: the mental health layer. What I was writing in my journal. The emotional weight sitting underneath every other number. <strong>What if I could take those words — raw, what I actually felt — and cross-reference them with biometric data from ten different sources, then anchor all of it in scientific evidence? Not generic health advice. Something built specifically for me, from everything I am.</strong>
+        </p>
+        <p>
+          Once that door opened, my mind started spiraling. What about connecting my sleep data? My glucose? What if someone could read my journal entries and find patterns I couldn't see? What could we correlate between different domains? When I slip — and I always slip eventually — could the data tell me why?
+        </p>
+        <p>
+          Today it's <span data-const="platform.lambdas">62</span> Lambda functions, <span data-const="platform.data_sources">26</span> data sources, <span data-const="platform.mcp_tools">121</span> intelligence tools — the whole thing runs on AWS for about <span data-const="platform.monthly_cost">$19</span> a month.
+        </p>
+        <p>
+          I've been in IT my entire career — applications, data, operations, startups. I understand how systems fit together, even if it's been a long time since I built something myself. Claude handled the code. I handled the architecture, the product decisions, and every single deploy.
+        </p>
+        <p>
+          What I bring is the thing no language model can simulate: I know what it's like to be me. I know which patterns matter and which are noise. I know that my relationship with food isn't about macros — it's about coping. The platform I'm building isn't something a prompt could decode, because the person it's designed for is too specific, too contradictory, and too stubborn to fit in a template.
+        </p>
+        <div class="st-throughline">
+          <span class="st-throughline__text">See exactly how the platform is built — architecture, data flow, cost breakdown.</span>
+          <a href="/platform/" class="st-throughline__link">The Platform →</a>
+        </div>
       </div>
     </div>
-  </div>
 
-  <hr class="chapter-divider">
+    <hr class="st-divider">
 
-  <!-- Chapter 4 -->
-  <div class="story-chapter">
-    <p class="chapter-num">Chapter 04</p>
-    <h2 class="chapter-title">What the Data Has Shown &mdash; So Far</h2>
-    <div class="chapter-body">
-      <p id="ch4-prelaunch" class="ch4-state">
-        This chapter is deliberately short, because the experiment hasn't started yet.
-        The platform is built. The data sources are connected. April 1 is when the
-        real signal begins.
-      </p>
-      <p id="ch4-postlaunch" class="ch4-state" style="display:none">
-        The data is accumulating. What follows will grow as the experiment runs —
-        updated as patterns emerge and findings solidify.
-        <a href="/explorer/" style="color:var(--accent);border-bottom:1px solid var(--accent-dim);">See the live correlations &rarr;</a>
-      </p>
-      <p>
-        What I do have is history. Ten years of weight scale logs. Years of workout data, Strava runs, gym check-ins. When you plot it all on a graph, the pattern is unmistakable: this is a person who operates at either peak performance or severe under-performance. The scale chart looks like a stock ticker with accelerated market crashes &mdash; all-time highs followed by freefall. There is no middle.
-      </p>
-      <p>
-        What I don't have &mdash; what nobody has &mdash; is good data on my mind. My insight. My patterns of thought when things start to slip. How impactful is journaling, really? When I do it consistently, do the other numbers improve? When I stop, is there a measurable lag before the physical metrics follow?
-      </p>
-      <p>
-        That's what April 1 is for. The backfilled data tells the story of what happened. The platform is designed to tell me <strong>why</strong> &mdash; and, eventually, to catch it before it happens again.
-      </p>
-      <p>
-        This chapter will grow as the data does.
-      </p>
-
-      <div class="throughline">
-        <span class="throughline__text">Explore the real correlation data, FDR-corrected, as it accumulates.</span>
-        <a href="/explorer/" class="throughline__link">Data Explorer &rarr;</a>
+    <!-- Chapter 4 -->
+    <div class="st-chapter">
+      <p class="st-chapter__num">Chapter 04</p>
+      <h2 class="st-chapter__title">What the Data Has Shown — So Far</h2>
+      <div class="st-chapter__body">
+        <p>
+          What I do have is history. Ten years of weight scale logs. Years of workout data, Strava runs, gym check-ins. When you plot it all on a graph, the pattern is unmistakable: this is a person who operates at either peak performance or severe under-performance. The scale chart looks like a stock ticker with accelerated market crashes — all-time highs followed by freefall. There is no middle.
+        </p>
+        <p>
+          What I don't have — what nobody has — is good data on my mind. My insight. My patterns of thought when things start to slip. How impactful is journaling, really? When I do it consistently, do the other numbers improve? When I stop, is there a measurable lag before the physical metrics follow?
+        </p>
+        <p>
+          That's what April 1 is for. The backfilled data tells the story of what happened. The platform is designed to tell me <strong>why</strong> — and, eventually, to catch it before it happens again.
+        </p>
+        <p>This chapter will grow as the data does.</p>
+        <div class="st-throughline">
+          <span class="st-throughline__text">Explore the real correlation data, FDR-corrected, as it accumulates.</span>
+          <a href="/explorer/" class="st-throughline__link">Data Explorer →</a>
+        </div>
       </div>
     </div>
-  </div>
 
-  <hr class="chapter-divider">
+    <hr class="st-divider">
 
-  <!-- Chapter 5 -->
-  <div class="story-chapter">
-    <p class="chapter-num">Chapter 05</p>
-    <h2 class="chapter-title">Why Public</h2>
-    <div class="chapter-body">
-      <p>
-        I've noticed something about myself recently: I'm more willing to be honest about what I'm going through than I used to be. With friends, with family, with people I barely know. And every time I am, I find out they're dealing with something too. Different shape, same weight.
-      </p>
-      <p>
-        The public part isn't about performance. It's about a pattern I can't seem to break on my own: when things get hard, I disappear. I pull away from friends, cancel plans, stop answering texts. Not because I'm angry or antisocial &mdash; but because the gap between who I was a few months ago and who I am now feels too loud. I don't want anyone to see it.
-      </p>
-      <p>
-        Publishing everything removes that option. The numbers are right there. If my gym check-ins vanish for two weeks, that's visible. If my journal goes quiet, that's visible. The people who care about me won't have to wonder whether I've gone quiet because I'm busy or because I'm in a spiral. They'll know.
-      </p>
-      <p>
-        That might sound suffocating. Maybe it will be. But I want to try it &mdash; because the alternative is disappearing again, and I know exactly where that leads.
-      </p>
-      <p>
-        Every week, an AI journalist named Elena Voss reads <span id="story-data-sources-1" data-const="platform.data_sources">26</span> data sources and writes a chronicle of what the numbers say.
-        She doesn't soften bad weeks. She doesn't celebrate plateaus as progress.
-        The point is that the data tells the truth, even when I don't want it to.
-      </p>
-      <p>
-        You're welcome to watch.
-      </p>
-
-      <div class="throughline">
-        <span class="throughline__text">Follow the weekly chronicle &mdash; every number, every failure, every week.</span>
-        <a href="/chronicle/" class="throughline__link">The Chronicle &rarr;</a>
+    <!-- Chapter 5 -->
+    <div class="st-chapter">
+      <p class="st-chapter__num">Chapter 05</p>
+      <h2 class="st-chapter__title">Why Public</h2>
+      <div class="st-chapter__body">
+        <p>
+          I've noticed something about myself recently: I'm more willing to be honest about what I'm going through than I used to be. With friends, with family, with people I barely know. And every time I am, I find out they're dealing with something too. Different shape, same weight.
+        </p>
+        <p>
+          The public part isn't about performance. It's about a pattern I can't seem to break on my own: when things get hard, I disappear. I pull away from friends, cancel plans, stop answering texts. Not because I'm angry or antisocial — but because the gap between who I was a few months ago and who I am now feels too loud. I don't want anyone to see it.
+        </p>
+        <p>
+          Publishing everything removes that option. The numbers are right there. If my gym check-ins vanish for two weeks, that's visible. If my journal goes quiet, that's visible. The people who care about me won't have to wonder whether I've gone quiet because I'm busy or because I'm in a spiral. They'll know.
+        </p>
+        <p>
+          That might sound suffocating. Maybe it will be. But I want to try it — because the alternative is disappearing again, and I know exactly where that leads.
+        </p>
+        <p>
+          Every week, an AI journalist named Elena Voss reads <span data-const="platform.data_sources">26</span> data sources and writes a chronicle of what the numbers say. She doesn't soften bad weeks. She doesn't celebrate plateaus as progress. The point is that the data tells the truth, even when I don't want it to.
+        </p>
+        <p>You're welcome to watch.</p>
+        <div class="st-throughline">
+          <span class="st-throughline__text">Follow the weekly chronicle — every number, every failure, every week.</span>
+          <a href="/chronicle/" class="st-throughline__link">The Chronicle →</a>
+        </div>
       </div>
     </div>
-  </div>
 
-</div><!-- /story-body -->
+  </section>
 
-<!-- CTA -->
-<section style="
-  padding: var(--space-16) var(--page-padding);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-  text-align: center;
-">
-  <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">The Measured Life</p>
-  <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Follow the experiment.</h3>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
-    Real numbers from <span id="story-data-sources-2" data-const="platform.data_sources">26</span> data sources. Every Wednesday, in your inbox. No highlight reel &mdash; every failure included.
-  </p>
-  <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
-    <input id="story-email" type="email" placeholder="your@email.com" style="
-      flex:1;background:var(--bg);border:1px solid var(--cta);color:var(--text);
-      font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);
-      outline:none;
-    ">
-    <button id="story-subscribe-btn" class="btn btn--cta" style="white-space:nowrap">Subscribe</button>
-  </div>
-  <p id="story-subscribe-msg" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
-  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);">
-    Join <span id="story-sub-count">&mdash;</span> people following the experiment
-  </div>
-</section>
-<script>
-fetch('/api/sub_count').then(r=>r.ok?r.json():null).then(d=>{if(d&&d.count>50)document.getElementById('story-sub-count').textContent=d.count}).catch(()=>{});
-</script>
-
-
-<!-- Journey Timeline -->
-<div class="jtl-section reveal">
-  <div class="jtl-heading">The experiment so far</div>
-  <div class="jtl-list" id="jtl-list">
-    <div class="jtl-skeleton" id="jtl-skeleton">
-      <div class="jtl-node">
-        <div class="jtl-skel-line" style="width:80px"></div>
-        <div class="jtl-skel-line" style="width:200px"></div>
-        <div class="jtl-skel-line" style="width:160px"></div>
-      </div>
-      <div class="jtl-node">
-        <div class="jtl-skel-line" style="width:80px"></div>
-        <div class="jtl-skel-line" style="width:180px"></div>
-        <div class="jtl-skel-line" style="width:140px"></div>
-      </div>
-      <div class="jtl-node">
-        <div class="jtl-skel-line" style="width:80px"></div>
-        <div class="jtl-skel-line" style="width:220px"></div>
-      </div>
+  <!-- ═══ CROSS-LINK FOOTER ═══ -->
+  <nav class="fp-cross-footer">
+    <div class="fp-cross-footer__prev"><a href="/about/">← About</a></div>
+    <div class="fp-cross-footer__mid">
+      Where this began, and why
     </div>
-  </div>
+    <div class="fp-cross-footer__next"><a href="/character/">Character →</a></div>
+  </nav>
+
 </div>
 
-<div class="discord-community-card" style="max-width:var(--content-width);margin:40px auto;padding-left:calc(var(--page-padding) + 28px);padding-right:var(--page-padding);">
-  <div class="community-card-header">&sharp; COMMUNITY ──────────────</div>
-  <p class="community-card-body">Want to talk about this data, ask questions, or share your own tracking? There's a community for that.</p>
-  <a href="https://discord.gg/T4Ndt2WsU" target="_blank" rel="noopener" class="community-card-cta">Join Average Joe Community &rarr;</a>
-</div>
-
-<!-- STORY-5: Tech / Life intersection cards -->
-<div class="intersection-section reveal">
-  <div class="intersection-label">Where the platform meets the person</div>
-  <div class="intersection-heading">The System Catches What I Miss</div>
-  <div class="intersection-grid">
-    <div class="intersection-card">
-      <div class="intersection-card__tech">Daily AI Brief</div>
-      <div class="intersection-card__arrow">&darr;</div>
-      <div class="intersection-card__life">Caught a sleep pattern I didn't see</div>
-      <p class="intersection-card__body">The brief flagged that my 11pm&ndash;1am late window was costing me deep sleep stage time &mdash; not obvious from a single night, but visible across 3 weeks of data. Changed my schedule. HRV improved within days.</p>
-    </div>
-    <div class="intersection-card">
-      <div class="intersection-card__tech">Character Sheet</div>
-      <div class="intersection-card__arrow">&darr;</div>
-      <div class="intersection-card__life">Gamified accountability that actually works</div>
-      <p class="intersection-card__body">Every behavior earns XP. Every pillar is visible. The moment I could see that my Relationships score was lagging, I called my family. The score is artificial; the call wasn't.</p>
-    </div>
-    <div class="intersection-card">
-      <div class="intersection-card__tech">Public Website</div>
-      <div class="intersection-card__arrow">&darr;</div>
-      <div class="intersection-card__life">You can't lie to yourself when everyone's watching</div>
-      <p class="intersection-card__body">Publishing the data live &mdash; including the bad weeks &mdash; removes the option of private rationalization. The numbers are right there. I can't un-publish them. That's the design.</p>
-    </div>
-  </div>
-</div>
-
-<div class="story-nav">
-  <a href="/chronicle/" class="btn btn--ghost">Read the Chronicle &rarr;</a>
-  <a href="/platform/" class="btn btn--ghost">See the Platform &rarr;</a>
-  <a href="/live/" class="btn btn--ghost">Today's Pulse &rarr;</a>
-</div>
-
-<!-- Phase 1: Reading path -->
-<div class="reading-path-v2">
-  <a href="/" class="reading-path-v2__prev">
-    <span class="reading-path-v2__label">Home</span>
-    <span class="reading-path-v2__title">&larr; Back</span>
-  </a>
-  <a href="/live/" class="reading-path-v2__next">
-    <span class="reading-path-v2__label">See where the numbers are right now</span>
-    <span class="reading-path-v2__title">Today&rsquo;s Data &rarr;</span>
-  </a>
-</div>
-
-<!-- Mobile bottom nav -->
 <div id="amj-subscribe"></div>
 <div id="amj-bottom-nav"></div>
-
 <div id="amj-footer"></div>
 
-<script>
-// Live weight
-(async function() {
-  try {
-    const r = await fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
-    if (!r.ok) return;
-    const d = await r.json();
-    const w = (d.vitals || {}).weight_lbs || (d.hero || {}).current_weight_lbs;
-    if (w) document.getElementById('story-weight').textContent = Math.round(w);
-    // STORY-2: Day X milestone
-    var daysIn = (d.journey || {}).days_in || (d.platform || {}).days_in;
-    var dxEl = document.getElementById('story-day-x');
-    if (dxEl) {
-      if (daysIn != null) {
-        dxEl.textContent = daysIn;
-      } else {
-        var msIn = Date.now() - new Date('2026-04-01T07:00:00-07:00').getTime();
-        if (msIn < 0) {
-          var daysUntil = Math.ceil(Math.abs(msIn) / 86400000);
-          dxEl.textContent = daysUntil;
-          var milestoneEl = dxEl.closest('.milestone');
-          if (milestoneEl) {
-            var lbl = milestoneEl.querySelector('.milestone__label');
-            if (lbl) lbl.textContent = daysUntil === 1 ? 'Day until launch' : 'Days until launch';
-          }
-        } else {
-          dxEl.textContent = Math.max(1, Math.floor(msIn / 86400000) + 1);
-        }
-      }
-    }
-    // D6: update data_sources prose spans
-    const plat = d.platform || {};
-    const ds = plat.data_sources;
-    if (ds != null) {
-      ['story-data-sources-1','story-data-sources-2','story-data-sources-stat'].forEach(function(id) {
-        var el = document.getElementById(id); if (el) el.textContent = ds;
-      });
-    }
-    if (plat.lambdas != null) { var el = document.getElementById('story-lambda-count'); if (el) el.textContent = plat.lambdas; }
-    if (plat.mcp_tools != null) { var el = document.getElementById('story-tools-count'); if (el) el.textContent = plat.mcp_tools; }
-  } catch(e) {}
-})();
-
-// Journey Timeline (STORY-3)
-(function() {
-  var TYPE_COLORS = {
-    'milestone':  getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#3db88a',
-    'weight':     '#f0a500',
-    'level_up':   '#5ba4cf',
-    'experiment': '#6dba6d',
-    'discovery':  '#a78bfa',
-  };
-
-  function esc(s) {
-    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
-  function fmtDate(d) {
-    try {
-      var parts = d.split('-');
-      var dt = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-      return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    } catch(e) { return d; }
-  }
-
-  function renderTimeline(events) {
-    var list = document.getElementById('jtl-list');
-    if (!list) return;
-    var skel = document.getElementById('jtl-skeleton');
-    if (skel) skel.remove();
-
-    if (!events || !events.length) {
-      list.innerHTML = '<div style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono)">Timeline populates as the experiment runs</div>';
-      return;
-    }
-
-    list.innerHTML += events.map(function(e) {
-      var color = TYPE_COLORS[e.type] || 'var(--border-strong)';
-      var linkHtml = e.link ? ' <a href="' + esc(e.link) + '" class="jtl-link">' + (e.type === 'weight' ? 'live \u2192' : e.type === 'experiment' ? 'experiments \u2192' : e.type === 'discovery' ? 'discoveries \u2192' : e.type === 'level_up' ? 'character \u2192' : 'story \u2192') + '</a>' : '';
-      return '<div class="jtl-node jtl-node--' + esc(e.type) + '">' +
-        '<div class="jtl-date">' + esc(fmtDate(e.date)) + '</div>' +
-        '<div class="jtl-title">' + esc(e.title) + '</div>' +
-        (e.body ? '<div class="jtl-body">' + esc(e.body) + linkHtml + '</div>' : linkHtml) +
-        '</div>';
-    }).join('');
-  }
-
-  fetch('/api/journey_timeline')
-    .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
-    .then(function(d) { renderTimeline(d.events || []); })
-    .catch(function(e) {
-      console.warn('[jtl] failed:', e);
-      var skel = document.getElementById('jtl-skeleton');
-      if (skel) skel.remove();
-    });
-})();
-
-// STORY-4: Emotional waveform
-(function() {
-  fetch('/api/journey_waveform')
-    .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
-    .then(function(d) {
-      var EXPERIMENT_START = '2026-04-01';
-      var days = (d.days || []).filter(function(day) { return day.date >= EXPERIMENT_START; });
-      var maxScore = d.max_score || 1;
-      var chart = document.getElementById('waveform-chart');
-      if (!chart || !days.length) return;
-      chart.innerHTML = '';
-      days.forEach(function(day) {
-        var bar = document.createElement('div');
-        bar.className = 'waveform-bar waveform-bar--' + day.color;
-        var heightPct = day.score ? Math.max(8, Math.round((day.score / maxScore) * 100)) : 5;
-        bar.style.height = heightPct + '%';
-        var label = day.date + (day.score !== null ? ': ' + day.score + ' pts' : ': no data');
-        bar.title = label;
-        chart.appendChild(bar);
-      });
-      // Hide ghost bars now that real data is rendered
-      var empty = document.getElementById('waveform-empty');
-      if (empty) empty.style.display = 'none';
-    })
-    .catch(function(e) { console.warn('[waveform] failed:', e); });
-})();
-
-// Subscribe form
-document.getElementById('story-subscribe-btn').addEventListener('click', async () => {
-  const email = document.getElementById('story-email').value.trim();
-  const msg = document.getElementById('story-subscribe-msg');
-  if (!email || !email.includes('@')) {
-    msg.textContent = 'Enter a valid email address.';
-    msg.style.color = 'var(--c-yellow-status)';
-    return;
-  }
-  msg.textContent = 'Subscribing...';
-  try {
-    const res = await fetch('/api/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, source: 'story_page' }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      msg.textContent = '\u2713 You\'re in. Check your inbox to confirm.';
-      msg.style.color = 'var(--c-amber-500)';
-      document.getElementById('story-email').value = '';
-    } else {
-      msg.textContent = data.error || 'Something went wrong.';
-      msg.style.color = 'var(--c-yellow-status)';
-    }
-  } catch { msg.textContent = 'Network error \u2014 try again.'; msg.style.color = 'var(--c-yellow-status)'; }
-});
-document.getElementById('story-email').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('story-subscribe-btn').click();
-});
-</script>
-<nav class="reading-path-v2">
-  <a href="/" class="reading-path-v2__link">
-    <span class="reading-path-v2__dir">← Previous</span>
-    <span class="reading-path-v2__title">Home</span>
-  </a>
-  <a href="/about/" class="reading-path-v2__link reading-path-v2__link--next">
-    <span class="reading-path-v2__dir">Next →</span>
-    <span class="reading-path-v2__title">About</span>
-  </a>
-</nav>
-
-<script>
-// Chapter 4 two-state flip on launch
-(function() {
-  var isLive = (window.AMJ_EXPERIMENT && window.AMJ_EXPERIMENT.isLive) ||
-               (new Date() >= new Date('2026-04-01T00:00:00-07:00'));
-  if (isLive) {
-    var pre = document.getElementById('ch4-prelaunch');
-    var post = document.getElementById('ch4-postlaunch');
-    if (pre) pre.style.display = 'none';
-    if (post) post.style.display = '';
-  }
-})();
-</script>
-<script src="/assets/js/animations.js" defer></script>
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>
 <script src="/assets/js/nav.js"></script>
+<script>
+(function() {
+  // Date stamp in masthead meta
+  var dEl = document.getElementById('st-date');
+  if (dEl) {
+    var d = new Date();
+    dEl.textContent = d.toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    }).toUpperCase();
+  }
+
+  // Live weight + day counter for lede delta
+  fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(d) {
+      if (!d) return;
+      var w = (d.vitals || {}).weight_lbs || (d.hero || {}).current_weight_lbs;
+      if (w) {
+        var el = document.getElementById('st-current-weight');
+        if (el) el.textContent = Math.round(w);
+      }
+      var daysIn = (d.journey || {}).days_in || (d.platform || {}).days_in;
+      var dxEl = document.getElementById('st-day-x');
+      if (dxEl) {
+        if (daysIn != null) {
+          dxEl.textContent = daysIn;
+        } else {
+          var msIn = Date.now() - new Date('2026-04-01T07:00:00-07:00').getTime();
+          dxEl.textContent = msIn >= 0 ? Math.max(1, Math.floor(msIn / 86400000) + 1) : '—';
+        }
+      }
+    })
+    .catch(function() {});
+})();
+</script>
+<script src="/assets/js/animations.js" defer></script>
 </body>
 </html>

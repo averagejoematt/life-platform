@@ -4,1858 +4,871 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="30+ weeks of continuous glucose monitoring data — time-in-range, variability, meal response tables, and metabolic intelligence from Dexcom Stelo.">
-  <meta property="og:title" content="Glucose Observatory — Matthew">
-  <meta property="og:description" content="Real CGM data: time-in-range, glucose variability, and what my metabolic patterns actually look like.">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://averagejoematt.com/glucose/">
+  <meta name="description" content="The Glucose Dispatch — daily continuous-glucose-monitor reading: time-in-range, variability, meal response, and 30-day TIR arc.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-glucose.png">
+  <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <title>Glucose Observatory — Matthew</title>
+  <meta property="og:title" content="The Glucose Dispatch — Matthew">
+  <meta property="og:description" content="Continuous glucose monitoring: time-in-range, variability, meal response, 30-day TIR arc.">
+  <title>The Glucose Dispatch — Matthew</title>
   <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
-  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
-  <meta name="theme-color" content="#080c0a">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
-  <link rel="stylesheet" href="/assets/css/observatory-v3.css">
   <style>
-    :root {
-      --g-teal: #2dd4bf;
-      --g-teal-dim: rgba(45,212,191,0.15);
-      --g-teal-glow: rgba(45,212,191,0.06);
-      --g-green: #3ecf8e;
-      --g-red: #ef4444;
-      --g-amber: #f59e0b;
-      --g-violet: #818cf8;
-    }
+    /* /glucose/ — uses Front Page pattern (.fp-*); see assets/css/frontpage.css.
+       Page-scope additions only — namespace .g- (glucose). */
+    .g-page { padding-top: var(--nav-height); }
 
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(16px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes ringDraw {
-      from { stroke-dasharray: 0 251; }
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       HERO (merged narrative + gauges)
-       ═══════════════════════════════════════════════════════ */
-    .g-hero {
-      padding: var(--space-20) var(--page-padding) var(--space-16);
-      position: relative;
-      overflow: hidden;
-      border-bottom: 1px solid var(--border);
-      max-width: var(--max-width);
-      margin: 0 auto;
-    }
-    .g-hero-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-12);
-      align-items: center;
-    }
-    .g-hero__eyebrow {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--g-teal);
-      margin-bottom: var(--space-6);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      opacity: 0;
-      animation: fadeUp 0.6s 0.1s forwards;
-    }
-    .g-hero__eyebrow::before {
-      content: '';
-      width: 32px;
-      height: 1px;
-      background: var(--g-teal);
-    }
-    .g-hero__title {
-      font-family: var(--font-display);
-      font-size: clamp(36px, 5vw, 52px);
-      color: var(--text);
-      line-height: 1.05;
-      max-width: 640px;
-      margin-bottom: var(--space-6);
-      opacity: 0;
-      animation: fadeUp 0.6s 0.2s forwards;
-    }
-    .g-hero__title em {
-      font-style: normal;
-      color: var(--g-teal);
-    }
-    .g-hero__narrative {
-      font-family: var(--font-serif);
-      font-size: var(--text-lg);
-      color: var(--text-muted);
-      line-height: 1.8;
-      max-width: 600px;
-      margin-bottom: var(--space-10);
-      opacity: 0;
-      animation: fadeUp 0.6s 0.3s forwards;
-    }
-    .g-hero__narrative p { margin-bottom: var(--space-4); }
-    .g-hero__meta {
-      font-size: var(--text-sm);
-      color: var(--text-faint);
-      font-family: var(--font-mono);
-      margin-bottom: var(--space-8);
-      opacity: 0;
-      animation: fadeUp 0.6s 0.35s forwards;
-    }
-
-    /* Gauge row — 2x2 grid in right column of hero */
-    .g-gauge-row {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: var(--space-4);
-      opacity: 0;
-      animation: fadeUp 0.6s 0.4s forwards;
-    }
-    .g-gauge {
-      text-align: center;
-      padding: var(--space-5) var(--space-3);
-      background: var(--surface);
-      border: 1px solid var(--border);
-    }
-    .g-gauge__ring {
-      width: 88px;
-      height: 88px;
-      margin: 0 auto var(--space-3);
-      position: relative;
-    }
-    .g-gauge__ring svg { width: 100%; height: 100%; }
-    .g-gauge__center {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-    }
-    .g-gauge__num {
-      font-family: var(--font-display);
-      font-size: 22px;
-      line-height: 1;
-    }
-    .g-gauge__unit {
-      font-family: var(--font-mono);
-      font-size:var(--text-3xs);
-      color: var(--text-faint);
-      letter-spacing: 0.08em;
-    }
-    .g-gauge__label {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-muted);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       EDITORIAL PULL-QUOTES (staggered, offset left, serif)
-       ═══════════════════════════════════════════════════════ */
-    .g-pullquote {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      position: relative;
-      border-bottom: 1px solid var(--border);
-    }
-    .g-pullquote--left {
-      padding-left: calc(var(--page-padding) + 2rem);
-    }
-    .g-pullquote--right {
-      padding-left: calc(var(--page-padding) + 8rem);
-    }
-    .g-pullquote__watermark {
-      position: absolute;
-      top: 24px;
-      right: var(--page-padding);
-      font-family: var(--font-display);
-      font-size: 120px;
-      color: rgba(45, 212, 191, 0.04);
-      line-height: 1;
-      pointer-events: none;
-    }
-    .g-pullquote__text {
-      font-family: var(--font-serif);
-      font-size: clamp(24px, 3.5vw, 32px);
-      line-height: 1.4;
-      color: var(--text);
-      max-width: 640px;
-      position: relative;
-    }
-    .g-pullquote__text em {
-      font-style: normal;
-      color: var(--g-teal);
-    }
-    .g-pullquote__attr {
-      display: flex;
-      align-items: center;
-      gap: var(--space-3);
-      margin-top: var(--space-4);
-    }
-    .g-pullquote__badge {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      color: var(--g-teal);
-      background: var(--g-teal-dim);
-      padding: 3px 10px;
+    /* Skeleton placeholder before /api/glucose resolves */
+    .g-skeleton {
+      background: linear-gradient(90deg, var(--surface) 25%, var(--surface-raised) 50%, var(--surface) 75%);
+      background-size: 200% 100%;
+      animation: g-shimmer 1.5s infinite;
+      border-radius: 2px;
       display: inline-block;
     }
-    .g-pullquote__source {
+    @keyframes g-shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    .g-row-empty {
+      padding: 28px 22px;
+      border-top: 1px solid var(--border-subtle);
       font-family: var(--font-mono);
       font-size: 11px;
+      letter-spacing: 0.1em;
       color: var(--text-faint);
-      letter-spacing:var(--ls-subtle);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       MONOSPACE SECTION HEADERS with trailing em-dash
-       ═══════════════════════════════════════════════════════ */
-    .g-section-header {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: 0.15em;
       text-transform: uppercase;
-      margin-bottom: var(--space-8);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .g-section-header::after {
-      content: '\2014\2014';
-      color: var(--border);
-      font-weight: 300;
-      flex-shrink: 0;
     }
 
-    /* ═══════════════════════════════════════════════════════
-       NARRATIVE CONTEXT (between data sections)
-       ═══════════════════════════════════════════════════════ */
-    .g-narrative-context {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-6) var(--page-padding);
-      font-family: var(--font-serif);
-      font-size: var(--text-base);
-      color: var(--text-muted);
-      line-height: 1.8;
-      max-width: 640px;
-      font-style: italic;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       LEFT-ACCENT RULE CARDS
-       ═══════════════════════════════════════════════════════ */
-    .g-accent-card {
-      padding: var(--space-6);
-      border: 1px solid rgba(255,255,255,0.04);
-      border-left: 3px solid var(--g-teal);
-      background: var(--surface);
-    }
-    .g-accent-card__title {
-      font-family: var(--font-display);
-      font-size: var(--text-base);
-      color: var(--text);
-      line-height: 1.35;
-      margin-bottom: var(--space-3);
-    }
-    .g-accent-card__body {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.7;
-    }
-    .g-accent-card__body em {
-      font-style: normal;
-      color: var(--g-teal);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       TIR EDITORIAL — 3-column
-       ═══════════════════════════════════════════════════════ */
-    .g-tir-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .g-tir-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 0;
-    }
-    .g-tir-col {
-      padding: var(--space-6) var(--space-6);
-    }
-    .g-tir-col:not(:last-child) {
-      border-right: 1px solid var(--border);
-    }
-    .g-tir-bar {
-      height: 3px;
-      background: rgba(255,255,255,0.03);
-      margin-bottom: var(--space-5);
-      position: relative;
-      overflow: hidden;
-    }
-    .g-tir-bar__fill {
-      height: 100%;
-      position: absolute;
-      left: 0;
-      top: 0;
-      transition: width 1.2s ease;
-    }
-    .g-tir-big {
-      font-family: var(--font-display);
-      font-size: clamp(36px, 4vw, 44px);
-      line-height: 1;
-      margin-bottom: var(--space-2);
-    }
-    .g-tir-name {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text-muted);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      margin-bottom: var(--space-3);
-    }
-    .g-tir-detail {
-      font-size: var(--text-sm);
-      color: var(--text-faint);
-      line-height: 1.7;
-    }
-    .g-tir-detail a {
-      color: var(--g-teal);
+    /* Strip nav buttons (prev/next dispatch) — disabled by default */
+    .g-strip-btn {
+      cursor: not-allowed;
+      opacity: 0.5;
+      color: inherit;
       text-decoration: none;
     }
 
-    /* ═══════════════════════════════════════════════════════
-       DYNAMIC MEAL RESPONSE TABLE (9c/9d)
-       ═══════════════════════════════════════════════════════ */
-    .g-meal-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
+    /* Extras section: meal-response table & daily curve.
+       These live AFTER the long-story arc but BEFORE the cross-link footer
+       (see handoff notes — page-specific features that don't fit standings). */
+    .g-extra {
+      padding: 32px 56px;
+      border-top: 1px solid var(--border);
     }
+    .g-extra__head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--border-strong);
+    }
+    .g-extra__title {
+      font-family: var(--font-display);
+      font-size: 24px;
+      letter-spacing: 0.04em;
+      color: var(--text);
+    }
+    .g-extra__meta {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    /* Meal-response chips */
     .g-meal-filters {
       display: flex;
-      gap: var(--space-2);
-      margin-bottom: var(--space-6);
+      gap: 8px;
+      margin-bottom: 18px;
       flex-wrap: wrap;
     }
     .g-meal-chip {
       font-family: var(--font-mono);
       font-size: 10px;
-      letter-spacing:var(--ls-wide);
+      letter-spacing: 0.18em;
       text-transform: uppercase;
       padding: 6px 14px;
       border: 1px solid var(--border);
       background: transparent;
       color: var(--text-muted);
       cursor: pointer;
-      transition: all 0.15s;
+      transition: border-color var(--dur-fast, 120ms), color var(--dur-fast, 120ms);
     }
-    .g-meal-chip:hover { border-color: var(--g-teal); color: var(--text); }
-    .g-meal-chip.active {
-      background: var(--g-teal-dim);
-      border-color: var(--g-teal);
-      color: var(--g-teal);
+    .g-meal-chip:hover { border-color: var(--accent-dim); color: var(--text); }
+    .g-meal-chip.is-active {
+      background: var(--accent-bg-subtle);
+      border-color: var(--accent);
+      color: var(--accent);
     }
-    .g-meal-growing {
+    .g-meal-search {
+      width: 100%;
+      max-width: 320px;
+      padding: 8px 12px;
       font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: 0.08em;
-      margin-bottom: var(--space-6);
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      font-size: 11px;
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      outline: none;
+      margin-bottom: 14px;
     }
-    .g-meal-growing::before {
-      content: '';
-      width: 6px; height: 6px;
-      background: var(--g-green);
-      border-radius: 50%;
-      animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 0.4; }
-      50% { opacity: 1; }
-    }
-
-    .g-meal-cards {
-      display: grid;
-      gap: var(--space-3);
-    }
+    .g-meal-search:focus { border-color: var(--accent-dim); }
     .g-meal-card {
       display: grid;
-      grid-template-columns: 2fr 1fr 1fr 1fr 1fr 80px 60px;
+      grid-template-columns: 2fr 60px 60px 60px 70px 50px 40px;
       align-items: center;
-      padding: var(--space-4) var(--space-5);
-      background: var(--surface);
-      border: 1px solid var(--border);
+      gap: 14px;
+      padding: 14px 18px;
+      border-top: 1px solid var(--border-subtle);
       border-left: 3px solid var(--border);
-      transition: border-color 0.15s;
-      gap: var(--space-3);
+      transition: background var(--dur-fast, 120ms);
     }
-    .g-meal-card:hover { border-color: rgba(255,255,255,0.08); }
-    .g-meal-card--green { border-left-color: var(--g-green); }
-    .g-meal-card--amber { border-left-color: var(--g-amber); }
-    .g-meal-card--red   { border-left-color: var(--g-red); }
+    .g-meal-card:hover { background: var(--accent-bg-subtle); }
+    .g-meal-card--green { border-left-color: var(--c-green-500); }
+    .g-meal-card--amber { border-left-color: var(--c-yellow-status); }
+    .g-meal-card--red   { border-left-color: var(--c-red-status); }
     .g-meal-card__name {
-      font-size: var(--text-sm);
+      font-size: 12px;
       color: var(--text);
-      font-weight: 500;
     }
     .g-meal-card__val {
       font-family: var(--font-mono);
-      font-size: var(--text-sm);
+      font-size: 11px;
       color: var(--text-muted);
       text-align: right;
     }
     .g-meal-card__spike {
       font-family: var(--font-mono);
-      font-size: var(--text-sm);
+      font-size: 12px;
       text-align: right;
-      font-weight: 600;
+      font-weight: 700;
     }
-    .g-meal-card__spike--green { color: var(--g-green); }
-    .g-meal-card__spike--amber { color: var(--g-amber); }
-    .g-meal-card__spike--red   { color: var(--g-red); }
+    .g-meal-card__spike--green { color: var(--c-green-500); }
+    .g-meal-card__spike--amber { color: var(--c-yellow-status); }
+    .g-meal-card__spike--red   { color: var(--c-red-status); }
     .g-meal-card__grade {
       font-family: var(--font-mono);
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
       text-align: center;
       padding: 2px 8px;
-      border-radius: 2px;
     }
-    .g-meal-card__grade--a { color: var(--g-green); background: rgba(62,207,142,0.1); }
-    .g-meal-card__grade--b { color: var(--g-teal); background: var(--g-teal-dim); }
-    .g-meal-card__grade--c { color: var(--g-amber); background: rgba(245,158,11,0.1); }
-    .g-meal-card__grade--d { color: var(--g-red); background: rgba(239,68,68,0.1); }
-    .g-meal-card__curve {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .g-meal-card__share {
-      background: none;
-      border: 1px solid var(--border);
-      color: var(--text-faint);
-      font-family: var(--font-mono);
-      font-size:var(--text-3xs);
-      letter-spacing: 0.08em;
-      padding: 4px 8px;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .g-meal-card__share:hover { border-color: var(--g-teal); color: var(--g-teal); }
-    .g-meal-table-head {
-      display: grid;
-      grid-template-columns: 2fr 1fr 1fr 1fr 1fr 80px 60px;
-      padding: var(--space-3) var(--space-5);
-      gap: var(--space-3);
-    }
-    .g-meal-th {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-faint);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      text-align: right;
-      cursor: pointer;
-      user-select: none;
-      transition: color 0.15s;
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 4px;
-    }
-    .g-meal-th:first-child { text-align: left; justify-content: flex-start; }
-    .g-meal-th:hover { color: var(--g-teal); }
-    .g-meal-th .sort-arrow { font-size: 8px; opacity: 0.4; }
-    .g-meal-th.sorted .sort-arrow { opacity: 1; color: var(--g-teal); }
+    .g-meal-card__grade--a { color: var(--c-green-500); background: rgba(0,229,160,0.08); }
+    .g-meal-card__grade--b { color: var(--accent);      background: var(--accent-bg-subtle); }
+    .g-meal-card__grade--c { color: var(--c-yellow-status); background: rgba(245,166,35,0.08); }
+    .g-meal-card__grade--d { color: var(--c-red-status);    background: rgba(255,82,82,0.08); }
+    .g-meal-card__curve { display: flex; align-items: center; justify-content: center; }
 
-    /* ═══════════════════════════════════════════════════════
-       TREND CHART
-       ═══════════════════════════════════════════════════════ */
-    .g-chart-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
+    /* Daily glucose curve */
+    .g-daycurve {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 16px;
     }
-    .g-chart-header {
+    .g-daycurve svg { width: 100%; height: 220px; display: block; }
+    .g-daycurve__labels {
       display: flex;
       justify-content: space-between;
-      align-items: baseline;
-      margin-bottom: var(--space-4);
-    }
-    .g-chart-title {
+      padding: 8px 12px 0;
       font-family: var(--font-mono);
-      font-size: var(--text-2xs);
+      font-size: 9px;
       color: var(--text-faint);
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .g-chart-title::after {
-      content: '\2014\2014';
-      color: var(--border);
-    }
-    .g-chart-legend {
-      display: flex;
-      gap: var(--space-4);
-    }
-    .g-legend-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-faint);
-    }
-    .g-legend-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-    }
-    canvas.g-chart {
-      width: 100%;
-      height: 200px;
-      display: block;
-      background: var(--surface);
-      border: 1px solid var(--border);
+      letter-spacing: 0.18em;
     }
 
-    /* ═══════════════════════════════════════════════════════
-       DAILY GLUCOSE CURVE (9e)
-       ═══════════════════════════════════════════════════════ */
-    .g-daycurve-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .g-daycurve-wrap {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: var(--space-4);
-      position: relative;
-    }
-    .g-daycurve-svg {
-      width: 100%;
-      height: 260px;
-      display: block;
-    }
-    .g-daycurve-labels {
-      display: flex;
-      justify-content: space-between;
-      padding: var(--space-2) var(--space-3) 0;
-      font-family: var(--font-mono);
-      font-size:var(--text-3xs);
-      color: var(--text-faint);
-      letter-spacing: 0.08em;
-    }
-    .g-daycurve-compare {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-4);
-      margin-top: var(--space-6);
-    }
-    .g-daycurve-compare__card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: var(--space-5);
-    }
-    .g-daycurve-compare__tag {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--g-teal);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      margin-bottom: var(--space-2);
-    }
-    .g-daycurve-compare__desc {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
-    .g-daycurve-compare__placeholder {
-      height: 120px;
-      border: 1px dashed rgba(255,255,255,0.06);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-faint);
-      letter-spacing: 0.08em;
-      margin-top: var(--space-3);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       CROSS-DOMAIN VISUALIZATIONS (9f)
-       ═══════════════════════════════════════════════════════ */
-    .g-crossdomain-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .g-crossdomain-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-4);
-    }
-    .g-crossdomain-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--g-teal);
-      padding: var(--space-6);
-    }
-    .g-crossdomain-card__tag {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--g-teal);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      margin-bottom: var(--space-3);
-    }
-    .g-crossdomain-card__title {
-      font-family: var(--font-display);
-      font-size: var(--text-base);
-      color: var(--text);
-      line-height: 1.3;
-      margin-bottom: var(--space-3);
-    }
-    .g-crossdomain-card__desc {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.7;
-      margin-bottom: var(--space-4);
-    }
-    .g-crossdomain-card__placeholder {
-      height: 100px;
-      border: 1px dashed rgba(255,255,255,0.06);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--font-mono);
-      font-size:var(--text-3xs);
-      color: var(--text-faint);
-      letter-spacing: 0.08em;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       NOCTURNAL PATTERNS (9g)
-       ═══════════════════════════════════════════════════════ */
-    .g-nocturnal-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .g-nocturnal-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-4);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       TOOLTIPS / DEFINITIONS (9h)
-       ═══════════════════════════════════════════════════════ */
-    .g-term {
-      position: relative;
-      border-bottom: 1px dotted var(--g-teal);
-      cursor: help;
-      color: var(--text);
-    }
-    .g-term__tip {
-      position: absolute;
-      bottom: calc(100% + 8px);
-      left: 50%;
-      transform: translateX(-50%);
-      background: #1a1f2e;
-      border: 1px solid var(--border);
-      padding: var(--space-3) var(--space-4);
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text-muted);
-      line-height: 1.5;
-      white-space: normal;
-      width: 260px;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.15s;
-      z-index: 10;
-    }
-    .g-term:hover .g-term__tip,
-    .g-term:focus .g-term__tip {
-      opacity: 1;
-      pointer-events: auto;
-    }
-    .g-term__tip::after {
-      content: '';
-      position: absolute;
-      top: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      border: 5px solid transparent;
-      border-top-color: var(--border);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       N=1 RULES
-       ═══════════════════════════════════════════════════════ */
-    .g-rules-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .g-rule-grid {
+    /* Hypotheses block — small inline list inside the watch/extra area */
+    .g-hyp-list {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: var(--space-4);
+      gap: 14px;
     }
-    .g-rule {
-      padding: var(--space-6);
-      border: 1px solid rgba(255,255,255,0.04);
-      border-left: 3px solid var(--g-teal);
+    .g-hyp {
+      padding: 14px 16px;
+      border-left: 2px solid var(--accent-dim);
       background: var(--surface);
     }
-    .g-rule__num {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--g-teal);
-      margin-bottom: var(--space-3);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .g-rule__num::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: rgba(45,212,191,0.1);
-    }
-    .g-rule__finding {
-      font-family: var(--font-display);
-      font-size: var(--text-base);
-      color: var(--text);
-      line-height: 1.35;
-      margin-bottom: var(--space-3);
-    }
-    .g-rule__evidence {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text-faint);
-    }
-    .g-rule__evidence em {
-      font-style: normal;
-      color: var(--g-teal);
-    }
-    .g-rule__evidence a {
-      color: var(--g-teal);
-      text-decoration: none;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       GENOMICS SECTION (9i)
-       ═══════════════════════════════════════════════════════ */
-    .g-genomics-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       CROSS-LINKS
-       ═══════════════════════════════════════════════════════ */
-    .g-xref {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-8) var(--page-padding);
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-4);
-      border-bottom: 1px solid var(--border);
-    }
-    .g-xref-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--g-teal);
-      padding: var(--space-5) var(--space-6);
-      transition: border-color 0.15s;
-      text-decoration: none;
-      display: block;
-    }
-    .g-xref-card:hover { border-color: var(--g-teal); }
-    .g-xref-card__tag {
+    .g-hyp__num {
       font-family: var(--font-mono);
       font-size: 10px;
-      color: var(--g-teal);
-      letter-spacing:var(--ls-wide);
-      text-transform: uppercase;
-      margin-bottom: var(--space-2);
+      letter-spacing: 0.2em;
+      color: var(--accent);
+      margin-bottom: 6px;
     }
-    .g-xref-card__text {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       NARRATIVE
-       ═══════════════════════════════════════════════════════ */
-    .g-narrative {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-12);
-      border-bottom: 1px solid var(--border);
-    }
-    .g-narrative__title {
+    .g-hyp__finding {
       font-family: var(--font-display);
-      font-size: var(--text-h2);
+      font-size: 16px;
+      letter-spacing: 0.02em;
       color: var(--text);
-      line-height: 1.15;
-      margin-bottom: var(--space-5);
+      line-height: 1.3;
+      margin-bottom: 6px;
     }
-    .g-narrative__title em {
-      font-style: normal;
-      color: var(--g-teal);
-    }
-    .g-narrative__body {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.8;
-    }
-    .g-narrative__body strong { color: var(--text); }
-    .g-protocol-list {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-4);
-    }
-    .g-protocol-item {
-      display: flex;
-      gap: var(--space-4);
-      padding: var(--space-4);
-      background: var(--surface);
-      border-left: 2px solid var(--g-teal);
-    }
-    .g-protocol-num {
-      font-family: var(--font-display);
-      font-size: 20px;
-      color: var(--g-teal);
-      line-height: 1;
-      flex-shrink: 0;
-      width: 28px;
-    }
-    .g-protocol-text {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
-    .g-protocol-text strong { color: var(--text); }
-
-    /* ═══════════════════════════════════════════════════════
-       METHODOLOGY
-       ═══════════════════════════════════════════════════════ */
-    .g-method {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
-    }
-    .g-method-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-6);
-    }
-    .g-method-item {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.7;
-    }
-    .g-method-item strong {
-      display: block;
-      color: var(--text);
+    .g-hyp__evidence {
       font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: 0.08em;
-      margin-bottom: var(--space-2);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       PSYCHOLOGICAL THREAD (9l)
-       ═══════════════════════════════════════════════════════ */
-    .g-psych-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .g-psych-body {
-      font-family: var(--font-serif);
-      font-size: var(--text-base);
-      color: var(--text-muted);
-      line-height: 1.9;
-      max-width: 640px;
-    }
-    .g-psych-body strong { color: var(--text); }
-
-    /* ═══════════════════════════════════════════════════════
-       LOADING
-       ═══════════════════════════════════════════════════════ */
-    .g-loading {
-      text-align: center;
-      padding: var(--space-20);
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
+      font-size: 10px;
       color: var(--text-faint);
-      letter-spacing: 0.15em;
+      letter-spacing: 0.06em;
     }
+    .g-hyp__evidence a { color: var(--accent-dim); text-decoration: none; }
+    .g-hyp__evidence a:hover { color: var(--accent); }
 
-    /* ═══════════════════════════════════════════════════════
-       RESPONSIVE
-       ═══════════════════════════════════════════════════════ */
-    @media (max-width: 768px) {
-      .g-hero-grid { grid-template-columns: 1fr; }
-      .g-gauge-row { grid-template-columns: repeat(2, 1fr); }
-      .g-tir-grid { grid-template-columns: 1fr; }
-      .g-tir-col:not(:last-child) { border-right: none; border-bottom: 1px solid var(--border); }
-      .g-rule-grid { grid-template-columns: 1fr; }
-      .g-narrative { grid-template-columns: 1fr; }
-      .g-method-grid { grid-template-columns: 1fr; }
-      .g-xref { grid-template-columns: 1fr; }
-      .g-crossdomain-grid { grid-template-columns: 1fr; }
-      .g-nocturnal-grid { grid-template-columns: 1fr; }
-      .g-daycurve-compare { grid-template-columns: 1fr; }
-      .g-meal-card { grid-template-columns: 1fr 1fr; }
-      .g-meal-table-head { display: none; }
-      .g-meal-card__name { grid-column: 1 / -1; }
-      .g-pullquote--left,
-      .g-pullquote--right { padding-left: var(--page-padding); }
+    @media (max-width: 720px) {
+      .g-extra { padding: 24px 20px; }
+      .g-meal-card {
+        grid-template-columns: 1fr auto auto;
+        gap: 8px;
+      }
+      .g-meal-card__val:nth-of-type(2),
+      .g-meal-card__val:nth-of-type(3),
+      .g-meal-card__curve { display: none; }
+      .g-hyp-list { grid-template-columns: 1fr; }
     }
-  </style>
-
-  <style>
-    /* DB-03: Observatory pillar accent */
-    :root {
-      --obs-accent: var(--pillar-nutrition);
-      --obs-accent-dim: #f59e0b66;
-      --obs-accent-bg: #f59e0b18;
-    }
-    .s-hero__eyebrow, .eyebrow { color: var(--obs-accent) !important; }
-    .detail-card { border-left-color: var(--obs-accent); }
   </style>
 </head>
 <body class="body-signal">
+  <div id="amj-nav"></div>
+  <div id="amj-hierarchy-nav"></div>
 
-<div id="amj-nav"></div>
-<div id="amj-hierarchy-nav"></div>
-<!-- Product Board Item 11: Day X context banner -->
-<div id="day-x-banner" style="
-  margin:0 var(--page-padding);
-  padding:var(--space-3) var(--space-5);
-  background:rgba(var(--amber-rgb,245,158,11),0.06);
-  border:1px solid rgba(var(--amber-rgb,245,158,11),0.15);
-  border-radius:4px;
-  display:flex;
-  align-items:center;
-  gap:var(--space-3);
-  font-family:var(--font-mono);
-  font-size:var(--text-2xs);
-  letter-spacing:var(--ls-tag);
-">
-  <span class="experiment-counter" data-format="short" style="color:var(--c-amber-500);font-weight:700;"></span>
-  <span style="color:var(--text-muted);"> — Early data. This page gets smarter every week.</span>
-  <a href="/subscribe/" style="color:var(--c-amber-400);text-decoration:none;margin-left:auto;white-space:nowrap;">Follow along &rarr;</a>
-</div>
+  <div class="fp-page g-page" style="--accent: #e16c8a; --accent-dim: #b54866;">
 
-
-<!-- ════════════════════════════════════════════════════════════
-     V3 Section 1: STATUS BAR — rendered by observatory-v3.js
-     ════════════════════════════════════════════════════════════ -->
-<div id="obs-v3-status"></div>
-<p class="obs-subtitle">Continuous glucose monitoring across a 12-month body composition experiment.</p>
-
-<!-- ════════════════════════════════════════════════════════════
-     V3 Section 2: COACH ANALYSIS — rendered by observatory-v3.js
-     ════════════════════════════════════════════════════════════ -->
-<div id="obs-v3-coach"></div>
-
-<!-- ════════════════════════════════════════════════════════════
-     9b: MERGED HERO — narrative intro + gauges as payoff
-     ════════════════════════════════════════════════════════════ -->
-<section class="g-hero">
-  <div class="g-hero-grid">
-    <div style="display:none"><!-- Editorial moved to depth section -->
-    </div>
-    <div class="g-gauge-row">
-    <div class="g-gauge">
-      <div class="g-gauge__ring">
-        <svg viewBox="0 0 88 88">
-          <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-          <circle id="gg-tir-arc" cx="44" cy="44" r="35" fill="none" stroke="#2dd4bf" stroke-width="7"
-            stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-            style="transition: stroke-dasharray 1.2s ease 0.5s"/>
-        </svg>
-        <div class="g-gauge__center">
-          <div class="g-gauge__num" id="gg-tir-num" style="color:#2dd4bf">&mdash;</div>
-          <div class="g-gauge__unit">%</div>
+    <!-- ═══ 1. MASTHEAD ═════════════════════════════════════ -->
+    <header class="fp-masthead">
+      <div class="fp-masthead__top">
+        <div>
+          <div class="fp-masthead__brow" id="fp-eyebrow">
+            The Glucose Dispatch · Vol I · Dispatch №<span id="fp-dispatch">—</span>
+          </div>
+          <div class="fp-masthead__title">GLUCOSE</div>
+        </div>
+        <div class="fp-masthead__meta">
+          <div id="fp-date"><span class="g-skeleton" style="width:160px;height:10px"></span></div>
+          <div id="fp-meta-status">288 readings per day · Dexcom Stelo</div>
+          <div id="fp-sensor-day" style="margin-top:4px;color:var(--text-faint)">Sensor: —</div>
         </div>
       </div>
-      <div class="g-gauge__label">
-        <dfn class="g-term" tabindex="0">TIR<span class="g-term__tip">Time in Range: percentage of the day glucose stays between 70-180 mg/dL. The ADA target for non-diabetics is >90%. More actionable than HbA1c because it responds to changes within days.</span></dfn>
+      <div class="fp-masthead__strip">
+        <div>
+          <span class="g-strip-btn" id="fp-prev" title="Available after Day 1">← Yesterday</span>
+          <span class="fp-masthead__strip-sep">·</span>
+          Reading day <span id="fp-day-strip">—</span>
+          <span class="fp-masthead__strip-sep">·</span>
+          <span class="g-strip-btn" id="fp-next" title="Tomorrow's data isn't here yet">Tomorrow →</span>
+        </div>
+        <div id="fp-filed">Filed —</div>
       </div>
-    </div>
-    <div class="g-gauge">
-      <div class="g-gauge__ring">
-        <svg viewBox="0 0 88 88">
-          <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-          <circle id="gg-avg-arc" cx="44" cy="44" r="35" fill="none" stroke="#3ecf8e" stroke-width="7"
-            stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-            style="transition: stroke-dasharray 1.2s ease 0.6s"/>
-        </svg>
-        <div class="g-gauge__center">
-          <div class="g-gauge__num" id="gg-avg-num" style="color:#3ecf8e">&mdash;</div>
-          <div class="g-gauge__unit">mg/dL</div>
+    </header>
+
+    <!-- ═══ 2. LEDE ═════════════════════════════════════════ -->
+    <section class="fp-lede">
+      <div>
+        <div class="fp-lede__num-brow">Reading day</div>
+        <div class="fp-lede__num" id="fp-day">—</div>
+        <div class="fp-lede__num-cap">288 readings / day</div>
+      </div>
+      <div>
+        <div class="fp-lede__status" id="fp-status">▸ TODAY'S DESPATCH · STATE: LOADING</div>
+        <div class="fp-lede__narrative" id="fp-narrative">
+          "<span class="g-skeleton" style="width:80%;height:18px"></span>"
+        </div>
+        <div class="fp-lede__delta" id="fp-delta" style="display:none">
+          <span class="fp-lede__delta-label">Today:</span>
         </div>
       </div>
-      <div class="g-gauge__label">Avg glucose</div>
+    </section>
+
+    <!-- ═══ 3. WATCH BANNER (optional) ══════════════════════ -->
+    <div class="fp-watch" id="fp-watch" style="display:none">
+      <span class="fp-watch__label" id="fp-watch-label">Watch</span>
+      <span id="fp-watch-text"></span>
     </div>
-    <div class="g-gauge">
-      <div class="g-gauge__ring">
-        <svg viewBox="0 0 88 88">
-          <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-          <circle id="gg-sd-arc" cx="44" cy="44" r="35" fill="none" stroke="#f59e0b" stroke-width="7"
-            stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-            style="transition: stroke-dasharray 1.2s ease 0.7s"/>
-        </svg>
-        <div class="g-gauge__center">
-          <div class="g-gauge__num" id="gg-sd-num" style="color:#f59e0b">&mdash;</div>
-          <div class="g-gauge__unit">
-            <dfn class="g-term" tabindex="0">SD<span class="g-term__tip">Standard Deviation: measures glucose variability. SD &lt;15 mg/dL is excellent, 15-20 is good, &gt;20 indicates elevated metabolic stress. Lower is better.</span></dfn>
+
+    <!-- ═══ 4. STANDINGS — WINDOWS ══════════════════════════ -->
+    <section class="fp-standings">
+      <div class="fp-standings__head">
+        <div class="fp-standings__title">WINDOWS</div>
+        <div class="fp-standings__meta">7-day trend · last reading</div>
+      </div>
+      <div id="fp-standings-rows">
+        <div class="g-row-empty">Loading windows…</div>
+      </div>
+    </section>
+
+    <!-- ═══ 5. LONG STORY — 30-day TIR arc ══════════════════ -->
+    <section class="fp-arc" id="fp-arc-section">
+      <div class="fp-arc__head">
+        <div>
+          <div class="fp-arc__brow">The Long Story · 30-Day TIR</div>
+          <div class="fp-arc__num" id="fp-arc-num">
+            <span id="fp-arc-first">—</span> →
+            <span class="fp-arc__num-current" id="fp-arc-current">—</span> →
+            <span style="color:var(--text-muted)">90%</span>
+          </div>
+        </div>
+        <div class="fp-arc__stats" id="fp-arc-stats">
+          <div>
+            <div class="fp-arc__stat-label">30-day avg TIR</div>
+            <div class="fp-arc__stat-val fp-arc__stat-val--accent" id="fp-arc-avg">—</div>
+          </div>
+          <div>
+            <div class="fp-arc__stat-label">Best day</div>
+            <div class="fp-arc__stat-val" id="fp-arc-best">—</div>
+          </div>
+          <div>
+            <div class="fp-arc__stat-label">Avg glucose</div>
+            <div class="fp-arc__stat-val" id="fp-arc-avgmgdl">—</div>
           </div>
         </div>
       </div>
-      <div class="g-gauge__label">Variability</div>
-    </div>
-    <div class="g-gauge">
-      <div class="g-gauge__ring">
-        <svg viewBox="0 0 88 88">
-          <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-          <circle id="gg-opt-arc" cx="44" cy="44" r="35" fill="none" stroke="#818cf8" stroke-width="7"
-            stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-            style="transition: stroke-dasharray 1.2s ease 0.8s"/>
+      <div class="fp-arc__chart" id="fp-arc-chart"></div>
+      <div class="fp-arc__caption" id="fp-arc-caption">
+        <span>Day 1 · — %</span>
+        <span>Today · — %</span>
+      </div>
+    </section>
+
+    <!-- ═══ EXTRA: MEAL RESPONSE TABLE ══════════════════════ -->
+    <section class="g-extra" id="g-meal-section">
+      <div class="g-extra__head">
+        <div class="g-extra__title">MEAL RESPONSE</div>
+        <div class="g-extra__meta">food log × CGM · grows over time</div>
+      </div>
+      <input type="text" id="g-meal-search" class="g-meal-search" placeholder="Search meals…" />
+      <div class="g-meal-filters">
+        <button class="g-meal-chip is-active" data-filter="all">All</button>
+        <button class="g-meal-chip" data-filter="breakfast">Breakfast</button>
+        <button class="g-meal-chip" data-filter="lunch">Lunch</button>
+        <button class="g-meal-chip" data-filter="dinner">Dinner</button>
+        <button class="g-meal-chip" data-filter="snack">Snack</button>
+      </div>
+      <div id="g-meal-cards">
+        <div class="g-row-empty">Meal × CGM data appears here once MacroFactor logs overlap with readings.</div>
+      </div>
+    </section>
+
+    <!-- ═══ EXTRA: DAILY GLUCOSE CURVE ══════════════════════ -->
+    <section class="g-extra" id="g-daycurve-section" style="display:none">
+      <div class="g-extra__head">
+        <div class="g-extra__title">DAILY CURVE</div>
+        <div class="g-extra__meta">last 24h · 5-min readings</div>
+      </div>
+      <div class="g-daycurve">
+        <svg id="g-daycurve-svg" viewBox="0 0 900 220" preserveAspectRatio="none">
+          <rect x="40" y="34" width="840" height="120" fill="rgba(225,108,138,0.04)"/>
+          <line x1="40"  y1="34"  x2="880" y2="34"  stroke="rgba(225,108,138,0.15)" stroke-dasharray="4"/>
+          <line x1="40"  y1="154" x2="880" y2="154" stroke="rgba(225,108,138,0.15)" stroke-dasharray="4"/>
+          <text x="36" y="38"  fill="rgba(225,108,138,0.5)" font-size="9" font-family="monospace" text-anchor="end">120</text>
+          <text x="36" y="158" fill="rgba(225,108,138,0.5)" font-size="9" font-family="monospace" text-anchor="end">70</text>
+          <line x1="40"  y1="10" x2="40"  y2="200" stroke="rgba(255,255,255,0.04)"/>
+          <line x1="245" y1="10" x2="245" y2="200" stroke="rgba(255,255,255,0.04)"/>
+          <line x1="450" y1="10" x2="450" y2="200" stroke="rgba(255,255,255,0.04)"/>
+          <line x1="655" y1="10" x2="655" y2="200" stroke="rgba(255,255,255,0.04)"/>
+          <line x1="880" y1="10" x2="880" y2="200" stroke="rgba(255,255,255,0.04)"/>
+          <path id="g-daycurve-path" d="" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.85"/>
         </svg>
-        <div class="g-gauge__center">
-          <div class="g-gauge__num" id="gg-opt-num" style="color:#818cf8">&mdash;</div>
-          <div class="g-gauge__unit">%</div>
+        <div class="g-daycurve__labels">
+          <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span>
         </div>
       </div>
-      <div class="g-gauge__label">
-        <dfn class="g-term" tabindex="0">Optimal<span class="g-term__tip">Optimal Range: 70-120 mg/dL. A tighter window used in longevity medicine. Standard range is 70-180 mg/dL; optimal is where glucose, energy, and cognition are all stable.</span></dfn>
+    </section>
+
+    <!-- ═══ EXTRA: HYPOTHESES UNDER TEST ════════════════════ -->
+    <section class="g-extra">
+      <div class="g-extra__head">
+        <div class="g-extra__title">HYPOTHESES UNDER TEST</div>
+        <div class="g-extra__meta">N=1 · pending data</div>
       </div>
-    </div>
-  </div>
-  </div><!-- /.g-hero-grid -->
-  <div class="obs-freshness" id="obs-freshness" style="display:none">
-    <div>
-      <span class="obs-freshness__label">Last data: <span id="obs-fresh-time">&mdash;</span></span>
-      <span class="obs-freshness__sub">Updated daily</span>
-      <span class="sensor-day" id="sensor-day" style="display:none;margin-left:var(--space-3,8px);font-family:var(--font-mono);font-size:var(--text-2xs,10px);letter-spacing:0.08em;color:var(--text-faint)"></span>
-    </div>
-    <span class="obs-freshness__dot obs-freshness__dot--live" id="obs-fresh-dot"></span>
-  </div>
-</section>
-
-<div id="obs-thisweek" style="display:none"></div>
-
-<div id="g-loading" class="g-loading">LOADING METABOLIC DATA&hellip;</div>
-<div id="g-content" style="display:none">
-
-<!-- ════════════════════════════════════════════════════════════
-     9a/9j: PULL-QUOTE #1 — staggered left, serif, editorial
-     ════════════════════════════════════════════════════════════ -->
-<div class="g-pullquote g-pullquote--left reveal" id="g-pullquote-1">
-  <div class="g-pullquote__watermark">01</div>
-  <div class="g-pullquote__text" id="g-pq1-text">
-    The first CGM finding will appear here once enough meal &times; glucose data
-    is collected to identify <em>your body&rsquo;s best and worst foods</em>.
-  </div>
-  <div class="g-pullquote__attr">
-    <span class="g-pullquote__badge">Pending data</span>
-    <span class="g-pullquote__source">Dexcom Stelo &times; MacroFactor cross-reference</span>
-  </div>
-</div>
-
-<!-- 9k: narrative context sentence -->
-<p class="g-narrative-context reveal">
-  Every meal logged in MacroFactor is cross-referenced against CGM glucose readings.
-  Over time, patterns emerge &mdash; which foods spike, which don&rsquo;t, and what
-  context (sleep, stress, timing) changes the curve.
-</p>
-
-<!-- ════════════════════════════════════════════════════════════
-     TIR EDITORIAL — 3-column spread
-     ════════════════════════════════════════════════════════════ -->
-<section class="g-tir-section reveal">
-  <div class="g-section-header">Glucose Response</div>
-  <div class="g-tir-grid">
-    <div class="g-tir-col">
-      <div class="g-tir-bar"><div class="g-tir-bar__fill" id="gbar-opt" style="width:0%;background:#3ecf8e"></div></div>
-      <div class="g-tir-big" id="gval-opt" style="color:#3ecf8e">&mdash;</div>
-      <div class="g-tir-name">
-        <dfn class="g-term" tabindex="0">Optimal (70&ndash;120)<span class="g-term__tip">The tighter glucose window used in longevity medicine. Keeping glucose here means stable energy, clear cognition, and minimal metabolic stress.</span></dfn>
+      <div class="g-hyp-list">
+        <div class="g-hyp">
+          <div class="g-hyp__num">H-01</div>
+          <div class="g-hyp__finding">Protein-first ordering blunts post-meal spikes</div>
+          <div class="g-hyp__evidence">Research-backed → testing with paired CGM data → <a href="/nutrition/">Nutrition</a></div>
+        </div>
+        <div class="g-hyp">
+          <div class="g-hyp__num">H-02</div>
+          <div class="g-hyp__finding">Post-meal walking reduces peak glucose</div>
+          <div class="g-hyp__evidence">Insulin-independent uptake → testing with step data → <a href="/training/">Training</a></div>
+        </div>
+        <div class="g-hyp">
+          <div class="g-hyp__num">H-03</div>
+          <div class="g-hyp__finding">Higher fiber correlates with lower variability</div>
+          <div class="g-hyp__evidence">MacroFactor fiber × CGM SD → <a href="/nutrition/">Nutrition</a></div>
+        </div>
+        <div class="g-hyp">
+          <div class="g-hyp__num">H-04</div>
+          <div class="g-hyp__finding">Poor sleep elevates next-morning fasting glucose</div>
+          <div class="g-hyp__evidence">Cortisol pathway → Whoop sleep × morning CGM → <a href="/sleep/">Sleep</a></div>
+        </div>
       </div>
-      <div class="g-tir-detail">Longevity medicine target. The tighter window where glucose, energy, and cognition are all stable.</div>
-    </div>
-    <div class="g-tir-col">
-      <div class="g-tir-bar"><div class="g-tir-bar__fill" id="gbar-tir" style="width:0%;background:#2dd4bf"></div></div>
-      <div class="g-tir-big" id="gval-tir" style="color:#2dd4bf">&mdash;</div>
-      <div class="g-tir-name">
-        <dfn class="g-term" tabindex="0">In Range (70&ndash;180)<span class="g-term__tip">ADA standard range for non-diabetic individuals. Target >90%. More actionable than HbA1c because it responds to dietary changes within days, not months.</span></dfn>
+    </section>
+
+    <!-- ═══ 6. CROSS-LINK FOOTER ════════════════════════════ -->
+    <nav class="fp-cross-footer">
+      <div class="fp-cross-footer__prev"><a href="/sleep/">← Sleep</a></div>
+      <div class="fp-cross-footer__mid">
+        Glucose tells you what nutrition did →
+        <a href="/nutrition/">Nutrition</a>
       </div>
-      <div class="g-tir-detail">ADA standard for non-diabetic. Target &gt;90%. More actionable than HbA1c because it responds in days.</div>
-    </div>
-    <div class="g-tir-col">
-      <div class="g-tir-bar"><div class="g-tir-bar__fill" id="gbar-hi" style="width:0%;background:#ef4444"></div></div>
-      <div class="g-tir-big" id="gval-hi" style="color:#ef4444">&mdash;</div>
-      <div class="g-tir-name">Elevated (&gt;140)</div>
-      <div class="g-tir-detail">Post-meal spikes above 140 indicate metabolic stress. Reduced by <a href="/nutrition/">protein-first meal ordering</a>.</div>
-    </div>
-  </div>
-</section>
+      <div class="fp-cross-footer__next"><a href="/nutrition/">Nutrition →</a></div>
+    </nav>
 
-<!-- 9k: narrative context sentence -->
-<p class="g-narrative-context reveal">
-  Once the broad numbers looked stable, the real experiment began: mapping individual
-  foods to their glucose curves. Every meal became a data point.
-</p>
-
-<!-- ════════════════════════════════════════════════════════════
-     9c/9d: DYNAMIC MEAL RESPONSE TABLE (KILLER FEATURE)
-     ════════════════════════════════════════════════════════════ -->
-<section class="g-meal-section reveal" id="meal-response-section">
-  <div class="g-section-header">Meal Response Table</div>
-  <div class="g-meal-growing">This table grows over time &mdash; every logged meal adds a data point</div>
-
-  <!-- G2: Meal search -->
-  <div style="margin-bottom:var(--space-3)">
-    <input type="text" id="g-meal-search" placeholder="Search meals..." style="width:100%;max-width:320px;padding:var(--space-2) var(--space-4);font-family:var(--font-mono);font-size:var(--text-xs);background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;outline:none" />
-  </div>
-  <!-- Filter chips -->
-  <div class="g-meal-filters">
-    <button class="g-meal-chip active" data-filter="all">All</button>
-    <button class="g-meal-chip" data-filter="breakfast">Breakfast</button>
-    <button class="g-meal-chip" data-filter="lunch">Lunch</button>
-    <button class="g-meal-chip" data-filter="dinner">Dinner</button>
-    <button class="g-meal-chip" data-filter="snack">Snack</button>
   </div>
 
-  <!-- Sortable column headers -->
-  <div class="g-meal-table-head">
-    <div class="g-meal-th sorted" data-sort="meal">Meal <span class="sort-arrow">&darr;</span></div>
-    <div class="g-meal-th" data-sort="calories">Cal <span class="sort-arrow">&darr;</span></div>
-    <div class="g-meal-th" data-sort="protein">Protein <span class="sort-arrow">&darr;</span></div>
-    <div class="g-meal-th" data-sort="carbs">Carbs <span class="sort-arrow">&darr;</span></div>
-    <div class="g-meal-th" data-sort="spike">Spike <span class="sort-arrow">&darr;</span></div>
-    <div class="g-meal-th" data-sort="grade">Grade <span class="sort-arrow">&darr;</span></div>
-    <div class="g-meal-th"></div>
-  </div>
+  <div id="amj-subscribe"></div>
+  <div id="amj-bottom-nav"></div>
+  <div id="amj-footer"></div>
 
-  <!-- Meal cards rendered by JS -->
-  <div class="g-meal-cards" id="meal-cards-container"></div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     9j: DYNAMIC PULL-QUOTE #2 — staggered right, editorial
-     ════════════════════════════════════════════════════════════ -->
-<div class="g-pullquote g-pullquote--right reveal" id="g-pullquote-2">
-  <div class="g-pullquote__watermark">02</div>
-  <div class="g-pullquote__text" id="g-pq2-text">
-    Honestly? I don't expect to see much here while I'm eating the way I should be. My glucose tends to stay stable when I'm on. The interesting data will come later — when I reintroduce things, when life gets in the way, when the experiment gets messier. That's when the CGM earns its place.
-  </div>
-  <div class="g-pullquote__attr">
-    <span class="g-pullquote__badge">&mdash; Matthew</span>
-  </div>
-</div>
-
-<!-- ════════════════════════════════════════════════════════════
-     30-DAY TREND CHART
-     ════════════════════════════════════════════════════════════ -->
-<section class="g-chart-section reveal">
-  <div class="g-chart-header">
-    <div class="g-chart-title">30-Day Glucose Trend</div>
-    <div class="g-chart-legend">
-      <div class="g-legend-item"><div class="g-legend-dot" style="background:#2dd4bf"></div> Avg glucose</div>
-      <div class="g-legend-item"><div class="g-legend-dot" style="background:#3ecf8e"></div> TIR %</div>
-    </div>
-  </div>
-  <canvas class="g-chart" id="g-trend-canvas"></canvas>
-</section>
-
-<!-- 9k: narrative context sentence -->
-<p class="g-narrative-context reveal">
-  The trend line tells one story; the individual days tell another. Some days are
-  textbook flat. Others spike and crash. The difference almost always traces back to
-  one variable.
-</p>
-
-<!-- ════════════════════════════════════════════════════════════
-     9e: DAILY GLUCOSE CURVE — 288-reading day plot
-     ════════════════════════════════════════════════════════════ -->
-<section class="g-daycurve-section reveal" id="g-daycurve-section" style="display:none">
-  <div class="g-section-header">Daily Glucose Curve</div>
-  <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.7;margin-bottom:var(--space-6);max-width:600px;">
-    288 readings across 24 hours, with meal events overlaid. The ideal day stays within the
-    <dfn class="g-term" tabindex="0">optimal zone<span class="g-term__tip">70-120 mg/dL. The tighter longevity-medicine target where energy and cognition remain stable. Standard range (70-180) is less strict.</span></dfn>
-    with gentle post-meal rises that return to baseline within 90 minutes.
-  </p>
-  <div class="g-daycurve-wrap">
-    <svg class="g-daycurve-svg" id="g-daycurve-svg" viewBox="0 0 900 260" preserveAspectRatio="none">
-      <!-- Optimal zone band -->
-      <rect x="40" y="40" width="840" height="130" fill="rgba(45,212,191,0.04)" />
-      <line x1="40" y1="40" x2="880" y2="40" stroke="rgba(45,212,191,0.15)" stroke-dasharray="4"/>
-      <line x1="40" y1="170" x2="880" y2="170" stroke="rgba(45,212,191,0.15)" stroke-dasharray="4"/>
-      <text x="36" y="44" fill="rgba(45,212,191,0.4)" font-size="9" font-family="monospace" text-anchor="end">120</text>
-      <text x="36" y="174" fill="rgba(45,212,191,0.4)" font-size="9" font-family="monospace" text-anchor="end">70</text>
-      <!-- Grid lines -->
-      <line x1="40" y1="10" x2="40" y2="240" stroke="rgba(255,255,255,0.04)"/>
-      <line x1="245" y1="10" x2="245" y2="240" stroke="rgba(255,255,255,0.04)"/>
-      <line x1="450" y1="10" x2="450" y2="240" stroke="rgba(255,255,255,0.04)"/>
-      <line x1="655" y1="10" x2="655" y2="240" stroke="rgba(255,255,255,0.04)"/>
-      <line x1="880" y1="10" x2="880" y2="240" stroke="rgba(255,255,255,0.04)"/>
-      <!-- Placeholder glucose trace -->
-      <path id="g-daycurve-path" d="" fill="none" stroke="var(--g-teal)" stroke-width="1.5" opacity="0.7"/>
-      <text x="460" y="135" fill="rgba(255,255,255,0.2)" font-size="12" font-family="monospace" text-anchor="middle" letter-spacing="0.08em">Individual glucose readings render here once intraday CGM data is available. Current data shows daily averages.</text>
-      <!-- Meal event markers (placeholders) -->
-      <g id="g-meal-markers">
-        <line x1="245" y1="10" x2="245" y2="240" stroke="rgba(245,158,11,0.3)" stroke-dasharray="2"/>
-        <text x="248" y="22" fill="var(--g-amber)" font-size="8" font-family="monospace">BREAKFAST</text>
-        <line x1="450" y1="10" x2="450" y2="240" stroke="rgba(245,158,11,0.3)" stroke-dasharray="2"/>
-        <text x="453" y="22" fill="var(--g-amber)" font-size="8" font-family="monospace">LUNCH</text>
-        <line x1="655" y1="10" x2="655" y2="240" stroke="rgba(245,158,11,0.3)" stroke-dasharray="2"/>
-        <text x="658" y="22" fill="var(--g-amber)" font-size="8" font-family="monospace">DINNER</text>
-      </g>
-    </svg>
-    <div class="g-daycurve-labels">
-      <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span>
-    </div>
-  </div>
-
-  <!-- Good Day vs Bad Day comparison -->
-  <div class="g-daycurve-compare">
-    <div class="g-daycurve-compare__card">
-      <div class="g-daycurve-compare__tag">Good Day</div>
-      <div class="g-daycurve-compare__desc">Protein-first meals, post-meal walk, &gt;7h sleep the night before. TIR &gt;95%, max spike &lt;30 mg/dL.</div>
-      <div class="g-daycurve-compare__placeholder">Curve visualization &mdash; populates with data</div>
-    </div>
-    <div class="g-daycurve-compare__card">
-      <div class="g-daycurve-compare__tag" style="color:var(--g-red)">Bad Day</div>
-      <div class="g-daycurve-compare__desc">Refined carbs, no walk, poor sleep. TIR &lt;80%, spikes above 140 after meals, slow return to baseline.</div>
-      <div class="g-daycurve-compare__placeholder">Curve visualization &mdash; populates with data</div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     9j: PULL-QUOTE #3 — staggered left, fiber finding
-     ════════════════════════════════════════════════════════════ -->
-<div class="g-pullquote g-pullquote--left reveal">
-  <div class="g-pullquote__watermark">03</div>
-  <div class="g-pullquote__text">
-    Fiber above <em>30g/day</em> correlates with lower glucose variability &mdash;
-    <dfn class="g-term" tabindex="0">SD<span class="g-term__tip">Standard Deviation of glucose readings. Measures how much glucose fluctuates. Lower SD means more stable glucose throughout the day.</span></dfn>
-    <em>14 vs 22</em>&thinsp;mg/dL on high vs low fiber days.
-  </div>
-  <div class="g-pullquote__attr">
-    <span class="g-pullquote__badge">N=1 &middot; Correlational</span>
-    <span class="g-pullquote__source">MacroFactor fiber data &times; Dexcom Stelo SD &mdash; <a href="/nutrition/" style="color:var(--g-teal);text-decoration:none">Nutrition Observatory</a></span>
-  </div>
-</div>
-
-<!-- ════════════════════════════════════════════════════════════
-     9f: CROSS-DOMAIN VISUALIZATIONS
-     ════════════════════════════════════════════════════════════ -->
-<section class="g-crossdomain-section reveal">
-  <div class="g-section-header">Cross-Domain Patterns</div>
-  <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.7;margin-bottom:var(--space-6);max-width:600px;">
-    Glucose doesn&rsquo;t exist in isolation. Sleep quality, movement, and stress all
-    shape the same curve. These comparisons surface the interactions.
-  </p>
-  <div class="g-crossdomain-grid">
-    <div class="g-crossdomain-card">
-      <div class="g-crossdomain-card__tag">Sleep &times; Glucose</div>
-      <div class="g-crossdomain-card__title">Same meal, different sleep</div>
-      <div class="g-crossdomain-card__desc">
-        Hypothesis: identical meals produce higher spikes after poor sleep. Cortisol from sleep
-        deprivation may impair insulin sensitivity the following day. Testing with paired data.
-      </div>
-      <div class="g-crossdomain-card__placeholder">Comparison chart &mdash; populates with data</div>
-    </div>
-    <div class="g-crossdomain-card">
-      <div class="g-crossdomain-card__tag">Movement &times; Glucose</div>
-      <div class="g-crossdomain-card__title">With vs without post-meal walk</div>
-      <div class="g-crossdomain-card__desc">
-        Hypothesis: a 10-minute walk after eating lowers the post-meal glucose peak.
-        Research suggests muscle contraction creates insulin-independent glucose uptake. Testing with paired data.
-      </div>
-      <div class="g-crossdomain-card__placeholder">Walk vs no-walk overlay &mdash; populates with data</div>
-    </div>
-    <div class="g-crossdomain-card">
-      <div class="g-crossdomain-card__tag">Stress &times; Glucose</div>
-      <div class="g-crossdomain-card__title">Glucose and stress level</div>
-      <div class="g-crossdomain-card__desc">
-        Hypothesis: high-stress days elevate fasting glucose and widen variability,
-        even with identical food intake. Testing the cortisol-glucose axis with paired data.
-      </div>
-      <div class="g-crossdomain-card__placeholder">Stress correlation &mdash; populates with data</div>
-    </div>
-  </div>
-</section>
-
-<!-- 9k: narrative context sentence -->
-<p class="g-narrative-context reveal">
-  The more cross-domain data I layered in, the clearer it became: glucose isn&rsquo;t just
-  about food. It&rsquo;s about everything &mdash; sleep, movement, stress, timing.
-</p>
-
-<!-- ════════════════════════════════════════════════════════════
-     9g: NOCTURNAL GLUCOSE PATTERNS
-     ════════════════════════════════════════════════════════════ -->
-<section class="g-nocturnal-section reveal">
-  <div class="g-section-header">Nocturnal Glucose Patterns</div>
-  <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.7;margin-bottom:var(--space-6);max-width:600px;">
-    What happens to glucose while you sleep reveals metabolic health that daytime
-    readings can&rsquo;t capture. The dawn phenomenon, overnight stability, and how
-    sleep architecture shapes nighttime glucose are all visible in CGM data.
-  </p>
-  <div class="g-nocturnal-grid">
-    <div class="g-accent-card">
-      <div class="g-accent-card__title">Dawn Phenomenon</div>
-      <div class="g-accent-card__body">
-        A natural glucose rise between 4&ndash;7 AM driven by cortisol and growth hormone.
-        Normal in healthy individuals. Tracking magnitude over time to establish personal baseline.
-        Currently seeing <em>10&ndash;18 mg/dL</em> pre-dawn rise.
-      </div>
-    </div>
-    <div class="g-accent-card">
-      <div class="g-accent-card__title">Overnight Stability</div>
-      <div class="g-accent-card__body">
-        Glucose should remain relatively flat during deep sleep (10 PM &ndash; 3 AM).
-        Elevated overnight variability often correlates with late-night eating or
-        poor sleep quality. Target: <em>SD &lt;10 mg/dL</em> overnight.
-      </div>
-    </div>
-    <div class="g-accent-card">
-      <div class="g-accent-card__title">Sleep Architecture &times; Glucose</div>
-      <div class="g-accent-card__body">
-        Deep sleep stages correlate with the most stable glucose. REM sleep shows
-        slight increases likely tied to cortisol cycling. Nights with &gt;90 min deep
-        sleep show <em>lower morning fasting glucose</em> the next day.
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     9j: PULL-QUOTE #4 — dynamic, staggered right
-     ════════════════════════════════════════════════════════════ -->
-<div class="g-pullquote g-pullquote--right reveal" id="g-pullquote-4">
-  <div class="g-pullquote__watermark">04</div>
-  <div class="g-pullquote__text" id="g-pq4-text">
-    Testing whether <em>sleep quality</em> changes how the same meal affects glucose &mdash;
-    this requires repeated meals across different sleep conditions.
-  </div>
-  <div class="g-pullquote__attr">
-    <span class="g-pullquote__badge">Pending data</span>
-    <span class="g-pullquote__source">Whoop sleep quality &times; Dexcom Stelo meal response</span>
-  </div>
-</div>
-
-<!-- ════════════════════════════════════════════════════════════
-     N=1 RULES
-     ════════════════════════════════════════════════════════════ -->
-<div class="g-pullquote g-pullquote--right reveal" style="border-bottom:1px solid var(--border);">
-  <blockquote class="g-pullquote__text">
-    &ldquo;The CGM didn&rsquo;t change what he eats. It changed the order. Protein first, then everything else &mdash; and the spikes just stopped mattering.&rdquo;
-  </blockquote>
-  <div class="g-pullquote__attr">
-    <span class="g-pullquote__badge">Chronicle &middot; Elena Voss</span>
-    <span class="g-pullquote__source">AI narrative voice &mdash; <a href="/chronicle/" style="color:var(--g-teal,#2dd4bf);text-decoration:none;">Read the chronicle &rarr;</a></span>
-  </div>
-</div>
-
-<section class="g-rules-section reveal">
-  <div class="g-section-header">Glucose Hypotheses Under Test</div>
-  <div class="g-rule-grid">
-    <div class="g-rule">
-      <div class="g-rule__num">H-01</div>
-      <div class="g-rule__finding">Protein-first meal ordering blunts post-meal glucose spikes</div>
-      <div class="g-rule__evidence">Research-backed &rarr; testing with paired CGM data &rarr; <a href="/nutrition/">Nutrition</a></div>
-    </div>
-    <div class="g-rule">
-      <div class="g-rule__num">H-02</div>
-      <div class="g-rule__finding">Post-meal walking reduces peak glucose</div>
-      <div class="g-rule__evidence">Muscle contraction drives <em>insulin-independent glucose uptake</em> &rarr; testing with step data</div>
-    </div>
-    <div class="g-rule">
-      <div class="g-rule__num">H-03</div>
-      <div class="g-rule__finding">Higher fiber intake correlates with lower glucose variability</div>
-      <div class="g-rule__evidence">Testing with MacroFactor fiber logs &times; CGM variability &rarr; <a href="/explorer/">Data Explorer</a></div>
-    </div>
-    <div class="g-rule">
-      <div class="g-rule__num">H-04</div>
-      <div class="g-rule__finding">Poor sleep elevates next-morning fasting glucose</div>
-      <div class="g-rule__evidence">Cortisol pathway &rarr; testing with Whoop sleep quality &times; morning CGM &rarr; <a href="/sleep/">Sleep</a></div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     9i: GENOMICS CONNECTION
-     ════════════════════════════════════════════════════════════ -->
-<section class="g-genomics-section reveal">
-  <div class="g-section-header">Genomic Context</div>
-  <div class="g-accent-card" style="max-width:640px;">
-    <div class="g-accent-card__title">Why my glucose curve is mine</div>
-    <div class="g-accent-card__body">
-      Genetic variants in <em>FADS2</em> (fatty acid desaturase) and <em>MTHFR</em> (methylation pathway)
-      affect how individuals metabolize carbohydrates and process glucose differently.
-      Population averages for glycemic index don&rsquo;t account for these variants &mdash; which is
-      exactly why N=1 CGM data matters more than any food label.
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     9l: PSYCHOLOGICAL THREAD
-     ════════════════════════════════════════════════════════════ -->
-<section class="g-psych-section reveal">
-  <div class="g-section-header">Why CGM</div>
-  <div class="g-psych-body">
-    <p style="margin-bottom:var(--space-4);">
-      I've been curious about glucose for years — specifically whether certain foods respond differently in my body than they might in someone else's. When Dexcom launched the Stelo without a prescription, I didn't need much convincing. It was the first time I could actually get the data without a doctor's visit.
-    </p>
-    <p style="margin-bottom:var(--space-4);">
-      The question I'm interested in isn't whether my glucose is 'good or bad.' It's more specific than that: what does my body actually do with what I eat? Which foods spike me that probably shouldn't? Which ones don't? And what context — sleep, stress, timing, activity — changes the curve?
-    </p>
-    <p>
-      The CGM doesn't answer those questions on day one. It answers them over months of logged meals and paired data. That's what this page tracks.
-    </p>
-  </div>
-</section>
-
-</div><!-- /g-content -->
-
-<!-- ════════════════════════════════════════════════════════════
-     V3 Section 5: CROSS-DOMAIN
-     ════════════════════════════════════════════════════════════ -->
-<div id="obs-v3-cross"></div>
-
-<!-- ════════════════════════════════════════════════════════════
-     V3 Section 6: DEPTH (Collapsed)
-     ════════════════════════════════════════════════════════════ -->
-<div id="obs-v3-depth"></div>
-
-<div class="obs-insight" id="obs-insight"></div>
-
-<!-- AI expert analysis now rendered by V3 coach at position 2 (renderCoachAnalysis above) -->
-
-<nav class="reading-path-v2">
-  <a href="/sleep/" class="reading-path-v2__link">
-    <span class="reading-path-v2__dir">&larr; Previous</span>
-    <span class="reading-path-v2__title">Sleep</span>
-  </a>
-  <a href="/benchmarks/" class="reading-path-v2__link reading-path-v2__link--next">
-    <span class="reading-path-v2__dir">Next &rarr;</span>
-    <span class="reading-path-v2__title">Benchmarks</span>
-  </a>
-</nav>
-
-<div id="amj-subscribe"></div>
-<div id="amj-bottom-nav"></div>
-<div id="amj-footer"></div>
-
-<script src="/assets/js/site_constants.js"></script>
-<script src="/assets/js/components.js"></script>
-<script src="/assets/js/observatory-v3.js"></script>
-<script src="/assets/js/cycle-pause.js"></script>
-<script src="/assets/js/nav.js"></script>
-<script src="/assets/js/engagement.js"></script>
-<script>
-  initObservatoryWeek('glucose', 'obs-thisweek');
-  fetch('/api/observatory_week?domain=glucose').then(r=>r.ok?r.json():null).then(d=>{
-    if(d&&d.last_updated) initObsFreshness(d.last_updated);
-  }).catch(function(){});
-</script>
-<script src="/assets/js/reveal.js"></script>
-<script>
-/* ── V3: Coach Analysis (position 2) — fires immediately ── */
-renderCoachAnalysis('obs-v3-coach', 'glucose', {
-  name: 'Dr. Amara Patel',
-  initials: 'AP',
-  title: 'Metabolic health researcher',
-  color: '#2dd4bf'
-});
-
-(async function() {
-  var API = 'https://averagejoematt.com';
-  var loading = document.getElementById('g-loading');
-  var content = document.getElementById('g-content');
-  var setText = function(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
-  var setWidth = function(id, pct) { var el = document.getElementById(id); if (el) el.style.width = Math.min(100, Math.max(0, pct)) + '%'; };
-  var circ = 2 * Math.PI * 35;
-
-  function setArc(id, pct) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    var len = (Math.min(pct, 100) / 100) * circ;
-    el.setAttribute('stroke-dasharray', len + ' ' + (circ - len));
-  }
-
-  /* ── 9c/9d: Meal Response Table ─────────────────────────── */
-
-  // Static fallback data (9m: used when /api/meal_responses is unavailable)
-  // No fallback meals — only show real MacroFactor data paired with CGM readings.
-  // If the API returns no data, the table shows an honest "no data yet" message.
-  var mealData = [];
-  var currentFilter = 'all';
-  var currentSort = { key: 'spike', asc: false };
-
-  // Try to load real meal × CGM data from API
+  <script src="/assets/js/site_constants.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/nav.js"></script>
+  <script>
   (function() {
-    fetch('/api/meal_glucose')
+    'use strict';
+
+    var API_BASE = (typeof AMJ !== 'undefined' && AMJ.API_BASE) ? AMJ.API_BASE : '';
+
+    /* ── Window definitions: maps to standings rows ─────────── */
+    var WINDOW_ORDER = ['fasting','breakfast','lunch','dinner','overnight'];
+    var WINDOW_LABELS = {
+      fasting:   'Fasting',
+      breakfast: 'Post-Breakfast',
+      lunch:     'Post-Lunch',
+      dinner:    'Post-Dinner',
+      overnight: 'Overnight'
+    };
+    var WINDOW_CONTEXT = {
+      fasting:   'AM baseline · 5–7 AM',
+      breakfast: 'Spike + return · 0–2h',
+      lunch:     'Midday peak · 0–2h',
+      dinner:    'Evening peak · 0–2h',
+      overnight: 'SD overnight · 10p–3a'
+    };
+
+    function fmtDate(s) {
+      try {
+        var d = new Date(s + 'T12:00:00');
+        return d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' }).toUpperCase();
+      } catch(e) { return s; }
+    }
+
+    function timePrefix() {
+      var h = new Date().getHours();
+      if (h < 10) return 'Morning read: ';
+      if (h < 14) return 'Midday check: ';
+      if (h < 18) return 'Afternoon: ';
+      return 'End of day: ';
+    }
+
+    function statusFromMetrics(g) {
+      var tir = g.time_in_range_pct || 0;
+      var sd = g.std_dev || 0;
+      if (tir >= 90 && sd < 20) return { word: 'STABLE', cls: 'fp-lede__status--strong' };
+      if (tir >= 75) return { word: 'WATCH', cls: 'fp-lede__status--watch' };
+      return { word: 'VOLATILE', cls: 'fp-lede__status--attention' };
+    }
+
+    function narrativeFromMetrics(g) {
+      var tir = g.time_in_range_pct;
+      var avg = g.avg_mg_dl;
+      var sd = g.std_dev;
+      if (tir == null && avg == null) return 'CGM is collecting. The dispatch fills in as readings arrive.';
+      var bits = [];
+      if (tir != null) bits.push('time-in-range at ' + tir.toFixed(0) + '%');
+      if (avg != null) bits.push('average ' + avg.toFixed(0) + ' mg/dL');
+      if (sd != null) bits.push('variability SD ' + sd.toFixed(0));
+      var verdict = '';
+      if (tir != null && tir >= 90) verdict = ' The glucose is behaving.';
+      else if (tir != null && tir >= 75) verdict = ' Mostly in range; a few excursions to investigate.';
+      else if (tir != null) verdict = ' Notable swings — worth pairing against the food log.';
+      return 'The body is reporting ' + bits.join(', ') + '.' + verdict;
+    }
+
+    /* ── Standings (windows) renderer ───────────────────────── */
+    function buildWindowsFromGlucose(g, trend) {
+      // Adapt the single-day glucose object into per-window rows.
+      // The current API doesn't break out per-window stats, so we synthesize
+      // sensible context strings from the metrics that ARE available and
+      // fill values that map onto each window's headline metric.
+      var w = g.windows || {};
+      function pick(key, fallback) { return w[key] != null ? w[key] : fallback; }
+
+      var fasting = pick('fasting_avg', g.fasting_avg);
+      var brSpike = pick('breakfast_spike', null);
+      var lnSpike = pick('lunch_spike', null);
+      var dnSpike = pick('dinner_spike', null);
+      var ovSD    = pick('overnight_sd', null);
+
+      var rows = [
+        {
+          key: 'fasting',
+          value: fasting != null ? Math.round(fasting) : (g.avg_mg_dl != null ? Math.round(g.avg_mg_dl) : null),
+          unit: 'mg/dL',
+          state: fasting != null ? (fasting < 100 ? 'green' : fasting < 110 ? 'amber' : 'red') : 'green',
+          spark: trend.slice(-7).map(function(d) { return d.fasting != null ? d.fasting : d.avg; })
+        },
+        {
+          key: 'breakfast',
+          value: brSpike != null ? '+' + Math.round(brSpike) : (g.max_spike != null ? '+' + Math.round(g.max_spike) : null),
+          unit: 'mg/dL',
+          state: brSpike != null ? (brSpike < 30 ? 'green' : brSpike < 50 ? 'amber' : 'red') : 'amber',
+          spark: trend.slice(-7).map(function(d) { return d.breakfast_spike || d.max_spike || null; })
+        },
+        {
+          key: 'lunch',
+          value: lnSpike != null ? '+' + Math.round(lnSpike) : null,
+          unit: 'mg/dL',
+          state: lnSpike != null ? (lnSpike < 30 ? 'green' : lnSpike < 50 ? 'amber' : 'red') : 'amber',
+          spark: trend.slice(-7).map(function(d) { return d.lunch_spike || null; })
+        },
+        {
+          key: 'dinner',
+          value: dnSpike != null ? '+' + Math.round(dnSpike) : null,
+          unit: 'mg/dL',
+          state: dnSpike != null ? (dnSpike < 30 ? 'green' : dnSpike < 50 ? 'amber' : 'red') : 'amber',
+          spark: trend.slice(-7).map(function(d) { return d.dinner_spike || null; })
+        },
+        {
+          key: 'overnight',
+          value: ovSD != null ? Math.round(ovSD) : (g.std_dev != null ? Math.round(g.std_dev) : null),
+          unit: 'SD',
+          state: ovSD != null ? (ovSD < 10 ? 'green' : ovSD < 18 ? 'amber' : 'red') : 'green',
+          spark: trend.slice(-7).map(function(d) { return d.overnight_sd || d.sd || null; })
+        }
+      ];
+      return rows;
+    }
+
+    function renderSpark(values, state) {
+      var clean = (values || []).filter(function(v) { return v != null; });
+      if (clean.length === 0) return '';
+      var max = Math.max.apply(null, clean);
+      var min = Math.min.apply(null, clean);
+      var range = max - min || 1;
+      var html = '<div class="fp-spark fp-spark--' + (state || 'green') + '">';
+      clean.forEach(function(v) {
+        var pct = Math.max(10, ((v - min) / range) * 100);
+        html += '<div class="fp-spark__bar" style="height:' + pct + '%"></div>';
+      });
+      html += '</div>';
+      return html;
+    }
+
+    function iconHTML() {
+      // A small generic dot — windows don't have per-row icons in the data.
+      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9" opacity="0.4"/></svg>';
+    }
+
+    function renderStandings(rows) {
+      var box = document.getElementById('fp-standings-rows');
+      box.innerHTML = '';
+      var any = false;
+      rows.forEach(function(r) {
+        if (r.value == null) return;
+        any = true;
+        var html =
+          '<div class="fp-row">' +
+            '<div class="fp-row__icon">' + iconHTML() + '</div>' +
+            '<div class="fp-row__name">' + WINDOW_LABELS[r.key] + '</div>' +
+            '<div class="fp-row__context">' + WINDOW_CONTEXT[r.key] + '</div>' +
+            '<div class="fp-row__value">' +
+              '<span class="fp-row__num">' + r.value + '</span>' +
+              '<span class="fp-row__unit">' + r.unit + '</span>' +
+            '</div>' +
+            '<div class="fp-row__spark">' + renderSpark(r.spark, r.state) + '</div>' +
+          '</div>';
+        box.insertAdjacentHTML('beforeend', html);
+      });
+      if (!any) {
+        box.innerHTML = '<div class="g-row-empty">No window data reporting yet today.</div>';
+      }
+    }
+
+    /* ── Masthead / lede rendering ──────────────────────────── */
+    function renderMasthead(g, dispatchNum) {
+      document.getElementById('fp-dispatch').textContent = dispatchNum || '—';
+      document.getElementById('fp-day-strip').textContent = dispatchNum || '—';
+      var dateStr = g.latest_reading_date || g.as_of_date || '';
+      document.getElementById('fp-date').textContent = dateStr ? fmtDate(dateStr) : 'TODAY';
+      if (g.sensor_day) {
+        document.getElementById('fp-sensor-day').textContent = 'Sensor: Day ' + g.sensor_day + ' of 15';
+      } else {
+        document.getElementById('fp-sensor-day').textContent = 'Sensor: live';
+      }
+      var now = new Date();
+      var hh = String(now.getHours()).padStart(2,'0');
+      var mm = String(now.getMinutes()).padStart(2,'0');
+      document.getElementById('fp-filed').textContent = 'Filed ' + hh + ':' + mm + ' · CGM auto-sync';
+    }
+
+    function renderLede(g, dispatchNum) {
+      document.getElementById('fp-day').textContent = dispatchNum || '—';
+      var s = statusFromMetrics(g);
+      var statusEl = document.getElementById('fp-status');
+      statusEl.textContent = "▸ TODAY'S DESPATCH · STATE: " + s.word;
+      statusEl.className = 'fp-lede__status ' + s.cls;
+
+      var narr = narrativeFromMetrics(g);
+      document.getElementById('fp-narrative').textContent = '"' + timePrefix() + narr + '"';
+
+      // Delta strip — built from headline metrics
+      var el = document.getElementById('fp-delta');
+      var items = [];
+      if (g.time_in_range_pct != null) {
+        items.push({ text: 'TIR ' + g.time_in_range_pct.toFixed(0) + '%', good: g.time_in_range_pct >= 90 });
+      }
+      if (g.avg_mg_dl != null) {
+        items.push({ text: 'Avg ' + g.avg_mg_dl.toFixed(0) + ' mg/dL', good: g.avg_mg_dl < 110 });
+      }
+      if (g.std_dev != null) {
+        items.push({ text: 'SD ' + g.std_dev.toFixed(0), good: g.std_dev < 18 });
+      }
+      if (g.time_in_optimal_pct != null) {
+        items.push({ text: 'Optimal ' + g.time_in_optimal_pct.toFixed(0) + '%', good: g.time_in_optimal_pct >= 70 });
+      }
+      if (!items.length) { el.style.display = 'none'; return; }
+      el.style.display = '';
+      var html = '<span class="fp-lede__delta-label">Today:</span>';
+      html += items.map(function(d) {
+        return '<span class="' + (d.good ? 'fp-delta--good' : 'fp-delta--bad') + '">' + d.text + '</span>';
+      }).join('');
+      el.innerHTML = html;
+    }
+
+    function renderWatch(g) {
+      var w = document.getElementById('fp-watch');
+      var msg = '';
+      var attention = false;
+      if (g.time_above_180_pct != null && g.time_above_180_pct > 5) {
+        msg = (g.time_above_180_pct).toFixed(1) + '% of the day spent above 180 mg/dL — investigate which meal drove it.';
+        attention = true;
+      } else if (g.std_dev != null && g.std_dev > 22) {
+        msg = 'Variability SD ' + g.std_dev.toFixed(0) + ' is elevated. High SD often tracks with poor sleep or refined-carb meals.';
+      } else if (g.time_in_range_pct != null && g.time_in_range_pct < 75) {
+        msg = 'Time-in-range dropped below 75% today. Check the meal-response table for outliers.';
+      }
+      if (!msg) { w.style.display = 'none'; return; }
+      w.classList.toggle('fp-watch--attention', attention);
+      document.getElementById('fp-watch-label').textContent = attention ? 'Attention' : 'Watch';
+      document.getElementById('fp-watch-text').textContent = msg;
+      w.style.display = '';
+    }
+
+    function renderArc(g, trend) {
+      // Long-arc = 30-day TIR series.
+      var tirSeries = (trend || []).map(function(d) { return d.tir != null ? d.tir : null; }).filter(function(v) { return v != null; });
+      var section = document.getElementById('fp-arc-section');
+      if (tirSeries.length < 2) {
+        // Fall back to avg glucose series if TIR not in the trend.
+        var avgSeries = (trend || []).map(function(d) { return d.avg != null ? d.avg : null; }).filter(function(v) { return v != null; });
+        if (avgSeries.length < 2) {
+          // Hide chart area but keep current TIR readout if available.
+          var cur = g.time_in_range_pct;
+          if (cur != null) {
+            document.getElementById('fp-arc-current').textContent = cur.toFixed(0) + '%';
+            document.getElementById('fp-arc-first').textContent = '—';
+            document.getElementById('fp-arc-avg').textContent = cur.toFixed(0) + '%';
+          } else {
+            section.style.display = 'none';
+          }
+          return;
+        }
+        // Render avg-glucose arc instead.
+        renderArcChart(avgSeries, ' mg/dL');
+        var curAvg = avgSeries[avgSeries.length - 1];
+        document.getElementById('fp-arc-num').innerHTML =
+          Math.round(avgSeries[0]) + ' → <span class="fp-arc__num-current">' + Math.round(curAvg) + '</span> mg/dL';
+        document.getElementById('fp-arc-avg').textContent = Math.round(avgSeries.reduce(function(a,b){return a+b;}, 0) / avgSeries.length) + ' mg/dL';
+        return;
+      }
+
+      var first = tirSeries[0];
+      var current = tirSeries[tirSeries.length - 1];
+      var best = Math.max.apply(null, tirSeries);
+      var avgTir = tirSeries.reduce(function(a,b){return a+b;}, 0) / tirSeries.length;
+
+      document.getElementById('fp-arc-first').textContent = first.toFixed(0) + '%';
+      document.getElementById('fp-arc-current').textContent = current.toFixed(0) + '%';
+      document.getElementById('fp-arc-avg').textContent = avgTir.toFixed(0) + '%';
+      document.getElementById('fp-arc-best').textContent = best.toFixed(0) + '%';
+      document.getElementById('fp-arc-avgmgdl').textContent = g.avg_mg_dl != null ? g.avg_mg_dl.toFixed(0) + ' mg/dL' : '—';
+
+      renderArcChart(tirSeries, '%');
+
+      document.getElementById('fp-arc-caption').innerHTML =
+        '<span>Day 1 · ' + first.toFixed(0) + '%</span>' +
+        '<span>Today · ' + current.toFixed(0) + '%</span>';
+    }
+
+    function renderArcChart(values, unit) {
+      var w = 1100, h = 80, pad = 4;
+      var max = Math.max.apply(null, values);
+      var min = Math.min.apply(null, values);
+      var range = max - min || 1;
+      var pts = values.map(function(v, i) {
+        var x = pad + (i / (values.length - 1)) * (w - 2 * pad);
+        var y = pad + (1 - (v - min) / range) * (h - 2 * pad);
+        return x.toFixed(1) + ',' + y.toFixed(1);
+      });
+      var area = pts.join(' ') + ' ' + (w - pad) + ',' + (h - pad) + ' ' + pad + ',' + (h - pad);
+      document.getElementById('fp-arc-chart').innerHTML =
+        '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
+          '<polygon class="fp-arc__chart-area" points="' + area + '"/>' +
+          '<polyline class="fp-arc__chart-line" points="' + pts.join(' ') + '"/>' +
+        '</svg>';
+    }
+
+    /* ── Daily curve (extra) ────────────────────────────────── */
+    function renderDayCurve(readings) {
+      if (!readings || readings.length < 2) return;
+      var section = document.getElementById('g-daycurve-section');
+      var path = document.getElementById('g-daycurve-path');
+      // Plot in the SVG viewBox (900x220) — x mapped 40..880, y mapped 70..180 -> 154..34
+      var x0 = 40, x1 = 880, y70 = 154, y120 = 34;
+      // Allow any reading; we'll clamp to a 40..220 mg/dL window for display.
+      var yMin = 40, yMax = 220;
+      var yTop = 10, yBot = 200;
+      function yOf(v) { return yBot - ((v - yMin) / (yMax - yMin)) * (yBot - yTop); }
+      var n = readings.length;
+      var d = readings.map(function(r, i) {
+        var x = x0 + (i / (n - 1)) * (x1 - x0);
+        var v = (typeof r === 'number') ? r : (r.mg_dl || r.value || r.glucose);
+        if (v == null) return null;
+        return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + yOf(v).toFixed(1);
+      }).filter(Boolean).join(' ');
+      if (!d) return;
+      path.setAttribute('d', d);
+      section.style.display = '';
+    }
+
+    /* ── Meal response table ────────────────────────────────── */
+    var mealData = [];
+    var currentFilter = 'all';
+    var currentSort = { key: 'spike', asc: false };
+
+    function spikeClass(spike) {
+      if (spike <= 20) return 'green';
+      if (spike <= 35) return 'amber';
+      return 'red';
+    }
+    function gradeClass(grade) { return (grade || '').toLowerCase(); }
+
+    function miniCurve(type) {
+      var paths = {
+        flat:     'M0 14 Q8 12 16 13 Q24 12 32 14',
+        gentle:   'M0 16 Q8 8  16 6  Q24 10 32 15',
+        moderate: 'M0 16 Q8 4  16 3  Q24 8  32 15',
+        steep:    'M0 16 Q8 2  14 1  Q22 6  32 16'
+      };
+      var colorByType = {
+        flat: 'var(--c-green-500)', gentle: 'var(--accent)',
+        moderate: 'var(--c-yellow-status)', steep: 'var(--c-red-status)'
+      };
+      return '<svg width="32" height="18" viewBox="0 0 32 18"><path d="' + (paths[type] || paths.gentle) + '" fill="none" stroke="' + (colorByType[type] || 'var(--accent)') + '" stroke-width="1.5"/></svg>';
+    }
+
+    function renderMeals() {
+      var box = document.getElementById('g-meal-cards');
+      if (!box) return;
+      if (!mealData.length) {
+        box.innerHTML = '<div class="g-row-empty">Meal × CGM data appears here once MacroFactor logs overlap with readings.</div>';
+        return;
+      }
+      var term = ((document.getElementById('g-meal-search') || {}).value || '').toLowerCase().trim();
+      var filtered = mealData.filter(function(m) {
+        var matchFilter = currentFilter === 'all' || m.category === currentFilter;
+        var matchSearch = !term || ((m.meal || m.name || '') + '').toLowerCase().indexOf(term) >= 0;
+        return matchFilter && matchSearch;
+      });
+      filtered.sort(function(a, b) {
+        var va = a[currentSort.key], vb = b[currentSort.key];
+        if (typeof va === 'string') va = va.toLowerCase();
+        if (typeof vb === 'string') vb = vb.toLowerCase();
+        if (va < vb) return currentSort.asc ? -1 : 1;
+        if (va > vb) return currentSort.asc ? 1 : -1;
+        return 0;
+      });
+      box.innerHTML = filtered.map(function(m) {
+        var sc = spikeClass(m.spike);
+        var name = m.meal || m.name || '—';
+        return '<div class="g-meal-card g-meal-card--' + sc + '">' +
+          '<div class="g-meal-card__name">' + name + '</div>' +
+          '<div class="g-meal-card__val">' + (m.calories != null ? m.calories : '—') + '</div>' +
+          '<div class="g-meal-card__val">' + (m.protein != null ? m.protein + 'g' : '—') + '</div>' +
+          '<div class="g-meal-card__val">' + (m.carbs != null ? m.carbs + 'g' : '—') + '</div>' +
+          '<div class="g-meal-card__spike g-meal-card__spike--' + sc + '">+' + (m.spike != null ? m.spike : '—') + '</div>' +
+          '<div class="g-meal-card__grade g-meal-card__grade--' + gradeClass(m.grade || 'b') + '">' + (m.grade || '—') + '</div>' +
+          '<div class="g-meal-card__curve">' + miniCurve(m.curve) + '</div>' +
+          '</div>';
+      }).join('') || '<div class="g-row-empty">No meals match the current filter.</div>';
+    }
+
+    document.querySelectorAll('.g-meal-chip').forEach(function(chip) {
+      chip.addEventListener('click', function() {
+        document.querySelectorAll('.g-meal-chip').forEach(function(c) { c.classList.remove('is-active'); });
+        chip.classList.add('is-active');
+        currentFilter = chip.getAttribute('data-filter');
+        renderMeals();
+      });
+    });
+
+    var searchEl = document.getElementById('g-meal-search');
+    if (searchEl) {
+      var t;
+      searchEl.addEventListener('input', function() {
+        clearTimeout(t);
+        t = setTimeout(renderMeals, 200);
+      });
+    }
+
+    /* ── Fetch meal-response data (preserved from prior page) ─ */
+    fetch(API_BASE + '/api/meal_glucose')
       .then(function(r) { return r.ok ? r.json() : null; })
       .then(function(data) {
-        if (data && data.meals && data.meals.length > 0) {
+        if (data && data.meals && data.meals.length) {
           mealData = data.meals;
           renderMeals();
         }
       })
       .catch(function() {});
+
+    fetch(API_BASE + '/api/meal_responses')
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(data) {
+        if (data && data.meals && data.meals.length) {
+          mealData = data.meals;
+          renderMeals();
+        }
+      })
+      .catch(function() {});
+
+    /* ── Fetch glucose dashboard ────────────────────────────── */
+    fetch(API_BASE + '/api/glucose')
+      .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function(data) {
+        var g = data.glucose || data;
+        var trend = data.glucose_trend || g.trend || [];
+        if (!g) {
+          document.getElementById('fp-narrative').textContent = 'CGM data will appear here once Dexcom Stelo readings sync.';
+          return;
+        }
+        var dispatchNum = g.reading_day || g.day_number || (trend && trend.length) || '—';
+        renderMasthead(g, dispatchNum);
+        renderLede(g, dispatchNum);
+        renderWatch(g);
+        renderStandings(buildWindowsFromGlucose(g, trend));
+        renderArc(g, trend);
+        if (g.intraday_readings) renderDayCurve(g.intraday_readings);
+        else if (data.intraday) renderDayCurve(data.intraday);
+      })
+      .catch(function(err) {
+        console.error('[glucose] fetch failed:', err);
+        document.getElementById('fp-narrative').textContent = "Could not load today's glucose. Refresh to try again.";
+      });
   })();
+  </script>
 
-  // Mini glucose curve SVG
-  function miniCurve(type) {
-    var paths = {
-      flat: 'M0 14 Q8 12 16 13 Q24 12 32 14',
-      gentle: 'M0 16 Q8 8 16 6 Q24 10 32 15',
-      moderate: 'M0 16 Q8 4 16 3 Q24 8 32 15',
-      steep: 'M0 16 Q8 2 14 1 Q22 6 32 16'
-    };
-    var colors = { flat: '#3ecf8e', gentle: '#2dd4bf', moderate: '#f59e0b', steep: '#ef4444' };
-    return '<svg width="32" height="18" viewBox="0 0 32 18"><path d="' + (paths[type] || paths.gentle) + '" fill="none" stroke="' + (colors[type] || '#2dd4bf') + '" stroke-width="1.5"/></svg>';
-  }
-
-  function spikeClass(spike) {
-    if (spike <= 20) return 'green';
-    if (spike <= 35) return 'amber';
-    return 'red';
-  }
-
-  function gradeClass(grade) {
-    return grade.toLowerCase();
-  }
-
-  function renderMeals() {
-    var container = document.getElementById('meal-cards-container');
-    if (!container) return;
-    if (!mealData || mealData.length === 0) {
-      container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:2rem 0;">Meal glucose data will appear here once MacroFactor food logs overlap with CGM readings.</p>';
-      return;
-    }
-    var _searchTerm = (document.getElementById('g-meal-search') || {}).value || '';
-    _searchTerm = _searchTerm.toLowerCase().trim();
-    var filtered = mealData.filter(function(m) {
-      var matchFilter = currentFilter === 'all' || m.category === currentFilter;
-      var matchSearch = !_searchTerm || (m.name || '').toLowerCase().indexOf(_searchTerm) >= 0;
-      return matchFilter && matchSearch;
-    });
-    filtered.sort(function(a, b) {
-      var va = a[currentSort.key], vb = b[currentSort.key];
-      if (typeof va === 'string') va = va.toLowerCase();
-      if (typeof vb === 'string') vb = vb.toLowerCase();
-      if (va < vb) return currentSort.asc ? -1 : 1;
-      if (va > vb) return currentSort.asc ? 1 : -1;
-      return 0;
-    });
-    container.innerHTML = filtered.map(function(m) {
-      var sc = spikeClass(m.spike);
-      return '<div class="g-meal-card g-meal-card--' + sc + '">' +
-        '<div class="g-meal-card__name">' + m.meal + '</div>' +
-        '<div class="g-meal-card__val">' + m.calories + '</div>' +
-        '<div class="g-meal-card__val">' + m.protein + 'g</div>' +
-        '<div class="g-meal-card__val">' + m.carbs + 'g</div>' +
-        '<div class="g-meal-card__spike g-meal-card__spike--' + sc + '">+' + m.spike + '</div>' +
-        '<div class="g-meal-card__grade g-meal-card__grade--' + gradeClass(m.grade) + '">' + m.grade + '</div>' +
-        '<div class="g-meal-card__curve">' + miniCurve(m.curve) + '</div>' +
-        '</div>';
-    }).join('');
-  }
-
-  // Filter chips
-  document.querySelectorAll('.g-meal-chip').forEach(function(chip) {
-    chip.addEventListener('click', function() {
-      document.querySelectorAll('.g-meal-chip').forEach(function(c) { c.classList.remove('active'); });
-      chip.classList.add('active');
-      currentFilter = chip.getAttribute('data-filter');
-      renderMeals();
-    });
-  });
-
-  // Sortable headers
-  document.querySelectorAll('.g-meal-th[data-sort]').forEach(function(th) {
-    th.addEventListener('click', function() {
-      var key = th.getAttribute('data-sort');
-      if (currentSort.key === key) {
-        currentSort.asc = !currentSort.asc;
-      } else {
-        currentSort.key = key;
-        currentSort.asc = true;
-      }
-      document.querySelectorAll('.g-meal-th').forEach(function(t) { t.classList.remove('sorted'); });
-      th.classList.add('sorted');
-      th.querySelector('.sort-arrow').textContent = currentSort.asc ? '\u2193' : '\u2191';
-      renderMeals();
-    });
-  });
-
-  // 9m: Try API first, fall back to static data
-  try {
-    var mealResp = await fetch(API + '/api/meal_responses');
-    if (mealResp.ok) {
-      var mealJson = await mealResp.json();
-      if (mealJson.meals && mealJson.meals.length > 0) {
-        mealData = mealJson.meals;
-      }
-    }
-  } catch (e) {
-    // Gracefully fall back to static data — endpoint not built yet
-  }
-  renderMeals();
-
-  // G2: Wire search input with debounce
-  var _mealSearchEl = document.getElementById('g-meal-search');
-  if (_mealSearchEl) {
-    var _mealSearchTimer;
-    _mealSearchEl.addEventListener('input', function() {
-      clearTimeout(_mealSearchTimer);
-      _mealSearchTimer = setTimeout(renderMeals, 200);
-    });
-  }
-
-  /* ── Main glucose data ─────────────────────────────────── */
-
-  try {
-    var resp = await fetch(API + '/api/glucose');
-    if (!resp.ok) throw new Error(resp.status);
-    var data = await resp.json();
-    var g = data.glucose;
-    var trend = data.glucose_trend || [];
-    if (!g) {
-      loading.textContent = 'CGM data will appear here once Dexcom Stelo readings are imported.';
-      content.style.display = 'block';  // Show meal table even without CGM
-      renderMeals();
-      return;
-    }
-
-    /* ── Hero gauges ── */
-    var tir = g.time_in_range_pct || 0;
-    setText('gg-tir-num', tir ? tir.toFixed(0) : '\u2014');
-    setArc('gg-tir-arc', tir);
-
-    var avg = g.avg_mg_dl || 0;
-    setText('gg-avg-num', avg ? avg.toFixed(0) : '\u2014');
-    setArc('gg-avg-arc', avg ? Math.min(100, ((180 - avg) / 80) * 100) : 0);
-
-    var sd = g.std_dev || 0;
-    setText('gg-sd-num', sd ? sd.toFixed(0) : '\u2014');
-    setArc('gg-sd-arc', sd ? Math.min(100, ((40 - sd) / 40) * 100) : 0);
-
-    var opt = g.time_in_optimal_pct || 0;
-    setText('gg-opt-num', opt ? opt.toFixed(0) : '\u2014');
-    setArc('gg-opt-arc', opt);
-
-    /* ── TIR editorial ── */
-    if (g.time_in_optimal_pct != null) {
-      setWidth('gbar-opt', g.time_in_optimal_pct);
-      setText('gval-opt', g.time_in_optimal_pct.toFixed(1) + '%');
-    }
-    if (g.time_in_range_pct != null) {
-      setWidth('gbar-tir', g.time_in_range_pct);
-      setText('gval-tir', g.time_in_range_pct.toFixed(1) + '%');
-    }
-    var hi = g.time_above_140_pct || 0;
-    setWidth('gbar-hi', hi);
-    setText('gval-hi', hi.toFixed(1) + '%');
-
-    // DPR-1.17: Sensor day indicator + freshness
-    if (g.latest_reading_date || g.as_of_date) {
-      var lastDate = g.latest_reading_date || g.as_of_date;
-      document.getElementById('obs-fresh-time').textContent = lastDate;
-      document.getElementById('obs-freshness').style.display = '';
-    }
-    var sensorDay = g.sensor_day || null;
-    if (sensorDay) {
-      var sdEl = document.getElementById('sensor-day');
-      sdEl.textContent = 'Sensor: Day ' + sensorDay + ' of 15';
-      sdEl.style.display = '';
-    }
-
-    // Show content BEFORE chart rendering (canvas needs offsetWidth > 0)
-    loading.style.display = 'none';
-    content.style.display = 'block';
-
-    /* ── 30-day trend chart ── */
-    if (trend.length < 2) {
-      var gTrendCanvas = document.getElementById('g-trend-canvas');
-      if (gTrendCanvas) {
-        gTrendCanvas.style.display = 'none';
-        gTrendCanvas.insertAdjacentHTML('afterend', '<div style="text-align:center;color:var(--text-faint);font-size:var(--text-sm);padding:var(--space-8) 0;font-family:var(--font-mono);letter-spacing:0.04em">Requires 2+ days of CGM data. Trend builds as readings accumulate.</div>');
-      }
-    }
-    if (trend.length >= 2) {
-      var canvas = document.getElementById('g-trend-canvas');
-      var dpr = window.devicePixelRatio || 1;
-      canvas.width = canvas.offsetWidth * dpr;
-      canvas.height = canvas.offsetHeight * dpr;
-      var ctx = canvas.getContext('2d');
-      ctx.scale(dpr, dpr);
-      var W = canvas.offsetWidth, H = canvas.offsetHeight;
-      var pad = { t: 16, r: 16, b: 24, l: 42 };
-      var iW = W - pad.l - pad.r, iH = H - pad.t - pad.b;
-      var nn = trend.length;
-
-      var avgs = trend.map(function(d) { return d.avg; }).filter(function(v) { return v != null; });
-      var minA = Math.min.apply(null, avgs.concat([70]));
-      var maxA = Math.max.apply(null, avgs.concat([130]));
-
-      var xOf = function(i) { return pad.l + (i / (nn - 1)) * iW; };
-      var yOf = function(v) { return pad.t + iH - ((v - minA) / (maxA - minA)) * iH; };
-
-      /* Grid */
-      ctx.strokeStyle = 'rgba(255,255,255,0.04)';
-      ctx.lineWidth = 1;
-      for (var r = 0; r <= 4; r++) {
-        var y = pad.t + (r / 4) * iH;
-        ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
-      }
-
-      /* 70-120 target zone */
-      if (120 <= maxA) {
-        var y70 = yOf(Math.max(70, minA));
-        var y120 = yOf(Math.min(120, maxA));
-        ctx.fillStyle = 'rgba(45,212,191,0.06)';
-        ctx.fillRect(pad.l, y120, iW, y70 - y120);
-      }
-
-      /* CYCLE PAUSE: overlay band BEFORE data so it sits behind */
-      if (window.CyclePause) {
-        CyclePause.renderCanvasBand(ctx, { trendData: trend, padding: pad, canvasW: W, canvasH: H });
-      }
-
-      /* Area fill */
-      var gradient = ctx.createLinearGradient(0, pad.t, 0, pad.t + iH);
-      gradient.addColorStop(0, 'rgba(45,212,191,0.15)');
-      gradient.addColorStop(1, 'rgba(45,212,191,0)');
-      ctx.beginPath();
-      var first = true;
-      trend.forEach(function(d, i) {
-        if (d.avg == null) return;
-        var x = xOf(i), yy = yOf(d.avg);
-        first ? (ctx.moveTo(x, yy), first = false) : ctx.lineTo(x, yy);
-      });
-      if (!first) {
-        ctx.lineTo(xOf(nn - 1), pad.t + iH);
-        ctx.lineTo(xOf(0), pad.t + iH);
-        ctx.closePath();
-        ctx.fillStyle = gradient;
-        ctx.fill();
-      }
-
-      /* Avg glucose line */
-      ctx.strokeStyle = 'rgba(45,212,191,0.9)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      first = true;
-      trend.forEach(function(d, i) {
-        if (d.avg == null) return;
-        var x = xOf(i), yy = yOf(d.avg);
-        first ? (ctx.moveTo(x, yy), first = false) : ctx.lineTo(x, yy);
-      });
-      ctx.stroke();
-
-      /* TIR dots */
-      trend.forEach(function(d, i) {
-        if (d.tir == null) return;
-        var x = xOf(i);
-        var yy = pad.t + iH - (d.tir / 100) * iH;
-        ctx.fillStyle = d.tir >= 90 ? 'rgba(62,207,142,0.7)' : d.tir >= 70 ? 'rgba(245,158,11,0.7)' : 'rgba(239,68,68,0.7)';
-        ctx.beginPath(); ctx.arc(x, yy, 3, 0, Math.PI * 2); ctx.fill();
-      });
-
-      /* Y-axis */
-      ctx.fillStyle = 'rgba(255,255,255,0.3)';
-      ctx.font = '10px monospace';
-      ctx.textAlign = 'right';
-      [minA, Math.round((minA + maxA) / 2), maxA].forEach(function(v) {
-        ctx.fillText(v.toFixed(0), pad.l - 4, yOf(v) + 4);
-      });
-    }
-
-    // (content already shown above before chart rendering)
-
-    /* ── V3 Status Bar (Section 1) ── */
-    renderStatusBar('obs-v3-status', [
-      {label: 'Time in range', value: tir ? tir.toFixed(1) : null, unit: '%', delta: null, context: '70\u2013180 mg/dL target \u226590%'},
-      {label: 'Avg glucose', value: avg ? avg.toFixed(0) : null, unit: 'mg/dL', delta: null, context: '30-day rolling mean'},
-      {label: 'Std deviation', value: sd ? sd.toFixed(1) : null, unit: 'mg/dL', delta: null, context: 'Target SD <15'},
-      {label: 'Optimal range', value: opt ? opt.toFixed(1) : null, unit: '%', delta: null, context: '70\u2013120 mg/dL target \u226570%'}
-    ], {});
-
-    /* ── V3 Cross-Domain (Section 5) ── */
-    renderCrossDomain('obs-v3-cross', [
-      {title: 'Glucose \u00d7 Nutrition', finding: 'Each meal scored against CGM glucose response. Protein-first meals consistently produce the lowest spikes.', link: '/nutrition/'},
-      {title: 'Glucose \u00d7 Sleep', finding: 'Poor sleep elevates next-morning fasting glucose via cortisol pathway. Testing with Whoop sleep quality data.', link: '/sleep/'},
-      {title: 'Glucose \u00d7 Character', finding: 'Glucose variability and time-in-range factor into the Body pillar in the Character Sheet.', link: '/character/'}
-    ]);
-
-    /* ── V3 Depth Sections (Section 6) ── */
-    renderDepth('obs-v3-depth', [
-      {label: 'About this observatory', id: 'about', content: '<h2 style="font-family:var(--font-display);font-size:24px;margin:0 0 12px;">The number that <em>changed what I eat.</em></h2><p>When continuous glucose monitors became available to non-diabetics at an affordable price, I wanted to understand how my body actually responds to specific foods. Not from a nutrition label \u2014 from my own bloodstream, in real time. Every meal becomes a data point. Every spike tells a story.</p><p style="font-style:italic;border-left:2px solid var(--text-faint);padding-left:16px;color:var(--text-muted);">Honestly? I don\u2019t expect to see much here while I\u2019m eating the way I should be. My glucose tends to stay stable when I\u2019m on. The interesting data will come later \u2014 when I reintroduce things, when life gets in the way, when the experiment gets messier. That\u2019s when the CGM earns its place.</p>'},
-      {label: '288 readings vs one fasting number', id: 'narrative', content: '<p>A fasting glucose test gives you one snapshot taken after 8+ hours without food. <strong>It captures none of the metabolic action</strong>: not what happens after meals, not whether glucose spikes at 2am, not whether a salad or a steak drives different post-meal curves in your body specifically.</p><p>A continuous glucose monitor reads glucose every 5 minutes, 24 hours a day. The additional signal includes glucose variability, post-meal spike magnitude, nocturnal patterns, and how specific foods interact with <strong>your individual physiology</strong> \u2014 not population averages.</p><p>Time-in-range is now considered a more actionable metric than HbA1c because it responds to intervention within days, not months.</p>'},
-      {label: 'Measurement protocol', id: 'protocol', content: '<p><strong>Dexcom Stelo CGM</strong> \u2014 worn continuously, no prescription required. Replaced every 15 days. 5-minute reading interval. 288 data points per day. Syncs to life-platform automatically.</p><p><strong>Time in Range (TIR)</strong> \u2014 Standard: 70\u2013180 mg/dL (ADA guideline). Optimal: 70\u2013120 mg/dL (longevity medicine target). Target: >90% standard, >70% optimal.</p><p><strong>Variability (SD)</strong> \u2014 Standard deviation of all 5-min readings in a 24-hour period. SD <15: excellent. 15\u201320: good. >20: elevated metabolic stress. N=1 data \u2014 individual baselines vary.</p>'},
-      {label: 'CGM protocols', id: 'protocols', content: '<p><strong>01 \u2014 Dexcom Stelo CGM</strong> worn continuously, no prescription required. Replaced every 15 days. Syncs to life-platform automatically.</p><p><strong>02 \u2014 Target TIR >90%</strong> in the 70\u2013180 mg/dL range and >70% in the tighter 70\u2013120 optimal window.</p><p><strong>03 \u2014 Protein-first meals</strong> moved the needle most. Eating protein and fat before carbs blunts the spike by slowing gastric emptying.</p><p><strong>04 \u2014 10-minute walk after eating</strong> consistently drops post-meal peak. Muscle contraction creates glucose uptake independent of insulin.</p><p><strong>05 \u2014 Reducing refined carbs</strong> eliminated the majority of >140 readings. Whole-food carbs with fiber produce much smaller spikes.</p>'}
-    ]);
-
-  } catch (e) {
-    loading.textContent = 'Could not load glucose data.';
-    content.style.display = 'block';
-    console.error(e);
-  }
-  /* AI expert analysis now rendered by V3 coach at position 2 (renderCoachAnalysis above) */
-})();
-</script>
-<script src="/assets/js/animations.js" defer></script>
+  <script src="/assets/js/animations.js" defer></script>
 </body>
 </html>

@@ -16,7 +16,7 @@
   <meta name="twitter:title" content="Coaching Dashboard — averagejoematt.com">
   <meta name="twitter:description" content="Live dashboard for eight AI coaching specialists with persistent memory, open actions, and prediction tracking.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
-  <title>Coaching Dashboard — averagejoematt.com</title>
+  <title>Coaches — averagejoematt.com</title>
   <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
@@ -543,6 +543,35 @@
         grid-template-columns: 1fr;
       }
     }
+
+    /* ── /coaches/ partial Front Page additions (.co- namespace) ─── */
+    .co-page { padding-top: var(--nav-height); }
+
+    /* MEMBERS list rows — repurpose .fp-row 5-col grid for coach bench:
+       icon · name · role+specialty · signature stat · (empty sparkline column) */
+    .co-bench .fp-row { cursor: pointer; }
+    .co-bench__avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: var(--text-3xs);
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: 0.05em;
+    }
+    .co-bench__stat {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      min-width: 130px;
+      text-align: right;
+    }
   </style>
 </head>
 <body class="body-story">
@@ -550,8 +579,119 @@
 <div id="amj-nav"></div>
 <div id="amj-hierarchy-nav"></div>
 
+<div class="fp-page co-page">
+
+  <!-- ═══ MASTHEAD ═══ -->
+  <header class="fp-masthead">
+    <div class="fp-masthead__top">
+      <div>
+        <div class="fp-masthead__brow">The Coaches Bench · Vol I · Dispatch №01</div>
+        <div class="fp-masthead__title">COACHES</div>
+      </div>
+      <div class="fp-masthead__meta">
+        <div id="co-date">—</div>
+        <div>Eight specialists · persistent memory</div>
+      </div>
+    </div>
+    <div class="fp-masthead__strip">
+      <div>
+        <a href="/character/" style="color:inherit;text-decoration:none">← Character</a>
+        <span class="fp-masthead__strip-sep">·</span>
+        Domain experts on retainer
+        <span class="fp-masthead__strip-sep">·</span>
+        <a href="/board/" style="color:var(--accent-dim);text-decoration:none">Board →</a>
+      </div>
+      <div>Filed weekly</div>
+    </div>
+  </header>
+
+  <!-- ═══ LEDE ═══ -->
+  <section class="fp-lede">
+    <div>
+      <div class="fp-lede__num-brow">On bench</div>
+      <div class="fp-lede__num">8</div>
+      <div class="fp-lede__num-cap">domain coaches</div>
+    </div>
+    <div>
+      <div class="fp-lede__status fp-lede__status--strong">▸ The Coaching Team · State: Active</div>
+      <div class="fp-lede__narrative">
+        "Eight AI specialists — sleep, nutrition, training, mind, body, glucose, labs, cross-domain — each with persistent memory, explicit predictions, and the standing instruction to disagree when they should."
+      </div>
+      <div class="fp-lede__delta">
+        <span class="fp-lede__delta-label">This week:</span>
+        <span class="fp-delta--good"><span id="co-lede-priority">Synthesizing…</span></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ MEMBERS LIST: BENCH ═══ -->
+  <section class="fp-standings co-bench">
+    <div class="fp-standings__head">
+      <div class="fp-standings__title">BENCH</div>
+      <div class="fp-standings__meta">Click through to each coach's domain dashboard</div>
+    </div>
+    <div id="co-bench-rows">
+      <a class="fp-row" href="/sleep/">
+        <div class="fp-row__icon"><div class="co-bench__avatar" style="background:#818cf8">LP</div></div>
+        <div class="fp-row__name">Dr. Lisa Park</div>
+        <div class="fp-row__context">Sleep &amp; Circadian Rhythm — sleep architecture, HRV, light protocols</div>
+        <div class="fp-row__value"><span class="co-bench__stat">Signal: HRV</span></div>
+        <div class="fp-row__spark"></div>
+      </a>
+      <a class="fp-row" href="/nutrition/">
+        <div class="fp-row__icon"><div class="co-bench__avatar" style="background:#10b981">MW</div></div>
+        <div class="fp-row__name">Dr. Marcus Webb</div>
+        <div class="fp-row__context">Evidence-Based Nutrition — macros, deficit, protein synthesis</div>
+        <div class="fp-row__value"><span class="co-bench__stat">Signal: Protein g</span></div>
+        <div class="fp-row__spark"></div>
+      </a>
+      <a class="fp-row" href="/training/">
+        <div class="fp-row__icon"><div class="co-bench__avatar" style="background:#3db88a">SC</div></div>
+        <div class="fp-row__name">Dr. Sarah Chen</div>
+        <div class="fp-row__context">Exercise Physiology &amp; Strength — Zone 2, periodization, VO2max</div>
+        <div class="fp-row__value"><span class="co-bench__stat">Signal: CTL/ATL</span></div>
+        <div class="fp-row__spark"></div>
+      </a>
+      <a class="fp-row" href="/mind/">
+        <div class="fp-row__icon"><div class="co-bench__avatar" style="background:#a78bfa">NR</div></div>
+        <div class="fp-row__name">Dr. Nathan Reeves</div>
+        <div class="fp-row__context">Behavioral Patterns — journal sentiment, stress, identity</div>
+        <div class="fp-row__value"><span class="co-bench__stat">Signal: Mood</span></div>
+        <div class="fp-row__spark"></div>
+      </a>
+      <a class="fp-row" href="/physical/">
+        <div class="fp-row__icon"><div class="co-bench__avatar" style="background:#f59e0b">VR</div></div>
+        <div class="fp-row__name">Dr. Victor Reyes</div>
+        <div class="fp-row__context">Longevity &amp; Body Composition — DEXA, lean mass, recomposition</div>
+        <div class="fp-row__value"><span class="co-bench__stat">Signal: Body fat %</span></div>
+        <div class="fp-row__spark"></div>
+      </a>
+      <a class="fp-row" href="/glucose/">
+        <div class="fp-row__icon"><div class="co-bench__avatar" style="background:#2dd4bf">AP</div></div>
+        <div class="fp-row__name">Dr. Amara Patel</div>
+        <div class="fp-row__context">Metabolic Health &amp; CGM — TIR, glucose variability, meal response</div>
+        <div class="fp-row__value"><span class="co-bench__stat">Signal: Time in range</span></div>
+        <div class="fp-row__spark"></div>
+      </a>
+      <a class="fp-row" href="/labs/">
+        <div class="fp-row__icon"><div class="co-bench__avatar" style="background:#5ba4cf">JO</div></div>
+        <div class="fp-row__name">Dr. James Okafor</div>
+        <div class="fp-row__context">Clinical Pathology &amp; Preventive Labs — biomarker trajectory</div>
+        <div class="fp-row__value"><span class="co-bench__stat">Signal: ApoB</span></div>
+        <div class="fp-row__spark"></div>
+      </a>
+      <a class="fp-row" href="/explorer/">
+        <div class="fp-row__icon"><div class="co-bench__avatar" style="background:#e879f9">HB</div></div>
+        <div class="fp-row__name">Dr. Henning Brandt</div>
+        <div class="fp-row__context">Biostatistics &amp; N=1 Research — cross-domain correlation, FDR</div>
+        <div class="fp-row__value"><span class="co-bench__stat">Signal: Correlations</span></div>
+        <div class="fp-row__spark"></div>
+      </a>
+    </div>
+  </section>
+
 <!-- ═══════════════════════════════════════════════════════════
-     1. HERO + WEEKLY PRIORITY
+     1. HERO + WEEKLY PRIORITY (preserved interactive dashboard)
      ═══════════════════════════════════════════════════════════ -->
 <div class="cd-hero animate-in">
   <p class="cd-hero__kicker">Intelligence Layer</p>
@@ -665,9 +805,45 @@
   </div>
 </section>
 
+  <!-- ═══ CROSS-LINK FOOTER ═══ -->
+  <nav class="fp-cross-footer">
+    <div class="fp-cross-footer__prev"><a href="/character/">← Character</a></div>
+    <div class="fp-cross-footer__mid">
+      Who you train with
+    </div>
+    <div class="fp-cross-footer__next"><a href="/board/">Board →</a></div>
+  </nav>
+
+</div><!-- /.fp-page -->
+
 <div id="amj-subscribe"></div>
 <div id="amj-bottom-nav"></div>
 <div id="amj-footer"></div>
+
+<script>
+(function() {
+  // Date stamp in masthead meta
+  var dEl = document.getElementById('co-date');
+  if (dEl) {
+    var d = new Date();
+    dEl.textContent = d.toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    }).toUpperCase();
+  }
+  // Pull weekly priority into the lede delta when it loads
+  fetch('/api/coaching-dashboard')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(d) {
+      if (!d) return;
+      var pri = (d.weekly_priority || {}).text;
+      var pEl = document.getElementById('co-lede-priority');
+      if (pEl && pri) {
+        pEl.textContent = pri.length > 90 ? pri.slice(0, 87) + '…' : pri;
+      }
+    })
+    .catch(function() {});
+})();
+</script>
 
 <script>
 (async function() {
