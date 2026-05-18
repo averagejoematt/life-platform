@@ -1,14 +1,38 @@
-import json
-import os
-import logging
-import time
-import boto3
-import urllib.request
-import urllib.parse
-from datetime import datetime, timezone, timedelta
-from decimal import Decimal
+"""
+todoist_lambda.py — Todoist ingestion via SIMP-2 framework (P4.1, 2026-05-17).
 
-# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+Migrated from the standalone pattern to lambdas/ingestion_framework.py. The
+shape of the DDB record + S3 archive is unchanged — daily-brief and other
+consumers see no difference.
+
+Framework provides (for free):
+  - Auth-failure circuit breaker (24h marker on 401/403; auto-clears on success)
+  - Gap-aware backfill (env LOOKBACK_DAYS=7 default)
+  - Date-override event payload ({"date_override": "YYYY-MM-DD"} or "today")
+  - DATA-2 validation + DDB write
+  - S3 raw archival
+  - Decimal conversion
+  - Structured logging via platform_logger
+
+Source-specific logic stays here:
+  - api_get retry helper
+  - get_projects / get_completed_tasks / get_active_tasks / get_filtered_tasks
+  - normalize_completed_task
+
+P4.1 proof-of-concept Lambda. If this works for 1-2 weeks without issues, the
+other 12 ingestion Lambdas can follow the same pattern.
+"""
+
+import json
+import logging
+import os
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from datetime import datetime, timezone
+
+# OBS-1 logger
 try:
     from platform_logger import get_logger
     logger = get_logger("todoist")
@@ -16,114 +40,64 @@ except ImportError:
     logger = logging.getLogger("todoist")
     logger.setLevel(logging.INFO)
 
+# Framework (shipped in the shared layer)
+from ingestion_framework import IngestionConfig, run_ingestion
+
 SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/ingestion-keys")
-# ── Config (env vars with backwards-compatible defaults) ──
-REGION         = os.environ.get("AWS_REGION", "us-west-2")
-S3_BUCKET      = os.environ["S3_BUCKET"]
-DYNAMODB_TABLE = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID        = os.environ.get("USER_ID", "matthew")
-
-secrets_client = boto3.client("secretsmanager", region_name=REGION)
-s3_client = boto3.client("s3", region_name=REGION)
-dynamodb = boto3.resource("dynamodb", region_name=REGION)
-table = dynamodb.Table(DYNAMODB_TABLE)
-
-# COST-OPT-1: Cache secrets in warm Lambda containers (15-min TTL)
-_secret_cache = {}
+USER_ID     = os.environ.get("USER_ID", "matthew")
+BASE_URL    = "https://api.todoist.com/api/v1"
 
 
-def _cached_secret(client, secret_id):
-    import time as _t
-    entry = _secret_cache.get(secret_id)
-    if entry and _t.time() - entry[1] < 900:
-        return entry[0]
-    val = client.get_secret_value(SecretId=secret_id)["SecretString"]
-    _secret_cache[secret_id] = (val, _t.time())
-    return val
-
-BASE_URL = "https://api.todoist.com/api/v1"
-
-
-def floats_to_decimal(obj):
-    if isinstance(obj, float):
-        return Decimal(str(obj))
-    elif isinstance(obj, dict):
-        return {k: floats_to_decimal(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [floats_to_decimal(v) for v in obj]
-    return obj
-
-
-def get_secret():
-    return json.loads(_cached_secret(secrets_client, SECRET_NAME))
-
+# ── Todoist API helpers (unchanged from pre-migration) ─────────────────────────
 
 def api_get(path, api_token, params=None):
     """GET with retry on transient Todoist outages (429/500/502/503/504).
-
-    3 attempts with 2s/8s backoff. The Todoist API occasionally returns 503
-    during maintenance windows; without this retry, ingestion-error-todoist
-    fires on every transient blip.
+    3 attempts with 2s/8s backoff.
     """
     url = BASE_URL + path
     if params:
         url = url + "?" + urllib.parse.urlencode(params)
-    req = urllib.request.Request(
-        url,
-        headers={"Authorization": f"Bearer {api_token}"}
-    )
-    backoff = [2, 8]  # 3 attempts total: immediate, +2s, +8s
+    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {api_token}"})
+    backoff = [2, 8]
     for attempt in range(3):
         try:
             with urllib.request.urlopen(req, timeout=30) as response:
                 return json.loads(response.read())
         except urllib.error.HTTPError as e:
             if e.code in (429, 500, 502, 503, 504) and attempt < 2:
-                logger.warning("Todoist HTTP %d on %s — retry %d/2 in %ds", e.code, path, attempt + 1, backoff[attempt])
+                logger.warning("Todoist HTTP %d on %s — retry %d/2 in %ds",
+                               e.code, path, attempt + 1, backoff[attempt])
                 time.sleep(backoff[attempt])
                 continue
             raise
 
 
 def get_projects(api_token):
-    """Get all projects, return id->name map."""
+    """Get all projects, return id→name map."""
     result = api_get("/projects", api_token)
     projects = result.get("items", result.get("results", result)) if isinstance(result, dict) else result
     return {p["id"]: p["name"] for p in projects}
 
 
 def get_completed_tasks(api_token, since, until):
-    """
-    Fetch completed tasks using the new v1 endpoint.
-    GET /api/v1/tasks/completed/by_completion_date
-    Params: since (ISO datetime), until (ISO datetime), limit, cursor
-    """
-    all_tasks = []
-    cursor = None
-
+    """Fetch completed tasks via GET /tasks/completed/by_completion_date with cursor pagination."""
+    all_tasks, cursor = [], None
     while True:
-        params = {
-            "since": since,
-            "until": until,
-            "limit": 200,
-        }
+        params = {"since": since, "until": until, "limit": 200}
         if cursor:
             params["cursor"] = cursor
-
         result = api_get("/tasks/completed/by_completion_date", api_token, params)
         tasks = result.get("items", [])
         all_tasks.extend(tasks)
-
         next_cursor = result.get("next_cursor") or result.get("cursor")
         if not next_cursor or not tasks:
             break
         cursor = next_cursor
-
     return all_tasks
 
 
 def get_active_tasks(api_token):
-    """Snapshot of current active tasks count."""
+    """Snapshot of current active tasks."""
     result = api_get("/tasks", api_token, {"limit": 200})
     return result.get("items", result.get("results", result)) if isinstance(result, dict) else result
 
@@ -131,8 +105,7 @@ def get_active_tasks(api_token):
 def get_filtered_tasks(api_token, filter_str):
     """Fetch tasks matching a Todoist filter string (e.g. 'overdue', 'today')."""
     try:
-        all_tasks = []
-        cursor = None
+        all_tasks, cursor = [], None
         while True:
             params = {"filter": filter_str, "limit": 200}
             if cursor:
@@ -148,57 +121,82 @@ def get_filtered_tasks(api_token, filter_str):
             cursor = next_cursor
         return all_tasks
     except Exception as e:
-        print(f"Warning: filter query '{filter_str}' failed: {e}")
+        logger.warning("filter query %r failed: %s", filter_str, e)
         return []
 
 
 def normalize_completed_task(task, project_map):
     """Normalize a completed task from the v1 API."""
     return {
-        "task_id": str(task.get("id", "")),
-        "task_name": task.get("content", ""),
-        "project_id": str(task.get("project_id", "")),
+        "task_id":      str(task.get("id", "")),
+        "task_name":    task.get("content", ""),
+        "project_id":   str(task.get("project_id", "")),
         "project_name": project_map.get(str(task.get("project_id", "")), "Unknown"),
         "completed_at": task.get("completed_at", ""),
-        "labels": task.get("labels", []),
-        "priority": task.get("priority", 1),
+        "labels":       task.get("labels", []),
+        "priority":     task.get("priority", 1),
     }
 
 
-def lambda_handler(event, context):
-    if event.get("healthcheck"):
-        return {"statusCode": 200, "body": "ok"}
-    if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
-    # Date range handling
-    if "start_date" in event and "end_date" in event:
-        start_date = datetime.strptime(event["start_date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        end_date = datetime.strptime(event["end_date"], "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1)
-    elif "date" in event:
-        target = datetime.strptime(event["date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        start_date = target
-        end_date = target + timedelta(days=1)
-    else:
-        yesterday = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
-        start_date = yesterday
-        end_date = yesterday + timedelta(days=1)
+# ── SIMP-2 framework callbacks ─────────────────────────────────────────────────
 
-    date_str = start_date.strftime("%Y-%m-%d")
-    print(f"Fetching Todoist data for {date_str}")
+def authenticate(secret_data: dict) -> dict:
+    """Extract the API token from the secret bundle. SIMP-2 will pass this back
+    to fetch_day as `credentials`. No OAuth refresh — Todoist uses a long-lived
+    personal token; staleness alerts come from the freshness checker (P2.6)."""
+    token = secret_data.get("todoist_api_token") or secret_data.get("api_token")
+    if not token:
+        raise RuntimeError("Todoist secret missing 'todoist_api_token' / 'api_token' field")
+    return {"api_token": token}
 
-    secret = get_secret()
-    api_token = secret.get("todoist_api_token") or secret.get("api_token")
+
+def fetch_day(credentials: dict, date_str: str) -> dict | None:
+    """Fetch one day of Todoist data. Returns raw aggregate dict that transform_fn
+    will convert into a DDB record. Returns None on error (framework will retry next run)."""
+    api_token = credentials["api_token"]
+
+    # ISO datetime window for "this date in UTC" → API's date-aware completed query
+    start_dt = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    end_dt = start_dt.replace(hour=23, minute=59, second=59)
+    since = start_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    until = end_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     project_map = get_projects(api_token)
-    print(f"Found {len(project_map)} projects")
+    logger.info("Found %d projects", len(project_map))
 
-    since = start_date.strftime("%Y-%m-%dT%H:%M:%SZ")
-    until = end_date.strftime("%Y-%m-%dT%H:%M:%SZ")
     completed_raw = get_completed_tasks(api_token, since, until)
-    print(f"Found {len(completed_raw)} completed tasks")
-
     active_tasks = get_active_tasks(api_token)
-    active_count = len(active_tasks)
-    print(f"Active tasks: {active_count}")
+    overdue_tasks = get_filtered_tasks(api_token, "overdue")
+    due_today_tasks = get_filtered_tasks(api_token, "today")
+    logger.info("Day %s: completed=%d active=%d overdue=%d due_today=%d",
+                date_str, len(completed_raw), len(active_tasks),
+                len(overdue_tasks), len(due_today_tasks))
+
+    return {
+        "date":              date_str,
+        "project_map":       project_map,
+        "completed_raw":     completed_raw,
+        "active_tasks":      active_tasks,
+        "overdue_tasks":     overdue_tasks,
+        "due_today_tasks":   due_today_tasks,
+    }
+
+
+def transform(raw: dict, date_str: str) -> list[dict]:
+    """Convert raw Todoist response to a single DDB record dict.
+
+    Returned dict must include a 'source' key (SIMP-2 builds the pk from it as
+    USER#{user_id}#SOURCE#{source}). Optionally include 'sk_suffix' for
+    sub-records — omitted here since Todoist writes one record per date.
+    """
+    if not raw:
+        return []
+
+    project_map = raw["project_map"]
+    completed_raw = raw["completed_raw"]
+    active_tasks = raw["active_tasks"]
+    overdue_tasks = raw["overdue_tasks"]
+    due_today_tasks = raw["due_today_tasks"]
 
     normalized = [normalize_completed_task(t, project_map) for t in completed_raw]
 
@@ -207,94 +205,61 @@ def lambda_handler(event, context):
         proj = task["project_name"]
         by_project[proj] = by_project.get(proj, 0) + 1
 
-    # Priority breakdown of active tasks
     priority_map = {1: "p1_urgent", 2: "p2_high", 3: "p3_medium", 4: "p4_normal"}
     priority_breakdown = {"p1_urgent": 0, "p2_high": 0, "p3_medium": 0, "p4_normal": 0}
     for t in active_tasks:
-        p = t.get("priority", 4)
-        key = priority_map.get(p, "p4_normal")
+        key = priority_map.get(t.get("priority", 4), "p4_normal")
         priority_breakdown[key] += 1
 
-    # Overdue and due-today counts via filter API
-    overdue_tasks = get_filtered_tasks(api_token, "overdue")
-    due_today_tasks = get_filtered_tasks(api_token, "today")
-    overdue_count = len(overdue_tasks)
-    due_today_count = len(due_today_tasks)
-    print(f"Overdue: {overdue_count}, Due today: {due_today_count}")
-
-    # Lightweight due-today task list for Daily Brief context
     tasks_due_today = [
         {
-            "task_id": str(t.get("id", "")),
-            "task_name": t.get("content", ""),
-            "project_id": str(t.get("project_id", "")),
+            "task_id":     str(t.get("id", "")),
+            "task_name":   t.get("content", ""),
+            "project_id":  str(t.get("project_id", "")),
             "project_name": project_map.get(str(t.get("project_id", "")), "Unknown"),
-            "priority": t.get("priority", 4),
+            "priority":    t.get("priority", 4),
         }
-        for t in due_today_tasks[:50]  # cap at 50
+        for t in due_today_tasks[:50]
     ]
 
-    s3_payload = {
-        "date": date_str,
-        "ingested_at": datetime.now(timezone.utc).isoformat(),
-        "completed_count": len(normalized),
-        "active_count": active_count,
-        "overdue_count": overdue_count,
-        "due_today_count": due_today_count,
-        "priority_breakdown": priority_breakdown,
-        "completed_tasks": normalized,
+    return [{
+        "source":                "todoist",
+        "date":                  date_str,
+        "completed_count":       len(normalized),
+        "active_count":          len(active_tasks),
+        "overdue_count":         len(overdue_tasks),
+        "due_today_count":       len(due_today_tasks),
+        "priority_breakdown":    priority_breakdown,
+        "completed_tasks":       normalized,
         "completions_by_project": by_project,
-        "tasks_due_today": tasks_due_today,
-    }
+        "tasks_due_today":       tasks_due_today,
+    }]
 
-    key = f"raw/todoist/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
-    s3_client.put_object(
-        Bucket=S3_BUCKET,
-        Key=key,
-        Body=json.dumps(s3_payload, default=str),
-        ContentType="application/json"
-    )
-    print(f"Saved to S3: {key}")
 
-    db_item = {
-        "pk": f"USER#{USER_ID}#SOURCE#todoist",
-        "sk": f"DATE#{date_str}",
-        "date": date_str,
-        "source": "todoist",
-        "schema_version": 1,
-        "ingested_at": datetime.now(timezone.utc).isoformat(),
-        "completed_count": len(normalized),
-        "active_count": active_count,
-        "overdue_count": overdue_count,
-        "due_today_count": due_today_count,
-        "priority_breakdown": priority_breakdown,
-        "completed_tasks": normalized,
-        "completions_by_project": by_project,
-        "tasks_due_today": tasks_due_today,
-    }
-    # DATA-2: Validate before write
+# ── Framework config (one place, declarative) ──────────────────────────────────
+
+_config = IngestionConfig(
+    source_name="todoist",
+    secret_id=SECRET_NAME,
+    s3_archive_prefix="raw/todoist",
+    schema_version=1,
+    enable_gap_detection=True,  # backfill yesterday + 7 day lookback
+    lookback_days=7,
+    enable_item_size_guard=True,
+)
+
+
+def lambda_handler(event: dict, context) -> dict:
+    """SIMP-2 entry point. Accepts:
+      {}                                 — gap-aware backfill (default cron behavior)
+      {"date_override": "today"}         — force today's data only
+      {"date_override": "2026-05-15"}    — single explicit date
+      {"healthcheck": true}              — boot check, returns 200/"ok"
+    """
     try:
-        from ingestion_validator import validate_item as _validate_item
-        _vr = _validate_item("todoist", floats_to_decimal(db_item), date_str)
-        if _vr.should_skip_ddb:
-            logger.error(f"[DATA-2] CRITICAL: Skipping todoist DDB write for {date_str}: {_vr.errors}")
-            _vr.archive_to_s3(s3_client, bucket=S3_BUCKET, item=db_item)
-        else:
-            if _vr.warnings:
-                logger.warning(f"[DATA-2] Validation warnings for todoist/{date_str}: {_vr.warnings}")
-            table.put_item(Item=floats_to_decimal(db_item))
-            print(f"Saved to DynamoDB for {date_str}")
-    except ImportError:
-        table.put_item(Item=floats_to_decimal(db_item))
-        print(f"Saved to DynamoDB for {date_str}")
-
-    return {
-        "statusCode": 200,
-        "body": json.dumps({
-            "completed_tasks": len(normalized),
-            "active_tasks": active_count,
-            "overdue_tasks": overdue_count,
-            "due_today": due_today_count,
-            "projects": len(project_map),
-        })
-    }
+        if event.get("healthcheck"):
+            return {"statusCode": 200, "body": "ok"}
+        return run_ingestion(_config, authenticate, fetch_day, transform, event, context)
+    except Exception as e:
+        logger.error("todoist ingestion failed: %s", e, exc_info=True)
+        raise
