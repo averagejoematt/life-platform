@@ -16,495 +16,176 @@
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
-    /* ─── PULSE: Layer 1 — Headline ─── */
-    .pulse-hero {
-      padding-top: var(--nav-height);
-      border-bottom: 1px solid var(--border);
-      background: var(--bg);
-    }
-    .pulse-hero__inner {
-      max-width: var(--content-width);
-      margin: 0 auto;
-      padding: var(--space-10) var(--page-padding) var(--space-8);
-      display: grid;
-      grid-template-columns: auto 1fr;
-      gap: var(--space-8);
-      align-items: start;
-    }
-    .pulse-day {
-      text-align: center;
-      min-width: 80px;
-    }
-    .pulse-day__number {
-      font-family: var(--font-display);
-      font-size: clamp(56px, 8vw, 96px);
-      line-height: 0.85;
-      letter-spacing: var(--ls-display);
-      color: var(--text);
-    }
-    .pulse-day__label {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--text-faint);
-      margin-top: var(--space-1);
-    }
-    .pulse-state {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-3);
-    }
-    .pulse-status {
-      display: flex;
-      align-items: center;
-      gap: var(--space-3);
-    }
-    .pulse-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      flex-shrink: 0;
-      animation: pulse-breathe 3s ease-in-out infinite;
-    }
-    .pulse-dot--strong { background: var(--c-green-500); }
-    .pulse-dot--mixed  { background: var(--c-yellow-status); animation-duration: 2s; }
-    .pulse-dot--quiet  { background: #3a5a48; animation-duration: 5s; }
-    @keyframes pulse-breathe { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    /* /live/ — uses Front Page pattern (.fp-*); see assets/css/frontpage.css.
+       Page-scope additions only — namespace .lp- (live-page). */
+    .lp-page { padding-top: var(--nav-height); }
 
-    .pulse-word {
-      font-family: var(--font-display);
-      font-size: var(--text-h3);
-      letter-spacing: var(--ls-heading);
-      text-transform: uppercase;
-    }
-    .pulse-word--strong { color: var(--c-green-500); }
-    .pulse-word--mixed  { color: var(--c-yellow-status); }
-    .pulse-word--quiet  { color: #3a5a48; }
-
-    .pulse-narrative {
-      font-family: var(--font-serif);
-      font-size: var(--text-lg);
-      line-height: var(--lh-body);
-      color: var(--text-muted);
-      max-width: var(--prose-width);
-    }
-    .pulse-date {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      color: var(--text-faint);
-      text-transform: uppercase;
-    }
-    .pulse-nav {
-      display: flex; gap: var(--space-4); margin-top: var(--space-2);
-    }
-    .pulse-nav__btn {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      text-decoration: none;
-      letter-spacing: var(--ls-tag);
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    .pulse-nav__btn.is-active { opacity: 1; cursor: pointer; color: var(--accent-dim); }
-    .pulse-nav__btn.is-active:hover { color: var(--accent); }
-
-    /* ─── PULSE: Layer 2 — Glyph Strip ─── */
-    .glyph-strip {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    .glyph-strip__inner {
-      max-width: var(--content-width);
-      margin: 0 auto;
-      padding: var(--space-6) var(--page-padding);
-      display: flex;
-      justify-content: space-between;
-      gap: var(--space-4);
-      min-width: 600px;
-    }
-    .glyph {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: var(--space-2);
-      cursor: pointer;
-      transition: transform var(--dur-fast) var(--ease-out);
-      flex: 1;
-      max-width: 80px;
-    }
-    .glyph:hover { transform: translateY(-2px); }
-    .glyph.is-selected .glyph__ring { box-shadow: 0 0 0 2px var(--accent); }
-
-    .glyph__ring {
-      width: 52px; height: 52px;
-      border-radius: 50%;
-      border: 2px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: border-color var(--dur-mid), box-shadow var(--dur-mid);
-      background: var(--bg);
-    }
-    .glyph__ring--green { border-color: var(--c-green-500); }
-    .glyph__ring--amber { border-color: var(--c-yellow-status); border-style: dashed; }
-    .glyph__ring--red   { border-color: var(--c-red-status); animation: ring-pulse 2s infinite; }
-    .glyph__ring--gray  { border-color: var(--border); opacity: 0.5; }
-    @keyframes ring-pulse { 0%,100%{border-color:var(--c-red-status)} 50%{border-color:rgba(255,82,82,0.3)} }
-
-    .glyph__icon { width: 24px; height: 24px; }
-    .glyph__icon--green { color: var(--c-green-500); }
-    .glyph__icon--amber { color: var(--c-yellow-status); }
-    .glyph__icon--red   { color: var(--c-red-status); }
-    .glyph__icon--gray  { color: var(--text-faint); opacity: 0.4; }
-    .glyph__icn {
-      width: 24px; height: 24px; display: block;
-      -webkit-mask-size: contain; mask-size: contain;
-      -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
-      -webkit-mask-position: center; mask-position: center;
-    }
-    .glyph__ring--green .glyph__icn { background-color: var(--c-green-500); }
-    .glyph__ring--amber .glyph__icn { background-color: var(--c-yellow-status); }
-    .glyph__ring--red   .glyph__icn { background-color: var(--c-red-status); }
-    .glyph__ring--gray  .glyph__icn { background-color: var(--text-faint); opacity: 0.4; }
-
-    .glyph__name {
-      font-family: var(--font-mono);
-      font-size:var(--text-3xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--text-faint);
-      text-align: center;
-    }
-
-    /* ─── PULSE: Layer 3 — Detail Cards ─── */
-    .detail-section {
-      max-width: var(--content-width);
-      margin: 0 auto;
-      padding: var(--space-8) var(--page-padding);
-    }
-    .detail-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: var(--space-4);
-    }
-    .detail-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--border);
-      padding: var(--space-5) var(--space-6);
-      transition: border-left-color var(--dur-fast), opacity var(--dur-mid);
-    }
-    .detail-card--green { border-left-color: var(--c-green-500); }
-    .detail-card--amber { border-left-color: var(--c-yellow-status); }
-    .detail-card--red   { border-left-color: var(--c-red-status); }
-    .detail-card--gray  { border-left-color: var(--border); opacity: 0.6; }
-    .detail-card.is-hidden { display: none; }
-
-    .detail-card__header {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: var(--space-3);
-    }
-    .detail-card__name {
-      font-size: var(--text-2xs); letter-spacing: var(--ls-tag);
-      text-transform: uppercase; color: var(--text-muted);
-    }
-    .detail-card__state {
-      font-family: var(--font-mono); font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag); text-transform: uppercase;
-    }
-    .detail-card__state--green { color: var(--c-green-500); }
-    .detail-card__state--amber { color: var(--c-yellow-status); }
-    .detail-card__state--red   { color: var(--c-red-status); }
-    .detail-card__state--gray  { color: var(--text-faint); }
-
-    .detail-card__hero {
-      display: flex; align-items: baseline; gap: var(--space-2);
-      margin-bottom: var(--space-2);
-    }
-    .detail-card__value {
-      font-family: var(--font-display); font-size: 32px;
-      letter-spacing: var(--ls-display); color: var(--text); line-height: 1;
-    }
-    .detail-card__unit {
-      font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted);
-    }
-    .detail-card__sub {
-      font-family: var(--font-mono); font-size: var(--text-2xs);
-      color: var(--text-faint); margin-bottom: var(--space-3);
-    }
-    .detail-card__sparkline {
-      display: flex; align-items: flex-end; gap: 2px; height: 28px;
-    }
-    .spark-bar {
-      flex: 1; background: var(--accent); opacity: 0.4; border-radius: 1px 1px 0 0;
-      min-width: 4px; transition: opacity var(--dur-fast);
-    }
-    .spark-bar:last-child { opacity: 1; }
-
-    /* ─── JOURNEY: Below fold ─── */
-    .journey-section {
-      border-top: 1px solid var(--border);
-      background: var(--surface);
-    }
-    .journey-inner {
-      max-width: var(--content-width);
-      margin: 0 auto;
-      padding: var(--space-16) var(--page-padding) var(--space-12);
-    }
-    .journey-title {
-      font-family: var(--font-display);
-      font-size: var(--text-h2);
-      letter-spacing: var(--ls-display);
-      color: var(--text);
-      margin-bottom: var(--space-2);
-    }
-    .journey-title span { color: var(--accent); }
-    .journey-sub {
-      font-family: var(--font-mono);
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      margin-bottom: var(--space-8);
-    }
-    .journey-stats {
-      display: flex; gap: var(--space-8); flex-wrap: wrap; margin-bottom: var(--space-8);
-    }
-    .j-stat { border-left: 2px solid var(--accent); padding-left: var(--space-4); }
-    .j-stat__label {
-      font-size: var(--text-2xs); letter-spacing: var(--ls-tag);
-      text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-1);
-    }
-    .j-stat__value {
-      font-family: var(--font-display); font-size: 28px;
-      color: var(--text); letter-spacing: var(--ls-display);
-    }
-
-    /* ─── 3j: Loading skeleton ─── */
-    .pulse-loading {
-      text-align: center; padding: var(--space-12);
-      font-family: var(--font-mono); font-size: var(--text-xs);
-      color: var(--text-faint); letter-spacing: var(--ls-tag);
-    }
-    .skeleton-line {
+    /* Skeleton placeholder before /api/pulse resolves */
+    .lp-skeleton {
       background: linear-gradient(90deg, var(--surface) 25%, var(--surface-raised) 50%, var(--surface) 75%);
       background-size: 200% 100%;
-      animation: skeleton-shimmer 1.5s infinite;
-      border-radius: 4px;
-      height: 14px;
+      animation: lp-shimmer 1.5s infinite;
+      border-radius: 2px;
+      display: inline-block;
     }
-    @keyframes skeleton-shimmer {
-      0% { background-position: 200% 0; }
+    @keyframes lp-shimmer {
+      0%   { background-position: 200% 0; }
       100% { background-position: -200% 0; }
     }
-    .skeleton-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--border);
-      padding: var(--space-5) var(--space-6);
-    }
-    .skeleton-card .skeleton-line { margin-bottom: var(--space-2); }
-
-    /* ─── 3f: Share button ─── */
-    .pulse-share {
-      display: inline-flex; align-items: center; gap: var(--space-2);
-      font-family: var(--font-mono); font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag); text-transform: uppercase;
-      color: var(--text-faint); background: none; border: 1px solid var(--border);
-      padding: var(--space-1) var(--space-3); cursor: pointer;
-      transition: color var(--dur-fast), border-color var(--dur-fast);
-    }
-    .pulse-share:hover { color: var(--accent); border-color: var(--accent); }
-    .pulse-share.is-copied { color: var(--c-green-500); border-color: var(--c-green-500); }
-
-    /* ─── 3e: Since yesterday delta ─── */
-    .pulse-delta {
-      font-family: var(--font-mono); font-size: var(--text-2xs);
-      color: var(--text-faint); letter-spacing: var(--ls-tag);
-      margin-top: var(--space-2);
-    }
-    .pulse-delta__up { color: var(--c-green-500); }
-    .pulse-delta__down { color: var(--c-red-status); }
-
-    /* ─── 3c: Expandable detail cards ─── */
-    .detail-card__expand {
-      display: none; margin-top: var(--space-3);
-      padding-top: var(--space-3); border-top: 1px solid var(--border);
-      font-family: var(--font-mono); font-size: var(--text-2xs);
-      color: var(--text-muted); line-height: var(--lh-body);
-    }
-    .detail-card.is-expanded .detail-card__expand { display: block; }
-    .detail-card__toggle {
-      font-family: var(--font-mono); font-size:var(--text-3xs);
-      color: var(--text-faint); cursor: pointer; text-transform: uppercase;
-      letter-spacing: var(--ls-tag); margin-top: var(--space-2);
-    }
-    .detail-card__toggle:hover { color: var(--accent); }
-
-    /* ─── 3b: Sparkline reference line ─── */
-    .detail-card__sparkline { position: relative; }
-    .spark-ref {
-      position: absolute; left: 0; right: 0;
-      border-top: 1px dashed var(--text-faint);
-      opacity: 0.3; pointer-events: none;
-    }
-    .spark-bar { position: relative; }
-    .spark-bar[data-value]:hover::after {
-      content: attr(data-value);
-      position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
-      font-family: var(--font-mono); font-size:var(--text-3xs);
-      color: var(--text); background: var(--surface-raised);
-      padding: 2px 4px; white-space: nowrap; pointer-events: none;
-      border: 1px solid var(--border);
-    }
-
-    /* ─── 3h: Elevated notable card ─── */
-    .detail-card.is-notable {
-      border-left-width: 4px;
-      box-shadow: 0 0 0 1px var(--border);
-    }
-
-    /* ─── 3d: Weight trend line ─── */
-    .journey-trend { margin-top: var(--space-6); }
-    .journey-trend svg { width: 100%; height: 80px; }
-    .journey-trend__line { fill: none; stroke: var(--accent); stroke-width: 2; }
-    .journey-trend__area { fill: var(--accent); opacity: 0.08; }
-    .journey-trend__label {
-      font-family: var(--font-mono); font-size: var(--text-2xs);
-      color: var(--text-faint); letter-spacing: var(--ls-tag);
-      margin-top: var(--space-2);
-    }
-
-    /* ─── Responsive ─── */
-    @media (max-width: 640px) {
-      .pulse-hero__inner { grid-template-columns: 1fr; gap: var(--space-4); text-align: center; }
-      .pulse-day { display: flex; align-items: baseline; gap: var(--space-3); justify-content: center; }
-      .pulse-day__number { font-size: 48px; }
-      .pulse-status { justify-content: center; }
-      .pulse-narrative { margin: 0 auto; text-align: center; }
-      .pulse-date, .pulse-nav { justify-content: center; }
-      .glyph-strip__inner { min-width: 520px; padding: var(--space-4) var(--space-3); gap: var(--space-2); }
-      .glyph__ring { width: 44px; height: 44px; }
-      .detail-grid { grid-template-columns: 1fr; }
-    }
-    /* DPR-1.10: First-time visitor context */
-    .pulse-context {
-      max-width: var(--content-width, 1200px);
-      margin: 0 auto var(--space-3);
-      padding: var(--space-2) var(--space-5);
-      text-align: center;
+    .lp-row-empty {
+      padding: 28px 22px;
+      border-top: 1px solid var(--border-subtle);
       font-family: var(--font-mono);
-      font-size: var(--text-2xs);
+      font-size: 11px;
+      letter-spacing: 0.1em;
       color: var(--text-faint);
-      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
     }
-    .pulse-context__legend { display: inline-flex; align-items: center; gap: var(--space-3); margin-left: var(--space-3); }
-    .pulse-context__dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 2px; vertical-align: middle; }
-    .pulse-context__dot--green { background: var(--c-green-500); }
-    .pulse-context__dot--amber { background: var(--c-yellow-status); }
-    .pulse-context__dot--red { background: var(--c-red-status); }
-    .pulse-context__dot--gray { background: var(--text-faint); }
-    /* DPR-1.14: Delta color coding */
-    .delta-up { color: var(--c-green-500); }
-    .delta-down { color: var(--c-red-status); }
-    .delta-flat { color: var(--text-muted); }
-    /* DPR-1.15: Notable signal banner */
-    .notable-banner {
-      max-width: var(--content-width, 1200px);
-      margin: 0 auto var(--space-4);
-      padding: var(--space-3) var(--space-5);
-      background: rgba(255, 82, 82, 0.06);
-      border: 1px solid rgba(255, 82, 82, 0.2);
-      border-left: 3px solid var(--c-red-status);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      display: flex;
+
+    /* Strip nav buttons (prev/next dispatch) */
+    .lp-strip-btn {
+      cursor: not-allowed;
+      opacity: 0.5;
+      color: inherit;
+      text-decoration: none;
+    }
+    .lp-strip-btn.is-active { opacity: 1; cursor: pointer; color: var(--accent-dim); }
+    .lp-strip-btn.is-active:hover { color: var(--accent); }
+
+    /* Share button — minimal, lives in masthead meta */
+    .lp-share {
+      display: inline-flex;
       align-items: center;
-      gap: var(--space-3);
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      background: none;
+      border: 1px solid var(--border);
+      padding: 4px 8px;
+      cursor: pointer;
+      transition: color var(--dur-fast), border-color var(--dur-fast);
+      margin-top: 6px;
     }
+    .lp-share:hover { color: var(--accent); border-color: var(--accent-dim); }
+    .lp-share.is-copied { color: var(--c-green-500); border-color: var(--c-green-500); }
   </style>
 </head>
-<body>
+<body class="body-signal">
   <div id="amj-nav"></div>
-<div id="amj-hierarchy-nav"></div>
+  <div id="amj-hierarchy-nav"></div>
 
-  <!-- ═══ LAYER 1: THE PULSE HEADLINE ═══ -->
-  <section class="pulse-hero" id="pulse-hero">
-    <div class="pulse-hero__inner">
-      <div class="pulse-day">
-        <div class="pulse-day__number" id="p-day">—</div>
-        <div class="pulse-day__label">days</div>
-      </div>
-      <div class="pulse-state">
-        <div class="pulse-status">
-          <div class="pulse-dot pulse-dot--quiet" id="p-dot"></div>
-          <div class="pulse-word pulse-word--quiet" id="p-word">Loading</div>
-        </div>
-        <div class="pulse-narrative" id="p-narrative">
-          <div class="skeleton-line" style="width:85%;margin-bottom:8px;"></div>
-          <div class="skeleton-line" style="width:65%;margin-bottom:8px;"></div>
-          <div class="skeleton-line" style="width:45%;"></div>
-        </div>
-        <div class="pulse-delta" id="p-delta"></div>
-        <div class="pulse-date" id="p-date"></div>
-        <div style="display:flex;align-items:center;gap:var(--space-4);margin-top:var(--space-2);flex-wrap:wrap;">
-          <div class="pulse-nav">
-            <span class="pulse-nav__btn" id="p-prev" title="Available after Day 1">← Yesterday</span>
-            <span class="pulse-nav__btn" id="p-next" title="Tomorrow's data isn't here yet">Tomorrow →</span>
+  <div class="fp-page lp-page">
+
+    <!-- ═══ 1. MASTHEAD ═════════════════════════════════════ -->
+    <header class="fp-masthead">
+      <div class="fp-masthead__top">
+        <div>
+          <div class="fp-masthead__brow" id="fp-eyebrow">
+            The Daily Pulse · Vol I · Dispatch №<span id="fp-dispatch">—</span>
           </div>
-          <button class="pulse-share" id="p-share" title="Copy today's pulse summary">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-            Copy pulse
+          <div class="fp-masthead__title">THE PULSE</div>
+        </div>
+        <div class="fp-masthead__meta">
+          <div id="fp-date"><span class="lp-skeleton" style="width:160px;height:10px"></span></div>
+          <div id="fp-meta-status">Reporting from one body</div>
+          <button class="lp-share" id="lp-share" type="button" title="Copy today's pulse summary">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            <span>Copy pulse</span>
           </button>
         </div>
       </div>
+      <div class="fp-masthead__strip">
+        <div>
+          <span class="lp-strip-btn" id="fp-prev" title="Available after Day 1">← Yesterday</span>
+          <span class="fp-masthead__strip-sep">·</span>
+          Day <span id="fp-day-strip">—</span> of 365
+          <span class="fp-masthead__strip-sep">·</span>
+          <span class="lp-strip-btn" id="fp-next" title="Tomorrow's data isn't here yet">Tomorrow →</span>
+        </div>
+        <div id="fp-filed">Filed —</div>
+      </div>
+    </header>
+
+    <!-- ═══ 2. LEDE ═════════════════════════════════════════ -->
+    <section class="fp-lede">
+      <div>
+        <div class="fp-lede__num-brow">Day</div>
+        <div class="fp-lede__num" id="fp-day">—</div>
+        <div class="fp-lede__num-cap">of 365</div>
+      </div>
+      <div>
+        <div class="fp-lede__status" id="fp-status">▸ Today's Despatch · State: Loading</div>
+        <div class="fp-lede__narrative" id="fp-narrative">
+          "<span class="lp-skeleton" style="width:80%;height:18px"></span>"
+        </div>
+        <div class="fp-lede__delta" id="fp-delta" style="display:none">
+          <span class="fp-lede__delta-label">Since yesterday:</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 3. WATCH BANNER (optional) ══════════════════════ -->
+    <div class="fp-watch" id="fp-watch" style="display:none">
+      <span class="fp-watch__label" id="fp-watch-label">Watch</span>
+      <span id="fp-watch-text"></span>
     </div>
-  </section>
 
-  <!-- ═══ LAYER 2: THE GLYPH STRIP ═══ -->
-  <section class="glyph-strip" id="glyph-strip">
-    <div class="glyph-strip__inner" id="glyph-container"></div>
-  </section>
+    <!-- ═══ 4. STANDINGS ════════════════════════════════════ -->
+    <section class="fp-standings">
+      <div class="fp-standings__head">
+        <div class="fp-standings__title">STANDINGS</div>
+        <div class="fp-standings__meta">7-day trend · last reading</div>
+      </div>
+      <div id="fp-standings-rows">
+        <div class="lp-row-empty">Loading signals…</div>
+      </div>
+    </section>
 
-  <!-- ═══ DPR-1.10: First-time visitor context ═══ -->
-  <div class="pulse-context" id="pulse-context" style="display:none">
-    <span class="pulse-context__text">
-      8 daily health signals from wearables and manual logs.
-      <span class="pulse-context__legend">
-        <span class="pulse-context__dot pulse-context__dot--green"></span> on track
-        <span class="pulse-context__dot pulse-context__dot--amber"></span> watch
-        <span class="pulse-context__dot pulse-context__dot--red"></span> attention needed
-        <span class="pulse-context__dot pulse-context__dot--gray"></span> no data yet
-      </span>
-    </span>
+    <!-- ═══ 5. LONG STORY (weight arc) ══════════════════════ -->
+    <section class="fp-arc" id="fp-arc-section">
+      <div class="fp-arc__head">
+        <div>
+          <div class="fp-arc__brow">The Long Story</div>
+          <div class="fp-arc__num" id="fp-arc-num">
+            307 → <span class="fp-arc__num-current" id="fp-arc-current">—</span> → 185
+          </div>
+        </div>
+        <div class="fp-arc__stats" id="fp-arc-stats">
+          <div>
+            <div class="fp-arc__stat-label">Lost</div>
+            <div class="fp-arc__stat-val fp-arc__stat-val--accent" id="fp-arc-lost">—</div>
+          </div>
+          <div>
+            <div class="fp-arc__stat-label">To go</div>
+            <div class="fp-arc__stat-val" id="fp-arc-togo">—</div>
+          </div>
+          <div>
+            <div class="fp-arc__stat-label">Pace</div>
+            <div class="fp-arc__stat-val" id="fp-arc-pace">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="fp-arc__chart" id="fp-arc-chart"></div>
+      <div class="fp-arc__caption" id="fp-arc-caption">
+        <span>Day 1 · 307 lbs</span>
+        <span>Today · — lbs</span>
+      </div>
+    </section>
+
+    <!-- ═══ 6. CROSS-LINK FOOTER ════════════════════════════ -->
+    <nav class="fp-cross-footer">
+      <div class="fp-cross-footer__prev"><a href="/about/">← About</a></div>
+      <div class="fp-cross-footer__mid">
+        The numbers tell part of the story. The rest is in the writing →
+        <a href="/chronicle/">Chronicle</a>
+      </div>
+      <div class="fp-cross-footer__next"><a href="/character/">Character →</a></div>
+    </nav>
+
   </div>
-
-  <!-- ═══ DPR-1.15: Notable Signal Banner ═══ -->
-  <div class="notable-banner" id="notable-banner" style="display:none">
-    <span class="notable-banner__icon">&#9888;</span>
-    <span class="notable-banner__text" id="notable-text"></span>
-  </div>
-
-  <!-- ═══ LAYER 3: DETAIL CARDS ═══ -->
-  <section class="detail-section" id="detail-section">
-    <div class="detail-grid" id="detail-grid">
-      <div class="skeleton-card"><div class="skeleton-line" style="width:40%;"></div><div class="skeleton-line" style="width:60%;height:28px;margin-top:8px;"></div><div class="skeleton-line" style="width:80%;margin-top:8px;"></div></div>
-      <div class="skeleton-card"><div class="skeleton-line" style="width:35%;"></div><div class="skeleton-line" style="width:50%;height:28px;margin-top:8px;"></div><div class="skeleton-line" style="width:70%;margin-top:8px;"></div></div>
-      <div class="skeleton-card"><div class="skeleton-line" style="width:45%;"></div><div class="skeleton-line" style="width:55%;height:28px;margin-top:8px;"></div><div class="skeleton-line" style="width:65%;margin-top:8px;"></div></div>
-    </div>
-  </section>
-
-  <!-- ═══ THE JOURNEY (below fold) ═══ -->
-  <section class="journey-section" id="journey-section">
-    <div class="journey-inner">
-      <div class="journey-title">THE <span>JOURNEY</span> SO FAR</div>
-      <div class="journey-sub" id="j-sub">Loading journey data…</div>
-      <div class="journey-stats" id="j-stats"></div>
-    </div>
-  </section>
 
   <div id="amj-subscribe"></div>
   <div id="amj-bottom-nav"></div>
@@ -517,260 +198,119 @@
   (function() {
     'use strict';
 
-    // ─── DPR-1.10: Show context for first-time visitors ──
-    (function() {
-      var KEY = 'amj_pulse_seen';
-      var ctx = document.getElementById('pulse-context');
-      if (ctx && !localStorage.getItem(KEY)) {
-        ctx.style.display = '';
-        localStorage.setItem(KEY, '1');
-      }
-    })();
-
-    // ─── SVG Glyph Icons (custom icon set) ────────────────
-    var GLYPH_ICON_MAP = {
-      scale: 'icon-scale', water: 'icon-water', movement: 'icon-movement',
-      lift: 'icon-lift', recovery: 'icon-recovery', sleep: 'icon-sleep',
-      journal: 'icon-journal', mind: 'icon-mind'
+    var GLYPH_ORDER = ['scale','water','movement','lift','recovery','sleep','journal','mind'];
+    var GLYPH_LABELS = {
+      scale:'Scale', water:'Water', movement:'Move', lift:'Lift',
+      recovery:'Recovery', sleep:'Sleep', journal:'Journal', mind:'Mind'
+    };
+    var GLYPH_HREF = {
+      scale: '/physical/', water: '/nutrition/', movement: '/training/', lift: '/training/',
+      recovery: '/sleep/', sleep: '/sleep/', journal: '/chronicle/', mind: '/mind/'
+    };
+    var ICON_FILE = {
+      scale:'icon-scale', water:'icon-water', movement:'icon-movement',
+      lift:'icon-lift', recovery:'icon-recovery', sleep:'icon-sleep',
+      journal:'icon-journal', mind:'icon-mind'
     };
 
-    function glyphIcon(key) {
-      var iconFile = '/assets/icons/custom/' + GLYPH_ICON_MAP[key] + '.svg';
-      return '<div class="glyph__icn" style="-webkit-mask-image:url(' + iconFile + ');mask-image:url(' + iconFile + ')"></div>';
+    function iconHTML(key) {
+      var url = '/assets/icons/custom/' + ICON_FILE[key] + '.svg';
+      return '<div style="width:24px;height:24px;background-color:currentColor;-webkit-mask:url(' + url + ') center/contain no-repeat;mask:url(' + url + ') center/contain no-repeat"></div>';
     }
 
-    var GLYPH_ORDER = ['scale','water','movement','lift','recovery','sleep','journal','mind'];
-    var GLYPH_LABELS = {scale:'Scale',water:'Water',movement:'Move',lift:'Lift',recovery:'Recovery',sleep:'Sleep',journal:'Journal',mind:'Mind'};
+    function fmtRow(key, g) {
+      switch (key) {
+        case 'scale':    return { v: g.value != null ? g.value.toFixed(1) : '—', u: g.value != null ? 'lbs' : '', sub: g.delta_label || g.journey_summary || '' };
+        case 'water':    return { v: g.liters != null ? g.liters.toFixed(1) : '—', u: g.liters != null ? 'L' : '', sub: g.label || '' };
+        case 'movement': return { v: g.steps != null ? g.steps.toLocaleString() : '—', u: g.steps != null ? 'steps' : '', sub: g.activity_type || (g.zone2_week_min ? 'Z2 ' + g.zone2_week_min + '/150 min' : '') };
+        case 'lift':     return { v: g.trained_today ? '✓' : '—', u: '', sub: g.workout_type || (g.trained_today ? '' : 'Rest day') };
+        case 'recovery': return { v: g.recovery_pct != null ? g.recovery_pct + '' : '—', u: g.recovery_pct != null ? '%' : '', sub: [g.hrv_ms ? 'HRV ' + g.hrv_ms : null, g.rhr_bpm ? 'RHR ' + Math.round(g.rhr_bpm) : null, g.status_label].filter(Boolean).join(' · ') };
+        case 'sleep':    return { v: g.hours != null ? g.hours.toFixed(1) : '—', u: g.hours != null ? 'hrs' : '', sub: [g.score ? 'Score ' + g.score : null, g.deep_hours ? g.deep_hours.toFixed(1) + 'h deep' : null].filter(Boolean).join(' · ') };
+        case 'journal':  return { v: g.word_count != null ? g.word_count + '' : (g.written_today ? 'Open' : '—'), u: g.word_count != null ? 'words' : '', sub: (g.themes || []).join(', ') || (g.emotion_tags || []).join(' · ') };
+        case 'mind':     return { v: g.score != null ? g.score + '' : '—', u: g.score != null ? '/ 5' : '', sub: g.mood_label || g.label || '' };
+        default:         return { v: '—', u: '', sub: '' };
+      }
+    }
 
-    var STATE_COLORS = {
-      green: 'var(--c-green-500)',
-      amber: 'var(--c-yellow-status)',
-      red:   'var(--c-red-status)',
-      gray:  'var(--text-faint)'
-    };
-
-    // ─── 3b: Sparkline renderer with 7-day avg reference line + hover values ──
-    function renderSparkline(values, state) {
+    function renderSpark(values, state) {
       if (!values || values.length === 0) return '';
-      var clean = values.filter(function(v) { return v !== null && v !== undefined; });
+      var clean = values.filter(function(v) { return v != null; });
       if (clean.length === 0) return '';
       var max = Math.max.apply(null, clean);
       var min = Math.min.apply(null, clean);
       var range = max - min || 1;
-      var avg = clean.reduce(function(a,b){ return a+b; }, 0) / clean.length;
-      var avgPct = Math.max(8, ((avg - min) / range) * 100);
-      var html = '<div class="detail-card__sparkline">';
-      // 3b: Reference line at 7-day avg
-      html += '<div class="spark-ref" style="bottom:' + avgPct + '%;"></div>';
-      clean.forEach(function(v, i) {
-        var pct = Math.max(8, ((v - min) / range) * 100);
-        var isLast = i === clean.length - 1;
-        var rounded = typeof v === 'number' ? (v % 1 === 0 ? v : v.toFixed(1)) : v;
-        html += '<div class="spark-bar" data-value="' + rounded + '" style="height:' + pct + '%;opacity:' + (isLast ? '1' : '0.35') + ';background:' + (STATE_COLORS[state] || 'var(--accent)') + '"></div>';
+      var cls = 'fp-spark fp-spark--' + (state || 'green');
+      var html = '<div class="' + cls + '">';
+      clean.forEach(function(v) {
+        var pct = Math.max(10, ((v - min) / range) * 100);
+        html += '<div class="fp-spark__bar" style="height:' + pct + '%"></div>';
       });
       html += '</div>';
       return html;
     }
 
-    // ─── Detail card content builders (3c: expandable, 3g: enriched journal/mind) ──
-    var DETAIL_BUILDERS = {
-      scale: function(g) {
-        var v = g.value ? g.value.toFixed(1) : '—';
-        var u = g.value ? 'lbs' : '';
-        var sub = g.delta_label || g.journey_summary || 'No weigh-in data';
-        return { value: v, unit: u, sub: sub, sparkline: g.sparkline_7d };
-      },
-      water: function(g) {
-        return { value: g.liters ? g.liters.toFixed(1) : '—', unit: g.liters ? 'L' : '', sub: g.label || 'Not yet tracked', sparkline: g.sparkline_7d };
-      },
-      movement: function(g) {
-        var v = g.steps ? g.steps.toLocaleString() : (g.zone2_week_min > 0 ? g.zone2_week_min : '—');
-        var u = g.steps ? 'steps' : (g.zone2_week_min > 0 ? 'min Z2' : '');
-        var sub = g.activity_type || ('Z2 this week: ' + (g.zone2_week_min || 0) + '/150 min');
-        return { value: v, unit: u, sub: sub, sparkline: g.sparkline_7d };
-      },
-      lift: function(g) {
-        return { value: g.trained_today ? '✓' : 'Rest', unit: '', sub: g.workout_type || 'Rest day', sparkline: [] };
-      },
-      // 3c: Recovery expandable with HRV + RHR + respiratory rate breakdown
-      recovery: function(g) {
-        var v = g.recovery_pct ? g.recovery_pct + '' : '—';
-        var sub = [];
-        if (g.hrv_ms) sub.push('HRV ' + g.hrv_ms + 'ms');
-        if (g.rhr_bpm) sub.push('RHR ' + Math.round(g.rhr_bpm));
-        if (g.status_label) sub.push(g.status_label);
-        var expand = [];
-        if (g.hrv_ms) expand.push('HRV: ' + g.hrv_ms + ' ms');
-        if (g.rhr_bpm) expand.push('Resting HR: ' + Math.round(g.rhr_bpm) + ' bpm');
-        if (g.respiratory_rate) expand.push('Resp rate: ' + g.respiratory_rate.toFixed(1) + ' brpm');
-        if (g.skin_temp_delta) expand.push('Skin temp Δ: ' + (g.skin_temp_delta > 0 ? '+' : '') + g.skin_temp_delta.toFixed(1) + '°');
-        if (g.spo2) expand.push('SpO₂: ' + g.spo2 + '%');
-        return { value: v, unit: g.recovery_pct ? '%' : '', sub: sub.join(' · ') || 'No Whoop data', sparkline: g.sparkline_7d, expand: expand.length > 0 ? expand.join('<br>') : null };
-      },
-      // 3c: Sleep expandable with REM/deep/efficiency breakdown
-      sleep: function(g) {
-        var expand = [];
-        if (g.efficiency_pct) expand.push('Efficiency: ' + Math.round(g.efficiency_pct) + '%');
-        if (g.deep_hours) expand.push('Deep: ' + g.deep_hours.toFixed(1) + ' hrs');
-        if (g.rem_hours) expand.push('REM: ' + g.rem_hours.toFixed(1) + ' hrs');
-        if (g.light_hours) expand.push('Light: ' + g.light_hours.toFixed(1) + ' hrs');
-        if (g.awake_hours) expand.push('Awake: ' + g.awake_hours.toFixed(1) + ' hrs');
-        if (g.latency_min) expand.push('Latency: ' + Math.round(g.latency_min) + ' min');
-        return { value: g.hours ? g.hours.toFixed(1) : '—', unit: g.hours ? 'hrs' : '', sub: g.score ? 'Score: ' + g.score : 'Duration only', sparkline: g.sparkline_7d, expand: expand.length > 0 ? expand.join('<br>') : null };
-      },
-      // 3g: Journal card enriched with emotion tags, themes, word context
-      journal: function(g) {
-        var v = g.written_today ? 'Open' : 'Closed';
-        var sub = '';
-        if (g.themes && g.themes.length > 0) {
-          sub = g.themes.join(', ');
-        } else if (g.emotion_tags && g.emotion_tags.length > 0) {
-          sub = g.emotion_tags.join(' · ');
-        } else {
-          sub = g.written_today ? 'Entry logged' : 'No entry today';
-        }
-        var expand = null;
-        if (g.written_today) {
-          var parts = [];
-          if (g.word_count) parts.push(g.word_count + ' words');
-          if (g.emotion_tags && g.emotion_tags.length > 0) parts.push('Emotions: ' + g.emotion_tags.join(', '));
-          if (g.themes && g.themes.length > 0) parts.push('Themes: ' + g.themes.join(', '));
-          if (g.sentiment) parts.push('Sentiment: ' + g.sentiment);
-          if (parts.length > 0) expand = parts.join('<br>');
-        }
-        return { value: v, unit: '', sub: sub, sparkline: [], expand: expand };
-      },
-      // 3g: Mind card enriched with context
-      mind: function(g) {
-        var sub = '';
-        if (g.label) {
-          sub = g.label;
-        } else if (g.mood_label) {
-          sub = g.mood_label;
-        } else {
-          sub = 'Not tracked today';
-        }
-        var expand = null;
-        var parts = [];
-        if (g.stress_level) parts.push('Stress: ' + g.stress_level + '/5');
-        if (g.energy_level) parts.push('Energy: ' + g.energy_level + '/5');
-        if (g.clarity_level) parts.push('Clarity: ' + g.clarity_level + '/5');
-        if (g.anxiety_flag) parts.push('Anxiety flag: yes');
-        if (parts.length > 0) expand = parts.join('<br>');
-        return { value: g.score ? g.score + '' : '—', unit: g.score ? '/ 5' : '', sub: sub, sparkline: g.sparkline_7d, expand: expand };
-      }
-    };
-
-    // ─── Render Layer 2: Glyph Strip ────────────────────────────
-    function renderGlyphs(glyphs) {
-      var container = document.getElementById('glyph-container');
-      container.innerHTML = '';
-      GLYPH_ORDER.forEach(function(key) {
-        var g = glyphs[key] || { state: 'gray' };
-        var state = g.state || 'gray';
-        var iconHtml = glyphIcon(key);
-
-        var el = document.createElement('div');
-        el.className = 'glyph';
-        el.setAttribute('data-glyph', key);
-        el.innerHTML =
-          '<div class="glyph__ring glyph__ring--' + state + '">' + iconHtml + '</div>' +
-          '<div class="glyph__name">' + GLYPH_LABELS[key] + '</div>';
-        el.addEventListener('click', function() { toggleDetail(key); });
-        container.appendChild(el);
-      });
-    }
-
-    // ─── 3h: Find most notable signal (biggest change from baseline) ──
-    function findNotableKey(glyphs) {
-      var maxDelta = 0, notableKey = null;
+    function renderStandings(glyphs) {
+      var rows = document.getElementById('fp-standings-rows');
+      rows.innerHTML = '';
+      var any = false;
       GLYPH_ORDER.forEach(function(key) {
         var g = glyphs[key];
         if (!g) return;
-        if (g.state === 'red') { notableKey = key; maxDelta = 999; }
-        else if (g.state === 'amber' && maxDelta < 500) { notableKey = key; maxDelta = 500; }
-      });
-      return notableKey;
-    }
-
-    // ─── Render Layer 3: Detail Cards (3c: expandable, 3h: notable) ──
-    function renderDetails(glyphs) {
-      var grid = document.getElementById('detail-grid');
-      grid.innerHTML = '';
-      var notableKey = findNotableKey(glyphs);
-
-      GLYPH_ORDER.forEach(function(key) {
-        var g = glyphs[key] || { state: 'gray' };
-        var state = g.state || 'gray';
-        var builder = DETAIL_BUILDERS[key];
-        var d = builder ? builder(g) : { value: '—', unit: '', sub: '', sparkline: [] };
-
-        var stateLabel = state.charAt(0).toUpperCase() + state.slice(1);
-        var card = document.createElement('div');
-        card.className = 'detail-card detail-card--' + state;
-        if (key === notableKey) card.classList.add('is-notable');
-        card.setAttribute('data-detail', key);
-
+        any = true;
+        var f = fmtRow(key, g);
+        var href = GLYPH_HREF[key] || '#';
+        var spark = renderSpark(g.sparkline_7d, g.state);
         var html =
-          '<div class="detail-card__header">' +
-            '<div class="detail-card__name">' + GLYPH_LABELS[key] + '</div>' +
-            '<div class="detail-card__state detail-card__state--' + state + '">' + stateLabel + '</div>' +
-          '</div>' +
-          '<div class="detail-card__hero">' +
-            '<div class="detail-card__value">' + d.value + '</div>' +
-            '<div class="detail-card__unit">' + d.unit + '</div>' +
-          '</div>' +
-          '<div class="detail-card__sub">' + d.sub + '</div>' +
-          renderSparkline(d.sparkline, state);
-
-        // 3c: Expandable section for sleep/recovery/journal/mind
-        if (d.expand) {
-          html += '<div class="detail-card__toggle" onclick="this.parentElement.classList.toggle(\'is-expanded\')">▸ Details</div>';
-          html += '<div class="detail-card__expand">' + d.expand + '</div>';
-        }
-
-        card.innerHTML = html;
-        grid.appendChild(card);
+          '<a class="fp-row" href="' + href + '">' +
+            '<div class="fp-row__icon">' + iconHTML(key) + '</div>' +
+            '<div class="fp-row__name">' + GLYPH_LABELS[key] + '</div>' +
+            '<div class="fp-row__context">' + (f.sub || '') + '</div>' +
+            '<div class="fp-row__value">' +
+              '<span class="fp-row__num">' + f.v + '</span>' +
+              '<span class="fp-row__unit">' + f.u + '</span>' +
+            '</div>' +
+            '<div class="fp-row__spark">' + spark + '</div>' +
+          '</a>';
+        rows.insertAdjacentHTML('beforeend', html);
       });
+      if (!any) rows.innerHTML = '<div class="lp-row-empty">No signals reporting yet today.</div>';
     }
 
-    // ─── Toggle detail card (glyph click) ───────────────────────
-    var selectedGlyph = null;
-    function toggleDetail(key) {
-      var glyphs = document.querySelectorAll('.glyph');
-      var cards = document.querySelectorAll('.detail-card');
-
-      if (selectedGlyph === key) {
-        // Deselect — show all
-        selectedGlyph = null;
-        glyphs.forEach(function(g) { g.classList.remove('is-selected'); });
-        cards.forEach(function(c) { c.classList.remove('is-hidden'); });
-        return;
-      }
-
-      selectedGlyph = key;
-      glyphs.forEach(function(g) {
-        g.classList.toggle('is-selected', g.getAttribute('data-glyph') === key);
-      });
-      cards.forEach(function(c) {
-        c.classList.toggle('is-hidden', c.getAttribute('data-detail') !== key);
-      });
-
-      // Scroll card into view
-      var card = document.querySelector('[data-detail="' + key + '"]');
-      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-
-    // ─── Format date nicely ─────────────────────────────────────
-    function formatDate(dateStr) {
+    function fmtDate(s) {
       try {
-        var d = new Date(dateStr + 'T12:00:00');
-        return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-      } catch(e) { return dateStr; }
+        var d = new Date(s + 'T12:00:00');
+        return d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' }).toUpperCase();
+      } catch(e) { return s; }
     }
 
-    // ─── 3i: Time-of-day prefix for narrative ──────────────────
-    function timeOfDayPrefix() {
+    function renderMasthead(pulse) {
+      var dispatch = pulse.day_number || '—';
+      document.getElementById('fp-dispatch').textContent = dispatch;
+      document.getElementById('fp-day-strip').textContent = dispatch;
+      document.getElementById('fp-date').textContent = fmtDate(pulse.date);
+      var reporting = pulse.signals_reporting != null
+        ? 'Reporting from one body · ' + pulse.signals_reporting + ' of ' + (pulse.signals_total || 8) + ' signals in'
+        : 'Reporting from one body';
+      document.getElementById('fp-meta-status').textContent = reporting;
+      var now = new Date();
+      var hh = String(now.getHours()).padStart(2,'0');
+      var mm = String(now.getMinutes()).padStart(2,'0');
+      document.getElementById('fp-filed').textContent = 'Filed ' + hh + ':' + mm + ' · Auto-synthesis';
+      if (pulse.day_number > 1) {
+        var prev = document.getElementById('fp-prev');
+        prev.classList.add('is-active');
+        prev.title = "View yesterday's pulse";
+      }
+    }
+
+    function statusClass(status) {
+      if (status === 'strong')  return 'fp-lede__status--strong';
+      if (status === 'mixed')   return 'fp-lede__status--watch';
+      if (status === 'attention') return 'fp-lede__status--attention';
+      return 'fp-lede__status--watch';
+    }
+
+    function timePrefix() {
       var h = new Date().getHours();
       if (h < 10) return 'Morning read: ';
       if (h < 14) return 'Midday check: ';
@@ -778,221 +318,149 @@
       return 'End of day: ';
     }
 
-    // ─── 3e: Since yesterday delta line (DPR-1.14: color-coded) ──
-    function renderDelta(pulse) {
-      var el = document.getElementById('p-delta');
-      if (!el) return;
-      var items = pulse.since_yesterday || [];
-      if (items.length === 0 && pulse.glyphs) {
-        var g = pulse.glyphs;
-        if (g.scale && g.scale.delta_1d != null) items.push({signal:'weight', text:'Weight ' + (g.scale.delta_1d > 0 ? '+' : '') + g.scale.delta_1d.toFixed(1) + ' lbs', delta:g.scale.delta_1d});
-        if (g.recovery && g.recovery.delta_1d != null) items.push({signal:'recovery', text:'Recovery ' + (g.recovery.delta_1d > 0 ? '+' : '') + g.recovery.delta_1d + '%', delta:g.recovery.delta_1d});
-        if (g.sleep && g.sleep.delta_1d != null) items.push({signal:'sleep', text:'Sleep ' + (g.sleep.delta_1d > 0 ? '+' : '') + g.sleep.delta_1d.toFixed(1) + 'h', delta:g.sleep.delta_1d});
-      }
-      if (items.length > 0) {
-        var html = 'Since yesterday: ';
-        html += items.map(function(d) {
-          var txt = typeof d === 'string' ? d : d.text;
-          var delta = typeof d === 'object' ? d.delta : 0;
-          var sig = typeof d === 'object' ? d.signal : '';
-          // Weight: down is good. Recovery/sleep: up is good.
-          var good = sig === 'weight' ? delta < 0 : delta > 0;
-          var cls = delta === 0 ? 'delta-flat' : (good ? 'delta-up' : 'delta-down');
-          return '<span class="' + cls + '">' + txt + '</span>';
-        }).join(' <span style="opacity:0.3">\u00b7</span> ');
-        el.innerHTML = html;
-        el.style.display = '';
-      } else {
-        el.style.display = 'none';
-      }
-    }
+    function renderLede(pulse) {
+      document.getElementById('fp-day').textContent = pulse.day_number || '—';
+      var statusEl = document.getElementById('fp-status');
+      var word = (pulse.status_word || pulse.status || 'steady').toUpperCase();
+      statusEl.textContent = "▸ TODAY'S DESPATCH · STATE: " + word;
+      statusEl.className = 'fp-lede__status ' + statusClass(pulse.status);
 
-    // ─── DPR-1.15: Notable signal banner ──────────────────────
-    function renderNotableBanner(pulse) {
-      var banner = document.getElementById('notable-banner');
-      if (!banner) return;
-      var signals = pulse.notable_signals || [];
-      if (signals.length === 0) { banner.style.display = 'none'; return; }
-      var first = signals[0];
-      document.getElementById('notable-text').textContent = first.message;
-      banner.style.display = '';
-    }
-
-    // ─── Render Layer 1: Headline (3i: time-of-day, 3a: multi-sentence) ──
-    function renderHeadline(pulse) {
-      document.getElementById('p-day').textContent = pulse.day_number || '—';
-      document.getElementById('p-date').textContent = formatDate(pulse.date);
-
-      var status = pulse.status || 'quiet';
-      var dot = document.getElementById('p-dot');
-      dot.className = 'pulse-dot pulse-dot--' + status;
-      var word = document.getElementById('p-word');
-      word.className = 'pulse-word pulse-word--' + status;
-      word.textContent = status.charAt(0).toUpperCase() + status.slice(1);
-
-      // 3i + P1: Time-of-day responsive narrative
-      var narrative = pulse.narrative || 'No signal yet.';
-      var prefix = timeOfDayPrefix();
-      var h = new Date().getHours();
-      var g = pulse.glyphs || {};
-      // P1: Add time-context supplement
-      if (h < 10 && g.sleep && g.sleep.hours) {
-        // Morning: lead with sleep/recovery context
-        var morningNote = g.recovery && g.recovery.recovery_pct
-          ? (g.recovery.recovery_pct < 50 ? ' Consider easing into the day.' : ' Recovery supports a full day.')
-          : '';
-        narrative += morningNote;
-      } else if (h >= 18 && g.movement && g.movement.value) {
-        // Evening: add day-end reflection
-        var steps = g.movement.value;
-        var waterL = g.water && g.water.liters ? g.water.liters : 0;
-        if (steps < 4000 && waterL < 2) narrative += ' Still time for a walk and a glass of water.';
-      }
-      document.getElementById('p-narrative').textContent = prefix + narrative;
-
-      // 3e: Since yesterday
+      var narr = pulse.narrative || 'No signal yet.';
+      // Time-of-day prefix mirrors the previous /live/ behaviour.
+      document.getElementById('fp-narrative').textContent = '"' + timePrefix() + narr + '"';
       renderDelta(pulse);
     }
 
-    // ─── 3f: Share / Copy today's pulse ──────────────────────
-    var _lastPulse = null;
-    function setupShareButton() {
-      var btn = document.getElementById('p-share');
-      if (!btn) return;
+    function renderDelta(pulse) {
+      var el = document.getElementById('fp-delta');
+      var items = pulse.since_yesterday || [];
+      if (!items.length && pulse.glyphs) {
+        var g = pulse.glyphs;
+        if (g.scale && g.scale.delta_1d != null)
+          items.push({ signal:'weight', text:'Weight ' + (g.scale.delta_1d > 0 ? '+' : '') + g.scale.delta_1d.toFixed(1) + ' lbs', delta:g.scale.delta_1d });
+        if (g.recovery && g.recovery.delta_1d != null)
+          items.push({ signal:'recovery', text:'Recovery ' + (g.recovery.delta_1d > 0 ? '+' : '') + g.recovery.delta_1d + '%', delta:g.recovery.delta_1d });
+        if (g.sleep && g.sleep.delta_1d != null)
+          items.push({ signal:'sleep', text:'Sleep ' + (g.sleep.delta_1d > 0 ? '+' : '') + g.sleep.delta_1d.toFixed(1) + 'h', delta:g.sleep.delta_1d });
+      }
+      if (!items.length) { el.style.display = 'none'; return; }
+      el.style.display = '';
+      var html = '<span class="fp-lede__delta-label">Since yesterday:</span>';
+      html += items.map(function(d) {
+        var delta = d.delta || 0;
+        var sig = d.signal || '';
+        var good = sig === 'weight' ? delta < 0 : delta > 0;
+        var cls = delta === 0 ? 'fp-delta--flat' : (good ? 'fp-delta--good' : 'fp-delta--bad');
+        return '<span class="' + cls + '">' + d.text + '</span>';
+      }).join('');
+      el.innerHTML = html;
+    }
+
+    function renderWatch(pulse) {
+      var w = document.getElementById('fp-watch');
+      var sigs = pulse.notable_signals || [];
+      if (!sigs.length) { w.style.display = 'none'; return; }
+      var first = sigs[0];
+      var label = (first.severity === 'attention' || first.severity === 'red') ? 'Attention' : 'Watch';
+      w.classList.toggle('fp-watch--attention', label === 'Attention');
+      document.getElementById('fp-watch-label').textContent = label;
+      document.getElementById('fp-watch-text').textContent = first.message || '';
+      w.style.display = '';
+    }
+
+    function renderArc(pulse) {
+      var scale = (pulse.glyphs || {}).scale || {};
+      var cur = scale.value;
+      if (cur == null) {
+        document.getElementById('fp-arc-section').style.display = 'none';
+        return;
+      }
+      document.getElementById('fp-arc-current').textContent = cur.toFixed(1);
+      // Stats — pull from journey_summary if present, else compute against 307→185 scaffold.
+      var lost = (307 - cur).toFixed(1);
+      var togo = (cur - 185).toFixed(1);
+      document.getElementById('fp-arc-lost').textContent = lost + ' lbs';
+      document.getElementById('fp-arc-togo').textContent = togo + ' lbs';
+      // Pace: rough from sparkline_7d if available.
+      var sp = scale.sparkline_7d;
+      if (sp && sp.length >= 2) {
+        var first = sp[0], last = sp[sp.length-1];
+        var pace = ((first - last) / (sp.length - 1) * 7);
+        document.getElementById('fp-arc-pace').textContent = (pace >= 0 ? '' : '+') + (Math.abs(pace)).toFixed(1) + ' / wk';
+      } else {
+        document.getElementById('fp-arc-pace').textContent = '—';
+      }
+
+      // Chart
+      var hist = scale.weight_history || sp;
+      if (hist && hist.length >= 2) {
+        var vals = hist.map(function(v) { return typeof v === 'number' ? v : (v.lbs || v.value); });
+        var w = 1100, h = 80, pad = 4;
+        var max = Math.max.apply(null, vals);
+        var min = Math.min.apply(null, vals);
+        var range = max - min || 1;
+        var pts = vals.map(function(v, i) {
+          var x = pad + (i / (vals.length - 1)) * (w - 2 * pad);
+          var y = pad + (1 - (v - min) / range) * (h - 2 * pad);
+          return x.toFixed(1) + ',' + y.toFixed(1);
+        });
+        var area = pts.join(' ') + ' ' + (w - pad) + ',' + (h - pad) + ' ' + pad + ',' + (h - pad);
+        document.getElementById('fp-arc-chart').innerHTML =
+          '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
+            '<polygon class="fp-arc__chart-area" points="' + area + '"/>' +
+            '<polyline class="fp-arc__chart-line" points="' + pts.join(' ') + '"/>' +
+          '</svg>';
+        document.getElementById('fp-arc-caption').innerHTML =
+          '<span>Day 1 · ' + Math.round(vals[0]) + ' lbs</span>' +
+          '<span>Today · ' + cur.toFixed(1) + ' lbs</span>';
+      }
+    }
+
+    function setupShare(pulse) {
+      var btn = document.getElementById('lp-share');
       btn.addEventListener('click', function() {
-        if (!_lastPulse) return;
-        var p = _lastPulse;
-        var status = (p.status || 'quiet').toUpperCase();
-        var text = 'Day ' + (p.day_number || '?') + ' — ' + status + '\n';
-        text += (p.narrative || '') + '\n';
-        var glyphs = p.glyphs || {};
+        if (!pulse) return;
+        var status = (pulse.status || 'quiet').toUpperCase();
+        var lines = ['Day ' + (pulse.day_number || '?') + ' — ' + status, pulse.narrative || ''];
+        var glyphs = pulse.glyphs || {};
         GLYPH_ORDER.forEach(function(key) {
           var g = glyphs[key];
           if (!g || g.state === 'gray') return;
-          var b = DETAIL_BUILDERS[key];
-          if (!b) return;
-          var d = b(g);
-          text += GLYPH_LABELS[key] + ': ' + d.value + (d.unit ? ' ' + d.unit : '') + '\n';
+          var f = fmtRow(key, g);
+          lines.push(GLYPH_LABELS[key] + ': ' + f.v + (f.u ? ' ' + f.u : ''));
         });
-        text += '\naveragejoematt.com/live/';
-        navigator.clipboard.writeText(text).then(function() {
+        lines.push('', 'averagejoematt.com/live/');
+        navigator.clipboard.writeText(lines.join('\n')).then(function() {
           btn.classList.add('is-copied');
-          btn.querySelector('span') && (btn.querySelector('span').textContent = 'Copied!');
+          var sp = btn.querySelector('span'); if (sp) sp.textContent = 'Copied!';
           setTimeout(function() {
             btn.classList.remove('is-copied');
-            var sp = btn.querySelector('span');
             if (sp) sp.textContent = 'Copy pulse';
           }, 2000);
         });
       });
     }
-    setupShareButton();
 
-    // ─── 3d: Weight trend SVG renderer ──────────────────────────
-    function renderWeightTrend(weightHistory) {
-      if (!weightHistory || weightHistory.length < 2) return '';
-      var vals = weightHistory.map(function(d) { return d.lbs || d.value || 0; });
-      var max = Math.max.apply(null, vals);
-      var min = Math.min.apply(null, vals);
-      var range = max - min || 1;
-      var w = 100, h = 80, pad = 4;
-      var points = vals.map(function(v, i) {
-        var x = pad + (i / (vals.length - 1)) * (w - 2 * pad);
-        var y = pad + (1 - (v - min) / range) * (h - 2 * pad);
-        return x.toFixed(1) + ',' + y.toFixed(1);
-      });
-      var areaPoints = points.join(' ') + ' ' + (w - pad) + ',' + (h - pad) + ' ' + pad + ',' + (h - pad);
-      return '<div class="journey-trend">' +
-        '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
-          '<polygon class="journey-trend__area" points="' + areaPoints + '"/>' +
-          '<polyline class="journey-trend__line" points="' + points.join(' ') + '"/>' +
-        '</svg>' +
-        '<div class="journey-trend__label">' + vals[0].toFixed(0) + ' lbs → ' + vals[vals.length-1].toFixed(0) + ' lbs</div>' +
-      '</div>';
-    }
-
-    // ─── Render Journey Stats (below fold) + 3d: weight trend ──
-    function renderJourney(pulse) {
-      var scale = (pulse.glyphs || {}).scale || {};
-      if (!scale.value) {
-        document.getElementById('j-sub').textContent = 'Weight data populates after first weigh-in.';
-        return;
-      }
-      var lost = scale.journey_summary || '';
-      document.getElementById('j-sub').textContent = 'From 307 lbs · Goal: 185 lbs · ' + (lost || 'In progress');
-
-      var stats = document.getElementById('j-stats');
-      var items = [
-        { label: 'Current', value: scale.value ? scale.value.toFixed(1) + ' lbs' : '—' },
-        { label: 'Day', value: pulse.day_number || '—' },
-        { label: 'Signals', value: (pulse.signals_reporting || 0) + ' / ' + (pulse.signals_total || 8) },
-      ];
-      stats.innerHTML = '';
-      items.forEach(function(item) {
-        stats.innerHTML +=
-          '<div class="j-stat">' +
-            '<div class="j-stat__label">' + item.label + '</div>' +
-            '<div class="j-stat__value">' + item.value + '</div>' +
-          '</div>';
-      });
-
-      // 3d: Weight trend line — use scale sparkline or weight_history
-      var weightData = scale.weight_history || scale.sparkline_7d;
-      if (weightData && weightData.length >= 2) {
-        var mapped = weightData.map(function(v) { return typeof v === 'number' ? { lbs: v } : v; });
-        stats.insertAdjacentHTML('afterend', renderWeightTrend(mapped));
-      }
-    }
-
-    // ─── Fetch and render ───────────────────────────────────────
+    // ─── Fetch /api/pulse and render ───────────────────────
     var API_BASE = (typeof AMJ !== 'undefined' && AMJ.API_BASE) ? AMJ.API_BASE : '';
-
     fetch(API_BASE + '/api/pulse')
       .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
       .then(function(data) {
         var pulse = data.pulse || data;
-        _lastPulse = pulse;
-        renderHeadline(pulse);
-        renderGlyphs(pulse.glyphs || {});
-        renderNotableBanner(pulse);
-        renderDetails(pulse.glyphs || {});
-        renderJourney(pulse);
-
-        // 3k: Enable Yesterday button if day > 1
-        if (pulse.day_number && pulse.day_number > 1) {
-          var prev = document.getElementById('p-prev');
-          if (prev) {
-            prev.classList.add('is-active');
-            prev.title = 'View yesterday\'s pulse';
-          }
-        }
+        renderMasthead(pulse);
+        renderLede(pulse);
+        renderWatch(pulse);
+        renderStandings(pulse.glyphs || {});
+        renderArc(pulse);
+        setupShare(pulse);
       })
       .catch(function(err) {
         console.error('[pulse] fetch failed:', err);
-        document.getElementById('p-narrative').textContent = 'Could not load today\'s pulse. Refresh to try again.';
+        document.getElementById('fp-narrative').textContent = "Could not load today's pulse. Refresh to try again.";
       });
   })();
   </script>
 
-<nav class="reading-path-v2">
-  <a href="/about/" class="reading-path-v2__link">
-    <span class="reading-path-v2__dir">← Previous</span>
-    <span class="reading-path-v2__title">About</span>
-  </a>
-  <a href="/character/" class="reading-path-v2__link reading-path-v2__link--next">
-    <span class="reading-path-v2__dir">Next →</span>
-    <span class="reading-path-v2__title">Character</span>
-  </a>
-</nav>
-
-<!-- 3l: Throughline → latest Chronicle (daily-to-narrative connection) -->
-<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-6) var(--page-padding);border-top:1px solid var(--border-subtle);">
-  <div style="border-left:2px solid var(--c-amber-500);padding:var(--space-4) var(--space-5);background:var(--surface);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-4);">
-    <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);">These numbers tell part of the story. The rest is in the writing.</span>
-    <a href="/chronicle/" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--c-amber-400);text-decoration:none;letter-spacing:var(--ls-tag);">Read the latest Chronicle →</a>
-  </div>
-</div>
-
-<script src="/assets/js/animations.js" defer></script>
+  <script src="/assets/js/animations.js" defer></script>
 </body>
 </html>

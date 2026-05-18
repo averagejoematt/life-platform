@@ -16,7 +16,7 @@
   <meta property="og:title" content="Character Sheet — Level Up Your Life, Publicly">
   <meta property="og:description" content="RPG-style 7-pillar Character Score tracking physical, mental, and behavioral health. Real data.">
   <meta property="og:type" content="website">
-  <title>Character Sheet — Matthew</title>
+  <title>Character — averagejoematt.com</title>
   <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
@@ -1241,6 +1241,53 @@
 <div id="amj-nav"></div>
 <div id="amj-hierarchy-nav"></div>
 
+<div class="fp-page c-page">
+
+  <!-- ═══ MASTHEAD ═══ -->
+  <header class="fp-masthead">
+    <div class="fp-masthead__top">
+      <div>
+        <div class="fp-masthead__brow">The Character Sheet · Vol I · Dispatch №<span id="c-dispatch">—</span></div>
+        <div class="fp-masthead__title">CHARACTER</div>
+      </div>
+      <div class="fp-masthead__meta">
+        <div id="c-date">—</div>
+        <div>Seven pillars · scored nightly</div>
+      </div>
+    </div>
+    <div class="fp-masthead__strip">
+      <div>
+        <a href="/story/" style="color:inherit;text-decoration:none">← Story</a>
+        <span class="fp-masthead__strip-sep">·</span>
+        Live RPG character sheet
+        <span class="fp-masthead__strip-sep">·</span>
+        <a href="/coaches/" style="color:var(--accent-dim);text-decoration:none">Coaches →</a>
+      </div>
+      <div id="c-filed">Filed —</div>
+    </div>
+  </header>
+
+  <!-- ═══ LEDE ═══ -->
+  <section class="fp-lede">
+    <div>
+      <div class="fp-lede__num-brow">Level</div>
+      <div class="fp-lede__num" id="c-lede-level">—</div>
+      <div class="fp-lede__num-cap" id="c-lede-tier">of 100</div>
+    </div>
+    <div>
+      <div class="fp-lede__status fp-lede__status--strong" id="c-lede-status">▸ Today's Score · State: Leveling</div>
+      <div class="fp-lede__narrative">
+        "Seven pillars, scored nightly from <span data-const="platform.data_sources">26</span> live data sources — no self-reporting. Composite score is honest, public, and unforgiving. The number is the consequence of the week."
+      </div>
+      <div class="fp-lede__delta">
+        <span class="fp-lede__delta-label">By the numbers:</span>
+        <span class="fp-delta--good">Composite <span id="c-lede-score">—</span></span>
+        <span class="fp-delta--flat">XP <span id="c-lede-xp">—</span></span>
+        <span class="fp-delta--flat">Day <span id="c-lede-day">—</span></span>
+      </div>
+    </div>
+  </section>
+
 <!-- ═══ SECTION: IDENTITY (Decision 4k) ═══ -->
 <div class="section-label">Identity</div>
 
@@ -2416,6 +2463,64 @@ fetch('../data/character_stats.json')
     hydrateBadges();
     setTimeout(() => { collapseLocked(); buildBadgeCompact(); }, 1500);
   });
+</script>
+
+  <!-- ═══ CROSS-LINK FOOTER ═══ -->
+  <nav class="fp-cross-footer">
+    <div class="fp-cross-footer__prev"><a href="/story/">← Story</a></div>
+    <div class="fp-cross-footer__mid">
+      The score that ties everything together
+    </div>
+    <div class="fp-cross-footer__next"><a href="/coaches/">Coaches →</a></div>
+  </nav>
+
+</div><!-- /.fp-page -->
+
+<script>
+(function() {
+  // Date + filed time
+  var d = new Date();
+  var dEl = document.getElementById('c-date');
+  if (dEl) {
+    dEl.textContent = d.toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    }).toUpperCase();
+  }
+  var fEl = document.getElementById('c-filed');
+  if (fEl) {
+    var hh = String(d.getHours()).padStart(2, '0');
+    var mm = String(d.getMinutes()).padStart(2, '0');
+    fEl.textContent = 'Filed ' + hh + ':' + mm;
+  }
+
+  // Hydrate lede from /data/character_stats.json (mirrors existing fetch)
+  fetch('/data/character_stats.json?t=' + Date.now(), { cache: 'no-store' })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if (!data) return;
+      var level = data.level || data.character_level;
+      var score = data.composite_score || data.score;
+      var xp = data.total_xp || data.xp;
+      var days = data.days_active || data.days;
+      var tier = (data.tier || 'foundation');
+      var dispatch = days || level || 1;
+      if (level != null) {
+        var lEl = document.getElementById('c-lede-level'); if (lEl) lEl.textContent = level;
+        var lvEl = document.getElementById('c-lede-day'); if (lvEl) lvEl.textContent = days || level;
+      }
+      if (score != null) {
+        var sEl = document.getElementById('c-lede-score'); if (sEl) sEl.textContent = score;
+      }
+      if (xp != null) {
+        var xEl = document.getElementById('c-lede-xp'); if (xEl) xEl.textContent = xp;
+      }
+      var tEl = document.getElementById('c-lede-tier');
+      if (tEl) tEl.textContent = tier.charAt(0).toUpperCase() + tier.slice(1) + ' tier';
+      var dispEl = document.getElementById('c-dispatch');
+      if (dispEl) dispEl.textContent = dispatch;
+    })
+    .catch(function() {});
+})();
 </script>
 
 <nav class="reading-path-v2">

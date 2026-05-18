@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ask My Health Board | Average Joe Matt</title>
+  <title>Board — averagejoematt.com</title>
   <meta name="description" content="Get personalized health perspectives from a curated panel of expert AI advisors — in the domains of metabolic medicine, neuroscience, nutrition, and more.">
   <meta property="og:title" content="Ask My Health Board — Average Joe Matt">
   <meta property="og:description" content="AI-powered responses from 6 expert advisors — metabolic medicine, neuroscience, nutrition, habit architecture, and mental performance.">
@@ -182,6 +182,21 @@
     @media (max-width: 480px) {
       .board-roster__grid { grid-template-columns: 1fr; }
     }
+
+    /* ── /board/ partial Front Page additions (.b- namespace) ──── */
+    .b-page { padding-top: var(--nav-height); }
+
+    /* MEMBERS list — repurpose .fp-row 5-col grid for board members:
+       icon · name · role+one-line bio · (blank) · (blank) */
+    .b-members__icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
   </style>
   <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
 </head>
@@ -189,10 +204,104 @@
 
 <div id="amj-nav"></div>
 <div id="amj-hierarchy-nav"></div>
-</div>
 
+<div class="fp-page b-page">
 
+  <!-- ═══ MASTHEAD ═══ -->
+  <header class="fp-masthead">
+    <div class="fp-masthead__top">
+      <div>
+        <div class="fp-masthead__brow">The Board · Vol I · Dispatch №01</div>
+        <div class="fp-masthead__title">BOARD</div>
+      </div>
+      <div class="fp-masthead__meta">
+        <div id="b-date">—</div>
+        <div>Six advisors · open to questions</div>
+      </div>
+    </div>
+    <div class="fp-masthead__strip">
+      <div>
+        <a href="/coaches/" style="color:inherit;text-decoration:none">← Coaches</a>
+        <span class="fp-masthead__strip-sep">·</span>
+        Ask the panel
+        <span class="fp-masthead__strip-sep">·</span>
+        <a href="/" style="color:var(--accent-dim);text-decoration:none">Home →</a>
+      </div>
+      <div>Filed continuously</div>
+    </div>
+  </header>
 
+  <!-- ═══ LEDE ═══ -->
+  <section class="fp-lede">
+    <div>
+      <div class="fp-lede__num-brow">Seated</div>
+      <div class="fp-lede__num">6</div>
+      <div class="fp-lede__num-cap">advisors at the table</div>
+    </div>
+    <div>
+      <div class="fp-lede__status fp-lede__status--strong">▸ The Advisory Board · State: Seated</div>
+      <div class="fp-lede__narrative">
+        "Six AI personas, each with a distinct domain, a different lens, and genuinely different answers to the same question. The tension between them is the point."
+      </div>
+      <div class="fp-lede__delta">
+        <span class="fp-lede__delta-label">Disclaimer:</span>
+        <span class="fp-delta--flat">AI personas drawing on published research</span>
+        <span class="fp-delta--bad">Not medical advice</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ MEMBERS LIST ═══ -->
+  <section class="fp-standings">
+    <div class="fp-standings__head">
+      <div class="fp-standings__title">MEMBERS</div>
+      <div class="fp-standings__meta">Six perspectives · One question</div>
+    </div>
+    <div>
+      <div class="fp-row" style="cursor:default">
+        <div class="fp-row__icon"><div class="b-members__icon" style="background:rgba(61,184,138,0.15)">💪</div></div>
+        <div class="fp-row__name">Dr. Sarah Chen</div>
+        <div class="fp-row__context">Training &amp; Exercise Physiology — Zone 2, periodization, exercise as medicine</div>
+        <div class="fp-row__value"></div>
+        <div class="fp-row__spark"></div>
+      </div>
+      <div class="fp-row" style="cursor:default">
+        <div class="fp-row__icon"><div class="b-members__icon" style="background:rgba(240,165,0,0.15)">🍎</div></div>
+        <div class="fp-row__name">Dr. Marcus Webb</div>
+        <div class="fp-row__context">Evidence-Based Nutrition — macros, deficit optimization, protein synthesis</div>
+        <div class="fp-row__value"></div>
+        <div class="fp-row__spark"></div>
+      </div>
+      <div class="fp-row" style="cursor:default">
+        <div class="fp-row__icon"><div class="b-members__icon" style="background:rgba(129,140,248,0.15)">🌙</div></div>
+        <div class="fp-row__name">Dr. Lisa Park</div>
+        <div class="fp-row__context">Sleep Science &amp; Circadian Biology — sleep architecture, light protocols, HRV</div>
+        <div class="fp-row__value"></div>
+        <div class="fp-row__spark"></div>
+      </div>
+      <div class="fp-row" style="cursor:default">
+        <div class="fp-row__icon"><div class="b-members__icon" style="background:rgba(91,164,207,0.15)">🧬</div></div>
+        <div class="fp-row__name">Dr. James Okafor</div>
+        <div class="fp-row__context">Longevity &amp; Preventive Medicine — biomarkers, decade-scale trajectory</div>
+        <div class="fp-row__value"></div>
+        <div class="fp-row__spark"></div>
+      </div>
+      <div class="fp-row" style="cursor:default">
+        <div class="fp-row__icon"><div class="b-members__icon" style="background:rgba(78,205,196,0.15)">⚡</div></div>
+        <div class="fp-row__name">Coach Maya Rodriguez</div>
+        <div class="fp-row__context">Behavioral Performance — habit architecture, identity change, accountability</div>
+        <div class="fp-row__value"></div>
+        <div class="fp-row__spark"></div>
+      </div>
+      <div class="fp-row" style="cursor:default">
+        <div class="fp-row__icon"><div class="b-members__icon" style="background:rgba(224,224,224,0.12)">👁</div></div>
+        <div class="fp-row__name">The Chair</div>
+        <div class="fp-row__context">Synthesis &amp; Priority — cross-domain integration, verdict synthesis</div>
+        <div class="fp-row__value"></div>
+        <div class="fp-row__spark"></div>
+      </div>
+    </div>
+  </section>
 
 
 
@@ -478,6 +587,17 @@
   });
 </script>
 
+  <!-- ═══ CROSS-LINK FOOTER ═══ -->
+  <nav class="fp-cross-footer">
+    <div class="fp-cross-footer__prev"><a href="/coaches/">← Coaches</a></div>
+    <div class="fp-cross-footer__mid">
+      The voices that govern direction
+    </div>
+    <div class="fp-cross-footer__next"><a href="/">Home →</a></div>
+  </nav>
+
+</div><!-- /.fp-page -->
+
 <!-- Mobile bottom nav -->
 <div id="amj-subscribe"></div>
 <div id="amj-bottom-nav"></div>
@@ -485,6 +605,18 @@
 <div id="amj-reading-path"></div>
 <div id="amj-footer"></div>
 
+<script>
+(function() {
+  // Date stamp in masthead meta
+  var dEl = document.getElementById('b-date');
+  if (dEl) {
+    var d = new Date();
+    dEl.textContent = d.toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    }).toUpperCase();
+  }
+})();
+</script>
 <script src="/assets/js/reveal.js"></script>
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>
