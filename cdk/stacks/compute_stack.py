@@ -7,14 +7,17 @@ v2.0 (v3.4.0): CDK-managed IAM roles replace existing_role_arn references.
 
 Lambdas (8+):
   anomaly-detector          cron(5 15 * * ? *)    — 8:05 AM PT daily
-  character-sheet-compute   cron(35 17 * * ? *)   — 9:35 AM PT daily
-  daily-metrics-compute     cron(40 17 * * ? *)   — 9:40 AM PT daily
-  daily-insight-compute     cron(45 17 * * ? *)   — 9:45 AM PT daily
-  adaptive-mode-compute     cron(50 17 * * ? *)   — 9:50 AM PT daily
+  character-sheet-compute   cron(30 16 * * ? *)   — 9:30 AM PT daily (ADR-052)
+  adaptive-mode-compute     cron(35 16 * * ? *)   — 9:35 AM PT daily (ADR-052)
+  daily-metrics-compute     cron(40 16 * * ? *)   — 9:40 AM PT daily (ADR-052)
+  daily-insight-compute     cron(45 16 * * ? *)   — 9:45 AM PT daily (ADR-052)
   hypothesis-engine         cron(0 19 ? * SUN *)  — Sunday 12:00 PM PT
   weekly-correlation-compute cron(30 18 ? * SUN *) — Sunday 11:30 AM PT
   dashboard-refresh         cron(0 21 * * ? *)    — 2:00 PM PDT + 6:00 PM PDT
   challenge-generator       cron(0 22 ? * SUN *)  — Sunday 3:00 PM PT
+
+V2 P2.9 (2026-05-17): docstring corrected to match actual ADR-052 reordering
+(was 17:35-17:50, now 16:30-16:45 to run BEFORE daily-brief at 17:00).
 """
 
 import aws_cdk as cdk
