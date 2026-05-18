@@ -1,47 +1,35 @@
-#!/usr/bin/env python3
 """
-Habitify → DynamoDB ingestion Lambda.
+habitify_lambda.py — Habitify ingestion via SIMP-2 framework (P4.1, 2026-05-17).
 
-Replaces Chronicling as the P40 habit tracking source. Pulls daily habit
-completion, group scores, and mood from the Habitify API.
+Migrated from the standalone pattern to lambdas/ingestion_framework.py.
+2nd of 13 ingestion Lambdas (Todoist was 1st).
 
-DynamoDB schema (matches chronicling format for MCP compatibility):
+Source-specific concerns:
+  - Multiple API calls per day: areas (static config), journal (habits), moods
+  - Aggregation into P40 groups + per-group + overall completion %
+  - **Today refreshed on every hourly run** — habits checked throughout the day;
+    framework's new refresh_today=True flag (P4.1, 2026-05-17) handles this.
+  - **Supplement bridge** — checked supplement habits get extracted into a
+    separate `USER#matthew#SOURCE#supplements` partition. Framework's
+    post_store_fn callback is the right hook for this.
+
+DDB shape unchanged from pre-migration (chronicling-compatible format):
   pk: USER#matthew#SOURCE#habitify
   sk: DATE#YYYY-MM-DD
-  Fields:
-    habits          — {habit_name: 1/0}  (matches chronicling count format)
-    by_group        — {GroupName: {completed, possible, pct, habits_done}}
-    total_completed — int
-    total_possible  — int
-    completion_pct  — Decimal (0.0–1.0)
-    mood            — int (1-5, from Habitify moods)
-    mood_label      — string (Terrible/Bad/Okay/Good/Excellent)
-    skipped_count   — int
-
-EventBridge trigger: daily at 6:15 AM PT (captures previous day; runs before
-daily brief at 8:15 AM PT).
-
-Can also be invoked manually:
-  {"date": "YYYY-MM-DD"}           — single date
-  {"start": "...", "end": "..."}   — backfill range
-
-Environment variables:
-  HABITIFY_SECRET_NAME — Secrets Manager key (default: life-platform/habitify)
-  TABLE_NAME           — DynamoDB table (default: life-platform)
+  habits: {name: 0/1}, by_group: {group: {...}}, total_*, completion_pct, mood
 """
 
 import json
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from decimal import Decimal
-from urllib.request import Request, urlopen
-from urllib.error import HTTPError
 from urllib.parse import urlencode
+from urllib.request import Request
+from urllib.error import HTTPError
 
 import boto3
 
-# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
     logger = get_logger("habitify")
@@ -49,30 +37,24 @@ except ImportError:
     logger = logging.getLogger("habitify")
     logger.setLevel(logging.INFO)
 
-# ── Config ────────────────────────────────────────────────────────────────────
-TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
+from ingestion_framework import IngestionConfig, run_ingestion
+
 SECRET_NAME = os.environ.get("HABITIFY_SECRET_NAME", "life-platform/habitify")
-BASE_URL = "https://api.habitify.me"
-# ── Config (env vars with backwards-compatible defaults) ──
-REGION     = os.environ.get("AWS_REGION", "us-west-2")
-USER_ID    = os.environ.get("USER_ID", "matthew")
-LOOKBACK_DAYS = int(os.environ.get("LOOKBACK_DAYS", "7"))
-
-PK = f"USER#{USER_ID}#SOURCE#habitify"
-
+REGION      = os.environ.get("AWS_REGION", "us-west-2")
+USER_ID     = os.environ.get("USER_ID", "matthew")
+BASE_URL    = "https://api.habitify.me"
 MOOD_LABELS = {1: "Terrible", 2: "Bad", 3: "Okay", 4: "Good", 5: "Excellent"}
+P40_GROUPS  = ["Data", "Discipline", "Growth", "Hygiene", "Nutrition",
+               "Performance", "Recovery", "Supplements", "Wellbeing"]
 
-# P40 group order (for consistent output)
-P40_GROUPS = ["Data", "Discipline", "Growth", "Hygiene",
-              "Nutrition", "Performance", "Recovery", "Supplements", "Wellbeing"]
+# AWS clients used directly by the supplement bridge (post-store hook needs DDB
+# access independent of the framework's table reference).
+_dynamodb = boto3.resource("dynamodb", region_name=REGION)
+_table = _dynamodb.Table(os.environ.get("TABLE_NAME", "life-platform"))
+_SUPPLEMENTS_PK = f"USER#{USER_ID}#SOURCE#supplements"
 
-# ── Supplement Bridge (v2.55.1) ───────────────────────────────────────────────
-# Maps Habitify supplement habit names → structured supplement metadata.
-# Automatically writes to USER#matthew#SOURCE#supplements after each Habitify
-# ingestion so get_supplement_log / get_supplement_correlation have data.
-# Dosages are defaults — update here when actual doses are confirmed.
 
-SUPPLEMENTS_PK = f"USER#{USER_ID}#SOURCE#supplements"
+# ── Supplement bridge mapping (unchanged) ─────────────────────────────────────
 
 SUPPLEMENT_MAP = {
     # ── Morning batch (fasted) ──
@@ -101,189 +83,164 @@ SUPPLEMENT_MAP = {
     "Reishi":        {"dose": 1000, "unit": "mg", "timing": "before_bed", "category": "supplement"},
 }
 
-# ── AWS clients ───────────────────────────────────────────────────────────────
-secrets = boto3.client("secretsmanager", region_name=REGION)
-dynamodb = boto3.resource("dynamodb", region_name=REGION)
-table = dynamodb.Table(TABLE_NAME)
 
-# COST-OPT-1: Cache secrets in warm Lambda containers (15-min TTL)
-_secret_cache = {}
-
-
-def _cached_secret(client, secret_id):
-    import time as _t
-    entry = _secret_cache.get(secret_id)
-    if entry and _t.time() - entry[1] < 900:
-        return entry[0]
-    val = client.get_secret_value(SecretId=secret_id)["SecretString"]
-    _secret_cache[secret_id] = (val, _t.time())
-    return val
-
-
-def get_api_key():
-    """Fetch Habitify API key from Secrets Manager."""
-    secret = json.loads(_cached_secret(secrets, SECRET_NAME))
-    return secret.get("habitify_api_key") or secret.get("api_key")
-
+# ── Habitify API helpers ──────────────────────────────────────────────────────
 
 def api_get(endpoint, api_key, params=None):
-    """GET request to Habitify API. Returns parsed JSON data field."""
+    """GET request to Habitify API. Returns parsed JSON `data` field.
+    Retries via http_retry (P3.5) on 429/5xx."""
     url = f"{BASE_URL}{endpoint}"
     if params:
-        qs = urlencode(params)
-        url = f"{url}?{qs}"
+        url = f"{url}?{urlencode(params)}"
     req = Request(url, headers={"Authorization": api_key, "User-Agent": "LifePlatform/1.0"})
     try:
-        with urlopen(req, timeout=30) as resp:
+        from http_retry import urlopen_with_retry
+        with urlopen_with_retry(req, timeout=30) as resp:
             body = json.loads(resp.read().decode())
             if not body.get("status"):
                 raise Exception(f"API error: {body.get('message', 'Unknown')}")
             return body.get("data", [])
     except HTTPError as e:
         error_body = e.read().decode() if e.fp else ""
-        logger.error(f"Habitify API {e.code} on {endpoint}: {error_body}")
+        logger.error("Habitify API %s on %s: %s", e.code, endpoint, error_body)
         raise
 
 
 def fetch_areas(api_key):
-    """Fetch all areas → {area_id: area_name} mapping."""
+    """{area_id: area_name} map. Used to bucket habits into P40 groups."""
     areas = api_get("/areas", api_key)
     return {a["id"]: a["name"] for a in areas}
 
 
 def fetch_journal(api_key, target_date):
-    """Fetch all habits with status for a given date."""
+    """Habits + status for a date."""
     date_str = f"{target_date}T00:00:00+00:00"
     return api_get("/journal", api_key, {"target_date": date_str})
 
 
 def fetch_moods(api_key, target_date):
-    """Fetch mood entries for a given date."""
+    """Mood entries for a date. Non-fatal on error."""
     date_str = f"{target_date}T00:00:00+00:00"
     try:
         return api_get("/moods", api_key, {"target_date": date_str})
     except Exception as e:
-        logger.warning(f"Moods fetch failed (non-fatal): {e}")
+        logger.warning("Moods fetch failed (non-fatal): %s", e)
         return []
 
 
-def process_day(api_key, area_map, target_date):
-    """
-    Process a single day: fetch journal + moods, compute scores.
+# ── SIMP-2 framework callbacks ────────────────────────────────────────────────
 
-    Output matches chronicling DynamoDB format for MCP compatibility:
-      habits:          {name: 1/0}
-      by_group:        {GroupName: {completed, possible, pct, habits_done}}
-      total_completed: int
-      total_possible:  int
-      completion_pct:  Decimal (0.0–1.0)
+def authenticate(secret_data: dict) -> dict:
+    """Habitify uses a long-lived API key. No OAuth refresh."""
+    key = secret_data.get("habitify_api_key") or secret_data.get("api_key")
+    if not key:
+        raise RuntimeError("Habitify secret missing 'habitify_api_key'/'api_key' field")
+    return {"api_key": key}
 
-    Returns None if no habit data exists for the day.
-    """
-    journal = fetch_journal(api_key, target_date)
 
+def fetch_day(credentials: dict, date_str: str) -> dict | None:
+    """Fetch journal + moods for one day. Areas fetched per-invocation (rare
+    that they change between days within a single run; could cache further)."""
+    api_key = credentials["api_key"]
+    area_map = fetch_areas(api_key)
+    journal = fetch_journal(api_key, date_str)
     if not journal:
-        logger.info(f"No journal data for {target_date}")
+        logger.info("No journal data for %s", date_str)
         return None
+    moods = fetch_moods(api_key, date_str)
+    return {
+        "date":     date_str,
+        "area_map": area_map,
+        "journal":  journal,
+        "moods":    moods,
+    }
 
-    # ── Build habits map and group tallies ────────────────────────────────────
-    habits = {}                   # {habit_name: 1 or 0}
-    group_habits_done = {}        # {group: [list of completed habit names]}
-    group_habits_possible = {}    # {group: [list of all habit names]}
+
+def transform(raw: dict, date_str: str) -> list[dict]:
+    """Build the chronicling-compatible habit record (single per day)."""
+    if not raw:
+        return []
+    area_map = raw["area_map"]
+    journal = raw["journal"]
+    moods = raw["moods"]
+
+    habits = {}
+    group_habits_done = {}
+    group_habits_possible = {}
     skipped_count = 0
 
     for entry in journal:
-        name = entry.get("name", "Unknown")
-        is_archived = entry.get("is_archived", False)
-        if is_archived:
+        if entry.get("is_archived"):
             continue
-
-        # Determine completion status
+        name = entry.get("name", "Unknown")
         status = entry.get("status", "none")
         if isinstance(status, dict):
             status = status.get("status", "none")
-
         is_completed = (status == "completed")
         is_skipped = (status == "skipped")
-
-        # Store as 1/0 to match chronicling format (int(val) in MCP _habit_series)
         habits[name] = Decimal("1") if is_completed else Decimal("0")
-
         if is_skipped:
             skipped_count += 1
 
-        # Determine group from area
         area = entry.get("area")
-        group = None
-        if area and area.get("id"):
-            group = area_map.get(area["id"])
-
-        # Only count habits in recognized P40 groups
+        group = area_map.get(area["id"]) if area and area.get("id") else None
         if group and group in P40_GROUPS:
             group_habits_possible.setdefault(group, []).append(name)
             if is_completed:
                 group_habits_done.setdefault(group, []).append(name)
 
-    # ── Compute by_group (matches chronicling format) ─────────────────────────
     by_group = {}
     for group in P40_GROUPS:
         possible_list = group_habits_possible.get(group, [])
         done_list = group_habits_done.get(group, [])
-        possible = len(possible_list)
-        completed = len(done_list)
-        if possible > 0:
+        if possible_list:
             by_group[group] = {
-                "completed": completed,
-                "possible": possible,
-                "pct": Decimal(str(round(completed / possible, 4))),
+                "completed":   len(done_list),
+                "possible":    len(possible_list),
+                "pct":         Decimal(str(round(len(done_list) / len(possible_list), 4))),
                 "habits_done": done_list,
             }
 
-    # ── Total score ───────────────────────────────────────────────────────────
     total_possible = sum(len(v) for v in group_habits_possible.values())
     total_completed = sum(len(v) for v in group_habits_done.values())
-    completion_pct = Decimal(str(round(total_completed / total_possible, 4))) \
+    completion_pct = (
+        Decimal(str(round(total_completed / total_possible, 4)))
         if total_possible > 0 else Decimal("0")
+    )
 
-    # ── Mood ──────────────────────────────────────────────────────────────────
-    moods = fetch_moods(api_key, target_date)
-    mood_value = None
-    mood_label = None
+    record = {
+        "source":          "habitify",
+        "date":            date_str,
+        "habits":          habits,
+        "by_group":        by_group,
+        "total_completed": total_completed,
+        "total_possible":  total_possible,
+        "completion_pct":  completion_pct,
+        "skipped_count":   skipped_count,
+        "updated_at":      datetime.now(timezone.utc).isoformat(),
+    }
+
     if moods:
         latest = moods[-1]
         mood_value = latest.get("value")
-        mood_label = MOOD_LABELS.get(mood_value, "Unknown")
+        if mood_value is not None:
+            record["mood"] = mood_value
+            record["mood_label"] = MOOD_LABELS.get(mood_value, "Unknown")
 
-    # ── Build DynamoDB item ───────────────────────────────────────────────────
-    item = {
-        "pk": PK,
-        "sk": f"DATE#{target_date}",
-        "date": target_date,
-        "source": "habitify",
-        "schema_version": 1,
-        # ── Chronicling-compatible fields (MCP tools read these) ──────────────
-        "habits": habits,                    # {name: 1/0}
-        "by_group": by_group,                # {Group: {completed, possible, pct, habits_done}}
-        "total_completed": total_completed,
-        "total_possible": total_possible,
-        "completion_pct": completion_pct,     # 0.0–1.0
-        # ── New fields (Habitify-specific) ────────────────────────────────────
-        "skipped_count": skipped_count,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }
-
-    if mood_value is not None:
-        item["mood"] = mood_value
-        item["mood_label"] = mood_label
-
-    return item
+    return [record]
 
 
-def bridge_supplements(item):
-    """Extract checked supplement habits from a Habitify item and write to supplements partition."""
+def supplement_bridge(items: list[dict], date_str: str) -> None:
+    """Post-store hook: extract supplement habit completions → supplements partition.
+
+    Framework calls this AFTER successful DDB write of the main habit record.
+    Failures here are logged but never raised — the bridge is auxiliary; if it
+    breaks, the primary habitify record still got written.
+    """
+    if not items:
+        return
+    item = items[0]
     habits = item.get("habits", {})
-    date_str = item["date"]
-
     entries = []
     for habit_name, completed in habits.items():
         if int(completed) != 1:
@@ -292,186 +249,61 @@ def bridge_supplements(item):
             continue
         meta = SUPPLEMENT_MAP[habit_name]
         entries.append({
-            "name": habit_name,
-            "dose": Decimal(str(meta["dose"])),
-            "unit": meta["unit"],
-            "timing": meta["timing"],
-            "category": meta["category"],
+            "name":      habit_name,
+            "dose":      Decimal(str(meta["dose"])),
+            "unit":      meta["unit"],
+            "timing":    meta["timing"],
+            "category":  meta["category"],
             "logged_at": datetime.now(timezone.utc).isoformat(),
-            "source": "habitify_bridge",
+            "source":    "habitify_bridge",
         })
 
     if not entries:
-        logger.info(f"Supplement bridge: no supplements checked for {date_str}")
-        return 0
+        logger.info("Supplement bridge: no supplements checked for %s", date_str)
+        return
 
-    table.put_item(Item={
-        "pk": SUPPLEMENTS_PK,
-        "sk": f"DATE#{date_str}",
-        "date": date_str,
-        "source": "supplements",
-        "schema_version": 1,
-        "supplements": entries,
-        "bridge_source": "habitify",
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    })
-    logger.info(f"Supplement bridge: wrote {len(entries)} supplements for {date_str}")
-    return len(entries)
-
-
-def write_to_dynamo(item):
-    """Write item to DynamoDB, then bridge supplements."""
-    date_str = item.get("sk", "").replace("DATE#", "")
-    # DATA-2: Validate before write
     try:
-        from ingestion_validator import validate_item as _validate_item
-        _vr = _validate_item("habitify", item, date_str)
-        if _vr.should_skip_ddb:
-            logger.error(f"[DATA-2] CRITICAL: Skipping habitify DDB write for {date_str}: {_vr.errors}")
-            return  # no s3_client in habitify — log only
-        else:
-            if _vr.warnings:
-                logger.warning(f"[DATA-2] Validation warnings for habitify/{date_str}: {_vr.warnings}")
-            table.put_item(Item=item)
-    except ImportError:
-        table.put_item(Item=item)
-    logger.info(f"Wrote {item['sk']} — pct={item['completion_pct']}, "
-                f"completed={item['total_completed']}/{item['total_possible']}"
-                f"{', mood=' + str(item.get('mood', '')) if item.get('mood') else ''}")
-    # Bridge supplements automatically
-    try:
-        bridge_supplements(item)
+        _table.put_item(Item={
+            "pk":             _SUPPLEMENTS_PK,
+            "sk":             f"DATE#{date_str}",
+            "date":           date_str,
+            "source":         "supplements",
+            "schema_version": 1,
+            "supplements":    entries,
+            "bridge_source":  "habitify",
+            "updated_at":     datetime.now(timezone.utc).isoformat(),
+        })
+        logger.info("Supplement bridge: wrote %d supplements for %s", len(entries), date_str)
     except Exception as e:
-        logger.error(f"Supplement bridge failed for {item.get('date')}: {e}")
+        logger.error("Supplement bridge write failed for %s: %s", date_str, e)
 
 
-# ── Gap detection (v2.0) ──────────────────────────────────────────────────────
-def find_missing_dates(lookback_days=LOOKBACK_DAYS):
-    """Check DynamoDB for missing or stale Habitify records in the lookback window.
-    Always includes today — habits are checked off throughout the day so the
-    record needs to be refreshed on every hourly run, not just the first."""
-    from boto3.dynamodb.conditions import Key
-    today = datetime.now(timezone.utc).date()
-    today_str = today.strftime("%Y-%m-%d")
-    check_dates = set()
-    for i in range(0, lookback_days + 1):  # includes today
-        check_dates.add((today - timedelta(days=i)).strftime("%Y-%m-%d"))
+# ── Framework config ──────────────────────────────────────────────────────────
 
-    oldest = min(check_dates)
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(PK)
-            & Key("sk").between(f"DATE#{oldest}", f"DATE#{today_str}"),
-        ProjectionExpression="sk",
-    )
-    existing = {item["sk"][5:] for item in resp.get("Items", [])}
-    missing = sorted(check_dates - existing)
-
-    # Always re-process today AND yesterday — habits are checked off throughout
-    # the day, and the UTC/PT boundary means early UTC runs capture incomplete
-    # PT-day data. Yesterday may also be incomplete if the last run was before
-    # the user finished checking off habits for the PT day.
-    yesterday_str = (today - timedelta(days=1)).strftime("%Y-%m-%d")
-    for refresh_date in [yesterday_str, today_str]:
-        if refresh_date not in missing and refresh_date >= oldest:
-            missing.append(refresh_date)
-    missing.sort()
-
-    if missing:
-        print(f"[GAP-FILL] Found {len(missing)} dates to process (including today refresh): {missing}")
-    else:
-        print(f"[GAP-FILL] No gaps in last {lookback_days} days")
-    return missing
+_config = IngestionConfig(
+    source_name="habitify",
+    secret_id=SECRET_NAME,
+    s3_archive_prefix="raw/matthew/habitify",
+    schema_version=1,
+    enable_gap_detection=True,
+    lookback_days=int(os.environ.get("LOOKBACK_DAYS", "7")),
+    enable_item_size_guard=True,
+    refresh_today=True,  # Habits update throughout day → re-write today every run
+)
 
 
-def lambda_handler(event, context):
-    if event.get("healthcheck"):
-        return {"statusCode": 200, "body": "ok"}
+def lambda_handler(event: dict, context) -> dict:
+    """SIMP-2 entry point. Same event shapes as Todoist:
+      {}                                 — gap-aware backfill (default, includes today)
+      {"date_override": "today"}         — force today's data only
+      {"date_override": "2026-05-15"}    — single explicit date
+      {"healthcheck": true}              — boot check, returns 200/"ok"
+    """
     try:
-        """
-        Lambda entry point.
-
-        Event formats:
-          {}                                → gap-aware lookback (default for 6:15am schedule)
-          {"date": "YYYY-MM-DD"}            → fetch specific date
-          {"start": "...", "end": "..."}    → backfill date range
-        """
-        import time as _time
-        if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
-
-        api_key = get_api_key()
-        area_map = fetch_areas(api_key)
-        logger.info(f"Fetched {len(area_map)} areas: {list(area_map.values())}")
-
-        # ── Mode 1: Explicit date range backfill ──
-        if "start" in event and "end" in event:
-            start = datetime.strptime(event["start"], "%Y-%m-%d")
-            end = datetime.strptime(event["end"], "%Y-%m-%d")
-            days_written = 0
-            current = start
-            while current <= end:
-                date_str = current.strftime("%Y-%m-%d")
-                item = process_day(api_key, area_map, date_str)
-                if item:
-                    write_to_dynamo(item)
-                    days_written += 1
-                current += timedelta(days=1)
-            return {"statusCode": 200, "body": f"Backfilled {days_written} days"}
-
-        # ── Mode 2: Explicit single date ──
-        if "date" in event:
-            target_date = event["date"]
-            print(f"Habitify ingestion — explicit date={target_date}")
-            item = process_day(api_key, area_map, target_date)
-            if item:
-                write_to_dynamo(item)
-                return {
-                    "statusCode": 200,
-                    "body": json.dumps({
-                        "date": target_date,
-                        "completion_pct": float(item["completion_pct"]),
-                        "total_completed": item["total_completed"],
-                        "total_possible": item["total_possible"],
-                    }),
-                }
-            return {"statusCode": 200, "body": json.dumps({"date": target_date, "message": "No data"})}
-
-        # ── Mode 3: Scheduled run — gap-aware lookback ──
-        print(f"[GAP-FILL] Habitify gap-aware lookback ({LOOKBACK_DAYS} days)")
-        missing_dates = find_missing_dates()
-
-        if not missing_dates:
-            return {"statusCode": 200, "body": json.dumps({"message": "No gaps to fill", "lookback_days": LOOKBACK_DAYS})}
-
-        results = {}
-        for i, date_str in enumerate(missing_dates):
-            print(f"[GAP-FILL] Ingesting {date_str} ({i+1}/{len(missing_dates)})")
-            try:
-                item = process_day(api_key, area_map, date_str)
-                if item:
-                    write_to_dynamo(item)
-                    results[date_str] = float(item["completion_pct"])
-                else:
-                    results[date_str] = "no data"
-            except Exception as e:
-                print(f"[GAP-FILL] ERROR on {date_str}: {e}")
-                results[date_str] = f"error: {e}"
-            if i < len(missing_dates) - 1:
-                _time.sleep(0.5)  # Gentle pacing
-
-        filled = sum(1 for v in results.values() if isinstance(v, float))
-        print(f"[GAP-FILL] Complete: {filled}/{len(missing_dates)} days filled")
-
-        return {
-            "statusCode": 200,
-            "body": json.dumps({
-                "mode": "gap_fill",
-                "lookback_days": LOOKBACK_DAYS,
-                "gaps_found": len(missing_dates),
-                "gaps_filled": filled,
-                "details": results,
-            }, default=str),
-        }
+        if event.get("healthcheck"):
+            return {"statusCode": 200, "body": "ok"}
+        return run_ingestion(_config, authenticate, fetch_day, transform,
+                             event, context, post_store_fn=supplement_bridge)
     except Exception as e:
-        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        logger.error("habitify ingestion failed: %s", e, exc_info=True)
         raise
-

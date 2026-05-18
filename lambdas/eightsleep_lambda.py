@@ -159,14 +159,16 @@ def _cached_secret(client, secret_id):
 
 
 # ── Serialisation ──────────────────────────────────────────────────────────────
-def floats_to_decimal(obj):
-    if isinstance(obj, float):
-        return Decimal(str(obj))
-    if isinstance(obj, dict):
-        return {k: floats_to_decimal(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [floats_to_decimal(v) for v in obj]
-    return obj
+# Phase 4.2 (2026-05-16): canonical impl in lambdas/numeric.py.
+try:
+    from numeric import floats_to_decimal  # noqa: F401
+except ImportError:
+    def floats_to_decimal(obj):
+        if isinstance(obj, bool): return obj
+        if isinstance(obj, float): return Decimal(str(obj))
+        if isinstance(obj, dict): return {k: floats_to_decimal(v) for k, v in obj.items()}
+        if isinstance(obj, list): return [floats_to_decimal(v) for v in obj]
+        return obj
 
 
 # ── Secrets ────────────────────────────────────────────────────────────────────
@@ -204,7 +206,9 @@ def login(email: str, password: str, client_id: str = None, client_secret: str =
         },
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    # Phase 3.5 (2026-05-16): retry on transient 429/5xx.
+    from http_retry import urlopen_with_retry
+    with urlopen_with_retry(req, timeout=30) as resp:
         data = json.loads(resp.read())
 
     return {
@@ -231,7 +235,9 @@ def ensure_user_id(secret: dict) -> dict:
         f"{CLIENT_API}/v1/users/me",
         headers={"Authorization": f"Bearer {secret['access_token']}"},
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    # Phase 3.5 (2026-05-16): retry on transient 429/5xx.
+    from http_retry import urlopen_with_retry
+    with urlopen_with_retry(req, timeout=30) as resp:
         data = json.loads(resp.read())
     secret["user_id"] = data["user"]["userId"]
     print(f"Resolved user_id: {secret['user_id']}")
@@ -252,9 +258,13 @@ def api_get(path: str, access_token: str, params: dict = None) -> dict:
             "user-agent":      "okhttp/4.9.3",
         },
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    # Phase 3.5 (2026-05-16): retry on transient 429/5xx.
+    # Note: http_retry wraps the response and hides .headers — detect gzip via
+    # magic bytes (1f 8b) instead of relying on the Content-Encoding header.
+    from http_retry import urlopen_with_retry
+    with urlopen_with_retry(req, timeout=30) as resp:
         raw = resp.read()
-        if resp.headers.get("Content-Encoding") == "gzip":
+        if raw[:2] == b"\x1f\x8b":
             raw = gzip.decompress(raw)
         return json.loads(raw)
 
@@ -583,190 +593,88 @@ def parse_trends_for_date(
 
 # ── Core ingestion ─────────────────────────────────────────────────────────────
 
-def ingest_day(wake_date: str, secret: dict) -> dict:
-    """Fetch sleep data for wake_date, write to S3 + DynamoDB. Returns parsed record."""
-    user_id   = secret["user_id"]
-    token     = secret["access_token"]
-    bed_side  = secret.get("bed_side", "left")
-    tz        = secret.get("timezone", "America/Los_Angeles")
-    tz_offset = _TZ_OFFSETS.get(tz, _DEFAULT_TZ_OFFSET)
+# ══════════════════════════════════════════════════════════════════════════════
+# P4.1 SIMP-2 framework migration (2026-05-17)
+# ══════════════════════════════════════════════════════════════════════════════
 
-    from_date = (datetime.strptime(wake_date, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
-    to_date   = wake_date
+from ingestion_framework import IngestionConfig, run_ingestion
 
-    print(f"Fetching trends for user={user_id} side={bed_side} window={from_date}→{to_date}")
-
-    trends = api_get(
-        f"/v1/users/{user_id}/trends",
-        token,
-        params={"from": from_date, "to": to_date, "tz": tz},
-    )
-
-    parsed = parse_trends_for_date(trends, wake_date, bed_side, tz_offset=tz_offset)
-
-    if parsed is None:
-        print(f"No sleep data found for wake_date={wake_date}")
-        return {}
-
-    # ── Fetch temperature data (Feature #6: Sleep Environment) ────────────
-    temp_data = fetch_temperature_data(user_id, token, wake_date, tz)
-
-    # ── S3 backup ──────────────────────────────────────────────────────────────
-    s3_key = f"raw/{USER_ID}/eightsleep/{wake_date[:4]}/{wake_date[5:7]}/{wake_date[8:10]}.json"
-    s3_client.put_object(
-        Bucket=S3_BUCKET,
-        Key=s3_key,
-        Body=json.dumps({
-            "wake_date":   wake_date,
-            "ingested_at": datetime.now(timezone.utc).isoformat(),
-            "raw":         trends,
-            "parsed":      parsed,
-        }, default=str),
-        ContentType="application/json",
-    )
-    print(f"S3: s3://{S3_BUCKET}/{s3_key}")
-
-    # ── DynamoDB ───────────────────────────────────────────────────────────────
-    db_item = {
-        "pk":             f"USER#{USER_ID}#SOURCE#eightsleep",
-        "sk":             f"DATE#{wake_date}",
-        "date":           wake_date,
-        "source":         "eightsleep",
-        "schema_version": 1,
-        "ingested_at":    datetime.now(timezone.utc).isoformat(),
-        **parsed,
-        **(floats_to_decimal(temp_data) if temp_data else {}),
-    }
-    # DATA-2: Validate before write
-    try:
-        from ingestion_validator import validate_item as _validate_item
-        _vr = _validate_item("eightsleep", floats_to_decimal(db_item), wake_date)
-        if _vr.should_skip_ddb:
-            logger.error(f"[DATA-2] CRITICAL: Skipping eightsleep DDB write for {wake_date}: {_vr.errors}")
-            _vr.archive_to_s3(s3_client, bucket=S3_BUCKET, item=db_item)
-        else:
-            if _vr.warnings:
-                logger.warning(f"[DATA-2] Validation warnings for eightsleep/{wake_date}: {_vr.warnings}")
-            table.put_item(Item=floats_to_decimal(db_item))
-            print(f"DynamoDB: DATE#{wake_date} → {len(parsed)} fields written")
-    except ImportError:
-        table.put_item(Item=floats_to_decimal(db_item))
-        print(f"DynamoDB: DATE#{wake_date} → {len(parsed)} fields written")
-
-    return parsed
+_secret_cache_simp2 = {"secret": None}
 
 
-# ── Lambda handler ─────────────────────────────────────────────────────────────
-
-# ── Gap detection (v2.0) ──────────────────────────────────────────────────────
-def find_missing_dates(lookback_days=LOOKBACK_DAYS):
-    """Check DynamoDB for missing Eight Sleep records in the lookback window."""
-    from boto3.dynamodb.conditions import Key
-    today = datetime.now(timezone.utc).date()
-    check_dates = set()
-    for i in range(0, lookback_days + 1):  # includes today
-        check_dates.add((today - timedelta(days=i)).strftime("%Y-%m-%d"))
-
-    oldest = min(check_dates)
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}#SOURCE#eightsleep")
-            & Key("sk").between(f"DATE#{oldest}", f"DATE#{today.strftime('%Y-%m-%d')}"),
-        ProjectionExpression="sk",
-    )
-    existing = {item["sk"][5:] for item in resp.get("Items", [])}
-    missing = sorted(check_dates - existing)
-    if missing:
-        print(f"[GAP-FILL] Found {len(missing)} missing dates in last {lookback_days} days: {missing}")
-    else:
-        print(f"[GAP-FILL] No gaps in last {lookback_days} days")
-    return missing
-
-
-# ── Lambda handler ─────────────────────────────────────────────────────────────
-
-def _ensure_auth(secret):
-    """Ensure valid access token, refreshing if needed. Returns updated secret."""
+def authenticate(secret_data: dict) -> dict:
+    """Reuse cached access_token; full re-login only if missing. Eight Sleep v1
+    has no refresh-token endpoint — refresh = re-login with email/password, so
+    we avoid proactive refresh to minimize token churn. fetch_day handles
+    on-demand 401 → re-login."""
+    secret = dict(secret_data)
     if not secret.get("access_token"):
-        print("No access token — performing full login...")
-        secret.update(login(secret["email"], secret["password"]))
-        save_secret(secret)
+        secret = refresh_token(secret)
+    secret = ensure_user_id(secret)
+    _secret_cache_simp2["secret"] = secret
     return secret
 
 
-def _ingest_with_retry(wake_date, secret):
-    """Ingest a single day with 401 retry. Returns (result, updated_secret)."""
+def fetch_day(credentials: dict, date_str: str) -> dict | None:
+    """Fetch trends for one wake_date. Returns raw + temperature data."""
+    secret = _secret_cache_simp2["secret"] or credentials
+    user_id_es = secret["user_id"]
+    token = secret["access_token"]
+    bed_side = secret.get("bed_side", "left")
+    tz = secret.get("timezone", "America/Los_Angeles")
+    from_date = (datetime.strptime(date_str, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
     try:
-        return ingest_day(wake_date, secret), secret
+        trends = api_get(f"/v1/users/{user_id_es}/trends", token,
+                         params={"from": from_date, "to": date_str, "tz": tz})
     except urllib.error.HTTPError as e:
         if e.code == 401:
-            print("401 — refreshing token and retrying...")
+            logger.info("Eight Sleep 401 — re-logging in and retrying...")
             secret = refresh_token(secret)
-            save_secret(secret)
-            return ingest_day(wake_date, secret), secret
-        raise
+            _secret_cache_simp2["secret"] = secret
+            trends = api_get(f"/v1/users/{user_id_es}/trends", secret["access_token"],
+                             params={"from": from_date, "to": date_str, "tz": tz})
+        else:
+            raise
+    temp = fetch_temperature_data(user_id_es, secret["access_token"], date_str, tz)
+    return {"trends": trends, "temp": temp, "bed_side": bed_side, "tz": tz}
 
 
-def lambda_handler(event, context):
-    if event.get("healthcheck"):
-        return {"statusCode": 200, "body": "ok"}
+def transform(raw: dict, date_str: str) -> list[dict]:
+    """Parse sleep + merge environment temperature."""
+    if not raw:
+        return []
+    tz_offset = _TZ_OFFSETS.get(raw["tz"], _DEFAULT_TZ_OFFSET)
+    parsed = parse_trends_for_date(raw["trends"], date_str, raw["bed_side"], tz_offset=tz_offset)
+    if not parsed:
+        return []
+    return [{
+        "source": "eightsleep",
+        "date":   date_str,
+        **parsed,
+        **(raw["temp"] or {}),
+    }]
+
+
+_config = IngestionConfig(
+    source_name="eightsleep",
+    secret_id=SECRET_NAME,
+    s3_archive_prefix=f"raw/{USER_ID}/eightsleep",
+    schema_version=1,
+    enable_gap_detection=True,
+    lookback_days=int(os.environ.get("LOOKBACK_DAYS", "7")),
+    enable_secret_writeback=True,
+    enable_item_size_guard=True,
+    refresh_today=True,
+)
+
+
+def lambda_handler(event: dict, context) -> dict:
     try:
-        import time as _time
-        if hasattr(logger, 'set_date'):
-            logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
-
-        # ── Mode 1: Explicit date (manual invoke / backfill) ──
-        if event.get("date"):
-            wake_date = event["date"]
-            print(f"Eight Sleep ingestion — explicit date={wake_date}")
-            secret = get_secret()
-            secret = _ensure_auth(secret)
-            result, _ = _ingest_with_retry(wake_date, secret)
-            if not result:
-                return {"statusCode": 204, "body": json.dumps({"message": f"No sleep data for {wake_date}"})}
-            return {
-                "statusCode": 200,
-                "body": json.dumps({
-                    "wake_date": wake_date,
-                    "sleep_score": result.get("sleep_score"),
-                    "sleep_duration_hours": result.get("sleep_duration_hours"),
-                }, default=str),
-            }
-
-        # ── Mode 2: Scheduled run — gap-aware lookback ──
-        print(f"[GAP-FILL] Eight Sleep gap-aware lookback ({LOOKBACK_DAYS} days)")
-        missing_dates = find_missing_dates()
-
-        if not missing_dates:
-            return {"statusCode": 200, "body": json.dumps({"message": "No gaps to fill", "lookback_days": LOOKBACK_DAYS})}
-
-        secret = get_secret()
-        secret = _ensure_auth(secret)
-        results = {}
-
-        for i, wake_date in enumerate(missing_dates):
-            print(f"[GAP-FILL] Ingesting {wake_date} ({i+1}/{len(missing_dates)})")
-            try:
-                result, secret = _ingest_with_retry(wake_date, secret)
-                results[wake_date] = result.get("sleep_score") if result else "no data"
-            except Exception as e:
-                print(f"[GAP-FILL] ERROR on {wake_date}: {e}")
-                results[wake_date] = f"error: {e}"
-            if i < len(missing_dates) - 1:
-                _time.sleep(1)  # Rate limit pacing
-
-        filled = sum(1 for v in results.values() if v not in ("no data",) and not str(v).startswith("error"))
-        print(f"[GAP-FILL] Complete: {filled}/{len(missing_dates)} days filled")
-
-        return {
-            "statusCode": 200,
-            "body": json.dumps({
-                "mode": "gap_fill",
-                "lookback_days": LOOKBACK_DAYS,
-                "gaps_found": len(missing_dates),
-                "gaps_filled": filled,
-                "details": results,
-            }, default=str),
-        }
+        if event.get("healthcheck"):
+            return {"statusCode": 200, "body": "ok"}
+        return run_ingestion(_config, authenticate, fetch_day, transform, event, context)
     except Exception as e:
-        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        logger.error("eightsleep ingestion failed: %s", e, exc_info=True)
         raise
+
+
