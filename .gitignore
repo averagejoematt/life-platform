@@ -25,6 +25,9 @@ __pycache__/
 
 # Local output / scratch files
 output.json
+ingest/ingest.log
+ingest/*.log
+
 
 # Virtual environments
 venv/

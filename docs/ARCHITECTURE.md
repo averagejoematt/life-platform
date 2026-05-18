@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-05-18 (v7.21.0 — 128 tools, 36-module MCP package, 19 data sources, 68 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed), 27 DDB source partitions, 79 Lambdas across us-west-2 + us-east-1, 14 secrets, ~100 alarms split urgent/digest (ADR-052), 7 CDK stacks deployed, S3 KMS CMK retained but bucket default reverted to AES256 for website-endpoint compatibility (ADR-053/054), pipeline race fixed (P3.1), SIMP-2 framework adopted by 8 of 14 ingestion Lambdas (ADR-056), coach prediction loop closed end-to-end (ADR-055), shared layer v50)
+Last updated: 2026-05-18 (v7.21.0 — 128 tools, 35-module MCP package, 19 data sources, 68 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed), 27 DDB source partitions, 79 Lambdas across us-west-2 + us-east-1, 14 secrets, ~100 alarms split urgent/digest (ADR-052), 7 CDK stacks deployed, S3 KMS CMK retained but bucket default reverted to AES256 for website-endpoint compatibility (ADR-053/054), pipeline race fixed (P3.1), SIMP-2 framework adopted by 8 of 14 ingestion Lambdas (ADR-056), coach prediction loop closed end-to-end (ADR-055), shared layer v50)
 
 ---
 
@@ -336,7 +336,7 @@ Target: under $25/month | Current: ~$13/month
 ~/Documents/Claude/life-platform/
   mcp_server.py                   ← MCP Lambda entry point
   mcp_bridge.py                   ← Local MCP adapter (Claude Desktop → Lambda HTTPS)
-  mcp/                            ← MCP server package (36 modules)
+  mcp/                            ← MCP server package (35 modules)
     handler.py, config.py, utils.py, core.py, helpers.py, warmer.py
     labs_helpers.py, strength_helpers.py, registry.py
     tools_sleep, tools_health, tools_training, tools_nutrition, tools_habits

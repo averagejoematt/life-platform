@@ -85,8 +85,8 @@ KNOWN_ORPHANS = {
     "tool_get_personal_records",
     "tool_get_training_load", "tool_get_training_periodization",
     "tool_get_training_recommendation", "tool_get_exercise_variety",
-    # Movement + lifestyle (8 orphans)
-    "tool_get_calendar_events", "tool_get_daily_summary",
+    # Movement + lifestyle (7 orphans; tool_get_calendar_events removed V2 P4.1)
+    "tool_get_daily_summary",
     "tool_get_day_type_analysis", "tool_get_energy_balance",
     "tool_get_energy_expenditure", "tool_get_movement_score",
     "tool_get_ruck_log", "tool_get_exposure_log",
@@ -97,7 +97,7 @@ KNOWN_ORPHANS = {
     "tool_get_state_of_mind_trend",
     # Misc (8 orphans)
     "tool_get_latest", "tool_get_nutrition_summary",
-    "tool_get_schedule_load", "tool_get_supplement_correlation",
+    "tool_get_supplement_correlation",  # tool_get_schedule_load removed V2 P4.1
     "tool_get_weather_correlation", "tool_log_exposure",
     "tool_log_ruck", "tool_remove_board_member", "tool_update_board_member",
 }
@@ -138,7 +138,7 @@ def test_orphan_count_doesnt_grow():
     defined = _defined_tools()
     registered = _registered_tools()
     orphans = defined - registered
-    AUDITED_AT = 66  # 2026-05-16 — Phase 4.8 baseline (4 already-registered removed from allowlist)
+    AUDITED_AT = 64  # 2026-05-17 — V2 P4.1: tools_calendar.py deleted (ADR-030 retired Google Calendar), 2 entries removed
     assert len(orphans) <= AUDITED_AT, (
         f"Orphan count is {len(orphans)} (was {AUDITED_AT} at audit). "
         "Each new orphan is tech debt — either register it or delete the function."
