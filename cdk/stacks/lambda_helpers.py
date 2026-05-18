@@ -44,6 +44,7 @@ from aws_cdk import (
     aws_sns as sns,
     aws_dynamodb as dynamodb,
     aws_s3 as s3,
+    aws_logs as logs,
 )
 from constructs import Construct
 
@@ -207,6 +208,11 @@ def create_platform_lambda(
         dead_letter_queue=dlq if use_dlq_constructor else None,
         layers=([shared_layer] if shared_layer else []) + (additional_layers or []),
         tracing=tracing,  # R13-XR: None = CDK default (PASS_THROUGH); ACTIVE = X-Ray
+        # V2 P2.3 (2026-05-17): default 30-day retention on log groups created
+        # by CDK for new Lambdas. Prevents indefinite log accumulation
+        # (was the drift class that re-emerged with coach-observatory-renderer
+        # and life-platform-delete-user-data on 2026-05-17).
+        log_retention=logs.RetentionDays.ONE_MONTH,
     )
 
     # Set DLQ via L1 escape hatch when using existing role — avoids auto-grant.
