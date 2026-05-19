@@ -781,7 +781,7 @@ def record_email_send(table, lambda_name):
             "ttl": int(_time.time()) + 86400 * 90
         })
     except Exception as e:
-        print(f"[status-tracking] Non-fatal write failure: {e}")
+        logger.info(f"[status-tracking] Non-fatal write failure: {e}")
 
 
 def lambda_handler(event, context):

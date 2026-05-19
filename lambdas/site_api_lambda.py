@@ -2818,6 +2818,8 @@ def _handle_board_ask(event: dict) -> dict:
                 "system": p["system"],
                 "messages": [{"role": "user", "content": question}],
             })
+            # V2 follow-up (2026-05-19): route through retry_utils for 4-attempt
+            # backoff + token telemetry. Layer is v51 so retry_utils available.
             req = urllib.request.Request(
                 "https://api.anthropic.com/v1/messages",
                 data=req_body.encode(),
@@ -2827,8 +2829,12 @@ def _handle_board_ask(event: dict) -> dict:
                     "anthropic-version": "2023-06-01",
                 },
             )
-            with urllib.request.urlopen(req, timeout=20) as r:
-                result = json.loads(r.read())
+            try:
+                from retry_utils import call_anthropic_raw
+                result = call_anthropic_raw(req, timeout=20)
+            except ImportError:
+                with urllib.request.urlopen(req, timeout=20) as r:
+                    result = json.loads(r.read())
             responses[pid] = _scrub_blocked_terms("".join(b["text"] for b in result.get("content", []) if b.get("type") == "text"))
         except Exception as e:
             logger.error(f"[board_ask] {pid} failed: {e}")
@@ -7840,6 +7846,8 @@ def lambda_handler(event, context):
                 "messages": [{"role": "user", "content": question}],
             })
 
+            # V2 follow-up (2026-05-19): route through retry_utils for 4-attempt
+            # backoff + token telemetry on /api/ask (was: dark Anthropic call).
             req = urllib.request.Request(
                 "https://api.anthropic.com/v1/messages",
                 data=req_body.encode(),
@@ -7849,9 +7857,12 @@ def lambda_handler(event, context):
                     "anthropic-version": "2023-06-01",
                 },
             )
-
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                result = json.loads(resp.read())
+            try:
+                from retry_utils import call_anthropic_raw
+                result = call_anthropic_raw(req, timeout=30)
+            except ImportError:
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    result = json.loads(resp.read())
 
             answer = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
 

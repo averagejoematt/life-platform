@@ -46,6 +46,40 @@ AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 # ── AWS clients (module-level for warm container reuse) ────
 dynamodb = boto3.resource("dynamodb", region_name=DDB_REGION)
 table = dynamodb.Table(TABLE_NAME)
+_cw = boto3.client("cloudwatch", region_name=DDB_REGION)
+_LAMBDA_NAME = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "life-platform-site-api-ai")
+
+
+def _emit_token_metrics(usage: dict, endpoint: str) -> None:
+    """V2 follow-up (2026-05-19): inline token telemetry (no shared layer).
+
+    Mirrors retry_utils._emit_token_metrics but copy-inlined because site-api-ai
+    is intentionally layer-less for cold-start performance. Emits to the same
+    LifePlatform/AI namespace as the other AI Lambdas, dimensioned by both
+    LambdaFunction and Endpoint so /api/ask and /api/board_ask can be graphed
+    separately.
+    """
+    if not isinstance(usage, dict) or not usage:
+        return
+    try:
+        dims_base = [
+            {"Name": "LambdaFunction", "Value": _LAMBDA_NAME},
+            {"Name": "Endpoint", "Value": endpoint},
+        ]
+        in_tok = int(usage.get("input_tokens", 0) or 0)
+        out_tok = int(usage.get("output_tokens", 0) or 0)
+        cache_w = int(usage.get("cache_creation_input_tokens", 0) or 0)
+        cache_r = int(usage.get("cache_read_input_tokens", 0) or 0)
+        metric_data = [
+            {"MetricName": "AnthropicInputTokens",  "Dimensions": dims_base, "Value": in_tok,  "Unit": "Count"},
+            {"MetricName": "AnthropicOutputTokens", "Dimensions": dims_base, "Value": out_tok, "Unit": "Count"},
+        ]
+        if cache_w or cache_r:
+            metric_data.append({"MetricName": "AnthropicCacheWriteTokens", "Dimensions": dims_base, "Value": cache_w, "Unit": "Count"})
+            metric_data.append({"MetricName": "AnthropicCacheReadTokens",  "Dimensions": dims_base, "Value": cache_r, "Unit": "Count"})
+        _cw.put_metric_data(Namespace="LifePlatform/AI", MetricData=metric_data)
+    except Exception as e:
+        logger.warning(f"site_api_ai token-metric emit failed (non-fatal): {e}")
 
 # ── CORS headers ───────────────────────────────────────────
 CORS_ORIGIN = os.environ.get("CORS_ORIGIN", "https://averagejoematt.com")
@@ -526,6 +560,9 @@ def _handle_ask(event: dict) -> dict:
         with urllib.request.urlopen(req, timeout=30) as resp:
             result = json.loads(resp.read())
 
+        # V2 follow-up: emit token metrics (was dark)
+        _emit_token_metrics(result.get("usage", {}), endpoint="api_ask")
+
         answer = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
 
         return {
@@ -627,6 +664,8 @@ def _handle_board_ask(event: dict) -> dict:
             # measurable issue (currently <1/month per CloudWatch).
             with urllib.request.urlopen(req, timeout=20) as r:
                 result = json.loads(r.read())
+            # V2 follow-up: emit per-persona token metrics (was dark)
+            _emit_token_metrics(result.get("usage", {}), endpoint="api_board_ask")
             responses[pid] = _scrub_blocked_terms("".join(b["text"] for b in result.get("content", []) if b.get("type") == "text"))
         except Exception as e:
             logger.error(f"[board_ask] {pid} failed: {e}")

@@ -470,9 +470,9 @@ def call_haiku_monthly(data, goals, api_key):
     # Try config-driven prompt first, fall back to hardcoded
     prompt_template = _build_monthly_prompt_from_config()
     if prompt_template:
-        print("[INFO] Using config-driven monthly board prompt")
+        logger.info("Using config-driven monthly board prompt")
     else:
-        print("[INFO] Using fallback hardcoded monthly board prompt")
+        logger.info("Using fallback hardcoded monthly board prompt")
         prompt_template = _FALLBACK_MONTHLY_PROMPT
 
     prompt = prompt_template.format(
@@ -488,7 +488,7 @@ def call_haiku_monthly(data, goals, api_key):
             if prev_ctx:
                 prompt = prev_ctx + "\n\n" + prompt
         except Exception as e:
-            print(f"[WARN] IC-16 failed: {e}")
+            logger.warning(f"IC-16 failed: {e}")
 
     payload = json.dumps({
         "model": os.environ.get("AI_MODEL", "claude-sonnet-4-6"),
@@ -521,7 +521,7 @@ def gather_all():
         p_item = table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"}).get("Item", {})
         profile = d2f(p_item)
     except Exception as e:
-        print(f"[WARN] gather_all: profile fetch failed: {e}")
+        logger.warning(f"gather_all: profile fetch failed: {e}")
         profile = {}
 
     raw_cur = {s: fetch_range(s, wins["cur_start"],   wins["cur_end"]) for s in sources}
@@ -559,7 +559,7 @@ def gather_all():
         cs_recs_cur = _cs_fetch(wins["cur_start"],   wins["cur_end"])
         cs_recs_prior = _cs_fetch(wins["prior_start"], wins["prior_end"])
     except Exception as e_cs:
-        print(f"[WARN] Character sheet fetch failed: {e_cs}")
+        logger.warning(f"Character sheet fetch failed: {e_cs}")
     cur["character_sheet"] = ex_character_sheet(cs_recs_cur)
     prior["character_sheet"] = ex_character_sheet(cs_recs_prior)
 
@@ -870,20 +870,20 @@ def lambda_handler(event, context):
     from datetime import date
     today = date.today()
     if today.weekday() != 0:  # 0 = Monday
-        print(f"[SKIP] Monthly digest: today is {today.strftime('%A')} — only runs on Mondays. Exiting.")
+        logger.info(f"[SKIP] Monthly digest: today is {today.strftime('%A')} — only runs on Mondays. Exiting.")
         return {"statusCode": 200, "body": "skipped — not Monday"}
 
-    print("[INFO] Monthly Coach's Letter v1.1.0 (Board Centralization) starting...")
+    logger.info("Monthly Coach's Letter v1.1.0 (Board Centralization) starting...")
     data, goals = gather_all()
     windows = data["windows"]
-    print(f"[INFO] {windows['month_label']} | {windows['cur_start']} → {windows['cur_end']}")
+    logger.info(f"{windows['month_label']} | {windows['cur_start']} → {windows['cur_end']}")
 
     api_key = get_anthropic_key()
-    print("[INFO] Calling Haiku for monthly council commentary...")
+    logger.info("Calling Haiku for monthly council commentary...")
     try:
         commentary = call_haiku_monthly(data, goals, api_key)
     except Exception as e:
-        print(f"[WARN] Haiku failed: {e}")
+        logger.warning(f"Haiku failed: {e}")
         commentary = ("🎯 THE CHAIR — MONTHLY OVERVIEW\nCommentary unavailable this month.\n"
                       "💡 INSIGHT OF THE MONTH\nReview your data sections below.")
 
@@ -891,11 +891,11 @@ def lambda_handler(event, context):
     if _HAS_AI_VALIDATOR and commentary and "unavailable" not in commentary[:50]:
         _val = validate_ai_output(commentary, AIOutputType.MONTHLY_DIGEST)
         if _val.blocked:
-            print(f"[AI-3] Monthly digest commentary BLOCKED: {_val.block_reason}")
+            logger.info(f"[AI-3] Monthly digest commentary BLOCKED: {_val.block_reason}")
             commentary = _val.safe_fallback or ("\U0001f3af THE CHAIR \u2014 MONTHLY OVERVIEW\nCommentary unavailable this month.\n"
                                                 "\U0001f4a1 INSIGHT OF THE MONTH\nReview your data sections below.")
         elif _val.warnings:
-            print(f"[AI-3] Monthly digest warnings: {_val.warnings}")
+            logger.info(f"[AI-3] Monthly digest warnings: {_val.warnings}")
 
     html = build_html(data, goals, commentary, windows)
 
@@ -910,7 +910,7 @@ def lambda_handler(event, context):
         ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
         EmailTags=[{"Name": "message_type", "Value": "monthly_digest"}],
     )
-    print(f"[INFO] Sent: Monthly Coach's Letter · {month}")
+    logger.info(f"Sent: Monthly Coach's Letter · {month}")
 
     # IC-15: Persist monthly insights
     if _HAS_INSIGHT_WRITER and commentary and "unavailable" not in commentary[:50]:
@@ -921,8 +921,8 @@ def lambda_handler(event, context):
                 pillars=["sleep", "movement", "nutrition", "mind", "metabolic", "consistency"],
                 tags=["monthly", "board", "coaching"],
                 confidence="high", actionable=True, date=month)
-            print("[INFO] IC-15: monthly insight persisted")
+            logger.info("IC-15: monthly insight persisted")
         except Exception as e:
-            print(f"[WARN] IC-15 failed: {e}")
+            logger.warning(f"IC-15 failed: {e}")
 
     return {"statusCode": 200, "body": f"Monthly letter sent: {month}"}
