@@ -1,6 +1,6 @@
 # Life Platform — Cost Tracker
 
-Last updated: 2026-05-19 (V2 audit operational sweep)
+Last updated: 2026-05-19 (v7.21.0)
 
 > Budget target: **$25/month**. Design constraint: every feature must justify its cost.
 
@@ -12,7 +12,7 @@ V2 audit delivered **$3.65/mo total savings** across 5 items: power-tuning Lambd
 
 | Service | Cost/Month | Notes |
 |---------|-----------|-------|
-| **Secrets Manager** | $4.80 | 12 active secrets × $0.40/mo (was 15; `notion`+`dropbox`+`anthropic-api-key` in deletion window, save $1.20/mo from June). |
+| **Secrets Manager** | $3.60 | 9 active secrets × $0.40/secret/month. `api-keys` deleted 2026-03-14. `webhook-key` deleted 2026-03-14. `google-calendar` deleted 2026-03-15 (ADR-030). |
 | **Lambda** | ~$0.50 | ~2,500 invocations/month; 73 Lambdas deployed (5 power-tuning functions deleted in V2 P4). |
 | **DynamoDB** | ~$0.30 | On-demand pay-per-request, ~5,000 WCU + ~15,000 RCU/month |
 | **S3** | ~$0.05 | ~2.5 GB stored (raw archives + generated + site + cloudtrail). CMK consolidation pending — S3 CMK scheduled for deletion 2026-06-16 (default AWS-managed key takes over). |
