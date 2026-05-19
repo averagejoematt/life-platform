@@ -34,7 +34,7 @@ AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 
 # Shared utils layer — update on every layer rebuild (bash deploy/build_layer.sh)
-SHARED_LAYER_VERSION = 50  # v50: V2 audit baseline (2026-05-17). v49=SIMP-2 OAuth cohort; v50=ai-expert-analyzer staleness signals.
+SHARED_LAYER_VERSION = 51  # v51: V2 follow-up (2026-05-19) — ai_calls wires coach-quality-gate after each COACH-V2 generation.
 
 SHARED_LAYER_ARN = (
     f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"

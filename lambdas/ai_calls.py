@@ -2101,6 +2101,25 @@ Write your {domain_label} coaching section now."""
         except Exception as e:
             print(f"[COACH-V2:{coach_id}] State updater invoke failed (non-blocking): {e}")
 
+        # Step 7 (V2 follow-up, 2026-05-19): Invoke quality gate (async, advisory)
+        # Wires the previously-orphaned coach-quality-gate Lambda. Each coach output
+        # gets scored against its voice spec; results land in DDB under
+        # COACH#{coach_id} / QUALITY#{date}. Non-blocking — never fails this call.
+        # See ADR-057 P5.5 follow-up.
+        try:
+            lambda_client.invoke(
+                FunctionName="coach-quality-gate",
+                InvocationType="Event",
+                Payload=json.dumps({
+                    "coach_id": coach_id,
+                    "output_text": output,
+                    "generation_brief": generation_brief if isinstance(generation_brief, dict) else None,
+                    "generation_date": _date_cls.today().isoformat(),
+                }).encode(),
+            )
+        except Exception as e:
+            print(f"[COACH-V2:{coach_id}] Quality gate invoke failed (non-blocking): {e}")
+
         return output
 
     except Exception as e:

@@ -17,8 +17,8 @@ MODULES=(
     intelligence_common.py
     # Phase 4.2 (2026-05-16): shared numeric helpers (replaces 8 dup copies)
     numeric.py
-    # Phase 4.10 (2026-05-16): shared email HTML scaffolding
-    email_framework.py
+    # email_framework.py removed V2 (2026-05-19) — zero importers, 7 email
+    # Lambdas too divergent for a single framework.
     # Phase 3.6 (2026-05-16): standalone auth-failure circuit breaker
     auth_breaker.py
     # Phase 3.5 (2026-05-16): generic HTTP retry for non-Anthropic APIs
