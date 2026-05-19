@@ -4,15 +4,41 @@
 > For architectural decisions: ARCHITECTURE.md
 > For emergency procedures: RUNBOOK.md
 > For deployment steps: QUICKSTART.md
-> Last updated: 2026-04-05 (v5.3.0)
+> Last updated: 2026-05-19 (V2 audit refresh)
 
 ---
 
 ## System in 60 Seconds
 
-The Life Platform is a personal health intelligence system. It pulls data from 26 sources (wearables, apps, food logs, labs), stores everything in DynamoDB, and makes it queryable by Claude through 115 MCP tools. A pipeline of 63 Lambdas runs daily: ingestion (6:45-9 AM PT) feeds compute (10:20-10:35 AM) which feeds the daily brief email + website update (11 AM). The public website at averagejoematt.com has 72 pages serving real-time health data.
+The Life Platform is a personal health intelligence system. It pulls data from ~19 sources (wearables, apps, food logs, labs), stores everything in DynamoDB single-table (`life-platform`, us-west-2), and makes it queryable by Claude through 127 MCP tools. **73 Lambdas** (5 power-tuning Lambdas deleted in V2 P4) run the ingest → compute → email pipeline daily.
 
-Monthly cost: ~$19 (including WAF). All infrastructure is CDK-managed across 8 stacks.
+**Pipeline (UTC, ADR-052):**
+- Ingestion: 06:45-09:00 PT
+- 16:30 UTC `character-sheet-compute` → 16:35 `adaptive-mode-compute` → 16:40 `daily-metrics-compute` → 16:45 `daily-insight-compute` → 17:00 `daily-brief`
+- 11:30 PT OG images
+
+May 2026 MTD AWS spend (through 2026-05-19): **~$18.58**. Budget target: **$25/mo**. Anthropic API ~$8-12/mo on top.
+
+All infrastructure is CDK-managed across 8 stacks (`cdk/stacks/`).
+
+---
+
+## Day 1 Onboarding Checklist
+
+Before you can operate the platform, you need:
+
+1. **AWS auth**: `aws configure list` should show the `205930651321` account, region `us-west-2`. (Use SSO or aws-vault — never long-lived keys.)
+2. **Pager off**: disable AWS CLI pager so commands don't block scripts:
+   ```bash
+   aws configure set cli_pager ""
+   ```
+3. **Git clone**: `~/Documents/Claude/life-platform/` is the canonical workdir.
+4. **Read `docs/RUNBOOK.md`** end-to-end at least once.
+5. **Bookmark these**:
+   - https://averagejoematt.com/status/ — system health dashboard
+   - https://averagejoematt.com/api/healthz — JSON health check
+   - AWS Console → CloudWatch → Dashboards → `life-platform-ops`
+   - AWS Console → SQS → `life-platform-ingestion-dlq`
 
 ---
 
@@ -20,9 +46,13 @@ Monthly cost: ~$19 (including WAF). All infrastructure is CDK-managed across 8 s
 
 1. **Visit** https://averagejoematt.com/status/
 2. All sources should show **green**. Yellow = overdue. Red = broken.
-3. Check email for any SNS alarm notifications from overnight
-4. Hit https://averagejoematt.com/api/healthz — should return `{"status": "ok"}`
-5. If anything is red: see "Responding to Failures" below
+3. Check inbox for any SNS alarm notifications from overnight (sent to `awsdev@mattsusername.com`).
+4. Hit https://averagejoematt.com/api/healthz — should return `{"status": "ok"}`.
+5. Verify daily-brief sent. Inbox check, or:
+   ```bash
+   aws logs tail /aws/lambda/daily-brief --since 24h | tail -50
+   ```
+6. If anything is red, follow "Responding to Failures" below.
 
 ---
 
@@ -30,46 +60,101 @@ Monthly cost: ~$19 (including WAF). All infrastructure is CDK-managed across 8 s
 
 | Day | Check |
 |-----|-------|
-| Monday | Monday Compass email sent? (CloudWatch: `monday-compass`) |
-| Wednesday | Chronicle email sent? (CloudWatch: `wednesday-chronicle`) |
-| Saturday | Nutrition review email sent? (CloudWatch: `nutrition-review`) |
-| Sunday | Hypothesis engine ran? (CloudWatch: `hypothesis-engine`) |
-| Any time | Glance at CloudWatch dashboard: `life-platform-ops` |
+| Monday | Monday Compass email sent? (`aws logs tail /aws/lambda/monday-compass --since 12h`) |
+| Wednesday | Chronicle email sent? Both `wednesday-chronicle` (08:00 PT, compute) AND `chronicle-email-sender` (08:10 PT, email) Lambdas should have run. Re-enabled in V2 P3. |
+| Friday | Weekly Plate email sent? (`weekly-plate`) |
+| Saturday | Nutrition review email sent? (`nutrition-review`) |
+| Sunday | Hypothesis engine ran + Weekly Digest sent? (`hypothesis-engine`, `weekly-digest`) |
+| Any time | Glance at CloudWatch dashboard `life-platform-ops`. Investigate any alarms in ALARM state. |
 
 ---
 
 ## Responding to Failures
 
 ### A Lambda is erroring
-1. Find the Lambda name from the alarm email
-2. Check CloudWatch logs: **AWS Console → Lambda → [function name] → Monitor → View logs**
-3. Read the most recent error
-4. Common fixes:
-   - `AccessDenied` → IAM role missing permission → check `cdk/stacks/role_policies.py`
-   - `ResourceNotFoundException` on secret → secret was deleted → check Secrets Manager
-   - `ImportModuleError` → stale code → redeploy: `bash deploy/deploy_lambda.sh [function-name]`
-   - `logger.set_date` → stale platform_logger.py → rebuild shared layer: `bash deploy/build_layer.sh`
+
+1. Find the Lambda name from the alarm email or status page.
+2. Read the most recent log:
+   ```bash
+   aws logs tail /aws/lambda/<function-name> --since 2h --follow
+   ```
+3. Common fixes:
+   - `AccessDenied` → IAM role missing permission. Check `cdk/stacks/role_policies.py`, then `cd cdk && npx cdk diff && npx cdk deploy <stack>`.
+   - `ResourceNotFoundException` on secret → secret deleted or in deletion window. Run `aws secretsmanager list-secrets --include-planned-deletion`.
+   - `ImportModuleError` → stale code or wrong handler. Redeploy: `bash deploy/deploy_lambda.sh <function-name>`.
+   - `AttributeError: ... 'set_date'` → stale layer or bundled shared module. Rebuild layer: `bash deploy/build_layer.sh`, then `cd cdk && npx cdk deploy --all` to push the new layer version.
+   - For MCP: NEVER use `deploy_lambda.sh` — use the full-zip flow in `docs/RUNBOOK.md` (#MCP Server Failure section).
 
 ### A data source is stale
-1. Check the status page to identify which source
-2. Check the ingestion Lambda's CloudWatch logs
+
+1. Identify the source from `https://averagejoematt.com/status/`.
+2. Read the ingestion Lambda's logs.
 3. Common causes:
-   - OAuth token expired → re-run auth setup (e.g., `python3 setup/fix_withings_oauth.py`)
-   - Upstream API down → wait and monitor
-   - Lambda code bug → fix and redeploy
-   - Secret deleted → check Secrets Manager, restore if in recovery window
+   - OAuth token expired → re-run the auth setup (see `setup/` directory). For Garmin: `python3 setup/setup_garmin_browser_auth.py` (Playwright/Chromium). For Withings: `python3 setup/fix_withings_oauth.py`.
+   - `auth_breaker` tripped → clear the marker (see RUNBOOK "Garmin: 429 Too Many Requests" section for the procedure; same pattern applies to all OAuth sources).
+   - Upstream API outage → wait, retry.
+   - Secret deleted or in deletion window → restore via Secrets Manager Console (the 7-day recovery window is your friend).
 
 ### DLQ has messages
-1. Check DLQ depth: status page or `aws sqs get-queue-attributes --queue-url [url]`
-2. DLQ messages are failed async Lambda invocations
-3. The `dlq-consumer` Lambda processes them on schedule (every 6 hours)
-4. If messages accumulate: check which Lambda is failing and fix the root cause
+
+The DLQ `life-platform-ingestion-dlq` is normally near-empty. As of 2026-05-19 it shows 66 messages — investigate via the dlq-consumer Lambda:
+
+```bash
+aws sqs get-queue-attributes \
+  --queue-url https://sqs.us-west-2.amazonaws.com/205930651321/life-platform-ingestion-dlq \
+  --attribute-names ApproximateNumberOfMessages
+aws logs tail /aws/lambda/life-platform-dlq-consumer --since 1d | tail -50
+```
+
+The `life-platform-dlq-consumer` runs every 6 hours, logs failure context, and re-drives where possible. If accumulation persists, identify the root-cause Lambda from the consumer's logs and fix that.
 
 ### Daily brief didn't send
-1. Check CloudWatch logs for `daily-brief` Lambda
-2. Common causes: upstream compute Lambda failed, AI API timeout, SES issue
-3. The brief reads pre-computed results — if compute Lambdas failed, sections degrade gracefully
-4. Manual trigger: invoke `daily-brief` Lambda from AWS Console with empty test event
+
+1. Read CloudWatch logs:
+   ```bash
+   aws logs tail /aws/lambda/daily-brief --since 6h | tail -100
+   ```
+2. Verify all upstream compute Lambdas succeeded (their failure degrades but should not block the brief):
+   ```bash
+   for fn in character-sheet-compute adaptive-mode-compute daily-metrics-compute daily-insight-compute; do
+     echo "== $fn =="
+     aws logs tail /aws/lambda/$fn --since 6h | tail -5
+   done
+   ```
+3. Common causes: Anthropic API timeout or quota exhausted (check `LifePlatform/AI::AnthropicAPIFailure` metric), SES `AccessDenied` (verify `ses:SendEmail` on identity AND configuration-set ARN), config drift.
+4. Manual trigger:
+   ```bash
+   aws lambda invoke --function-name daily-brief --payload '{}' \
+     --cli-binary-format raw-in-base64-out /tmp/brief.json && cat /tmp/brief.json
+   ```
+
+### Costs spiked
+
+```bash
+# MTD spend
+aws ce get-cost-and-usage \
+  --time-period Start=$(date -u +%Y-%m-01),End=$(date -u +%Y-%m-%d) \
+  --granularity MONTHLY --metrics UnblendedCost --region us-east-1
+
+# Group by service to find the spike
+aws ce get-cost-and-usage \
+  --time-period Start=$(date -u +%Y-%m-01),End=$(date -u +%Y-%m-%d) \
+  --granularity MONTHLY --metrics UnblendedCost \
+  --group-by Type=DIMENSION,Key=SERVICE --region us-east-1 \
+  --query 'ResultsByTime[0].Groups[].{Service:Keys[0],Cost:Metrics.UnblendedCost.Amount}' --output table
+```
+
+If Anthropic is the cause, check the daily-brief AI token alarm `ai-tokens-daily-brief-daily` and the `LifePlatform/AI` metrics.
+
+### MCP Tool Usage Audit
+
+```bash
+# What tools are clients actually using? (CloudWatch namespace: LifePlatform/MCP)
+aws cloudwatch list-metrics --namespace LifePlatform/MCP --metric-name ToolInvocations \
+  --query 'Metrics[*].Dimensions[?Name==`ToolName`].Value' --output text
+```
+
+V2 P4.1 finding: only ~11 of 127 tools used in the last 30 days. Most cold tools are pre-V2 specialty queries scheduled for pruning.
 
 ---
 
@@ -77,11 +162,15 @@ Monthly cost: ~$19 (including WAF). All infrastructure is CDK-managed across 8 s
 
 | Change | Command | Notes |
 |--------|---------|-------|
-| Single Lambda | `bash deploy/deploy_lambda.sh [name] lambdas/[name]_lambda.py` | Auto-reads handler config |
-| MCP server | Full zip build (see RUNBOOK) | **NEVER** use deploy_lambda.sh for MCP |
-| Website | `bash deploy/sync_site_to_s3.sh` | Validates, syncs, invalidates CDN |
-| Shared layer module | `bash deploy/build_layer.sh` then redeploy dependents | Rebuilds layer for all consumers |
-| CDK stack | `cd cdk && npx cdk diff [Stack] && npx cdk deploy [Stack]` | Always diff first |
+| Single Lambda code | `bash deploy/deploy_lambda.sh <name>` | Auto-reads handler config from AWS |
+| Single Lambda code + smoke | `bash deploy/deploy_and_verify.sh <name>` | Preferred for non-trivial changes |
+| MCP server | Full zip build (see RUNBOOK #MCP Lambda Deploy) | **NEVER** use `deploy_lambda.sh life-platform-mcp` — it strips `mcp/` |
+| Website | `bash deploy/sync_site_to_s3.sh` | Uses `safe_sync.sh` wrapper; targets `s3://matthew-life-platform/site/` |
+| Shared layer module | `bash deploy/build_layer.sh` then `cd cdk && npx cdk deploy --all` | Layer version bumps in `cdk/stacks/constants.py` |
+| CDK stack | `cd cdk && npx cdk diff <Stack> && npx cdk deploy <Stack>` | Always diff first |
+| Full CDK redeploy | `cd cdk && npx cdk deploy --all` | After layer bump or cross-stack changes |
+
+**Rollback procedure:** see `docs/RUNBOOK.md` → "Rolling Back a Failed Lambda".
 
 ---
 
@@ -92,39 +181,63 @@ Monthly cost: ~$19 (including WAF). All infrastructure is CDK-managed across 8 s
 | https://averagejoematt.com/ | Public site |
 | https://averagejoematt.com/status/ | System health dashboard |
 | https://averagejoematt.com/api/healthz | Health check endpoint (JSON) |
-| https://dash.averagejoematt.com/ | Private analytics dashboard |
 | AWS Console → CloudWatch → Dashboards → `life-platform-ops` | Ops metrics |
-| AWS Console → SQS → `life-platform-ingestion-dlq` | Dead letter queue |
+| AWS Console → SQS → `life-platform-ingestion-dlq` | Dead letter queue (retention 14d) |
+| MCP Lambda URL | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/` |
 
 ---
 
 ## Secrets & Credentials
 
-- All 10 secrets in AWS Secrets Manager under `life-platform/` prefix
-- OAuth tokens (Whoop, Withings, Strava, Garmin) auto-refresh — if broken, re-run auth setup
-- MCP API key auto-rotates every 90 days via `life-platform-key-rotator`
-- `pipeline-health-check` Lambda probes all secrets daily at 6 AM PT
-- **Never** store secrets in code, env vars, or documentation
+- **12 active secrets** in AWS Secrets Manager under `life-platform/` prefix (as of 2026-05-19).
+- **3 in deletion window**: `notion`, `dropbox` (delete 2026-05-24, migrated to `ingestion-keys` bundle); `anthropic-api-key` (delete 2026-05-23, orphan never adopted).
+- OAuth tokens (Whoop, Withings, Strava, Garmin, Eight Sleep) auto-refresh on each successful API call.
+- MCP API key auto-rotates every 90 days via `life-platform-key-rotator`.
+- `pipeline-health-check` Lambda probes all secrets daily and emits CloudWatch metrics.
+- **Never** store secrets in code, env vars, or documentation.
+- See `docs/SECRETS_MAP.md` (inventory + consumer map) and `docs/SECRETS_ROTATION.md` (rotation procedures).
 
 ---
 
 ## Pipeline Ordering (Critical)
 
-The pipeline runs in strict order. Changing schedules without maintaining this order produces stale results.
+The pipeline runs in strict order (ADR-052). Changing schedules without maintaining this order produces stale results.
 
 ```
-06:45-09:00 AM PT  →  Ingestion (16 Lambdas fetch from APIs)
-09:05 AM           →  Anomaly detector
-10:20-10:35 AM     →  Compute (metrics, day grade, character sheet, adaptive mode)
-11:00 AM           →  Daily brief (reads ALL computed + raw → 4 AI calls → email + 4 S3 files)
-11:30 AM           →  OG image generator
+06:45-09:00 PT     →  Ingestion (multiple Lambdas fetch from APIs)
+09:05 PT (16:05Z)  →  Anomaly detector
+16:30 UTC          →  character-sheet-compute
+16:35 UTC          →  adaptive-mode-compute
+16:40 UTC          →  daily-metrics-compute
+16:45 UTC          →  daily-insight-compute
+17:00 UTC          →  daily-brief (4 AI calls → email + S3 files; async-invokes coach-quality-gate per coach)
+11:30 PT           →  OG image generator
 ```
+
+All EventBridge crons are fixed UTC. PT references shift 1 hour at DST boundaries; UTC never does.
+
+---
+
+## Concurrency Limit (Active Constraint)
+
+**Account-wide Lambda concurrency limit: 10** (verified 2026-05-19).
+
+This is dangerously low — AWS default is 1000. AWS Support case **177921309700709** filed 2026-05-19 to request raise to 100. Until approved:
+
+- Avoid invoking high-fan-out workflows manually during the daily pipeline window (16:30-17:00 UTC).
+- Reserved concurrency in CDK is **pre-staged but commented out** (see `docs/RESERVED_CONCURRENCY.md`).
+- Throttled invocations land in the DLQ — if you see DLQ growth during the compute window, suspect concurrency.
 
 ---
 
 ## Emergency Contacts
 
 - Platform builder: Matthew
-- AWS account: 205930651321 (us-west-2)
-- Alert SNS topic: `life-platform-alerts` → email notifications
+- AWS account: **205930651321** (us-west-2)
+- Alert SNS topic: `life-platform-alerts` → email to `awsdev@mattsusername.com`
 - CloudFront distribution: `E3S424OXQZ8NBE`
+- AWS Support case for concurrency raise: **177921309700709** (filed 2026-05-19)
+
+---
+
+**Verified:** 2026-05-19 (V2 audit operational sweep)

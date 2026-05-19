@@ -1,6 +1,6 @@
 # Data Governance — PII Classification + Retention Policy
 
-Phase 7 (2026-05-16): single source of truth for what data exists, who can see it, and how long it's kept.
+Phase 7 (2026-05-16, refreshed 2026-05-19 post-V2): single source of truth for what data exists, who can see it, and how long it's kept.
 
 This document covers two cross-cutting concerns:
 1. **PII Classification** (P7.4) — what's personally identifiable and what's safe to expose
@@ -116,12 +116,11 @@ No Glacier or deep-archive tier is in use today. Could be added if compliance de
 
 ### Export
 - `lambdas/data_export_lambda.py` exists; on-demand only. Generates a snapshot of all DDB partitions + S3 archive references.
-- **Audit P7.1 still outstanding** — verify output format covers all current source partitions.
+- **Audit P7.1 still outstanding** — verify output format covers all current source partitions (now 19, up from earlier estimates).
 
 ### Deletion
-- No automated "delete my data" workflow today.
-- **P7.3 still outstanding** — design + implement `delete_user_data_lambda` for the multi-user readiness phase.
-- Today: manual procedure documented below.
+- `lambdas/delete_user_data_lambda.py` scaffolded; not yet wired to a request-driven trigger. The Phase 6 multi-user roll-out (formally deferred per ADR-057) is the gating context.
+- Today: manual procedure documented below remains the operative process.
 
 ### Access
 - Matthew accesses everything via MCP (Claude Desktop) or `dash.averagejoematt.com`.
@@ -170,7 +169,7 @@ aws secretsmanager delete-secret --secret-id life-platform/${USER_ID}/whoop \
 - **CCPA**: technically applicable if California user added; delete-account flow (P7.3) is the gap
 - **SOC2 / ISO 27001**: not pursued; would require formal access-control + audit-trail processes
 
-If any of these become relevant (e.g., onboarding a second user from CA, sale of the platform, clinician handoff), Phases 6 + 7 of the audit plan address the remaining gaps.
+If any of these become relevant (e.g., onboarding a second user from CA, sale of the platform, clinician handoff), Phases 6 + 7 of the audit plan address the remaining gaps. Phase 6 (multi-user / Cognito) was formally deferred in ADR-057 — see that ADR for re-open triggers.
 
 ---
 
@@ -180,4 +179,12 @@ If any of these become relevant (e.g., onboarding a second user from CA, sale of
 |------|--------|-----------|
 | 2026-05-16 | Initial document; consolidates per-data-type retention scattered across P1.1, P1.3, P1.7, P2.6, P3.6 | This commit |
 | 2026-05-16 | S3 KMS encryption activated for new objects | P2.4 changelog v7.2.0 |
+| 2026-05-17 | S3 KMS rollback to AES256 (website endpoint incompatibility) | ADR-053 (v7.20.0) |
 | 2026-05-16 | CloudTrail multi-region + delivery restored after 3-month outage | P2.5 changelog v7.2.0 |
+| 2026-05-17 | Two-tier alerting (urgent + daily digest) reduces inbox noise | ADR-052 (v7.x) |
+| 2026-05-17 | Phase 6 multi-user / delete-user-data flow formally deferred | ADR-057 |
+| 2026-05-19 | Doc re-verified post V2 closure; data_export + delete_user_data lambdas confirmed present | This commit |
+
+---
+
+**Verified:** 2026-05-19

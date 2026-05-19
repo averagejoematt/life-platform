@@ -2,6 +2,7 @@
 
 > Three expert boards advise different aspects of the platform. Invoke by name or board type.
 > This file is the single reference for all board composition. Claude Code should read this when board input is needed.
+> Last updated: 2026-05-19 (v8.0.0). Personal Board roster cross-checked against `s3://matthew-life-platform/config/board_of_directors.json`.
 
 ---
 
@@ -9,27 +10,37 @@
 
 **Purpose**: Advise Matthew as an individual on health, longevity, behavior, mental health, and social connection.
 **Invocation**: "personal board" or by member name
-**Config**: `s3://matthew-life-platform/config/board_of_directors.json` (consumed by daily brief, weekly digest, monthly digest, nutrition review, chronicle Lambdas)
-**Convenes**: Daily brief, weekly digest, monthly digest, nutrition reviews, chronicle interviews
+**Config**: `s3://matthew-life-platform/config/board_of_directors.json` — loaded by `lambdas/board_loader.py` (shared layer).
+**Consumed by**: daily brief, weekly digest, monthly digest, nutrition review, chronicle, observatory renderer.
+**Convenes**: Daily brief, weekly digest, monthly digest, nutrition reviews, chronicle interviews, observatory pages.
 
-| Name | Title | Type | Domains |
-|------|-------|------|---------|
-| Dr. Sarah Chen | Sports Scientist | fictional | Training, exercise physiology, periodization, recovery |
-| Dr. Marcus Webb | Nutritionist | fictional | Nutrition, macros, meal timing, caloric balance |
-| Dr. Lisa Park | Sleep & Circadian Specialist | fictional | Sleep architecture, circadian rhythm, recovery |
-| Dr. James Okafor | Longevity & Preventive Medicine | fictional | Biomarkers, trajectory analysis, ASCVD risk |
-| Coach Maya Rodriguez | Behavioural Performance Coach | fictional | Habit formation, motivation, knowing-doing gap |
-| Dr. Layne Norton | Macros, Protein & Adherence | real_expert | Evidence-based nutrition, body composition, MacroFactor |
-| Dr. Rhonda Patrick | Micronutrients, Genome & Longevity | real_expert | Nutrigenomics, supplementation, SNP analysis |
-| Dr. Victor Reyes | Metabolic Health & Longevity | fictional (replaces Attia) | CGM, body composition, exercise medicine, DEXA |
-| Dr. Kai Nakamura | Neuroscience & Protocols | fictional (replaces Huberman) | Circadian biology, dopamine, stress protocols |
-| Dr. Paul Conti | Psychiatrist — Self-Structure | real_expert | Defense mechanisms, grief, identity, self-compassion |
-| Dr. Vivek Murthy | Social Connection & Loneliness | real_expert | Male isolation, community health, belonging |
-| Elena Voss | Embedded Journalist | narrator | Weekly chronicle author — "The Measured Life" |
-| Margaret Calloway | Senior Editor — Longform | fictional | Edits Elena's work, narrative structure, prose craft |
-| The Chair | Board Chair — Verdict & Priority | meta_role | Cross-domain synthesis, one priority, verdict |
+Note on identity: the JSON config keeps **legacy keys** (e.g. `peter_attia`, `paul_conti`, `andrew_huberman`, `rhonda_patrick`) holding **fictional replacement personas** for backward-compatibility with existing prompts. The displayed name on every public surface is the fictional persona — never the real public figure. The legacy keys are mirrored by canonical keys (`victor_reyes`, `nathan_reeves`, `integrator`, `amara_patel`) used by observatory pages.
 
-**Potential addition (backlog)**: Sports Medicine / Movement Quality specialist — injury prevention, biomechanics of training at higher body weight, joint health screening.
+### Active personas (14 distinct)
+
+| Display name | Title | Type | Config key(s) | Domains |
+|--------------|-------|------|---------------|---------|
+| Dr. Sarah Chen | Sports Scientist | fictional | `sarah_chen` | Training, exercise physiology, periodization, recovery |
+| Dr. Marcus Webb | Nutritionist (panel) / Macros (long-form) | fictional + legacy `layne_norton` | `marcus_webb`, `layne_norton` | Nutrition, macros, meal timing, deficit sustainability |
+| Dr. Lisa Park | Sleep Scientist & Circadian Specialist | fictional | `lisa_park` | Sleep architecture, circadian rhythm, sleep debt |
+| Dr. James Okafor | Longevity & Preventive Medicine | fictional | `james_okafor` | Biomarkers, trajectory analysis, ASCVD risk |
+| Coach Maya Rodriguez | Behavioural Performance Coach | fictional | `maya_rodriguez` | Habit formation, motivation, knowing-doing gap |
+| Dr. Amara Patel | Micronutrients, Genome & Longevity | fictional (replaces Patrick) | `rhonda_patrick`, `amara_patel` | Nutrigenomics, supplementation, SNP analysis |
+| Dr. Victor Reyes | Metabolic Health & Longevity | fictional (replaces Attia) | `peter_attia`, `victor_reyes` | CGM, body composition, exercise medicine, DEXA |
+| Dr. Kai Nakamura | Neuroscience & Protocols / Integrator | fictional (replaces Huberman) | `andrew_huberman`, `integrator` | Circadian biology, dopamine, stress protocols, cross-domain integration |
+| Dr. Nathan Reeves | Psychiatrist — Self-Structure | fictional (replaces Conti) | `paul_conti`, `nathan_reeves` | Defense mechanisms, grief, identity, self-compassion |
+| Dr. Vivek Murthy | Social Connection & Loneliness | real_expert | `vivek_murthy` | Male isolation, community health, belonging |
+| Dr. Henning Brandt | Biostatistician — N=1 Research | fictional | `henning_brandt` | Statistical rigor, confidence intervals, false-positive risk |
+| Elena Voss | Embedded Journalist — "The Measured Life" | narrator | `elena_voss` | Weekly chronicle author |
+| Margaret Calloway | Senior Editor — Longform | fictional | `margaret_calloway` | Edits Elena's work, narrative structure, prose craft |
+| The Chair | Board Chair — Verdict & Priority | meta_role | `the_chair` | Cross-domain synthesis, one priority, verdict |
+
+**Source of truth**: this table is derived from the live S3 config. To re-verify:
+```bash
+aws s3 cp s3://matthew-life-platform/config/board_of_directors.json - | python3 -c "import sys, json; d=json.load(sys.stdin); [print(f\"{k} → {v.get('name','?')} ({v.get('type','?')})\") for k,v in d['members'].items()]"
+```
+
+**Backlog addition**: Sports Medicine / Movement Quality specialist — injury prevention, biomechanics of training at higher body weight, joint health screening.
 
 ---
 
@@ -112,3 +123,18 @@ In any Claude session (claude.ai or Claude Code):
 - **"Tech board review this Lambda change"** → Technical Board convenes
 - **"Product board — should we build the Data Explorer or Milestones first?"** → Product Board convenes
 - **"All boards — is the platform ready for public launch?"** → All three convene with their respective lenses
+
+---
+
+## Coach Intelligence (related, but separate)
+
+The Personal Board personas above appear in the **email + observatory surface**. The platform also runs an **8-agent Coach Intelligence pipeline** (ADR-047, ADR-055) with internal coach IDs that drive the underlying deterministic computation and stateful memory. The two systems are connected (coaches contribute to brief sections), but the IDs are different.
+
+Coach IDs (from `lambdas/coach_computation_engine.py:COACH_IDS`):
+`dr_johansson` · `fitness_coach` · `nutrition_coach` · `mind_coach` · `sleep_coach` · `body_comp_coach` · `lifestyle_coach` · `recovery_coach`
+
+Each coach maintains episodic memory under `COACH#<coach_id>` partitions, with cross-coach summary under `ENSEMBLE#`, narrative arcs under `NARRATIVE#`, and prediction outcomes under `PREDICTION#` / `LEARNING#`. Prediction loop closed end-to-end per ADR-055.
+
+---
+
+**Verified:** 2026-05-19

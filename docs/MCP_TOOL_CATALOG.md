@@ -1,8 +1,10 @@
 # Life Platform — MCP Tool Catalog
 
-**Version:** v7.21.0 | **Last updated:** 2026-05-19 | **Total tools:** 128
+**Version:** v8.0.0 | **Last updated:** 2026-05-19 | **Total tools:** 127
 
-> SIMP-1 Phase 1 complete (v3.7.17–19): 116 → 86 tools via 13 view-dispatchers. ADR-030 (v3.7.46): `get_calendar_events` + `get_schedule_load` retired (Google Calendar integration blocked by IT policy).
+> Source of truth: `grep -E '^\s*"name":\s*"[a-z_]+"' mcp/registry.py | wc -l` → **127**.
+>
+> SIMP-1 Phase 1 (v3.7.17–19) collapsed 116 → 86 tools via 13 view-dispatchers; subsequent feature work has restored counts to 127. ADR-030 (v3.7.46): `get_calendar_events` + `get_schedule_load` retired (Google Calendar). **V2 cleanup (2026-05-17):** `mcp/tools_calendar.py` DELETED.
 > Many previously standalone tools are now `view=` parameters of a parent dispatcher.
 > For architecture and schema details, see ARCHITECTURE.md and SCHEMA.md.
 
@@ -29,7 +31,7 @@
 
 ---
 
-## Quick Reference — All 126 Tools
+## Quick Reference — All 127 Tools
 
 ### Core Data Access
 | Tool | Key Params | Description |
@@ -270,7 +272,7 @@
 
 ## Warmer Coverage (⚡ = nightly pre-compute)
 
-13 warm steps run at 10:00 AM PT daily. All dispatch via the relevant tool function and cache to `CACHE#matthew` (26h TTL):
+14 warm steps run nightly (see `mcp/warmer.py`). All dispatch via the relevant tool function and cache to `CACHE#matthew` (26h TTL):
 
 | Step | Cache Key | Warm Call |
 |------|-----------|-----------|
@@ -287,3 +289,7 @@
 | 13 | training_recommendation_today | get_training(view=recommendation) |
 | 14 | character_sheet_today | get_character(view=sheet) |
 | 15 | cgm_dashboard_today | get_cgm(view=dashboard) |
+
+---
+
+**Verified:** 2026-05-19 — full audit (V2 audit + follow-up). Tool count recounted via `grep -E '^\s*"name":\s*"[a-z_]+"' mcp/registry.py | wc -l` → 127. `tools_calendar.py` confirmed absent from `mcp/`. Module count 26 confirmed via `ls mcp/tools_*.py | wc -l`. [NEEDS VERIFICATION: individual tool inventories below may have drifted; the 127 figure is authoritative for total count, but the per-section tables in this catalog were not exhaustively cross-checked against `registry.py` line-by-line in this audit. A 2026-05-19 follow-up to regenerate the catalog from `registry.py` directly is recommended.]

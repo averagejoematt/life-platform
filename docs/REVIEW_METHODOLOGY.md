@@ -1,8 +1,10 @@
 # Life Platform — Architecture Review Methodology
 
 > Repeatable process for conducting comprehensive architecture reviews.
-> First review: 2026-03-08 (v2.91.0). Reviews stored in docs/reviews/.  
+> First review: 2026-03-08 (v2.91.0). Latest: V2 audit (2026-05-17, 76 findings, ~33 shipped, formally closed in ADR-057).
+> Reviews stored in `docs/reviews/`; V2-style audits in `docs/v2-audits/`.
 > Tech Board: invoke as "tech board" or by name. 12 seats across Architecture, Security, Data, AI, Operations, Product, and FinOps.
+> Last updated: 2026-05-19 (v8.0.0)
 
 ---
 
@@ -65,7 +67,7 @@ IMPORTANT PROCESS RULES — follow these before issuing any finding:
 
 Focus areas this cycle: [FILL IN — e.g., "observability improvements, new MCP canary, X-Ray tracing, CI/CD layer tests"]
 
-Previous review: #13 (v3.7.29, 2026-03-14). Current version: v3.7.40.
+Previous review: [FILL IN with prior review # and version]. Current version: [FILL IN].
 ```
 
 ### Step 4: After the review
@@ -153,3 +155,25 @@ The single biggest failure mode is Opus re-flagging already-resolved findings. T
 5. **Review prompt had no verification instruction** — Opus wasn't told to check before flagging. Fix: explicit rules 1-4 in the prompt above.
 
 **Maintenance rule:** After every session where findings are resolved, update Section 13b in `generate_review_bundle.py` immediately. Don't defer to review time.
+
+---
+
+## V2 Audit Learnings (2026-05-17)
+
+The V2 audit produced ~130 findings across 8 phases — ~33 shipped, ~37 deferred-with-rationale (closed in ADR-057), the rest superseded or merged. Things to do differently next time:
+
+1. **Verify before recommending.** ~10% of V2 findings had wrong premises (P1.2 said the WAF was orphaned — it wasn't, it protects HAE webhook; P5.2 proposed prompt-caching savings below Anthropic's 1024-token cache minimum; P5.7 said to build a coach prediction evaluator that already existed and was running daily). Future auditors must read the actual code/AWS state before issuing the finding, not just the docs. Section 13b helps for resolved findings but doesn't catch wrong-premise *new* findings.
+
+2. **Audit the docs alongside the code.** The V1 ADR list, ONBOARDING, ARCHITECTURE all carried stale Lambda counts, MCP tool counts, ADR counts, and layer versions for 2–6 months. The fix is to **bake live commands into the docs** (e.g., `grep -c '"name":' mcp/registry.py`, `aws lambda list-functions … | wc -l`) so the next reader can re-verify in 5 seconds rather than asking "is this stale?"
+
+3. **Close formally, not "later."** Phase 6 (multi-user), P4.3 (split intelligence_common.py), P8.6 (Lambda Power Tuning), and several others were on the backlog for months with no progress and no decision. ADR-057 closed them with documented re-open triggers. **Indefinitely-open items are debt; formally-closed items are clarity.** Convert to closure or active work on every audit pass.
+
+4. **Bundle still matters.** The pre-compiled review bundle (Section 13b inventory + full ci-cd.yml + test function names + last review .md content + 400-line CHANGELOG) is still the single biggest defense against re-flagging. Don't skip generating it.
+
+5. **Plan != ship.** V2 had 76 findings *planned* and ~33 *shipped*. The shipped:planned ratio is fine but the plan must include explicit "defer-or-do" decisions on every item before audit close — otherwise the unplanned remainder leaks into the next audit as "you didn't do this."
+
+6. **Track corrections in the closure ADR.** ADR-057 is the V2 record. The next audit pass should produce a similar ADR — every item closed, every premise correction documented, every re-open trigger named.
+
+---
+
+**Verified:** 2026-05-19
