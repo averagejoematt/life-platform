@@ -1814,7 +1814,7 @@ def record_email_send(table, lambda_name):
             "ttl": int(_time.time()) + 86400 * 90
         })
     except Exception as e:
-        print(f"[status-tracking] Non-fatal write failure: {e}")
+        logger.info(f"[status-tracking] Non-fatal write failure: {e}")
 
 
 def lambda_handler(event, context):
@@ -1876,9 +1876,9 @@ def lambda_handler(event, context):
     # Try config-driven prompt first, fall back to hardcoded
     elena_prompt = _build_elena_prompt_from_config()
     if elena_prompt:
-        print("[INFO] Using config-driven Elena prompt")
+        logger.info("Using config-driven Elena prompt")
     else:
-        print("[INFO] Using fallback hardcoded Elena prompt")
+        logger.info("Using fallback hardcoded Elena prompt")
         elena_prompt = _FALLBACK_ELENA_PROMPT
 
     # IC-16: Progressive context — narrative-relevant insight threads
@@ -1898,7 +1898,7 @@ def lambda_handler(event, context):
                 )
                 user_message = field_notes_framing + prev_ctx + "\n\n" + user_message
         except Exception as e:
-            print(f"[WARN] IC-16 failed: {e}")
+            logger.warning(f"IC-16 failed: {e}")
 
     # Call Sonnet
     api_key = get_anthropic_key()
@@ -2064,9 +2064,9 @@ def lambda_handler(event, context):
                 tags=["chronicle", "narrative", f"week_{week_num}"],
                 confidence="high", actionable=False,
                 date=data["dates"]["end"])
-            print("[INFO] IC-15: chronicle insight persisted")
+            logger.info("IC-15: chronicle insight persisted")
         except Exception as e:
-            print(f"[WARN] IC-15 failed: {e}")
+            logger.warning(f"IC-15 failed: {e}")
 
     record_email_send(table, "wednesday_chronicle")
     if PREVIEW_MODE:

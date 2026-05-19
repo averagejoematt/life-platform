@@ -2,7 +2,20 @@
 Tool registry: maps tool names to their functions and JSON schemas.
 """
 from mcp.config import SOURCES, RAW_DAY_LIMIT, P40_GROUPS
-from mcp.tools_data import *
+from mcp.tools_data import (
+    tool_compare_periods,
+    tool_complete_action,
+    tool_find_days,
+    tool_get_daily_snapshot,
+    tool_get_date_range,
+    tool_get_field_stats,
+    tool_get_intelligence_quality,
+    tool_get_longitudinal_summary,
+    tool_get_sources,
+    tool_get_weekly_summary,
+    tool_list_actions,
+    tool_search_activities,
+)
 from mcp.tools_coach_intelligence import (
     tool_get_coach_thread, tool_get_predictions, tool_get_coach_disagreements,
     tool_evaluate_prediction, tool_get_coaching_summary, tool_get_coach_track_record,
@@ -13,15 +26,34 @@ from mcp.tools_strength import (
     tool_get_strength_progress, tool_get_workout_frequency, tool_get_strength_standards,
     tool_get_strength, tool_get_centenarian_benchmarks,
 )
-from mcp.tools_training import *
-from mcp.tools_health import *
+from mcp.tools_training import (
+    tool_get_acwr_status,
+    tool_get_cross_source_correlation,
+    tool_get_exercise_efficiency_trend,
+    tool_get_hr_recovery_trend,
+    tool_get_lactate_threshold_estimate,
+    tool_get_training,
+)
+from mcp.tools_health import (
+    tool_get_autonomic_balance,
+    tool_get_body_composition_trend,
+    tool_get_daily_metrics,
+    tool_get_health,
+    tool_get_readiness_score,
+    tool_get_weight_loss_progress,
+)
 from mcp.tools_health import tool_get_autonomic_balance  # BS-MP1
-from mcp.tools_sleep import *
+from mcp.tools_sleep import tool_get_sleep_analysis, tool_get_sleep_environment_analysis
 from mcp.tools_sleep import tool_get_sleep_environment_analysis  # BS-SL1
-from mcp.tools_nutrition import *
+from mcp.tools_nutrition import (
+    tool_get_deficit_sustainability,
+    tool_get_food_log,
+    tool_get_metabolic_adaptation,
+    tool_get_nutrition,
+)
 # BS-12 + IC-29 explicit imports
 from mcp.tools_nutrition import tool_get_deficit_sustainability, tool_get_metabolic_adaptation
-from mcp.tools_correlation import *
+from mcp.tools_correlation import tool_get_zone2_breakdown
 from mcp.tools_habits import (
     tool_get_habits, tool_compare_habit_periods, tool_get_habit_registry,
     tool_get_habit_tier_report, tool_get_vice_streak_history,
@@ -29,22 +61,84 @@ from mcp.tools_habits import (
     tool_get_essential_seven,
     tool_get_garmin_summary, tool_get_device_agreement,
 )
-from mcp.tools_labs import *
-from mcp.tools_measurements import *
-from mcp.tools_cgm import *
-from mcp.tools_journal import *
+from mcp.tools_labs import (
+    tool_get_allergies,
+    tool_get_freshness_status,
+    tool_get_genome_insights,
+    tool_get_lab_deltas,
+    tool_get_labs,
+    tool_search_biomarker,
+)
+from mcp.tools_measurements import tool_get_measurement_trends, tool_get_measurements
+from mcp.tools_cgm import tool_get_cgm, tool_get_glucose_meal_response
+from mcp.tools_journal import (
+    tool_get_journal_entries,
+    tool_get_journal_insights,
+    tool_get_journal_sentiment_trajectory,
+    tool_get_mood,
+    tool_search_journal,
+)
 from mcp.tools_journal import tool_get_journal_sentiment_trajectory  # BS-MP2
-from mcp.tools_lifestyle import *
-from mcp.tools_board import *
-from mcp.tools_character import *
-from mcp.tools_social import *
-from mcp.tools_adaptive import *
-from mcp.tools_todoist import *
-from mcp.tools_memory import *
+from mcp.tools_lifestyle import (
+    tool_create_experiment,
+    tool_end_experiment,
+    tool_get_blood_pressure_dashboard,
+    tool_get_experiment_results,
+    tool_get_field_notes,
+    tool_get_insights,
+    tool_get_jet_lag_recovery,
+    tool_get_social_connection_trend,
+    tool_get_supplement_log,
+    tool_get_travel_log,
+    tool_list_experiments,
+    tool_log_field_note_response,
+    tool_log_ledger_entry,
+    tool_log_supplement,
+    tool_log_travel,
+    tool_save_insight,
+    tool_update_insight_outcome,
+)
+from mcp.tools_board import tool_get_board_of_directors
+from mcp.tools_character import (
+    tool_get_character,
+    tool_get_rewards,
+    tool_set_reward,
+    tool_update_character_config,
+)
+from mcp.tools_social import (
+    tool_annotate_discovery,
+    tool_get_discovery_annotations,
+    tool_get_life_events,
+    tool_get_social_dashboard,
+    tool_get_temptation_trend,
+    tool_log_interaction,
+    tool_log_life_event,
+    tool_log_temptation,
+)
+from mcp.tools_adaptive import get_adaptive_mode
+from mcp.tools_todoist import (
+    close_todoist_task,
+    create_todoist_task,
+    delete_todoist_task,
+    get_decision_fatigue_signal,
+    get_project_activity,
+    get_task_completion_trend,
+    get_todoist_projects,
+    list_todoist_tasks,
+    tool_get_todoist_snapshot,
+    update_todoist_task,
+)
+from mcp.tools_memory import (
+    tool_capture_baseline,
+    tool_delete_platform_memory,
+    tool_list_memory_categories,
+    tool_read_platform_memory,
+    tool_write_platform_memory,
+)
 from mcp.tools_memory import tool_capture_baseline
-from mcp.tools_decisions import *
-from mcp.tools_hypotheses import *
-from mcp.tools_sick_days import *
+from mcp.tools_decisions import tool_get_decisions, tool_log_decision, tool_update_decision_outcome
+from mcp.tools_hypotheses import tool_get_hypotheses, tool_update_hypothesis_outcome
+from mcp.tools_sick_days import tool_manage_sick_days
 from mcp.tools_challenges import (
     tool_create_challenge, tool_activate_challenge,
     tool_checkin_challenge, tool_list_challenges,

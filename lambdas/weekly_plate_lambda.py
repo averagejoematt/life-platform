@@ -535,7 +535,7 @@ def record_email_send(table, lambda_name):
             "ttl": int(_time.time()) + 86400 * 90
         })
     except Exception as e:
-        print(f"[status-tracking] Non-fatal write failure: {e}")
+        logger.info(f"[status-tracking] Non-fatal write failure: {e}")
 
 
 def lambda_handler(event, context):
@@ -576,7 +576,7 @@ def lambda_handler(event, context):
             if prev_ctx:
                 user_message = prev_ctx + "\n\n" + user_message
         except Exception as e:
-            print(f"[WARN] IC-16 failed: {e}")
+            logger.warning(f"IC-16 failed: {e}")
 
     api_key = get_anthropic_key()
     logger.info("Calling Sonnet for The Weekly Plate...")
@@ -634,9 +634,9 @@ def lambda_handler(event, context):
                 text=ai_content[:800], pillars=["nutrition"],
                 data_sources=["macrofactor"], tags=["plate", "meal_plan", "nutrition"],
                 confidence="medium", actionable=True, date=dates.get("end", ""))
-            print("[INFO] IC-15: plate insight persisted")
+            logger.info("IC-15: plate insight persisted")
         except Exception as e:
-            print(f"[WARN] IC-15 failed: {e}")
+            logger.warning(f"IC-15 failed: {e}")
 
     record_email_send(table, "weekly_plate")
     return {"statusCode": 200, "body": f"The Weekly Plate sent: {subject}"}
