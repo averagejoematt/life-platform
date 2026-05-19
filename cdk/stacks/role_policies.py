@@ -26,6 +26,10 @@ KMS_KEY_ARN = f"arn:aws:kms:{REGION}:{ACCT}:key/{KMS_KEY_ID}"
 # Roles need encrypt/decrypt on it to write/read KMS-encrypted objects.
 S3_KMS_KEY_ARN = f"arn:aws:kms:{REGION}:{ACCT}:key/{S3_KMS_KEY_ID}"
 SES_IDENTITY = f"arn:aws:ses:{REGION}:{ACCT}:identity/{SES_DOMAIN}"  # SEC-08: domain from constants
+# V2 P1.6 follow-up (2026-05-19): SES requires send permission on BOTH the
+# identity AND the configuration-set when SendEmail includes ConfigurationSetName.
+# Missing this caused daily-brief AccessDeniedException for 2 days post-P1.6.
+SES_CONFIG_SET_ARN = f"arn:aws:ses:{REGION}:{ACCT}:configuration-set/life-platform-emails"
 
 
 def _secret_arn(name: str) -> str:
@@ -430,7 +434,7 @@ def _compute_base(
         stmts.append(iam.PolicyStatement(
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
-            resources=[SES_IDENTITY],
+            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
         ))
     stmts.append(iam.PolicyStatement(
         sid="DLQ",
@@ -602,7 +606,7 @@ def _email_base(
         iam.PolicyStatement(
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
-            resources=[SES_IDENTITY],
+            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
         ),
         iam.PolicyStatement(
             sid="DLQ",
@@ -702,7 +706,7 @@ def email_evening_nudge() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
-            resources=[SES_IDENTITY],
+            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
         ),
         iam.PolicyStatement(
             sid="DLQ",
@@ -737,7 +741,7 @@ def email_chronicle_sender() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
-            resources=[SES_IDENTITY],
+            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
         ),
         iam.PolicyStatement(
             sid="DLQ",
@@ -773,7 +777,7 @@ def email_weekly_signal() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
-            resources=[SES_IDENTITY],
+            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
         ),
         iam.PolicyStatement(
             sid="DLQ",
@@ -847,7 +851,7 @@ def operational_freshness_checker() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
-            resources=[SES_IDENTITY],
+            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
         ),
         iam.PolicyStatement(
             # WR-48 root-cause fix (PR-reentry-4, 2026-05-03): the freshness checker
@@ -896,7 +900,7 @@ def operational_alert_digest() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
-            resources=[SES_IDENTITY],
+            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
         ),
     ]
 
@@ -912,7 +916,7 @@ def operational_dlq_consumer() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
-            resources=[SES_IDENTITY],
+            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
         ),
         iam.PolicyStatement(
             sid="DLQ",
@@ -979,7 +983,7 @@ def operational_pip_audit() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
-            resources=[SES_IDENTITY],
+            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
         ),
     ]
 
@@ -1031,7 +1035,7 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
-            resources=[SES_IDENTITY],
+            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
         ),
     ]
 
@@ -1139,7 +1143,7 @@ def operational_data_reconciliation() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
-            resources=[SES_IDENTITY],
+            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
         ),
     ]
 
@@ -1246,7 +1250,7 @@ def operational_email_subscriber() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
-            resources=[SES_IDENTITY],
+            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
         ),
         iam.PolicyStatement(
             sid="DLQ",
