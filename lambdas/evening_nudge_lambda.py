@@ -25,22 +25,22 @@ from decimal import Decimal
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-_REGION    = os.environ.get("AWS_REGION", "us-west-2")
+_REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-RECIPIENT  = os.environ["EMAIL_RECIPIENT"]
-SENDER     = os.environ["EMAIL_SENDER"]
-USER_ID    = os.environ.get("USER_ID", "matthew")
+RECIPIENT = os.environ["EMAIL_RECIPIENT"]
+SENDER = os.environ["EMAIL_SENDER"]
+USER_ID = os.environ.get("USER_ID", "matthew")
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
-table    = dynamodb.Table(TABLE_NAME)
-ses      = boto3.client("sesv2", region_name=_REGION)
+table = dynamodb.Table(TABLE_NAME)
+ses = boto3.client("sesv2", region_name=_REGION)
 
 
 def _d2f(obj):
-    if isinstance(obj, list):    return [_d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: _d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [_d2f(i) for i in obj]
+    if isinstance(obj, dict): return {k: _d2f(v) for k, v in obj.items()}
     if isinstance(obj, Decimal): return float(obj)
     return obj
 
@@ -206,7 +206,7 @@ def lambda_handler(event, context):
             },
         ]
 
-        missing  = []
+        missing = []
         complete = []
 
         for check in checks:
@@ -227,7 +227,7 @@ def lambda_handler(event, context):
             logger.info("[nudge] All sources complete — no email needed today")
             return {"statusCode": 200, "body": "All complete — no nudge sent"}
 
-        html    = _build_html(today, missing, complete)
+        html = _build_html(today, missing, complete)
         subject = f"Evening nudge · {len(missing)} thing(s) to log before bed"
 
         ses.send_email(

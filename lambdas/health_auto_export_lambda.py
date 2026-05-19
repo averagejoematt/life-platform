@@ -114,17 +114,17 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-S3_BUCKET      = os.environ["S3_BUCKET"]
+S3_BUCKET = os.environ["S3_BUCKET"]
 DYNAMODB_TABLE = os.environ.get("DYNAMODB_TABLE", "life-platform")
-SECRET_NAME    = os.environ.get("SECRET_NAME", "life-platform/ingestion-keys")
-REGION         = os.environ.get("AWS_DEFAULT_REGION", "us-west-2")
-USER_ID        = os.environ.get("USER_ID", "matthew")
-PK             = f"USER#{USER_ID}#SOURCE#apple_health"
+SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/ingestion-keys")
+REGION = os.environ.get("AWS_DEFAULT_REGION", "us-west-2")
+USER_ID = os.environ.get("USER_ID", "matthew")
+PK = f"USER#{USER_ID}#SOURCE#apple_health"
 
 # ── AWS clients ────────────────────────────────────────────────────────────────
-s3_client      = boto3.client("s3", region_name=REGION)
-dynamodb       = boto3.resource("dynamodb", region_name=REGION)
-table          = dynamodb.Table(DYNAMODB_TABLE)
+s3_client = boto3.client("s3", region_name=REGION)
+dynamodb = boto3.resource("dynamodb", region_name=REGION)
+table = dynamodb.Table(DYNAMODB_TABLE)
 secrets_client = boto3.client("secretsmanager", region_name=REGION)
 
 # COST-OPT-1: Cache secrets in warm Lambda containers (15-min TTL)
@@ -421,7 +421,7 @@ _METRIC_DEFS = [
     # to serve as cross-reference without polluting the primary SOT values.
     ({"Heart Rate", "heart_rate"},                        {"field": "heart_rate_apple",            "agg": "avg_special", "tier": 2}),
     ({"Resting Heart Rate", "resting_heart_rate"},        {"field": "resting_heart_rate_apple",    "agg": "avg",         "tier": 2}),
-    ({"Heart Rate Variability", "heart_rate_variability"},{"field": "hrv_sdnn_apple",              "agg": "avg",         "tier": 2}),
+    ({"Heart Rate Variability", "heart_rate_variability"}, {"field": "hrv_sdnn_apple",              "agg": "avg",         "tier": 2}),
     ({"Respiratory Rate", "respiratory_rate"},            {"field": "respiratory_rate_apple",      "agg": "avg",         "tier": 2}),
     ({"Oxygen Saturation", "blood_oxygen_saturation"},   {"field": "spo2_pct_apple",              "agg": "avg",         "tier": 2}),
 ]
@@ -652,18 +652,18 @@ def process_generic_metrics(metrics):
 
     # ── Logging ──
     if matched:
-        print(f"Matched metrics ({len(matched)}): {matched}")
+        logger.info(f"Matched metrics ({len(matched)}): {matched}")
     if skipped_sot:
-        print(f"Skipped (SOT elsewhere, {len(skipped_sot)}): {skipped_sot}")
+        logger.info(f"Skipped (SOT elsewhere, {len(skipped_sot)}): {skipped_sot}")
     if unmatched:
-        print(f"Unmatched (no mapping, {len(unmatched)}): {unmatched}")
+        logger.info(f"Unmatched (no mapping, {len(unmatched)}): {unmatched}")
     if filtered_counts:
         for m, counts in filtered_counts.items():
-            print(f"Source filter [{m}]: kept {counts['kept']} Apple readings, dropped {counts['dropped']} non-Apple")
+            logger.info(f"Source filter [{m}]: kept {counts['kept']} Apple readings, dropped {counts['dropped']} non-Apple")
     if source_audit:
         for date, fields_audit in source_audit.items():
             for fname, choice in fields_audit.items():
-                print(f"Source dedup [{date} {fname}]: chose {choice['chosen']!r}, rejected {choice['rejected']}")
+                logger.info(f"Source dedup [{date} {fname}]: chose {choice['chosen']!r}, rejected {choice['rejected']}")
 
     return daily_data, dict(daily_timestamps), dict(source_audit)
 
@@ -710,7 +710,7 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None):
                 # Store merged map back (handled in write section below)
                 reading_timestamps[field_name] = merged
         except Exception as e:
-            print(f"[DEDUP] Read failed (proceeding with full write): {e}")
+            logger.info(f"[DEDUP] Read failed (proceeding with full write): {e}")
 
     # Derive oz from deduped ml (oz not tracked independently)
     if "water_intake_ml" in fields:
@@ -1231,7 +1231,7 @@ def lambda_handler(event, context):
     """
     _request_start = datetime.now(timezone.utc)
     if hasattr(logger, "set_date"): logger.set_date(_request_start.strftime("%Y-%m-%d"))  # OBS-1
-    print(f"Health Auto Export webhook received")
+    logger.info(f"Health Auto Export webhook received")
 
     # ── Auth ──
     headers = event.get("headers", {})
@@ -1269,7 +1269,7 @@ def lambda_handler(event, context):
     try:
         payload = json.loads(body) if isinstance(body, str) else body
     except (json.JSONDecodeError, TypeError) as e:
-        print(f"ERROR: Invalid JSON body: {e}")
+        logger.info(f"ERROR: Invalid JSON body: {e}")
         return {"statusCode": 400, "body": json.dumps({"error": "Invalid JSON"})}
 
     # Health Auto Export wraps everything in a "data" key
@@ -1277,7 +1277,7 @@ def lambda_handler(event, context):
     metrics = data.get("metrics", []) if isinstance(data, dict) else []
     workouts = data.get("workouts", []) if isinstance(data, dict) else []
 
-    print(f"Payload: {len(metrics)} metrics, {len(workouts)} workouts")
+    logger.info(f"Payload: {len(metrics)} metrics, {len(workouts)} workouts")
 
     # ── Detect State of Mind payload (v1.5.0) ──
     # HAE sends SoM as a separate Data Type automation, so payload shape differs.
@@ -1287,7 +1287,7 @@ def lambda_handler(event, context):
     som_days = 0
 
     if som_daily_entries:
-        print(f"State of Mind detected: {sum(len(v) for v in som_daily_entries.values())} entries across {len(som_daily_entries)} days")
+        logger.info(f"State of Mind detected: {sum(len(v) for v in som_daily_entries.values())} entries across {len(som_daily_entries)} days")
         for date_str, entries in som_daily_entries.items():
             n = save_state_of_mind_to_s3(date_str, entries)
             som_entries_new += n
@@ -1297,11 +1297,11 @@ def lambda_handler(event, context):
             som_days += 1
 
         if som_entries_new:
-            print(f"State of Mind: {som_entries_new} new entries saved to S3, {som_days} days updated in DynamoDB")
+            logger.info(f"State of Mind: {som_entries_new} new entries saved to S3, {som_days} days updated in DynamoDB")
 
     # ── Archive raw payload ──
     s3_key = save_raw_payload(payload)
-    print(f"Raw payload archived: s3://{S3_BUCKET}/{s3_key}")
+    logger.info(f"Raw payload archived: s3://{S3_BUCKET}/{s3_key}")
 
     # ── Process blood glucose (CGM) ──
     glucose_metric = None
@@ -1317,7 +1317,7 @@ def lambda_handler(event, context):
     if glucose_metric:
         glucose_data = glucose_metric.get("data", [])
         glucose_units = glucose_metric.get("units", "mg/dL")
-        print(f"Blood Glucose: {len(glucose_data)} readings, units={glucose_units}")
+        logger.info(f"Blood Glucose: {len(glucose_data)} readings, units={glucose_units}")
 
         daily_agg, daily_readings = process_blood_glucose(glucose_data, glucose_units)
 
@@ -1329,9 +1329,9 @@ def lambda_handler(event, context):
             n = save_cgm_readings_to_s3(date_str, readings)
             glucose_readings_new += n
 
-        print(f"Glucose: {glucose_days} days updated, {glucose_readings_new} new readings saved")
+        logger.info(f"Glucose: {glucose_days} days updated, {glucose_readings_new} new readings saved")
     else:
-        print("No blood glucose data in payload")
+        logger.info("No blood glucose data in payload")
 
     # ── Process other metrics ──
     other_daily, other_timestamps, source_audit = process_generic_metrics(metrics)
@@ -1345,7 +1345,7 @@ def lambda_handler(event, context):
         fields_written = set()
         for fields in other_daily.values():
             fields_written.update(fields.keys())
-        print(f"Other metrics: {other_days} days updated, fields: {sorted(fields_written)}")
+        logger.info(f"Other metrics: {other_days} days updated, fields: {sorted(fields_written)}")
 
     # ── Process blood pressure individual readings (v1.4.0 + v1.4.1 combined format) ──
     bp_readings_new = 0
@@ -1381,7 +1381,7 @@ def lambda_handler(event, context):
                     "blood_pressure_readings_count": len(readings),
                 })
             if bp_readings_new:
-                print(f"Blood Pressure: {bp_readings_new} new readings saved (combined format)")
+                logger.info(f"Blood Pressure: {bp_readings_new} new readings saved (combined format)")
             break
 
     # v1.4.0: Handle separate systolic/diastolic metrics
@@ -1416,7 +1416,7 @@ def lambda_handler(event, context):
                     bp_readings_new += n
                     merge_day_to_dynamo(date_str, {"blood_pressure_readings_count": len(readings)})
                 if bp_readings_new:
-                    print(f"Blood Pressure: {bp_readings_new} new readings saved to S3")
+                    logger.info(f"Blood Pressure: {bp_readings_new} new readings saved to S3")
             break
 
     # ── Process workouts (v1.6.0) ──
@@ -1432,7 +1432,7 @@ def lambda_handler(event, context):
         for wkts in daily_workouts.values():
             for w in wkts:
                 all_types.add(f"{w['name']} ({w['category']})")
-        print(f"Workout types found: {sorted(all_types)}")
+        logger.info(f"Workout types found: {sorted(all_types)}")
 
         # Save ALL workouts to S3 (including non-recovery, for reference)
         for date_str, wkts in daily_workouts.items():
@@ -1450,7 +1450,7 @@ def lambda_handler(event, context):
             print(f"Workouts: {workout_new} new saved to S3 across {workout_days} days, "
                   f"{recovery_days} days with recovery aggregates written to DynamoDB")
     else:
-        print("No workouts in payload")
+        logger.info("No workouts in payload")
 
     # ── Summary ──
     duration_ms = int((datetime.now(timezone.utc) - _request_start).total_seconds() * 1000) if _request_start else 0
@@ -1467,7 +1467,7 @@ def lambda_handler(event, context):
         "workouts_received": len(workouts),
         "raw_archive": s3_key,
     }
-    print(f"Result: {json.dumps(result)}")
+    logger.info(f"Result: {json.dumps(result)}")
 
     # Structured log line for CloudWatch Insights queries
     structured_log = {
@@ -1488,7 +1488,7 @@ def lambda_handler(event, context):
         "duration_ms": duration_ms,
         "payload_bytes": len(body) if isinstance(body, str) else 0,
     }
-    print(json.dumps(structured_log))
+    logger.info(json.dumps(structured_log))
 
     return {
         "statusCode": 200,

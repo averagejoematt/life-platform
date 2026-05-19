@@ -37,10 +37,10 @@ def nightly_cache_warmer():
     Per-step timing is logged so slowdowns are easy to diagnose.
     """
     warmer_start = time.time()
-    today    = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     five_yrs = (datetime.now(timezone.utc) - timedelta(days=365 * 5)).strftime("%Y-%m-%d")
-    two_yrs  = (datetime.now(timezone.utc) - timedelta(days=365 * 2)).strftime("%Y-%m-%d")
-    results  = {}
+    two_yrs = (datetime.now(timezone.utc) - timedelta(days=365 * 2)).strftime("%Y-%m-%d")
+    results = {}
     logger.info(f"[warmer] START date={today} sources={WARMER_CORE_SOURCES}")
 
     # 1. get_aggregated_summary — year view (5 years, core sources only)
@@ -228,8 +228,8 @@ def nightly_cache_warmer():
         results["cgm_dashboard"] = {"status": f"error: {e}", "ms": int((time.time()-_t)*1000)}
 
     total_ms = int((time.time() - warmer_start) * 1000)
-    errors   = [k for k, v in results.items() if not v.get("status", "").startswith("ok")]
-    status   = "COMPLETE" if not errors else f"PARTIAL — {len(errors)} step(s) failed: {errors}"
+    errors = [k for k, v in results.items() if not v.get("status", "").startswith("ok")]
+    status = "COMPLETE" if not errors else f"PARTIAL — {len(errors)} step(s) failed: {errors}"
     logger.info(f"[warmer] {status} total_ms={total_ms} steps={json.dumps(results)}")
     if errors:
         logger.error(f"[warmer] FAILED steps: {errors}")

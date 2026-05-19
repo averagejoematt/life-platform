@@ -35,8 +35,8 @@ def safe_float(rec, field, default=None):
 
 def d2f(obj):
     from decimal import Decimal
-    if isinstance(obj, list):    return [d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [d2f(i) for i in obj]
+    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
     if isinstance(obj, Decimal): return float(obj)
     return obj
 
@@ -113,12 +113,12 @@ def _compute_weekly_habit_review(habit_7d_records, profile):
     all_missed = {}  # habit_name -> days_missed_count
 
     for rec in sorted_recs:
-        t0_done  = int(rec.get("tier0_done", 0))
+        t0_done = int(rec.get("tier0_done", 0))
         t0_total = int(rec.get("tier0_total", 0))
-        raw_pct  = rec.get("tier0_pct")
-        t0_pct   = float(raw_pct) if raw_pct is not None else (t0_done / t0_total if t0_total else 0)
-        missed   = rec.get("missed_tier0") or []
-        perfect  = (t0_total > 0) and (t0_done == t0_total)
+        raw_pct = rec.get("tier0_pct")
+        t0_pct = float(raw_pct) if raw_pct is not None else (t0_done / t0_total if t0_total else 0)
+        missed = rec.get("missed_tier0") or []
+        perfect = (t0_total > 0) and (t0_done == t0_total)
         date_str = rec.get("date", rec.get("sk", "").replace("DATE#", ""))
         daily.append({
             "date":    date_str,
@@ -135,16 +135,16 @@ def _compute_weekly_habit_review(habit_7d_records, profile):
     if days == 0:
         return None
 
-    perfect_days  = sum(1 for d in daily if d["perfect"])
-    avg_t0_raw    = [d["t0_pct"] for d in daily]
-    avg_t0_pct    = round(sum(avg_t0_raw) / len(avg_t0_raw), 3) if avg_t0_raw else 0
+    perfect_days = sum(1 for d in daily if d["perfect"])
+    avg_t0_raw = [d["t0_pct"] for d in daily]
+    avg_t0_pct = round(sum(avg_t0_raw) / len(avg_t0_raw), 3) if avg_t0_raw else 0
 
     # Per T0 habit breakdown
     t0_habits = []
     for name, meta in registry.items():
         if meta.get("status") == "active" and meta.get("tier", 2) == 0:
             days_missed = all_missed.get(name, 0)
-            days_done   = days - days_missed
+            days_done = days - days_missed
             t0_habits.append({
                 "name":       name,
                 "days_done":  days_done,
@@ -184,13 +184,13 @@ def _render_weekly_habit_review(whr):
     if not whr:
         return ""
 
-    days        = whr.get("days", 7)
-    perfect     = whr.get("perfect_days", 0)
-    avg_t0      = whr.get("avg_t0_pct", 0)
-    t0_habits   = whr.get("t0_habits", [])
-    avg_t1      = whr.get("avg_t1_pct")
-    synergy     = whr.get("synergy", {})
-    daily       = whr.get("daily", [])
+    days = whr.get("days", 7)
+    perfect = whr.get("perfect_days", 0)
+    avg_t0 = whr.get("avg_t0_pct", 0)
+    t0_habits = whr.get("t0_habits", [])
+    avg_t1 = whr.get("avg_t1_pct")
+    synergy = whr.get("synergy", {})
+    daily = whr.get("daily", [])
 
     # Overall completion colour
     t0_pct_int = int(avg_t0 * 100)
@@ -682,10 +682,10 @@ def build_html(data, profile, day_grade_score, grade, component_scores, componen
     # Sarah Chen: this is the surface. Before AI commentary.
     try:
         html += '<!-- S:essential_seven -->'
-        habits_detail   = component_details.get("habits_mvp", {})
-        tier_status     = habits_detail.get("tier_status", {})
-        tier0_status    = tier_status.get(0, tier_status.get("0", {}))
-        registry        = profile.get("habit_registry", {})
+        habits_detail = component_details.get("habits_mvp", {})
+        tier_status = habits_detail.get("tier_status", {})
+        tier0_status = tier_status.get(0, tier_status.get("0", {}))
+        registry = profile.get("habit_registry", {})
 
         tier0_names = [
             n for n, m in registry.items()
@@ -708,7 +708,7 @@ def build_html(data, profile, day_grade_score, grade, component_scores, componen
             for h_name in tier0_names:
                 done = bool(tier0_status.get(h_name, False))
                 # Ava: green = done, amber = miss. No red — amber signals attention, not failure.
-                icon_html  = ('<span style="color:#22c55e;font-size:14px;">&#10003;</span>'
+                icon_html = ('<span style="color:#22c55e;font-size:14px;">&#10003;</span>'
                               if done else
                               '<span style="color:#f59e0b;font-size:14px;">&#10005;</span>')
                 name_color = '#e2e8f0' if done else '#94a3b8'
@@ -724,8 +724,8 @@ def build_html(data, profile, day_grade_score, grade, component_scores, componen
                 )
             done_count = sum(1 for n in tier0_names if bool(tier0_status.get(n, False)))
             total_count = len(tier0_names)
-            bar_pct     = round(done_count / total_count * 100) if total_count else 0
-            bar_color   = '#22c55e' if done_count == total_count else '#f59e0b' if done_count >= total_count * 0.7 else '#ef4444'
+            bar_pct = round(done_count / total_count * 100) if total_count else 0
+            bar_color = '#22c55e' if done_count == total_count else '#f59e0b' if done_count >= total_count * 0.7 else '#ef4444'
             html += (
                 '<div style="margin-top:8px;background:#1e293b;border-radius:4px;height:4px;">'
                 '<div style="background:' + bar_color + ';border-radius:4px;height:4px;width:' + str(bar_pct) + '%;"></div>'

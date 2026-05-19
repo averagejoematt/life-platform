@@ -18,11 +18,11 @@ import json
 import os
 from datetime import datetime, timezone, date, timedelta
 
-REGION       = os.environ.get("AWS_REGION", "us-west-2")
-TABLE_NAME   = os.environ.get("TABLE_NAME", "life-platform")
-S3_BUCKET    = os.environ.get("S3_BUCKET", "matthew-life-platform")
-USER_ID      = os.environ.get("USER_ID", "matthew")
-STATS_KEY    = "generated/public_stats.json"  # ADR-046
+REGION = os.environ.get("AWS_REGION", "us-west-2")
+TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
+S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+USER_ID = os.environ.get("USER_ID", "matthew")
+STATS_KEY = "generated/public_stats.json"  # ADR-046
 
 # Ingestion Lambdas to re-invoke before reading DynamoDB
 INGESTION_LAMBDAS = [
@@ -33,7 +33,7 @@ INGESTION_LAMBDAS = [
 
 _lambda = boto3.client("lambda", region_name=REGION)
 _dynamo = boto3.resource("dynamodb", region_name=REGION)
-_s3     = boto3.client("s3", region_name=REGION)
+_s3 = boto3.client("s3", region_name=REGION)
 
 
 def _safe_float(d, key):
@@ -85,8 +85,8 @@ def lambda_handler(event, context):
             print(f"[WARN] {fn} invoke failed (non-fatal): {e}")
 
     # ── 2. Read fresh records from DynamoDB ───────────────────────────────────
-    table    = _dynamo.Table(TABLE_NAME)
-    whoop    = _get_latest(table, "whoop")
+    table = _dynamo.Table(TABLE_NAME)
+    whoop = _get_latest(table, "whoop")
     withings = _get_latest(table, "withings")
     habitify = _get_latest(table, "habitify")
     apple_health = _get_latest(table, "apple_health")
@@ -105,10 +105,10 @@ def lambda_handler(event, context):
 
     # ── 4. Build fresh vitals ────────────────────────────────────────────────
     recovery = _safe_float(whoop, "recovery_score")
-    hrv      = _safe_float(whoop, "hrv")
-    rhr      = _safe_float(whoop, "resting_heart_rate")
-    sleep    = _safe_float(whoop, "sleep_duration_hours")
-    weight   = _safe_float(withings, "weight_lbs")
+    hrv = _safe_float(whoop, "hrv")
+    rhr = _safe_float(whoop, "resting_heart_rate")
+    sleep = _safe_float(whoop, "sleep_duration_hours")
+    weight = _safe_float(withings, "weight_lbs")
 
     weight_as_of = withings.get("sk", "").replace("DATE#", "") or None
     # v1.4.2: Check apple_health for more recent weight (HAE fallback)
@@ -118,11 +118,11 @@ def lambda_handler(event, context):
         weight = ah_weight
         weight_as_of = ah_date
     if not weight:
-        weight       = ev.get("weight_lbs")
+        weight = ev.get("weight_lbs")
         weight_as_of = ev.get("weight_as_of")
 
     rec_status = (
-        "green"  if (recovery or 0) >= 67 else
+        "green" if (recovery or 0) >= 67 else
         "yellow" if (recovery or 0) >= 34 else
         "red"
     )
@@ -131,13 +131,13 @@ def lambda_handler(event, context):
         "weight_lbs":          round(weight) if weight else None,
         "weight_as_of":        weight_as_of,
         "weight_delta_30d":    ev.get("weight_delta_30d"),   # preserved from morning
-        "hrv_ms":              round(hrv, 1)  if hrv      else ev.get("hrv_ms"),
+        "hrv_ms":              round(hrv, 1) if hrv else ev.get("hrv_ms"),
         "hrv_trend":           ev.get("hrv_trend"),
-        "rhr_bpm":             round(rhr, 1)  if rhr      else ev.get("rhr_bpm"),
+        "rhr_bpm":             round(rhr, 1) if rhr else ev.get("rhr_bpm"),
         "rhr_trend":           ev.get("rhr_trend"),
         "recovery_pct":        round(recovery, 0) if recovery else None,
         "recovery_status":     rec_status if recovery else ev.get("recovery_status"),
-        "sleep_hours":         round(sleep, 1) if sleep   else ev.get("sleep_hours"),
+        "sleep_hours":         round(sleep, 1) if sleep else ev.get("sleep_hours"),
         "sleep_hours_30d_avg": ev.get("sleep_hours_30d_avg"),
     }
 

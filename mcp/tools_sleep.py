@@ -38,9 +38,9 @@ def tool_get_sleep_analysis(args):
     sleep regardless of location (couch, travel, naps), whereas Eight Sleep only
     sees time spent in the pod.
     """
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    days       = int(args.get("days", 90))   # rolling window
-    target_h   = float(args.get("target_sleep_hours", 7.5))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    days = int(args.get("days", 90))   # rolling window
+    target_h = float(args.get("target_sleep_hours", 7.5))
     start_date = args.get("start_date") or (
         datetime.now(timezone.utc) - timedelta(days=days)
     ).strftime("%Y-%m-%d")
@@ -77,15 +77,15 @@ def tool_get_sleep_analysis(args):
     n = len(items)
 
     # ── 1. Sleep architecture ─────────────────────────────────────────────────
-    rem_pcts   = series("rem_pct")
-    deep_pcts  = series("deep_pct")
+    rem_pcts = series("rem_pct")
+    deep_pcts = series("deep_pct")
     light_pcts = series("light_pct")
-    eff_pcts   = series("sleep_efficiency_pct")
-    dur_hrs    = series("sleep_duration_hours")
-    waso_hrs   = series("waso_hours")
-    latency    = series("time_to_sleep_min")
+    eff_pcts = series("sleep_efficiency_pct")
+    dur_hrs = series("sleep_duration_hours")
+    waso_hrs = series("waso_hours")
+    latency = series("time_to_sleep_min")
     resp_rates = series("respiratory_rate")
-    hrv_vals   = series("hrv_avg")
+    hrv_vals = series("hrv_avg")
 
     architecture = {
         "rem_avg_pct":         avg(rem_pcts),
@@ -155,16 +155,16 @@ def tool_get_sleep_analysis(args):
     efficiency["clinical_alerts"] = eff_alerts
 
     # ── 3. Circadian timing & consistency ─────────────────────────────────────
-    onset_hours   = series("sleep_onset_hour")
-    wake_hours    = series("wake_hour")
+    onset_hours = series("sleep_onset_hour")
+    wake_hours = series("wake_hour")
     midpoint_hours= series("sleep_midpoint_hour")
 
-    onset_sd  = std_dev(onset_hours)
-    wake_sd   = std_dev(wake_hours)
-    mid_sd    = std_dev(midpoint_hours)
+    onset_sd = std_dev(onset_hours)
+    wake_sd = std_dev(wake_hours)
+    mid_sd = std_dev(midpoint_hours)
     avg_onset = avg(onset_hours)
-    avg_wake  = avg(wake_hours)
-    avg_mid   = avg(midpoint_hours)
+    avg_wake = avg(wake_hours)
+    avg_mid = avg(midpoint_hours)
 
     def format_hour(h):
         if h is None:
@@ -249,7 +249,7 @@ def tool_get_sleep_analysis(args):
     cumulative_debt_7d = None
     cumulative_debt_30d= None
     if nightly_debts:
-        cumulative_debt_7d  = round(sum(nightly_debts[-7:]),  2)
+        cumulative_debt_7d = round(sum(nightly_debts[-7:]),  2)
         cumulative_debt_30d = round(sum(nightly_debts[-30:]), 2)
 
     debt = {
@@ -303,7 +303,7 @@ def tool_get_sleep_analysis(args):
         score_summary["avg_sleep_score"] = avg(scores)
         if len(scores) >= 14:
             recent_half = scores[len(scores)//2:]
-            early_half  = scores[:len(scores)//2]
+            early_half = scores[:len(scores)//2]
             delta = round(avg(recent_half) - avg(early_half), 1)
             score_summary["trend"] = "improving" if delta > 2 else ("declining" if delta < -2 else "stable")
             score_summary["trend_delta"] = delta
@@ -347,8 +347,8 @@ def tool_get_sleep_environment_analysis(args):
     Huberman/Walker: core body temperature drop of 1-3°F is the primary
     trigger for sleep onset. Eight Sleep controls this precisely.
     """
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    days       = int(args.get("days", 90))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    days = int(args.get("days", 90))
     start_date = args.get("start_date") or (
         datetime.now(timezone.utc) - timedelta(days=days)
     ).strftime("%Y-%m-%d")
@@ -363,16 +363,16 @@ def tool_get_sleep_environment_analysis(args):
         es = es_items[date_key]
         wh = wh_items[date_key]
 
-        bed_temp  = es.get("bed_temperature_f") or es.get("bed_temp_f")
+        bed_temp = es.get("bed_temperature_f") or es.get("bed_temp_f")
         room_temp = es.get("room_temperature_f") or es.get("room_temp_f")
-        es_level  = es.get("sleep_temperature_level") or es.get("temperature_level")
+        es_level = es.get("sleep_temperature_level") or es.get("temperature_level")
 
-        efficiency   = wh.get("sleep_efficiency")
-        deep_pct     = wh.get("deep_sleep_pct") or wh.get("sws_pct")
-        rem_pct      = wh.get("rem_sleep_pct")
-        hrv          = wh.get("hrv")
-        sleep_score  = wh.get("sleep_performance_pct") or wh.get("sleep_score")
-        duration_h   = wh.get("sleep_duration_hours")
+        efficiency = wh.get("sleep_efficiency")
+        deep_pct = wh.get("deep_sleep_pct") or wh.get("sws_pct")
+        rem_pct = wh.get("rem_sleep_pct")
+        hrv = wh.get("hrv")
+        sleep_score = wh.get("sleep_performance_pct") or wh.get("sleep_score")
+        duration_h = wh.get("sleep_duration_hours")
 
         if bed_temp is None and room_temp is None:
             continue

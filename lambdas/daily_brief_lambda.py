@@ -55,12 +55,12 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 # -- Configuration from environment variables (with backwards-compatible defaults) --
-_REGION    = os.environ.get("AWS_REGION", "us-west-2")
+_REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-S3_BUCKET  = os.environ.get("S3_BUCKET", "")
-USER_ID    = os.environ.get("USER_ID", "")
-RECIPIENT  = os.environ.get("EMAIL_RECIPIENT", "")
-SENDER     = os.environ.get("EMAIL_SENDER", "")
+S3_BUCKET = os.environ.get("S3_BUCKET", "")
+USER_ID = os.environ.get("USER_ID", "")
+RECIPIENT = os.environ.get("EMAIL_RECIPIENT", "")
+SENDER = os.environ.get("EMAIL_SENDER", "")
 ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
 
 # BUG-11: Validate required env vars at startup with descriptive errors
@@ -77,14 +77,14 @@ for _var, _addr in [("EMAIL_RECIPIENT", RECIPIENT), ("EMAIL_SENDER", SENDER)]:
         raise RuntimeError(f"daily-brief Lambda misconfigured — {_var}={_addr!r} is not a valid email address")
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
-PROFILE_PK  = f"USER#{USER_ID}"
+PROFILE_PK = f"USER#{USER_ID}"
 
 # -- AWS clients ---------------------------------------------------------------
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
-table    = dynamodb.Table(TABLE_NAME)
-ses      = boto3.client("sesv2", region_name=_REGION)
-s3       = boto3.client("s3", region_name=_REGION)
-secrets  = boto3.client("secretsmanager", region_name=_REGION)
+table = dynamodb.Table(TABLE_NAME)
+ses = boto3.client("sesv2", region_name=_REGION)
+s3 = boto3.client("s3", region_name=_REGION)
+secrets = boto3.client("secretsmanager", region_name=_REGION)
 
 # BUG-08: Emit EMF metric when optional layer module fails to import.
 def _emit_module_load_failure(module_name: str) -> None:
@@ -160,8 +160,8 @@ def get_anthropic_key():
     return json.loads(secret["SecretString"])["anthropic_api_key"]
 
 def d2f(obj):
-    if isinstance(obj, list):    return [d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [d2f(i) for i in obj]
+    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
     if isinstance(obj, Decimal): return float(obj)
     return obj
 
@@ -294,13 +294,13 @@ def _emit_source_fetch_metrics(sources: dict) -> None:
 def gather_daily_data(profile, yesterday):
     today = datetime.now(timezone.utc).date()
 
-    whoop       = fetch_date("whoop",        yesterday)
-    sleep       = _normalize_whoop_sleep(whoop)  # Whoop is now SOT for sleep duration/staging
-    apple       = fetch_date("apple_health", yesterday)
+    whoop = fetch_date("whoop",        yesterday)
+    sleep = _normalize_whoop_sleep(whoop)  # Whoop is now SOT for sleep duration/staging
+    apple = fetch_date("apple_health", yesterday)
     macrofactor = fetch_date("macrofactor",  yesterday)
-    strava      = fetch_date("strava",       yesterday)
-    habitify    = fetch_date("habitify",     yesterday)
-    garmin      = fetch_date("garmin",       yesterday)
+    strava = fetch_date("strava",       yesterday)
+    habitify = fetch_date("habitify",     yesterday)
+    garmin = fetch_date("garmin",       yesterday)
     whoop_today = fetch_date("whoop", today.isoformat())
 
     # DEXA, measurements, labs — latest records (not date-specific; periodic data)
@@ -314,9 +314,9 @@ def gather_daily_data(profile, yesterday):
     journal_entries = fetch_journal_entries(yesterday)
     journal = extract_journal_signals(journal_entries)
 
-    hrv_7d_recs  = fetch_range("whoop", (today - timedelta(days=7)).isoformat(), yesterday)
+    hrv_7d_recs = fetch_range("whoop", (today - timedelta(days=7)).isoformat(), yesterday)
     hrv_30d_recs = fetch_range("whoop", (today - timedelta(days=30)).isoformat(), yesterday)
-    hrv_7d_vals  = [float(r["hrv"]) for r in hrv_7d_recs  if "hrv" in r]
+    hrv_7d_vals = [float(r["hrv"]) for r in hrv_7d_recs if "hrv" in r]
     hrv_30d_vals = [float(r["hrv"]) for r in hrv_30d_recs if "hrv" in r]
 
     strava_60d = fetch_range("strava", (today - timedelta(days=60)).isoformat(), yesterday)
@@ -451,8 +451,13 @@ def gather_daily_data(profile, yesterday):
     if computed_metrics and computed_metrics.get("acwr"):
         _acwr_zone = computed_metrics.get("zone", "?")
         _acwr_alert = computed_metrics.get("alert", False)
-        print("[INFO] ACWR loaded for " + yesterday + ": " + str(round(float(computed_metrics["acwr"]), 3)) +
-              " (" + _acwr_zone + ")" + (" \u26a0 ALERT" if _acwr_alert else ""))
+        logger.info(
+            "ACWR loaded for %s: %s (%s)%s",
+            yesterday,
+            round(float(computed_metrics["acwr"]), 3),
+            _acwr_zone,
+            " \u26a0 ALERT" if _acwr_alert else "",
+        )
     else:
         logger.info("No computed_metrics/ACWR for " + yesterday + " — acwr-compute may not have run yet")
 
@@ -1254,11 +1259,11 @@ def _regrade_handler(dates, profile):
                             profile.get("day_grade_weights", {}),
                             profile.get("day_grade_algorithm_version", "1.1"))
             hyd = comp_scores.get("hydration", "—")
-            print(f"[REGRADE] {date_str}: {score} ({grade}) hydration={hyd}")
+            logger.info(f"[REGRADE] {date_str}: {score} ({grade}) hydration={hyd}")
             results.append({"date": date_str, "score": score, "grade": grade,
                             "hydration": hyd, "components": comp_scores})
         except Exception as e:
-            print(f"[REGRADE] {date_str} FAILED: {e}")
+            logger.info(f"[REGRADE] {date_str} FAILED: {e}")
             results.append({"date": date_str, "error": str(e)})
     return {"statusCode": 200, "regraded": len(results), "results": results}
 
@@ -1362,8 +1367,11 @@ def lambda_handler(event, context):
         logger.warning(f"logger.set_date failed (correlation_id missing for this execution): {e}")
 
     data = gather_daily_data(profile, yesterday)
-    print("[INFO] Date: " + yesterday + " | sources: " +
-          ", ".join(k for k in ["whoop", "sleep", "macrofactor", "habitify", "apple", "strava", "mf_workouts"] if data.get(k)))
+    logger.info(
+        "Date: %s | sources: %s",
+        yesterday,
+        ", ".join(k for k in ["whoop", "sleep", "macrofactor", "habitify", "apple", "strava", "mf_workouts"] if data.get(k)),
+    )
 
     # ── Sick day check ─────────────────────────────────────────────────────
     # If today's subject date was a sick/rest day, send a brief recovery
@@ -1378,14 +1386,14 @@ def lambda_handler(event, context):
         _sick_brief_reason = _sick_brief_rec.get("reason") or "sick day"
         logger.info(f"Sick day flagged for {yesterday} ({_sick_brief_reason}) — sending recovery brief")
 
-        _sb_whoop      = fetch_date("whoop", yesterday)
-        _sb_sleep_hrs  = safe_float(_sb_whoop, "sleep_duration_hours")
-        _sb_recovery   = safe_float(_sb_whoop, "recovery_score")
-        _sb_hrv        = safe_float(_sb_whoop, "hrv")
+        _sb_whoop = fetch_date("whoop", yesterday)
+        _sb_sleep_hrs = safe_float(_sb_whoop, "sleep_duration_hours")
+        _sb_recovery = safe_float(_sb_whoop, "recovery_score")
+        _sb_hrv = safe_float(_sb_whoop, "hrv")
 
-        _sb_sleep_line    = f"{_sb_sleep_hrs:.1f} hrs" if _sb_sleep_hrs else "—"
+        _sb_sleep_line = f"{_sb_sleep_hrs:.1f} hrs" if _sb_sleep_hrs else "—"
         _sb_recovery_line = f"{int(_sb_recovery)}%" if _sb_recovery else "—"
-        _sb_hrv_line      = f"{int(_sb_hrv)} ms"   if _sb_hrv      else "—"
+        _sb_hrv_line = f"{int(_sb_hrv)} ms" if _sb_hrv else "—"
 
         try:
             _today_short = today.strftime("%a %b %-d")
@@ -1532,17 +1540,17 @@ def lambda_handler(event, context):
         _cm_score = _computed.get("day_grade_score")
         day_grade_score = int(float(_cm_score)) if _cm_score is not None else None
         grade = _computed.get("day_grade_letter", "—")
-        component_scores  = {k: int(float(v)) if v is not None else None
+        component_scores = {k: int(float(v)) if v is not None else None
                              for k, v in _computed.get("component_scores", {}).items()}
         component_details = _computed.get("component_details", {})
         # Overwrite data dict with pre-computed derived values for HTML rendering
-        if _computed.get("tsb")              is not None: data["tsb"]              = float(_computed["tsb"])
-        if _computed.get("hrv_7d")           is not None: data["hrv"]["hrv_7d"]    = float(_computed["hrv_7d"])
-        if _computed.get("hrv_30d")          is not None: data["hrv"]["hrv_30d"]   = float(_computed["hrv_30d"])
+        if _computed.get("tsb") is not None: data["tsb"] = float(_computed["tsb"])
+        if _computed.get("hrv_7d") is not None: data["hrv"]["hrv_7d"] = float(_computed["hrv_7d"])
+        if _computed.get("hrv_30d") is not None: data["hrv"]["hrv_30d"] = float(_computed["hrv_30d"])
         if _computed.get("sleep_debt_7d_hrs") is not None: data["sleep_debt_7d_hrs"] = float(_computed["sleep_debt_7d_hrs"])
-        if _computed.get("latest_weight"):   data["latest_weight"]   = float(_computed["latest_weight"])
+        if _computed.get("latest_weight"):   data["latest_weight"] = float(_computed["latest_weight"])
         if _computed.get("week_ago_weight"): data["week_ago_weight"] = float(_computed["week_ago_weight"])
-        if _computed.get("avatar_weight"):   data["avatar_weight"]   = float(_computed["avatar_weight"])
+        if _computed.get("avatar_weight"):   data["avatar_weight"] = float(_computed["avatar_weight"])
         logger.info("Day Grade (pre-computed): " + str(day_grade_score) + " (" + grade + ")")
     else:
         # Fallback: compute inline and store (pre-computed Lambda not yet run)
@@ -1591,7 +1599,7 @@ def lambda_handler(event, context):
 
     if _computed:
         _cm_r = _computed.get("readiness_score")
-        readiness_score  = int(float(_cm_r)) if _cm_r is not None else None
+        readiness_score = int(float(_cm_r)) if _cm_r is not None else None
         readiness_colour = _computed.get("readiness_colour", "gray")
     else:
         try:
@@ -1602,14 +1610,14 @@ def lambda_handler(event, context):
 
     streak_data = None  # FIX: always initialise so write_public_stats_json ref is safe
     if _computed:
-        mvp_streak   = int(float(_computed.get("tier0_streak",  0)))
-        full_streak  = int(float(_computed.get("tier01_streak", 0)))
+        mvp_streak = int(float(_computed.get("tier0_streak",  0)))
+        full_streak = int(float(_computed.get("tier01_streak", 0)))
         vice_streaks = {k: int(float(v)) for k, v in _computed.get("vice_streaks", {}).items()}
     else:
         try:
-            streak_data  = compute_habit_streaks(profile, yesterday)
-            mvp_streak   = streak_data.get("tier0_streak",  0)
-            full_streak  = streak_data.get("tier01_streak", 0)
+            streak_data = compute_habit_streaks(profile, yesterday)
+            mvp_streak = streak_data.get("tier0_streak",  0)
+            full_streak = streak_data.get("tier01_streak", 0)
             vice_streaks = streak_data.get("vice_streaks",  {})
         except Exception as e:
             logger.warning("compute_habit_streaks failed: " + str(e))
@@ -1828,15 +1836,15 @@ def lambda_handler(event, context):
                 tldr_guidance=tldr_guidance,
                 health_context=_health_ctx,
             )
-            bod_insight        = _validated["bod_insight"]
+            bod_insight = _validated["bod_insight"]
             training_nutrition = _validated["training_nutrition"]
             journal_coach_text = _validated["journal_coach_text"]
-            tldr_guidance      = _validated["tldr_guidance"]
-            _v_warnings        = _validated.get("validation_warnings", [])
+            tldr_guidance = _validated["tldr_guidance"]
+            _v_warnings = _validated.get("validation_warnings", [])
             if _v_warnings:
-                print(f"[AI-3] {len(_v_warnings)} validation warning(s): {_v_warnings[:5]}")
+                logger.info(f"[AI-3] {len(_v_warnings)} validation warning(s): {_v_warnings[:5]}")
             else:
-                print("[AI-3] All AI outputs passed validation")
+                logger.info("[AI-3] All AI outputs passed validation")
         except Exception as _v_e:
             logger.warning(f"AI-3 validation failed (non-fatal): {_v_e}")
 
@@ -1919,8 +1927,8 @@ def lambda_handler(event, context):
     # fails like it did for 30 days).
     try:
         from boto3.dynamodb.conditions import Key as _DDBKey
-        _SOURCES = ["whoop","withings","strava","todoist","apple_health","eightsleep",
-                    "macrofactor","garmin","habitify","food_delivery","measurements","notion"]
+        _SOURCES = ["whoop", "withings", "strava", "todoist", "apple_health", "eightsleep",
+                    "macrofactor", "garmin", "habitify", "food_delivery", "measurements", "notion"]
         _STALE_OVERRIDE = {"food_delivery": 90, "measurements": 60}
         _today_d = datetime.now(timezone.utc).date()
         _stale = []
@@ -2035,11 +2043,11 @@ def lambda_handler(event, context):
 
             # Journey calc from profile
             _start_wt = float(profile.get("journey_start_weight_lbs", 307))
-            _goal_wt  = float(profile.get("goal_weight_lbs", 185))
+            _goal_wt = float(profile.get("goal_weight_lbs", 185))
             # G-3/G-4 FIX: fall back to avatar_weight (broader lookback) when latest_weight is None
-            _curr_wt  = data.get("latest_weight") or data.get("avatar_weight")  # float or None
-            _lost     = round(_start_wt - _curr_wt, 1) if _curr_wt else None
-            _remain   = round(_curr_wt - _goal_wt, 1) if _curr_wt else None
+            _curr_wt = data.get("latest_weight") or data.get("avatar_weight")  # float or None
+            _lost = round(_start_wt - _curr_wt, 1) if _curr_wt else None
+            _remain = round(_curr_wt - _goal_wt, 1) if _curr_wt else None
             # G-4 FIX: always compute progress from constants; negative = gained back (honest)
             _prog_pct = round((_start_wt - _curr_wt) / (_start_wt - _goal_wt) * 100, 1) if _curr_wt and _start_wt != _goal_wt else None
 
@@ -2177,7 +2185,7 @@ def lambda_handler(event, context):
                 if character_sheet:
                     _cs = character_sheet if isinstance(character_sheet, dict) else {}
                     _cs_level = _cs.get("level") or _cs.get("character_level")
-                    _cs_tier  = _cs.get("tier") or _cs.get("tier_name")
+                    _cs_tier = _cs.get("tier") or _cs.get("tier_name")
                     if _cs_level:
                         _group_narratives["mind"] = (
                             f"Character at Level {_cs_level}"

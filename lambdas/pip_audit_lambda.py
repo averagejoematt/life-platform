@@ -49,14 +49,14 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-REGION    = os.environ.get("AWS_REGION", "us-west-2")
-BUCKET    = os.environ["S3_BUCKET"]
-USER_ID   = os.environ.get("USER_ID", "matthew")
+REGION = os.environ.get("AWS_REGION", "us-west-2")
+BUCKET = os.environ["S3_BUCKET"]
+USER_ID = os.environ.get("USER_ID", "matthew")
 RECIPIENT = os.environ["EMAIL_RECIPIENT"]
-SENDER    = os.environ["EMAIL_SENDER"]
+SENDER = os.environ["EMAIL_SENDER"]
 REQ_S3_PREFIX = os.environ.get("REQ_S3_PREFIX", "config/requirements/")
 
-s3  = boto3.client("s3",    region_name=REGION)
+s3 = boto3.client("s3",    region_name=REGION)
 ses = boto3.client("sesv2", region_name=REGION)
 
 
@@ -206,16 +206,16 @@ def build_report_html(results: list[dict], scan_date: str) -> tuple[str, bool]:
 
     if has_vulns:
         header_color = "#dc2626"
-        status_icon  = "🔴"
-        status_text  = f"VULNERABLE — {total_vulns} vulnerability{'s' if total_vulns > 1 else ''} found"
+        status_icon = "🔴"
+        status_text = f"VULNERABLE — {total_vulns} vulnerability{'s' if total_vulns > 1 else ''} found"
     elif has_errors:
         header_color = "#d97706"
-        status_icon  = "🟡"
-        status_text  = "SCAN ERRORS — review logs"
+        status_icon = "🟡"
+        status_text = "SCAN ERRORS — review logs"
     else:
         header_color = "#059669"
-        status_icon  = "🟢"
-        status_text  = "CLEAN — no known vulnerabilities"
+        status_icon = "🟢"
+        status_text = "CLEAN — no known vulnerabilities"
 
     # Vulnerability details rows
     vuln_rows = ""

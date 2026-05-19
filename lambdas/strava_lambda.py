@@ -36,8 +36,8 @@ except ImportError:
 from ingestion_framework import IngestionConfig, run_ingestion
 
 SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/strava")
-REGION      = os.environ.get("AWS_REGION", "us-west-2")
-USER_ID     = os.environ.get("USER_ID", "matthew")
+REGION = os.environ.get("AWS_REGION", "us-west-2")
+USER_ID = os.environ.get("USER_ID", "matthew")
 
 # Module-level CloudWatch client for writeback-failure metric (P3.6 pattern)
 _cw = boto3.client("cloudwatch", region_name=REGION)
@@ -58,9 +58,9 @@ def _refresh_oauth(secret: dict) -> dict:
     from http_retry import urlopen_with_retry
     with urlopen_with_retry(req, timeout=30) as resp:
         result = json.loads(resp.read())
-    secret["access_token"]  = result["access_token"]
+    secret["access_token"] = result["access_token"]
     secret["refresh_token"] = result["refresh_token"]
-    secret["expires_at"]    = result["expires_at"]
+    secret["expires_at"] = result["expires_at"]
     return secret
 
 
@@ -228,7 +228,7 @@ def fetch_day(credentials: dict, date_str: str) -> dict | None:
     """Fetch one day of Strava activities. Per-day API call window."""
     secret = _secret_cache["secret"] or credentials
     start_dt = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-    end_dt   = start_dt + timedelta(days=1)
+    end_dt = start_dt + timedelta(days=1)
     activities, secret = _fetch_activities_in_range(
         secret, start_dt.timestamp(), end_dt.timestamp(),
     )

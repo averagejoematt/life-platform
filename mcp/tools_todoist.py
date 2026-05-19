@@ -559,7 +559,7 @@ def tool_get_todoist_snapshot(args):
     """
     VALID_VIEWS = {
         "today": lambda a: get_todoist_day(a.get("date")),
-        "load":  lambda a: get_task_load_summary(int(a.get("days", 7))),
+        "load": lambda a: get_task_load_summary(int(a.get("days", 7))),
     }
     view = (args.get("view") or "load").lower().strip()
     if view not in VALID_VIEWS:

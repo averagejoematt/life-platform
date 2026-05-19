@@ -82,7 +82,7 @@ def _load_cgm_readings(date_str):
 
 def tool_get_cgm_dashboard(args):
     """CGM glucose daily dashboard from DynamoDB aggregates."""
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
 
     items = query_source("apple_health", start_date, end_date)
@@ -156,7 +156,7 @@ def tool_get_cgm_dashboard(args):
 
 def tool_get_glucose_sleep_correlation(args):
     """Correlate daily glucose with same-night Eight Sleep metrics."""
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     sources = parallel_query_sources(["apple_health", "eightsleep"], start_date, end_date)
@@ -228,7 +228,7 @@ def tool_get_glucose_sleep_correlation(args):
 
 def tool_get_glucose_exercise_correlation(args):
     """Exercise vs rest day glucose comparison + intensity analysis."""
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     sources = parallel_query_sources(["apple_health", "strava"], start_date, end_date)
@@ -330,7 +330,7 @@ def tool_get_glucose_meal_response(args):
     resistance, inflammation, and accelerated glycation. Fiber, protein, and fat
     blunt the spike; refined carbs and sugar amplify it.
     """
-    end_date   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
     meal_gap_minutes = args.get("meal_gap_minutes", 30)
     baseline_window_min = 30  # minutes before meal for baseline
@@ -641,10 +641,10 @@ def tool_get_fasting_glucose_validation(args):
 
     # ── Parameters ────────────────────────────────────────────────────────
     nadir_start = float(args.get("nadir_start_hour", 0))      # midnight
-    nadir_end   = float(args.get("nadir_end_hour", 6))        # 6 AM
+    nadir_end = float(args.get("nadir_end_hour", 6))        # 6 AM
     # 2-5 AM avoids dawn phenomenon cortisol rise (4-7 AM per Attia/Patrick)
-    deep_start  = float(args.get("deep_nadir_start_hour", 2)) # 2 AM
-    deep_end    = float(args.get("deep_nadir_end_hour", 5))   # 5 AM
+    deep_start = float(args.get("deep_nadir_start_hour", 2)) # 2 AM
+    deep_end = float(args.get("deep_nadir_end_hour", 5))   # 5 AM
     min_readings = int(args.get("min_overnight_readings", 6))  # need ~30 min coverage
 
     # ── Discover all CGM days from S3 ─────────────────────────────────────

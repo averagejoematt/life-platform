@@ -50,14 +50,14 @@ except ImportError:
     logger = logging.getLogger("acwr-compute")
     logger.setLevel(logging.INFO)
 
-_REGION    = os.environ.get("AWS_REGION", "us-west-2")
+_REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
+USER_ID = os.environ.get("USER_ID", "matthew")
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
-table    = dynamodb.Table(TABLE_NAME)
+table = dynamodb.Table(TABLE_NAME)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -66,8 +66,8 @@ table    = dynamodb.Table(TABLE_NAME)
 
 def _d2f(obj):
     """Recursively convert DynamoDB Decimal to float."""
-    if isinstance(obj, list):    return [_d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: _d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [_d2f(i) for i in obj]
+    if isinstance(obj, dict): return {k: _d2f(v) for k, v in obj.items()}
     if isinstance(obj, Decimal): return float(obj)
     return obj
 
@@ -101,14 +101,14 @@ def _rolling_avg(items: list, field: str, n_days: int, end_date: str):
     ending on `end_date` (inclusive). Missing days contribute 0.0 (rest day).
     Returns (avg, n_with_data). Returns (None, 0) only if ALL days are missing.
     """
-    end_dt  = datetime.strptime(end_date, "%Y-%m-%d")
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
     by_date = {item["date"]: item for item in items if item.get("date")}
-    vals    = []
-    n_data  = 0
+    vals = []
+    n_data = 0
     for i in range(n_days):
-        d   = (end_dt - timedelta(days=i)).strftime("%Y-%m-%d")
+        d = (end_dt - timedelta(days=i)).strftime("%Y-%m-%d")
         rec = by_date.get(d)
-        v   = None
+        v = None
         if rec:
             raw = rec.get(field)
             try:
@@ -173,8 +173,8 @@ def _write_acwr(date_str, acwr, acute_7d, chronic_28d,
     """
     now_iso = datetime.now(timezone.utc).isoformat()
 
-    set_parts  = []
-    expr_vals  = {
+    set_parts = []
+    expr_vals = {
         ":zone":   zone,
         ":alert":  alert,
         ":reason": alert_reason,
@@ -216,7 +216,7 @@ def _write_acwr(date_str, acwr, acute_7d, chronic_28d,
             date_str,
             f"{acwr:.3f}" if acwr is not None else "null",
             zone, alert,
-            acute_7d    if acute_7d    is not None else 0,
+            acute_7d if acute_7d is not None else 0,
             chronic_28d if chronic_28d is not None else 0,
         )
     except Exception as exc:
@@ -237,7 +237,7 @@ def lambda_handler(event, context):
         target_date = event["date"]
         logger.info("Override date: %s", target_date)
     else:
-        today       = datetime.now(timezone.utc).date()
+        today = datetime.now(timezone.utc).date()
         target_date = (today - timedelta(days=1)).isoformat()
 
     # Fetch Whoop strain records — 30 days back gives us full 28d chronic window
@@ -252,8 +252,8 @@ def lambda_handler(event, context):
     )
 
     # Compute rolling averages
-    acute_7d,    n_acute    = _rolling_avg(whoop_items, "strain", 7,  target_date)
-    chronic_28d, n_chronic  = _rolling_avg(whoop_items, "strain", 28, target_date)
+    acute_7d,    n_acute = _rolling_avg(whoop_items, "strain", 7,  target_date)
+    chronic_28d, n_chronic = _rolling_avg(whoop_items, "strain", 28, target_date)
 
     # ACWR ratio
     acwr = None
@@ -269,15 +269,15 @@ def lambda_handler(event, context):
     )
 
     _write_acwr(
-        date_str     = target_date,
-        acwr         = acwr,
-        acute_7d     = acute_7d,
-        chronic_28d  = chronic_28d,
-        zone         = zone,
-        alert        = alert,
-        alert_reason = reason,
-        n_days_acute = n_acute,
-        n_days_chronic = n_chronic,
+        date_str=target_date,
+        acwr=acwr,
+        acute_7d=acute_7d,
+        chronic_28d=chronic_28d,
+        zone=zone,
+        alert=alert,
+        alert_reason=reason,
+        n_days_acute=n_acute,
+        n_days_chronic=n_chronic,
     )
 
     elapsed = round(time.time() - t0, 1)

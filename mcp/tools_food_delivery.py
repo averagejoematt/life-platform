@@ -44,10 +44,10 @@ def _query_prefix(prefix, limit=24, asc=False):
 def _classify_state(index, streak_days):
     if streak_days >= 30: return 'clean_extended'
     if streak_days >= 14: return 'clean_building'
-    if streak_days >= 7:  return 'clean_early'
-    if index >= 7:        return 'binge_active'
-    if index >= 4:        return 'elevated'
-    if index >= 1:        return 'occasional'
+    if streak_days >= 7: return 'clean_early'
+    if index >= 7: return 'binge_active'
+    if index >= 4: return 'elevated'
+    if index >= 1: return 'occasional'
     return 'clean'
 
 

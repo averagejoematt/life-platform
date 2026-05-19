@@ -33,11 +33,11 @@ def tool_get_caffeine_sleep_correlation(args):
     Whoop sleep metrics (SOT v2.55.0). Splits days into time buckets to show where sleep degrades.
     Based on Huberman & Attia: caffeine timing is one of the highest-leverage sleep interventions.
     """
-    end_date   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=89)).strftime("%Y-%m-%d"))
 
     mf_items = query_source("macrofactor", start_date, end_date)
-    wh_raw   = query_source("whoop",       start_date, end_date)
+    wh_raw = query_source("whoop",       start_date, end_date)
 
     if not mf_items:
         return {"error": "No MacroFactor data for range.", "start_date": start_date, "end_date": end_date}
@@ -107,11 +107,11 @@ def tool_get_caffeine_sleep_correlation(args):
                         last_caffeine_food = entry.get("food_name", "Unknown")
 
         # Sleep metrics
-        eff     = _sf(sleep.get("sleep_efficiency_pct"))
-        deep    = _sf(sleep.get("deep_pct"))
-        rem     = _sf(sleep.get("rem_pct"))
-        score   = _sf(sleep.get("sleep_score"))
-        dur     = _sf(sleep.get("sleep_duration_hours"))
+        eff = _sf(sleep.get("sleep_efficiency_pct"))
+        deep = _sf(sleep.get("deep_pct"))
+        rem = _sf(sleep.get("rem_pct"))
+        score = _sf(sleep.get("sleep_score"))
+        dur = _sf(sleep.get("sleep_duration_hours"))
         latency = _sf(sleep.get("time_to_sleep_min"))
 
         if eff is None and score is None and deep is None:
@@ -161,7 +161,7 @@ def tool_get_caffeine_sleep_correlation(args):
         ("rem_pct",              "REM %",              "higher_is_better"),
         ("sleep_score",          "Sleep Score",        "higher_is_better"),
         ("sleep_duration_hrs",   "Sleep Duration",     "higher_is_better"),
-        ("time_to_sleep_min",    "Sleep Onset Latency","lower_is_better"),
+        ("time_to_sleep_min",    "Sleep Onset Latency", "lower_is_better"),
     ]
 
     BUCKET_ORDER = ["no_caffeine", "before_noon", "noon_to_2pm", "2pm_to_4pm", "after_4pm"]
@@ -204,7 +204,7 @@ def tool_get_caffeine_sleep_correlation(args):
     timing_correlations = {}
     for field, label, direction in SLEEP_METRICS:
         xs = [r["last_caffeine_time"] for r in timed_rows if r[field] is not None]
-        ys = [r[field]                for r in timed_rows if r[field] is not None]
+        ys = [r[field] for r in timed_rows if r[field] is not None]
         r_val = pearson_r(xs, ys) if len(xs) >= 5 else None
         if r_val is not None:
             if direction == "higher_is_better":
@@ -225,7 +225,7 @@ def tool_get_caffeine_sleep_correlation(args):
     caff_rows = [r for r in daily_rows if r["total_caffeine_mg"] > 0]
     for field, label, direction in SLEEP_METRICS:
         xs = [r["total_caffeine_mg"] for r in caff_rows if r[field] is not None]
-        ys = [r[field]               for r in caff_rows if r[field] is not None]
+        ys = [r[field] for r in caff_rows if r[field] is not None]
         r_val = pearson_r(xs, ys) if len(xs) >= 5 else None
         if r_val is not None:
             if direction == "higher_is_better":
@@ -345,13 +345,13 @@ def tool_get_exercise_sleep_correlation(args):
     Based on Huberman, Galpin, and Attia: exercise timing is a modifiable lever
     for sleep quality, but the effect is highly individual.
     """
-    end_date   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=179)).strftime("%Y-%m-%d"))
     min_duration_min = int(args.get("min_duration_minutes", 15))
     exclude_types = [t.strip().lower() for t in (args.get("exclude_sport_types") or "").split(",") if t.strip()]
 
     strava_items = query_source("strava", start_date, end_date)
-    wh_raw       = query_source("whoop",  start_date, end_date)
+    wh_raw = query_source("whoop",  start_date, end_date)
 
     if not strava_items:
         return {"error": "No Strava data for range.", "start_date": start_date, "end_date": end_date}
@@ -435,13 +435,13 @@ def tool_get_exercise_sleep_correlation(args):
         sleep = sleep_by_date[date]
 
         # Sleep metrics
-        eff     = _sf(sleep.get("sleep_efficiency_pct"))
-        deep    = _sf(sleep.get("deep_pct"))
-        rem     = _sf(sleep.get("rem_pct"))
-        score   = _sf(sleep.get("sleep_score"))
-        dur     = _sf(sleep.get("sleep_duration_hours"))
+        eff = _sf(sleep.get("sleep_efficiency_pct"))
+        deep = _sf(sleep.get("deep_pct"))
+        rem = _sf(sleep.get("rem_pct"))
+        score = _sf(sleep.get("sleep_score"))
+        dur = _sf(sleep.get("sleep_duration_hours"))
         latency = _sf(sleep.get("time_to_sleep_min"))
-        hrv     = _sf(sleep.get("hrv_avg"))
+        hrv = _sf(sleep.get("hrv_avg"))
 
         if eff is None and score is None and deep is None:
             continue
@@ -474,9 +474,9 @@ def tool_get_exercise_sleep_correlation(args):
         for act in valid_acts:
             start_local = act.get("start_date_local", "")
             elapsed = _sf(act.get("elapsed_time_seconds")) or 0
-            moving  = _sf(act.get("moving_time_seconds")) or elapsed
-            avg_hr  = _sf(act.get("average_heartrate"))
-            sport   = act.get("sport_type") or act.get("type") or "Unknown"
+            moving = _sf(act.get("moving_time_seconds")) or elapsed
+            avg_hr = _sf(act.get("average_heartrate"))
+            sport = act.get("sport_type") or act.get("type") or "Unknown"
 
             start_decimal = _parse_local_time(start_local)
             if start_decimal is not None:
@@ -550,7 +550,7 @@ def tool_get_exercise_sleep_correlation(args):
         ("rem_pct",              "REM %",              "higher_is_better"),
         ("sleep_score",          "Sleep Score",        "higher_is_better"),
         ("sleep_duration_hrs",   "Sleep Duration",     "higher_is_better"),
-        ("time_to_sleep_min",    "Sleep Onset Latency","lower_is_better"),
+        ("time_to_sleep_min",    "Sleep Onset Latency", "lower_is_better"),
         ("hrv_avg",              "HRV",                "higher_is_better"),
     ]
 
@@ -592,7 +592,7 @@ def tool_get_exercise_sleep_correlation(args):
     timing_correlations = {}
     for field, label, direction in SLEEP_METRICS:
         xs = [r["last_end_time"] for r in timed_rows if r[field] is not None]
-        ys = [r[field]           for r in timed_rows if r[field] is not None]
+        ys = [r[field] for r in timed_rows if r[field] is not None]
         r_val = pearson_r(xs, ys) if len(xs) >= 5 else None
         if r_val is not None:
             if direction == "higher_is_better":
@@ -613,7 +613,7 @@ def tool_get_exercise_sleep_correlation(args):
     hr_rows = [r for r in exercise_days if r["avg_hr"] is not None]
     for field, label, direction in SLEEP_METRICS:
         xs = [r["avg_hr"] for r in hr_rows if r[field] is not None]
-        ys = [r[field]     for r in hr_rows if r[field] is not None]
+        ys = [r[field] for r in hr_rows if r[field] is not None]
         r_val = pearson_r(xs, ys) if len(xs) >= 5 else None
         if r_val is not None:
             if direction == "higher_is_better":
@@ -821,15 +821,15 @@ def tool_get_zone2_breakdown(args):
     density, fat oxidation capacity, and cardiovascular base. Most people drastically
     undertrain Zone 2 relative to higher intensities.
     """
-    end_date   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=89)).strftime("%Y-%m-%d"))
     weekly_target_min = int(args.get("weekly_target_minutes", 150))
-    min_duration_min  = int(args.get("min_duration_minutes", 10))
+    min_duration_min = int(args.get("min_duration_minutes", 10))
 
     # HR zone thresholds from profile
     profile = get_profile()
-    max_hr  = float(profile.get("max_heart_rate", 190))
-    rhr     = float(profile.get("resting_heart_rate_baseline", 60))
+    max_hr = float(profile.get("max_heart_rate", 190))
+    rhr = float(profile.get("resting_heart_rate_baseline", 60))
 
     # 5 zones by % of max HR (standard model)
     # Zone 1: 50-60%  (warm-up / recovery)
@@ -1116,11 +1116,11 @@ def tool_get_alcohol_sleep_correlation(args):
     Based on Huberman, Attia, and Walker: even moderate alcohol suppresses REM and
     deep sleep, raises resting HR, and impairs next-day HRV recovery.
     """
-    end_date   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=89)).strftime("%Y-%m-%d"))
 
     mf_items = query_source("macrofactor", start_date, end_date)
-    wh_raw   = query_source("whoop",       start_date, end_date)
+    wh_raw = query_source("whoop",       start_date, end_date)
 
     if not mf_items:
         return {"error": "No MacroFactor data for range.", "start_date": start_date, "end_date": end_date}
@@ -1219,13 +1219,13 @@ def tool_get_alcohol_sleep_correlation(args):
                         last_drink_food = entry.get("food_name", "Unknown")
 
         # Sleep metrics (same night)
-        eff     = _sf(sleep.get("sleep_efficiency_pct"))
-        deep    = _sf(sleep.get("deep_pct"))
-        rem     = _sf(sleep.get("rem_pct"))
-        score   = _sf(sleep.get("sleep_score"))
-        dur     = _sf(sleep.get("sleep_duration_hours"))
+        eff = _sf(sleep.get("sleep_efficiency_pct"))
+        deep = _sf(sleep.get("deep_pct"))
+        rem = _sf(sleep.get("rem_pct"))
+        score = _sf(sleep.get("sleep_score"))
+        dur = _sf(sleep.get("sleep_duration_hours"))
         latency = _sf(sleep.get("time_to_sleep_min"))
-        es_hrv  = _sf(sleep.get("hrv_avg"))
+        es_hrv = _sf(sleep.get("hrv_avg"))
 
         if eff is None and score is None and deep is None:
             continue
@@ -1233,9 +1233,9 @@ def tool_get_alcohol_sleep_correlation(args):
         # Next-day Whoop recovery
         next_day = _next_date(date)
         whoop_next = whoop_by_date.get(next_day)
-        next_recovery  = _sf(whoop_next.get("recovery_score")) if whoop_next else None
-        next_hrv       = _sf(whoop_next.get("hrv")) if whoop_next else None
-        next_rhr       = _sf(whoop_next.get("resting_heart_rate")) if whoop_next else None
+        next_recovery = _sf(whoop_next.get("recovery_score")) if whoop_next else None
+        next_hrv = _sf(whoop_next.get("hrv")) if whoop_next else None
+        next_rhr = _sf(whoop_next.get("resting_heart_rate")) if whoop_next else None
 
         drinks = round(total_alcohol_g / GRAMS_PER_DRINK, 1) if total_alcohol_g > 0 else 0
         bucket = _classify_dose(total_alcohol_g)
@@ -1323,7 +1323,7 @@ def tool_get_alcohol_sleep_correlation(args):
     dose_correlations = {}
     for field, label, direction in ALL_METRICS:
         xs = [r["total_alcohol_g"] for r in daily_rows if r[field] is not None]
-        ys = [r[field]             for r in daily_rows if r[field] is not None]
+        ys = [r[field] for r in daily_rows if r[field] is not None]
         r_val = pearson_r(xs, ys) if len(xs) >= 5 else None
         if r_val is not None:
             if direction == "higher_is_better":
@@ -1339,7 +1339,7 @@ def tool_get_alcohol_sleep_correlation(args):
     timed_rows = [r for r in daily_rows if r["last_drink_time"] is not None]
     for field, label, direction in SLEEP_METRICS:
         xs = [r["last_drink_time"] for r in timed_rows if r[field] is not None]
-        ys = [r[field]             for r in timed_rows if r[field] is not None]
+        ys = [r[field] for r in timed_rows if r[field] is not None]
         r_val = pearson_r(xs, ys) if len(xs) >= 5 else None
         if r_val is not None:
             if direction == "higher_is_better":
@@ -1357,7 +1357,7 @@ def tool_get_alcohol_sleep_correlation(args):
 
     # ── Drinking vs sober comparison ─────────────────────────────────────────
     drinking_days = [r for r in daily_rows if r["bucket"] != "none"]
-    sober_days    = [r for r in daily_rows if r["bucket"] == "none"]
+    sober_days = [r for r in daily_rows if r["bucket"] == "none"]
 
     drinking_vs_sober = {}
     if drinking_days and sober_days:

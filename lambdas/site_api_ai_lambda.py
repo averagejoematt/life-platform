@@ -32,11 +32,11 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 # ── Config ─────────────────────────────────────────────────
-TABLE_NAME  = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID     = os.environ.get("USER_ID", "matthew")
+TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
+USER_ID = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
-DDB_REGION  = os.environ.get("DYNAMODB_REGION", "us-west-2")
-S3_REGION   = os.environ.get("S3_REGION", "us-west-2")
+DDB_REGION = os.environ.get("DYNAMODB_REGION", "us-west-2")
+S3_REGION = os.environ.get("S3_REGION", "us-west-2")
 
 # R17-04: Separate Anthropic key for site-api — injected via CDK env var
 AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/site-api-ai-key")
@@ -45,7 +45,7 @@ AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 # ── AWS clients (module-level for warm container reuse) ────
 dynamodb = boto3.resource("dynamodb", region_name=DDB_REGION)
-table    = dynamodb.Table(TABLE_NAME)
+table = dynamodb.Table(TABLE_NAME)
 
 # ── CORS headers ───────────────────────────────────────────
 CORS_ORIGIN = os.environ.get("CORS_ORIGIN", "https://averagejoematt.com")

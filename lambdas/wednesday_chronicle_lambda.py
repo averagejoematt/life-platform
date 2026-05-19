@@ -38,27 +38,27 @@ from collections import defaultdict
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
 
-REGION     = os.environ.get("AWS_REGION", "us-west-2")
+REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-S3_BUCKET  = os.environ["S3_BUCKET"]
-USER_ID    = os.environ.get("USER_ID", "matthew")
-RECIPIENT  = os.environ["EMAIL_RECIPIENT"]
-SENDER     = os.environ["EMAIL_SENDER"]
+S3_BUCKET = os.environ["S3_BUCKET"]
+USER_ID = os.environ.get("USER_ID", "matthew")
+RECIPIENT = os.environ["EMAIL_RECIPIENT"]
+SENDER = os.environ["EMAIL_SENDER"]
 
 # FEAT-12: Preview-before-publish workflow.
 # When PREVIEW_MODE=true (default), the Chronicle is stored as a draft in DynamoDB
 # and a preview email is sent to RECIPIENT with Approve / Request Changes links.
 # No content is published to S3 until Matthew approves via the chronicle-approve Lambda.
-PREVIEW_MODE      = os.environ.get("PREVIEW_MODE", "true").lower() == "true"
+PREVIEW_MODE = os.environ.get("PREVIEW_MODE", "true").lower() == "true"
 APPROVE_LAMBDA_URL = os.environ.get("APPROVE_LAMBDA_URL", "")  # Function URL of chronicle-approve
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
-table    = dynamodb.Table(TABLE_NAME)
-ses      = boto3.client("sesv2", region_name=REGION)
-s3       = boto3.client("s3", region_name=REGION)
-secrets  = boto3.client("secretsmanager", region_name=REGION)
+table = dynamodb.Table(TABLE_NAME)
+ses = boto3.client("sesv2", region_name=REGION)
+s3 = boto3.client("s3", region_name=REGION)
+secrets = boto3.client("secretsmanager", region_name=REGION)
 
 # Board of Directors config loader
 try:
@@ -110,8 +110,8 @@ def get_anthropic_key():
     return json.loads(secret["SecretString"])["anthropic_api_key"]
 
 def d2f(obj):
-    if isinstance(obj, list):    return [d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [d2f(i) for i in obj]
+    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
     if isinstance(obj, Decimal): return float(obj)
     return obj
 
@@ -1719,11 +1719,11 @@ def store_installment(date_str, week_num, title, stats_line, raw_markdown,
         if approval_token:
             item["approval_token"] = approval_token
         if draft_blog_post_html:
-            item["draft_blog_post_html"]   = draft_blog_post_html
+            item["draft_blog_post_html"] = draft_blog_post_html
         if draft_blog_post_key:
-            item["draft_blog_post_key"]    = draft_blog_post_key
+            item["draft_blog_post_key"] = draft_blog_post_key
         if draft_blog_index_html:
-            item["draft_blog_index_html"]  = draft_blog_index_html
+            item["draft_blog_index_html"] = draft_blog_index_html
         if draft_journal_post_html:
             item["draft_journal_post_html"] = draft_journal_post_html
         if draft_journal_post_key:

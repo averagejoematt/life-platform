@@ -45,18 +45,18 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 # ── Configuration from environment variables ──
-_REGION    = os.environ.get("AWS_REGION", "us-west-2")
+_REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-S3_BUCKET  = os.environ["S3_BUCKET"]
-USER_ID    = os.environ.get("USER_ID", "matthew")
+S3_BUCKET = os.environ["S3_BUCKET"]
+USER_ID = os.environ.get("USER_ID", "matthew")
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 PILLAR_ORDER = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
 
 # ── AWS clients ──
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
-table    = dynamodb.Table(TABLE_NAME)
-s3       = boto3.client("s3", region_name=_REGION)
+table = dynamodb.Table(TABLE_NAME)
+s3 = boto3.client("s3", region_name=_REGION)
 
 
 # ==============================================================================
@@ -65,8 +65,8 @@ s3       = boto3.client("s3", region_name=_REGION)
 
 def d2f(obj):
     """Convert DynamoDB Decimal to float recursively."""
-    if isinstance(obj, list):    return [d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [d2f(i) for i in obj]
+    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
     if isinstance(obj, Decimal): return float(obj)
     return obj
 
@@ -326,7 +326,7 @@ def get_food_delivery_modifier():
             return 0.85
         if streak_days >= 30: return 1.10
         if streak_days >= 14: return 1.05
-        if streak_days >= 7:  return 1.02
+        if streak_days >= 7: return 1.02
         return 1.0
     except Exception:
         return 1.0
@@ -380,20 +380,20 @@ def lambda_handler(event, context):
         if _prev:
             # Build a frozen record: copy previous EMA state, update date fields
             _frozen = {k: v for k, v in _prev.items()}
-            _frozen["pk"]              = USER_PREFIX + "character_sheet"
-            _frozen["sk"]              = "DATE#" + yesterday_str
-            _frozen["date"]            = yesterday_str
-            _frozen["sick_day"]        = True
+            _frozen["pk"] = USER_PREFIX + "character_sheet"
+            _frozen["sk"] = "DATE#" + yesterday_str
+            _frozen["date"] = yesterday_str
+            _frozen["sick_day"] = True
             _frozen["sick_day_reason"] = _sick_reason
-            _frozen["frozen_from"]     = _prev.get("date", "")
-            _frozen["computed_at"]     = datetime.now(timezone.utc).isoformat()
+            _frozen["frozen_from"] = _prev.get("date", "")
+            _frozen["computed_at"] = datetime.now(timezone.utc).isoformat()
             # Convert floats → Decimal for DynamoDB
             def _dec(obj):
-                if isinstance(obj, list):  return [_dec(i) for i in obj]
-                if isinstance(obj, dict):  return {k: _dec(v) for k, v in obj.items()}
-                if isinstance(obj, bool):  return obj
+                if isinstance(obj, list): return [_dec(i) for i in obj]
+                if isinstance(obj, dict): return {k: _dec(v) for k, v in obj.items()}
+                if isinstance(obj, bool): return obj
                 if isinstance(obj, float): return Decimal(str(obj))
-                if isinstance(obj, int):   return Decimal(str(obj))
+                if isinstance(obj, int): return Decimal(str(obj))
                 return obj
             # Phase 3.3 (2026-05-16): tag with run_id + computed_at for double-run observability.
             from compute_metadata import tag_record

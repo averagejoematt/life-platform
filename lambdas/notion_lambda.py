@@ -571,7 +571,7 @@ def lambda_handler(event, context):
     if _HAS_AUTH_BREAKER:
         marker = check_breaker(table, source_name="notion", user_id=USER_ID, logger=logger)
         if marker:
-            logger.warning(f"auth_breaker_skip source=notion marked_at={marker.get('marked_at')} error={marker.get('error','')[:80]}")
+            logger.warning(f"auth_breaker_skip source=notion marked_at={marker.get('marked_at')} error={marker.get('error', '')[:80]}")
             return {"statusCode": 200, "body": json.dumps({
                 "skipped": "auth_failure_circuit_breaker",
                 "marked_at": marker.get("marked_at"),

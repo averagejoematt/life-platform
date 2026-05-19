@@ -32,20 +32,20 @@ from collections import defaultdict
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
 
-REGION     = os.environ.get("AWS_REGION", "us-west-2")
+REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
-RECIPIENT  = os.environ["EMAIL_RECIPIENT"]
-SENDER     = os.environ["EMAIL_SENDER"]
+USER_ID = os.environ.get("USER_ID", "matthew")
+RECIPIENT = os.environ["EMAIL_RECIPIENT"]
+SENDER = os.environ["EMAIL_SENDER"]
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
-dynamodb   = boto3.resource("dynamodb", region_name=REGION)
-table      = dynamodb.Table(TABLE_NAME)
-ses        = boto3.client("sesv2", region_name=REGION)
-secrets    = boto3.client("secretsmanager", region_name=REGION)
-s3_client  = boto3.client("s3", region_name=REGION)
-S3_BUCKET  = os.environ["S3_BUCKET"]
+dynamodb = boto3.resource("dynamodb", region_name=REGION)
+table = dynamodb.Table(TABLE_NAME)
+ses = boto3.client("sesv2", region_name=REGION)
+secrets = boto3.client("secretsmanager", region_name=REGION)
+s3_client = boto3.client("s3", region_name=REGION)
+S3_BUCKET = os.environ["S3_BUCKET"]
 
 # Board of Directors config loader
 try:
@@ -90,8 +90,8 @@ def get_anthropic_key():
     return json.loads(secret["SecretString"])["anthropic_api_key"]
 
 def d2f(obj):
-    if isinstance(obj, list):    return [d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [d2f(i) for i in obj]
+    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
     if isinstance(obj, Decimal): return float(obj)
     return obj
 

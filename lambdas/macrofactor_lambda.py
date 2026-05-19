@@ -32,16 +32,16 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 # ── Config (env vars with backwards-compatible defaults) ──
-REGION         = os.environ.get("AWS_REGION", "us-west-2")
-S3_BUCKET      = os.environ["S3_BUCKET"]
+REGION = os.environ.get("AWS_REGION", "us-west-2")
+S3_BUCKET = os.environ["S3_BUCKET"]
 DYNAMODB_TABLE = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID        = os.environ.get("USER_ID", "matthew")
-PK             = f"USER#{USER_ID}#SOURCE#macrofactor"
-PK_WORKOUTS    = f"USER#{USER_ID}#SOURCE#macrofactor_workouts"
+USER_ID = os.environ.get("USER_ID", "matthew")
+PK = f"USER#{USER_ID}#SOURCE#macrofactor"
+PK_WORKOUTS = f"USER#{USER_ID}#SOURCE#macrofactor_workouts"
 
 s3_client = boto3.client("s3", region_name=REGION)
-dynamodb  = boto3.resource("dynamodb", region_name=REGION)
-table     = dynamodb.Table(DYNAMODB_TABLE)
+dynamodb = boto3.resource("dynamodb", region_name=REGION)
+table = dynamodb.Table(DYNAMODB_TABLE)
 
 NUTRIENT_COLUMNS = OrderedDict([
     ("Calories (kcal)",          "calories_kcal"),
@@ -80,7 +80,7 @@ NUTRIENT_COLUMNS = OrderedDict([
     ("B1, Thiamine (mg)",        "b1_thiamine_mg"),
     ("B2, Riboflavin (mg)",      "b2_riboflavin_mg"),
     ("B3, Niacin (mg)",          "b3_niacin_mg"),
-    ("B5, Pantothenic Acid (mg)","b5_pantothenic_mg"),
+    ("B5, Pantothenic Acid (mg)", "b5_pantothenic_mg"),
     ("B6, Pyridoxine (mg)",      "b6_pyridoxine_mg"),
     ("B12, Cobalamin (mcg)",     "b12_cobalamin_mcg"),
     ("Folate (mcg)",             "folate_mcg"),
@@ -101,7 +101,7 @@ NUTRIENT_COLUMNS = OrderedDict([
     ("Valine (g)",               "aa_valine_g"),
 ])
 NUTRIENT_FIELD_NAMES = set(NUTRIENT_COLUMNS.values())
-COL_TO_FIELD         = dict(NUTRIENT_COLUMNS)
+COL_TO_FIELD = dict(NUTRIENT_COLUMNS)
 
 
 # Phase 4.2 (2026-05-16): canonical impl in lambdas/numeric.py.
@@ -129,7 +129,7 @@ def safe_float(val):
 
 
 def parse_entry(row):
-    date_str  = row.get("Date", "").strip()
+    date_str = row.get("Date", "").strip()
     food_name = row.get("Food Name", "").strip()
     if not date_str or not food_name:
         return None
@@ -526,9 +526,9 @@ def build_summary_day_items(rows):
             "food_log": [],
         }
         if cal is not None:    item["total_calories_kcal"] = round(cal, 2)
-        if prot is not None:   item["total_protein_g"]    = round(prot, 2)
-        if fat is not None:    item["total_fat_g"]         = round(fat, 2)
-        if carbs is not None:  item["total_carbs_g"]       = round(carbs, 2)
+        if prot is not None:   item["total_protein_g"] = round(prot, 2)
+        if fat is not None:    item["total_fat_g"] = round(fat, 2)
+        if carbs is not None:  item["total_carbs_g"] = round(carbs, 2)
         if weight is not None and weight > 0: item["weight_lbs_macrofactor"] = round(weight, 2)
         if trend_weight is not None and trend_weight > 0: item["trend_weight_lbs"] = round(trend_weight, 2)
         if expenditure is not None and expenditure > 0:   item["expenditure_kcal"] = round(expenditure, 2)
@@ -541,11 +541,11 @@ def build_summary_day_items(rows):
 
 def archive_raw(bucket, source_key, content_bytes, subfolder=""):
     from datetime import datetime, timezone
-    now     = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
     import os
-    fname   = os.path.basename(source_key)
-    sub     = f"/{subfolder}" if subfolder else ""
-    dest    = f"raw/{USER_ID}/macrofactor{sub}/{now.strftime('%Y/%m')}/{fname}"
+    fname = os.path.basename(source_key)
+    sub = f"/{subfolder}" if subfolder else ""
+    dest = f"raw/{USER_ID}/macrofactor{sub}/{now.strftime('%Y/%m')}/{fname}"
     s3_client.put_object(Bucket=bucket, Key=dest, Body=content_bytes, ContentType="text/csv")
     print(f"Archived to s3://{bucket}/{dest}")
 
@@ -555,8 +555,8 @@ def lambda_handler(event, context):
     print(f"Event: {json.dumps(event)}")
 
     if "Records" in event:
-        record     = event["Records"][0]
-        bucket     = record["s3"]["bucket"]["name"]
+        record = event["Records"][0]
+        bucket = record["s3"]["bucket"]["name"]
         source_key = record["s3"]["object"]["key"]
     elif "bucket" in event and "key" in event:
         bucket, source_key = event["bucket"], event["key"]
@@ -564,13 +564,13 @@ def lambda_handler(event, context):
         return {"statusCode": 400, "body": "No S3 record in event"}
 
     print(f"Processing s3://{bucket}/{source_key}")
-    response      = s3_client.get_object(Bucket=bucket, Key=source_key)
+    response = s3_client.get_object(Bucket=bucket, Key=source_key)
     content_bytes = response["Body"].read()
     print(f"Downloaded {len(content_bytes):,} bytes")
 
-    text   = content_bytes.decode("utf-8-sig")
+    text = content_bytes.decode("utf-8-sig")
     reader = csv.DictReader(io.StringIO(text))
-    rows   = list(reader)
+    rows = list(reader)
     print(f"CSV rows: {len(rows)}")
 
     if not rows:

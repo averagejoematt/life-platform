@@ -32,9 +32,9 @@ from mcp.helpers import (
 # RDA: NIH DRI for adult males 31-50. "optimal": longevity targets per Attia/Patrick (not official guidelines). "upper": NIH Tolerable Upper Intake Level.
 _MICRONUTRIENT_TARGETS = {
     "total_fiber_g":            {"rda": 38,    "optimal": 50,    "unit": "g",   "category": "Macros",     "score": True},
-    "total_omega3_total_g":     {"rda": 1.6,   "optimal": 4.0,   "unit": "g",   "category": "Fatty Acids","score": True},
-    "total_omega3_dha_g":       {"rda": 0.5,   "optimal": 2.0,   "unit": "g",   "category": "Fatty Acids","score": True},
-    "total_omega3_epa_g":       {"rda": 0.5,   "optimal": 1.5,   "unit": "g",   "category": "Fatty Acids","score": True},
+    "total_omega3_total_g":     {"rda": 1.6,   "optimal": 4.0,   "unit": "g",   "category": "Fatty Acids", "score": True},
+    "total_omega3_dha_g":       {"rda": 0.5,   "optimal": 2.0,   "unit": "g",   "category": "Fatty Acids", "score": True},
+    "total_omega3_epa_g":       {"rda": 0.5,   "optimal": 1.5,   "unit": "g",   "category": "Fatty Acids", "score": True},
     "total_omega6_g":           {"rda": None,  "optimal": None,  "unit": "g",   "category": "Fatty Acids"},
     "total_sodium_mg":          {"rda": 1500,  "optimal": 1500,  "unit": "mg",  "category": "Minerals",   "upper_limit": 2300},
     "total_potassium_mg":       {"rda": 3400,  "optimal": 4700,  "unit": "mg",  "category": "Minerals",   "score": True},
@@ -60,9 +60,9 @@ _MICRONUTRIENT_TARGETS = {
     "total_choline_mg":         {"rda": 550,   "optimal": 750,   "unit": "mg",  "category": "Other",      "score": True},
     "total_caffeine_mg":        {"rda": None,  "optimal": None,  "unit": "mg",  "category": "Other",      "upper_limit": 400},
 }
-_MICRO_CATEGORY_ORDER  = ["Macros", "Fatty Acids", "Minerals", "Vitamins", "B Vitamins", "Other"]
+_MICRO_CATEGORY_ORDER = ["Macros", "Fatty Acids", "Minerals", "Vitamins", "B Vitamins", "Other"]
 # Simopoulos 2002; ratio approach debated — some authorities question its validity
-_OMEGA_RATIO_TARGET    = 4.0    # Attia / Simopoulos: keep O6:O3 < 4:1
+_OMEGA_RATIO_TARGET = 4.0    # Attia / Simopoulos: keep O6:O3 < 4:1
 # Phillips 2016 MPS threshold; older adults may need 3g+ (anabolic resistance)
 _LEUCINE_MPS_THRESHOLD = 2.5    # g leucine per meal to trigger MPS (Phillips / Attia)
 
@@ -73,7 +73,7 @@ def tool_get_micronutrient_report(args):
     Flags chronic deficiencies (avg < 60% RDA), near-miss gaps (60-90%), upper-limit exceedances,
     omega-6:omega-3 ratio, and generates actionable longevity commentary.
     """
-    end_date   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=29)).strftime("%Y-%m-%d"))
 
     items = query_source("macrofactor", start_date, end_date)
@@ -81,19 +81,19 @@ def tool_get_micronutrient_report(args):
         return {"error": "No MacroFactor data for range.", "start_date": start_date, "end_date": end_date}
 
     n = len(items)
-    totals_sum   = defaultdict(float)
+    totals_sum = defaultdict(float)
     totals_count = defaultdict(int)
     for item in items:
         for field in _MICRONUTRIENT_TARGETS:
             v = item.get(field)
             if v is not None:
-                totals_sum[field]   += float(v)
+                totals_sum[field] += float(v)
                 totals_count[field] += 1
 
-    categories   = {}
+    categories = {}
     deficiencies = []
-    near_gaps    = []
-    exceedances  = []
+    near_gaps = []
+    exceedances = []
 
     for cat in _MICRO_CATEGORY_ORDER:
         cat_rows = []
@@ -103,14 +103,14 @@ def tool_get_micronutrient_report(args):
             if totals_count[field] == 0:
                 continue
             avg_val = round(totals_sum[field] / totals_count[field], 2)
-            rda     = meta.get("rda")
+            rda = meta.get("rda")
             optimal = meta.get("optimal")
-            ul      = meta.get("upper_limit")
-            unit    = meta["unit"]
+            ul = meta.get("upper_limit")
+            unit = meta["unit"]
             row = {"field": field, "average": avg_val, "unit": unit, "days_logged": totals_count[field]}
             if rda:
                 pct_rda = round(avg_val / rda * 100, 1)
-                row["rda"]     = rda
+                row["rda"] = rda
                 row["pct_rda"] = pct_rda
                 if meta.get("score"):
                     if pct_rda < 60:
@@ -125,28 +125,28 @@ def tool_get_micronutrient_report(args):
                     else:
                         row["status"] = "ADEQUATE"
             if optimal:
-                row["optimal"]      = optimal
-                row["pct_optimal"]  = round(avg_val / optimal * 100, 1)
+                row["optimal"] = optimal
+                row["pct_optimal"] = round(avg_val / optimal * 100, 1)
             cat_rows.append(row)
         if cat_rows:
             categories[cat] = sorted(cat_rows, key=lambda r: r.get("pct_rda", 999))
 
     omega6 = totals_sum.get("total_omega6_g", 0) / max(totals_count.get("total_omega6_g", 1), 1)
     omega3 = totals_sum.get("total_omega3_total_g", 0) / max(totals_count.get("total_omega3_total_g", 1), 1)
-    o6_o3  = round(omega6 / omega3, 1) if omega3 > 0 else None
+    o6_o3 = round(omega6 / omega3, 1) if omega3 > 0 else None
 
     longevity_flags = []
     if o6_o3 and o6_o3 > _OMEGA_RATIO_TARGET:
         longevity_flags.append(f"Omega-6:Omega-3 ratio is {o6_o3}:1 (target <{_OMEGA_RATIO_TARGET}:1). Pro-inflammatory — increase EPA/DHA or reduce seed oils.")
     dha_avg = totals_sum.get("total_omega3_dha_g", 0) / max(totals_count.get("total_omega3_dha_g", 1), 1)
     if dha_avg < 1.0:
-        longevity_flags.append(f"DHA averages {round(dha_avg,2)}g/day — below the 1g+ associated with cognitive protection (Rhonda Patrick). Add fatty fish ≥3x/week or algae-based DHA supplement.")
+        longevity_flags.append(f"DHA averages {round(dha_avg, 2)}g/day — below the 1g+ associated with cognitive protection (Rhonda Patrick). Add fatty fish ≥3x/week or algae-based DHA supplement.")
     mag_avg = totals_sum.get("total_magnesium_mg", 0) / max(totals_count.get("total_magnesium_mg", 1), 1)
     if mag_avg < 350:
         longevity_flags.append(f"Magnesium averages {round(mag_avg)}mg/day. Sub-optimal magnesium is linked to poor sleep quality, elevated cortisol, and lower HRV. Target 400-500mg from food + glycinate supplement.")
     vd_avg = totals_sum.get("total_vitamin_d_mcg", 0) / max(totals_count.get("total_vitamin_d_mcg", 1), 1)
     if vd_avg < 25:
-        longevity_flags.append(f"Vitamin D from food averages {round(vd_avg,1)}mcg/day. Difficult to reach optimal serum levels (60-80 ng/mL) from diet alone in the Pacific Northwest — consider 4,000-5,000 IU D3+K2 supplement.")
+        longevity_flags.append(f"Vitamin D from food averages {round(vd_avg, 1)}mcg/day. Difficult to reach optimal serum levels (60-80 ng/mL) from diet alone in the Pacific Northwest — consider 4,000-5,000 IU D3+K2 supplement.")
 
     return {
         "period":          {"start_date": start_date, "end_date": end_date, "days_with_data": n},
@@ -166,7 +166,7 @@ def tool_get_meal_timing(args):
     across morning/midday/evening/late, circadian consistency (SD of meal times),
     and overlap with sleep onset. Based on Satchin Panda / Salk Institute TRF research.
     """
-    end_date   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=29)).strftime("%Y-%m-%d"))
 
     items = query_source("macrofactor", start_date, end_date)
@@ -191,10 +191,10 @@ def tool_get_meal_timing(args):
             h += 1; m = 0
         return f"{h:02d}:{m:02d}"
 
-    daily_rows  = []
+    daily_rows = []
     first_bites = []
-    last_bites  = []
-    windows     = []
+    last_bites = []
+    windows = []
 
     for item in sorted(items, key=lambda x: x["date"]):
         food_log = item.get("food_log", [])
@@ -203,14 +203,14 @@ def tool_get_meal_timing(args):
         times = []
         morning_cal = midday_cal = evening_cal = late_cal = 0.0
         for entry in food_log:
-            td  = t2d(entry.get("time"))
+            td = t2d(entry.get("time"))
             cal = float(entry.get("calories_kcal", 0) or 0)
             if td is not None:
                 times.append(td)
                 if td < 11:   morning_cal += cal
-                elif td < 15: midday_cal  += cal
+                elif td < 15: midday_cal += cal
                 elif td < 20: evening_cal += cal
-                else:         late_cal    += cal
+                else:         late_cal += cal
         if not times:
             continue
         fb = min(times); lb = max(times); wh = round(lb - fb, 2)
@@ -224,9 +224,9 @@ def tool_get_meal_timing(args):
             "total_calories": round(total_cal, 0),
             "distribution": {
                 "morning_pct": round(morning_cal / total_cal * 100, 1) if total_cal else 0,
-                "midday_pct":  round(midday_cal  / total_cal * 100, 1) if total_cal else 0,
+                "midday_pct":  round(midday_cal / total_cal * 100, 1) if total_cal else 0,
                 "evening_pct": round(evening_cal / total_cal * 100, 1) if total_cal else 0,
-                "late_pct":    round(late_cal    / total_cal * 100, 1) if total_cal else 0,
+                "late_pct":    round(late_cal / total_cal * 100, 1) if total_cal else 0,
             },
             "late_eating_flag": lb >= 20.0,
         })
@@ -235,8 +235,8 @@ def tool_get_meal_timing(args):
         return {"error": "No food log entries with timestamps found."}
 
     n = len(daily_rows)
-    avg_fb  = sum(first_bites) / n
-    avg_lb  = sum(last_bites)  / n
+    avg_fb = sum(first_bites) / n
+    avg_lb = sum(last_bites) / n
     avg_win = round(sum(windows) / n, 1)
 
     def stdev(vals):
@@ -310,9 +310,9 @@ def tool_get_nutrition_biometrics_correlation(args):
     This is the personalized insight layer — what does YOUR diet actually predict about
     YOUR recovery, sleep, HRV, and weight?
     """
-    end_date   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=89)).strftime("%Y-%m-%d"))
-    lag_days   = int(args.get("lag_days", 1))
+    lag_days = int(args.get("lag_days", 1))
 
     NUTRITION_FIELDS = [
         ("total_calories_kcal",  "Calories (kcal)"),
@@ -343,7 +343,7 @@ def tool_get_nutrition_biometrics_correlation(args):
         return {"error": f"Need ≥14 days of MacroFactor data. Found {len(mf_items)}."}
     mf_by_date = {item["date"]: item for item in mf_items}
 
-    bio_end  = (datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=lag_days + 1)).strftime("%Y-%m-%d")
+    bio_end = (datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=lag_days + 1)).strftime("%Y-%m-%d")
     bio_srcs = list({src for src, _, _ in BIOMETRIC_FIELDS})
     bio_data = parallel_query_sources(bio_srcs, start_date, bio_end)
     bio_by_src = {src: {i["date"]: i for i in items} for src, items in bio_data.items()}
@@ -401,7 +401,7 @@ def tool_get_nutrition_summary(args):
     Returns per-day rows and period averages for calories, protein, carbs, fat, fiber,
     sodium, caffeine, omega-3, and key micronutrients.
     """
-    end_date   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=29)).strftime("%Y-%m-%d"))
 
     items = query_source("macrofactor", start_date, end_date)
@@ -432,7 +432,7 @@ def tool_get_nutrition_summary(args):
             if v is not None:
                 row[out_field] = float(v)
         # Derived: protein % of calories
-        cal  = row.get("calories_kcal", 0)
+        cal = row.get("calories_kcal", 0)
         prot = row.get("protein_g", 0)
         if cal > 0:
             row["protein_pct_of_calories"] = round(prot * 4 / cal * 100, 1)
@@ -487,8 +487,8 @@ def tool_get_macro_targets(args):
     Pulls recent Withings weight to compute TDEE-based calorie target,
     then scores daily adherence to each macro goal.
     """
-    end_date   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    days       = int(args.get("days", 30))
+    end_date = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    days = int(args.get("days", 30))
     start_date = args.get("start_date") or (
         (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=days - 1)).strftime("%Y-%m-%d")
     )
@@ -521,23 +521,23 @@ def tool_get_macro_targets(args):
     protein_target = protein_target or 180  # Matthew-specific targets: 2400 kcal deficit, 180g protein (~0.8g/lb BW)
 
     daily_rows = []
-    hits_cal  = hits_prot = hits_fiber = 0
+    hits_cal = hits_prot = hits_fiber = 0
     for item in sorted(items, key=lambda x: x["date"]):
-        cal   = float(item.get("total_calories_kcal", 0) or 0)
-        prot  = float(item.get("total_protein_g",     0) or 0)
+        cal = float(item.get("total_calories_kcal", 0) or 0)
+        prot = float(item.get("total_protein_g",     0) or 0)
         fiber = float(item.get("total_fiber_g",       0) or 0)
-        fat   = float(item.get("total_fat_g",         0) or 0)
+        fat = float(item.get("total_fat_g",         0) or 0)
         carbs = float(item.get("total_carbs_g",       0) or 0)
 
-        cal_pct  = round(cal  / calorie_target * 100, 1)
+        cal_pct = round(cal / calorie_target * 100, 1)
         prot_pct = round(prot / protein_target * 100, 1)
 
-        hit_cal  = 0.85 <= cal / calorie_target <= 1.10
+        hit_cal = 0.85 <= cal / calorie_target <= 1.10
         hit_prot = prot >= protein_target * 0.95
         hit_fiber = fiber >= 25
 
-        hits_cal   += int(hit_cal)
-        hits_prot  += int(hit_prot)
+        hits_cal += int(hit_cal)
+        hits_prot += int(hit_prot)
         hits_fiber += int(hit_fiber)
 
         daily_rows.append({
@@ -564,7 +564,7 @@ def tool_get_macro_targets(args):
             "note":           "Calorie target estimated from TDEE (Mifflin-St Jeor × 1.55 activity factor) unless overridden.",
         },
         "adherence": {
-            "calorie_target_hit_pct":  round(hits_cal  / n * 100, 1) if n else 0,
+            "calorie_target_hit_pct":  round(hits_cal / n * 100, 1) if n else 0,
             "protein_target_hit_pct":  round(hits_prot / n * 100, 1) if n else 0,
             "fiber_target_hit_pct":    round(hits_fiber / n * 100, 1) if n else 0,
         },
@@ -582,7 +582,7 @@ def tool_get_food_log(args):
     pk = USER_PREFIX + "macrofactor"
 
     response = table.get_item(Key={"pk": pk, "sk": f"DATE#{date_str}"})
-    item     = response.get("Item")
+    item = response.get("Item")
 
     if not item:
         return {"error": f"No MacroFactor data for {date_str}. Check the date or re-export from MacroFactor."}
@@ -608,13 +608,13 @@ def tool_get_food_log(args):
     # Day totals
     totals = {
         "calories_kcal": float(item.get("total_calories_kcal") or 0),
-        "protein_g":     float(item.get("total_protein_g")     or 0),
-        "carbs_g":       float(item.get("total_carbs_g")        or 0),
-        "fat_g":         float(item.get("total_fat_g")          or 0),
-        "fiber_g":       float(item.get("total_fiber_g")        or 0),
-        "sodium_mg":     float(item.get("total_sodium_mg")      or 0),
-        "caffeine_mg":   float(item.get("total_caffeine_mg")    or 0),
-        "omega3_total_g":float(item.get("total_omega3_total_g") or 0),
+        "protein_g":     float(item.get("total_protein_g") or 0),
+        "carbs_g":       float(item.get("total_carbs_g") or 0),
+        "fat_g":         float(item.get("total_fat_g") or 0),
+        "fiber_g":       float(item.get("total_fiber_g") or 0),
+        "sodium_mg":     float(item.get("total_sodium_mg") or 0),
+        "caffeine_mg":   float(item.get("total_caffeine_mg") or 0),
+        "omega3_total_g": float(item.get("total_omega3_total_g") or 0),
     }
 
     return {
@@ -660,8 +660,8 @@ def tool_get_deficit_sustainability(args):
     When 3+ of 5 degrade concurrently during an active deficit → flag.
     Attia / Huberman: aggressive deficits destroy adherence and muscle.
     """
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    days       = int(args.get("days", 14))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    days = int(args.get("days", 14))
     start_date = args.get("start_date") or (
         datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=days - 1)
     ).strftime("%Y-%m-%d")
@@ -689,17 +689,17 @@ def tool_get_deficit_sustainability(args):
             tdee_estimate = 2400  # Matthew-specific TDEE fallback for ~220lb moderately active male
 
     deficit_kcal = round(tdee_estimate - avg_cal)
-    deficit_pct  = round(deficit_kcal / tdee_estimate * 100, 1) if tdee_estimate else 0
-    in_deficit   = deficit_kcal > 200
+    deficit_pct = round(deficit_kcal / tdee_estimate * 100, 1) if tdee_estimate else 0
+    in_deficit = deficit_kcal > 200
 
     # ── 2. Pull multi-source data ──
     sources = parallel_query_sources(
         ["whoop", "habitify", "strava", "hevy"], start_date, end_date
     )
-    whoop_items   = sorted(sources.get("whoop", []),   key=lambda x: x.get("date", ""))
-    habit_items   = sorted(sources.get("habitify", []),key=lambda x: x.get("date", ""))
-    strava_items  = sorted(sources.get("strava", []),  key=lambda x: x.get("date", ""))
-    hevy_items    = sorted(sources.get("hevy", []),    key=lambda x: x.get("date", ""))
+    whoop_items = sorted(sources.get("whoop", []),   key=lambda x: x.get("date", ""))
+    habit_items = sorted(sources.get("habitify", []), key=lambda x: x.get("date", ""))
+    strava_items = sorted(sources.get("strava", []),  key=lambda x: x.get("date", ""))
+    hevy_items = sorted(sources.get("hevy", []),    key=lambda x: x.get("date", ""))
 
     def safe_avg(vals):
         v = [x for x in vals if x is not None]
@@ -712,7 +712,7 @@ def tool_get_deficit_sustainability(args):
             return "insufficient_data", 0
         third = len(v) // 3
         first_avg = sum(v[:third]) / third
-        last_avg  = sum(v[-third:]) / third
+        last_avg = sum(v[-third:]) / third
         if first_avg == 0:
             return "stable", 0
         delta_pct = round((last_avg - first_avg) / abs(first_avg) * 100, 1)
@@ -729,10 +729,10 @@ def tool_get_deficit_sustainability(args):
     hrv_degraded = hrv_dir == "declining" and abs(hrv_delta) > 8
 
     # ── Channel 2: Sleep quality ──
-    eff_vals  = [float(w.get("sleep_efficiency_pct") or w.get("sleep_efficiency_percentage", 0)) for w in whoop_items if w.get("sleep_efficiency_pct") or w.get("sleep_efficiency_percentage")]
+    eff_vals = [float(w.get("sleep_efficiency_pct") or w.get("sleep_efficiency_percentage", 0)) for w in whoop_items if w.get("sleep_efficiency_pct") or w.get("sleep_efficiency_percentage")]
     deep_vals = [float(w.get("slow_wave_sleep_hours", 0)) / max(float(w.get("sleep_duration_hours", 1)), 1) * 100 for w in whoop_items
                  if w.get("slow_wave_sleep_hours") and w.get("sleep_duration_hours")]
-    eff_dir, eff_delta   = trend_direction(eff_vals)
+    eff_dir, eff_delta = trend_direction(eff_vals)
     deep_dir, deep_delta = trend_direction(deep_vals)
     sleep_degraded = (eff_dir == "declining" and abs(eff_delta) > 3) or \
                      (deep_dir == "declining" and abs(deep_delta) > 8)
@@ -826,8 +826,8 @@ def tool_get_metabolic_adaptation(args):
     Lyle McDonald / Layne Norton: metabolic adaptation = TDEE suppression beyond
     what weight loss alone predicts. Key signal for diet breaks and reverse diets.
     """
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    weeks      = int(args.get("weeks", 8))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    weeks = int(args.get("weeks", 8))
     start_date = args.get("start_date") or (
         datetime.strptime(end_date, "%Y-%m-%d") - timedelta(weeks=weeks)
     ).strftime("%Y-%m-%d")
@@ -846,8 +846,8 @@ def tool_get_metabolic_adaptation(args):
     def iso_week(date_str):
         return datetime.strptime(date_str, "%Y-%m-%d").strftime("%G-W%V")
 
-    weekly_cal   = defaultdict(list)
-    weekly_wt    = defaultdict(list)
+    weekly_cal = defaultdict(list)
+    weekly_wt = defaultdict(list)
     for item in mf_items:
         d = item.get("date", "")
         cal = item.get("total_calories_kcal")
@@ -876,7 +876,7 @@ def tool_get_metabolic_adaptation(args):
     weekly_data = []
     for wk in weeks_sorted:
         avg_cal = sum(weekly_cal[wk]) / len(weekly_cal[wk])
-        avg_wt  = sum(weekly_wt[wk])  / len(weekly_wt[wk])
+        avg_wt = sum(weekly_wt[wk]) / len(weekly_wt[wk])
         weekly_data.append({
             "week":        wk,
             "avg_cal":     round(avg_cal),
@@ -893,7 +893,7 @@ def tool_get_metabolic_adaptation(args):
         total_deficit_kcal += max(weekly_deficit, 0)  # only count deficit weeks
 
     expected_loss_lbs = round(total_deficit_kcal / 3500, 1)
-    actual_loss_lbs   = round(weekly_data[0]["avg_weight"] - weekly_data[-1]["avg_weight"], 1)
+    actual_loss_lbs = round(weekly_data[0]["avg_weight"] - weekly_data[-1]["avg_weight"], 1)
 
     # Adaptation ratio: actual / expected
     if expected_loss_lbs > 0.5:
@@ -909,9 +909,9 @@ def tool_get_metabolic_adaptation(args):
             wd["weekly_loss_lbs"] = round(weekly_data[i-1]["avg_weight"] - wd["avg_weight"], 2)
 
     recent_rates = [wd["weekly_loss_lbs"] for wd in weekly_data[-4:] if wd.get("weekly_loss_lbs") is not None]
-    early_rates  = [wd["weekly_loss_lbs"] for wd in weekly_data[1:5] if wd.get("weekly_loss_lbs") is not None]
-    recent_avg   = round(sum(recent_rates) / len(recent_rates), 2) if recent_rates else None
-    early_avg    = round(sum(early_rates) / len(early_rates), 2) if early_rates else None
+    early_rates = [wd["weekly_loss_lbs"] for wd in weekly_data[1:5] if wd.get("weekly_loss_lbs") is not None]
+    recent_avg = round(sum(recent_rates) / len(recent_rates), 2) if recent_rates else None
+    early_avg = round(sum(early_rates) / len(early_rates), 2) if early_rates else None
 
     rate_slowdown = None
     if recent_avg is not None and early_avg is not None and early_avg > 0.3:

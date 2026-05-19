@@ -41,15 +41,15 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-_REGION    = os.environ.get("AWS_REGION", "us-west-2")
+_REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
+USER_ID = os.environ.get("USER_ID", "matthew")
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
-table    = dynamodb.Table(TABLE_NAME)
+table = dynamodb.Table(TABLE_NAME)
 
 # ── Lookback window ───────────────────────────────────────────────────────────
 LOOKBACK_DAYS = int(os.environ.get("LOOKBACK_DAYS", "90"))
@@ -67,8 +67,8 @@ except ImportError:
     # Fallback for local testing without layer
     from decimal import Decimal as _Decimal
     def d2f(obj):
-        if isinstance(obj, list):    return [d2f(i) for i in obj]
-        if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
+        if isinstance(obj, list): return [d2f(i) for i in obj]
+        if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
         if isinstance(obj, _Decimal): return float(obj)
         return obj
 
@@ -296,51 +296,51 @@ def assemble_daily_series(start_date, end_date):
     # Build metric series per date
     series = {}
     for d, src_map in sorted(by_date.items()):
-        w   = src_map.get("whoop")
-        st  = src_map.get("strava")
-        mf  = src_map.get("macrofactor")
-        ap  = src_map.get("apple")
+        w = src_map.get("whoop")
+        st = src_map.get("strava")
+        mf = src_map.get("macrofactor")
+        ap = src_map.get("apple")
         hab = src_map.get("habitify")
-        cm  = src_map.get("computed")
+        cm = src_map.get("computed")
 
         metrics = {}
 
         # ── Recovery / Sleep ─────────────────────────────────────────────
-        metrics["hrv"]              = safe_float(w, "hrv")
-        metrics["recovery_score"]   = safe_float(w, "recovery_score")
-        metrics["sleep_duration"]   = safe_float(w, "sleep_duration_hours")
-        metrics["sleep_score"]      = safe_float(w, "sleep_quality_score") or safe_float(w, "sleep_score")
-        metrics["resting_hr"]       = safe_float(w, "resting_heart_rate")
-        metrics["strain"]           = safe_float(w, "strain")
+        metrics["hrv"] = safe_float(w, "hrv")
+        metrics["recovery_score"] = safe_float(w, "recovery_score")
+        metrics["sleep_duration"] = safe_float(w, "sleep_duration_hours")
+        metrics["sleep_score"] = safe_float(w, "sleep_quality_score") or safe_float(w, "sleep_score")
+        metrics["resting_hr"] = safe_float(w, "resting_heart_rate")
+        metrics["strain"] = safe_float(w, "strain")
 
         # ── Training ─────────────────────────────────────────────────────
-        metrics["tsb"]              = safe_float(cm, "tsb")
+        metrics["tsb"] = safe_float(cm, "tsb")
         if st:
             acts = st.get("activities", [])
-            metrics["training_kj"]  = sum(float(a.get("kilojoules") or 0) for a in acts)
+            metrics["training_kj"] = sum(float(a.get("kilojoules") or 0) for a in acts)
             metrics["training_mins"] = sum(float(a.get("moving_time_seconds") or 0) / 60 for a in acts)
         else:
-            metrics["training_kj"]  = None
+            metrics["training_kj"] = None
             metrics["training_mins"] = None
 
         # ── Nutrition ─────────────────────────────────────────────────────
-        metrics["calories"]         = safe_float(mf, "total_calories_kcal")
-        metrics["protein_g"]        = safe_float(mf, "total_protein_g")
-        metrics["carbs_g"]          = safe_float(mf, "total_carbs_g")
-        metrics["fat_g"]            = safe_float(mf, "total_fat_g")
+        metrics["calories"] = safe_float(mf, "total_calories_kcal")
+        metrics["protein_g"] = safe_float(mf, "total_protein_g")
+        metrics["carbs_g"] = safe_float(mf, "total_carbs_g")
+        metrics["fat_g"] = safe_float(mf, "total_fat_g")
 
         # ── Activity ─────────────────────────────────────────────────────
-        metrics["steps"]            = safe_float(ap, "steps")
+        metrics["steps"] = safe_float(ap, "steps")
 
         # ── Composite / Computed ──────────────────────────────────────────
-        metrics["day_grade"]        = safe_float(cm, "day_grade_score")
-        metrics["readiness"]        = safe_float(cm, "readiness_score")
-        metrics["tier0_streak"]     = safe_float(cm, "tier0_streak")
+        metrics["day_grade"] = safe_float(cm, "day_grade_score")
+        metrics["readiness"] = safe_float(cm, "readiness_score")
+        metrics["tier0_streak"] = safe_float(cm, "tier0_streak")
 
         # ── Habits ────────────────────────────────────────────────────────
         if hab:
             habits = hab.get("habits", {})
-            done  = sum(1 for v in habits.values() if v)
+            done = sum(1 for v in habits.values() if v)
             total = len(habits)
             metrics["habit_pct"] = (done / total) if total > 0 else None
         else:
@@ -363,7 +363,7 @@ def assemble_daily_series(start_date, end_date):
 CORRELATION_PAIRS = [
     # Recovery / HRV (cross-sectional)
     ("hrv",           "recovery_score",  "hrv_vs_recovery",               0),
-    ("sleep_duration","recovery_score",  "sleep_duration_vs_recovery",    0),
+    ("sleep_duration", "recovery_score",  "sleep_duration_vs_recovery",    0),
     ("sleep_score",   "recovery_score",  "sleep_score_vs_recovery",       0),
     ("hrv",           "sleep_score",     "hrv_vs_sleep_score",            0),
     ("resting_hr",    "recovery_score",  "rhr_vs_recovery",               0),
@@ -397,7 +397,7 @@ CORRELATION_PAIRS = [
     # Henning: lagged pairs test whether metric_a TODAY predicts metric_b TOMORROW.
     # Degrees of freedom reduced by lag_days; interpretation requires higher n thresholds.
     ("hrv",           "training_kj",     "hrv_predicts_next_day_load",    1),
-    ("recovery_score","training_kj",     "recovery_predicts_next_day_load", 1),
+    ("recovery_score", "training_kj",     "recovery_predicts_next_day_load", 1),
     ("training_kj",   "recovery_score",  "load_predicts_next_day_recovery", 1),
 ]
 
@@ -548,6 +548,12 @@ def store_correlations(week_key, correlations, start_date, end_date, computed_at
         "correlations": _dec_correlations(correlations),
         "computed_at": computed_at,
     }
+    # V2 P2.6 (2026-05-19): tag with run_id + computed_at
+    try:
+        from compute_metadata import tag_record
+        item = tag_record(item, source_id="weekly_correlations")
+    except ImportError:
+        pass
     table.put_item(Item=item)
     logger.info("Stored weekly_correlations for week %s (%d pairs)", week_key, len(correlations))
 
@@ -615,15 +621,15 @@ def _compute_centenarian_progress(series, end_date):
         # Score each lift
         lift_scores = {}
         overall_ready = 0
-        lifts_scored  = 0
+        lifts_scored = 0
         for lift, target_ratio in CENTENARIAN_TARGETS.items():
-            target_lbs  = target_ratio * bodyweight_lbs
+            target_lbs = target_ratio * bodyweight_lbs
             current_lbs = lift_1rm.get(lift)
             if current_lbs is None:
                 lift_scores[lift] = {"status": "no_data", "target_lbs": round(target_lbs, 1)}
                 continue
             pct_of_target = current_lbs / target_lbs
-            gap_lbs       = max(0.0, target_lbs - current_lbs)
+            gap_lbs = max(0.0, target_lbs - current_lbs)
             if pct_of_target >= 1.0:
                 status = "exceeds_target"
             elif pct_of_target >= 0.9:
@@ -643,7 +649,7 @@ def _compute_centenarian_progress(series, end_date):
                 "status":        status,
             }
             overall_ready += pct_of_target
-            lifts_scored  += 1
+            lifts_scored += 1
 
         overall_readiness = round(overall_ready / lifts_scored * 100, 1) if lifts_scored else None
         priority_lift = min(
@@ -702,7 +708,7 @@ def store_centenarian_progress(week_key, progress, end_date, computed_at):
 # ==============================================================================
 
 # Zone 2 HR range (as % of max HR) — matches get_zone2_breakdown defaults
-ZONE2_HR_LOW  = int(os.environ.get("ZONE2_HR_LOW", "110"))
+ZONE2_HR_LOW = int(os.environ.get("ZONE2_HR_LOW", "110"))
 ZONE2_HR_HIGH = int(os.environ.get("ZONE2_HR_HIGH", "139"))
 ZONE2_MIN_DURATION_MINUTES = int(os.environ.get("ZONE2_MIN_DURATION_MINUTES", "20"))
 
@@ -733,7 +739,7 @@ def _compute_zone2_efficiency(series, end_date):
                 continue
             activities = rec.get("activities", [])
             for act in activities:
-                avg_hr   = safe_float(act, "average_heartrate")
+                avg_hr = safe_float(act, "average_heartrate")
                 duration_s = safe_float(act, "moving_time_seconds") or 0
                 distance_m = safe_float(act, "distance") or 0  # metres from Strava
                 sport_type = (act.get("sport_type") or "").lower()
@@ -746,12 +752,12 @@ def _compute_zone2_efficiency(series, end_date):
                     continue
                 # Compute efficiency: (distance_miles / duration_hours) / avg_hr
                 # = speed_mph / avg_hr → dimensionless efficiency metric
-                duration_h  = duration_s / 3600
+                duration_h = duration_s / 3600
                 distance_mi = distance_m * 0.000621371
                 if duration_h <= 0 or distance_mi <= 0:
                     continue
-                speed_mph   = distance_mi / duration_h
-                efficiency  = speed_mph / avg_hr  # higher = better
+                speed_mph = distance_mi / duration_h
+                efficiency = speed_mph / avg_hr  # higher = better
                 week_samples.setdefault(week_key, []).append(round(efficiency, 6))
 
         if not week_samples:
@@ -788,11 +794,11 @@ def _compute_zone2_efficiency(series, end_date):
                 trend = "stable"
         else:
             slope_per_week = None
-            pct_change     = None
-            trend          = "insufficient_data"
+            pct_change = None
+            trend = "insufficient_data"
 
-        latest_eff   = weekly[-1]["avg_efficiency"] if weekly else None
-        baseline_eff = weekly[0]["avg_efficiency"]  if weekly else None
+        latest_eff = weekly[-1]["avg_efficiency"] if weekly else None
+        baseline_eff = weekly[0]["avg_efficiency"] if weekly else None
 
         return {
             "weeks_analyzed":          len(weekly),
@@ -846,9 +852,9 @@ def store_zone2_efficiency(week_key, efficiency, end_date, computed_at):
         "weekly":                weekly_enc,
     }
     if efficiency.get("slope_per_week") is not None:
-        item["slope_per_week"]       = _safe_dec(efficiency["slope_per_week"])
+        item["slope_per_week"] = _safe_dec(efficiency["slope_per_week"])
     if efficiency.get("pct_change_per_week") is not None:
-        item["pct_change_per_week"]  = _safe_dec(efficiency["pct_change_per_week"])
+        item["pct_change_per_week"] = _safe_dec(efficiency["pct_change_per_week"])
 
     table.put_item(Item=item)
     logger.info("BS-TR2: Stored zone2_efficiency for week %s (trend=%s, weeks=%d)",

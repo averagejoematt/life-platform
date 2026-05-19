@@ -214,18 +214,18 @@ def attia_benchmark_status(lift_key: str, bw_ratio: float) -> dict:
     if not target:
         return {"error": f"No Attia benchmark defined for '{lift_key}'"}
 
-    t_ratio  = target["target_ratio"]
+    t_ratio = target["target_ratio"]
     min_ratio = target["minimum_ratio"]
     pct_of_target = round(bw_ratio / t_ratio * 100, 1)
     gap_ratio = round(t_ratio - bw_ratio, 3)
     gap_pct_of_target = round(gap_ratio / t_ratio * 100, 1)
 
     status = "below_minimum"
-    label  = "Below minimum threshold"
+    label = "Below minimum threshold"
     for threshold, code, text in _ATTIA_STATUS_TIERS:
         if pct_of_target / 100 >= threshold:
             status = code
-            label  = text
+            label = text
             break
 
     above_minimum = bw_ratio >= min_ratio

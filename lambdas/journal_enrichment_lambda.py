@@ -52,8 +52,8 @@ ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
 MODEL = os.environ.get("MODEL", "claude-haiku-4-5-20251001")
 ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
 # ── Config (env vars with backwards-compatible defaults) ──
-REGION     = os.environ.get("AWS_REGION", "us-west-2")
-USER_ID    = os.environ.get("USER_ID", "matthew")
+REGION = os.environ.get("AWS_REGION", "us-west-2")
+USER_ID = os.environ.get("USER_ID", "matthew")
 
 PK = f"USER#{USER_ID}#SOURCE#notion"
 MIN_TEXT_LENGTH = 20  # Skip enrichment for very short entries

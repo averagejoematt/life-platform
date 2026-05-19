@@ -26,18 +26,18 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 # -- Configuration --
-_REGION    = os.environ.get("AWS_REGION", "us-west-2")
+_REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-S3_BUCKET  = os.environ["S3_BUCKET"]
-USER_ID    = os.environ.get("USER_ID", "matthew")
+S3_BUCKET = os.environ["S3_BUCKET"]
+USER_ID = os.environ.get("USER_ID", "matthew")
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 BUDDY_LOOKBACK_DAYS = 7
 
 # -- AWS clients --
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
-table    = dynamodb.Table(TABLE_NAME)
-s3       = boto3.client("s3", region_name=_REGION)
+table = dynamodb.Table(TABLE_NAME)
+s3 = boto3.client("s3", region_name=_REGION)
 
 
 # ==============================================================================
@@ -46,8 +46,8 @@ s3       = boto3.client("s3", region_name=_REGION)
 
 def d2f(obj):
     """Convert DynamoDB Decimals to floats."""
-    if isinstance(obj, list):    return [d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [d2f(i) for i in obj]
+    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
     if isinstance(obj, Decimal): return float(obj)
     return obj
 

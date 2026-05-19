@@ -71,9 +71,9 @@ def flatten_strava_activity(day_record):
 
 # ── Training load model helpers ───────────────────────────────────────────────
 def compute_daily_load_score(day_record):
-    kj     = day_record.get("total_kilojoules") or 0
-    dist   = day_record.get("total_distance_miles") or 0
-    elev   = day_record.get("total_elevation_gain_feet") or 0
+    kj = day_record.get("total_kilojoules") or 0
+    dist = day_record.get("total_distance_miles") or 0
+    elev = day_record.get("total_elevation_gain_feet") or 0
     hr_avg = day_record.get("average_heartrate") or 0
     time_s = day_record.get("total_moving_time_seconds") or 0
 
@@ -92,8 +92,8 @@ def compute_daily_load_score(day_record):
 
 
 def compute_ewa(daily_values_chrono, decay_days):
-    alpha  = 1.0 - math.exp(-1.0 / decay_days)
-    ewa    = 0.0
+    alpha = 1.0 - math.exp(-1.0 / decay_days)
+    ewa = 0.0
     result = []
     for date_str, val in daily_values_chrono:
         ewa = alpha * val + (1 - alpha) * ewa
@@ -107,7 +107,7 @@ def pearson_r(xs, ys):
         return None
     mx = sum(xs) / n
     my = sum(ys) / n
-    num   = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+    num = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
     denom = math.sqrt(sum((x - mx)**2 for x in xs) * sum((y - my)**2 for y in ys))
     if denom == 0:
         return None

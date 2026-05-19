@@ -51,20 +51,20 @@ except ImportError:
 # AWS_REGION is set automatically by Lambda to the function's deployment region.
 # email-subscriber deploys to us-east-1 (web_stack.py) but DDB is in us-west-2.
 # DYNAMODB_REGION env var overrides to ensure cross-region DDB access.
-REGION          = os.environ.get("AWS_REGION", "us-east-1")      # Lambda's own region
+REGION = os.environ.get("AWS_REGION", "us-east-1")      # Lambda's own region
 DYNAMODB_REGION = os.environ.get("DYNAMODB_REGION", "us-west-2") # DDB table region
-SES_REGION      = os.environ.get("SES_REGION", "us-west-2")      # SES verified identity region
+SES_REGION = os.environ.get("SES_REGION", "us-west-2")      # SES verified identity region
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-S3_BUCKET  = os.environ.get("S3_BUCKET", "matthew-life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
-SENDER     = os.environ.get("EMAIL_SENDER", "lifeplatform@mattsusername.com")
-SITE_URL   = os.environ.get("SITE_URL", "https://averagejoematt.com")
+S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+USER_ID = os.environ.get("USER_ID", "matthew")
+SENDER = os.environ.get("EMAIL_SENDER", "lifeplatform@mattsusername.com")
+SITE_URL = os.environ.get("SITE_URL", "https://averagejoematt.com")
 
 SUBSCRIBERS_PK = f"USER#{USER_ID}#SOURCE#subscribers"
 
 dynamodb = boto3.resource("dynamodb", region_name=DYNAMODB_REGION)  # us-west-2
-table    = dynamodb.Table(TABLE_NAME)
-ses      = boto3.client("sesv2", region_name=SES_REGION)             # us-west-2 (verified identity)
+table = dynamodb.Table(TABLE_NAME)
+ses = boto3.client("sesv2", region_name=SES_REGION)             # us-west-2 (verified identity)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -135,7 +135,7 @@ def handle_subscribe(email: str, source_ip: str = "", referrer: str = "") -> dic
         return _json_response(200, {"status": "pending_confirmation", "message": "Check your inbox."})
 
     email_hash = _email_hash(email)
-    now_iso    = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(timezone.utc).isoformat()
 
     # Check existing record
     existing = _get_record(email_hash)
@@ -150,7 +150,7 @@ def handle_subscribe(email: str, source_ip: str = "", referrer: str = "") -> dic
             logger.info("subscribe: resubscribe from unsubscribed %s", email_hash[:8])
 
     # Generate confirmation token
-    token     = secrets.token_hex(32)
+    token = secrets.token_hex(32)
     token_exp = (datetime.now(timezone.utc) + timedelta(hours=48)).isoformat()
     confirm_url = f"{SITE_URL}/api/subscribe?action=confirm&token={token}&h={email_hash[:16]}"
 
@@ -263,7 +263,7 @@ def handle_confirm(token: str, email_hash_prefix: str) -> dict:
         return _redirect(f"{SITE_URL}/subscribe/confirm/?error=invalid_token")
 
     record = items[0]
-    email  = record.get("email", "")
+    email = record.get("email", "")
 
     # Check expiry
     expires = record.get("token_expires", "")
@@ -339,9 +339,9 @@ Unsubscribe: {unsub_url}"""
 
 def handle_unsubscribe(email: str) -> dict:
     """Mark status=unsubscribed. Raj directive: NEVER hard-delete. Row retained for analytics."""
-    email      = email.strip().lower()
+    email = email.strip().lower()
     email_hash = _email_hash(email)
-    now_iso    = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(timezone.utc).isoformat()
 
     existing = _get_record(email_hash)
     if not existing:
@@ -386,7 +386,7 @@ def lambda_handler(event, context):
         )
 
         if action == "confirm":
-            token          = params.get("token", "")
+            token = params.get("token", "")
             email_hash_pfx = params.get("h", "")
             return handle_confirm(token, email_hash_pfx)
 
@@ -399,7 +399,7 @@ def lambda_handler(event, context):
         # Default: subscribe (POST body)
         if method == "POST":
             try:
-                body  = json.loads(event.get("body") or "{}")
+                body = json.loads(event.get("body") or "{}")
                 email = body.get("email", "").strip()
             except Exception:
                 return _json_response(400, {"error": "Invalid request body."})

@@ -30,8 +30,8 @@ SICK_DAYS_PK = f"USER#{USER_ID}#SOURCE#sick_days"
 
 
 def _d2f(obj):
-    if isinstance(obj, list):    return [_d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: _d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [_d2f(i) for i in obj]
+    if isinstance(obj, dict): return {k: _d2f(v) for k, v in obj.items()}
     if isinstance(obj, Decimal): return float(obj)
     return obj
 
@@ -40,9 +40,9 @@ def _d2f(obj):
 
 def tool_log_sick_day(args):
     """Flag one or more dates as sick/rest days."""
-    date_arg  = args.get("date")
+    date_arg = args.get("date")
     dates_arg = args.get("dates")
-    reason    = (args.get("reason") or "").strip()
+    reason = (args.get("reason") or "").strip()
 
     if not date_arg and not dates_arg:
         return {"error": "Provide 'date' (single YYYY-MM-DD) or 'dates' (list of YYYY-MM-DD)."}
@@ -89,8 +89,8 @@ def tool_log_sick_day(args):
 
 def tool_get_sick_days(args):
     """List sick/rest days within a date range."""
-    today     = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    end_date  = args.get("end_date")  or today
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    end_date = args.get("end_date") or today
     start_date = args.get("start_date") or (
         datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=90)
     ).strftime("%Y-%m-%d")

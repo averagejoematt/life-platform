@@ -39,14 +39,14 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 # ── Configuration ────────────────────────────────────────────────────────────
-_REGION    = os.environ.get("AWS_REGION", "us-west-2")
+_REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
-S3_BUCKET  = os.environ.get("S3_BUCKET", "matthew-life-platform")
+USER_ID = os.environ.get("USER_ID", "matthew")
+S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 
-USER_PREFIX     = f"USER#{USER_ID}#SOURCE#"
-ALGO_VERSION    = "1.0"
-LOOKBACK_DAYS   = 30
+USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
+ALGO_VERSION = "1.0"
+LOOKBACK_DAYS = 30
 EXPERIMENT_START = "2026-04-01"
 
 # Metrics by source for EWMA processing
@@ -119,8 +119,8 @@ DEFAULT_SEASONAL_ADJUSTMENTS = {
 
 # ── AWS clients ──────────────────────────────────────────────────────────────
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
-table    = dynamodb.Table(TABLE_NAME)
-s3       = boto3.client("s3", region_name=_REGION)
+table = dynamodb.Table(TABLE_NAME)
+s3 = boto3.client("s3", region_name=_REGION)
 
 
 # =============================================================================

@@ -37,14 +37,14 @@ except ImportError:
 
 from ingestion_framework import IngestionConfig, run_ingestion
 
-REGION        = os.environ.get("AWS_REGION", "us-west-2")
-USER_ID       = os.environ.get("USER_ID", "matthew")
-SECRET_NAME   = os.environ.get("WITHINGS_SECRET_NAME", "life-platform/withings")
-DYNAMO_PK     = f"USER#{USER_ID}#SOURCE#withings"
+REGION = os.environ.get("AWS_REGION", "us-west-2")
+USER_ID = os.environ.get("USER_ID", "matthew")
+SECRET_NAME = os.environ.get("WITHINGS_SECRET_NAME", "life-platform/withings")
+DYNAMO_PK = f"USER#{USER_ID}#SOURCE#withings"
 
-WITHINGS_SIG_URL   = "https://wbsapi.withings.net/v2/signature"
+WITHINGS_SIG_URL = "https://wbsapi.withings.net/v2/signature"
 WITHINGS_OAUTH_URL = "https://wbsapi.withings.net/v2/oauth2"
-WITHINGS_MEAS_URL  = "https://wbsapi.withings.net/measure"
+WITHINGS_MEAS_URL = "https://wbsapi.withings.net/measure"
 
 # Measurement type IDs from Withings API → field names in DDB record.
 MEAS_TYPES = {
@@ -109,7 +109,7 @@ def _get_nonce(client_id: str, client_secret: str) -> str:
 def _refresh_access_token(secret: dict) -> dict:
     """HMAC-signed refresh flow; mutates + returns the secret with new tokens."""
     logger.info("Refreshing Withings access token...")
-    client_id     = secret["client_id"]
+    client_id = secret["client_id"]
     client_secret = secret["client_secret"]
     refresh_token = secret["refresh_token"]
 

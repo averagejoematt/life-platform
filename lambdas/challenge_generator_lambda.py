@@ -51,21 +51,21 @@ try:
 except ImportError:
     _HAS_AI_VALIDATOR = False
 
-REGION     = os.environ.get("AWS_REGION", "us-west-2")
+REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
-S3_BUCKET  = os.environ["S3_BUCKET"]
+USER_ID = os.environ.get("USER_ID", "matthew")
+S3_BUCKET = os.environ["S3_BUCKET"]
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
-table    = dynamodb.Table(TABLE_NAME)
-s3       = boto3.client("s3", region_name=REGION)
-secrets  = boto3.client("secretsmanager", region_name=REGION)
+table = dynamodb.Table(TABLE_NAME)
+s3 = boto3.client("s3", region_name=REGION)
+secrets = boto3.client("secretsmanager", region_name=REGION)
 
 AI_MODEL = os.environ.get("AI_MODEL", "claude-haiku-4-5-20251001")
 
-CHALLENGES_PK  = f"USER#{USER_ID}#SOURCE#challenges"
-HYPOTHESES_PK  = f"USER#{USER_ID}#SOURCE#hypotheses"
-CHARACTER_PK   = f"USER#{USER_ID}#SOURCE#character_sheet"
+CHALLENGES_PK = f"USER#{USER_ID}#SOURCE#challenges"
+HYPOTHESES_PK = f"USER#{USER_ID}#SOURCE#hypotheses"
+CHARACTER_PK = f"USER#{USER_ID}#SOURCE#character_sheet"
 HABIT_SCORES_PK = f"USER#{USER_ID}#SOURCE#habit_scores"
 
 MAX_NEW_CHALLENGES = 5
