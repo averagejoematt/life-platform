@@ -721,7 +721,7 @@ def record_email_send(table, lambda_name):
             "ttl": int(_time.time()) + 86400 * 90
         })
     except Exception as e:
-        print(f"[status-tracking] Non-fatal write failure: {e}")
+        logger.info(f"[status-tracking] Non-fatal write failure: {e}")
 
 
 def lambda_handler(event, context):
@@ -749,9 +749,9 @@ def lambda_handler(event, context):
     # Try config-driven prompt first, fall back to hardcoded
     system = _build_nutrition_prompt_from_config(cal_target, pro_target)
     if system:
-        print("[INFO] Using config-driven nutrition panel prompt")
+        logger.info("Using config-driven nutrition panel prompt")
     else:
-        print("[INFO] Using fallback hardcoded nutrition panel prompt")
+        logger.info("Using fallback hardcoded nutrition panel prompt")
         system = _FALLBACK_SYSTEM_PROMPT.format(
             calorie_target=cal_target,
             protein_target_g=pro_target,
@@ -784,7 +784,7 @@ def lambda_handler(event, context):
         )
         user_message = journey_block + "\n" + user_message
     except Exception as e:
-        print(f"[WARN] P2 journey context failed: {e}")
+        logger.warning(f"P2 journey context failed: {e}")
 
     # IC-16: Progressive context for nutrition insights
     if _HAS_INSIGHT_WRITER:
@@ -795,7 +795,7 @@ def lambda_handler(event, context):
             if prev_ctx:
                 user_message = prev_ctx + "\n\n" + user_message
         except Exception as e:
-            print(f"[WARN] IC-16 failed: {e}")
+            logger.warning(f"IC-16 failed: {e}")
 
     api_key = get_anthropic_key()
     logger.info("Calling Sonnet for analysis...")
@@ -842,9 +842,9 @@ def lambda_handler(event, context):
                 text=ai_content[:800], pillars=["nutrition"],
                 data_sources=["macrofactor"], tags=["nutrition", "weekly", "coaching"],
                 confidence="high", actionable=True, date=dates.get("this_end", ""))
-            print("[INFO] IC-15: nutrition insight persisted")
+            logger.info("IC-15: nutrition insight persisted")
         except Exception as e:
-            print(f"[WARN] IC-15 failed: {e}")
+            logger.warning(f"IC-15 failed: {e}")
 
     record_email_send(table, "nutrition_review")
     return {"statusCode": 200, "body": f"Nutrition review sent: {subject}"}
