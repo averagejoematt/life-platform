@@ -5,11 +5,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Documentation Index
 
 Deep documentation lives in `docs/`. Start here when context is needed:
-- `docs/ONBOARDING.md` — mental model, key concepts
-- `docs/ARCHITECTURE.md` — full system design, 79 Lambdas, 7 CDK stacks, data flows (updated v7.20.0)
+- `docs/ONBOARDING.md` — first-day mental model, key concepts
+- `docs/QUICKSTART.md` — first-day commands (AWS auth, deploy, rollback)
+- `docs/ARCHITECTURE.md` — full system design, 73 Lambdas (us-west-2) + 4 (us-east-1), 8 CDK stacks, data flows (updated v8.0.0)
 - `docs/SCHEMA.md` — DynamoDB field reference (authoritative)
 - `docs/RUNBOOK.md` — daily operations, troubleshooting
 - `docs/DECISIONS.md` — ADRs (ADR-001 through ADR-057), why things are the way they are
+- `docs/DATA_GOVERNANCE.md` — PII classification + retention policy (added v7.2.0)
+- `docs/BOARDS.md` — the three AI persona boards (Personal, Technical, Product)
+- `docs/REVIEW_METHODOLOGY.md` — how to run architecture audits
+- `docs/V2_AUDIT_PLAN.md` — V2 audit plan + outcomes (2026-05-17)
 
 ## Commands
 
@@ -48,7 +53,7 @@ python3 mcp_bridge.py
 2. **Store**: Raw JSON in S3 (`raw/{source}/{datatype}/{YYYY}/{MM}/{DD}.json`), normalized metrics in DynamoDB single-table (`life-platform`, PK `USER#matthew#SOURCE#{source}`, SK `DATE#{YYYY-MM-DD}`).
 
 3. **Serve/Compute**:
-   - **MCP Lambda** — 135 tools across 26 domain modules (`mcp/tools_*.py`), accessed via Claude Desktop and claude.ai. **Note (V2 P4.1):** only ~11 tools used in last 30 days per EMF telemetry; bulk pruning planned.
+   - **MCP Lambda** — 135 tools across 26 domain modules (`mcp/tools_*.py`), accessed via Claude Desktop and claude.ai. ARCHITECTURE.md tracks the catalog-facing count of 127; `grep -c '"name":' mcp/registry.py` is source of truth. **Note (V2 P4.1):** only ~11 tools used in last 30 days per EMF telemetry; bulk pruning planned.
    - **Compute Lambdas** (5) — run before 11 AM daily: `character-sheet`, `adaptive-mode`, `daily-metrics-compute`, `daily-insight-compute`, `hypothesis-engine`; store pre-computed results to DynamoDB
    - **Email Lambdas** (7) — daily brief at 11 AM reads pre-computed results
    - **OG Image Lambda** — generates 6 data-driven PNG share cards daily at 11:30 AM PT using Pillow
@@ -74,7 +79,7 @@ python3 mcp_bridge.py
 
 **EventBridge crons use fixed UTC** — no DST drift. All schedules in `cdk/stacks/` must be UTC-fixed.
 
-**Lambda Layer** — shared modules (`ai_calls.py`, `retry_utils.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `site_writer.py`, `character_engine.py`, `intelligence_common.py`, `auth_breaker.py`, `compute_metadata.py`, `email_framework.py`, `http_retry.py`, `numeric.py`, `platform_logger.py`, `rate_limiter.py`, `request_validator.py`, + 8 more) are deployed as a layer (currently **v50**, mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`). Changes here require a layer rebuild (`bash deploy/build_layer.sh`) before deploying dependent functions. Source of truth: `aws lambda list-layer-versions --layer-name life-platform-shared-utils --query 'LayerVersions[0].Version'`.
+**Lambda Layer** — shared modules (`ai_calls.py`, `retry_utils.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `site_writer.py`, `character_engine.py`, `intelligence_common.py`, `auth_breaker.py`, `compute_metadata.py`, `http_retry.py`, `numeric.py`, `platform_logger.py`, `rate_limiter.py`, `request_validator.py`, + others) are deployed as a layer (currently **v51**, mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`). Note: `email_framework.py` was deleted in V2 (replaced inline). Changes here require a layer rebuild (`bash deploy/build_layer.sh`) before deploying dependent functions. Source of truth: `aws lambda list-layer-versions --layer-name life-platform-shared-utils --query 'LayerVersions[0].Version'`.
 
 **Prompt caching (COST-OPT-2)** — `ai_calls.py` and `retry_utils.py` auto-wrap system messages as Anthropic cached content blocks (90% discount). Model tiering: structured tasks use Haiku, narrative content uses Sonnet. All model assignments configurable via `AI_MODEL` env var. See ADR-049.
 
@@ -95,3 +100,7 @@ The tool registry in `mcp/registry.py` wires all tools. `tests/test_wiring_cover
 ## CI/CD
 
 GitHub Actions (`.github/workflows/ci-cd.yml`): Lint → Test → Plan → Deploy (requires manual approval via GitHub Environment: `production`) → Smoke Test → Auto-rollback if smoke fails. Auth via OIDC federation (no long-lived AWS keys).
+
+---
+
+**Verified:** 2026-05-19 (v8.0.0)

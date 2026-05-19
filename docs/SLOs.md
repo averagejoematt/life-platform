@@ -1,7 +1,7 @@
 # Life Platform — Service Level Objectives (SLOs)
 
 > OBS-3: Formal SLO definitions for critical platform paths.
-> Last updated: 2026-05-19 (v7.21.0)
+> Last updated: 2026-05-19 (V2 audit operational sweep)
 
 ---
 
@@ -110,3 +110,20 @@ The `life-platform-ops` dashboard includes an "SLO Health" section with:
 | SLO-4 AI | 99% | ~3 failed calls/day budget | ~1,095 failed calls/year |
 
 **Error budget policy:** When budget is burned >50% in a rolling window, pause feature work and investigate. This is a personal guideline, not an automated gate.
+
+---
+
+## SLO Status Snapshot (2026-05-19)
+
+| SLO | Status | Notes |
+|-----|--------|-------|
+| SLO-1 Daily Brief | Likely BREACHED in current window | Daily-brief was AccessDenied for 2026-05-17 (V2 SES IAM regression) — error budget consumed for May. Recovered same day. |
+| SLO-2 Freshness | **BREACHED** | `slo-source-freshness` in ALARM — Garmin stale ~44 days (P2 incident, see INCIDENT_LOG.md). Expected to clear within 24h of OAuth refresh. |
+| SLO-3 MCP | OK | No alarms firing |
+| SLO-4 AI | At risk | `ai-tokens-daily-brief-daily` in ALARM (token budget exceeded) — investigate prompt size growth |
+
+Alarms in ALARM state at audit time (2026-05-19): `ai-tokens-daily-brief-daily`, `life-platform-compute-pipeline-stale`, `life-platform-dlq-depth-warning`, `life-platform-garmin-data-ingestion-errors`, `life-platform-ingestion-dlq-messages`, `life-platform-weather-data-ingestion-errors`, `slo-source-freshness`.
+
+---
+
+**Verified:** 2026-05-19 (V2 audit operational sweep)

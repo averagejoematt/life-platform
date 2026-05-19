@@ -1,7 +1,7 @@
 # Life Platform — Dependency Graph
 
 > Complete dependency map: which Lambdas depend on which DynamoDB partitions, which MCP tools depend on which data, which emails depend on which compute Lambdas.
-> Last updated: 2026-03-30 (v4.5.0)
+> Last updated: 2026-05-19 (v8.0.0 — V2 audit + follow-up)
 
 ---
 
@@ -17,20 +17,23 @@ EXTERNAL APIs → INGESTION LAMBDAS → DDB PARTITIONS → COMPUTE LAMBDAS → C
 
 ## 1. Ingestion Layer (External API → DynamoDB)
 
-| External Source | Lambda | DDB Partition Written | Schedule (UTC) |
-|----------------|--------|----------------------|----------------|
-| Whoop API | `whoop_lambda` | `whoop` | 14:00 daily |
-| Withings API | `withings_lambda` | `withings` | 14:15 daily |
-| Strava API | `strava_lambda` | `strava` | 14:30 daily |
-| Eight Sleep API | `eightsleep_lambda` | `eightsleep` | 15:00 daily |
-| Garmin (garth) | `garmin_lambda` | `garmin` | 14:00 daily |
-| Habitify API | `habitify_lambda` | `habitify`, `supplements` | 14:15 daily |
-| Todoist API | `todoist_lambda` | `todoist` | 14:45 daily |
-| Notion API | `notion_lambda` | `notion` | 14:00 daily |
-| Apple Health webhook | `health_auto_export` | `apple_health`, `state_of_mind` | On webhook |
-| Open-Meteo | `weather_handler` | `weather` | 13:45 daily |
-| Dropbox → MacroFactor CSV | `dropbox_poll` | `macrofactor` | Every 30 min |
+| External Source | Lambda | DDB Partition Written | Schedule |
+|----------------|--------|----------------------|----------|
+| Whoop API | `whoop_lambda` (SIMP-2) | `whoop` | Hourly (active hours) |
+| Withings API | `withings_lambda` (SIMP-2) | `withings` | Hourly (active hours) |
+| Strava API | `strava_lambda` (SIMP-2) | `strava` | Hourly (active hours) |
+| Eight Sleep API | `eightsleep_lambda` (SIMP-2) | `eightsleep` | Hourly (active hours) |
+| Garmin (garth) | `garmin_lambda` (SIMP-2) | `garmin` | 4x daily (OAuth rate limits) |
+| Habitify API | `habitify_lambda` (SIMP-2) | `habitify`, `supplements` | Hourly (active hours) |
+| Todoist API | `todoist_lambda` (SIMP-2) | `todoist` | 2x daily |
+| Notion API | `notion_lambda` (pattern-exempt) | `notion` | Hourly (active hours) |
+| Open-Meteo | `weather_lambda` (renamed from `weather_handler` in V2; SIMP-2) | `weather` | 2x daily |
+| Apple Health webhook | `health_auto_export_webhook` | `apple_health`, `state_of_mind`, CGM, BP, water, caffeine | Near real-time |
+| MacroFactor export | `macrofactor_lambda` | `macrofactor` | S3 trigger (`uploads/macrofactor/*.csv`) |
+| Dropbox → MacroFactor CSV | `dropbox_poll` | (pulls export → S3, then triggers macrofactor) | `rate(30 minutes)` |
+| Apple Health XML | `apple_health_lambda` | `apple_health` | S3 trigger (`imports/apple_health/*.xml`) |
 | Food delivery CSV | `food_delivery_lambda` | `food_delivery` | S3 trigger |
+| Body measurements | `measurements_ingestion` | `measurements` | S3 trigger (ADR-044) |
 
 ---
 
@@ -47,9 +50,13 @@ Runs daily after ingestion completes. **Order matters** — see critical path be
 | `daily_insight_compute` | 10:20 AM | `computed_metrics`, `habit_scores`, `day_grade`, platform_memory, whoop, garmin, macrofactor, apple_health, withings | `computed_insights`, `platform_memory` |
 | `hypothesis_engine` | Sun 12:00 PM | ALL 9 ingestion sources + `hypotheses` (self) | `hypotheses`, `platform_memory` |
 
-### Schedule Ordering Bug
+### Compute → COACH-V2 hand-off (v51, 2026-05-19)
 
-`daily_insight_compute` runs at **10:20 AM** but reads `computed_metrics` written at **10:25 AM**. It reads yesterday's metrics, not today's. Fix: swap to `daily_metrics_compute` at 10:20, `daily_insight_compute` at 10:25.
+After each COACH-V2 generation, `ai_calls.call_coach_brief_v2` now invokes `coach-quality-gate` **asynchronously** (`InvocationType=Event`) — wiring the previously-orphaned quality gate into the pipeline. The gate validates hallucination, voice drift, and repetition before downstream `coach-state-updater` and `coach-ensemble-digest` write to DDB.
+
+### Schedule Ordering Note
+
+Historical bug (v4.5.0): `daily_insight_compute` ran at 10:20 AM while reading `computed_metrics` written at 10:25 AM. Schedules in current ARCHITECTURE.md table reflect the canonical order — verify against `cdk/stacks/compute_stack.py` if a stale-data symptom recurs.
 
 ---
 
@@ -70,7 +77,7 @@ Runs daily after ingestion completes. **Order matters** — see critical path be
 
 ## 4. MCP Tool Layer (DynamoDB → Claude)
 
-Read-only query layer. 121 tools across 26 modules.
+Read-only query layer (with limited writes for memory, insights, decisions, hypotheses, social, supplements, todoist, character config). **127 tools across 26 modules** (verified via `grep -E '^\s*"name":\s*"[a-z_]+"' mcp/registry.py | wc -l`).
 
 | MCP Module | DDB Partitions Read |
 |------------|-------------------|
@@ -105,11 +112,11 @@ Read-only query layer. 121 tools across 26 modules.
 | `dashboard.json` | daily_brief | dash.averagejoematt.com | Daily 11 AM |
 | `clinical.json` | daily_brief | /labs/ page | Daily 11 AM |
 | `buddy.json` | daily_brief | buddy.averagejoematt.com | Daily 11 AM |
-| Site HTML/CSS/JS | Manual deploy (`sync_site_to_s3.sh`) | All 72 pages | On deploy |
+| Site HTML/CSS/JS | Manual deploy (`safe_sync.sh` wrapper, ADR-032/033/046) | All ~72 pages | On deploy |
 
-**Site-api Lambda** (separate from daily brief) serves real-time endpoints: `/api/vitals`, `/api/ask`, `/api/board_ask`, etc. Reads directly from DDB, not from S3 files.
+**Site-api Lambda** (`life-platform-site-api`, us-west-2) serves real-time endpoints: `/api/vitals`, `/api/journey`, `/api/character`, `/api/timeline`, `/api/correlations`, etc. Reads directly from DDB. Layer: v50 (bumped from v25 today).
 
-**Site-api-ai Lambda** (split from site-api) serves `/api/ask` and `/api/board_ask` only. Isolated concurrency.
+**Site-api-ai Lambda** (`life-platform-site-api-ai`, split from site-api) serves `/api/ask` and `/api/board_ask` only. Isolated concurrency, dedicated `site-api-ai-key` secret.
 
 **Observatory API endpoints** (v4.5.0 — site-api Lambda):
 
@@ -130,10 +137,11 @@ Read-only query layer. 121 tools across 26 modules.
 |------|--------------|----------------|
 | **`daily_brief_lambda`** | Writes all 4 S3 files powering the website + dashboard + buddy page + sends daily email | Entire website shows stale data; no daily email; no fallback writer |
 | **`daily_metrics_compute`** | Writes `computed_metrics`, `day_grade`, `habit_scores` read by 6+ downstream Lambdas | All downstream compute + all emails show stale/missing grades |
-| **`public_stats.json`** | Homepage, story, mission, all observatory pages, OG images | All 67 site pages show stale data |
+| **`public_stats.json`** | Homepage, story, mission, all observatory pages, OG images | All ~72 site pages show stale data |
 | **Whoop partition** | Read by 8 Lambdas + 6 MCP modules | Sleep, HRV, recovery, readiness all missing; day grade drops |
 | **MacroFactor partition** | Read by 7 Lambdas + 4 MCP modules | Nutrition scoring absent across platform |
-| **Anthropic API** | 9 Lambdas + 2 site-api endpoints | All AI coaching returns `[AI_UNAVAILABLE]`; website Q&A returns 503 |
+| **Anthropic API** | 24+ Lambdas + 2 site-api endpoints | All AI coaching returns `[AI_UNAVAILABLE]`; website Q&A returns 503 |
+| **Account Lambda concurrency quota (10)** | All sync invokes share this pool | Quota raise filed 2026-05-19 (case 177921309700709). Until granted, parallel cold starts can throttle. |
 | **DynamoDB table** | Everything | Complete platform outage |
 | **Secrets Manager** | All OAuth Lambdas + all AI Lambdas + MCP + site-api | All ingestion stops; all AI stops |
 
@@ -163,7 +171,7 @@ Read-only query layer. 121 tools across 26 modules.
 11:00 AM     Daily brief → reads ALL computed + raw → 4 AI calls → writes 4 S3 files + email
              ─── OUTPUT COMPLETE ───
 11:01 AM     CloudFront serves updated public_stats.json to visitors
-11:30 AM     OG image generator reads public_stats.json → generates 12 share images
+11:30 AM     OG image generator reads public_stats.json → generates share images (PNG + WebP variants)
 ```
 
 **Wall clock:** 06:45 AM → 11:01 AM = **4 hours 16 minutes**
@@ -210,3 +218,9 @@ Partitions ranked by number of Lambda + MCP readers:
 | `day_grade` | 1 (daily_metrics) | 5 | 0 modules | **5** |
 | `character_sheet` | 1 (character_sheet) | 4 | 1 module | **5** |
 | `habit_scores` | 1 (daily_metrics) | 4 | 1 module | **5** |
+
+> Reader counts above are best-effort static estimates from v4.5.0 and may drift as Lambdas are added/removed. Re-derive via `grep -rln '"SOURCE#whoop"\|source.*=.*whoop' lambdas/ mcp/` when audit precision is required.
+
+---
+
+**Verified:** 2026-05-19 — full audit (V2 audit + follow-up). Ingestion table updated to reflect SIMP-2 cohort (ADR-056) and current schedules; weather Lambda renamed; coach-quality-gate wiring documented; tool count corrected to 127.

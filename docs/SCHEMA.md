@@ -1,8 +1,8 @@
 # Life Platform — Schema & Data Dictionary
 
-**Table:** `life-platform` (us-west-2)  
-**Design:** Single-table with composite keys  
-**Last updated:** 2026-05-19 (v7.21.0 — 128 MCP tools, 19 data sources, 68 Lambdas, 12 cached tools)
+**Table:** `life-platform` (us-west-2)
+**Design:** Single-table with composite keys (no GSIs — ADR-005)
+**Last updated:** 2026-05-19 (v8.0.0 — V2 audit + follow-up — 127 MCP tools, 19 data sources, 73 Lambdas us-west-2 + 4 us-east-1, 14 warmed cache keys)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -1978,3 +1978,7 @@ Post-generation validation results from the intelligence validator.
 ## Aggregation Behavior
 
 The MCP server automatically switches from raw daily records to monthly aggregates when a requested date window exceeds 90 days (`RAW_DAY_LIMIT = 90`). This keeps response payloads manageable and costs low.
+
+---
+
+**Verified:** 2026-05-19 — full audit (V2 audit + follow-up). Header counts updated; sources, partitions, and TTL policy reviewed. Note: per-source field tables (whoop, withings, strava, etc.) describe the canonical contract written by the ingestion Lambdas and were not exhaustively re-cross-referenced against current Lambda source in this pass — last full re-derivation 2026-05-19 baseline. [NEEDS VERIFICATION: when SCHEMA.md is next refreshed, regenerate each per-source field table from the Lambda's actual DDB write payload (e.g. `grep -A 30 'ddb_item = {' lambdas/whoop_lambda.py`).]
