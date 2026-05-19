@@ -42,13 +42,13 @@ except ImportError:
 
 from ingestion_framework import IngestionConfig, run_ingestion
 
-REGION         = os.environ.get("AWS_REGION", "us-west-2")
-USER_ID        = os.environ.get("USER_ID", "matthew")
-SECRET_NAME    = os.environ.get("WHOOP_SECRET_NAME", "life-platform/whoop")
+REGION = os.environ.get("AWS_REGION", "us-west-2")
+USER_ID = os.environ.get("USER_ID", "matthew")
+SECRET_NAME = os.environ.get("WHOOP_SECRET_NAME", "life-platform/whoop")
 DYNAMODB_TABLE = os.environ.get("TABLE_NAME", "life-platform")
 
 WHOOP_TOKEN_URL = "https://api.prod.whoop.com/oauth/oauth2/token"
-WHOOP_API_BASE  = "https://api.prod.whoop.com/developer/v2"
+WHOOP_API_BASE = "https://api.prod.whoop.com/developer/v2"
 WHOOP_SCOPES = (
     "offline read:recovery read:cycles read:workout read:sleep "
     "read:profile read:body_measurement"
@@ -160,15 +160,15 @@ def _extract_sleep(sleep: dict) -> dict:
         return round((ms or 0) / 3_600_000, 2)
 
     in_bed_ms = stage.get("total_in_bed_time_milli", 0)
-    awake_ms  = stage.get("total_awake_time_milli", 0)
-    rem_ms    = stage.get("total_rem_sleep_time_milli", 0)
-    sws_ms    = stage.get("total_slow_wave_sleep_time_milli", 0)
-    light_ms  = stage.get("total_light_sleep_time_milli", 0)
-    sleep_ms  = in_bed_ms - awake_ms
+    awake_ms = stage.get("total_awake_time_milli", 0)
+    rem_ms = stage.get("total_rem_sleep_time_milli", 0)
+    sws_ms = stage.get("total_slow_wave_sleep_time_milli", 0)
+    light_ms = stage.get("total_light_sleep_time_milli", 0)
+    sleep_ms = in_bed_ms - awake_ms
 
     if sleep_ms > 0: _set_dec(fields, "sleep_duration_hours", ms_to_h(sleep_ms))
-    if rem_ms   > 0: _set_dec(fields, "rem_sleep_hours",      ms_to_h(rem_ms))
-    if sws_ms   > 0: _set_dec(fields, "slow_wave_sleep_hours", ms_to_h(sws_ms))
+    if rem_ms > 0: _set_dec(fields, "rem_sleep_hours",      ms_to_h(rem_ms))
+    if sws_ms > 0: _set_dec(fields, "slow_wave_sleep_hours", ms_to_h(sws_ms))
     if light_ms > 0: _set_dec(fields, "light_sleep_hours",    ms_to_h(light_ms))
     if awake_ms > 0: _set_dec(fields, "time_awake_hours",     ms_to_h(awake_ms))
 
@@ -185,7 +185,7 @@ def _extract_sleep(sleep: dict) -> dict:
         _set_dec(fields, "sleep_quality_score", perf)  # backward-compat alias
 
     if main.get("start"): fields["sleep_start"] = main["start"]
-    if main.get("end"):   fields["sleep_end"]   = main["end"]
+    if main.get("end"):   fields["sleep_end"] = main["end"]
 
     naps = [r for r in records if r.get("nap", False)]
     if naps:
@@ -281,7 +281,7 @@ def authenticate(secret_data: dict) -> dict:
     access_token, new_refresh = _refresh_access_token(
         secret["client_id"], secret["client_secret"], secret["refresh_token"],
     )
-    secret["access_token"]  = access_token
+    secret["access_token"] = access_token
     secret["refresh_token"] = new_refresh
     _secret_cache["access_token"] = access_token
     return secret
@@ -292,7 +292,7 @@ def fetch_day(credentials: dict, date_str: str) -> dict | None:
     token = _secret_cache["access_token"] or credentials["access_token"]
     next_day = (datetime.strptime(date_str, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
     start_dt = f"{date_str}T00:00:00.000Z"
-    end_dt   = f"{next_day}T00:00:00.000Z"
+    end_dt = f"{next_day}T00:00:00.000Z"
     return {
         "recovery": _fetch_endpoint(token, "recovery",         start_dt, end_dt),
         "sleep":    _fetch_endpoint(token, "activity/sleep",   start_dt, end_dt),
@@ -312,7 +312,7 @@ def transform(raw: dict, date_str: str) -> list[dict]:
 
     # Field-presence validation logging (F2.5)
     critical = ["recovery_score", "hrv", "resting_heart_rate", "sleep_duration_hours", "strain"]
-    missing  = [f for f in critical if f not in normalized]
+    missing = [f for f in critical if f not in normalized]
     if missing:
         logger.warning("[VALIDATION] whoop/%s missing CRITICAL fields: %s", date_str, missing)
 

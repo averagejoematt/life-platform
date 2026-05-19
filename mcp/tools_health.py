@@ -34,20 +34,20 @@ from mcp.strength_helpers import classify_exercise
 from mcp.tools_training import tool_get_training_load
 from mcp.helpers import normalize_whoop_sleep
 def tool_get_health_dashboard(args):
-    today     = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     d30_start = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
-    d7_start  = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+    d7_start = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
 
     dashboard = {"as_of": today, "alerts": []}
 
     whoop_recent = query_source("whoop", d7_start, today)
-    whoop_today  = next((w for w in sorted(whoop_recent, key=lambda x: x.get("date",""), reverse=True)
+    whoop_today = next((w for w in sorted(whoop_recent, key=lambda x: x.get("date", ""), reverse=True)
                          if w.get("recovery_score") is not None), None)
     if whoop_today:
-        rec  = whoop_today.get("recovery_score")
-        hrv  = whoop_today.get("hrv")
-        rhr  = whoop_today.get("resting_heart_rate")
-        slp  = whoop_today.get("sleep_duration_hours")
+        rec = whoop_today.get("recovery_score")
+        hrv = whoop_today.get("hrv")
+        rhr = whoop_today.get("resting_heart_rate")
+        slp = whoop_today.get("sleep_duration_hours")
         dashboard["readiness"] = {
             "date":                  whoop_today.get("date"),
             "recovery_score":        rec,
@@ -81,8 +81,8 @@ def tool_get_health_dashboard(args):
     strava_7d = query_source("strava", d7_start, today)
     if strava_7d:
         miles_7d = sum(float(d.get("total_distance_miles") or 0) for d in strava_7d)
-        elev_7d  = sum(float(d.get("total_elevation_gain_feet") or 0) for d in strava_7d)
-        acts_7d  = sum(int(d.get("activity_count") or 0) for d in strava_7d)
+        elev_7d = sum(float(d.get("total_elevation_gain_feet") or 0) for d in strava_7d)
+        acts_7d = sum(int(d.get("activity_count") or 0) for d in strava_7d)
         dashboard["last_7_days"] = {
             "total_miles":      round(miles_7d, 1),
             "total_elev_feet":  round(elev_7d, 0),
@@ -92,8 +92,8 @@ def tool_get_health_dashboard(args):
     strava_30d = query_source("strava", d30_start, today)
     if strava_30d:
         miles_30d = sum(float(d.get("total_distance_miles") or 0) for d in strava_30d)
-        elev_30d  = sum(float(d.get("total_elevation_gain_feet") or 0) for d in strava_30d)
-        acts_30d  = sum(int(d.get("activity_count") or 0) for d in strava_30d)
+        elev_30d = sum(float(d.get("total_elevation_gain_feet") or 0) for d in strava_30d)
+        acts_30d = sum(int(d.get("activity_count") or 0) for d in strava_30d)
         dashboard["last_30_days"] = {
             "total_miles":     round(miles_30d, 1),
             "total_elev_feet": round(elev_30d, 0),
@@ -123,7 +123,7 @@ def tool_get_health_dashboard(args):
     withings_30d = query_source("withings", d30_start, today)
     if withings_30d:
         sorted_wi = sorted(withings_30d, key=lambda x: x.get("date", ""))
-        wt_vals   = [float(w["weight_lbs"]) for w in sorted_wi if w.get("weight_lbs") is not None]
+        wt_vals = [float(w["weight_lbs"]) for w in sorted_wi if w.get("weight_lbs") is not None]
         if wt_vals:
             wt_trend = "increasing" if wt_vals[-1] > wt_vals[0] else "decreasing"
             trends["weight_30d"] = {
@@ -160,10 +160,10 @@ def tool_get_readiness_score(args):
     Device agreement: Whoop vs Garmin HRV and RHR delta is computed and returned
     as a confidence signal — large disagreement flags lower score reliability.
     """
-    end_date   = args.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    d7_start   = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
-    d30_start  = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
-    d90_start  = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=90)).strftime("%Y-%m-%d")
+    end_date = args.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    d7_start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
+    d30_start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
+    d90_start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=90)).strftime("%Y-%m-%d")
 
     def _clamp(v, lo=0.0, hi=100.0):
         return max(lo, min(hi, v))
@@ -183,7 +183,7 @@ def tool_get_readiness_score(args):
     # ── 1. Whoop recovery score (35%) ─────────────────────────────────────────
     whoop_recent = query_source("whoop", d7_start, end_date)
     whoop_sorted = sorted(whoop_recent, key=lambda x: x.get("date", ""), reverse=True)
-    whoop_today  = next((w for w in whoop_sorted if w.get("recovery_score") is not None), None)
+    whoop_today = next((w for w in whoop_sorted if w.get("recovery_score") is not None), None)
 
     if whoop_today:
         rec_score = float(whoop_today["recovery_score"])
@@ -203,7 +203,7 @@ def tool_get_readiness_score(args):
     # Reuse whoop_recent (already fetched above) — avoids duplicate 7d Whoop query
     sleep_recent = [normalize_whoop_sleep(i) for i in whoop_recent]
     sleep_sorted = sorted(sleep_recent, key=lambda x: x.get("date", ""), reverse=True)
-    sleep_today  = next((s for s in sleep_sorted
+    sleep_today = next((s for s in sleep_sorted
                          if s.get("sleep_score") is not None or s.get("sleep_efficiency_pct") is not None), None)
 
     if sleep_today:
@@ -214,7 +214,7 @@ def tool_get_readiness_score(args):
         else:
             eff = float(sleep_today["sleep_efficiency_pct"])
             # 75% eff → ~50 score; 85% → ~70; 95% → ~90 (linear: score = eff - 25)
-            es_score  = _clamp(eff - 25.0)
+            es_score = _clamp(eff - 25.0)
             es_method = "derived_from_efficiency"
 
         components["sleep_quality"] = {
@@ -234,11 +234,11 @@ def tool_get_readiness_score(args):
     # ── 3. HRV 7-day trend vs 30-day baseline (20%) ───────────────────────────
     # SIMP-1 Ph1: read hrv_7d / hrv_30d from computed_metrics (single record)
     # instead of re-querying 30 days of Whoop at call time.
-    hrv_7d_avg  = float(_cm["hrv_7d"])  if _cm.get("hrv_7d")  is not None else None
+    hrv_7d_avg = float(_cm["hrv_7d"]) if _cm.get("hrv_7d") is not None else None
     hrv_30d_avg = float(_cm["hrv_30d"]) if _cm.get("hrv_30d") is not None else None
 
     if hrv_7d_avg is not None and hrv_30d_avg is not None and hrv_30d_avg > 0:
-        ratio     = hrv_7d_avg / hrv_30d_avg
+        ratio = hrv_7d_avg / hrv_30d_avg
         trend_pct = round((ratio - 1.0) * 100, 1)
         # Base 60 (neutral readiness); +10% HRV above baseline = score 80, -10% = score 40
         hrv_score = _clamp(60.0 + (ratio - 1.0) * 200.0)
@@ -257,11 +257,11 @@ def tool_get_readiness_score(args):
         # Fallback: live 30-day Whoop query (pre-compute record missing)
         whoop_30d = query_source("whoop", d30_start, end_date)
         hrv_30d_vals = [float(w["hrv"]) for w in whoop_30d if w.get("hrv") is not None]
-        hrv_7d_vals  = [float(w["hrv"]) for w in whoop_recent if w.get("hrv") is not None]
+        hrv_7d_vals = [float(w["hrv"]) for w in whoop_recent if w.get("hrv") is not None]
         if len(hrv_30d_vals) >= 7 and hrv_7d_vals:
-            baseline  = sum(hrv_30d_vals) / len(hrv_30d_vals)
-            recent7   = sum(hrv_7d_vals)  / len(hrv_7d_vals)
-            ratio     = recent7 / baseline if baseline > 0 else 1.0
+            baseline = sum(hrv_30d_vals) / len(hrv_30d_vals)
+            recent7 = sum(hrv_7d_vals) / len(hrv_7d_vals)
+            ratio = recent7 / baseline if baseline > 0 else 1.0
             trend_pct = round((ratio - 1.0) * 100, 1)
             # Base 60 (neutral readiness); +10% HRV above baseline = score 80, -10% = score 40
             hrv_score = _clamp(60.0 + (ratio - 1.0) * 200.0)
@@ -304,7 +304,7 @@ def tool_get_readiness_score(args):
         try:
             load_result = tool_get_training_load({"end_date": end_date})
             if "current_state" in load_result:
-                cs  = load_result["current_state"]
+                cs = load_result["current_state"]
                 tsb = cs.get("tsb_form", 0.0)
                 tsb_score = _clamp(70.0 + float(tsb) * 2.5)
                 components["training_form"] = {
@@ -325,7 +325,7 @@ def tool_get_readiness_score(args):
     # ── 5. Garmin Body Battery (10%) ──────────────────────────────────────────
     garmin_recent = query_source("garmin", d7_start, end_date)
     garmin_sorted = sorted(garmin_recent, key=lambda x: x.get("date", ""), reverse=True)
-    garmin_today  = next((g for g in garmin_sorted
+    garmin_today = next((g for g in garmin_sorted
                           if g.get("body_battery_end") is not None or g.get("body_battery_high") is not None), None)
 
     if garmin_today:
@@ -350,9 +350,9 @@ def tool_get_readiness_score(args):
     # ── Device agreement: Whoop vs Garmin cross-validation ───────────────────
     device_agreement = None
     if "whoop_recovery" in components and garmin_today is not None:
-        whoop_hrv_val  = components["whoop_recovery"]["raw"].get("hrv_ms")
+        whoop_hrv_val = components["whoop_recovery"]["raw"].get("hrv_ms")
         garmin_hrv_val = garmin_today.get("hrv_last_night")
-        whoop_rhr_val  = components["whoop_recovery"]["raw"].get("resting_hr")
+        whoop_rhr_val = components["whoop_recovery"]["raw"].get("resting_hr")
         garmin_rhr_val = garmin_today.get("resting_heart_rate")
 
         checks = {}
@@ -462,16 +462,16 @@ def tool_get_readiness_score(args):
 
 
 def tool_get_weight_loss_progress(args):
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", "2010-01-01")
-    profile    = get_profile()
+    profile = get_profile()
 
-    journey_start      = profile.get("journey_start_date")
-    journey_start_wt   = profile.get("journey_start_weight_lbs")
-    goal_weight        = profile.get("goal_weight_lbs")
+    journey_start = profile.get("journey_start_date")
+    journey_start_wt = profile.get("journey_start_weight_lbs")
+    goal_weight = profile.get("goal_weight_lbs")
     target_weekly_loss = profile.get("target_weekly_loss_lbs", 1.5)
-    height_in          = profile.get("height_inches", 70)
-    dob_str            = profile.get("date_of_birth")
+    height_in = profile.get("height_inches", 70)
+    dob_str = profile.get("date_of_birth")
 
     effective_start = journey_start if journey_start else start_date
 
@@ -513,7 +513,7 @@ def tool_get_weight_loss_progress(args):
 
     for pt in weight_series:
         bmi = calc_bmi(pt["weight_lbs"], height_in)
-        pt["bmi"]          = bmi
+        pt["bmi"] = bmi
         pt["bmi_category"] = bmi_category(bmi)
 
     weekly_rates = []
@@ -590,10 +590,10 @@ def tool_get_weight_loss_progress(args):
                 "note": "Scale has moved less than 1.5 lbs in 14 days. This is normal — check training load and sleep quality before changing nutrition.",
             }
 
-    start_weight   = weight_series[0]["weight_lbs"]
+    start_weight = weight_series[0]["weight_lbs"]
     current_weight = weight_series[-1]["weight_lbs"]
-    total_lost     = round(start_weight - current_weight, 1)
-    avg_weekly     = round(sum(weekly_rates) / len(weekly_rates), 2) if weekly_rates else None
+    total_lost = round(start_weight - current_weight, 1)
+    avg_weekly = round(sum(weekly_rates) / len(weekly_rates), 2) if weekly_rates else None
 
     projection = None
     if goal_weight and avg_weekly and avg_weekly > 0:
@@ -629,10 +629,10 @@ def tool_get_weight_loss_progress(args):
 
 def tool_get_body_composition_trend(args):
     start_date = args.get("start_date", "2010-01-01")
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    profile    = get_profile()
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    profile = get_profile()
     journey_start = profile.get("journey_start_date", start_date)
-    height_in     = profile.get("height_inches", 70)
+    height_in = profile.get("height_inches", 70)
 
     effective_start = journey_start if journey_start < start_date else start_date
     items = query_source("withings", effective_start, end_date)
@@ -641,27 +641,27 @@ def tool_get_body_composition_trend(args):
 
     series = []
     for item in sorted(items, key=lambda x: x.get("date", "")):
-        wt  = item.get("weight_lbs")
-        bf  = item.get("body_fat_percentage")
-        mm  = item.get("muscle_mass_lbs")
-        bm  = item.get("bone_mass_lbs")
+        wt = item.get("weight_lbs")
+        bf = item.get("body_fat_percentage")
+        mm = item.get("muscle_mass_lbs")
+        bm = item.get("bone_mass_lbs")
         visc= item.get("visceral_fat_index")
         if wt is None:
             continue
         wt = float(wt)
-        pt  = {"date": item["date"], "weight_lbs": round(wt, 1)}
+        pt = {"date": item["date"], "weight_lbs": round(wt, 1)}
         if bf is not None:
             bf = float(bf)
-            fat_lbs  = round(wt * bf / 100, 1)
+            fat_lbs = round(wt * bf / 100, 1)
             lean_lbs = round(wt - fat_lbs, 1)
-            pt["body_fat_pct"]   = round(bf, 1)
-            pt["fat_mass_lbs"]   = fat_lbs
-            pt["lean_mass_lbs"]  = lean_lbs
-            lean_kg   = lean_lbs * 0.453592
-            height_m  = height_in * 0.0254
+            pt["body_fat_pct"] = round(bf, 1)
+            pt["fat_mass_lbs"] = fat_lbs
+            pt["lean_mass_lbs"] = lean_lbs
+            lean_kg = lean_lbs * 0.453592
+            height_m = height_in * 0.0254
             pt["ffmi"] = round(lean_kg / (height_m ** 2), 1)
-        if mm  is not None: pt["muscle_mass_lbs"]     = round(float(mm), 1)
-        if bm  is not None: pt["bone_mass_lbs"]       = round(float(bm), 1)
+        if mm is not None: pt["muscle_mass_lbs"] = round(float(mm), 1)
+        if bm is not None: pt["bone_mass_lbs"] = round(float(bm), 1)
         if visc is not None: pt["visceral_fat_index"] = round(float(visc), 1)
         series.append(pt)
 
@@ -673,15 +673,15 @@ def tool_get_body_composition_trend(args):
 
     if has_composition:
         first_comp = next((pt for pt in series if "body_fat_pct" in pt), None)
-        last_comp  = next((pt for pt in reversed(series) if "body_fat_pct" in pt), None)
+        last_comp = next((pt for pt in reversed(series) if "body_fat_pct" in pt), None)
 
         if first_comp and last_comp and first_comp["date"] != last_comp["date"]:
-            wt_change   = round(last_comp["weight_lbs"]  - first_comp["weight_lbs"],  1)
-            fat_change  = round(last_comp["fat_mass_lbs"] - first_comp["fat_mass_lbs"], 1) if "fat_mass_lbs" in last_comp and "fat_mass_lbs" in first_comp else None
+            wt_change = round(last_comp["weight_lbs"] - first_comp["weight_lbs"],  1)
+            fat_change = round(last_comp["fat_mass_lbs"] - first_comp["fat_mass_lbs"], 1) if "fat_mass_lbs" in last_comp and "fat_mass_lbs" in first_comp else None
             lean_change = round(last_comp["lean_mass_lbs"] - first_comp["lean_mass_lbs"], 1) if "lean_mass_lbs" in last_comp and "lean_mass_lbs" in first_comp else None
 
-            summary["from_date"]           = first_comp["date"]
-            summary["to_date"]             = last_comp["date"]
+            summary["from_date"] = first_comp["date"]
+            summary["to_date"] = last_comp["date"]
             summary["total_weight_change"] = wt_change
             summary["fat_mass_change_lbs"] = fat_change
             summary["lean_mass_change_lbs"]= lean_change
@@ -749,14 +749,14 @@ def tool_get_body_composition_trend(args):
 
 
 def tool_get_energy_expenditure(args):
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    d30_start  = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
-    d7_start   = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
-    profile    = get_profile()
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    d30_start = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+    d7_start = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+    profile = get_profile()
 
-    height_in  = profile.get("height_inches", 70)
-    dob_str    = profile.get("date_of_birth")
-    sex        = profile.get("biological_sex", "male").lower()
+    height_in = profile.get("height_inches", 70)
+    dob_str = profile.get("date_of_birth")
+    sex = profile.get("biological_sex", "male").lower()
     target_deficit_kcal = args.get("target_deficit_kcal", 500)
 
     withings_recent = query_source("withings", d7_start, end_date)
@@ -770,9 +770,9 @@ def tool_get_energy_expenditure(args):
     if current_weight_lbs is None:
         return {"error": "No recent weight data. Ensure Withings is syncing."}
 
-    weight_kg  = current_weight_lbs * 0.453592
-    height_cm  = height_in * 2.54
-    age_years  = None
+    weight_kg = current_weight_lbs * 0.453592
+    height_cm = height_in * 2.54
+    age_years = None
     if dob_str:
         try:
             dob = datetime.strptime(dob_str, "%Y-%m-%d")
@@ -787,31 +787,31 @@ def tool_get_energy_expenditure(args):
         bmr = round(10 * weight_kg + 6.25 * height_cm - 5 * age_years + 5, 0)
 
     def exercise_kcal_from_strava(strava_items):
-        total_kj   = sum(float(d.get("total_kilojoules") or 0) for d in strava_items)
+        total_kj = sum(float(d.get("total_kilojoules") or 0) for d in strava_items)
         total_time = sum(float(d.get("total_moving_time_seconds") or 0) for d in strava_items)
         if total_kj > 0:
             return round(total_kj * 1.0, 0)
         hours = total_time / 3600
         return round(6 * weight_kg * hours, 0)
 
-    strava_7d  = query_source("strava", d7_start, end_date)
+    strava_7d = query_source("strava", d7_start, end_date)
     strava_30d = query_source("strava", d30_start, end_date)
 
-    ex_kcal_7d       = exercise_kcal_from_strava(strava_7d)
-    ex_kcal_30d      = exercise_kcal_from_strava(strava_30d)
-    ex_daily_7d_avg  = round(ex_kcal_7d / 7, 0)
+    ex_kcal_7d = exercise_kcal_from_strava(strava_7d)
+    ex_kcal_30d = exercise_kcal_from_strava(strava_30d)
+    ex_daily_7d_avg = round(ex_kcal_7d / 7, 0)
     ex_daily_30d_avg = round(ex_kcal_30d / 30, 0)
 
-    tdee_7d_avg  = round(bmr + ex_daily_7d_avg, 0)
+    tdee_7d_avg = round(bmr + ex_daily_7d_avg, 0)
     tdee_30d_avg = round(bmr + ex_daily_30d_avg, 0)
-    calorie_target_7d  = round(tdee_7d_avg  - target_deficit_kcal, 0)
+    calorie_target_7d = round(tdee_7d_avg - target_deficit_kcal, 0)
     calorie_target_30d = round(tdee_30d_avg - target_deficit_kcal, 0)
     implied_weekly_loss_lbs = round(target_deficit_kcal * 7 / 3500, 2)
 
     journey_start_wt = profile.get("journey_start_weight_lbs")
     bmr_change = None
     if journey_start_wt:
-        start_kg  = float(journey_start_wt) * 0.453592
+        start_kg = float(journey_start_wt) * 0.453592
         if sex == "female":
             bmr_start = round(10 * start_kg + 6.25 * height_cm - 5 * age_years - 161, 0)
         else:
@@ -843,22 +843,22 @@ def tool_get_energy_expenditure(args):
 
 
 def tool_get_non_scale_victories(args):
-    end_date    = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    profile     = get_profile()
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    profile = get_profile()
     journey_start = profile.get("journey_start_date")
 
     if not journey_start:
         return {"error": "journey_start_date not set in profile. Run seed_profile.py to add it."}
 
-    js_dt          = datetime.strptime(journey_start, "%Y-%m-%d")
+    js_dt = datetime.strptime(journey_start, "%Y-%m-%d")
     baseline_start = journey_start
-    baseline_end   = (js_dt + timedelta(days=30)).strftime("%Y-%m-%d")
-    recent_start   = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+    baseline_end = (js_dt + timedelta(days=30)).strftime("%Y-%m-%d")
+    recent_start = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
 
     victories = []
     comparisons = {}
 
-    whoop_base   = query_source("whoop", baseline_start, baseline_end)
+    whoop_base = query_source("whoop", baseline_start, baseline_end)
     whoop_recent = query_source("whoop", recent_start, end_date)
 
     def whoop_avg(items, field):
@@ -869,11 +869,11 @@ def tool_get_non_scale_victories(args):
         ("resting_heart_rate", "Resting Heart Rate", "bpm", "lower_is_better"),
         ("hrv",                "HRV",                "ms",  "higher_is_better"),
         ("recovery_score",     "Recovery Score",     "%",   "higher_is_better"),
-        ("sleep_duration_hours","Sleep Duration",    "hrs", "higher_is_better"),
+        ("sleep_duration_hours", "Sleep Duration",    "hrs", "higher_is_better"),
     ]
 
     for field, label, unit, direction in whoop_fields:
-        base_avg   = whoop_avg(whoop_base,   field)
+        base_avg = whoop_avg(whoop_base,   field)
         recent_avg = whoop_avg(whoop_recent, field)
         if base_avg is None or recent_avg is None:
             continue
@@ -890,7 +890,7 @@ def tool_get_non_scale_victories(args):
         if improved and abs(delta) > 1:
             victories.append(f"✅ {label}: {'+' if delta > 0 else ''}{delta} {unit} vs journey start")
 
-    strava_base   = query_source("strava", baseline_start, baseline_end)
+    strava_base = query_source("strava", baseline_start, baseline_end)
     strava_recent = query_source("strava", recent_start, end_date)
 
     def strava_sum(items, field):
@@ -899,11 +899,11 @@ def tool_get_non_scale_victories(args):
     def strava_count(items):
         return sum(int(i.get("activity_count") or 0) for i in items)
 
-    base_acts   = strava_count(strava_base)
+    base_acts = strava_count(strava_base)
     recent_acts = strava_count(strava_recent)
-    base_miles  = strava_sum(strava_base,   "total_distance_miles")
+    base_miles = strava_sum(strava_base,   "total_distance_miles")
     recent_miles= strava_sum(strava_recent, "total_distance_miles")
-    base_elev   = strava_sum(strava_base,   "total_elevation_gain_feet")
+    base_elev = strava_sum(strava_base,   "total_elevation_gain_feet")
     recent_elev = strava_sum(strava_recent, "total_elevation_gain_feet")
 
     comparisons["activity_count_30d"] = {
@@ -937,7 +937,7 @@ def tool_get_non_scale_victories(args):
             return round(total_dist / (total_time / 3600), 2)
         return None
 
-    base_speed   = avg_speed_mph(strava_base)
+    base_speed = avg_speed_mph(strava_base)
     recent_speed = avg_speed_mph(strava_recent)
     if base_speed and recent_speed:
         speed_delta = round(recent_speed - base_speed, 2)
@@ -1343,12 +1343,12 @@ def tool_get_day_type_analysis(args):
       - 'Do I eat more on training days?'
       - 'What\'s my average HRV by day type?'
     """
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    days       = int(args.get("days", 90))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    days = int(args.get("days", 90))
     start_date = args.get("start_date") or (
         datetime.now(timezone.utc) - timedelta(days=days)
     ).strftime("%Y-%m-%d")
-    metrics    = args.get("metrics", ["sleep", "recovery", "nutrition"])
+    metrics = args.get("metrics", ["sleep", "recovery", "nutrition"])
     if isinstance(metrics, str):
         metrics = [metrics]
 
@@ -1993,7 +1993,7 @@ def tool_get_hydration_score(args):
     Source: apple_health (water_intake_ml). Bodyweight target: 35ml/kg (Webb).
     Fallback guidance: Habitify manual log if Apple Health sync is incomplete.
     """
-    end   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
     target_ml_override = args.get("target_ml")
 
@@ -2078,7 +2078,7 @@ def tool_get_hydration_score(args):
             "met_target":       met_target,
             "score":            score,
             "exercise_min":     ex["total_min"] if ex else 0,
-            "exercise_avg_hr":  ex["avg_hr"]    if ex else None,
+            "exercise_avg_hr":  ex["avg_hr"] if ex else None,
         }
         daily_rows.append(row)
         if not met_target:
@@ -2106,9 +2106,9 @@ def tool_get_hydration_score(args):
             break
 
     # Correlation: exercise days vs rest days
-    ex_days   = [r for r in daily_rows if r["exercise_min"] > 20]
+    ex_days = [r for r in daily_rows if r["exercise_min"] > 20]
     rest_days = [r for r in daily_rows if r["exercise_min"] <= 20]
-    ex_avg_ml   = round(sum(r["water_ml"] for r in ex_days)   / max(1, len(ex_days)),   0) if ex_days   else None
+    ex_avg_ml = round(sum(r["water_ml"] for r in ex_days) / max(1, len(ex_days)),   0) if ex_days else None
     rest_avg_ml = round(sum(r["water_ml"] for r in rest_days) / max(1, len(rest_days)), 0) if rest_days else None
 
     # Recommendations
@@ -2227,8 +2227,8 @@ def tool_get_autonomic_balance(args):
     Provides rolling 7-day trend and state transition detection.
     Porges polyvagal theory + Huberman ANS framework.
     """
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    days       = int(args.get("days", 30))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    days = int(args.get("days", 30))
     start_date = args.get("start_date") or (
         datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=days - 1)
     ).strftime("%Y-%m-%d")
@@ -2245,7 +2245,7 @@ def tool_get_autonomic_balance(args):
 
     hrv_all = safe_list("hrv")
     rhr_all = safe_list("resting_heart_rate")
-    rr_all  = safe_list("respiratory_rate")
+    rr_all = safe_list("respiratory_rate")
     eff_all = safe_list("sleep_efficiency")
     rec_all = safe_list("recovery_score")
 
@@ -2294,14 +2294,14 @@ def tool_get_autonomic_balance(args):
     for item in items:
         hrv_val = item.get("hrv")
         rhr_val = item.get("resting_heart_rate")
-        rr_val  = item.get("respiratory_rate")
+        rr_val = item.get("respiratory_rate")
         eff_val = item.get("sleep_efficiency")
         rec_val = item.get("recovery_score")
 
         hrv_z = z_score(float(hrv_val) if hrv_val else None, baselines["hrv"])
         rhr_z = z_score(float(rhr_val) if rhr_val else None, baselines["rhr"])
-        rr_z  = z_score(float(rr_val)  if rr_val  else None, baselines["rr"])
-        eff_z = z_score(float(eff_val)  if eff_val else None, baselines["eff"])
+        rr_z = z_score(float(rr_val) if rr_val else None, baselines["rr"])
+        eff_z = z_score(float(eff_val) if eff_val else None, baselines["eff"])
 
         quadrant, energy, valence = classify_quadrant(hrv_z, rhr_z, eff_z, rr_z)
 
@@ -2318,7 +2318,7 @@ def tool_get_autonomic_balance(args):
             "valence_axis":   round(valence, 2),
             "hrv":            float(hrv_val) if hrv_val else None,
             "rhr":            float(rhr_val) if rhr_val else None,
-            "rr":             float(rr_val)  if rr_val  else None,
+            "rr":             float(rr_val) if rr_val else None,
             "efficiency":     float(eff_val) if eff_val else None,
             "recovery":       float(rec_val) if rec_val else None,
         })

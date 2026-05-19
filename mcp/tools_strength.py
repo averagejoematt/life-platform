@@ -36,7 +36,7 @@ def tool_get_exercise_history(args):
     if not exercise_name:
         return {"error": "exercise_name is required"}
     start_date = args.get("start_date", "2000-01-01")
-    end_date   = args.get("end_date", date.today().isoformat())
+    end_date = args.get("end_date", date.today().isoformat())
     include_warmups = args.get("include_warmups", False)
 
     items = query_source_range("hevy", start_date, end_date)
@@ -46,9 +46,9 @@ def tool_get_exercise_history(args):
 
     classification = classify_exercise(sessions[0]["exercise_name"])
     pr_weight = 0.0
-    pr_1rm    = 0.0
+    pr_1rm = 0.0
     pr_log_weight = []
-    pr_log_1rm    = []
+    pr_log_1rm = []
     for s in sessions:
         if s["best_weight"] > pr_weight:
             pr_weight = s["best_weight"]
@@ -58,7 +58,7 @@ def tool_get_exercise_history(args):
             pr_log_1rm.append({"date": s["date"], "estimated_1rm": s["best_1rm"]})
 
     first_1rm = sessions[0]["best_1rm"]
-    last_1rm  = sessions[-1]["best_1rm"]
+    last_1rm = sessions[-1]["best_1rm"]
     gain = round(last_1rm - first_1rm, 1) if first_1rm and last_1rm else None
 
     return {
@@ -93,10 +93,10 @@ def tool_get_exercise_history(args):
 
 def tool_get_strength_prs(args):
     """All-exercise PR leaderboard ranked by estimated 1RM."""
-    start_date    = args.get("start_date", "2000-01-01")
-    end_date      = args.get("end_date", date.today().isoformat())
+    start_date = args.get("start_date", "2000-01-01")
+    end_date = args.get("end_date", date.today().isoformat())
     muscle_filter = args.get("muscle_group_filter", "").strip().lower()
-    min_sessions  = int(args.get("min_sessions", 3))
+    min_sessions = int(args.get("min_sessions", 3))
 
     items = query_source_range("hevy", start_date, end_date)
 
@@ -168,13 +168,13 @@ def tool_get_strength_prs(args):
 def tool_get_muscle_volume(args):
     """Weekly sets per muscle group vs MEV/MAV/MRV volume landmarks."""
     start_date = args.get("start_date", "2000-01-01")
-    end_date   = args.get("end_date", date.today().isoformat())
-    period     = args.get("period", "week")  # "week" or "month"
+    end_date = args.get("end_date", date.today().isoformat())
+    period = args.get("period", "week")  # "week" or "month"
 
     items = query_source_range("hevy", start_date, end_date)
 
     start_dt = datetime.fromisoformat(start_date)
-    end_dt   = datetime.fromisoformat(end_date)
+    end_dt = datetime.fromisoformat(end_date)
     total_days = max((end_dt - start_dt).days, 1)
     num_periods = total_days / 7 if period == "week" else total_days / 30.44
 
@@ -192,12 +192,12 @@ def tool_get_muscle_volume(args):
                 n = len(normal_sets)
                 vol = sum(float(s.get("weight_lbs", 0) or 0) * int(s.get("reps", 0) or 0) for s in normal_sets)
                 for m in cls["muscle_groups"]:
-                    muscle_sets[m]   = muscle_sets.get(m, 0) + n
+                    muscle_sets[m] = muscle_sets.get(m, 0) + n
                     muscle_volume[m] = muscle_volume.get(m, 0.0) + vol
                 pattern = cls["movement_pattern"]
                 if pattern == "Push":   push_sets += n
                 elif pattern == "Pull": pull_sets += n
-                elif pattern == "Legs": leg_sets  += n
+                elif pattern == "Legs": leg_sets += n
                 elif pattern == "Core": core_sets += n
 
     period_label = "week" if period == "week" else "month"
@@ -205,7 +205,7 @@ def tool_get_muscle_volume(args):
     for muscle in sorted(muscle_sets):
         total_sets = muscle_sets[muscle]
         avg = total_sets / num_periods if num_periods > 0 else 0
-        lm  = _VOLUME_LANDMARKS.get(muscle, _VOLUME_LANDMARKS["Other"])
+        lm = _VOLUME_LANDMARKS.get(muscle, _VOLUME_LANDMARKS["Other"])
         volume_report[muscle] = {
             "total_sets": total_sets,
             f"avg_sets_per_{period_label}": round(avg, 1),
@@ -247,7 +247,7 @@ def tool_get_strength_progress(args):
     if not exercise_name:
         return {"error": "exercise_name is required"}
     start_date = args.get("start_date", "2000-01-01")
-    end_date   = args.get("end_date", date.today().isoformat())
+    end_date = args.get("end_date", date.today().isoformat())
     plateau_days = int(args.get("plateau_threshold_days", 90))
 
     items = query_source_range("hevy", start_date, end_date)
@@ -260,17 +260,17 @@ def tool_get_strength_progress(args):
     if not time_series:
         return {"error": f"No 1RM data for '{exercise_name}' (bodyweight exercise or no valid reps ≤ 10)"}
 
-    first_1rm  = time_series[0]["estimated_1rm"]
+    first_1rm = time_series[0]["estimated_1rm"]
     latest_1rm = time_series[-1]["estimated_1rm"]
     all_time_pr = max(t["estimated_1rm"] for t in time_series)
     all_time_pr_date = next(t["date"] for t in reversed(time_series) if t["estimated_1rm"] == all_time_pr)
     total_gain = round(latest_1rm - first_1rm, 1)
-    pct_gain   = round(total_gain / first_1rm * 100, 1) if first_1rm else None
+    pct_gain = round(total_gain / first_1rm * 100, 1) if first_1rm else None
 
     # Rate of gain per month
     start_dt = datetime.fromisoformat(time_series[0]["date"])
-    end_dt   = datetime.fromisoformat(time_series[-1]["date"])
-    months   = max((end_dt - start_dt).days / 30.44, 0.1)
+    end_dt = datetime.fromisoformat(time_series[-1]["date"])
+    months = max((end_dt - start_dt).days / 30.44, 0.1)
     monthly_gain = round(total_gain / months, 2)
 
     # Plateau: days since last PR
@@ -280,9 +280,9 @@ def tool_get_strength_progress(args):
         if t["estimated_1rm"] > running_pr:
             running_pr = t["estimated_1rm"]
             last_pr_date = t["date"]
-    last_pr_dt   = datetime.fromisoformat(last_pr_date)
-    days_since   = (datetime.fromisoformat(time_series[-1]["date"]) - last_pr_dt).days
-    in_plateau   = days_since >= plateau_days
+    last_pr_dt = datetime.fromisoformat(last_pr_date)
+    days_since = (datetime.fromisoformat(time_series[-1]["date"]) - last_pr_dt).days
+    in_plateau = days_since >= plateau_days
 
     # Periodization: split into thirds
     n = len(time_series)
@@ -322,7 +322,7 @@ def tool_get_strength_progress(args):
 def tool_get_workout_frequency(args):
     """Adherence metrics: streaks, gaps, monthly counts, top exercises."""
     start_date = args.get("start_date", "2000-01-01")
-    end_date   = args.get("end_date", date.today().isoformat())
+    end_date = args.get("end_date", date.today().isoformat())
 
     items = query_source_range("hevy", start_date, end_date)
 
@@ -337,8 +337,8 @@ def tool_get_workout_frequency(args):
     # Streak and gap analysis
     date_objs = [datetime.fromisoformat(d) for d in workout_dates]
     longest_streak = 1
-    cur_streak     = 1
-    longest_gap    = 0
+    cur_streak = 1
+    longest_gap = 0
     for i in range(1, len(date_objs)):
         diff = (date_objs[i] - date_objs[i-1]).days
         if diff == 1:
@@ -349,7 +349,7 @@ def tool_get_workout_frequency(args):
             longest_gap = max(longest_gap, diff)
 
     total_days = max((date_objs[-1] - date_objs[0]).days, 1)
-    avg_per_week  = round(len(workout_dates) / (total_days / 7), 2)
+    avg_per_week = round(len(workout_dates) / (total_days / 7), 2)
     avg_per_month = round(len(workout_dates) / (total_days / 30.44), 2)
 
     # Monthly breakdown
@@ -464,8 +464,8 @@ def tool_get_strength_standards(args):
 
 def tool_get_centenarian_benchmarks(args):
     """Compare compound lift 1RMs against Attia centenarian decathlon targets."""
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    bw_source  = args.get("bodyweight_source", "withings")
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    bw_source = args.get("bodyweight_source", "withings")
 
     # Get bodyweight
     bodyweight = None
@@ -510,7 +510,7 @@ def tool_get_centenarian_benchmarks(args):
                             best_1rms[lift_key] = (e1rm, date_str)
 
     lifts_out = {}
-    statuses  = []
+    statuses = []
     for lift_key in _ATTIA_TARGETS:
         if lift_key not in best_1rms:
             lifts_out[lift_key] = {
@@ -520,10 +520,10 @@ def tool_get_centenarian_benchmarks(args):
             }
             continue
         best, best_date = best_1rms[lift_key]
-        ratio  = round(best / bodyweight, 3)
+        ratio = round(best / bodyweight, 3)
         result = attia_benchmark_status(lift_key, ratio)
         result["best_estimated_1rm_lbs"] = best
-        result["date_achieved"]           = best_date
+        result["date_achieved"] = best_date
         result["lbs_to_target"] = round(
             max(0, (_ATTIA_TARGETS[lift_key]["target_ratio"] - ratio) * bodyweight), 1
         )

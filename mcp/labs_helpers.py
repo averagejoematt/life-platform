@@ -86,7 +86,7 @@ _GENOME_LAB_XREF = {
     "folate":            ["MTHFR", "MTRR"],
     "vitamin_b12":       ["MTHFR", "MTRR"],
     "omega_3_index":     ["FADS2"],
-    "testosterone_total":["SHBG"],
+    "testosterone_total": ["SHBG"],
     "apolipoprotein_b":  ["ABCG8", "SLCO1B1"],
 }
 

@@ -30,7 +30,7 @@ _MAX_ATTEMPTS = len(_BACKOFF_DELAYS) + 1  # 4
 _RETRYABLE_CODES = frozenset([429, 500, 502, 503, 504, 529])
 
 # AI model constants — override via env to avoid silent deprecation failures
-AI_MODEL       = os.environ.get("AI_MODEL",       "claude-sonnet-4-6")
+AI_MODEL = os.environ.get("AI_MODEL",       "claude-sonnet-4-6")
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 

@@ -43,21 +43,21 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-REGION     = os.environ.get("AWS_REGION", "us-west-2")
+REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-S3_BUCKET  = os.environ["S3_BUCKET"]
-DLQ_URL    = os.environ.get("DLQ_URL", "")
-RECIPIENT  = "awsdev@mattsusername.com"
-SENDER     = "awsdev@mattsusername.com"
+S3_BUCKET = os.environ["S3_BUCKET"]
+DLQ_URL = os.environ.get("DLQ_URL", "")
+RECIPIENT = "awsdev@mattsusername.com"
+SENDER = "awsdev@mattsusername.com"
 
 MAX_MESSAGES_PER_RUN = 10
-MAX_RETRY_COUNT      = 3   # treat as permanent if receive count >= this
+MAX_RETRY_COUNT = 3   # treat as permanent if receive count >= this
 
 # ── AWS clients ────────────────────────────────────────────────────────────────
-sqs     = boto3.client("sqs",        region_name=REGION)
-lam     = boto3.client("lambda",     region_name=REGION)
-ses     = boto3.client("sesv2",      region_name=REGION)
-s3      = boto3.client("s3",         region_name=REGION)
+sqs = boto3.client("sqs",        region_name=REGION)
+lam = boto3.client("lambda",     region_name=REGION)
+ses = boto3.client("sesv2",      region_name=REGION)
+s3 = boto3.client("s3",         region_name=REGION)
 
 
 # ── Classification ─────────────────────────────────────────────────────────────
@@ -224,10 +224,10 @@ def send_alert(permanent_failures: list[dict]) -> None:
     count = len(permanent_failures)
     rows = ""
     for f in permanent_failures:
-        msg_id   = f.get("message_id", "?")
-        fn_name  = f.get("function_name", "unknown")
+        msg_id = f.get("message_id", "?")
+        fn_name = f.get("function_name", "unknown")
         body_pre = str(f.get("body", ""))[:200].replace("<", "&lt;").replace(">", "&gt;")
-        s3_key   = f.get("s3_key", "")
+        s3_key = f.get("s3_key", "")
         rows += f"""
         <tr>
           <td style="padding:6px 12px;border-bottom:1px solid #333;">{msg_id[:12]}…</td>

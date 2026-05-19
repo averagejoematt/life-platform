@@ -40,11 +40,11 @@ except ImportError:
 from ingestion_framework import IngestionConfig, run_ingestion
 
 SECRET_NAME = os.environ.get("HABITIFY_SECRET_NAME", "life-platform/habitify")
-REGION      = os.environ.get("AWS_REGION", "us-west-2")
-USER_ID     = os.environ.get("USER_ID", "matthew")
-BASE_URL    = "https://api.habitify.me"
+REGION = os.environ.get("AWS_REGION", "us-west-2")
+USER_ID = os.environ.get("USER_ID", "matthew")
+BASE_URL = "https://api.habitify.me"
 MOOD_LABELS = {1: "Terrible", 2: "Bad", 3: "Okay", 4: "Good", 5: "Excellent"}
-P40_GROUPS  = ["Data", "Discipline", "Growth", "Hygiene", "Nutrition",
+P40_GROUPS = ["Data", "Discipline", "Growth", "Hygiene", "Nutrition",
                "Performance", "Recovery", "Supplements", "Wellbeing"]
 
 # AWS clients used directly by the supplement bridge (post-store hook needs DDB

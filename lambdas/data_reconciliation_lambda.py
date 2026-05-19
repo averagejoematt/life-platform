@@ -49,12 +49,12 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-REGION    = os.environ.get("AWS_REGION", "us-west-2")
-TABLE     = os.environ.get("TABLE_NAME", "life-platform")
-BUCKET    = os.environ["S3_BUCKET"]
-USER_ID   = os.environ.get("USER_ID", "matthew")
+REGION = os.environ.get("AWS_REGION", "us-west-2")
+TABLE = os.environ.get("TABLE_NAME", "life-platform")
+BUCKET = os.environ["S3_BUCKET"]
+USER_ID = os.environ.get("USER_ID", "matthew")
 RECIPIENT = os.environ["EMAIL_RECIPIENT"]
-SENDER    = os.environ["EMAIL_SENDER"]
+SENDER = os.environ["EMAIL_SENDER"]
 ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
 LOOKBACK_DAYS = int(os.environ.get("LOOKBACK_DAYS", "7"))
 
@@ -74,7 +74,7 @@ SOURCES = [
     ("computed_metrics", 7, "Computed by daily-metrics-compute"),
     ("character_sheet",  7, "Computed by character-sheet-compute"),
     ("adaptive_mode",    7, "Computed by adaptive-mode-compute"),
-    ("computed_insights",7, "Computed by daily-insight-compute"),
+    ("computed_insights", 7, "Computed by daily-insight-compute"),
     # Highly active but may miss days
     ("strava",           5, "Exercise days only — OK to miss 2+"),
     ("garmin",           5, "Exercise days only — OK to miss 2+"),
@@ -95,15 +95,15 @@ _SKIP_SOURCES = set()
 
 # ── AWS clients ────────────────────────────────────────────────────────────────
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
-table    = dynamodb.Table(TABLE)
-ses      = boto3.client("sesv2", region_name=REGION)
-secrets  = boto3.client("secretsmanager", region_name=REGION)
+table = dynamodb.Table(TABLE)
+ses = boto3.client("sesv2", region_name=REGION)
+secrets = boto3.client("secretsmanager", region_name=REGION)
 
 
 def d2f(obj):
     if isinstance(obj, Decimal): return float(obj)
-    if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, list):    return [d2f(i) for i in obj]
+    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [d2f(i) for i in obj]
     return obj
 
 
@@ -129,7 +129,7 @@ def check_source_coverage(source: str, dates: list[str]) -> dict[str, bool]:
 
 
 def coverage_emoji(present: bool | None) -> str:
-    if present is True:  return "✅"
+    if present is True: return "✅"
     if present is False: return "❌"
     return "❓"  # unknown (error)
 
@@ -150,7 +150,7 @@ def classify_severity(source_results: list[dict]) -> tuple[str, str]:
 def build_html_report(dates: list[str], source_results: list[dict], severity: str, color: str) -> str:
     """Build HTML email with reconciliation table."""
     week_start = dates[0]
-    week_end   = dates[-1]
+    week_end = dates[-1]
     day_labels = [datetime.strptime(d, "%Y-%m-%d").strftime("%a") for d in dates]
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
@@ -232,7 +232,7 @@ def lambda_handler(event, context):
             continue
         coverage = check_source_coverage(source, dates)
         days_present = sum(1 for v in coverage.values() if v is True)
-        days_missing  = sum(1 for v in coverage.values() if v is False)
+        days_missing = sum(1 for v in coverage.values() if v is False)
         # Only count as "gap" if below expected_days threshold
         # e.g. strava expected 5/7 — if only 4, that's 1 gap
         expected_present = min(expected_days, len(dates))

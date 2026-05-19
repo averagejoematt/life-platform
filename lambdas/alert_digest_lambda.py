@@ -32,10 +32,10 @@ except ImportError:
     logger = logging.getLogger("alert-digest")
     logger.setLevel(logging.INFO)
 
-REGION             = os.environ.get("AWS_REGION", "us-west-2")
-DIGEST_QUEUE_URL   = os.environ["DIGEST_QUEUE_URL"]
-EMAIL_RECIPIENT    = os.environ.get("EMAIL_RECIPIENT", "awsdev@mattsusername.com")
-EMAIL_SENDER       = os.environ.get("EMAIL_SENDER", "awsdev@mattsusername.com")
+REGION = os.environ.get("AWS_REGION", "us-west-2")
+DIGEST_QUEUE_URL = os.environ["DIGEST_QUEUE_URL"]
+EMAIL_RECIPIENT = os.environ.get("EMAIL_RECIPIENT", "awsdev@mattsusername.com")
+EMAIL_SENDER = os.environ.get("EMAIL_SENDER", "awsdev@mattsusername.com")
 
 # SQS receive-message caps at 10 per call. Loop until empty.
 MAX_RECEIVE_BATCH = 10

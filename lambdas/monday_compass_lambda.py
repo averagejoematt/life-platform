@@ -43,21 +43,21 @@ _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
 
 # ── Config ────────────────────────────────────────────────────────────────────
-REGION     = os.environ.get("AWS_REGION", "us-west-2")
+REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
-RECIPIENT  = os.environ["EMAIL_RECIPIENT"]
-SENDER     = os.environ["EMAIL_SENDER"]
-S3_BUCKET  = os.environ["S3_BUCKET"]
+USER_ID = os.environ.get("USER_ID", "matthew")
+RECIPIENT = os.environ["EMAIL_RECIPIENT"]
+SENDER = os.environ["EMAIL_SENDER"]
+S3_BUCKET = os.environ["S3_BUCKET"]
 SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/ai-keys")
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
-dynamodb   = boto3.resource("dynamodb", region_name=REGION)
-table      = dynamodb.Table(TABLE_NAME)
-ses        = boto3.client("sesv2", region_name=REGION)
-s3_client  = boto3.client("s3", region_name=REGION)
-secrets    = boto3.client("secretsmanager", region_name=REGION)
+dynamodb = boto3.resource("dynamodb", region_name=REGION)
+table = dynamodb.Table(TABLE_NAME)
+ses = boto3.client("sesv2", region_name=REGION)
+s3_client = boto3.client("s3", region_name=REGION)
+secrets = boto3.client("secretsmanager", region_name=REGION)
 
 _TODOIST_BASE = "https://api.todoist.com/api/v1"
 
@@ -120,7 +120,7 @@ _PILLAR_EMOJIS = {
     "mind":         "🧠",
     "metabolic":    "📈",
     "consistency":  "🔗",
-    "relationships":"❤️",
+    "relationships": "❤️",
     "general":      "📌",
 }
 
@@ -135,8 +135,8 @@ _PILLAR_WEIGHTS = {
 # ══════════════════════════════════════════════════════════════════════════════
 
 def d2f(obj):
-    if isinstance(obj, list):    return [d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [d2f(i) for i in obj]
+    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
     if isinstance(obj, Decimal): return float(obj)
     return obj
 
@@ -373,7 +373,7 @@ def _due_label(due):
         delta = (due_date - today).days
         if delta == 0: return "· due today"
         if delta == 1: return "· due tomorrow"
-        if delta < 0:  return f"· {abs(delta)}d overdue"
+        if delta < 0: return f"· {abs(delta)}d overdue"
         return f"· {due_date.strftime('%a')}"
     except Exception:
         return ""
@@ -381,16 +381,16 @@ def _due_label(due):
 def build_week_state_summary(health_data, profile):
     """Build human-readable week state for prompt and email."""
     metrics = health_data.get("computed_metrics", {})
-    whoop  = health_data.get("whoop_today", {})
-    char   = health_data.get("character_sheet", {})
+    whoop = health_data.get("whoop_today", {})
+    char = health_data.get("character_sheet", {})
     grades = health_data.get("day_grades", [])
 
-    recovery   = safe_float(whoop, "recovery_score")
-    hrv        = safe_float(metrics, "hrv_yesterday") or safe_float(whoop, "hrv_rmssd_ms")
-    readiness  = safe_float(metrics, "readiness_score")
-    tsb        = safe_float(metrics, "tsb")
+    recovery = safe_float(whoop, "recovery_score")
+    hrv = safe_float(metrics, "hrv_yesterday") or safe_float(whoop, "hrv_rmssd_ms")
+    readiness = safe_float(metrics, "readiness_score")
+    tsb = safe_float(metrics, "tsb")
     char_level = char.get("character_level", 1)
-    char_tier  = char.get("character_tier", "Foundation")
+    char_tier = char.get("character_tier", "Foundation")
 
     # Last week grade avg
     grade_scores = [float(g.get("day_grade", 0)) for g in grades if g.get("day_grade") is not None]
@@ -408,8 +408,8 @@ def build_week_state_summary(health_data, profile):
     if pillar_scores:
         weakest_pillar = min(pillar_scores, key=lambda x: pillar_scores[x])
 
-    start_w  = profile.get("journey_start_weight_lbs", 307)
-    goal_w   = profile.get("goal_weight_lbs", 185)
+    start_w = profile.get("journey_start_weight_lbs", 307)
+    goal_w = profile.get("goal_weight_lbs", 185)
     week_num = _compute_week_num(profile)
 
     return {
@@ -600,9 +600,9 @@ def build_user_message(week_state, todoist_data, health_data, profile,
 
     week_num = week_state.get("week_num", 1)
     start_w = week_state.get("start_weight", 307)
-    goal_w  = week_state.get("goal_weight", 185)
+    goal_w = week_state.get("goal_weight", 185)
     char_level = week_state.get("char_level", 1)
-    char_tier  = week_state.get("char_tier", "Foundation")
+    char_tier = week_state.get("char_tier", "Foundation")
     journey_context = (
         f"Week {week_num} of transformation journey ({start_w}→{goal_w} lbs). "
         f"Character Level {char_level} ({char_tier}). "
@@ -658,7 +658,7 @@ def build_user_message(week_state, todoist_data, health_data, profile,
         t0_rates = []
         for h in habit_items:
             total = int(h.get("t0_total", 0))
-            comp  = int(h.get("t0_completed", 0))
+            comp = int(h.get("t0_completed", 0))
             if total > 0:
                 t0_rates.append(round(comp / total * 100))
         if t0_rates:
@@ -734,9 +734,9 @@ def build_email_html(ai_content, week_state, today_str):
         date_label = today_str
 
     char_level = week_state.get("char_level", 1)
-    char_tier  = week_state.get("char_tier", "Foundation")
-    recovery   = week_state.get("recovery")
-    week_num   = week_state.get("week_num", 1)
+    char_tier = week_state.get("char_tier", "Foundation")
+    recovery = week_state.get("recovery")
+    week_num = week_state.get("week_num", 1)
 
     recovery_str = f"{recovery:.0f}%" if recovery is not None else "—"
     recovery_color = (
@@ -788,7 +788,7 @@ def lambda_handler(event, context):
     logger.info("Monday Compass v1.0.0 starting...")
 
     secret = get_secret()
-    api_key       = secret.get("anthropic_api_key")
+    api_key = secret.get("anthropic_api_key")
     todoist_token = secret.get("todoist_api_token") or secret.get("todoist")
 
     if not api_key:
@@ -800,7 +800,7 @@ def lambda_handler(event, context):
         logger.error("No profile found in DDB")
         return {"statusCode": 500, "body": "No profile"}
 
-    pillar_map  = load_project_pillar_map()
+    pillar_map = load_project_pillar_map()
     health_data = gather_health_data()
 
     todoist_data = {"due_this_week": [], "overdue": [], "total_due_this_week": 0, "total_overdue": 0}
@@ -813,7 +813,7 @@ def lambda_handler(event, context):
     else:
         logger.warning("No Todoist token — skipping task data")
 
-    week_state    = build_week_state_summary(health_data, profile)
+    week_state = build_week_state_summary(health_data, profile)
     board_context = _build_board_context_for_compass(week_state, todoist_data)
 
     user_message, journey_context = build_user_message(
@@ -840,7 +840,7 @@ def lambda_handler(event, context):
             logger.warning(f"[AI-3] Monday Compass warnings: {_val.warnings}")
 
     today_str = health_data.get("today_str", datetime.now(timezone.utc).date().isoformat())
-    html      = build_email_html(ai_content, week_state, today_str)
+    html = build_email_html(ai_content, week_state, today_str)
 
     try:
         dt = datetime.strptime(today_str, "%Y-%m-%d")

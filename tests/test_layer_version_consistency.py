@@ -234,6 +234,55 @@ def test_lv4_consumer_count_sanity():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# LV6 — CDK constant matches latest published layer (AWS-aware, V2 P0.2 follow-up)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@pytest.mark.integration
+def test_lv6_cdk_constant_matches_latest_published_layer():
+    """LV6: cdk/stacks/constants.py SHARED_LAYER_VERSION must equal the latest
+    published version of life-platform-shared-utils in AWS.
+
+    Failure mode this catches: a layer rebuild publishes vN+1 to AWS but the
+    constant in CDK source still says vN. The next `cdk deploy --all` would
+    silently point every Lambda at vN, downgrading every consumer.
+
+    This is the V2 P0.2 bug: constants.py was 43 while prod was 50. The first
+    5 LV tests above did NOT catch it because they're offline static-pattern
+    checks. This test queries AWS and asserts source-of-truth alignment.
+
+    Fix when this fails:
+      sed -i '' 's/SHARED_LAYER_VERSION = N/SHARED_LAYER_VERSION = M/' \\
+        cdk/stacks/constants.py
+    """
+    constants_path = os.path.join(ROOT, "cdk", "stacks", "constants.py")
+    src = open(constants_path).read()
+    m = re.search(r"^SHARED_LAYER_VERSION\s*=\s*(\d+)", src, re.MULTILINE)
+    if not m:
+        pytest.skip("SHARED_LAYER_VERSION not found in constants.py")
+    cdk_version = int(m.group(1))
+
+    try:
+        import boto3
+    except ImportError:
+        pytest.skip("boto3 unavailable")
+    try:
+        lc = boto3.client("lambda", region_name="us-west-2")
+        versions = lc.list_layer_versions(LayerName=SHARED_LAYER_NAME)["LayerVersions"]
+    except Exception as e:
+        pytest.skip(f"Could not query layer versions: {e}")
+    if not versions:
+        pytest.skip(f"Layer {SHARED_LAYER_NAME} has no versions")
+    latest = int(versions[0]["Version"])
+
+    assert cdk_version == latest, (
+        f"LV6 FAIL: CDK constants.py SHARED_LAYER_VERSION = v{cdk_version}, "
+        f"but latest published is v{latest}.\n"
+        f"  Next `cdk deploy --all` would silently regress Lambdas to v{cdk_version}.\n"
+        f"  Fix: update SHARED_LAYER_VERSION to {latest} in cdk/stacks/constants.py."
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Standalone runner
 # ══════════════════════════════════════════════════════════════════════════════
 

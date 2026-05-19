@@ -36,19 +36,19 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-REGION       = os.environ.get("AWS_REGION", "us-west-2")
-TABLE_NAME   = os.environ.get("TABLE_NAME", "life-platform")
-S3_BUCKET    = os.environ["S3_BUCKET"]
-RECIPIENT    = os.environ["EMAIL_RECIPIENT"]
-SENDER       = os.environ["EMAIL_SENDER"]
-USER_PREFIX  = "USER#matthew#SOURCE#"
+REGION = os.environ.get("AWS_REGION", "us-west-2")
+TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
+S3_BUCKET = os.environ["S3_BUCKET"]
+RECIPIENT = os.environ["EMAIL_RECIPIENT"]
+SENDER = os.environ["EMAIL_SENDER"]
+USER_PREFIX = "USER#matthew#SOURCE#"
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
-table    = dynamodb.Table(TABLE_NAME)
-s3       = boto3.client("s3", region_name=REGION)
-ses      = boto3.client("sesv2", region_name=REGION)
+table = dynamodb.Table(TABLE_NAME)
+s3 = boto3.client("s3", region_name=REGION)
+ses = boto3.client("sesv2", region_name=REGION)
 MCP_FUNCTION_URL = os.environ.get("MCP_FUNCTION_URL", "")
-MCP_SECRET_NAME  = os.environ.get("MCP_SECRET_NAME", "life-platform/mcp-api-key")
+MCP_SECRET_NAME = os.environ.get("MCP_SECRET_NAME", "life-platform/mcp-api-key")
 
 
 # ---------------------------------------------------------------------------
@@ -180,7 +180,7 @@ def check_score_sanity():
         return [Check("dashboard:parse", "Score Sanity").fail(f"Cannot load dashboard/matthew/data.json: {e}")]
 
     expected_date = yesterday_str()
-    actual_date   = data.get("date", "")
+    actual_date = data.get("date", "")
     c = Check("dashboard:date", "Score Sanity")
     if actual_date == expected_date:
         c.ok(f"Date = {actual_date}")
@@ -199,12 +199,12 @@ def check_score_sanity():
         return c.fail(f"{name} = {value}{unit} — outside plausible range [{lo},{hi}]")
 
     readiness = (data.get("readiness") or {}).get("score")
-    sleep_s   = (data.get("sleep")     or {}).get("score")
-    weight    = (data.get("weight")    or {}).get("current")
-    hrv       = (data.get("hrv")       or {}).get("value")
-    glucose   = (data.get("glucose")   or {}).get("avg")
-    grade_l   = (data.get("day_grade") or {}).get("letter")
-    grade_s   = (data.get("day_grade") or {}).get("score")
+    sleep_s = (data.get("sleep") or {}).get("score")
+    weight = (data.get("weight") or {}).get("current")
+    hrv = (data.get("hrv") or {}).get("value")
+    glucose = (data.get("glucose") or {}).get("avg")
+    grade_l = (data.get("day_grade") or {}).get("letter")
+    grade_s = (data.get("day_grade") or {}).get("score")
     hydration = (data.get("day_grade", {}).get("components") or {}).get("hydration")
 
     checks += [
@@ -296,8 +296,8 @@ def check_blog_links():
 
 def check_lambda_secrets():
     """Verify every Lambda's SECRET_NAME env var points to an existing secret."""
-    lm  = boto3.client("lambda",         region_name=REGION)
-    sm  = boto3.client("secretsmanager", region_name=REGION)
+    lm = boto3.client("lambda",         region_name=REGION)
+    sm = boto3.client("secretsmanager", region_name=REGION)
 
     # Build set of existing (non-deleted) secrets
     existing = set()
@@ -334,7 +334,7 @@ def check_lambda_secrets():
 # ---------------------------------------------------------------------------
 
 def check_avatar_assets():
-    TIERS  = ["foundation", "momentum", "discipline", "mastery", "elite"]
+    TIERS = ["foundation", "momentum", "discipline", "mastery", "elite"]
     FRAMES = [1, 2, 3]
 
     try:
@@ -473,14 +473,14 @@ def check_mcp_tool_calls():
 # ---------------------------------------------------------------------------
 
 def build_report_html(all_checks, run_time_str):
-    fails  = [c for c in all_checks if c.passed is False]
-    warns  = [c for c in all_checks if c.passed is None]
+    fails = [c for c in all_checks if c.passed is False]
+    warns = [c for c in all_checks if c.passed is None]
     passes = [c for c in all_checks if c.passed is True]
 
-    overall      = "ALL CLEAR" if not fails else f"{len(fails)} FAILURE(S)"
+    overall = "ALL CLEAR" if not fails else f"{len(fails)} FAILURE(S)"
     banner_emoji = "✅" if not fails else "🔴"
-    hdr_bg       = "#064e3b" if not fails else "#450a0a"
-    hdr_fg       = "#d1fae5" if not fails else "#fecaca"
+    hdr_bg = "#064e3b" if not fails else "#450a0a"
+    hdr_fg = "#d1fae5" if not fails else "#fecaca"
 
     cats = {}
     for c in all_checks:
@@ -524,11 +524,11 @@ def build_report_html(all_checks, run_time_str):
 
 def lambda_handler(event, context):
     try:
-        run_time     = pt_now()
+        run_time = pt_now()
         run_time_str = run_time.strftime("%A, %b %-d at %-I:%M %p PT")
         print(f"[QA] Smoke test starting — {run_time_str}")
 
-        all_checks  = []
+        all_checks = []
         all_checks += check_ddb_freshness()
         all_checks += check_s3_freshness()
         all_checks += check_score_sanity()
@@ -539,8 +539,8 @@ def lambda_handler(event, context):
 
         html = build_report_html(all_checks, run_time_str)
 
-        fails  = [c for c in all_checks if c.passed is False]
-        warns  = [c for c in all_checks if c.passed is None]
+        fails = [c for c in all_checks if c.passed is False]
+        warns = [c for c in all_checks if c.passed is None]
 
         if not fails and not warns:
             print(f"[QA] All clear — no email sent (green-only suppression)")

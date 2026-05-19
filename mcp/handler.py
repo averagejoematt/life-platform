@@ -61,7 +61,7 @@ def handle_tools_list(_params):
 
 
 def handle_tools_call(params):
-    name      = params.get("name")
+    name = params.get("name")
     arguments = params.get("arguments", {})
     if name not in TOOLS:
         raise ValueError(f"Unknown tool: {name}")
@@ -252,7 +252,7 @@ METHOD_HANDLERS = {
     "tools/list":                handle_tools_list,
     "tools/call":                handle_tools_call,
     "notifications/initialized": lambda _: None,
-    "ping":                      lambda _: {},
+    "ping": lambda _: {},
 }
 
 

@@ -574,8 +574,8 @@ def tool_get_journal_sentiment_trajectory(args):
     Seligman PERMA + Beck CBT: mood-energy divergence is a leading indicator
     of unsustainable effort or suppressed emotional processing.
     """
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    days       = int(args.get("days", 60))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    days = int(args.get("days", 60))
     start_date = args.get("start_date") or (
         datetime.now(timezone.utc) - timedelta(days=days)
     ).strftime("%Y-%m-%d")
@@ -595,13 +595,13 @@ def tool_get_journal_sentiment_trajectory(args):
         if not date_str:
             continue
 
-        mood    = entry.get("enriched_mood_score") or entry.get("mood_score")
-        energy  = entry.get("enriched_energy_score") or entry.get("energy_score")
-        stress  = entry.get("enriched_stress_score") or entry.get("stress_score")
-        themes  = entry.get("enriched_themes", [])
+        mood = entry.get("enriched_mood_score") or entry.get("mood_score")
+        energy = entry.get("enriched_energy_score") or entry.get("energy_score")
+        stress = entry.get("enriched_stress_score") or entry.get("stress_score")
+        themes = entry.get("enriched_themes", [])
         emotions = entry.get("enriched_emotions", [])
         ownership = entry.get("enriched_ownership_score")
-        social_q  = entry.get("enriched_social_quality")
+        social_q = entry.get("enriched_social_quality")
 
         if mood is None and energy is None and stress is None:
             continue
@@ -633,7 +633,7 @@ def tool_get_journal_sentiment_trajectory(args):
             })
         return result
 
-    mood_trend   = rolling_avg(daily_signals, "mood")
+    mood_trend = rolling_avg(daily_signals, "mood")
     energy_trend = rolling_avg(daily_signals, "energy")
     stress_trend = rolling_avg(daily_signals, "stress")
 
@@ -649,7 +649,7 @@ def tool_get_journal_sentiment_trajectory(args):
             return round(result[0], 3), round(result[1], 2)  # slope, intercept
         return None, None
 
-    mood_slope, _   = compute_slope(daily_signals, "mood")
+    mood_slope, _ = compute_slope(daily_signals, "mood")
     energy_slope, _ = compute_slope(daily_signals, "energy")
     stress_slope, _ = compute_slope(daily_signals, "stress")
 
@@ -703,7 +703,7 @@ def tool_get_journal_sentiment_trajectory(args):
                 inflections.append({"date": trend_data[i]["date"], "type": "peak", "value": avgs[i]})
         return inflections
 
-    mood_inflections   = find_inflections(mood_trend)
+    mood_inflections = find_inflections(mood_trend)
     energy_inflections = find_inflections(energy_trend)
 
     # ── Theme frequency (top recurring themes) ──

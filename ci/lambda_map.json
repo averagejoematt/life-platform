@@ -39,9 +39,6 @@
     "lambdas/dropbox_poll_lambda.py": {
       "function": "dropbox-poll"
     },
-    "lambdas/weather_handler.py": {
-      "function": "weather-data-ingestion"
-    },
     "lambdas/enrichment_lambda.py": {
       "function": "activity-enrichment"
     },
@@ -204,6 +201,9 @@
     },
     "lambdas/coach_quality_gate.py": {
       "function": "coach-quality-gate"
+    },
+    "lambdas/weather_lambda.py": {
+      "function": "weather-data-ingestion"
     }
   },
   "mcp": {
@@ -332,7 +332,6 @@
       "lambdas/site_api_ai_lambda.py",
       "lambdas/auth_breaker.py",
       "lambdas/compute_metadata.py",
-      "lambdas/email_framework.py",
       "lambdas/http_retry.py",
       "lambdas/intelligence_common.py",
       "lambdas/numeric.py",

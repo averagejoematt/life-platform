@@ -55,8 +55,8 @@ DOWNLOAD_URL = "https://content.dropboxapi.com/2/files/download"
 DELETE_URL = "https://api.dropboxapi.com/2/files/delete_v2"
 
 # ── Config (env vars with backwards-compatible defaults) ──
-REGION     = os.environ.get("AWS_REGION", "us-west-2")
-USER_ID    = os.environ.get("USER_ID", "matthew")
+REGION = os.environ.get("AWS_REGION", "us-west-2")
+USER_ID = os.environ.get("USER_ID", "matthew")
 
 PK_TRACKER = f"USER#{USER_ID}#SOURCE#dropbox_tracker"
 
@@ -392,7 +392,7 @@ def lambda_handler(event, context):
     if _HAS_AUTH_BREAKER:
         marker = check_breaker(table, source_name="dropbox", user_id=USER_ID, logger=logger)
         if marker:
-            logger.warning(f"auth_breaker_skip source=dropbox marked_at={marker.get('marked_at')} error={marker.get('error','')[:80]}")
+            logger.warning(f"auth_breaker_skip source=dropbox marked_at={marker.get('marked_at')} error={marker.get('error', '')[:80]}")
             return {"statusCode": 200, "body": json.dumps({
                 "skipped": "auth_failure_circuit_breaker",
                 "marked_at": marker.get("marked_at"),

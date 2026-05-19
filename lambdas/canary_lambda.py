@@ -54,10 +54,10 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-REGION     = os.environ.get("AWS_REGION", "us-west-2")
+REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-S3_BUCKET  = os.environ["S3_BUCKET"]
-MCP_URL    = os.environ.get("MCP_FUNCTION_URL", "")   # set from deploy script
+S3_BUCKET = os.environ["S3_BUCKET"]
+MCP_URL = os.environ.get("MCP_FUNCTION_URL", "")   # set from deploy script
 MCP_SECRET = os.environ.get("MCP_SECRET_NAME", "life-platform/mcp-api-key")
 
 # Reentry sweep (2026-05-03): Anthropic API canary — catches the "API access
@@ -67,18 +67,18 @@ MCP_SECRET = os.environ.get("MCP_SECRET_NAME", "life-platform/mcp-api-key")
 ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
 ANTHROPIC_API_BASE = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_CANARY_MODEL = os.environ.get("ANTHROPIC_CANARY_MODEL", "claude-haiku-4-5-20251001")
-SENDER     = os.environ["EMAIL_SENDER"]
-RECIPIENT  = os.environ["EMAIL_RECIPIENT"]
+SENDER = os.environ["EMAIL_SENDER"]
+RECIPIENT = os.environ["EMAIL_RECIPIENT"]
 
-CANARY_PK  = "CANARY#matthew"
+CANARY_PK = "CANARY#matthew"
 
 # ── AWS clients ────────────────────────────────────────────────────────────────
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
-table    = dynamodb.Table(TABLE_NAME)
-s3       = boto3.client("s3", region_name=REGION)
-ses      = boto3.client("sesv2", region_name=REGION)
-cw       = boto3.client("cloudwatch", region_name=REGION)
-secrets  = boto3.client("secretsmanager", region_name=REGION)
+table = dynamodb.Table(TABLE_NAME)
+s3 = boto3.client("s3", region_name=REGION)
+ses = boto3.client("sesv2", region_name=REGION)
+cw = boto3.client("cloudwatch", region_name=REGION)
+secrets = boto3.client("secretsmanager", region_name=REGION)
 
 CW_NAMESPACE = "LifePlatform/Canary"
 

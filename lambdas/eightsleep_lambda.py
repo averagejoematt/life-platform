@@ -94,17 +94,17 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 # ── Constants ──────────────────────────────────────────────────────────────────
-SECRET_NAME    = "life-platform/eightsleep"
+SECRET_NAME = "life-platform/eightsleep"
 # ── Config (env vars with backwards-compatible defaults) ──
-REGION         = os.environ.get("AWS_REGION", "us-west-2")
-S3_BUCKET      = os.environ["S3_BUCKET"]
+REGION = os.environ.get("AWS_REGION", "us-west-2")
+S3_BUCKET = os.environ["S3_BUCKET"]
 DYNAMODB_TABLE = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID        = os.environ.get("USER_ID", "matthew")
-LOOKBACK_DAYS  = int(os.environ.get("LOOKBACK_DAYS", "7"))
+USER_ID = os.environ.get("USER_ID", "matthew")
+LOOKBACK_DAYS = int(os.environ.get("LOOKBACK_DAYS", "7"))
 
 # Eight Sleep API bases
 CLIENT_API = "https://client-api.8slp.net"
-AUTH_API   = "https://auth-api.8slp.net"
+AUTH_API = "https://auth-api.8slp.net"
 
 # OAuth2 client credentials — loaded from Secrets Manager at first use
 _es_client_cache = None
@@ -126,10 +126,10 @@ def _get_es_client_creds():
 # where we care about consistency rather than exact precision.
 _TZ_OFFSETS = {
     "America/Los_Angeles": -8,
-    "America/Vancouver":   -8,
-    "America/Denver":      -7,
-    "America/Chicago":     -6,
-    "America/New_York":    -5,
+    "America/Vancouver": -8,
+    "America/Denver": -7,
+    "America/Chicago": -6,
+    "America/New_York": -5,
     "Europe/London":        0,
     "Europe/Paris":         1,
     "Europe/Berlin":        1,
@@ -140,9 +140,9 @@ _DEFAULT_TZ_OFFSET = -8  # PST (Seattle)
 
 # ── AWS clients (module-level — reused across Lambda warm invocations) ─────────
 secrets_client = boto3.client("secretsmanager", region_name=REGION)
-s3_client      = boto3.client("s3",             region_name=REGION)
-dynamodb       = boto3.resource("dynamodb",      region_name=REGION)
-table          = dynamodb.Table(DYNAMODB_TABLE)
+s3_client = boto3.client("s3",             region_name=REGION)
+dynamodb = boto3.resource("dynamodb",      region_name=REGION)
+table = dynamodb.Table(DYNAMODB_TABLE)
 
 # COST-OPT-1: Cache secrets in warm Lambda containers (15-min TTL)
 _secret_cache = {}
@@ -221,7 +221,7 @@ def login(email: str, password: str, client_id: str = None, client_secret: str =
 def refresh_token(secret: dict) -> dict:
     """Re-login to get a fresh token (Eight Sleep v1 has no refresh endpoint)."""
     token_data = login(secret["email"], secret["password"])
-    secret["access_token"]  = token_data["access_token"]
+    secret["access_token"] = token_data["access_token"]
     secret["refresh_token"] = token_data["refresh_token"]
     return secret
 
@@ -317,14 +317,14 @@ def compute_derived_fields(record: dict, tz_offset: int = _DEFAULT_TZ_OFFSET) ->
     """
     derived = {}
 
-    sleep_h     = record.get("sleep_duration_hours")
-    awake_h     = record.get("awake_hours")
+    sleep_h = record.get("sleep_duration_hours")
+    awake_h = record.get("awake_hours")
     latency_min = record.get("time_to_sleep_min")
-    rem_h       = record.get("rem_hours")
-    deep_h      = record.get("deep_hours")
-    light_h     = record.get("light_hours")
+    rem_h = record.get("rem_hours")
+    deep_h = record.get("deep_hours")
+    light_h = record.get("light_hours")
     sleep_start = record.get("sleep_start")
-    sleep_end   = record.get("sleep_end")
+    sleep_end = record.get("sleep_end")
 
     # ── Time in bed & sleep efficiency ────────────────────────────────────────
     if sleep_h is not None and awake_h is not None:
@@ -344,13 +344,13 @@ def compute_derived_fields(record: dict, tz_offset: int = _DEFAULT_TZ_OFFSET) ->
     # ── Stage percentages ─────────────────────────────────────────────────────
     if sleep_h and float(sleep_h) > 0:
         sh = float(sleep_h)
-        if rem_h   is not None: derived["rem_pct"]   = round(float(rem_h)   / sh * 100, 1)
-        if deep_h  is not None: derived["deep_pct"]  = round(float(deep_h)  / sh * 100, 1)
+        if rem_h is not None: derived["rem_pct"] = round(float(rem_h) / sh * 100, 1)
+        if deep_h is not None: derived["deep_pct"] = round(float(deep_h) / sh * 100, 1)
         if light_h is not None: derived["light_pct"] = round(float(light_h) / sh * 100, 1)
 
     # ── Circadian timing ──────────────────────────────────────────────────────
     onset_h = _hour_of_day(sleep_start, tz_offset) if sleep_start else None
-    wake_h  = _hour_of_day(sleep_end,   tz_offset) if sleep_end   else None
+    wake_h = _hour_of_day(sleep_end,   tz_offset) if sleep_end else None
 
     if onset_h is not None:
         derived["sleep_onset_hour"] = onset_h
@@ -532,28 +532,28 @@ def parse_trends_for_date(
     if target is None and len(days) == 1:
         target = days[0]
     if target is None:
-        print(f"No day matching {wake_date}. Available: {[d.get('day','?') for d in days]}")
+        print(f"No day matching {wake_date}. Available: {[d.get('day', '?') for d in days]}")
         return None
 
     def secs_to_hours(s):
         return round(s / 3600.0, 2) if s else None
 
-    sleep_s    = target.get("sleepDuration") or 0
+    sleep_s = target.get("sleepDuration") or 0
     presence_s = target.get("presenceDuration") or 0
-    awake_s    = max(presence_s - sleep_s, 0)
+    awake_s = max(presence_s - sleep_s, 0)
 
-    sq  = target.get("sleepQualityScore") or {}
-    sr  = target.get("sleepRoutineScore") or {}
+    sq = target.get("sleepQualityScore") or {}
+    sr = target.get("sleepRoutineScore") or {}
 
-    hr_avg    = _safe_float((sq.get("heartRate")       or {}).get("current"))
-    hrv_avg   = _safe_float((sq.get("hrv")             or {}).get("current"))
+    hr_avg = _safe_float((sq.get("heartRate") or {}).get("current"))
+    hrv_avg = _safe_float((sq.get("hrv") or {}).get("current"))
     resp_rate = _safe_float((sq.get("respiratoryRate") or {}).get("current"))
 
-    latency_s   = (sr.get("latencyAsleepSeconds") or {}).get("current")
+    latency_s = (sr.get("latencyAsleepSeconds") or {}).get("current")
     latency_min = round(float(latency_s) / 60.0, 1) if latency_s else None
 
     sleep_start = target.get("sleepStart")
-    sleep_end   = target.get("sleepEnd")
+    sleep_end = target.get("sleepEnd")
 
     record = {
         "sleep_score":          _safe_float(target.get("score")),

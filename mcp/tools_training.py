@@ -27,10 +27,10 @@ from mcp.helpers import (
 from mcp.tools_correlation import tool_get_zone2_breakdown
 
 def tool_get_training_load(args):
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    start_dt   = datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=180)
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_dt = datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=180)
     start_date = args.get("start_date", start_dt.strftime("%Y-%m-%d"))
-    warmup_dt  = datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=84)
+    warmup_dt = datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=84)
     warmup_start = warmup_dt.strftime("%Y-%m-%d")
 
     cardio_source = get_sot("cardio")
@@ -59,7 +59,7 @@ def tool_get_training_load(args):
     for (date_str, ctl), (_, atl) in zip(ctl_series, atl_series):
         if datetime.strptime(date_str, "%Y-%m-%d") < start_dt_req:
             continue
-        tsb  = round(ctl - atl, 2)
+        tsb = round(ctl - atl, 2)
         acwr = round(atl / ctl, 2) if ctl > 0 else None
 
         risk = "low"
@@ -129,15 +129,15 @@ def tool_get_training_load(args):
 
 def tool_get_personal_records(args):
     end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    profile  = get_profile()
-    dob_str  = profile.get("date_of_birth")
+    profile = get_profile()
+    dob_str = profile.get("date_of_birth")
 
     def age_at(date_str):
         if not dob_str or not date_str:
             return None
         try:
             dob = datetime.strptime(dob_str, "%Y-%m-%d")
-            d   = datetime.strptime(date_str, "%Y-%m-%d")
+            d = datetime.strptime(date_str, "%Y-%m-%d")
             return round((d - dob).days / 365.25, 1)
         except Exception:
             return None
@@ -152,7 +152,7 @@ def tool_get_personal_records(args):
     pr_sources = parallel_query_sources([get_sot("cardio"), get_sot("physiology"), get_sot("body")], "2000-01-01", end_date)
 
     strava_days = pr_sources.get(get_sot("cardio"), [])
-    all_acts    = []
+    all_acts = []
     for day in strava_days:
         all_acts.extend(flatten_strava_activity(day))
 
@@ -183,7 +183,7 @@ def tool_get_personal_records(args):
     day_fields = {
         "biggest_day_miles":     ("total_distance_miles",      "max"),
         "biggest_day_elevation": ("total_elevation_gain_feet", "max"),
-        "most_activities_in_day":("activity_count",            "max"),
+        "most_activities_in_day": ("activity_count",            "max"),
     }
     for label, (field, mode) in day_fields.items():
         candidates = [(float(d[field]), d) for d in strava_days if d.get(field)]
@@ -202,17 +202,17 @@ def tool_get_personal_records(args):
         if not date_str:
             continue
         try:
-            dt  = datetime.strptime(date_str, "%Y-%m-%d")
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
             key = f"{dt.isocalendar()[0]}-W{dt.isocalendar()[1]:02d}"
         except ValueError:
             continue
         weeks[key]["miles"] += float(day.get("total_distance_miles") or 0)
-        weeks[key]["elev"]  += float(day.get("total_elevation_gain_feet") or 0)
+        weeks[key]["elev"] += float(day.get("total_elevation_gain_feet") or 0)
         weeks[key]["dates"].append(date_str)
 
     if weeks:
         best_week_miles = max(weeks.items(), key=lambda x: x[1]["miles"])
-        best_week_elev  = max(weeks.items(), key=lambda x: x[1]["elev"])
+        best_week_elev = max(weeks.items(), key=lambda x: x[1]["elev"])
         records["biggest_week_miles"] = {
             "value": round(best_week_miles[1]["miles"], 2),
             "week":  best_week_miles[0],
@@ -232,7 +232,7 @@ def tool_get_personal_records(args):
         "lowest_resting_hr_bpm":    ("resting_heart_rate",  "min"),
         "best_recovery_score":      ("recovery_score",      "max"),
         "highest_strain":           ("strain",              "max"),
-        "longest_sleep_hours":      ("sleep_duration_hours","max"),
+        "longest_sleep_hours":      ("sleep_duration_hours", "max"),
         "worst_recovery_score":     ("recovery_score",      "min"),
     }
     for label, (field, mode) in whoop_fields.items():
@@ -292,19 +292,19 @@ def tool_get_cross_source_correlation(args):
     """
     import math
 
-    source_a   = args.get("source_a")
-    field_a    = args.get("field_a")
-    source_b   = args.get("source_b")
-    field_b    = args.get("field_b")
+    source_a = args.get("source_a")
+    field_a = args.get("field_a")
+    source_b = args.get("source_b")
+    field_b = args.get("field_b")
     start_date = args.get("start_date", "2019-01-01")
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    lag_days   = int(args.get("lag_days", 0))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    lag_days = int(args.get("lag_days", 0))
 
     if not all([source_a, field_a, source_b, field_b]):
         raise ValueError("source_a, field_a, source_b, field_b are all required")
 
-    lag_end_dt  = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=abs(lag_days))
-    lag_end     = lag_end_dt.strftime("%Y-%m-%d")
+    lag_end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=abs(lag_days))
+    lag_end = lag_end_dt.strftime("%Y-%m-%d")
 
     items_a = query_source(source_a, start_date, lag_end)
     items_b = query_source(source_b, start_date, lag_end)
@@ -354,7 +354,7 @@ def tool_get_cross_source_correlation(args):
 
     xs = [p[1] for p in pairs]
     ys = [p[2] for p in pairs]
-    r  = pearson_r(xs, ys)
+    r = pearson_r(xs, ys)
 
     # ── P-value (two-tailed t-test, df = n-2) ───────────────────────────────
     p_value = None
@@ -395,7 +395,7 @@ def tool_get_cross_source_correlation(args):
     if r is not None and abs(r) < 1.0 and n > 3:
         try:
             z_r = math.atanh(r)  # Fisher z
-            se  = 1.0 / math.sqrt(n - 3)
+            se = 1.0 / math.sqrt(n - 3)
             z_crit = 1.96  # 95% two-tailed
             ci_lower = round(math.tanh(z_r - z_crit * se), 3)
             ci_upper = round(math.tanh(z_r + z_crit * se), 3)
@@ -484,15 +484,15 @@ def tool_get_cross_source_correlation(args):
 
 
 def tool_get_seasonal_patterns(args):
-    source     = args.get("source")
+    source = args.get("source")
     start_date = args.get("start_date", "2010-01-01")
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
 
     sources_to_query = [source] if source and source in SOURCES else SOURCES
     skip_fields = {"pk", "sk", "source", "ingested_at", "date", "activities", "sport_types"}
 
-    month_names = {1:"January",2:"February",3:"March",4:"April",5:"May",6:"June",
-                   7:"July",8:"August",9:"September",10:"October",11:"November",12:"December"}
+    month_names = {1: "January", 2: "February", 3: "March", 4: "April", 5: "May", 6: "June",
+                   7: "July", 8: "August", 9: "September", 10: "October", 11: "November", 12: "December"}
 
     cache_key = f"seasonal_patterns_{start_date}_{end_date}_{','.join(sources_to_query)}"
     cached = ddb_cache_get(cache_key) or mem_cache_get(cache_key)
@@ -511,7 +511,7 @@ def tool_get_seasonal_patterns(args):
             continue
 
         month_buckets = defaultdict(lambda: defaultdict(list))
-        year_counts   = defaultdict(set)
+        year_counts = defaultdict(set)
 
         for item in items:
             if "#WORKOUT#" in item.get("sk", ""):
@@ -521,7 +521,7 @@ def tool_get_seasonal_patterns(args):
                 continue
             try:
                 month = int(date_str[5:7])
-                year  = date_str[:4]
+                year = date_str[:4]
             except ValueError:
                 continue
             year_counts[month].add(year)
@@ -1603,12 +1603,12 @@ def tool_get_lactate_threshold_estimate(args):
     Linear regression on cardiac_efficiency reveals direction and rate of change.
     Chen: proxy lactate curve from HR drift over repeated steady-state efforts.
     """
-    end   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
-    zone2_low      = float(args.get("zone2_hr_low",      110))
-    zone2_high     = float(args.get("zone2_hr_high",     139))
-    min_duration   = float(args.get("min_duration_min",   20))
-    sport_filter   = (args.get("sport_type") or "").lower()
+    zone2_low = float(args.get("zone2_hr_low",      110))
+    zone2_high = float(args.get("zone2_hr_high",     139))
+    min_duration = float(args.get("min_duration_min",   20))
+    sport_filter = (args.get("sport_type") or "").lower()
 
     strava = query_source("strava", start, end)
     if not strava:
@@ -1622,9 +1622,9 @@ def tool_get_lactate_threshold_estimate(args):
             sport = (a.get("sport_type") or a.get("type") or "").lower()
             if sport_filter and sport_filter not in sport:
                 continue
-            hr  = float(a.get("average_heartrate") or 0)
+            hr = float(a.get("average_heartrate") or 0)
             sec = float(a.get("moving_time_seconds") or a.get("elapsed_time_seconds") or 0)
-            mi  = float(a.get("distance_miles") or 0)
+            mi = float(a.get("distance_miles") or 0)
             if hr < zone2_low or hr > zone2_high:
                 continue
             dur_min = sec / 60
@@ -1662,7 +1662,7 @@ def tool_get_lactate_threshold_estimate(args):
 
     third = max(1, n // 3)
     early_avg = sum(ce_vals[:third]) / third
-    late_avg  = sum(ce_vals[-third:]) / third
+    late_avg = sum(ce_vals[-third:]) / third
     pct_change = round((late_avg - early_avg) / early_avg * 100, 1) if early_avg > 0 else None
 
     if slope is None or n < 4:
@@ -1733,11 +1733,11 @@ def tool_get_exercise_efficiency_trend(args):
     per sport type to detect improvement signal.
     Attia: pace-at-HR over time is the purest fitness signal available from consumer data.
     """
-    end         = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    start       = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
-    min_hr      = float(args.get("min_hr", 100))
-    min_dur     = float(args.get("min_duration_min", 10))
-    sport_type  = (args.get("sport_type") or "").lower()
+    end = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
+    min_hr = float(args.get("min_hr", 100))
+    min_dur = float(args.get("min_duration_min", 10))
+    sport_type = (args.get("sport_type") or "").lower()
 
     strava = query_source("strava", start, end)
     if not strava:
@@ -1752,9 +1752,9 @@ def tool_get_exercise_efficiency_trend(args):
             sport = (a.get("sport_type") or a.get("type") or "").lower()
             if sport_type and sport_type not in sport:
                 continue
-            hr  = float(a.get("average_heartrate") or 0)
+            hr = float(a.get("average_heartrate") or 0)
             sec = float(a.get("moving_time_seconds") or a.get("elapsed_time_seconds") or 0)
-            mi  = float(a.get("distance_miles") or 0)
+            mi = float(a.get("distance_miles") or 0)
             dur_min = sec / 60
             if hr < min_hr or dur_min < min_dur or mi < 0.5:
                 continue
@@ -1786,7 +1786,7 @@ def tool_get_exercise_efficiency_trend(args):
 
         third = max(1, n // 3)
         early_avg = sum(ce_vals[:third]) / third
-        late_avg  = sum(ce_vals[-third:]) / third
+        late_avg = sum(ce_vals[-third:]) / third
         pct_delta = round((late_avg - early_avg) / early_avg * 100, 1) if early_avg > 0 else None
 
         if slope is None or n < 3:
@@ -1837,8 +1837,8 @@ def tool_get_acwr_status(args):
     Reads pre-computed acwr fields from the computed_metrics partition.
     Falls back to live computation from Whoop strain if pre-computed record is missing.
     """
-    end_date   = args.get("date", (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"))
-    days_back  = int(args.get("days_back", 14))   # how many days of history to return
+    end_date = args.get("date", (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"))
+    days_back = int(args.get("days_back", 14))   # how many days of history to return
 
     def _sf(v):
         if v is None: return None
@@ -1888,8 +1888,8 @@ def tool_get_acwr_status(args):
     alerts_7d = sum(1 for h in history[:7] if h.get("alert"))
 
     # ── Board coaching note ──────────────────────────────────────────────────
-    zone    = latest.get("zone", "unknown")
-    acwr    = latest.get("acwr")
+    zone = latest.get("zone", "unknown")
+    acwr = latest.get("acwr")
     coaching = None
     if zone == "danger":
         coaching = "Attia + Galpin: ACWR above 1.5 is the strongest predictor of non-contact injury in the next 7 days. Rest is not optional this week."

@@ -62,18 +62,18 @@ except ImportError:
     logger = logging.getLogger("daily-insight-compute")
     logger.setLevel(logging.INFO)
 
-_REGION     = os.environ.get("AWS_REGION", "us-west-2")
-TABLE_NAME  = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID     = os.environ.get("USER_ID", "matthew")
+_REGION = os.environ.get("AWS_REGION", "us-west-2")
+TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
+USER_ID = os.environ.get("USER_ID", "matthew")
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
-PROFILE_PK  = f"USER#{USER_ID}"
+PROFILE_PK = f"USER#{USER_ID}"
 
-ANTHROPIC_API  = "https://api.anthropic.com/v1/messages"
+ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
 _api_key_cache = None
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
-table    = dynamodb.Table(TABLE_NAME)
+table = dynamodb.Table(TABLE_NAME)
 
 # AI model constant — read from env so model can be updated without redeployment
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
@@ -89,15 +89,15 @@ DECISION_FATIGUE_HABIT_THRESHOLD = float(os.environ.get("DECISION_FATIGUE_HABIT_
 # ==============================================================================
 
 def d2f(obj):
-    if isinstance(obj, list):    return [d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [d2f(i) for i in obj]
+    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
     if isinstance(obj, Decimal): return float(obj)
     return obj
 
 
 def safe_float(rec, field, default=None):
     if rec and field in rec:
-        try:   return float(rec[field])
+        try: return float(rec[field])
         except Exception: return default
     return default
 
@@ -146,7 +146,7 @@ def fetch_memory_records(category, days=30):
     start = (today - timedelta(days=days)).isoformat()
     pk = USER_PREFIX + "platform_memory"
     start_sk = f"MEMORY#{category}#{start}"
-    end_sk   = f"MEMORY#{category}#~"
+    end_sk = f"MEMORY#{category}#~"
     try:
         resp = table.query(
             KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
@@ -214,12 +214,12 @@ def detect_metric_trends(computed_records_7d):
     Returns: (declining_list, improving_list), each item:
       {metric, consecutive_days, current, baseline_7d_avg, delta_pct}
     """
-    TOP_METRICS  = ["day_grade_score", "readiness_score"]
+    TOP_METRICS = ["day_grade_score", "readiness_score"]
     COMP_METRICS = ["sleep_quality", "recovery", "nutrition", "movement", "habits_mvp"]
 
     series = {m: [] for m in TOP_METRICS + COMP_METRICS}
     for rec in sorted(computed_records_7d, key=lambda x: x.get("date", "")):
-        date_str    = rec.get("date") or rec.get("sk", "").replace("DATE#", "")
+        date_str = rec.get("date") or rec.get("sk", "").replace("DATE#", "")
         comp_scores = rec.get("component_scores", {})
         for m in TOP_METRICS:
             val = safe_float(rec, m)
@@ -234,7 +234,7 @@ def detect_metric_trends(computed_records_7d):
     for metric, pts in series.items():
         if len(pts) < 3:
             continue
-        recent      = pts[-3:]
+        recent = pts[-3:]
         baseline_7d = round(sum(v for _, v in pts) / len(pts), 1)
 
         if all(recent[i][1] < recent[i - 1][1] for i in range(1, len(recent))):
@@ -270,7 +270,7 @@ def compute_habit_patterns(habit_score_records_7d, profile):
         return {}, [], [], {}
 
     t0_miss_counts = {}
-    t0_total_days  = 0
+    t0_total_days = 0
     for rec in habit_score_records_7d:
         missed = rec.get("missed_tier0") or []
         t0_total_days += 1
@@ -293,14 +293,14 @@ def compute_habit_patterns(habit_score_records_7d, profile):
     for name, meta in registry.items():
         if meta.get("status") != "active" or meta.get("tier", 2) != 0:
             continue
-        days_missed    = t0_miss_counts.get(name, 0)
+        days_missed = t0_miss_counts.get(name, 0)
         days_available = t0_total_days
         if days_available > 0:
             t0_completion_rates[name] = round(1 - days_missed / days_available, 2)
 
     strongest = [h for h, r in sorted(t0_completion_rates.items(), key=lambda x: -x[1])
                  if r >= 0.8][:5]
-    weakest   = [h for h, r in sorted(t0_completion_rates.items(), key=lambda x: x[1])
+    weakest = [h for h, r in sorted(t0_completion_rates.items(), key=lambda x: x[1])
                  if r <= 0.4][:5]
 
     return miss_rates, strongest, weakest, synergy_health
@@ -332,8 +332,8 @@ def build_memory_context():
         lines.append("WHAT HAS WORKED (recent episodes):")
         for rec in what_worked[:2]:
             conditions = rec.get("conditions", "")
-            behaviors  = rec.get("behaviors", "")
-            outcomes   = rec.get("outcomes", "")
+            behaviors = rec.get("behaviors", "")
+            outcomes = rec.get("outcomes", "")
             if conditions or behaviors:
                 lines.append(f"  When {conditions}: {behaviors} → {outcomes}"[:150])
 
@@ -418,32 +418,32 @@ def _fetch_execution_metrics(date_str, profile):
 
     Returns a compact dict with enough context for Haiku evaluation.
     """
-    metrics     = {}
-    cal_target  = profile.get("calorie_target", 1800)
+    metrics = {}
+    cal_target = profile.get("calorie_target", 1800)
     prot_target = profile.get("protein_target_g", 190)
 
     # Nutrition (MacroFactor)
     mf = fetch_date("macrofactor", date_str)
     if mf:
-        cal   = safe_float(mf, "total_calories_kcal")
-        prot  = safe_float(mf, "total_protein_g")
+        cal = safe_float(mf, "total_calories_kcal")
+        prot = safe_float(mf, "total_protein_g")
         items = len(mf.get("food_log", []))
         if cal is not None:
-            metrics["calories_logged"]   = int(cal)
-            metrics["calorie_target"]    = cal_target
+            metrics["calories_logged"] = int(cal)
+            metrics["calorie_target"] = cal_target
             metrics["food_items_logged"] = items
             if cal < cal_target * 0.65:
                 metrics["nutrition_note"] = (
                     f"Likely incomplete log -- only {int(cal)} cal logged vs {cal_target} target"
                 )
         if prot is not None:
-            metrics["protein_g"]        = int(prot)
+            metrics["protein_g"] = int(prot)
             metrics["protein_target_g"] = prot_target
 
     # Activity (Strava)
     strava = fetch_date("strava", date_str)
     if strava:
-        act_count  = int(strava.get("activity_count") or 0)
+        act_count = int(strava.get("activity_count") or 0)
         activities = strava.get("activities", [])
         metrics["exercise_sessions"] = act_count
         if activities:
@@ -464,10 +464,10 @@ def _fetch_execution_metrics(date_str, profile):
     # Habits (habit_scores partition)
     hs = fetch_date("habit_scores", date_str)
     if hs:
-        t0_done  = int(hs.get("tier0_done") or 0)
+        t0_done = int(hs.get("tier0_done") or 0)
         t0_total = int(hs.get("tier0_total") or 0)
         if t0_total > 0:
-            metrics["habit_tier0_pct"]    = round(t0_done / t0_total * 100)
+            metrics["habit_tier0_pct"] = round(t0_done / t0_total * 100)
             metrics["habit_tier0_detail"] = f"{t0_done}/{t0_total} T0 habits completed"
         missed = hs.get("missed_tier0") or []
         if missed:
@@ -492,7 +492,7 @@ def _evaluate_intentions_haiku(intentions_dict, execution_metrics, api_key):
         return []
 
     intentions_str = "\n".join(parts)
-    metrics_str    = json.dumps(execution_metrics, indent=2)
+    metrics_str = json.dumps(execution_metrics, indent=2)
 
     prompt = f"""Evaluate which stated intentions were executed based on actual metrics.
 
@@ -564,7 +564,7 @@ def _load_intention_history(yesterday_str):
         )
         records = []
         for item in resp.get("Items", []):
-            rec       = d2f(item)
+            rec = d2f(item)
             evals_raw = rec.get("evaluations", "[]")
             if isinstance(evals_raw, str):
                 try:
@@ -590,14 +590,14 @@ def _compute_intention_patterns(history_records):
 
     type_stated = {}
     type_missed = {}
-    day_rates   = []
+    day_rates = []
 
     for rec in history_records:
         evals = rec.get("evaluations", [])
         if not evals:
             continue
         day_total = len(evals)
-        day_exec  = sum(
+        day_exec = sum(
             1 for e in evals if e.get("executed") and e.get("confidence") != "low"
         )
         day_rates.append(day_exec / day_total if day_total else 0)
@@ -614,7 +614,7 @@ def _compute_intention_patterns(history_records):
         if count < 2:
             continue
         miss_count = type_missed.get(itype, 0)
-        miss_rate  = miss_count / count
+        miss_rate = miss_count / count
         if miss_rate >= 0.50:
             gap_types.append({
                 "type":      itype,
@@ -624,7 +624,7 @@ def _compute_intention_patterns(history_records):
             })
     gap_types.sort(key=lambda x: -x["miss_rate"])
 
-    recent  = day_rates[-7:] if len(day_rates) >= 7 else day_rates
+    recent = day_rates[-7:] if len(day_rates) >= 7 else day_rates
     overall = round(sum(recent) / len(recent), 2) if recent else None
 
     return {
@@ -649,13 +649,13 @@ def analyze_intention_execution_gap(yesterday_str, profile):
     # Intentions to check for yesterday:
     #   (a) Yesterday's morning check-in: todays_intention
     #   (b) Day-before's evening reflection: tomorrow_focus (refers to yesterday)
-    yesterday_entries  = _fetch_journal_for_date(yesterday_str)
-    day_before_str     = (
+    yesterday_entries = _fetch_journal_for_date(yesterday_str)
+    day_before_str = (
         datetime.strptime(yesterday_str, "%Y-%m-%d") - timedelta(days=1)
     ).strftime("%Y-%m-%d")
     day_before_entries = _fetch_journal_for_date(day_before_str)
 
-    yesterday_intents  = _extract_intention_texts(yesterday_entries)
+    yesterday_intents = _extract_intention_texts(yesterday_entries)
     day_before_intents = _extract_intention_texts(day_before_entries)
 
     combined = {
@@ -676,7 +676,7 @@ def analyze_intention_execution_gap(yesterday_str, profile):
         logger.info(f"IC-8: No evaluations produced for {yesterday_str}")
         return ""
 
-    total          = len(evaluations)
+    total = len(evaluations)
     executed_count = sum(
         1 for e in evaluations if e.get("executed") and e.get("confidence") != "low"
     )
@@ -703,7 +703,7 @@ def analyze_intention_execution_gap(yesterday_str, profile):
         logger.warning(f"IC-8: Failed to store to platform_memory: {e}")
 
     # Recurring patterns from history
-    history  = _load_intention_history(yesterday_str)
+    history = _load_intention_history(yesterday_str)
     patterns = _compute_intention_patterns(history)
 
     # Build prompt block
@@ -717,9 +717,9 @@ def analyze_intention_execution_gap(yesterday_str, profile):
         lines.append(f"  \u2705 Followed through: {hit_types}")
 
     for gap in gaps[:3]:
-        text     = (gap.get("text") or "")[:80]
+        text = (gap.get("text") or "")[:80]
         evidence = (gap.get("evidence") or "")[:100]
-        itype    = (gap.get("type") or "generic").replace("_", " ")
+        itype = (gap.get("type") or "generic").replace("_", " ")
         lines.append(f"  \u274c Intent: '{text}' ({itype}) -- {evidence}")
 
     if not gaps and total > 0:
@@ -730,7 +730,7 @@ def analyze_intention_execution_gap(yesterday_str, profile):
         lines.append("  RECURRING GAPS (last 14 days):")
         for gt in gap_types[:2]:
             times = f"{gt['missed']}/{gt['stated']} times"
-            pct   = int(gt["miss_rate"] * 100)
+            pct = int(gt["miss_rate"] * 100)
             lines.append(
                 f"    \u2192 {gt['type'].replace('_', ' ')}: missed {times} ({pct}% miss rate)"
             )
@@ -798,13 +798,13 @@ def detect_early_warning(computed_records_7d, habit_7d, declining):
     sorted_habits = sorted(habit_7d, key=lambda x: x.get("date", ""))
     if len(sorted_habits) >= 4:
         recent_h = sorted_habits[-3:]
-        prior_h  = sorted_habits[-7:-3] if len(sorted_habits) >= 7 else sorted_habits[:-3]
+        prior_h = sorted_habits[-7:-3] if len(sorted_habits) >= 7 else sorted_habits[:-3]
         def avg_completion(records):
             vals = [safe_float(r, "t0_completion_rate") for r in records]
             vals = [v for v in vals if v is not None]
             return sum(vals) / len(vals) if vals else None
         recent_comp = avg_completion(recent_h)
-        prior_comp  = avg_completion(prior_h)
+        prior_comp = avg_completion(prior_h)
         if recent_comp is not None and prior_comp is not None:
             drop_pp = prior_comp - recent_comp  # positive = drop
             if drop_pp >= 0.15:  # 15 percentage point drop
@@ -861,7 +861,7 @@ def _build_prioritized_context_block(signals, token_budget=700):
               "causal chains, and leading indicators above \u2014 don't just list them, connect them.")
 
     lines = [header]
-    used  = len(header.split())  # rough word count as token proxy
+    used = len(header.split())  # rough word count as token proxy
 
     for sig in sorted(signals, key=lambda s: s["priority"]):
         est = sig.get("token_estimate", 20)
@@ -902,7 +902,7 @@ def _check_circadian_consistency(yesterday_str, window_days=21):
     try:
         today = datetime.now(timezone.utc).date()
         start = (today - timedelta(days=window_days + 1)).isoformat()
-        recs  = fetch_range("eightsleep", start, yesterday_str)
+        recs = fetch_range("eightsleep", start, yesterday_str)
         bedtimes = []
         for r in recs:
             bt = r.get("bedtime_start") or r.get("sleep_start")
@@ -951,15 +951,15 @@ def _compute_slow_drift(yesterday_str, profile):
       metric, source, recent_mean, baseline_mean, drift_sd, severity,
       baseline_n, note (optional context string)
     """
-    today       = datetime.now(timezone.utc).date()
-    yest        = datetime.strptime(yesterday_str, "%Y-%m-%d").date()
+    today = datetime.now(timezone.utc).date()
+    yest = datetime.strptime(yesterday_str, "%Y-%m-%d").date()
 
     # Recent window: days 1-14 before yesterday (inclusive) — TB7-22
-    recent_end   = (yest - timedelta(days=1)).isoformat()
+    recent_end = (yest - timedelta(days=1)).isoformat()
     recent_start = (yest - timedelta(days=14)).isoformat()
 
     # Baseline window: days 15-28 before yesterday (non-overlapping) — TB7-22
-    baseline_end   = (yest - timedelta(days=15)).isoformat()
+    baseline_end = (yest - timedelta(days=15)).isoformat()
     baseline_start = (yest - timedelta(days=28)).isoformat()
 
     drift_results = []
@@ -975,10 +975,10 @@ def _compute_slow_drift(yesterday_str, profile):
     circadian_sd = None  # computed once if HRV or recovery drift detected
 
     for source, field, label, higher_is_better in DRIFT_METRICS:
-        recent_recs   = fetch_range(source, recent_start, recent_end)
+        recent_recs = fetch_range(source, recent_start, recent_end)
         baseline_recs = fetch_range(source, baseline_start, baseline_end)
 
-        recent_vals   = [safe_float(r, field) for r in recent_recs
+        recent_vals = [safe_float(r, field) for r in recent_recs
                          if safe_float(r, field) is not None]
         baseline_vals = [safe_float(r, field) for r in baseline_recs
                          if safe_float(r, field) is not None]
@@ -997,8 +997,8 @@ def _compute_slow_drift(yesterday_str, profile):
             continue
 
         baseline_mean = sum(baseline_vals) / len(baseline_vals)
-        baseline_sd   = statistics.stdev(baseline_vals) if len(baseline_vals) > 1 else 0
-        recent_mean   = sum(recent_vals) / len(recent_vals)
+        baseline_sd = statistics.stdev(baseline_vals) if len(baseline_vals) > 1 else 0
+        recent_mean = sum(recent_vals) / len(recent_vals)
 
         if baseline_sd == 0:
             continue
@@ -1010,10 +1010,10 @@ def _compute_slow_drift(yesterday_str, profile):
         # Determine severity direction (worse or better?)
         if higher_is_better:
             is_worsening = drift_sd_val < 0
-            abs_drift    = abs(drift_sd_val)
+            abs_drift = abs(drift_sd_val)
         else:
             is_worsening = drift_sd_val > 0
-            abs_drift    = abs(drift_sd_val)
+            abs_drift = abs(drift_sd_val)
 
         if abs_drift < 0.5:
             continue  # noise, skip entirely
@@ -1058,8 +1058,8 @@ def _compute_slow_drift(yesterday_str, profile):
 
         if len(wt_vals) >= 8:  # Attia: need >=8 measurements for regression
             # Check complete nutrition log days (Henning: >=11 of last 14 days)
-            cal_target  = profile.get("calorie_target", 1800)
-            mf_recs     = fetch_range("macrofactor",
+            cal_target = profile.get("calorie_target", 1800)
+            mf_recs = fetch_range("macrofactor",
                                       (yest - timedelta(days=14)).isoformat(),
                                       yesterday_str)
             complete_days = sum(
@@ -1136,7 +1136,7 @@ def _build_experiment_context(yesterday_str, profile):
     """
     try:
         exp_pk = USER_PREFIX + "experiments"
-        resp   = table.query(
+        resp = table.query(
             KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
             FilterExpression="#st = :active",
             ExpressionAttributeNames={"#st": "status"},
@@ -1155,9 +1155,9 @@ def _build_experiment_context(yesterday_str, profile):
     if not active_exps:
         return ""
 
-    today_dt   = datetime.now(timezone.utc).date()
-    yest_dt    = datetime.strptime(yesterday_str, "%Y-%m-%d").date()
-    lines      = ["ACTIVE EXPERIMENTS (descriptive only — evaluate with get_experiment_results):"]
+    today_dt = datetime.now(timezone.utc).date()
+    yest_dt = datetime.strptime(yesterday_str, "%Y-%m-%d").date()
+    lines = ["ACTIVE EXPERIMENTS (descriptive only — evaluate with get_experiment_results):"]
 
     # Negative psychological variable keywords (Conti: use intervention framing)
     _NEG_PSYCH_KEYWORDS = {
@@ -1166,46 +1166,46 @@ def _build_experiment_context(yesterday_str, profile):
     }
 
     for exp in active_exps:
-        name        = exp.get("name", exp.get("experiment_id", "Unknown"))
-        start_str   = exp.get("start_date", "")
-        hypothesis  = exp.get("hypothesis", "")
-        category    = (exp.get("category") or "").lower()
-        metrics     = exp.get("primary_metrics") or []
+        name = exp.get("name", exp.get("experiment_id", "Unknown"))
+        start_str = exp.get("start_date", "")
+        hypothesis = exp.get("hypothesis", "")
+        category = (exp.get("category") or "").lower()
+        metrics = exp.get("primary_metrics") or []
 
         # Compute day count
         try:
             start_dt = datetime.strptime(start_str, "%Y-%m-%d").date()
-            days_in  = (yest_dt - start_dt).days + 1
+            days_in = (yest_dt - start_dt).days + 1
         except Exception:
-            days_in  = "?"
+            days_in = "?"
 
         lines.append(f"  {name} (Day {days_in}, started {start_str}):")
 
         # Per-metric descriptive snapshot: baseline vs recent — NO verdict
         for metric_def in metrics[:4]:  # cap at 4 metrics per experiment
             source = metric_def.get("source", "")
-            field  = metric_def.get("field", "")
-            label  = metric_def.get("label", field)
+            field = metric_def.get("field", "")
+            label = metric_def.get("label", field)
             if not source or not field:
                 continue
             try:
                 # Baseline: same window before experiment started
                 if isinstance(days_in, int) and days_in >= 1:
                     bl_start = (start_dt - timedelta(days=days_in)).isoformat()
-                    bl_end   = (start_dt - timedelta(days=1)).isoformat()
-                    bl_recs  = fetch_range(source, bl_start, bl_end)
-                    bl_vals  = [safe_float(r, field) for r in bl_recs
+                    bl_end = (start_dt - timedelta(days=1)).isoformat()
+                    bl_recs = fetch_range(source, bl_start, bl_end)
+                    bl_vals = [safe_float(r, field) for r in bl_recs
                                 if safe_float(r, field) is not None]
                     # Recent 7d during experiment
                     dur_start = max(start_str,
                                     (yest_dt - timedelta(days=6)).isoformat())
-                    dur_recs  = fetch_range(source, dur_start, yesterday_str)
-                    dur_vals  = [safe_float(r, field) for r in dur_recs
+                    dur_recs = fetch_range(source, dur_start, yesterday_str)
+                    dur_vals = [safe_float(r, field) for r in dur_recs
                                  if safe_float(r, field) is not None]
                     if bl_vals and dur_vals:
-                        bl_mean   = round(sum(bl_vals) / len(bl_vals), 1)
-                        dur_mean  = round(sum(dur_vals) / len(dur_vals), 1)
-                        delta     = round(dur_mean - bl_mean, 1)
+                        bl_mean = round(sum(bl_vals) / len(bl_vals), 1)
+                        dur_mean = round(sum(dur_vals) / len(dur_vals), 1)
+                        delta = round(dur_mean - bl_mean, 1)
                         delta_str = f"+{delta}" if delta > 0 else str(delta)
                         lines.append(f"    {label}: baseline {bl_mean} | 7d avg {dur_mean} | delta {delta_str}")
             except Exception:
@@ -1215,7 +1215,7 @@ def _build_experiment_context(yesterday_str, profile):
         if "supplement" in category or "supplement" in name.lower():
             try:
                 supp_name = exp.get("supplement_name") or name
-                supp_pk   = USER_PREFIX + "supplements"
+                supp_pk = USER_PREFIX + "supplements"
                 if isinstance(days_in, int):
                     supp_recs = fetch_range("supplements",
                                             start_str, yesterday_str)
@@ -1267,18 +1267,18 @@ def _build_acwr_signal(computed_7d):
     if not latest:
         return None
 
-    acwr      = safe_float(latest, "acwr")
-    zone      = latest.get("acwr_zone", "unknown")
-    alert     = bool(latest.get("acwr_alert"))
-    reason    = latest.get("acwr_alert_reason", "")
-    acute_7d  = safe_float(latest, "acute_load_7d")
+    acwr = safe_float(latest, "acwr")
+    zone = latest.get("acwr_zone", "unknown")
+    alert = bool(latest.get("acwr_alert"))
+    reason = latest.get("acwr_alert_reason", "")
+    acute_7d = safe_float(latest, "acute_load_7d")
     chron_28d = safe_float(latest, "chronic_load_28d")
 
     if zone == "unknown" or acwr is None:
         return None
 
     # Build signal content
-    acwr_str  = f"{acwr:.2f}" if acwr is not None else "?"
+    acwr_str = f"{acwr:.2f}" if acwr is not None else "?"
     acute_str = f"{acute_7d:.1f}" if acute_7d is not None else "?"
     chron_str = f"{chron_28d:.1f}" if chron_28d is not None else "?"
 
@@ -1351,14 +1351,14 @@ def _compute_decision_fatigue_alert(yesterday_str, habit_7d):
         )
         todoist_items = [d2f(i) for i in resp.get("Items", [])]
 
-        active_count  = None
+        active_count = None
         overdue_count = None
         for item in todoist_items:
             # Try various field names written by different ingestion versions
             ac = item.get("active_task_count") or item.get("active_count") or item.get("total_active")
             oc = item.get("overdue_count") or item.get("overdue_task_count") or item.get("overdue")
             if ac is not None:
-                active_count  = int(ac)
+                active_count = int(ac)
                 overdue_count = int(oc or 0)
                 break
 
@@ -1383,7 +1383,7 @@ def _compute_decision_fatigue_alert(yesterday_str, habit_7d):
             return False, ""
 
         # ── 3. Evaluate thresholds ────────────────────────────────────────────
-        load_breached  = total_load > DECISION_FATIGUE_THRESHOLD
+        load_breached = total_load > DECISION_FATIGUE_THRESHOLD
         habits_breached = t0_avg_7d < DECISION_FATIGUE_HABIT_THRESHOLD
         fired = load_breached and habits_breached
 
@@ -1396,8 +1396,8 @@ def _compute_decision_fatigue_alert(yesterday_str, habit_7d):
             return False, ""
 
         # ── 4. Build alert block ──────────────────────────────────────────────
-        t0_pct_str    = f"{int(t0_avg_7d * 100)}%"
-        overdue_note  = f" ({overdue_count} overdue)" if overdue_count > 0 else ""
+        t0_pct_str = f"{int(t0_avg_7d * 100)}%"
+        overdue_note = f" ({overdue_count} overdue)" if overdue_count > 0 else ""
         alert = (
             f"\U0001f9e0 DECISION FATIGUE DETECTED (BS-MP3):\n"
             f"  Task load: {total_load} active+overdue tasks{overdue_note} "
@@ -1433,15 +1433,15 @@ def _compute_decision_fatigue_alert(yesterday_str, habit_7d):
 # ==============================================================================
 
 # Tier A threshold: >2.5 lbs/week is the hard medical line (Norton/Attia board spec)
-DEFICIT_RATE_THRESHOLD_LBS_WEEK  = float(os.environ.get("DEFICIT_RATE_THRESHOLD", "2.5"))
+DEFICIT_RATE_THRESHOLD_LBS_WEEK = float(os.environ.get("DEFICIT_RATE_THRESHOLD", "2.5"))
 # Tier B thresholds
-DEFICIT_HRV_DROP_PCT              = float(os.environ.get("DEFICIT_HRV_DROP_PCT", "0.15"))   # 15%
-DEFICIT_SLEEP_EFF_FLOOR           = float(os.environ.get("DEFICIT_SLEEP_EFF_FLOOR", "80.0"))
-DEFICIT_SLEEP_BAD_DAYS_GATE       = int(os.environ.get("DEFICIT_SLEEP_BAD_DAYS", "3"))
-DEFICIT_T0_FAIL_GATE              = int(os.environ.get("DEFICIT_T0_FAIL_GATE", "2"))
+DEFICIT_HRV_DROP_PCT = float(os.environ.get("DEFICIT_HRV_DROP_PCT", "0.15"))   # 15%
+DEFICIT_SLEEP_EFF_FLOOR = float(os.environ.get("DEFICIT_SLEEP_EFF_FLOOR", "80.0"))
+DEFICIT_SLEEP_BAD_DAYS_GATE = int(os.environ.get("DEFICIT_SLEEP_BAD_DAYS", "3"))
+DEFICIT_T0_FAIL_GATE = int(os.environ.get("DEFICIT_T0_FAIL_GATE", "2"))
 # Prescription params
-DEFICIT_KCAL_INCREASE             = int(os.environ.get("DEFICIT_KCAL_INCREASE", "200"))
-DEFICIT_REASSESS_DAYS             = int(os.environ.get("DEFICIT_REASSESS_DAYS", "5"))
+DEFICIT_KCAL_INCREASE = int(os.environ.get("DEFICIT_KCAL_INCREASE", "200"))
+DEFICIT_REASSESS_DAYS = int(os.environ.get("DEFICIT_REASSESS_DAYS", "5"))
 
 
 def _compute_deficit_ceiling_alert(yesterday_str, habit_7d, computed_7d, profile):
@@ -1451,8 +1451,8 @@ def _compute_deficit_ceiling_alert(yesterday_str, habit_7d, computed_7d, profile
     Non-fatal throughout — returns (None, "") on any failure.
     """
     try:
-        today    = datetime.now(timezone.utc).date()
-        yest     = datetime.strptime(yesterday_str, "%Y-%m-%d").date()
+        today = datetime.now(timezone.utc).date()
+        yest = datetime.strptime(yesterday_str, "%Y-%m-%d").date()
         wt_start = (yest - timedelta(days=13)).isoformat()  # 14-day window
 
         # ── Tier A: rate-of-loss check (Withings scale) ──────────────────────
@@ -1474,27 +1474,27 @@ def _compute_deficit_ceiling_alert(yesterday_str, habit_7d, computed_7d, profile
                     rate_alert = True
 
         # ── Tier B: multi-signal check ───────────────────────────────────────
-        multi_alert     = False
-        hrv_drop_fired  = False
-        sleep_fired     = False
-        t0_fail_fired   = False
+        multi_alert = False
+        hrv_drop_fired = False
+        sleep_fired = False
+        t0_fail_fired = False
 
         # HRV: compare 7d recent vs 14d baseline (same as slow_drift logic)
         hrv_baseline_start = (yest - timedelta(days=21)).isoformat()
-        hrv_baseline_end   = (yest - timedelta(days=8)).isoformat()
-        hrv_recent_start   = (yest - timedelta(days=7)).isoformat()
+        hrv_baseline_end = (yest - timedelta(days=8)).isoformat()
+        hrv_recent_start = (yest - timedelta(days=7)).isoformat()
 
         hrv_baseline_recs = fetch_range("whoop", hrv_baseline_start, hrv_baseline_end)
-        hrv_recent_recs   = fetch_range("whoop", hrv_recent_start, yesterday_str)
+        hrv_recent_recs = fetch_range("whoop", hrv_recent_start, yesterday_str)
 
         baseline_hrv_vals = [safe_float(r, "hrv") for r in hrv_baseline_recs
                              if safe_float(r, "hrv") is not None]
-        recent_hrv_vals   = [safe_float(r, "hrv") for r in hrv_recent_recs
+        recent_hrv_vals = [safe_float(r, "hrv") for r in hrv_recent_recs
                              if safe_float(r, "hrv") is not None]
 
         if len(baseline_hrv_vals) >= 7 and len(recent_hrv_vals) >= 3:
             baseline_hrv_mean = sum(baseline_hrv_vals) / len(baseline_hrv_vals)
-            recent_hrv_mean   = sum(recent_hrv_vals) / len(recent_hrv_vals)
+            recent_hrv_mean = sum(recent_hrv_vals) / len(recent_hrv_vals)
             if baseline_hrv_mean > 0:
                 hrv_drop_pct = (baseline_hrv_mean - recent_hrv_mean) / baseline_hrv_mean
                 if hrv_drop_pct >= DEFICIT_HRV_DROP_PCT:
@@ -1534,9 +1534,9 @@ def _compute_deficit_ceiling_alert(yesterday_str, habit_7d, computed_7d, profile
             return None, ""
 
         # ── Build prescription ────────────────────────────────────────────────
-        cal_target     = profile.get("calorie_target", 1800)
-        new_ceiling    = cal_target + DEFICIT_KCAL_INCREASE
-        prot_target    = profile.get("protein_target_g", 190)
+        cal_target = profile.get("calorie_target", 1800)
+        new_ceiling = cal_target + DEFICIT_KCAL_INCREASE
+        prot_target = profile.get("protein_target_g", 190)
 
         rate_str = f"{rate_lbs_week:.1f} lbs/wk" if rate_lbs_week else "unknown"
 
@@ -1716,7 +1716,7 @@ def build_ai_context_block(momentum_signal, this_week_avg, prev_week_avg, trend_
     if weakest:
         habit_detail = []
         for h in weakest[:3]:
-            miss_rate   = miss_rates.get(h)
+            miss_rate = miss_rates.get(h)
             days_missed = round(miss_rate * 7) if miss_rate else "?"
             habit_detail.append(f"{h} (missed {days_missed}/7 days)")
         signals.append({"priority": 9,
@@ -1823,7 +1823,7 @@ def lambda_handler(event, context):
         return {"statusCode": 200, "body": "ok"}
     logger.info("Daily Insight Compute v1.2.0 starting...")
 
-    today         = datetime.now(timezone.utc).date()
+    today = datetime.now(timezone.utc).date()
     yesterday_str = event.get("date") or (today - timedelta(days=1)).isoformat()
 
     # Idempotency check (skip unless force=True)
@@ -1839,10 +1839,10 @@ def lambda_handler(event, context):
     computed_7d = fetch_range("computed_metrics",
                               (today - timedelta(days=7)).isoformat(),
                               yesterday_str)
-    habit_7d    = fetch_range("habit_scores",
+    habit_7d = fetch_range("habit_scores",
                               (today - timedelta(days=7)).isoformat(),
                               yesterday_str)
-    grade_14d   = fetch_range("day_grade",
+    grade_14d = fetch_range("day_grade",
                               (today - timedelta(days=14)).isoformat(),
                               yesterday_str)
 

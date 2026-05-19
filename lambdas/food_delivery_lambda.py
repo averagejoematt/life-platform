@@ -30,9 +30,9 @@ def lambda_handler(event, context):
 
     # Filter to food delivery rows only
     food_rows = [r for r in all_rows
-                 if 'food delivery' in r.get('Category','').lower()
-                 or any(p in (r.get('Merchant','') + r.get('Original Statement','')).lower()
-                        for p in ['doordash','uber eats','ubereats','grubhub','eat.com'])]
+                 if 'food delivery' in r.get('Category', '').lower()
+                 or any(p in (r.get('Merchant', '') + r.get('Original Statement', '')).lower()
+                        for p in ['doordash', 'uber eats', 'ubereats', 'grubhub', 'eat.com'])]
 
     if not food_rows:
         print(f'No food delivery rows in {key}')
@@ -41,10 +41,10 @@ def lambda_handler(event, context):
     # Group by date
     by_date = defaultdict(list)
     for row in food_rows:
-        amt = abs(float(row['Amount'].replace(',','')))
+        amt = abs(float(row['Amount'].replace(',', '')))
         by_date[row['Date']].append({
             'merchant': row['Merchant'],
-            'platform': normalize_platform(row['Merchant'], row.get('Original Statement','')),
+            'platform': normalize_platform(row['Merchant'], row.get('Original Statement', '')),
             'amount': amt,
         })
 
@@ -66,7 +66,7 @@ def lambda_handler(event, context):
                     'amount': Decimal(str(round(txn['amount'], 2))),
                     'orders_that_day': orders_that_day,
                     'is_binge_day': is_binge,
-                    'day_of_week': datetime.strptime(date_str,'%Y-%m-%d').strftime('%A'),
+                    'day_of_week': datetime.strptime(date_str, '%Y-%m-%d').strftime('%A'),
                     'month': date_str[:7],
                     'year': int(date_str[:4]),
                     'import_date': import_date,
@@ -104,12 +104,12 @@ def lambda_handler(event, context):
                 'year': yr,
                 'order_count': data['orders'],
                 'total_spend': Decimal(str(round(data['spend'], 2))),
-                'avg_order_size': Decimal(str(round(data['spend'] / max(data['orders'],1), 2))),
+                'avg_order_size': Decimal(str(round(data['spend'] / max(data['orders'], 1), 2))),
                 'binge_days': len(data['binge_days']),
                 'delivery_days': len(data['delivery_days']),
                 'orders_per_week': Decimal(str(opw)),
                 'delivery_index': Decimal(str(idx)),
-                'platform_breakdown': {k: Decimal(str(round(v,2))) for k,v in data['platforms'].items()},
+                'platform_breakdown': {k: Decimal(str(round(v, 2))) for k, v in data['platforms'].items()},
                 'computed_at': datetime.now(timezone.utc).isoformat(),
             })
 
@@ -154,7 +154,7 @@ def lambda_handler(event, context):
     })
 
     # Write annual summaries
-    by_year = defaultdict(lambda: {'orders':0,'spend':0.0,'binge':0,'days':0})
+    by_year = defaultdict(lambda: {'orders': 0, 'spend': 0.0, 'binge': 0, 'days': 0})
     for m, data in by_month.items():
         yr = int(m[:4])
         by_year[yr]['orders'] += data['orders']
@@ -170,7 +170,7 @@ def lambda_handler(event, context):
                 'year': yr,
                 'order_count': data['orders'],
                 'total_spend': Decimal(str(round(data['spend'], 2))),
-                'avg_order_size': Decimal(str(round(data['spend'] / max(data['orders'],1), 2))),
+                'avg_order_size': Decimal(str(round(data['spend'] / max(data['orders'], 1), 2))),
                 'binge_days': data['binge'],
                 'delivery_days': data['days'],
                 'clean_days': 365 - data['days'],

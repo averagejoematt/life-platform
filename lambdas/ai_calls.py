@@ -36,7 +36,7 @@ except ImportError:
     _AI_VALIDATOR_AVAILABLE = False
 
 # AI model constants — read from env so model can be updated without redeployment
-AI_MODEL       = os.environ.get("AI_MODEL",       "claude-sonnet-4-6")
+AI_MODEL = os.environ.get("AI_MODEL",       "claude-sonnet-4-6")
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 # CloudWatch client for token usage + failure metrics (P1.8/P1.9)
@@ -342,7 +342,7 @@ def _build_journey_context(profile, current_date_str=None):
         week_num = 1
 
     start_weight = profile.get("journey_start_weight_lbs", 307)
-    goal_weight  = profile.get("goal_weight_lbs", 185)
+    goal_weight = profile.get("goal_weight_lbs", 185)
 
     # Periodization: Foundation (1-4wk) habit formation, Momentum (5-12) progressive overload,
     # Building (13-26) base, Advanced (27+) optimization
@@ -883,22 +883,22 @@ def _build_cross_pillar_tradeoffs(component_scores, data, profile):
 
     Returns a compact prompt block. Empty string if no meaningful trade-offs detected.
     """
-    sleep_score       = component_scores.get("sleep")
-    movement_score    = component_scores.get("movement")
-    nutrition_score   = component_scores.get("nutrition")
-    mind_score        = component_scores.get("mind")  # noqa: F841
-    metabolic_score   = component_scores.get("metabolic_health")
+    sleep_score = component_scores.get("sleep")
+    movement_score = component_scores.get("movement")
+    nutrition_score = component_scores.get("nutrition")
+    mind_score = component_scores.get("mind")  # noqa: F841
+    metabolic_score = component_scores.get("metabolic_health")
     consistency_score = component_scores.get("consistency")
 
-    mf      = data.get("macrofactor") or {}
-    whoop   = data.get("whoop") or {}
+    mf = data.get("macrofactor") or {}
+    whoop = data.get("whoop") or {}
     journal = data.get("journal") or {}
 
-    cal        = _safe_float(mf, "total_calories_kcal")
-    tsb        = data.get("tsb")
+    cal = _safe_float(mf, "total_calories_kcal")
+    tsb = data.get("tsb")
     sleep_debt = data.get("sleep_debt_7d_hrs")
-    stress     = _safe_float(journal, "stress_avg")
-    recovery   = _safe_float(whoop, "recovery_score")
+    stress = _safe_float(journal, "stress_avg")
+    recovery = _safe_float(whoop, "recovery_score")
     cal_target = profile.get("calorie_target", 1800)
 
     tradeoffs = []
@@ -1303,17 +1303,17 @@ def _build_acwr_coaching_context(data):
     or empty string if no ACWR data present.
     """
     computed = data.get("computed_metrics") or {}
-    zone   = computed.get("acwr_zone", "")
-    acwr   = _safe_float(computed, "acwr")
-    alert  = bool(computed.get("acwr_alert"))
+    zone = computed.get("acwr_zone", "")
+    acwr = _safe_float(computed, "acwr")
+    alert = bool(computed.get("acwr_alert"))
     reason = computed.get("acwr_alert_reason", "")
-    acute  = _safe_float(computed, "acute_load_7d")
-    chron  = _safe_float(computed, "chronic_load_28d")
+    acute = _safe_float(computed, "acute_load_7d")
+    chron = _safe_float(computed, "chronic_load_28d")
 
     if not zone or zone == "unknown" or acwr is None:
         return ""
 
-    acwr_str  = f"{acwr:.2f}"
+    acwr_str = f"{acwr:.2f}"
     acute_str = f"{acute:.1f}" if acute is not None else "?"
     chron_str = f"{chron:.1f}" if chron is not None else "?"
 

@@ -79,19 +79,19 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 # ── Constants ──────────────────────────────────────────────────────────────────
-SECRET_NAME    = "life-platform/garmin"
+SECRET_NAME = "life-platform/garmin"
 # ── Config (env vars with backwards-compatible defaults) ──
-REGION         = os.environ.get("AWS_REGION", "us-west-2")
-S3_BUCKET      = os.environ["S3_BUCKET"]
+REGION = os.environ.get("AWS_REGION", "us-west-2")
+S3_BUCKET = os.environ["S3_BUCKET"]
 DYNAMODB_TABLE = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID        = os.environ.get("USER_ID", "matthew")
-LOOKBACK_DAYS  = int(os.environ.get("LOOKBACK_DAYS", "7"))
+USER_ID = os.environ.get("USER_ID", "matthew")
+LOOKBACK_DAYS = int(os.environ.get("LOOKBACK_DAYS", "7"))
 
 # ── AWS clients ────────────────────────────────────────────────────────────────
 secrets_client = boto3.client("secretsmanager", region_name=REGION)
-s3_client      = boto3.client("s3",             region_name=REGION)
-dynamodb       = boto3.resource("dynamodb",      region_name=REGION)
-table          = dynamodb.Table(DYNAMODB_TABLE)
+s3_client = boto3.client("s3",             region_name=REGION)
+dynamodb = boto3.resource("dynamodb",      region_name=REGION)
+table = dynamodb.Table(DYNAMODB_TABLE)
 
 
 # ── Serialisation ──────────────────────────────────────────────────────────────
@@ -131,7 +131,7 @@ def save_secret(secret: dict):
             SecretString=json.dumps(secret),
         )
     except Exception as e:
-        print(f"[WARN] Garmin token writeback failed: {e}")
+        logger.warning(f"Garmin token writeback failed: {e}")
         try:
             cw = boto3.client("cloudwatch", region_name=REGION)
             cw.put_metric_data(
@@ -184,18 +184,18 @@ def get_garmin_client(secret: dict):
             with open(os.path.join(garth_dir, "oauth2_token.json"), "w") as f:
                 json.dump(parsed["oauth2"], f)
             garth.resume(garth_dir)
-            print("Loaded OAuth tokens (browser-auth format) via garth.resume()")
+            logger.info("Loaded OAuth tokens (browser-auth format) via garth.resume()")
             loaded = True
     except (json.JSONDecodeError, TypeError, KeyError):
         pass
     except Exception as e:
-        print(f"Browser-auth token load failed: {e}, trying legacy format...")
+        logger.info(f"Browser-auth token load failed: {e}, trying legacy format...")
 
     # Format 2: Legacy garth.client.dumps() blob
     if not loaded:
         try:
             garth.client.loads(token_data)
-            print("Loaded stored garth OAuth tokens (legacy format).")
+            logger.info("Loaded stored garth OAuth tokens (legacy format).")
             loaded = True
         except Exception as e:
             raise RuntimeError(
@@ -207,9 +207,9 @@ def get_garmin_client(secret: dict):
     try:
         oauth2 = garth.client.oauth2_token
         if oauth2 and hasattr(oauth2, "expires_at"):
-            print(f"OAuth2 token expires at: {oauth2.expires_at}")
+            logger.info(f"OAuth2 token expires at: {oauth2.expires_at}")
         if oauth2 and hasattr(oauth2, "expired"):
-            print(f"OAuth2 token expired: {oauth2.expired}")
+            logger.info(f"OAuth2 token expired: {oauth2.expired}")
     except Exception:
         pass
 
@@ -224,9 +224,9 @@ def get_garmin_client(secret: dict):
     for refresh_attempt in range(refresh_attempts):
         try:
             if garth.client.oauth2_token and garth.client.oauth2_token.expired:
-                print(f"OAuth2 token expired — refresh attempt {refresh_attempt + 1}/{refresh_attempts}...")
+                logger.info(f"OAuth2 token expired — refresh attempt {refresh_attempt + 1}/{refresh_attempts}...")
                 garth.client.refresh_oauth2()
-                print("OAuth2 token refreshed successfully.")
+                logger.info("OAuth2 token refreshed successfully.")
             break  # Either non-expired or refreshed successfully — proceed
         except Exception as e:
             err_str = str(e)
@@ -240,7 +240,7 @@ def get_garmin_client(secret: dict):
             # Retry transient 5xx; everything else (4xx auth, malformed token) raises.
             is_transient = any(c in err_str for c in ("500", "502", "503", "504", "timeout", "timed out"))
             if is_transient and refresh_attempt < refresh_attempts - 1:
-                print(f"OAuth refresh transient error: {e} — retry in {refresh_backoff[refresh_attempt]}s")
+                logger.info(f"OAuth refresh transient error: {e} — retry in {refresh_backoff[refresh_attempt]}s")
                 time.sleep(refresh_backoff[refresh_attempt])
                 continue
             raise RuntimeError(
@@ -255,9 +255,9 @@ def get_garmin_client(secret: dict):
             if new_tokens and new_tokens != secret.get("garth_tokens"):
                 secret["garth_tokens"] = new_tokens
                 save_secret(secret)
-                print("Refreshed OAuth tokens saved to Secrets Manager.")
+                logger.info("Refreshed OAuth tokens saved to Secrets Manager.")
         except Exception as e:
-            print(f"Warning: could not save refreshed tokens ({e})")
+            logger.info(f"Warning: could not save refreshed tokens ({e})")
 
     _save_tokens()
 
@@ -269,7 +269,7 @@ def get_garmin_client(secret: dict):
     # Prefer pre-stored display_name from browser auth
     if secret.get("display_name"):
         api.display_name = secret["display_name"]
-        print(f"display_name from secret: {api.display_name}")
+        logger.info(f"display_name from secret: {api.display_name}")
     else:
         for profile_path in [
             "/userprofile-service/socialProfile",
@@ -286,10 +286,10 @@ def get_garmin_client(secret: dict):
                     name = profile.strip()
                 if name:
                     api.display_name = name
-                    print(f"Resolved display_name: {name} (from {profile_path})")
+                    logger.info(f"Resolved display_name: {name} (from {profile_path})")
                     break
             except Exception as e:
-                print(f"Profile path {profile_path} failed: {e}")
+                logger.info(f"Profile path {profile_path} failed: {e}")
 
     if not api.display_name:
         raise RuntimeError(
@@ -318,11 +318,11 @@ def extract_body_battery(api, date_str: str) -> dict:
                     values.append(int(row[1]))
         if values:
             result["body_battery_high"] = max(values)
-            result["body_battery_low"]  = min(values)
-            result["body_battery_end"]  = values[-1]
-            print(f"Body Battery: high={result['body_battery_high']}, low={result['body_battery_low']}, end={result['body_battery_end']}")
+            result["body_battery_low"] = min(values)
+            result["body_battery_end"] = values[-1]
+            logger.info(f"Body Battery: high={result['body_battery_high']}, low={result['body_battery_low']}, end={result['body_battery_end']}")
     except Exception as e:
-        print(f"Warning: body battery extraction failed: {e}")
+        logger.info(f"Warning: body battery extraction failed: {e}")
     return result
 
 
@@ -332,10 +332,10 @@ def extract_hrv(api, date_str: str) -> dict:
         data = api.get_hrv_data(date_str)
         if not data:
             return result
-        summary    = data.get("hrvSummary") or {}
+        summary = data.get("hrvSummary") or {}
         last_night = summary.get("lastNight")
-        status     = summary.get("status")
-        high       = summary.get("lastNight5MinHigh")
+        status = summary.get("status")
+        high = summary.get("lastNight5MinHigh")
         if last_night is not None:
             result["hrv_last_night"] = safe_float(last_night)
         if status and status not in ("NONE", "UNQUALIFIED", ""):
@@ -343,9 +343,9 @@ def extract_hrv(api, date_str: str) -> dict:
         if high is not None:
             result["hrv_5min_high"] = safe_float(high)
         if result:
-            print(f"HRV: last_night={result.get('hrv_last_night')}ms status={result.get('hrv_status')}")
+            logger.info(f"HRV: last_night={result.get('hrv_last_night')}ms status={result.get('hrv_status')}")
     except Exception as e:
-        print(f"Warning: HRV extraction failed: {e}")
+        logger.info(f"Warning: HRV extraction failed: {e}")
     return result
 
 
@@ -357,7 +357,7 @@ def extract_stress(api, date_str: str) -> dict:
             return result
         avg_stress = data.get("avgStressLevel")
         max_stress = data.get("maxStressLevel")
-        qualifier  = data.get("stressQualifier")
+        qualifier = data.get("stressQualifier")
         if avg_stress is not None and avg_stress >= 0:
             result["avg_stress"] = safe_float(avg_stress)
         if max_stress is not None and max_stress >= 0:
@@ -365,9 +365,9 @@ def extract_stress(api, date_str: str) -> dict:
         if qualifier:
             result["stress_qualifier"] = qualifier
         if result:
-            print(f"Stress: avg={result.get('avg_stress')} max={result.get('max_stress')} qualifier={result.get('stress_qualifier')}")
+            logger.info(f"Stress: avg={result.get('avg_stress')} max={result.get('max_stress')} qualifier={result.get('stress_qualifier')}")
     except Exception as e:
-        print(f"Warning: stress extraction failed: {e}")
+        logger.info(f"Warning: stress extraction failed: {e}")
     return result
 
 
@@ -377,16 +377,16 @@ def extract_user_summary(api, date_str: str) -> dict:
         data = api.get_user_summary(date_str)
         if not data:
             return result
-        rhr   = data.get("restingHeartRate")
+        rhr = data.get("restingHeartRate")
         steps = data.get("totalSteps")
         if rhr is not None and rhr > 0:
             result["resting_heart_rate"] = safe_float(rhr)
         if steps is not None and steps >= 0:
             result["steps"] = int(steps)
         if result:
-            print(f"Summary: RHR={result.get('resting_heart_rate')}bpm steps={result.get('steps')}")
+            logger.info(f"Summary: RHR={result.get('resting_heart_rate')}bpm steps={result.get('steps')}")
     except Exception as e:
-        print(f"Warning: user summary extraction failed: {e}")
+        logger.info(f"Warning: user summary extraction failed: {e}")
     return result
 
 
@@ -397,15 +397,15 @@ def extract_respiration(api, date_str: str) -> dict:
         if not data:
             return result
         avg_waking = data.get("avgWakingRespirationValue")
-        avg_sleep  = data.get("avgSleepRespirationValue")
+        avg_sleep = data.get("avgSleepRespirationValue")
         if avg_waking is not None and avg_waking > 0:
             result["avg_respiration"] = safe_float(avg_waking)
         if avg_sleep is not None and avg_sleep > 0:
             result["sleep_respiration"] = safe_float(avg_sleep)
         if result:
-            print(f"Respiration: waking={result.get('avg_respiration')} sleep={result.get('sleep_respiration')} brpm")
+            logger.info(f"Respiration: waking={result.get('avg_respiration')} sleep={result.get('sleep_respiration')} brpm")
     except Exception as e:
-        print(f"Warning: respiration extraction failed: {e}")
+        logger.info(f"Warning: respiration extraction failed: {e}")
     return result
 
 
@@ -421,9 +421,9 @@ def extract_spo2(api, date_str: str) -> dict:
             if low and low > 0:
                 result["spo2_low"] = safe_float(low)
         if result:
-            print(f"SpO2: avg={result.get('spo2_avg')}% low={result.get('spo2_low')}%")
+            logger.info(f"SpO2: avg={result.get('spo2_avg')}% low={result.get('spo2_low')}%")
     except Exception as e:
-        print(f"Warning: SpO2 extraction failed: {e}")
+        logger.info(f"Warning: SpO2 extraction failed: {e}")
     return result
 
 
@@ -432,18 +432,18 @@ def extract_max_metrics(api, date_str: str) -> dict:
     try:
         data = api.get_max_metrics(date_str)
         if data and isinstance(data, list) and data:
-            entry   = data[0] if isinstance(data[0], dict) else {}
+            entry = data[0] if isinstance(data[0], dict) else {}
             generic = entry.get("generic") or {}
-            vo2     = generic.get("vo2MaxPreciseValue") or generic.get("vo2MaxValue")
+            vo2 = generic.get("vo2MaxPreciseValue") or generic.get("vo2MaxValue")
             fit_age = generic.get("fitnessAge")
             if vo2 and vo2 > 0:
                 result["vo2_max"] = safe_float(vo2)
             if fit_age and fit_age > 0:
                 result["fitness_age"] = int(fit_age)
         if result:
-            print(f"MaxMetrics: VO2max={result.get('vo2_max')} fitness_age={result.get('fitness_age')}")
+            logger.info(f"MaxMetrics: VO2max={result.get('vo2_max')} fitness_age={result.get('fitness_age')}")
     except Exception as e:
-        print(f"Warning: max metrics extraction failed: {e}")
+        logger.info(f"Warning: max metrics extraction failed: {e}")
     return result
 
 
@@ -476,9 +476,9 @@ def extract_training_status(api, date_str: str) -> dict:
                 break
 
         if result:
-            print(f"Training status: {result.get('training_status')} acute={result.get('garmin_acute_load')} chronic={result.get('garmin_chronic_load')} ACWR={result.get('garmin_acwr')}")
+            logger.info(f"Training status: {result.get('training_status')} acute={result.get('garmin_acute_load')} chronic={result.get('garmin_chronic_load')} ACWR={result.get('garmin_acwr')}")
     except Exception as e:
-        print(f"Warning: training status extraction failed: {e}")
+        logger.info(f"Warning: training status extraction failed: {e}")
 
     try:
         data = api.get_training_readiness(date_str)
@@ -497,15 +497,15 @@ def extract_training_status(api, date_str: str) -> dict:
             if recovery_time is not None:
                 result["recovery_time_hours"] = int(recovery_time)
             if result.get("training_readiness"):
-                print(f"Training readiness: {result['training_readiness']} ({result.get('training_readiness_level')}) HRV_weekly={result.get('hrv_weekly_average')}ms recovery={result.get('recovery_time_hours')}h")
+                logger.info(f"Training readiness: {result['training_readiness']} ({result.get('training_readiness_level')}) HRV_weekly={result.get('hrv_weekly_average')}ms recovery={result.get('recovery_time_hours')}h")
         elif data and isinstance(data, dict):
             # Fallback for dict response (older API versions)
             score = data.get("score") or data.get("trainingReadinessScore")
             if score and score > 0:
                 result["training_readiness"] = safe_float(score)
-                print(f"Training readiness: {score}")
+                logger.info(f"Training readiness: {score}")
     except Exception as e:
-        print(f"Warning: training readiness extraction failed: {e}")
+        logger.info(f"Warning: training readiness extraction failed: {e}")
     return result
 
 
@@ -530,15 +530,15 @@ def extract_sleep(api, date_str: str) -> dict:
     result = {}
     try:
         data = api.get_sleep_data(date_str)
-        print(f"Sleep API response type={type(data).__name__} truthy={bool(data)}")
+        logger.info(f"Sleep API response type={type(data).__name__} truthy={bool(data)}")
         if data:
-            print(f"Sleep API top keys: {list(data.keys()) if isinstance(data, dict) else 'not a dict'}")
+            logger.info(f"Sleep API top keys: {list(data.keys()) if isinstance(data, dict) else 'not a dict'}")
         if not data:
-            print("Sleep: no data returned from get_sleep_data")
+            logger.info("Sleep: no data returned from get_sleep_data")
             return result
 
         daily = data.get("dailySleepDTO") or {}
-        print(f"dailySleepDTO keys: {list(daily.keys())[:10] if daily else 'empty'}")
+        logger.info(f"dailySleepDTO keys: {list(daily.keys())[:10] if daily else 'empty'}")
 
         # ── Core (existing) ──
         duration = daily.get("sleepTimeSeconds")
@@ -626,7 +626,7 @@ def extract_sleep(api, date_str: str) -> dict:
                   f"{stage_str} spo2={result.get('sleep_spo2_avg')} restless={result.get('restless_moments_count')}")
 
     except Exception as e:
-        print(f"Warning: sleep extraction failed: {e}")
+        logger.info(f"Warning: sleep extraction failed: {e}")
     return result
 
 
@@ -645,9 +645,9 @@ def extract_hr_zones(api, date_str: str) -> dict:
             if z2:
                 result["zone2_minutes"] = round(z2 / 60, 1)
         if result:
-            print(f"HR zones: zone2={result.get('zone2_minutes')}min total_zones={len([k for k in result if 'zone' in k])}")
+            logger.info(f"HR zones: zone2={result.get('zone2_minutes')}min total_zones={len([k for k in result if 'zone' in k])}")
     except Exception as e:
-        print(f"Warning: HR zones extraction failed: {e}")
+        logger.info(f"Warning: HR zones extraction failed: {e}")
     return result
 
 
@@ -666,9 +666,9 @@ def extract_intensity_minutes(api, date_str: str) -> dict:
                 # WHO guidelines: 1 min vigorous = 2 min moderate for weekly activity targets
                 result["intensity_minutes_total"] = int(mod) + int(vig) * 2
         if result:
-            print(f"Intensity minutes: mod={result.get('intensity_minutes_moderate')} vig={result.get('intensity_minutes_vigorous')}")
+            logger.info(f"Intensity minutes: mod={result.get('intensity_minutes_moderate')} vig={result.get('intensity_minutes_vigorous')}")
     except Exception as e:
-        print(f"Warning: intensity minutes extraction failed: {e}")
+        logger.info(f"Warning: intensity minutes extraction failed: {e}")
     return result
 
 
@@ -679,8 +679,8 @@ def extract_stats(api, date_str: str) -> dict:
         if data:
             floors = data.get("floorsAscended")
             active = data.get("activeKilocalories")
-            bmr    = data.get("bmrKilocalories")
-            total  = data.get("totalKilocalories")
+            bmr = data.get("bmrKilocalories")
+            total = data.get("totalKilocalories")
             if floors is not None:
                 result["floors_climbed"] = int(floors)
             if active and active > 0:
@@ -690,9 +690,9 @@ def extract_stats(api, date_str: str) -> dict:
             if total and total > 0:
                 result["total_calories_burned"] = int(total)
         if result:
-            print(f"Stats: floors={result.get('floors_climbed')} active_cal={result.get('active_calories')} bmr={result.get('bmr_calories')}")
+            logger.info(f"Stats: floors={result.get('floors_climbed')} active_cal={result.get('active_calories')} bmr={result.get('bmr_calories')}")
     except Exception as e:
-        print(f"Warning: stats extraction failed: {e}")
+        logger.info(f"Warning: stats extraction failed: {e}")
     return result
 
 
@@ -709,10 +709,10 @@ def extract_activities(api, date_str: str) -> dict:
             aid = act.get("activityId")
             if aid:
                 ga["garmin_activity_id"] = str(aid)
-            ga["activity_name"]  = act.get("activityName")
-            ga["activity_type"]  = (act.get("activityType") or {}).get("typeKey")
-            ga["start_time"]     = act.get("startTimeLocal")
-            ga["duration_secs"]  = safe_float(act.get("duration"))
+            ga["activity_name"] = act.get("activityName")
+            ga["activity_type"] = (act.get("activityType") or {}).get("typeKey")
+            ga["start_time"] = act.get("startTimeLocal")
+            ga["duration_secs"] = safe_float(act.get("duration"))
             ga["distance_meters"] = safe_float(act.get("distance"))
 
             # Core activity metrics (v1.5.0 — previously missing)
@@ -738,7 +738,7 @@ def extract_activities(api, date_str: str) -> dict:
                 ("anaerobic_training_effect",  "anaerobicTrainingEffect"),
                 ("performance_condition",      "performanceCondition"),
                 ("lactate_threshold_hr",       "lactateThresholdHeartRate"),
-                ("lactate_threshold_speed_mps","lactateThresholdSpeed"),
+                ("lactate_threshold_speed_mps", "lactateThresholdSpeed"),
                 ("activity_training_load",     "activityTrainingLoad"),
                 ("normalized_power_watts",     "normalizedPower"),
                 ("training_stress_score",      "trainingStressScore"),
@@ -772,11 +772,11 @@ def extract_activities(api, date_str: str) -> dict:
                 garmin_activities.append(ga)
 
         if garmin_activities:
-            result["garmin_activities"]    = garmin_activities
+            result["garmin_activities"] = garmin_activities
             result["garmin_activity_count"] = len(garmin_activities)
-            print(f"Activities: {len(garmin_activities)} Garmin activities with proprietary fields")
+            logger.info(f"Activities: {len(garmin_activities)} Garmin activities with proprietary fields")
     except Exception as e:
-        print(f"Warning: activities extraction failed: {e}")
+        logger.info(f"Warning: activities extraction failed: {e}")
     return result
 
 

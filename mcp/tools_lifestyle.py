@@ -240,17 +240,17 @@ def tool_save_insight(args):
     PK: USER#matthew#SOURCE#insights
     SK: INSIGHT#<ISO-timestamp>
     """
-    text   = (args.get("text") or "").strip()
+    text = (args.get("text") or "").strip()
     if not text:
         raise ValueError("text is required")
 
-    tags   = args.get("tags") or []
+    tags = args.get("tags") or []
     source = args.get("source") or "chat"
 
-    now        = datetime.now(timezone.utc)
-    ts         = now.strftime("%Y-%m-%dT%H:%M:%S")
+    now = datetime.now(timezone.utc)
+    ts = now.strftime("%Y-%m-%dT%H:%M:%S")
     insight_id = ts  # human-readable, doubles as sort key suffix
-    sk         = f"INSIGHT#{ts}"
+    sk = f"INSIGHT#{ts}"
 
     item = {
         "pk":           INSIGHTS_PK,
@@ -281,8 +281,8 @@ def tool_get_insights(args):
     Returns newest-first. Flags items open >14 days.
     """
     status_filter = args.get("status_filter")  # None = all
-    limit         = int(args.get("limit") or 50)
-    today         = datetime.now(timezone.utc).date()
+    limit = int(args.get("limit") or 50)
+    today = datetime.now(timezone.utc).date()
 
     resp = table.query(
         KeyConditionExpression=Key("pk").eq(INSIGHTS_PK) & Key("sk").begins_with("INSIGHT#"),
@@ -331,9 +331,9 @@ def tool_update_insight_outcome(args):
     insight_id is the timestamp string returned by save_insight (e.g. 2026-02-22T09:15:00).
     status must be one of: open, acted, resolved.
     """
-    insight_id     = (args.get("insight_id") or "").strip()
-    outcome_notes  = (args.get("outcome_notes") or "").strip()
-    new_status     = (args.get("status") or "acted").strip()
+    insight_id = (args.get("insight_id") or "").strip()
+    outcome_notes = (args.get("outcome_notes") or "").strip()
+    new_status = (args.get("status") or "acted").strip()
 
     if not insight_id:
         raise ValueError("insight_id is required")
@@ -1062,9 +1062,9 @@ def tool_get_social_isolation_risk(args):
         pre_start = (ep_start - timedelta(days=7)).strftime("%Y-%m-%d")
         pre_end = (ep_start - timedelta(days=1)).strftime("%Y-%m-%d")
         impact = {"episode": ep, "health_deltas": {}}
-        for src, field, label in [("whoop","recovery_score","Recovery"),("whoop","hrv","HRV"),("whoop","sleep_score","Sleep"),("garmin","avg_stress","Stress")]:
-            pre_vals = [_sf(health_data.get(src,{}).get(d,{}).get(field)) for d in health_data.get(src,{}) if pre_start <= d <= pre_end]
-            ep_vals = [_sf(health_data.get(src,{}).get(d,{}).get(field)) for d in health_data.get(src,{}) if ep["start"] <= d <= ep["end"]]
+        for src, field, label in [("whoop", "recovery_score", "Recovery"), ("whoop", "hrv", "HRV"), ("whoop", "sleep_score", "Sleep"), ("garmin", "avg_stress", "Stress")]:
+            pre_vals = [_sf(health_data.get(src, {}).get(d, {}).get(field)) for d in health_data.get(src, {}) if pre_start <= d <= pre_end]
+            ep_vals = [_sf(health_data.get(src, {}).get(d, {}).get(field)) for d in health_data.get(src, {}) if ep["start"] <= d <= ep["end"]]
             pa, ea = _avg(pre_vals), _avg(ep_vals)
             if pa is not None and ea is not None:
                 impact["health_deltas"][label] = {"before": pa, "during": ea, "change": round(ea - pa, 2)}
@@ -1150,16 +1150,16 @@ def tool_get_meditation_correlation(args):
 
     non_practice_dates = [d for d in all_dates if d not in daily_minutes]
     COMPARE_METRICS = [
-        ("whoop","recovery_score","Recovery","higher_is_better"),("whoop","hrv","HRV","higher_is_better"),
-        ("whoop","resting_heart_rate","Resting HR","lower_is_better"),("whoop","sleep_score","Sleep Score","higher_is_better"),
-        ("whoop","sleep_efficiency_pct","Sleep Efficiency","higher_is_better"),("garmin","avg_stress","Stress","lower_is_better"),
-        ("garmin","body_battery_high","Body Battery","higher_is_better"),
+        ("whoop", "recovery_score", "Recovery", "higher_is_better"), ("whoop", "hrv", "HRV", "higher_is_better"),
+        ("whoop", "resting_heart_rate", "Resting HR", "lower_is_better"), ("whoop", "sleep_score", "Sleep Score", "higher_is_better"),
+        ("whoop", "sleep_efficiency_pct", "Sleep Efficiency", "higher_is_better"), ("garmin", "avg_stress", "Stress", "lower_is_better"),
+        ("garmin", "body_battery_high", "Body Battery", "higher_is_better"),
     ]
 
     comparison = []
     for src, field, label, direction in COMPARE_METRICS:
-        p_vals = [_sf(health_data.get(src,{}).get(d,{}).get(field)) for d in practice_dates]
-        n_vals = [_sf(health_data.get(src,{}).get(d,{}).get(field)) for d in non_practice_dates]
+        p_vals = [_sf(health_data.get(src, {}).get(d, {}).get(field)) for d in practice_dates]
+        n_vals = [_sf(health_data.get(src, {}).get(d, {}).get(field)) for d in non_practice_dates]
         p_avg, n_avg = _avg(p_vals), _avg(n_vals)
         if p_avg is not None and n_avg is not None:
             diff = round(p_avg - n_avg, 2)
@@ -1170,13 +1170,13 @@ def tool_get_meditation_correlation(args):
                                "n_control": len([v for v in n_vals if v is not None])})
 
     dose_response = {}
-    for low, high, label in [(0,5,"0-5 min"),(5,10,"5-10 min"),(10,20,"10-20 min"),(20,999,"20+ min")]:
+    for low, high, label in [(0, 5, "0-5 min"), (5, 10, "5-10 min"), (10, 20, "10-20 min"), (20, 999, "20+ min")]:
         bucket_dates = [d for d, m in daily_minutes.items() if low <= m < high]
         if not bucket_dates:
             continue
         bm = {}
         for src, field, ml, _ in COMPARE_METRICS:
-            vals = [_sf(health_data.get(src,{}).get(d,{}).get(field)) for d in bucket_dates]
+            vals = [_sf(health_data.get(src, {}).get(d, {}).get(field)) for d in bucket_dates]
             a = _avg(vals)
             if a is not None:
                 bm[ml] = a
@@ -1186,7 +1186,7 @@ def tool_get_meditation_correlation(args):
     for src, field, label, _ in COMPARE_METRICS:
         xs, ys = [], []
         for d in practice_dates:
-            hv = _sf(health_data.get(src,{}).get(d,{}).get(field))
+            hv = _sf(health_data.get(src, {}).get(d, {}).get(field))
             if hv is not None:
                 xs.append(daily_minutes[d])
                 ys.append(hv)
@@ -1203,7 +1203,7 @@ def tool_get_meditation_correlation(args):
         p_next, n_next = [], []
         for d in all_dates:
             nd = (datetime.strptime(d, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
-            hv = _sf(health_data.get(src,{}).get(nd,{}).get(field))
+            hv = _sf(health_data.get(src, {}).get(nd, {}).get(field))
             if hv is not None:
                 (p_next if d in daily_minutes else n_next).append(hv)
         pa, na = _avg(p_next), _avg(n_next)
@@ -1747,7 +1747,7 @@ def tool_get_blood_pressure_dashboard(args):
       Stage 2:   >=140 / >=90
       Crisis:    >180 / >120
     """
-    end_date   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=29)).strftime("%Y-%m-%d"))
 
     items = query_source("apple_health", start_date, end_date)
@@ -1905,7 +1905,7 @@ def tool_get_blood_pressure_correlation(args):
     Correlate blood pressure with lifestyle factors: sodium, training load, stress,
     sleep quality, caffeine, weight. Pearson r + bucketed comparisons.
     """
-    end_date   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=89)).strftime("%Y-%m-%d"))
 
     ah_items = query_source("apple_health", start_date, end_date)
@@ -2067,7 +2067,7 @@ def tool_get_blood_pressure_correlation(args):
 
 def tool_get_gait_analysis(args):
     """Gait & mobility analysis from Apple Watch passive measurements."""
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     items = query_source("apple_health", start_date, end_date)
@@ -2192,7 +2192,7 @@ def tool_get_gait_analysis(args):
 
 def tool_get_energy_balance(args):
     """Apple Watch TDEE vs MacroFactor intake — daily surplus/deficit."""
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
     target_deficit = args.get("target_deficit_kcal", 500)
 
@@ -2269,7 +2269,7 @@ def tool_get_energy_balance(args):
 
 def tool_get_movement_score(args):
     """Daily movement & NEAT analysis."""
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
     step_target = args.get("step_target", 8000)
 
@@ -2385,11 +2385,11 @@ def tool_create_experiment(args):
       - Minimum 14 days for meaningful signal (Attia)
       - Define success criteria upfront (Ferriss)
     """
-    name       = (args.get("name") or "").strip()
+    name = (args.get("name") or "").strip()
     hypothesis = (args.get("hypothesis") or "").strip()
     start_date = (args.get("start_date") or "").strip()
-    tags       = args.get("tags") or []
-    notes      = (args.get("notes") or "").strip()
+    tags = args.get("tags") or []
+    notes = (args.get("notes") or "").strip()
     library_id = (args.get("library_id") or "").strip()
     duration_tier = (args.get("duration_tier") or "").strip()
     experiment_type = (args.get("experiment_type") or "").strip()
@@ -2555,8 +2555,8 @@ def _cohens_d(before_vals, during_vals):
         return None
     mean_b = sum(before_vals) / len(before_vals)
     mean_d = sum(during_vals) / len(during_vals)
-    var_b  = sum((x - mean_b) ** 2 for x in before_vals) / (len(before_vals) - 1)
-    var_d  = sum((x - mean_d) ** 2 for x in during_vals) / (len(during_vals) - 1)
+    var_b = sum((x - mean_b) ** 2 for x in before_vals) / (len(before_vals) - 1)
+    var_d = sum((x - mean_d) ** 2 for x in during_vals) / (len(during_vals) - 1)
     pooled_sd = math.sqrt((var_b + var_d) / 2)
     if pooled_sd == 0:
         return None  # Yael: None propagates through JSON as null, not an error
@@ -2772,9 +2772,9 @@ def tool_end_experiment(args):
     EL-F5 additions: grade (completed/partial/failed), compliance_pct (0-100),
     reflection ("what I'd do differently").
     """
-    exp_id  = (args.get("experiment_id") or "").strip()
+    exp_id = (args.get("experiment_id") or "").strip()
     outcome = (args.get("outcome") or "").strip()
-    status  = (args.get("status") or "completed").strip()
+    status = (args.get("status") or "completed").strip()
     end_date = (args.get("end_date") or "").strip()
     grade = (args.get("grade") or "").strip()
     compliance_pct = args.get("compliance_pct")

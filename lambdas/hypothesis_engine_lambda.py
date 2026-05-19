@@ -55,18 +55,18 @@ try:
 except ImportError:
     _HAS_AI_VALIDATOR = False
 
-REGION     = os.environ.get("AWS_REGION", "us-west-2")
+REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
-S3_BUCKET  = os.environ["S3_BUCKET"]
+USER_ID = os.environ.get("USER_ID", "matthew")
+S3_BUCKET = os.environ["S3_BUCKET"]
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
-table    = dynamodb.Table(TABLE_NAME)
-s3       = boto3.client("s3", region_name=REGION)
-secrets  = boto3.client("secretsmanager", region_name=REGION)
+table = dynamodb.Table(TABLE_NAME)
+s3 = boto3.client("s3", region_name=REGION)
+secrets = boto3.client("secretsmanager", region_name=REGION)
 
 # AI model constants — read from env so model can be updated without redeployment
-AI_MODEL       = os.environ.get("AI_MODEL",       "claude-haiku-4-5-20251001")
+AI_MODEL = os.environ.get("AI_MODEL",       "claude-haiku-4-5-20251001")
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 HYPOTHESES_PK = f"USER#{USER_ID}#SOURCE#hypotheses"
@@ -212,6 +212,12 @@ def store_hypothesis(hypothesis: dict):
             return [to_decimal(v) for v in obj]
         return obj
 
+    # V2 P2.6 (2026-05-19): tag with run_id + computed_at for double-write detection
+    try:
+        from compute_metadata import tag_record
+        item = tag_record(item, source_id="hypotheses")
+    except ImportError:
+        pass
     table.put_item(Item=to_decimal(item))
     logger.info(f"Stored hypothesis: {hypothesis.get('hypothesis_id', sk)}")
 
@@ -828,6 +834,12 @@ def write_hypothesis_context_to_memory(active_hypotheses):
             "pending_count": len(pending),
             "confirmed_count": len(confirmed),
         }
+        # V2 P2.6 (2026-05-19): tag with run_id + computed_at
+        try:
+            from compute_metadata import tag_record
+            item = tag_record(item, source_id="hypothesis_context")
+        except ImportError:
+            pass
         table.put_item(Item=item)
         logger.info(f"Hypothesis context written: {len(pending)} pending, {len(confirmed)} confirmed")
     except Exception as e:

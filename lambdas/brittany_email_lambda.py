@@ -41,17 +41,17 @@ except ImportError:
     logger = logging.getLogger("brittany-weekly")
     logger.setLevel(logging.INFO)
 
-_REGION    = os.environ.get("AWS_REGION", "us-west-2")
+_REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
-SENDER     = os.environ["EMAIL_SENDER"]
-RECIPIENT  = os.environ.get("BRITTANY_EMAIL", "awsdev@mattsusername.com")
+USER_ID = os.environ.get("USER_ID", "matthew")
+SENDER = os.environ["EMAIL_SENDER"]
+RECIPIENT = os.environ.get("BRITTANY_EMAIL", "awsdev@mattsusername.com")
 ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
-table    = dynamodb.Table(TABLE_NAME)
-ses      = boto3.client("sesv2", region_name=_REGION)
-secrets  = boto3.client("secretsmanager", region_name=_REGION)
+table = dynamodb.Table(TABLE_NAME)
+ses = boto3.client("sesv2", region_name=_REGION)
+secrets = boto3.client("secretsmanager", region_name=_REGION)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -63,8 +63,8 @@ def get_api_key():
     return json.loads(secret["SecretString"])["anthropic_api_key"]
 
 def d2f(obj):
-    if isinstance(obj, list):    return [d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [d2f(i) for i in obj]
+    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
     if isinstance(obj, Decimal): return float(obj)
     return obj
 
@@ -145,8 +145,8 @@ def _normalize_whoop_sleep(item):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def gather_all():
-    today   = datetime.now(timezone.utc).date()
-    w_end   = (today - timedelta(days=1)).isoformat()
+    today = datetime.now(timezone.utc).date()
+    w_end = (today - timedelta(days=1)).isoformat()
     w_start = (today - timedelta(days=7)).isoformat()
     print("[INFO] Gathering " + w_start + " → " + w_end)
 
@@ -170,8 +170,8 @@ def gather_all():
         if d: sleep_durations.append(d)
 
     sleep_score_avg = avg(sleep_scores)
-    sleep_dur_avg   = avg(sleep_durations)
-    nights          = len(sleep_scores)
+    sleep_dur_avg = avg(sleep_durations)
+    nights = len(sleep_scores)
 
     # Plain-English sleep quality
     if sleep_score_avg is None:
@@ -212,7 +212,7 @@ def gather_all():
     emotion_freq = defaultdict(int)
     for em in all_emotions: emotion_freq[em] += 1
 
-    mood_avg   = avg(mood_scores)
+    mood_avg = avg(mood_scores)
     energy_avg = avg(energy_scores)
     stress_avg = avg(stress_scores)
 
@@ -227,37 +227,37 @@ def gather_all():
         mood_label = "struggling"
 
     # ── Nutrition ──
-    cals  = [safe_float(r, "total_calories_kcal") for r in raw["macrofactor"].values() if safe_float(r, "total_calories_kcal")]
-    prots = [safe_float(r, "total_protein_g")     for r in raw["macrofactor"].values() if safe_float(r, "total_protein_g")]
-    cal_target  = profile.get("calorie_target", 1800)
+    cals = [safe_float(r, "total_calories_kcal") for r in raw["macrofactor"].values() if safe_float(r, "total_calories_kcal")]
+    prots = [safe_float(r, "total_protein_g") for r in raw["macrofactor"].values() if safe_float(r, "total_protein_g")]
+    cal_target = profile.get("calorie_target", 1800)
     prot_target = profile.get("protein_target_g", 190)
-    cal_hit_rate  = round(sum(1 for c in cals if c <= cal_target * 1.1) / len(cals) * 100) if cals else None
+    cal_hit_rate = round(sum(1 for c in cals if c <= cal_target * 1.1) / len(cals) * 100) if cals else None
     prot_hit_rate = round(sum(1 for p in prots if p >= prot_target) / len(prots) * 100) if prots else None
-    days_logged   = len(raw["macrofactor"])
+    days_logged = len(raw["macrofactor"])
 
     # ── Training ──
     total_acts = 0
     zone2_mins = 0
-    max_hr     = profile.get("max_heart_rate", 186)
+    max_hr = profile.get("max_heart_rate", 186)
     z2_low, z2_high = max_hr * 0.60, max_hr * 0.70
     for r in raw["strava"].values():
         for a in r.get("activities", []):
             total_acts += 1
-            hr   = float(a.get("average_heartrate") or 0)
+            hr = float(a.get("average_heartrate") or 0)
             mins = float(a.get("moving_time_seconds") or 0) / 60
             if hr and z2_low <= hr <= z2_high:
                 zone2_mins += mins
 
     # ── Weight ──
     weight_rows = [(d, safe_float(r, "weight_lbs")) for d, r in sorted(raw["withings"].items()) if safe_float(r, "weight_lbs")]
-    weight_latest    = weight_rows[-1][1] if weight_rows else None
+    weight_latest = weight_rows[-1][1] if weight_rows else None
     weight_week_start = weight_rows[0][1] if weight_rows else None
-    goal             = profile.get("goal_weight_lbs", 185)
-    journey_start    = profile.get("journey_start_weight_lbs", 307)
-    week_delta       = round(weight_latest - weight_week_start, 1) if weight_latest and weight_week_start else None
-    lbs_lost         = round(journey_start - weight_latest, 1) if weight_latest else None
-    lbs_to_go        = round(weight_latest - goal, 1) if weight_latest else None
-    pct_to_goal      = round(lbs_lost / (journey_start - goal) * 100) if lbs_lost and (journey_start - goal) > 0 else None
+    goal = profile.get("goal_weight_lbs", 185)
+    journey_start = profile.get("journey_start_weight_lbs", 307)
+    week_delta = round(weight_latest - weight_week_start, 1) if weight_latest and weight_week_start else None
+    lbs_lost = round(journey_start - weight_latest, 1) if weight_latest else None
+    lbs_to_go = round(weight_latest - goal, 1) if weight_latest else None
+    pct_to_goal = round(lbs_lost / (journey_start - goal) * 100) if lbs_lost and (journey_start - goal) > 0 else None
 
     # ── Habits ──
     mvp_pcts = [safe_float(r, "completion_pct") for r in raw["habitify"].values() if safe_float(r, "completion_pct") is not None]
@@ -266,7 +266,7 @@ def gather_all():
     # ── Day grades ──
     grade_vals = [safe_float(r, "total_score") for r in raw["day_grade"].values() if safe_float(r, "total_score")]
     day_grade_avg = avg(grade_vals)
-    days_graded   = len(grade_vals)
+    days_graded = len(grade_vals)
 
     # Plain-English week summary
     if day_grade_avg is None:
@@ -422,41 +422,41 @@ Be warm. Be honest. Be human."""
 
 def build_commentary(data):
     api_key = get_api_key()
-    mood    = data["mood"]
-    sl      = data["sleep"]
-    tr      = data["training"]
-    nu      = data["nutrition"]
-    w       = data["weight"]
-    rec     = data["recovery"]
-    dg      = data["day_grade"]
+    mood = data["mood"]
+    sl = data["sleep"]
+    tr = data["training"]
+    nu = data["nutrition"]
+    w = data["weight"]
+    rec = data["recovery"]
+    dg = data["day_grade"]
 
     def fmt(v, fallback="unknown"):
         return str(round(v, 1)) if v is not None else fallback
 
     prompt = BOARD_PROMPT.format(
-        week_summary    = dg.get("week_summary", "unknown"),
-        mood_label      = mood.get("mood_label", "unknown"),
-        mood_avg        = fmt(mood.get("mood_avg")),
-        energy_avg      = fmt(mood.get("energy_avg")),
-        stress_avg      = fmt(mood.get("stress_avg")),
-        sleep_quality_label = sl.get("quality_label", "unknown"),
-        sleep_score_avg = fmt(sl.get("score_avg")),
-        nights          = sl.get("nights", 0),
-        sleep_dur_avg   = fmt(sl.get("duration_avg")),
-        recovery_avg    = fmt(rec.get("avg")),
-        activity_count  = tr.get("activity_count", 0),
-        days_logged     = nu.get("days_logged", 0),
-        cal_hit_rate    = fmt(nu.get("cal_hit_rate"), "unknown"),
-        prot_hit_rate   = fmt(nu.get("prot_hit_rate"), "unknown"),
-        top_themes      = ", ".join(t for t, _ in mood.get("top_themes", [])[:4]) or "none",
-        top_emotions    = ", ".join(e for e, _ in mood.get("top_emotions", [])[:4]) or "none",
-        avoidance_flags = ", ".join(mood.get("avoidance_flags", [])) or "none",
-        defense_patterns = ", ".join(mood.get("defense_patterns", [])) or "none",
-        notable_quotes  = " | ".join('"' + q["quote"] + '"' for q in mood.get("notable_quotes", [])) or "none",
-        pct_to_goal     = w.get("pct_to_goal", 0),
-        lbs_lost        = fmt(w.get("lbs_lost")),
-        lbs_to_go       = fmt(w.get("lbs_to_go")),
-        journey_week    = data.get("journey_week", 1),
+        week_summary=dg.get("week_summary", "unknown"),
+        mood_label=mood.get("mood_label", "unknown"),
+        mood_avg=fmt(mood.get("mood_avg")),
+        energy_avg=fmt(mood.get("energy_avg")),
+        stress_avg=fmt(mood.get("stress_avg")),
+        sleep_quality_label=sl.get("quality_label", "unknown"),
+        sleep_score_avg=fmt(sl.get("score_avg")),
+        nights=sl.get("nights", 0),
+        sleep_dur_avg=fmt(sl.get("duration_avg")),
+        recovery_avg=fmt(rec.get("avg")),
+        activity_count=tr.get("activity_count", 0),
+        days_logged=nu.get("days_logged", 0),
+        cal_hit_rate=fmt(nu.get("cal_hit_rate"), "unknown"),
+        prot_hit_rate=fmt(nu.get("prot_hit_rate"), "unknown"),
+        top_themes=", ".join(t for t, _ in mood.get("top_themes", [])[:4]) or "none",
+        top_emotions=", ".join(e for e, _ in mood.get("top_emotions", [])[:4]) or "none",
+        avoidance_flags=", ".join(mood.get("avoidance_flags", [])) or "none",
+        defense_patterns=", ".join(mood.get("defense_patterns", [])) or "none",
+        notable_quotes=" | ".join('"' + q["quote"] + '"' for q in mood.get("notable_quotes", [])) or "none",
+        pct_to_goal=w.get("pct_to_goal", 0),
+        lbs_lost=fmt(w.get("lbs_lost")),
+        lbs_to_go=fmt(w.get("lbs_to_go")),
+        journey_week=data.get("journey_week", 1),
     )
 
     # V2 P1.4 + P2.8: route through retry_utils.call_anthropic_raw for
@@ -603,9 +603,9 @@ def signal_dot(label, good, neutral=None):
 
 def build_html(data, commentary_text):
     sections = parse_sections(commentary_text)
-    w   = data["weight"]
-    sl  = data["sleep"]
-    dg  = data["day_grade"]
+    w = data["weight"]
+    sl = data["sleep"]
+    dg = data["day_grade"]
     mood = data["mood"]
     dates = data["dates"]
 
@@ -614,7 +614,7 @@ def build_html(data, commentary_text):
 
     try:
         start_dt = datetime.strptime(dates["start"], "%Y-%m-%d")
-        end_dt   = datetime.strptime(dates["end"], "%Y-%m-%d")
+        end_dt = datetime.strptime(dates["end"], "%Y-%m-%d")
         week_label = start_dt.strftime("%b %-d") + " – " + end_dt.strftime("%b %-d, %Y")
     except Exception:
         week_label = dates["start"] + " – " + dates["end"]
@@ -643,17 +643,17 @@ def build_html(data, commentary_text):
     # ── At a glance: 3 plain signals ──
     mood_avg = mood.get("mood_avg")
     sl_score = sl.get("score_avg")
-    dg_avg   = dg.get("avg")
+    dg_avg = dg.get("avg")
     dg_label = dg.get("week_summary", "")
 
-    mood_good    = mood_avg >= 3.5 if mood_avg is not None else None
+    mood_good = mood_avg >= 3.5 if mood_avg is not None else None
     mood_neutral = mood_avg >= 2.5 if mood_avg is not None else None
-    sleep_good   = sl_score >= 70 if sl_score is not None else None
+    sleep_good = sl_score >= 70 if sl_score is not None else None
     sleep_neutral = sl_score >= 55 if sl_score is not None else None
-    grade_good   = dg_avg >= 70 if dg_avg is not None else None
+    grade_good = dg_avg >= 70 if dg_avg is not None else None
     grade_neutral = dg_avg >= 55 if dg_avg is not None else None
 
-    mood_dot_label  = "Mood: " + mood.get("mood_label", "unknown")
+    mood_dot_label = "Mood: " + mood.get("mood_label", "unknown")
     sleep_dot_label = "Sleep: " + sl.get("quality_label", "unknown")
     grade_dot_label = "Week: " + dg_label
 
@@ -677,9 +677,9 @@ def build_html(data, commentary_text):
 
     # ── Board sections ──
     rodriguez_block = section_html(sections.get("rodriguez", ""), "#22c55e", "#f0fdf4", "#15803d")
-    conti_block     = section_html(sections.get("conti", ""),     "#a855f7", "#faf5ff", "#7e22ce")
-    murthy_block    = section_html(sections.get("murthy", ""),    "#3b82f6", "#eff6ff", "#1e40af")
-    chair_block     = section_html(sections.get("chair", ""),     "#6b7280", "#f9fafb", "#374151")
+    conti_block = section_html(sections.get("conti", ""),     "#a855f7", "#faf5ff", "#7e22ce")
+    murthy_block = section_html(sections.get("murthy", ""),    "#3b82f6", "#eff6ff", "#1e40af")
+    chair_block = section_html(sections.get("chair", ""),     "#6b7280", "#f9fafb", "#374151")
 
     # ── Notable quote ──
     quote_block = ""
@@ -773,7 +773,7 @@ def lambda_handler(event, context):
 
     html = build_html(data, commentary)
 
-    dates   = data["dates"]
+    dates = data["dates"]
     subject = "Matthew's Week · " + dates["end"]
 
     ses.send_email(
