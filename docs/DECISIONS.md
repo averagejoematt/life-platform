@@ -2,7 +2,8 @@
 
 > Permanent log of significant architectural, design, and operational decisions.
 > Each ADR captures the decision, context, alternatives considered, and outcome.
-> Last updated: 2026-04-09 (v6.7.1)
+> Last updated: 2026-05-19 (v8.0.0 — V2 audit closure)
+> 57 ADRs total (ADR-001 → ADR-057).
 
 ---
 
@@ -70,6 +71,17 @@ When a significant decision is made — a design pattern chosen, an approach rej
 | ADR-044 | Measurements ingestion via S3 trigger over EventBridge cron | ✅ Active | 2026-03-29 |
 | ADR-045 | SIMP-1 Phase 2: Accept 115 MCP tools as operating state | ✅ Active | 2026-03-30 |
 | ADR-046 | S3 prefix separation: static vs generated content | ✅ Active | 2026-04-05 |
+| ADR-047 | Coach Intelligence architecture: stateless prompts → stateful agents | ✅ Active | 2026-04-06 |
+| ADR-048 | Observatory integration: Coach Intelligence replaces expert analyzer | ✅ Active | 2026-04-06 |
+| ADR-049 | COST-OPT-2: prompt caching + strategic model downgrades | ✅ Active | 2026-04-09 |
+| ADR-050 | TD-19: UTC as the platform-wide DDB partition convention | ✅ Active | 2026-05-03 |
+| ADR-051 | WR-48: stale-source alerts + Anthropic canary (observability hardening) | ✅ Active | 2026-05-03 |
+| ADR-052 | Two-tier alerting: urgent SNS + daily-batched digest | ✅ Active | 2026-05-16 |
+| ADR-053 | S3 KMS rollback to AES256 — CloudFront website endpoint incompatibility | ✅ Active | 2026-05-17 |
+| ADR-054 | CloudFront origins: S3 website endpoint over REST+OAC (status quo) | ✅ Active | 2026-05-17 |
+| ADR-055 | Coach prediction loop closure: 4-step chain | ✅ Active | 2026-05-17 |
+| ADR-056 | SIMP-2 ingestion framework: 8 sources migrated, 6 pattern-exempt | ✅ Active | 2026-05-17 |
+| ADR-057 | V2 audit items formally closed with rationale | ✅ Active | 2026-05-17 |
 
 ---
 
@@ -1381,3 +1393,7 @@ Cumulative reduction: **5,560 LOC → 3,177 LOC (−2,383 LOC / −43%)** across
 **Files changed:** Task list updates (TaskUpdate with rationale on tasks #44, #46, #50), `docs/CHANGELOG.md` (v7.19.0, v7.20.0), this ADR.
 
 **Follow-ups:** None. Closure is final pending the specific trigger conditions per item.
+
+---
+
+**Verified:** 2026-05-19

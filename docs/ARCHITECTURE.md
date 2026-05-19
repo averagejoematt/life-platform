@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-05-19 (v7.21.0 — 128 tools, 35-module MCP package, 19 data sources, 68 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed), 27 DDB source partitions, 79 Lambdas across us-west-2 + us-east-1, 14 secrets, ~100 alarms split urgent/digest (ADR-052), 7 CDK stacks deployed, S3 KMS CMK retained but bucket default reverted to AES256 for website-endpoint compatibility (ADR-053/054), pipeline race fixed (P3.1), SIMP-2 framework adopted by 8 of 14 ingestion Lambdas (ADR-056), coach prediction loop closed end-to-end (ADR-055), shared layer v50)
+Last updated: 2026-05-19 (v7.21.0 — 128 tools, 35-module MCP package, 19 data sources, 68 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed). 127 MCP tools, 26-module MCP package, 19 data sources, 73 Lambdas in us-west-2 + 4 in us-east-1 = 77 total. 12 active secrets (3 in 30-day soft-delete recovery: notion, dropbox, anthropic-api-key). ~104 CloudWatch alarms. 8 CDK stacks deployed. S3 default encryption AES256 (KMS CMK retained, scheduled for deletion 2026-06-16; ADR-053/054). SIMP-2 framework adopted by 8 of 14 ingestion Lambdas (ADR-056). Coach prediction loop closed end-to-end (ADR-055); `coach-quality-gate` now WIRED — invoked async from `ai_calls.call_coach_brief_v2` after each COACH-V2 generation. Shared layer **v51** (mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`). 57 ADRs (ADR-001 → ADR-057). Total active CDK-managed IAM roles down by 5 (orphans deleted 2026-05-17: `life-platform-digest-role`, `life-platform-og-image-role`, `measurements-ingestion-role`, `pipeline-health-check-role`, `subscriber-onboarding-role`).
 
 ---
 
@@ -29,7 +29,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
                          │ DynamoDB queries
 ┌────────────────────────▼────────────────────────────────────┐
 │  SERVE LAYER                                                │
-│  MCP Server Lambda (115 tools, 768 MB) + Lambda Function URL │
+│  MCP Server Lambda (127 tools, 768 MB) + Lambda Function URL │
 │  ← Claude Desktop + claude.ai + Claude mobile via remote MCP│
 │                                                             │
 │  COMPUTE LAYER (IC intelligence features)                   │
@@ -68,21 +68,22 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | DynamoDB table | NoSQL database | `life-platform` (deletion protection + PITR enabled) |
 | S3 bucket | Object storage + static website | `matthew-life-platform` (static hosting on `dashboard/*`) |
 | SQS queue | Dead-letter queue | `life-platform-ingestion-dlq` |
-| Lambda Function URL (MCP) | MCP HTTPS endpoint | `https://votqefkra435xwrccmapxxbj6y0jawgn.lambda-url.us-west-2.on.aws/` (AuthType NONE — auth handled in Lambda via API key header) |
-| Lambda Function URL (remote MCP) | Remote MCP HTTPS endpoint | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` (OAuth 2.1 auto-approve + HMAC Bearer) |
+| Lambda Function URL (remote MCP) | Remote MCP HTTPS endpoint | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/` (OAuth 2.1 auto-approve + HMAC Bearer) |
 | API Gateway | HTTP endpoint | `health-auto-export-api` (a76xwxt2wa) — webhook ingest |
-| Secrets Manager | Credential store | 14 active secrets — full list and consumer Lambdas in [SECRETS_MAP.md](SECRETS_MAP.md). Rotation procedures in [SECRETS_ROTATION.md](SECRETS_ROTATION.md) (P2.6). Deleted: `api-keys` (2026-03-14), `google-calendar` (2026-03-15 ADR-030), `webhook-key` (2026-03-14), `anthropic-api-key` (2026-05-23 — soft-deleted P1.4). |
+| Secrets Manager | Credential store | **9 active secrets** at $0.40/month each = **~$3.60/month**
 | SNS topic | Alert routing | `life-platform-alerts` |
-| CloudFront (amj) | CDN (public) | `E3S424OXQZ8NBE` (`d2qlzq81ggequb.cloudfront.net`) → site-api Lambda + S3 `/site`, alias `averagejoematt.com` |
-| CloudFront (dash) | CDN + auth | `EM5NPX6NJN095` → S3 `/dashboard`, Lambda@Edge auth, alias `dash.averagejoematt.com` |
-| CloudFront (blog) | CDN (public) | `E1JOC1V6E6DDYI` → S3 `/blog`, alias `blog.averagejoematt.com` |
-| CloudFront (buddy) | CDN (public) | `ETTJ44FT0Z4GO` → S3 `/buddy`, alias `buddy.averagejoematt.com` |
-| ACM Certificate | TLS | `arn:aws:acm:us-east-1:205930651321:certificate/e85e4b63-...` — `averagejoematt.com` (DNS-validated) |
+| CloudFront (amj) | CDN (public) | `E3S424OXQZ8NBE` → site-api Lambda + S3 `/site`, alias `averagejoematt.com` |
+| CloudFront (dash) | CDN + auth | `EM5NPX6NJN095` (`d14jnhrgfrte42.cloudfront.net`) → S3 `/dashboard`, Lambda@Edge auth, alias `dash.averagejoematt.com` |
+| CloudFront (blog) | CDN (public) | `E1JOC1V6E6DDYI` (`d1aufb59hb2r1q.cloudfront.net`) → S3 `/blog`, alias `blog.averagejoematt.com` |
+| CloudFront (buddy) | CDN (public) | `ETTJ44FT0Z4GO` (`d1empeau04e0eg.cloudfront.net`) → S3 `/buddy`, alias `buddy.averagejoematt.com` |
+| ACM Certificate | TLS | us-east-1 — `averagejoematt.com` + all subdomains (DNS-validated via Route 53) |
 | SES Receipt Rule Set | Inbound email routing | `life-platform-inbound` (active) — rule `insight-capture` routes `insight@aws.mattsusername.com` → S3 |
+| SES Configuration Set | Outbound delivery telemetry | `life-platform-emails` wired to `daily-brief`, `weekly-digest`, `monthly-digest`, `partner-weekly-email` |
 | CloudWatch | Alarms + logs | **~49 metric alarms**, all Lambdas monitored |
-| CDK | Infrastructure as Code | `cdk/` — 8 stacks deployed. CDK owns all 71 Lambda IAM roles + ~50 EventBridge rules. |
-| CloudTrail | Audit logging | `life-platform-trail` → S3 |
+| CDK | Infrastructure as Code | `cdk/` — 8 stacks deployed. CDK owns all Lambda IAM roles + ~50 EventBridge rules. Stacks: `core_stack`, `ingestion_stack`, `email_stack`, `compute_stack`, `mcp_stack`, `operational_stack`, `web_stack`, `monitoring_stack`. |
+| CloudTrail | Audit logging | `life-platform-trail` → S3. Data events enabled for `s3://matthew-life-platform/raw/` and `s3://matthew-life-platform/uploads/`. |
 | AWS Budget | Cost guardrail | $20/mo cap, alerts at 25%/50%/100% |
+| Concurrency quota | Account-level | **10** (default; quota raise request filed 2026-05-19 — AWS Support case 177921309700709) |
 
 ---
 
@@ -96,9 +97,9 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 
 **Schedule:** Hourly during active hours (4am–10pm PST) for most sources. Exceptions: Garmin at 4x daily (OAuth rate limits), Weather + Todoist at 2x daily (COST-OPT). Maintenance window: 10pm–4am PST (UTC 6–11 skipped).
 
-**Shared Lambda Layer:** v50 — includes `ai_calls.py`, `retry_utils.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `intelligence_common.py` (P5.8 staleness signals in build_coach_preamble), `ingestion_framework.py` (SIMP-2 — see ADR-056), `auth_breaker.py`, `http_retry.py`, `rate_limiter.py`, `request_validator.py`, `compute_metadata.py`, `numeric.py`, `email_framework.py`, + 11 more. Rebuild with `bash deploy/build_layer.sh`. 25 modules, ~30 dependent Lambdas (some still pinned to older versions — survey via `aws lambda get-function-configuration ... Layers`).
+**Shared Lambda Layer:** **v51** — published 2026-05-19 (V2 follow-up: wires `coach-quality-gate` async invoke after each COACH-V2 generation in `ai_calls.call_coach_brief_v2`). Includes `ai_calls.py`, `retry_utils.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `intelligence_common.py` (P5.8 staleness signals in `build_coach_preamble`), `ingestion_framework.py` (SIMP-2 — see ADR-056), `auth_breaker.py`, `http_retry.py`, `rate_limiter.py`, `request_validator.py`, `compute_metadata.py`, `numeric.py`, `character_engine.py`, `html_builder.py`, `ai_output_validator.py`, `platform_logger.py`, `ingestion_validator.py`, `item_size_guard.py`, `digest_utils.py`, `sick_day_checker.py`, `site_writer.py`, `insight_writer.py`. **24 modules total** (`email_framework.py` DELETED in V2 cleanup — zero importers; the 7 email Lambdas were too divergent for a single framework). Rebuild with `bash deploy/build_layer.sh`. Source of truth for version: `cdk/stacks/constants.py:SHARED_LAYER_VERSION`. **Distribution:** 1 Lambda on v51, 56 on v50, 15 with no layer attached (Edge functions, webhook, freshness, dlq-consumer, etc.). Bulk v50→v51 bump deferred; only Lambdas re-deployed today are on v51.
 
-**Secret caching (COST-OPT-1):** 15-min in-memory TTL cache via `secret_cache.py` in shared layer. Reduces Secrets Manager API calls ~90% across 9 Lambdas.
+**Secret caching (COST-OPT-1):** 15-min in-memory TTL cache via `secret_cache.py` in shared layer. Reduces Secrets Manager API calls ~90% across 12 active Lambdas.
 
 **Prompt caching (COST-OPT-2, ADR-049):** Both `ai_calls.py` and `retry_utils.py` auto-wrap system messages as cached content blocks (`anthropic-beta: prompt-caching-2024-07-31`). 90% discount on repeated system prompt tokens. CloudWatch metrics: `AnthropicCacheWriteTokens`, `AnthropicCacheReadTokens`. Model tiering: structured/templated tasks use Haiku (`AI_MODEL` env var), narrative content stays on Sonnet. All model assignments are env-var configurable for instant rollback.
 
@@ -118,6 +119,10 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 | Journal Enrichment | `journal-enrichment` | Hourly | Compute |
 | Activity Enrichment | `activity-enrichment` | Hourly | Compute |
 | Apple Health (CGM, water, BP, SOM) | `health-auto-export-webhook` | Near real-time (webhook) | HAE push |
+
+> **SIMP-2 cohort (8 of 14 ingestion Lambdas, ADR-056):** `whoop`, `garmin`, `strava`, `withings`, `eightsleep`, `habitify`, `todoist`, `weather`. All `import from ingestion_framework`. The 6 pattern-exempt sources are: `notion`, `macrofactor`, `apple_health`, `dropbox_poll`, `food_delivery`, `health_auto_export` (now `measurements_ingestion`).
+>
+> **Lambda renames + deletions in V2 cleanup (2026-05-17/19):** `weather_handler.py` → `weather_lambda.py`. `tools_calendar.py` DELETED (ADR-030 retired, Google Calendar). `podcast_scanner_lambda.py` DELETED (no AWS counterpart). `email_framework.py` DELETED from shared layer.
 
 ### Compute + Email Lambdas
 
@@ -155,7 +160,7 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 
 ### Failure handling
 
-DLQ coverage: all async Lambdas → `life-platform-ingestion-dlq`. CloudWatch: **~66 alarms** total. Alarm actions → SNS `life-platform-alerts`.
+DLQ coverage: all async Lambdas → `life-platform-ingestion-dlq`. CloudWatch: **~104 alarms** total. Alarm actions → SNS `life-platform-alerts`.
 
 Additional safeguards: DLQ Consumer Lambda, Canary Lambda (synthetic health check every 30 min), item size guard.
 
@@ -180,11 +185,9 @@ SK: DATE#YYYY-MM-DD
 
 ### MCP Server
 
-**Lambda:** `life-platform-mcp` | **Tools:** 115 | **Memory:** 768 MB | **Modules:** 35
-**Remote MCP:** `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws`
-**Auth:** `x-api-key` header check + OAuth 2.1/HMAC Bearer for remote MCP
-
-35-module package — see local project structure below.
+**Lambda:** `life-platform-mcp` | **Tools:** 127 | **Memory:** 768 MB | **Runtime:** python3.12 | **Modules:** 26 (`mcp/tools_*.py` + helpers)
+**Remote MCP:** `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/`
+**Auth:** OAuth 2.1 auto-approve + HMAC Bearer (remote). Source of truth for tool count: `grep -E '^\s*"name":\s*"[a-z_]+"' mcp/registry.py | wc -l`.
 
 Cold start: ~700–800ms. Warm: 23–30ms. Cached tools: <100ms.
 
@@ -258,7 +261,7 @@ Eight domain-specific AI coaches generate daily analyses through a multi-stage p
 | Ensemble Digest | `coach-ensemble-digest` | Cross-coach synthesis, disagreement detection, influence graph |
 | Prediction Evaluator | `coach-prediction-evaluator` | Scores past predictions, calibrates confidence |
 | History Summarizer | `coach-history-summarizer` | Compresses old threads into COMPRESSED#latest |
-| Quality Gate | `coach-quality-gate` | Validates output quality before writes (hallucination, voice drift, repetition) |
+| Quality Gate | `coach-quality-gate` | **WIRED** as of v51 (2026-05-19) — invoked async from `ai_calls.call_coach_brief_v2` after each COACH-V2 generation. Validates output quality (hallucination, voice drift, repetition) before downstream writes. |
 | Observatory Renderer | `coach-observatory-renderer` | Renders coach analysis for /api/coach_analysis endpoint (replaces ai_expert_analyzer) |
 
 **Pipeline flow:** Computation Engine -> Narrative Orchestrator -> Quality Gate -> State Updater -> (async) Ensemble Digest + Prediction Evaluator + History Summarizer. Results stored to `COACH#` and `ENSEMBLE#` DynamoDB partitions and served via `/api/coach_analysis`.
@@ -273,14 +276,22 @@ Eight domain-specific AI coaches generate daily analyses through a multi-stage p
 
 ## IAM Security Model
 
-Each Lambda has a **dedicated, least-privilege IAM role** (57 roles total as of v6.0.0, CDK-managed). No shared roles.
+Each Lambda has a **dedicated, least-privilege IAM role**, all CDK-managed. No shared roles.
 
-- **Ingestion roles (13):** DDB write, S3 write, Secrets read, SQS DLQ
-- **MCP role:** DDB CRUD + S3 `config/*` + `raw/matthew/cgm_readings/*`
+**V2 cleanup (2026-05-17):** 5 orphan roles deleted (had no Lambda attached):
+- `life-platform-digest-role`
+- `life-platform-og-image-role`
+- `measurements-ingestion-role`
+- `pipeline-health-check-role`
+- `subscriber-onboarding-role`
+
+Active role categories (approx counts):
+- **Ingestion roles (14):** DDB write, S3 write, Secrets read, SQS DLQ
+- **MCP role:** DDB CRUD + S3 `config/*` + `raw/matthew/cgm_readings/*` + `life-platform/todoist` read
 - **Email/digest roles (7):** DDB read/write, ai-keys, SES, S3 write
-- **Compute roles (5):** DDB read/write, ai-keys
+- **Compute roles (5–7):** DDB read/write, ai-keys
 - **Coach Intelligence roles (8):** DDB read/write on COACH#/ENSEMBLE#/NARRATIVE# partitions, S3 read on config/coaches/*, ai-keys
-- **Operational roles (14):** scoped per function
+- **Operational roles (14+):** scoped per function
 - **Site API role:** DDB primarily read-only (`GetItem, Query`) + limited `PutItem` for interactive features (votes, follows, checkins), `kms:Decrypt`, S3 `site/config/*`, Secrets read (`site-api-ai-key` only) — **NO Scan**
 - No role has `dynamodb:Scan` or cross-account permissions
 
@@ -299,17 +310,17 @@ Each Lambda has a **dedicated, least-privilege IAM role** (57 roles total as of 
 | `life-platform/eightsleep` | Eight Sleep Lambda — username + password |
 | `life-platform/eightsleep-client` | Eight Sleep Lambda — client credential alongside user creds |
 | `life-platform/ai-keys` | 24 Lambdas — Anthropic API key (main pool) |
-| `life-platform/anthropic-api-key` | **Orphan** — created 2026-03-18, no consumer in source. Candidate for deletion (PR 3 finding). |
-| `life-platform/ingestion-keys` | Notion, Todoist, Habitify, Dropbox, HAE webhook — COST-B bundle |
+| `life-platform/ingestion-keys` | Notion, Todoist, Habitify, Dropbox, HAE webhook — COST-B bundle (now sole source for Notion + Dropbox after V2 dedicated-secret deletion) |
 | `life-platform/habitify` | Habitify Lambda — dedicated key (ADR-014) |
-| `life-platform/notion` | Notion Lambda — dedicated key (also in ingestion-keys bundle) |
-| `life-platform/dropbox` | Dropbox Lambda — dedicated key (also in ingestion-keys bundle) |
 | `life-platform/todoist` | MCP write tools — Todoist API token (TD-23, added to MCP IAM 2026-05-02) |
 | `life-platform/mcp-api-key` | MCP Key Rotator — bearer token (90-day auto-rotation) |
 | `life-platform/site-api-ai-key` | Site API Lambda — dedicated Anthropic key (R17-04, isolated from main ai-keys) |
-| ~~`life-platform/webhook-key`~~ | **DELETED 2026-03-14** |
-| ~~`life-platform/google-calendar`~~ | **DELETED 2026-03-15 (ADR-030)** |
-| ~~`life-platform/api-keys`~~ | **DELETED 2026-03-14** |
+| ~~`life-platform/notion`~~ | **SOFT-DELETED 2026-05-17** (30-day recovery; consumer migrated to `ingestion-keys`) |
+| ~~`life-platform/dropbox`~~ | **SOFT-DELETED 2026-05-17** (30-day recovery; consumer migrated to `ingestion-keys`) |
+| ~~`life-platform/anthropic-api-key`~~ | **SOFT-DELETED 2026-05-16** (orphan, no consumer in source) |
+| ~~`life-platform/webhook-key`~~ | **HARD-DELETED 2026-03-14** |
+| ~~`life-platform/google-calendar`~~ | **HARD-DELETED 2026-03-15 (ADR-030)** |
+| ~~`life-platform/api-keys`~~ | **HARD-DELETED 2026-03-14** |
 
 ---
 
@@ -324,9 +335,9 @@ Target: under $25/month | Current: ~$13/month
 | DynamoDB (on-demand) | ~$1.00 |
 | S3 (~2.5 GB + requests) | ~$0.50 |
 | CloudFront (4 distributions) | ~$1.50 |
-| CloudWatch (66 alarms + logs) | ~$2.00 |
+| CloudWatch (~104 alarms + logs) | ~$2.50 |
 | Anthropic API (Haiku + Sonnet, with prompt caching — ADR-049) | ~$8-12 |
-| **Total** | **~$17-21** |
+| **Total** | **~$18-23** |
 
 ---
 
@@ -336,14 +347,17 @@ Target: under $25/month | Current: ~$13/month
 ~/Documents/Claude/life-platform/
   mcp_server.py                   ← MCP Lambda entry point
   mcp_bridge.py                   ← Local MCP adapter (Claude Desktop → Lambda HTTPS)
-  mcp/                            ← MCP server package (35 modules)
-    handler.py, config.py, utils.py, core.py, helpers.py, warmer.py
-    labs_helpers.py, strength_helpers.py, registry.py
+  mcp/                            ← MCP server package (26 tool modules + helpers)
+    handler.py, config.py, utils.py, core.py, helpers.py, labs_helpers.py
+    strength_helpers.py, registry.py, warmer.py
     tools_sleep, tools_health, tools_training, tools_nutrition, tools_habits
     tools_cgm, tools_labs, tools_journal, tools_lifestyle, tools_social
     tools_strength, tools_correlation, tools_character, tools_board
     tools_decisions, tools_adaptive, tools_hypotheses, tools_memory
-    tools_data, tools_todoist
+    tools_data, tools_todoist, tools_protocols, tools_challenges,
+    tools_sick_days, tools_food_delivery, tools_measurements,
+    tools_coach_intelligence
+    # tools_calendar.py DELETED V2 (ADR-030 retired Google Calendar)
 
   lambdas/
     # 16 ingestion (whoop, withings, strava, garmin, habitify,
@@ -378,7 +392,7 @@ Target: under $25/month | Current: ~$13/month
     secret_cache.py               ← Shared: 15-min TTL secret cache (COST-OPT)
     site_writer.py                ← Shared: Public stats S3 writer
 
-  site/                           ← 72-page static website (averagejoematt.com)
+  site/                           ← static website (averagejoematt.com, ~72 pages)
     index.html                    ← Homepage
     story/, live/, journal/       ← Journey pages
     platform/, character/         ← Technical pages
@@ -394,3 +408,7 @@ Target: under $25/month | Current: ~$13/month
   tests/                          ← 1075+ passing tests, 8 CI linters
   handovers/                      ← Session handover notes
 ```
+
+---
+
+**Verified:** 2026-05-19 — full audit (V2 audit + follow-up). Lambda counts via `aws lambda list-functions`; layer version via `aws lambda list-layer-versions` and `cdk/stacks/constants.py:37`; MCP tool count via `grep -E '^\s*"name":' mcp/registry.py | wc -l`; SIMP-2 cohort via `grep -l 'from ingestion_framework import' lambdas/*_lambda.py`; alarm count via `aws cloudwatch describe-alarms`; secret list via `aws secretsmanager list-secrets`.

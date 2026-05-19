@@ -1,0 +1,282 @@
+# Disaster Recovery
+
+**Last updated:** 2026-05-19 (v8.0.0)
+
+> What can go catastrophically wrong, and the recovery sequence for each. Not exhaustive — meant as a starter playbook.
+
+---
+
+## RTO / RPO summary
+
+| Scenario | Recovery Time Objective | Recovery Point Objective |
+|---|---|---|
+| Single Lambda failure | 5 min (rollback) | Real-time |
+| Lambda code corruption (all functions) | 1h (re-deploy from git HEAD) | Real-time |
+| Single DDB item lost / overwritten | 5 min (PITR query) | 35 days |
+| Full DDB table lost | 30 min (PITR full restore) | 35 days |
+| S3 bucket corruption (specific path) | 5 min (versioned restore) | Versioning enabled — every put |
+| S3 bucket deletion (catastrophic) | ⚠️ NOT RECOVERABLE — cross-region replication not enabled (ADR-057 W-03 deferred) | — |
+| Account compromise | Hours (rotate all secrets + audit CloudTrail) | Depends on compromise window |
+| us-west-2 region outage | Hours-days (no DR region — ADR-057 W-03 deferred) | — |
+| Anthropic API outage | Auto-degrade — see below | — |
+
+---
+
+## What IS protected
+
+✅ **DynamoDB PITR** enabled (35-day point-in-time recovery)
+✅ **S3 versioning** enabled on `matthew-life-platform` — every PUT keeps prior version
+✅ **S3 lifecycle** — old versions expire (raw/* 7d, config/* 30d → Glacier IR, uploads/* 30d)
+✅ **CloudTrail** management events + data events on `raw/*` and `uploads/*` (90-day S3 retention)
+✅ **Git** — code in 2 places: local + GitHub. Multiple commits per session.
+✅ **Lambda deploy artifacts** in S3: `deploys/<fn>/latest.zip` + `previous.zip` per Lambda
+✅ **CDK source-of-truth** — entire infrastructure reproducible from `cdk/` + `cdk deploy --all`
+✅ **Secrets Manager** versioning — 30-day soft-delete recovery window on every secret
+
+## What is NOT protected (accepted risk per ADR-057)
+
+❌ **Cross-region replication** — single-region (us-west-2 + us-east-1 for CloudFront/edge)
+❌ **External secret backup** — if Secrets Manager region is wiped, OAuth tokens are gone (re-auth via setup scripts)
+❌ **Anthropic API key backup** — stored only in Secrets Manager `life-platform/ai-keys`; user must keep a backup elsewhere
+❌ **Multi-region DDB** — Global Tables not enabled
+❌ **Cross-account backups** — single AWS account
+
+---
+
+## Scenario 1 — Single DDB item lost or overwritten
+
+**Symptoms:** A user query returns wrong data; a record went missing after a buggy compute Lambda overwrite.
+
+**Recovery:**
+```bash
+# 1. Identify the partition + sort key affected
+PK="USER#matthew#SOURCE#whoop"; SK="DATE#2026-05-15"
+
+# 2. Use PITR to query at a known-good timestamp
+aws dynamodb restore-table-to-point-in-time \
+    --source-table-name life-platform \
+    --target-table-name life-platform-recovery \
+    --restore-date-time 2026-05-19T08:00:00 \
+    --region us-west-2
+
+# 3. Query the recovery table for the lost item
+aws dynamodb get-item \
+    --table-name life-platform-recovery \
+    --key "{\"pk\":{\"S\":\"$PK\"},\"sk\":{\"S\":\"$SK\"}}" \
+    --region us-west-2
+
+# 4. Copy back to main table (overwriting if needed)
+aws dynamodb put-item --table-name life-platform --item <copied json> --region us-west-2
+
+# 5. When done, delete the recovery table
+aws dynamodb delete-table --table-name life-platform-recovery --region us-west-2
+```
+
+**Cost:** $0.02/GB/month for PITR; ~$3 for a brief recovery-table operation.
+
+---
+
+## Scenario 2 — Full DDB table corruption
+
+**Symptoms:** Mass writes to wrong keys; bulk delete that shouldn't have happened.
+
+**Recovery:**
+```bash
+# 1. STOP all writes — disable EventBridge schedules
+aws events list-rules --region us-west-2 \
+    --query 'Rules[?State==`ENABLED`].Name' --output text \
+    | tr '\t' '\n' \
+    | xargs -I{} aws events disable-rule --name {} --region us-west-2
+
+# 2. PITR restore to a clean state (just BEFORE the bad writes)
+aws dynamodb restore-table-to-point-in-time \
+    --source-table-name life-platform \
+    --target-table-name life-platform-restored \
+    --restore-date-time 2026-05-19T07:00:00 \
+    --region us-west-2
+
+# 3. Verify the restored table has expected content
+aws dynamodb scan --table-name life-platform-restored --max-items 5 --region us-west-2
+
+# 4. Swap names (table renaming is not a thing in DDB — use one of two paths):
+#    Path A: leave restored as life-platform-restored; redirect all Lambdas (env var TABLE_NAME)
+#    Path B: delete corrupted + rename via boto3 export/import (slow)
+
+# 5. Re-enable EventBridge schedules
+# (manual: enable rules one-by-one to confirm each pipeline)
+```
+
+**Key insight:** Practice scenario 1 first (cheap, low-stakes); scenario 2 is rare and high-stakes.
+
+---
+
+## Scenario 3 — S3 path corruption
+
+**Symptoms:** `aws s3 sync` ran with wrong path; specific objects overwritten.
+
+**Recovery:**
+```bash
+# 1. List object versions
+aws s3api list-object-versions --bucket matthew-life-platform \
+    --prefix site/index.html --region us-west-2
+
+# 2. Find the good version ID (one before the corruption)
+# 3. Copy it back as current
+aws s3api copy-object \
+    --copy-source "matthew-life-platform/site/index.html?versionId=<good-id>" \
+    --bucket matthew-life-platform --key "site/index.html" \
+    --region us-west-2
+
+# 4. Invalidate CloudFront
+aws cloudfront create-invalidation --distribution-id E3S424OXQZ8NBE \
+    --paths "/index.html" --region us-west-2
+```
+
+---
+
+## Scenario 4 — Lambda code corruption (mass deploy went bad)
+
+**Symptoms:** Multiple Lambdas failing after a CDK deploy.
+
+**Recovery:**
+```bash
+# 1. STOP — don't keep pushing fixes
+# 2. Identify the bad commit
+git log --oneline -20
+
+# 3. Revert source
+git revert <bad-sha>  # or git reset --hard <good-sha> if you're sure
+
+# 4. Re-deploy via CDK
+cd cdk && npx cdk deploy --all
+
+# 5. If individual Lambda needs rollback faster than CDK deploy:
+bash deploy/rollback_lambda.sh <fn>
+```
+
+---
+
+## Scenario 5 — Account compromise
+
+**Symptoms:** Unexpected charges, foreign IPs in CloudTrail, secrets seen externally.
+
+**Immediate response (within 1 hour):**
+```bash
+# 1. ROTATE the AWS account root password via Console
+# 2. Rotate IAM access keys for matthew-admin
+aws iam create-access-key --user-name matthew-admin
+# Update local AWS config with new keys
+aws iam delete-access-key --user-name matthew-admin --access-key-id <OLD>
+
+# 3. Force-rotate all platform secrets
+for sec in $(aws secretsmanager list-secrets --region us-west-2 \
+    --query 'SecretList[?contains(Name, `life-platform/`)].Name' --output text | tr '\t' '\n'); do
+  aws secretsmanager rotate-secret --secret-id "$sec" --region us-west-2 || echo "no rotation: $sec"
+done
+
+# 4. Check CloudTrail for unauthorized API calls
+aws cloudtrail lookup-events --region us-west-2 \
+    --start-time $(date -u -v-1d '+%Y-%m-%dT%H:%M:%S') \
+    --query 'Events[?ErrorCode!=null].[EventTime,UserIdentity.UserName,EventName,ErrorCode]' \
+    --output table
+
+# 5. Disable any IAM users/roles that look suspicious
+```
+
+**Follow-up (within 24 hours):**
+- Audit S3 raw/ + uploads/ for data exfiltration (CloudTrail data events catch this)
+- Rotate the Anthropic API key (manually via console.anthropic.com — no programmatic API)
+- Reset Garmin / Whoop / etc. external service passwords (the platform's tokens were potentially compromised)
+- Notify Partner / Matthew of potential email-recipient exposure if SES was used by attacker
+
+---
+
+## Scenario 6 — us-west-2 region outage
+
+**Reality:** No DR region exists. AWS region outages have happened (the famous us-east-1 outages of 2017/2021). us-west-2 has had localized outages too.
+
+**Response sequence:**
+
+**Day 0 (during outage):**
+- Site averagejoematt.com may be down (CloudFront → S3 in us-west-2)
+- Daily-brief won't send (Lambda + DDB in us-west-2)
+- Accept the gap — it's a personal-scale platform
+
+**Day 1 (post-outage):**
+- AWS will restore data; no action needed
+- Re-run any failed scheduled Lambdas manually:
+  ```bash
+  aws lambda invoke --function-name daily-brief --payload '{}' --region us-west-2 /tmp/out.json
+  ```
+
+**Long-term mitigation (if outages become recurrent):**
+- Enable DynamoDB Global Tables (us-west-2 + us-east-1)
+- Replicate S3 bucket to us-east-1 (or different account)
+- Lambda functions deployed to both regions, Route53 health-check failover
+
+Per ADR-057 W-03, this is deferred — overkill for current scale.
+
+---
+
+## Scenario 7 — Anthropic API outage
+
+**Symptoms:** Daily-brief logs Anthropic 429 / 500 / network errors; coach outputs empty.
+
+**Auto-degradation (already in place):**
+- `retry_utils.py` retries 4 attempts with exponential backoff (5s, 15s, 45s)
+- After retry exhaustion, falls back to placeholder narratives
+- `daily_brief_lambda.py` substitutes a stub for empty journal coach output (V2 P3.5)
+- Daily-brief still sends an email even if 3 of 10 coaches fail — quality gate flags it but doesn't block
+
+**Manual intervention (rare):**
+- If Anthropic is fully down >1h: pause daily-brief schedule manually
+  ```bash
+  aws events disable-rule --name daily-brief-schedule --region us-west-2
+  # Re-enable when Anthropic recovers
+  aws events enable-rule --name daily-brief-schedule --region us-west-2
+  ```
+- Optional: switch model env var to a cheaper/different Claude model if specific model is degraded
+  ```bash
+  aws lambda update-function-configuration --function-name daily-brief \
+    --environment 'Variables={...,AI_MODEL=claude-sonnet-4-5}' --region us-west-2
+  ```
+
+---
+
+## Pre-emptive: Daily/weekly backups to keep
+
+Although automatic backups handle most cases, periodically (e.g. monthly):
+
+```bash
+# 1. Export full DDB to S3 (one-time snapshot, ~$0.10)
+aws dynamodb export-table-to-point-in-time \
+    --table-arn arn:aws:dynamodb:us-west-2:205930651321:table/life-platform \
+    --s3-bucket matthew-life-platform \
+    --s3-prefix backups/ddb/$(date +%Y-%m-%d)/ \
+    --export-time $(date -u '+%s') \
+    --region us-west-2
+
+# 2. Keep CloudWatch dashboards as JSON
+aws cloudwatch list-dashboards --region us-west-2 --query 'DashboardEntries[].DashboardName' --output text \
+    | tr '\t' '\n' \
+    | xargs -I{} bash -c 'aws cloudwatch get-dashboard --dashboard-name "{}" --region us-west-2 > backups/dashboards/{}.json'
+
+# 3. Snapshot the layer
+aws lambda list-layer-versions --layer-name life-platform-shared-utils --region us-west-2 \
+    --query 'LayerVersions[0]' > backups/layer-snapshot.json
+```
+
+---
+
+## Testing the playbook
+
+Once per quarter, rehearse a scenario:
+- **Easy:** Restore one DDB item from PITR
+- **Medium:** Restore one S3 object from versioning
+- **Hard:** Roll back a Lambda via the script + verify
+
+Document outcomes in `docs/INCIDENT_LOG.md` as "DR drill" entries.
+
+---
+
+**Verified:** 2026-05-19

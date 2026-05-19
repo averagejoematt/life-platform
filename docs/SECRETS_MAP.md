@@ -1,8 +1,13 @@
 # Secrets Map — central reference for source → secret mapping
 
-**Status:** ✅ Reconciled against AWS Secrets Manager on 2026-05-03 (PR 3).
+**Status:** ✅ Reconciled against AWS Secrets Manager on **2026-05-19** (V2 audit operational sweep).
 **Source TD:** TD-13 (LOW) from `handovers/HANDOVER_v6.8.1.md`
-**Region:** us-west-2 (per memory: AWS Account 205930651321, primary region us-west-2)
+**Region:** us-west-2 (AWS Account 205930651321)
+
+**Current state (2026-05-19):**
+- **12 active secrets** + **3 in deletion window** = 15 total in `aws secretsmanager list-secrets --include-planned-deletion`.
+- Deletion window: `life-platform/notion` (delete 2026-05-24), `life-platform/dropbox` (delete 2026-05-24), `life-platform/anthropic-api-key` (delete 2026-05-23 — orphan, never adopted).
+- `notion` and `dropbox` were retired in favor of fields inside `life-platform/ingestion-keys` (the keep-bundle pattern). Ingestion Lambdas already read from the bundle.
 
 ---
 
@@ -15,12 +20,17 @@ TD-13 surfaced when the Todoist API key was discovered to live at `life-platform
 ## Verification command
 
 ```bash
+# Active only
 aws secretsmanager list-secrets --region us-west-2 \
   --query 'SecretList[?starts_with(Name, `life-platform`)].[Name,Description,LastChangedDate]' \
   --output table
+
+# Include deletion-window
+aws secretsmanager list-secrets --include-planned-deletion --region us-west-2 \
+  --query 'SecretList[].{Name:Name,DeletedDate:DeletedDate}' --output table
 ```
 
-Last reconciled: **2026-05-03** (PR 3). 15 secrets total under `life-platform/*`.
+Last reconciled: **2026-05-19** (V2 audit). 12 active + 3 in deletion window under `life-platform/*`.
 
 ---
 
@@ -36,12 +46,12 @@ Last reconciled: **2026-05-03** (PR 3). 15 secrets total under `life-platform/*`
 | Habitify | `life-platform/habitify` | API key | static | rotate manually if exposed | ✅ (own dedicated secret, ADR-014) |
 | Todoist (ingestion) | `life-platform/ingestion-keys` (todoist field) | API key | static | rotate manually | ✅ — bundled with Notion / Dropbox / HAE webhook keys |
 | Todoist (MCP write tools) | `life-platform/todoist` | API key | static | rotate manually | ✅ — added to MCP IAM in PR 0 (TD-23) |
-| Notion | `life-platform/notion` (and `life-platform/ingestion-keys`) | Integration token | static | rotate via Notion settings | ✅ — present in both the dedicated and bundled secrets |
-| Dropbox (MacroFactor poll) | `life-platform/dropbox` (and `life-platform/ingestion-keys`) | OAuth2 | refresh on expiry | re-auth Dropbox if expired | ✅ |
+| Notion | `life-platform/ingestion-keys` (notion fields) — **dedicated `life-platform/notion` SCHEDULED FOR DELETION 2026-05-24** | Integration token | static | rotate via Notion settings | ⚠️ Bundle-only path is now authoritative; dedicated secret retired in V2 P5 cleanup. |
+| Dropbox (MacroFactor poll) | `life-platform/ingestion-keys` (dropbox fields) — **dedicated `life-platform/dropbox` SCHEDULED FOR DELETION 2026-05-24** | OAuth2 | refresh on expiry | re-auth Dropbox if expired | ⚠️ Bundle-only path is now authoritative; dedicated secret retired in V2 P5 cleanup. |
 | Apple Health (HAE) webhook key | `life-platform/ingestion-keys` (`health_auto_export_api_key` field) | bearer | static | regenerate from API Gateway if exposed | ✅ |
 | Anthropic — main pool | `life-platform/ai-keys` | API key | rotate periodically | manage in Anthropic console | ✅ — 24 consumer Lambdas |
 | Anthropic — site-api isolated | `life-platform/site-api-ai-key` | API key | rotate periodically | manage in Anthropic console | ✅ — R17-04, isolated for site Lambda |
-| Anthropic — orphan? | `life-platform/anthropic-api-key` | API key | unknown | unknown | ⚠️ **Orphan: not referenced in any Lambda or MCP code as of PR 3.** Created 2026-03-18, last modified same day. Candidate for deletion if confirmed unused. |
+| Anthropic — orphan | `life-platform/anthropic-api-key` | API key | n/a | n/a | ❌ **SCHEDULED FOR DELETION 2026-05-23** — confirmed unused in V2 audit; scheduled for deletion 2026-05-16. |
 | MCP Bearer token | `life-platform/mcp-api-key` | HMAC-derived bearer | 90-day auto-rotation via `mcp-key-rotator` Lambda | automated | ✅ |
 | Function Health | n/a | n/a | n/a | manual PDF acquisition + ingest script | ✅ no secret needed (PDF-driven, no API) |
 | MacroFactor | n/a (uses Dropbox) | n/a | n/a | re-auth Dropbox if expired | ✅ no MacroFactor-side secret; flows via Dropbox |
@@ -94,26 +104,30 @@ Cache TTL note: COST-OPT-1 uses `secret_cache.py` (15-min in-memory TTL across m
 | `life-platform/garmin` | `garmin-data-ingestion`, `freshness-checker`, `pipeline-health-check` | garth OAuth tokens |
 | `life-platform/eightsleep` + `life-platform/eightsleep-client` | `eightsleep-data-ingestion`, `pipeline-health-check` | creds + client ID |
 | `life-platform/habitify` | `habitify-data-ingestion`, `pipeline-health-check` | API key |
-| `life-platform/notion` | `notion-journal-ingestion`, `pipeline-health-check` | also in `ingestion-keys` bundle |
-| `life-platform/dropbox` | `dropbox-poll`, `pipeline-health-check` | also in `ingestion-keys` bundle |
+| `life-platform/notion` | **scheduled for deletion 2026-05-24** | Path migrated to `ingestion-keys` bundle. |
+| `life-platform/dropbox` | **scheduled for deletion 2026-05-24** | Path migrated to `ingestion-keys` bundle. |
 | `life-platform/todoist` | `life-platform-mcp` (via `mcp/tools_todoist.py`) | NEW (PR 0) — MCP write tools only |
 | `life-platform/ingestion-keys` | `todoist-data-ingestion`, `notion-journal-ingestion`, `dropbox-poll`, `health-auto-export-webhook`, `pipeline-health-check` | bundled — multiple keys per source |
 | `life-platform/ai-keys` | 24 Lambdas (ai-expert-analyzer, anomaly-detector, partner-email, challenge-generator, all 5 coach_*, daily-brief, daily-insight-compute, hypothesis-engine, journal-enrichment, monday-compass, monthly-digest, nutrition-review, weekly-digest, weekly-plate, weekly-signal, wednesday-chronicle, ai_calls module, etc.) | Anthropic API key. Run `grep -lrn life-platform/ai-keys lambdas/ mcp/` for the full list. |
 | `life-platform/site-api-ai-key` | `site-api-ai-lambda`, `life-platform-site-api`, `pipeline-health-check` | Isolated per R17-04 |
 | `life-platform/mcp-api-key` | `life-platform-mcp` (config), `canary-lambda`, `qa-smoke`, `mcp-key-rotator` | HMAC bearer; auto-rotates 90d |
-| `life-platform/anthropic-api-key` | **none — orphan** | **⚠️ See orphan note above. Candidate for deletion.** |
+| `life-platform/anthropic-api-key` | **none — scheduled for deletion 2026-05-23** | Orphan. V2 P5. |
 
 ---
 
 ## Cleanup actions surfaced by this audit
 
-1. **Orphan: `life-platform/anthropic-api-key`** — not referenced in source or IAM. Candidate for deletion. Decision deferred to Matthew.
-2. **Stale: `life-platform/webhook-key`** — referenced in `cdk/stacks/role_policies.py:326` ("Dedicated life-platform/webhook-key also exists — migration deferred") but NOT in `aws secretsmanager list-secrets` output (deleted 2026-03-14 per HANDOVER_v3.7.84). Either:
-   - Update the role_policies.py comment to note the deletion, OR
-   - Restore the secret if the comment's "migration deferred" intent is still active.
-3. **Test list drift** — `tests/test_iam_secrets_consistency.py KNOWN_SECRETS` was missing `anthropic-api-key` and `eightsleep-client`. PR 3 syncs the list.
-4. **ARCHITECTURE.md secrets table** — heading says "9 active secrets" but body lists 10 active rows (PR 0 added the todoist row, count not updated). PR 3 syncs the count to 15 active.
-5. **Orphan IAM `webhook-key` reference** — `cdk/stacks/role_policies.py` comment references a secret that no longer exists.
+1. ✅ **Orphan `life-platform/anthropic-api-key` scheduled for deletion 2026-05-23** (V2 P5).
+2. ✅ **Dedicated `life-platform/notion` retired** — bundle path is authoritative; secret scheduled for deletion 2026-05-24.
+3. ✅ **Dedicated `life-platform/dropbox` retired** — bundle path is authoritative; secret scheduled for deletion 2026-05-24.
+4. ✅ **Test list drift** — `tests/test_iam_secrets_consistency.py KNOWN_SECRETS` synced.
+5. ⚠️ **ARCHITECTURE.md secrets table** — verify count says "12 active secrets" (was inconsistent; V2 P3 swept).
+6. ⚠️ **role_policies.py stale comment about `webhook-key`** — confirm comment removed; `webhook-key` was deleted 2026-03-14.
+
+If any deletion-window secret is needed back, restore via console within the 7-day window:
+```bash
+aws secretsmanager restore-secret --secret-id life-platform/notion
+```
 
 ---
 
@@ -126,3 +140,7 @@ This doc must be updated whenever:
 - Re-auth procedure changes → update the procedure cell
 
 If this doc drifts from reality, it becomes worse than nothing. Treat divergences from the AWS reality as the doc being broken, not AWS.
+
+---
+
+**Verified:** 2026-05-19 (V2 audit operational sweep)

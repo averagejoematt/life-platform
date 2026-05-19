@@ -1,7 +1,7 @@
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-05-19 (v7.21.0 — 68 Lambdas, 9 active secrets, 128 MCP tools, ~49 alarms)
+> Last updated: 2026-05-19 (v8.0.0 — 73 Lambdas us-west-2 + 4 us-east-1, 12 active secrets, 127 MCP tools, ~104 alarms, shared layer v51)
 
 ---
 
@@ -10,9 +10,10 @@
 | Field | Value |
 |-------|-------|
 | Account ID | `205930651321` |
-| Region | `us-west-2` (Oregon) |
+| Region | `us-west-2` (Oregon); us-east-1 for Lambda@Edge + OG image + email-subscriber |
 | Budget | $20/month (alerts at 25% / 50% / 100%) |
-| CloudTrail | `life-platform-trail` → S3 |
+| CloudTrail | `life-platform-trail` → S3 (data events enabled on `raw/` and `uploads/` S3 prefixes) |
+| Account Lambda concurrency quota | **10** (default; raise request filed 2026-05-19, AWS Support case 177921309700709) |
 
 ---
 
@@ -52,12 +53,12 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 
 | Field | Value |
 |-------|-------|
-| Lambda | `life-platform-mcp` (768 MB) |
+| Lambda | `life-platform-mcp` (768 MB, python3.12) |
 | Function URL (remote) | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/` |
-| Auth (remote) | HMAC Bearer token via `life-platform/mcp-api-key` secret (auto-rotates every 90 days) |
+| Auth (remote) | OAuth 2.1 auto-approve + HMAC Bearer via `life-platform/mcp-api-key` secret (auto-rotates every 90 days) |
 | Auth (local) | `mcp_bridge.py` → `.config.json` → Function URL |
-| Tools | 128 across 35 modules |
-| Cache warmer | 14 tools pre-computed nightly at 9:00 AM PT |
+| Tools | **127** across **26** tool modules (`mcp/tools_*.py`) |
+| Cache warmer | 14 warm-steps pre-computed nightly (warmer config) |
 
 ---
 
@@ -77,7 +78,8 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Field | Value |
 |-------|-------|
 | Bucket | `matthew-life-platform` |
-| Key prefixes | `raw/` (source data) · `site/` (public website — 72 pages) · `generated/` (Lambda-generated files — public_stats.json, character_stats.json, OG images, journal posts; ADR-046) · `dashboard/` (web dashboard) · `blog/` (Chronicle) · `buddy/` (accountability page) · `config/` (profile, board, character sheet) · `inbound-email/` (insight parser) · `uploads/` (MacroFactor CSVs) · `imports/` (Apple Health XML) · `avatar/` (pixel art sprites) |
+| Default encryption | **AES256** (KMS CMK `5c50ca02-c187-4338-8704-5b27f1efafca` scheduled for deletion 2026-06-16 — bucket reverted to AES256 for CloudFront website-endpoint compatibility, ADR-053/054) |
+| Key prefixes | `raw/` (source data) · `site/` (public website — ~72 pages) · `generated/` (Lambda-generated files — public_stats.json, character_stats.json, OG images, journal posts; ADR-046) · `dashboard/` (web dashboard) · `blog/` (Chronicle) · `buddy/` (accountability page) · `config/` (profile, board, character sheet, coaches) · `inbound-email/` (insight parser) · `uploads/` (MacroFactor CSVs) · `imports/` (Apple Health XML) · `avatar/` (pixel art sprites) |
 
 ---
 
@@ -89,7 +91,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Key schema | PK: `USER#matthew#SOURCE#<source>` · SK: `DATE#YYYY-MM-DD` |
 | Protection | Deletion protection ON · PITR enabled (35-day rolling) |
 | Encryption | KMS CMK `alias/life-platform-dynamodb` (key `444438d1-a5e0-43b8-9391-3cd2d70dde4d`) · annual auto-rotation ON |
-| Partitions (30) | whoop, eightsleep, garmin, strava, withings, habitify, macrofactor, apple_health, notion_journal, todoist, weather, supplements, cgm, labs, genome, dexa, day_grade, habit_scores, character_sheet, chronicle, coaching_insights, life_events, contacts, temptations, cold_heat_exposure, exercise_variety, adaptive_mode, platform_memory, insights, hypotheses |
+| Partitions (raw + derived) | whoop, eightsleep, garmin, strava, withings, habitify, macrofactor, macrofactor_workouts, apple_health, notion, todoist, weather, supplements, labs, genome, dexa, state_of_mind, food_delivery, measurements, travel · derived: day_grade, habit_scores, character_sheet, adaptive_mode, computed_metrics, platform_memory, insights, hypotheses, decisions, chronicle, coaching_insights, COACH#, ENSEMBLE#, NARRATIVE# |
 
 ---
 
@@ -100,6 +102,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Sender / Recipient | `awsdev@mattsusername.com` |
 | Inbound rule set | `life-platform-inbound` (active) |
 | Inbound rule | `insight-capture` → routes `insight@aws.mattsusername.com` → S3 |
+| Outbound configuration set | `life-platform-emails` — wired to `daily-brief`, `weekly-digest`, `monthly-digest`, `partner-weekly-email` |
 
 ---
 
@@ -108,7 +111,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Field | Value |
 |-------|-------|
 | Alert topic | `life-platform-alerts` → email to `awsdev@mattsusername.com` |
-| CloudWatch alarms | ~49 metric alarms (ALARM-only; base + invocation-count + DDB item size + canary + duration + freshness + pipeline health) |
+| CloudWatch alarms | **~104 metric alarms** (base + invocation-count + DDB item size + canary + duration + freshness + pipeline health) |
 
 ---
 
@@ -133,7 +136,7 @@ All DNS-validated via Route 53 CNAME records.
 
 ---
 
-## Secrets Manager (9 active secrets)
+## Secrets Manager (12 active secrets)
 
 All under prefix `life-platform/`. No values stored in this doc — access via AWS console or CLI.
 
@@ -141,41 +144,61 @@ All under prefix `life-platform/`. No values stored in this doc — access via A
 |--------|------|----------------|
 | `whoop` | OAuth | Auto-refreshed by Lambda |
 | `eightsleep` | OAuth | Auto-refreshed by Lambda |
+| `eightsleep-client` | Client credential | Companion to `eightsleep`; required by Eight Sleep API |
 | `strava` | OAuth | Auto-refreshed by Lambda |
 | `withings` | OAuth | Auto-refreshed by Lambda |
-| `garmin` | Session | Auto-refreshed by Lambda |
+| `garmin` | Session | garth OAuth tokens — auto-refreshed by Lambda |
 | `ai-keys` | JSON bundle | `anthropic_api_key` + `mcp_api_key` (90-day auto-rotation) |
-| `ingestion-keys` | JSON bundle | `notion_api_key` + `todoist_api_key` + `habitify_api_key` + `dropbox_app_key` + `health_auto_export_api_key`. COST-B pattern — single secret, per-service key fields. |
+| `ingestion-keys` | JSON bundle | `notion_api_key` + `todoist_api_key` + `habitify_api_key` + `dropbox_app_key` + `health_auto_export_api_key`. COST-B pattern — single secret, per-service key fields. Now the **sole** source for Notion + Dropbox creds after the dedicated secrets were soft-deleted 2026-05-17. |
 | `habitify` | API key | Dedicated Habitify API token. Also present in `ingestion-keys` — see ADR-014 for governing principle. |
+| `todoist` | API key | Todoist API token used by MCP write tools (TD-23). |
 | `mcp-api-key` | Rotation target | MCP server bearer token consumed by `ai-keys`. 90-day auto-rotation via `life-platform-key-rotator`. |
 | `site-api-ai-key` | API key | Subscriber validation key for site-api-ai Lambda (ADR-041). |
 
-**Deleted secrets (historical):** See ADR-030, ADR-014 for retirement decisions.
+**Soft-deleted (30-day recovery window):**
+- `life-platform/notion` — deleted 2026-05-17 (consumer migrated to `ingestion-keys`)
+- `life-platform/dropbox` — deleted 2026-05-17 (consumer migrated to `ingestion-keys`)
+- `life-platform/anthropic-api-key` — deleted 2026-05-16 (orphan, no consumer)
+
+**Hard-deleted (historical):** `api-keys` (2026-03-14), `webhook-key` (2026-03-14), `google-calendar` (2026-03-15, ADR-030).
 
 ---
 
-## Lambdas (63)
+## Lambdas (73 us-west-2 + 4 us-east-1 = 77 total)
 
-60 CDK-managed (us-west-2) + 2 Lambda@Edge (us-east-1)
+CDK-managed in us-west-2 (73) plus 4 standalone in us-east-1 (Lambda@Edge + OG + email-subscriber).
+Source of truth: `aws lambda list-functions --region us-west-2 --query 'length(Functions)'`.
 
-### Ingestion (16)
-`whoop-data-ingestion` · `eightsleep-data-ingestion` · `garmin-data-ingestion` · `strava-data-ingestion` · `withings-data-ingestion` · `habitify-data-ingestion` · `macrofactor-data-ingestion` · `notion-journal-ingestion` · `todoist-data-ingestion` · `weather-data-ingestion` · `health-auto-export-webhook` · `apple-health-ingestion` · `journal-enrichment` · `activity-enrichment` · `food-delivery-ingestion` · `measurements-ingestion`
+### Ingestion (14)
+`whoop-data-ingestion` · `eightsleep-data-ingestion` · `garmin-data-ingestion` · `strava-data-ingestion` · `withings-data-ingestion` · `habitify-data-ingestion` · `macrofactor-data-ingestion` · `notion-journal-ingestion` · `todoist-data-ingestion` · `weather-data-ingestion` · `health-auto-export-webhook` · `apple-health-ingestion` · `dropbox-poll` · `food-delivery-ingestion` · `measurements-ingestion`
+
+> SIMP-2 cohort (8, ADR-056): whoop, garmin, strava, withings, eightsleep, habitify, todoist, weather. Pattern-exempt (6): notion, macrofactor, apple_health, dropbox_poll, food_delivery, measurements (HAE-fed).
+
+### Enrichment / Compute (15)
+`journal-enrichment` · `activity-enrichment` · `character-sheet-compute` · `adaptive-mode-compute` · `daily-metrics-compute` · `daily-insight-compute` · `hypothesis-engine` · `weekly-correlation-compute` · `acwr-compute` · `sleep-reconciler` · `circadian-compliance` · `failure-pattern-compute` · `journal-analyzer` · `field-notes-generate` · `weekly-signal`
+
+### Coach Intelligence (8)
+`coach-computation-engine` · `coach-narrative-orchestrator` · `coach-quality-gate` (WIRED v51) · `coach-state-updater` · `coach-ensemble-digest` · `coach-prediction-evaluator` · `coach-history-summarizer` · `coach-observatory-renderer` · plus legacy `ai-expert-analyzer` (deprecated, fallback only)
 
 ### Email / Digest (11)
-`daily-brief` · `weekly-digest` · `monthly-digest` · `nutrition-review` · `wednesday-chronicle` · `weekly-plate` · `monday-compass` · `anomaly-detector` · `evening-nudge` · `chronicle-email-sender` · `subscriber-onboarding`
+`daily-brief` · `weekly-digest` · `monthly-digest` · `nutrition-review` · `wednesday-chronicle` (EventBridge ENABLED) · `chronicle-email-sender` (EventBridge ENABLED) · `weekly-plate` · `monday-compass` · `anomaly-detector` · `evening-nudge` · `partner-weekly-email`
 
-### Compute (12)
-`character-sheet-compute` · `adaptive-mode-compute` · `daily-metrics-compute` · `daily-insight-compute` · `hypothesis-engine` · `weekly-correlation-compute` · `acwr-compute` · `sleep-reconciler` · `circadian-compliance` · `ai-expert-analyzer` · `journal-analyzer` · `field-notes-generate`
+### Infrastructure / Operational (~17)
+`life-platform-mcp` · `life-platform-mcp-warmer` · `life-platform-site-api` · `life-platform-site-api-ai` · `site-stats-refresh` · `life-platform-freshness-checker` · `life-platform-key-rotator` · `dashboard-refresh` · `life-platform-data-export` · `life-platform-data-reconciliation` · `life-platform-delete-user-data` · `life-platform-dlq-consumer` · `life-platform-canary` · `life-platform-pip-audit` · `life-platform-qa-smoke` · `life-platform-alert-digest` · `insight-email-parser` · `challenge-generator` · `pipeline-health-check` · `chronicle-approve` · `subscriber-onboarding`
 
-> **Skeleton Lambdas (source written, NOT yet CDK-wired or EventBridge-scheduled — activate ~2026-05-01):**
-> `failure-pattern-compute` (IC-4, `lambdas/failure_pattern_compute_lambda.py`) · `momentum-warning-compute` (IC-5, `lambdas/momentum_warning_compute_lambda.py`)
+### us-east-1 functions (4)
+- `life-platform-cf-auth` (Lambda@Edge) — attached to dashboard CloudFront (`EM5NPX6NJN095`), password-gates `dash.averagejoematt.com`
+- `life-platform-buddy-auth` (Lambda@Edge) — function exists; buddy CloudFront currently runs **without auth** (intentionally public; see Web Properties table)
+- `life-platform-og-image` — OG image generation (Pillow layer)
+- `email-subscriber` — Subscribe form intake
 
-### Infrastructure / Operational (21)
-`life-platform-freshness-checker` · `dropbox-poll` · `insight-email-parser` · `life-platform-key-rotator` · `dashboard-refresh` · `life-platform-data-export` · `life-platform-qa-smoke` · `life-platform-mcp` · `life-platform-mcp-warmer` · `dlq-consumer` · `life-platform-canary` · `data-reconciliation` · `pip-audit` · `partner-weekly-email` · `life-platform-site-api` · `site-stats-refresh` · `challenge-generator` · `og-image-generator` · `email-subscriber` · `pipeline-health-check` · `chronicle-approve`
+### Layer version distribution (2026-05-19)
+- v51: 1 Lambda (deployed during V2 follow-up)
+- v50: 56 Lambdas
+- None / N/A: 15 Lambdas (Edge functions, HAE webhook, freshness-checker, dlq-consumer, journal-analyzer, pipeline-health-check, data-reconciliation — intentionally no shared layer)
+- v2 (Pillow): 1 Lambda (og-image-generator)
 
-### Lambda@Edge (us-east-1) — manually managed, outside CDK
-`life-platform-cf-auth` — attached to dashboard CloudFront (`EM5NPX6NJN095`), password-gates `dash.averagejoematt.com`
-`life-platform-buddy-auth` — function exists but buddy CloudFront runs **without auth** (intentionally public; see Web Properties table)
+> A bulk v50→v51 bump is **not** required — only Lambdas in the COACH-V2 path need the new layer immediately, and they were re-deployed today. Bulk migration deferred.
 
 ---
 
@@ -185,8 +208,9 @@ All rules CDK-managed as of v3.4.0 (PROD-1). IAM role: `life-platform-scheduler-
 
 | Field | Value |
 |-------|-------|
-| Timezone | `America/Los_Angeles` (DST-safe) |
-| Schedules | 50+ total (see PROJECT_PLAN.md Ingestion Schedule for timing) |
+| Total rules | 65 (`aws events list-rules --region us-west-2`) |
+| Timezone | Fixed UTC cron (no DST drift; see CLAUDE.md convention) |
+| Chronicle pipeline | `wednesday-chronicle-schedule` ENABLED (`cron(0 15 ? * WED *)` — Wed 8 AM PT). Chronicle email sender ENABLED (`cron(10 15 ? * WED *)`). Re-enabled as part of V2 follow-up. |
 | Old manual rules | Deleted in v3.4.0 migration |
 
 ---
@@ -224,7 +248,7 @@ See `deploy/p1_kms_dynamodb.sh` for creation script.
 ~/Documents/Claude/life-platform/
 ├── mcp_server.py          # MCP Lambda source
 ├── mcp_bridge.py          # Local Claude Desktop bridge
-├── mcp/                   # 35 tool modules
+├── mcp/                   # 26 tool modules + helpers
 ├── lambdas/               # Lambda source + zips
 ├── deploy/                # Deploy scripts (run in terminal, never via MCP)
 ├── config/                # Local copies of S3 configs
@@ -234,3 +258,7 @@ See `deploy/p1_kms_dynamodb.sh` for creation script.
 ├── backfill/ seeds/ patches/ setup/ tests/ datadrops/
 └── .config.json           # Local MCP bridge credentials (gitignored)
 ```
+
+---
+
+**Verified:** 2026-05-19 — full audit (V2 audit + follow-up). Lambda inventory via `aws lambda list-functions` (both regions), secrets via `aws secretsmanager list-secrets --include-planned-deletion`, alarms via `aws cloudwatch describe-alarms`, EventBridge via `aws events list-rules`, S3 encryption via `aws s3api get-bucket-encryption`, CloudTrail data events via `aws cloudtrail get-event-selectors`, SES config sets via `aws sesv2 list-configuration-sets`. Layer version verified in code at `cdk/stacks/constants.py:37`.

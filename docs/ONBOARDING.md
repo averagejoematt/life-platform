@@ -1,207 +1,205 @@
 # Life Platform — Onboarding Guide
 
-> Start here. For your first day, also read `docs/QUICKSTART.md` (AWS setup, deploy commands, gotchas).
-> Last updated: 2026-05-03 (v6.8.9)
+> First-day mental model. For commands (AWS auth, deploy, rollback), see `docs/QUICKSTART.md`.
+> Last updated: 2026-05-19 (v8.0.0 — post V2 audit + closure ADR-057)
 >
 > **Resuming a Claude chat session?** Read `handovers/HANDOVER_LATEST.md` first — that's the canonical "what's the current state" doc. This file is the slower onboarding for a fresh contributor.
 
 ---
 
-## What Is This?
+## What Is This Platform?
 
-A personal health intelligence system built on AWS. It pulls data from ~13 API-based sources (wearables, apps, webhooks) plus manual/periodic uploads, stores everything in a single DynamoDB table (19 source partitions in active use), and makes it queryable by Claude through a Lambda-backed MCP server with 126 tools.
+A personal health intelligence system built on AWS for a single user (Matthew). It pulls data from 19 API/webhook/manual sources (wearables, apps, labs, manual uploads), stores everything in a single DynamoDB table, runs a deterministic computation pipeline + an 8-agent coaching layer, and exposes 127 MCP tools so Claude can answer natural-language health questions against real data.
 
-The end result: ask Claude a natural-language question about your health, and it queries real data rather than relying on memory or estimates.
+The end result: ask Claude a question about your health, and it queries actual readings rather than relying on memory or estimates.
 
----
-
-## How to Navigate the Docs
-
-| File | Purpose |
-|------|---------|
-| **ONBOARDING.md** (this file) | Start here — mental model + key concepts |
-| `QUICKSTART.md` | Your first day — AWS setup, deploy commands, gotchas |
-| `ARCHITECTURE.md` | Full system design, all AWS resources, data flows |
-| `RUNBOOK.md` | How to operate the platform (deploys, re-auth, troubleshooting) |
-| `SCHEMA.md` | Every DynamoDB field per source |
-| `PROJECT_PLAN.md` | Active roadmap and backlog |
-| `CHANGELOG.md` | Version history (current 30 days) |
-| `PLATFORM_GUIDE.md` | How to use the platform + all MCP tools in conversation with Claude |
-| `MCP_TOOL_CATALOG.md` | Full catalog of all 115 tools |
-| `deploy/README.md` | Guide to the deploy scripts |
-| `DEPENDENCY_GRAPH.md` | Full dependency map: Lambdas → DDB → MCP → website. SPOFs + critical path |
-| `DATA_FLOW_DIAGRAM.md` | Visual data flow (Mermaid diagrams) |
+Public surface: `averagejoematt.com` (blog + observatory cards) and `dash.averagejoematt.com` (private dashboard, Lambda@Edge auth).
 
 ---
 
-## System at a Glance
+## High-Level Data Flow
 
 ```
-13 API-based data sources (26 DDB partitions total)
-    ↓
-13 ingestion Lambdas (EventBridge cron + webhook + S3 trigger)
-    ↓
-DynamoDB (single table) + S3 (raw backup)
-    ↓
-MCP Lambda (115 tools) ← Claude queries this
-    ↓
-54 compute/email/coach/operational Lambdas
-    ↓                          ↓
-Daily Brief email        Coach Intelligence Pipeline
-  + Dashboard              Computation → Orchestration →
-  + Weekly emails           Coach Generation (8 parallel) →
-  + averagejoematt.com      State Update → Ensemble Digest
+19 sources (API + webhook + manual)
+    │
+    ▼
+14 ingestion Lambdas (8 SIMP-2 framework + 6 pattern-exempt — ADR-056)
+  • EventBridge cron (hourly 4am–10pm PT; Garmin 4x/day; Weather + Todoist 2x/day)
+  • HAE webhook (CGM, BP, water, State of Mind — near real-time)
+  • S3 triggers (apple_health XML, macrofactor CSV, measurements)
+    │
+    ▼
+Raw JSON in S3 (`raw/{source}/{datatype}/{YYYY}/{MM}/{DD}.json`)
+  + DynamoDB single-table (`life-platform`)
+      PK = USER#matthew#SOURCE#{source}
+      SK = DATE#YYYY-MM-DD
+    │
+    ▼
+5 compute Lambdas (10:20–10:35 AM PT, pre-compute):
+  character-sheet · adaptive-mode · daily-metrics-compute ·
+  daily-insight-compute · hypothesis-engine
+    │
+    ▼
+Coach Intelligence pipeline (deterministic math → 8 parallel LLM coaches):
+  coach-computation-engine → coach-narrative-orchestrator →
+  8 coach generations → coach-state-updater → coach-ensemble-digest →
+  coach-quality-gate (post-gen) + coach-prediction-evaluator (9 AM PT, daily)
+    │
+    ▼
+7 email Lambdas (daily-brief at 11 AM PT, weekly digests, chronicle, etc.)
+  + og-image-generator (11:30 AM PT, 6 PNG share cards)
+  + site-stats-refresh (writes public_stats.json)
+    │
+    ▼
+MCP Lambda (127 tools) ← Claude Desktop + claude.ai + mobile via remote MCP
+site-api Lambda (60+ endpoints, primarily read-only — ADR-037) ← averagejoematt.com
 ```
 
-All infrastructure is AWS, us-west-2. CDK manages all 8 stacks. Monthly cost: ~$13.
+73 Lambdas in us-west-2 + 4 in us-east-1 (CloudFront edge + auth) = 77 total. 8 CDK stacks. Monthly cost: ~$13.
+
+---
+
+## Key Services You'll Interact With
+
+| Service | Purpose | When you touch it |
+|---------|---------|-------------------|
+| **DynamoDB** (`life-platform`) | Single-table store for all source data, computed metrics, coach state | Read paths via MCP tools; writes via ingestion + compute Lambdas only |
+| **S3** (`matthew-life-platform`) | Raw archives + Lambda-generated content + site assets | `raw/`, `generated/`, `site/`, `uploads/`, `config/`, `cloudtrail/` — see ADR-046 for prefix separation |
+| **Lambda** (73 in us-west-2) | All compute. Ingest, compute, coaches, email, MCP, site-api | Deploy with `deploy/deploy_lambda.sh` (single function) or `cdk deploy <StackName>` (infra changes) |
+| **EventBridge** | All cron schedules, fixed UTC (no DST drift) | CDK-managed only — never create rules via Console |
+| **Secrets Manager** (`life-platform/*`) | All credentials | 11–14 active secrets (3 in soft-delete recovery). See `docs/SECRETS_MAP.md` |
+| **CloudFront** (4 distributions) | CDN for `averagejoematt.com`, `dash`, `blog`, `buddy` | S3 website endpoint origins (ADR-053/054). Site syncs invalidate via CDK helpers |
+| **MCP Lambda** | 127 tools across 26 domain modules in `mcp/` | The interface Claude uses to query data |
+| **Anthropic API** | Coach generation + daily brief sections | Prompt caching enabled (ADR-049); Haiku for structured, Sonnet for narrative |
 
 ---
 
 ## Key Mental Models
 
-### 1. Single-table DynamoDB
+### 1. Single-table DynamoDB (ADR-001)
 
-Every data source writes to one table: `life-platform`. The key schema is:
+Every data source writes to one table: `life-platform`.
 
 ```
 PK: USER#matthew#SOURCE#<source>   (e.g. USER#matthew#SOURCE#whoop)
 SK: DATE#YYYY-MM-DD
 ```
 
-To look up today's Whoop data: PK = `USER#matthew#SOURCE#whoop`, SK = `DATE#2026-03-15`. No GSI — all access patterns work with this composite key.
+Coach state, ensemble digests, narrative arcs, predictions, and learning records live in dedicated PK prefixes (`COACH#`, `ENSEMBLE#`, `NARRATIVE#`, `PREDICTION#`, `LEARNING#`). No GSI by design (ADR-005). All partition writes use UTC midnight (ADR-050).
 
-### 2. Ingestion → Compute → Email pipeline
+### 2. Ingest → Store → Compute → Serve, with strict ordering
 
-Data flows in one direction, with timing enforced by EventBridge:
+EventBridge enforces the timing:
 
 ```
-07:00–09:00 AM  →  Ingestion Lambdas (fetch from APIs + webhook)
-10:20–10:45 AM  →  Compute Lambdas (pre-compute metrics, character sheet)
-11:00 AM        →  Daily Brief (reads pre-computed results, sends email)
+06:45–09:00 AM PT   Ingestion (14 Lambdas — APIs, webhooks, S3 triggers)
+09:05  AM PT        Anomaly detector
+10:20–10:35 AM PT   Compute (5 pre-compute Lambdas + coach pipeline)
+11:00  AM PT        Daily Brief email (reads pre-computed results)
+11:30  AM PT        OG image cards (reads public_stats.json)
 ```
 
-If a compute Lambda fails, the Brief will degrade gracefully (missing section) rather than fail entirely.
+If compute runs before ingestion completes, it uses yesterday's data. If the brief runs before compute, it reads stale results. Compute Lambdas degrade gracefully — a missing section won't fail the brief.
 
-### 3. MCP tools are read-only (mostly)
+### 3. MCP tools are primarily read-only
 
-The MCP Lambda queries DynamoDB and returns results. Tools never write to ingestion partitions. The only writes are: cache entries (CACHE#matthew), and supplement/memory writes via dedicated tools.
+The MCP Lambda queries DynamoDB and returns results. Writes only happen via dedicated tools (`log_supplement`, `write_platform_memory`, `log_journal_entry`, etc.). Tools never write to source ingestion partitions.
 
 ### 4. CDK owns infrastructure
 
-Never create Lambda roles, EventBridge rules, or alarms manually. Everything goes through `cdk/stacks/`. Run `cd cdk && npx cdk deploy <StackName>` after code changes that affect IAM or scheduling.
+Never create Lambda roles, EventBridge rules, secrets, or alarms manually. Everything goes through `cdk/stacks/`. Run `cd cdk && npx cdk deploy <StackName>` after code changes affecting IAM or scheduling.
 
-### 5. Secrets are in Secrets Manager
+### 5. Secrets are in Secrets Manager only
 
-No credentials in code or environment variables. All secrets live under prefix `life-platform/` in Secrets Manager. 11 active secrets as of v4.4.0.
+No credentials in code or environment variables. All secrets live under prefix `life-platform/` in Secrets Manager. Auto-rotation for `mcp-api-key`; auto-refresh on use for OAuth tokens.
 
-### 6. Coach Intelligence as Persistent Agents
+### 6. Coaches are stateful agents, not stateless prompts (ADR-047)
 
-Coaches are not stateless prompt templates. They are persistent agents with continuity across the entire 12-month platform lifecycle. Each coach maintains:
+The 8 coaches are persistent agents with episodic memory, voice differentiation, cross-coach awareness, and Bayesian prediction accountability. All math happens in the deterministic computation engine — the LLM never does math. The prediction loop is closed end-to-end as of ADR-055 (May 2026).
 
-- **Episodic memory** — output archive (`OUTPUT#` records), thread registry, and learning log stored in DynamoDB under `COACH#` partitions
-- **Voice differentiation** — structural voice specs that define each coach's tone, vocabulary, and narrative style, preventing homogeneous output across the 8 coaches
-- **Cross-coach communication** — ensemble digest (`ENSEMBLE#` partition) and influence graph allow coaches to reference each other's findings without duplication
-- **Prediction accountability** — Bayesian confidence tracking with a prediction evaluator that scores past predictions against actual outcomes
-- **Narrative orchestration** — a showrunner (narrative orchestrator) that assigns themes, prevents redundancy, and maintains story arcs (`NARRATIVE#` partition) across days
+The 8 coach IDs (from `lambdas/coach_computation_engine.py:COACH_IDS`):
+`dr_johansson` · `fitness_coach` · `nutrition_coach` · `mind_coach` · `sleep_coach` · `body_comp_coach` · `lifestyle_coach` · `recovery_coach`
 
-The pipeline runs daily: computation engine (deterministic math) → orchestrator (assigns briefs) → 8 parallel coach generations (LLM) → state updater (writes memory) → ensemble digest (cross-coach summary). All math happens in the deterministic computation engine — the LLM never does math.
+These are the Coach Intelligence pipeline identities. The advisor *personas* used in emails/observatory (Dr. Sarah Chen, Dr. Marcus Webb, etc.) are configured separately in `s3://matthew-life-platform/config/board_of_directors.json` and bound to data domains — see `docs/BOARDS.md`.
+
+### 7. S3 prefix separation makes site deploys safe (ADR-046)
+
+Lambda-generated files (`public_stats.json`, OG images, journal posts) live under `generated/`. Static HTML/CSS/JS live under `site/`. `aws s3 sync site/ --delete` physically cannot touch `generated/*` — they're disjoint prefixes. Bucket policy also denies `DeleteObject` on `raw/*`, `config/*`, `uploads/*`, `generated/*` for the deploy user.
+
+### 8. Site-website CloudFront uses S3 website endpoints + AES256 (ADR-053/054)
+
+Don't try to migrate to KMS default encryption — S3 website endpoints can't serve KMS-encrypted objects. The CMK is retained for explicit-KMS use cases (e.g., `raw/` archives) but is **scheduled for deletion 2026-06-16** unless re-justified.
 
 ---
 
-## The Data Sources (26)
+## Where Do I Look For X?
+
+| If I want to find... | Look here |
+|----------------------|-----------|
+| Why a decision was made | `docs/DECISIONS.md` (57 ADRs, ADR-001 → ADR-057) |
+| How to deploy / roll back | `docs/QUICKSTART.md` + `docs/RUNBOOK.md` |
+| What field a source writes to | `docs/SCHEMA.md` |
+| Full system inventory (Lambdas, alarms, secrets, KMS) | `docs/ARCHITECTURE.md` |
+| Cost guardrails + recent spend | `docs/COST_TRACKER.md` |
+| How to run an audit / review | `docs/REVIEW_METHODOLOGY.md` |
+| PII classification + retention | `docs/DATA_GOVERNANCE.md` |
+| AI persona definitions | `docs/BOARDS.md` (3 boards: Personal, Technical, Product) |
+| MCP tool list | `docs/MCP_TOOL_CATALOG.md` |
+| Latest session context | `handovers/HANDOVER_LATEST.md` |
+| V2 audit findings + outcomes | `docs/V2_AUDIT_PLAN.md` |
+| Incident write-ups | `docs/INCIDENT_LOG.md` + `docs/rca/` |
+| Operator-grade procedures (alarms, runbooks) | `docs/OPERATOR_GUIDE.md` + `docs/RUNBOOK.md` |
+| Schema for a single S3 prefix or table partition | `docs/SCHEMA.md` |
+| SLOs + error budgets | `docs/SLOs.md` |
+
+---
+
+## The Data Sources (19)
 
 | Category | Sources |
 |----------|---------|
 | Wearables | Whoop (recovery, HRV, sleep), Eight Sleep (bed environment), Garmin (steps, body battery), Withings (weight, body composition) |
 | Fitness | Strava (activities, training load) |
 | Nutrition | MacroFactor (calories, macros, food log via Dropbox CSV) |
-| Health tracking | Apple Health via Health Auto Export webhook (CGM, blood pressure, gait, steps) |
+| Health tracking | Apple Health via Health Auto Export webhook (CGM, blood pressure, gait, steps, State of Mind) |
 | Productivity | Todoist (tasks), Notion (journal) |
 | Lifestyle | Habitify (habits), Weather (Open-Meteo) |
-| Manual/periodic | Labs (blood work), DEXA (body comp scan), Genome (SNPs), Supplements |
+| Manual/periodic | Labs (blood work), DEXA (body comp scan), Genome (SNPs), Supplements, Measurements (S3 trigger), Food Delivery (quarterly CSV) |
 | Derived | Day grade, Habit scores, Character sheet, Computed metrics |
 
----
-
-## Your Development Setup
-
-### Prerequisites
-- AWS CLI configured for account `205930651321` / `us-west-2`
-- Node.js 18+ (for CDK)
-- Python 3.12 with venv
-- Claude Desktop with `mcp_bridge.py` running
-
-### Clone and install
-```bash
-cd ~/Documents/Claude/life-platform
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r cdk/requirements.txt
-pip install boto3 anthropic
-```
-
-### CDK setup (first time)
-```bash
-cd cdk
-npm install -g aws-cdk
-pip install -r requirements.txt
-cdk bootstrap aws://205930651321/us-west-2   # one-time
-```
-
-### Run the MCP bridge locally
-```bash
-python3 mcp_bridge.py
-```
-The bridge translates Claude Desktop's stdio MCP calls into HTTPS requests to the Lambda Function URL.
-
----
-
-## Common Tasks (Quick Reference)
-
-| Task | Command/File |
-|------|-------------|
-| Deploy a Lambda | `bash deploy/deploy_lambda.sh <function-name>` |
-| Deploy + verify | `bash deploy/deploy_and_verify.sh <function-name>` |
-| Check all Lambda logs | AWS Console → CloudWatch → Log groups |
-| Re-auth Withings | `python3 setup/fix_withings_oauth.py` |
-| Run QA smoke | AWS Console → Lambda → `qa-smoke` → Test |
-| See today's freshness | Ask Claude: "get_data_freshness" |
-| Enter maintenance mode | `bash deploy/maintenance_mode.sh enable` |
-| CDK deploy (all stacks) | `cd cdk && npx cdk deploy --all` |
-| CDK deploy (one stack) | `cd cdk && npx cdk deploy LifePlatformEmail` |
-
-Stack names: `LifePlatformCore`, `LifePlatformIngestion`, `LifePlatformCompute`, `LifePlatformEmail`, `LifePlatformOperational`, `LifePlatformMcp`, `LifePlatformMonitoring`, `LifePlatformWeb`
+V2 outcome (2026-05-17): SIMP-2 ingestion framework now adopted by 8 Lambdas; 6 pattern-exempt (Notion, MacroFactor, Apple Health, HAE, Dropbox, Food Delivery) per ADR-056 with documented per-source rationale.
 
 ---
 
 ## Session Handover Protocol
 
-Every development session ends with a handover file written to `handovers/`. Use the Claude prompt:
+Every development session ends with a handover file written to `handovers/`. Ask Claude:
 
 > "Write a session handover"
 
-The handover captures: version bump, what changed, what's pending, and context for the next session. This is how context is preserved across Claude's session limits.
-
-Handovers live at `handovers/YYYY-MM-DD-session<N>-<slug>.md`. The latest is always symlinked/referenced from `docs/HANDOVER_LATEST.md`.
+The handover captures: version bump, what changed, what's pending, and context for the next session. This is how context is preserved across Claude's session limits. Handovers live at `handovers/YYYY-MM-DD-session<N>-<slug>.md`; the latest is referenced from `handovers/HANDOVER_LATEST.md`.
 
 ---
 
-## Where Things Can Go Wrong
+## Where Things Go Wrong
 
 | Symptom | Likely cause | Fix |
 |---------|-------------|-----|
 | Withings data gap | OAuth token expired | `python3 setup/fix_withings_oauth.py` |
-| Daily Brief missing sections | Compute Lambda failed upstream | Check CloudWatch logs for `daily-metrics-compute` |
-| MacroFactor data stale | CSV not dropped to Dropbox folder | Manually export from MacroFactor → drop to Dropbox folder |
+| Garmin gap | OAuth rate-limited (429) — known weakness | Wait for backoff, then re-auth manually |
+| Daily Brief missing sections | Compute Lambda failed upstream | CloudWatch logs for `daily-metrics-compute` |
+| MacroFactor data stale | CSV not dropped to Dropbox folder | Export from MacroFactor → drop to Dropbox |
 | MCP tool timeout | Query too broad or cold start | Narrow date range; wait for warm container |
 | CDK deploy fails with IAM error | Policy change blocked by CI lint | Check `tests/test_iam_secrets_consistency.py` |
 | Freshness checker alarm firing | Source hasn't updated in >48h | Check source Lambda logs; may need manual backfill |
+| Site shows stale gauges | `public_stats.json` not refreshed | Check `daily-brief` + `site-stats-refresh` logs |
+| Coach output looks degraded | `coach-quality-gate` flagged it | Check `COACH#<id>` `OUTPUT#` records for revision flags |
 
 ---
 
-## Architecture Review Schedule
+## Architecture Review Cadence
 
-Architecture reviews happen periodically. Run `python3 deploy/generate_review_bundle.py` first — it creates the bundle Claude needs to conduct the review. Reviews are stored in `docs/reviews/`. The platform is at review R18 (grade B+). CI/CD pipeline active (v3.9.4).
+Reviews are run from `docs/REVIEW_METHODOLOGY.md`. The platform is at audit V2 (2026-05-17, 76 findings, ~33 shipped). V2 outcomes are captured in `docs/V2_AUDIT_PLAN.md` and formally closed in **ADR-057**. Reviews stored in `docs/reviews/` and `docs/v2-audits/`. `python3 deploy/generate_review_bundle.py` produces the pre-compiled bundle Claude needs to conduct a fresh review.
 
 ---
 
@@ -209,38 +207,54 @@ Architecture reviews happen periodically. Run `python3 deploy/generate_review_bu
 
 | Term | Meaning |
 |------|---------|
-| **MCP** | Model Context Protocol — Claude's native tool interface. The MCP Lambda exposes 115 tools that Claude calls to query health data. |
-| **IC** | Intelligence Capability — the platform's computed health features (IC-1 through IC-30). Each IC is a specific analysis (e.g., IC-8 = intent vs execution, IC-18 = hypothesis engine). |
-| **DLQ** | Dead Letter Queue — failed async Lambda invocations land here. Consumed every 6 hours by `dlq-consumer` Lambda. |
-| **SOT** | Source of Truth — which device/service owns each health domain (e.g., Whoop owns sleep, MacroFactor owns nutrition). See `mcp/config.py`. |
-| **PITR** | Point-in-Time Recovery — DynamoDB's 35-day rolling backup. Enables table restore to any second within the window. |
-| **CDK** | AWS Cloud Development Kit — Python-based infrastructure as code. 8 stacks in `cdk/stacks/` define all Lambda, IAM, EventBridge, and CloudWatch resources. |
-| **P40** | Protocol 40 — the 65-habit personal framework tracked via Habitify. Habits are grouped into 9 P40 groups with tier weighting (T0/T1/T2). |
-| **Character Sheet** | Gamified scoring system aggregating 7 health pillars (Sleep, Movement, Nutrition, Metabolic, Mind, Relationships, Consistency) into a level 1-100 with RPG-style tiers (Foundation → Elite). Computed daily. |
-| **Board of Directors** | 14 fictional AI advisor personas (not real people) that provide domain-specific coaching in emails and the website. Configured in `s3://matthew-life-platform/config/board_of_directors.json`. See ADR-040. |
-| **Day Grade** | Daily score (0-100, A-F letter grade) computed from sleep, nutrition, exercise, habits, hydration, and glucose. Drives the Character Sheet and daily brief email. |
-| **Coach Intelligence** | The system of 8 persistent AI coaching agents (sleep, nutrition, training, etc.) with episodic memory, voice differentiation, cross-coach awareness, and prediction accountability. |
+| **MCP** | Model Context Protocol — Claude's native tool interface. The MCP Lambda exposes 127 tools that Claude calls to query health data. |
+| **IC** | Intelligence Capability — the platform's computed health features (IC-1 through IC-30). |
+| **DLQ** | Dead Letter Queue — failed async Lambda invocations. Drained every 6 hours by `dlq-consumer`. |
+| **SOT** | Source of Truth — which device/service owns each health domain (e.g., Whoop owns sleep). See `mcp/config.py`. |
+| **PITR** | Point-in-Time Recovery — DynamoDB's 35-day rolling backup. |
+| **CDK** | AWS Cloud Development Kit — Python IaC. 8 stacks in `cdk/stacks/`. |
+| **P40** | Protocol 40 — the 65-habit personal framework tracked via Habitify. 9 P40 groups with T0/T1/T2 tier weighting. |
+| **Character Sheet** | Gamified scoring aggregating 7 health pillars into a level 1-100 with RPG tiers (Foundation → Elite). |
+| **Board of Directors** | Three boards: Personal (14 advisors), Technical (12), Product (8). All configured in S3 (Personal) or code (Tech/Product). See `docs/BOARDS.md`. |
+| **Day Grade** | Daily score 0-100, A-F letter, computed from sleep, nutrition, exercise, habits, hydration, glucose. |
+| **Coach Intelligence** | 8 persistent AI coaching agents with episodic memory, voice differentiation, cross-coach awareness, and Bayesian prediction accountability (ADR-047, ADR-055). |
 | **COACH# partition** | DynamoDB partition (`COACH#<coach_id>`) storing each coach's outputs, voice state, learning log, and thread registry. |
-| **ENSEMBLE# digest** | DynamoDB partition (`ENSEMBLE#`) storing the cross-coach summary produced after all 8 coaches generate. Prevents duplication and enables coaches to reference each other. |
-| **NARRATIVE# arc** | DynamoDB partition (`NARRATIVE#`) storing multi-day story arcs and thematic assignments managed by the narrative orchestrator. |
-| **Voice spec** | Structural definition of a coach's tone, vocabulary, sentence patterns, and opening style. Stored in coach configuration and enforced during generation. |
-| **Generation brief** | The per-coach instruction packet assembled by the orchestrator, containing the coach's computation results, voice spec, narrative arc context, and ensemble awareness. |
-| **Computation engine** | Lambda (`coach-computation-engine`) that runs all deterministic math (trends, deltas, percentiles) before coach generation. The LLM never does math. |
-| **Narrative orchestrator** | Lambda (`coach-narrative-orchestrator`) that acts as showrunner — assigns themes, prevents redundancy, and sequences coach generation. |
-| **State updater** | Lambda (`coach-state-updater`) that writes coach outputs, voice state, and learning log entries to DynamoDB after generation completes. |
-| **Ensemble digest** | The cross-coach summary document produced after all coaches generate, identifying consensus findings, contradictions, and combined recommendations. |
-| **Prediction evaluator** | Lambda (`coach-prediction-evaluator`) that scores past coach predictions against actual outcomes using Bayesian confidence updating. Runs daily at 9 AM PT. |
+| **ENSEMBLE# digest** | Cross-coach summary written after all 8 coaches generate (`ENSEMBLE#YYYY-MM-DD`). |
+| **NARRATIVE# arc** | Multi-day story arcs and thematic assignments managed by the narrative orchestrator. |
+| **PREDICTION# / LEARNING#** | Outcome verdicts and audit records for coach predictions (closed loop per ADR-055). |
+| **SIMP-2** | Shared ingestion framework (`lambdas/ingestion_framework.py`) adopted by 8 of 14 ingestion Lambdas (ADR-056). |
+| **Voice spec** | Structural definition of a coach's tone, vocabulary, sentence patterns. |
+| **Computation engine** | Lambda (`coach-computation-engine`) that runs all deterministic math before coach generation. |
+| **Narrative orchestrator** | Lambda (`coach-narrative-orchestrator`) — showrunner that assigns themes and sequences generation. |
+| **Quality gate** | Lambda (`coach-quality-gate`) — invoked async from `ai_calls.call_coach_brief_v2` after each COACH-V2 generation (V2 wiring fix). |
+| **Prediction evaluator** | Lambda (`coach-prediction-evaluator`) — scores past predictions against outcomes daily at 9 AM PT. |
 
 ---
 
-## Key Architecture Assumptions
+## Key Architecture Assumptions (true but not obvious)
 
-Things that are true but not obvious from reading the code:
+1. **Single-user platform.** All DynamoDB keys are `USER#matthew#...`. IAM roles, secrets, schedules — everything assumes one user. Do not generalize without reading ADR-001 + ADR-057 (the "Phase 6 multi-user" decision was formally deferred).
+2. **Site-api is primarily read-only (ADR-037).** Limited writes for interactive features only (votes, follows, checkins, suggestions, user-submitted findings).
+3. **`public_stats.json` is the website heartbeat.** Home, story, mission, observatory pages all read from this one S3 file, written by daily-brief at 11 AM PT. Daily brief failure = stale website data.
+4. **All EventBridge crons are fixed UTC.** Schedules don't drift with DST. PT times in docs are for humans only.
+5. **Pipeline ordering is strict.** Ingestion → Anomaly → Compute → Brief → OG. Changing schedules without preserving order produces stale results.
+6. **Budget is $15/month target, $20 AWS Budget cap.** Current actual ~$13/month after V2 cost optimization (~$3.65/mo saved per Phase 5).
+7. **Coaches are stateful entities with persistent memory and cross-coach awareness over 12 months.** All math happens in the deterministic computation engine — the LLM never does math.
+8. **The KMS CMK (`alias/life-platform-s3`) is scheduled for deletion 2026-06-16.** Re-justify or let it expire — see ADR-053.
 
-1. **Single-user platform.** All DynamoDB keys are `USER#matthew#SOURCE#...`. IAM roles, secrets, schedules — everything assumes one user. Do not try to generalize without reading ADR-001.
-2. **Site-api is primarily read-only.** The public API Lambda (`life-platform-site-api`) is read-only for all data queries, with limited writes for interactive features (votes, follows, checkins). See ADR-037.
-3. **`public_stats.json` is the website heartbeat.** The homepage, story, mission, and observatory pages all read from this single S3 file, written by the daily brief Lambda at 11 AM PT. If the daily brief fails, the entire website shows stale data.
-4. **All EventBridge crons are fixed UTC.** Schedules don't drift with DST. The PT times in documentation are for human reference only.
-5. **Pipeline ordering is strict.** Ingestion (6:45-9 AM) must complete before Compute (10:20-10:35), which must complete before Daily Brief (11 AM). Changing schedules without maintaining this order produces stale computed results.
-6. **Budget is $15/month target, $20 AWS Budget cap.** Current actual spend is ~$13/month.
-7. **Coaches are stateful entities with persistent memory, cross-coach awareness, and narrative continuity over 12 months.** All math happens in the deterministic computation engine — the LLM never does math.
+---
+
+## Read These Next
+
+1. `docs/QUICKSTART.md` — set up AWS, run tests, deploy a Lambda, check daily-brief output, roll back
+2. `docs/ARCHITECTURE.md` — the full system catalog (every Lambda, alarm, secret, IAM role)
+3. `docs/DECISIONS.md` — start with ADR-001, ADR-046, ADR-047, ADR-053, ADR-055, ADR-056, ADR-057
+4. `docs/RUNBOOK.md` — daily operations + troubleshooting
+5. `docs/SCHEMA.md` — DynamoDB field-by-field reference
+6. `docs/BOARDS.md` — AI persona panels (Personal, Technical, Product)
+7. `docs/DATA_GOVERNANCE.md` — PII tiers + retention
+8. `docs/REVIEW_METHODOLOGY.md` — how to run an audit
+
+---
+
+**Verified:** 2026-05-19

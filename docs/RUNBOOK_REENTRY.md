@@ -1,7 +1,9 @@
 # Re-Entry Protocol — Reusable Runbook
 
+Last updated: 2026-05-19 (V2 audit operational sweep)
+
 **Trigger:** Any planned or unplanned platform gap > 7 days.
-**Source:** Synthesized from `Downloads/ajm_reentry_plan.md` (the 2026-05-02/03 re-entry from a 30-day move silence). Promoted to runbook 2026-05-03.
+**Source:** Synthesized from `Downloads/ajm_reentry_plan.md` (the 2026-05-02/03 re-entry from a 30-day move silence). Promoted to runbook 2026-05-03. Reinforced by the 2026-04-05→2026-05-19 Garmin OAuth outage (44 days; see INCIDENT_LOG.md).
 **Goal:** Every source flowing or explicitly known-broken with a workaround, by Day 2 evening. New baseline captured. Honest journal entry posted. Pause Mode → Re-Entry Day Template (WR-50) loaded once it ships.
 
 ---
@@ -40,10 +42,12 @@ For each source that's been flowing during the gap, run `get_daily_snapshot view
 
 | Source | Re-auth path | Notes |
 |---|---|---|
-| Garmin | `setup/setup_garmin_browser_auth.py` (Playwright/Chromium MFA) | OAuth1 refresh has ~30d lifetime — disable EventBridge rule before any planned silence > 2 weeks to prevent rate-limit accumulation |
+| Garmin | `setup/setup_garmin_browser_auth.py` (Playwright/Chromium MFA) | OAuth1 refresh has ~30d lifetime — disable EventBridge rule before any planned silence > 2 weeks to prevent rate-limit accumulation. After re-auth, **clear the `auth_breaker` marker** (see RUNBOOK "Garmin: 429" section). The 2026-04-05→05-19 outage was caused by this exact gap pattern. |
 | Withings | `setup/fix_withings_oauth.py` | Similar pattern; same mitigation |
-| Strava | similar setup script in `setup/` | Open app on phone first, force a sync |
+| Strava | OAuth via setup helper (manually re-auth via Strava developer console if needed) | Open app on phone first, force a sync |
 | Whoop | OAuth refresh tokens long-lived | Less risky during gaps |
+| Eight Sleep | `setup/setup_eightsleep_auth.py` | Password may have changed during gap |
+| Dropbox | `setup/setup_dropbox_auth.py` | If MacroFactor pipeline silent for >2 weeks |
 
 ### 3. Backfill Apple Health (if HAE webhook went silent)
 - iPhone → Health app → profile → Export All Health Data → wait for ZIP
@@ -183,3 +187,8 @@ By Day 2 evening:
 - `docs/audits/TD-11_HABITIFY_API_AUDIT.md` — Habitify state taxonomy (informs the Tier-0 habit reset)
 - `handovers/HANDOVER_v6.8.7.md` — what shipped 2026-05-03 (the re-entry session itself)
 - `Downloads/ajm_reentry_plan.md` — the original 2026-05-02 plan this runbook was synthesized from
+- `docs/INCIDENT_LOG.md` — Garmin OAuth outage entry (2026-04-05 → 2026-05-19) is the canonical example of "what breaks during gaps without active pause-mode discipline"
+
+---
+
+**Verified:** 2026-05-19 (V2 audit operational sweep)
