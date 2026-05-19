@@ -245,14 +245,25 @@ def _call_haiku(system, user_message, max_tokens=2000, temperature=0.3):
                     return json.loads(text)
                 except json.JSONDecodeError:
                     # Try extracting JSON from markdown code block
+                    # V2 (2026-05-19): defensive parse — text.index raises ValueError
+                    # ("substring not found") when LLM emits an opening fence but no
+                    # closing fence. Use .find() and fall back to raw text.
                     if "```json" in text:
-                        start = text.index("```json") + 7
-                        end = text.index("```", start)
-                        return json.loads(text[start:end].strip())
+                        start = text.find("```json") + 7
+                        end = text.find("```", start)
+                        if end > start:
+                            try:
+                                return json.loads(text[start:end].strip())
+                            except json.JSONDecodeError:
+                                pass
                     elif "```" in text:
-                        start = text.index("```") + 3
-                        end = text.index("```", start)
-                        return json.loads(text[start:end].strip())
+                        start = text.find("```") + 3
+                        end = text.find("```", start)
+                        if end > start:
+                            try:
+                                return json.loads(text[start:end].strip())
+                            except json.JSONDecodeError:
+                                pass
                     return text
 
         except urllib.error.HTTPError as e:

@@ -917,12 +917,12 @@ def _evaluate_condition(condition_str, pillar_levels):
 
 
 def _compare(a, op, b):
-    if op == "<":   return a < b
-    if op == "<=":  return a <= b
-    if op == ">":   return a > b
-    if op == ">=":  return a >= b
-    if op == "==":  return a == b
-    if op == "!=":  return a != b
+    if op == "<": return a < b
+    if op == "<=": return a <= b
+    if op == ">": return a > b
+    if op == ">=": return a >= b
+    if op == "==": return a == b
+    if op == "!=": return a != b
     return False
 
 

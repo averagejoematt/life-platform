@@ -39,21 +39,21 @@ except ImportError:
     logger = logging.getLogger("chronicle-email-sender")
     logger.setLevel(logging.INFO)
 
-REGION     = os.environ.get("AWS_REGION", "us-west-2")
+REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
-SENDER     = os.environ.get("EMAIL_SENDER", "lifeplatform@mattsusername.com")
-SITE_URL   = os.environ.get("SITE_URL", "https://averagejoematt.com")
+USER_ID = os.environ.get("USER_ID", "matthew")
+SENDER = os.environ.get("EMAIL_SENDER", "lifeplatform@mattsusername.com")
+SITE_URL = os.environ.get("SITE_URL", "https://averagejoematt.com")
 
 # Rate limit: 1/sec for SES sandbox; increase after production access granted
 SEND_RATE_PER_SEC = float(os.environ.get("SEND_RATE_PER_SEC", "1.0"))
 
 SUBSCRIBERS_PK = f"USER#{USER_ID}#SOURCE#subscribers"
-CHRONICLE_PK   = f"USER#{USER_ID}#SOURCE#chronicle"
+CHRONICLE_PK = f"USER#{USER_ID}#SOURCE#chronicle"
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
-table    = dynamodb.Table(TABLE_NAME)
-ses      = boto3.client("sesv2", region_name=REGION)
+table = dynamodb.Table(TABLE_NAME)
+ses = boto3.client("sesv2", region_name=REGION)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -61,8 +61,8 @@ ses      = boto3.client("sesv2", region_name=REGION)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _d2f(obj):
-    if isinstance(obj, list):    return [_d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: _d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [_d2f(i) for i in obj]
+    if isinstance(obj, dict): return {k: _d2f(v) for k, v in obj.items()}
     if isinstance(obj, Decimal): return float(obj)
     return obj
 
@@ -72,7 +72,7 @@ def _get_this_weeks_installment() -> dict | None:
     Get the most recent Chronicle installment published within the last 7 days.
     Viktor Sorokin guard: return None if nothing found — always a clean no-op.
     """
-    today    = datetime.now(timezone.utc).date()
+    today = datetime.now(timezone.utc).date()
     week_ago = (today - timedelta(days=7)).isoformat()
     today_str = today.isoformat()
 
@@ -147,7 +147,7 @@ BOARD_MEMBERS = {
     "andrew_huberman":  {"name": "Dr. Kai Nakamura",     "title": "Neuroscience & Protocols",         "color": "#06b6d4", "emoji": "\U0001F52C"},
     "elena_voss":       {"name": "Elena Voss",            "title": "Embedded Journalist",              "color": "#94a3b8", "emoji": "\u270D\uFE0F"},
     "paul_conti":       {"name": "Dr. Nathan Reeves",     "title": "Psychiatrist \u2014 Self-Structure",    "color": "#7c3aed", "emoji": "\U0001F9E0"},
-    "margaret_calloway":{"name": "Margaret Calloway",     "title": "Senior Editor \u2014 Longform",         "color": "#b45309", "emoji": "\u270F\uFE0F"},
+    "margaret_calloway": {"name": "Margaret Calloway",     "title": "Senior Editor \u2014 Longform",         "color": "#b45309", "emoji": "\u270F\uFE0F"},
     "vivek_murthy":     {"name": "Dr. Daniel Murthy",     "title": "Social Connection & Loneliness",   "color": "#0891b2", "emoji": "\U0001F91D"},
 }
 
@@ -162,10 +162,10 @@ def _extract_chronicle_preview(content_html: str, max_paragraphs: int = 3) -> st
 
 def _build_subscriber_email(installment: dict, subscriber: dict) -> tuple[str, str]:
     """Build the 5-section Weekly Signal email. Returns (subject, html)."""
-    title      = installment.get("title", "The Weekly Signal")
-    week_num   = installment.get("week_number", "?")
-    date_str   = installment.get("date", "")
-    body_html  = installment.get("content_html", "")
+    title = installment.get("title", "The Weekly Signal")
+    week_num = installment.get("week_number", "?")
+    date_str = installment.get("date", "")
+    body_html = installment.get("content_html", "")
 
     subject = f'The Measured Life \u2014 Week {week_num}: "{title}"'
 
@@ -261,9 +261,9 @@ def _build_subscriber_email(installment: dict, subscriber: dict) -> tuple[str, s
     if worked or didnt:
         items_html = ""
         for w in worked[:3]:
-            items_html += f'<tr><td style="padding:6px 0;color:#22c55e;font-size:13px;vertical-align:top;width:20px;">\u2713</td><td style="padding:6px 0;font-size:13px;color:#c9d1d9;"><strong style="color:#E6EDF3;">{w.get("headline","")}</strong><br><span style="color:#8b949e;font-size:12px;">{w.get("detail","")}</span></td></tr>'
+            items_html += f'<tr><td style="padding:6px 0;color:#22c55e;font-size:13px;vertical-align:top;width:20px;">\u2713</td><td style="padding:6px 0;font-size:13px;color:#c9d1d9;"><strong style="color:#E6EDF3;">{w.get("headline", "")}</strong><br><span style="color:#8b949e;font-size:12px;">{w.get("detail", "")}</span></td></tr>'
         for d in didnt[:3]:
-            items_html += f'<tr><td style="padding:6px 0;color:#f87171;font-size:13px;vertical-align:top;width:20px;">\u2717</td><td style="padding:6px 0;font-size:13px;color:#c9d1d9;"><strong style="color:#E6EDF3;">{d.get("headline","")}</strong><br><span style="color:#8b949e;font-size:12px;">{d.get("detail","")}</span></td></tr>'
+            items_html += f'<tr><td style="padding:6px 0;color:#f87171;font-size:13px;vertical-align:top;width:20px;">\u2717</td><td style="padding:6px 0;font-size:13px;color:#c9d1d9;"><strong style="color:#E6EDF3;">{d.get("headline", "")}</strong><br><span style="color:#8b949e;font-size:12px;">{d.get("detail", "")}</span></td></tr>'
         s3 = f"""
   <div style="background:#161b22;border-radius:8px;border:1px solid rgba(230,237,243,0.08);padding:24px 28px;margin-bottom:16px;">
     <p style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#F0B429;margin:0 0 16px;">What Worked / What Didn't</p>
@@ -364,7 +364,7 @@ def lambda_handler(event, context):
                 "skipped": True,
             }
 
-        title    = installment.get("title", "")
+        title = installment.get("title", "")
         week_num = installment.get("week_number", "?")
         logger.info("Installment found — Week %s: \"%s\"", week_num, title)
 

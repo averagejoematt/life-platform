@@ -17,8 +17,8 @@ HYPOTHESES_PK = f"USER#{USER_ID}#SOURCE#hypotheses"
 
 
 def _d2f(obj):
-    if isinstance(obj, list):    return [_d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: _d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [_d2f(i) for i in obj]
+    if isinstance(obj, dict): return {k: _d2f(v) for k, v in obj.items()}
     if isinstance(obj, Decimal): return float(obj)
     return obj
 

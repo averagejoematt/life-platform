@@ -53,16 +53,16 @@ from digest_utils import (
 )
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
-_REGION    = os.environ.get("AWS_REGION", "us-west-2")
+_REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-RECIPIENT  = os.environ["EMAIL_RECIPIENT"]
-SENDER     = os.environ["EMAIL_SENDER"]
-USER_ID    = os.environ.get("USER_ID", "matthew")
+RECIPIENT = os.environ["EMAIL_RECIPIENT"]
+SENDER = os.environ["EMAIL_SENDER"]
+USER_ID = os.environ.get("USER_ID", "matthew")
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
-table    = dynamodb.Table(TABLE_NAME)
-ses      = boto3.client("sesv2", region_name=_REGION)
-secrets  = boto3.client("secretsmanager", region_name=_REGION)
+table = dynamodb.Table(TABLE_NAME)
+ses = boto3.client("sesv2", region_name=_REGION)
+secrets = boto3.client("secretsmanager", region_name=_REGION)
 
 # IC-15/16: Insight Ledger — progressive context + insight persistence
 try:
@@ -104,7 +104,7 @@ def fetch_profile():
         r = table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"})
         return d2f(r.get("Item", {}))
     except Exception as e:
-        print(f"[ERROR] fetch_profile: {e}")
+        logger.error(f"fetch_profile: {e}")
         return {}
 
 def query_range(source, start_date, end_date):
@@ -632,7 +632,7 @@ def fetch_stale_insights(days_threshold=7):
                 ":s": "INSIGHT#0", ":e": "INSIGHT#z"})
         items = r.get("Items", [])
     except Exception as e:
-        print(f"[WARN] fetch_stale_insights: {e}")
+        logger.warning(f"fetch_stale_insights: {e}")
         return []
     now = datetime.now(timezone.utc)
     stale = []
@@ -665,12 +665,12 @@ def gather_all():
     w3_start = (today - timedelta(days=21)).isoformat()
     w4_start = (today - timedelta(days=28)).isoformat()
 
-    print(f"[INFO] This week: {w1_start} → {w1_end}")
-    print(f"[INFO] Prior week: {w2_start} → {w2_end}")
+    logger.info(f"This week: {w1_start} → {w1_end}")
+    logger.info(f"Prior week: {w2_start} → {w2_end}")
 
     profile = fetch_profile()
     if not profile:
-        print("[ERROR] No profile found")
+        logger.error("No profile found")
         return None, None
 
     # ── Batch query all sources for this week + prior week ──
@@ -683,12 +683,12 @@ def gather_all():
         full = query_range(src, w4_start, w1_end)  # get 4 weeks in one query
         raw_this[src] = {d: r for d, r in full.items() if w1_start <= d <= w1_end}
         raw_prior[src] = {d: r for d, r in full.items() if w2_start <= d <= w2_end}
-        print(f"  {src}: {len(raw_this[src])} this week, {len(raw_prior[src])} prior")
+        logger.info(f"  {src}: {len(raw_this[src])} this week, {len(raw_prior[src])} prior")
 
     # Journal entries
     journal_this = query_journal_range(w1_start, w1_end)
     journal_prior = query_journal_range(w2_start, w2_end)
-    print(f"  journal: {len(journal_this)} days this week, {len(journal_prior)} prior")
+    logger.info(f"  journal: {len(journal_this)} days this week, {len(journal_prior)} prior")
 
     # ── Extract this week + prior week ──
     this = {
@@ -783,7 +783,7 @@ def gather_all():
         })
         acwr_data = d2f(cm_resp.get("Item")) or None
         if acwr_data and acwr_data.get("acwr"):
-            print(f"  computed_metrics: ACWR {acwr_data['acwr']:.3f} ({acwr_data.get('zone','?')})")
+            logger.info(f"  computed_metrics: ACWR {acwr_data['acwr']:.3f} ({acwr_data.get('zone', '?')})")
         else:
             # Fallback: try prior day
             cm_resp2 = table.get_item(Key={
@@ -792,7 +792,7 @@ def gather_all():
             })
             acwr_data = d2f(cm_resp2.get("Item")) or None
     except Exception as _e:
-        print(f"  [WARN] computed_metrics fetch failed: {_e}")
+        logger.info(f"  [WARN] computed_metrics fetch failed: {_e}")
         acwr_data = None
 
     # ── Character Sheet (Phase 4 v2.71.0) ──
@@ -800,7 +800,7 @@ def gather_all():
     cs_prior_raw = query_range("character_sheet", w2_start, w2_end)
     character_sheet = ex_character_sheet(cs_this_raw)
     character_sheet_prior = ex_character_sheet(cs_prior_raw)
-    print(f"  character_sheet: {len(cs_this_raw)} days this week, {len(cs_prior_raw)} prior")
+    logger.info(f"  character_sheet: {len(cs_this_raw)} days this week, {len(cs_prior_raw)} prior")
 
     return {
         "this": this, "prior": prior, "profile": profile,
@@ -899,7 +899,7 @@ def call_haiku(data, profile, api_key):
             previous_insights = insight_writer.build_insights_context(
                 days=30, max_items=8, label="PREVIOUS INSIGHTS (last 30 days)")
         except Exception as e:
-            print(f"[WARN] IC-16 progressive context failed: {e}")
+            logger.warning(f"IC-16 progressive context failed: {e}")
 
     # P2: Dynamic journey context (replaces hardcoded 'Phase 1 Ignition')
     try:
@@ -1280,7 +1280,7 @@ def build_html(data, commentary, profile):
                 highlight=True)
             if _acwr_alert:
                 bl_rows += row("⚠️ Alert",
-                    f'<span style="color:#e74c3c;font-size:11px;">{str(_acwr_data.get("alert_reason",""))[:120]}</span>')
+                    f'<span style="color:#e74c3c;font-size:11px;">{str(_acwr_data.get("alert_reason", ""))[:120]}</span>')
     except Exception as e:
         logger.warning("banister_section_build: %s", e)
     banister_section = section("Training Load — Banister", "📈", tbl(bl_rows))
@@ -1291,12 +1291,12 @@ def build_html(data, commentary, profile):
         w = t["whoop"]; wp = p.get("whoop") or {}
         t4 = tr
         rec_rows += row("Avg Recovery", fmt(w.get("recovery_avg"), "%"),
-            delta_html(w.get("recovery_avg"), wp.get("recovery_avg"), "%") + f' <span style="font-size:11px;color:#888;">4wk {t4.get("recovery","→")}</span>', highlight=True)
+            delta_html(w.get("recovery_avg"), wp.get("recovery_avg"), "%") + f' <span style="font-size:11px;color:#888;">4wk {t4.get("recovery", "→")}</span>', highlight=True)
         rec_rows += row("Avg HRV", fmt(w.get("hrv_avg"), " ms"),
-            delta_html(w.get("hrv_avg"), wp.get("hrv_avg"), " ms") + f' <span style="font-size:11px;color:#888;">4wk {t4.get("hrv","→")}</span>')
+            delta_html(w.get("hrv_avg"), wp.get("hrv_avg"), " ms") + f' <span style="font-size:11px;color:#888;">4wk {t4.get("hrv", "→")}</span>')
         rec_rows += row("HRV Range", f'{fmt(w.get("hrv_min"), " ms")} – {fmt(w.get("hrv_max"), " ms")}')
         rec_rows += row("Avg RHR", fmt(w.get("rhr_avg"), " bpm"),
-            delta_html(w.get("rhr_avg"), wp.get("rhr_avg"), " bpm", invert=True) + f' <span style="font-size:11px;color:#888;">4wk {t4.get("rhr","→")}</span>')
+            delta_html(w.get("rhr_avg"), wp.get("rhr_avg"), " bpm", invert=True) + f' <span style="font-size:11px;color:#888;">4wk {t4.get("rhr", "→")}</span>')
         rec_rows += row("Avg Strain", fmt(w.get("strain_avg")))
     recovery_section = section("Recovery & HRV", "❤️", tbl(rec_rows)) if rec_rows else ""
 
@@ -1305,7 +1305,7 @@ def build_html(data, commentary, profile):
     if t.get("sleep"):
         s = t["sleep"]; sp = p.get("sleep") or {}
         sl_rows += row("Avg Sleep Score", fmt(s.get("score_avg"), "%"),
-            delta_html(s.get("score_avg"), sp.get("score_avg"), "%") + f' <span style="font-size:11px;color:#888;">4wk {tr.get("sleep","→")}</span>', highlight=True)
+            delta_html(s.get("score_avg"), sp.get("score_avg"), "%") + f' <span style="font-size:11px;color:#888;">4wk {tr.get("sleep", "→")}</span>', highlight=True)
         sl_rows += row("Worst Night", fmt(s.get("score_min"), "%"))
         sl_rows += row("Avg Duration", fmt(s.get("duration_avg_hrs"), " hrs"), delta_html(s.get("duration_avg_hrs"), sp.get("duration_avg_hrs"), " hrs"))
         if s.get("efficiency_avg"):
@@ -1383,7 +1383,7 @@ def build_html(data, commentary, profile):
     if t.get("withings"):
         w = t["withings"]; wp = p.get("withings") or {}
         wt_rows += row("Latest Weight", fmt(w.get("weight_latest"), " lbs"),
-            delta_html(w.get("weight_latest"), wp.get("weight_latest"), " lbs", invert=True) + f' <span style="font-size:11px;color:#888;">4wk {tr.get("weight","→")}</span>', highlight=True)
+            delta_html(w.get("weight_latest"), wp.get("weight_latest"), " lbs", invert=True) + f' <span style="font-size:11px;color:#888;">4wk {tr.get("weight", "→")}</span>', highlight=True)
         wt_rows += row("Weekly Range", f'{fmt(w.get("weight_min"), " lbs")} – {fmt(w.get("weight_max"), " lbs")}')
         if w.get("body_fat_avg"):
             wt_rows += row("Body Fat %", fmt(w["body_fat_avg"], "%"), delta_html(w.get("body_fat_avg"), wp.get("body_fat_avg"), "%", invert=True))
@@ -1558,17 +1558,17 @@ def record_email_send(table, lambda_name):
             "ttl": int(_time.time()) + 86400 * 90
         })
     except Exception as e:
-        print(f"[status-tracking] Non-fatal write failure: {e}")
+        logger.info(f"[status-tracking] Non-fatal write failure: {e}")
 
 
 def lambda_handler(event, context):
-    print("[INFO] Weekly Digest v4.0 starting...")
+    logger.info("Weekly Digest v4.0 starting...")
     result = gather_all()
     if result is None or result[0] is None:
         return {"statusCode": 500, "body": "Failed to gather data"}
     data, profile = result
     dates = data["dates"]
-    print(f"[INFO] {dates['this_start']} → {dates['this_end']}")
+    logger.info(f"{dates['this_start']} → {dates['this_end']}")
 
     # Store raw grades for component scorecard
     raw_grades = query_range("day_grade", dates["this_start"], dates["this_end"])
@@ -1576,11 +1576,11 @@ def lambda_handler(event, context):
 
     api_key = get_anthropic_key()
     if hasattr(logger, "set_date"): logger.set_date(dates.get("this_end", ""))  # OBS-1
-    print("[INFO] Calling Haiku for Board commentary...")
+    logger.info("Calling Haiku for Board commentary...")
     try:
         commentary = call_haiku(data, profile, api_key)
     except Exception as e:
-        print(f"[WARN] Haiku failed: {e}")
+        logger.warning(f"Haiku failed: {e}")
         commentary = ("🎯 THE CHAIR — OVERVIEW\nCommentary unavailable.\n"
                       "💡 INSIGHT OF THE WEEK\nReview data sections below.")
 
@@ -1588,10 +1588,10 @@ def lambda_handler(event, context):
     if _HAS_AI_VALIDATOR and commentary:
         _val = validate_ai_output(commentary, AIOutputType.WEEKLY_DIGEST)
         if _val.blocked:
-            print(f"[AI-3] Weekly digest commentary BLOCKED: {_val.block_reason}")
+            logger.info(f"[AI-3] Weekly digest commentary BLOCKED: {_val.block_reason}")
             commentary = _val.safe_fallback
         elif _val.warnings:
-            print(f"[AI-3] Weekly digest warnings: {_val.warnings}")
+            logger.info(f"[AI-3] Weekly digest warnings: {_val.warnings}")
 
     html = build_html(data, commentary, profile)
 
@@ -1608,7 +1608,7 @@ def lambda_handler(event, context):
         ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
         EmailTags=[{"Name": "message_type", "Value": "weekly_digest"}],
     )
-    print("[INFO] Sent.")
+    logger.info("Sent.")
 
     # IC-15: Persist insights from this digest
     if _HAS_INSIGHT_WRITER and commentary:
@@ -1626,9 +1626,9 @@ def lambda_handler(event, context):
                 "date": dates.get("this_end", ""),
             })
             written = insight_writer.write_insights_batch(insights)
-            print(f"[INFO] IC-15: {written} weekly insights persisted")
+            logger.info(f"IC-15: {written} weekly insights persisted")
         except Exception as e:
-            print(f"[WARN] IC-15 insight write failed (non-fatal): {e}")
+            logger.warning(f"IC-15 insight write failed (non-fatal): {e}")
 
     record_email_send(table, "weekly_digest")
     return {"statusCode": 200, "body": "Digest v4.0 sent."}

@@ -199,8 +199,8 @@ class IngestionStack(Stack):
         # ── 12. Weather — 2x daily (COST-OPT-2: weather doesn't change meaningfully hourly)
         create_platform_lambda(self, "WeatherIngestion",
             function_name="weather-data-ingestion",
-            source_file="lambdas/weather_handler.py",
-            handler="weather_handler.lambda_handler",
+            source_file="lambdas/weather_lambda.py",
+            handler="weather_lambda.lambda_handler",
             schedule="cron(0 14,2 * * ? *)",
             timeout_seconds=60,
             shared_layer=shared_utils_layer,

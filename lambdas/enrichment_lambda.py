@@ -39,20 +39,20 @@ except ImportError:
     logger = logging.getLogger("enrichment")
     logger.setLevel(logging.INFO)
 
-REGION         = os.environ.get("AWS_REGION", "us-west-2")
+REGION = os.environ.get("AWS_REGION", "us-west-2")
 DYNAMODB_TABLE = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID        = os.environ.get("USER_ID", "matthew")
-USER_PREFIX    = f"USER#{USER_ID}#SOURCE#"
+USER_ID = os.environ.get("USER_ID", "matthew")
+USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
-table    = dynamodb.Table(DYNAMODB_TABLE)
+table = dynamodb.Table(DYNAMODB_TABLE)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def decimal_to_float(obj):
-    if isinstance(obj, list):  return [decimal_to_float(i) for i in obj]
-    if isinstance(obj, dict):  return {k: decimal_to_float(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [decimal_to_float(i) for i in obj]
+    if isinstance(obj, dict): return {k: decimal_to_float(v) for k, v in obj.items()}
     if isinstance(obj, Decimal): return float(obj)
     return obj
 
@@ -117,7 +117,7 @@ def build_percentile_lookup(all_strava_items):
     for percentile ranking individual activities.
     """
     all_elevations = []
-    all_distances  = []
+    all_distances = []
     for day in all_strava_items:
         for act in day.get("activities", []):
             elev = act.get("total_elevation_gain_feet")
@@ -168,13 +168,13 @@ def recovery_emoji(recovery_score):
 # ── Enriched name builder ─────────────────────────────────────────────────────
 
 def build_enriched_name(activity, recovery_score, elev_pcts, dist_pcts, sorted_elevations, sorted_distances):
-    name      = activity.get("name", "").strip()
-    city      = activity.get("location_city")
-    state     = activity.get("location_state")
-    dist      = activity.get("distance_miles")
-    elev      = activity.get("total_elevation_gain_feet")
-    hr        = activity.get("average_heartrate")
-    pr_count  = activity.get("pr_count") or 0
+    name = activity.get("name", "").strip()
+    city = activity.get("location_city")
+    state = activity.get("location_state")
+    dist = activity.get("distance_miles")
+    elev = activity.get("total_elevation_gain_feet")
+    hr = activity.get("average_heartrate")
+    pr_count = activity.get("pr_count") or 0
 
     parts = []
 
@@ -235,7 +235,7 @@ def enrich_date_range(start_date: str, end_date: str):
     whoop_by_date = {w["date"]: w for w in whoop_items if w.get("date")}
 
     enriched_count = 0
-    skipped_count  = 0
+    skipped_count = 0
 
     for day in target_days:
         date_str = day.get("date")
@@ -245,7 +245,7 @@ def enrich_date_range(start_date: str, end_date: str):
 
         # Recovery score for this day
         whoop_day = whoop_by_date.get(date_str, {})
-        recovery  = whoop_day.get("recovery_score")
+        recovery = whoop_day.get("recovery_score")
 
         updated_activities = []
         day_changed = False
@@ -259,7 +259,7 @@ def enrich_date_range(start_date: str, end_date: str):
 
             if enriched != act.get("enriched_name"):
                 act["enriched_name"] = enriched
-                act["enriched_at"]   = datetime.now(timezone.utc).isoformat()
+                act["enriched_at"] = datetime.now(timezone.utc).isoformat()
                 day_changed = True
                 enriched_count += 1
                 logger.info(f"[enrichment] {date_str} | '{name}' → '{enriched}'")
@@ -291,21 +291,21 @@ def enrich_date_range(start_date: str, end_date: str):
 
 def lambda_handler(event, context):
     try:
-        today     = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         if hasattr(logger, "set_date"): logger.set_date(today)  # OBS-1
         yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
 
         if event.get("backfill"):
             start_date = event.get("start_date", "2020-01-01")
-            end_date   = event.get("end_date", today)
+            end_date = event.get("end_date", today)
             logger.info(f"[enrichment] Backfill mode: {start_date} → {end_date}")
         elif "start_date" in event and "end_date" in event:
             start_date = event["start_date"]
-            end_date   = event["end_date"]
+            end_date = event["end_date"]
         else:
             # Default: yesterday (nightly run)
             start_date = yesterday
-            end_date   = yesterday
+            end_date = yesterday
 
         result = enrich_date_range(start_date, end_date)
 

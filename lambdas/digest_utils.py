@@ -27,8 +27,8 @@ from decimal import Decimal
 
 def d2f(obj):
     """Recursively convert DynamoDB Decimal values to float."""
-    if isinstance(obj, list):    return [d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [d2f(i) for i in obj]
+    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
     if isinstance(obj, Decimal): return float(obj)
     return obj
 
@@ -176,10 +176,10 @@ def ex_whoop_from_list(recs):
     """Extract Whoop summary stats from a list of records."""
     if not recs:
         return None
-    hrvs  = [float(r["hrv"])                for r in recs if "hrv"                in r]
-    recov = [float(r["recovery_score"])     for r in recs if "recovery_score"     in r]
-    rhrs  = [float(r["resting_heart_rate"]) for r in recs if "resting_heart_rate" in r]
-    strs  = [float(r["strain"])             for r in recs if "strain"             in r]
+    hrvs = [float(r["hrv"]) for r in recs if "hrv" in r]
+    recov = [float(r["recovery_score"]) for r in recs if "recovery_score" in r]
+    rhrs = [float(r["resting_heart_rate"]) for r in recs if "resting_heart_rate" in r]
+    strs = [float(r["strain"]) for r in recs if "strain" in r]
     return {
         "hrv_avg":      avg(hrvs),
         "hrv_min":      min(hrvs, default=None),
@@ -195,12 +195,12 @@ def ex_whoop_sleep_from_list(recs):
     """Extract sleep metrics from a list of Whoop records (SOT for sleep duration/staging)."""
     if not recs:
         return None
-    normed    = [_normalize_whoop_sleep(r) for r in recs]
-    scores    = [float(r["sleep_score"])          for r in normed if "sleep_score"          in r]
-    durs      = [float(r["sleep_duration_hours"])  for r in normed if "sleep_duration_hours"  in r]
-    effs      = [float(r["sleep_efficiency_pct"])  for r in normed if "sleep_efficiency_pct"  in r]
-    deep_pcts = [float(r["deep_pct"])              for r in normed if "deep_pct"              in r]
-    rem_pcts  = [float(r["rem_pct"])               for r in normed if "rem_pct"               in r]
+    normed = [_normalize_whoop_sleep(r) for r in recs]
+    scores = [float(r["sleep_score"]) for r in normed if "sleep_score" in r]
+    durs = [float(r["sleep_duration_hours"]) for r in normed if "sleep_duration_hours" in r]
+    effs = [float(r["sleep_efficiency_pct"]) for r in normed if "sleep_efficiency_pct" in r]
+    deep_pcts = [float(r["deep_pct"]) for r in normed if "deep_pct" in r]
+    rem_pcts = [float(r["rem_pct"]) for r in normed if "rem_pct" in r]
     return {
         "score_avg":        avg(scores),
         "duration_avg_hrs": avg(durs),
@@ -215,7 +215,7 @@ def ex_withings_from_list(recs):
     """Extract Withings body composition summary from a list of records."""
     if not recs:
         return None
-    weights  = [float(r["weight_lbs"])   for r in recs if "weight_lbs"   in r]
+    weights = [float(r["weight_lbs"]) for r in recs if "weight_lbs" in r]
     bodyfats = [float(r["body_fat_pct"]) for r in recs if "body_fat_pct" in r]
     sr = sorted(recs, key=lambda r: r.get("sk", ""), reverse=True)
     return {
@@ -323,9 +323,9 @@ def compute_confidence(n=None, p_value=None, effect_size=None, sources=None, day
         return {"level": "LOW", "reason": "no data sources", "badge_html": _confidence_badge("LOW")}
 
     # HIGH gates (Raj: n≥50 + sig + meaningful effect)
-    n_ok     = effective_n is not None and effective_n >= 50
-    p_ok     = p_value is None or p_value < 0.05   # if no p_value given, assume it's not a correlation
-    eff_ok   = effect_size is None or abs(effect_size) >= 0.2   # Cohen's d ≥0.2 or r ≥0.2
+    n_ok = effective_n is not None and effective_n >= 50
+    p_ok = p_value is None or p_value < 0.05   # if no p_value given, assume it's not a correlation
+    eff_ok = effect_size is None or abs(effect_size) >= 0.2   # Cohen's d ≥0.2 or r ≥0.2
 
     if n_ok and p_ok and eff_ok:
         parts = [f"n={effective_n}"]

@@ -41,13 +41,13 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-_REGION    = os.environ.get("AWS_REGION", "us-west-2")
+_REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
+USER_ID = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
-table    = dynamodb.Table(TABLE_NAME)
+table = dynamodb.Table(TABLE_NAME)
 
 # Target sleep onset window (Huberman: 10–11 PM optimal for most adults)
 TARGET_SLEEP_ONSET_HOUR = float(os.environ.get("TARGET_SLEEP_ONSET_HOUR", "22.5"))  # 10:30 PM
@@ -80,8 +80,8 @@ def _to_dec(val):
 
 
 def d2f(obj):
-    if isinstance(obj, list):    return [d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [d2f(i) for i in obj]
+    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
     if isinstance(obj, Decimal): return float(obj)
     return obj
 
@@ -174,7 +174,7 @@ def score_morning_light(today_str, journal_entries):
       Probable (walk but no light mention) → 15 pts
       No evidence                      → 5 pts (can't confirm, not penalized heavily)
     """
-    score    = 5  # default: unknown
+    score = 5  # default: unknown
     evidence = "No morning light signal found — unable to confirm"
 
     # Check journal for morning light keywords
@@ -184,7 +184,7 @@ def score_morning_light(today_str, journal_entries):
         template = (entry.get("template") or "").lower()
         if template == "morning" or "morning" in raw_text[:50]:
             if any(kw in raw_text for kw in light_keywords):
-                score    = 25
+                score = 25
                 evidence = "Journal confirms morning light exposure"
                 return score, evidence
 
@@ -196,7 +196,7 @@ def score_morning_light(today_str, journal_entries):
             start_time = act.get("start_date_local") or act.get("start_time") or ""
             hour = _parse_time_to_hour(start_time)
             if sport in ("walk", "run", "hike") and hour is not None and hour < 10.0:
-                score    = 15
+                score = 15
                 evidence = f"Early {sport} detected ({start_time[:16] if start_time else 'unknown time'}) — probable outdoor light"
                 return score, evidence
 
@@ -317,10 +317,10 @@ def score_sleep_consistency(today_str):
         return 12, f"Only {len(onset_hours)} nights of sleep onset data — insufficient for consistency scoring"
 
     mean_onset = sum(onset_hours) / len(onset_hours)
-    variance   = sum((h - mean_onset) ** 2 for h in onset_hours) / len(onset_hours)
-    sd_hours   = math.sqrt(variance)
+    variance = sum((h - mean_onset) ** 2 for h in onset_hours) / len(onset_hours)
+    sd_hours = math.sqrt(variance)
     sd_minutes = sd_hours * 60
-    sd_str     = f"{sd_minutes:.0f} min SD over {len(onset_hours)} nights"
+    sd_str = f"{sd_minutes:.0f} min SD over {len(onset_hours)} nights"
 
     if sd_minutes < 20:
         return 25, f"Excellent circadian anchor — {sd_str}"
@@ -342,24 +342,24 @@ def compute_circadian_score(today_str):
     """Compute all 4 components and return unified score + prescription."""
     journal = fetch_journal_today(today_str)
 
-    light_score,  light_note   = score_morning_light(today_str, journal)
-    meal_score,   meal_note    = score_meal_timing(today_str)
-    screen_score, screen_note  = score_screen_windown(journal)
+    light_score,  light_note = score_morning_light(today_str, journal)
+    meal_score,   meal_note = score_meal_timing(today_str)
+    screen_score, screen_note = score_screen_windown(journal)
     consist_score, consist_note = score_sleep_consistency(today_str)
 
     total = light_score + meal_score + screen_score + consist_score
 
     if total >= 85:
-        category     = "optimal"
+        category = "optimal"
         prescription = "Tonight you're set up for excellent sleep. All four circadian anchors are firing."
     elif total >= 65:
-        category     = "good"
+        category = "good"
         prescription = "Tonight should be a good sleep night. One or two anchors could be stronger."
     elif total >= 45:
-        category     = "fair"
+        category = "fair"
         prescription = "Tonight's sleep setup is mediocre. Address the lowest-scoring component now."
     else:
-        category     = "poor"
+        category = "poor"
         prescription = "Tonight's sleep is at risk. Multiple circadian disruptions detected — act now."
 
     # Lowest-scoring component = tonight's priority
@@ -414,6 +414,12 @@ def store_circadian_score(result):
             "note":  comp_data["note"],
         }
     item["components"] = components_enc
+    # V2 P2.6 (2026-05-19): tag with run_id + computed_at
+    try:
+        from compute_metadata import tag_record
+        item = tag_record(item, source_id="circadian")
+    except ImportError:
+        pass
     table.put_item(Item=item)
     logger.info("BS-SL2: Stored circadian score for %s: %d/100 (%s)",
                 date_str, result["score"], result["category"])
@@ -429,7 +435,7 @@ def lambda_handler(event, context):
 
     today_str = event.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    result  = compute_circadian_score(today_str)
+    result = compute_circadian_score(today_str)
     store_circadian_score(result)
 
     elapsed = time.time() - t0

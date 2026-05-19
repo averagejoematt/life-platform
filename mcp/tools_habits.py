@@ -32,7 +32,7 @@ def tool_get_habit_adherence(args):
     Returns habits ranked worst-to-best by adherence.
     """
     start_date = args.get("start_date", "2020-01-01")
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     group_filter = (args.get("group") or "").strip()
 
     items = query_chronicling(start_date, end_date)
@@ -41,15 +41,15 @@ def tool_get_habit_adherence(args):
         return {"error": "No chronicling data found for the requested window."}
 
     n_days = len(series)
-    habit_counts: dict[str, int]   = {}  # name -> days completed
-    habit_days:   dict[str, int]   = {}  # name -> days tracked (possible)
+    habit_counts: dict[str, int] = {}  # name -> days completed
+    habit_days:   dict[str, int] = {}  # name -> days tracked (possible)
     group_completed: dict[str, list] = {}
     group_possible:  dict[str, list] = {}
 
     for row in series:
         for habit, val in row["habits"].items():
             habit_counts[habit] = habit_counts.get(habit, 0) + int(val)
-            habit_days[habit]   = habit_days.get(habit, 0) + 1
+            habit_days[habit] = habit_days.get(habit, 0) + 1
         for grp, gdata in row["by_group"].items():
             if group_filter and grp.lower() != group_filter.lower():
                 continue
@@ -60,7 +60,7 @@ def tool_get_habit_adherence(args):
     habit_rows = []
     for habit in sorted(habit_counts):
         days_tracked = habit_days[habit]
-        days_done    = habit_counts[habit]
+        days_done = habit_counts[habit]
         pct = round(days_done / days_tracked, 4) if days_tracked else 0
         habit_rows.append({
             "habit":        habit,
@@ -88,7 +88,7 @@ def tool_get_habit_adherence(args):
 
     # Overall
     all_comp = sum(row["total_completed"] for row in series)
-    all_poss = sum(row["total_possible"]  for row in series)
+    all_poss = sum(row["total_possible"] for row in series)
 
     return {
         "start_date":     start_date,
@@ -108,11 +108,11 @@ def tool_get_habit_streaks(args):
     Current streak, longest streak, and days since last completion for each habit.
     Returns sorted by current_streak descending.
     """
-    start_date   = args.get("start_date", "2020-01-01")
-    end_date     = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", "2020-01-01")
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     habit_filter = (args.get("habit_name") or "").strip().lower()
 
-    items  = query_chronicling(start_date, end_date)
+    items = query_chronicling(start_date, end_date)
     series = _habit_series(items)
     if not series:
         return {"error": "No chronicling data found."}
@@ -191,10 +191,10 @@ def tool_get_keystone_habits(args):
     with overall daily completion_pct — the behavioral levers that lift everything.
     """
     start_date = args.get("start_date", "2020-01-01")
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    top_n      = int(args.get("top_n", 15))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    top_n = int(args.get("top_n", 15))
 
-    items  = query_chronicling(start_date, end_date)
+    items = query_chronicling(start_date, end_date)
     series = _habit_series(items)
     if len(series) < 10:
         return {"error": f"Need at least 10 days of data (found {len(series)})."}
@@ -253,13 +253,13 @@ def tool_get_habit_health_correlations(args):
     Returns Pearson r, and mean biometric on days habit was done vs not done.
     Supports optional lag (e.g. does cold shower today predict HRV tomorrow?).
     """
-    habit_name    = (args.get("habit_name") or "").strip()
-    group_name    = (args.get("group_name") or "").strip()
+    habit_name = (args.get("habit_name") or "").strip()
+    group_name = (args.get("group_name") or "").strip()
     health_source = args.get("health_source")        # e.g. "whoop"
-    health_field  = args.get("health_field")         # e.g. "hrv"
-    start_date    = args.get("start_date", "2020-01-01")
-    end_date      = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    lag_days      = int(args.get("lag_days", 0))
+    health_field = args.get("health_field")         # e.g. "hrv"
+    start_date = args.get("start_date", "2020-01-01")
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    lag_days = int(args.get("lag_days", 0))
 
     if not (habit_name or group_name):
         return {"error": "Provide habit_name or group_name."}
@@ -268,12 +268,12 @@ def tool_get_habit_health_correlations(args):
 
     # Build date range that covers lag
     lag_end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=abs(lag_days))
-    lag_end    = lag_end_dt.strftime("%Y-%m-%d")
+    lag_end = lag_end_dt.strftime("%Y-%m-%d")
 
-    habit_items  = query_chronicling(start_date, lag_end)
+    habit_items = query_chronicling(start_date, lag_end)
     health_items = query_source(health_source, start_date, lag_end)
 
-    habit_series  = _habit_series(habit_items)
+    habit_series = _habit_series(habit_items)
     health_by_date = {}
     resolved = resolve_field(health_source, health_field)
     for item in health_items:
@@ -282,7 +282,7 @@ def tool_get_habit_health_correlations(args):
         if d and v is not None:
             health_by_date[d] = float(v)
 
-    pairs_done     = []
+    pairs_done = []
     pairs_not_done = []
     xs = []   # habit value (0/1 or group pct)
     ys = []   # health value (shifted by lag)
@@ -316,7 +316,7 @@ def tool_get_habit_health_correlations(args):
         return {"error": f"Insufficient paired data points ({len(xs)}). Try wider date range."}
 
     r = pearson_r(xs, ys)
-    mean_done     = round(sum(pairs_done)     / len(pairs_done),     2) if pairs_done     else None
+    mean_done = round(sum(pairs_done) / len(pairs_done),     2) if pairs_done else None
     mean_not_done = round(sum(pairs_not_done) / len(pairs_not_done), 2) if pairs_not_done else None
     delta = round(mean_done - mean_not_done, 2) if (mean_done is not None and mean_not_done is not None) else None
 
@@ -344,7 +344,7 @@ def tool_get_habit_health_correlations(args):
         "mean_health_when_not_done": mean_not_done,
         "delta":          delta,
         "n_days_done":    len(pairs_done),
-        "n_days_not_done":len(pairs_not_done),
+        "n_days_not_done": len(pairs_not_done),
         "coaching_note":  "r > 0.3 is meaningful. Check both r and the mean difference for practical significance.",
     }
 
@@ -354,11 +354,11 @@ def tool_get_group_trends(args):
     Weekly P40 group scores over time.
     Returns week-by-week completion % per group, with trend direction across the window.
     """
-    start_date    = args.get("start_date", "2020-01-01")
-    end_date      = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", "2020-01-01")
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     groups_filter = args.get("groups")  # optional list
 
-    items  = query_chronicling(start_date, end_date)
+    items = query_chronicling(start_date, end_date)
     series = _habit_series(items)
     if not series:
         return {"error": "No chronicling data found."}
@@ -368,9 +368,9 @@ def tool_get_group_trends(args):
     for row in series:
         date_str = row["date"]
         try:
-            dt  = datetime.strptime(date_str, "%Y-%m-%d")
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
             iso = dt.isocalendar()
-            wk  = f"{iso[0]}-W{iso[1]:02d}"
+            wk = f"{iso[0]}-W{iso[1]:02d}"
         except ValueError:
             continue
         weeks.setdefault(wk, {"overall": [], "dates": []})
@@ -403,11 +403,11 @@ def tool_get_group_trends(args):
         half = n // 2
         for grp in ["overall"] + P40_GROUPS:
             key = f"{grp}_pct" if grp != "overall" else "overall_pct"
-            early_vals = [r[key] for r in week_rows[:half]  if r.get(key) is not None]
-            late_vals  = [r[key] for r in week_rows[half:]  if r.get(key) is not None]
+            early_vals = [r[key] for r in week_rows[:half] if r.get(key) is not None]
+            late_vals = [r[key] for r in week_rows[half:] if r.get(key) is not None]
             if early_vals and late_vals:
                 early_avg = sum(early_vals) / len(early_vals)
-                late_avg  = sum(late_vals)  / len(late_vals)
+                late_avg = sum(late_vals) / len(late_vals)
                 delta = round(late_avg - early_avg, 4)
                 trends[grp] = {
                     "early_avg": round(early_avg, 4),
@@ -432,9 +432,9 @@ def tool_compare_habit_periods(args):
     Returns per-habit and per-group delta and direction.
     """
     pa_start = args.get("period_a_start")
-    pa_end   = args.get("period_a_end")
+    pa_end = args.get("period_a_end")
     pb_start = args.get("period_b_start")
-    pb_end   = args.get("period_b_end")
+    pb_end = args.get("period_b_end")
     pa_label = args.get("period_a_label", "Period A")
     pb_label = args.get("period_b_label", "Period B")
 
@@ -442,7 +442,7 @@ def tool_compare_habit_periods(args):
         return {"error": "period_a_start, period_a_end, period_b_start, period_b_end are all required."}
 
     def period_stats(start, end):
-        items  = query_chronicling(start, end)
+        items = query_chronicling(start, end)
         series = _habit_series(items)
         habit_rates: dict[str, float] = {}
         group_rates: dict[str, float] = {}
@@ -524,11 +524,11 @@ def tool_get_habit_stacks(args):
     Also returns natural 'stacks' — groups of 3+ habits that co-occur on ≥60% of days.
     """
     start_date = args.get("start_date", "2020-01-01")
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    top_n      = int(args.get("top_n", 20))
-    min_pct    = float(args.get("min_pct", 0.1))  # minimum base rate for either habit
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    top_n = int(args.get("top_n", 20))
+    min_pct = float(args.get("min_pct", 0.1))  # minimum base rate for either habit
 
-    items  = query_chronicling(start_date, end_date)
+    items = query_chronicling(start_date, end_date)
     series = _habit_series(items)
     if len(series) < 7:
         return {"error": "Need at least 7 days of data."}
@@ -550,8 +550,8 @@ def tool_get_habit_stacks(args):
 
     pairs = []
     for (ha, hb), cnt in pair_counts.items():
-        p_ab  = cnt / n
-        lift  = p_ab / (p[ha] * p[hb]) if (p[ha] * p[hb]) > 0 else 0
+        p_ab = cnt / n
+        lift = p_ab / (p[ha] * p[hb]) if (p[ha] * p[hb]) > 0 else 0
         pairs.append({
             "habit_a":        ha,
             "habit_b":        hb,
@@ -613,10 +613,10 @@ def tool_get_habit_dashboard(args):
     - Best and worst groups this week
     - Trend vs previous 7-day window
     """
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    d7_start   = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
-    d14_start  = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=14)).strftime("%Y-%m-%d")
-    d30_start  = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    d7_start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
+    d14_start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=14)).strftime("%Y-%m-%d")
+    d30_start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
 
     items_30d = query_chronicling(d30_start, end_date)
     series_30 = _habit_series(items_30d)
@@ -651,9 +651,9 @@ def tool_get_habit_dashboard(args):
             for grp in P40_GROUPS if grp in grp_comp and sum(grp_poss.get(grp, [0]))
         }
 
-    avgs_7    = group_avgs(series_7)
+    avgs_7 = group_avgs(series_7)
     avgs_prev = group_avgs(series_prev_7)
-    avgs_30   = group_avgs(series_30)
+    avgs_30 = group_avgs(series_30)
 
     overall_7 = round(sum(r["completion_pct"] for r in series_7) / len(series_7), 4) if series_7 else None
     overall_30 = round(sum(r["completion_pct"] for r in series_30) / len(series_30), 4) if series_30 else None
@@ -670,7 +670,7 @@ def tool_get_habit_dashboard(args):
             }
 
     sorted_groups = sorted(group_trend.items(), key=lambda x: x[1]["7d_avg"], reverse=True)
-    best_groups  = [grp for grp, _ in sorted_groups[:3]]
+    best_groups = [grp for grp, _ in sorted_groups[:3]]
     worst_groups = [grp for grp, _ in sorted_groups[-3:]]
 
     # Streak highlights: top 5 habits by current streak
@@ -745,7 +745,7 @@ def tool_get_garmin_summary(args):
       sleep_respiration — Sleep average respiration (cross-check with Eight Sleep).
     """
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d"))
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
 
     items = query_source("garmin", start_date, end_date)
     if not items:
@@ -828,9 +828,9 @@ def tool_get_device_agreement(args):
       - Composite device confidence rating
     """
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
 
-    whoop_items  = {item["date"]: item for item in query_source("whoop", start_date, end_date)
+    whoop_items = {item["date"]: item for item in query_source("whoop", start_date, end_date)
                     if item.get("date")}
     garmin_items = {item["date"]: item for item in query_source("garmin", start_date, end_date)
                     if item.get("date")}
@@ -854,7 +854,7 @@ def tool_get_device_agreement(args):
         flags = []
 
         # ── HRV comparison ────────────────────────────────────────────────────
-        whoop_hrv  = w.get("hrv")
+        whoop_hrv = w.get("hrv")
         garmin_hrv = g.get("hrv_last_night")
         if whoop_hrv is not None and garmin_hrv is not None:
             wh = float(whoop_hrv)
@@ -878,7 +878,7 @@ def tool_get_device_agreement(args):
                 flags.append(f"HRV: Whoop {wh:.0f}ms vs Garmin {gh:.0f}ms (diff {diff:.0f}ms)")
 
         # ── RHR comparison ────────────────────────────────────────────────────
-        whoop_rhr  = w.get("resting_heart_rate")
+        whoop_rhr = w.get("resting_heart_rate")
         garmin_rhr = g.get("resting_heart_rate")
         if whoop_rhr is not None and garmin_rhr is not None:
             wr = float(whoop_rhr)
@@ -1192,8 +1192,8 @@ def tool_get_vice_streaks(args):
     Compounding formula: value = streak^1.5 / 10 (day 30 is ~3x day 3).
     Champions: Goggins (identity), Clear (habit identity).
     """
-    days_back  = int(args.get("days_back", 90))
-    end_date   = args.get("end_date", (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"))
+    days_back = int(args.get("days_back", 90))
+    end_date = args.get("end_date", (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"))
     start_date = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=days_back - 1)).strftime("%Y-%m-%d")
     vice_filter = (args.get("vice_name") or "").strip().lower()
 
@@ -1228,21 +1228,21 @@ def tool_get_vice_streaks(args):
     def streak_risk(streak_days, miss_rate_14d):
         # Clear "Atomic Habits": 3d establishing, 14d habit forming, 30d identity-level commitment
         """Rate relapse risk based on streak length and recent miss rate."""
-        if streak_days <= 3:    return "establishing"
+        if streak_days <= 3: return "establishing"
         if streak_days <= 14:
             return "moderate_risk" if miss_rate_14d > 0 else "building"
-        if streak_days <= 30:  return "consolidating"
+        if streak_days <= 30: return "consolidating"
         return "identity_level"
 
     vice_reports = []
-    total_value  = 0.0
+    total_value = 0.0
 
     for vice_name, series in sorted(vice_series.items()):
-        streaks  = [s["streak_days"] for s in series]
-        dates    = [s["date"]        for s in series]
-        current  = streaks[-1] if streaks else 0
+        streaks = [s["streak_days"] for s in series]
+        dates = [s["date"] for s in series]
+        current = streaks[-1] if streaks else 0
         max_streak = max(streaks) if streaks else 0
-        max_date   = dates[streaks.index(max_streak)] if streaks else None
+        max_date = dates[streaks.index(max_streak)] if streaks else None
 
         # Relapse detection
         relapses = []
@@ -1261,8 +1261,8 @@ def tool_get_vice_streaks(args):
 
         # Compounding value
         current_value = compounding_value(current)
-        max_value     = compounding_value(max_streak)
-        total_value  += current_value
+        max_value = compounding_value(max_streak)
+        total_value += current_value
 
         # Value at milestone days
         milestones = {}
@@ -1270,7 +1270,7 @@ def tool_get_vice_streaks(args):
             if day > current:
                 milestones[f"day_{day}"] = compounding_value(day)
         next_milestone = min((d for d in [7, 14, 30, 60, 90] if d > current), default=None)
-        days_to_next   = (next_milestone - current) if next_milestone else None
+        days_to_next = (next_milestone - current) if next_milestone else None
 
         risk = streak_risk(current, miss_rate_14d)
 
@@ -1278,7 +1278,7 @@ def tool_get_vice_streaks(args):
         if len(streaks) >= 14:
             half = len(streaks) // 2
             early_avg = sum(streaks[:half]) / half
-            late_avg  = sum(streaks[half:]) / (len(streaks) - half)
+            late_avg = sum(streaks[half:]) / (len(streaks) - half)
             trend = "improving" if late_avg > early_avg + 2 else ("declining" if late_avg < early_avg - 2 else "stable")
         else:
             trend = "insufficient_data"
@@ -1309,9 +1309,9 @@ def tool_get_vice_streaks(args):
     vice_reports.sort(key=lambda r: -r["current_streak"])
 
     # Summary
-    identity_vices  = [r for r in vice_reports if r["streak_risk"] == "identity_level"]
-    at_risk_vices   = [r for r in vice_reports if r["current_streak"] > 0 and r["relapse_count"] > 0 and r["streak_risk"] == "building"]
-    broken_vices    = [r for r in vice_reports if r["current_streak"] == 0]
+    identity_vices = [r for r in vice_reports if r["streak_risk"] == "identity_level"]
+    at_risk_vices = [r for r in vice_reports if r["current_streak"] > 0 and r["relapse_count"] > 0 and r["streak_risk"] == "building"]
+    broken_vices = [r for r in vice_reports if r["current_streak"] == 0]
 
     coaching = []
     if identity_vices:
@@ -1347,8 +1347,8 @@ def tool_get_essential_seven(args):
     Clear + Attia: 65 habits is too many; Essential Seven is the fix.
     """
     target_date = args.get("date", (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"))
-    days_back   = int(args.get("days_back", 30))
-    start_date  = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=days_back - 1)).strftime("%Y-%m-%d")
+    days_back = int(args.get("days_back", 30))
+    start_date = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=days_back - 1)).strftime("%Y-%m-%d")
 
     def _sf(v):
         if v is None: return None
@@ -1356,7 +1356,7 @@ def tool_get_essential_seven(args):
         except (TypeError, ValueError): return None
 
     # ── Profile: get Tier 0 registry ───────────────────────────────────────────
-    profile  = get_profile()
+    profile = get_profile()
     registry = profile.get("habit_registry", {})
 
     tier0 = [
@@ -1381,16 +1381,16 @@ def tool_get_essential_seven(args):
 
     habit_rows = []
     for habit in tier0:
-        meta     = registry.get(habit, {})
+        meta = registry.get(habit, {})
         # Today's status
         today_val = _sf(today_habits.get(habit))
         today_done = bool(today_val and today_val >= 1)
 
         # Streak: walk back from target_date
-        streak       = 0
+        streak = 0
         last_fail_date = None
         for i in range(days_back):
-            d   = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=i)).strftime("%Y-%m-%d")
+            d = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=i)).strftime("%Y-%m-%d")
             rec = by_date.get(d, {})
             habits_map = rec.get("habits", {}) if rec else {}
             val = _sf(habits_map.get(habit))
@@ -1424,7 +1424,7 @@ def tool_get_essential_seven(args):
     # ── Aggregate streak (all T0 complete) ─────────────────────────────────────
     aggregate_streak = 0
     for i in range(days_back):
-        d   = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=i)).strftime("%Y-%m-%d")
+        d = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=i)).strftime("%Y-%m-%d")
         rec = by_date.get(d, {})
         habits_map = rec.get("habits", {}) if rec else {}
         if not habits_map:
@@ -1441,8 +1441,8 @@ def tool_get_essential_seven(args):
             break
 
     # ── Today's score ───────────────────────────────────────────────────────
-    today_done_count  = sum(1 for h in habit_rows if h["today"])
-    today_total       = len(habit_rows)
+    today_done_count = sum(1 for h in habit_rows if h["today"])
+    today_total = len(habit_rows)
 
     # ── Weakest link (most failures in window) ──────────────────────────────
     weakest = min(

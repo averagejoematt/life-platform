@@ -10,30 +10,30 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 # ── AI model constants (env-overridable to avoid silent deprecation failures) ──
-AI_MODEL       = os.environ.get("AI_MODEL",       "claude-sonnet-4-6")
+AI_MODEL = os.environ.get("AI_MODEL",       "claude-sonnet-4-6")
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 # ── Environment variables (with backwards-compatible defaults) ──
-_REGION         = os.environ.get("AWS_REGION", "us-west-2")
-TABLE_NAME      = os.environ.get("TABLE_NAME", "life-platform")
-S3_BUCKET       = os.environ["S3_BUCKET"]
-USER_ID         = os.environ["USER_ID"]
+_REGION = os.environ.get("AWS_REGION", "us-west-2")
+TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
+S3_BUCKET = os.environ["S3_BUCKET"]
+USER_ID = os.environ["USER_ID"]
 API_SECRET_NAME = os.environ.get("API_SECRET_NAME", "life-platform/mcp-api-key")
 
 # ── AWS clients ──
-dynamodb  = boto3.resource("dynamodb", region_name=_REGION)
-table     = dynamodb.Table(TABLE_NAME)
-secrets   = boto3.client("secretsmanager", region_name=_REGION)
+dynamodb = boto3.resource("dynamodb", region_name=_REGION)
+table = dynamodb.Table(TABLE_NAME)
+secrets = boto3.client("secretsmanager", region_name=_REGION)
 s3_client = boto3.client("s3", region_name=_REGION)
 
 # ── Derived constants ──
-USER_PREFIX     = f"USER#{USER_ID}#SOURCE#"
-PROFILE_PK      = f"USER#{USER_ID}"
-PROFILE_SK      = "PROFILE#v1"
-RAW_DAY_LIMIT   = 90
-CACHE_PK        = f"CACHE#{USER_ID}"
-CACHE_TTL_SECS  = 26 * 3600  # 26h: survives full day + 2h buffer for late-running ingestion pipelines
-MEM_CACHE_TTL   = 600  # 10 minutes
+USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
+PROFILE_PK = f"USER#{USER_ID}"
+PROFILE_SK = "PROFILE#v1"
+RAW_DAY_LIMIT = 90
+CACHE_PK = f"CACHE#{USER_ID}"
+CACHE_TTL_SECS = 26 * 3600  # 26h: survives full day + 2h buffer for late-running ingestion pipelines
+MEM_CACHE_TTL = 600  # 10 minutes
 
 # Fields stripped in lean queries
 _LEAN_STRIP = {"activities", "sport_types", "pk", "sk", "ingested_at", "source"}
@@ -54,7 +54,7 @@ _DEFAULT_SOURCE_OF_TRUTH = {
     "tasks":       "todoist",
     "habits":      "habitify",
     "stress":      "garmin",
-    "body_battery":"garmin",
+    "body_battery": "garmin",
     "gait":        "apple_health",
     "energy_expenditure": "apple_health",
     "cgm":         "apple_health",
@@ -77,15 +77,15 @@ FIELD_ALIASES = {
 }
 
 # Partition keys for sub-features
-INSIGHTS_PK     = f"USER#{USER_ID}#SOURCE#insights"
-EXPERIMENTS_PK  = f"USER#{USER_ID}#SOURCE#experiments"
-TRAVEL_PK       = f"USER#{USER_ID}#SOURCE#travel"
-RUCK_PK         = f"USER#{USER_ID}#SOURCE#ruck_log"
-LIFE_EVENTS_PK  = f"USER#{USER_ID}#SOURCE#life_events"
+INSIGHTS_PK = f"USER#{USER_ID}#SOURCE#insights"
+EXPERIMENTS_PK = f"USER#{USER_ID}#SOURCE#experiments"
+TRAVEL_PK = f"USER#{USER_ID}#SOURCE#travel"
+RUCK_PK = f"USER#{USER_ID}#SOURCE#ruck_log"
+LIFE_EVENTS_PK = f"USER#{USER_ID}#SOURCE#life_events"
 INTERACTIONS_PK = f"USER#{USER_ID}#SOURCE#interactions"
-TEMPTATIONS_PK  = f"USER#{USER_ID}#SOURCE#temptations"
-EXPOSURES_PK    = f"USER#{USER_ID}#SOURCE#exposures"
+TEMPTATIONS_PK = f"USER#{USER_ID}#SOURCE#temptations"
+EXPOSURES_PK = f"USER#{USER_ID}#SOURCE#exposures"
 FOOD_RESPONSES_PK = f"USER#{USER_ID}#SOURCE#food_responses"
-ANNOTATIONS_PK   = f"USER#{USER_ID}#SOURCE#discovery_annotations"
-CHALLENGES_PK    = f"USER#{USER_ID}#SOURCE#challenges"
-PROTOCOLS_PK     = f"USER#{USER_ID}#SOURCE#protocols"
+ANNOTATIONS_PK = f"USER#{USER_ID}#SOURCE#discovery_annotations"
+CHALLENGES_PK = f"USER#{USER_ID}#SOURCE#challenges"
+PROTOCOLS_PK = f"USER#{USER_ID}#SOURCE#protocols"

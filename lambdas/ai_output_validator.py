@@ -64,16 +64,16 @@ logger = logging.getLogger(__name__)
 # ── Output types ───────────────────────────────────────────────────────────────
 
 class AIOutputType(str, Enum):
-    BOD_COACHING   = "bod_coaching"      # Board of Directors 2-3 sentence coaching
-    TLDR           = "tldr"              # TL;DR one-liner
-    GUIDANCE       = "guidance"          # Smart guidance bullet item
+    BOD_COACHING = "bod_coaching"      # Board of Directors 2-3 sentence coaching
+    TLDR = "tldr"              # TL;DR one-liner
+    GUIDANCE = "guidance"          # Smart guidance bullet item
     TRAINING_COACH = "training_coach"    # Training coach section
     NUTRITION_COACH = "nutrition_coach"  # Nutrition coach section
-    JOURNAL_COACH  = "journal_coach"     # Journal reflection + tactical
-    CHRONICLE      = "chronicle"         # Weekly chronicle narrative
-    WEEKLY_DIGEST  = "weekly_digest"     # Weekly digest coaching
+    JOURNAL_COACH = "journal_coach"     # Journal reflection + tactical
+    CHRONICLE = "chronicle"         # Weekly chronicle narrative
+    WEEKLY_DIGEST = "weekly_digest"     # Weekly digest coaching
     MONTHLY_DIGEST = "monthly_digest"    # Monthly digest coaching
-    GENERIC        = "generic"           # Unknown — minimal checks only
+    GENERIC = "generic"           # Unknown — minimal checks only
 
 
 # ── Validation result ──────────────────────────────────────────────────────────
@@ -153,7 +153,7 @@ _METRIC_PATTERNS = [
     ("hrv",                r"HRV\s+(?:of\s+|was\s+|is\s+|at\s+)?(\d+(?:\.\d+)?)\s*ms",                 "HRV (ms)"),
     ("hrv",                r"(\d+(?:\.\d+)?)\s*ms\s+HRV",                                               "HRV (ms)"),
     ("resting_heart_rate", r"resting\s+(?:heart\s+rate|HR)\s+(?:of\s+|was\s+|is\s+|at\s+)?(\d+(?:\.\d+)?)\s*(?:bpm)?", "resting HR"),
-    ("sleep_quality_score",r"sleep\s+(?:score|quality)\s+(?:of\s+|was\s+|is\s+|at\s+)?(\d+(?:\.\d+)?)\s*%?", "sleep score"),
+    ("sleep_quality_score", r"sleep\s+(?:score|quality)\s+(?:of\s+|was\s+|is\s+|at\s+)?(\d+(?:\.\d+)?)\s*%?", "sleep score"),
     ("latest_weight",      r"weight\s+(?:of\s+|was\s+|is\s+|at\s+)?(\d{2,3}(?:\.\d+)?)\s*(?:lbs?|pounds?)", "weight"),
     ("tsb",                r"\bTSB\s+(?:of\s+|was\s+|is\s+|at\s+)?(-?\d+(?:\.\d+)?)",                  "TSB"),
 ]

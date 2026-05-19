@@ -44,8 +44,8 @@ except ImportError:
 from ingestion_framework import IngestionConfig, run_ingestion
 
 SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/ingestion-keys")
-USER_ID     = os.environ.get("USER_ID", "matthew")
-BASE_URL    = "https://api.todoist.com/api/v1"
+USER_ID = os.environ.get("USER_ID", "matthew")
+BASE_URL = "https://api.todoist.com/api/v1"
 
 
 # ── Todoist API helpers (unchanged from pre-migration) ─────────────────────────

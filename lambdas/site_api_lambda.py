@@ -72,8 +72,8 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 # ── Config ─────────────────────────────────────────────────
-TABLE_NAME  = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID     = os.environ.get("USER_ID", "matthew")
+TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
+USER_ID = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
 # All user-facing dates use Pacific Time (DST-aware).
@@ -87,7 +87,7 @@ S3_REGION = os.environ.get("S3_REGION", "us-west-2")
 
 # ── AWS clients (module-level for warm container reuse) ─────
 dynamodb = boto3.resource("dynamodb", region_name=DDB_REGION)
-table    = dynamodb.Table(TABLE_NAME)
+table = dynamodb.Table(TABLE_NAME)
 
 # COST-OPT-1: Cache secrets in warm Lambda containers (15-min TTL)
 _secret_cache = {}
@@ -339,7 +339,7 @@ def handle_vitals() -> dict:
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
-    d7  = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+    d7 = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
 
     # Whoop (recovery, HRV, RHR, sleep)
     whoop_7d = _query_source("whoop", d7, today)
@@ -353,9 +353,9 @@ def handle_vitals() -> dict:
     latest = latest[0] if latest else {}
 
     # 30d averages + trends
-    hrv_vals     = sorted([float(w["hrv"]) for w in whoop_30d if w.get("hrv")], key=lambda _: 0)
-    rhr_vals     = sorted([float(w["resting_heart_rate"]) for w in whoop_30d if w.get("resting_heart_rate")], key=lambda _: 0)
-    rec_vals     = [float(w["recovery_score"]) for w in whoop_30d if w.get("recovery_score")]
+    hrv_vals = sorted([float(w["hrv"]) for w in whoop_30d if w.get("hrv")], key=lambda _: 0)
+    rhr_vals = sorted([float(w["resting_heart_rate"]) for w in whoop_30d if w.get("resting_heart_rate")], key=lambda _: 0)
+    rec_vals = [float(w["recovery_score"]) for w in whoop_30d if w.get("recovery_score")]
 
     def trend(vals):
         if len(vals) < 6: return "insufficient_data"
@@ -770,10 +770,10 @@ def handle_journey() -> dict:
 
     _p = _get_profile()
     start_weight = float(_p.get("journey_start_weight_lbs", 307.0))
-    goal_weight  = float(_p.get("goal_weight_lbs", 185.0))
+    goal_weight = float(_p.get("goal_weight_lbs", 185.0))
     current_weight = weight_series[-1][1]
-    lost_lbs     = round(start_weight - current_weight, 1)
-    remaining    = round(current_weight - goal_weight, 1)
+    lost_lbs = round(start_weight - current_weight, 1)
+    remaining = round(current_weight - goal_weight, 1)
     progress_pct = round(lost_lbs / (start_weight - goal_weight) * 100, 1) if start_weight != goal_weight else 0
 
     # Recent rate (last 28 days regression)
@@ -902,7 +902,7 @@ def handle_weight_progress() -> dict:
     Cache: 3600s (1 hr).
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d180  = max((datetime.now(timezone.utc) - timedelta(days=180)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    d180 = max((datetime.now(timezone.utc) - timedelta(days=180)).strftime("%Y-%m-%d"), EXPERIMENT_START)
     items = _query_source("withings", d180, today)
 
     readings = sorted(
@@ -926,7 +926,7 @@ def handle_character_stats() -> dict:
     Returns: current character level, tier, and all 7 pillar scores.
     Cache: 3600s (1 hr) — computed nightly.
     """
-    today     = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
     pk = f"{USER_PREFIX}character_sheet"
     record = None
@@ -990,7 +990,7 @@ def handle_habit_streaks() -> dict:
     Returns: Tier 0 habit streaks for public display (aggregate streak only, no habit names).
     Cache: 3600s (1 hr).
     """
-    today     = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
 
     # Read latest habit_scores record
@@ -1007,9 +1007,9 @@ def handle_habit_streaks() -> dict:
     if not record:
         return _error(503, "Habit scores not available")
 
-    t0_done  = int(record.get("tier0_done", 0))
+    t0_done = int(record.get("tier0_done", 0))
     t0_total = int(record.get("tier0_total", 1))
-    t0_pct   = round(t0_done / t0_total * 100) if t0_total else 0
+    t0_pct = round(t0_done / t0_total * 100) if t0_total else 0
 
     # Compute aggregate T0 streak from habit_scores (t0_streak field if present)
     t0_streak = int(record.get("t0_perfect_streak") or record.get("t0_aggregate_streak") or 0)
@@ -1047,13 +1047,13 @@ def handle_experiments() -> dict:
         if not item.get("sk", "").startswith("EXP#"):
             continue
         start = item.get("start_date", "")
-        end   = item.get("end_date")
+        end = item.get("end_date")
         status = item.get("status", "unknown")
 
         # Compute duration in days
         duration_days = None
         try:
-            end_d  = datetime.strptime(end, "%Y-%m-%d") if end else datetime.now(timezone.utc).replace(tzinfo=None)
+            end_d = datetime.strptime(end, "%Y-%m-%d") if end else datetime.now(timezone.utc).replace(tzinfo=None)
             start_d = datetime.strptime(start, "%Y-%m-%d")
             duration_days = max(0, (end_d - start_d).days)
         except Exception:
@@ -1234,7 +1234,7 @@ def handle_status() -> dict:
         ("supplements",        "Supplement Adherence",               "Daily supplement tracking & compliance",                25,  49, "auto",   "User-Driven", True,  "Habitify", None),
         # State of Mind tracked via apple_health partition field check (som_avg_valence) in Periodic Uploads section
         # ── Periodic Uploads (file drops, webhooks, device sync) ──
-        ("macrofactor_workouts","Exercise Log Data",                 "Workout CSV via file drop",                             48, 168, "auto",   "Periodic Uploads", True,  "MacroFactor via Dropbox", None),
+        ("macrofactor_workouts", "Exercise Log Data",                 "Workout CSV via file drop",                             48, 168, "auto",   "Periodic Uploads", True,  "MacroFactor via Dropbox", None),
         ("apple_health",       "CGM Glucose Data",                   "Continuous glucose monitor readings",                   25,  49, "auto",  "Periodic Uploads", True,  "Dexcom Stelo via Health Exporter", "blood_glucose_avg"),
         ("apple_health",       "Water Intake Data",                  "Daily water consumption tracking",                      25,  49, "auto",   "Periodic Uploads", True,  "Apple Health via Health Exporter", "water_intake_ml"),
         ("apple_health",       "Blood Pressure Data",                "Systolic \u00B7 diastolic \u00B7 pulse",               168, 336, "manual",  "Periodic Uploads", True,  "Apple Health via Health Exporter", "blood_pressure_systolic"),
@@ -1635,7 +1635,7 @@ def handle_status() -> dict:
             {"id": "data_sources",  "label": "Data sources",   "subtitle": f"{len(ds_components)} feeds \u2014 wearables \u00B7 nutrition \u00B7 labs \u00B7 genome", "components": ds_components},
             {"id": "compute",       "label": "Compute layer",  "subtitle": "character sheet \u00B7 metrics \u00B7 insights \u00B7 adaptive mode", "components": compute_components},
             {"id": "email",         "label": "Email & digests", "subtitle": "7 scheduled senders", "components": email_components},
-            {"id": "infrastructure","label": "Infrastructure",  "subtitle": "CloudFront \u00B7 DynamoDB \u00B7 SES \u00B7 DLQ", "components": infra},
+            {"id": "infrastructure", "label": "Infrastructure",  "subtitle": "CloudFront \u00B7 DynamoDB \u00B7 SES \u00B7 DLQ", "components": infra},
         ]
     }
 
@@ -1791,11 +1791,11 @@ def handle_vice_streaks() -> dict:
     Blocked vices (per content_filter.json) are excluded from the response.
     Cache: 3600s (1 hr).
     """
-    today           = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     ninety_days_ago = _experiment_date(90)
 
     content_filter = _load_content_filter()
-    blocked_set    = set(v.lower().strip() for v in content_filter.get("blocked_vices", []))
+    blocked_set = set(v.lower().strip() for v in content_filter.get("blocked_vices", []))
 
     pk = f"{USER_PREFIX}habit_scores"
     resp = table.query(
@@ -1826,16 +1826,16 @@ def handle_vice_streaks() -> dict:
         return _ok({"vices": [], "total_held": 0, "total_tracked": 0, "as_of_date": today}, cache_seconds=3600)
 
     # Current state from latest record
-    latest    = items[-1]
+    latest = items[-1]
     latest_vs = {}
-    raw_vs    = latest.get("vice_streaks") or {}
+    raw_vs = latest.get("vice_streaks") or {}
     if isinstance(raw_vs, dict):
         latest_vs = {k: int(v or 0) for k, v in raw_vs.items() if k.lower().strip() not in blocked_set}
 
     vices = []
     for vice_name, history in vice_history.items():
         current_streak = latest_vs.get(vice_name, history[-1] if history else 0)
-        best_streak    = max(history) if history else 0
+        best_streak = max(history) if history else 0
         # Relapse = streak dropped from >0 to 0
         relapses = sum(1 for i in range(1, len(history)) if history[i - 1] > 0 and history[i] == 0)
         vices.append({
@@ -1849,7 +1849,7 @@ def handle_vice_streaks() -> dict:
     # Sort: holding first, then by streak descending
     vices.sort(key=lambda v: (-int(v["holding"]), -v["current_streak"]))
 
-    total_held    = int(latest.get("vices_held", 0) or 0)
+    total_held = int(latest.get("vices_held", 0) or 0)
     total_tracked = len(vices)
 
     return _ok({
@@ -1869,11 +1869,11 @@ def handle_journey_timeline() -> dict:
     - Experiment start/completion events
     Cache: 3600s (1 hr).
     """
-    today           = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    start_date      = EXPERIMENT_START
-    _p              = _get_profile()
-    start_weight    = float(_p.get("journey_start_weight_lbs", 307.0))
-    goal_weight     = float(_p.get("goal_weight_lbs", 185.0))
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    start_date = EXPERIMENT_START
+    _p = _get_profile()
+    start_weight = float(_p.get("journey_start_weight_lbs", 307.0))
+    goal_weight = float(_p.get("goal_weight_lbs", 185.0))
 
     events: list = []
 
@@ -2096,9 +2096,9 @@ def handle_journey_waveform() -> dict:
     Color tiers: green (>=250), amber (>=150), red (<150), gray (no data).
     Cache: 3600s (1 hr).
     """
-    today      = datetime.now(timezone.utc).date()
+    today = datetime.now(timezone.utc).date()
     start_date = (today - timedelta(days=41)).isoformat()
-    end_date   = today.isoformat()
+    end_date = today.isoformat()
 
     PILLARS = [
         "pillar_sleep", "pillar_nutrition", "pillar_movement",
@@ -2203,13 +2203,13 @@ def handle_habits() -> dict:
     history = []
     for item in items:
         date_str = item.get("date") or item.get("sk", "").replace("DATE#", "")
-        t0_done  = int(item.get("tier0_done", 0) or 0)
+        t0_done = int(item.get("tier0_done", 0) or 0)
         t0_total = int(item.get("tier0_total", 1) or 1)
-        t01_done  = int(item.get("tier01_done", t0_done) or t0_done)
+        t01_done = int(item.get("tier01_done", t0_done) or t0_done)
         t01_total = int(item.get("tier01_total", t0_total) or t0_total)
-        t0_pct   = round(t0_done / t0_total * 100) if t0_total else 0
-        t01_pct  = round(t01_done / t01_total * 100) if t01_total else 0
-        streak   = int(item.get("t0_perfect_streak") or item.get("t0_aggregate_streak") or 0)
+        t0_pct = round(t0_done / t0_total * 100) if t0_total else 0
+        t01_pct = round(t01_done / t01_total * 100) if t01_total else 0
+        streak = int(item.get("t0_perfect_streak") or item.get("t0_aggregate_streak") or 0)
 
         # Per-group breakdown: prefer flat group_* fields on habit_scores;
         # fall back to habitify by_group data if present
@@ -2255,7 +2255,7 @@ def handle_habits() -> dict:
         for i in range(7)
     ]
     valid_dow = [(i, v) for i, v in enumerate(dow_avgs) if v is not None]
-    best_dow  = max(valid_dow, key=lambda x: x[1])[0] if valid_dow else None
+    best_dow = max(valid_dow, key=lambda x: x[1])[0] if valid_dow else None
     worst_dow = min(valid_dow, key=lambda x: x[1])[0] if valid_dow else None
 
     # ── 90-day per-group averages + keystone identification
@@ -2328,8 +2328,8 @@ def handle_habits() -> dict:
             mx = sum(xs) / n
             my = sum(ys) / n
             num = sum((xs[i] - mx) * (ys[i] - my) for i in range(n))
-            dx  = _math.sqrt(sum((x - mx) ** 2 for x in xs))
-            dy  = _math.sqrt(sum((y - my) ** 2 for y in ys))
+            dx = _math.sqrt(sum((x - mx) ** 2 for x in xs))
+            dy = _math.sqrt(sum((y - my) ** 2 for y in ys))
             if dx == 0 or dy == 0:
                 return None
             return round(num / (dx * dy), 3)
@@ -2852,9 +2852,9 @@ _nudge_counts: dict = {}       # ACCT-2: category -> approximate count (warm con
 _finding_rate_store: dict = {} # NEW-1: ip_hash -> list of timestamps for submit_finding
 
 # R17-04: Separate Anthropic key for site-api — injected via CDK env var
-AI_SECRET_NAME  = os.environ.get("AI_SECRET_NAME",  "life-platform/site-api-ai-key")
+AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME",  "life-platform/site-api-ai-key")
 # R17-11: env-overridable model string — avoids silent deprecation failures
-AI_MODEL_HAIKU  = os.environ.get("AI_MODEL_HAIKU",  "claude-haiku-4-5-20251001")
+AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU",  "claude-haiku-4-5-20251001")
 
 
 def _get_anthropic_key():
@@ -3137,8 +3137,8 @@ def handle_sleep_detail() -> dict:
 
     # 30-day averages (actual field names: sleep_efficiency_pct, sleep_duration_hours)
     score_vals = [float(r["sleep_score"]) for r in eight_with_data if r.get("sleep_score")]
-    eff_vals   = [float(r["sleep_efficiency_pct"]) for r in eight_with_data if r.get("sleep_efficiency_pct")]
-    temp_vals  = [float(r["bed_temp_f"]) for r in eight_with_data if r.get("bed_temp_f")]
+    eff_vals = [float(r["sleep_efficiency_pct"]) for r in eight_with_data if r.get("sleep_efficiency_pct")]
+    temp_vals = [float(r["bed_temp_f"]) for r in eight_with_data if r.get("bed_temp_f")]
 
     # Find best-performing temp range by pairing temp with sleep score
     temp_score_pairs = [
@@ -3699,8 +3699,8 @@ def _handle_submit_finding(event: dict) -> dict:
 
     metric_a = re.sub(r"<[^>]+>", "", (body.get("metric_a") or "").strip())[:100]
     metric_b = re.sub(r"<[^>]+>", "", (body.get("metric_b") or "").strip())[:100]
-    finding  = re.sub(r"<[^>]+>", "", (body.get("finding") or "").strip())[:500]
-    email    = re.sub(r"<[^>]+>", "", (body.get("email") or "").strip())[:254]
+    finding = re.sub(r"<[^>]+>", "", (body.get("finding") or "").strip())[:500]
+    email = re.sub(r"<[^>]+>", "", (body.get("email") or "").strip())[:254]
 
     if not metric_a or not metric_b:
         return _error(400, "Both metric_a and metric_b are required.")
@@ -7047,7 +7047,7 @@ _SIMPLE_ROUTES = {
     "/api/submit_finding":    ({"POST"},           _handle_submit_finding),
     "/api/experiment_vote":   ({"POST"},           _handle_experiment_vote),
     "/api/experiment_follow": ({"POST"},           _handle_experiment_follow),
-    "/api/experiment_suggest":({"POST"},           _handle_experiment_suggest),
+    "/api/experiment_suggest": ({"POST"},           _handle_experiment_suggest),
     "/api/challenge_checkin": ({"POST"},           _handle_challenge_checkin),
     "/api/challenge_vote":    ({"POST"},           _handle_challenge_vote),
     "/api/challenge_follow":  ({"POST"},           _handle_challenge_follow),
@@ -7062,7 +7062,7 @@ def lambda_handler(event, context):
     import time as _time
     _req_start = _time.time()
 
-    path   = event.get("rawPath") or event.get("path", "/")
+    path = event.get("rawPath") or event.get("path", "/")
     method = (event.get("requestContext", {}).get("http", {}).get("method") or
               event.get("httpMethod", "GET")).upper()
 

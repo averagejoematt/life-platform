@@ -17,10 +17,10 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 # ── Config (env vars with backwards-compatible defaults) ──
-REGION      = os.environ.get("AWS_REGION", "us-west-2")
-TABLE_NAME  = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID     = os.environ.get("USER_ID", "matthew")
-SNS_ARN     = os.environ.get("SNS_ARN", "arn:aws:sns:us-west-2:205930651321:life-platform-alerts")
+REGION = os.environ.get("AWS_REGION", "us-west-2")
+TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
+USER_ID = os.environ.get("USER_ID", "matthew")
+SNS_ARN = os.environ.get("SNS_ARN", "arn:aws:sns:us-west-2:205930651321:life-platform-alerts")
 STALE_HOURS = int(os.environ.get("STALE_HOURS", "48"))
 # ADR-052: early-warning threshold. Sources between 24h and STALE_HOURS old
 # emit a WarningSourceCount metric so degradation is visible on dashboards
@@ -32,8 +32,8 @@ WARNING_HOURS = int(os.environ.get("WARNING_HOURS", "24"))
 SICK_SUPPRESS_DAYS = int(os.environ.get("SICK_SUPPRESS_DAYS", "3"))
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
-sns      = boto3.client("sns", region_name=REGION)
-cw       = boto3.client("cloudwatch", region_name=REGION)
+sns = boto3.client("sns", region_name=REGION)
+cw = boto3.client("cloudwatch", region_name=REGION)
 
 SOURCES = {
     "whoop":           "Whoop recovery/sleep",

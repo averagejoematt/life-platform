@@ -87,9 +87,9 @@ def _compute_hero(vitals: dict, journey: dict) -> dict:
         days_on_journey = 0
 
     current_weight = journey.get("current_weight_lbs") or vitals.get("weight_lbs")
-    lost_lbs       = journey.get("lost_lbs")
-    progress_pct   = journey.get("progress_pct")
-    goal_date      = journey.get("projected_goal_date", "")
+    lost_lbs = journey.get("lost_lbs")
+    progress_pct = journey.get("progress_pct")
+    goal_date = journey.get("projected_goal_date", "")
 
     return {
         "why_paragraph":    HERO_WHY_PARAGRAPH,

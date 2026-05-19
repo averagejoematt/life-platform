@@ -43,14 +43,14 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-_REGION    = os.environ.get("AWS_REGION", "us-west-2")
+_REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
+USER_ID = os.environ.get("USER_ID", "matthew")
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
-table    = dynamodb.Table(TABLE_NAME)
+table = dynamodb.Table(TABLE_NAME)
 
 # How many days back to reconcile (default: yesterday only; backfill via date param)
 DEFAULT_LOOKBACK = int(os.environ.get("SLEEP_RECONCILER_LOOKBACK", "1"))
@@ -80,8 +80,8 @@ def _to_dec(val):
 
 
 def d2f(obj):
-    if isinstance(obj, list):    return [d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [d2f(i) for i in obj]
+    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
     if isinstance(obj, Decimal): return float(obj)
     return obj
 
@@ -107,25 +107,25 @@ def reconcile_sleep(date_str):
     Fetch Whoop, Eight Sleep, Apple Health records for date_str,
     apply conflict resolution rules, return canonical unified record.
     """
-    whoop  = fetch_source_date("whoop",        date_str)
-    eight  = fetch_source_date("eightsleep",   date_str)
-    apple  = fetch_source_date("apple_health", date_str)
+    whoop = fetch_source_date("whoop",        date_str)
+    eight = fetch_source_date("eightsleep",   date_str)
+    apple = fetch_source_date("apple_health", date_str)
 
     if not whoop and not eight and not apple:
         return None, {}
 
-    canonical  = {}
+    canonical = {}
     source_map = {}  # field → winning source
 
     def _set(field, value, source):
         if value is not None:
-            canonical[field]  = value
+            canonical[field] = value
             source_map[field] = source
 
     # ── Total duration: Apple Health wins ───────────────────────────────────────
     apple_duration = _sf(apple, "sleep_duration_hours") or _sf(apple, "total_sleep_hours")
     whoop_duration = _sf(whoop, "sleep_duration_hours")
-    duration_src   = "apple_health" if apple_duration else "whoop"
+    duration_src = "apple_health" if apple_duration else "whoop"
     _set("total_duration_hours", apple_duration or whoop_duration, duration_src)
 
     # ── Sleep staging: Whoop wins ───────────────────────────────────────────────
@@ -147,7 +147,7 @@ def reconcile_sleep(date_str):
     _set("sleep_efficiency_pct", _sf(whoop, "sleep_efficiency_percentage"), "whoop")
 
     # ── Respiratory rate: Whoop preferred, Eight Sleep fallback ─────────────────
-    rr     = _sf(whoop, "respiratory_rate") or _sf(eight, "respiratory_rate")
+    rr = _sf(whoop, "respiratory_rate") or _sf(eight, "respiratory_rate")
     rr_src = "whoop" if whoop and whoop.get("respiratory_rate") else "eightsleep"
     _set("respiratory_rate", rr, rr_src)
 
@@ -171,9 +171,9 @@ def reconcile_sleep(date_str):
 
     # ── Eight Sleep environment fields ──────────────────────────────────────────
     if eight:
-        _set("bed_temp_c",      _sf(eight, "bed_temp_c")    or _sf(eight, "avg_bed_temp_c"),   "eightsleep")
-        _set("room_temp_c",     _sf(eight, "room_temp_c")   or _sf(eight, "avg_room_temp_c"),  "eightsleep")
-        _set("sleep_score_env", _sf(eight, "sleep_score")   or _sf(eight, "sleep_fitness_score"), "eightsleep")
+        _set("bed_temp_c",      _sf(eight, "bed_temp_c") or _sf(eight, "avg_bed_temp_c"),   "eightsleep")
+        _set("room_temp_c",     _sf(eight, "room_temp_c") or _sf(eight, "avg_room_temp_c"),  "eightsleep")
+        _set("sleep_score_env", _sf(eight, "sleep_score") or _sf(eight, "sleep_fitness_score"), "eightsleep")
         _set("hrv_score_env",   _sf(eight, "hrv_score"),    "eightsleep")
         _set("toss_and_turns",  _sf(eight, "toss_and_turns"), "eightsleep")
 
@@ -184,9 +184,9 @@ def reconcile_sleep(date_str):
     if apple: sources_present.append("apple_health")
 
     canonical["sources_present"] = sources_present
-    canonical["source_map"]      = json.dumps(source_map)
-    canonical["date"]            = date_str
-    canonical["reconciled_at"]   = datetime.now(timezone.utc).isoformat()
+    canonical["source_map"] = json.dumps(source_map)
+    canonical["date"] = date_str
+    canonical["reconciled_at"] = datetime.now(timezone.utc).isoformat()
 
     return canonical, source_map
 
@@ -204,6 +204,12 @@ def store_unified_sleep(date_str, canonical):
             item[k] = v
         elif v is not None:
             item[k] = v
+    # V2 P2.6 (2026-05-19): tag with run_id + computed_at
+    try:
+        from compute_metadata import tag_record
+        item = tag_record(item, source_id="sleep_unified")
+    except ImportError:
+        pass
     table.put_item(Item=item)
     logger.info("BS-08: Stored sleep_unified for %s (sources: %s)",
                 date_str, canonical.get("sources_present", []))
@@ -221,7 +227,7 @@ def lambda_handler(event, context):
         dates = [event["date"]]
     elif event.get("start_date") and event.get("end_date"):
         start = datetime.strptime(event["start_date"], "%Y-%m-%d")
-        end   = datetime.strptime(event["end_date"],   "%Y-%m-%d")
+        end = datetime.strptime(event["end_date"],   "%Y-%m-%d")
         dates = []
         d = start
         while d <= end:
@@ -232,9 +238,9 @@ def lambda_handler(event, context):
         dates = [(today - timedelta(days=i)).isoformat()
                  for i in range(1, DEFAULT_LOOKBACK + 1)]
 
-    stored  = 0
+    stored = 0
     skipped = 0
-    errors  = 0
+    errors = 0
 
     for date_str in dates:
         try:

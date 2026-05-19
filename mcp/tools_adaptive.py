@@ -11,19 +11,19 @@ import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-_REGION    = os.environ.get("AWS_REGION", "us-west-2")
+_REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
+USER_ID = os.environ.get("USER_ID", "matthew")
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
-table    = dynamodb.Table(TABLE_NAME)
+table = dynamodb.Table(TABLE_NAME)
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
 
 def d2f(obj):
-    if isinstance(obj, list):    return [d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [d2f(i) for i in obj]
+    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
     if isinstance(obj, Decimal): return float(obj)
     return obj
 
@@ -41,7 +41,7 @@ def get_adaptive_mode(days: int = 14) -> dict:
     days = min(max(int(days), 1), 30)
     today = datetime.now(timezone.utc).date()
     start = (today - timedelta(days=days)).isoformat()
-    end   = (today - timedelta(days=1)).isoformat()
+    end = (today - timedelta(days=1)).isoformat()
 
     try:
         resp = table.query(

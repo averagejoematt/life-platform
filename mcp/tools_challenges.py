@@ -70,25 +70,25 @@ def tool_create_challenge(args):
     if not name:
         raise ValueError("name is required.")
 
-    catalog_id       = (args.get("catalog_id") or "").strip()
-    description      = (args.get("description") or "").strip()
-    source           = (args.get("source") or "manual").strip()
-    source_detail    = (args.get("source_detail") or "").strip()
-    domain           = (args.get("domain") or "general").strip()
-    difficulty       = (args.get("difficulty") or "moderate").strip()
-    duration_days    = args.get("duration_days", 7)
-    protocol         = (args.get("protocol") or "").strip()
+    catalog_id = (args.get("catalog_id") or "").strip()
+    description = (args.get("description") or "").strip()
+    source = (args.get("source") or "manual").strip()
+    source_detail = (args.get("source_detail") or "").strip()
+    domain = (args.get("domain") or "general").strip()
+    difficulty = (args.get("difficulty") or "moderate").strip()
+    duration_days = args.get("duration_days", 7)
+    protocol = (args.get("protocol") or "").strip()
     success_criteria = (args.get("success_criteria") or "").strip()
-    metric_targets   = args.get("metric_targets") or {}
-    status           = (args.get("status") or "candidate").strip()
-    verification     = (args.get("verification_method") or "self_report").strip()
-    challenge_type   = (args.get("challenge_type") or "standard").strip()
+    metric_targets = args.get("metric_targets") or {}
+    status = (args.get("status") or "candidate").strip()
+    verification = (args.get("verification_method") or "self_report").strip()
+    challenge_type = (args.get("challenge_type") or "standard").strip()
     # Connection-type fields
-    public_label     = (args.get("public_label") or "").strip()
+    public_label = (args.get("public_label") or "").strip()
     relationship_type = (args.get("relationship_type") or "").strip()
-    target_hours     = args.get("target_hours")
+    target_hours = args.get("target_hours")
     related_experiment = (args.get("related_experiment_id") or "").strip()
-    tags             = args.get("tags") or []
+    tags = args.get("tags") or []
 
     if challenge_type not in VALID_CHALLENGE_TYPES:
         raise ValueError(f"Invalid challenge_type '{challenge_type}'. Valid: {VALID_CHALLENGE_TYPES}")
@@ -546,7 +546,7 @@ def tool_complete_challenge(args):
     if final_status not in ("completed", "failed"):
         raise ValueError("status must be 'completed' or 'failed'.")
 
-    outcome    = (args.get("outcome") or "").strip()
+    outcome = (args.get("outcome") or "").strip()
     reflection = (args.get("reflection") or "").strip()
 
     sk = f"CHALLENGE#{challenge_id}"

@@ -32,10 +32,10 @@ from decimal import Decimal
 logger = logging.getLogger(__name__)
 
 WARN_THRESHOLD = 307_200   # 300 KB
-HARD_LIMIT     = 389_120   # 380 KB — truncate before this
-DDB_LIMIT      = 409_600   # 400 KB — DynamoDB hard limit
+HARD_LIMIT = 389_120   # 380 KB — truncate before this
+DDB_LIMIT = 409_600   # 400 KB — DynamoDB hard limit
 
-REGION       = os.environ.get("AWS_REGION", "us-west-2")
+REGION = os.environ.get("AWS_REGION", "us-west-2")
 CW_NAMESPACE = "LifePlatform/DynamoDB"
 
 _cw = None

@@ -32,19 +32,19 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 # ── Config ────────────────────────────────────────────────────────────────────
-REGION     = os.environ.get("AWS_REGION", "us-west-2")
+REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-S3_BUCKET  = os.environ.get("S3_BUCKET", "matthew-life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
-SENDER     = os.environ.get("EMAIL_SENDER", "lifeplatform@mattsusername.com")
-SITE_URL   = os.environ.get("SITE_URL", "https://averagejoematt.com")
-SEND_RATE  = float(os.environ.get("SEND_RATE_PER_SEC", "1.0"))
+S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+USER_ID = os.environ.get("USER_ID", "matthew")
+SENDER = os.environ.get("EMAIL_SENDER", "lifeplatform@mattsusername.com")
+SITE_URL = os.environ.get("SITE_URL", "https://averagejoematt.com")
+SEND_RATE = float(os.environ.get("SEND_RATE_PER_SEC", "1.0"))
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
-table    = dynamodb.Table(TABLE_NAME)
-s3       = boto3.client("s3", region_name=REGION)
-ses      = boto3.client("sesv2", region_name=REGION)
+table = dynamodb.Table(TABLE_NAME)
+s3 = boto3.client("s3", region_name=REGION)
+ses = boto3.client("sesv2", region_name=REGION)
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
@@ -66,8 +66,8 @@ BOARD_ROTATION = [
 
 
 def _d2f(obj):
-    if isinstance(obj, list):    return [_d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: _d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [_d2f(i) for i in obj]
+    if isinstance(obj, dict): return {k: _d2f(v) for k, v in obj.items()}
     if isinstance(obj, Decimal): return float(obj)
     return obj
 

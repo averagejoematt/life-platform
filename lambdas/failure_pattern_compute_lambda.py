@@ -37,10 +37,10 @@ except ImportError:
     logger = logging.getLogger("failure-pattern-compute")
     logger.setLevel(logging.INFO)
 
-_REGION    = os.environ.get("AWS_REGION", "us-west-2")
+_REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
-S3_BUCKET  = os.environ.get("S3_BUCKET", "matthew-life-platform")
+USER_ID = os.environ.get("USER_ID", "matthew")
+S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
@@ -50,7 +50,7 @@ USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 MIN_DAYS_REQUIRED = 42   # 6 weeks
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
-table    = dynamodb.Table(TABLE_NAME)
+table = dynamodb.Table(TABLE_NAME)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -60,7 +60,7 @@ table    = dynamodb.Table(TABLE_NAME)
 def _check_data_gate():
     """Return (ok: bool, days_available: int) for the habit_scores partition."""
     try:
-        today      = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         gate_start = (datetime.now(timezone.utc) - timedelta(days=MIN_DAYS_REQUIRED)).strftime("%Y-%m-%d")
         resp = table.query(
             KeyConditionExpression="pk = :pk AND sk BETWEEN :start AND :end",
@@ -367,6 +367,12 @@ def _write_pattern_memory(patterns, today):
                 "Use to inform coaching about recurring struggle patterns, not to predict failures."
             ),
         }
+        # V2 P2.6 (2026-05-19): tag with run_id + computed_at
+        try:
+            from compute_metadata import tag_record
+            item = tag_record(item, source_id="failure_patterns")
+        except ImportError:
+            pass
         table.put_item(Item=item)
         logger.info(f"[IC-4] Wrote failure_patterns memory for {today}")
     except Exception as e:

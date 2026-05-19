@@ -41,20 +41,20 @@ except ImportError:
     logger = logging.getLogger("chronicle-approve")
     logger.setLevel(logging.INFO)
 
-REGION     = os.environ.get("AWS_REGION", "us-west-2")
+REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-S3_BUCKET  = os.environ["S3_BUCKET"]
-USER_ID    = os.environ.get("USER_ID", "matthew")
+S3_BUCKET = os.environ["S3_BUCKET"]
+USER_ID = os.environ.get("USER_ID", "matthew")
 CF_DIST_ID = os.environ.get("CF_DIST_ID", "E3S424OXQZ8NBE")
 CHRONICLE_EMAIL_SENDER_ARN = os.environ.get("CHRONICLE_EMAIL_SENDER_ARN", "")
 
 CHRONICLE_PK = f"USER#{USER_ID}#SOURCE#chronicle"
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
-table    = dynamodb.Table(TABLE_NAME)
-s3       = boto3.client("s3", region_name=REGION)
-cf       = boto3.client("cloudfront", region_name="us-east-1")  # CF is global, endpoint is us-east-1
-lam      = boto3.client("lambda", region_name=REGION)
+table = dynamodb.Table(TABLE_NAME)
+s3 = boto3.client("s3", region_name=REGION)
+cf = boto3.client("cloudfront", region_name="us-east-1")  # CF is global, endpoint is us-east-1
+lam = boto3.client("lambda", region_name=REGION)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -119,7 +119,7 @@ def _publish_to_s3(item: dict) -> list[str]:
     invalidation_paths = []
 
     # Blog post
-    blog_post_key  = item.get("draft_blog_post_key", "")
+    blog_post_key = item.get("draft_blog_post_key", "")
     blog_post_html = item.get("draft_blog_post_html", "")
     blog_index_html = item.get("draft_blog_index_html", "")
 
@@ -143,7 +143,7 @@ def _publish_to_s3(item: dict) -> list[str]:
         invalidation_paths.append("/blog/index.html")
 
     # Journal post
-    journal_post_key  = item.get("draft_journal_post_key", "")
+    journal_post_key = item.get("draft_journal_post_key", "")
     journal_post_html = item.get("draft_journal_post_html", "")
     journal_posts_json = item.get("draft_journal_posts_json", "")
 
@@ -267,8 +267,8 @@ def _handle(event: dict) -> dict:
     # Parse query string params from Function URL event
     qs = event.get("queryStringParameters") or {}
     date_str = qs.get("date", "").strip()
-    token    = qs.get("token", "").strip()
-    action   = qs.get("action", "").strip().lower()
+    token = qs.get("token", "").strip()
+    action = qs.get("action", "").strip().lower()
 
     # ── Validate inputs ──────────────────────────────────────────────────────
     if not date_str or not token or action not in ("approve", "request_changes"):
@@ -287,9 +287,9 @@ def _handle(event: dict) -> dict:
             f'<p>No Chronicle draft found for {date_str}.</p>')
 
     current_status = item.get("status", "")
-    stored_token   = item.get("approval_token", "")
-    week_num       = item.get("week_number", "?")
-    title          = item.get("title", "Untitled")
+    stored_token = item.get("approval_token", "")
+    week_num = item.get("week_number", "?")
+    title = item.get("title", "Untitled")
 
     # ── Already processed? ───────────────────────────────────────────────────
     if current_status == "published":

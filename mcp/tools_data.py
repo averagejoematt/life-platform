@@ -42,14 +42,14 @@ def tool_get_sources(_args):
         # 2026-05-03: use .get() — at least one source partition has a record
         # without a `date` field; was raising KeyError and tanking the whole tool.
         first = oldest["Items"][0].get("date") if oldest["Items"] else None
-        last  = newest["Items"][0].get("date") if newest["Items"] else None
+        last = newest["Items"][0].get("date") if newest["Items"] else None
         result[source] = {"available": first is not None, "first_date": first, "latest_date": last}
     return result
 
 
 def tool_get_latest(args):
     sources = args.get("sources", SOURCES)
-    result  = {}
+    result = {}
     for source in sources:
         pk = f"{USER_PREFIX}{source}"
         response = table.query(KeyConditionExpression=Key("pk").eq(pk), Limit=1, ScanIndexForward=False)
@@ -75,15 +75,15 @@ def tool_get_daily_summary(args):
 
 
 def tool_get_date_range(args):
-    source     = args.get("source")
+    source = args.get("source")
     start_date = args.get("start_date")
-    end_date   = args.get("end_date")
+    end_date = args.get("end_date")
     if not all([source, start_date, end_date]):
         raise ValueError("'source', 'start_date', and 'end_date' are required")
     if source not in SOURCES:
         raise ValueError(f"Unknown source '{source}'. Valid: {SOURCES}")
 
-    days  = date_diff_days(start_date, end_date)
+    days = date_diff_days(start_date, end_date)
     items = query_source(source, start_date, end_date)
 
     if days > RAW_DAY_LIMIT:
@@ -99,10 +99,10 @@ def tool_get_date_range(args):
 
 
 def tool_find_days(args):
-    source     = args.get("source")
+    source = args.get("source")
     start_date = args.get("start_date")
-    end_date   = args.get("end_date")
-    filters    = args.get("filters", [])
+    end_date = args.get("end_date")
+    filters = args.get("filters", [])
     if not all([source, start_date, end_date]):
         raise ValueError("'source', 'start_date', and 'end_date' are required")
 
@@ -110,18 +110,18 @@ def tool_find_days(args):
 
     def passes(item):
         for f in filters:
-            field  = resolve_field(source, f["field"])
+            field = resolve_field(source, f["field"])
             actual = item.get(field)
             if actual is None:
                 return False
             actual = float(actual)
-            value  = float(f["value"])
-            op     = f["op"]
-            if op == ">"  and not actual >  value: return False
+            value = float(f["value"])
+            op = f["op"]
+            if op == ">" and not actual >  value: return False
             if op == ">=" and not actual >= value: return False
-            if op == "<"  and not actual <  value: return False
+            if op == "<" and not actual <  value: return False
             if op == "<=" and not actual <= value: return False
-            if op == "="  and not actual == value: return False
+            if op == "=" and not actual == value: return False
         return True
 
     matched = [item for item in items if passes(item)]
@@ -136,8 +136,8 @@ def tool_find_days(args):
 
 
 def tool_get_aggregated_summary(args):
-    source   = args.get("source")
-    period   = args.get("period", "year")
+    source = args.get("source")
+    period = args.get("period", "year")
     end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
 
     if period not in ("month", "year"):
@@ -181,14 +181,14 @@ def tool_get_aggregated_summary(args):
 
 
 def tool_search_activities(args):
-    start_date    = args.get("start_date", "2010-01-01")
-    end_date      = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", "2010-01-01")
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     name_contains = args.get("name_contains", "").lower()
-    sport_type    = args.get("sport_type", "").lower()
-    min_distance  = args.get("min_distance_miles")
+    sport_type = args.get("sport_type", "").lower()
+    min_distance = args.get("min_distance_miles")
     min_elevation = args.get("min_elevation_gain_feet")
-    sort_by       = args.get("sort_by", "distance_miles")
-    limit         = int(args.get("limit", 100))
+    sort_by = args.get("sort_by", "distance_miles")
+    limit = int(args.get("limit", 100))
 
     day_records = query_source(get_sot("cardio"), start_date, end_date)
 
@@ -210,7 +210,7 @@ def tool_search_activities(args):
     matched = []
     for act in all_activities:
         if name_contains:
-            name_match     = name_contains in (act.get("name")          or "").lower()
+            name_match = name_contains in (act.get("name") or "").lower()
             enriched_match = name_contains in (act.get("enriched_name") or "").lower()
             if not (name_match or enriched_match):
                 continue
@@ -254,10 +254,10 @@ def tool_search_activities(args):
 
 
 def tool_get_field_stats(args):
-    source     = args.get("source")
-    field      = args.get("field")
+    source = args.get("source")
+    field = args.get("field")
     start_date = args.get("start_date", "2010-01-01")
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
 
     if not source or not field:
         raise ValueError("'source' and 'field' are required")
@@ -279,20 +279,20 @@ def tool_get_field_stats(args):
         return {"source": source, "field": resolved_field,
                 "message": "No data found for this field in the specified range."}
 
-    nums    = [v for v, _ in values]
+    nums = [v for v, _ in values]
     max_val = max(nums)
     min_val = min(nums)
     avg_val = round(sum(nums) / len(nums), 2)
 
     sorted_desc = sorted(values, key=lambda x: x[0], reverse=True)
-    sorted_asc  = sorted(values, key=lambda x: x[0])
-    top5_high   = [{"value": v, "date": d} for v, d in sorted_desc[:5]]
-    top5_low    = [{"value": v, "date": d} for v, d in sorted_asc[:5]]
+    sorted_asc = sorted(values, key=lambda x: x[0])
+    top5_high = [{"value": v, "date": d} for v, d in sorted_desc[:5]]
+    top5_low = [{"value": v, "date": d} for v, d in sorted_asc[:5]]
 
     third = max(1, len(values) // 3)
     early_avg = round(sum(v for v, _ in values[:third]) / third, 2)
-    late_avg  = round(sum(v for v, _ in values[-third:]) / third, 2)
-    delta     = round(late_avg - early_avg, 2)
+    late_avg = round(sum(v for v, _ in values[-third:]) / third, 2)
+    delta = round(late_avg - early_avg, 2)
     if abs(delta) < 0.5:
         trend = "stable"
     elif delta > 0:
@@ -315,19 +315,19 @@ def tool_get_field_stats(args):
         "top5_lowest":      top5_low,
         "trend":            trend,
         "early_period_avg": early_avg,
-        "recent_period_avg":late_avg,
+        "recent_period_avg": late_avg,
         "storytelling_tip": "Pair with get_aggregated_summary (period=year) for the full arc.",
     }
 
 
 def tool_compare_periods(args):
     pa_start = args.get("period_a_start")
-    pa_end   = args.get("period_a_end")
+    pa_end = args.get("period_a_end")
     pb_start = args.get("period_b_start")
-    pb_end   = args.get("period_b_end")
+    pb_end = args.get("period_b_end")
     pa_label = args.get("period_a_label", "Period A")
     pb_label = args.get("period_b_label", "Period B")
-    source   = args.get("source")
+    source = args.get("source")
 
     if not all([pa_start, pa_end, pb_start, pb_end]):
         raise ValueError("period_a_start, period_a_end, period_b_start, period_b_end are all required")
@@ -368,8 +368,8 @@ def tool_compare_periods(args):
             row = {pa_label: val_a, pb_label: val_b}
             if val_a is not None and val_b is not None:
                 delta = round(val_b - val_a, 2)
-                pct   = round(100.0 * delta / val_a, 1) if val_a != 0 else None
-                row["delta"]     = delta
+                pct = round(100.0 * delta / val_a, 1) if val_a != 0 else None
+                row["delta"] = delta
                 row["pct_change"]= pct
                 row["direction"] = "improved" if delta > 0 else ("declined" if delta < 0 else "unchanged")
             comparisons[field] = row
@@ -385,10 +385,10 @@ def tool_compare_periods(args):
 
 def tool_get_weekly_summary(args):
     start_date = args.get("start_date", "2000-01-01")
-    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    sort_by    = args.get("sort_by", "total_distance_miles")
-    limit      = int(args.get("limit", 52))
-    sort_asc   = args.get("sort_ascending", False)
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    sort_by = args.get("sort_by", "total_distance_miles")
+    limit = int(args.get("limit", 52))
+    sort_asc = args.get("sort_ascending", False)
 
     day_records = query_source(get_sot("cardio"), start_date, end_date)
 
@@ -407,18 +407,18 @@ def tool_get_weekly_summary(args):
         if not date_str:
             continue
         try:
-            dt  = datetime.strptime(date_str, "%Y-%m-%d")
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
             iso = dt.isocalendar()
             key = f"{iso[0]}-W{iso[1]:02d}"
         except ValueError:
             continue
 
         w = weeks[key]
-        w["total_distance_miles"]      += float(day.get("total_distance_miles") or 0)
+        w["total_distance_miles"] += float(day.get("total_distance_miles") or 0)
         w["total_elevation_gain_feet"] += float(day.get("total_elevation_gain_feet") or 0)
         w["total_moving_time_seconds"] += int(day.get("total_moving_time_seconds") or 0)
-        w["activity_count"]            += int(day.get("activity_count") or 0)
-        w["days_active"]               += 1
+        w["activity_count"] += int(day.get("activity_count") or 0)
+        w["days_active"] += 1
         w["dates"].append(date_str)
         for st in (day.get("sport_types") or []):
             if st:
