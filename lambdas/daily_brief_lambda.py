@@ -115,7 +115,8 @@ try:
     _HAS_INSIGHT_WRITER = True
 except ImportError:
     _HAS_INSIGHT_WRITER = False
-    logger.warning("insight_writer not available — insights will not be persisted")
+    # NOTE: logger is initialized 15 lines below — use print() at module load time
+    print("[WARN] insight_writer not available — insights will not be persisted")
     _emit_module_load_failure("insight_writer")
 
 # AI-3: Output Validator — validates coaching text before delivery
@@ -124,7 +125,8 @@ try:
     _HAS_AI_VALIDATOR = True
 except ImportError:
     _HAS_AI_VALIDATOR = False
-    logger.warning("ai_output_validator not available — AI output validation skipped")
+    # NOTE: logger is initialized 10 lines below — use print() at module load time
+    print("[WARN] ai_output_validator not available — AI output validation skipped")
     _emit_module_load_failure("ai_output_validator")
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
