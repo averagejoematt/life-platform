@@ -211,6 +211,23 @@ def ingestion_hevy_backfill() -> list[iam.PolicyStatement]:
     )
 
 
+def ingestion_macrofactor_puller() -> list[iam.PolicyStatement]:
+    """MacroFactor unofficial-API puller (WS-2 Tier 1) — per ADR-061.
+
+    Reads: life-platform/macrofactor secret (username + password for
+    Firebase email/password auth — accepted risk).
+    Writes: NUTRITION#{date}#{entry_uid} records under
+    USER#matthew#SOURCE#macrofactor_api, plus raw S3 archive to
+    raw/macrofactor_api/, plus health status at USER#system /
+    INGESTION_STATE#macrofactor_api.
+    """
+    return _ingestion_base(
+        "macrofactor_api",
+        secret_name="life-platform/macrofactor",
+        s3_prefix="raw/macrofactor_api/*",
+    )
+
+
 def ingestion_journal_enrichment() -> list[iam.PolicyStatement]:
     """Journal enrichment uses ai-keys for Haiku enrichment, no raw S3 write."""
     return [
