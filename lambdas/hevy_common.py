@@ -155,15 +155,25 @@ def fetch_workout(workout_id: str) -> dict:
     return hevy_get(f"/v1/workouts/{workout_id}")
 
 
-def fetch_events_since(cursor: Optional[str], page_size: int = 100) -> dict:
-    """Fetch the workouts events feed since a cursor.
+def fetch_events_page(since_iso: str, page: int = 1, page_size: int = 10) -> dict:
+    """Fetch one page of the workouts events feed.
 
-    Returns {events: [...], next_cursor: str, has_more: bool}. Exact shape
-    per Hevy's response; verify against live docs and adjust as needed.
+    Verified 2026-05-25 against api.hevyapp.com OpenAPI spec:
+        GET /v1/workouts/events?since=<iso>&page=<n>&pageSize=<m>
+        Returns { page, page_count, events: [{type, workout}, ...] }
+        - type is "updated" or "deleted"
+        - workout has the full payload inline (no separate GET needed)
+        - pageSize max is 10
+        - events sorted newest-first
+
+    since_iso: only events newer than this ISO timestamp are returned.
+    page:      1-indexed page number.
+    page_size: 1..10.
     """
-    qs = f"?pageSize={page_size}"
-    if cursor:
-        qs += f"&since={urllib.parse.quote(cursor)}"
+    page_size = max(1, min(10, page_size))
+    qs = f"?page={page}&pageSize={page_size}"
+    if since_iso:
+        qs += f"&since={urllib.parse.quote(since_iso)}"
     return hevy_get(f"/v1/workouts/events{qs}")
 
 
@@ -339,29 +349,59 @@ def ingest_workout_by_id(workout_id: str) -> dict:
     return rec
 
 
-# ── Backfill cursor (DDB) ────────────────────────────────────────────────────
+# ── Backfill state (DDB) — "since" timestamp, not cursor ─────────────────────
+# Hevy uses page-based pagination with a `since` ISO timestamp parameter, not
+# opaque cursors. We persist the last-successful poll time and use it as
+# `since` on the next run. First run uses INITIAL_SINCE to pull history.
 
-_CURSOR_PK = "USER#system"
-_CURSOR_SK = "INGESTION_CURSOR#hevy"
+_STATE_PK = "USER#system"
+_STATE_SK = "INGESTION_STATE#hevy"
+
+# Pull everything from this date on the very first run. Pre-genesis workouts
+# auto-tag as phase=pilot (filtered out by default) so this is safe to set
+# far in the past.
+INITIAL_SINCE = "2023-01-01T00:00:00Z"
 
 
-def load_cursor() -> Optional[str]:
-    """Read the last successful events-feed cursor from DDB. None on first run."""
+def load_since() -> str:
+    """Return the `since` ISO timestamp to use for the next events poll.
+
+    On first run (no state record) returns INITIAL_SINCE so the backfill pulls
+    all available history.
+    """
     try:
-        resp = _table.get_item(Key={"pk": _CURSOR_PK, "sk": _CURSOR_SK})
+        resp = _table.get_item(Key={"pk": _STATE_PK, "sk": _STATE_SK})
         item = resp.get("Item") or {}
-        c = item.get("cursor")
-        return str(c) if c else None
+        since = item.get("since_iso")
+        return str(since) if since else INITIAL_SINCE
     except Exception as e:
-        logger.warning("hevy cursor load failed: %s", e)
-        return None
+        logger.warning("hevy state load failed (defaulting to INITIAL_SINCE): %s", e)
+        return INITIAL_SINCE
 
 
-def save_cursor(cursor: str) -> None:
-    """Persist the most-recently-processed events cursor."""
+def save_since(since_iso: str) -> None:
+    """Persist the high-water mark for the next poll."""
     _table.put_item(Item={
-        "pk": _CURSOR_PK,
-        "sk": _CURSOR_SK,
-        "cursor": cursor,
+        "pk": _STATE_PK,
+        "sk": _STATE_SK,
+        "since_iso": since_iso,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     })
+
+
+# ── Backward-compat shims (will be removed once nothing imports them) ────────
+
+def load_cursor() -> Optional[str]:  # noqa: D401 - kept for transitional callers
+    """DEPRECATED: use load_since(). Will be removed."""
+    v = load_since()
+    return v if v != INITIAL_SINCE else None
+
+
+def save_cursor(cursor: str) -> None:  # noqa: D401
+    """DEPRECATED: use save_since(). Will be removed."""
+    save_since(cursor)
+
+
+def fetch_events_since(cursor: Optional[str], page_size: int = 10) -> dict:  # noqa: D401
+    """DEPRECATED: use fetch_events_page(). Single-page fetch."""
+    return fetch_events_page(cursor or "", page=1, page_size=page_size)

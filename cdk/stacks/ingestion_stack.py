@@ -155,13 +155,19 @@ class IngestionStack(Stack):
             auth_type=_lambda.FunctionUrlAuthType.NONE,
         )
 
-        # ── 6c. Hevy backfill (scheduled events-cursor catch-up) — daily 06:00 PT.
+        # ── 6c. Hevy events-feed poller (PRIMARY ingestion path — hourly).
+        # Discovered 2026-05-25: Hevy doesn't currently offer public webhook
+        # subscriptions (OpenAPI spec at api.hevyapp.com/docs/ has no
+        # /v1/webhook* endpoints). The webhook Lambda above stays deployed
+        # for future Hevy webhook support but currently doesn't receive
+        # traffic. This poller is the actual ingestion mechanism: every
+        # waking hour, walk /v1/workouts/events?since=<last_success>.
+        # 12-23 UTC = 5 AM – 4 PM PT.  Adjust if Matthew lifts later.
         create_platform_lambda(self, "HevyBackfill",
             function_name="hevy-backfill",
             source_file="lambdas/hevy_backfill_lambda.py",
             handler="hevy_backfill_lambda.lambda_handler",
-            # 13:00 UTC = 06:00 PT (UTC-fixed, no DST drift per CLAUDE.md).
-            schedule="cron(0 13 * * ? *)",
+            schedule="cron(0 12-23 * * ? *)",   # hourly :00, 5 AM – 4 PM PT
             timeout_seconds=300, memory_mb=256,
             environment={
                 "SECRET_NAME": "life-platform/hevy",
