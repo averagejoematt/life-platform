@@ -28,6 +28,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from collections import defaultdict
+from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
@@ -759,10 +760,10 @@ def lambda_handler(event, context):
 
     # P2: Dynamic journey context — panel must know stage for appropriate coaching
     try:
-        _start = datetime.strptime(profile.get("journey_start_date", "2026-04-01"), "%Y-%m-%d").date()
+        _start = datetime.strptime(profile.get("journey_start_date", EXPERIMENT_START_DATE), "%Y-%m-%d").date()
         _days_in = max(1, (datetime.now(timezone.utc).date() - _start).days + 1)
         _week_num = max(1, (_days_in + 6) // 7)
-        _start_w = profile.get("journey_start_weight_lbs", 307)
+        _start_w = profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
         _goal_w = profile.get("goal_weight_lbs", 185)
         if _week_num <= 4:
             _stage = "Foundation Stage"

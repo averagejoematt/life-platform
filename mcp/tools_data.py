@@ -48,26 +48,36 @@ def tool_get_sources(_args):
 
 
 def tool_get_latest(args):
+    from mcp.core import _apply_phase_filter  # ADR-058
     sources = args.get("sources", SOURCES)
+    include_pilot = bool(args.get("include_pilot"))
     result = {}
     for source in sources:
         pk = f"{USER_PREFIX}{source}"
-        response = table.query(KeyConditionExpression=Key("pk").eq(pk), Limit=1, ScanIndexForward=False)
+        kwargs = _apply_phase_filter(
+            {"KeyConditionExpression": Key("pk").eq(pk), "Limit": 1, "ScanIndexForward": False},
+            include_pilot=include_pilot,
+        )
+        response = table.query(**kwargs)
         items = decimal_to_float(response.get("Items", []))
         result[source] = items[0] if items else None
     return result
 
 
 def tool_get_daily_summary(args):
+    from mcp.core import _apply_phase_filter  # ADR-058
     date = args.get("date")
     if not date:
         raise ValueError("'date' is required (YYYY-MM-DD)")
+    include_pilot = bool(args.get("include_pilot"))
     result = {}
     for source in SOURCES:
         pk = f"{USER_PREFIX}{source}"
-        response = table.query(
-            KeyConditionExpression=Key("pk").eq(pk) & Key("sk").begins_with(f"DATE#{date}")
+        kwargs = _apply_phase_filter(
+            {"KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(f"DATE#{date}")},
+            include_pilot=include_pilot,
         )
+        response = table.query(**kwargs)
         items = decimal_to_float(response.get("Items", []))
         if items:
             result[source] = items

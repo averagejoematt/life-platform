@@ -37,6 +37,9 @@ from decimal import Decimal
 
 import boto3
 
+from phase_filter import with_phase_filter  # ADR-058
+from constants import EXPERIMENT_START_DATE  # ADR-058
+
 # Structured logger
 try:
     from platform_logger import get_logger
@@ -303,13 +306,13 @@ def _get_item(pk, sk):
 
 
 def _query_begins_with(pk, sk_prefix, scan_forward=True):
-    """Query DynamoDB for items with SK beginning with a prefix."""
+    """Query DynamoDB for items with SK beginning with a prefix. ADR-058: phase-filtered."""
     from boto3.dynamodb.conditions import Key
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
-            ScanIndexForward=scan_forward,
-        )
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
+            "ScanIndexForward": scan_forward,
+        }))
         return _decimal_to_float(resp.get("Items", []))
     except Exception as e:
         logger.warning("query_begins_with(%s, %s) failed: %s", pk, sk_prefix, e)
@@ -317,14 +320,14 @@ def _query_begins_with(pk, sk_prefix, scan_forward=True):
 
 
 def _query_latest(pk, sk_prefix):
-    """Query for the most recent item matching a SK prefix (descending, limit 1)."""
+    """Query for the most recent item matching a SK prefix. ADR-058: phase-filtered."""
     from boto3.dynamodb.conditions import Key
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
-            ScanIndexForward=False,
-            Limit=1,
-        )
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
+            "ScanIndexForward": False,
+            "Limit": 1,
+        }))
         items = resp.get("Items", [])
         return _decimal_to_float(items[0]) if items else None
     except Exception as e:
@@ -409,10 +412,10 @@ def _gather_all_state(coach_id):
         logger.info("No narrative arc state — defaulting to early_baseline")
         narrative_arc = {
             "current_phase": "early_baseline",
-            "phase_started": "2026-04-01",
-            "journey_day": 6,
+            "phase_started": EXPERIMENT_START_DATE,
+            "journey_day": 1,
             "arc_history": [],
-            "note": "Day 6 of experiment — deep in early baseline.",
+            "note": "Early baseline phase — experiment just begun.",
         }
 
     # 7. Target coach voice state

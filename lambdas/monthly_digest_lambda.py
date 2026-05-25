@@ -21,6 +21,8 @@ import boto3
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
+
+from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from decimal import Decimal
 
 _logger_std = logging.getLogger()
@@ -277,7 +279,7 @@ def compute_annual_goals(cur, windows, profile=None):
     w = cur.get("withings")
     if w and w.get("weight_latest"):
         p = profile or {}
-        journey_start_weight = float(p.get("journey_start_weight_lbs", 307))
+        journey_start_weight = float(p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
         goal_weight = float(p.get("goal_weight_lbs", GOAL_WEIGHT_LBS))
         journey_start_date_str = str(p.get("journey_start_date", ""))
 

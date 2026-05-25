@@ -55,6 +55,9 @@ token*.json
 # Visual QA artifacts (regenerated per run; auth cookie is sensitive)
 qa-screenshots/
 
+# Personal backup snapshots — not project code, may contain sensitive material
+archive/051726_downloadsfolder_backup/
+
 # Backup files (use git instead)
 *.bak*
 *.sw[po]

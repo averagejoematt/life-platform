@@ -80,6 +80,11 @@
   margin: 0 14px;
   opacity: 0.3;
 }
+/* Dim variant for Yesterday/Tomorrow placeholders.
+   Note: not using opacity — that would composite below 4.5:1 even with the lifted --text-faint token. */
+.fp-masthead__strip-dim {
+  color: var(--text-muted);
+}
 
 /* ── 2. Lede ──────────────────────────────────────────────── */
 .fp-lede {

@@ -28,6 +28,8 @@ import secrets as _secrets
 import time
 import re
 import boto3
+
+from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -309,7 +311,7 @@ def build_data_packet(data):
     packet.append(f"Week ending: {dates['end']}")
 
     # --- Compute week number from journey start ---
-    journey_start = profile.get("journey_start_date", "2026-04-01")
+    journey_start = profile.get("journey_start_date", EXPERIMENT_START_DATE)
     try:
         js = datetime.strptime(journey_start, "%Y-%m-%d").date()
         end_date = datetime.strptime(dates["end"], "%Y-%m-%d").date()
@@ -319,7 +321,7 @@ def build_data_packet(data):
     packet.append(f"Week number: {week_num}")
     packet.append(f"Journey start: {journey_start}")
     # Matthew-specific fallback defaults; only used if profile fetch fails
-    packet.append(f"Journey start weight: {profile.get('journey_start_weight_lbs', 307)} lbs")
+    packet.append(f"Journey start weight: {profile.get('journey_start_weight_lbs', EXPERIMENT_BASELINE_WEIGHT_LBS)} lbs")
     packet.append(f"Goal weight: {profile.get('goal_weight_lbs', 185)} lbs")
     packet.append(f"Age: {profile.get('age', 37)}")
     packet.append("")
@@ -339,7 +341,7 @@ def build_data_packet(data):
             if earliest_7d:
                 delta = latest[1] - earliest_7d[0][1]
                 packet.append(f"Week change: {delta:+.1f} lbs")
-        journey_start_w = profile.get("journey_start_weight_lbs", 307)  # Matthew-specific fallback
+        journey_start_w = profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)  # Matthew-specific fallback
         total_lost = journey_start_w - latest[1]
         packet.append(f"Total journey loss: {total_lost:.1f} lbs")
     packet.append("")
@@ -756,6 +758,9 @@ When the data packet includes CHARACTER SHEET data, use it as narrative texture:
 CONTINUITY:
 If you have previous installments, USE THEM. Pick up threads. Make callbacks. Track character development across weeks. If you wrote about his fear of rest days previously, and this week he voluntarily took two, SAY THAT. The longitudinal view is your superpower as the embedded journalist. If this is the first installment, establish the story from the beginning.
 
+FIRST INSTALLMENT — SPECIAL RULE:
+If this is Week 1 (no previous installments exist, or week_number == 1), open with one mundane sensory detail — the temperature in the kitchen at 5 AM, the texture of a protein shake, what Matthew was wearing on Tuesday. Not a polished insight. Not an analytical thesis. Something small, specific, and slightly awkward — the way a real journalist notices small things before they figure out what story they're telling. Earn the reader's trust through specificity, then earn it again through honesty. Save the analytical voice for Week 2.
+
 METRICS AS TEXTURE, NOT STRUCTURE:
 When you reference numbers (and you should — they're concrete and vivid), weave them into the narrative naturally. "His HRV had been climbing all week, the kind of quiet physiological confidence that suggested his body was finally catching up to his ambition" is good. "On Monday his HRV was 45, on Tuesday it was 48, on Wednesday it was 51" is bad. Use numbers to ILLUMINATE, not to catalogue.
 
@@ -839,6 +844,9 @@ When the data packet includes CHARACTER SHEET data, use it as narrative texture:
 
 CONTINUITY:
 If you have previous installments, USE THEM. Pick up threads. Make callbacks. Track character development across weeks. If you wrote about his fear of rest days previously, and this week he voluntarily took two, SAY THAT. The longitudinal view is your superpower as the embedded journalist. If this is the first installment, establish the story from the beginning.
+
+FIRST INSTALLMENT — SPECIAL RULE:
+If this is Week 1 (no previous installments exist, or week_number == 1), open with one mundane sensory detail — the temperature in the kitchen at 5 AM, the texture of a protein shake, what Matthew was wearing on Tuesday. Not a polished insight. Not an analytical thesis. Something small, specific, and slightly awkward — the way a real journalist notices small things before they figure out what story they're telling. Earn the reader's trust through specificity, then earn it again through honesty. Save the analytical voice for Week 2.
 
 METRICS AS TEXTURE, NOT STRUCTURE:
 When you reference numbers (and you should — they're concrete and vivid), weave them into the narrative naturally. "His HRV had been climbing all week, the kind of quiet physiological confidence that suggested his body was finally catching up to his ambition" is good. "On Monday his HRV was 45, on Tuesday it was 48, on Wednesday it was 51" is bad. Use numbers to ILLUMINATE, not to catalogue.
@@ -1629,7 +1637,7 @@ def build_weekly_signal_data(data, week_num):
     weight_lbs = None
     if withings.get("weight_kg"):
         weight_lbs = round(float(withings["weight_kg"]) * 2.20462, 1)
-    start_weight = float(profile.get("journey_start_weight_lbs", 307))  # Matthew-specific fallback
+    start_weight = float(profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))  # Matthew-specific fallback
     weight_delta = round(start_weight - weight_lbs, 1) if weight_lbs else None
 
     # Sleep
@@ -1653,7 +1661,7 @@ def build_weekly_signal_data(data, week_num):
     avg_grade = grades.get("avg_score") or grades.get("total_score") or 0
 
     # Journey days
-    journey_start = profile.get("journey_start_date", "2026-04-01")
+    journey_start = profile.get("journey_start_date", EXPERIMENT_START_DATE)
     try:
         start_dt = datetime.strptime(journey_start, "%Y-%m-%d").replace(tzinfo=timezone.utc)
         journey_days = max(0, (datetime.now(timezone.utc) - start_dt).days)
@@ -1931,7 +1939,7 @@ def lambda_handler(event, context):
     _conf_reason = ""
     if _HAS_CONFIDENCE:
         try:
-            _journey_start = data.get("profile", {}).get("journey_start_date", "2026-04-01")
+            _journey_start = data.get("profile", {}).get("journey_start_date", EXPERIMENT_START_DATE)
             _journey_days = (
                 datetime.strptime(data["dates"]["end"], "%Y-%m-%d") -
                 datetime.strptime(_journey_start, "%Y-%m-%d")

@@ -1,9 +1,12 @@
 # Deploy Scripts — Reference Guide
 
 > Scripts in this directory are **run locally in Terminal**, never via Claude MCP tools.
-> Last updated: 2026-03-29 (v4.4.0)
+> Last updated: 2026-05-24 (v8.1.0)
 >
+> **Symptom-keyed operational runbook:** `deploy/OPERATIONAL_RUNBOOK.md` — read first when something looks wrong.
 > **First time deploying?** Read `docs/QUICKSTART.md` — it has a deploy decision tree and gotchas.
+>
+> **Multi-step state changes** (anything touching multiple DDB partitions OR multiple S3 prefixes) MUST go through `deploy/restart_pipeline.py` — see ADR-059.
 
 ---
 

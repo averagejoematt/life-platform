@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="The Physical Dispatch — body composition, weight trajectory, tape measurements. From 307 lbs to goal, tracked daily.">
+  <meta name="description" content="The Physical Dispatch — body composition, weight trajectory, tape measurements. From 297 lbs to goal, tracked daily.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
@@ -385,7 +385,7 @@
         <div>
           <div class="fp-arc__brow">The Long Story</div>
           <div class="fp-arc__num" id="ph-arc-num">
-            307 → <span class="fp-arc__num-current" id="ph-arc-current">—</span> → 185
+            297 → <span class="fp-arc__num-current" id="ph-arc-current">—</span> → 185
           </div>
         </div>
         <div class="fp-arc__stats" id="ph-arc-stats">
@@ -409,7 +409,7 @@
       </div>
       <div class="fp-arc__chart" id="ph-arc-chart"></div>
       <div class="fp-arc__caption" id="ph-arc-caption">
-        <span>Day 1 · 307 lbs</span>
+        <span>Day 1 · 297 lbs</span>
         <span>Today · — lbs</span>
       </div>
     </section>
@@ -583,7 +583,7 @@
       if (cur && lost != null) {
         narrative = timePrefix() +
           'the scale reads ' + cur.toFixed(1) + ' lbs — ' + Math.abs(lost).toFixed(1) +
-          ' down from 307' + (togo ? ', ' + Math.abs(togo).toFixed(0) + ' to go' : '') +
+          ' down from 297' + (togo ? ', ' + Math.abs(togo).toFixed(0) + ' to go' : '') +
           (rate ? ', moving ' + Math.abs(rate).toFixed(1) + ' lbs a week' : '') + '.';
       } else {
         narrative = 'No weigh-in on the wire yet today.';
@@ -663,7 +663,7 @@
         marks.push({
           icon: 'icon-scale',
           name: 'Weight',
-          context: (j.start_weight_lbs || 307) + ' → ' + (j.goal_weight_lbs || 185) + ' lbs goal',
+          context: (j.start_weight_lbs || 297) + ' → ' + (j.goal_weight_lbs || 297) + ' lbs goal',
           value: j.current_weight_lbs.toFixed(1),
           unit: 'lbs',
           spark: weightVals,
@@ -774,7 +774,7 @@
         document.getElementById('ph-arc-section').style.display = 'none';
         return;
       }
-      var startW = j.start_weight_lbs || 307;
+      var startW = j.start_weight_lbs || 297;
       var goalW = j.goal_weight_lbs || 185;
 
       setText('ph-arc-current', cur.toFixed(1));

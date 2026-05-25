@@ -749,7 +749,7 @@
 <script src="/assets/js/reveal.js"></script>
 <script>
 const API = 'https://averagejoematt.com';
-const JOURNEY_START = new Date('2026-04-01');
+const JOURNEY_START = new Date(((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25'));
 
 function daysSinceStart() {
   return Math.floor((Date.now() - JOURNEY_START.getTime()) / 86400000);
@@ -947,14 +947,14 @@ document.getElementById('filter-bar').addEventListener('click', (evt) => {
 function getDay1Events() {
   return [
     {
-      date: '2026-04-01',
+      date: ((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25'),
       type: 'milestone',
       title: 'Day 1: Platform goes live',
       body: 'All sensors connected. Whoop, Oura, Levels CGM, Cronometer, and Apple Health streaming data. The experiment begins.',
       status: 'confirmed',
     },
     {
-      date: '2026-04-01',
+      date: ((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25'),
       type: 'finding',
       title: 'Baseline measurements established',
       body: 'First complete data capture across all sources: sleep architecture, HRV baseline, resting heart rate, body composition, and nutritional intake. These become the reference point for every future discovery.',
@@ -966,14 +966,14 @@ function getDay1Events() {
       },
     },
     {
-      date: '2026-04-01',
+      date: ((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25'),
       type: 'experiment',
       title: 'Hypothesis set established',
       body: 'Three initial hypotheses queued for testing: sleep consistency vs. duration, morning light exposure on sleep onset, and protein timing on recovery. Each has defined metrics and success criteria.',
       status: 'investigating',
     },
     {
-      date: '2026-04-01',
+      date: ((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25'),
       type: 'counterintuitive',
       title: 'More data ≠ more insight (yet)',
       body: 'Day 1 insight: having 6 data sources streaming doesn\'t produce instant clarity. The correlation engine needs 14+ days of data before signal emerges from noise. Patience is part of the protocol.',

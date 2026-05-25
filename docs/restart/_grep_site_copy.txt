@@ -1,0 +1,26 @@
+site/index.html:552:        Day <span id="fp-day-strip">—</span> of 365
+site/index.html:683:  <div style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.7;margin-top:var(--space-1);">Started at 307 lbs. Built this entire platform with Claude as a development partner.</div>
+site/glucose/index.html:328:        <span>Day 1 · — %</span>
+site/glucose/index.html:701:        '<span>Day 1 · ' + first.toFixed(0) + '%</span>' +
+site/labs/index.html:574:    NfL cadence = 180d (Matthew tonight), Galleri cadence = 365d (per GRAIL).
+site/labs/index.html:717:      var GALLERI_CADENCE_DAYS = 365;
+site/builders/index.html:291:      Matthew is a technology leader who manages engineering teams at a SaaS company. He started this platform on February 22, 2026. Today it runs <span data-const="platform.lambdas">62</span> Lambdas, <span data-const="platform.mcp_tools">121</span> MCP tools, a <span data-const="platform.site_pages">72</span>-page website, and a CI/CD pipeline. How? Every single conversation was with Claude.
+site/character/index.html:1554:        <div class="badge-card" id="badge-365days"><div class="badge-card__icon"><img src="/assets/img/badges/badge_365_days.svg" width="48" height="48" alt="365 Days" loading="lazy"></div><div class="badge-card__name">365 Days Tracked</div><div class="badge-card__desc">One full year</div><div class="badge-card__status" id="badge-365days-status">Checking…</div></div>
+site/character/index.html:2263:        if (days >= 365) earnBadge('badge-365days');
+site/character/index.html:2264:        else setHint('badge-365days', days + ' / 365 days');
+site/physical/index.html:339:          Day <span id="ph-day-strip">—</span> of 365
+site/physical/index.html:352:        <div class="fp-lede__num-cap">of 365</div>
+site/physical/index.html:412:        <span>Day 1 · 307 lbs</span>
+site/physical/index.html:830:          '<span>Day 1 · ' + Math.round(vals[0]) + ' lbs</span>' +
+site/accountability/index.html:1026:  var MILESTONES = [7, 14, 21, 30, 60, 66, 90, 180, 365];
+site/live/index.html:105:          Day <span id="fp-day-strip">—</span> of 365
+site/live/index.html:118:        <div class="fp-lede__num-cap">of 365</div>
+site/live/index.html:174:        <span>Day 1 · 307 lbs</span>
+site/live/index.html:415:          '<span>Day 1 · ' + Math.round(vals[0]) + ' lbs</span>' +
+site/mind/index.html:313:          Entry day <span id="m-day-strip">—</span> of 365
+site/mind/index.html:326:        <div class="fp-lede__num-cap">of 365</div>
+site/nutrition/index.html:379:          Day <span id="fp-day-strip">—</span> of 365
+site/nutrition/index.html:392:        <div class="fp-lede__num-cap">of 365</div>
+site/data/content_manifest.json:45:        { "type": "constant",         "element": ".sidebar-block__note",       "contains": "Started at 307 lbs. Goal: 185." },
+site/assets/js/engagement.js:135:    if (daysSince < 1 || daysSince > 365) {
+site/assets/js/engagement.js:137:      if (daysSince > 365) return;

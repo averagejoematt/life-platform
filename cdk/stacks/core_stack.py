@@ -65,40 +65,12 @@ class CoreStack(Stack):
             topic_name="life-platform-alerts-digest",
         )
 
-        # ── KMS CMK for S3 (Phase 2.4, ADR-052+) ───────────────────────
-        # Created so the bucket can switch from AES256 (AWS-managed shared key)
-        # to KMS CMK encryption. Only NEW objects use this key by default;
-        # existing 27k AES256 objects remain as-is (user opted "new only").
-        # Annual rotation enabled by default in CDK.
-        # Policy: account-wide use (mirrors the DDB CMK pattern at
-        # 444438d1-a5e0-43b8-9391-3cd2d70dde4d) — IAM controls who can use it.
-        self.s3_kms_key = kms.Key(
-            self, "S3DataKey",
-            alias="alias/life-platform-s3",
-            description="Life Platform S3 bucket data encryption (Phase 2.4)",
-            enable_key_rotation=True,
-            removal_policy=RemovalPolicy.RETAIN,
-        )
-        # Allow account to use the key — same pattern as DDB CMK.
-        self.s3_kms_key.grant_encrypt_decrypt(iam.AccountRootPrincipal())
-
-        # P2.4-followup (v7.21.0, 2026-05-17): CloudFront must be able to
-        # decrypt KMS-encrypted objects in the site bucket. Without this grant,
-        # any KMS-encrypted object under site/ returns HTTP 400 to CloudFront
-        # readers ("InvalidRequest: stored using a form of Server Side
-        # Encryption"). Surfaced on 2026-05-17 when a default `aws s3 cp`
-        # broke averagejoematt.com for ~90 seconds.
-        #
-        # Scope: cloudfront.amazonaws.com service principal, restricted via
-        # aws:SourceAccount to this account only. CloudFront only triggers a
-        # KMS decrypt when serving an object from a configured S3 origin —
-        # the principal can't decrypt arbitrary objects elsewhere.
-        self.s3_kms_key.grant_decrypt(
-            iam.ServicePrincipal(
-                "cloudfront.amazonaws.com",
-                conditions={"StringEquals": {"aws:SourceAccount": cdk.Aws.ACCOUNT_ID}},
-            )
-        )
+        # ── S3 CMK retired (ADR-058, 2026-05-24) ───────────────────────
+        # The Phase 2.4 customer-managed S3 KMS key (5c50ca02-...) was
+        # scheduled for deletion when the bucket moved to AES256 (SSE-S3).
+        # CDK resource definition removed here; the key completes its
+        # scheduled deletion independently. IAM policies in role_policies.py
+        # still reference the (soon-orphan) ARN — harmless, cleaned up later.
 
         # ── Lambda Layer (CDK-managed) ──
         # Pre-built by deploy/build_layer.sh → cdk/layer-build/python/
@@ -120,5 +92,3 @@ class CoreStack(Stack):
         cdk.CfnOutput(self, "AlertsTopicArn", value=self.alerts_topic.topic_arn)
         cdk.CfnOutput(self, "DigestTopicArn", value=self.digest_topic.topic_arn)
         cdk.CfnOutput(self, "SharedLayerArn", value=self.shared_layer.layer_version_arn)
-        cdk.CfnOutput(self, "S3KmsKeyArn", value=self.s3_kms_key.key_arn)
-        cdk.CfnOutput(self, "S3KmsKeyId", value=self.s3_kms_key.key_id)

@@ -1312,7 +1312,7 @@ function buildHorizon(){
 
 // ── Build Heatmap ──
 function buildHeatmap(history){
-  var EXPERIMENT_START = '2026-04-01';
+  var EXPERIMENT_START = ((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25');
   var byDate = {};
   history.forEach(function(d){if(d.date>=EXPERIMENT_START) byDate[d.date]=d});
   var today = new Date();

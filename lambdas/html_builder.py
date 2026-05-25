@@ -13,6 +13,7 @@ Exports:
 import json
 import math
 from datetime import datetime
+from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 
 try:
     from digest_utils import compute_confidence
@@ -1295,7 +1296,7 @@ def build_html(data, profile, day_grade_score, grade, component_scores, componen
             phase = get_current_phase(profile, latest_weight)
             phase_name = phase.get("name", "") if phase else ""
             phase_end = phase.get("end_lbs", 0) if phase else 0
-            journey_start = profile.get("journey_start_weight_lbs", 307)
+            journey_start = profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
             goal_weight = profile.get("goal_weight_lbs", 185)
 
             # Progress bar
@@ -1500,7 +1501,7 @@ def build_html(data, profile, day_grade_score, grade, component_scores, componen
             # Henning: n = days since journey start (observation count proxy)
             try:
                 from datetime import datetime as _dt
-                _start = data.get("profile", profile).get("journey_start_date", "2026-04-01") if isinstance(data.get("profile", profile), dict) else profile.get("journey_start_date", "2026-04-01")
+                _start = data.get("profile", profile).get("journey_start_date", EXPERIMENT_START_DATE) if isinstance(data.get("profile", profile), dict) else profile.get("journey_start_date", EXPERIMENT_START_DATE)
                 _days = (_dt.utcnow().date() - _dt.strptime(_start, "%Y-%m-%d").date()).days
                 _sources_active = sum(1 for s in ["whoop", "macrofactor", "habitify", "strava", "apple"] if data.get(s))
                 _conf = compute_confidence(days_of_data=_days, sources=list(range(_sources_active)))

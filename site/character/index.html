@@ -1685,7 +1685,7 @@ const DEFAULTS = {
     { name:'consistency', emoji:'🎯', level:1, raw_score:0, xp_delta:0, trend:'neutral' }
   ],
   timeline: [
-    { date:'2026-04-01', character_level:1, event:'Day 1 — the experiment begins' }
+    { date:((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25'), character_level:1, event:'Day 1 — the experiment begins' }
   ],
   tiers: [
     { name:'Foundation', emoji:'🔨', min_level:1, max_level:20, status:'current' },
@@ -2153,7 +2153,7 @@ function renderHeatmap(pillarHistory) {
   const section = document.getElementById('heatmap-section');
   const grid = document.getElementById('hm-grid');
   if (!section || !grid || !pillarHistory || !pillarHistory.length) return;
-  const EXPERIMENT_START = '2026-04-01';
+  const EXPERIMENT_START = ((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25');
   pillarHistory = pillarHistory.filter(week => (week.week_end || week.week_start || '') >= EXPERIMENT_START);
   if (!pillarHistory.length) return;
 
@@ -2334,7 +2334,7 @@ function renderScoreHistory(pillarHistory) {
   const section = document.getElementById('score-history-section');
   const chart = document.getElementById('score-history-chart');
   if (!section || !chart || !pillarHistory || pillarHistory.length < 2) return;
-  const EXPERIMENT_START = '2026-04-01';
+  const EXPERIMENT_START = ((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25');
   pillarHistory = pillarHistory.filter(week => (week.week_end || week.week_start || '') >= EXPERIMENT_START);
   if (pillarHistory.length < 2) return;
 

@@ -17,13 +17,18 @@ Extraction order per review:
 """
 
 from datetime import datetime
+from typing import Any, Iterable, Optional, Union
+
+# Public type aliases used across this module.
+Numeric = Union[int, float]
+ScoreTuple = tuple[Optional[int], dict[str, Any]]
 
 
 # ==============================================================================
 # SHARED HELPERS  (self-contained — no imports from daily_brief)
 # ==============================================================================
 
-def safe_float(rec, field, default=None):
+def safe_float(rec: Optional[dict[str, Any]], field: str, default: Optional[float] = None) -> Optional[float]:
     if rec and field in rec:
         try:
             return float(rec[field])
@@ -32,12 +37,12 @@ def safe_float(rec, field, default=None):
     return default
 
 
-def avg(vals):
+def avg(vals: Iterable[Optional[Numeric]]) -> Optional[float]:
     v = [x for x in vals if x is not None]
     return round(sum(v) / len(v), 1) if v else None
 
 
-def clamp(val, lo=0, hi=100):
+def clamp(val: Numeric, lo: Numeric = 0, hi: Numeric = 100) -> Numeric:
     return max(lo, min(hi, val))
 
 
@@ -45,7 +50,7 @@ def clamp(val, lo=0, hi=100):
 # COMPONENT SCORERS  (each returns (score: int|None, details: dict))
 # ==============================================================================
 
-def score_sleep(data, profile):
+def score_sleep(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
     sleep = data.get("sleep")
     if not sleep:
         return None, {}
@@ -76,14 +81,14 @@ def score_sleep(data, profile):
     return clamp(round(sum(parts) / sum(weights))), details
 
 
-def score_recovery(data, profile):
+def score_recovery(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
     recovery = safe_float(data.get("whoop"), "recovery_score")
     if recovery is None:
         return None, {}
     return clamp(round(recovery)), {"recovery_score": recovery}
 
 
-def score_nutrition(data, profile):
+def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
     mf = data.get("macrofactor")
     if not mf:
         return None, {}
@@ -139,7 +144,7 @@ def score_nutrition(data, profile):
     return clamp(round(sum(parts) / sum(weights))), details
 
 
-def score_movement(data, profile):
+def score_movement(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
     step_target = profile.get("step_target", 7000)
     details = {}
     parts, weights = [], []
@@ -169,7 +174,7 @@ def score_movement(data, profile):
     return clamp(round(sum(parts) / sum(weights))), details
 
 
-def score_habits_registry(data, profile):
+def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
     """Tier-weighted habit scoring using habit_registry.
 
     Tier 0 (non-negotiable): 3x weight, binary (done/not done)
@@ -269,7 +274,7 @@ def score_habits_registry(data, profile):
     return composite, details
 
 
-def _score_habits_mvp_legacy(data, profile):
+def _score_habits_mvp_legacy(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
     """Legacy fallback if habit_registry not populated."""
     habitify = data.get("habitify")
     if not habitify:
@@ -290,7 +295,7 @@ def _score_habits_mvp_legacy(data, profile):
     return score, {"completed": completed, "total": len(mvp_list), "mvp_status": mvp_status}
 
 
-def score_hydration(data, profile):
+def score_hydration(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
     apple = data.get("apple")
     water_ml = safe_float(apple, "water_intake_ml") if apple else None
     target_ml = profile.get("water_target_ml", 2957)
@@ -306,7 +311,7 @@ def score_hydration(data, profile):
     }
 
 
-def score_journal(data, profile):
+def score_journal(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
     entries = data.get("journal_entries", [])
     if not entries:
         return None, {"entries": 0}
@@ -329,7 +334,7 @@ def score_journal(data, profile):
     }
 
 
-def score_glucose(data, profile):
+def score_glucose(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
     apple = data.get("apple")
     if not apple:
         return None, {}
@@ -383,7 +388,7 @@ COMPONENT_SCORERS = {
 }
 
 
-def letter_grade(score):
+def letter_grade(score: Optional[Numeric]) -> str:
     if score >= 95: return "A+"
     if score >= 90: return "A"
     if score >= 85: return "A-"
@@ -397,14 +402,14 @@ def letter_grade(score):
     return "F"
 
 
-def grade_colour(grade):
+def grade_colour(grade: str) -> str:
     if grade.startswith("A"): return "#059669"
     if grade.startswith("B"): return "#2563eb"
     if grade.startswith("C"): return "#d97706"
     return "#dc2626"
 
 
-def compute_day_grade(data, profile):
+def compute_day_grade(data: dict[str, Any], profile: dict[str, Any]) -> tuple[Optional[int], str, dict[str, Any]]:
     """Run all component scorers and compute weighted day grade.
 
     Returns: (total_score, letter_grade, component_scores, component_details)

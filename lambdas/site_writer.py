@@ -42,19 +42,25 @@ PUBLIC_STATS_KEY = "generated/public_stats.json"
 CHARACTER_STATS_KEY = "generated/data/character_stats.json"
 PULSE_KEY = "generated/pulse.json"
 
+# Journey start date — used for "X days on journey" counter (ADR-058)
+# IMPORTANT: this import must come BEFORE HERO_WHY_PARAGRAPH below, which
+# embeds JOURNEY_START_WEIGHT in an f-string at module-load time.
+from constants import (
+    EXPERIMENT_START_DATE as JOURNEY_START_DATE,
+    EXPERIMENT_BASELINE_WEIGHT_LBS as JOURNEY_START_WEIGHT,
+    EXPERIMENT_GOAL_WEIGHT_LBS as GOAL_WEIGHT,
+)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # BS-02: Hero narrative copy (finalised v3.7.67)
 # ─────────────────────────────────────────────────────────────────────────────
+# ADR-058: hero copy will be rewritten in §8 with Elena voice + clean-slate framing.
+# Until then, this is a placeholder that uses the new baseline weight.
 HERO_WHY_PARAGRAPH = (
     "Most people optimize in the dark — gut feelings, Instagram advice, someone's podcast take. "
     "I connect 19 data sources to a custom AI and publish every number, every week, without filtering. "
-    "307 lbs to 185. Every failure included. This is what systematic self-improvement actually looks like."
+    f"{int(round(JOURNEY_START_WEIGHT))} lbs to 185. Every failure included. This is what systematic self-improvement actually looks like."
 )
-
-# Journey start date — used for "X days on journey" counter
-JOURNEY_START_DATE = "2026-04-01"
-JOURNEY_START_WEIGHT = 307.0  # April 1 baseline weight — matches profile and site_constants.js
-GOAL_WEIGHT = 185.0
 
 
 def _json_safe(obj):

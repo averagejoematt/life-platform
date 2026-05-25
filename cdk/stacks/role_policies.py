@@ -11,7 +11,7 @@ Policy principle: least-privilege per Lambda. No shared roles.
 """
 
 from aws_cdk import aws_iam as iam
-from stacks.constants import ACCT, REGION, TABLE_NAME, S3_BUCKET, KMS_KEY_ID, S3_KMS_KEY_ID, CF_DIST_ID, SES_DOMAIN  # CONF-01, SEC-06, SEC-08
+from stacks.constants import ACCT, REGION, TABLE_NAME, S3_BUCKET, KMS_KEY_ID, CF_DIST_ID, SES_DOMAIN  # CONF-01, SEC-06, SEC-08
 
 # ── Constants ──────────────────────────────────────────────────────────────
 TABLE_ARN = f"arn:aws:dynamodb:{REGION}:{ACCT}:table/{TABLE_NAME}"
@@ -24,7 +24,8 @@ KMS_KEY_ARN = f"arn:aws:kms:{REGION}:{ACCT}:key/{KMS_KEY_ID}"
 # IMPORTANT: must reference by key ID ARN (not alias) — IAM does not resolve
 # alias ARNs in resource policies. Key is created in CoreStack (`s3_kms_key`).
 # Roles need encrypt/decrypt on it to write/read KMS-encrypted objects.
-S3_KMS_KEY_ARN = f"arn:aws:kms:{REGION}:{ACCT}:key/{S3_KMS_KEY_ID}"
+# S3_KMS_KEY_ARN removed 2026-05-24 — orphan reference; bucket uses AES256, key
+# scheduled for deletion 2026-06-16. See BACKLOG.md follow-up.
 SES_IDENTITY = f"arn:aws:ses:{REGION}:{ACCT}:identity/{SES_DOMAIN}"  # SEC-08: domain from constants
 # V2 P1.6 follow-up (2026-05-19): SES requires send permission on BOTH the
 # identity AND the configuration-set when SendEmail includes ConfigurationSetName.
@@ -72,12 +73,13 @@ def _ingestion_base(
         resources=[TABLE_ARN],
     ))
 
-    # KMS — DDB CMK for DDB ops, S3 CMK for S3 ops (Phase 2.4 added S3 CMK).
-    # Both keys needed because most ingestion Lambdas write to both stores.
+    # KMS — DDB CMK only. Phase 2.4 had also granted on the S3 CMK, but the
+    # S3 bucket switched to AES256 default encryption (no per-object KMS), so
+    # the S3 key is now orphaned and scheduled for deletion 2026-06-16.
     stmts.append(iam.PolicyStatement(
         sid="KMS",
         actions=["kms:Decrypt", "kms:GenerateDataKey"],
-        resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+        resources=[KMS_KEY_ARN],
     ))
 
     # S3 write (raw data)
@@ -193,7 +195,7 @@ def ingestion_journal_enrichment() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="Secrets",
@@ -244,7 +246,7 @@ def ingestion_activity_enrichment() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="Secrets",
@@ -289,7 +291,7 @@ def ingestion_weather() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="DLQ",
@@ -319,7 +321,7 @@ def ingestion_apple_health() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="S3Read",
@@ -356,7 +358,7 @@ def ingestion_hae() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="S3Write",
@@ -410,7 +412,7 @@ def _compute_base(
         stmts.append(iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ))
     if needs_s3_config:
         stmts.append(iam.PolicyStatement(
@@ -591,7 +593,7 @@ def _email_base(
             # Phase 2.4: include S3 CMK — email Lambdas read S3 (config, generated
             # content from S3) and some write back (chronicle, og images).
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="S3ConfigRead",
@@ -647,6 +649,11 @@ def email_daily_brief() -> list[iam.PolicyStatement]:
                     f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-narrative-orchestrator",
                     f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-state-updater",
                     f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-ensemble-digest",
+                    # Added 2026-05-24: daily-brief invokes coach-quality-gate
+                    # per-coach during the V2 pipeline; without this grant every
+                    # coach call logs an AccessDeniedException (non-blocking,
+                    # but flooding CloudWatch with errors).
+                    f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-quality-gate",
                 ],
             ),
         ],
@@ -701,7 +708,7 @@ def email_evening_nudge() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="SES",
@@ -736,7 +743,7 @@ def email_chronicle_sender() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="SES",
@@ -772,7 +779,7 @@ def email_weekly_signal() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="SES",
@@ -802,7 +809,7 @@ def email_chronicle_approve() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="S3Write",
@@ -828,6 +835,61 @@ def email_chronicle_approve() -> list[iam.PolicyStatement]:
     ]
 
 
+def _operational_base(
+    ddb_actions: list[str] = None,
+    needs_ses: bool = False,
+    needs_dlq: bool = False,
+    needs_s3_read: list[str] = None,
+    needs_s3_write: list[str] = None,
+    extra_statements: list[iam.PolicyStatement] = None,
+) -> list[iam.PolicyStatement]:
+    """Build standard operational role policies.
+
+    Operational Lambdas tend to share: DDB read+optional-write, KMS, optional
+    SES, optional S3 read/write, optional DLQ. Use this for the simpler ones;
+    keep bespoke patterns (canary, qa_smoke, delete_user_data) explicit.
+    """
+    stmts = [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=ddb_actions or ["dynamodb:GetItem", "dynamodb:Query"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+    ]
+    if needs_s3_read:
+        stmts.append(iam.PolicyStatement(
+            sid="S3Read",
+            actions=["s3:GetObject"],
+            resources=_s3(*needs_s3_read),
+        ))
+    if needs_s3_write:
+        stmts.append(iam.PolicyStatement(
+            sid="S3Write",
+            actions=["s3:PutObject"],
+            resources=_s3(*needs_s3_write),
+        ))
+    if needs_ses:
+        stmts.append(iam.PolicyStatement(
+            sid="SES",
+            actions=["ses:SendEmail", "sesv2:SendEmail"],
+            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
+        ))
+    if needs_dlq:
+        stmts.append(iam.PolicyStatement(
+            sid="DLQ",
+            actions=["sqs:SendMessage"],
+            resources=[DLQ_ARN],
+        ))
+    if extra_statements:
+        stmts.extend(extra_statements)
+    return stmts
+
+
 def operational_freshness_checker() -> list[iam.PolicyStatement]:
     """Freshness checker: reads DDB + publishes CloudWatch custom metrics, sends SES alert.
     R8-ST4: also calls DescribeSecret on OAuth secrets to check token freshness.
@@ -841,7 +903,7 @@ def operational_freshness_checker() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="CloudWatchMetrics",
@@ -939,7 +1001,7 @@ def operational_canary() -> list[iam.PolicyStatement]:
             sid="KMS",
             # DDB table uses CMK — canary needs decrypt + generate for PutItem/GetItem
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="S3Canary",
@@ -1000,7 +1062,7 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
             sid="KMS",
             # DDB table uses CMK — required for all GetItem/Query calls
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="S3Read",
@@ -1058,23 +1120,10 @@ def operational_key_rotator() -> list[iam.PolicyStatement]:
 
 def operational_data_export() -> list[iam.PolicyStatement]:
     """Data export: reads all DDB items, writes JSON/CSV to S3 exports/."""
-    return [
-        iam.PolicyStatement(
-            sid="DynamoDB",
-            actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan"],
-            resources=[TABLE_ARN],
-        ),
-        iam.PolicyStatement(
-            sid="KMS",
-            actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
-        ),
-        iam.PolicyStatement(
-            sid="S3Write",
-            actions=["s3:PutObject"],
-            resources=_s3("exports/*"),
-        ),
-    ]
+    return _operational_base(
+        ddb_actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan"],
+        needs_s3_write=["exports/*"],
+    )
 
 
 def operational_delete_user_data() -> list[iam.PolicyStatement]:
@@ -1092,7 +1141,7 @@ def operational_delete_user_data() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="S3DeleteUserData",
@@ -1124,28 +1173,11 @@ def operational_delete_user_data() -> list[iam.PolicyStatement]:
 
 def operational_data_reconciliation() -> list[iam.PolicyStatement]:
     """Data reconciliation: reads DDB, sends SES report."""
-    return [
-        iam.PolicyStatement(
-            sid="DynamoDB",
-            actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan"],
-            resources=[TABLE_ARN],
-        ),
-        iam.PolicyStatement(
-            sid="KMS",
-            actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
-        ),
-        iam.PolicyStatement(
-            sid="S3Write",
-            actions=["s3:PutObject"],
-            resources=_s3("reconciliation/*"),
-        ),
-        iam.PolicyStatement(
-            sid="SES",
-            actions=["ses:SendEmail", "sesv2:SendEmail"],
-            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
-        ),
-    ]
+    return _operational_base(
+        ddb_actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan"],
+        needs_s3_write=["reconciliation/*"],
+        needs_ses=True,
+    )
 
 
 def operational_og_image_generator() -> list[iam.PolicyStatement]:
@@ -1180,7 +1212,7 @@ def operational_site_stats_refresh() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="S3Read",
@@ -1206,28 +1238,11 @@ def operational_site_stats_refresh() -> list[iam.PolicyStatement]:
 
 def operational_insight_email_parser() -> list[iam.PolicyStatement]:
     """Insight email parser: reads from SES S3 drop, writes insight records to DDB."""
-    return [
-        iam.PolicyStatement(
-            sid="DynamoDB",
-            actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:UpdateItem"],
-            resources=[TABLE_ARN],
-        ),
-        iam.PolicyStatement(
-            sid="KMS",
-            actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
-        ),
-        iam.PolicyStatement(
-            sid="S3Read",
-            actions=["s3:GetObject"],
-            resources=_s3("inbound-email/*"),
-        ),
-        iam.PolicyStatement(
-            sid="DLQ",
-            actions=["sqs:SendMessage"],
-            resources=[DLQ_ARN],
-        ),
-    ]
+    return _operational_base(
+        ddb_actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:UpdateItem"],
+        needs_s3_read=["inbound-email/*"],
+        needs_dlq=True,
+    )
 
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -1245,7 +1260,7 @@ def operational_email_subscriber() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="SES",
@@ -1287,7 +1302,7 @@ def site_api() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="S3SiteConfigRead",
@@ -1340,7 +1355,7 @@ def site_api_ai() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="S3ConfigRead",
@@ -1370,7 +1385,7 @@ def compute_sleep_reconciler() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="DLQ",
@@ -1391,7 +1406,7 @@ def compute_circadian_compliance() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="DLQ",
@@ -1423,7 +1438,7 @@ def mcp_server() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="S3Read",
@@ -1510,7 +1525,7 @@ def pipeline_health_check() -> list[iam.PolicyStatement]:
     """
     return [
         iam.PolicyStatement(sid="DynamoDB", actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query"], resources=[TABLE_ARN]),
-        iam.PolicyStatement(sid="KMS", actions=["kms:Decrypt", "kms:GenerateDataKey"], resources=[KMS_KEY_ARN, S3_KMS_KEY_ARN]),
+        iam.PolicyStatement(sid="KMS", actions=["kms:Decrypt", "kms:GenerateDataKey"], resources=[KMS_KEY_ARN]),
         iam.PolicyStatement(sid="LambdaInvoke", actions=["lambda:InvokeFunction"], resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:*"]),
         iam.PolicyStatement(sid="SecretsRead", actions=["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"], resources=[f"arn:aws:secretsmanager:{REGION}:{ACCT}:secret:life-platform/*"]),
         iam.PolicyStatement(sid="CloudWatchMetrics", actions=["cloudwatch:PutMetricData"], resources=["*"]),

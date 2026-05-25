@@ -1,0 +1,762 @@
+lambdas/character_engine.py:161:def _compute_xp(raw_score, previous_xp, config, day_number=None):
+lambdas/character_engine.py:177:    if day_number is not None and day_number < grace_period:
+lambdas/character_engine.py:178:        daily_decay = daily_decay * min(1.0, day_number / grace_period)
+lambdas/character_engine.py:948:        _day_number = max(1, (datetime.strptime(compute_date, "%Y-%m-%d") - datetime.strptime(experiment_start, "%Y-%m-%d")).days + 1)
+lambdas/character_engine.py:950:        _day_number = None
+lambdas/character_engine.py:1004:        xp_earned, xp_delta, new_xp = _compute_xp(pillar_raw_scores[pillar_name], prev_xp, config, day_number=_day_number)
+lambdas/failure_pattern_compute_lambda.py:243:    Returns dict: {day_name: {mean_score, delta_from_overall, n_days, risk_level}}.
+lambdas/ai_expert_analyzer_lambda.py:129:    days_in_experiment = max(1, (datetime.now(timezone.utc).date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
+lambdas/ai_expert_analyzer_lambda.py:153:            "period": f"experiment days 1-{days_in_experiment}",
+lambdas/ai_expert_analyzer_lambda.py:164:            return {"expert_key": "nutrition", "period": f"experiment days 1-{days_in_experiment}", "note": "No nutrition data available"}
+lambdas/ai_expert_analyzer_lambda.py:176:            "period": f"experiment days 1-{days_in_experiment}",
+lambdas/ai_expert_analyzer_lambda.py:203:        rest_days = max(0, days_in_experiment - len(active_dates))
+lambdas/ai_expert_analyzer_lambda.py:206:            "period": f"experiment days 1-{days_in_experiment}",
+lambdas/ai_expert_analyzer_lambda.py:226:            "period": f"experiment days 1-{days_in_experiment}",
+lambdas/ai_expert_analyzer_lambda.py:268:            "period": f"experiment days 1-{days_in_experiment}",
+lambdas/ai_expert_analyzer_lambda.py:288:            "period": f"experiment days 1-{days_in_experiment}",
+lambdas/ai_expert_analyzer_lambda.py:331:            "period": f"experiment days 1-{days_in_experiment}",
+lambdas/ai_expert_analyzer_lambda.py:406:def build_prompt(expert_key, data, days_in_experiment=None, week_number=None):
+lambdas/ai_expert_analyzer_lambda.py:408:    if days_in_experiment is None:
+lambdas/ai_expert_analyzer_lambda.py:409:        days_in_experiment = max(1, (datetime.now(timezone.utc).date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
+lambdas/ai_expert_analyzer_lambda.py:410:    week_num = week_number or max(1, days_in_experiment // 7 + 1)
+lambdas/ai_expert_analyzer_lambda.py:508:This is Week {week_num} of the experiment (started {EXPERIMENT_START}, now day {days_in_experiment}).
+lambdas/ai_expert_analyzer_lambda.py:657:    days_in = max(1, (datetime.now(timezone.utc).date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
+lambdas/ai_expert_analyzer_lambda.py:658:    week_number = max(1, days_in // 7 + 1)
+lambdas/ai_expert_analyzer_lambda.py:659:    prompt = build_prompt(expert_key, data, days_in, week_number)
+lambdas/ai_expert_analyzer_lambda.py:732:        "days_in_experiment": days_in,
+lambdas/daily_brief_lambda.py:2068:            # Journey start date → days_in
+lambdas/daily_brief_lambda.py:2072:                _days_in = max(1, (_date.today() - _date.fromisoformat(_started)).days + 1)
+lambdas/daily_brief_lambda.py:2074:                _days_in = 0
+lambdas/daily_brief_lambda.py:2137:                        f"{'down' if _lost > 0 else 'up'} from Day 1"
+lambdas/daily_brief_lambda.py:2228:                    "days_in":            _days_in,
+lambdas/daily_brief_lambda.py:2248:                    "days_in":            _days_in,
+lambdas/daily_brief_lambda.py:2253:                # D10: Day 1 baseline from profile — historical constants, not live data
+lambdas/daily_insight_compute_lambda.py:360:#   Morning journal todays_intention  ─┐
+lambdas/daily_insight_compute_lambda.py:400:      "today"    -- morning check-in todays_intention
+lambdas/daily_insight_compute_lambda.py:405:        ti = (entry.get("todays_intention") or "").strip()
+lambdas/daily_insight_compute_lambda.py:650:    #   (a) Yesterday's morning check-in: todays_intention
+lambdas/daily_insight_compute_lambda.py:1178:            days_in = (yest_dt - start_dt).days + 1
+lambdas/daily_insight_compute_lambda.py:1180:            days_in = "?"
+lambdas/daily_insight_compute_lambda.py:1182:        lines.append(f"  {name} (Day {days_in}, started {start_str}):")
+lambdas/daily_insight_compute_lambda.py:1193:                if isinstance(days_in, int) and days_in >= 1:
+lambdas/daily_insight_compute_lambda.py:1194:                    bl_start = (start_dt - timedelta(days=days_in)).isoformat()
+lambdas/daily_insight_compute_lambda.py:1219:                if isinstance(days_in, int):
+lambdas/daily_insight_compute_lambda.py:1226:                    lines.append(f"    Adherence: {doses_taken}/{days_in} doses logged")
+lambdas/og_image_lambda.py:76:    days_in = stats.get("platform", {}).get("days_in", 0)
+lambdas/og_image_lambda.py:77:    draw.text((48, H - 30), f"Day {days_in}", fill=FAINT, font=_font(FONT_MONO, 11))
+lambdas/og_image_lambda.py:109:    _draw_metric(draw, 580, 260, _fmt(platform.get("days_in"), 0), "DAYS IN")
+lambdas/og_image_lambda.py:182:    _draw_metric(draw, 380, 260, _fmt(platform.get("days_in"), 0), "DAYS IN")
+lambdas/og_image_lambda.py:210:    _draw_metric(draw, 48, 260, _fmt(platform.get("days_in"), 0), "DAYS TRACKED")
+lambdas/og_image_lambda.py:246:    _draw_metric(draw, 48, 260, _fmt(platform.get("days_in"), 0), "DAYS IN")
+lambdas/coach_observatory_renderer.py:209:        days_in = max(1, (today - start).days + 1)
+lambdas/coach_observatory_renderer.py:210:        week_number = max(1, (days_in - 1) // 7 + 1)
+lambdas/coach_observatory_renderer.py:211:        return week_number, days_in
+lambdas/coach_observatory_renderer.py:470:    week_number, days_in_experiment = _compute_experiment_timing()
+lambdas/coach_observatory_renderer.py:494:        "days_in_experiment": days_in_experiment,
+lambdas/ai_calls.py:332:      week_num, days_in, stage, stage_label, coaching_principles (list[str])
+lambdas/ai_calls.py:338:        days_in = max(1, (today - start).days + 1)
+lambdas/ai_calls.py:339:        week_num = max(1, (days_in + 6) // 7)
+lambdas/ai_calls.py:341:        days_in = 1
+lambdas/ai_calls.py:361:            f"WEEK {week_num} — {days_in} days in. Habit foundation established. Progressive overload now appropriate.",
+lambdas/ai_calls.py:369:            f"WEEK {week_num} — {days_in} days in. Meaningful base established.",
+lambdas/ai_calls.py:376:            f"WEEK {week_num} — {days_in} days in. Sustained transformation in progress.",
+lambdas/ai_calls.py:382:        "days_in": days_in,
+lambdas/ai_calls.py:384:        "stage_label": f"Week {week_num} ({stage} Stage, Day {days_in})",
+lambdas/site_api_lambda.py:118:# ── Experiment start date — public Day 1 ───────────────────
+lambdas/site_api_lambda.py:1062:        # Day number (for active experiments) — April 1 start = Day 1 on April 1, Day 2 on April 2, etc.
+lambdas/site_api_lambda.py:1063:        days_in = None
+lambdas/site_api_lambda.py:1067:                days_in = (datetime.now(PT).replace(tzinfo=None) - datetime.strptime(start, "%Y-%m-%d")).days + 1
+lambdas/site_api_lambda.py:1073:        if status == "active" and days_in is not None and planned_duration:
+lambdas/site_api_lambda.py:1074:            progress_pct = min(100, round(days_in / int(planned_duration) * 100))
+lambdas/site_api_lambda.py:1093:            "days_in":           days_in,
+lambdas/site_api_lambda.py:1614:            days_in_month = 30
+lambdas/site_api_lambda.py:1615:            projected = round((mtd / max(days_elapsed, 1)) * days_in_month, 2)
+lambdas/site_api_lambda.py:1880:    # ── 1. Day 1 anchor ──────────────────────────────────────────────────────
+lambdas/site_api_lambda.py:1884:        "title": "Day 1 — The Experiment Begins",
+lambdas/site_api_lambda.py:3810:            days_in = None
+lambdas/site_api_lambda.py:3813:                    days_in = (datetime.now(PT).replace(tzinfo=None) - datetime.strptime(start, "%Y-%m-%d")).days + 1
+lambdas/site_api_lambda.py:3820:                "days_in": days_in,
+lambdas/site_api_lambda.py:3850:            exp["days_in"] = matched.get("days_in")
+lambdas/site_api_lambda.py:4591:            "day_number": _pulse_day,
+lambdas/site_api_lambda.py:4641:    day_num = 1
+lambdas/site_api_lambda.py:4666:            "day_number": day_num,
+lambdas/site_api_lambda.py:4676:        day_num += 1
+lambdas/site_api_lambda.py:5782:    # Latest = most recent scan after EXPERIMENT_START (progress since Day 1)
+lambdas/site_api_lambda.py:7241:        if ai_item.get("days_in_experiment"):
+lambdas/site_api_lambda.py:7242:            resp_data["days_in_experiment"] = int(ai_item["days_in_experiment"])
+lambdas/site_api_lambda.py:7398:                "days_in_experiment": output.get("days_in_experiment"),
+lambdas/nutrition_review_lambda.py:589:            day_name = datetime.strptime(d["date"], "%Y-%m-%d").strftime("%a %m/%d")
+lambdas/nutrition_review_lambda.py:591:            day_name = d["date"]
+lambdas/nutrition_review_lambda.py:605:            <td style="padding:8px;color:#e0e0e0;font-size:13px;">{day_name}</td>
+lambdas/nutrition_review_lambda.py:763:        _days_in = max(1, (datetime.now(timezone.utc).date() - _start).days + 1)
+lambdas/nutrition_review_lambda.py:764:        _week_num = max(1, (_days_in + 6) // 7)
+lambdas/nutrition_review_lambda.py:782:            f"JOURNEY CONTEXT: Week {_week_num} ({_days_in} days in) | {_start_w}→{_goal_w} lbs | {_stage}\n"
+lambdas/challenge_generator_lambda.py:161:            for field in ["win_of_the_day", "what_drained_me", "todays_intention",
+lambdas/coach_computation_engine.py:943:        days_in_phase = (datetime.strptime(today_str, "%Y-%m-%d") - datetime.strptime(entered_date, "%Y-%m-%d")).days
+lambdas/coach_computation_engine.py:945:        days_in_phase = 0
+lambdas/coach_computation_engine.py:974:        if days_in_phase >= 14 and up_pct > 0.5:
+lambdas/coach_computation_engine.py:976:            reason = f"{days_in_phase} days in baseline, {up_pct:.0%} of trends positive"
+lambdas/coach_computation_engine.py:977:        elif days_in_phase >= 28:
+lambdas/coach_computation_engine.py:985:    if flat_pct >= 0.7 and days_in_phase >= 7 and current_phase in ("building_momentum", "deep_adaptation"):
+lambdas/coach_computation_engine.py:987:        reason = f"{flat_count}/{total} metrics flat for {days_in_phase}+ days"
+lambdas/weekly_digest_lambda.py:907:        _days_in = max(1, (datetime.now(timezone.utc).date() - _start).days + 1)
+lambdas/weekly_digest_lambda.py:908:        _week_num = max(1, (_days_in + 6) // 7)
+lambdas/weekly_digest_lambda.py:927:            f"JOURNEY STAGE: Week {_week_num} ({_days_in} days in) | {_start_w}→{_goal_w} lbs | {_stage}\n"
+lambdas/weekly_digest_lambda.py:1040:            day_name = ""
+lambdas/weekly_digest_lambda.py:1041:            try: day_name = datetime.strptime(d["date"], "%Y-%m-%d").strftime("%a")[0]
+lambdas/weekly_digest_lambda.py:1042:            except Exception as e: logger.warning("day_name parse failed for %s: %s", d.get("date"), e)
+lambdas/weekly_digest_lambda.py:1046:                          f'<div style="font-size:8px;color:#9ca3af;margin-top:2px;">{day_name}</div>'
+lambdas/output_writers.py:362:            days_in = (today - start_dt).days
+lambdas/output_writers.py:364:            days_in = 0
+lambdas/output_writers.py:387:            "days_in": days_in,
+lambdas/output_writers.py:1094:        days_into_week = today_dt.weekday() + 1
+lambdas/output_writers.py:1105:        elif days_into_week <= 2:
+lambdas/output_writers.py:1208:            day_name = now_pt.strftime("%A")
+lambdas/output_writers.py:1212:            friendly_time = f"{day_name} {tod}, {month_day} at {time_pt} PT"
+lambdas/coach_narrative_orchestrator.py:415:            "note": "Day 6 of experiment — deep in early baseline.",
+lambdas/dashboard_refresh_lambda.py:522:        days_into_week = today.weekday() + 1
+lambdas/dashboard_refresh_lambda.py:533:        elif days_into_week <= 2:
+lambdas/dashboard_refresh_lambda.py:639:            day_name = now_pt.strftime("%A")
+lambdas/dashboard_refresh_lambda.py:643:            friendly_time = f"{day_name} {tod}, {month_day} at {time_pt} PT"
+lambdas/subscriber_onboarding_lambda.py:2:Subscriber Onboarding Lambda — Day 2 Bridge Email
+lambdas/subscriber_onboarding_lambda.py:75:    """Build the Day 2 bridge email with curated installments."""
+lambdas/subscriber_onboarding_lambda.py:135:    """Query new subscribers and send Day 2 bridge email."""
+lambdas/site_stats_refresh_lambda.py:179:    days_in = max(1, (date.today() - exp_start).days + 1) if date.today() >= exp_start else 1
+lambdas/site_stats_refresh_lambda.py:199:        fresh_vitals["training_avg_daily_min"] = round(total_min / days_in) if total_min else ev.get("training_avg_daily_min")
+lambdas/site_stats_refresh_lambda.py:231:                     "days_in": max(1, (date.today() - date.fromisoformat("2026-04-01")).days + 1) if date.today() >= date.fromisoformat("2026-04-01") else 0},
+lambdas/site_writer.py:27:v1.3.0 — 2026-03-22 (D10): baseline param added. Day 1 historical constants
+lambdas/site_writer.py:224:        baseline:     optional dict with Day 1 historical constants:
+lambdas/site_writer.py:271:            # D10: Day 1 baseline for compare card — historical constants, not live data
+lambdas/site_writer.py:380:        day_number = max(1, (_date.today() - started).days + 1)
+lambdas/site_writer.py:382:        day_number = 0
+lambdas/site_writer.py:527:            "day_number": day_number, "date": today,
+lambdas/apple_health_lambda.py:314:    year, month, day_num = date_str[:4], date_str[5:7], date_str[8:10]
+lambdas/apple_health_lambda.py:315:    s3_key = f"raw/{USER_ID}/apple_health/{year}/{month}/{day_num}.json.gz"
+lambdas/monthly_digest_lambda.py:271:    days_in_year = 365
+lambdas/monthly_digest_lambda.py:272:    year_pct = round(days_elapsed / days_in_year * 100)
+lambdas/food_delivery_lambda.py:97:            days_in_m = (next_m - datetime(yr, mo, 1)).days
+lambdas/food_delivery_lambda.py:98:            opw = round(data['orders'] / (days_in_m / 7), 2)
+lambdas/buddy/write_buddy_json.py:230:        days_into_week = today_dt.weekday() + 1  # Mon=1, Tue=2, ..., Sun=7
+lambdas/buddy/write_buddy_json.py:241:        elif days_into_week <= 2:
+lambdas/buddy/write_buddy_json.py:352:            day_name = now_pt.strftime("%A")
+lambdas/buddy/write_buddy_json.py:356:            friendly_time = f"{day_name} {tod}, {month_day} at {time_pt} PT"
+handovers/HANDOVER_LATEST.md:139:├── OPERATOR_GUIDE.md      ← Day 1 ops walkthrough
+cdk/stacks/email_stack.py:174:        # ── Subscriber Onboarding — daily (Day 2 bridge email for new subscribers)
+handovers/archive/HANDOVER_v3.9.8.md:44:- Day 1 baseline + today comparison working from public_stats.json
+handovers/archive/HANDOVER_v3.7.59.md:41:- `daily_brief_lambda.py` site_writer: fixed weight_delta_30d direction, weekly_rate_lbs null guard, hrv/rhr/recovery None guards, tier0_streak + days_in in platform block, ACWR from computed_metrics
+handovers/archive/HANDOVER_v3.9.41-offsite-p4.md:38:2. **29a** — Fix "365+ Days Tracked" → `data-const="journey.days_in"`
+handovers/archive/HANDOVER_v3.9.30.md:60:- Day 1 checklist (April 1): run `capture_baseline`, verify homepage shows "DAY 1"
+handovers/archive/HANDOVER_v3.9.20.md:12:- **Moved**: Day 1 vs Today from position 6 → position 2 (after hero)
+handovers/archive/HANDOVER_v3.9.3.md:16:**HOME-3**: Day 1 vs Today → 4 dimensions
+handovers/archive/HANDOVER_v3.9.3.md:18:- Day 1: 302.0 lbs · 0 day streak · 7.0h sleep · Level 1 Foundation
+handovers/archive/HANDOVER_v3.9.3.md:51:- Dynamic: loads from `public_stats.json` journey.days_in (fallback: days since Jan 1)
+handovers/archive/HANDOVER_v3.9.40.md:44:### Home Page Day 1 vs Today Centering
+handovers/archive/HANDOVER_v3.9.40.md:87:Expected pre-April 1. Handler returns 503 when no character sheet record exists for today/yesterday in DynamoDB. Resolves automatically once the character sheet Lambda computes after Day 1.
+handovers/archive/HANDOVER_v3.9.40.md:96:4. ⬜ **April 1 morning**: `bash deploy/capture_baseline.sh` (real Day 1 data)
+handovers/archive/HANDOVER_v3.9.40.md:132:- `site/index.html` — Day 1 vs Today centering
+handovers/archive/HANDOVER_v3.7.84.md:25:- WR-33: Day 1 vs Today comparison card on homepage (302→287.7, HRV +47%, etc.)
+handovers/archive/HANDOVER_v3.7.84.md:68:- Day 1 baseline values in comparison card are hardcoded (should pull from DynamoDB for accuracy)
+handovers/archive/2026-02-22c.md:12:| 2025-06-24 | 14934036699 | Inca Trail Day 1 – Cusco to Llactapata |
+handovers/archive/2026-02-22c.md:13:| 2025-06-25 | 14934041440 | Inca Trail Day 2 – Dead Woman's Pass |
+handovers/archive/2026-02-22c.md:14:| 2025-06-25 | 14934041357 | Inca Trail Day 2 – Dead Woman's Pass (cont.) |
+handovers/archive/2026-02-22c.md:15:| 2025-06-26 | 14934046630 | Inca Trail Day 3 – Phuyupatamarca |
+handovers/archive/2026-02-22c.md:16:| 2025-06-27 | 14934046812 | Inca Trail Day 4 – Sun Gate & Machu Picchu |
+handovers/archive/2026-03-08_ic8_complete.md:10:- **Data sources checked:** Notion journal (`todays_intention`, `tomorrow_focus`) → MacroFactor (calories/protein), Strava (exercise sessions), Whoop (sleep start time), habit_scores (T0 completion)
+handovers/archive/2026-03-08_ic8_complete.md:50:- **Day 1+:** Daily evaluation runs; `ic8_active: true` once any journal intention data exists
+handovers/archive/2026-03-08_ic8_complete.md:51:- **Day 14+:** Recurring gap patterns emerge (`_compute_intention_patterns()` needs ≥2 occurrences per type)
+handovers/archive/2026-03-08_ic8_complete.md:52:- **Prerequisite:** Notion journal must have `todays_intention` or `tomorrow_focus` fields populated
+handovers/archive/HANDOVER_v3.8.2.md:8:### D10 — Compare card Day 1 baseline now dynamic
+handovers/archive/HANDOVER_v4.4.0.md:21:- `subscriber-onboarding` Lambda — Day 2 bridge email for new subscribers
+handovers/archive/HANDOVER_v3.9.31.md:26:- "Day 1 vs Today" empty states show "Apr 1" / "data starts Day 1" instead of dashes
+handovers/archive/HANDOVER_v3.7.64.md:45:- Compounding value: `streak^1.5 / 10` (Day 30 ≈ 16.4 vs Day 3 ≈ 0.5)
+handovers/archive/HANDOVER_v3.8.1.md:27:| days_in | missing | 28 |
+handovers/archive/HANDOVER_v3.8.1.md:61:| D10 | Day 1 baseline hardcoded in compare card | ❌ Still open |
+handovers/archive/HANDOVER_v3.8.1.md:64:1. **D10**: Compare card Day 1 baseline values (302→287.7 hardcoded in HTML) — pull from profile
+handovers/archive/HANDOVER_v3.9.26.md:7:**v3.9.26**: Full April 1 launch reframe. Product Board convened and unanimously endorsed reframing all pre-April data as the "testing window" with April 1 as Day 1 of the public experiment.
+handovers/archive/HANDOVER_v3.9.26.md:25:- "Day 1. For real this time." headline
+handovers/archive/HANDOVER_v3.9.26.md:28:- Subscribe label changed to "Follow from Day 1"
+handovers/archive/HANDOVER_v3.9.26.md:53:- Designed to run April 1 morning to create permanent Day 1 anchor
+handovers/archive/HANDOVER_v3.9.26.md:86:### Day 1 Checklist (April 1, 2026)
+handovers/archive/HANDOVER_v3.9.32.md:24:- Experiments: "Experiments begin on Day 1" empty state
+handovers/archive/HANDOVER_v4.7.0.md:154:- **DISC-7** annotation seeding: 4 Day 1 events seeded to DynamoDB, annotations merge with journey_timeline
+handovers/archive/HANDOVER_v4.7.0.md:181:### Day 1 Pipeline Fixes (v4.8.1)
+handovers/archive/HANDOVER_v4.7.0.md:191:- 4 experiments + 1 challenge activated for Day 1
+handovers/archive/HANDOVER_v4.7.0.md:203:### Day 1 Sweep + Pipeline Reliability (v4.8.3)
+handovers/archive/HANDOVER_v4.7.0.md:211:- **Site API PT conversion**: all user-facing dates use Pacific Time. Pulse day_number, challenge days_in.
+handovers/archive/HANDOVER_v3.9.22.md:95:2. The timeline currently shows ~12-15 events (Day 1, weight crossings, level-ups, experiments, findings). As more data accumulates, it will grow automatically.
+handovers/archive/HANDOVER_v4.6.0.md:81:Most charts show empty/zero data until April 1 (Day 1) due to EXPERIMENT_START clamp. Physical weight chart works now (33 Withings readings). All charts auto-populate once ingestion begins.
+handovers/archive/HANDOVER_v3.8.4.md:22:result_value, metrics_tracked, duration_days, days_in, progress_pct, confirmed,
+handovers/archive/HANDOVER_v4.7.1.md:50:**Physical:** 307 lbs on Day 1. Scale data since 2011 shows pattern: long disappearance → reappear at high → aggressive drop → repeat. Scale = pattern detector, not confession.
+handovers/archive/HANDOVER_v4.7.1.md:63:- ~~**DISC-7 annotation testing/seeding**~~ — DONE v4.7.4: 4 Day 1 events seeded, MCP tools verified
+handovers/archive/2026-02-22e.md:15:- `name_contains=machu` → Inca Trail Day 4 – Sun Gate & Machu Picchu (2025-06-27)
+handovers/archive/HANDOVER_v3.9.27.md:46:- Day 1 checklist (April 1): run `capture_baseline`, verify homepage shows "DAY 1", verify prequel banner auto-hides
+handovers/archive/HANDOVER_v3.9.30.1.md:71:7. **Day 1 checklist** (April 1): run `capture_baseline`, verify homepage shows "DAY 1"
+handovers/archive/HANDOVER_v3.8.0.md:53:- Day 1 baseline values in comparison card are hardcoded
+handovers/archive/HANDOVER_v3.9.39.md:27:- **Already run once** (pre-April 1 test) — run again on actual April 1 morning for real Day 1 baseline
+handovers/archive/HANDOVER_v3.9.39.md:102:4. ⬜ **April 1 morning**: `bash deploy/capture_baseline.sh` (real Day 1 data)
+handovers/archive/HANDOVER_v3.9.39.md:135:- `deploy/capture_baseline.sh` — Day 1 baseline capture script
+handovers/archive/HANDOVER_v6.8.8.md:15:5. **Re-Entry Protocol runbook written.** `docs/RUNBOOK_REENTRY.md` — Day 0 / Day 1 morning / Day 1 afternoon / Day 1 evening / Day 2 morning / Day 2 midday / Day 2 afternoon / Day 2 evening / Day 3+ structure. Synthesized from `Downloads/ajm_reentry_plan.md`. Reusable for any future gap > 7 days.
+handovers/archive/HANDOVER_v4.2.2.md:1:# Handover v4.2.2 — Offsite Day 2 Complete
+handovers/archive/HANDOVER_v4.2.2.md:4:**Session focus**: Offsite Day 2 — Board sessions, story/about implementation, three specs written for Claude Code.
+handovers/archive/HANDOVER_v4.2.2.md:147:4. April 1 is Day 1 — run `capture_baseline` MCP tool on the morning of April 1
+handovers/archive/HANDOVER_v3.9.29.md:49:- Day 1 checklist (April 1): run `capture_baseline`, verify homepage shows "DAY 1"
+handovers/archive/HANDOVER_v3.9.28.md:83:- Day 1 checklist (April 1): run `capture_baseline`, verify homepage shows "DAY 1"
+handovers/archive/HANDOVER_v5.4.0.md:15:- `/api/journey_timeline` returns 7+ events (4 Day 1 seeds + level_ups + experiments)
+handovers/archive/HANDOVER_v5.4.0.md:76:- **Coach timestamp:** Added "Saturday, April 5, 2026 · 7:00 AM PT · Day 5 Observations" prefix to all coach cards
+archive/051726_downloadsfolder_backup/handovers/2026-03-28_HANDOVER_v3.9.41-offsite-p4.md:38:2. **29a** — Fix "365+ Days Tracked" → `data-const="journey.days_in"`
+handovers/archive/HANDOVER_v3.9.19.md:11:- `site/index.html` — new `<section id="chronicle-cards">` between Discoveries and Day 1 vs Today, JS loader, responsive mobile styles
+archive/051726_downloadsfolder_backup/handovers/2026-03-27_CHANGELOG.md:283:- Experiments: "Experiments begin on Day 1" empty state
+archive/051726_downloadsfolder_backup/handovers/2026-03-27_CHANGELOG.md:341:- "Day 1 vs Today" empty states fixed: shows "Apr 1" / "data starts Day 1" instead of dashes/loading
+archive/051726_downloadsfolder_backup/handovers/2026-03-27_CHANGELOG.md:550:Product Board emergency session unanimously endorsed reframing all pre-April data as the "testing window" with April 1, 2026 as Day 1 of the public experiment. Chronicle archive relabeled with prequel numbering (Week −5 through Week −1). New "The Interview" chronicle written — Elena Voss's first direct conversation with Matthew covering the relapse, the gap, and what Day 1 means. Global countdown/Day N component added to homepage and archive. Baseline snapshot MCP tool built for April 1 Day 1 capture.
+archive/051726_downloadsfolder_backup/handovers/2026-03-27_CHANGELOG.md:560:- `site/index.html` — Hero rewritten with countdown, "Day 1. For real this time." headline, prequel banner (auto-hides after April 1), subscribe label "Follow from Day 1"
+archive/051726_downloadsfolder_backup/handovers/2026-03-27_CHANGELOG.md:570:- Day 1 action: run `capture_baseline` MCP tool with no args on April 1 morning
+archive/051726_downloadsfolder_backup/handovers/2026-03-27_CHANGELOG.md:775:HP-09 section consolidation shipped: homepage restructured from 9 sections to 7. Day 1 vs Today moved up (immediately after hero for impact), What's New merged into Discoveries as "What the Data Found" with embedded pulse bar, standalone Quote section eliminated and embedded in About. Backend deploys completed: site-api Lambda redeployed (HP-06 dynamic correlations now live), shared layer v15 published and attached to all 15 consumers (HP-12 elena_hero_line + HP-14 chronicle_recent in write_public_stats pipeline).
+archive/051726_downloadsfolder_backup/handovers/2026-03-27_CHANGELOG.md:780:- Section order: Hero → Day 1 vs Today → Signals/Brief → What the Data Found → Chronicles → Features → About+Quote
+archive/051726_downloadsfolder_backup/handovers/2026-03-27_CHANGELOG.md:783:- Moved Day 1 vs Today from position 6 to position 2 (immediately after hero)
+archive/051726_downloadsfolder_backup/handovers/2026-03-27_CHANGELOG.md:822:- New `<section id="chronicle-cards">` between Discoveries and Day 1 vs Today
+archive/051726_downloadsfolder_backup/handovers/2026-03-27_CHANGELOG.md:1425:  `baseline_value`, `result_value`, `metrics_tracked`, `duration_days`, `days_in`,
+archive/051726_downloadsfolder_backup/handovers/2026-03-27_CHANGELOG.md:1483:D10: the compare card Day 1 column now pulls from `public_stats.json` baseline object
+archive/051726_downloadsfolder_backup/handovers/2026-03-27_CHANGELOG.md:1559:| `journey.days_in` | missing | 28 |
+archive/051726_downloadsfolder_backup/handovers/2026-03-27_CHANGELOG.md:1651:- **WR-33: Day 1 vs Today comparison card** — side-by-side: weight 302→287.7, HRV 45→66 (+47%), RHR 62→52, recovery 55%→89%
+archive/051726_downloadsfolder_backup/handovers/2026-03-28_CHANGELOG_PREPEND.md:23:- General Feedback (GEN-series): 8 post-launch ideas — "Your Day 1" page, reader observation pipeline, "start here" reading order
+archive/051726_downloadsfolder_backup/specs/PULSE_REDESIGN_SPEC.md:48:│  Day 487 · Strong · "Weight dropped again. System       │
+archive/051726_downloadsfolder_backup/specs/PULSE_REDESIGN_SPEC.md:80:- **Navigation arrows**: "← Day 486" / "Day 488 →" to walk through daily states.
+archive/051726_downloadsfolder_backup/specs/PULSE_REDESIGN_SPEC.md:228:    "day_number": 487,
+archive/051726_downloadsfolder_backup/specs/PULSE_REDESIGN_SPEC.md:345:- Enables "← Day 486 / Day 488 →" navigation on the page.
+archive/051726_downloadsfolder_backup/specs/PULSE_REDESIGN_SPEC.md:349:`averagejoematt.com/live?date=2026-03-25` renders that day's pulse. OG meta tags dynamically reflect the date and status: "Day 487: Strong — March 25, 2026". This is the shareable URL (Sofia requirement).
+archive/051726_downloadsfolder_backup/specs/PULSE_REDESIGN_SPEC.md:380:- Google sees: `<meta name="description" content="Day 487: Strong — Weight dropped again. Sleep was deep.">` in the raw HTML.
+archive/051726_downloadsfolder_backup/handovers/2026-03-29_CHANGELOG_combined.md:171:## v4.2.2 — 2026-03-28: Offsite Day 2 — Story/About Punch List + Status Page Spec + Food Delivery Spec
+archive/051726_downloadsfolder_backup/handovers/2026-03-29_CHANGELOG_combined.md:173:Full-day offsite session (Day 2). Three board sessions convened. Three implementation specs written and committed. Story/About pages implemented directly. Food delivery CSV analyzed (1,598 transactions, 15 years). No Lambda code shipped — specs and site page implementations ready for Claude Code handoff.
+archive/051726_downloadsfolder_backup/handovers/2026-03-29_CHANGELOG_combined.md:209:- Static "Day 1 — April 2026" → live JS day counter (shows "Launching April 1" pre-launch)
+archive/051726_downloadsfolder_backup/handovers/2026-03-29_CHANGELOG_combined.md:212:- Day counter pre/post launch aware: "Launching April 1" → "Day 1" → "Day N"
+archive/051726_downloadsfolder_backup/specs/EXPERIMENTS_EVOLUTION_SPEC.md:214:1. ✅ Tongkat Ali — Recovery (ACTIVE, Day 44)
+archive/051726_downloadsfolder_backup/specs/EXPERIMENTS_EVOLUTION_SPEC.md:215:2. ✅ NMN — NAD+ (ACTIVE, Day 44)
+archive/051726_downloadsfolder_backup/specs/EXPERIMENTS_EVOLUTION_SPEC.md:216:3. ✅ Creatine — Strength (ACTIVE, Day 39)
+archive/051726_downloadsfolder_backup/specs/EXPERIMENTS_EVOLUTION_SPEC.md:217:4. ✅ Berberine — Glucose (ACTIVE, Day 44)
+archive/051726_downloadsfolder_backup/specs/EXPERIMENTS_EVOLUTION_SPEC.md:386:│ │  Day 44  │                                                           │
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part1_build_plan_v2_updated.md:139:| 3d | **Add weight trend line to Journey section** — visual arc Day 1 → present, projected goal date, rate of loss | Data viz | Medium | Must-have |
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part1_build_plan_v2_updated.md:146:| 3k | **Fix Yesterday/Tomorrow disabled state** — tooltip "Available after Day 1", active styling when applicable | Polish | Low | Must-have |
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part1_build_plan_v2_updated.md:184:| 4d | **Collapse locked badges by default** — lead with earned badges prominently, show "X more to unlock" with expand option. Prevents Day 1 wall-of-failure | UX/Psych | Low | Must-have |
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part1_build_plan_v2_updated.md:197:- At launch (Day 1), the badges section is mostly locked — needs inversion to lead with accomplishment
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part1_build_plan_v2_updated.md:663:| 13j | **Add "Day 1 vs Now" column** — three-point comparison | Data | Medium | Should-have |
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part1_build_plan_v2_updated.md:669:**Key themes:** Self-check is highest-potential growth feature, currently buried. Evidence rating (●●●) is a credibility asset. Page needs one human moment. "Tracking soon" is a credibility liability. 27-benchmark SEO opportunity. "Day 1 vs Now" reveals the journey.
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part1_build_plan_v2_updated.md:684:- [ ] Data: Day 1 baseline values
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part1_build_plan_v2_updated.md:741:| 15d | **Pre-seed for launch** — Day 1 baselines, hypotheses, experiment starts | Content | Low | Must-have |
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part1_build_plan_v2_updated.md:758:- [ ] Content: pre-seed Day 1 events
+archive/051726_downloadsfolder_backup/planning/ajm_reentry_plan.md:104:- [ ] 31. **Decide: do you remove the April 1 "Day 1" entry?**
+archive/051726_downloadsfolder_backup/planning/ajm_reentry_plan.md:110:  Recommendation: yes — but as a narrative beat, not a data reset. Monday's daily brief is the first of "Cycle 2." Make it feel like a Day 1 without erasing Day 1.
+archive/051726_downloadsfolder_backup/planning/ajm_reentry_plan.md:118:- [ ] 35. Open Notion, create entry titled "Day 32 — Re-Entry" (or similar).
+archive/051726_downloadsfolder_backup/planning/ajm_reentry_plan.md:180:  - Day 0: declare the gap (new "Pause Mode" state — Phase 11 to build).
+archive/051726_downloadsfolder_backup/planning/ajm_reentry_plan.md:181:  - Day 1 morning: Phase 1-3 of this checklist (connector sweep + lab refresh + HAE backfill).
+archive/051726_downloadsfolder_backup/planning/ajm_reentry_plan.md:182:  - Day 1 afternoon: re-entry journal entry. Non-negotiable.
+archive/051726_downloadsfolder_backup/planning/ajm_reentry_plan.md:183:  - Day 1 evening: Tier-0 habits only.
+archive/051726_downloadsfolder_backup/planning/ajm_reentry_plan.md:184:  - Day 2: tech debt + warming.
+archive/051726_downloadsfolder_backup/planning/ajm_reentry_plan.md:185:  - Day 3+: gradual ramp to full P40.
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part3_build_plan.md:241:**Key themes:** Page launches 66% empty — start experiments before Day 1. Voting is the strongest engagement mechanic. Living library story (AI scans → Board reviews). No downvotes. Inline expand for browsing. Show the payoff on tiles.
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part1_feature_list_decisions01-15.md:118:- [ ] Visual arc Day 1 → present
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part1_feature_list_decisions01-15.md:148:- [ ] Tooltip "Available after Day 1", active styling when applicable
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part1_feature_list_decisions01-15.md:730:### 13j. Add "Day 1 vs Now" column
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part1_feature_list_decisions01-15.md:835:- [ ] Day 1 events: baseline measurements, hypothesis set, first experiments
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part4_feature_list_decisions25-34.md:208:- [ ] Change `<div class="method-stat__value">365+</div>` to `<div class="method-stat__value" data-const="journey.days_in">—</div>`
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part4_feature_list_decisions25-34.md:236:- [ ] Days Tracked: `data-const="journey.days_in"`
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part4_feature_list_decisions25-34.md:361:- [ ] Hero subscribe label: "The Measured Life" not "Follow from Day 1"
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part4_feature_list_decisions25-34.md:550:- [ ] Apply to: ticker, hero, Day 1 vs Today, sparklines
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part4_feature_list_decisions25-34.md:592:- [ ] Verify `site_constants.js` has: platform.lambdas, platform.mcp_tools, platform.data_sources, platform.monthly_cost, platform.test_count, platform.review_count, platform.review_grade, journey.days_in, journey.start_weight, journey.goal_weight
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part3_feature_list_decisions16-24.md:157:- [ ] "Started creatine Day 1. Added sleep stack Week 3. Paused Reishi Week 6 — no signal."
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part3_feature_list_decisions16-24.md:508:- [ ] Activate one challenge so hero zone has live check-in on Day 1
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part1_build_plan_v1.md:139:| 3d | **Add weight trend line to Journey section** — visual arc Day 1 → present, projected goal date, rate of loss | Data viz | Medium | Must-have |
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part1_build_plan_v1.md:146:| 3k | **Fix Yesterday/Tomorrow disabled state** — tooltip "Available after Day 1", active styling when applicable | Polish | Low | Must-have |
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part1_build_plan_v1.md:184:| 4d | **Collapse locked badges by default** — lead with earned badges prominently, show "X more to unlock" with expand option. Prevents Day 1 wall-of-failure | UX/Psych | Low | Must-have |
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part1_build_plan_v1.md:197:- At launch (Day 1), the badges section is mostly locked — needs inversion to lead with accomplishment
+archive/051726_downloadsfolder_backup/code/daily_brief_lambda.py:1777:            # Journey start date → days_in
+archive/051726_downloadsfolder_backup/code/daily_brief_lambda.py:1781:                _days_in = (today.date() if hasattr(today, 'date') else today - _date(2026, 2, 9).toordinal()).days
+archive/051726_downloadsfolder_backup/code/daily_brief_lambda.py:1782:                _days_in = max(0, (_date.today() - _date.fromisoformat(_started)).days)
+archive/051726_downloadsfolder_backup/code/daily_brief_lambda.py:1784:                _days_in = 0
+archive/051726_downloadsfolder_backup/code/daily_brief_lambda.py:1847:                        f"{'down' if _lost > 0 else 'up'} from Day 1"
+archive/051726_downloadsfolder_backup/code/daily_brief_lambda.py:1938:                    "days_in":            _days_in,
+archive/051726_downloadsfolder_backup/code/daily_brief_lambda.py:1958:                    "days_in":            _days_in,
+archive/051726_downloadsfolder_backup/code/daily_brief_lambda.py:1963:                # D10: Day 1 baseline from profile — historical constants, not live data
+archive/051726_downloadsfolder_backup/specs/SPEC_CHARACTER_ENGINE_v1.1.0.md:310:    # Day 7 ≈ 58, Day 14 ≈ 77, Day 30 = 100
+archive/051726_downloadsfolder_backup/specs/SPEC_CHARACTER_ENGINE_v1.1.0.md:837:    """Day 7 should score higher than linear 23%."""
+archive/051726_downloadsfolder_backup/code/site_writer.py:27:v1.3.0 — 2026-03-22 (D10): baseline param added. Day 1 historical constants
+archive/051726_downloadsfolder_backup/code/site_writer.py:223:        baseline:     optional dict with Day 1 historical constants:
+archive/051726_downloadsfolder_backup/code/site_writer.py:270:            # D10: Day 1 baseline for compare card — historical constants, not live data
+archive/051726_downloadsfolder_backup/code/site_writer.py:379:        day_number = max(0, (_date.today() - started).days)
+archive/051726_downloadsfolder_backup/code/site_writer.py:381:        day_number = 0
+archive/051726_downloadsfolder_backup/code/site_writer.py:526:            "day_number": day_number, "date": today,
+archive/051726_downloadsfolder_backup/specs/FIELD_NOTES_SPEC.md:180:PLATFORM WEEK: {platform_week} (days into journey: {days_into_journey})
+archive/051726_downloadsfolder_backup/site/WEBSITE_STRATEGY.md:170:| D10 | Day 1 baseline values hardcoded | Static numbers in HTML | Pull from DynamoDB baseline partition or public_stats |
+archive/051726_downloadsfolder_backup/reviews/averagejoematt-strategy-review.md:318:**Resolution:** Graham is right that monetization is premature. But Lavingia is right that a lightweight test costs nothing. **Primary focus: build the site and audience for 90 days. Secondary: have a $49 guide ready as a test vehicle by Day 90.**
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part4_build_plan.md:284:| 32j | Make "Day 1" status dynamic via data-const | Architecture | Low | Should-have |
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part4_build_plan.md:292:**Current state:** 1,763 lines. Ticker, hero with weight counter and subscribe, about section, Day 1 vs Today, sparklines + AI Brief, "What the Data Found," Recent Chronicles, "What's Inside" feature cards, subscribe CTA, sticky bar, challenge ticker.
+archive/051726_downloadsfolder_backup/planning/OFFSITE_part4_build_plan.md:409:| GEN-3 | "Your Day 1" guided start page | Maya | Content/Feature |
+archive/051726_downloadsfolder_backup/site/design_handoff_frontpage_rework/Live Page - 4 Variations.html:34:        subtitle="Four alternative designs for the daily-return page. Same data (Day 318, mostly green, sleep flagged), four different conceptual frames. Click any to focus."
+archive/051726_downloadsfolder_backup/site/V2_PAGE_DESIGN_BRIEFS.md:226:1. "Days on Journey" stat chip: verify `hero.days_on_journey` or `j.days_in` is populated. Current fallback calculates from Sept 1 2024 — that's the platform start, but journey start for weight should be Feb 22 2026. Verify the correct date is used.
+archive/051726_downloadsfolder_backup/site/V2_PAGE_DESIGN_BRIEFS.md:227:2. "Current Streak" chip: display "Day 0" when no active streak, not blank.
+archive/051726_downloadsfolder_backup/site/V2_PAGE_DESIGN_BRIEFS.md:242:**"Day 1 vs Today" comparison card**:
+archive/051726_downloadsfolder_backup/site/V2_PAGE_DESIGN_BRIEFS.md:347:- Day 1 baseline vs today for all major metrics
+archive/051726_downloadsfolder_backup/planning/midjourney-visual-sprint.md:19:**Yuki Tanaka (Consultant, Brand/Graphic Design — Pentagram alumna):** "Establish a Midjourney 'style seed' early. Run 5-10 prompts on Day 1 just to lock the aesthetic — color palette, illustration density, line weight, mood. Then every subsequent prompt references that seed. Consistency > quantity."
+archive/051726_downloadsfolder_backup/planning/midjourney-visual-sprint.md:40:## STYLE FOUNDATION (Day 1 — Lock This First)
+archive/051726_downloadsfolder_backup/planning/midjourney-visual-sprint.md:451:1. **Day 1:** Run style seed prompts. Lock aesthetic. Save `--sref` code.
+archive/051726_downloadsfolder_backup/site/design_handoff_frontpage_rework/README.md:154:  9px mono all-caps, `--text-faint`. "Day 1 · 307 lbs" left, "Today · 218.4
+archive/051726_downloadsfolder_backup/site/design_handoff_frontpage_rework/README.md:181:| `/live/` | Day 318 (current) | "STANDINGS" | 307 → 218.4 → 185 lbs |
+archive/051726_downloadsfolder_backup/site/design_handoff_frontpage_rework/README.md:184:| `/nutrition/` | Day 318 | "MEALS" | Protein avg arc |
+archive/051726_downloadsfolder_backup/site/design_handoff_frontpage_rework/README.md:187:| `/physical/` | Day 318 | "MARKS" | Body comp arc |
+archive/051726_downloadsfolder_backup/planning/BACKLOG_HANDOFF_CLAUDE_CODE.md:48:Create a seed script at `seeds/seed_discoveries.py` that writes the following Day 1 baseline events to DynamoDB. These are the pre-launch seed events the Product Board specified (recommendation 15d):
+archive/051726_downloadsfolder_backup/planning/BACKLOG_HANDOFF_CLAUDE_CODE.md:55:        "title": "Day 1 — Journey Begins",
+archive/051726_downloadsfolder_backup/planning/BACKLOG_HANDOFF_CLAUDE_CODE.md:174:│  Day {days_in}                                      │
+archive/051726_downloadsfolder_backup/planning/BACKLOG_HANDOFF_CLAUDE_CODE.md:225:        "days_in": _days_in,
+archive/051726_downloadsfolder_backup/reviews/PRODUCT_REVIEW_PR1.md:3:**Review Date:** April 4, 2026 · **Platform Version:** v4.9.0 · **Day 4 of Experiment**
+archive/051726_downloadsfolder_backup/reviews/PRODUCT_REVIEW_PR1.md:12:averagejoematt.com is, at this moment, a paradox. It is simultaneously one of the most ambitious personal health platforms ever built by a single person and a site that — on Day 4 of its public experiment — cannot yet deliver on half of what it promises. The architecture is extraordinary: 62 Lambda functions, 26 data sources, 121 MCP tools, a 14-system AI intelligence layer, a character engine with EMA smoothing and Benjamini-Hochberg FDR correction, and the whole thing runs for $19/month. That's not a hobby project. That's a proof-of-concept for how a non-engineer can ship production infrastructure using AI as a development partner.
+archive/051726_downloadsfolder_backup/reviews/PRODUCT_REVIEW_PR1.md:37:| **Live** | `/live/` | D+ | Almost entirely loading states. "— days Loading" is the primary content. The journey data card is a skeleton. | This should be the most dynamic page on the site. On Day 4, it's the emptiest. |
+archive/051726_downloadsfolder_backup/reviews/PRODUCT_REVIEW_PR1.md:62:| **Discoveries** | `/discoveries/` | B- | "Intuition isn't evidence" framing is strong. Timeline concept is good. | Mostly empty. "In X days, the platform surfaced Y findings" — those numbers are tiny at Day 4. |
+archive/051726_downloadsfolder_backup/reviews/PRODUCT_REVIEW_PR1.md:99:| **Ask** | `/ask/` | B | AI-powered Q&A against 26 data sources. 5 questions/hour for free, 20 for subscribers. Prompt suggestions are well-chosen. | The "Subscribe for more" upsell is premature on Day 4. |
+archive/051726_downloadsfolder_backup/reviews/PRODUCT_REVIEW_PR1.md:251:- **Every number:** Not yet delivered. Most numbers show dashes on Day 4. ✗
+archive/051726_downloadsfolder_backup/reviews/PRODUCT_REVIEW_PR1.md:329:"Does this move the needle on the metric that matters? The metric that matters is: does Matthew lose weight and keep it off? The platform can't answer that yet — it's Day 4. What I can evaluate is whether the platform is structured to serve that goal. The accountability mechanisms (public data, Elena's chronicle, his partner's email, character score) are strong. The intelligence layer (anomaly detection, adaptive mode, daily brief) is well-designed. But the product has a feature proliferation problem — 72 pages, 121 tools, 14 AI systems — and I worry that building more features has become a substitute for behavior change. The next 90 days should be a feature freeze focused on using the existing system, not extending it."
+archive/051726_downloadsfolder_backup/reviews/PRODUCT_REVIEW_PR1.md:391:**2. He thinks the platform serves his health. It mostly serves his identity as a builder.** The v4.9.0 changelog shows 57 QA fixes, 4 shared layer rebuilds, and a documentation sprint — on Day 3 of an experiment that's supposed to be about losing weight. When was the last time Matthew went for a walk instead of shipping a Lambda? The platform is valuable, but Matthew needs to watch the ratio of building-time to health-time.
+archive/051726_downloadsfolder_backup/reviews/PRODUCT_REVIEW_PR1.md:405:| 5 | **Data Integrity & Freshness** | C | Most metrics show dashes on Day 4. Parameterization work is solid but data needs time to accumulate. | Expected to improve organically. Add "last updated" timestamps to every data section. |
+archive/051726_downloadsfolder_backup/reviews/PRODUCT_REVIEW_PR1.md:423:**However:** The building itself has become a partially competing activity. The changelog shows Matthew shipped 57 QA fixes on Day 3, a documentation sprint on Day 4, and 15 editorial rewrites on Day 1. The platform is consuming the time and energy that could go toward the health behaviors it tracks. This is not a hypothetical concern — it's the same pattern Matthew describes in the Mind page: intellectualizing instead of feeling, building instead of doing.
+archive/051726_downloadsfolder_backup/reviews/PRODUCT_REVIEW_PR1.md:588:You built a 62-Lambda AI system, wrote 72 pages of content, shipped 57 QA fixes in a single day, and completed a documentation sprint — all in the first 4 days of an experiment about health transformation. On Day 4, your changelog has more entries than your habit heatmap has cells. What would happen if you couldn't touch the codebase for 30 days?
+archive/051726_downloadsfolder_backup/reviews/PRODUCT_REVIEW_PR1.md:608:The Life Platform is a genuine technical achievement and a promising content platform that is, on Day 4, still a caterpillar. The architecture is A-tier. The editorial content is A-tier where it exists. The data and engagement layers are C-tier because the experiment just started. The IA needs the restructuring that was planned in March and hasn't been shipped.
+archive/051726_downloadsfolder_backup/reviews/PRODUCT_REVIEW_PR1.md:624:*Review conducted April 4, 2026. Platform v4.9.0. Day 4 of experiment.*
+archive/20260309/deploy/patch_prod2_phase2.py:174:            'f"raw/apple_health/{year}/{month}/{day_num}.json.gz"',
+archive/20260309/deploy/patch_prod2_phase2.py:175:            'f"raw/{USER_ID}/apple_health/{year}/{month}/{day_num}.json.gz"',
+archive/20260308/lambdas/weekly_digest_v2_lambda.py:1201:            day_name = ""
+archive/20260308/lambdas/weekly_digest_v2_lambda.py:1202:            try: day_name = datetime.strptime(d["date"], "%Y-%m-%d").strftime("%a")[0]
+archive/20260308/lambdas/weekly_digest_v2_lambda.py:1207:                          f'<div style="font-size:8px;color:#9ca3af;margin-top:2px;">{day_name}</div>'
+archive/20260308/lambdas/backup_20260227_182129/weekly_digest_v2_lambda.py:1098:            day_name = ""
+archive/20260308/lambdas/backup_20260227_182129/weekly_digest_v2_lambda.py:1099:            try: day_name = datetime.strptime(d["date"], "%Y-%m-%d").strftime("%a")[0]
+archive/20260308/lambdas/backup_20260227_182129/weekly_digest_v2_lambda.py:1104:                          f'<div style="font-size:8px;color:#9ca3af;margin-top:2px;">{day_name}</div>'
+archive/20260308/lambdas/backup_20260227_182129/apple_health_lambda.py:281:    year, month, day_num = date_str[:4], date_str[5:7], date_str[8:10]
+archive/20260308/lambdas/backup_20260227_182129/apple_health_lambda.py:282:    s3_key = f"raw/apple_health/{year}/{month}/{day_num}.json.gz"
+archive/051726_downloadsfolder_backup/reviews/review.md:127:| 2 | **Visual transformation timeline** | The most shareable format in health/fitness. Before/during data comparison is what people send to friends. | Weight curve, body composition (DEXA), key biometric improvements (HRV, resting HR, sleep quality) plotted over time. Side-by-side metrics cards: "Day 1 vs. Today." | **P0** |
+archive/051726_downloadsfolder_backup/reviews/review.md:133:| 8 | **Before/After comparison cards** | Shareable social assets. These are the viral format for transformation stories. | Single-image cards: "Day 1: 302 lbs, HRV 45, Recovery 55%. Day 60: 287.7 lbs, HRV 54, Recovery 75%." Formatted for Twitter/LinkedIn sharing. | **P1** |
+archive/051726_downloadsfolder_backup/reviews/review.md:305:| 2 | **Build a visual transformation timeline** | The most shareable content format in health/fitness. "Day 1 vs. Day 60" comparison cards drive social sharing. | Create a /timeline/ page that pulls from DynamoDB longitudinal data: weight curve, HRV trend, DEXA body composition changes, key milestone markers. Use D3 or Chart.js. |
+archive/20260308/lambdas/backup_20260227_183354/monthly_digest_lambda.py:230:    days_in_year = 365
+archive/20260308/lambdas/backup_20260227_183354/monthly_digest_lambda.py:231:    year_pct = round(days_elapsed / days_in_year * 100)
+archive/20260308/lambdas/backup_20260227_183354/weekly_digest_v2_lambda.py:1109:            day_name = ""
+archive/20260308/lambdas/backup_20260227_183354/weekly_digest_v2_lambda.py:1110:            try: day_name = datetime.strptime(d["date"], "%Y-%m-%d").strftime("%a")[0]
+archive/20260308/lambdas/backup_20260227_183354/weekly_digest_v2_lambda.py:1115:                          f'<div style="font-size:8px;color:#9ca3af;margin-top:2px;">{day_name}</div>'
+archive/20260308/deploy/patch_mcp_features_12_25.py:394:        "summary": {"total_practice_days": practice_days, "total_days_in_range": total_days,
+archive/20260308/lambdas/backup_20260227_182129/monthly_digest_lambda.py:219:    days_in_year = 365
+archive/20260308/lambdas/backup_20260227_182129/monthly_digest_lambda.py:220:    year_pct = round(days_elapsed / days_in_year * 100)
+archive/20260308/deploy/daily_brief_lambda.py:3202:        days_into_week = today_dt.weekday() + 1  # Mon=1, Tue=2, ..., Sun=7
+archive/20260308/deploy/daily_brief_lambda.py:3213:        elif days_into_week <= 2:
+archive/20260308/deploy/daily_brief_lambda.py:3317:            day_name = now_pt.strftime("%A")
+archive/20260308/deploy/daily_brief_lambda.py:3321:            friendly_time = f"{day_name} {tod}, {month_day} at {time_pt} PT"
+archive/20260308/lambdas/backup_20260227_183354/apple_health_lambda.py:286:    year, month, day_num = date_str[:4], date_str[5:7], date_str[8:10]
+archive/20260308/lambdas/backup_20260227_183354/apple_health_lambda.py:287:    s3_key = f"raw/apple_health/{year}/{month}/{day_num}.json.gz"
+patches/archive/pre_2026_03/patch_mcp_journal_tools.py:139:                          "what_happened", "notes", "todays_intention", "gratitude",
+deploy/archive/onetime/daily_brief_lambda.py:1357:                _sw_days_in = max(0, (_d.today() - _d.fromisoformat(profile.get("journey_start_date", "2026-02-09"))).days)
+deploy/archive/onetime/daily_brief_lambda.py:1359:                _sw_days_in = 0
+deploy/archive/onetime/daily_brief_lambda.py:1385:                    "days_in":            _sw_days_in,
+deploy/archive/onetime/daily_brief_lambda.py:1400:                    "days_in":           _sw_days_in,
+deploy/archive/onetime/daily_brief_lambda.py:1773:            # Journey start date → days_in
+deploy/archive/onetime/daily_brief_lambda.py:1777:                _days_in = (today.date() if hasattr(today, 'date') else today - _date(2026, 2, 9).toordinal()).days
+deploy/archive/onetime/daily_brief_lambda.py:1778:                _days_in = max(0, (_date.today() - _date.fromisoformat(_started)).days)
+deploy/archive/onetime/daily_brief_lambda.py:1780:                _days_in = 0
+deploy/archive/onetime/daily_brief_lambda.py:1852:                    "days_in":            _days_in,
+deploy/archive/onetime/daily_brief_lambda.py:1872:                    "days_in":           _days_in,
+deploy/archive/onetime/patch_v3.9.37_product_board.py:164:print("\n[8/23] Move About section up — after hero, before Day 1 vs Today")
+deploy/archive/onetime/patch_v3.9.37_product_board.py:186:        # Insert after hero section close (before Day 1 vs Today)
+deploy/archive/onetime/patch_v3.9.37_product_board.py:187:        insert_marker = '<!-- WR-33: Day 1 vs. Today'
+deploy/archive/onetime/patch_v3.9.37_product_board.py:191:            print("  ✓ Moved About section above Day 1 vs Today")
+deploy/archive/onetime/patch_v3.9.37_product_board.py:211:    '<div class="hero-subscribe-label">Follow from Day 1</div>',
+deploy/archive/onetime/patch_v3.9.37_product_board.py:212:    '<div class="hero-subscribe-label">Follow from Day 1</div>\n    <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-2);max-width:400px;text-align:center;line-height:1.5;">A weekly email. Real data, real failures, no filter.</div>',
+deploy/archive/onetime/fix_public_stats.py:159:        days_in = max(0, (today - date.fromisoformat(start_date)).days)
+deploy/archive/onetime/fix_public_stats.py:161:        days_in = 0
+deploy/archive/onetime/fix_public_stats.py:163:    print(f"[profile] start={start_weight}lbs → goal={goal_weight}lbs, started={start_date}, days_in={days_in}")
+deploy/archive/onetime/fix_public_stats.py:327:            "days_in":            days_in,
+deploy/archive/onetime/fix_public_stats.py:347:            "days_in":            days_in,
+deploy/archive/onetime/fix_public_stats.py:349:        # D10: Day 1 baseline — from profile fields or fallback to known journey-start values.
+deploy/archive/onetime/fix_public_stats.py:350:        # These are historical constants (true Day 1 readings) stored in PROFILE#v1.
+tests/test_shared_modules.py:269:def test_check_sick_day_none():
+tests/test_shared_modules.py:306:def test_write_sick_day_no_reason():
+tests/test_shared_modules.py:318:_run("check_sick_day: None when not found", test_check_sick_day_none)
+tests/test_shared_modules.py:325:_run("write_sick_day: no reason field if not provided", test_write_sick_day_no_reason)
+mcp/tools_data.py:378:            "days_in_period_a": len(items_a),
+mcp/tools_data.py:379:            "days_in_period_b": len(items_b),
+tests/test_failure_pattern_detectors.py:85:    # Day 2-6 are bad
+tests/test_failure_pattern_detectors.py:147:    # Day 1-3: bad (40); Day 4: recovered (75); Day 5-7: good
+tests/test_character_engine.py:172:    """Day 7 should score higher than old linear 23%."""
+tests/test_character_engine.py:179:    """Day 30 should score 100."""
+mcp/tools_sleep.py:216:        "weekday_nights_analyzed":  len(weekday_mids),
+mcp/registry.py:2294:                "Day 1 (April 1, 2026) to create the anchor point for all future progress comparisons. "
+mcp/tools_memory.py:268:# BASELINE SNAPSHOT — Day 1 capture
+mcp/tools_memory.py:276:    This is designed to be run once on Day 1 (April 1, 2026) to create
+mcp/tools_social.py:715:            "exposure_day_n": len(exposure_days[metric]),
+mcp/tools_social.py:716:            "rest_day_n": len(rest_days[metric]),
+mcp/tools_journal.py:146:                          "what_happened", "notes", "todays_intention", "gratitude",
+mcp/tools_habits.py:1225:        """Compounding value formula: streak^1.5 / 10. Day 30 ≈ 16.4, Day 3 ≈ 0.5 (3x ratio)."""
+mcp/tools_habits.py:1336:        "formula_note":    "Compounding value = streak^1.5 / 10. Day 30 ≈ 16.4 points (3x Day 3's 5.2). Portfolio value = sum of all active vice streak values.",
+docs/RUNBOOK_REENTRY.md:7:**Goal:** Every source flowing or explicitly known-broken with a workaround, by Day 2 evening. New baseline captured. Honest journal entry posted. Pause Mode → Re-Entry Day Template (WR-50) loaded once it ships.
+docs/RUNBOOK_REENTRY.md:21:## Day 0 — Declare the gap
+docs/RUNBOOK_REENTRY.md:26:- Skip to "Day 1" below.
+docs/RUNBOOK_REENTRY.md:29:- Mentally mark today as "Day 0 — gap acknowledged."
+docs/RUNBOOK_REENTRY.md:34:## Day 1 morning — Connector sweep + lab refresh + HAE backfill (~90 min)
+docs/RUNBOOK_REENTRY.md:69:## Day 1 afternoon — Re-Entry Journal Entry (NON-NEGOTIABLE)
+docs/RUNBOOK_REENTRY.md:82:## Day 1 evening — Tier-0 habits only
+docs/RUNBOOK_REENTRY.md:94:## Day 2 morning — Tech debt sweep (~90 min)
+docs/RUNBOOK_REENTRY.md:112:## Day 2 midday — Capture new baseline (~15 min)
+docs/RUNBOOK_REENTRY.md:126:## Day 2 afternoon — Narrative & UX
+docs/RUNBOOK_REENTRY.md:132:3. **Soft re-launch?** Recommendation: yes — but as a narrative beat, not a data reset. The first daily brief of the new cycle is "Day 1 of Cycle N" without erasing prior cycle data.
+docs/RUNBOOK_REENTRY.md:138:## Day 2 evening — Validation sweep
+docs/RUNBOOK_REENTRY.md:149:## Day 3+ — Gradual ramp
+docs/RUNBOOK_REENTRY.md:162:- The re-entry journal entry (Day 1 afternoon)
+docs/RUNBOOK_REENTRY.md:164:- Visual site walkthrough (Day 2 narrative phase)
+docs/RUNBOOK_REENTRY.md:172:By Day 2 evening:
+mcp/tools_lifestyle.py:504:        "total_days_in_range": total_days,
+mcp/tools_lifestyle.py:1215:        "summary": {"total_practice_days": practice_days, "total_days_in_range": total_days,
+mcp/tools_lifestyle.py:1476:            day_num = (datetime.strptime(item.get("date", post_start), "%Y-%m-%d") -
+mcp/tools_lifestyle.py:1478:            daily.append({"day": day_num, "value": round(val, 1)})
+mcp/tools_lifestyle.py:1483:                    days_to_baseline = day_num
+mcp/tools_lifestyle.py:1485:                    days_to_baseline = day_num
+docs/DISASTER_RECOVERY.md:200:**Day 0 (during outage):**
+docs/DISASTER_RECOVERY.md:205:**Day 1 (post-outage):**
+mcp/tools_health.py:2372:            "days_in_state": streak,
+docs/OPERATOR_GUIDE.md:3:> Everything you need to run this platform. Read this on Day 1.
+docs/OPERATOR_GUIDE.md:26:## Day 1 Onboarding Checklist
+docs/SCHEMA.md:665:| `todays_intention` | string | Free text |
+docs/CHANGELOG.md:1961:- **`docs/RUNBOOK_REENTRY.md`** (NEW): reusable Re-Entry Protocol synthesized from `ajm_reentry_plan.md`. Trigger: any gap > 7 days. Day 0 / Day 1 morning / Day 1 afternoon / Day 1 evening / Day 2 morning / Day 2 midday / Day 2 afternoon / Day 2 evening / Day 3+.
+docs/CHANGELOG.md:2425:- Coach timestamp prefix: "Saturday, April 5, 2026 · 7:00 AM PT · Day 5 Observations"
+docs/CHANGELOG.md:2451:- `site_api_lambda.py`: `week_number` + `days_in_experiment` in ai_analysis response
+docs/CHANGELOG.md:2549:## v4.9.0 — Day 3 QA Sweep + Cost Optimization (2026-04-03)
+docs/CHANGELOG.md:2601:## v4.8.3 — 2026-04-01: Day 1 Sweep + Pipeline Reliability
+docs/CHANGELOG.md:2624:- Pulse day_number, challenge/experiment days_in: switched from UTC to PT
+docs/CHANGELOG.md:2684:## v4.8.1 — 2026-04-01: Day 1 Pipeline Fixes
+docs/CHANGELOG.md:2686:Critical fixes discovered during Day 1 go-live. Most issues traced to timing/sequencing assumptions that break on the first day of the experiment.
+docs/CHANGELOG.md:2698:- **Day counter**: `days_in` showed 0 on Day 1. Fixed to `max(1, days + 1)` across 4 files.
+docs/CHANGELOG.md:2703:- **Stale fallbacks**: character_stats.json, site_config.json overwritten with Day 1 values.
+docs/CHANGELOG.md:2799:- `seeds/seed_discoveries.py` created (idempotent) — 4 Day 1 events seeded to DynamoDB
+docs/CHANGELOG.md:2800:- Day 1 milestone annotation merges with journey_timeline correctly
+docs/CHANGELOG.md:3131:- Day 2 bridge email: new `subscriber-onboarding` Lambda with 3 curated installments
+docs/CHANGELOG.md:3350:## v4.2.2 — 2026-03-28: Offsite Day 2 — Story/About Punch List + Status Page Spec + Food Delivery Spec
+docs/CHANGELOG.md:3352:Full-day offsite session (Day 2). Three board sessions convened. Three implementation specs written and committed. Story/About pages implemented directly. Food delivery CSV analyzed (1,598 transactions, 15 years). No Lambda code shipped — specs and site page implementations ready for Claude Code handoff.
+docs/CHANGELOG.md:3388:- Static "Day 1 — April 2026" → live JS day counter (shows "Launching April 1" pre-launch)
+docs/CHANGELOG.md:3391:- Day counter pre/post launch aware: "Launching April 1" → "Day 1" → "Day N"
+docs/MCP_TOOL_CATALOG.md:251:| `capture_baseline` | date=, label=, force= | Capture full-state Day 1 baseline snapshot across 8 domains (weight, BP, HRV, character, habits, vices, glucose, nutrition). Safe: won't overwrite without force=true. |
+docs/archive/LAUNCH_DAY.md:18:- [ ] Homepage loads, countdown shows "Day 1": `https://averagejoematt.com/`
+docs/archive/LAUNCH_DAY.md:30:## Monitoring During Day 1
+docs/archive/LAUNCH_DAY.md:94:## Timeline for Day 1
+docs/archive/OFFSITE_BUILD_PLAN_2026-03-27.md:139:| 3d | **Add weight trend line to Journey section** — visual arc Day 1 → present, projected goal date, rate of loss | Data viz | Medium | Must-have |
+docs/archive/OFFSITE_BUILD_PLAN_2026-03-27.md:146:| 3k | **Fix Yesterday/Tomorrow disabled state** — tooltip "Available after Day 1", active styling when applicable | Polish | Low | Must-have |
+docs/archive/OFFSITE_BUILD_PLAN_2026-03-27.md:184:| 4d | **Collapse locked badges by default** — lead with earned badges prominently, show "X more to unlock" with expand option. Prevents Day 1 wall-of-failure | UX/Psych | Low | Must-have |
+docs/archive/OFFSITE_BUILD_PLAN_2026-03-27.md:197:- At launch (Day 1), the badges section is mostly locked — needs inversion to lead with accomplishment
+docs/archive/OFFSITE_BUILD_PLAN_PART3.md:241:**Key themes:** Page launches 66% empty — start experiments before Day 1. Voting is the strongest engagement mechanic. Living library story (AI scans → Board reviews). No downvotes. Inline expand for browsing. Show the payoff on tiles.
+docs/DECISIONS.md:1024:**Outcome:** All 8 coaches live on both email pipeline and public observatory pages. System accumulates state forward from Day 6 of the experiment.
+docs/archive/OFFSITE_FEATURE_LIST_PART3.md:157:- [ ] "Started creatine Day 1. Added sleep stack Week 3. Paused Reishi Week 6 — no signal."
+docs/archive/OFFSITE_FEATURE_LIST_PART3.md:508:- [ ] Activate one challenge so hero zone has live check-in on Day 1
+docs/archive/A_GRADE_PHASE6_SUPPLEMENT.md:223:> Everything you need to run this platform. Read this on Day 1.
+docs/archive/usability_study.md:68:- *Find Matt's current weight trend*: Found it on Home page within 15 seconds via the Day 1 vs Today comparison.
+docs/archive/usability_study.md:209:Started at homepage. Day 1 vs Today section hit her immediately — "oh, he started at 297? I started at 275." Visible emotional connection. Went to Character Sheet. Saw the weight progression. Then found Journey Timeline under Story.
+docs/archive/usability_study.md:353:Looked at homepage for a full 60 seconds without scrolling. "This is very dark. Is this a video game?" Scrolled slowly. Found the Day 1 vs Today numbers. "Oh — this person has lost weight. That's good for them." Clicked "Story" in the nav. Ended up on Journey Timeline. "Okay, I see — this is someone's health journal."
+docs/archive/usability_study.md:457:4. **Day 1 vs Today** — the homepage comparison section was the single most effective element for creating instant emotional investment. Every weight-loss participant connected with it within seconds.
+docs/archive/usability_study.md:519:2. **P0 — Homepage hero rewrite**: The current hero should center the transformation narrative. "One man's public health transformation, tracked with 26 data sources, analyzed by AI, and documented with radical honesty." The Day 1 vs Today section is already the most effective element — promote it above the fold.
+docs/archive/STORY_ABOUT_REVIEW_SPEC.md:66:### Bug 2: Story Day Counter pre-launch and Day 1 states
+docs/archive/STORY_ABOUT_REVIEW_SPEC.md:76:2. Show "Day 1" on April 1
+docs/archive/STORY_ABOUT_REVIEW_SPEC.md:81:var daysIn = (d.journey || {}).days_in || (d.platform || {}).days_in;
+docs/archive/STORY_ABOUT_REVIEW_SPEC.md:89:var daysIn = (d.journey || {}).days_in || (d.platform || {}).days_in;
+docs/archive/STORY_ABOUT_REVIEW_SPEC.md:320:1. `Status: Day 1 — April 2026` — will be immediately stale after launch
+docs/archive/STORY_ABOUT_REVIEW_SPEC.md:330:  <span style="font-family:var(--font-mono);...color:var(--c-amber-500);">Day 1 &mdash; April 2026</span>
+docs/archive/OFFSITE_FEATURE_LIST.md:118:- [ ] Visual arc Day 1 → present
+docs/archive/OFFSITE_FEATURE_LIST.md:148:- [ ] Tooltip "Available after Day 1", active styling when applicable
+docs/archive/OFFSITE_FEATURE_LIST.md:730:### 13j. Add "Day 1 vs Now" column
+docs/archive/OFFSITE_FEATURE_LIST.md:835:- [ ] Day 1 events: baseline measurements, hypothesis set, first experiments
+docs/archive/USABILITY_BRIEF_PROMPT.md:31:1. P0-3: Homepage hero rewrite — change the hero from "AI experiment" framing to transformation-first: "One man's public health transformation." Promote Day 1 vs Today above all other content blocks. Update meta descriptions. Keep page title as "The Measured Life."
+docs/archive/USABILITY_BRIEF_PROMPT.md:37:4. MISC-6: Matt bio element — 2-sentence bio near Day 1 vs Today section. "Senior Director at a SaaS company. Started at 297 lbs on Feb 22, 2026. Built this entire platform with Claude."
+docs/archive/STATUS_PAGE_SPEC.md:179:        day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+docs/archive/STATUS_PAGE_SPEC.md:180:        return "gray", f"next: {day_names[expected_dow]}"
+docs/archive/IMPL_SUBSCRIBER_EMAIL_REDESIGN.md:4:**Goal:** Redesign the subscriber email experience across all four touchpoints: confirmation, welcome, weekly digest, and a new Day 2 bridge email.
+docs/archive/IMPL_SUBSCRIBER_EMAIL_REDESIGN.md:27:Day 2     → NEW: subscriber_onboarding_lambda.py                        [NEW LAMBDA]
+docs/archive/IMPL_SUBSCRIBER_EMAIL_REDESIGN.md:39:| `lambdas/subscriber_onboarding_lambda.py` | New file — Day 2 bridge email for new subscribers | New |
+docs/archive/IMPL_SUBSCRIBER_EMAIL_REDESIGN.md:262:## Phase 4: Day 2 Bridge Email (New Lambda)
+docs/archive/IMPL_SUBSCRIBER_EMAIL_REDESIGN.md:303:- `test_subscriber_onboarding.py` — trigger logic for Day 2 bridge
+docs/archive/reader-engagement-implementation-plan.md:585:Claudio: *"It replaces the 'Day 1 vs Today' section for returning visitors. First-timers see Day 1 vs Today (which is about the journey's arc). Returners see 'Since Your Last Visit' (which is about the recent chapter). Same screen real estate, different content, different purpose."*
+docs/archive/reader-engagement-implementation-plan.md:721:    // First visit — record timestamp, show "Day 1 vs Today"
+docs/archive/reader-engagement-implementation-plan.md:734:    // Hide "Day 1 vs Today" section
+docs/archive/reader-engagement-implementation-plan.md:751:4. Add container `<div>` to homepage HTML (inside existing layout, between hero and Day 1 vs Today)
+docs/archive/reader-engagement-implementation-plan.md:752:5. Conditional display logic: first visit = Day 1 vs Today; return visit = Since Last Visit
+docs/archive/reader-engagement-implementation-plan.md:1356:| Weight milestone | Body | "Crossed below 270 — Day 52" | "That's 32 lbs from 302. Velocity: 2.1 lbs/week." | /live/ |
+docs/archive/reader-engagement-implementation-plan.md:1358:| Experiment update | Science | "Cold exposure — Day 18 of 30" | "Morning protocol. HRV response: +8% vs baseline." | /experiments/ |
+docs/archive/reader-engagement-implementation-plan.md:1536:      "headline": "Crossed below 270 — Day 52",
+docs/archive/usability_implementation_brief.md:162:**Study evidence**: Sarah Mitchell (W1, 11 visits/30 days) connected instantly with Day 1 vs Today. Every weight-loss participant anchored on the human transformation. Zoe (journalist) said "pick one primary frame." Sofia Herrera (CMO) recommended leading with transformation.
+docs/archive/usability_implementation_brief.md:174:- The Day 1 vs Today section should be promoted ABOVE any other content blocks — it's already the most effective element on the page
+docs/archive/usability_implementation_brief.md:193:**Ensure**: Day 1 vs Today section appears as the first data section after the hero, before vital signs quadrant or What's New.
+docs/archive/usability_implementation_brief.md:198:- [ ] Day 1 vs Today is the first content section after hero
+docs/archive/usability_implementation_brief.md:565:   - Hero: Emphasize the weight journey, Day 1 vs Today, vice streaks
+docs/archive/usability_implementation_brief.md:899:**A small card on the homepage** (after Day 1 vs Today, near What's New Pulse) showing the active experiment:
+docs/archive/usability_implementation_brief.md:906:│  Day 14 of 30 · Hypothesis: ...   │
+docs/archive/usability_implementation_brief.md:974:**This is partially addressed by the Start Here modal (P0-1) and homepage hero rewrite (P0-3).** But consider adding a small "About Matt" element to the homepage — a 2-sentence bio with a photo, positioned near the Day 1 vs Today section.
+docs/archive/usability_implementation_brief.md:984:**Position**: Above or beside Day 1 vs Today. Small, not hero-sized. The data should still dominate — this just provides human context.
+docs/archive/usability_implementation_brief.md:989:- `site/index.html` — Add bio element near Day 1 vs Today section
+docs/archive/usability_implementation_brief.md:996:- [ ] Does not compete with Day 1 vs Today for visual attention
+docs/archive/DPR1_PHASE2_IMPLEMENTATION_BRIEF.md:255:**What:** The Start page shows a fully functioning narrative: *"Day 4. 296.5 lbs — down 10.5 from start. Sleep: 5.5h — short night. Recovery low at 33% — rest day suggested."* This is exactly what the Pulse page should say but doesn't (it shows "No signal yet"). The Start page already has the working implementation.
+docs/archive/FOOD_DELIVERY_SPEC.md:243:            days_in_m = (next_m - datetime(yr, mo, 1)).days
+docs/archive/FOOD_DELIVERY_SPEC.md:244:            opw = round(data['orders'] / (days_in_m / 7), 2)
+docs/archive/MEASUREMENTS_IMPLEMENTATION_SPEC.md:93:2026-03-29,17.0,49.0,49.5,52.0,55.5,16.0,17.0,17.5,18.0,19.0,19.0,30.5,30.0,Day 1 baseline
+docs/archive/MEASUREMENTS_IMPLEMENTATION_SPEC.md:363:## 8. Day 1 Seed Data
+docs/archive/MEASUREMENTS_IMPLEMENTATION_SPEC.md:437:1. `seeds/seed_measurements.py` — write Day 1 data directly to DynamoDB. Validate schema.
+docs/archive/PULSE_REDESIGN_SPEC.md:48:│  Day 487 · Strong · "Weight dropped again. System       │
+docs/archive/PULSE_REDESIGN_SPEC.md:80:- **Navigation arrows**: "← Day 486" / "Day 488 →" to walk through daily states.
+docs/archive/PULSE_REDESIGN_SPEC.md:228:    "day_number": 487,
+docs/archive/PULSE_REDESIGN_SPEC.md:345:- Enables "← Day 486 / Day 488 →" navigation on the page.
+docs/archive/PULSE_REDESIGN_SPEC.md:349:`averagejoematt.com/live?date=2026-03-25` renders that day's pulse. OG meta tags dynamically reflect the date and status: "Day 487: Strong — March 25, 2026". This is the shareable URL (Sofia requirement).
+docs/archive/PULSE_REDESIGN_SPEC.md:380:- Google sees: `<meta name="description" content="Day 487: Strong — Weight dropped again. Sleep was deep.">` in the raw HTML.
+docs/archive/DPR1_IMPLEMENTATION_BRIEF.md:81:- With weight=296.5, sleep=5.5h, recovery=33%: narrative reads something like "Day 4. 296.5 lbs, down 10.5 from start. Sleep short at 5.5 hours. Recovery low at 33% — rest day suggested."
+docs/archive/DPR1_IMPLEMENTATION_BRIEF.md:274:**What:** Three inconsistencies: (a) Habit count shows 62 in hero but meta description says 37; (b) Journal pull-quote attributed to "Day 47" on a Day 4 platform; (c) Day of Week chart claims "last 90 days" with only 3 days of data.
+docs/archive/DPR1_IMPLEMENTATION_BRIEF.md:684:- If no yesterday data exists (Day 1), line is hidden
+docs/archive/DPR1_IMPLEMENTATION_BRIEF.md:791:**What:** No indication of how long the current CGM sensor has been worn. Adding "Sensor: Day 4 of 15" contextualizes the data volume.
+docs/archive/OFFSITE_FEATURE_LIST_PART4.md:208:- [ ] Change `<div class="method-stat__value">365+</div>` to `<div class="method-stat__value" data-const="journey.days_in">—</div>`
+docs/archive/OFFSITE_FEATURE_LIST_PART4.md:236:- [ ] Days Tracked: `data-const="journey.days_in"`
+docs/archive/OFFSITE_FEATURE_LIST_PART4.md:361:- [ ] Hero subscribe label: "The Measured Life" not "Follow from Day 1"
+docs/archive/OFFSITE_FEATURE_LIST_PART4.md:550:- [ ] Apply to: ticker, hero, Day 1 vs Today, sparklines
+docs/archive/OFFSITE_FEATURE_LIST_PART4.md:592:- [ ] Verify `site_constants.js` has: platform.lambdas, platform.mcp_tools, platform.data_sources, platform.monthly_cost, platform.test_count, platform.review_count, platform.review_grade, journey.days_in, journey.start_weight, journey.goal_weight
+docs/archive/FIELD_NOTES_SPEC.md:180:PLATFORM WEEK: {platform_week} (days into journey: {days_into_journey})
+docs/archive/SPRINT_PLAN.md:236:| WR-33 | **Visual transformation comparison cards** | M (3-4h) | Panel §4,§5 — "the most shareable format in health/fitness" | Auto-generated single-image comparison cards: "Day 1 vs. Today" showing weight, HRV, recovery, body comp deltas. Formatted for Twitter/LinkedIn sharing. Could be a dedicated `/timeline/` enhancement or standalone component. | ✅ Done (homepage) |
+docs/archive/OFFSITE_BUILD_PLAN.md:139:| 3d | **Add weight trend line to Journey section** — visual arc Day 1 → present, projected goal date, rate of loss | Data viz | Medium | Must-have |
+docs/archive/OFFSITE_BUILD_PLAN.md:146:| 3k | **Fix Yesterday/Tomorrow disabled state** — tooltip "Available after Day 1", active styling when applicable | Polish | Low | Must-have |
+docs/archive/OFFSITE_BUILD_PLAN.md:184:| 4d | **Collapse locked badges by default** — lead with earned badges prominently, show "X more to unlock" with expand option. Prevents Day 1 wall-of-failure | UX/Psych | Low | Must-have |
+docs/archive/OFFSITE_BUILD_PLAN.md:197:- At launch (Day 1), the badges section is mostly locked — needs inversion to lead with accomplishment
+docs/archive/OFFSITE_BUILD_PLAN.md:663:| 13j | **Add "Day 1 vs Now" column** — three-point comparison | Data | Medium | Should-have |
+docs/archive/OFFSITE_BUILD_PLAN.md:669:**Key themes:** Self-check is highest-potential growth feature, currently buried. Evidence rating (●●●) is a credibility asset. Page needs one human moment. "Tracking soon" is a credibility liability. 27-benchmark SEO opportunity. "Day 1 vs Now" reveals the journey.
+docs/archive/OFFSITE_BUILD_PLAN.md:684:- [ ] Data: Day 1 baseline values
+docs/archive/OFFSITE_BUILD_PLAN.md:741:| 15d | **Pre-seed for launch** — Day 1 baselines, hypotheses, experiment starts | Content | Low | Must-have |
+docs/archive/OFFSITE_BUILD_PLAN.md:758:- [ ] Content: pre-seed Day 1 events
+docs/archive/OFFSITE_BUILD_PLAN_PART4.md:284:| 32j | Make "Day 1" status dynamic via data-const | Architecture | Low | Should-have |
+docs/archive/OFFSITE_BUILD_PLAN_PART4.md:292:**Current state:** 1,763 lines. Ticker, hero with weight counter and subscribe, about section, Day 1 vs Today, sparklines + AI Brief, "What the Data Found," Recent Chronicles, "What's Inside" feature cards, subscribe CTA, sticky bar, challenge ticker.
+docs/archive/OFFSITE_BUILD_PLAN_PART4.md:409:| GEN-3 | "Your Day 1" guided start page | Maya | Content/Feature |
+docs/archive/HOME_EVOLUTION_SPEC.md:207:**What**: Current section flow: Hero → Signals/Brief → What's New → Discoveries → Day 1 vs Today → Quote → Feature Cards → About/Stack → Subscribe. That's 8+ sections.
+docs/archive/HOME_EVOLUTION_SPEC.md:215:| Day 1 vs Today | **Keep** — move higher, between hero and dashboard |
+docs/archive/HOME_EVOLUTION_SPEC.md:220:**Net**: Hero → Day 1 vs Today → Live Dashboard → What the Data Found → 3 Moments → About/Stack → Subscribe
+docs/archive/OFFSITE_PRIORITY_SPEC.md:507:4. Day 1 vs Today comparison (4 dimensions)
+docs/archive/V2_PAGE_DESIGN_BRIEFS.md:226:1. "Days on Journey" stat chip: verify `hero.days_on_journey` or `j.days_in` is populated. Current fallback calculates from Sept 1 2024 — that's the platform start, but journey start for weight should be Feb 22 2026. Verify the correct date is used.
+docs/archive/V2_PAGE_DESIGN_BRIEFS.md:227:2. "Current Streak" chip: display "Day 0" when no active streak, not blank.
+docs/archive/V2_PAGE_DESIGN_BRIEFS.md:242:**"Day 1 vs Today" comparison card**:
+docs/archive/V2_PAGE_DESIGN_BRIEFS.md:347:- Day 1 baseline vs today for all major metrics
+docs/archive/FIELD_NOTES_SPEC_ROOT.md:188:PLATFORM WEEK: {platform_week} (days into journey: {days_into_journey})
+docs/archive/WEBSITE_STRATEGY.md:170:| D10 | Day 1 baseline values hardcoded | Static numbers in HTML | Pull from DynamoDB baseline partition or public_stats |
+docs/archive/specs-pre-launch/SPEC_CHARACTER_ENGINE_v1.1.0.md:310:    # Day 7 ≈ 58, Day 14 ≈ 77, Day 30 = 100
+docs/archive/specs-pre-launch/SPEC_CHARACTER_ENGINE_v1.1.0.md:837:    """Day 7 should score higher than linear 23%."""
+docs/archive/WEBSITE_REDESIGN_SPEC.md:40:- HOME-3: Day 1 vs Today 4 dimensions ✅ (confirmed v3.9.8 — all 4 dimensions live with API data, Day 1 baseline + today comparison)
+docs/archive/2026_q2_specs/cowork_handoff.md:10:Matthew did a house move in mid-March 2026 and effectively went silent on the AJM platform and his P40 framework for ~4 weeks (April 2 → May 1). One journal entry exists from April 1 ("Day 1") and nothing since. Most of the platform is still standing — Whoop, Eight Sleep, weather, Todoist, Apple Health webhook are flowing — but several OAuth-based integrations have died silently during the gap (known issue BUG-005 from Feb 22 docs: ingestion Lambdas don't auto-refresh tokens). New Function Health labs are pending upload. Today we built a 75-step weekend re-entry plan and started executing Phase 1 (connector sweep). Got blocked on Withings re-auth and the user is moving to Cowork so the new Claude can read the actual repo and debug the auth script directly.
+docs/archive/2026_q2_specs/cowork_handoff.md:108:- **Don't delete the April 1 "Day 1" journal entry.** It's the only entry and it's honest.
+docs/archive/2026_q2_specs/cowork_handoff.md:122:5. The user's North Star: by Monday 6am every source flows or has a known workaround, the new FH labs are loaded, the re-entry journal entry is written, and the daily_brief Lambda fires Cycle 2 Day 1.
+docs/archive/OBSERVATORY_V2_SPEC.md:561:- X-axis: Full journey timeline (Day 1 to present)
+docs/archive/2026_q2_specs/V3_OBSERVATORY_SPEC.md:205:def build_prompt_v3(expert_key, data, days_in_experiment=None, week_number=None):
+docs/archive/2026_q2_specs/V3_OBSERVATORY_SPEC.md:211:    week_num = week_number or max(1, (days_in_experiment or 1) // 7)
+docs/archive/2026_q2_specs/V3_OBSERVATORY_SPEC.md:252:This is Week {week_num} of the experiment (started {EXPERIMENT_START}, now day {days_in_experiment}).
+docs/archive/2026_q2_specs/V3_OBSERVATORY_SPEC.md:337:    "rest_days": days_in_experiment - len(set(a.get("sk", "")[:15] for a in activities)),
+docs/archive/2026_q2_specs/V3_OBSERVATORY_SPEC.md:374:week_number = max(1, days_in_experiment // 7 + 1)
+docs/archive/2026_q2_specs/V3_OBSERVATORY_SPEC.md:375:prompt = build_prompt_v3(expert_key, data, days_in_experiment, week_number)
+docs/archive/2026_q2_specs/V3_OBSERVATORY_SPEC.md:487:Add `week_number` and `days_in_experiment` to the response. In `site_api_lambda.py`:
+docs/archive/2026_q2_specs/V3_OBSERVATORY_SPEC.md:492:if ai_item.get("days_in_experiment"):
+docs/archive/2026_q2_specs/V3_OBSERVATORY_SPEC.md:493:    resp_data["days_in_experiment"] = int(ai_item.get("days_in_experiment", 0))
+docs/archive/2026_q2_specs/COACH_INTELLIGENCE_DESIGN_SPEC.md:769:### Day 6 Seed (Not a Full Backfill)
+docs/archive/2026_q2_specs/V3_1_OBSERVATORY_SPEC.md:217:SLEEP OBSERVATORY                                          Day 5 · Updated 0h ago
+docs/archive/2026_q2_specs/V3_1_OBSERVATORY_SPEC.md:231:| Physical | 307 lbs on Day 1. Tracking the trajectory across 12 months. |
+docs/archive/2026_q2_specs/EXPERIMENTS_EVOLUTION_SPEC.md:214:1. ✅ Tongkat Ali — Recovery (ACTIVE, Day 44)
+docs/archive/2026_q2_specs/EXPERIMENTS_EVOLUTION_SPEC.md:215:2. ✅ NMN — NAD+ (ACTIVE, Day 44)
+docs/archive/2026_q2_specs/EXPERIMENTS_EVOLUTION_SPEC.md:216:3. ✅ Creatine — Strength (ACTIVE, Day 39)
+docs/archive/2026_q2_specs/EXPERIMENTS_EVOLUTION_SPEC.md:217:4. ✅ Berberine — Glucose (ACTIVE, Day 44)
+docs/archive/2026_q2_specs/EXPERIMENTS_EVOLUTION_SPEC.md:386:│ │  Day 44  │                                                           │
+docs/archive/2026_q2_specs/REVIEW_RUNBOOK.md:72:| Monthly cost should be under $20 budget | Check `cost.current_month.total`. Project to full month: `total / days_elapsed * days_in_month`. Flag if projected > $20. | P0 |
+docs/archive/2026_q2_specs/BACKLOG_HANDOFF_CLAUDE_CODE.md:48:Create a seed script at `seeds/seed_discoveries.py` that writes the following Day 1 baseline events to DynamoDB. These are the pre-launch seed events the Product Board specified (recommendation 15d):
+docs/archive/2026_q2_specs/BACKLOG_HANDOFF_CLAUDE_CODE.md:55:        "title": "Day 1 — Journey Begins",
+docs/archive/2026_q2_specs/BACKLOG_HANDOFF_CLAUDE_CODE.md:180:│  Day {days_in}                                      │
+docs/archive/2026_q2_specs/BACKLOG_HANDOFF_CLAUDE_CODE.md:231:        "days_in": _days_in,
+docs/archive/intelligence-layer/INTELLIGENCE_LAYER_V2_1_SPEC.md:82:Week 13 surprise: "No postprandial spikes at all on Day 4 despite a 
+docs/specs/SPEC_CHARACTER_ENGINE_v1.1.0.md:310:    # Day 7 ≈ 58, Day 14 ≈ 77, Day 30 = 100
+docs/specs/SPEC_CHARACTER_ENGINE_v1.1.0.md:837:    """Day 7 should score higher than linear 23%."""
+docs/specs/PRODUCT_BOARD_SPRINT_HANDOVER.md:48:DISC-7 seeding was marked DONE in CHANGELOG v4.7.4. Four Day 1 events were seeded to DynamoDB. The `annotate_discovery` and `get_discovery_annotations` MCP tools exist in `mcp/tools_social.py`. The Discoveries page frontend (`site/discoveries/index.html`) has the full annotation UI.
+docs/specs/PRODUCT_BOARD_SPRINT_HANDOVER.md:61:If the response contains the 4 Day 1 seed events from `seeds/seed_discoveries.py` (milestone, 2 experiments, 1 discovery), the page should render them. Open `https://averagejoematt.com/discoveries/` and visually verify:
+docs/specs/PRODUCT_BOARD_SPRINT_HANDOVER.md:358:- `subscriber_onboarding_lambda.py` — sends Day 2 bridge email to new subscribers ✅
+docs/reviews/REVIEW_BUNDLE_2026-03-30.md:152:- Day 2 bridge email: new `subscriber-onboarding` Lambda with 3 curated installments
+docs/reviews/REVIEW_BUNDLE_2026-03-30.md:371:## v4.2.2 — 2026-03-28: Offsite Day 2 — Story/About Punch List + Status Page Spec + Food Delivery Spec
+docs/reviews/REVIEW_BUNDLE_2026-03-30.md:373:Full-day offsite session (Day 2). Three board sessions convened. Three implementation specs written and committed. Story/About pages implemented directly. Food delivery CSV analyzed (1,598 transactions, 15 years). No Lambda code shipped — specs and site page implementations ready for Claude Code handoff.
+docs/reviews/REVIEW_BUNDLE_2026-03-30.md:409:- Static "Day 1 — April 2026" → live JS day counter (shows "Launching April 1" pre-launch)
+docs/reviews/REVIEW_BUNDLE_2026-03-30.md:412:- Day counter pre/post launch aware: "Launching April 1" → "Day 1" → "Day N"
+docs/reviews/REVIEW_BUNDLE_2026-03-30.md:2010:**test_shared_modules.py** (66 tests): test_empty_blocked, test_none_blocked, test_too_short_blocked, test_truncated_blocked, test_good_text_passes, test_dangerous_training_red_recovery, test_aggressive_borderline_warns, test_low_cal_blocked, test_causation_warns, test_generic_phrases_warn, test_sanitized_text_fallback, test_sanitized_text_original, test_fallbacks_all_types, test_validate_json_none_blocked, test_validate_json_missing_key, test_validate_json_ok, test_get_logger_type, test_get_logger_singleton, test_set_date, test_set_correlation_id, test_info_json_output, test_positional_args, test_helpers_no_raise, test_check_sick_day_none, test_check_sick_day_found, test_check_sick_day_decimal, test_check_sick_day_ddb_error, test_get_sick_days_range_empty, test_get_sick_days_range_error, test_write_sick_day_fields, test_write_sick_day_no_reason, test_delete_sick_day, test_d2f_decimal, test_d2f_nested, test_avg_basic, test_avg_none_ignored, test_avg_empty, test_avg_all_none, test_fmt_value, test_fmt_none, test_fmt_with_unit, test_fmt_num, test_fmt_num_none, test_safe_float_present, test_safe_float_missing, test_safe_float_default, test_dedup_different_sports, test_dedup_removes_duplicate, test_dedup_empty, test_normalize_whoop_sleep, test_ex_whoop_from_list, test_ex_whoop_empty, test_ex_withings_latest, test_banister_zero_input, test_banister_with_training, test_validate_whoop_ok, test_validate_whoop_out_of_range, test_validate_empty_record, test_validation_result_structure, test_list_supported_sources, test_call_anthropic_has_output_type_param, test_ai_validator_importable, test_ai_output_type_importable, test_bod_caller_passes_output_type, test_journal_caller_passes_output_type, test_email_lambdas_dont_call_anthropic_directly
+docs/reviews/REVIEW_BUNDLE_2026-03-30.md:2740:| **Jordan Kim** | Growth | A- | A- | = | "Community page created. Discord strategy ready. Subscriber onboarding Lambda (Day 2 bridge email) is the right engagement play. Ready for April 1." |
+docs/reviews/REVIEW_BUNDLE_2026-03-30.md:2882:| 10 | **Garmin re-auth** — resolve the last red item on pipeline health check | S | Low | Day 1 |
+docs/reviews/REVIEW_2026-03-29_v19.md:61:| **Jordan Kim** | Growth | A- | A- | = | "Community page created. Discord strategy ready. Subscriber onboarding Lambda (Day 2 bridge email) is the right engagement play. Ready for April 1." |
+docs/reviews/REVIEW_2026-03-29_v19.md:203:| 10 | **Garmin re-auth** — resolve the last red item on pipeline health check | S | Low | Day 1 |
+docs/briefs/BRIEF_2026-03-26_design_brief.md:7:> **Deadline**: April 1, 2026 (Day 1 launch)
+docs/briefs/BRIEF_2026-03-26_design_brief.md:144:**Why coral?** It's warm, urgent, and stands out against both green and amber. The "Subscribe" button should NOT be the same green as "Day 57" in the nav. Coral says "do this now" — green says "this is data."
+docs/briefs/BRIEF_2026-03-26_design_brief.md:358:| Hero weight counter shows null | Wire to live API data OR hardcode "302" as starting weight with "Day 1: April 1" | James (CTO) |
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_PHASE2_RESULTS.md:39:Every protocol has adherence showing "—" which is consistent with Day 4. The signal statuses (Positive/Pending) are appropriately differentiated. Evidence citations (Walker 2017, Seiler & Kjerland 2006, Zeevi et al. 2015, de Cabo & Mattson 2019) are specific and linked.
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_PHASE2_RESULTS.md:73:The Record section ("No experiments match this filter") will naturally be empty until experiments complete — this is Day 4 of 30-day experiments. Appropriate.
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_PHASE2_RESULTS.md:93:The timeline is the most interesting element — it shows real entries: Day 1 milestone, 4 experiment launches, and several Inner Life discoveries (Nutrition Patterns, Journal Breakthroughs, Coaching Insights, Weekly Patterns) dating back to late March. These appear to be auto-generated from platform data.
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_PHASE2_RESULTS.md:95:The brutally honest metric: *"In 3 days, the platform surfaced 0 findings. 0 were investigated. 0 changed behavior."* and *"0% of AI findings led to behavioral change."* This is the kind of radical transparency that makes the platform credible — though 3 days isn't enough time to expect behavioral change from AI findings. Consider adding a "Day 4 — behavioral change tracking begins at Day 30" context note.
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_PHASE2_RESULTS.md:199:Seven interactive calculators, each showing Matthew's "Day 1" vs "Current" values alongside the visitor's inputs. This is the best "try it yourself" feature on the site after the Benchmarks Quick Check.
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_PHASE2_RESULTS.md:301:**Status** is the most comprehensive system health page on a personal project. 43 components, honest stale warnings, operational sparklines. **Privacy** is exemplary plain-language policy. **Community** is the weakest page on the entire site — bare minimum for a platform that measures social connection as a pillar. **Start** is surprisingly strong and critically has a working narrative generator that the Pulse page lacks. **Kitchen** is a placeholder that should be hidden from nav. **Ledger** has a compelling concept but is theoretical at Day 4. **Elena** is excellent meta-content with beautiful closing line. **404** is on-brand.
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_PHASE2_RESULTS.md:339:**Viktor:** *"The lifecycle model (Challenges → Experiments → Protocols → Stack → Discoveries) is the most original idea on this site. But on Day 4, the flywheel hasn't turned yet: 0 experiments completed, 0 discoveries from experiments, 6 protocols with no adherence data. The architecture is right. The question is whether Matthew will use the system he built — and whether 62 habits and 52 experiment candidates are setting up paralysis rather than progress."*
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_PHASE2_RESULTS.md:350:| Protocols | A- | Adherence all "—" (Day 4, expected) | Yes |
+docs/reviews/IMPLEMENTATION_PLAN_WR4.md:5:**Target**: All items complete before April 1, 2026 (Day 1)  
+docs/reviews/IMPLEMENTATION_PLAN_WR4.md:61:| 2.9 | Fix "Day 1 vs Today" empty states | 🟡 | `site/index.html` | When data shows "—" for weight/habits/sleep/level, show a message: "Data populates after Day 1 (April 1)" instead of dashes. Prevents the broken-dashboard look for first-time visitors. | Mara, Persona B |
+docs/reviews/IMPLEMENTATION_PLAN_WR4.md:82:| 3.1 | Fix week numbering display | 🟡 | `site/journal/posts.json` | Options: (A) Re-number remaining articles sequentially (Prologue, Week 1, Week 2, Prequel), (B) Keep negative numbering but add "Prequel Series" label to make gaps expected, (C) Add a note on the chronicle page: "The prequel chronicles count backward from Day 1." Board recommendation: Option C — the countdown-to-Day-1 numbering is actually a feature if explained. | Ava, Persona D |
+docs/reviews/IMPLEMENTATION_PLAN_WR4.md:83:| 3.2 | Add chronicle numbering explainer | 🟡 | `site/chronicle/index.html` | Add a small note below the series intro cards: "Prequel chronicles count backward from Day 1 (April 1). Week −4 was four weeks before launch. The series resets to Week 1 after Day 1." | Ava |
+docs/reviews/IMPLEMENTATION_PLAN_WR4.md:94:| 3.8 | Update subscribe page content | 🟡 | `site/subscribe/index.html` | Add: "What you'll get" section (weekly chronicle by Elena Voss, every Wednesday). "What it looks like" link to /chronicle/sample/. "When it starts" — Week 1 ships after April 1 Day 1. | Jordan |
+docs/reviews/IMPLEMENTATION_PLAN_WR4.md:95:| 3.9 | Differentiate CTA messaging by context | 🟢 | `site/assets/js/components.js`, `site/index.html`, `site/story/index.html`, `site/chronicle/index.html` | Chronicle page CTA: "Follow Elena's weekly chronicle." Homepage CTA: "Follow the experiment from Day 1." Data pages CTA: "Get AI-powered insights weekly." Story page CTA: "Follow the journey." | Jordan, Sofia |
+docs/reviews/IMPLEMENTATION_PLAN_WR4.md:126:| 4.7 | Add "experiments begin April 1" empty state | 🟡 | `site/experiments/index.html` | All seed experiments are abandoned. Page should show: "N=1 experiments begin on Day 1 (April 1, 2026). Each experiment tests one variable at a time with a minimum 14-day window. Check back after launch." | Lena |
+docs/reviews/IMPLEMENTATION_PLAN_WR4.md:157:| 5.5 | Weekly Snapshot page prep | 🟢 | `site/weekly/index.html` | Ensure the page has a "Weekly snapshots begin after Day 1" message and the pipeline is ready to generate the first one. | Ava |
+docs/reviews/IMPLEMENTATION_PLAN_WR4.md:211:| **April 1** | | **Day 1 — Launch** | |
+docs/reviews/REVIEW_BUNDLE_2026-04-04.md:111:## v4.9.0 — Day 3 QA Sweep + Cost Optimization (2026-04-03)
+docs/reviews/REVIEW_BUNDLE_2026-04-04.md:163:## v4.8.3 — 2026-04-01: Day 1 Sweep + Pipeline Reliability
+docs/reviews/REVIEW_BUNDLE_2026-04-04.md:186:- Pulse day_number, challenge/experiment days_in: switched from UTC to PT
+docs/reviews/REVIEW_BUNDLE_2026-04-04.md:246:## v4.8.1 — 2026-04-01: Day 1 Pipeline Fixes
+docs/reviews/REVIEW_BUNDLE_2026-04-04.md:248:Critical fixes discovered during Day 1 go-live. Most issues traced to timing/sequencing assumptions that break on the first day of the experiment.
+docs/reviews/REVIEW_BUNDLE_2026-04-04.md:260:- **Day counter**: `days_in` showed 0 on Day 1. Fixed to `max(1, days + 1)` across 4 files.
+docs/reviews/REVIEW_BUNDLE_2026-04-04.md:265:- **Stale fallbacks**: character_stats.json, site_config.json overwritten with Day 1 values.
+docs/reviews/REVIEW_BUNDLE_2026-04-04.md:361:- `seeds/seed_discoveries.py` created (idempotent) — 4 Day 1 events seeded to DynamoDB
+docs/reviews/REVIEW_BUNDLE_2026-04-04.md:362:- Day 1 milestone annotation merges with journey_timeline correctly
+docs/reviews/REVIEW_BUNDLE_2026-04-04.md:2092:**test_shared_modules.py** (66 tests): test_empty_blocked, test_none_blocked, test_too_short_blocked, test_truncated_blocked, test_good_text_passes, test_dangerous_training_red_recovery, test_aggressive_borderline_warns, test_low_cal_blocked, test_causation_warns, test_generic_phrases_warn, test_sanitized_text_fallback, test_sanitized_text_original, test_fallbacks_all_types, test_validate_json_none_blocked, test_validate_json_missing_key, test_validate_json_ok, test_get_logger_type, test_get_logger_singleton, test_set_date, test_set_correlation_id, test_info_json_output, test_positional_args, test_helpers_no_raise, test_check_sick_day_none, test_check_sick_day_found, test_check_sick_day_decimal, test_check_sick_day_ddb_error, test_get_sick_days_range_empty, test_get_sick_days_range_error, test_write_sick_day_fields, test_write_sick_day_no_reason, test_delete_sick_day, test_d2f_decimal, test_d2f_nested, test_avg_basic, test_avg_none_ignored, test_avg_empty, test_avg_all_none, test_fmt_value, test_fmt_none, test_fmt_with_unit, test_fmt_num, test_fmt_num_none, test_safe_float_present, test_safe_float_missing, test_safe_float_default, test_dedup_different_sports, test_dedup_removes_duplicate, test_dedup_empty, test_normalize_whoop_sleep, test_ex_whoop_from_list, test_ex_whoop_empty, test_ex_withings_latest, test_banister_zero_input, test_banister_with_training, test_validate_whoop_ok, test_validate_whoop_out_of_range, test_validate_empty_record, test_validation_result_structure, test_list_supported_sources, test_call_anthropic_has_output_type_param, test_ai_validator_importable, test_ai_output_type_importable, test_bod_caller_passes_output_type, test_journal_caller_passes_output_type, test_email_lambdas_dont_call_anthropic_directly
+docs/reviews/PRODUCT_REVIEW_PR1_REVISED.md:3:**Review Date:** April 4, 2026 · **Platform Version:** v4.9.0 · **Day 4 of Experiment**
+docs/reviews/PRODUCT_REVIEW_PR1_REVISED.md:44:| **Character** | `/character/` | B+ | The RPG metaphor is well-executed. 7-pillar system with EMA smoothing is genuinely sophisticated. Methodology section is honest about the math. Level 2 at Day 4 is expected and honest. | Heatmap will fill naturally. The level-up notification email hook ("Get notified when I level up") is a smart retention mechanic. |
+docs/reviews/PRODUCT_REVIEW_PR1_REVISED.md:55:| **Sleep** | `/sleep/` | B+ | Good editorial design with cross-device triangulation framing. Real data: 7.44 hrs, score 87, 22.7% deep, 34.4% REM from Eight Sleep. Whoop recovery and HRV cross-referenced. Hypothesis card is a nice touch. | "Early data" banner is appropriate for Day 4 but should auto-remove after a threshold (30 days?). Charts need time to show trends but the infrastructure is working. |
+docs/reviews/PRODUCT_REVIEW_PR1_REVISED.md:58:| **Training** | `/training/` | B+ | "Training for 80, not for 30" is a strong framing. Real data from Strava (4-mile walk), Whoop (strain, recovery), Garmin (steps, HR). The pull-quote about "the fall — how fast the void fills" is the kind of honesty that makes this site unique. | Zone 2 and strength charts need weeks to show trends. The training modality breakdown is well-designed but thin at Day 4. |
+docs/reviews/PRODUCT_REVIEW_PR1_REVISED.md:60:| **Mind** | `/mind/` | A | The crown jewel. "The pillar I avoided building." The confessional about relapses that can't be explained, intellectualizing over feeling — this is the most differentiated content on the internet for a quantified self project. Day 1 journal entry exists and is raw. | Vice streaks showing 0/8 is honest. The temptation logging system needs usage to prove its value but the framework is compelling. |
+docs/reviews/PRODUCT_REVIEW_PR1_REVISED.md:105:| **Ask** | `/ask/` | B | AI-powered Q&A against 26 data sources. Prompt suggestions well-chosen. | Subscribe upsell premature on Day 4. |
+docs/reviews/PRODUCT_REVIEW_PR1_REVISED.md:307:"The Mind page avoids toxic positivity entirely. The Day 1 journal entry is psychologically honest — health anxiety, work anxiety, the test of no doom-scrolling. The temptation logging system (vice streaks at 0/8) is honest about where he's starting."
+docs/reviews/PRODUCT_REVIEW_PR1_REVISED.md:310:"The accountability framing is healthy. Partner partnership in challenges, the subscriber relationship — all point toward connection. The Day 1 journal's mention of work relationships and imposter syndrome shows Matthew is tracking social health, not just physical."
+docs/reviews/PRODUCT_REVIEW_PR1_REVISED.md:368:| Entertainment | 7 | Real data creates a compelling live narrative even at Day 4. |
+docs/reviews/PRODUCT_REVIEW_PR1_REVISED.md:450:*Review conducted April 4, 2026. Platform v4.9.0. Day 4 of experiment.*
+docs/reviews/REVIEW_BUNDLE_2026-03-29.md:72:- Day 2 bridge email: new `subscriber-onboarding` Lambda with 3 curated installments
+docs/reviews/REVIEW_BUNDLE_2026-03-29.md:291:## v4.2.2 — 2026-03-28: Offsite Day 2 — Story/About Punch List + Status Page Spec + Food Delivery Spec
+docs/reviews/REVIEW_BUNDLE_2026-03-29.md:293:Full-day offsite session (Day 2). Three board sessions convened. Three implementation specs written and committed. Story/About pages implemented directly. Food delivery CSV analyzed (1,598 transactions, 15 years). No Lambda code shipped — specs and site page implementations ready for Claude Code handoff.
+docs/reviews/REVIEW_BUNDLE_2026-03-29.md:329:- Static "Day 1 — April 2026" → live JS day counter (shows "Launching April 1" pre-launch)
+docs/reviews/REVIEW_BUNDLE_2026-03-29.md:332:- Day counter pre/post launch aware: "Launching April 1" → "Day 1" → "Day N"
+docs/reviews/REVIEW_BUNDLE_2026-03-29.md:2003:**test_shared_modules.py** (66 tests): test_empty_blocked, test_none_blocked, test_too_short_blocked, test_truncated_blocked, test_good_text_passes, test_dangerous_training_red_recovery, test_aggressive_borderline_warns, test_low_cal_blocked, test_causation_warns, test_generic_phrases_warn, test_sanitized_text_fallback, test_sanitized_text_original, test_fallbacks_all_types, test_validate_json_none_blocked, test_validate_json_missing_key, test_validate_json_ok, test_get_logger_type, test_get_logger_singleton, test_set_date, test_set_correlation_id, test_info_json_output, test_positional_args, test_helpers_no_raise, test_check_sick_day_none, test_check_sick_day_found, test_check_sick_day_decimal, test_check_sick_day_ddb_error, test_get_sick_days_range_empty, test_get_sick_days_range_error, test_write_sick_day_fields, test_write_sick_day_no_reason, test_delete_sick_day, test_d2f_decimal, test_d2f_nested, test_avg_basic, test_avg_none_ignored, test_avg_empty, test_avg_all_none, test_fmt_value, test_fmt_none, test_fmt_with_unit, test_fmt_num, test_fmt_num_none, test_safe_float_present, test_safe_float_missing, test_safe_float_default, test_dedup_different_sports, test_dedup_removes_duplicate, test_dedup_empty, test_normalize_whoop_sleep, test_ex_whoop_from_list, test_ex_whoop_empty, test_ex_withings_latest, test_banister_zero_input, test_banister_with_training, test_validate_whoop_ok, test_validate_whoop_out_of_range, test_validate_empty_record, test_validation_result_structure, test_list_supported_sources, test_call_anthropic_has_output_type_param, test_ai_validator_importable, test_ai_output_type_importable, test_bod_caller_passes_output_type, test_journal_caller_passes_output_type, test_email_lambdas_dont_call_anthropic_directly
+docs/reviews/REVIEW_BUNDLE_2026-03-29.md:2880:| 3 | **lambda_map.json update** — add all missing entries, add CI lint for orphan .py files | S | High | Day 1 post-launch |
+docs/reviews/REVIEW_BUNDLE_2026-03-29.md:2881:| 4 | **New resource alarms** — error alarms for og-image-generator, food-delivery; freshness for food-delivery | S | Medium | Day 1 post-launch |
+docs/reviews/REVIEW_BUNDLE_2026-03-15.md:1980:**test_shared_modules.py** (66 tests): test_empty_blocked, test_none_blocked, test_too_short_blocked, test_truncated_blocked, test_good_text_passes, test_dangerous_training_red_recovery, test_aggressive_borderline_warns, test_low_cal_blocked, test_causation_warns, test_generic_phrases_warn, test_sanitized_text_fallback, test_sanitized_text_original, test_fallbacks_all_types, test_validate_json_none_blocked, test_validate_json_missing_key, test_validate_json_ok, test_get_logger_type, test_get_logger_singleton, test_set_date, test_set_correlation_id, test_info_json_output, test_positional_args, test_helpers_no_raise, test_check_sick_day_none, test_check_sick_day_found, test_check_sick_day_decimal, test_check_sick_day_ddb_error, test_get_sick_days_range_empty, test_get_sick_days_range_error, test_write_sick_day_fields, test_write_sick_day_no_reason, test_delete_sick_day, test_d2f_decimal, test_d2f_nested, test_avg_basic, test_avg_none_ignored, test_avg_empty, test_avg_all_none, test_fmt_value, test_fmt_none, test_fmt_with_unit, test_fmt_num, test_fmt_num_none, test_safe_float_present, test_safe_float_missing, test_safe_float_default, test_dedup_different_sports, test_dedup_removes_duplicate, test_dedup_empty, test_normalize_whoop_sleep, test_ex_whoop_from_list, test_ex_whoop_empty, test_ex_withings_latest, test_banister_zero_input, test_banister_with_training, test_validate_whoop_ok, test_validate_whoop_out_of_range, test_validate_empty_record, test_validation_result_structure, test_list_supported_sources, test_call_anthropic_has_output_type_param, test_ai_validator_importable, test_ai_output_type_importable, test_bod_caller_passes_output_type, test_journal_caller_passes_output_type, test_email_lambdas_dont_call_anthropic_directly
+docs/reviews/REVIEW_2026-04-04_v20.md:47:This is the most consequential review delta in the platform's history. Five days ago at R19, the platform was a B+ system preparing for launch. Today it is a launched, stabilized, documented A- system that has survived its first 72 hours of public operation and emerged materially stronger. The grade movement from B+ to A- is earned through three concurrent achievements: a successful public launch with rapid Day 1-3 triage, a dedicated documentation sprint that resolved every outstanding R19 finding, and a QA sweep of unprecedented thoroughness that found and fixed 51 issues in a single session.
+docs/reviews/REVIEW_2026-04-04_v20.md:82:| Omar Khalil | Data Architecture | A | A | = | "DynamoDB single-table design continues to scale cleanly. 30 partitions, no GSIs needed. Gap-aware backfill self-healed all Day 1 data issues. Water intake deduplication (timestamp map) is particularly elegant." |
+docs/reviews/REVIEW_2026-04-04_v20.md:121:| 3 | Reliability | A- | A | ↑ | Zero P1/P2 incidents in v4.8–v4.9 window. Pipeline-health-check probes secrets daily. MCP canary fixed. Gap-aware backfill self-healed Day 1 data issues. 4 SLOs defined with alarms. |
+docs/reviews/REVIEW_2026-04-04_v20.md:226:**1. Launch Execution Under Pressure (Sarah Chen, Ava Moreau):** The April 1 launch was the first real stress test. The v4.8.0–v4.9.0 arc shows systematic triage: 6 stale-layer Lambdas fixed Day 1, MCP canary mismatch caught and fixed, Garmin rate limiting addressed, timezone edge cases resolved across 4 files, 57 QA issues found and 51 fixed in a single session. Zero P1/P2 incidents. This is operational maturity.
+docs/reviews/REVIEW_2026-03-26_website_v4.md:29:- Homepage hero section is dense. "Day 1. For real this time." — wait, is this a fitness tracker or a dev blog? Took 15 seconds to understand the dual identity.
+docs/reviews/REVIEW_2026-03-26_website_v4.md:57:- Homepage "Day 1 vs Today" comparison section shows mostly dashes and loading states for a first-time visitor. If the data hasn't populated, this section actively hurts.
+docs/reviews/REVIEW_2026-03-26_website_v4.md:84:- The prequel banner on the homepage says "everything before April 1 is the testing window" — but what does April 1 mean? There's no explanation of what changes on Day 1 vs. what's been happening.
+docs/reviews/REVIEW_2026-03-26_website_v4.md:133:- "Day 1. For real this time." — For real *what* time? This presumes context the visitor doesn't have.
+docs/reviews/REVIEW_2026-03-26_website_v4.md:276:- The experiments page will need a fresh state after all 4 seed experiments were abandoned. Consider adding an "experiments begin Day 1" placeholder.
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_RESULTS.md:24:The page displays 8 "glyph" signals: Scale, Water, Move, Lift, Recovery, Sleep, Journal, Mind. On capture day (Day 4), only 2 of 8 signals are reporting real data (Scale: 296.5 lbs, green; Water: 1.3L, gray). The remaining 6 are gray/absent: Move shows "Z2 this week: 0/150 min", Lift is "Rest day", Recovery shows "33%" but is gray-state, Sleep is "5.5 hrs" but gray, Journal is "Closed", Mind is "Not tracked today."
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_RESULTS.md:26:The headline narrative reads: **"Midday check: No signal yet."** — which is a time-of-day prefix bolted onto a null narrative. This is the first thing a visitor reads after the day number, and it says "no signal." That's honest, but for a page called "The Pulse" on Day 4 of a public health experiment, it undercuts the promise. The system has data — weight is down 10.5 lbs, recovery is 33%, sleep was 5.5 hours — but the narrative generator didn't synthesize any of it into a sentence.
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_RESULTS.md:30:**Ava Moreau (Content):** "No signal yet" is technically correct but editorially dead. This should say something like: "Day 4. Weight 296.5 — down 10.5 from start. Sleep short at 5.5 hours, recovery at 33%. Journal and Mind not yet logged." The data exists. The narrative engine just isn't using it.
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_RESULTS.md:62:A stranger landing here sees: Day 4, "Mixed" status, "No signal yet," and mostly gray indicators. They'd conclude: "This person just started and the system barely has data." The reading path CTA at the bottom ("These numbers tell part of the story. The rest is in the writing. → Read the latest Chronicle") is a nice throughline connector. But the page doesn't explain what these 8 glyphs mean or why someone should care. **No context for a first-time visitor about what "The Pulse" is or what they're looking at.**
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_RESULTS.md:83:2. 🔴 **Fix narrative generator** — "No signal yet" when data exists is a bug. Generate a real sentence: "Day 4. Down 10.5 lbs. Sleep short, recovery low — rest day recommended." *Lens: Content, Product. Effort: M.*
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_RESULTS.md:125:- 4 of 13 badges earned — appropriate for Day 4
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_RESULTS.md:159:| Skeptic (Viktor) | B+ | Impressive and substantive, but Level 4 with declining XP across all pillars on Day 4 raises the question: is the scoring punishing him for being new? |
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_RESULTS.md:168:5. ⚪ **Consider softening early-days XP decline** — All 7 pillars show negative or zero XP delta on Day 4. If the system always punishes early users before they've had time to stabilize, the first impression is discouraging. This may be mathematically correct but experientially hostile. *Lens: Serves Matthew, Product. Effort: M (requires scoring engine adjustment).*
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_RESULTS.md:184:The journal pull-quote (*"The hardest habit wasn't the workout. It was the journal."*) is attributed to "day 47" — but we're on Day 4. This is either historical content from a previous attempt or fabricated. Either way, the attribution is misleading and would fail the credibility test.
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_RESULTS.md:200:- **Days Tracked: 3** — accurate for Day 4
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_RESULTS.md:239:2. 🔴 **Fix journal pull-quote attribution** — "Day 47" on a Day 4 platform is either historical or fabricated. If historical, label it clearly: "From a previous attempt, October 2025." If fabricated, remove it. *Lens: Skeptic, credibility. Effort: XS.*
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_RESULTS.md:241:4. 🟡 **Reframe the failure state** — 19% completion, 0-day streak — the page reads as a wall of red. Add a "Day 4 perspective" note: "You're building the measurement system. Completion rates typically stabilize by Week 3." *Lens: Serves Matthew, Return Visitor. Effort: S.*
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_RESULTS.md:256:The comparative context line — *"Average habit program adherence: 18 days. Matthew: 0 days"* — is a clever benchmark, though "0 days" on Day 4 when the real streak is 0 is accurate but contextually harsh. It might benefit from "Day 4 of this attempt."
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_RESULTS.md:266:The 30-day calendar and 90-day arc chart are the visual anchors. On Day 4, both are mostly empty (gray cells = no data). The nudge buttons are prominent and inviting.
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_RESULTS.md:385:The "What makes this different" callout (cross-device triangulation, cross-domain correlation, hypotheses under test) provides immediate context. The "Day 4" banner ("Early data. This page gets smarter every week. Follow along →") is honest and hooks subscribers.
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_RESULTS.md:466:1. 🟡 **Show CGM wear status** — How many days has the sensor been on? A "Sensor: Day 4 of 15" indicator would contextualize the data volume. *Effort: XS.*
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_RESULTS.md:765:The 6 domains (Physical, Sleep, Cognitive, Emotional, Connection, Discipline) each have 4-5 benchmarks with research citations (Mandsager JAMA 2018, Cappuccio Sleep 2010, Holt-Lunstad PLOS Medicine 2010, Lally EJSP 2010). Each benchmark has: target, current value (when available), evidence rating (●●● to ●), letter grade, and a "Day 1 → Now → Target" journey view.
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_RESULTS.md:889:| 7 | Journal pull-quote attributed to "Day 47" on Day 4 platform | High | Habits | Clarify as historical or remove | XS | Skeptic |
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_RESULTS.md:910:| 3 | Vice streak counters | Mind, Habits | Identity investment. "Day 15 means something different than Day 1." | Already built |
+docs/reviews/DEEP_PAGE_REVIEW_DPR1_RESULTS.md:950:5. *"Day 4. You've built 45+ pages, 62 Lambda functions, 115 MCP tools, and a review system with 12 board members evaluating the platform. And you've journaled once. The ratio of system-building to system-using is the most honest metric this platform produces — and it's not on any page."*
+docs/reviews/PRODUCT_REVIEW_PR1.md:3:**Review Date:** April 4, 2026 · **Platform Version:** v4.9.0 · **Day 4 of Experiment**
+docs/reviews/PRODUCT_REVIEW_PR1.md:12:averagejoematt.com is, at this moment, a paradox. It is simultaneously one of the most ambitious personal health platforms ever built by a single person and a site that — on Day 4 of its public experiment — cannot yet deliver on half of what it promises. The architecture is extraordinary: 62 Lambda functions, 26 data sources, 121 MCP tools, a 14-system AI intelligence layer, a character engine with EMA smoothing and Benjamini-Hochberg FDR correction, and the whole thing runs for $19/month. That's not a hobby project. That's a proof-of-concept for how a non-engineer can ship production infrastructure using AI as a development partner.
+docs/reviews/PRODUCT_REVIEW_PR1.md:37:| **Live** | `/live/` | D+ | Almost entirely loading states. "— days Loading" is the primary content. The journey data card is a skeleton. | This should be the most dynamic page on the site. On Day 4, it's the emptiest. |
+docs/reviews/PRODUCT_REVIEW_PR1.md:62:| **Discoveries** | `/discoveries/` | B- | "Intuition isn't evidence" framing is strong. Timeline concept is good. | Mostly empty. "In X days, the platform surfaced Y findings" — those numbers are tiny at Day 4. |
+docs/reviews/PRODUCT_REVIEW_PR1.md:99:| **Ask** | `/ask/` | B | AI-powered Q&A against 26 data sources. 5 questions/hour for free, 20 for subscribers. Prompt suggestions are well-chosen. | The "Subscribe for more" upsell is premature on Day 4. |
+docs/reviews/PRODUCT_REVIEW_PR1.md:251:- **Every number:** Not yet delivered. Most numbers show dashes on Day 4. ✗
+docs/reviews/PRODUCT_REVIEW_PR1.md:329:"Does this move the needle on the metric that matters? The metric that matters is: does Matthew lose weight and keep it off? The platform can't answer that yet — it's Day 4. What I can evaluate is whether the platform is structured to serve that goal. The accountability mechanisms (public data, Elena's chronicle, his partner's email, character score) are strong. The intelligence layer (anomaly detection, adaptive mode, daily brief) is well-designed. But the product has a feature proliferation problem — 72 pages, 121 tools, 14 AI systems — and I worry that building more features has become a substitute for behavior change. The next 90 days should be a feature freeze focused on using the existing system, not extending it."
+docs/reviews/PRODUCT_REVIEW_PR1.md:391:**2. He thinks the platform serves his health. It mostly serves his identity as a builder.** The v4.9.0 changelog shows 57 QA fixes, 4 shared layer rebuilds, and a documentation sprint — on Day 3 of an experiment that's supposed to be about losing weight. When was the last time Matthew went for a walk instead of shipping a Lambda? The platform is valuable, but Matthew needs to watch the ratio of building-time to health-time.
+docs/reviews/PRODUCT_REVIEW_PR1.md:405:| 5 | **Data Integrity & Freshness** | C | Most metrics show dashes on Day 4. Parameterization work is solid but data needs time to accumulate. | Expected to improve organically. Add "last updated" timestamps to every data section. |
+docs/reviews/PRODUCT_REVIEW_PR1.md:423:**However:** The building itself has become a partially competing activity. The changelog shows Matthew shipped 57 QA fixes on Day 3, a documentation sprint on Day 4, and 15 editorial rewrites on Day 1. The platform is consuming the time and energy that could go toward the health behaviors it tracks. This is not a hypothetical concern — it's the same pattern Matthew describes in the Mind page: intellectualizing instead of feeling, building instead of doing.
+docs/reviews/PRODUCT_REVIEW_PR1.md:588:You built a 62-Lambda AI system, wrote 72 pages of content, shipped 57 QA fixes in a single day, and completed a documentation sprint — all in the first 4 days of an experiment about health transformation. On Day 4, your changelog has more entries than your habit heatmap has cells. What would happen if you couldn't touch the codebase for 30 days?
+docs/reviews/PRODUCT_REVIEW_PR1.md:608:The Life Platform is a genuine technical achievement and a promising content platform that is, on Day 4, still a caterpillar. The architecture is A-tier. The editorial content is A-tier where it exists. The data and engagement layers are C-tier because the experiment just started. The IA needs the restructuring that was planned in March and hasn't been shipped.
+docs/reviews/PRODUCT_REVIEW_PR1.md:624:*Review conducted April 4, 2026. Platform v4.9.0. Day 4 of experiment.*
+docs/reviews/REVIEW_2026-03-28_v18.md:208:| 3 | **lambda_map.json update** — add all missing entries, add CI lint for orphan .py files | S | High | Day 1 post-launch |
+docs/reviews/REVIEW_2026-03-28_v18.md:209:| 4 | **New resource alarms** — error alarms for og-image-generator, food-delivery; freshness for food-delivery | S | Medium | Day 1 post-launch |
+docs/reviews/REVIEW_2026-03-30_v19.md:61:| **Jordan Kim** | Growth | A- | A- | = | "Community page created. Discord strategy ready. Subscriber onboarding Lambda (Day 2 bridge email) is the right engagement play. Ready for April 1." |
+docs/reviews/REVIEW_2026-03-30_v19.md:203:| 10 | **Garmin re-auth** — resolve the last red item on pipeline health check | S | Low | Day 1 |
+backfill/archive/backfill_apple_health.py:317:            year, month, day_num = date_str[:4], date_str[5:7], date_str[8:10]
+backfill/archive/backfill_apple_health.py:318:            s3_key = f"raw/apple_health/{year}/{month}/{day_num}.json.gz"
+seeds/seed_discoveries.py:3:seed_discoveries.py — Seed Day 1 timeline events with annotations for the Discoveries page.
+seeds/seed_discoveries.py:34:# The Day 1 anchor uses type="milestone", title="Day 1 — The Experiment Begins".
+seeds/seed_discoveries.py:40:        "title": "Day 1 \u2014 The Experiment Begins",  # matches site_api_lambda.py line 1748
+seeds/seed_discoveries.py:76:    print("Life Platform — Seed Day 1 Discovery Annotations")
+seeds/seed_measurements.py:1:"""Seed Day 1 body measurements to DynamoDB. Validates schema and derived fields."""
+seeds/seed_measurements.py:18:# Day 1 measurements (2026-03-29, captured by Partner)
+seeds/seed_measurements.py:65:    "source_file": "seed_measurements.py (Day 1 baseline)",
+site/index.html:751:  <div class="h-pullquote__badge">Day 1 &middot; April 2026</div>
+site/index.html:940:              : j.days_in != null ? j.days_in
+site/index.html:941:              : p.days_in != null ? p.days_in
+site/index.html:1313:      var dispatch = pulse.day_number || '—';
+site/labs/index.html:547:    <span class="lb-pullquote__badge">Matthew &middot; Day 1</span>
+site/tools/index.html:345:    Matthew&rsquo;s Day 1 starting point and current values are shown alongside for comparison.
+site/tools/index.html:361:          <div class="matthew-badge__label">Day 1 RHR</div>
+site/tools/index.html:418:          <div class="matthew-badge__label">Day 1 HRV</div>
+site/tools/index.html:476:          <div class="matthew-badge__label">Day 1 target</div>
+site/tools/index.html:535:          <div class="matthew-badge__label">Day 1 sleep</div>
+site/tools/index.html:590:          <div class="matthew-badge__label">Day 1 weight</div>
+site/tools/index.html:647:          <div class="matthew-badge__label">Day 1 VO2max</div>
+site/journal/posts.json:9:      "excerpt": "Six days before Day 1. Elena Voss sits down with Matthew for the first time — no data cards, no board verdicts. Just a conversation about what went wrong, what he learned, and what April 1 actually means.",
+site/recap/index.html:334:      headline = Math.round(journey.lost_lbs) + ' lbs down. Day ' + (journey.days_in || '?') + '.';
+site/builders/index.html:531:          <div class="timeline-item__title">Day 1 &mdash; First Lambda, first DynamoDB write</div>
+site/glucose/index.html:255:          <span class="g-strip-btn" id="fp-prev" title="Available after Day 1">← Yesterday</span>
+site/glucose/index.html:328:        <span>Day 1 · — %</span>
+site/glucose/index.html:701:        '<span>Day 1 · ' + first.toFixed(0) + '%</span>' +
+site/glucose/index.html:857:        var dispatchNum = g.reading_day || g.day_number || (trend && trend.length) || '—';
+site/discoveries/index.html:482:    /* Milestone (Day 1) — gold/accent */
+site/discoveries/index.html:946:// 15d: Pre-seeded Day 1 content — used as fallback if API returns empty or fails
+site/discoveries/index.html:952:      title: 'Day 1: Platform goes live',
+site/discoveries/index.html:963:        annotation: 'Captured full baseline across 6 data sources on Day 1.',
+site/discoveries/index.html:979:      body: 'Day 1 insight: having 6 data sources streaming doesn\'t produce instant clarity. The correlation engine needs 14+ days of data before signal emerges from noise. Patience is part of the protocol.',
+site/discoveries/index.html:1035:    // If API returns no science events, use Day 1 pre-seeded content (15d)
+site/discoveries/index.html:1054:    // Fallback: render Day 1 pre-seeded content (15d)
+site/discoveries/index.html:1101:            days_in: daysIn,
+site/discoveries/index.html:1151:          '<div class="hypothesis-card__meta">Pillar: ' + esc(h.pillar) + ' · Tracking: ' + esc(metrics) + ' · Duration: ' + duration + (h.days_in ? ' · Day ' + h.days_in + ' in' : '') + '</div>' +
+site/experiments/index.html:1057:      var daysIn = exp.days_in != null ? exp.days_in : daysBetween(exp.start_date, null);
+site/experiments/index.html:1140:        if (exp.status === 'active') { statusClass = 'active'; statusLabel = 'Day ' + (exp.days_in || '?'); }
+site/character/index.html:1688:    { date:'2026-04-01', character_level:1, event:'Day 1 — the experiment begins' }
+site/training/index.html:651:      var sessionNum = (t && t.workouts_alltime) || (t && t.workouts_30d) || (pulse && pulse.day_number) || '—';
+site/physical/index.html:337:          <span class="ph-strip-btn" id="ph-prev" title="Available after Day 1">← Yesterday</span>
+site/physical/index.html:412:        <span>Day 1 · 307 lbs</span>
+site/physical/index.html:830:          '<span>Day 1 · ' + Math.round(vals[0]) + ' lbs</span>' +
+site/live/index.html:103:          <span class="lp-strip-btn" id="fp-prev" title="Available after Day 1">← Yesterday</span>
+site/live/index.html:174:        <span>Day 1 · 307 lbs</span>
+site/live/index.html:288:      var dispatch = pulse.day_number || '—';
+site/live/index.html:300:      if (pulse.day_number > 1) {
+site/live/index.html:323:      document.getElementById('fp-day').textContent = pulse.day_number || '—';
+site/live/index.html:415:          '<span>Day 1 · ' + Math.round(vals[0]) + ' lbs</span>' +
+site/live/index.html:425:        var lines = ['Day ' + (pulse.day_number || '?') + ' — ' + status, pulse.narrative || ''];
+site/methodology/index.html:317:        <div class="method-stat__value" data-const="journey.days_in">&mdash;</div>
+site/benchmarks/index.html:602:    /* 13j: Day 1 vs Now journey row */
+site/benchmarks/index.html:917:    <div class="std-intro__text">Each benchmark comes with a <strong>research-backed target</strong>, an <strong>evidence rating</strong> (●●● = meta-analysis/RCT, ●● = observational, ● = framework), a <strong>letter grade</strong> (A through F based on % to target), a <strong>trend arrow</strong> showing direction vs 30 days ago, and a <strong>Day 1 → Now → Target</strong> journey view. Research and personal data are separated so you can see the science independently from Matthew's progress.</div>
+site/benchmarks/index.html:964:    <div class="bench-card bench-card--survival" id="deadlift"><div class="bench-card__top"><div class="bench-card__name">Deadlift</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">2.0×</div><div class="bench-card__target-label">bodyweight</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-dl"></div></div><div class="bb-labels"><span id="bl-dl-c">—</span><span id="bl-dl-t">—</span></div></div><!-- 13j: Journey --><div class="bench-card__journey" id="journey-dl"><div class="bench-card__journey-point"><div class="bench-card__journey-value">135 lbs</div><div class="bench-card__journey-label">Day 1</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value" id="journey-dl-now">—</div><div class="bench-card__journey-label">Now</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value journey-target" id="journey-dl-target">—</div><div class="bench-card__journey-label">Target</div></div></div><!-- 13c: Math of decline --><div class="bench-card__decline">Why 2x bodyweight at 40? We lose 3-8% strength per decade after 30. The target is the reserve that keeps you independent at 85.</div><!-- 13k: Research vs Personal --><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Posterior chain strength — the ability to pick things up off the floor safely at any age. Functional independence reserve for the Centenarian Decathlon.</div><div class="bench-card__layer-content" data-layer="personal">Current tracking via Hevy. Building from a baseline of 135 lbs toward 2x bodyweight. Progressive overload protocol: 3x/week deadlift variations.</div></div><div class="bench-card__source">Centenarian Decathlon · Functional independence reserve</div></div>
+site/benchmarks/index.html:966:    <div class="bench-card bench-card--survival" id="back-squat"><div class="bench-card__top"><div class="bench-card__name">Back Squat</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">1.75×</div><div class="bench-card__target-label">bodyweight</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-sq"></div></div><div class="bb-labels"><span id="bl-sq-c">—</span><span id="bl-sq-t">—</span></div></div><div class="bench-card__journey" id="journey-sq"><div class="bench-card__journey-point"><div class="bench-card__journey-value">95 lbs</div><div class="bench-card__journey-label">Day 1</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value" id="journey-sq-now">—</div><div class="bench-card__journey-label">Now</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value journey-target" id="journey-sq-target">—</div><div class="bench-card__journey-label">Target</div></div></div><div class="bench-card__decline">Why 1.75x bodyweight? Quad and glute strength directly predict fall risk. At 80+, a hip fracture carries 30% one-year mortality.</div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Quad and glute strength — fall prevention, stairs, getting out of chairs unassisted. Directly tied to functional independence in old age.</div><div class="bench-card__layer-content" data-layer="personal">Progressing from 95 lbs baseline. Current squat program: 3x/week with linear periodization. Mobility work is the bottleneck.</div></div><div class="bench-card__source">Centenarian Decathlon · Leong et al., Lancet 2015</div></div>
+site/benchmarks/index.html:968:    <div class="bench-card bench-card--survival" id="grip-strength"><div class="bench-card__top"><div class="bench-card__name">Grip Strength</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">>40</div><div class="bench-card__target-label">kg per hand</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-grip"></div></div><div class="bb-labels"><span id="bl-grip-c">—</span><span>40 kg</span></div></div><div class="bench-card__journey" id="journey-grip"><div class="bench-card__journey-point"><div class="bench-card__journey-value">—</div><div class="bench-card__journey-label">Day 1</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value" id="journey-grip-now">—</div><div class="bench-card__journey-label">Now</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value journey-target">40 kg</div><div class="bench-card__journey-label">Target</div></div></div><div class="bench-card__decline">Grip strength declines ~2-5% per year after 50. Building reserve now means maintaining independence decades later.</div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">One of the single strongest predictors of all-cause mortality — stronger than blood pressure in some analyses. 140,000 participants across 17 countries.</div><div class="bench-card__layer-content" data-layer="personal">Dynamometer baseline pending. Currently training grip via dead hangs, farmer carries, and barbell holds.</div></div><div class="bench-card__source">Leong et al., Lancet 2015 · 140,000 participants, 17 countries</div></div>
+site/benchmarks/index.html:970:    <div class="bench-card bench-card--survival" id="vo2-max"><div class="bench-card__top"><div class="bench-card__name">VO2 Max</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">50+</div><div class="bench-card__target-label">ml/kg/min</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-vo2"></div></div><div class="bb-labels"><span id="bl-vo2-c">—</span><span>50 ml/kg/min</span></div></div><div class="bench-card__journey" id="journey-vo2"><div class="bench-card__journey-point"><div class="bench-card__journey-value">~38</div><div class="bench-card__journey-label">Day 1</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value" id="journey-vo2-now">—</div><div class="bench-card__journey-label">Now</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value journey-target">50+</div><div class="bench-card__journey-label">Target</div></div></div><div class="bench-card__decline">VO2 max drops ~10% per decade after 30. At 50 ml/kg/min now, you're buying yourself functional capacity at 80 that most people lose at 60.</div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Elite fitness = 5x mortality reduction vs low fitness. The most powerful longevity lever measured. Stronger predictor than smoking cessation.</div><div class="bench-card__layer-content" data-layer="personal">Estimated via Apple Watch + zone 2 training. Target: 3-4 zone 2 sessions/week (45+ min) plus 1 high-intensity interval session.</div></div><div class="bench-card__source">Mandsager et al., JAMA Network Open, 2018</div></div>
+site/benchmarks/index.html:972:    <div class="bench-card" id="dead-hang"><div class="bench-card__top"><div class="bench-card__name">Dead Hang</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot empty"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">60+</div><div class="bench-card__target-label">seconds</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-hang"></div></div><div class="bb-labels"><span id="bl-hang-c">—</span><span>60s</span></div></div><div class="bench-card__journey" id="journey-hang"><div class="bench-card__journey-point"><div class="bench-card__journey-value">~20s</div><div class="bench-card__journey-label">Day 1</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value" id="journey-hang-now">—</div><div class="bench-card__journey-label">Now</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value journey-target">60s</div><div class="bench-card__journey-label">Target</div></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Shoulder health, grip endurance, upper body hanging reserve. A functional marker for joint integrity and overhead mobility.</div><div class="bench-card__layer-content" data-layer="personal">Training dead hangs 3x/week at end of pulling sessions. Progressing from ~20 seconds baseline.</div></div><div class="bench-card__source">Centenarian Decathlon · Functional reserve framework</div></div>
+site/benchmarks/index.html:974:    <div class="bench-card bench-card--survival" id="resting-heart-rate"><div class="bench-card__top"><div class="bench-card__name">Resting Heart Rate</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">&lt;60</div><div class="bench-card__target-label">bpm</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-rhr"></div></div><div class="bb-labels"><span id="bl-rhr-c">—</span><span>&lt;60 bpm</span></div></div><div class="bench-card__journey" id="journey-rhr"><div class="bench-card__journey-point"><div class="bench-card__journey-value">~68</div><div class="bench-card__journey-label">Day 1</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value" id="journey-rhr-now">—</div><div class="bench-card__journey-label">Now</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value journey-target">&lt;60</div><div class="bench-card__journey-label">Target</div></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Cardiovascular efficiency. Lower resting HR consistently linked to lower cardiovascular mortality across 46 cohort studies.</div><div class="bench-card__layer-content" data-layer="personal">Tracked daily via Whoop. Zone 2 training is the primary driver. Seeing gradual downward trend from baseline ~68 bpm.</div></div><div class="bench-card__source">Zhang et al., CMAJ 2016 · Meta-analysis, 46 cohorts</div></div>
+site/benchmarks/index.html:998:    <div class="bench-card bench-card--survival" id="total-sleep"><div class="bench-card__top"><div class="bench-card__name">Total Sleep</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">7–9</div><div class="bench-card__target-label">hours / night</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-slp"></div></div><div class="bb-labels"><span id="bl-slp-c">—</span><span>7–9 hrs</span></div></div><div class="bench-card__journey" id="journey-slp"><div class="bench-card__journey-point"><div class="bench-card__journey-value">~6.2 hrs</div><div class="bench-card__journey-label">Day 1</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value" id="journey-slp-now">—</div><div class="bench-card__journey-label">Now</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value journey-target">7-9 hrs</div><div class="bench-card__journey-label">Target</div></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">&lt;6 hours associated with 12% higher all-cause mortality. Cognitive decline, immune suppression, metabolic disruption. 1.3M participants in the Cappuccio meta-analysis.</div><div class="bench-card__layer-content" data-layer="personal">Whoop-tracked nightly. Started averaging ~6.2 hours. Sleep hygiene protocol: consistent bed/wake times, cool room, no screens after 9pm.</div></div><div class="bench-card__source">Cappuccio et al., Sleep 2010 · 1.3M participants</div></div>
+site/chronicle/posts/interview/index.html:7:  <meta name="description" content="The Interview — The eve of Day 1. Elena Voss sits down with Matthew the night before the experiment begins.">
+site/chronicle/posts/interview/index.html:9:  <meta property="og:description" content="Special Edition · April 1, 2026 · The night before Day 1.">
+site/chronicle/posts/interview/index.html:65:  <div class="post-header__stats">Week 0 &middot; The eve of Day 1 &middot; 5:03 PM &middot; Seattle, WA</div>
+site/chronicle/posts/interview/index.html:71:    <p class="interview-note">This installment is drawn from a conversation conducted the evening before Day 1. The experiment begins tomorrow.</p>
+site/chronicle/posts/interview/index.html:119:    <p>We wrapped up at half past five. The platform is ready. The observatory pages are live. Tomorrow morning, a baseline will be captured &mdash; weight, body composition, blood pressure, habit scores, vice streaks, all of it anchored to a single date from which every future measurement will be measured. No more ambiguity about when the data starts or what it&rsquo;s compared against. There is one Day 1. It is tomorrow. Whatever the numbers are, they are.</p>
+site/chronicle/posts/interview/index.html:128:    <p class="signature"><em>Week 0 &mdash; The Measured Life. Day 1 begins April 1st.</em></p>
+site/chronicle/posts.json:22:      "stats_line": "Week 0 · April 1, 2026 · The eve of Day 1",
+site/chronicle/posts.json:24:      "excerpt": "Six days before Day 1. Elena Voss sits down with Matthew for the first time — no data cards, no board verdicts. Just a conversation about what went wrong, what he learned, and what April 1 actually means.",
+site/chronicle/index.html:257:    // Prequel chronicles count backward from Day 1 (April 1). Week −4 was four weeks before launch. The series resets to Week 1 after Day 1.
+site/assets/js/components.js:327:      match = { h: 'Follow the experiment from Day 1.', b: 'Real numbers from 26 data sources. No highlight reel. Every Wednesday, in your inbox.' };
+site/nutrition/index.html:377:          <span class="n-strip-btn" id="fp-prev" title="Available after Day 1">← Yesterday</span>
+site/nutrition/index.html:978:        return (p && p.day_number) || null;
+site/assets/js/site_constants.js:23:    experiment_start: '2026-04-01',  // Day 1 of the public experiment
+site/assets/js/site_constants.js:26:    hero_tagline:  'Day 1. For real this time.',
+site/assets/js/site_constants.js:28:    hero_copy:     'I built an AI health platform, got sick, fell off the wagon, and the system I built didn\'t catch me. So I\'m starting over — publicly. April 1, 2026 is Day 1. Every number, every failure, no filter.',
+site/assets/js/site_constants.js:29:    cta_sub:       '307 lbs. A relapse. A relaunch. Day 1.',
+site/assets/js/site_constants.js:58:    home:        'Day 1: April 1, 2026. 307 lbs. 26 data sources. An AI health platform. Every number public, every failure included.',
+site/data/index.html:215:      This is the file that powers the homepage ticker, sparklines, and Day 1 vs. Today comparison.
+site/data/content_manifest.json:23:        { "type": "api_driven",       "element": "#d1-weight",                 "contains": "Day 1 weight (from baseline in public_stats.json)" },
+site/data/content_manifest.json:24:        { "type": "api_driven",       "element": "HOME-3 compare card",       "contains": "Day 1 vs Today (4 dimensions from API)" }
+site/assets/js/countdown.js:27:  var dayNumber = isLive ? daysSinceStart + 1 : 0; // Day 1 on April 1
+site/assets/js/engagement.js:436:            headline: 'Day ' + day.day_number + ' \u2014 ' + day.headline,
+site/weekly/index.html:340:        glanceHL.textContent = lost > 0 ? Math.round(lost) + ' lbs down. Day ' + (journey.days_in || '?') + '.' : 'Week ' + currentWeek;
+site/story/index.html:367:      var daysIn = (d.journey || {}).days_in || (d.platform || {}).days_in;

@@ -3,128 +3,263 @@
     "purpose": "Inventory of journey-sensitive prose content across the site. When reframing the journey narrative, consult this file to find every location that needs a human editorial pass.",
     "updated": "2026-03-30",
     "categories": {
-      "constant": "Value comes from site_constants.js — auto-updates via data-const attributes",
-      "api_driven": "Value comes from /api/platform_stats or public_stats.json — auto-updates on page load",
-      "prose_with_facts": "Editorial paragraph with embedded facts — needs manual review when facts change",
-      "narrative": "Pure editorial content — needs rewrite if journey framing changes",
-      "archive": "Published historical content — should NOT be changed retroactively"
+      "constant": "Value comes from site_constants.js \u2014 auto-updates via data-const attributes",
+      "api_driven": "Value comes from /api/platform_stats or public_stats.json \u2014 auto-updates on page load",
+      "prose_with_facts": "Editorial paragraph with embedded facts \u2014 needs manual review when facts change",
+      "narrative": "Pure editorial content \u2014 needs rewrite if journey framing changes",
+      "archive": "Published historical content \u2014 should NOT be changed retroactively"
     }
   },
-
   "pages": {
     "index.html": {
       "journey_sensitive": true,
       "sections": [
-        { "type": "constant",         "element": "og:description meta tag",    "contains": "307, 185, data source count, tool count" },
-        { "type": "constant",         "element": "twitter:description meta",   "contains": "307, 185, data source count" },
-        { "type": "constant",         "element": ".hero weight counter",       "contains": "307 start weight display" },
-        { "type": "constant",         "element": ".hero-copy paragraph",       "contains": "307 lbs to 185, journey narrative" },
-        { "type": "constant",         "element": ".dual-cta__sub",             "contains": "307 lbs tagline" },
-        { "type": "api_driven",       "element": "#d1-weight",                 "contains": "Day 1 weight (from baseline in public_stats.json)" },
-        { "type": "api_driven",       "element": "HOME-3 compare card",       "contains": "Day 1 vs Today (4 dimensions from API)" }
+        {
+          "type": "constant",
+          "element": "og:description meta tag",
+          "contains": "307, 185, data source count, tool count"
+        },
+        {
+          "type": "constant",
+          "element": "twitter:description meta",
+          "contains": "307, 185, data source count"
+        },
+        {
+          "type": "constant",
+          "element": ".hero weight counter",
+          "contains": "307 start weight display"
+        },
+        {
+          "type": "constant",
+          "element": ".hero-copy paragraph",
+          "contains": "307 lbs to 185, journey narrative"
+        },
+        {
+          "type": "constant",
+          "element": ".dual-cta__sub",
+          "contains": "307 lbs tagline"
+        },
+        {
+          "type": "api_driven",
+          "element": "#d1-weight",
+          "contains": "Day 1 weight (from baseline in public_stats.json)"
+        },
+        {
+          "type": "api_driven",
+          "element": "HOME-3 compare card",
+          "contains": "Day 1 vs Today (4 dimensions from API)"
+        }
       ]
     },
-
     "story/index.html": {
       "journey_sensitive": true,
       "sections": [
-        { "type": "constant",         "element": "og:description meta tag",    "contains": "307 lbs, March 2026" },
-        { "type": "narrative",        "element": "h1.story-header__title",     "contains": "307 pounds. One decision." },
-        { "type": "constant",         "element": ".milestone__value (start)",  "contains": "307" },
-        { "type": "constant",         "element": ".milestone__value (goal)",   "contains": "185" },
-        { "type": "narrative",        "element": "interview prompts",          "contains": "Did you know you were 307? — references specific moment" },
-        { "type": "narrative",        "element": "chapter structure",          "contains": "5 chapters framed around original journey start" }
+        {
+          "type": "constant",
+          "element": "og:description meta tag",
+          "contains": "307 lbs, March 2026"
+        },
+        {
+          "type": "narrative",
+          "element": "h1.story-header__title",
+          "contains": "307 pounds. One decision."
+        },
+        {
+          "type": "constant",
+          "element": ".milestone__value (start)",
+          "contains": "307"
+        },
+        {
+          "type": "constant",
+          "element": ".milestone__value (goal)",
+          "contains": "185"
+        },
+        {
+          "type": "narrative",
+          "element": "interview prompts",
+          "contains": "Did you know you were 307? \u2014 references specific moment"
+        },
+        {
+          "type": "narrative",
+          "element": "chapter structure",
+          "contains": "5 chapters framed around original journey start"
+        }
       ]
     },
-
     "about/index.html": {
       "journey_sensitive": true,
       "sections": [
-        { "type": "prose_with_facts", "element": ".bio-prose paragraph 2",     "contains": "March 2026, I decided..." },
-        { "type": "constant",         "element": "data-const bio stats",       "contains": "26 sources, 121 tools, 62 Lambdas, $19/month — all via data-const" },
-        { "type": "constant",         "element": ".sidebar-block__note",       "contains": "Started at 307 lbs. Goal: 185." },
-        { "type": "constant",         "element": "#bio-50 (50-word bio)",      "contains": "307 → 185, 26 sources, 121 tools, 62 Lambdas, $19/month" },
-        { "type": "constant",         "element": "#bio-100 (100-word bio)",    "contains": "26 integrations, 121 tools, $19/month" },
-        { "type": "prose_with_facts", "element": "stack-row Test coverage",    "contains": "83 tests, Review #19: grade A — via data-const" }
+        {
+          "type": "prose_with_facts",
+          "element": ".bio-prose paragraph 2",
+          "contains": "March 2026, I decided..."
+        },
+        {
+          "type": "constant",
+          "element": "data-const bio stats",
+          "contains": "26 sources, 121 tools, 62 Lambdas, $19/month \u2014 all via data-const"
+        },
+        {
+          "type": "constant",
+          "element": ".sidebar-block__note",
+          "contains": "Started at 297 lbs. Goal: 185."
+        },
+        {
+          "type": "constant",
+          "element": "#bio-50 (50-word bio)",
+          "contains": "307 \u2192 185, 26 sources, 121 tools, 62 Lambdas, $19/month"
+        },
+        {
+          "type": "constant",
+          "element": "#bio-100 (100-word bio)",
+          "contains": "26 integrations, 121 tools, $19/month"
+        },
+        {
+          "type": "prose_with_facts",
+          "element": "stack-row Test coverage",
+          "contains": "83 tests, Review #19: grade A \u2014 via data-const"
+        }
       ]
     },
-
     "platform/index.html": {
       "journey_sensitive": false,
       "platform_sensitive": true,
       "sections": [
-        { "type": "constant",         "element": "og:description meta tag",    "contains": "62 Lambda, 121 tools, 26 sources, $19/month" },
-        { "type": "constant",         "element": "data-const stats grid",      "contains": "tool count, source count, lambda count, grade — all via data-const" },
-        { "type": "api_driven",       "element": "stats overridden by fetch",  "contains": "/api/platform_stats hydrates data-const on page load" },
-        { "type": "prose_with_facts", "element": "AI section body",            "contains": "Sonnet for coaching, Haiku for classification" },
-        { "type": "prose_with_facts", "element": "review card R17",            "contains": "Historical — grade A-, 13 findings (do not update)" }
+        {
+          "type": "constant",
+          "element": "og:description meta tag",
+          "contains": "62 Lambda, 121 tools, 26 sources, $19/month"
+        },
+        {
+          "type": "constant",
+          "element": "data-const stats grid",
+          "contains": "tool count, source count, lambda count, grade \u2014 all via data-const"
+        },
+        {
+          "type": "api_driven",
+          "element": "stats overridden by fetch",
+          "contains": "/api/platform_stats hydrates data-const on page load"
+        },
+        {
+          "type": "prose_with_facts",
+          "element": "AI section body",
+          "contains": "Sonnet for coaching, Haiku for classification"
+        },
+        {
+          "type": "prose_with_facts",
+          "element": "review card R17",
+          "contains": "Historical \u2014 grade A-, 13 findings (do not update)"
+        }
       ]
     },
-
     "methodology/index.html": {
       "journey_sensitive": false,
       "platform_sensitive": true,
       "sections": [
-        { "type": "constant",         "element": "method-stat sources",        "contains": "26 — via data-const" },
-        { "type": "constant",         "element": "method-stat 23 pairs",       "contains": "23 metric pairs (methodology constant)" },
-        { "type": "narrative",        "element": "N=1 philosophy sections",    "contains": "Timeless prose — does not need updating" },
-        { "type": "narrative",        "element": "Honest Limitations section", "contains": "Timeless prose — does not need updating" }
+        {
+          "type": "constant",
+          "element": "method-stat sources",
+          "contains": "26 \u2014 via data-const"
+        },
+        {
+          "type": "constant",
+          "element": "method-stat 23 pairs",
+          "contains": "23 metric pairs (methodology constant)"
+        },
+        {
+          "type": "narrative",
+          "element": "N=1 philosophy sections",
+          "contains": "Timeless prose \u2014 does not need updating"
+        },
+        {
+          "type": "narrative",
+          "element": "Honest Limitations section",
+          "contains": "Timeless prose \u2014 does not need updating"
+        }
       ]
     },
-
     "live/index.html": {
       "journey_sensitive": true,
       "sections": [
-        { "type": "constant",         "element": "meta description",           "contains": "307 lbs to goal, 26 sources" },
-        { "type": "api_driven",       "element": "all cockpit data",           "contains": "Weight, HRV, recovery — all from APIs" }
+        {
+          "type": "constant",
+          "element": "meta description",
+          "contains": "307 lbs to goal, 26 sources"
+        },
+        {
+          "type": "api_driven",
+          "element": "all cockpit data",
+          "contains": "Weight, HRV, recovery \u2014 all from APIs"
+        }
       ]
     },
-
     "subscribe/index.html": {
       "journey_sensitive": false,
       "sections": [
-        { "type": "constant",         "element": "og:description",             "contains": "26 sources — updated in meta tag" }
+        {
+          "type": "constant",
+          "element": "og:description",
+          "contains": "26 sources \u2014 updated in meta tag"
+        }
       ]
     },
-
     "start/index.html": {
       "journey_sensitive": false,
       "sections": [
-        { "type": "prose_with_facts", "element": "path descriptions",          "contains": "May reference journey or platform stats" }
+        {
+          "type": "prose_with_facts",
+          "element": "path descriptions",
+          "contains": "May reference journey or platform stats"
+        }
       ]
     },
-
     "chronicle/posts/*": {
       "journey_sensitive": false,
       "sections": [
-        { "type": "archive",          "element": "full post content",          "contains": "Historical narrative — dates, weights, context from time of publication. DO NOT retroactively edit." }
+        {
+          "type": "archive",
+          "element": "full post content",
+          "contains": "Historical narrative \u2014 dates, weights, context from time of publication. DO NOT retroactively edit."
+        }
       ]
     },
-
     "journal/posts/*": {
       "journey_sensitive": false,
       "sections": [
-        { "type": "archive",          "element": "full post content",          "contains": "Historical narrative — DO NOT retroactively edit." }
+        {
+          "type": "archive",
+          "element": "full post content",
+          "contains": "Historical narrative \u2014 DO NOT retroactively edit."
+        }
       ]
     },
-
     "platform/reviews/index.html": {
       "journey_sensitive": false,
       "sections": [
-        { "type": "archive",          "element": "full review content",        "contains": "Historical Review #17. All numbers (A-, 13 findings, 14 board members, $13/month, 49 Lambdas) are time-frozen. DO NOT update." }
+        {
+          "type": "archive",
+          "element": "full review content",
+          "contains": "Historical Review #17. All numbers (A-, 13 findings, 14 board members, $13/month, 49 Lambdas) are time-frozen. DO NOT update."
+        }
       ]
     }
   },
-
   "non_html": {
-    "sitemap.xml":      { "note": "Hardcoded page list — regenerate via deploy/build_sitemap.sh when pages change" },
-    "rss.xml":          { "note": "Channel description embeds journey framing — update if narrative changes" },
-    "robots.txt":       { "note": "noindex rules for /biology/ — update if page visibility changes" },
-    "public_stats.json": { "note": "Generated by daily-brief Lambda + site-stats-refresh — auto-updates" }
+    "sitemap.xml": {
+      "note": "Hardcoded page list \u2014 regenerate via deploy/build_sitemap.sh when pages change"
+    },
+    "rss.xml": {
+      "note": "Channel description embeds journey framing \u2014 update if narrative changes"
+    },
+    "robots.txt": {
+      "note": "noindex rules for /biology/ \u2014 update if page visibility changes"
+    },
+    "public_stats.json": {
+      "note": "Generated by daily-brief Lambda + site-stats-refresh \u2014 auto-updates"
+    }
   },
-
   "fragile_strings": {
-    "_purpose": "Strings that indicate stale content if found hardcoded in HTML (not in data-const or historical/archive pages). Most are now auto-populated via /api/platform_stats → data-const.",
+    "_purpose": "Strings that indicate stale content if found hardcoded in HTML (not in data-const or historical/archive pages). Most are now auto-populated via /api/platform_stats \u2192 data-const.",
     "values": [
       "19 data sources",
       "25 data sources",
@@ -140,7 +275,7 @@
       "~$13",
       "$15/month",
       "302 lbs",
-      "302 →",
+      "302 \u2192",
       "grade A-"
     ]
   }

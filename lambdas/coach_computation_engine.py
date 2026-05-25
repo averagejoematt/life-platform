@@ -27,6 +27,8 @@ import os
 import logging
 import math
 import boto3
+
+from phase_filter import with_phase_filter  # ADR-058
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -47,7 +49,7 @@ S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 ALGO_VERSION = "1.0"
 LOOKBACK_DAYS = 30
-EXPERIMENT_START = "2026-04-01"
+from constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
 
 # Metrics by source for EWMA processing
 SOURCE_METRICS = {
@@ -200,7 +202,7 @@ def _fetch_range(source, start_date, end_date):
             },
         }
         while True:
-            r = table.query(**kwargs)
+            r = table.query(**with_phase_filter(kwargs))
             records.extend(_decimal_to_float(i) for i in r.get("Items", []))
             if "LastEvaluatedKey" not in r:
                 break
@@ -233,7 +235,7 @@ def _fetch_predictions():
                     ":prefix": "PREDICTION#",
                 },
             }
-            resp = table.query(**kwargs)
+            resp = table.query(**with_phase_filter(kwargs))
             items = [_decimal_to_float(i) for i in resp.get("Items", [])]
             for item in items:
                 if item.get("status") == "pending":
@@ -937,7 +939,7 @@ def _detect_arc_transition(trends, guardrails, all_data, today_str):
         arc = {}
 
     current_phase = arc.get("phase", "early_baseline")
-    entered_date = arc.get("entered_date", "2026-04-01")
+    entered_date = arc.get("entered_date", EXPERIMENT_START)
 
     try:
         days_in_phase = (datetime.strptime(today_str, "%Y-%m-%d") - datetime.strptime(entered_date, "%Y-%m-%d")).days

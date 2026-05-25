@@ -293,3 +293,19 @@
 ---
 
 **Verified:** 2026-05-19 — full audit (V2 audit + follow-up). Tool count recounted via `grep -E '^\s*"name":\s*"[a-z_]+"' mcp/registry.py | wc -l` → 127. `tools_calendar.py` confirmed absent from `mcp/`. Module count 26 confirmed via `ls mcp/tools_*.py | wc -l`. [NEEDS VERIFICATION: individual tool inventories below may have drifted; the 127 figure is authoritative for total count, but the per-section tables in this catalog were not exhaustively cross-checked against `registry.py` line-by-line in this audit. A 2026-05-19 follow-up to regenerate the catalog from `registry.py` directly is recommended.]
+
+
+### Phase-filter behavior (ADR-058)
+
+The following tools default to `phase=experiment`-only results and hide
+phase=pilot records:
+
+- `get_date_range`, `find_days`, `get_aggregated_summary`, `search_activities`,
+  `get_field_stats`, `compare_periods`, `get_weekly_summary` — route through
+  `mcp.core.query_source` which applies the filter.
+- `get_latest`, `get_daily_summary` — apply the filter directly.
+- `get_daily_snapshot`, `get_longitudinal_summary` — dispatch to the above.
+
+To access pre-genesis data, pass `include_pilot=True`. Most tools accept this
+keyword via the args dict. See `lambdas/phase_filter.py::with_phase_filter()`
+for the underlying mechanism.

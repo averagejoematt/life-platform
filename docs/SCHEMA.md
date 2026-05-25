@@ -1982,3 +1982,21 @@ The MCP server automatically switches from raw daily records to monthly aggregat
 ---
 
 **Verified:** 2026-05-19 — full audit (V2 audit + follow-up). Header counts updated; sources, partitions, and TTL policy reviewed. Note: per-source field tables (whoop, withings, strava, etc.) describe the canonical contract written by the ingestion Lambdas and were not exhaustively re-cross-referenced against current Lambda source in this pass — last full re-derivation 2026-05-19 baseline. [NEEDS VERIFICATION: when SCHEMA.md is next refreshed, regenerate each per-source field table from the Lambda's actual DDB write payload (e.g. `grep -A 30 'ddb_item = {' lambdas/whoop_lambda.py`).]
+
+
+### ADR-058: Phase attribute
+
+Every DDB item under `USER#matthew#SOURCE#*` carries an optional `phase` attribute:
+
+| Value         | Meaning                                                          |
+|---------------|------------------------------------------------------------------|
+| `experiment`  | Record dated on or after EXPERIMENT_START_DATE (currently 2026-05-18). |
+| `pilot`       | Record dated before EXPERIMENT_START_DATE.                       |
+| (unset)       | Cross-phase identity record: profile, config, subscribers, genome, field_notes, baseline_snapshot, re_entry. |
+
+Records under wipe-list partitions (chronicle, coach_threads, predictions, hypotheses,
+decisions, insights, challenges, experiments, character_sheet, habit_scores, certain
+platform_memory categories) additionally carry `tombstone=true`, `tombstoned_at`,
+`tombstoned_reason` after the §5 wipe. `hidden=true` on chronicle items specifically.
+
+Read-path filtering is supplied by `lambdas/phase_filter.py::with_phase_filter()`.

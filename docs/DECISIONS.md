@@ -1397,3 +1397,92 @@ Cumulative reduction: **5,560 LOC → 3,177 LOC (−2,383 LOC / −43%)** across
 ---
 
 **Verified:** 2026-05-19
+
+## ADR-058: Experiment Restart — single source of truth for genesis date
+
+**Status:** Accepted (2026-05-23)
+**Anchor:** EXPERIMENT_START_DATE = 2026-05-18
+**Baseline:** 303.68 lbs (Withings reading on genesis)
+
+### Decision
+Re-anchor the experiment to a fresh genesis date. All pre-genesis raw data is
+preserved in DynamoDB but tagged `phase=pilot` and hidden from public surfaces,
+scoring, coaching, chronicle, and grading. The genesis date is the single
+source of truth — everything (Day-N counter, character sheet, coach predictions,
+challenges, experiments, chronicle, public site) anchors to it.
+
+### Implementation
+- **Config-driven constants** — `config/user_goals.json` is the canonical source of
+  truth. `lambdas/constants.py` is regenerated from it via
+  `deploy/sync_constants_from_config.py`.
+- **DDB phase tagging** — `restart_phase_tag.py` marks every record under
+  `USER#matthew#SOURCE#*` with `phase=pilot` (sk date < genesis) or
+  `phase=experiment` (sk date ≥ genesis). Cross-phase identity records
+  (subscribers, genome, profile, config) are never tagged.
+- **Read-path filter** — `lambdas/phase_filter.py` provides `with_phase_filter()`
+  used by `site_api._query_source`, `mcp.core.query_source`, and named
+  endpoints/tools. Default: phase=pilot hidden. `include_pilot=True` to bypass.
+- **Intelligence wipe** — `restart_intelligence_wipe.py` tombstones coach
+  state via UpdateItem add-flag (interpretation B): the original content
+  stays intact under `tombstone=true`. Reversible by removing the flag.
+- **Character rebuild** — `restart_character_rebuild.py` invokes
+  `character-sheet-compute` for every day genesis→today with `force=true`.
+  `fetch_date` filters tombstones so the cascade starts at Level 1.
+- **Chronicle** — `restart_chronicle_handler.py` archives chronicle HTML to
+  `*/archive/pilot/` (tombstone-overwrite originals, IAM blocks DeleteObject).
+  Indexes rewritten to Day-1 placeholder. Optional --resurrect-sk to keep + redate.
+- **Site copy** — `restart_site_copy_sync.py` regenerates
+  `site_constants.js` journey block + hero copy, sweeps "Day 1 · 307 lbs" /
+  Feb-22 references, S3 syncs, CloudFront invalidates.
+- **Orchestrator** — `restart_pipeline.py` chains all of the above given
+  `--genesis YYYY-MM-DD`.
+
+### Consequences
+- The system is **repeatable**: a one-command pipeline can move genesis to a
+  new date and re-converge all surfaces.
+- All pre-genesis data is preserved and recoverable (interpretation B
+  preserves item content under tombstone flags; raw S3 objects are
+  tombstone-overwritten but accessible at `*/archive/pilot/*`).
+- Public-facing copy has no acknowledgement of any prior attempt. Per
+  Matthew's D decision: full scrub, including the platform-build narrative.
+- Six pre-existing tech-debt failures in the integration test suite are
+  not in scope: notion secret deletion, 62-message DLQ, stale layer versions
+  on 6 Lambdas (now resolved as side-effect of v53 deploy).
+
+
+## ADR-059: Deploy Governance — `restart_pipeline.py` as the Single Safe Entry Point for Multi-Step State Changes
+
+**Status:** Accepted (2026-05-24)
+**Sits alongside:** ADR-058 (restart pipeline), ADR-032/033/046 (S3 safety).
+
+### Context
+
+`deploy/` has grown to 66 scripts (28 Python + 31 Bash + helpers). The May 2026 restart alone added 9 new scripts. Without a documented governance model, the next operator has no way to know which script is safe to run alone vs which is a sub-step of an orchestrator. The recent restart effort proved that even with idempotent sub-scripts, running them in the wrong order or with stale local state can leak pre-genesis content into the public site.
+
+### Decision
+
+**For any operation that mutates more than one DDB partition OR more than one S3 prefix in a single session, the operator MUST go through `deploy/restart_pipeline.py`.**
+
+Direct invocation of sub-scripts (`restart_phase_tag.py`, `restart_intelligence_wipe.py`, `restart_character_rebuild.py`, `restart_chronicle_handler.py`, `restart_site_copy_sync.py`, `restart_docs_update.py`, `restart_verify_rendered.py`) is reserved for:
+
+1. Pipeline development / testing
+2. Surgical fixes when only one sub-step needs replaying
+3. Read-only inspection (every sub-script supports `--dry-run`)
+
+The orchestrator provides guarantees no individual sub-script does:
+- **Ordered execution** — sub-steps depend on each other (constants regen precedes phase-tag, etc.)
+- **Idempotency** — re-running with the same `--genesis` is a no-op
+- **Verify-rendered hard gate** — the run fails if public surfaces still show pre-genesis state
+
+### Consequences
+
+- One-off scripts older than 30 days are moved to `deploy/archive/<YYYY-MM-DD>/` once their execution is logged.
+- `deploy/OPERATIONAL_RUNBOOK.md` is the single index keyed by symptom.
+- New operational scripts must be either: wrapped into the pipeline as a sub-step, or dated as one-off (auto-archive after 30 days).
+- The `restart_verify_rendered.py` URL+token list is institutional memory. New public surfaces (pages, endpoints) must be added to it in the same PR that introduces them.
+
+### Non-decisions
+
+- Per-Lambda surgical deploys (`deploy_lambda.sh`) are unchanged.
+- Normal `cdk deploy` for infra changes is unchanged.
+- This scopes only **state-mutating operational workflows** — not feature deploys.

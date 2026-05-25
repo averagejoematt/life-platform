@@ -32,6 +32,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone, date
 from decimal import Decimal
 from collections import defaultdict
+from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -253,7 +254,7 @@ def gather_all():
     weight_latest = weight_rows[-1][1] if weight_rows else None
     weight_week_start = weight_rows[0][1] if weight_rows else None
     goal = profile.get("goal_weight_lbs", 185)
-    journey_start = profile.get("journey_start_weight_lbs", 307)
+    journey_start = profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
     week_delta = round(weight_latest - weight_week_start, 1) if weight_latest and weight_week_start else None
     lbs_lost = round(journey_start - weight_latest, 1) if weight_latest else None
     lbs_to_go = round(weight_latest - goal, 1) if weight_latest else None
@@ -337,7 +338,7 @@ def gather_all():
             "week_summary": week_summary,
         },
         "dates": {"start": w_start, "end": w_end},
-        "journey_week": max(1, ((today - datetime.strptime(profile.get("journey_start_date", "2026-04-01"), "%Y-%m-%d").date()).days // 7) + 1),
+        "journey_week": max(1, ((today - datetime.strptime(profile.get("journey_start_date", EXPERIMENT_START_DATE), "%Y-%m-%d").date()).days // 7) + 1),
         "profile": profile,
     }
 

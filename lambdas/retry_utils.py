@@ -14,6 +14,7 @@ import os
 import time
 import urllib.error
 import urllib.request
+from typing import Any, Optional, Union
 
 import boto3
 
@@ -34,8 +35,8 @@ AI_MODEL = os.environ.get("AI_MODEL",       "claude-sonnet-4-6")
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 
-def _emit_token_metrics(input_tokens, output_tokens,
-                        cache_creation_tokens=0, cache_read_tokens=0):
+def _emit_token_metrics(input_tokens: int, output_tokens: int,
+                        cache_creation_tokens: int = 0, cache_read_tokens: int = 0) -> None:
     """Emit per-Lambda token usage to CloudWatch (non-fatal)."""
     try:
         metric_data = [
@@ -70,7 +71,7 @@ def _emit_token_metrics(input_tokens, output_tokens,
         print(f"[WARN] CloudWatch token metric emit failed (non-fatal): {e}")
 
 
-def _emit_failure_metric():
+def _emit_failure_metric() -> None:
     """Emit API failure metric to CloudWatch (non-fatal)."""
     try:
         _cw.put_metric_data(
@@ -86,7 +87,10 @@ def _emit_failure_metric():
         print(f"[WARN] CloudWatch failure metric emit failed (non-fatal): {e}")
 
 
-def _build_system_block(system, cache_system):
+def _build_system_block(
+    system: Union[str, list[dict[str, Any]], None],
+    cache_system: bool,
+) -> Union[str, list[dict[str, Any]], None]:
     """Convert system prompt to cached content block format if caching enabled."""
     if not system:
         return None
@@ -98,15 +102,15 @@ def _build_system_block(system, cache_system):
 
 
 def call_anthropic_api(
-    prompt,
-    api_key,
-    max_tokens=500,
-    system=None,
-    model=None,
-    temperature=None,
-    timeout=55,
-    cache_system=True,
-):
+    prompt: str,
+    api_key: str,
+    max_tokens: int = 500,
+    system: Union[str, list[dict[str, Any]], None] = None,
+    model: Optional[str] = None,
+    temperature: Optional[float] = None,
+    timeout: int = 55,
+    cache_system: bool = True,
+) -> str:
     """Call Anthropic /v1/messages with exponential backoff + CloudWatch metrics.
 
     Args:
@@ -189,7 +193,7 @@ def call_anthropic_api(
                 raise
 
 
-def call_anthropic_raw(req, timeout=55):
+def call_anthropic_raw(req: urllib.request.Request, timeout: int = 55) -> dict[str, Any]:
     """Retry wrapper for pre-built urllib Request objects (used by weekly-digest pattern).
 
     Returns the full parsed JSON response (not just text) — callers extract

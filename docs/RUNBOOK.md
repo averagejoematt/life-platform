@@ -1123,3 +1123,30 @@ bash deploy/build_layer.sh && cd cdk && npx cdk deploy --all --require-approval 
 ---
 
 **Verified:** 2026-05-19 (V2 audit operational sweep)
+
+
+## Restart Pipeline
+
+To re-anchor the experiment to a new genesis date:
+
+```bash
+# 1. Verify the Withings reading exists for the target date in DDB.
+# 2. Run the orchestrator:
+python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --dry-run
+# 3. Review the report, then commit:
+python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --apply
+```
+
+The pipeline runs (in order, each idempotent):
+1. `sync_constants_from_config.py` — regenerates `lambdas/constants.py`
+2. `bash deploy/build_layer.sh` + layer version bump + `cdk deploy LifePlatformCore LifePlatformCompute LifePlatformEmail`
+3. `restart_phase_tag.py --apply` — flips DDB phase tags relative to the new genesis
+4. `restart_intelligence_wipe.py --apply` — tombstones any newly pre-genesis records
+5. `restart_character_rebuild.py --apply` — recomputes character sheets from new genesis
+6. `restart_chronicle_handler.py --apply` — archives any newly pre-genesis chronicle HTML
+7. `restart_site_copy_sync.py --apply` — regenerates JS/JSON/HTML site copy + CloudFront invalidate
+
+All steps preserve original data (interpretation B for DDB, archive-not-delete for S3).
+Roll back by removing tombstone flags (DDB) or copying from `*/archive/pilot/` (S3).
+
+See ADR-058 in `docs/DECISIONS.md` for the design rationale.

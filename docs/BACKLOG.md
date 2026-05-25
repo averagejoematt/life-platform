@@ -235,3 +235,50 @@ If you do an item, move it to `docs/CHANGELOG.md` and remove from here. If you d
 ---
 
 **Verified:** 2026-05-19 — synthesized from V1 audit + V2 audit + V2 follow-ups
+
+
+### Restart 2026-05-18 follow-ups
+
+- [ ] Sweep ~110 remaining direct `table.query` call sites that bypass the phase-filter chokepoints (mostly in compute Lambdas and secondary MCP tools — see `_restart_followups.txt`).
+- [ ] Re-evaluate phase filter at 30/60/90 days post-restart (ADR-058 §13).
+- [ ] Remove orphan IAM references to `S3_KMS_KEY_ARN` in `cdk/stacks/role_policies.py` once the customer key completes its scheduled deletion (2026-06-16).
+- [x] ~~DLQ has 62 stale messages — drain via `life-platform-dlq-consumer`.~~ — drained 2026-05-24 (down to 0).
+- [x] ~~`life-platform/notion` secret is `MARKED FOR DELETION` — confirm intentional or re-create.~~ — verified 2026-05-24: secret is healthy (`DeletedDate: null`, last changed today), actively referenced by `notion_lambda.py`, `freshness_checker_lambda.py`, `pipeline_health_check_lambda.py`. Was likely restored before this BACKLOG note got written. No action needed.
+- [ ] Decide whether to resurrect 1-2 specific chronicle entries via `restart_chronicle_handler.py --resurrect-sk`, or leave the chronicle blank until the next Wednesday cycle generates the first fresh entry.
+
+### 2026-05-24 P3.4 site-api work follow-ups
+
+- [x] ~~Site-api Lambda is missing the shared layer attachment.~~ — **Code staged 2026-05-24.** `shared_layer=shared_utils_layer` added to `SiteApiLambda`, `SiteApiAiLambda`, and `SiteStatsRefresh` in `cdk/stacks/operational_stack.py`. Awaits next `cdk deploy --all` (deferred to post-launch to avoid hot-fix-overwrite risk).
+- [ ] CloudWatch dashboard for `LifePlatform/SiteAPI` EMF metrics. The Lambda now emits `DurationMs` + `ColdStart` per (Route, Method) but no dashboard renders them yet. Build a Logs Insights board: p50 / p95 latency per route + cold-start rate.
+- [x] ~~Subscribe-page CLS 0.151 (over the 0.1 budget).~~ — **Fixed 2026-05-24.** Root cause: empty `#amj-nav` / `#amj-hierarchy-nav` / `#amj-subscribe` mount points shifted content when components.js populated them. Added `min-height` reservations in `site/assets/css/base.css`. CLS now 0.091 (under budget).
+
+### 2026-05-24 post-launch CDK deploy follow-ups
+
+- [ ] **Batched `cdk deploy --all` post-launch.** Pending changes staged in CDK code:
+    1. Remove orphan S3 CMK grants from all IAM role policies (`cdk/stacks/role_policies.py` — `S3_KMS_KEY_ARN` deleted from 26 PolicyStatement resources). Bucket is AES256, key in PendingDeletion until 2026-06-16. Code-complete; deploy deferred to avoid the CDK reconcile hot-fix-overwrite risk on launch eve.
+    2. Reattach shared layer to `site-api`, `site-api-ai`, `site-stats-refresh` (see above).
+    3. Run after Monday's launch settles. Use `cdk deploy --all --hotswap-fallback` and verify against `restart_verify_rendered.py` (27/27) immediately after.
+
+### 2026-05-25 launch-eve bug sweep — fixed + open follow-ups
+
+**Fixed and deployed 2026-05-25 01:30–02:30 UTC:**
+- [x] `site_writer.py` — `JOURNEY_START_WEIGHT` referenced at module-load before its import. Caused `(non-fatal)` warning on every daily-brief run. Moved the `from constants import ...` block above the `HERO_WHY_PARAGRAPH` f-string. Deployed via daily-brief bundle.
+- [x] `coach-quality-gate` IAM gap — daily-brief role granted `lambda:InvokeFunction` on coach-computation-engine etc. but not coach-quality-gate. Every coach call logged `AccessDeniedException (non-blocking)`. Added the ARN to the `CoachIntelligenceInvoke` policy statement. Deployed via `cdk deploy LifePlatformEmail`.
+- [x] Canary subscribe bouncing — `/api/subscribe` synthetic subscriber `canary+<ts>@mattsusername.com` resulted in SES sending a confirmation email that then bounced (MAILER-DAEMON spam). `email_subscriber_lambda.py` now reads `source` from POST body and skips the confirmation send when `source == "canary"`. Deployed to both us-west-2 and us-east-1.
+- [x] Canary alert-on-any-failure — every transient blip emailed `🔴 canary: 1 failure(s)`. Added a 2-consecutive-fail buffer using DDB state at `USER#system / CANARY#last_state`. Only alerts when the SAME check has failed in both the previous AND current run. Deployed.
+- [x] 43 CloudWatch alarms still publishing to immediate-email SNS topic `life-platform-alerts` — root cause of "AWS Notification Message" + alarm-flap spam. Batch-rerouted to digest topic via `aws cloudwatch put-metric-alarm` script. CDK source updated (mcp_stack + operational_stack `add_alarm_action`/`add_ok_action` lines now point at `local_digest_topic`).
+- [x] `pipeline-health-check` Lambda had no `SNS_ARN` env var, falling back to hardcoded `life-platform-alerts` topic. Set env var to digest topic via CLI.
+
+**Open follow-ups:**
+- [ ] **Garmin OAuth rate-limited (HTTP 429)** — Garmin's exchange endpoint is throttling our refresh requests. Every scheduled invocation aborts and adds a DLQ message. **Needs manual re-auth**: log into Garmin Connect, generate fresh OAuth tokens, update `life-platform/garmin` secret. Until then, no Garmin data flows.
+- [ ] **The 5 duplicate Morning Brief emails** were caused by `aws lambda invoke daily-brief` during my P3.4 / phase-filter test cycles. Lesson: never invoke an email-shipping Lambda unless explicitly intended. Future-Claude: if testing daily-brief logic, set `DRY_RUN=1` env var (add this gate to the Lambda) or invoke a dedicated test endpoint that returns the HTML without SES'ing.
+- [ ] **`compute-pipeline-stale` alarm** will fire tomorrow (genesis = first day) because compute hasn't run yet. Now routes to digest, so it'll batch into one email. Once compute runs at 11 AM PT Monday, alarm self-clears.
+- [ ] **JOURNAL_COACH validator BLOCKED empty output** in daily-brief logs (currently every run). Cause: pre-genesis there are no journal entries, so the coach returns empty, the validator blocks it as low-quality. **Expected pre-launch behavior** — once you start journaling (via Notion), the coach will produce output and the validator will accept it. Self-resolves; no code change needed.
+- [ ] **Training coach prompt drift** — `[ai_validator] WARNING: Output starts with 'Matthew' — prompt instruction may have been ignored`. Quality issue, not blocking. The Sonnet prompt for the training coach tells the model not to start with "Matthew" — Sonnet is ignoring that instruction. Worth a prompt-engineering pass post-launch.
+- [ ] **76 untagged DDB records discovered + retro-tagged** via `restart_phase_tag.py --apply` 2026-05-25 02:24 UTC. Root cause: per-Lambda write paths (`character_engine.store_character_sheet`, daily-brief insight writes, ingestion writes between phase-tag runs) didn't add phase tags. Fixed `store_character_sheet` to tag pre-genesis writes as `pilot`; **other write paths still don't tag**. Acceptable for now (untagged passes the filter as "experiment"), but a future hardening pass should add a `compute_metadata.tag_record(item, phase=...)` helper used by every writer.
+
+**Source freshness inventory captured 2026-05-25 02:25 UTC** — 3 fresh (whoop, apple_health, habitify), 9 stale. Of the 9: only Garmin is a code bug (above). The rest are behavioral (macrofactor=44d, food_delivery=58d, measurements=57d, notion=23d, etc.) and resolve when you log data.
+
+### 2026-05-24 phase-filter sweep — deferred-with-reason
+
+- [ ] **~254 raw `table.query()` callsites still bypass the phase-filter chokepoint.** Audited per-Lambda counts; not the bounded mechanical sweep originally estimated — each callsite needs human judgment (USER#-prefixed user data needs the filter; SUBSCRIBER#/ADMIN#/system tables are exempt). Daily-brief / character-sheet / daily-insight-compute have the highest blast radius. Defer to launch+1 week with daylight to test; pre-genesis data is already correctly phase-tagged at the DDB level, so the practical risk of leakage into post-genesis compute outputs is low.

@@ -40,6 +40,8 @@ from decimal import Decimal
 
 import boto3
 
+from phase_filter import with_phase_filter  # ADR-058
+
 # Structured logger
 try:
     from platform_logger import get_logger
@@ -331,14 +333,18 @@ def _put_item(item):
         return False
 
 
-def _query_begins_with(pk, sk_prefix, scan_forward=True, limit=None):
-    """Query DynamoDB for items with SK beginning with a prefix."""
+def _query_begins_with(pk, sk_prefix, scan_forward=True, limit=None, include_pilot=False):
+    """Query DynamoDB for items with SK beginning with a prefix.
+
+    ADR-058: applies the default-deny phase filter so tombstoned coach records
+    (phase=pilot) are hidden. Pass include_pilot=True to see them.
+    """
     from boto3.dynamodb.conditions import Key
     try:
-        kwargs = {
+        kwargs = with_phase_filter({
             "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
             "ScanIndexForward": scan_forward,
-        }
+        }, include_pilot=include_pilot)
         if limit:
             kwargs["Limit"] = limit
 

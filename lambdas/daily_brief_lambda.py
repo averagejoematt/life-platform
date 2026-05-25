@@ -142,6 +142,8 @@ except ImportError:
 import html_builder
 import ai_calls
 import output_writers
+from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # ai_calls can be init'd at import time (no dependency on locally-defined functions)
 ai_calls.init(
@@ -196,10 +198,11 @@ def fetch_date(source, date_str):
 def _latest_item(source):
     """Fetch the most recent record for a source (e.g., dexa, labs, measurements)."""
     try:
-        r = table.query(
-            KeyConditionExpression=Key("pk").eq(USER_PREFIX + source) & Key("sk").begins_with("DATE#"),
-            ScanIndexForward=False, Limit=1,
-        )
+        kwargs = with_phase_filter({
+            "KeyConditionExpression": Key("pk").eq(USER_PREFIX + source) & Key("sk").begins_with("DATE#"),
+            "ScanIndexForward": False, "Limit": 1,
+        })
+        r = table.query(**kwargs)
         items = r.get("Items", [])
         return d2f(items[0]) if items else None
     except Exception:
@@ -208,10 +211,12 @@ def _latest_item(source):
 
 def fetch_range(source, start, end):
     try:
-        r = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={":pk": USER_PREFIX + source,
-                                       ":s": "DATE#" + start, ":e": "DATE#" + end})
+        kwargs = with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {":pk": USER_PREFIX + source,
+                                          ":s": "DATE#" + start, ":e": "DATE#" + end},
+        })
+        r = table.query(**kwargs)
         return [d2f(i) for i in r.get("Items", [])]
     except Exception:
         return []
@@ -248,12 +253,14 @@ def _normalize_whoop_sleep(item):
 
 def fetch_journal_entries(date_str):
     try:
-        r = table.query(
-            KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
-            ExpressionAttributeValues={
+        kwargs = with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+            "ExpressionAttributeValues": {
                 ":pk": USER_PREFIX + "notion",
                 ":prefix": "DATE#" + date_str + "#journal#"
-            })
+            },
+        })
+        r = table.query(**kwargs)
         return [d2f(i) for i in r.get("Items", [])]
     except Exception as e:
         logger.warning("fetch_journal_entries: " + str(e))
@@ -399,10 +406,11 @@ def gather_daily_data(profile, yesterday):
     # Travel — check if currently traveling (v2.40.0)
     travel_active = None
     try:
-        travel_resp = table.query(
-            KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
-            ExpressionAttributeValues={":pk": USER_PREFIX + "travel", ":prefix": "TRIP#"},
-        )
+        travel_kwargs = with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+            "ExpressionAttributeValues": {":pk": USER_PREFIX + "travel", ":prefix": "TRIP#"},
+        })
+        travel_resp = table.query(**travel_kwargs)
         for trip in travel_resp.get("Items", []):
             start = trip.get("start_date", "")
             end = trip.get("end_date") or "9999-12-31"
@@ -1939,10 +1947,11 @@ def lambda_handler(event, context):
             _threshold_d = _STALE_OVERRIDE.get(_src, 2)
             _pk = f"USER#{_user_id}#SOURCE#{_src}"
             try:
-                _resp = table.query(
-                    KeyConditionExpression=_DDBKey("pk").eq(_pk) & _DDBKey("sk").begins_with("DATE#"),
-                    Limit=1, ScanIndexForward=False,
-                )
+                _kwargs = with_phase_filter({
+                    "KeyConditionExpression": _DDBKey("pk").eq(_pk) & _DDBKey("sk").begins_with("DATE#"),
+                    "Limit": 1, "ScanIndexForward": False,
+                })
+                _resp = table.query(**_kwargs)
                 _items = _resp.get("Items", [])
                 if not _items:
                     _stale.append({"source": _src, "age_days": None, "label": "no data"})
@@ -2044,7 +2053,7 @@ def lambda_handler(event, context):
             _rec_status = "green" if _rec >= 67 else ("yellow" if _rec >= 34 else "red")
 
             # Journey calc from profile
-            _start_wt = float(profile.get("journey_start_weight_lbs", 307))
+            _start_wt = float(profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
             _goal_wt = float(profile.get("goal_weight_lbs", 185))
             # G-3/G-4 FIX: fall back to avatar_weight (broader lookback) when latest_weight is None
             _curr_wt = data.get("latest_weight") or data.get("avatar_weight")  # float or None
@@ -2068,7 +2077,7 @@ def lambda_handler(event, context):
             # Journey start date → days_in
             try:
                 from datetime import date as _date
-                _started = profile.get("journey_start_date", "2026-04-01")
+                _started = profile.get("journey_start_date", EXPERIMENT_START_DATE)
                 _days_in = max(1, (_date.today() - _date.fromisoformat(_started)).days + 1)
             except Exception:
                 _days_in = 0
@@ -2223,7 +2232,7 @@ def lambda_handler(event, context):
                     "progress_pct":       _prog_pct,
                     "weekly_rate_lbs":    _weekly_rate,
                     "projected_goal_date": profile.get("goal_date", "2026-07-31"),
-                    "started_date":       profile.get("journey_start_date", "2026-04-01"),
+                    "started_date":       profile.get("journey_start_date", EXPERIMENT_START_DATE),
                     "current_phase":      (get_current_phase(profile, _curr_wt) or {}).get("name", "Ignition") if _curr_wt else None,
                     "days_in":            _days_in,
                 },
@@ -2252,8 +2261,8 @@ def lambda_handler(event, context):
                 group_narratives=_group_narratives,
                 # D10: Day 1 baseline from profile — historical constants, not live data
                 baseline={
-                    "date":         profile.get("baseline_date") or profile.get("journey_start_date", "2026-04-01"),
-                    "weight_lbs":   float(profile.get("baseline_weight_lbs") or profile.get("journey_start_weight_lbs", 307.0)),
+                    "date":         profile.get("baseline_date") or profile.get("journey_start_date", EXPERIMENT_START_DATE),
+                    "weight_lbs":   float(profile.get("baseline_weight_lbs") or profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)),
                     "hrv_ms":       float(profile.get("baseline_hrv_ms", 45)),
                     "rhr_bpm":      float(profile.get("baseline_rhr_bpm", 62)),
                     "recovery_pct": float(profile.get("baseline_recovery_pct", 55)),

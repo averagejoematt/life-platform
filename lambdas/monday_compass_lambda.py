@@ -39,6 +39,8 @@ from decimal import Decimal
 
 import boto3
 
+from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
 
@@ -408,7 +410,7 @@ def build_week_state_summary(health_data, profile):
     if pillar_scores:
         weakest_pillar = min(pillar_scores, key=lambda x: pillar_scores[x])
 
-    start_w = profile.get("journey_start_weight_lbs", 307)
+    start_w = profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
     goal_w = profile.get("goal_weight_lbs", 185)
     week_num = _compute_week_num(profile)
 
@@ -429,7 +431,7 @@ def build_week_state_summary(health_data, profile):
 
 def _compute_week_num(profile):
     try:
-        start = datetime.strptime(profile.get("journey_start_date", "2026-04-01"), "%Y-%m-%d").date()
+        start = datetime.strptime(profile.get("journey_start_date", EXPERIMENT_START_DATE), "%Y-%m-%d").date()
         today = datetime.now(timezone.utc).date()
         return max(1, ((today - start).days + 6) // 7)
     except Exception:
@@ -599,7 +601,7 @@ def build_user_message(week_state, todoist_data, health_data, profile,
     today = datetime.now(timezone.utc).date()
 
     week_num = week_state.get("week_num", 1)
-    start_w = week_state.get("start_weight", 307)
+    start_w = week_state.get("start_weight", EXPERIMENT_BASELINE_WEIGHT_LBS)
     goal_w = week_state.get("goal_weight", 185)
     char_level = week_state.get("char_level", 1)
     char_tier = week_state.get("char_tier", "Foundation")

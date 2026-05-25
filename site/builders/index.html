@@ -288,7 +288,7 @@
     <div class="builders-section__eyebrow">00 — The Meta-Story</div>
     <h2 class="builders-section__title">Who Built This</h2>
     <p class="builders-section__body">
-      Matthew is a technology leader who manages engineering teams at a SaaS company. He started this platform on February 22, 2026. Today it runs <span data-const="platform.lambdas">62</span> Lambdas, <span data-const="platform.mcp_tools">121</span> MCP tools, a <span data-const="platform.site_pages">72</span>-page website, and a CI/CD pipeline. How? Every single conversation was with Claude.
+      Matthew is a technology leader who manages engineering teams at a SaaS company. Today it runs <span data-const="platform.lambdas">62</span> Lambdas, <span data-const="platform.mcp_tools">121</span> MCP tools, a <span data-const="platform.site_pages">72</span>-page website, and a CI/CD pipeline. How? Every single conversation was with Claude.
     </p>
     <p class="builders-section__body">
       This is what happens when a domain expert &mdash; someone who knows their health data, their goals, and their constraints &mdash; pairs with an AI that can write production code. The human sets the architecture. The AI writes the implementation. The human reviews the output. The AI iterates. Zero Stack Overflow.
@@ -516,65 +516,13 @@
     </div>
   </div>
 
-  <!-- Build Timeline -->
+  <!-- Build summary (timeline removed per ADR-058 — no pre-launch history shown publicly) -->
   <div class="builders-section reveal">
-    <div class="builders-section__eyebrow">05 — Build timeline</div>
-    <h2 class="builders-section__title">How Fast It Grew</h2>
+    <div class="builders-section__eyebrow">05 — Build summary</div>
+    <h2 class="builders-section__title">What It Became</h2>
     <p class="builders-section__body">
-      From zero to <span data-const="platform.lambdas">62</span> Lambdas in 5 weeks. Every version was built with Claude as the sole engineering partner.
+      <span data-const="platform.lambdas">62</span> Lambdas, <span data-const="platform.mcp_tools">121</span> MCP tools, <span data-const="platform.data_sources">19</span> data sources, on AWS at roughly <span data-const="platform.monthly_cost">$19</span> a month. Built entirely with Claude as the sole engineering partner — no contractors, no co-engineers, no boilerplate templates.
     </p>
-
-    <div class="timeline">
-      <div class="timeline-item">
-        <div class="timeline-item__date">Feb 22</div>
-        <div>
-          <div class="timeline-item__title">Day 1 &mdash; First Lambda, first DynamoDB write</div>
-          <div class="timeline-item__desc">Whoop ingestion. Single Lambda, single table. 15 minutes from idea to working code.</div>
-        </div>
-      </div>
-      <div class="timeline-item">
-        <div class="timeline-item__date">Week 1</div>
-        <div>
-          <div class="timeline-item__title">8 data sources online</div>
-          <div class="timeline-item__desc">Whoop, Withings, Strava, Apple Health, MacroFactor, Habitify, Garmin, Eight Sleep. All on EventBridge crons.</div>
-        </div>
-      </div>
-      <div class="timeline-item">
-        <div class="timeline-item__date">Week 2</div>
-        <div>
-          <div class="timeline-item__title">Daily Brief email + MCP server</div>
-          <div class="timeline-item__desc">Claude synthesizes all data into a coaching email every morning. MCP tools let me query data in natural language.</div>
-        </div>
-      </div>
-      <div class="timeline-item">
-        <div class="timeline-item__date">Week 3</div>
-        <div>
-          <div class="timeline-item__title">Character Sheet engine + public website</div>
-          <div class="timeline-item__desc">7-pillar scoring system with EMA smoothing, level/tier transitions. averagejoematt.com goes live with live data.</div>
-        </div>
-      </div>
-      <div class="timeline-item">
-        <div class="timeline-item__date">Week 4</div>
-        <div>
-          <div class="timeline-item__title">Intelligence layer: correlations + hypothesis engine</div>
-          <div class="timeline-item__desc">23-pair Pearson correlation matrix with BH-FDR correction. Weekly AI hypothesis generation from data patterns.</div>
-        </div>
-      </div>
-      <div class="timeline-item">
-        <div class="timeline-item__date">Week 5</div>
-        <div>
-          <div class="timeline-item__title">CI/CD, architecture reviews, 103 MCP tools</div>
-          <div class="timeline-item__desc">GitHub Actions pipeline with OIDC. 17 architecture reviews by 14-member AI board. Challenge system with XP gamification.</div>
-        </div>
-      </div>
-      <div class="timeline-item">
-        <div class="timeline-item__date">Week 6+</div>
-        <div>
-          <div class="timeline-item__title">Observatory editorial design, 67-page site, launch prep</div>
-          <div class="timeline-item__desc">Full editorial observatory pattern across 6 health domains. Usability study with 15 simulated participants. Site-api split for isolated AI endpoints. <span data-const="platform.lambdas">62</span> Lambdas, <span data-const="platform.mcp_tools">121</span> MCP tools, <span data-const="platform.data_sources">26</span> data sources. <span data-const="platform.monthly_cost">$19</span>/month.</div>
-        </div>
-      </div>
-    </div>
   </div>
 
   <!-- If I Started Over -->
