@@ -1529,4 +1529,57 @@ Hevy is a workout-logging app Matthew uses alongside MacroFactor. Previously wor
 
 - MacroFactor Dropbox workout pipeline is **NOT removed** — runs parallel.
 - Cross-source workout dedupe between Hevy and MacroFactor is **NOT introduced** (they're independent apps).
-- The MacroFactor unofficial-API client (WS-2) is **NOT included** in this ADR — separate decision pending the parity diff (Thursday).
+- The MacroFactor unofficial-API client (WS-2) is **NOT included** in this ADR — see ADR-061.
+
+---
+
+## ADR-061: MacroFactor Unofficial-API Puller as Tier 1 Food-Level Nutrition Path
+
+**Date:** 2026-05-25
+**Status:** Accepted
+**Spec:** `SPEC_HEVY_AND_NUTRITION_BRIDGE_2026_05_25` (WS-2).
+
+### Context
+
+The platform's current food-level nutrition path is a manual MacroFactor Dropbox export. The goal is no-touch food-level ingestion (food names, brands, per-entry servings — not just aggregate macros). FatSecret, Cronometer, and Terra/Vital were all rejected (see spec §3.7); the unofficial MacroFactor API is the only path that satisfies both "food-level" and "no manual upload" without changing apps.
+
+### Decision
+
+1. **Pure-Python Firebase + Firestore client** (`lambdas/macrofactor_client.py`). NOT the npm `@sjawhar/macrofactor-mcp` package or the Rust `macro-factor-api` crate. Both are unofficial undocumented community libraries; depending on either at runtime adds a fragile remote-distribution risk to a critical path. Instead: we reverse-engineered the Firebase config + Firestore collection paths from both libraries on 2026-05-25, and re-implemented the minimum surface in pure Python (stdlib `urllib` only). What we learned:
+   - **Firebase web API key** for the `sbs-diet-app` project is **public** (`AIzaSyA17Uwy37irVEQSwz6PIyX3wnkHrDBeleA`, hardcoded in the Rust crate). Firebase web keys are designed to be embedded — security comes from Firebase Auth rules + bundle ID validation, not the key being secret.
+   - **Bundle ID header** `X-Ios-Bundle-Identifier: com.sbs.diet` is required on auth requests.
+   - **Firestore base** `https://firestore.googleapis.com/v1/projects/sbs-diet-app/databases/(default)/documents`.
+   - **Food log path** `users/{uid}/food/{YYYY-MM-DD}` — single doc per day, food entries as map fields keyed by epoch-micros id.
+   - Food entry field codes (one-letter): `t`=name, `b`=brand, `c`=calories, `p`=protein, `e`=carbs, `f`=fat, `g`=grams, `q`=quantity, `s`=serving, `h`=hour, `mi`=minute. Values stored as `stringValue` (MF Android parser convention).
+
+2. **Dedicated secret `life-platform/macrofactor`** holding `{username, password}`. Per ADR-014: NOT bundled into `api-keys`. Mirrors `life-platform/habitify` precedent.
+
+3. **The secret holds Matthew's actual MacroFactor account password** (Firebase email/password auth — no scoped API key exists for MacroFactor). **Accepted risk** per spec §3.0:
+   - Encrypted at rest by AWS KMS.
+   - Only `mf-puller` Lambda role can read it.
+   - Rotate immediately if you change your MF password.
+
+4. **Architecture (isolation guarantee):** the puller Lambda NEVER raises. Hard failures (auth, schema drift, App Check changes) are caught, logged, and written into a health record at `USER#system / INGESTION_STATE#macrofactor_api`. The platform doesn't notice. Matthew falls back to Tier 2 (manual Dropbox export) when the digest alert says "Tier 1 down".
+
+5. **Tier 1 writes alongside Tier 2 — NOT instead of it.** Both write to the same nutrition-record shape; the `entry_uid` is derived from a stable hash of `date + entry_id + food_name` so dedupe works across tiers. Priority when both have the same date is configurable; default = Tier 1 authoritative.
+
+6. **Schedule:** daily 14:00 UTC = 07:00 PT. Rolling 3-day lookback window self-heals small gaps without re-processing the whole archive every run.
+
+### Accepted risks
+
+- **Unofficial undocumented API.** MacroFactor can change the Firestore schema, add App Check enforcement, or block our bundle-ID header at any time. Mitigations: per-request best-effort, status record with `consecutive_failures` counter, fallback path (Tier 2) preserved.
+- **Account password in Secrets Manager.** Risk acknowledged in `deploy/create_macrofactor_secret.sh` interactive prompt. Operator must explicitly type `y` to proceed.
+- **Token refresh requires real account credentials.** Lambda re-authenticates each cold start; warm containers refresh idToken via `securetoken.googleapis.com/v1/token` when within 5min of expiry. Refresh-token never expires unless MF revokes it.
+
+### Consequences
+
+- One new secret + 1 new Lambda (`mf-puller`) in `LifePlatformIngestion`.
+- New DDB partition: `USER#matthew#SOURCE#macrofactor_api` with `NUTRITION#{date}#{entry_uid}` SK pattern.
+- Raw payloads archived to `s3://matthew-life-platform/raw/macrofactor_api/`.
+- `pytest tests/test_macrofactor_client.py` (16 tests) covers Firestore value decoding, field-code → schema mapping, stable-uid determinism, phase tagging.
+- Parity diff (spec §3.8) deferred — Matthew runs a manual export later, compares Tier 1 vs Tier 2 records for a 7-day window, signs off on which fields are export-only and adjusts `priority` constant accordingly.
+
+### Non-decisions
+
+- **Workout ingestion via MacroFactor unofficial API** — out of scope. Hevy (ADR-060) is the no-touch workout path; MF workouts continue arriving via Dropbox (Tier 2 only). If Tier 1 proves stable for nutrition for 90 days, revisit.
+- **Periodic credential health check** beyond the puller's own failure tracking — not added.
