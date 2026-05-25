@@ -26,6 +26,10 @@ from mcp.tools_strength import (
     tool_get_strength_progress, tool_get_workout_frequency, tool_get_strength_standards,
     tool_get_strength, tool_get_centenarian_benchmarks,
 )
+# SPEC_HEVY_AND_NUTRITION_BRIDGE §2.6 — source-agnostic workout query layer
+from mcp.tools_hevy import (
+    tool_get_workouts, tool_get_workout_detail, tool_get_workout_source_status,
+)
 from mcp.tools_training import (
     tool_get_acwr_status,
     tool_get_cross_source_correlation,
@@ -3006,6 +3010,73 @@ TOOLS = {
                 },
                 "required": ["source_type", "source_id", "outcome"],
             },
+        },
+    },
+
+    # SPEC_HEVY_AND_NUTRITION_BRIDGE §2.6 — source-agnostic workout tools.
+    # Read the new per-workout schema (sk=DATE#yyyy-mm-dd#WORKOUT#<id>).
+    # Coexists with the legacy tool_get_workout_frequency / tool_get_strength
+    # tools that read the old daily-aggregate shape.
+    "get_workouts": {
+        "fn": tool_get_workouts,
+        "schema": {
+            "name": "get_workouts",
+            "description": (
+                "List normalized workouts across all logging sources (Hevy + MacroFactor) "
+                "in a date range. Returns per-workout records with title, duration, "
+                "set count, total volume in kg, and source attribution. Use for: "
+                "'what workouts did I do this week?', 'show recent training', "
+                "'compare workouts across apps'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "start_date": {"type": "string",
+                                   "description": "ISO yyyy-mm-dd. Default: 30 days ago."},
+                    "end_date":   {"type": "string",
+                                   "description": "ISO yyyy-mm-dd. Default: today."},
+                    "source":     {"type": "string",
+                                   "enum": ["hevy", "macrofactor_api", "macrofactor_export"],
+                                   "description": "Optional source filter. Omit for all."},
+                    "limit":      {"type": "integer", "default": 100, "minimum": 1, "maximum": 500,
+                                   "description": "Max workouts to return."},
+                },
+                "required": [],
+            },
+        },
+    },
+
+    "get_workout_detail": {
+        "fn": tool_get_workout_detail,
+        "schema": {
+            "name": "get_workout_detail",
+            "description": (
+                "Return full per-set detail for one workout (exercises, weights, reps, RPE, "
+                "notes). Looked up by workout_uid in the form '<source>:<source_workout_id>' "
+                "(e.g. 'hevy:abc-123'). Use after get_workouts to drill into a specific session."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "workout_uid": {"type": "string",
+                                    "description": "Stable workout uid, '<source>:<id>'."},
+                },
+                "required": ["workout_uid"],
+            },
+        },
+    },
+
+    "get_workout_source_status": {
+        "fn": tool_get_workout_source_status,
+        "schema": {
+            "name": "get_workout_source_status",
+            "description": (
+                "Per-source workout-ingestion health: last ingested workout date, age in "
+                "hours, and whether that source is currently healthy (<36h old). Plus the "
+                "Hevy backfill high-water mark. Use for: 'is Hevy syncing?', "
+                "'why are no recent workouts showing up?', dashboard sync indicator."
+            ),
+            "inputSchema": {"type": "object", "properties": {}, "required": []},
         },
     },
 
