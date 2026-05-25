@@ -29,6 +29,8 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from collections import Counter, defaultdict
+
+from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 import re
 
 _logger_std = logging.getLogger()
@@ -345,7 +347,7 @@ def extract_weight_trend(withings_data):
 def build_weight_context(withings_data, profile):
     """Build human-readable weight context for AI."""
     weight = extract_weight_trend(withings_data)
-    start_w = profile.get("journey_start_weight_lbs", 307)
+    start_w = profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
     goal_w = profile.get("goal_weight_lbs", 185)
     if weight:
         current = weight["latest_weight_lbs"]

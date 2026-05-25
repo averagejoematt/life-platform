@@ -39,6 +39,8 @@ from decimal import Decimal
 
 import boto3
 
+from phase_filter import with_phase_filter  # ADR-058
+
 # ── Structured logger ────────────────────────────────────────────────────────
 try:
     from platform_logger import get_logger
@@ -217,7 +219,7 @@ def _fetch_range(source, start_date, end_date):
             },
         }
         while True:
-            r = table.query(**kwargs)
+            r = table.query(**with_phase_filter(kwargs))
             records.extend(_decimal_to_float(i) for i in r.get("Items", []))
             if "LastEvaluatedKey" not in r:
                 break
@@ -247,7 +249,7 @@ def _fetch_predictions():
                 },
             }
             while True:
-                resp = table.query(**kwargs)
+                resp = table.query(**with_phase_filter(kwargs))
                 items = [_decimal_to_float(i) for i in resp.get("Items", [])]
                 for item in items:
                     status = item.get("status", "")

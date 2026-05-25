@@ -81,7 +81,11 @@ def create_platform_lambda(
     # ── Code override ──
     code: _lambda.Code = None,  # Override code asset (default: Code.from_asset("../lambdas"))
     # ── Observability ──
-    tracing: _lambda.Tracing = None,  # R13-XR: pass _lambda.Tracing.ACTIVE for X-Ray
+    # ADR-058 follow-up (2026-05-24): default to ACTIVE so all Lambdas emit X-Ray
+    # traces. ~$0.50/month for this platform's volume. Enables distributed-tracing
+    # debugging of multi-hop chains (ingest → enrich → DDB → site-api).
+    # Pass _lambda.Tracing.PASS_THROUGH explicitly to opt out for a specific Lambda.
+    tracing: _lambda.Tracing = _lambda.Tracing.ACTIVE,
 ) -> _lambda.Function:
     """Create a Lambda function with standard Life Platform conventions.
 

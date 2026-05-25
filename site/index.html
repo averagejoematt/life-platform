@@ -522,11 +522,15 @@
 </head>
 <body>
 
+<a href="#main" class="skip-link">Skip to main content</a>
+
 <div id="amj-nav"></div>
 
 <h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">
-  Matthew — Public Health Transformation: 307 to 185 lbs, Tracked with 26 Data Sources and AI
+  Matthew — Public Health Transformation: 297 to 185 lbs, Tracked with 19 Data Sources and AI
 </h1>
+
+<main id="main">
 
 <!-- ═══════════════════════════════════════════════════════════
      0. FRONT PAGE MASTHEAD (Front Page pattern — top of home)
@@ -547,11 +551,11 @@
     </div>
     <div class="fp-masthead__strip">
       <div>
-        <span style="opacity:0.5">&larr; Yesterday</span>
+        <span class="fp-masthead__strip-dim">&larr; Yesterday</span>
         <span class="fp-masthead__strip-sep">·</span>
         Day <span id="fp-day-strip">—</span> of 365
         <span class="fp-masthead__strip-sep">·</span>
-        <span style="opacity:0.5">Tomorrow &rarr;</span>
+        <span class="fp-masthead__strip-dim">Tomorrow &rarr;</span>
       </div>
       <div id="fp-filed">Filed —</div>
     </div>
@@ -578,7 +582,7 @@
       <!-- Weight gauge -->
       <div class="h-gauge" id="h-g-weight">
         <div class="h-gauge__ring">
-          <svg viewBox="0 0 88 88">
+          <svg viewBox="0 0 88 88" aria-hidden="true" focusable="false">
             <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
             <circle id="h-g-weight-arc" cx="44" cy="44" r="35" fill="none" stroke="var(--h-accent)" stroke-width="7"
               stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
@@ -594,7 +598,7 @@
       <!-- Lost gauge -->
       <div class="h-gauge" id="h-g-lost">
         <div class="h-gauge__ring">
-          <svg viewBox="0 0 88 88">
+          <svg viewBox="0 0 88 88" aria-hidden="true" focusable="false">
             <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
             <circle id="h-g-lost-arc" cx="44" cy="44" r="35" fill="none" stroke="var(--h-accent)" stroke-width="7"
               stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
@@ -610,7 +614,7 @@
       <!-- Progress gauge -->
       <div class="h-gauge" id="h-g-progress">
         <div class="h-gauge__ring">
-          <svg viewBox="0 0 88 88">
+          <svg viewBox="0 0 88 88" aria-hidden="true" focusable="false">
             <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
             <circle id="h-g-progress-arc" cx="44" cy="44" r="35" fill="none" stroke="var(--h-accent)" stroke-width="7"
               stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
@@ -626,7 +630,7 @@
       <!-- HRV gauge -->
       <div class="h-gauge" id="h-g-hrv">
         <div class="h-gauge__ring">
-          <svg viewBox="0 0 88 88">
+          <svg viewBox="0 0 88 88" aria-hidden="true" focusable="false">
             <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
             <circle id="h-g-hrv-arc" cx="44" cy="44" r="35" fill="none" stroke="var(--h-blue)" stroke-width="7"
               stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
@@ -642,7 +646,7 @@
       <!-- Sleep gauge -->
       <div class="h-gauge" id="h-g-sleep">
         <div class="h-gauge__ring">
-          <svg viewBox="0 0 88 88">
+          <svg viewBox="0 0 88 88" aria-hidden="true" focusable="false">
             <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
             <circle id="h-g-sleep-arc" cx="44" cy="44" r="35" fill="none" stroke="var(--h-violet)" stroke-width="7"
               stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
@@ -658,7 +662,7 @@
       <!-- Character gauge -->
       <div class="h-gauge" id="h-g-char">
         <div class="h-gauge__ring">
-          <svg viewBox="0 0 88 88">
+          <svg viewBox="0 0 88 88" aria-hidden="true" focusable="false">
             <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
             <circle id="h-g-char-arc" cx="44" cy="44" r="35" fill="none" stroke="var(--h-amber)" stroke-width="7"
               stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
@@ -680,7 +684,7 @@
      ═══════════════════════════════════════════════════════════ -->
 <div id="amj-bio" style="max-width:var(--max-width);margin:0 auto;padding:var(--space-4) var(--page-padding);">
   <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-wide);text-transform:uppercase;color:var(--text-faint);">Matthew &middot; Seattle, WA</div>
-  <div style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.7;margin-top:var(--space-1);">Started at 307 lbs. Built this entire platform with Claude as a development partner.</div>
+  <div style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.7;margin-top:var(--space-1);">Started at 297 lbs. A 12-month experiment in measured living.</div>
   <div style="font-size:var(--text-sm);color:var(--text-faint);line-height:1.7;margin-top:var(--space-1);font-style:italic;">Made public because accountability needs an audience.</div>
 </div>
 <div id="amj-since-last-visit"></div>
@@ -742,14 +746,9 @@
 <div id="h-currently-testing" style="display:none" class="reveal"></div>
 
 <!-- ═══════════════════════════════════════════════════════════
-     6. PULL-QUOTE #1 (left-offset)
+     6. PULL-QUOTE #1 — removed per ADR-058. Chronicle carries
+        the narrative voice; the homepage stays quiet.
      ═══════════════════════════════════════════════════════════ -->
-<div class="h-pullquote h-pullquote--left reveal">
-  <blockquote class="h-pullquote__text">
-    &ldquo;I didn&rsquo;t start this to prove anything. I started it because I was 307 pounds and running out of excuses.&rdquo;
-  </blockquote>
-  <div class="h-pullquote__badge">Day 1 &middot; April 2026</div>
-</div>
 
 <!-- ═══════════════════════════════════════════════════════════
      7. SECTION HEADER: The evidence
@@ -851,6 +850,8 @@
   <div class="fp-cross-footer__next"><a href="/live/">Live &rarr;</a></div>
 </nav>
 
+</main>
+
 <!-- ═══════════════════════════════════════════════════════════
      13. Subscribe + footer placeholders
      ═══════════════════════════════════════════════════════════ -->
@@ -934,7 +935,7 @@
     var meta = raw._meta || {};
 
     // ── Hero stats line ──
-    var startDateStr = j.started_date || j.start_date || '2026-04-01';
+    var startDateStr = j.started_date || j.start_date || (window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25';
     var journeyStart = new Date(startDateStr + 'T12:00:00Z');
     var daysIn = hero.days_on_journey != null ? hero.days_on_journey
               : j.days_in != null ? j.days_in
@@ -954,9 +955,9 @@
     }
 
     // ── Gauge rings ──
-    // Weight: progress % toward goal (307 -> 185)
+    // Weight: progress % toward goal (start -> 185, sourced from API)
     var progressPct = hero.progress_pct || j.progress_pct || 0;
-    var startWeight = hero.start_weight || j.start_weight_lbs || 307;
+    var startWeight = hero.start_weight || j.start_weight_lbs || 297;
     var goalWeight = hero.goal_weight || j.goal_weight_lbs || 185;
     var lostLbs = Math.max(0, startWeight - (wLbs || startWeight));
     var totalToLose = startWeight - goalWeight;
@@ -1007,7 +1008,7 @@
     // Rolling avg from Apr 1 onwards (self-corrects: 3-day avg on day 3, 14-day avg on day 14, etc.)
     var sleepAvg;
     var sleepDaysUsed = 0;
-    var sleepLaunchDate = new Date('2026-04-01T00:00:00Z');
+    var sleepLaunchDate = new Date(((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25') + 'T00:00:00Z');
     if (trends.sleep_daily && trends.sleep_daily.length > 0) {
       var launchSleepEntries = trends.sleep_daily.filter(function(r) {
         return r.date && new Date(r.date + 'T12:00:00Z') >= sleepLaunchDate;

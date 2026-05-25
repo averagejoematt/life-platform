@@ -21,6 +21,8 @@ import re
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+
 # ==============================================================================
 # MODULE STATE (set by init())
 # ==============================================================================
@@ -96,7 +98,7 @@ def _build_avatar_data(character_sheet, profile, current_weight=None):
     tier = (character_sheet.get("character_tier") or "Foundation").lower().replace(" ", "_")
     pillar_names = _PILLAR_ORDER
 
-    start_w = profile.get("journey_start_weight_lbs", 307)
+    start_w = profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
     goal_w = profile.get("goal_weight_lbs", 185)
     cw = current_weight or start_w
     if start_w != goal_w:
@@ -351,8 +353,8 @@ def write_public_stats_json(data, profile, streak_data=None):
     try:
         today = datetime.now(timezone.utc).date()
 
-        journey_start_date = profile.get("journey_start_date", "2026-04-01")
-        journey_start_weight = float(profile.get("journey_start_weight_lbs", 307))
+        journey_start_date = profile.get("journey_start_date", EXPERIMENT_START_DATE)
+        journey_start_weight = float(profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
         goal_weight = float(profile.get("goal_weight_lbs", 185))
         current_weight = data.get("latest_weight")
 
@@ -466,7 +468,7 @@ def write_dashboard_json(data, profile, day_grade_score, grade, component_scores
 
         phase = _get_current_phase(profile, latest_weight) if latest_weight else None
         phase_name = phase.get("name", "") if phase else ""
-        journey_start = profile.get("journey_start_weight_lbs", 307)
+        journey_start = profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
         goal_weight = profile.get("goal_weight_lbs", 185)
         journey_pct = None
         if latest_weight and journey_start and goal_weight:
@@ -1190,9 +1192,9 @@ def write_buddy_json(data, profile, yesterday, character_sheet=None):
             prompt = "No action needed. If you reach out, just be a mate — talk about life, not health."
 
         # Journey Stats
-        journey_start = profile.get("journey_start_date", "2026-04-01")
+        journey_start = profile.get("journey_start_date", EXPERIMENT_START_DATE)
         goal_weight = _safe_float(profile, "goal_weight_lbs") or 185
-        start_weight = _safe_float(profile, "start_weight_lbs") or 307
+        start_weight = _safe_float(profile, "start_weight_lbs") or EXPERIMENT_BASELINE_WEIGHT_LBS
         try:
             journey_days = (today_dt - datetime.strptime(journey_start, "%Y-%m-%d").date()).days
         except Exception:

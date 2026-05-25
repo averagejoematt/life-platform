@@ -212,7 +212,7 @@ function renderCoachAnalysis(container, expertKey, coachMeta) {
         var genDate = new Date(data.generated_at);
         var dayName = genDate.toLocaleDateString('en-US', { weekday: 'long' });
         var dateFmt = genDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-        var expStart = new Date('2026-04-01');
+        var expStart = new Date((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25');
         var expDay = Math.max(1, Math.floor((genDate - expStart) / 86400000) + 1);
         genEl.innerHTML = '<strong>' + dayName + ', ' + dateFmt + '</strong> \u00b7 Day ' + expDay + ' Observations';
       }

@@ -426,7 +426,7 @@
       // about-weight shows STARTING weight (307) — don't overwrite it with current weight
       var lostEl = document.getElementById('about-lost');
       if (lostEl) {
-        var journeyStarted = Date.now() >= new Date('2026-04-01T00:00:00-07:00').getTime();
+        var journeyStarted = Date.now() >= new Date(((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25') + 'T00:00:00-07:00').getTime();
         var lost = journeyStarted ? Math.max(0, 307 - rounded) : 0;  // 307 = April 1 baseline weight
         if (lost > 0) lostEl.textContent = lost.toFixed(1) + ' lbs';
         else lostEl.textContent = '—';
@@ -435,14 +435,17 @@
   } catch(e) {}
 })();
 
-// Live status day counter
+// Live status day counter (ADR-058: genesis from window.AMJ.journey)
 (function() {
   var el = document.getElementById('about-status-day');
   if (!el) return;
-  var msIn = Date.now() - new Date('2026-04-01T07:00:00-07:00').getTime();
+  var genesisIso = (window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25';
+  var msIn = Date.now() - new Date(genesisIso + 'T07:00:00-07:00').getTime();
   if (msIn >= 0) {
     var dayNum = Math.max(1, Math.floor(msIn / 86400000) + 1);
     el.textContent = 'Day ' + dayNum + ' \u2014 Active';
+  } else {
+    el.textContent = 'Begins ' + genesisIso;
   }
 })();
 

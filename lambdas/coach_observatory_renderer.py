@@ -29,6 +29,8 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+
+from phase_filter import with_phase_filter  # ADR-058
 from boto3.dynamodb.conditions import Key
 
 # ── Structured logger ────────────────────────────────────────────────────────
@@ -47,7 +49,7 @@ REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 
-EXPERIMENT_START = "2026-04-01"
+from constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
 
 # AWS clients
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
@@ -185,7 +187,7 @@ def _query_begins_with(pk, sk_prefix, scan_forward=True, limit=None):
 
         items = []
         while True:
-            resp = table.query(**kwargs)
+            resp = table.query(**with_phase_filter(kwargs))
             items.extend(resp.get("Items", []))
             # If we have a limit and have enough items, stop paginating
             if limit and len(items) >= limit:
@@ -438,12 +440,12 @@ def _render_coach_card(domain, include_threads=True):
     track_record = None
     try:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
-        tr_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(coach_pk)
+        tr_resp = table.query(**with_phase_filter({  # ADR-058
+            "KeyConditionExpression": Key("pk").eq(coach_pk)
                 & Key("sk").between(f"LEARNING#{cutoff}", "LEARNING#z"),
-            ProjectionExpression="#s",
-            ExpressionAttributeNames={"#s": "status"},
-        )
+            "ProjectionExpression": "#s, #p",  # phase_filter needs #p in projection too
+            "ExpressionAttributeNames": {"#s": "status"},
+        }))
         counts = {"confirmed": 0, "refuted": 0, "inconclusive": 0, "expired": 0}
         for it in tr_resp.get("Items", []):
             s = it.get("status", "")

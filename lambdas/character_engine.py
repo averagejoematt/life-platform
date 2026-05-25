@@ -21,6 +21,9 @@ import math
 import time
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import Any, Optional
+
+from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +52,12 @@ _DEFAULT_TIERS = [
 # CONFIG LOADER
 # ==============================================================================
 
-def load_character_config(s3_client, bucket, force_refresh=False, user_id="matthew"):
+def load_character_config(
+    s3_client: Any,
+    bucket: str,
+    force_refresh: bool = False,
+    user_id: str = "matthew",
+) -> dict[str, Any]:
     """Load character_sheet.json from S3 with warm-container caching."""
     now = time.time()
     if (not force_refresh and _config_cache["data"]
@@ -149,7 +157,7 @@ def _trend_score(values, higher_is_better=True):
     return round(_clamp(score), 1)
 
 
-def get_tier(level, config=None):
+def get_tier(level: int, config: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     """Get tier info for a given level."""
     tiers = (config or {}).get("tiers", _DEFAULT_TIERS)
     for tier in tiers:
@@ -193,7 +201,7 @@ def _compute_xp(raw_score, previous_xp, config, day_number=None):
 # PILLAR RAW SCORE COMPUTATIONS
 # ==============================================================================
 
-def compute_sleep_raw(data, config):
+def compute_sleep_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[float, dict[str, Any]]:
     """Compute Sleep pillar raw_score (0-100)."""
     pillar_cfg = config.get("pillars", {}).get("sleep", {})
     components = pillar_cfg.get("components", {})
@@ -273,7 +281,7 @@ def compute_sleep_raw(data, config):
     return _weighted_pillar_score(scores, components)
 
 
-def compute_movement_raw(data, config):
+def compute_movement_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[float, dict[str, Any]]:
     """Compute Movement pillar raw_score (0-100)."""
     pillar_cfg = config.get("pillars", {}).get("movement", {})
     components = pillar_cfg.get("components", {})
@@ -351,7 +359,7 @@ def compute_movement_raw(data, config):
 def _body_comp_score(current_weight, config):
     """Two-phase body composition scoring: sigmoid during loss, band during maintenance. [F-04]"""
     baseline = config.get("baseline", {})
-    start = baseline.get("start_weight_lbs", 307)
+    start = baseline.get("start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
     goal = baseline.get("goal_weight_lbs", 185)
     maintenance_band = baseline.get("maintenance_band_lbs", 3)
     phase = baseline.get("weight_phase", "loss")
@@ -379,7 +387,7 @@ def _body_comp_score(current_weight, config):
     return round(_clamp(score), 1)
 
 
-def compute_nutrition_raw(data, config):
+def compute_nutrition_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[float, dict[str, Any]]:
     """Compute Nutrition pillar raw_score (0-100)."""
     pillar_cfg = config.get("pillars", {}).get("nutrition", {})
     components = pillar_cfg.get("components", {})
@@ -438,7 +446,7 @@ def compute_nutrition_raw(data, config):
     return _weighted_pillar_score(scores, components)
 
 
-def compute_metabolic_raw(data, config):
+def compute_metabolic_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[float, dict[str, Any]]:
     """Compute Metabolic Health pillar raw_score (0-100)."""
     pillar_cfg = config.get("pillars", {}).get("metabolic", {})
     components = pillar_cfg.get("components", {})
@@ -528,7 +536,7 @@ def _compute_lab_score(labs, compute_date, lab_cfg):
     return round(sum(marker_scores) / len(marker_scores) * decay, 1)
 
 
-def compute_mind_raw(data, config):
+def compute_mind_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[float, dict[str, Any]]:
     """Compute Mind pillar raw_score (0-100)."""
     pillar_cfg = config.get("pillars", {}).get("mind", {})
     components = pillar_cfg.get("components", {})
@@ -599,7 +607,7 @@ def compute_mind_raw(data, config):
     return _weighted_pillar_score(scores, components)
 
 
-def compute_relationships_raw(data, config):
+def compute_relationships_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[float, dict[str, Any]]:
     """Compute Relationships pillar raw_score (0-100)."""
     pillar_cfg = config.get("pillars", {}).get("relationships", {})
     components = pillar_cfg.get("components", {})
@@ -647,7 +655,7 @@ def compute_relationships_raw(data, config):
     return _weighted_pillar_score(scores, components)
 
 
-def compute_consistency_raw(data, config, other_pillar_raw_scores):
+def compute_consistency_raw(data: dict[str, Any], config: dict[str, Any], other_pillar_raw_scores: dict[str, float]) -> tuple[float, dict[str, Any]]:
     """Compute Consistency meta-pillar raw_score (0-100)."""
     pillar_cfg = config.get("pillars", {}).get("consistency", {})
     components = pillar_cfg.get("components", {})
@@ -728,7 +736,7 @@ def _weighted_pillar_score(component_scores, components_config):
 # EMA + LEVEL COMPUTATION
 # ==============================================================================
 
-def compute_ema_level_score(raw_scores_history, config, pillar_name=None):
+def compute_ema_level_score(raw_scores_history: list[float], config: dict[str, Any], pillar_name: Optional[str] = None) -> float:
     """Compute EMA of raw scores. Uses per-pillar lambda if available. [F-03]"""
     leveling = config.get("leveling", {})
 
@@ -752,7 +760,7 @@ def compute_ema_level_score(raw_scores_history, config, pillar_name=None):
     return round(total / total_w, 1) if total_w > 0 else 50.0
 
 
-def evaluate_level_changes(pillar_name, current_level_score, previous_state, config):
+def evaluate_level_changes(pillar_name: str, current_level_score: float, previous_state: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
     """Level changes with progressive difficulty by tier. [F-15, F-10, F-11, F-02]"""
     leveling = config.get("leveling", {})
 
@@ -859,7 +867,7 @@ def evaluate_level_changes(pillar_name, current_level_score, previous_state, con
 # CROSS-PILLAR EFFECTS
 # ==============================================================================
 
-def compute_cross_pillar_effects(pillar_levels, config):
+def compute_cross_pillar_effects(pillar_levels: dict[str, float], config: dict[str, Any]) -> dict[str, Any]:
     """Evaluate cross-pillar effects. Returns (active_effects, modifier_dict). [F-05]"""
     effects_config = config.get("cross_pillar_effects", [])
     active = []
@@ -940,10 +948,10 @@ PILLAR_COMPUTERS = {
 }
 
 
-def compute_character_sheet(data, previous_day_state, raw_score_histories, config):
+def compute_character_sheet(data: dict[str, Any], previous_day_state: Optional[dict[str, Any]], raw_score_histories: dict[str, list[float]], config: dict[str, Any]) -> dict[str, Any]:
     """Compute the full character sheet for a single day."""
     compute_date = data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    experiment_start = config.get("experiment_start", "2026-04-01")
+    experiment_start = config.get("experiment_start", EXPERIMENT_START_DATE)
     try:
         _day_number = max(1, (datetime.strptime(compute_date, "%Y-%m-%d") - datetime.strptime(experiment_start, "%Y-%m-%d")).days + 1)
     except Exception:
@@ -1053,8 +1061,8 @@ def compute_character_sheet(data, previous_day_state, raw_score_histories, confi
     total_xp = sum(pr["xp_total"] for pr in pillar_results.values())
 
     # Confidence stats [F-01]
-    confidences = [pr.get("confidence") for pr in pillar_results.values()
-                   if pr.get("confidence") is not None]
+    confidences: list[float] = [pr["confidence"] for pr in pillar_results.values()
+                                if pr.get("confidence") is not None]
     min_confidence = round(min(confidences), 3) if confidences else 0.0
     avg_confidence = round(sum(confidences) / len(confidences), 3) if confidences else 0.0
 
@@ -1081,11 +1089,18 @@ def compute_character_sheet(data, previous_day_state, raw_score_histories, confi
 # DDB HELPERS
 # ==============================================================================
 
-def store_character_sheet(table_resource, user_prefix, record):
+def store_character_sheet(table_resource: Any, user_prefix: str, record: dict[str, Any]) -> None:
     """Write a character_sheet record to DynamoDB.
-    Phase 3.3 (2026-05-16): tags with run_id + computed_at via compute_metadata."""
+    Phase 3.3 (2026-05-16): tags with run_id + computed_at via compute_metadata.
+    ADR-058 (2026-05-25): pre-genesis dates are tagged phase='pilot' so the
+    read-path phase_filter excludes them by default. Without this, compute
+    runs on pre-genesis dates (e.g., from manual test invocations or backfill
+    scripts) silently leak as live data post-launch.
+    """
     item = {"pk": user_prefix + "character_sheet", "sk": "DATE#" + record["date"]}
     item.update(_to_decimal(record))
+    if record.get("date", "") < EXPERIMENT_START_DATE:
+        item["phase"] = "pilot"
     try:
         from compute_metadata import tag_record
         item = tag_record(item, source_id="character_sheet")
@@ -1095,7 +1110,7 @@ def store_character_sheet(table_resource, user_prefix, record):
     return item
 
 
-def fetch_character_sheet(table_resource, user_prefix, date_str):
+def fetch_character_sheet(table_resource: Any, user_prefix: str, date_str: str) -> Optional[dict[str, Any]]:
     try:
         resp = table_resource.get_item(
             Key={"pk": user_prefix + "character_sheet", "sk": "DATE#" + date_str})
@@ -1105,7 +1120,7 @@ def fetch_character_sheet(table_resource, user_prefix, date_str):
         return None
 
 
-def fetch_character_sheet_range(table_resource, user_prefix, start_date, end_date):
+def fetch_character_sheet_range(table_resource: Any, user_prefix: str, start_date: str, end_date: str) -> list[dict[str, Any]]:
     try:
         resp = table_resource.query(
             KeyConditionExpression="pk = :pk AND sk BETWEEN :start AND :end",

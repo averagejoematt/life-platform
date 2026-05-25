@@ -323,7 +323,7 @@
     if (!section) return;
 
     // Don't show Pulse feed before launch
-    if (new Date() < new Date('2026-04-01T00:00:00')) return;
+    if (new Date() < new Date(((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25') + 'T00:00:00')) return;
 
     try {
       // Build pulse items from multiple data sources
@@ -339,7 +339,7 @@
             domain: 'body',
             date: p.date || new Date().toISOString().split('T')[0],
             headline: (function() {
-              var launch = new Date('2026-04-01T00:00:00');
+              var launch = new Date(((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25') + 'T00:00:00');
               var now = new Date();
               if (now < launch) {
                 var daysUntil = Math.ceil((launch - now) / 86400000);

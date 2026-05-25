@@ -1,18 +1,21 @@
 /**
  * countdown.js — Global experiment countdown / Day N counter
  *
- * Before April 1, 2026: Shows "Experiment begins in X days"
- * After April 1, 2026:  Shows "Day N" of the experiment
+ * Reads genesis from window.AMJ.journey.start_date (set by site_constants.js).
+ * Falls back to a sentinel if site_constants.js hasn't loaded yet.
  *
  * Injects into any element with class="experiment-counter"
  * Also exposes window.AMJ_EXPERIMENT for other scripts to consume.
  *
- * v1.0.0 — 2026-03-25
+ * v1.1.0 — 2026-05-24 (ADR-058: genesis from window.AMJ.journey, not hardcoded)
  */
 (function() {
   'use strict';
 
-  var EXPERIMENT_START = new Date('2026-04-01T00:00:00-07:00'); // PDT
+  // ADR-058: read genesis from site_constants.js. Hardcoded fallback only
+  // if site_constants.js hasn't loaded — should never happen in production.
+  var GENESIS_ISO = (window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25';
+  var EXPERIMENT_START = new Date(GENESIS_ISO + 'T00:00:00-07:00'); // PDT
 
   function daysBetween(a, b) {
     var msPerDay = 86400000;

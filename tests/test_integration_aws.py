@@ -938,6 +938,372 @@ def test_i14_canary_mcp_check_passes():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# I15 — Reserved concurrency guard
+# Catches: "Lambda quota raised to 100 but CDK reserved-concurrency overrides
+# are still commented out" (or the inverse: quota still 10 but someone
+# uncommented them and the deploy will fail).
+# Added 2026-05-24 per P1.2 of the holistic platform investment plan.
+# ══════════════════════════════════════════════════════════════════════════════
+
+@pytest.mark.integration
+def test_i15_reserved_concurrency_guard():
+    """I15: account quota and CDK reserved-concurrency overrides must agree.
+
+    Reserved-concurrency overrides are pre-staged as commented-out lines in
+    cdk/stacks/{ingestion,operational}_stack.py. They MUST stay commented while
+    the account concurrency quota is at the AWS default of 10 (otherwise CDK
+    deploys fail). They SHOULD be uncommented once AWS Support raises the
+    quota (case 177921309700709).
+    """
+    import re
+    boto3 = _get_boto3()
+    lambda_client = boto3.client("lambda", region_name=REGION)
+
+    try:
+        account_settings = lambda_client.get_account_settings()
+        # AccountLimit.ConcurrentExecutions is the regional concurrent-execution cap.
+        quota = account_settings["AccountLimit"]["ConcurrentExecutions"]
+    except Exception as e:
+        pytest.skip(f"I15 SKIP: could not fetch Lambda account settings: {e}")
+
+    stack_files = [
+        os.path.join(ROOT, "cdk", "stacks", "ingestion_stack.py"),
+        os.path.join(ROOT, "cdk", "stacks", "operational_stack.py"),
+        os.path.join(ROOT, "cdk", "stacks", "compute_stack.py"),
+        os.path.join(ROOT, "cdk", "stacks", "mcp_stack.py"),
+    ]
+    uncommented_lines = []
+    commented_lines = []
+    for path in stack_files:
+        if not os.path.exists(path):
+            continue
+        with open(path) as f:
+            for lineno, line in enumerate(f, 1):
+                if "ReservedConcurrentExecutions" not in line:
+                    continue
+                stripped = line.lstrip()
+                if stripped.startswith("#"):
+                    commented_lines.append(f"{os.path.basename(path)}:{lineno}")
+                else:
+                    uncommented_lines.append(f"{os.path.basename(path)}:{lineno}")
+
+    if quota < 100 and uncommented_lines:
+        pytest.fail(
+            f"I15 FAIL: Account quota is {quota} (< 100) but CDK has "
+            f"{len(uncommented_lines)} uncommented reserved-concurrency override(s):\n"
+            + "\n".join(f"    {ln}" for ln in uncommented_lines)
+            + "\n\nThis combination will fail CDK deploy. Either re-comment the "
+            "overrides, or wait for AWS Support case 177921309700709 to raise quota to 100+."
+        )
+
+    if quota >= 100 and commented_lines and not uncommented_lines:
+        pytest.fail(
+            f"I15 FAIL: Account quota is {quota} (≥ 100, raised by AWS), but ALL "
+            f"reserved-concurrency overrides are still commented out:\n"
+            + "\n".join(f"    {ln}" for ln in commented_lines)
+            + "\n\nFix: uncomment the overrides in the listed CDK stacks and "
+            "cdk deploy --all to protect critical Lambdas from starve-out."
+        )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# I16 — Ingest → DDB sanity check
+# Each day after genesis, at least 2 ingestion sources should have a DATE#
+# record. Catches "ingest cron silently broken — daily-brief renders zeros".
+# Added 2026-05-24 per P2.1 of the holistic platform investment plan.
+# ══════════════════════════════════════════════════════════════════════════════
+
+@pytest.mark.integration
+def test_i16_recent_ingest_records_exist():
+    """I16: at least 2 ingestion sources have today-or-yesterday DATE# records.
+
+    Post-genesis, the system should ingest withings + whoop + macrofactor +
+    todoist + notion daily. Allow 24h slop so an early-morning run before all
+    ingestions complete doesn't flake.
+    """
+    from datetime import datetime, timedelta, timezone
+    boto3 = _get_boto3()
+
+    sys.path.insert(0, os.path.join(ROOT, "lambdas"))
+    from constants import EXPERIMENT_START_DATE
+
+    genesis = datetime.strptime(EXPERIMENT_START_DATE, "%Y-%m-%d").date()
+    today = datetime.now(timezone.utc).date()
+    if today < genesis:
+        pytest.skip(f"I16 SKIP: pre-genesis (today={today}, genesis={genesis})")
+
+    ddb = boto3.client("dynamodb", region_name=REGION)
+    sources_to_check = ["withings", "whoop", "macrofactor", "todoist", "notion"]
+    yesterday = (today - timedelta(days=1)).isoformat()
+    today_iso = today.isoformat()
+
+    found = []
+    for source in sources_to_check:
+        pk = f"USER#matthew#SOURCE#{source}"
+        for sk in (f"DATE#{today_iso}", f"DATE#{yesterday}"):
+            try:
+                resp = ddb.get_item(
+                    TableName=TABLE_NAME,
+                    Key={"pk": {"S": pk}, "sk": {"S": sk}},
+                )
+                if "Item" in resp:
+                    found.append(f"{source}@{sk[5:]}")
+                    break
+            except Exception:
+                pass
+
+    if len(found) < 2:
+        pytest.fail(
+            f"I16 FAIL: fewer than 2 sources have recent DATE# records. "
+            f"Found: {found or 'NONE'}\n"
+            f"Expected ≥2 from {sources_to_check} for {today_iso} or {yesterday}."
+        )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# I17 — Character compute → EMA continuity
+# The character-sheet-compute Lambda runs daily and writes a single record per
+# day. Catches "compute Lambda silently failed; level stays frozen for days".
+# ══════════════════════════════════════════════════════════════════════════════
+
+@pytest.mark.integration
+def test_i17_character_sheet_recent_record():
+    """I17: a CHARACTER_SHEET# record exists for today or yesterday with level ≥ 1."""
+    from datetime import datetime, timedelta, timezone
+    boto3 = _get_boto3()
+
+    sys.path.insert(0, os.path.join(ROOT, "lambdas"))
+    from constants import EXPERIMENT_START_DATE
+
+    genesis = datetime.strptime(EXPERIMENT_START_DATE, "%Y-%m-%d").date()
+    today = datetime.now(timezone.utc).date()
+    if today < genesis:
+        pytest.skip(f"I17 SKIP: pre-genesis (today={today})")
+
+    ddb = boto3.client("dynamodb", region_name=REGION)
+    pk = "USER#matthew#SOURCE#character_sheet"
+
+    for offset in (0, 1):
+        date = (today - timedelta(days=offset)).isoformat()
+        resp = ddb.get_item(
+            TableName=TABLE_NAME,
+            Key={"pk": {"S": pk}, "sk": {"S": f"DATE#{date}"}},
+        )
+        item = resp.get("Item")
+        if item:
+            level_attr = item.get("character_level") or item.get("level") or {}
+            level_raw = level_attr.get("N") if isinstance(level_attr, dict) else None
+            assert level_raw is not None, (
+                f"I17 FAIL: character record exists for {date} but has no "
+                f"character_level/level attribute. Item keys: {sorted(item.keys())}"
+            )
+            assert float(level_raw) >= 1, (
+                f"I17 FAIL: character level is {level_raw} on {date} — expected ≥ 1."
+            )
+            return
+
+    pytest.fail(
+        f"I17 FAIL: no character_sheet DATE# record for today or yesterday. "
+        f"character-sheet-compute may have silently failed; investigate "
+        f"/aws/lambda/character-sheet-compute logs."
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# I18 — Daily-brief recent successful invocation
+# Catches "daily-brief stopped sending; nobody noticed because the failure is
+# silent (no alarm if it raises in error-trapped section)".
+# ══════════════════════════════════════════════════════════════════════════════
+
+@pytest.mark.integration
+def test_i18_daily_brief_recently_invoked():
+    """I18: daily-brief Lambda has been invoked successfully in the past 48h."""
+    from datetime import datetime, timedelta, timezone
+    boto3 = _get_boto3()
+
+    sys.path.insert(0, os.path.join(ROOT, "lambdas"))
+    from constants import EXPERIMENT_START_DATE
+
+    genesis = datetime.strptime(EXPERIMENT_START_DATE, "%Y-%m-%d").date()
+    today = datetime.now(timezone.utc).date()
+    if today < genesis:
+        pytest.skip(f"I18 SKIP: pre-genesis (today={today})")
+
+    cw = boto3.client("cloudwatch", region_name=REGION)
+    end = datetime.now(timezone.utc)
+    start = end - timedelta(hours=48)
+
+    resp = cw.get_metric_statistics(
+        Namespace="AWS/Lambda",
+        MetricName="Invocations",
+        Dimensions=[{"Name": "FunctionName", "Value": "daily-brief"}],
+        StartTime=start,
+        EndTime=end,
+        Period=3600,
+        Statistics=["Sum"],
+    )
+    total = sum(p["Sum"] for p in resp.get("Datapoints", []))
+    assert total >= 1, (
+        f"I18 FAIL: daily-brief has 0 invocations in the last 48h. "
+        f"Check EventBridge rule + Lambda permissions."
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# I19 — Site-api /api/journey contract
+# The homepage hero and Day-N counter are populated by /api/journey. The
+# endpoint must keep returning the expected JSON shape — a typo'd field name
+# silently breaks the homepage with no Lambda error.
+# ══════════════════════════════════════════════════════════════════════════════
+
+@pytest.mark.integration
+def test_i19_site_api_journey_contract():
+    """I19: /api/journey returns the expected fields with sensible values."""
+    import urllib.request
+    sys.path.insert(0, os.path.join(ROOT, "lambdas"))
+    from constants import EXPERIMENT_START_DATE
+
+    try:
+        req = urllib.request.Request(
+            "https://averagejoematt.com/api/journey",
+            headers={"User-Agent": "integration-test-i19/1.0"},
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = json.loads(resp.read())
+    except Exception as e:
+        pytest.skip(f"I19 SKIP: /api/journey unreachable: {e}")
+
+    # Contract: top-level wrapper.
+    assert "journey" in body, (
+        f"I19 FAIL: /api/journey missing 'journey' wrapper key. "
+        f"Got keys: {sorted(body.keys())}"
+    )
+    j = body["journey"]
+    required = ["started_date", "start_weight_lbs", "current_weight_lbs", "goal_weight_lbs"]
+    missing = [k for k in required if k not in j]
+    assert not missing, (
+        f"I19 FAIL: /api/journey.journey missing fields: {missing}\n"
+        f"Got keys: {sorted(j.keys())}"
+    )
+
+    # Cross-check started_date matches our deployed constants.
+    assert j["started_date"] == EXPERIMENT_START_DATE, (
+        f"I19 FAIL: /api/journey started_date={j['started_date']} but "
+        f"deployed constants say {EXPERIMENT_START_DATE}. site-api Lambda is stale."
+    )
+
+    # Sanity bounds on weight.
+    cw = j["current_weight_lbs"]
+    if cw is not None:
+        assert 100 < float(cw) < 500, f"I19 FAIL: weight {cw} outside [100, 500]"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# I20 — Pre-genesis DDB phase-tag integrity
+# Anything written before EXPERIMENT_START_DATE should be phase-tagged "pilot"
+# (so read-path phase_filter excludes it). A miss here means the launch-eve
+# bug class is back. Catches "DDB read returns a 2026-04 record because someone
+# forgot to phase-tag a partition".
+# ══════════════════════════════════════════════════════════════════════════════
+
+@pytest.mark.integration
+def test_i20_pre_genesis_records_are_phase_tagged():
+    """I20: spot-check that pre-genesis DATE# records carry phase='pilot'."""
+    boto3 = _get_boto3()
+
+    sys.path.insert(0, os.path.join(ROOT, "lambdas"))
+    from constants import EXPERIMENT_START_DATE
+
+    ddb = boto3.client("dynamodb", region_name=REGION)
+    # Pick three partitions known to have pre-genesis history.
+    sample_partitions = [
+        "USER#matthew#SOURCE#whoop",
+        "USER#matthew#SOURCE#withings",
+        "USER#matthew#SOURCE#macrofactor",
+    ]
+
+    untagged_pre_genesis: list[str] = []
+    checked = 0
+    for pk in sample_partitions:
+        resp = ddb.query(
+            TableName=TABLE_NAME,
+            KeyConditionExpression="pk = :p AND begins_with(sk, :s)",
+            ExpressionAttributeValues={
+                ":p": {"S": pk},
+                ":s": {"S": "DATE#"},
+            },
+            Limit=20,
+            ScanIndexForward=True,  # oldest first
+        )
+        for item in resp.get("Items", []):
+            sk_raw = item["sk"]["S"]
+            if not sk_raw.startswith("DATE#"):
+                continue
+            date_part = sk_raw[5:15]
+            if date_part >= EXPERIMENT_START_DATE:
+                continue  # post-genesis — skip
+            checked += 1
+            phase = item.get("phase", {}).get("S") if "phase" in item else None
+            if phase != "pilot":
+                untagged_pre_genesis.append(f"{pk} {sk_raw} phase={phase!r}")
+
+    if checked == 0:
+        pytest.skip(
+            "I20 SKIP: no pre-genesis records found in sample (table may "
+            "be empty pre-launch — that's also fine)"
+        )
+
+    assert not untagged_pre_genesis, (
+        f"I20 FAIL: {len(untagged_pre_genesis)} pre-genesis records lack "
+        f"phase='pilot' tag:\n  " + "\n  ".join(untagged_pre_genesis[:5])
+        + (f"\n  ... ({len(untagged_pre_genesis) - 5} more)" if len(untagged_pre_genesis) > 5 else "")
+        + "\n\nFix: rerun deploy/restart_phase_tag.py --apply"
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# I21 — DDB profile matches deployed constants.py
+# constants.py is the source of truth for EXPERIMENT_START_DATE +
+# EXPERIMENT_BASELINE_WEIGHT_LBS. The DDB PROFILE#v1 record is what site-api
+# reads. If they diverge, the site shows stale data with no Lambda error.
+# Catches the "site_api warm cache held stale weight" class of bug.
+# ══════════════════════════════════════════════════════════════════════════════
+
+@pytest.mark.integration
+def test_i21_ddb_profile_matches_constants():
+    """I21: USER#matthew PROFILE#v1 fields must match lambdas/constants.py."""
+    boto3 = _get_boto3()
+
+    sys.path.insert(0, os.path.join(ROOT, "lambdas"))
+    from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS
+
+    ddb = boto3.client("dynamodb", region_name=REGION)
+    resp = ddb.get_item(
+        TableName=TABLE_NAME,
+        Key={"pk": {"S": "USER#matthew"}, "sk": {"S": "PROFILE#v1"}},
+    )
+    item = resp.get("Item")
+    assert item, "I21 FAIL: USER#matthew PROFILE#v1 record missing from DDB"
+
+    ddb_start = item.get("journey_start_date", {}).get("S")
+    ddb_weight_raw = item.get("journey_start_weight_lbs", {}).get("N")
+    ddb_weight = float(ddb_weight_raw) if ddb_weight_raw else None
+
+    assert ddb_start == EXPERIMENT_START_DATE, (
+        f"I21 FAIL: DDB profile journey_start_date={ddb_start!r} but constants.py "
+        f"says {EXPERIMENT_START_DATE!r}. Run deploy/restart_pipeline.py to reconcile."
+    )
+
+    # Allow 0.5lb tolerance for Decimal/float rounding noise.
+    if ddb_weight is not None:
+        assert abs(ddb_weight - EXPERIMENT_BASELINE_WEIGHT_LBS) < 0.5, (
+            f"I21 FAIL: DDB profile journey_start_weight_lbs={ddb_weight} vs "
+            f"constants.py EXPERIMENT_BASELINE_WEIGHT_LBS={EXPERIMENT_BASELINE_WEIGHT_LBS}. "
+            f"Run deploy/restart_pipeline.py to reconcile."
+        )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Standalone runner
 # ══════════════════════════════════════════════════════════════════════════════
 

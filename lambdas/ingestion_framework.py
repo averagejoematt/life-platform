@@ -64,6 +64,16 @@ import boto3
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+# ADR-058 (2026-05-25): tag every DDB write with phase=pilot|experiment so the
+# read-path phase_filter can default-deny pre-genesis data. Without this, every
+# ingestion run leaves untagged records that need a periodic
+# `restart_phase_tag.py --apply` sweep.
+try:
+    from constants import EXPERIMENT_START_DATE, EXPERIMENT_PHASE_CURRENT
+except ImportError:
+    EXPERIMENT_START_DATE = "2026-05-25"
+    EXPERIMENT_PHASE_CURRENT = "experiment"
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # AUTH-FAILURE CIRCUIT BREAKER (ADR-052)
@@ -288,6 +298,18 @@ def _find_missing_dates(table, config, logger):
 # VALIDATE + STORE (DATA-2 + REL-3)
 # ══════════════════════════════════════════════════════════════════════════════
 
+def _phase_for_date(date_str: str) -> str:
+    """Return phase tag ('pilot' or 'experiment') for a given DATE# value.
+
+    Records written for dates before EXPERIMENT_START_DATE are pilot data;
+    records for the genesis date or later are live experiment data. The
+    read-path phase_filter (lambdas/phase_filter.py) excludes pilot by default.
+    """
+    if date_str and date_str < EXPERIMENT_START_DATE:
+        return "pilot"
+    return EXPERIMENT_PHASE_CURRENT
+
+
 def _store_item(table, s3, config, item, date_str, logger):
     """Validate (DATA-2), size-guard (REL-3), and store a single DDB item.
 
@@ -307,6 +329,11 @@ def _store_item(table, s3, config, item, date_str, logger):
                            f"{config.source_name}/{date_str}: {vr.warnings}")
     except ImportError:
         pass  # Validator not available — proceed without
+
+    # ADR-058: stamp phase=pilot|experiment so the default-deny read filter works.
+    # Don't overwrite an explicitly-set phase (e.g., admin backfill scripts).
+    if "phase" not in item:
+        item["phase"] = _phase_for_date(date_str)
 
     # REL-3: Item size guard (optional, for large-item sources)
     if config.enable_item_size_guard:

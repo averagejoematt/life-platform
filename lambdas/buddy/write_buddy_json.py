@@ -332,9 +332,9 @@ def write_buddy_json(data, profile, yesterday):
             prompt = "No action needed. If you reach out, just be a mate \u2014 talk about life, not health."
 
         # ── Journey Stats ──
-        journey_start = profile.get("journey_start_date", "2026-04-01")
+        journey_start = profile.get("journey_start_date", EXPERIMENT_START_DATE)  # ADR-058 (resolves from caller scope)
         goal_weight = safe_float(profile, "goal_weight_lbs") or 185
-        start_weight = safe_float(profile, "start_weight_lbs") or 307
+        start_weight = safe_float(profile, "start_weight_lbs") or EXPERIMENT_BASELINE_WEIGHT_LBS
 
         try:
             journey_days = (today_dt - datetime.strptime(journey_start, "%Y-%m-%d").date()).days

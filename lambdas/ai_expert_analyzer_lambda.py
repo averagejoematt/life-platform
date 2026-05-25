@@ -119,7 +119,7 @@ def _latest_item(source):
     return items[0] if items else None
 
 
-EXPERIMENT_START = "2026-04-01"
+from constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
 
 
 def gather_data_for_expert(expert_key):

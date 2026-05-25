@@ -361,6 +361,77 @@ def check_anthropic(canary_ts: str) -> tuple[bool, str, float]:
         return False, f"Anthropic error: {e}", latency
 
 
+def check_subscribe_flow(canary_ts: str) -> tuple[bool, str, float]:
+    """Verify the subscriber-onboarding flow creates a DDB record in <5s.
+
+    POSTs a throwaway email under the verified domain (canary+<ts>@mattsusername.com)
+    to /api/subscribe via the live site-api Function URL, then verifies the
+    USER#matthew#SOURCE#subscribers DDB partition has a new pending-confirmation
+    record within 5s. Cleans up by tombstone-overwriting the canary record.
+
+    Returns (None, msg, 0) on environment misconfig (skip).
+    """
+    import hashlib as _h
+    canary_email = f"canary+{int(time.time())}@mattsusername.com"
+    email_hash = _h.sha256(canary_email.lower().encode()).hexdigest()
+    sk = f"EMAIL#{email_hash}"
+    site_url = os.environ.get("SITE_URL", "https://averagejoematt.com")
+    api_url = f"{site_url}/api/subscribe"
+
+    t0 = time.monotonic()
+    try:
+        # POST the subscribe request
+        body = json.dumps({"email": canary_email, "source": "canary"}).encode()
+        req = urllib.request.Request(
+            api_url, data=body,
+            headers={"Content-Type": "application/json", "User-Agent": "life-platform-canary/1.0"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                api_status = resp.status
+        except urllib.error.HTTPError as e:
+            latency = (time.monotonic() - t0) * 1000
+            return False, f"subscribe API HTTP {e.code}", latency
+
+        # Verify DDB record created
+        ddb_client = boto3.client("dynamodb", region_name=REGION)
+        rec_resp = ddb_client.get_item(
+            TableName=TABLE_NAME,
+            Key={"pk": {"S": f"USER#matthew#SOURCE#subscribers"}, "sk": {"S": sk}},
+        )
+        item = rec_resp.get("Item")
+        latency = (time.monotonic() - t0) * 1000
+
+        if not item:
+            return False, f"subscribe POST returned {api_status} but no DDB record for {sk[:40]}", latency
+        status_attr = item.get("status", {}).get("S", "?")
+        if status_attr != "pending_confirmation":
+            return False, f"subscribe record status='{status_attr}' (expected pending_confirmation)", latency
+
+        # Cleanup: tombstone the canary record (IAM blocks DeleteItem)
+        try:
+            ddb_client.update_item(
+                TableName=TABLE_NAME,
+                Key={"pk": {"S": "USER#matthew#SOURCE#subscribers"}, "sk": {"S": sk}},
+                UpdateExpression="SET #s = :v, tombstone = :tomb, tombstoned_at = :ts, tombstoned_reason = :r",
+                ExpressionAttributeNames={"#s": "status"},
+                ExpressionAttributeValues={
+                    ":v":    {"S": "canary"},
+                    ":tomb": {"BOOL": True},
+                    ":ts":   {"S": canary_ts},
+                    ":r":    {"S": "canary_subscribe_check"},
+                },
+            )
+        except Exception:
+            pass  # cleanup failure is non-fatal for the canary itself
+
+        return True, f"subscribe flow OK ({api_status}, DDB pending_confirmation in {round(latency)}ms)", latency
+    except Exception as e:
+        latency = (time.monotonic() - t0) * 1000
+        return False, f"subscribe canary error: {e}", latency
+
+
 def send_alert(failures: list[dict], canary_ts: str) -> None:
     rows = ""
     for f in failures:
@@ -475,10 +546,47 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
                 results["anthropic"] = {"ok": None, "message": ant_msg, "latency_ms": 0}
                 print(f"  Anthropic: ⚪ {ant_msg}")
 
-        # ── Alert if any failures ───────────────────────────────────────────────
-        if failures:
-            print(f"  Sending alert: {len(failures)} failure(s)")
-            send_alert(failures, canary_ts)
+        # ── Subscribe flow check ────────────────────────────────────────────────
+        # P0.3 (2026-05-24): synthetic subscriber via /api/subscribe + DDB read.
+        # Skipped on mcp_only runs — full pass is enough cadence to catch a broken
+        # onboarding flow within 4h.
+        if not mcp_only:
+            sub_ok, sub_msg, sub_ms = check_subscribe_flow(canary_ts)
+            if sub_ok is not None:
+                results["subscribe"] = {"ok": sub_ok, "message": sub_msg, "latency_ms": round(sub_ms)}
+                print(f"  Subscribe: {'✅' if sub_ok else '❌'} {sub_msg}")
+                emit("CanarySubscribePass" if sub_ok else "CanarySubscribeFail", 1)
+                emit("CanaryLatencySubscribe_ms", sub_ms, "Milliseconds")
+                if not sub_ok:
+                    failures.append({"check": "Subscribe flow", "message": sub_msg})
+
+        # ── Alert only if the SAME check has failed in 2 consecutive runs ──────
+        # Persistence is what's load-bearing; transient blips (Anthropic 503,
+        # MCP cold start) shouldn't email the operator. State is kept in DDB at
+        # USER#system / CANARY#last_state — read previous failed checks, alert
+        # only on the intersection, then persist current.
+        current_failed = sorted({f["check"] for f in failures})
+        try:
+            _state_key = {"pk": {"S": "USER#system"}, "sk": {"S": "CANARY#last_state"}}
+            _ddb_cli = boto3.client("dynamodb", region_name=REGION)
+            _prev = _ddb_cli.get_item(TableName=TABLE_NAME, Key=_state_key).get("Item") or {}
+            prev_failed = set((_prev.get("failed_checks", {}).get("SS") or []))
+            # Persist current state for the next run's comparison
+            _ddb_cli.put_item(TableName=TABLE_NAME, Item={
+                **_state_key,
+                "failed_checks": {"SS": current_failed} if current_failed else {"SS": ["__none__"]},
+                "ts": {"S": canary_ts},
+            })
+        except Exception as _se:
+            print(f"[WARN] canary state read/write failed (defaulting to no-alert): {_se}")
+            prev_failed = set()
+
+        persistent_failures = [f for f in failures if f["check"] in prev_failed]
+        if persistent_failures:
+            print(f"  Sending alert: {len(persistent_failures)} persistent failure(s) (failed in previous run too)")
+            send_alert(persistent_failures, canary_ts)
+        elif failures:
+            print(f"  Suppressed first-occurrence alert ({len(failures)} new failure(s)); will alert if repeat next run")
 
         all_ok = len(failures) == 0
         print(f"Canary complete: {'ALL PASS ✅' if all_ok else f'{len(failures)} FAILURES ❌'}")

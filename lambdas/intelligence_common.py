@@ -20,6 +20,8 @@ from decimal import Decimal
 import boto3
 from boto3.dynamodb.conditions import Key
 
+from phase_filter import with_phase_filter  # ADR-058
+
 logger = logging.getLogger(__name__)
 
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
@@ -89,21 +91,21 @@ def build_data_inventory() -> dict:
 
         try:
             pk = f"{USER_PREFIX}{partition}"
-            # Count records in last 90 days
-            resp = table.query(
-                KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(
+            # Count records in last 90 days (ADR-058: phase=pilot filtered)
+            resp = table.query(**with_phase_filter({
+                "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(
                     f"DATE#{d90}", f"DATE#{today}~"
                 ),
-                Select="COUNT",
-            )
+                "Select": "COUNT",
+            }))
             count = resp.get("Count", 0)
 
-            # Get latest record
-            latest_resp = table.query(
-                KeyConditionExpression=Key("pk").eq(pk) & Key("sk").begins_with("DATE#"),
-                ScanIndexForward=False, Limit=1,
-                ProjectionExpression="sk",
-            )
+            # Get latest record (ADR-058: phase=pilot filtered)
+            latest_resp = table.query(**with_phase_filter({
+                "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with("DATE#"),
+                "ScanIndexForward": False, "Limit": 1,
+                "ProjectionExpression": "sk",
+            }))
             latest_items = latest_resp.get("Items", [])
             latest_date = None
             if latest_items:
@@ -112,13 +114,13 @@ def build_data_inventory() -> dict:
 
             # For CGM, check if blood_glucose_avg exists in apple_health records
             if label == "cgm":
-                cgm_resp = table.query(
-                    KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(
+                cgm_resp = table.query(**with_phase_filter({
+                    "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(
                         f"DATE#{d90}", f"DATE#{today}~"
                     ),
-                    FilterExpression="attribute_exists(blood_glucose_avg)",
-                    Select="COUNT",
-                )
+                    "FilterExpression": "attribute_exists(blood_glucose_avg)",
+                    "Select": "COUNT",
+                }))
                 count = cgm_resp.get("Count", 0)
 
             inventory[label] = {
@@ -254,10 +256,11 @@ def load_goals_config() -> dict:
         return _goals_cache
     except Exception as e:
         logger.warning("Failed to load goals config: %s — using defaults", e)
+        from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
         return {
             "mission": "12-month body recomposition for longevity",
-            "start_date": "2026-04-01",
-            "start_weight_lbs": 307,
+            "start_date": EXPERIMENT_START_DATE,
+            "start_weight_lbs": EXPERIMENT_BASELINE_WEIGHT_LBS,
             "targets": {},
             "philosophy": "",
             "known_constraints": [],
@@ -804,15 +807,15 @@ def get_open_actions(domain: str = None) -> list:
     Returns list of action dicts.
     """
     try:
-        resp = table.query(
-            KeyConditionExpression=(
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": (
                 Key("pk").eq(f"USER#{USER_ID}")
                 & Key("sk").begins_with("SOURCE#coach_actions#")
             ),
-            FilterExpression="attribute_exists(#st) AND #st = :open",
-            ExpressionAttributeNames={"#st": "status"},
-            ExpressionAttributeValues={":open": "open"},
-        )
+            "FilterExpression": "attribute_exists(#st) AND #st = :open",
+            "ExpressionAttributeNames": {"#st": "status"},
+            "ExpressionAttributeValues": {":open": "open"},
+        }))
         items = _decimal_to_float(resp.get("Items", []))
     except Exception as e:
         logger.error("Failed to query open actions: %s", e)
@@ -833,13 +836,13 @@ def get_action_history(domain: str = None, limit: int = 10) -> list:
     Returns list of action dicts (most recent first), capped at limit.
     """
     try:
-        resp = table.query(
-            KeyConditionExpression=(
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": (
                 Key("pk").eq(f"USER#{USER_ID}")
                 & Key("sk").begins_with("SOURCE#coach_actions#")
             ),
-            ScanIndexForward=False,
-        )
+            "ScanIndexForward": False,
+        }))
         items = _decimal_to_float(resp.get("Items", []))
     except Exception as e:
         logger.error("Failed to query action history: %s", e)
@@ -1019,14 +1022,14 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     start = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
 
-    # Platform activity: Todoist tasks completed
+    # Platform activity: Todoist tasks completed (ADR-058: phase=pilot filtered)
     platform_tasks = 0
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}todoist") & Key("sk").between(
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}todoist") & Key("sk").between(
                 f"DATE#{start}", f"DATE#{today}~"
             ),
-        )
+        }))
         for item in resp.get("Items", []):
             # Count completed tasks — todoist records have task_count or completed_count
             platform_tasks += int(item.get("tasks_completed", 0) or 0)
@@ -1038,27 +1041,27 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
     except Exception as e:
         logger.warning("Builder's Paradox: Todoist query failed: %s", e)
 
-    # Health signals
+    # Health signals (ADR-058: phase=pilot filtered)
     workouts = 0
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}strava") & Key("sk").between(
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}strava") & Key("sk").between(
                 f"DATE#{start}", f"DATE#{today}~"
             ),
-            Select="COUNT",
-        )
+            "Select": "COUNT",
+        }))
         workouts = resp.get("Count", 0)
     except Exception:
         pass
 
     journal_entries = 0
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}notion") & Key("sk").between(
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}notion") & Key("sk").between(
                 f"DATE#{start}", f"DATE#{today}~"
             ),
-            Select="COUNT",
-        )
+            "Select": "COUNT",
+        }))
         journal_entries = resp.get("Count", 0)
     except Exception:
         pass
@@ -1066,11 +1069,11 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
     habit_adherence_pct = 0
     habit_days = 0
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}habitify") & Key("sk").between(
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}habitify") & Key("sk").between(
                 f"DATE#{start}", f"DATE#{today}~"
             ),
-        )
+        }))
         items = resp.get("Items", [])
         pcts = []
         for item in items:
@@ -1085,11 +1088,11 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
 
     avg_steps = 0
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}garmin") & Key("sk").between(
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}garmin") & Key("sk").between(
                 f"DATE#{start}", f"DATE#{today}~"
             ),
-        )
+        }))
         step_vals = [float(i.get("steps", 0)) for i in resp.get("Items", []) if i.get("steps")]
         if step_vals:
             avg_steps = round(sum(step_vals) / len(step_vals))
@@ -1202,13 +1205,13 @@ def read_coach_thread(coach_id: str, limit: int = 4) -> list:
     Returns list of thread entries, most recent first.
     """
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}") & Key("sk").begins_with(
+        resp = table.query(**with_phase_filter({  # ADR-058
+            "KeyConditionExpression": Key("pk").eq(f"USER#{USER_ID}") & Key("sk").begins_with(
                 f"SOURCE#coach_thread#{coach_id}#"
             ),
-            ScanIndexForward=False,
-            Limit=limit,
-        )
+            "ScanIndexForward": False,
+            "Limit": limit,
+        }))
         items = resp.get("Items", [])
         return [_decimal_to_float(i) for i in items]
     except Exception as e:
@@ -1518,9 +1521,9 @@ def summarize_coach_month(coach_id: str, month: str) -> dict:
     end_sk = f"SOURCE#coach_thread#{coach_id}#{month}-31~"
 
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}") & Key("sk").between(start_sk, end_sk),
-        )
+        resp = table.query(**with_phase_filter({  # ADR-058
+            "KeyConditionExpression": Key("pk").eq(f"USER#{USER_ID}") & Key("sk").between(start_sk, end_sk),
+        }))
         entries = [_decimal_to_float(i) for i in resp.get("Items", [])]
     except Exception as e:
         logger.warning("Thread query failed for %s/%s: %s", coach_id, month, e)
@@ -1529,20 +1532,21 @@ def summarize_coach_month(coach_id: str, month: str) -> dict:
     if not entries:
         return {}
 
-    # Extract summary data
-    positions = [e.get("position_summary", "") for e in entries if e.get("position_summary")]
+    # Extract summary data — variable name 'entry' avoids shadowing the
+    # `except Exception as e` block above (mypy flags the reuse as misc-error).
+    positions = [entry.get("position_summary", "") for entry in entries if entry.get("position_summary")]
     all_preds = []
-    for e in entries:
-        all_preds.extend(e.get("predictions", []))
+    for entry in entries:
+        all_preds.extend(entry.get("predictions", []))
     all_surprises = []
-    for e in entries:
-        all_surprises.extend(e.get("surprises", []))
+    for entry in entries:
+        all_surprises.extend(entry.get("surprises", []))
     stance_changes = []
-    for e in entries:
-        stance_changes.extend(e.get("stance_changes", []))
+    for entry in entries:
+        stance_changes.extend(entry.get("stance_changes", []))
 
     # Emotional arc
-    investments = [e.get("emotional_investment", "observing") for e in entries]
+    investments = [entry.get("emotional_investment", "observing") for entry in entries]
     emotional_arc = " → ".join(dict.fromkeys(investments))  # deduplicated ordered
 
     confirmed = sum(1 for p in all_preds if p.get("status") == "confirmed")
@@ -1579,11 +1583,11 @@ def summarize_coach_month(coach_id: str, month: str) -> dict:
 def read_thread_summaries(coach_id: str) -> list:
     """Read all monthly thread summaries for a coach."""
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}") & Key("sk").begins_with(
+        resp = table.query(**with_phase_filter({  # ADR-058
+            "KeyConditionExpression": Key("pk").eq(f"USER#{USER_ID}") & Key("sk").begins_with(
                 f"SOURCE#coach_thread_summary#{coach_id}#"
             ),
-        )
+        }))
         return [_decimal_to_float(i) for i in resp.get("Items", [])]
     except Exception:
         return []

@@ -362,7 +362,7 @@
         if (weight && weight.textContent && weight.textContent !== '—') {
           var wText = weight.textContent.replace(/[^0-9.]/g,'');
           var weekText = wLabel ? wLabel.textContent : '';
-          var tweet = weekText + ': ' + wText + ' lbs, tracking 307→185 with 26 data sources + AI health OS. Every number public. averagejoematt.com/week/';
+          var tweet = weekText + ': ' + wText + ' lbs, tracking 297→185 with 26 data sources + AI health OS. Every number public. averagejoematt.com/week/';
           btn.href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(tweet);
         }
       }
@@ -406,7 +406,7 @@ function deltaArrow(val, isGoodDown) {
 
 async function loadWeek() {
   // Week number
-  const start = new Date('2026-04-01');
+  const start = new Date(((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25'));
   const today = new Date();
   const days = Math.floor((today - start) / 86400000);
   const weekNum = Math.ceil(days / 7);

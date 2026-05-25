@@ -1,0 +1,70 @@
+intelligence wipe report — mode=APPLY — genesis=2026-05-25
+reason=experiment_restart_2026-05-25  generated=2026-05-24T20:03:27.854622+00:00
+
+partition                 mode total  to-tomb already-tomb  skip-mode   applied   errors
+----------------------------------------------------------------------------------------
+chronicle                  all    12        0           12          0         0        0
+coach_threads              all     0        0            0          0         0        0
+predictions                all     0        0            0          0         0        0
+hypotheses                 all    13        4            9          0         4        0
+decisions                  all     0        0            0          0         0        0
+insights                   all   336        0          336          0         0        0
+challenges                 all    26        0           26          0         0        0
+experiments                all     4        0            4          0         0        0
+character_sheet            all    56        0           56          0         0        0
+habit_scores               all    81        0           81          0         0        0
+computed_metrics         prege    80        0           80          0         0        0
+ledger                   prege     6        0            5          1         0        0
+platform_memory          by_ca    18        1           12          5         1        0
+rewards                    all     0        0            0          0         0        0
+field_notes              prege     4        4            0          0         4        0
+discovery_annotation     prege     4        4            0          0         4        0
+anomalies                prege    84       84            0          0        84        0
+weekly_correlations      prege    10       10            0          0        10        0
+computed_insights        prege    77       77            0          0        77        0
+coach_sleep                all   619        0          619          0         0        0
+coach_nutrition            all   633        0          633          0         0        0
+coach_training             all   607        0          607          0         0        0
+coach_mind                 all   608        0          608          0         0        0
+coach_physical             all   581        0          581          0         0        0
+coach_glucose              all   543        0          543          0         0        0
+coach_labs                 all   401        0          401          0         0        0
+coach_explorer             all   334        0          334          0         0        0
+coach_compute            prege     8        0            8          0         0        0
+----------------------------------------------------------------------------------------
+TOTAL                           5145      184         4955          6       184        0
+
+=== samples of items that would be tombstoned (up to 3 per partition) ===
+
+[anomalies]
+  sk=DATE#2026-02-22
+  sk=DATE#2026-02-25
+  sk=DATE#2026-02-26
+
+[computed_insights]
+  sk=DATE#2026-03-06
+  sk=DATE#2026-03-07
+  sk=DATE#2026-03-09
+
+[discovery_annotations]
+  sk=EVENT#14c27dfa1d6dc049
+  sk=EVENT#433f6d4121ed3719
+  sk=EVENT#5cbff38789c9a7d0
+
+[field_notes]
+  sk=WEEK#2026-W14
+  sk=WEEK#2026-W17
+  sk=WEEK#2026-W19
+
+[hypotheses]
+  sk=HYPOTHESIS#2026-05-24T19:01:16.930290+00:00
+  sk=HYPOTHESIS#2026-05-24T19:01:17.153968+00:00
+  sk=HYPOTHESIS#2026-05-24T19:01:17.189474+00:00
+
+[platform_memory]
+  sk=MEMORY#hypothesis_monitoring#2026-05-24
+
+[weekly_correlations]
+  sk=WEEK#2026-W11
+  sk=WEEK#2026-W13
+  sk=WEEK#2026-W14

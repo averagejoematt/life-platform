@@ -54,8 +54,9 @@ import role_policies as rp  # noqa — importable now
 
 # ── Constants from role_policies ──────────────────────────────────────────────
 KMS_KEY_ARN = rp.KMS_KEY_ARN
-S3_KMS_KEY_ARN = rp.S3_KMS_KEY_ARN  # Phase 2.4: S3 default-encryption CMK
-ALLOWED_KMS_ARNS = {KMS_KEY_ARN, S3_KMS_KEY_ARN}
+# S3 KMS CMK removed 2026-05-24 — bucket uses AES256 default encryption; key
+# scheduled for deletion 2026-06-16.
+ALLOWED_KMS_ARNS = {KMS_KEY_ARN}
 TABLE_ARN   = rp.TABLE_ARN
 
 DDB_READ_ACTIONS  = {
