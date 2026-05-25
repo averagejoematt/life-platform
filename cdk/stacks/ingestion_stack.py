@@ -185,6 +185,30 @@ class IngestionStack(Stack):
             description="POST this URL to Hevy's webhook subscription endpoint",
         )
 
+        # ── 6d. MacroFactor unofficial-API puller (WS-2 Tier 1).
+        # Per SPEC_HEVY_AND_NUTRITION_BRIDGE §3 + ADR-061. Daily at 14:00 UTC
+        # = 07:00 PT — runs after Matthew's morning food logs are likely in.
+        # Rolling 3-day lookback to self-heal small gaps without re-processing
+        # everything every run. Failure handling: the Lambda NEVER raises (so
+        # Lambda error alarms don't fire on top of the digest alert path).
+        # It records errors into a status DDB record and the operator falls
+        # back to the manual Dropbox export (Tier 2) on its signal.
+        create_platform_lambda(self, "MacrofactorPuller",
+            function_name="mf-puller",
+            source_file="lambdas/macrofactor_puller_lambda.py",
+            handler="macrofactor_puller_lambda.lambda_handler",
+            schedule="cron(0 14 * * ? *)",   # daily 14:00 UTC = 07:00 PT
+            timeout_seconds=300, memory_mb=256,
+            environment={
+                "SECRET_NAME":      "life-platform/macrofactor",
+                "S3_BUCKET":        "matthew-life-platform",
+                "TABLE_NAME":       "life-platform",
+                "MF_LOOKBACK_DAYS": "3",
+            },
+            alarm_name="ingestion-error-macrofactor-puller",
+            shared_layer=shared_utils_layer,
+            custom_policies=rp.ingestion_macrofactor_puller(), **shared)
+
         # ── 7. Journal Enrichment — 6:30 AM PT daily
         create_platform_lambda(self, "JournalEnrichment",
             function_name="journal-enrichment",

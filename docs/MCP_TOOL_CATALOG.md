@@ -1,6 +1,6 @@
 # Life Platform — MCP Tool Catalog
 
-**Version:** v7.21.0 | **Last updated:** 2026-05-25 | **Total tools:** 128
+**Version:** v7.21.0 | **Last updated:** 2026-05-25 | **Total tools:** 131
 
 > Source of truth: `grep -E '^\s*"name":\s*"[a-z_]+"' mcp/registry.py | wc -l` → **127**.
 >
