@@ -184,6 +184,33 @@ def ingestion_strava() -> list[iam.PolicyStatement]:
     )
 
 
+def ingestion_hevy_webhook() -> list[iam.PolicyStatement]:
+    """Hevy webhook FunctionURL Lambda — receives webhook POST + fetches workout.
+
+    Per SPEC_HEVY_AND_NUTRITION_BRIDGE_2026_05_25 + ADR-014 (dedicated secret).
+    Reads: life-platform/hevy secret (api_key + webhook_secret).
+    Writes: DDB workouts under USER#matthew#SOURCE#hevy + S3 raw/hevy/.
+    """
+    return _ingestion_base(
+        "hevy",
+        secret_name="life-platform/hevy",
+        s3_prefix="raw/hevy/*",
+    )
+
+
+def ingestion_hevy_backfill() -> list[iam.PolicyStatement]:
+    """Hevy scheduled events-cursor backfill Lambda.
+
+    Same secret + storage as webhook, plus cursor read/write under
+    USER#system / INGESTION_CURSOR#hevy.
+    """
+    return _ingestion_base(
+        "hevy",
+        secret_name="life-platform/hevy",
+        s3_prefix="raw/hevy/*",
+    )
+
+
 def ingestion_journal_enrichment() -> list[iam.PolicyStatement]:
     """Journal enrichment uses ai-keys for Haiku enrichment, no raw S3 write."""
     return [

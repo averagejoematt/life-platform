@@ -132,6 +132,53 @@ class IngestionStack(Stack):
             custom_policies=rp.ingestion_strava(), **shared)
         # strava.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
 
+        # ── 6b. Hevy webhook (real-time) — FunctionURL, no schedule.
+        #        Per SPEC_HEVY_AND_NUTRITION_BRIDGE_2026_05_25 §2.2-A. The URL is
+        #        registered with Hevy's webhook subscription endpoint after deploy.
+        hevy_webhook = create_platform_lambda(self, "HevyWebhook",
+            function_name="hevy-webhook",
+            source_file="lambdas/hevy_webhook_lambda.py",
+            handler="hevy_webhook_lambda.lambda_handler",
+            timeout_seconds=30, memory_mb=256,
+            environment={
+                "SECRET_NAME": "life-platform/hevy",
+                "S3_BUCKET":   "matthew-life-platform",
+                "TABLE_NAME":  "life-platform",
+            },
+            alarm_name="ingestion-error-hevy-webhook",
+            shared_layer=shared_utils_layer,
+            custom_policies=rp.ingestion_hevy_webhook(), **shared)
+        # Expose a public FunctionURL for Hevy to POST to. Auth=NONE because
+        # Hevy can't sign with a CDK-managed IAM principal; we validate via
+        # the webhook_secret stored in life-platform/hevy.
+        hevy_webhook_url = hevy_webhook.add_function_url(
+            auth_type=_lambda.FunctionUrlAuthType.NONE,
+        )
+
+        # ── 6c. Hevy backfill (scheduled events-cursor catch-up) — daily 06:00 PT.
+        create_platform_lambda(self, "HevyBackfill",
+            function_name="hevy-backfill",
+            source_file="lambdas/hevy_backfill_lambda.py",
+            handler="hevy_backfill_lambda.lambda_handler",
+            # 13:00 UTC = 06:00 PT (UTC-fixed, no DST drift per CLAUDE.md).
+            schedule="cron(0 13 * * ? *)",
+            timeout_seconds=300, memory_mb=256,
+            environment={
+                "SECRET_NAME": "life-platform/hevy",
+                "S3_BUCKET":   "matthew-life-platform",
+                "TABLE_NAME":  "life-platform",
+            },
+            alarm_name="ingestion-error-hevy-backfill",
+            shared_layer=shared_utils_layer,
+            custom_policies=rp.ingestion_hevy_backfill(), **shared)
+
+        # Export the FunctionURL so the post-deploy `setup_hevy_webhook_subscription.sh`
+        # script can register it with Hevy.
+        cdk.CfnOutput(self, "HevyWebhookFunctionUrl",
+            value=hevy_webhook_url.url,
+            description="POST this URL to Hevy's webhook subscription endpoint",
+        )
+
         # ── 7. Journal Enrichment — 6:30 AM PT daily
         create_platform_lambda(self, "JournalEnrichment",
             function_name="journal-enrichment",

@@ -1486,3 +1486,47 @@ The orchestrator provides guarantees no individual sub-script does:
 - Per-Lambda surgical deploys (`deploy_lambda.sh`) are unchanged.
 - Normal `cdk deploy` for infra changes is unchanged.
 - This scopes only **state-mutating operational workflows** — not feature deploys.
+
+---
+
+## ADR-060: Hevy Workout API as Independent Source — Dedicated Secret, Webhook + Cursor Backfill
+
+**Date:** 2026-05-25
+**Status:** Accepted
+**Spec:** `SPEC_HEVY_AND_NUTRITION_BRIDGE_2026_05_25` (WS-1).
+
+### Context
+
+Hevy is a workout-logging app Matthew uses alongside MacroFactor. Previously workouts arrived ONLY via the MacroFactor Dropbox export (manual upload). Spec adds Hevy as a first-class data source so workouts log automatically with no manual export. Both Hevy and the MacroFactor workout path stay live — they're independent apps, not duplicates (different workouts on different days), so records are additive.
+
+### Decision
+
+1. **Dedicated secret `life-platform/hevy`** holding `{api_key, webhook_secret}`. Per ADR-014: NOT bundled into `api-keys`. Mirrors `life-platform/habitify` precedent.
+
+2. **Two ingestion modes** writing to the same normalized records:
+   - **Webhook (primary, real-time):** `hevy-webhook` Lambda exposes a FunctionURL with `auth_type=NONE`; auth is enforced via the `webhook_secret` in the Hevy-sent header (direct-match OR HMAC-SHA256 of the body). Webhook payload contents are NOT trusted — only the `workout_id` is extracted, then full data is fetched via the authenticated `GET /v1/workouts/{id}`.
+   - **Backfill (cursor-based catch-up):** `hevy-backfill` Lambda runs daily at 13:00 UTC (06:00 PT), reads a cursor from `USER#system / INGESTION_CURSOR#hevy`, walks `GET /v1/workouts/events?since=<cursor>`, ingests anything the webhook missed, and persists the new cursor on success.
+
+3. **Schema follows platform convention** (`USER#matthew#SOURCE#hevy` + `DATE#{yyyy-mm-dd}#WORKOUT#{hevy_id}`), NOT the spec's proposed `USER#matthew / WORKOUT#...`. Verified against live table before authoring. Weights normalize to kg at ingest (Hevy account may be lbs); original unit recorded in `original_unit`.
+
+4. **Raw payloads archived to `s3://matthew-life-platform/raw/hevy/{id}.json`** so derived fields can be recomputed without re-hitting Hevy (matches the platform's re-derivation discipline).
+
+5. **`source: "hevy"` + `workout_uid: "hevy:<id>"`** on every record. Hevy never dedupes against MacroFactor records — different apps, different workouts.
+
+### Accepted risk
+
+- Hevy explicitly warns the API surface may change. Mitigations: schema_version pinned in the normalized shape; the webhook payload parser is liberal (multiple field-name shapes accepted); the backfill cursor falls back gracefully if `next_cursor` is missing.
+- Webhook auth mechanism is best-guessed (Hevy's docs are sparse). The verifier accepts both direct-string match and HMAC; tighten to one once the actual mechanism is observed.
+
+### Consequences
+
+- One new secret + 2 Lambdas in `LifePlatformIngestion` (CDK).
+- `pytest tests/test_hevy_common.py` (9 tests) covers normalization + signature verification with synthetic payloads. A `tests/test_hevy_live.py` parity test is deferred until a real workout is observed end-to-end.
+- Hevy Pro subscription cost: ~$5/month (paid by Matthew, not platform infra).
+- Site/UI changes (source attribution) are out-of-scope for WS-1; deferred to WS-3 once schema migration of historical MacroFactor workouts is decided.
+
+### Non-decisions
+
+- MacroFactor Dropbox workout pipeline is **NOT removed** — runs parallel.
+- Cross-source workout dedupe between Hevy and MacroFactor is **NOT introduced** (they're independent apps).
+- The MacroFactor unofficial-API client (WS-2) is **NOT included** in this ADR — separate decision pending the parity diff (Thursday).
