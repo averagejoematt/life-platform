@@ -1,6 +1,6 @@
 # Life Platform — Runbook
 
-Last updated: 2026-05-19 (v7.21.0 — 128 MCP tools, 35-module package, 68 Lambdas, 19 data sources)
+Last updated: 2026-05-25 (v7.21.0 — 128 MCP tools, 35-module package, 68 Lambdas, 19 data sources)
 
 **Ground truth at last verification:**
 - Lambda functions deployed: 73 (5 power-tuning Lambdas deleted in V2 P4)
