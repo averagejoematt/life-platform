@@ -40,6 +40,8 @@ import urllib.error
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
@@ -531,7 +533,7 @@ OUTPUT ONLY valid JSON. No preamble, no markdown, no backticks."""
 def generate_hypotheses(daily_rows, existing_hypotheses, api_key, profile=None):
     """Run Claude to generate new cross-domain hypotheses from 14 days of data."""
     p = profile or {}
-    start_w = p.get("journey_start_weight_lbs", 307)
+    start_w = p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
     goal_w = p.get("goal_weight_lbs", 185)
     total_loss = round(start_w - goal_w)
     cal_target = p.get("calorie_target", 1800)

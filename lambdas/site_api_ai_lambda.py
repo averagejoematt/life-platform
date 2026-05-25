@@ -23,6 +23,8 @@ import re
 import time
 import urllib.request
 from datetime import datetime, timezone, timedelta
+
+from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from decimal import Decimal
 
 import boto3
@@ -310,10 +312,10 @@ def _ask_fetch_context() -> dict:
     try:
         prof_resp = table.get_item(Key={"pk": f"{USER_PREFIX}profile", "sk": "PROFILE"})
         prof = _decimal_to_float(prof_resp.get("Item", {}))
-        ctx["start_weight"] = float(prof.get("journey_start_weight_lbs", 307))
+        ctx["start_weight"] = float(prof.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
         ctx["goal_weight"] = float(prof.get("goal_weight_lbs", 185))
     except Exception:
-        ctx["start_weight"] = 307
+        ctx["start_weight"] = EXPERIMENT_BASELINE_WEIGHT_LBS
         ctx["goal_weight"] = 185
     return ctx
 
@@ -348,7 +350,7 @@ def _ask_build_prompt(ctx: dict) -> str:
     return f"""You are the AI behind Matthew Walker's Life Platform — a personal health intelligence system tracking 19 data sources.
 
 CURRENT DATA:
-  Weight: {ctx.get('weight_lbs', '?')} lbs (started {ctx.get('start_weight', 307)}, goal {ctx.get('goal_weight', 185)})
+  Weight: {ctx.get('weight_lbs', '?')} lbs (started {ctx.get('start_weight', EXPERIMENT_BASELINE_WEIGHT_LBS)}, goal {ctx.get('goal_weight', 185)})
   HRV: {ctx.get('hrv_ms', '?')} ms
   RHR: {ctx.get('rhr_bpm', '?')} bpm
   Recovery: {ctx.get('recovery_pct', '?')}%

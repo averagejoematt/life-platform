@@ -23,8 +23,11 @@ import time
 import urllib.error
 import urllib.request
 from datetime import date as _date_cls
+from typing import Any, Optional, Union
 
 import boto3
+
+from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 
 # AI-3 middleware: lazy import of output validator (transparent fail-safe)
 try:
@@ -32,7 +35,7 @@ try:
     _AI_VALIDATOR_AVAILABLE = True
 except ImportError:
     _validate_ai_output = None
-    AIOutputType = None
+    AIOutputType = None  # type: ignore[misc]
     _AI_VALIDATOR_AVAILABLE = False
 
 # AI model constants — read from env so model can be updated without redeployment
@@ -109,7 +112,7 @@ _HAS_BOARD_LOADER = False
 _board_loader = None
 
 
-def init(s3_client, bucket, has_board_loader, board_loader_module=None):
+def init(s3_client: Any, bucket: str, has_board_loader: bool, board_loader_module: Any = None) -> None:
     """Inject shared dependencies. Call once at Lambda startup."""
     global _s3, _S3_BUCKET, _HAS_BOARD_LOADER, _board_loader
     _s3 = s3_client
@@ -331,7 +334,7 @@ def _build_journey_context(profile, current_date_str=None):
     Returns a dict with:
       week_num, days_in, stage, stage_label, coaching_principles (list[str])
     """
-    start_str = profile.get("journey_start_date", "2026-04-01")
+    start_str = profile.get("journey_start_date", EXPERIMENT_START_DATE)
     try:
         start = _date_cls.fromisoformat(start_str)
         today = _date_cls.fromisoformat(current_date_str) if current_date_str else _date_cls.today()
@@ -341,7 +344,7 @@ def _build_journey_context(profile, current_date_str=None):
         days_in = 1
         week_num = 1
 
-    start_weight = profile.get("journey_start_weight_lbs", 307)
+    start_weight = profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
     goal_weight = profile.get("goal_weight_lbs", 185)
 
     # Periodization: Foundation (1-4wk) habit formation, Momentum (5-12) progressive overload,
@@ -982,7 +985,7 @@ def _build_cross_pillar_tradeoffs(component_scores, data, profile):
 # DATA SUMMARY BUILDERS (used by AI prompt construction)
 # ==============================================================================
 
-def build_data_summary(data, profile):
+def build_data_summary(data: dict[str, Any], profile: dict[str, Any]) -> dict[str, Any]:
     journal = data.get("journal") or {}
     mf = data.get("macrofactor") or {}
     strava = data.get("strava") or {}
@@ -1029,7 +1032,7 @@ def build_data_summary(data, profile):
     }
 
 
-def build_food_summary(data):
+def build_food_summary(data: dict[str, Any]) -> dict[str, Any]:
     mf = data.get("macrofactor") or {}
     food_log = mf.get("food_log", [])
     if not food_log:
@@ -1044,7 +1047,7 @@ def build_food_summary(data):
     return "\n".join(meals)
 
 
-def build_activity_summary(data):
+def build_activity_summary(data: dict[str, Any]) -> dict[str, Any]:
     """Extract activity details from Strava."""
     strava = data.get("strava") or {}
     activities = strava.get("activities", [])
@@ -1069,7 +1072,7 @@ def build_activity_summary(data):
     return "\n".join(lines)
 
 
-def build_workout_summary(data):
+def build_workout_summary(data: dict[str, Any]) -> dict[str, Any]:
     """v2.2: Extract exercise-level detail from MacroFactor workouts."""
     mf_workouts = data.get("mf_workouts")
     if not mf_workouts:
@@ -1108,7 +1111,10 @@ def build_workout_summary(data):
 # ANTHROPIC API
 # ==============================================================================
 
-def daily_brief_shared_system(data, profile, day_grade=None, grade=None):
+def daily_brief_shared_system(
+    data: dict[str, Any], profile: dict[str, Any],
+    day_grade: Optional[int] = None, grade: Optional[str] = None,
+) -> str:
     """Phase 3.8 (2026-05-16): build a stable system block reused across the 4
     daily-brief AI calls (BoD, training+nutrition, journal, TL;DR).
 
@@ -1157,9 +1163,16 @@ def _build_system_block(system, cache_system):
     return system
 
 
-def call_anthropic(prompt, api_key, max_tokens=200, system=None,
-                   output_type=None, health_context=None,
-                   model=None, cache_system=True):
+def call_anthropic(
+    prompt: str,
+    api_key: str,
+    max_tokens: int = 200,
+    system: Union[str, list[dict[str, Any]], None] = None,
+    output_type: Any = None,
+    health_context: Optional[dict[str, Any]] = None,
+    model: Optional[str] = None,
+    cache_system: bool = True,
+) -> str:
     """Call Anthropic API with exponential backoff (4 attempts: 5s/15s/45s delays).
 
     P1.8: Exponential backoff replaces fixed 2-attempt/5s retry.
@@ -1261,7 +1274,7 @@ def call_anthropic(prompt, api_key, max_tokens=200, system=None,
 
 def _build_weight_context(data, profile):
     """Dynamic weight context for AI prompts."""
-    start_w = profile.get("journey_start_weight_lbs", 307)
+    start_w = profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
     goal_w = profile.get("goal_weight_lbs", 185)
     current_w = data.get("latest_weight")
     if current_w:
@@ -1349,7 +1362,7 @@ def _build_acwr_coaching_context(data):
 # AI CALLS
 # ==============================================================================
 
-def call_training_nutrition_coach(data, profile, api_key, shared_system=None):
+def call_training_nutrition_coach(data: dict[str, Any], profile: dict[str, Any], api_key: str, shared_system: Optional[str] = None) -> str:
     """AI call: Training coach + Nutritionist combined. (P2+P3+P5 aware)
     Phase 3.8: optional shared_system reused across 4 daily-brief calls (cached)."""
     data_summary = build_data_summary(data, profile)
@@ -1431,7 +1444,7 @@ Respond in EXACTLY this JSON format, no other text:
         return {}
 
 
-def call_journal_coach(data, profile, api_key, shared_system=None):
+def call_journal_coach(data: dict[str, Any], profile: dict[str, Any], api_key: str, shared_system: Optional[str] = None) -> str:
     journal_entries = data.get("journal_entries", [])
     if not journal_entries:
         return ""
@@ -1522,7 +1535,7 @@ def _build_daily_bod_intro_from_config(data=None, profile=None):
         if feat_cfg.get("role") == "protocol_tips":
             protocol_note = f"\n{member['name']} provides: {feat_cfg.get('contribution', 'protocol recommendations')}"
 
-    weight_ctx = _build_weight_context(data, profile) if data and profile else "307->185 lbs"
+    weight_ctx = _build_weight_context(data, profile) if data and profile else f"{int(round(EXPERIMENT_BASELINE_WEIGHT_LBS))}->185 lbs"
     intro = f"""You are the Board of Directors for Project40 — {panel_desc} — unified.
 Speaking to Matthew, 36yo, weight loss journey ({weight_ctx}). Phase 1 Ignition: 3 lbs/week, 1500 kcal deficit, 1800 cal daily.
 Tone: direct, empathetic, no-BS.{protocol_note}"""
@@ -2032,10 +2045,10 @@ EVIDENCE NOTE: {brief.get('evidence_note', 'Early data — use preliminary frami
 VOICE: Write in FIRST PERSON. You ARE {voice_spec['display_name']}. Say "I" not "Dr. [Name]". Address Matthew directly as "you". Never refer to yourself in third person.
 
 MATTHEW'S GOALS:
-- Target weight: 185 lbs (starting 307, currently ~295)
+- Target weight: 185 lbs (starting {int(round(EXPERIMENT_BASELINE_WEIGHT_LBS))})
 - Body composition: reduce body fat, preserve lean mass
 - Training philosophy: building from walking + Zone 2 base; structured strength training planned but not yet started
-- Timeline: 12-month experiment starting April 1, 2026
+- Timeline: 12-month experiment, genesis {EXPERIMENT_START_DATE}
 - Key priorities: sleep quality, protein adherence (190g/day target), consistent movement (8,000+ steps/day)
 
 DATA INTERPRETATION RULES:
@@ -2186,17 +2199,17 @@ def _build_training_data(data):
     }
 
 
-def call_sleep_coach_v2(data, profile, api_key):
+def call_sleep_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str) -> str:
     """Run Coach Intelligence pipeline for sleep coach. Returns text or None."""
     return _run_coach_v2_pipeline("sleep_coach", _build_sleep_data(data), "sleep", data, api_key)
 
 
-def call_nutrition_coach_v2(data, profile, api_key):
+def call_nutrition_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str) -> str:
     """Run Coach Intelligence pipeline for nutrition coach. Returns text or None."""
     return _run_coach_v2_pipeline("nutrition_coach", _build_nutrition_data(data), "nutrition", data, api_key)
 
 
-def call_training_coach_v2(data, profile, api_key):
+def call_training_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str) -> str:
     """Run Coach Intelligence pipeline for training coach. Returns text or None."""
     return _run_coach_v2_pipeline("training_coach", _build_training_data(data), "training", data, api_key)
 
@@ -2271,26 +2284,26 @@ def _build_explorer_data(data):
     }
 
 
-def call_mind_coach_v2(data, profile, api_key):
+def call_mind_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str) -> str:
     """Run Coach Intelligence pipeline for mind coach. Returns text or None."""
     return _run_coach_v2_pipeline("mind_coach", _build_mind_data(data), "mind", data, api_key)
 
 
-def call_physical_coach_v2(data, profile, api_key):
+def call_physical_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str) -> str:
     """Run Coach Intelligence pipeline for physical coach. Returns text or None."""
     return _run_coach_v2_pipeline("physical_coach", _build_physical_data(data), "physical", data, api_key)
 
 
-def call_glucose_coach_v2(data, profile, api_key):
+def call_glucose_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str) -> str:
     """Run Coach Intelligence pipeline for glucose coach. Returns text or None."""
     return _run_coach_v2_pipeline("glucose_coach", _build_glucose_data(data), "glucose", data, api_key)
 
 
-def call_labs_coach_v2(data, profile, api_key):
+def call_labs_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str) -> str:
     """Run Coach Intelligence pipeline for labs coach. Returns text or None."""
     return _run_coach_v2_pipeline("labs_coach", _build_labs_data(data), "labs", data, api_key)
 
 
-def call_explorer_coach_v2(data, profile, api_key):
+def call_explorer_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str) -> str:
     """Run Coach Intelligence pipeline for explorer coach. Returns text or None."""
     return _run_coach_v2_pipeline("explorer_coach", _build_explorer_data(data), "cross-domain exploration", data, api_key)

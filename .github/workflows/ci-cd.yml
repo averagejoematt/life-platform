@@ -88,6 +88,19 @@ jobs:
           # Fail on syntax errors and undefined names; pass on style warnings
           flake8 lambdas/ mcp/ --count --select=E9,F63,F7,F82 --show-source --statistics
 
+      - name: Mypy (advisory — typed shared modules only)
+        run: |
+          pip install mypy==2.1.0
+          echo "::group::Mypy on type-annotated shared modules"
+          # See tests/test_mypy_clean_modules.py for the authoritative module list.
+          python -m mypy --config-file mypy.ini \
+            lambdas/secret_cache.py lambdas/retry_utils.py lambdas/phase_filter.py \
+            lambdas/constants.py lambdas/scoring_engine.py lambdas/character_engine.py \
+            lambdas/intelligence_common.py lambdas/ai_calls.py || true
+          echo "::endgroup::"
+          # Advisory step — do not fail build. Test test_mypy_clean_modules in
+          # the pytest job enforces the same set as a fail-loud guard.
+
       - name: Syntax check (py_compile)
         # Catches broken syntax that flake8 misses (e.g. invalid f-strings, truncated files)
         run: |

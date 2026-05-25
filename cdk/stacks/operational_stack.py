@@ -258,7 +258,7 @@ class OperationalStack(Stack):
         # ── Canary custom metric alarms ──
         def _canary_alarm(aid, aname, mname):
             a = cloudwatch.Alarm(self, aid, alarm_name=aname, metric=cloudwatch.Metric(namespace="LifePlatform/Canary", metric_name=mname, period=Duration.seconds(300), statistic="Sum"), evaluation_periods=1, threshold=1, comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD, treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING)
-            a.add_alarm_action(cw_actions.SnsAction(local_alerts_topic)); a.add_ok_action(cw_actions.SnsAction(local_alerts_topic))
+            a.add_alarm_action(cw_actions.SnsAction(local_digest_topic)); a.add_ok_action(cw_actions.SnsAction(local_digest_topic))
         # NOTE: CanaryAnyFailureAlarm removed 2026-03-10 — bug: watched CanaryDDBFail
         # (identical to canary-ddb-failure). The 3 individual alarms below provide full coverage.
         _canary_alarm("CanaryDdbFailureAlarm", "life-platform-canary-ddb-failure", "CanaryDDBFail")
@@ -271,7 +271,7 @@ class OperationalStack(Stack):
 
         # ── DLQ depth alarm ──
         dlq_depth = cloudwatch.Alarm(self, "DlqDepthAlarm", alarm_name="life-platform-dlq-depth-warning", metric=cloudwatch.Metric(namespace="AWS/SQS", metric_name="ApproximateNumberOfMessagesVisible", dimensions_map={"QueueName": "life-platform-ingestion-dlq"}, period=Duration.seconds(300), statistic="Maximum"), evaluation_periods=1, threshold=1, comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD, treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING)
-        dlq_depth.add_alarm_action(cw_actions.SnsAction(local_alerts_topic)); dlq_depth.add_ok_action(cw_actions.SnsAction(local_alerts_topic))
+        dlq_depth.add_alarm_action(cw_actions.SnsAction(local_digest_topic)); dlq_depth.add_ok_action(cw_actions.SnsAction(local_digest_topic))
 
         # ── WR-48 Enhancement 5: backstop alarm for the freshness checker itself ──
         # PR-reentry-4 (2026-05-03): the freshness-checker is the platform's gap-detection
@@ -291,8 +291,8 @@ class OperationalStack(Stack):
             comparison_operator=cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
             treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
         )
-        freshness_backstop.add_alarm_action(cw_actions.SnsAction(local_alerts_topic))
-        freshness_backstop.add_ok_action(cw_actions.SnsAction(local_alerts_topic))
+        freshness_backstop.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+        freshness_backstop.add_ok_action(cw_actions.SnsAction(local_digest_topic))
 
         # ── 10. Site API Lambda — life-platform-site-api (R17-09: moved from web_stack us-east-1)
         # Read-only. DynamoDB same-region (eliminates cross-region latency).
@@ -316,6 +316,10 @@ class OperationalStack(Stack):
                 "S3_REGION":      "us-west-2",
                 "CORS_ORIGIN":    "https://averagejoematt.com",
             },
+            # 2026-05-24: shared layer re-attached after drift. Lambda was running
+            # `Layers: null` and importing constants/phase_filter from the deploy
+            # zip directly (worked but fragile). Layer provides the canonical copy.
+            shared_layer=shared_utils_layer,
         )
 
         site_api_url = site_api_fn.add_function_url(
@@ -356,6 +360,8 @@ class OperationalStack(Stack):
                 "S3_REGION":      "us-west-2",
                 "CORS_ORIGIN":    "https://averagejoematt.com",
             },
+            # 2026-05-24: shared layer attached. Was running `Layers: null` — same drift as site-api.
+            shared_layer=shared_utils_layer,
         )
 
         # Cap AI Lambda concurrency — 2 concurrent is enough for personal site traffic
@@ -437,6 +443,8 @@ class OperationalStack(Stack):
             },
             custom_policies=rp.operational_site_stats_refresh(),
             table=local_table, bucket=local_bucket, dlq=None, alerts_topic=None,
+            # 2026-05-24: shared layer attached. Was running `Layers: null` — same drift as site-api.
+            shared_layer=shared_utils_layer,
         )
         # Four EventBridge cron rules — UTC equivalents of 8am/12pm/4pm/8pm Pacific (no DST drift)
         for utc_hour, label in [(15, "8amPT"), (19, "12pmPT"), (23, "4pmPT"), (3, "8pmPT")]:
@@ -450,12 +458,16 @@ class OperationalStack(Stack):
         # CDK can manage it. Tracked as R18-F02. Lambda runs fine outside CDK.
 
         # ── 13. Pipeline Health Check — daily at 13:00 UTC (6 AM PT)
+        # SNS_ARN env added 2026-05-25: Lambda hardcodes life-platform-alerts as
+        # fallback (the immediate-email topic). Set explicitly to digest so
+        # direct publishes batch into the daily alerts-digest email.
         pipeline_health = create_platform_lambda(self, "PipelineHealthCheck",
             function_name="pipeline-health-check",
             source_file="lambdas/pipeline_health_check_lambda.py",
             handler="pipeline_health_check_lambda.lambda_handler",
             schedule="cron(30 2,6,14,18,22 * * ? *)",  # 5x daily, 30 min after ingestion
             timeout_seconds=300, memory_mb=256,
+            environment={"SNS_ARN": DIGEST_TOPIC_ARN},
             custom_policies=rp.pipeline_health_check(),
             table=local_table, bucket=local_bucket, dlq=None,
             alerts_topic=local_alerts_topic, digest_topic=local_digest_topic, digest=True)

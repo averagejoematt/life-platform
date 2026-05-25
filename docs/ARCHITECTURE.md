@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-05-19 (v7.21.0 — 128 tools, 35-module MCP package, 19 data sources, 68 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed). 127 MCP tools, 26-module MCP package, 19 data sources, 73 Lambdas in us-west-2 + 4 in us-east-1 = 77 total. 12 active secrets (3 in 30-day soft-delete recovery: notion, dropbox, anthropic-api-key). ~104 CloudWatch alarms. 8 CDK stacks deployed. S3 default encryption AES256 (KMS CMK retained, scheduled for deletion 2026-06-16; ADR-053/054). SIMP-2 framework adopted by 8 of 14 ingestion Lambdas (ADR-056). Coach prediction loop closed end-to-end (ADR-055); `coach-quality-gate` now WIRED — invoked async from `ai_calls.call_coach_brief_v2` after each COACH-V2 generation. Shared layer **v51** (mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`). 57 ADRs (ADR-001 → ADR-057). Total active CDK-managed IAM roles down by 5 (orphans deleted 2026-05-17: `life-platform-digest-role`, `life-platform-og-image-role`, `measurements-ingestion-role`, `pipeline-health-check-role`, `subscriber-onboarding-role`).
+Last updated: 2026-05-25 (v7.21.0 — 128 tools, 35-module MCP package, 19 data sources, 68 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed). 127 MCP tools, 26-module MCP package, 19 data sources, 73 Lambdas in us-west-2 + 4 in us-east-1 = 77 total. 12 active secrets (3 in 30-day soft-delete recovery: notion, dropbox, anthropic-api-key). ~104 CloudWatch alarms. 8 CDK stacks deployed. S3 default encryption AES256 (KMS CMK retained, scheduled for deletion 2026-06-16; ADR-053/054). SIMP-2 framework adopted by 8 of 14 ingestion Lambdas (ADR-056). Coach prediction loop closed end-to-end (ADR-055); `coach-quality-gate` now WIRED — invoked async from `ai_calls.call_coach_brief_v2` after each COACH-V2 generation. Shared layer **v51** (mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`). 57 ADRs (ADR-001 → ADR-057). Total active CDK-managed IAM roles down by 5 (orphans deleted 2026-05-17: `life-platform-digest-role`, `life-platform-og-image-role`, `measurements-ingestion-role`, `pipeline-health-check-role`, `subscriber-onboarding-role`).
 
 ---
 
@@ -412,3 +412,19 @@ Target: under $25/month | Current: ~$13/month
 ---
 
 **Verified:** 2026-05-19 — full audit (V2 audit + follow-up). Lambda counts via `aws lambda list-functions`; layer version via `aws lambda list-layer-versions` and `cdk/stacks/constants.py:37`; MCP tool count via `grep -E '^\s*"name":' mcp/registry.py | wc -l`; SIMP-2 cohort via `grep -l 'from ingestion_framework import' lambdas/*_lambda.py`; alarm count via `aws cloudwatch describe-alarms`; secret list via `aws secretsmanager list-secrets`.
+
+
+### Experiment Phase Filtering
+
+**Default deny pilot.** Every Query/Scan that fans-in via `_query_source` (site-api)
+or `query_source` (mcp/core) automatically appends a FilterExpression that hides
+`phase=pilot` records. Items without a `phase` attribute pass through (cross-phase
+identity records, plus historical writes that pre-date ADR-058).
+
+Direct `table.query` call sites that bypass the chokepoints are individually
+wrapped in `intelligence_common.py` and in the spec-named site-api endpoints
+(`handle_timeline`, `handle_correlations`). ~110 secondary call sites remain
+unwrapped — most operate on post-genesis date ranges where pilot exposure is
+not a concern. Tracked as a follow-up sweep.
+
+Callers can pass `include_pilot=True` to bypass the filter (research / audit use).

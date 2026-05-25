@@ -370,7 +370,7 @@
         if (daysIn != null) {
           dxEl.textContent = daysIn;
         } else {
-          var msIn = Date.now() - new Date('2026-04-01T07:00:00-07:00').getTime();
+          var msIn = Date.now() - new Date(((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25') + 'T07:00:00-07:00').getTime();
           dxEl.textContent = msIn >= 0 ? Math.max(1, Math.floor(msIn / 86400000) + 1) : '—';
         }
       }

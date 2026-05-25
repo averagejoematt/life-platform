@@ -33,6 +33,8 @@ from decimal import Decimal
 
 import boto3
 
+from phase_filter import with_phase_filter  # ADR-058
+
 # Structured logger
 try:
     from platform_logger import get_logger
@@ -313,14 +315,17 @@ def _put_item(item):
 
 
 def _query_latest(pk, sk_prefix):
-    """Query for the most recent item matching a SK prefix (descending, limit 1)."""
+    """Query for the most recent item matching a SK prefix (descending, limit 1).
+
+    ADR-058: phase-filtered (tombstoned items hidden).
+    """
     from boto3.dynamodb.conditions import Key
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
-            ScanIndexForward=False,
-            Limit=1,
-        )
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
+            "ScanIndexForward": False,
+            "Limit": 1,
+        }))
         items = resp.get("Items", [])
         return _decimal_to_float(items[0]) if items else None
     except Exception as e:

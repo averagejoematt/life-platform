@@ -331,7 +331,7 @@
 
     var html = '<section class="email-cta-footer reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface);text-align:center;">';
     html += '<p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">The Measured Life</p>';
-    html += '<h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">' + ctaHeadline + '</h3>';
+    html += '<h2 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">' + ctaHeadline + '</h2>';
     html += '<p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">';
     html += ctaBody + '<br>';
     html += '<a href="/chronicle/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue \u2192</a></p>';

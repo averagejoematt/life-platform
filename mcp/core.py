@@ -115,18 +115,41 @@ def ddb_cache_set(cache_key: str, data):
 import re
 _SAFE_SOURCE = re.compile(r'^[a-zA-Z0-9_]+$')
 
+# ADR-058: phase filter — hides phase=pilot records by default. Records without
+# a phase attribute (genome, profile, config, board) pass through.
+_PHASE_FILTER_EXPRESSION = "(#phase = :phase_experiment OR attribute_not_exists(#phase))"
+_PHASE_FILTER_NAMES = {"#phase": "phase"}
+_PHASE_FILTER_VALUES = {":phase_experiment": "experiment"}
 
-def query_source(source, start_date, end_date, lean=False):
-    """Query DynamoDB by source + date range with full pagination."""
+
+def _apply_phase_filter(kwargs: dict, include_pilot: bool = False) -> dict:
+    if include_pilot:
+        return kwargs
+    out = dict(kwargs)
+    existing = out.get("FilterExpression")
+    out["FilterExpression"] = (
+        f"({existing}) AND {_PHASE_FILTER_EXPRESSION}" if existing else _PHASE_FILTER_EXPRESSION
+    )
+    names = dict(out.get("ExpressionAttributeNames") or {})
+    names.update(_PHASE_FILTER_NAMES)
+    out["ExpressionAttributeNames"] = names
+    values = dict(out.get("ExpressionAttributeValues") or {})
+    values.update(_PHASE_FILTER_VALUES)
+    out["ExpressionAttributeValues"] = values
+    return out
+
+
+def query_source(source, start_date, end_date, lean=False, include_pilot=False):
+    """Query DynamoDB by source + date range with full pagination. ADR-058: phase=pilot hidden by default."""
     if not source or not _SAFE_SOURCE.match(source):
         logger.warning(f"query_source: rejected invalid source name: {source!r}")
         return []
     pk = f"{USER_PREFIX}{source}"
-    kwargs = {
+    kwargs = _apply_phase_filter({
         "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(
             f"DATE#{start_date}", f"DATE#{end_date}~"
         )
-    }
+    }, include_pilot=include_pilot)
     items = []
     while True:
         response = table.query(**kwargs)
@@ -142,12 +165,12 @@ def query_source(source, start_date, end_date, lean=False):
     return raw
 
 
-def parallel_query_sources(sources, start_date, end_date, lean=False):
+def parallel_query_sources(sources, start_date, end_date, lean=False, include_pilot=False):
     """Query multiple DynamoDB sources concurrently."""
     results = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(sources), 5)) as pool:
         future_to_src = {
-            pool.submit(query_source, src, start_date, end_date, lean): src
+            pool.submit(query_source, src, start_date, end_date, lean, include_pilot): src
             for src in sources
         }
         for future in concurrent.futures.as_completed(future_to_src):
@@ -160,9 +183,9 @@ def parallel_query_sources(sources, start_date, end_date, lean=False):
     return results
 
 
-def query_source_range(source, start_date, end_date):
+def query_source_range(source, start_date, end_date, include_pilot=False):
     """Alias for query_source used by some tools."""
-    return query_source(source, start_date, end_date)
+    return query_source(source, start_date, end_date, include_pilot=include_pilot)
 
 
 def date_diff_days(start, end):

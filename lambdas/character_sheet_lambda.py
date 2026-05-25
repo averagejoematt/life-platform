@@ -35,6 +35,8 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import character_engine
+from constants import EXPERIMENT_START_DATE  # ADR-058
+from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -72,13 +74,19 @@ def d2f(obj):
 
 
 def fetch_date(source, date_str):
-    """Fetch a single record for a source on a given date."""
+    """Fetch a single record for a source on a given date.
+
+    ADR-058: returns None if the record is tombstoned (preserves clean-slate
+    semantics during/after the experiment restart wipe).
+    """
     try:
         resp = table.get_item(Key={
             "pk": USER_PREFIX + source,
             "sk": "DATE#" + date_str,
         })
         item = resp.get("Item")
+        if item and item.get("tombstone"):
+            return None
         return d2f(item) if item else None
     except Exception as e:
         logger.warning(f"[character] fetch_date({source}, {date_str}) failed: {e}")
@@ -89,14 +97,14 @@ def fetch_range(source, start_date, end_date):
     """Fetch all records for a source within a date range."""
     try:
         records = []
-        kwargs = {
+        kwargs = with_phase_filter({
             "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
             "ExpressionAttributeValues": {
                 ":pk": USER_PREFIX + source,
                 ":s": "DATE#" + start_date,
                 ":e": "DATE#" + end_date,
             },
-        }
+        })
         while True:
             resp = table.query(**kwargs)
             for item in resp.get("Items", []):
@@ -115,14 +123,14 @@ def fetch_journal_entries(date_str):
     try:
         pk = f"USER#{USER_ID}#SOURCE#notion"
         entries = []
-        kwargs = {
+        kwargs = with_phase_filter({
             "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
             "ExpressionAttributeValues": {
                 ":pk": pk,
                 ":s": f"DATE#{date_str}#journal#",
                 ":e": f"DATE#{date_str}#journal#zzz",
             },
-        }
+        })
         while True:
             resp = table.query(**kwargs)
             for item in resp.get("Items", []):
@@ -221,15 +229,16 @@ def assemble_data(yesterday_str):
         d = (dt - timedelta(days=i)).strftime("%Y-%m-%d")
         try:
             pk = f"USER#{USER_ID}#SOURCE#notion"
-            resp = table.query(
-                KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-                ExpressionAttributeValues={
+            _j14_kwargs = with_phase_filter({
+                "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                "ExpressionAttributeValues": {
                     ":pk": pk,
                     ":s": f"DATE#{d}#journal#",
                     ":e": f"DATE#{d}#journal#zzz",
                 },
-                Select="COUNT",
-            )
+                "Select": "COUNT",
+            })
+            resp = table.query(**_j14_kwargs)
             if resp.get("Count", 0) > 0:
                 j14d_count += 1
         except Exception:
@@ -489,9 +498,10 @@ def lambda_handler(event, context):
     try:
         from boto3.dynamodb.conditions import Key as _Key
         _ch_pk = USER_PREFIX + "challenges"
-        _ch_resp = table.query(
-            KeyConditionExpression=_Key("pk").eq(_ch_pk) & _Key("sk").begins_with("CHALLENGE#"),
-        )
+        _ch_kwargs = with_phase_filter({
+            "KeyConditionExpression": _Key("pk").eq(_ch_pk) & _Key("sk").begins_with("CHALLENGE#"),
+        })
+        _ch_resp = table.query(**_ch_kwargs)
         _completed_today = [
             c for c in _ch_resp.get("Items", [])
             if c.get("status") in ("completed", "failed")
@@ -659,7 +669,7 @@ def lambda_handler(event, context):
                 "level_events_count": len(events),
                 "next_tier":          "Momentum",
                 "next_tier_level":    21,
-                "started_date":       "2026-04-01",  # Hardcoded P40 journey start -- should read from profile.journey_start_date
+                "started_date":       EXPERIMENT_START_DATE,
                 "challenge_bonus_xp": {k: v for k, v in (record.get("challenge_bonus_xp") or {}).items()},
             },
             pillars=pillars_for_site,

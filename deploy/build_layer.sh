@@ -15,6 +15,10 @@ MODULES=(
     ingestion_validator.py item_size_guard.py digest_utils.py
     sick_day_checker.py site_writer.py secret_cache.py
     intelligence_common.py
+    # ADR-058 (2026-05-21): experiment genesis constants + day_n()
+    constants.py
+    # ADR-058 (2026-05-23): phase filter helper for read-path filtering
+    phase_filter.py
     # Phase 4.2 (2026-05-16): shared numeric helpers (replaces 8 dup copies)
     numeric.py
     # email_framework.py removed V2 (2026-05-19) — zero importers, 7 email

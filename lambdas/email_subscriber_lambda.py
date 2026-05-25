@@ -121,8 +121,13 @@ _BLOCKED_DOMAINS = {
 }
 
 
-def handle_subscribe(email: str, source_ip: str = "", referrer: str = "") -> dict:
-    """Create/update pending record and send confirmation email."""
+def handle_subscribe(email: str, source_ip: str = "", referrer: str = "", source: str = "") -> dict:
+    """Create/update pending record and send confirmation email.
+
+    source='canary' skips the confirmation email (the canary POSTs a synthetic
+    subscriber every 4h to verify the flow; we don't want SES to send a real
+    email to canary+<ts>@mattsusername.com which then bounces and floods inbox).
+    """
     email = email.strip().lower()
     if not email or "@" not in email or len(email) > 254:
         return _json_response(400, {"error": "Invalid email address."})
@@ -133,6 +138,8 @@ def handle_subscribe(email: str, source_ip: str = "", referrer: str = "") -> dic
         logger.info("subscribe: blocked disposable domain %s", domain)
         # Return success silently — don't reveal we blocked it
         return _json_response(200, {"status": "pending_confirmation", "message": "Check your inbox."})
+
+    is_canary = (source == "canary")
 
     email_hash = _email_hash(email)
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -178,8 +185,12 @@ def handle_subscribe(email: str, source_ip: str = "", referrer: str = "") -> dic
         return _json_response(500, {"error": "Database error. Please try again."})
 
     # Send confirmation email (Ava: warm, specific, on-brand)
-    _send_confirmation_email(email, confirm_url)
-    logger.info("subscribe: pending confirmation sent to %s", email_hash[:8])
+    # Skipped for canary synthetic subscribers — see handle_subscribe docstring.
+    if is_canary:
+        logger.info("subscribe: canary synthetic — skipping confirmation email for %s", email_hash[:8])
+    else:
+        _send_confirmation_email(email, confirm_url)
+        logger.info("subscribe: pending confirmation sent to %s", email_hash[:8])
     return _json_response(200, {"status": "pending_confirmation", "message": "Check your inbox."})
 
 
@@ -401,10 +412,11 @@ def lambda_handler(event, context):
             try:
                 body = json.loads(event.get("body") or "{}")
                 email = body.get("email", "").strip()
+                source = body.get("source", "").strip()
             except Exception:
                 return _json_response(400, {"error": "Invalid request body."})
             referrer = (event.get("headers") or {}).get("referer", "")
-            return handle_subscribe(email, source_ip=source_ip, referrer=referrer)
+            return handle_subscribe(email, source_ip=source_ip, referrer=referrer, source=source)
 
         return _json_response(405, {"error": "Method not allowed."})
     except Exception as e:

@@ -115,11 +115,11 @@ _cost_cache = {}
 _cost_cache_ts = 0
 STATUS_CACHE_TTL = 60  # 1 minute — more dynamic status updates
 
-# ── Experiment start date — public Day 1 ───────────────────
-EXPERIMENT_START = "2026-04-01"
+# ── Experiment start date — public Day 1 (ADR-058: re-anchored 2026-05-18) ───
+from constants import EXPERIMENT_START_DATE as EXPERIMENT_START, EXPERIMENT_BASELINE_WEIGHT_LBS
 # Data query start: 1 day before experiment for sleep/recovery data
-# (sleep keyed to wake date — night of Mar 31 = record on Mar 31)
-EXPERIMENT_QUERY_START = "2026-03-31"
+# (sleep keyed to wake date — night before genesis = record on that night).
+EXPERIMENT_QUERY_START = "2026-05-17"
 
 
 def _experiment_date(days_back=30):
@@ -146,10 +146,10 @@ PLATFORM_STATS = {
     "test_count": 1075,
     "board_technical": 12,
     "board_product": 8,
-    "start_weight": 307,
+    "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,
     "goal_weight": 185,
     "start_date": EXPERIMENT_START,
-    "build_date": "2026-02-22",
+    # build_date intentionally removed per ADR-058 full-scrub decision (was "2026-02-22")
 }
 
 # ── Profile (DynamoDB-cached per warm container) ────────────
@@ -268,6 +268,13 @@ CORS_HEADERS = {
 }
 
 
+# P3.4: per-request correlation ID — set at handler start, read by _ok/_error
+# so 5xx responses carry the same id that appears in the CloudWatch route_metric
+# line. A user reporting "site error at 4:33pm" can paste their x-request-id and
+# the operator runs: aws logs filter-log-events ... --filter-pattern '"<id>"'
+_current_request_id: str | None = None
+
+
 def _decimal_to_float(obj):
     if isinstance(obj, Decimal):
         return float(obj)
@@ -278,29 +285,41 @@ def _decimal_to_float(obj):
     return obj
 
 
-def _query_source(source: str, start_date: str, end_date: str) -> list:
-    """Query DynamoDB for a source within a date range."""
+from phase_filter import with_phase_filter  # ADR-058
+
+
+def _query_source(source: str, start_date: str, end_date: str, include_pilot: bool = False) -> list:
+    """Query DynamoDB for a source within a date range. ADR-058: phase=pilot hidden by default."""
     if start_date > end_date:
         return []  # EXPERIMENT_START is in the future — no data yet
     pk = f"{USER_PREFIX}{source}"
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(
+    kwargs = with_phase_filter({
+        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(
             f"DATE#{start_date}", f"DATE#{end_date}"
-        )
-    )
+        ),
+    }, include_pilot=include_pilot)
+    resp = table.query(**kwargs)
     return _decimal_to_float(resp.get("Items", []))
 
 
-def _latest_item(source: str) -> dict | None:
-    """Get the most recent item for a source."""
+def _latest_item(source: str, include_pilot: bool = False) -> dict | None:
+    """Get the most recent item for a source. ADR-058: phase=pilot hidden by default."""
     pk = f"{USER_PREFIX}{source}"
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(pk),
-        ScanIndexForward=False,
-        Limit=1,
-    )
+    kwargs = with_phase_filter({
+        "KeyConditionExpression": Key("pk").eq(pk),
+        "ScanIndexForward": False,
+        "Limit": 1,
+    }, include_pilot=include_pilot)
+    resp = table.query(**kwargs)
     items = _decimal_to_float(resp.get("Items", []))
     return items[0] if items else None
+
+
+def _request_id_headers() -> dict:
+    """Return {x-request-id: ...} if a request id is set, else {}."""
+    if _current_request_id:
+        return {"x-request-id": _current_request_id}
+    return {}
 
 
 def _ok(data: dict, cache_seconds: int = 300) -> dict:
@@ -309,12 +328,14 @@ def _ok(data: dict, cache_seconds: int = 300) -> dict:
         "statusCode": 200,
         "headers": {
             **CORS_HEADERS,
+            **_request_id_headers(),
             "Cache-Control": f"public, max-age={cache_seconds}, s-maxage={cache_seconds}",
         },
         "body": json.dumps({
             "_meta": {
                 "generated_at": datetime.now(timezone.utc).isoformat(),
                 "cache_seconds": cache_seconds,
+                **({"request_id": _current_request_id} if _current_request_id else {}),
             },
             **data,
         }),
@@ -324,8 +345,11 @@ def _ok(data: dict, cache_seconds: int = 300) -> dict:
 def _error(status: int, message: str) -> dict:
     return {
         "statusCode": status,
-        "headers": {**CORS_HEADERS, "Cache-Control": "no-cache, no-store"},
-        "body": json.dumps({"error": message}),
+        "headers": {**CORS_HEADERS, **_request_id_headers(), "Cache-Control": "no-cache, no-store"},
+        "body": json.dumps({
+            "error": message,
+            **({"request_id": _current_request_id} if _current_request_id else {}),
+        }),
     }
 
 
@@ -472,9 +496,9 @@ def handle_tools_baseline() -> dict:
         "sleep_hours": avg_val(current_whoop, "sleep_duration_hours"),
     }
 
-    # Weight — baseline uses configured journey start weight (307), not first weigh-in (302)
+    # Weight — baseline uses EXPERIMENT_BASELINE_WEIGHT_LBS (ADR-058: May 18 Withings reading)
     _p = _get_profile()
-    baseline["weight_lbs"] = float(_p.get("journey_start_weight_lbs", 307))
+    baseline["weight_lbs"] = float(_p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
 
     latest_withings = _latest_item("withings")
     current["weight_lbs"] = (round(float(latest_withings["weight_lbs"]))
@@ -766,10 +790,10 @@ def handle_journey() -> dict:
                          or withings_latest.get("date", today))
             weight_series = [(last_date, float(withings_latest["weight_lbs"]))]
         else:
-            weight_series = [("2026-04-01", 307.0)]  # Matthew's journey start weight fallback; only used when no Withings data exists
+            weight_series = [(EXPERIMENT_START, EXPERIMENT_BASELINE_WEIGHT_LBS)]  # ADR-058: genesis baseline; only used when no Withings data exists
 
     _p = _get_profile()
-    start_weight = float(_p.get("journey_start_weight_lbs", 307.0))
+    start_weight = float(_p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
     goal_weight = float(_p.get("goal_weight_lbs", 185.0))
     current_weight = weight_series[-1][1]
     lost_lbs = round(start_weight - current_weight, 1)
@@ -811,7 +835,7 @@ def handle_journey() -> dict:
             "weekly_rate_lbs":    weekly_rate,
             "projected_goal_date": projected_goal_date,
             "days_to_goal":       days_to_goal,
-            "started_date":       "2026-04-01",
+            "started_date":       EXPERIMENT_START,
         }
     }, cache_seconds=3600)
 
@@ -1665,7 +1689,7 @@ def handle_timeline() -> dict:
     Cache: 3600s.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    start = "2026-04-01"
+    start = EXPERIMENT_START
 
     # Weight series (full journey)
     wt_items = _query_source("withings", start, today)
@@ -1675,18 +1699,18 @@ def handle_timeline() -> dict:
         key=lambda x: x["date"]
     )
 
-    # Life events
+    # Life events (ADR-058: phase=pilot filtered)
     life_pk = f"USER#{USER_ID}#SOURCE#life_events"
-    le_resp = table.query(KeyConditionExpression=Key("pk").eq(life_pk))
+    le_resp = table.query(**with_phase_filter({"KeyConditionExpression": Key("pk").eq(life_pk)}))
     life_events = [
         {"date": i.get("date", ""), "title": i.get("title", ""),
          "type": i.get("type", "other"), "weight": int(i.get("emotional_weight", 3))}
         for i in _decimal_to_float(le_resp.get("Items", []))
     ]
 
-    # Experiments
+    # Experiments (ADR-058: phase=pilot filtered)
     exp_pk = f"USER#{USER_ID}#SOURCE#experiments"
-    exp_resp = table.query(KeyConditionExpression=Key("pk").eq(exp_pk))
+    exp_resp = table.query(**with_phase_filter({"KeyConditionExpression": Key("pk").eq(exp_pk)}))
     experiments = [
         {"name": i.get("name", ""), "start": i.get("start_date", ""),
          "end": i.get("end_date"), "status": i.get("status", "active")}
@@ -1694,12 +1718,12 @@ def handle_timeline() -> dict:
         if i.get("sk", "").startswith("EXP#")
     ]
 
-    # Character level history
+    # Character level history (ADR-058: phase=pilot filtered)
     cs_pk = f"{USER_PREFIX}character_sheet"
-    cs_resp = table.query(
-        KeyConditionExpression=Key("pk").eq(cs_pk) & Key("sk").begins_with("DATE#"),
-        ScanIndexForward=True,
-    )
+    cs_resp = table.query(**with_phase_filter({
+        "KeyConditionExpression": Key("pk").eq(cs_pk) & Key("sk").begins_with("DATE#"),
+        "ScanIndexForward": True,
+    }))
     level_events = []
     prev_level = 0
     for item in _decimal_to_float(cs_resp.get("Items", [])):
@@ -1719,7 +1743,7 @@ def handle_timeline() -> dict:
             "experiments":  sorted(experiments, key=lambda x: x["start"]),
             "level_ups":    level_events,
             "journey_start": EXPERIMENT_START,
-            "start_weight":  float(_get_profile().get("journey_start_weight_lbs", 307.0)),
+            "start_weight":  float(_get_profile().get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)),
             "goal_weight":   float(_get_profile().get("goal_weight_lbs", 185.0)),
         }
     }, cache_seconds=3600)
@@ -1872,17 +1896,17 @@ def handle_journey_timeline() -> dict:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     start_date = EXPERIMENT_START
     _p = _get_profile()
-    start_weight = float(_p.get("journey_start_weight_lbs", 307.0))
+    start_weight = float(_p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
     goal_weight = float(_p.get("goal_weight_lbs", 185.0))
 
     events: list = []
 
-    # ── 1. Day 1 anchor ──────────────────────────────────────────────────────
+    # ── 1. Day 1 anchor (ADR-058: copy rewritten in §8 with Elena voice) ─────
     events.append({
         "date":  start_date,
         "type":  "milestone",
-        "title": "Day 1 — The Experiment Begins",
-        "body":  "Started at 307 lbs. Built the platform from scratch. Committed publicly.",
+        "title": "Day 1",
+        "body":  f"Starting weight: {int(round(EXPERIMENT_BASELINE_WEIGHT_LBS))} lbs. Goal: 185.",
         "link":  "/story/",
     })
 
@@ -1916,7 +1940,7 @@ def handle_journey_timeline() -> dict:
             "date":  crossed[thr],
             "type":  "weight",
             "title": f"Crossed {thr} lbs — {int(lbs_lost)} lbs lost",
-            "body":  f"Down {int(lbs_lost)} lbs from 307. {round((lbs_lost / (start_weight - goal_weight)) * 100)}% of the way to goal.",
+            "body":  f"Down {int(lbs_lost)} lbs from {int(round(start_weight))}. {round((lbs_lost / (start_weight - goal_weight)) * 100)}% of the way to goal.",
             "link":  "/live/",
         })
 
@@ -2394,11 +2418,11 @@ def handle_correlations(event: dict = None) -> dict:
             pass
 
     pk = f"{USER_PREFIX}weekly_correlations"
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(pk),
-        ScanIndexForward=False,
-        Limit=1,
-    )
+    resp = table.query(**with_phase_filter({  # ADR-058: hide pilot weekly correlations
+        "KeyConditionExpression": Key("pk").eq(pk),
+        "ScanIndexForward": False,
+        "Limit": 1,
+    }))
     items = _decimal_to_float(resp.get("Items", []))
     if not items:
         return _error(503, "No correlation data available yet.")
@@ -2944,10 +2968,10 @@ def _ask_fetch_context() -> dict:
     try:
         prof_resp = table.get_item(Key={"pk": f"{USER_PREFIX}profile", "sk": "PROFILE"})
         prof = _decimal_to_float(prof_resp.get("Item", {}))
-        ctx["start_weight"] = float(prof.get("journey_start_weight_lbs", 307))
+        ctx["start_weight"] = float(prof.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
         ctx["goal_weight"] = float(prof.get("goal_weight_lbs", 185))
     except Exception:
-        ctx["start_weight"] = 307
+        ctx["start_weight"] = EXPERIMENT_BASELINE_WEIGHT_LBS
         ctx["goal_weight"] = 185
     return ctx
 
@@ -2982,7 +3006,7 @@ def _ask_build_prompt(ctx: dict) -> str:
     return f"""You are the AI behind Matthew Walker's Life Platform — a personal health intelligence system tracking 19 data sources.
 
 CURRENT DATA:
-  Weight: {ctx.get('weight_lbs', '?')} lbs (started {ctx.get('start_weight', 307)}, goal {ctx.get('goal_weight', 185)})
+  Weight: {ctx.get('weight_lbs', '?')} lbs (started {ctx.get('start_weight', EXPERIMENT_BASELINE_WEIGHT_LBS)}, goal {ctx.get('goal_weight', 185)})
   HRV: {ctx.get('hrv_ms', '?')} ms
   RHR: {ctx.get('rhr_bpm', '?')} bpm
   Recovery: {ctx.get('recovery_pct', '?')}%
@@ -3315,7 +3339,7 @@ def handle_achievements() -> dict:
     # ── Weight milestones
     withings = _latest_item("withings")
     current_weight = float(withings.get("weight_lbs", 999)) if withings else 999.0
-    start_weight = float(_get_profile().get("journey_start_weight_lbs", 307.0))
+    start_weight = float(_get_profile().get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
     lost_lbs = round(start_weight - current_weight, 1) if current_weight < start_weight else 0
 
     # ── First experiment
@@ -4273,7 +4297,7 @@ def handle_pulse() -> dict:
         w_val = ah_wt
 
     _p = _get_profile()
-    start_weight = float(_p.get("journey_start_weight_lbs", 307))
+    start_weight = float(_p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
 
     recovery = float(whoop.get("recovery_score", 0)) if whoop.get("recovery_score") else None
     sleep_hrs = float(whoop.get("sleep_duration_hours", 0)) if whoop.get("sleep_duration_hours") else None
@@ -4637,7 +4661,7 @@ def handle_pulse_history() -> dict:
     current = datetime.strptime(EXPERIMENT_START, "%Y-%m-%d")
     end = datetime.strptime(today, "%Y-%m-%d")
     _p = _get_profile()
-    start_weight = float(_p.get("journey_start_weight_lbs", 307))
+    start_weight = float(_p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
     day_num = 1
 
     while current <= end:
@@ -7066,11 +7090,20 @@ def lambda_handler(event, context):
     Main Lambda handler. Supports both API Gateway HTTP API and Function URL events.
     """
     import time as _time
+    import uuid as _uuid
     _req_start = _time.time()
 
     path = event.get("rawPath") or event.get("path", "/")
     method = (event.get("requestContext", {}).get("http", {}).get("method") or
               event.get("httpMethod", "GET")).upper()
+
+    # P3.4: assign a per-request correlation ID. Honor an inbound x-request-id
+    # header if the client (CloudFront / a debugging operator) set one — this
+    # lets the same id flow end-to-end. Otherwise generate a fresh uuid4.
+    global _current_request_id
+    inbound_headers = event.get("headers") or {}
+    incoming_rid = (inbound_headers.get("x-request-id") or inbound_headers.get("X-Request-Id"))
+    _current_request_id = incoming_rid if incoming_rid else _uuid.uuid4().hex[:16]
 
     # Phase 2.2 (2026-05-16): centralized request envelope validation.
     # Catches oversized bodies, injection patterns, malformed user_id/date/source
@@ -7091,18 +7124,41 @@ def lambda_handler(event, context):
         raise
 
     def _emit_route_log(status_code):
-        """Emit structured JSON route metric to CloudWatch Logs (zero cost)."""
+        """Emit structured JSON route metric to CloudWatch Logs.
+
+        Uses CloudWatch EMF (Embedded Metric Format) so per-route latency is
+        auto-extracted as a real CloudWatch metric (no PutMetricData cost).
+        Dimensions: Route + Method. The Logs Insights query can pivot on either
+        via the JSON object — same line, two consumers.
+        """
         global _COLD_START
         try:
             duration_ms = round((_time.time() - _req_start) * 1000, 1)
-            print(json.dumps({
-                "_type": "route_metric",
-                "route": path,
-                "method": method,
-                "status": status_code,
-                "duration_ms": duration_ms,
-                "cold_start": _COLD_START,
-            }))
+            emf = {
+                # _aws block → CloudWatch automatically ingests the named
+                # fields as metrics. Cheap (≤ 5 dimension sets, no API call).
+                "_aws": {
+                    "Timestamp": int(_time.time() * 1000),
+                    "CloudWatchMetrics": [{
+                        "Namespace": "LifePlatform/SiteAPI",
+                        "Dimensions": [["Route", "Method"]],
+                        "Metrics": [
+                            {"Name": "DurationMs", "Unit": "Milliseconds"},
+                            {"Name": "ColdStart", "Unit": "Count"},
+                        ],
+                    }],
+                },
+                "_type":      "route_metric",
+                "Route":      path,
+                "Method":     method,
+                "status":     status_code,
+                "DurationMs": duration_ms,
+                "ColdStart":  1 if _COLD_START else 0,
+                "request_id": _current_request_id,
+                "duration_ms": duration_ms,  # back-compat field name
+                "cold_start":  _COLD_START,
+            }
+            print(json.dumps(emf))
         except Exception:
             pass
         _COLD_START = False

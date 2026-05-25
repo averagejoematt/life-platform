@@ -27,6 +27,8 @@ from decimal import Decimal
 
 import boto3
 
+from phase_filter import with_phase_filter  # ADR-058
+
 # Structured logger
 try:
     from platform_logger import get_logger
@@ -423,13 +425,13 @@ def _put_item(item):
 
 
 def _query_begins_with(pk, sk_prefix, scan_forward=True):
-    """Query DynamoDB for items with SK beginning with a prefix."""
+    """Query DynamoDB for items with SK beginning with a prefix. ADR-058: phase-filtered."""
     from boto3.dynamodb.conditions import Key
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
-            ScanIndexForward=scan_forward,
-        )
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
+            "ScanIndexForward": scan_forward,
+        }))
         return _decimal_to_float(resp.get("Items", []))
     except Exception as e:
         logger.warning("query_begins_with(%s, %s) failed: %s", pk, sk_prefix, e)

@@ -18,6 +18,8 @@ import json
 import os
 from datetime import datetime, timezone, date, timedelta
 
+from constants import EXPERIMENT_START_DATE  # ADR-058
+
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
@@ -175,7 +177,7 @@ def lambda_handler(event, context):
 
     # ── 5f. Training summary (average daily active minutes from Strava) ──
     # Use the experiment start to compute avg daily training
-    exp_start = date.fromisoformat("2026-04-01")
+    exp_start = date.fromisoformat(EXPERIMENT_START_DATE)
     days_in = max(1, (date.today() - exp_start).days + 1) if date.today() >= exp_start else 1
     try:
         _tr_resp = table.query(
@@ -228,7 +230,7 @@ def lambda_handler(event, context):
         "vitals":   fresh_vitals,
         "platform": {**ep, "tier0_streak": fresh_streak,
                      "protein_avg": fresh_vitals.get("nutrition_protein_g"),
-                     "days_in": max(1, (date.today() - date.fromisoformat("2026-04-01")).days + 1) if date.today() >= date.fromisoformat("2026-04-01") else 0},
+                     "days_in": max(1, (date.today() - exp_start).days + 1) if date.today() >= exp_start else 0},
     }
 
     # ── 7. Write back ─────────────────────────────────────────────────────────

@@ -42,7 +42,7 @@
   /* Signal green (primary accent) — SLOP-1: desaturated warm teal */
   --c-green-500:      #3db88a;
   --c-green-400:      #2fa37a;
-  --c-green-300:      #258a68;
+  --c-green-300:      #2da97e;   /* 5.5:1 on #0f1612 ✅ (was #258a68 / 4.29:1) */
   --c-green-200:      #1a6b50;
   --c-green-100:      rgba(61, 184, 138, 0.12);
   --c-green-050:      rgba(61, 184, 138, 0.06);
@@ -65,7 +65,7 @@
   /* Text scale */
   --c-text-primary:   #e8ede9;
   --c-text-secondary: #8aaa90;  /* PRE-5 ROLLBACK: was #7a9080 */
-  --c-text-muted:     #5a7565;
+  --c-text-muted:     #708a7a;   /* 5.2:1 ✅ on #080c0a (was #5a7565 / 3.9:1) */
   --c-text-disabled:  #2a3c30;
 
   /* Borders */

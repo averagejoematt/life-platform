@@ -31,6 +31,8 @@ from decimal import Decimal
 
 import boto3
 
+from phase_filter import with_phase_filter  # ADR-058
+
 # Structured logger
 try:
     from platform_logger import get_logger
@@ -305,7 +307,7 @@ def _query_begins_with(pk, sk_prefix, scan_forward=True, limit=None):
 
         items = []
         while True:
-            resp = table.query(**kwargs)
+            resp = table.query(**with_phase_filter(kwargs))
             items.extend(resp.get("Items", []))
             if limit and len(items) >= limit:
                 items = items[:limit]

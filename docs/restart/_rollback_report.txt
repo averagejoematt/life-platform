@@ -1,0 +1,6 @@
+rollback report — mode=DRY-RUN — current_genesis=2026-05-25
+generated=2026-05-24T17:39:14.939500+00:00
+
+to_genesis=2026-05-18
+full_unwind=False
+untombstoned=610

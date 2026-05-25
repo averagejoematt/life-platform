@@ -17,16 +17,15 @@ window.AMJ = {
 
   // ── Journey ────────────────────────────────────────────────
   journey: {
-    start_weight:  307,
+    start_weight:  297,
     goal_weight:   185,
-    start_date:    '2026-04-01',
-    experiment_start: '2026-04-01',  // Day 1 of the public experiment
-    build_date:    '2026-02-22',     // Day platform build began
-    phase:         'Launch',
-    hero_tagline:  'Day 1. For real this time.',
-    hero_short:    '307 → 185. 26 data sources. Every number public.',
-    hero_copy:     'I built an AI health platform, got sick, fell off the wagon, and the system I built didn\'t catch me. So I\'m starting over — publicly. April 1, 2026 is Day 1. Every number, every failure, no filter.',
-    cta_sub:       '307 lbs. A relapse. A relaunch. Day 1.',
+    start_date:    '2026-05-25',
+    experiment_start: '2026-05-25',  // Day 1 of the public experiment
+    phase:         'Foundation',
+    hero_tagline:  'Day 1.',
+    hero_short:    '297 → 185. 19 data sources. Every number public.',
+    hero_copy:     'A 12-month experiment in measured living. Body, sleep, training, nutrition — every metric tracked, every change documented. Begin here.',
+    cta_sub:       '297 lbs. The work begins.',
   },
 
   // ── Platform (fallbacks — overridden by /api/platform_stats) ──

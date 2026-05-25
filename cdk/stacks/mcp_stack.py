@@ -132,7 +132,7 @@ class McpStack(Stack):
             evaluation_periods=1, threshold=3,
             comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
             treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING)
-        slo_alarm.add_alarm_action(cw_actions.SnsAction(local_alerts_topic))
+        slo_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
         # ── SLO-5: Warmer completeness alarm (R9 A+ hardening) ────────────────
         # Fires if the dedicated warmer Lambda errors on its daily run.
