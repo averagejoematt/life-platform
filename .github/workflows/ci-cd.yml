@@ -443,10 +443,13 @@ jobs:
         run: |
           LAYER_NAME="life-platform-shared-utils"
 
+          # AWS CLI paginates list-layer-versions; `[0]` returns the first
+          # value PER PAGE, so we get one version per page concatenated. Pipe
+          # through head -1 to take the actual latest (first item of page 1).
           LATEST_VER=$(aws lambda list-layer-versions \
             --layer-name "$LAYER_NAME" \
             --region ${{ env.AWS_REGION }} \
-            --query 'LayerVersions[0].Version' --output text 2>/dev/null)
+            --query 'LayerVersions[0].Version' --output text 2>/dev/null | head -1)
 
           if [ -z "$LATEST_VER" ] || [ "$LATEST_VER" = "None" ]; then
             echo "::warning::Layer '$LAYER_NAME' not found in AWS — skipping consistency check (first deploy?)"
@@ -600,11 +603,13 @@ jobs:
           echo "═══ Rebuilding shared utils layer ═══"
           bash deploy/p3_build_shared_utils_layer.sh
 
+          # Same pagination caveat as above — pipe through head -1 so we
+          # only get page 1's [0], not [0] from every page.
           LAYER_ARN=$(aws lambda list-layer-versions \
             --layer-name life-platform-shared-utils \
             --region ${{ env.AWS_REGION }} \
             --query 'LayerVersions[0].LayerVersionArn' \
-            --output text)
+            --output text | head -1)
           echo "New layer ARN: $LAYER_ARN"
 
           echo "Attaching to consumers..."
