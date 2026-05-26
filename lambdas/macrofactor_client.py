@@ -193,6 +193,36 @@ class MacroFactorClient:
         except urllib.error.URLError as e:
             raise MacroFactorAPIError(f"firestore GET {path} network error: {e}") from e
 
+    def _firestore_list(self, collection_path: str, page_size: int = 100) -> list[dict]:
+        """LIST documents in a Firestore collection. Auto-paginates via nextPageToken."""
+        token = self._ensure_fresh_token()
+        all_docs: list[dict] = []
+        page_token: Optional[str] = None
+        while True:
+            qs = f"?pageSize={page_size}"
+            if page_token:
+                qs += f"&pageToken={urllib.parse.quote(page_token)}"
+            req = urllib.request.Request(
+                f"{FIRESTORE_BASE}/{collection_path}{qs}",
+                headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    data = json.loads(resp.read().decode())
+            except urllib.error.HTTPError as e:
+                if e.code == 404:
+                    break
+                err_body = e.read().decode("utf-8", errors="replace")[:300]
+                raise MacroFactorAPIError(f"firestore LIST {collection_path} HTTP {e.code}: {err_body}") from e
+            except urllib.error.URLError as e:
+                raise MacroFactorAPIError(f"firestore LIST {collection_path} network error: {e}") from e
+            for doc in (data.get("documents") or []):
+                all_docs.append(doc)
+            page_token = data.get("nextPageToken")
+            if not page_token:
+                break
+        return all_docs
+
     # ── Firestore value decoding ────────────────────────────────────────────
     # Firestore returns values as typed wrappers: {stringValue}/{integerValue}/
     # {doubleValue}/{booleanValue}/{mapValue}/{arrayValue}/etc. MacroFactor's
@@ -276,6 +306,40 @@ class MacroFactorClient:
         out.sort(key=lambda e: e["date"])
         return out
 
+    def get_workouts(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> list[dict]:
+        """List all workouts in users/{uid}/workoutHistory, optionally filtered by date.
+
+        Reverse-engineered shape (from @sjawhar/macrofactor-mcp client.ts):
+          - Collection: users/{uid}/workoutHistory
+          - Each doc has: name, startTime (ISO), duration (microseconds!),
+            gymId, gymName, blocks[]
+          - blocks[] → exercises[] (each: name + sets[])
+          - sets[] → weight, reps, rpe, ...
+
+        Returns a list of NORMALIZED workout dicts in the platform schema
+        (compatible with the Hevy normalizer's output so MCP read tools see
+        a uniform shape).
+        """
+        docs = self._firestore_list(f"users/{self.uid}/workoutHistory")
+        out: list[dict] = []
+        for doc in docs:
+            parsed = self._parse_document(doc)
+            doc_name = doc.get("name") or ""
+            doc_id = doc_name.rsplit("/", 1)[-1] if doc_name else (parsed.get("id") or "")
+            if not doc_id:
+                continue
+            workout = _normalize_mf_workout(doc_id, parsed)
+            # Date-range filter applied after normalization (workout date may
+            # not match Firestore-doc creation time exactly — e.g. user logs
+            # yesterday's workout today).
+            if start_date and workout["date"] < start_date:
+                continue
+            if end_date and workout["date"] > end_date:
+                continue
+            out.append(workout)
+        out.sort(key=lambda w: w.get("start_time") or "", reverse=True)
+        return out
+
 
 # ── Module-level helpers ─────────────────────────────────────────────────────
 
@@ -324,3 +388,85 @@ def _maybe_int(v: Any) -> Optional[int]:
         return int(v) if v is not None else None
     except (TypeError, ValueError):
         return None
+
+
+def _normalize_mf_workout(doc_id: str, parsed: dict) -> dict:
+    """Map a MF workoutHistory doc → platform-canonical workout shape.
+
+    Output shape mirrors lambdas/hevy_common.normalize_workout so MCP read
+    tools (tool_get_workouts etc.) see a uniform schema across sources.
+    Differences from Hevy:
+      - duration is microseconds in MF, seconds in Hevy → normalize to seconds
+      - MF uses blocks[] → exercises[]; Hevy uses exercises[] directly. Flatten.
+      - workout_uid = 'mf:<doc_id>' — for cross-tier dedupe with the future
+        macrofactor_export per-workout records, BOTH paths must produce the
+        same uid. The Firestore doc id is the natural stable key.
+    """
+    start_iso = parsed.get("startTime") or ""
+    try:
+        from datetime import datetime as _dt
+        start_dt = _dt.fromisoformat(str(start_iso).replace("Z", "+00:00"))
+        date_str = start_dt.strftime("%Y-%m-%d")
+    except Exception:
+        date_str = ""
+
+    # duration is in microseconds per the npm client (`d.duration as number / 1_000_000`)
+    duration_us = parsed.get("duration")
+    try:
+        duration_sec = int(float(duration_us) / 1_000_000) if duration_us is not None else None
+    except (TypeError, ValueError):
+        duration_sec = None
+
+    # Flatten blocks → exercises so the platform schema matches Hevy's shape.
+    exercises: list[dict] = []
+    total_volume_kg = 0.0
+    set_count = 0
+    for block in (parsed.get("blocks") or []):
+        if not isinstance(block, dict):
+            continue
+        for ex in (block.get("exercises") or []):
+            if not isinstance(ex, dict):
+                continue
+            sets = []
+            for s in (ex.get("sets") or []):
+                if not isinstance(s, dict):
+                    continue
+                weight_kg = _maybe_float(s.get("weight") or s.get("weightKg"))
+                reps = _maybe_int(s.get("reps"))
+                sets.append({
+                    "set_index":    _maybe_int(s.get("index")) or len(sets),
+                    "weight_kg":    weight_kg,
+                    "reps":         reps,
+                    "rpe":          _maybe_float(s.get("rpe")),
+                    "type":         s.get("type") or "normal",
+                    "duration_sec": _maybe_int(s.get("durationSeconds") or s.get("duration_seconds")),
+                    "distance_m":   _maybe_float(s.get("distanceMeters") or s.get("distance_meters")),
+                })
+                set_count += 1
+                if weight_kg is not None and reps is not None:
+                    total_volume_kg += weight_kg * reps
+            exercises.append({
+                "name":         ex.get("name") or ex.get("title") or "",
+                "template_id":  ex.get("exerciseId") or ex.get("templateId") or ex.get("exercise_template_id"),
+                "sets":         sets,
+                "notes":        ex.get("notes") or "",
+            })
+
+    return {
+        "source":            "macrofactor_api",
+        "source_workout_id": doc_id,
+        "workout_uid":       f"mf:{doc_id}",
+        "date":              date_str,
+        "title":             parsed.get("name") or "",
+        "description":       parsed.get("notes") or "",
+        "start_time":        str(start_iso) if start_iso else "",
+        "end_time":          "",
+        "duration_sec":      duration_sec,
+        "total_volume_kg":   round(total_volume_kg, 2),
+        "exercises":         exercises,
+        "exercise_count":    len(exercises),
+        "set_count":         set_count,
+        "original_unit":     "kg",  # MF stores in kg per its Firestore schema
+        "gym_id":            parsed.get("gymId"),
+        "gym_name":          parsed.get("gymName"),
+    }
