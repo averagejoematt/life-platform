@@ -13,7 +13,7 @@ import os
 import re
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-SRC = os.path.join(ROOT, "lambdas", "site_api_lambda.py")
+SRC = os.path.join(ROOT, "lambdas", "web", "site_api_lambda.py")  # P3.1: moved to web/
 
 
 def _src():

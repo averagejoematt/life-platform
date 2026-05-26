@@ -10,8 +10,8 @@
 #   ./deploy/deploy_lambda.sh <function-name> <source-file> --extra-files file1.py file2.py ...
 #
 # Examples:
-#   ./deploy/deploy_lambda.sh health-auto-export-webhook lambdas/health_auto_export_lambda.py
-#   ./deploy/deploy_lambda.sh daily-brief lambdas/daily_brief_lambda.py \
+#   ./deploy/deploy_lambda.sh health-auto-export-webhook lambdas/ingestion/health_auto_export_lambda.py
+#   ./deploy/deploy_lambda.sh daily-brief lambdas/email/daily_brief_lambda.py \
 #       --extra-files lambdas/ai_calls.py lambdas/html_builder.py lambdas/output_writers.py lambdas/board_loader.py
 #
 # Rollback:
@@ -25,7 +25,7 @@ BUCKET="matthew-life-platform"
 
 if [ $# -lt 2 ]; then
     echo "Usage: $0 <function-name> <source-file> [--extra-files file1.py ...]"
-    echo "Example: $0 health-auto-export-webhook lambdas/health_auto_export_lambda.py"
+    echo "Example: $0 health-auto-export-webhook lambdas/ingestion/health_auto_export_lambda.py"
     exit 1
 fi
 

@@ -4,7 +4,7 @@ set -euo pipefail
 REGION="us-west-2"
 FUNCTION_NAME="pipeline-health-check"
 ROLE_NAME="pipeline-health-check-role"
-SOURCE_FILE="lambdas/pipeline_health_check_lambda.py"
+SOURCE_FILE="lambdas/operational/pipeline_health_check_lambda.py"
 
 echo "=== Setting up $FUNCTION_NAME ==="
 

@@ -160,25 +160,31 @@ def test_h2_all_source_files_exist():
 
 
 def test_h3_handler_module_matches_source_file():
-    """H3: handler module name must match source_file basename.
+    """H3: handler module path must match source_file path (relative to lambdas/).
 
-    handler='freshness_checker_lambda.lambda_handler'
-        → module = 'freshness_checker_lambda'
-        → source_file must contain 'freshness_checker_lambda.py'
+    P3.1 (2026-05-25): handlers are now subpackage-qualified.
+      handler='ingestion.whoop_lambda.lambda_handler'
+          → module path = 'ingestion.whoop_lambda'
+          → source_file must be 'lambdas/ingestion/whoop_lambda.py'
     """
     failures = []
     for pair in _all_cdk_pairs():
         handler = pair["handler"]
         source_file = pair["source_file"]
-        handler_module = handler.rsplit(".", 1)[0]
-        source_basename = os.path.basename(source_file).replace(".py", "")
-        if handler_module != source_basename:
+        # handler is "X.Y.lambda_handler" — strip the last component to get the module path.
+        handler_module_path = handler.rsplit(".", 1)[0]  # "ingestion.whoop_lambda" or "site_api_lambda"
+        # source_file is "lambdas/ingestion/whoop_lambda.py" — convert to "ingestion.whoop_lambda"
+        rel = source_file
+        if rel.startswith("lambdas/"):
+            rel = rel[len("lambdas/"):]
+        expected_module_path = rel.replace(".py", "").replace("/", ".")
+        if handler_module_path != expected_module_path:
             failures.append(
                 f"{pair['stack']}:{pair['line']} — "
-                f"handler module '{handler_module}' != source_file basename '{source_basename}'\n"
+                f"handler module '{handler_module_path}' != source_file as module '{expected_module_path}'\n"
                 f"    handler='{handler}'\n"
                 f"    source_file='{source_file}'\n"
-                f"    Fix: handler should be '{source_basename}.lambda_handler'"
+                f"    Fix: handler should be '{expected_module_path}.lambda_handler'"
             )
 
     assert not failures, (
