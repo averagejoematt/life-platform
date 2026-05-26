@@ -51,7 +51,7 @@ env:
   AWS_REGION: us-west-2
   AWS_ACCOUNT_ID: "205930651321"  # CONF-03: single place — override via GitHub env var for staging
   LAMBDA_MAP: ci/lambda_map.json
-  SNS_TOPIC_ARN: arn:aws:sns:us-west-2:205930651321:life-platform-alerts  # CONF-03: constructed from AWS_ACCOUNT_ID in future; centralized above
+  SNS_TOPIC_ARN: arn:aws:sns:us-west-2:205930651321:life-platform-alerts-digest  # 2026-05-25: was life-platform-alerts (immediate-email). CI failure notifications now batch into the daily digest like all other alerts (per the inbox-noise mitigation sweep). CONF-03 follow-up: construct from AWS_ACCOUNT_ID.
 
 permissions:
   id-token: write   # OIDC token for AWS

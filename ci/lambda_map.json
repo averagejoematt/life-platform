@@ -5,6 +5,15 @@
     "lambdas/strava_lambda.py": {
       "function": "strava-data-ingestion"
     },
+    "lambdas/hevy_webhook_lambda.py": {
+      "function": "hevy-webhook"
+    },
+    "lambdas/hevy_backfill_lambda.py": {
+      "function": "hevy-backfill"
+    },
+    "lambdas/macrofactor_puller_lambda.py": {
+      "function": "mf-puller"
+    },
     "lambdas/whoop_lambda.py": {
       "function": "whoop-data-ingestion"
     },
