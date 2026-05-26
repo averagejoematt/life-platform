@@ -279,6 +279,17 @@ If you do an item, move it to `docs/CHANGELOG.md` and remove from here. If you d
 
 **Source freshness inventory captured 2026-05-25 02:25 UTC** — 3 fresh (whoop, apple_health, habitify), 9 stale. Of the 9: only Garmin is a code bug (above). The rest are behavioral (macrofactor=44d, food_delivery=58d, measurements=57d, notion=23d, etc.) and resolve when you log data.
 
+### 2026-05-25 MacroFactor Tier 1 — blocked by Firebase App Check
+
+- [ ] **MF unofficial-API path is currently blocked at the auth layer by Firebase App Check.** See ADR-061 "Update 2026-05-25". The `mf-puller` Lambda is deployed but its EventBridge schedule is disabled. Re-enable when a workaround surfaces:
+  ```bash
+  aws events enable-rule \
+    --name LifePlatformIngestion-MacrofactorPullerScheduleEF59-xvxKHODEy3PS \
+    --region us-west-2
+  ```
+- [ ] **Tier 2 (manual MacroFactor Dropbox export) is the active food-level path.** Unchanged. No code work required.
+- [ ] WS-3 schema migration of historical MacroFactor Dropbox workout records to carry `source="macrofactor_export"` + per-workout `mf:<id>` uid — needed so the Tier-1/Tier-2 dedupe story actually triggers if Tier 1 is ever re-enabled.
+
 ### 2026-05-24 phase-filter sweep — deferred-with-reason
 
 - [ ] **~254 raw `table.query()` callsites still bypass the phase-filter chokepoint.** Audited per-Lambda counts; not the bounded mechanical sweep originally estimated — each callsite needs human judgment (USER#-prefixed user data needs the filter; SUBSCRIBER#/ADMIN#/system tables are exempt). Daily-brief / character-sheet / daily-insight-compute have the highest blast radius. Defer to launch+1 week with daylight to test; pre-genesis data is already correctly phase-tagged at the DDB level, so the practical risk of leakage into post-genesis compute outputs is low.

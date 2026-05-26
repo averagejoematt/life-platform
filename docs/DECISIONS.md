@@ -1581,5 +1581,38 @@ The platform's current food-level nutrition path is a manual MacroFactor Dropbox
 
 ### Non-decisions
 
-- **Workout ingestion via MacroFactor unofficial API** — out of scope. Hevy (ADR-060) is the no-touch workout path; MF workouts continue arriving via Dropbox (Tier 2 only). If Tier 1 proves stable for nutrition for 90 days, revisit.
+- **Workout ingestion via MacroFactor unofficial API** — out of scope of the initial cut, BUT added in a follow-up commit (62549d0) on 2026-05-25: the same puller now pulls both food log AND `users/{uid}/workoutHistory` in a single signed-in session, so MF workouts get the same Tier-1/Tier-2 treatment as nutrition.
 - **Periodic credential health check** beyond the puller's own failure tracking — not added.
+
+### Update 2026-05-25 — Tier 1 BLOCKED by Firebase App Check
+
+**Status: ⚠️ Tier 1 deployed but disabled until further notice.**
+
+First live test invocation (mf-puller against the real `life-platform/macrofactor` secret) returned:
+```
+HTTP 401: "Firebase App Check token is invalid."
+```
+
+App Check enforcement on the auth endpoint itself is **new since the community libraries were written**. Confirmed by probing 5 alternate paths — all fail:
+
+| Approach | Result |
+|---|---|
+| Android package header | 403 — Firebase restricts to iOS bundle only |
+| `/v3/verifyPassword` (pre-2018 endpoint) | 404 — removed |
+| Referer + Origin spoof | 403 — same iOS-bundle restriction |
+| No bundle header | 403 |
+| `X-Firebase-AppCheck: debug` token | 401 — would need MF to allow our debug token in their Firebase Console |
+
+The remaining theoretical paths all require either:
+- Real device attestation (DeviceCheck on iOS, Play Integrity on Android) — **impossible from a Lambda**, or
+- Capturing a live App Check token from Matthew's MF mobile app and refreshing manually every ~1 hour — too brittle to operate.
+
+**Actions taken 2026-05-25 23:50 UTC:**
+1. Disabled the EventBridge schedule `LifePlatformIngestion-MacrofactorPullerScheduleEF59-xvxKHODEy3PS` so the puller does not fire daily and create error spam.
+2. Wrote a final status record at `USER#system/INGESTION_STATE#macrofactor_api` with `healthy=false`, `blocked_reason="firebase_app_check"`, and a human-readable explanation in `last_error`.
+3. The Lambda code, IAM role, secret, and CDK definition all remain in place — no infrastructure removed. Re-enabling Tier 1 is a one-step `aws events enable-rule` command once an App Check workaround surfaces.
+4. The graceful-degradation contract worked correctly: puller caught the auth error, recorded health, returned 200 (so Lambda alarm didn't fire), surfaced the "use Dropbox export" advice — exactly the design intent.
+
+**Practical impact:** Tier 2 (manual MacroFactor Dropbox export) is the active food-level + workout path. Hevy (ADR-060) is the active no-touch workout path. There is currently no no-touch path for food-level nutrition — the explicit "accepted risk" of WS-2 has materialized on day one.
+
+**Re-evaluate when:** Either (a) a credible App Check workaround appears in the community libraries, OR (b) MacroFactor publishes an official API, OR (c) 6 months pass and we accept the manual export as the permanent food-level path.
