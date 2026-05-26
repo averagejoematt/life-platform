@@ -37,7 +37,9 @@ def _parse_routes():
 
 def test_routes_dict_parses():
     routes = _parse_routes()
-    assert len(routes) >= 10, f"Expected ≥10 routes, found {len(routes)}"
+    # 2026-05-25 (P1.1): was ≥10; /api/board_ask removed when dead AI code was purged from
+    # site_api_lambda.py — that endpoint lives in life-platform-site-api-ai (ADR-036).
+    assert len(routes) >= 9, f"Expected ≥9 routes, found {len(routes)}"
 
 
 def test_no_duplicate_paths():
