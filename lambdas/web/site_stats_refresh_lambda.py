@@ -54,16 +54,18 @@ def _get_latest(table, source, days_back=2):
     today = date.today().isoformat()
     start = (date.today() - timedelta(days=days_back)).isoformat()
     try:
-        resp = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={
+        # ADR-058: phase=pilot hidden by default.
+        from phase_filter import with_phase_filter
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {
                 ":pk": f"USER#{USER_ID}#SOURCE#{source}",
                 ":s":  f"DATE#{start}",
                 ":e":  f"DATE#{today}",
             },
-            ScanIndexForward=False,
-            Limit=1,
-        )
+            "ScanIndexForward": False,
+            "Limit": 1,
+        }))
         items = resp.get("Items", [])
         return dict(items[0]) if items else {}
     except Exception as e:
@@ -180,14 +182,16 @@ def lambda_handler(event, context):
     exp_start = date.fromisoformat(EXPERIMENT_START_DATE)
     days_in = max(1, (date.today() - exp_start).days + 1) if date.today() >= exp_start else 1
     try:
-        _tr_resp = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={
+        # ADR-058: phase=pilot hidden by default.
+        from phase_filter import with_phase_filter
+        _tr_resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {
                 ":pk": f"USER#{USER_ID}#SOURCE#strava",
                 ":s": f"DATE#{exp_start.isoformat()}",
                 ":e": f"DATE#{date.today().isoformat()}",
             },
-        )
+        }))
         _tr_items = _tr_resp.get("Items", [])
         total_min = 0
         for ti in _tr_items:
