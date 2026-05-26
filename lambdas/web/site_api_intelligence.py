@@ -31,7 +31,7 @@ from web.site_api_common import (
     dynamodb,
     USER_ID, USER_PREFIX,
     EXPERIMENT_START, EXPERIMENT_BASELINE_WEIGHT_LBS,
-    PT,
+    PT, DDB_REGION,
     STATUS_CACHE_TTL,
     PLATFORM_STATS,
     _ok, _error,

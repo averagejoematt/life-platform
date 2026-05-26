@@ -22,6 +22,7 @@ from web.site_api_common import (
     table,
     USER_ID, USER_PREFIX,
     EXPERIMENT_START, EXPERIMENT_BASELINE_WEIGHT_LBS,
+    CORS_HEADERS,
     _ok, _error,
     _query_source, _latest_item, _decimal_to_float,
     _experiment_date,

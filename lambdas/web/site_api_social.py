@@ -40,6 +40,7 @@ from web.site_api_common import (
     EXPERIMENT_START,
     CORS_HEADERS,
     S3_REGION,
+    PT,
     _ok, _error,
     _query_source, _latest_item, _decimal_to_float,
     _cached_secret,
@@ -63,6 +64,18 @@ _challenge_catalog_cache = None
 
 # R17-04: separate Anthropic key for site-api (distinct from main ai-keys).
 AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/site-api-ai-key")
+
+# ── ACCT-2 / NEW-1 constants ──────────────────────────────
+# Moved with their handlers in P1.1 Phase B step 7 (originally module-level
+# in site_api_lambda.py — only _handle_nudge + _handle_submit_finding use them).
+NUDGE_CATEGORIES = {"back_on_it", "watching", "take_your_time", "you_got_this"}
+NUDGE_LABELS = {
+    "back_on_it":    "Get back on it 🔥",
+    "watching":      "We're watching 👀",
+    "take_your_time": "Take your time ⏰",
+    "you_got_this":  "You've got this 💪",
+}
+FINDING_RATE_LIMIT = 3  # per IP per hour
 
 
 def handle_current_challenge() -> dict:
