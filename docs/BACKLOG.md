@@ -279,16 +279,11 @@ If you do an item, move it to `docs/CHANGELOG.md` and remove from here. If you d
 
 **Source freshness inventory captured 2026-05-25 02:25 UTC** — 3 fresh (whoop, apple_health, habitify), 9 stale. Of the 9: only Garmin is a code bug (above). The rest are behavioral (macrofactor=44d, food_delivery=58d, measurements=57d, notion=23d, etc.) and resolve when you log data.
 
-### 2026-05-25 MacroFactor Tier 1 — blocked by Firebase App Check
+### 2026-05-25 MacroFactor Tier 1 — TORN DOWN (was blocked by Firebase App Check)
 
-- [ ] **MF unofficial-API path is currently blocked at the auth layer by Firebase App Check.** See ADR-061 "Update 2026-05-25". The `mf-puller` Lambda is deployed but its EventBridge schedule is disabled. Re-enable when a workaround surfaces:
-  ```bash
-  aws events enable-rule \
-    --name LifePlatformIngestion-MacrofactorPullerScheduleEF59-xvxKHODEy3PS \
-    --region us-west-2
-  ```
-- [ ] **Tier 2 (manual MacroFactor Dropbox export) is the active food-level path.** Unchanged. No code work required.
-- [ ] WS-3 schema migration of historical MacroFactor Dropbox workout records to carry `source="macrofactor_export"` + per-workout `mf:<id>` uid — needed so the Tier-1/Tier-2 dedupe story actually triggers if Tier 1 is ever re-enabled.
+- [x] **MF unofficial-API path removed.** Closed same day it was deployed. Firebase App Check blocked the auth endpoint; 5 workarounds all failed. Code, Lambda, IAM role, EventBridge rule, secret, and DDB state record all removed. ADR-061 "Update 2026-05-25 (same day, later)" documents the attempt and tear-down rationale for institutional memory.
+- [x] **Tier 2 (manual MacroFactor Dropbox export) is the only food-level + MF-workout path.** Unchanged.
+- [x] WS-3 schema migration of historical MF Dropbox workout records — no longer needed since there's no Tier 1 to dedupe against. Existing `_expand_legacy_aggregate` bridge in `mcp/tools_hevy.py` continues to surface them via `source="macrofactor_export"`.
 
 ### 2026-05-24 phase-filter sweep — deferred-with-reason
 
