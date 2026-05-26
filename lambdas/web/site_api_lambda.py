@@ -268,20 +268,9 @@ AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME",  "life-platform/site-api-ai-ke
 
 # ── ARCH-02: Snapshot endpoint ──────────────────────────────
 
-# ── ACCT-2: Nudge handler ───────────────────────────────────
-
-NUDGE_CATEGORIES = {"back_on_it", "watching", "take_your_time", "you_got_this"}
-NUDGE_LABELS = {
-    "back_on_it":    "Get back on it 🔥",
-    "watching":      "We're watching 👀",
-    "take_your_time": "Take your time ⏰",
-    "you_got_this":  "You've got this 💪",
-}
-
-
-# ── NEW-1: Submit Finding ────────────────────────────────────
-
-FINDING_RATE_LIMIT = 3  # per IP per hour
+# P1.1 Phase B step 7 follow-up (2026-05-26): NUDGE_CATEGORIES, NUDGE_LABELS,
+# FINDING_RATE_LIMIT moved with their handlers to site_api_social.py (CI lint
+# caught the orphan references).
 
 
 # ── EL-2: Experiment Library endpoint ───────────────────────

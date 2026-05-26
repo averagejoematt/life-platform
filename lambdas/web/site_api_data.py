@@ -30,9 +30,9 @@ from web.site_api_common import (
     logger,
     table,
     USER_ID, USER_PREFIX,
-    EXPERIMENT_START, EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_QUERY_START,
-    S3_REGION, CORS_HEADERS,
-    STATUS_CACHE_TTL,
+    EXPERIMENT_START, EXPERIMENT_BASELINE_WEIGHT_LBS,
+    S3_REGION,
+    PT,
     PLATFORM_STATS,
     _ok, _error,
     _query_source, _latest_item, _decimal_to_float,
@@ -41,8 +41,6 @@ from web.site_api_common import (
     _load_supp_metadata,
     _load_content_filter,
     _load_s3_json,
-    _scrub_blocked_terms,
-    _is_blocked_vice,
 )
 
 # Module-owned S3 config caches (read by handle_protocols + handle_domains)

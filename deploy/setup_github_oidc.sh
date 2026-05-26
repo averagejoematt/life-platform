@@ -157,7 +157,10 @@ PERMISSION_POLICY=$(cat <<EOF
         "sns:GetTopicAttributes",
         "sns:Publish"
       ],
-      "Resource": "arn:aws:sns:us-west-2:${ACCOUNT}:life-platform-alerts"
+      "Resource": [
+        "arn:aws:sns:us-west-2:${ACCOUNT}:life-platform-alerts",
+        "arn:aws:sns:us-west-2:${ACCOUNT}:life-platform-alerts-digest"
+      ]
     },
     {
       "Sid": "SQS",

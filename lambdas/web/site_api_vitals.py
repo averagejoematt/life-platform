@@ -19,6 +19,7 @@ Endpoints:
   /api/snapshot         — single-call vitals+journey+character combo
   /api/timeline         — life events timeline
 """
+import hashlib  # used by handle_achievements stable-event-key hash
 import json
 import re
 import time
