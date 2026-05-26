@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Deep documentation lives in `docs/`. Start here when context is needed:
 - `docs/ONBOARDING.md` — first-day mental model, key concepts
 - `docs/QUICKSTART.md` — first-day commands (AWS auth, deploy, rollback)
-- `docs/ARCHITECTURE.md` — full system design, 73 Lambdas (us-west-2) + 4 (us-east-1), 8 CDK stacks, data flows (updated v8.0.0)
+- `docs/ARCHITECTURE.md` — full system design, 80 Lambdas (us-west-2) + 5 (us-east-1), 8 CDK stacks, data flows (updated v8.1.0)
 - `docs/SCHEMA.md` — DynamoDB field reference (authoritative)
 - `docs/RUNBOOK.md` — daily operations, troubleshooting
 - `docs/DECISIONS.md` — ADRs (ADR-001 through ADR-057), why things are the way they are
@@ -48,12 +48,12 @@ python3 mcp_bridge.py
 
 **Ingest → Store → Serve** pipeline on AWS (us-west-2):
 
-1. **Ingest**: 14 Lambda functions pull from APIs on EventBridge schedules (8 SIMP-2 framework + 6 pattern-exempt per ADR-056; hourly 4am–10pm PST, except Garmin at 4x daily due to OAuth rate limits, Weather + Todoist at 2x daily). Gap-aware backfill — each ingestion Lambda detects missing `DATE#` records (including today) and only fetches what's absent. HAE webhook sources (CGM, water, BP, State of Mind) are near-real-time with reading-level dedup for cumulative fields.
+1. **Ingest**: 15 scheduled ingestion Lambda functions pull from APIs on EventBridge (8 SIMP-2 framework + 7 pattern-exempt per ADR-056/060; hourly 4am–10pm PST, except Garmin at 4x daily due to OAuth rate limits, Weather + Todoist at 2x daily, Hevy at hourly 12-23 UTC). Plus 1 webhook-driven FunctionURL Lambda (`hevy-webhook`, currently parked since Hevy doesn't publish webhooks). Gap-aware backfill — each ingestion Lambda detects missing `DATE#` records (including today) and only fetches what's absent. HAE webhook sources (CGM, water, BP, State of Mind) are near-real-time with reading-level dedup for cumulative fields.
 
 2. **Store**: Raw JSON in S3 (`raw/{source}/{datatype}/{YYYY}/{MM}/{DD}.json`), normalized metrics in DynamoDB single-table (`life-platform`, PK `USER#matthew#SOURCE#{source}`, SK `DATE#{YYYY-MM-DD}`).
 
 3. **Serve/Compute**:
-   - **MCP Lambda** — 135 tools across 26 domain modules (`mcp/tools_*.py`), accessed via Claude Desktop and claude.ai. ARCHITECTURE.md tracks the catalog-facing count of 127; `grep -c '"name":' mcp/registry.py` is source of truth. **Note (V2 P4.1):** only ~11 tools used in last 30 days per EMF telemetry; bulk pruning planned.
+   - **MCP Lambda** — 138 tools across 27 domain modules (`mcp/tools_*.py`, including `tools_hevy.py` added 2026-05-25 per ADR-060), accessed via Claude Desktop and claude.ai. `grep -c '"name":' mcp/registry.py` is source of truth. **Note (V2 P4.1):** only ~11 tools used in last 30 days per EMF telemetry; bulk pruning planned.
    - **Compute Lambdas** (5) — run before 11 AM daily: `character-sheet`, `adaptive-mode`, `daily-metrics-compute`, `daily-insight-compute`, `hypothesis-engine`; store pre-computed results to DynamoDB
    - **Email Lambdas** (7) — daily brief at 11 AM reads pre-computed results
    - **OG Image Lambda** — generates 6 data-driven PNG share cards daily at 11:30 AM PT using Pillow
