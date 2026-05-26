@@ -100,6 +100,15 @@ class OperationalStack(Stack):
             handler="operational.dlq_consumer_lambda.lambda_handler",
             schedule="rate(6 hours)",
             timeout_seconds=120, memory_mb=256,
+            environment={
+                # 2026-05-26: DLQ_URL was never wired in CDK; the Lambda
+                # required it (see lambda body) but only ever got default
+                # env from create_platform_lambda. Result: every scheduled
+                # fire logged "DLQ_URL not set" and returned 500 silently.
+                # The Lambda comment says "set from deploy script" but no
+                # such script exists. Wired here now.
+                "DLQ_URL": f"https://sqs.{REGION}.amazonaws.com/{ACCT}/life-platform-ingestion-dlq",
+            },
             custom_policies=rp.operational_dlq_consumer(),
             table=local_table, bucket=local_bucket, dlq=None, alerts_topic=None,
         )
