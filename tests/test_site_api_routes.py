@@ -57,12 +57,30 @@ def test_no_duplicate_handlers():
 
 
 def test_all_handlers_defined():
+    """Every handler referenced in _SIMPLE_ROUTES must be defined somewhere in
+    the site_api family of modules (site_api_lambda.py + sibling modules
+    extracted in P1.1 Phase B)."""
     src = _src()
+    # P1.1 Phase B (2026-05-26): handlers may live in any of the sibling modules.
+    sibling_files = [
+        SRC,
+        os.path.join(ROOT, "lambdas", "web", "site_api_observatory.py"),
+        os.path.join(ROOT, "lambdas", "web", "site_api_intelligence.py"),
+        os.path.join(ROOT, "lambdas", "web", "site_api_social.py"),
+        os.path.join(ROOT, "lambdas", "web", "site_api_common.py"),
+    ]
+    combined_src = ""
+    for f in sibling_files:
+        if os.path.exists(f):
+            with open(f, encoding="utf-8") as fh:
+                combined_src += fh.read() + "\n"
+
     routes = _parse_routes()
     for path, _, handler in routes:
         pattern = rf"^def {handler}\("
-        assert re.search(pattern, src, re.MULTILINE), (
-            f"Route {path} references {handler} but no `def {handler}(` found in site_api_lambda.py"
+        assert re.search(pattern, combined_src, re.MULTILINE), (
+            f"Route {path} references {handler} but no `def {handler}(` "
+            f"found in any site_api_*.py sibling module."
         )
 
 
