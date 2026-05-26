@@ -102,7 +102,7 @@ sleep 15
 
 # ── 4. Zip and create Lambda
 echo "[3/4] Zipping email_subscriber_lambda.py..."
-zip -j /tmp/email_subscriber_setup.zip lambdas/email_subscriber_lambda.py
+zip -j /tmp/email_subscriber_setup.zip lambdas/web/email_subscriber_lambda.py
 echo "    ✓ Zip created"
 
 echo "[4/4] Creating Lambda function..."

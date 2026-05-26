@@ -34,16 +34,21 @@ TYPED_PATTERN = re.compile(r"^def lambda_handler\(event:\s*\w[^)]*,\s*context\)\
 
 
 def _count_handlers():
+    # P3.1 (2026-05-25): walk recursively to pick up files in
+    # lambdas/{ingestion,compute,coach,email,web,operational,intelligence}/.
     untyped = 0
     typed = 0
-    for fname in sorted(os.listdir(LAMBDAS_DIR)):
-        if not fname.endswith(".py"):
+    for root, _, files in os.walk(LAMBDAS_DIR):
+        if "__pycache__" in root:
             continue
-        path = os.path.join(LAMBDAS_DIR, fname)
-        with open(path, encoding="utf-8") as fh:
-            src = fh.read()
-        untyped += len(UNTYPED_PATTERN.findall(src))
-        typed += len(TYPED_PATTERN.findall(src))
+        for fname in sorted(files):
+            if not fname.endswith(".py") or fname == "__init__.py":
+                continue
+            path = os.path.join(root, fname)
+            with open(path, encoding="utf-8") as fh:
+                src = fh.read()
+            untyped += len(UNTYPED_PATTERN.findall(src))
+            typed += len(TYPED_PATTERN.findall(src))
     return untyped, typed
 
 

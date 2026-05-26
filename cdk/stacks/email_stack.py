@@ -71,29 +71,29 @@ class EmailStack(Stack):
         # disable — calls actually completed but blew past the 300s budget. 900s
         # gives ample headroom; daily-brief typically completes in 4-5 min when
         # Anthropic is healthy. Memory bumped 512→768 MB for some headroom too.
-        create_platform_lambda(self, "DailyBrief", function_name="daily-brief", handler="daily_brief_lambda.lambda_handler", source_file="lambdas/daily_brief_lambda.py", schedule="cron(0 17 * * ? *)", timeout_seconds=900, memory_mb=768, environment=_email_env, custom_policies=rp.email_daily_brief(), **{**shared, "alerts_topic": None})
+        create_platform_lambda(self, "DailyBrief", function_name="daily-brief", handler="email.daily_brief_lambda.lambda_handler", source_file="lambdas/email/daily_brief_lambda.py", schedule="cron(0 17 * * ? *)", timeout_seconds=900, memory_mb=768, environment=_email_env, custom_policies=rp.email_daily_brief(), **{**shared, "alerts_topic": None})
 
-        create_platform_lambda(self, "WeeklyDigest", function_name="weekly-digest", handler="weekly_digest_lambda.lambda_handler", source_file="lambdas/weekly_digest_lambda.py", schedule="cron(0 16 ? * SUN *)", timeout_seconds=120, memory_mb=256, environment=_email_env, custom_policies=rp.email_weekly_digest(), **shared)
+        create_platform_lambda(self, "WeeklyDigest", function_name="weekly-digest", handler="email.weekly_digest_lambda.lambda_handler", source_file="lambdas/email/weekly_digest_lambda.py", schedule="cron(0 16 ? * SUN *)", timeout_seconds=120, memory_mb=256, environment=_email_env, custom_policies=rp.email_weekly_digest(), **shared)
 
-        create_platform_lambda(self, "MonthlyDigest", function_name="monthly-digest", handler="monthly_digest_lambda.lambda_handler", source_file="lambdas/monthly_digest_lambda.py", schedule="cron(0 16 ? * 1#1 *)", timeout_seconds=120, memory_mb=256, environment=_email_env, custom_policies=rp.email_monthly_digest(), **shared)
+        create_platform_lambda(self, "MonthlyDigest", function_name="monthly-digest", handler="email.monthly_digest_lambda.lambda_handler", source_file="lambdas/email/monthly_digest_lambda.py", schedule="cron(0 16 ? * 1#1 *)", timeout_seconds=120, memory_mb=256, environment=_email_env, custom_policies=rp.email_monthly_digest(), **shared)
 
-        create_platform_lambda(self, "NutritionReview", function_name="nutrition-review", handler="nutrition_review_lambda.lambda_handler", source_file="lambdas/nutrition_review_lambda.py", schedule="cron(0 17 ? * SAT *)", timeout_seconds=120, memory_mb=256, environment=_email_env, custom_policies=rp.email_nutrition_review(), **shared)
+        create_platform_lambda(self, "NutritionReview", function_name="nutrition-review", handler="email.nutrition_review_lambda.lambda_handler", source_file="lambdas/email/nutrition_review_lambda.py", schedule="cron(0 17 ? * SAT *)", timeout_seconds=120, memory_mb=256, environment=_email_env, custom_policies=rp.email_nutrition_review(), **shared)
 
-        wednesday_chronicle = create_platform_lambda(self, "WednesdayChronicle", function_name="wednesday-chronicle", handler="wednesday_chronicle_lambda.lambda_handler", source_file="lambdas/wednesday_chronicle_lambda.py", schedule="cron(0 15 ? * WED *)", timeout_seconds=120, memory_mb=256, environment=_email_env, custom_policies=rp.email_wednesday_chronicle(), **shared)
+        wednesday_chronicle = create_platform_lambda(self, "WednesdayChronicle", function_name="wednesday-chronicle", handler="email.wednesday_chronicle_lambda.lambda_handler", source_file="lambdas/email/wednesday_chronicle_lambda.py", schedule="cron(0 15 ? * WED *)", timeout_seconds=120, memory_mb=256, environment=_email_env, custom_policies=rp.email_wednesday_chronicle(), **shared)
 
-        create_platform_lambda(self, "WeeklyPlate", function_name="weekly-plate", handler="weekly_plate_lambda.lambda_handler", source_file="lambdas/weekly_plate_lambda.py", schedule="cron(0 2 ? * SAT *)", timeout_seconds=120, memory_mb=512, environment=_email_env, custom_policies=rp.email_weekly_plate(), **shared)
+        create_platform_lambda(self, "WeeklyPlate", function_name="weekly-plate", handler="email.weekly_plate_lambda.lambda_handler", source_file="lambdas/email/weekly_plate_lambda.py", schedule="cron(0 2 ? * SAT *)", timeout_seconds=120, memory_mb=512, environment=_email_env, custom_policies=rp.email_weekly_plate(), **shared)
 
-        create_platform_lambda(self, "MondayCompass", function_name="monday-compass", handler="monday_compass_lambda.lambda_handler", source_file="lambdas/monday_compass_lambda.py", schedule="cron(0 15 ? * MON *)", timeout_seconds=120, memory_mb=512, environment=_email_env, custom_policies=rp.email_monday_compass(), **shared)
+        create_platform_lambda(self, "MondayCompass", function_name="monday-compass", handler="email.monday_compass_lambda.lambda_handler", source_file="lambdas/email/monday_compass_lambda.py", schedule="cron(0 15 ? * MON *)", timeout_seconds=120, memory_mb=512, environment=_email_env, custom_policies=rp.email_monday_compass(), **shared)
 
         # EXTERNAL_EMAILS_ENABLED kill switch — flip to "true" to resume sending to
         # non-Matthew recipients (Partner, confirmed subscribers). Used by
         # partner-weekly-email, chronicle-email-sender, weekly-signal.
         _partner_env = {**_email_env, "PARTNER_EMAIL": "[partner-address-redacted]", "EMAIL_SENDER": "awsdev@mattsusername.com", "EXTERNAL_EMAILS_ENABLED": "false"}
-        create_platform_lambda(self, "PartnerWeeklyEmail", function_name="partner-weekly-email", handler="partner_email_lambda.lambda_handler", source_file="lambdas/partner_email_lambda.py", schedule="cron(30 17 ? * 1 *)", timeout_seconds=90, memory_mb=256, environment=_partner_env, custom_policies=rp.email_partner(), **shared)
+        create_platform_lambda(self, "PartnerWeeklyEmail", function_name="partner-weekly-email", handler="email.partner_email_lambda.lambda_handler", source_file="lambdas/email/partner_email_lambda.py", schedule="cron(30 17 ? * 1 *)", timeout_seconds=90, memory_mb=256, environment=_partner_env, custom_policies=rp.email_partner(), **shared)
 
         # R54: Evening nudge — checks supplements/journal/How We Feel completeness at 8 PM PT
         # cron(0 3 * * ? *) = 3:00 AM UTC = 8:00 PM PDT (UTC-7). Adjust after DST ends.
-        create_platform_lambda(self, "EveningNudge", function_name="evening-nudge", handler="evening_nudge_lambda.lambda_handler", source_file="lambdas/evening_nudge_lambda.py", schedule="cron(0 3 * * ? *)", timeout_seconds=60, memory_mb=256, environment=_email_env, custom_policies=rp.email_evening_nudge(), **shared)
+        create_platform_lambda(self, "EveningNudge", function_name="evening-nudge", handler="email.evening_nudge_lambda.lambda_handler", source_file="lambdas/email/evening_nudge_lambda.py", schedule="cron(0 3 * * ? *)", timeout_seconds=60, memory_mb=256, environment=_email_env, custom_policies=rp.email_evening_nudge(), **shared)
 
         # PB-06: Weekly Signal — curated 5-section subscriber email every Sunday 9:30 AM PT.
         # Reads pre-computed data from S3 + DynamoDB — no AI calls.
@@ -101,8 +101,8 @@ class EmailStack(Stack):
         create_platform_lambda(
             self, "WeeklySignal",
             function_name="weekly-signal",
-            handler="weekly_signal_lambda.lambda_handler",
-            source_file="lambdas/weekly_signal_lambda.py",
+            handler="compute.weekly_signal_lambda.lambda_handler",
+            source_file="lambdas/compute/weekly_signal_lambda.py",
             schedule="cron(30 16 ? * SUN *)",  # Sunday 9:30 AM PT
             timeout_seconds=300,
             memory_mb=256,
@@ -124,8 +124,8 @@ class EmailStack(Stack):
         chronicle_sender = create_platform_lambda(
             self, "ChronicleEmailSender",
             function_name="chronicle-email-sender",
-            handler="chronicle_email_sender_lambda.lambda_handler",
-            source_file="lambdas/chronicle_email_sender_lambda.py",
+            handler="email.chronicle_email_sender_lambda.lambda_handler",
+            source_file="lambdas/email/chronicle_email_sender_lambda.py",
             schedule="cron(10 15 ? * WED *)",
             timeout_seconds=300,
             memory_mb=256,
@@ -146,8 +146,8 @@ class EmailStack(Stack):
         chronicle_approve = create_platform_lambda(
             self, "ChronicleApprove",
             function_name="chronicle-approve",
-            handler="chronicle_approve_lambda.lambda_handler",
-            source_file="lambdas/chronicle_approve_lambda.py",
+            handler="email.chronicle_approve_lambda.lambda_handler",
+            source_file="lambdas/email/chronicle_approve_lambda.py",
             timeout_seconds=30,
             memory_mb=256,
             environment={
@@ -174,8 +174,8 @@ class EmailStack(Stack):
         # ── Subscriber Onboarding — daily (Day 2 bridge email for new subscribers)
         create_platform_lambda(self, "SubscriberOnboarding",
             function_name="subscriber-onboarding",
-            source_file="lambdas/subscriber_onboarding_lambda.py",
-            handler="subscriber_onboarding_lambda.lambda_handler",
+            source_file="lambdas/web/subscriber_onboarding_lambda.py",
+            handler="web.subscriber_onboarding_lambda.lambda_handler",
             schedule="cron(5 17 * * ? *)",  # 10:05 AM PT daily (staggered from daily-brief)
             timeout_seconds=120, memory_mb=256,
             environment=_email_env,

@@ -104,18 +104,25 @@ _CONVENTION_RE = re.compile(r"^life-platform/")
 # ── File collection ───────────────────────────────────────────────────────────
 
 def _collect_files():
-    """Collect all Python source files to scan."""
+    """Collect all Python source files to scan.
+
+    P3.1 (2026-05-25): walks recursively to pick up files in
+    lambdas/{ingestion,compute,coach,email,web,operational,intelligence}/.
+    """
     files = []
     for path in SCAN_PATHS:
         if os.path.isfile(path) and path.endswith(".py"):
             files.append(path)
         elif os.path.isdir(path):
-            for fname in os.listdir(path):
-                if not fname.endswith(".py"):
+            for root, _, fnames in os.walk(path):
+                if "__pycache__" in root:
                     continue
-                if any(ex in fname for ex in EXCLUDE_PATTERNS):
-                    continue
-                files.append(os.path.join(path, fname))
+                for fname in fnames:
+                    if not fname.endswith(".py"):
+                        continue
+                    if any(ex in fname for ex in EXCLUDE_PATTERNS):
+                        continue
+                    files.append(os.path.join(root, fname))
     return sorted(files)
 
 

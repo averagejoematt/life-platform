@@ -87,8 +87,8 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "AnomalyDetector",
             function_name="anomaly-detector",
-            handler="anomaly_detector_lambda.lambda_handler",
-            source_file="lambdas/anomaly_detector_lambda.py",
+            handler="email.anomaly_detector_lambda.lambda_handler",
+            source_file="lambdas/email/anomaly_detector_lambda.py",
             schedule="cron(5 15 * * ? *)",
             timeout_seconds=90, memory_mb=256,
             custom_policies=rp.compute_anomaly_detector(),
@@ -98,8 +98,8 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "CharacterSheetCompute",
             function_name="character-sheet-compute",
-            handler="character_sheet_lambda.lambda_handler",
-            source_file="lambdas/character_sheet_lambda.py",
+            handler="compute.character_sheet_lambda.lambda_handler",
+            source_file="lambdas/compute/character_sheet_lambda.py",
             schedule="cron(30 16 * * ? *)",  # Phase 3.1 (2026-05-16): 17:35→16:30 (9:30 AM PT) so character_sheet completes BEFORE daily-brief at 17:00 UTC. Was reading yesterday's sheet.
             timeout_seconds=60, memory_mb=512,
             custom_policies=rp.compute_character_sheet(),
@@ -109,8 +109,8 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "DailyMetricsCompute",
             function_name="daily-metrics-compute",
-            handler="daily_metrics_compute_lambda.lambda_handler",
-            source_file="lambdas/daily_metrics_compute_lambda.py",
+            handler="compute.daily_metrics_compute_lambda.lambda_handler",
+            source_file="lambdas/compute/daily_metrics_compute_lambda.py",
             schedule="cron(40 16 * * ? *)",  # Phase 3.1 (2026-05-16): 17:40→16:40 (9:40 AM PT) so daily-metrics completes BEFORE daily-brief.
             timeout_seconds=120, memory_mb=512,
             custom_policies=rp.compute_daily_metrics(),
@@ -120,8 +120,8 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "DailyInsightCompute",
             function_name="daily-insight-compute",
-            handler="daily_insight_compute_lambda.lambda_handler",
-            source_file="lambdas/daily_insight_compute_lambda.py",
+            handler="compute.daily_insight_compute_lambda.lambda_handler",
+            source_file="lambdas/compute/daily_insight_compute_lambda.py",
             schedule="cron(45 16 * * ? *)",  # Phase 3.1 (2026-05-16): 17:45→16:45 (9:45 AM PT) so daily-insight completes BEFORE daily-brief.
             timeout_seconds=120, memory_mb=512,
             custom_policies=rp.compute_daily_insight(),
@@ -131,8 +131,8 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "AdaptiveModeCompute",
             function_name="adaptive-mode-compute",
-            handler="adaptive_mode_lambda.lambda_handler",
-            source_file="lambdas/adaptive_mode_lambda.py",
+            handler="compute.adaptive_mode_lambda.lambda_handler",
+            source_file="lambdas/compute/adaptive_mode_lambda.py",
             schedule="cron(35 16 * * ? *)",  # Phase 3.1 (2026-05-16): 17:50→16:35 (9:35 AM PT) so adaptive-mode completes BEFORE daily-brief.
             timeout_seconds=120, memory_mb=256,
             custom_policies=rp.compute_adaptive_mode(),
@@ -142,8 +142,8 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "HypothesisEngine",
             function_name="hypothesis-engine",
-            handler="hypothesis_engine_lambda.lambda_handler",
-            source_file="lambdas/hypothesis_engine_lambda.py",
+            handler="compute.hypothesis_engine_lambda.lambda_handler",
+            source_file="lambdas/compute/hypothesis_engine_lambda.py",
             schedule="cron(0 19 ? * SUN *)",
             timeout_seconds=120, memory_mb=256,
             custom_policies=rp.compute_hypothesis_engine(),
@@ -153,8 +153,8 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "WeeklyCorrelationCompute",
             function_name="weekly-correlation-compute",
-            handler="weekly_correlation_compute_lambda.lambda_handler",
-            source_file="lambdas/weekly_correlation_compute_lambda.py",
+            handler="compute.weekly_correlation_compute_lambda.lambda_handler",
+            source_file="lambdas/compute/weekly_correlation_compute_lambda.py",
             schedule="cron(30 18 ? * SUN *)",  # Sunday 11:30 AM PT (30 min before hypothesis engine)
             timeout_seconds=120, memory_mb=256,
             custom_policies=rp.compute_weekly_correlations(),
@@ -164,8 +164,8 @@ class ComputeStack(Stack):
         dashboard = create_platform_lambda(
             self, "DashboardRefresh",
             function_name="dashboard-refresh",
-            handler="dashboard_refresh_lambda.lambda_handler",
-            source_file="lambdas/dashboard_refresh_lambda.py",
+            handler="compute.dashboard_refresh_lambda.lambda_handler",
+            source_file="lambdas/compute/dashboard_refresh_lambda.py",
             schedule="cron(0 21 * * ? *)",
             timeout_seconds=60, memory_mb=256,
             custom_policies=rp.compute_dashboard_refresh(),
@@ -188,8 +188,8 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "ACWRCompute",
             function_name="acwr-compute",
-            handler="acwr_compute_lambda.lambda_handler",
-            source_file="lambdas/acwr_compute_lambda.py",
+            handler="compute.acwr_compute_lambda.lambda_handler",
+            source_file="lambdas/compute/acwr_compute_lambda.py",
             schedule="cron(55 16 * * ? *)",
             timeout_seconds=60, memory_mb=256,
             custom_policies=rp.compute_acwr(),
@@ -202,8 +202,8 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "SleepReconciler",
             function_name="sleep-reconciler",
-            handler="sleep_reconciler_lambda.lambda_handler",
-            source_file="lambdas/sleep_reconciler_lambda.py",
+            handler="compute.sleep_reconciler_lambda.lambda_handler",
+            source_file="lambdas/compute/sleep_reconciler_lambda.py",
             schedule="cron(0 14 * * ? *)",  # 7:00 AM PT daily
             timeout_seconds=60, memory_mb=256,
             custom_policies=rp.compute_sleep_reconciler(),
@@ -216,8 +216,8 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "CircadianCompliance",
             function_name="circadian-compliance",
-            handler="circadian_compliance_lambda.lambda_handler",
-            source_file="lambdas/circadian_compliance_lambda.py",
+            handler="compute.circadian_compliance_lambda.lambda_handler",
+            source_file="lambdas/compute/circadian_compliance_lambda.py",
             schedule="cron(0 2 * * ? *)",  # 7:00 PM PT daily (02:00 UTC)
             timeout_seconds=60, memory_mb=256,
             custom_policies=rp.compute_circadian_compliance(),
@@ -227,8 +227,8 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "FailurePatternCompute",
             function_name="failure-pattern-compute",
-            handler="failure_pattern_compute_lambda.lambda_handler",
-            source_file="lambdas/failure_pattern_compute_lambda.py",
+            handler="compute.failure_pattern_compute_lambda.lambda_handler",
+            source_file="lambdas/compute/failure_pattern_compute_lambda.py",
             schedule="cron(50 17 ? * SUN *)",
             timeout_seconds=300, memory_mb=256,
             environment={
@@ -246,8 +246,8 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "ChallengeGenerator",
             function_name="challenge-generator",
-            handler="challenge_generator_lambda.lambda_handler",
-            source_file="lambdas/challenge_generator_lambda.py",
+            handler="intelligence.challenge_generator_lambda.lambda_handler",
+            source_file="lambdas/intelligence/challenge_generator_lambda.py",
             schedule="cron(0 22 ? * SUN *)",  # Sunday 3:00 PM PT (22:00 UTC)
             timeout_seconds=120, memory_mb=512,
             environment={
@@ -264,8 +264,8 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "CoachComputationEngine",
             function_name="coach-computation-engine",
-            handler="coach_computation_engine.lambda_handler",
-            source_file="lambdas/coach_computation_engine.py",
+            handler="coach.coach_computation_engine.lambda_handler",
+            source_file="lambdas/coach/coach_computation_engine.py",
             timeout_seconds=60, memory_mb=256,
             custom_policies=rp.compute_coach_computation(),
             **shared,
@@ -274,8 +274,8 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "CoachNarrativeOrchestrator",
             function_name="coach-narrative-orchestrator",
-            handler="coach_narrative_orchestrator.lambda_handler",
-            source_file="lambdas/coach_narrative_orchestrator.py",
+            handler="coach.coach_narrative_orchestrator.lambda_handler",
+            source_file="lambdas/coach/coach_narrative_orchestrator.py",
             timeout_seconds=90, memory_mb=256,
             environment={
                 "ANTHROPIC_SECRET": "life-platform/ai-keys",
@@ -288,8 +288,8 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "CoachStateUpdater",
             function_name="coach-state-updater",
-            handler="coach_state_updater.lambda_handler",
-            source_file="lambdas/coach_state_updater.py",
+            handler="coach.coach_state_updater.lambda_handler",
+            source_file="lambdas/coach/coach_state_updater.py",
             timeout_seconds=60, memory_mb=256,
             environment={
                 "ANTHROPIC_SECRET": "life-platform/ai-keys",
@@ -302,8 +302,8 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "CoachEnsembleDigest",
             function_name="coach-ensemble-digest",
-            handler="coach_ensemble_digest.lambda_handler",
-            source_file="lambdas/coach_ensemble_digest.py",
+            handler="coach.coach_ensemble_digest.lambda_handler",
+            source_file="lambdas/coach/coach_ensemble_digest.py",
             timeout_seconds=90, memory_mb=256,
             environment={
                 "ANTHROPIC_SECRET": "life-platform/ai-keys",
@@ -316,8 +316,8 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "CoachHistorySummarizer",
             function_name="coach-history-summarizer",
-            handler="coach_history_summarizer.lambda_handler",
-            source_file="lambdas/coach_history_summarizer.py",
+            handler="coach.coach_history_summarizer.lambda_handler",
+            source_file="lambdas/coach/coach_history_summarizer.py",
             schedule="cron(0 17 ? * SUN *)",  # Sunday 10:00 AM PT (before weekly digest)
             timeout_seconds=120, memory_mb=256,
             environment={
@@ -331,8 +331,8 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "CoachQualityGate",
             function_name="coach-quality-gate",
-            handler="coach_quality_gate.lambda_handler",
-            source_file="lambdas/coach_quality_gate.py",
+            handler="coach.coach_quality_gate.lambda_handler",
+            source_file="lambdas/coach/coach_quality_gate.py",
             timeout_seconds=30, memory_mb=256,
             environment={
                 "ANTHROPIC_SECRET": "life-platform/ai-keys",
@@ -345,8 +345,8 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "CoachObservatoryRenderer",
             function_name="coach-observatory-renderer",
-            handler="coach_observatory_renderer.lambda_handler",
-            source_file="lambdas/coach_observatory_renderer.py",
+            handler="coach.coach_observatory_renderer.lambda_handler",
+            source_file="lambdas/coach/coach_observatory_renderer.py",
             timeout_seconds=30, memory_mb=256,
             custom_policies=rp.compute_coach_computation(),  # read-only DDB + S3
             **shared,
@@ -355,8 +355,8 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "CoachPredictionEvaluator",
             function_name="coach-prediction-evaluator",
-            handler="coach_prediction_evaluator.lambda_handler",
-            source_file="lambdas/coach_prediction_evaluator.py",
+            handler="coach.coach_prediction_evaluator.lambda_handler",
+            source_file="lambdas/coach/coach_prediction_evaluator.py",
             schedule="cron(0 16 * * ? *)",  # 9:00 AM PT daily (before daily brief at 11 AM)
             timeout_seconds=60, memory_mb=256,
             custom_policies=rp.compute_coach_computation(),  # same permissions as computation engine

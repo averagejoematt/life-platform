@@ -31,14 +31,28 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 LAMBDAS_DIR = os.path.join(ROOT, "lambdas")
 
 
+# P3.1 (2026-05-25): subpkg-aware flat-name resolution
+def _build_lambda_index():
+    idx = {}
+    for root, _, files in os.walk(LAMBDAS_DIR):
+        if "__pycache__" in root:
+            continue
+        for fname in files:
+            if fname.endswith(".py"):
+                idx[fname] = os.path.join(root, fname)
+    return idx
+
+_LAMBDA_INDEX = _build_lambda_index()
+
+
 def _src(filename: str) -> str:
-    path = os.path.join(LAMBDAS_DIR, filename)
+    path = _LAMBDA_INDEX.get(filename) or os.path.join(LAMBDAS_DIR, filename)
     with open(path, encoding="utf-8") as f:
         return f.read()
 
 
 def _exists(filename: str) -> bool:
-    return os.path.exists(os.path.join(LAMBDAS_DIR, filename))
+    return filename in _LAMBDA_INDEX or os.path.exists(os.path.join(LAMBDAS_DIR, filename))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
