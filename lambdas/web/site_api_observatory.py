@@ -1544,12 +1544,14 @@ def handle_strength_deep_dive() -> dict:
 def handle_benchmark_trends() -> dict:
     """GET /api/benchmark_trends — Returns benchmark progress data."""
     try:
-        resp = table.query(
-            KeyConditionExpression='pk = :pk',
-            ExpressionAttributeValues={':pk': 'USER#matthew#SOURCE#benchmarks'},
-            ScanIndexForward=False,
-            Limit=30
-        )
+        # ADR-058: phase=pilot hidden by default; pre-genesis benchmarks won't leak.
+        from phase_filter import with_phase_filter
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": 'pk = :pk',
+            "ExpressionAttributeValues": {':pk': 'USER#matthew#SOURCE#benchmarks'},
+            "ScanIndexForward": False,
+            "Limit": 30,
+        }))
         items = resp.get('Items', [])
         return {
             'statusCode': 200,
@@ -1569,12 +1571,14 @@ def handle_benchmark_trends() -> dict:
 def handle_meal_responses() -> dict:
     """GET /api/meal_responses — Returns CGM x MacroFactor meal response data."""
     try:
-        resp = table.query(
-            KeyConditionExpression='pk = :pk',
-            ExpressionAttributeValues={':pk': 'USER#matthew#SOURCE#meal_responses'},
-            ScanIndexForward=False,
-            Limit=50
-        )
+        # ADR-058: phase=pilot hidden by default.
+        from phase_filter import with_phase_filter
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": 'pk = :pk',
+            "ExpressionAttributeValues": {':pk': 'USER#matthew#SOURCE#meal_responses'},
+            "ScanIndexForward": False,
+            "Limit": 50,
+        }))
         items = resp.get('Items', [])
         return {
             'statusCode': 200,
