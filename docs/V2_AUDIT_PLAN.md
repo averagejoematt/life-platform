@@ -456,10 +456,9 @@ Add READMEs to remaining dirs without one: `datadrops/`, `handovers/`, `seeds/`,
 **Action:** Add `DeadLetterConfig` → `life-platform-ingestion-dlq` for the async Lambdas in their CDK definitions.
 **Effort:** 30 min. **ROI:** Data integrity on async-invocation failures.
 
-### P6.6 [MEDIUM] Site_api partial extraction: pull `board_ask` + `/api/ask` handlers to `site_api_ai_handlers.py`
-**Evidence:** `site_api_lambda.py` is 7,879 LOC. Two dispatch tables (`_SIMPLE_ROUTES`, `ROUTES`) suggest the v7.7.0 router refactor was started + stopped. The 2,800-line `board_ask`/`ask` handlers (lines 2810-3000, 7820-7870) are the prime candidates for extraction — would also ease P1.4 (retry_utils integration).
-**Action:** Extract those 2 handlers to `lambdas/site_api_ai_handlers.py`. Keep dispatch wiring in `site_api_lambda.py`.
-**Effort:** M. **Risk:** Medium (public surface). **ROI:** Smaller file; easier follow-on work.
+### ~~P6.6 [MEDIUM] Site_api partial extraction~~ ✅ DONE 2026-05-26 (superseded by P1.1 Phase B full split)
+**Original recommendation:** pull `board_ask` + `/api/ask` handlers to a sibling module.
+**What shipped instead:** P1.1 Phase B did the full 7-module split (`site_api_lambda.py` 7,949 → 1,216 lines, 85% reduction). The `board_ask` + `/api/ask` handlers were already in a separate Lambda (`life-platform-site-api-ai` per ADR-036) — the dead-code stubs in `site_api_lambda.py` were purged in the P1.1 Phase A dead-code sweep before extraction began. See ARCHITECTURE.md "Site API Lambda" section for the current module layout.
 
 ### P6.7 [LOW] WebP OG image + lifecycle on `generated/og/`
 **Evidence:** OG image is 10KB PNG only.
