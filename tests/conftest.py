@@ -21,7 +21,7 @@ _LAMBDAS = os.path.join(_REPO, "lambdas")
 sys.path.insert(0, _LAMBDAS)
 
 # Each subpackage — so flat-name handler imports work
-for _sp in ("ingestion", "compute", "coach", "email", "web", "operational", "intelligence"):
+for _sp in ("ingestion", "compute", "coach", "emails", "web", "operational", "intelligence"):
     _path = os.path.join(_LAMBDAS, _sp)
     if os.path.isdir(_path):
         sys.path.insert(0, _path)

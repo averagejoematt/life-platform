@@ -87,8 +87,8 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "AnomalyDetector",
             function_name="anomaly-detector",
-            handler="email.anomaly_detector_lambda.lambda_handler",
-            source_file="lambdas/email/anomaly_detector_lambda.py",
+            handler="emails.anomaly_detector_lambda.lambda_handler",
+            source_file="lambdas/emails/anomaly_detector_lambda.py",
             schedule="cron(5 15 * * ? *)",
             timeout_seconds=90, memory_mb=256,
             custom_policies=rp.compute_anomaly_detector(),
