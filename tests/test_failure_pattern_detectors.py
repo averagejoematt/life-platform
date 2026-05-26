@@ -10,6 +10,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas", "compute"))  # P3.1: handler moved here
 
 # Stub boto3 + env so the lambda module can import without AWS credentials.
 os.environ.setdefault("TABLE_NAME", "life-platform-test")

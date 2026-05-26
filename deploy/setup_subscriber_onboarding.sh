@@ -7,7 +7,7 @@ set -euo pipefail
 REGION="us-west-2"
 FUNCTION_NAME="subscriber-onboarding"
 ROLE_NAME="subscriber-onboarding-role"
-SOURCE_FILE="lambdas/subscriber_onboarding_lambda.py"
+SOURCE_FILE="lambdas/web/subscriber_onboarding_lambda.py"
 
 echo "=== Setting up $FUNCTION_NAME ==="
 

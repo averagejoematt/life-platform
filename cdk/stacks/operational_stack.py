@@ -77,8 +77,8 @@ class OperationalStack(Stack):
         # are exactly the "4 stale source(s)" daily emails we want to batch.
         freshness = create_platform_lambda(self, "FreshnessChecker",
             function_name="life-platform-freshness-checker",
-            source_file="lambdas/freshness_checker_lambda.py",
-            handler="freshness_checker_lambda.lambda_handler",
+            source_file="lambdas/email/freshness_checker_lambda.py",
+            handler="email.freshness_checker_lambda.lambda_handler",
             schedule="cron(45 16 * * ? *)",
             timeout_seconds=30, memory_mb=128,
             environment={
@@ -96,8 +96,8 @@ class OperationalStack(Stack):
         # ── 2. DLQ Consumer — every 6 hours
         create_platform_lambda(self, "DlqConsumer",
             function_name="life-platform-dlq-consumer",
-            source_file="lambdas/dlq_consumer_lambda.py",
-            handler="dlq_consumer_lambda.lambda_handler",
+            source_file="lambdas/operational/dlq_consumer_lambda.py",
+            handler="operational.dlq_consumer_lambda.lambda_handler",
             schedule="rate(6 hours)",
             timeout_seconds=120, memory_mb=256,
             custom_policies=rp.operational_dlq_consumer(),
@@ -120,8 +120,8 @@ class OperationalStack(Stack):
 
         digest_lambda = create_platform_lambda(self, "AlertDigest",
             function_name="life-platform-alert-digest",
-            source_file="lambdas/alert_digest_lambda.py",
-            handler="alert_digest_lambda.lambda_handler",
+            source_file="lambdas/operational/alert_digest_lambda.py",
+            handler="operational.alert_digest_lambda.lambda_handler",
             # cron(0 15 * * ? *) = 15:00 UTC = 8 AM PT (UTC-fixed, no DST drift).
             schedule="cron(0 15 * * ? *)",
             timeout_seconds=60, memory_mb=128,
@@ -140,8 +140,8 @@ class OperationalStack(Stack):
         # ── 3. Canary — every 4 hours
         canary = create_platform_lambda(self, "Canary",
             function_name="life-platform-canary",
-            source_file="lambdas/canary_lambda.py",
-            handler="canary_lambda.lambda_handler",
+            source_file="lambdas/operational/canary_lambda.py",
+            handler="operational.canary_lambda.lambda_handler",
             schedule="rate(4 hours)",
             timeout_seconds=60, memory_mb=256,
             environment={
@@ -156,8 +156,8 @@ class OperationalStack(Stack):
         # ── 4. Pip Audit — every Monday
         create_platform_lambda(self, "PipAudit",
             function_name="life-platform-pip-audit",
-            source_file="lambdas/pip_audit_lambda.py",
-            handler="pip_audit_lambda.lambda_handler",
+            source_file="lambdas/operational/pip_audit_lambda.py",
+            handler="operational.pip_audit_lambda.lambda_handler",
             schedule="cron(0 17 ? * MON *)",
             timeout_seconds=300, memory_mb=512,
             environment={"EMAIL_RECIPIENT": "awsdev@mattsusername.com", "EMAIL_SENDER": "awsdev@mattsusername.com"},
@@ -168,8 +168,8 @@ class OperationalStack(Stack):
         # ── 5. QA Smoke — daily 11:30 AM PT
         create_platform_lambda(self, "QaSmoke",
             function_name="life-platform-qa-smoke",
-            source_file="lambdas/qa_smoke_lambda.py",
-            handler="qa_smoke_lambda.lambda_handler",
+            source_file="lambdas/operational/qa_smoke_lambda.py",
+            handler="operational.qa_smoke_lambda.lambda_handler",
             schedule="cron(30 18 ? * * *)",
             timeout_seconds=120, memory_mb=256,
             environment={
@@ -185,8 +185,8 @@ class OperationalStack(Stack):
         # ── 6. Key Rotator — Secrets Manager rotation trigger only
         key_rotator = create_platform_lambda(self, "KeyRotator",
             function_name="life-platform-key-rotator",
-            source_file="lambdas/key_rotator_lambda.py",
-            handler="key_rotator_lambda.lambda_handler",
+            source_file="lambdas/operational/key_rotator_lambda.py",
+            handler="operational.key_rotator_lambda.lambda_handler",
             timeout_seconds=30, memory_mb=128,
             alarm_name="key-rotator-errors",
             custom_policies=rp.operational_key_rotator(),
@@ -201,8 +201,8 @@ class OperationalStack(Stack):
         # ── 7. Data Export — on-demand only
         create_platform_lambda(self, "DataExport",
             function_name="life-platform-data-export",
-            source_file="lambdas/data_export_lambda.py",
-            handler="data_export_lambda.lambda_handler",
+            source_file="lambdas/operational/data_export_lambda.py",
+            handler="operational.data_export_lambda.lambda_handler",
             timeout_seconds=300, memory_mb=512,
             alarm_name="life-platform-data-export-errors",
             custom_policies=rp.operational_data_export(),
@@ -217,8 +217,8 @@ class OperationalStack(Stack):
         # record to USER#admin#SOURCE#deletion_log on every real run.
         create_platform_lambda(self, "DeleteUserData",
             function_name="life-platform-delete-user-data",
-            source_file="lambdas/delete_user_data_lambda.py",
-            handler="delete_user_data_lambda.lambda_handler",
+            source_file="lambdas/operational/delete_user_data_lambda.py",
+            handler="operational.delete_user_data_lambda.lambda_handler",
             timeout_seconds=300, memory_mb=256,
             alarm_name="life-platform-delete-user-data-errors",
             custom_policies=rp.operational_delete_user_data(),
@@ -229,8 +229,8 @@ class OperationalStack(Stack):
         # ── 8. Data Reconciliation — Monday 12:30 AM PT
         create_platform_lambda(self, "DataReconciliation",
             function_name="life-platform-data-reconciliation",
-            source_file="lambdas/data_reconciliation_lambda.py",
-            handler="data_reconciliation_lambda.lambda_handler",
+            source_file="lambdas/operational/data_reconciliation_lambda.py",
+            handler="operational.data_reconciliation_lambda.lambda_handler",
             schedule="cron(30 7 ? * MON *)",
             timeout_seconds=120, memory_mb=256,
             environment={"EMAIL_RECIPIENT": "awsdev@mattsusername.com", "EMAIL_SENDER": "awsdev@mattsusername.com"},
@@ -241,8 +241,8 @@ class OperationalStack(Stack):
         # ── 9. Insight Email Parser — SES inbound trigger (previously unmanaged)
         insight_parser = create_platform_lambda(self, "InsightEmailParser",
             function_name="insight-email-parser",
-            source_file="lambdas/insight_email_parser_lambda.py",
-            handler="insight_email_parser_lambda.lambda_handler",
+            source_file="lambdas/email/insight_email_parser_lambda.py",
+            handler="email.insight_email_parser_lambda.lambda_handler",
             timeout_seconds=30, memory_mb=128,
             environment={
                 "ALLOWED_SENDERS": "awsdev@mattsusername.com,mattsthrowaway@protonmail.com",
@@ -299,8 +299,8 @@ class OperationalStack(Stack):
         # Function URL is a global HTTPS endpoint — CloudFront in us-east-1 can origin to it.
         site_api_fn = create_platform_lambda(self, "SiteApiLambda",
             function_name="life-platform-site-api",
-            source_file="lambdas/site_api_lambda.py",
-            handler="site_api_lambda.lambda_handler",
+            source_file="lambdas/web/site_api_lambda.py",
+            handler="web.site_api_lambda.lambda_handler",
             table=local_table,
             bucket=local_bucket,
             dlq=None,
@@ -343,8 +343,8 @@ class OperationalStack(Stack):
         # Reserved concurrency=2 prevents AI traffic from starving data endpoints.
         site_api_ai_fn = create_platform_lambda(self, "SiteApiAiLambda",
             function_name="life-platform-site-api-ai",
-            source_file="lambdas/site_api_ai_lambda.py",
-            handler="site_api_ai_lambda.lambda_handler",
+            source_file="lambdas/web/site_api_ai_lambda.py",
+            handler="web.site_api_ai_lambda.lambda_handler",
             table=local_table,
             bucket=local_bucket,
             dlq=None,
@@ -433,8 +433,8 @@ class OperationalStack(Stack):
         # public_stats.json in-place without any AI calls. Zero incremental cost.
         site_stats_fn = create_platform_lambda(self, "SiteStatsRefresh",
             function_name="site-stats-refresh",
-            source_file="lambdas/site_stats_refresh_lambda.py",
-            handler="site_stats_refresh_lambda.lambda_handler",
+            source_file="lambdas/web/site_stats_refresh_lambda.py",
+            handler="web.site_stats_refresh_lambda.lambda_handler",
             timeout_seconds=300, memory_mb=256,
             environment={
                 "TABLE_NAME":  "life-platform",
@@ -463,8 +463,8 @@ class OperationalStack(Stack):
         # direct publishes batch into the daily alerts-digest email.
         pipeline_health = create_platform_lambda(self, "PipelineHealthCheck",
             function_name="pipeline-health-check",
-            source_file="lambdas/pipeline_health_check_lambda.py",
-            handler="pipeline_health_check_lambda.lambda_handler",
+            source_file="lambdas/operational/pipeline_health_check_lambda.py",
+            handler="operational.pipeline_health_check_lambda.lambda_handler",
             schedule="cron(30 2,6,14,18,22 * * ? *)",  # 5x daily, 30 min after ingestion
             timeout_seconds=300, memory_mb=256,
             environment={"SNS_ARN": DIGEST_TOPIC_ARN},

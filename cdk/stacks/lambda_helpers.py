@@ -21,8 +21,8 @@ Usage in a stack:
     fn = create_platform_lambda(
         self, "WhoopIngestion",
         function_name="whoop-data-ingestion",
-        source_file="lambdas/whoop_lambda.py",
-        handler="whoop_lambda.lambda_handler",
+        source_file="lambdas/ingestion/whoop_lambda.py",
+        handler="ingestion.whoop_lambda.lambda_handler",
         table=core.table,
         bucket=core.bucket,
         dlq=core.dlq,

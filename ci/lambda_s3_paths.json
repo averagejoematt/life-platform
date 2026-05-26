@@ -8,15 +8,15 @@
       "expected_prefix": "raw/todoist/",
       "iam_prefix": "raw/todoist/*",
       "reason": "Todoist Lambda was built before the raw/{USER_ID}/ convention \u2014 writes to raw/todoist/ directly",
-      "lambda_file": "lambdas/todoist_lambda.py",
-      "evidence": "lambdas/todoist_lambda.py: key = f\"raw/todoist/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json\""
+      "lambda_file": "lambdas/ingestion/todoist_lambda.py",
+      "evidence": "lambdas/ingestion/todoist_lambda.py: key = f\"raw/todoist/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json\""
     },
     "dropbox": {
       "expected_prefix": "uploads/macrofactor/",
       "iam_prefix": "uploads/macrofactor/*",
       "reason": "Dropbox poll Lambda reads MacroFactor CSV uploads from S3 uploads/ prefix \u2014 it's a trigger path, not a raw ingest path",
-      "lambda_file": "lambdas/dropbox_poll_lambda.py",
-      "evidence": "lambdas/dropbox_poll_lambda.py: s3_key = f\"uploads/macrofactor/{filename}\""
+      "lambda_file": "lambdas/ingestion/dropbox_poll_lambda.py",
+      "evidence": "lambdas/ingestion/dropbox_poll_lambda.py: s3_key = f\"uploads/macrofactor/{filename}\""
     },
     "hevy": {
       "expected_prefix": "raw/hevy/",

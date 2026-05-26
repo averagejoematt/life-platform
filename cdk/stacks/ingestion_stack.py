@@ -55,8 +55,8 @@ class IngestionStack(Stack):
         # ── 1. Whoop — 5x daily ingestion + recovery refresh
         whoop = create_platform_lambda(self, "WhoopIngestion",
             function_name="whoop-data-ingestion",
-            source_file="lambdas/whoop_lambda.py",
-            handler="whoop_lambda.lambda_handler",
+            source_file="lambdas/ingestion/whoop_lambda.py",
+            handler="ingestion.whoop_lambda.lambda_handler",
             schedule=f"cron(0 {INGEST_HOURLY} * * ? *)",
             timeout_seconds=300, alarm_name="ingestion-error-whoop",
             shared_layer=shared_utils_layer,
@@ -77,8 +77,8 @@ class IngestionStack(Stack):
         # ── 2. Garmin — 4x daily (Garmin API rate-limits OAuth token exchange at hourly frequency)
         garmin = create_platform_lambda(self, "GarminIngestion",
             function_name="garmin-data-ingestion",
-            source_file="lambdas/garmin_lambda.py",
-            handler="garmin_lambda.lambda_handler",
+            source_file="lambdas/ingestion/garmin_lambda.py",
+            handler="ingestion.garmin_lambda.lambda_handler",
             schedule="cron(0 0,6,14,22 * * ? *)",
             timeout_seconds=300, memory_mb=512, shared_layer=shared_utils_layer,
             additional_layers=[garth_layer],
@@ -89,8 +89,8 @@ class IngestionStack(Stack):
         # ── 3. Notion — 5x daily
         create_platform_lambda(self, "NotionIngestion",
             function_name="notion-journal-ingestion",
-            source_file="lambdas/notion_lambda.py",
-            handler="notion_lambda.lambda_handler",
+            source_file="lambdas/ingestion/notion_lambda.py",
+            handler="ingestion.notion_lambda.lambda_handler",
             schedule=f"cron(0 {INGEST_HOURLY} * * ? *)",
             timeout_seconds=120,
             environment={"NOTION_SECRET_NAME": "life-platform/ingestion-keys"},
@@ -101,8 +101,8 @@ class IngestionStack(Stack):
         # ── 4. Withings — 5x daily (:05 stagger)
         withings = create_platform_lambda(self, "WithingsIngestion",
             function_name="withings-data-ingestion",
-            source_file="lambdas/withings_lambda.py",
-            handler="withings_lambda.lambda_handler",
+            source_file="lambdas/ingestion/withings_lambda.py",
+            handler="ingestion.withings_lambda.lambda_handler",
             schedule=f"cron(5 {INGEST_HOURLY} * * ? *)",
             timeout_seconds=120, alarm_name="ingestion-error-withings",
             shared_layer=shared_utils_layer,
@@ -112,8 +112,8 @@ class IngestionStack(Stack):
         # ── 5. Habitify — 5x daily (:05 stagger)
         create_platform_lambda(self, "HabitifyIngestion",
             function_name="habitify-data-ingestion",
-            source_file="lambdas/habitify_lambda.py",
-            handler="habitify_lambda.lambda_handler",
+            source_file="lambdas/ingestion/habitify_lambda.py",
+            handler="ingestion.habitify_lambda.lambda_handler",
             schedule=f"cron(5 {INGEST_HOURLY} * * ? *)",
             timeout_seconds=180,
             environment={"HABITIFY_SECRET_NAME": "life-platform/habitify"},
@@ -124,8 +124,8 @@ class IngestionStack(Stack):
         # ── 6. Strava — 5x daily (:10 stagger)
         strava = create_platform_lambda(self, "StravaIngestion",
             function_name="strava-data-ingestion",
-            source_file="lambdas/strava_lambda.py",
-            handler="strava_lambda.lambda_handler",
+            source_file="lambdas/ingestion/strava_lambda.py",
+            handler="ingestion.strava_lambda.lambda_handler",
             schedule=f"cron(10 {INGEST_HOURLY} * * ? *)",
             timeout_seconds=300, alarm_name="ingestion-error-strava",
             shared_layer=shared_utils_layer,
@@ -137,8 +137,8 @@ class IngestionStack(Stack):
         #        registered with Hevy's webhook subscription endpoint after deploy.
         hevy_webhook = create_platform_lambda(self, "HevyWebhook",
             function_name="hevy-webhook",
-            source_file="lambdas/hevy_webhook_lambda.py",
-            handler="hevy_webhook_lambda.lambda_handler",
+            source_file="lambdas/ingestion/hevy_webhook_lambda.py",
+            handler="ingestion.hevy_webhook_lambda.lambda_handler",
             timeout_seconds=30, memory_mb=256,
             environment={
                 "SECRET_NAME": "life-platform/hevy",
@@ -165,8 +165,8 @@ class IngestionStack(Stack):
         # 12-23 UTC = 5 AM – 4 PM PT.  Adjust if Matthew lifts later.
         create_platform_lambda(self, "HevyBackfill",
             function_name="hevy-backfill",
-            source_file="lambdas/hevy_backfill_lambda.py",
-            handler="hevy_backfill_lambda.lambda_handler",
+            source_file="lambdas/ingestion/hevy_backfill_lambda.py",
+            handler="ingestion.hevy_backfill_lambda.lambda_handler",
             schedule="cron(0 12-23 * * ? *)",   # hourly :00, 5 AM – 4 PM PT
             timeout_seconds=300, memory_mb=256,
             environment={
@@ -198,8 +198,8 @@ class IngestionStack(Stack):
         # ── 7. Journal Enrichment — 6:30 AM PT daily
         create_platform_lambda(self, "JournalEnrichment",
             function_name="journal-enrichment",
-            source_file="lambdas/journal_enrichment_lambda.py",
-            handler="journal_enrichment_lambda.lambda_handler",
+            source_file="lambdas/ingestion/journal_enrichment_lambda.py",
+            handler="ingestion.journal_enrichment_lambda.lambda_handler",
             schedule="cron(30 14 * * ? *)",
             timeout_seconds=300,
             environment={"ANTHROPIC_SECRET": "life-platform/ai-keys"},
@@ -216,8 +216,8 @@ class IngestionStack(Stack):
         # cron(0 14 * * ? *) = 14:00 UTC = 6 AM PST / 7 AM PDT (UTC-fixed per CLAUDE.md).
         create_platform_lambda(self, "TodoistIngestion",
             function_name="todoist-data-ingestion",
-            source_file="lambdas/todoist_lambda.py",
-            handler="todoist_lambda.lambda_handler",
+            source_file="lambdas/ingestion/todoist_lambda.py",
+            handler="ingestion.todoist_lambda.lambda_handler",
             schedule="cron(0 14 * * ? *)",
             timeout_seconds=120, alarm_name="ingestion-error-todoist",
             environment={"SECRET_NAME": "life-platform/ingestion-keys"},
@@ -227,8 +227,8 @@ class IngestionStack(Stack):
         # ── 9. Eight Sleep — 5x daily (:15 stagger)
         eightsleep = create_platform_lambda(self, "EightsleepIngestion",
             function_name="eightsleep-data-ingestion",
-            source_file="lambdas/eightsleep_lambda.py",
-            handler="eightsleep_lambda.lambda_handler",
+            source_file="lambdas/ingestion/eightsleep_lambda.py",
+            handler="ingestion.eightsleep_lambda.lambda_handler",
             schedule=f"cron(15 {INGEST_HOURLY} * * ? *)",
             timeout_seconds=120, alarm_name="ingestion-error-eightsleep",
             shared_layer=shared_utils_layer,
@@ -238,8 +238,8 @@ class IngestionStack(Stack):
         # ── 10. Activity Enrichment — 7:30 AM PT daily
         create_platform_lambda(self, "ActivityEnrichment",
             function_name="activity-enrichment",
-            source_file="lambdas/enrichment_lambda.py",
-            handler="enrichment_lambda.lambda_handler",
+            source_file="lambdas/ingestion/enrichment_lambda.py",
+            handler="ingestion.enrichment_lambda.lambda_handler",
             schedule="cron(30 15 * * ? *)",
             timeout_seconds=300, alarm_name="ingestion-error-enrichment",
             shared_layer=shared_utils_layer,
@@ -248,8 +248,8 @@ class IngestionStack(Stack):
         # ── 11. MacroFactor — 8:00 AM PT daily + S3 trigger
         macrofactor = create_platform_lambda(self, "MacrofactorIngestion",
             function_name="macrofactor-data-ingestion",
-            source_file="lambdas/macrofactor_lambda.py",
-            handler="macrofactor_lambda.lambda_handler",
+            source_file="lambdas/ingestion/macrofactor_lambda.py",
+            handler="ingestion.macrofactor_lambda.lambda_handler",
             schedule="cron(0 16 * * ? *)",
             timeout_seconds=300, alarm_name="ingestion-error-macrofactor",
             shared_layer=shared_utils_layer,
@@ -262,8 +262,8 @@ class IngestionStack(Stack):
         # ── 12. Weather — 2x daily (COST-OPT-2: weather doesn't change meaningfully hourly)
         create_platform_lambda(self, "WeatherIngestion",
             function_name="weather-data-ingestion",
-            source_file="lambdas/weather_lambda.py",
-            handler="weather_lambda.lambda_handler",
+            source_file="lambdas/ingestion/weather_lambda.py",
+            handler="ingestion.weather_lambda.lambda_handler",
             schedule="cron(0 14,2 * * ? *)",
             timeout_seconds=60,
             shared_layer=shared_utils_layer,
@@ -273,8 +273,8 @@ class IngestionStack(Stack):
         # ── 13. Dropbox Poll — every 30 minutes
         create_platform_lambda(self, "DropboxPoll",
             function_name="dropbox-poll",
-            source_file="lambdas/dropbox_poll_lambda.py",
-            handler="dropbox_poll_lambda.lambda_handler",
+            source_file="lambdas/ingestion/dropbox_poll_lambda.py",
+            handler="ingestion.dropbox_poll_lambda.lambda_handler",
             schedule="rate(30 minutes)",
             timeout_seconds=120,
             environment={"SECRET_NAME": "life-platform/ingestion-keys"},
@@ -285,8 +285,8 @@ class IngestionStack(Stack):
         # ── 14. Apple Health — S3 trigger only (no EventBridge)
         apple_health = create_platform_lambda(self, "AppleHealthIngestion",
             function_name="apple-health-ingestion",
-            source_file="lambdas/apple_health_lambda.py",
-            handler="apple_health_lambda.lambda_handler",
+            source_file="lambdas/ingestion/apple_health_lambda.py",
+            handler="ingestion.apple_health_lambda.lambda_handler",
             timeout_seconds=300, memory_mb=512, alarm_name="ingestion-error-apple-health",
             shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_apple_health(), **shared)
@@ -302,7 +302,7 @@ class IngestionStack(Stack):
             hae_role.add_to_policy(stmt)
         # NOTE: HAE uses code=from_asset (entire lambdas/ dir), not source_file=.
         # Handler health_auto_export_lambda.lambda_handler → lambdas/health_auto_export_lambda.py  # noqa: CDK_HANDLER_ORPHAN
-        hae = _lambda.Function(self, "HaeWebhook", function_name="health-auto-export-webhook", runtime=_lambda.Runtime.PYTHON_3_12, handler="health_auto_export_lambda.lambda_handler", code=_lambda.Code.from_asset("../lambdas", exclude=_ASSET_EXCLUDES), role=hae_role, timeout=Duration.seconds(300), memory_size=256, environment={"TABLE_NAME": local_table.table_name, "S3_BUCKET": local_bucket.bucket_name, "USER_ID": self.node.try_get_context("user_id") or "matthew"})  # Phase 1.6 (2026-05-16): 60s→300s. Large Apple Health exports (10-50MB) silently 504'd. BUG-07.
+        hae = _lambda.Function(self, "HaeWebhook", function_name="health-auto-export-webhook", runtime=_lambda.Runtime.PYTHON_3_12, handler="ingestion.health_auto_export_lambda.lambda_handler", code=_lambda.Code.from_asset("../lambdas", exclude=_ASSET_EXCLUDES), role=hae_role, timeout=Duration.seconds(300), memory_size=256, environment={"TABLE_NAME": local_table.table_name, "S3_BUCKET": local_bucket.bucket_name, "USER_ID": self.node.try_get_context("user_id") or "matthew"})  # Phase 1.6 (2026-05-16): 60s→300s. Large Apple Health exports (10-50MB) silently 504'd. BUG-07.
         hae.add_permission("ApiGatewayInvoke", principal=iam.ServicePrincipal("apigateway.amazonaws.com"), source_arn=f"arn:aws:execute-api:{self.region}:{self.account}:a76xwxt2wa/*/*/ingest")
 
         # ── 16. Google Calendar — RETIRED (ADR-030, v3.7.46)
@@ -312,8 +312,8 @@ class IngestionStack(Stack):
         # ── 17. Food Delivery — S3 trigger on uploads/food_delivery/
         food_delivery = create_platform_lambda(self, "FoodDeliveryIngestion",
             function_name="food-delivery-ingestion",
-            source_file="lambdas/food_delivery_lambda.py",
-            handler="food_delivery_lambda.lambda_handler",
+            source_file="lambdas/ingestion/food_delivery_lambda.py",
+            handler="ingestion.food_delivery_lambda.lambda_handler",
             timeout_seconds=60,
             shared_layer=shared_utils_layer,
             custom_policies=rp.food_delivery_ingestion(), **shared)
@@ -325,8 +325,8 @@ class IngestionStack(Stack):
         # ── 18. Measurements — manual/MCP-triggered (no schedule)
         create_platform_lambda(self, "MeasurementsIngestion",
             function_name="measurements-ingestion",
-            source_file="lambdas/measurements_ingestion_lambda.py",
-            handler="measurements_ingestion_lambda.lambda_handler",
+            source_file="lambdas/ingestion/measurements_ingestion_lambda.py",
+            handler="ingestion.measurements_ingestion_lambda.lambda_handler",
             timeout_seconds=60,
             shared_layer=shared_utils_layer,
             custom_policies=rp.measurements_ingestion(), **shared)

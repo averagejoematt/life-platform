@@ -270,8 +270,8 @@ class WebStack(Stack):
         subscriber_fn = create_platform_lambda(
             self, "EmailSubscriberLambda",
             function_name="email-subscriber",
-            source_file="lambdas/email_subscriber_lambda.py",
-            handler="email_subscriber_lambda.lambda_handler",
+            source_file="lambdas/web/email_subscriber_lambda.py",
+            handler="web.email_subscriber_lambda.lambda_handler",
             table=local_table,
             bucket=local_bucket,
             dlq=subscriber_dlq,
@@ -333,7 +333,7 @@ class WebStack(Stack):
             self, "OgImageLambda",
             function_name="life-platform-og-image",
             runtime=_lambda.Runtime.NODEJS_20_X,
-            handler="og_image_lambda.handler",
+            handler="web.og_image_lambda.handler",
             code=_lambda.Code.from_asset("../lambdas", exclude=[
                 "*.py", "**/*.py", "__pycache__", "**/__pycache__/**",
                 "*.pyc", "**/*.pyc", "*.md", "dashboard/**", "buddy/**",

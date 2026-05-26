@@ -47,15 +47,15 @@ fi
 echo "🚀 Step 2: Deploying Lambdas..."
 
 bash "$SCRIPT_DIR/deploy_lambda.sh" coach-computation-engine \
-  "$ROOT_DIR/lambdas/coach_computation_engine.py"
+  "$ROOT_DIR/lambdas/coach/coach_computation_engine.py"
 sleep 2
 
 bash "$SCRIPT_DIR/deploy_lambda.sh" coach-narrative-orchestrator \
-  "$ROOT_DIR/lambdas/coach_narrative_orchestrator.py"
+  "$ROOT_DIR/lambdas/coach/coach_narrative_orchestrator.py"
 sleep 2
 
 bash "$SCRIPT_DIR/deploy_lambda.sh" coach-state-updater \
-  "$ROOT_DIR/lambdas/coach_state_updater.py"
+  "$ROOT_DIR/lambdas/coach/coach_state_updater.py"
 
 echo
 echo "✅ All Lambdas deployed"

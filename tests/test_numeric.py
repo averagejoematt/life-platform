@@ -68,7 +68,8 @@ def test_shim_imports():
         sys.modules.pop(module_name, None)
         # We can't actually import these (they require boto3 + env), but we
         # can verify the file has the canonical-import marker.
-        path = os.path.join(ROOT, "lambdas", module_name + ".py")
+        # P3.1: these handlers moved to lambdas/ingestion/
+        path = os.path.join(ROOT, "lambdas", "ingestion", module_name + ".py")
         with open(path) as f:
             src = f.read()
         assert "from numeric import floats_to_decimal" in src, (
