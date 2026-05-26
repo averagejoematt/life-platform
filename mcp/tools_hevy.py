@@ -27,11 +27,99 @@ from boto3.dynamodb.conditions import Key
 
 _WORKOUT_SOURCES = ("hevy", "macrofactor_api", "macrofactor_export")
 
+# Legacy daily-aggregate partitions that pre-date the per-workout schema.
+# The MCP read layer expands them into virtual per-workout records on the fly
+# so the canonical `tool_get_workouts` is source-agnostic and dedupes by
+# workout_uid (content-hash based for legacy data — see _content_uid below).
+# Migration to the new schema is deferred per BACKLOG; this bridge lets the
+# spec goal ("a workout is a workout") work today.
+_LEGACY_AGGREGATE_SOURCES = {
+    # legacy DDB partition         → returned `source` label
+    "macrofactor_workouts": "macrofactor_export",
+}
+
 
 def _is_per_workout_record(item: dict) -> bool:
     """A new-schema per-workout record has source_workout_id; old daily
     aggregates do not."""
     return bool(item.get("source_workout_id"))
+
+
+def _content_uid(source_label: str, date_str: str, title: str, start_time: str) -> str:
+    """Stable hash uid for legacy aggregates lacking a native workout id.
+
+    Use case: the MacroFactor Dropbox export doesn't carry Firestore doc ids,
+    so we synthesize a stable id from content fields (date + start_time + title).
+    When MF Tier 1 (API) becomes unblocked and is updated to use the same
+    content-hash scheme, this enables the spec §3.4 dedupe story.
+    """
+    import hashlib
+    key = f"{source_label}|{date_str}|{(start_time or '').strip()}|{(title or '').strip()}"
+    return f"mf:{hashlib.sha256(key.encode()).hexdigest()[:16]}"
+
+
+def _expand_legacy_aggregate(item: dict, source_label: str) -> list[dict]:
+    """Expand one daily-aggregate item into a list of per-workout virtual records.
+
+    Daily-aggregate shape (legacy, both for macrofactor_workouts and the
+    pre-2026-05-25 hevy daily aggregates):
+        {
+          date: "YYYY-MM-DD",
+          workouts: [
+            {title, start_time, end_time, duration_minutes,
+             exercises: [{name, sets: [{weight_lbs, reps, set_index, set_type}]}]}
+          ],
+          total_sets, total_volume_lbs, unique_exercises, ...
+        }
+    """
+    date_str = item.get("date") or ""
+    workouts = item.get("workouts") or []
+    expanded: list[dict] = []
+    for w in workouts:
+        if not isinstance(w, dict):
+            continue
+        title = w.get("title") or ""
+        start_time = w.get("start_time") or ""
+        end_time = w.get("end_time") or ""
+        wid = _content_uid(source_label, date_str, title, start_time)
+        # Compute volume in kg from lbs sets
+        total_volume_kg = 0.0
+        set_count = 0
+        ex_list = w.get("exercises") or []
+        for ex in ex_list:
+            for s in (ex.get("sets") or []):
+                set_count += 1
+                w_lbs = s.get("weight_lbs")
+                reps = s.get("reps")
+                if w_lbs is not None and reps is not None:
+                    try:
+                        total_volume_kg += float(w_lbs) * float(reps) * 0.45359237
+                    except (TypeError, ValueError):
+                        pass
+        duration_min = w.get("duration_minutes")
+        duration_sec = None
+        if duration_min is not None:
+            try:
+                duration_sec = int(float(duration_min) * 60)
+            except (TypeError, ValueError):
+                pass
+        expanded.append({
+            "workout_uid":       wid,
+            "source":            source_label,
+            "source_workout_id": wid.split(":", 1)[-1],  # synthetic but stable
+            "date":              date_str,
+            "title":             title,
+            "start_time":        start_time,
+            "end_time":          end_time,
+            "duration_sec":      duration_sec,
+            "exercise_count":    len(ex_list),
+            "set_count":         set_count,
+            "total_volume_kg":   round(total_volume_kg, 2),
+            "original_unit":     "lbs",   # legacy aggregates always stored lbs
+            "exercises":         ex_list,
+            "_legacy_aggregate": True,    # tell callers this came from the bridge
+        })
+    return expanded
 
 
 def _slim_workout(item: dict, include_sets: bool = False) -> dict:
@@ -61,27 +149,55 @@ def tool_get_workouts(args: dict) -> dict:
     """List normalized workouts in a date range, optionally filtered by source.
 
     Args:
-      start_date: ISO yyyy-mm-dd (default: 30 days ago)
-      end_date:   ISO yyyy-mm-dd (default: today)
-      source:     'hevy' | 'macrofactor_api' | 'macrofactor_export' | None (all)
-      limit:      max workouts to return (default 100)
+      start_date:    ISO yyyy-mm-dd (default: 30 days ago)
+      end_date:      ISO yyyy-mm-dd (default: today)
+      source:        'hevy' | 'macrofactor_api' | 'macrofactor_export' | None (all)
+      limit:         max workouts to return (default 100)
+      include_pilot: include pre-genesis (phase=pilot) historical workouts.
+                     Default TRUE for this tool — Matthew typically wants to
+                     see his full training history when asking via MCP. Set to
+                     False to mirror the public-site default-deny behavior.
     """
     today = date.today()
     end_date = args.get("end_date") or today.isoformat()
     start_date = args.get("start_date") or (today - timedelta(days=30)).isoformat()
     source_filter = (args.get("source") or "").strip().lower() or None
     limit = int(args.get("limit") or 100)
+    include_pilot = args.get("include_pilot", True)
+    if isinstance(include_pilot, str):
+        include_pilot = include_pilot.lower() not in ("false", "0", "no")
 
     sources_to_query = [source_filter] if source_filter else list(_WORKOUT_SOURCES)
     rows: list[dict] = []
+    seen_uids: set[str] = set()
     for src in sources_to_query:
         try:
-            items = query_source_range(src, start_date, end_date) or []
+            items = query_source_range(src, start_date, end_date,
+                                       include_pilot=include_pilot) or []
         except Exception:
             items = []
         for it in items:
             if _is_per_workout_record(it):
-                rows.append(_slim_workout(it))
+                slim = _slim_workout(it)
+                if slim.get("workout_uid") not in seen_uids:
+                    rows.append(slim)
+                    seen_uids.add(slim.get("workout_uid"))
+
+    # Legacy bridge: expand any daily-aggregate partitions whose `source`
+    # label maps to a requested filter. macrofactor_workouts → macrofactor_export.
+    for legacy_src, label in _LEGACY_AGGREGATE_SOURCES.items():
+        if source_filter and source_filter != label:
+            continue
+        try:
+            items = query_source_range(legacy_src, start_date, end_date,
+                                       include_pilot=include_pilot) or []
+        except Exception:
+            items = []
+        for it in items:
+            for w in _expand_legacy_aggregate(it, label):
+                if w.get("workout_uid") not in seen_uids:
+                    rows.append(w)
+                    seen_uids.add(w.get("workout_uid"))
 
     rows.sort(key=lambda r: (r.get("date") or "", r.get("start_time") or ""), reverse=True)
     return {
@@ -167,6 +283,43 @@ def tool_get_workout_source_status(args: dict) -> dict:
             "set_count":           rec.get("set_count"),
             "healthy":             (age_hours is not None and age_hours < 36),
         }
+
+    # Legacy bridge: report freshness of the macrofactor_workouts daily-aggregate
+    # partition as macrofactor_export's effective health (the MCP read layer
+    # expands those aggregates per workout — see _expand_legacy_aggregate).
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq("USER#matthew#SOURCE#macrofactor_workouts")
+                                    & Key("sk").begins_with("DATE#"),
+            ScanIndexForward=False, Limit=1,
+        )
+        items = resp.get("Items") or []
+        if items:
+            rec = items[0]
+            last_ingested = rec.get("ingested_at")
+            age_hours = None
+            if last_ingested:
+                try:
+                    ts = datetime.fromisoformat(str(last_ingested).replace("Z", "+00:00"))
+                    age_hours = round((now - ts).total_seconds() / 3600, 1)
+                except Exception:
+                    pass
+            existing = out["sources"].get("macrofactor_export") or {}
+            # Take the more-recent of (per-workout records, legacy aggregates)
+            existing_age = existing.get("age_hours")
+            if existing_age is None or (age_hours is not None and age_hours < existing_age):
+                out["sources"]["macrofactor_export"] = {
+                    "last_workout_date":   rec.get("date"),
+                    "last_ingested_at":    last_ingested,
+                    "age_hours":           age_hours,
+                    "title":               "(legacy daily aggregate)",
+                    "set_count":           int(rec.get("total_sets") or 0),
+                    "healthy":             (age_hours is not None and age_hours < 36),
+                    "_legacy_aggregate":   True,
+                }
+    except Exception:
+        pass
+
     # Hevy backfill state record (high-water mark for the events poller)
     try:
         resp = table.get_item(Key={
@@ -180,4 +333,21 @@ def tool_get_workout_source_status(args: dict) -> dict:
         }
     except Exception:
         pass
+
+    # MacroFactor Tier 1 (mf-puller) status — currently disabled per ADR-061 update
+    try:
+        resp = table.get_item(Key={
+            "pk": "USER#system",
+            "sk": "INGESTION_STATE#macrofactor_api",
+        })
+        state = resp.get("Item") or {}
+        out["macrofactor_tier1"] = {
+            "healthy":         state.get("healthy"),
+            "last_error":      state.get("last_error"),
+            "blocked_reason":  state.get("blocked_reason"),
+            "updated_at":      state.get("updated_at"),
+        }
+    except Exception:
+        pass
+
     return out
