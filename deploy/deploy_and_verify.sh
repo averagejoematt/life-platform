@@ -9,7 +9,7 @@
 #   bash deploy/deploy_and_verify.sh <function-name> <source-file> [extra args...]
 #
 # EXAMPLES:
-#   bash deploy/deploy_and_verify.sh daily-brief lambdas/email/daily_brief_lambda.py \
+#   bash deploy/deploy_and_verify.sh daily-brief lambdas/emails/daily_brief_lambda.py \
 #       --extra-files lambdas/ai_calls.py lambdas/html_builder.py lambdas/output_writers.py
 #
 # EXIT:

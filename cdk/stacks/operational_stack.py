@@ -77,8 +77,8 @@ class OperationalStack(Stack):
         # are exactly the "4 stale source(s)" daily emails we want to batch.
         freshness = create_platform_lambda(self, "FreshnessChecker",
             function_name="life-platform-freshness-checker",
-            source_file="lambdas/email/freshness_checker_lambda.py",
-            handler="email.freshness_checker_lambda.lambda_handler",
+            source_file="lambdas/emails/freshness_checker_lambda.py",
+            handler="emails.freshness_checker_lambda.lambda_handler",
             schedule="cron(45 16 * * ? *)",
             timeout_seconds=30, memory_mb=128,
             environment={
@@ -241,8 +241,8 @@ class OperationalStack(Stack):
         # ── 9. Insight Email Parser — SES inbound trigger (previously unmanaged)
         insight_parser = create_platform_lambda(self, "InsightEmailParser",
             function_name="insight-email-parser",
-            source_file="lambdas/email/insight_email_parser_lambda.py",
-            handler="email.insight_email_parser_lambda.lambda_handler",
+            source_file="lambdas/emails/insight_email_parser_lambda.py",
+            handler="emails.insight_email_parser_lambda.lambda_handler",
             timeout_seconds=30, memory_mb=128,
             environment={
                 "ALLOWED_SENDERS": "awsdev@mattsusername.com,mattsthrowaway@protonmail.com",
