@@ -1,0 +1,302 @@
+"""
+lambdas/web/site_api_common.py — shared helpers for the site-api Lambda.
+
+Extracted from lambdas/web/site_api_lambda.py (P1.1 Phase B, 2026-05-26).
+
+This module owns:
+  • AWS client setup (DDB table, S3 region/bucket)
+  • Module-level caches (secrets, content filter, supplements, profile, status)
+  • Configuration constants (TABLE_NAME, USER_ID, USER_PREFIX, EXPERIMENT_START)
+  • Request envelope helpers (_ok, _error, CORS_HEADERS)
+  • DDB helpers (_query_source, _latest_item, _decimal_to_float)
+  • Cross-cutting business helpers (_get_profile, _scrub_blocked_terms, etc.)
+  • Per-request correlation ID state (set by lambda_handler, read by _ok/_error)
+
+site_api_lambda.py + sibling handler modules import from here.
+"""
+import copy  # noqa: F401 — kept for downstream import compatibility
+import hashlib  # noqa: F401
+import json
+import logging
+import os
+import re
+import time
+from datetime import datetime, timezone, timedelta
+from decimal import Decimal
+from zoneinfo import ZoneInfo
+
+import boto3
+from boto3.dynamodb.conditions import Key  # noqa: F401 — re-exported for downstream use
+
+from constants import EXPERIMENT_START_DATE as EXPERIMENT_START, EXPERIMENT_BASELINE_WEIGHT_LBS
+from phase_filter import with_phase_filter
+
+# ── Config ─────────────────────────────────────────────────
+TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
+USER_ID = os.environ.get("USER_ID", "matthew")
+USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
+PT = ZoneInfo("America/Los_Angeles")
+DDB_REGION = os.environ.get("DYNAMODB_REGION", "us-west-2")
+S3_REGION = os.environ.get("S3_REGION", "us-west-2")
+# Data query start: 1 day before experiment for sleep/recovery data
+# (sleep keyed to wake date — night before genesis = record on that night).
+EXPERIMENT_QUERY_START = "2026-05-17"
+
+# ── Logger ─────────────────────────────────────────────────
+logger = logging.getLogger("site_api")
+logger.setLevel(logging.INFO)
+
+# ── AWS clients (module-level for warm container reuse) ─────
+dynamodb = boto3.resource("dynamodb", region_name=DDB_REGION)
+table = dynamodb.Table(TABLE_NAME)
+
+# ── Caches ─────────────────────────────────────────────────
+# COST-OPT-1: cache secrets in warm containers (15-min TTL).
+_secret_cache: dict = {}
+_content_filter_cache = None
+_supp_metadata_cache = None
+_status_cache: dict = {}
+_status_cache_ts = 0
+_cost_cache: dict = {}
+_cost_cache_ts = 0
+STATUS_CACHE_TTL = 60
+_profile_cache = None
+
+# ── Per-request correlation ID (P3.4) ─────────────────────
+# Lambda handler sets via set_request_id(); _ok/_error read via get_request_id().
+_current_request_id: str | None = None
+
+
+def set_request_id(rid):
+    global _current_request_id
+    _current_request_id = rid
+
+
+def get_request_id():
+    return _current_request_id
+
+
+# ── CORS ──────────────────────────────────────────────────
+# SEC-07: CORS_ORIGIN env-configurable so staging/dev can override.
+CORS_ORIGIN = os.environ.get("CORS_ORIGIN", "https://averagejoematt.com")
+
+# SEC-04: CloudFront injects X-AMJ-Origin header on every origin request.
+# When SITE_API_ORIGIN_SECRET is set, missing/wrong values 403.
+SITE_API_ORIGIN_SECRET = os.environ.get("SITE_API_ORIGIN_SECRET", "")
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin":  CORS_ORIGIN,
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, X-Subscriber-Token",
+    "Access-Control-Max-Age":       "3600",
+    "Content-Type":                 "application/json",
+    "X-Content-Type-Options":       "nosniff",
+    "X-Frame-Options":              "DENY",
+    "Strict-Transport-Security":    "max-age=31536000; includeSubDomains",
+}
+
+
+# ── Platform stats — single source of truth for all site pages ──
+PLATFORM_STATS = {
+    "data_sources": 26,
+    "mcp_tools": 121,
+    "lambdas": 62,
+    "cdk_stacks": 8,
+    "alarms": 66,
+    "adrs": 45,
+    "monthly_cost": "$19",
+    "review_count": 19,
+    "review_grade": "A",
+    "active_secrets": 10,
+    "site_pages": 72,
+    "test_count": 1075,
+    "board_technical": 12,
+    "board_product": 8,
+    "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,
+    "goal_weight": 185,
+    "start_date": EXPERIMENT_START,
+}
+
+
+# ── Helpers ───────────────────────────────────────────────
+
+def _cached_secret(client, secret_id):
+    entry = _secret_cache.get(secret_id)
+    if entry and time.time() - entry[1] < 900:
+        return entry[0]
+    val = client.get_secret_value(SecretId=secret_id)["SecretString"]
+    _secret_cache[secret_id] = (val, time.time())
+    return val
+
+
+def _decimal_to_float(obj):
+    if isinstance(obj, Decimal):
+        return float(obj)
+    if isinstance(obj, dict):
+        return {k: _decimal_to_float(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_decimal_to_float(i) for i in obj]
+    return obj
+
+
+def _experiment_date(days_back=30):
+    """Compute a date N days ago, clamped to EXPERIMENT_START.
+    Use this for ALL date range queries to prevent pre-experiment data leaking through."""
+    raw = (datetime.now(timezone.utc) - timedelta(days=days_back)).strftime("%Y-%m-%d")
+    return max(raw, EXPERIMENT_START)
+
+
+def _query_source(source: str, start_date: str, end_date: str, include_pilot: bool = False) -> list:
+    """Query DynamoDB for a source within a date range. ADR-058: phase=pilot hidden by default."""
+    if start_date > end_date:
+        return []  # EXPERIMENT_START is in the future — no data yet
+    pk = f"{USER_PREFIX}{source}"
+    kwargs = with_phase_filter({
+        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(
+            f"DATE#{start_date}", f"DATE#{end_date}"
+        ),
+    }, include_pilot=include_pilot)
+    resp = table.query(**kwargs)
+    return _decimal_to_float(resp.get("Items", []))
+
+
+def _latest_item(source: str, include_pilot: bool = False) -> dict | None:
+    """Get the most recent item for a source. ADR-058: phase=pilot hidden by default."""
+    pk = f"{USER_PREFIX}{source}"
+    kwargs = with_phase_filter({
+        "KeyConditionExpression": Key("pk").eq(pk),
+        "ScanIndexForward": False,
+        "Limit": 1,
+    }, include_pilot=include_pilot)
+    resp = table.query(**kwargs)
+    items = _decimal_to_float(resp.get("Items", []))
+    return items[0] if items else None
+
+
+def _get_profile() -> dict:
+    """Read PROFILE#v1 from DynamoDB. Cached after first call in warm container."""
+    global _profile_cache
+    if _profile_cache is not None:
+        return _profile_cache
+    try:
+        resp = table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"})
+        _profile_cache = _decimal_to_float(resp.get("Item", {}))
+    except Exception as e:
+        logger.warning("[profile] Failed to read profile: %s", e)
+        _profile_cache = {}
+    return _profile_cache
+
+
+def _load_supp_metadata() -> dict:
+    """Load supplement registry from S3 config/supplement_registry.json. Cached after first call."""
+    global _supp_metadata_cache
+    if _supp_metadata_cache is not None:
+        return _supp_metadata_cache
+    try:
+        S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+        s3 = boto3.client("s3", region_name=S3_REGION)
+        resp = s3.get_object(Bucket=S3_BUCKET, Key="site/config/supplement_registry.json")
+        data = json.loads(resp["Body"].read())
+        _supp_metadata_cache = data
+        total = sum(len(g.get("items", [])) for g in data.get("groups", {}).values())
+        logger.info(f"[supp_registry] Loaded: {total} supplements in {len(data.get('groups', {}))} groups")
+    except Exception as e:
+        logger.warning(f"[supp_registry] Failed to load from S3: {e}")
+        _supp_metadata_cache = {}
+    return _supp_metadata_cache
+
+
+def _load_content_filter():
+    """Load blocked terms from S3 config/content_filter.json. Cached after first call."""
+    global _content_filter_cache
+    if _content_filter_cache is not None:
+        return _content_filter_cache
+    try:
+        S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+        s3 = boto3.client("s3", region_name=S3_REGION)
+        resp = s3.get_object(Bucket=S3_BUCKET, Key="config/content_filter.json")
+        _content_filter_cache = json.loads(resp["Body"].read())
+        logger.info(f"[content_filter] Loaded: {len(_content_filter_cache.get('blocked_vice_keywords', []))} blocked terms")
+    except Exception as e:
+        logger.warning(f"[content_filter] Failed to load from S3: {e}")
+        _content_filter_cache = {
+            "blocked_vices": ["No porn", "No marijuana"],
+            "blocked_vice_keywords": ["porn", "pornography", "marijuana", "cannabis", "weed", "thc"],
+        }
+        # BUG-05: emit metric when fallback is active
+        try:
+            print(json.dumps({"_aws": {"Timestamp": int(time.time() * 1000),
+                "CloudWatchMetrics": [{"Namespace": "LifePlatform/SiteApi",
+                    "Dimensions": [[]], "Metrics": [{"Name": "ContentFilterFallback", "Unit": "Count"}]}]},
+                "ContentFilterFallback": 1}))
+        except Exception:
+            pass
+    return _content_filter_cache
+
+
+def _scrub_blocked_terms(text: str) -> str:
+    """Remove any mention of blocked terms from public-facing text."""
+    cf = _load_content_filter()
+    result = text
+    for term in cf.get("blocked_vice_keywords", []):
+        pattern = re.compile(re.escape(term), re.IGNORECASE)
+        result = pattern.sub("[filtered]", result)
+    for vice in cf.get("blocked_vices", []):
+        pattern = re.compile(re.escape(vice), re.IGNORECASE)
+        result = pattern.sub("[filtered]", result)
+    result = re.sub(r'\[filtered\]', '', result)
+    result = re.sub(r'\s{2,}', ' ', result)
+    return result.strip()
+
+
+def _is_blocked_vice(name: str) -> bool:
+    """Check if a vice/habit name matches the blocked list."""
+    cf = _load_content_filter()
+    name_lower = name.lower().strip()
+    for blocked in cf.get("blocked_vices", []):
+        if blocked.lower() == name_lower:
+            return True
+    for kw in cf.get("blocked_vice_keywords", []):
+        if kw.lower() in name_lower:
+            return True
+    return False
+
+
+def _request_id_headers() -> dict:
+    """Return {x-request-id: ...} if a request id is set, else {}."""
+    rid = get_request_id()
+    if rid:
+        return {"x-request-id": rid}
+    return {}
+
+
+def _ok(data: dict, cache_seconds: int = 300) -> dict:
+    """Return a successful API response with caching headers."""
+    rid = get_request_id()
+    return {
+        "statusCode": 200,
+        "headers": {
+            **CORS_HEADERS,
+            **_request_id_headers(),
+            "Cache-Control": f"public, max-age={cache_seconds}, s-maxage={cache_seconds}",
+        },
+        "body": json.dumps({
+            "_meta": {
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "cache_seconds": cache_seconds,
+                **({"request_id": rid} if rid else {}),
+            },
+            **data,
+        }),
+    }
+
+
+def _error(status: int, message: str) -> dict:
+    rid = get_request_id()
+    return {
+        "statusCode": status,
+        "headers": {**CORS_HEADERS, **_request_id_headers(), "Cache-Control": "no-cache, no-store"},
+        "body": json.dumps({
+            "error": message,
+            **({"request_id": rid} if rid else {}),
+        }),
+    }
