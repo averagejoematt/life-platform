@@ -11,9 +11,6 @@
     "lambdas/hevy_backfill_lambda.py": {
       "function": "hevy-backfill"
     },
-    "lambdas/macrofactor_puller_lambda.py": {
-      "function": "mf-puller"
-    },
     "lambdas/whoop_lambda.py": {
       "function": "whoop-data-ingestion"
     },
