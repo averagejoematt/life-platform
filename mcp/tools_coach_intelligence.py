@@ -26,12 +26,14 @@ def tool_get_coach_thread(args):
     limit = int(args.get("limit", 4))
 
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq("USER#matthew") & Key("sk").begins_with(
+        # ADR-058: phase=pilot hidden by default.
+        from mcp.core import _apply_phase_filter
+        resp = table.query(**_apply_phase_filter({
+            "KeyConditionExpression": Key("pk").eq("USER#matthew") & Key("sk").begins_with(
                 f"SOURCE#coach_thread#{coach_id}#"
             ),
-            ScanIndexForward=False, Limit=limit,
-        )
+            "ScanIndexForward": False, "Limit": limit,
+        }))
         entries = [decimal_to_float(i) for i in resp.get("Items", [])]
         return {
             "coach_id": coach_id,
@@ -66,12 +68,14 @@ def tool_get_predictions(args):
 
     for cid in coaches_to_check:
         try:
-            resp = table.query(
-                KeyConditionExpression=Key("pk").eq("USER#matthew") & Key("sk").begins_with(
+            # ADR-058: phase=pilot hidden by default.
+            from mcp.core import _apply_phase_filter
+            resp = table.query(**_apply_phase_filter({
+                "KeyConditionExpression": Key("pk").eq("USER#matthew") & Key("sk").begins_with(
                     f"SOURCE#coach_thread#{cid}#"
                 ),
-                ScanIndexForward=False, Limit=8,
-            )
+                "ScanIndexForward": False, "Limit": 8,
+            }))
             for item in resp.get("Items", []):
                 entry = decimal_to_float(item)
                 for pred in entry.get("predictions", []):
@@ -214,12 +218,14 @@ def tool_evaluate_prediction(args):
     # Find the prediction across all coach threads
     for cid in COACH_IDS:
         try:
-            resp = table.query(
-                KeyConditionExpression=Key("pk").eq("USER#matthew") & Key("sk").begins_with(
+            # ADR-058: phase=pilot hidden by default.
+            from mcp.core import _apply_phase_filter
+            resp = table.query(**_apply_phase_filter({
+                "KeyConditionExpression": Key("pk").eq("USER#matthew") & Key("sk").begins_with(
                     f"SOURCE#coach_thread#{cid}#"
                 ),
-                ScanIndexForward=False, Limit=10,
-            )
+                "ScanIndexForward": False, "Limit": 10,
+            }))
             for item in resp.get("Items", []):
                 entry = decimal_to_float(item)
                 for pred in entry.get("predictions", []):
@@ -250,12 +256,14 @@ def tool_get_coaching_summary(args):
     coaches = []
     for cid in COACH_IDS:
         try:
-            resp = table.query(
-                KeyConditionExpression=Key("pk").eq("USER#matthew") & Key("sk").begins_with(
+            # ADR-058: phase=pilot hidden by default.
+            from mcp.core import _apply_phase_filter
+            resp = table.query(**_apply_phase_filter({
+                "KeyConditionExpression": Key("pk").eq("USER#matthew") & Key("sk").begins_with(
                     f"SOURCE#coach_thread#{cid}#"
                 ),
-                ScanIndexForward=False, Limit=1,
-            )
+                "ScanIndexForward": False, "Limit": 1,
+            }))
             items = resp.get("Items", [])
             if items:
                 entry = decimal_to_float(items[0])

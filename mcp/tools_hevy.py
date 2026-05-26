@@ -288,11 +288,12 @@ def tool_get_workout_source_status(args: dict) -> dict:
     # partition as macrofactor_export's effective health (the MCP read layer
     # expands those aggregates per workout — see _expand_legacy_aggregate).
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq("USER#matthew#SOURCE#macrofactor_workouts")
+        from mcp.core import _apply_phase_filter
+        resp = table.query(**_apply_phase_filter({
+            "KeyConditionExpression": Key("pk").eq("USER#matthew#SOURCE#macrofactor_workouts")
                                     & Key("sk").begins_with("DATE#"),
-            ScanIndexForward=False, Limit=1,
-        )
+            "ScanIndexForward": False, "Limit": 1,
+        }))
         items = resp.get("Items") or []
         if items:
             rec = items[0]
