@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-05-26 (v7.21.0 — 131 tools, 36-module MCP package, 19 data sources, 70 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed). 138 MCP tools, 27-module MCP package, 20 data sources (added `hevy` as active), 80 Lambdas in us-west-2 + 5 in us-east-1 = 85 total. 14 active secrets. ~104 CloudWatch alarms. 8 CDK stacks deployed. S3 default encryption AES256 (KMS CMK retained, scheduled for deletion 2026-06-16; ADR-053/054). SIMP-2 framework adopted by 8 of 14 ingestion Lambdas (ADR-056). Coach prediction loop closed end-to-end (ADR-055); `coach-quality-gate` invoked async from `ai_calls.call_coach_brief_v2` after each COACH-V2 generation. Shared layer **v57** (mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`). 61 ADRs (ADR-001 → ADR-061). Total active CDK-managed IAM roles: see `aws iam list-roles --query 'Roles[?starts_with(RoleName, \`life-platform-\`)]'` for live count.
+Last updated: 2026-05-26 (v7.21.0 — 131 tools, 36-module MCP package, 19 data sources, 70 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed). 138 MCP tools, 27-module MCP package, 20 data sources (added `hevy` as active), 80 Lambdas in us-west-2 + 5 in us-east-1 = 85 total. 14 active secrets. ~104 CloudWatch alarms. 8 CDK stacks deployed. S3 default encryption AES256 (KMS CMK retained, scheduled for deletion 2026-06-16; ADR-053/054). SIMP-2 framework adopted by 8 of 14 ingestion Lambdas (ADR-056). Coach prediction loop closed end-to-end (ADR-055); `coach-quality-gate` invoked async from `ai_calls.call_coach_brief_v2` after each COACH-V2 generation. Shared layer **v58** (mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`; bumped 2026-05-26 when P3.1 lambdas/ subpkg restructure triggered an asset-hash rebuild). 61 ADRs (ADR-001 → ADR-061). Total active CDK-managed IAM roles: see `aws iam list-roles --query 'Roles[?starts_with(RoleName, \`life-platform-\`)]'` for live count.
 
 ---
 
@@ -204,6 +204,20 @@ Compute → store → read pattern. Standalone Lambdas run before Daily Brief, s
 **Lambda:** `life-platform-site-api` | **Stack:** LifePlatformOperational | **Region:** us-west-2 (R17-09 migration)
 **Function URL:** Routed through CloudFront (E3S424OXQZ8NBE). Lambda confirmed in us-west-2 (verified via AWS CLI 2026-03-30).
 **IAM:** Primarily read-only — `dynamodb:GetItem, Query, PutItem` + `kms:Decrypt` + `s3:GetObject` on `site/config/*`. Limited writes for interactive features (votes, follows, checkins).
+
+**Source layout** (P1.1 Phase B, 2026-05-26 — 85% reduction from original 7,949-line monolith):
+
+| Module | Lines | Owns |
+|---|---:|---|
+| `lambdas/web/site_api_lambda.py` | 1,216 | `lambda_handler` entry point + `ROUTES`/`_SIMPLE_ROUTES` dispatch + 5 inline coach handlers |
+| `lambdas/web/site_api_common.py` | 320 | Shared helpers: `_ok`, `_error`, `_query_source`, `_latest_item`, `_decimal_to_float`, `_load_s3_json`, CORS, request-id state |
+| `lambdas/web/site_api_observatory.py` | 1,591 | 14 `/api/*_overview` + meal/strength/journal handlers |
+| `lambdas/web/site_api_intelligence.py` | 1,057 | `/api/status` + `/api/pulse` |
+| `lambdas/web/site_api_social.py` | 1,168 | 15 subscriber/experiment/challenge/nudge handlers + token-HMAC machinery |
+| `lambdas/web/site_api_vitals.py` | 1,086 | 10 homepage/dashboard handlers (vitals, journey, character, achievements, snapshot) |
+| `lambdas/web/site_api_data.py` | 1,619 | 19 domain-data handlers (glucose, sleep, habits, correlations, ledger, discoveries, etc.) |
+
+All 7 modules ship together via the standard `Code.from_asset("../lambdas")` zip. `/api/ask` + `/api/board_ask` are served by the separate `life-platform-site-api-ai` Lambda (ADR-036).
 
 **Routes served via CloudFront → site-api:**
 - `GET /api/vitals` — weight, HRV, recovery (TTL 300s)
