@@ -9,347 +9,95 @@ PURPOSE:
 
 ARCHITECTURE:
     Browser → CloudFront (TTL cache) → API Gateway → this Lambda → DynamoDB
-    
+
     CloudFront TTL tiers (set on each route):
       /api/vitals      → 300s  (5 min) — weight, HRV, recovery
       /api/journey     → 3600s (1 hr)  — weight trajectory, goal date
       /api/character   → 900s  (15 min) — pillar scores, level
       /api/status      → 60s   (1 min) — system health check
 
-VIRAL DEFENCE (board-mandated by Marcus + Dana):
-    1. CloudFront TTL means 50k visitors → ~12 Lambda calls per endpoint
-    2. Lambda reserved concurrency = 20 (set in CDK)
-    3. WAF rate limit: 100 req/min per IP (set in WAF rule)
-    4. Budget alert at $5 (already configured)
-    
-    Cost at 50k hits: under $1.00
-
-COST ESTIMATE (50k hits, all endpoints):
-    CloudFront: ~$0.25 (data transfer)
-    Lambda:     ~$0.05 (12 calls × 4 endpoints × 50ms avg)
-    DynamoDB:   ~$0.01 (few dozen reads, all cached in Lambda warm container)
-    API GW:     ~$0.02
-    Total:      ~$0.33
-
 DEPLOYMENT:
-    1. Create Lambda: life-platform-site-api
-    2. Set reserved concurrency: 20 (hard cap — returns 429 if exceeded)
-    3. Add Function URL or API Gateway HTTP route
-    4. Create CloudFront distribution with /api/* → Lambda origin
-    5. Set Cache-Control headers per endpoint (handled in this Lambda)
-    6. Add to CDK: compute_stack.py or new web_api_stack.py
+    1. Lambda: life-platform-site-api
+    2. Reserved concurrency: 20 (hard cap — returns 429 if exceeded)
+    3. Function URL or API Gateway HTTP route
+    4. CloudFront distribution with /api/* → Lambda origin
+    5. Add to CDK: operational_stack.py
 
 IAM ROLE:
-    Primary (read):
-      dynamodb:GetItem, Query on life-platform table
-      s3:GetObject on matthew-life-platform/config/*, generated/*
-    Limited writes (interactive features only):
-      dynamodb:PutItem, UpdateItem — scoped to vote/follow/checkin/suggestion records
-      s3:PutObject on matthew-life-platform/generated/findings/*
-    AI endpoints:
-      secretsmanager:GetSecretValue on life-platform/site-api-ai-key
+    Primary (read):  dynamodb:GetItem/Query, s3:GetObject
+    Limited writes: vote/follow/checkin/suggestion records
+    AI endpoints:   handled by life-platform-site-api-ai (ADR-036)
     NO access to MCP server.
+
+P1.1 Phase B (2026-05-26):
+    Shared helpers, CORS, AWS clients, caches, request-id state are now in
+    lambdas/web/site_api_common.py and imported here. Site-api-only logic
+    (endpoint handlers + routing) stays in this file.
 
 v1.0.0 — 2026-03-16
 """
-
-import copy
-import hashlib
+# stdlib
+import hashlib  # noqa: F401 — used by handlers
 import json
-import logging
 import os
 import re
 import time
+import urllib.request  # noqa: F401 — used by AI handlers (kept for backward-compat)
+import base64 as _b64  # noqa: F401 — used by subscriber-token helpers
+import hmac as _hmac  # noqa: F401 — used by subscriber-token helpers
 from datetime import datetime, timezone, timedelta
-from decimal import Decimal
-from zoneinfo import ZoneInfo
+from decimal import Decimal  # noqa: F401 — kept for backward-compat with handlers
 
-import boto3
+# third-party
+import boto3  # noqa: F401 — kept for handlers that create clients
 from boto3.dynamodb.conditions import Key
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+# shared layer
+from phase_filter import with_phase_filter  # noqa: F401 — used by handlers below
 
-# ── Config ─────────────────────────────────────────────────
-TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID = os.environ.get("USER_ID", "matthew")
-USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
+# P1.1 Phase B (2026-05-26): shared helpers extracted to sibling module.
+# Re-import as module-level names so the rest of this file (and the
+# ROUTES dict) reference them unchanged.
+from web.site_api_common import (
+    logger,
+    # config
+    TABLE_NAME, USER_ID, USER_PREFIX, PT, DDB_REGION, S3_REGION,
+    EXPERIMENT_START, EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_QUERY_START,
+    # AWS
+    dynamodb, table,
+    # CORS
+    CORS_ORIGIN, SITE_API_ORIGIN_SECRET, CORS_HEADERS,
+    # caches
+    STATUS_CACHE_TTL, PLATFORM_STATS,
+    # helpers
+    _cached_secret,
+    _decimal_to_float,
+    _experiment_date,
+    _query_source,
+    _latest_item,
+    _get_profile,
+    _load_supp_metadata,
+    _load_content_filter,
+    _scrub_blocked_terms,
+    _is_blocked_vice,
+    _request_id_headers,
+    _ok,
+    _error,
+    # request-id state (set by lambda_handler; read by _ok/_error)
+    set_request_id, get_request_id,
+)
 
-# All user-facing dates use Pacific Time (DST-aware).
-PT = ZoneInfo("America/Los_Angeles")
-
-# DynamoDB is always us-west-2 even when this Lambda runs in us-east-1 (web stack).
-# DYNAMODB_REGION env var injected by CDK; defaults to us-west-2.
-DDB_REGION = os.environ.get("DYNAMODB_REGION", "us-west-2")
-# SEC-03: S3 bucket is us-west-2; separate from DDB_REGION so each can be changed independently.
-S3_REGION = os.environ.get("S3_REGION", "us-west-2")
-
-# ── AWS clients (module-level for warm container reuse) ─────
-dynamodb = boto3.resource("dynamodb", region_name=DDB_REGION)
-table = dynamodb.Table(TABLE_NAME)
-
-# COST-OPT-1: Cache secrets in warm Lambda containers (15-min TTL)
-_secret_cache = {}
-
-
-def _cached_secret(client, secret_id):
-    import time as _t
-    entry = _secret_cache.get(secret_id)
-    if entry and _t.time() - entry[1] < 900:
-        return entry[0]
-    val = client.get_secret_value(SecretId=secret_id)["SecretString"]
-    _secret_cache[secret_id] = (val, _t.time())
-    return val
-
-# ── Content safety filter (S3-cached) ───────────────────────
+# Module-level mutable state that handlers below modify directly.
+# These were originally globals in this file; the helper module owns the
+# "official" copies but the handlers reference these names via globals().
+# Kept here for any handler that still uses them via `global _profile_cache`.
+_profile_cache = None  # mirrored from common; handlers should use _get_profile()
 _content_filter_cache = None
-
-# ── Supplement metadata (S3-cached) ─────────────────────────
 _supp_metadata_cache = None
-
-# ── Status page (module-level cache) ───────────────────────
 _status_cache = {}
 _status_cache_ts = 0
 _cost_cache = {}
 _cost_cache_ts = 0
-STATUS_CACHE_TTL = 60  # 1 minute — more dynamic status updates
-
-# ── Experiment start date — public Day 1 (ADR-058: re-anchored 2026-05-18) ───
-from constants import EXPERIMENT_START_DATE as EXPERIMENT_START, EXPERIMENT_BASELINE_WEIGHT_LBS
-# Data query start: 1 day before experiment for sleep/recovery data
-# (sleep keyed to wake date — night before genesis = record on that night).
-EXPERIMENT_QUERY_START = "2026-05-17"
-
-
-def _experiment_date(days_back=30):
-    """Compute a date N days ago, clamped to EXPERIMENT_START.
-    Use this for ALL date range queries to prevent pre-experiment data leaking through."""
-    raw = (datetime.now(timezone.utc) - timedelta(days=days_back)).strftime("%Y-%m-%d")
-    return max(raw, EXPERIMENT_START)
-
-
-# ── Platform stats — single source of truth for all site pages ──
-# Update these when Lambdas/tools/sources change. Every page reads from here.
-PLATFORM_STATS = {
-    "data_sources": 26,
-    "mcp_tools": 121,
-    "lambdas": 62,
-    "cdk_stacks": 8,
-    "alarms": 66,
-    "adrs": 45,
-    "monthly_cost": "$19",
-    "review_count": 19,
-    "review_grade": "A",
-    "active_secrets": 10,
-    "site_pages": 72,
-    "test_count": 1075,
-    "board_technical": 12,
-    "board_product": 8,
-    "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,
-    "goal_weight": 185,
-    "start_date": EXPERIMENT_START,
-    # build_date intentionally removed per ADR-058 full-scrub decision (was "2026-02-22")
-}
-
-# ── Profile (DynamoDB-cached per warm container) ────────────
-_profile_cache = None
-
-
-def _get_profile() -> dict:
-    """Read PROFILE#v1 from DynamoDB. Cached after first call in warm container."""
-    global _profile_cache
-    if _profile_cache is not None:
-        return _profile_cache
-    try:
-        resp = table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"})
-        _profile_cache = _decimal_to_float(resp.get("Item", {}))
-    except Exception as e:
-        logger.warning("[profile] Failed to read profile: %s", e)
-        _profile_cache = {}
-    return _profile_cache
-
-
-def _load_supp_metadata() -> dict:
-    """Load supplement registry from S3 config/supplement_registry.json. Cached after first call.
-    Returns the full registry dict with 'groups' and 'genome_snps' keys."""
-    global _supp_metadata_cache
-    if _supp_metadata_cache is not None:
-        return _supp_metadata_cache
-    try:
-        S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
-        s3 = boto3.client("s3", region_name=S3_REGION)
-        resp = s3.get_object(Bucket=S3_BUCKET, Key="site/config/supplement_registry.json")
-        data = json.loads(resp["Body"].read())
-        _supp_metadata_cache = data
-        total = sum(len(g.get("items", [])) for g in data.get("groups", {}).values())
-        logger.info(f"[supp_registry] Loaded: {total} supplements in {len(data.get('groups', {}))} groups")
-    except Exception as e:
-        logger.warning(f"[supp_registry] Failed to load from S3: {e}")
-        _supp_metadata_cache = {}
-    return _supp_metadata_cache
-
-def _load_content_filter():
-    """Load blocked terms from S3 config/content_filter.json. Cached after first call."""
-    global _content_filter_cache
-    if _content_filter_cache is not None:
-        return _content_filter_cache
-    try:
-        S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
-        s3 = boto3.client("s3", region_name=S3_REGION)
-        resp = s3.get_object(Bucket=S3_BUCKET, Key="config/content_filter.json")
-        _content_filter_cache = json.loads(resp["Body"].read())
-        logger.info(f"[content_filter] Loaded: {len(_content_filter_cache.get('blocked_vice_keywords', []))} blocked terms")
-    except Exception as e:
-        logger.warning(f"[content_filter] Failed to load from S3: {e}")
-        _content_filter_cache = {
-            "blocked_vices": ["No porn", "No marijuana"],
-            "blocked_vice_keywords": ["porn", "pornography", "marijuana", "cannabis", "weed", "thc"],
-        }
-        # BUG-05: Emit metric so we know when the fallback is active
-        try:
-            import time as _t, json as _j
-            print(_j.dumps({"_aws": {"Timestamp": int(_t.time() * 1000),
-                "CloudWatchMetrics": [{"Namespace": "LifePlatform/SiteApi",
-                    "Dimensions": [[]], "Metrics": [{"Name": "ContentFilterFallback", "Unit": "Count"}]}]},
-                "ContentFilterFallback": 1}))
-        except Exception:
-            pass
-    return _content_filter_cache
-
-
-def _scrub_blocked_terms(text: str) -> str:
-    """Remove any mention of blocked terms from public-facing text."""
-    cf = _load_content_filter()
-    result = text
-    for term in cf.get("blocked_vice_keywords", []):
-        pattern = re.compile(re.escape(term), re.IGNORECASE)
-        result = pattern.sub("[filtered]", result)
-    # Also scrub full vice names
-    for vice in cf.get("blocked_vices", []):
-        pattern = re.compile(re.escape(vice), re.IGNORECASE)
-        result = pattern.sub("[filtered]", result)
-    # Clean up any "[filtered]" artifacts in sentences
-    result = re.sub(r'\[filtered\]', '', result)
-    result = re.sub(r'\s{2,}', ' ', result)
-    return result.strip()
-
-
-def _is_blocked_vice(name: str) -> bool:
-    """Check if a vice/habit name matches the blocked list."""
-    cf = _load_content_filter()
-    name_lower = name.lower().strip()
-    for blocked in cf.get("blocked_vices", []):
-        if blocked.lower() == name_lower:
-            return True
-    for kw in cf.get("blocked_vice_keywords", []):
-        if kw.lower() in name_lower:
-            return True
-    return False
-
-
-# ── CORS headers ────────────────────────────────────────────
-# SEC-07: CORS_ORIGIN is env-configurable so staging/dev can override.
-CORS_ORIGIN = os.environ.get("CORS_ORIGIN", "https://averagejoematt.com")
-
-# SEC-04: CloudFront injects X-AMJ-Origin header on every origin request.
-# When SITE_API_ORIGIN_SECRET is set, requests missing this header are rejected with 403.
-# Leave unset in local/test environments to disable the check.
-SITE_API_ORIGIN_SECRET = os.environ.get("SITE_API_ORIGIN_SECRET", "")
-CORS_HEADERS = {
-    "Access-Control-Allow-Origin":  CORS_ORIGIN,
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, X-Subscriber-Token",
-    "Access-Control-Max-Age":       "3600",
-    "Content-Type":                 "application/json",
-    "X-Content-Type-Options":       "nosniff",
-    "X-Frame-Options":              "DENY",
-    "Strict-Transport-Security":    "max-age=31536000; includeSubDomains",
-}
-
-
-# P3.4: per-request correlation ID — set at handler start, read by _ok/_error
-# so 5xx responses carry the same id that appears in the CloudWatch route_metric
-# line. A user reporting "site error at 4:33pm" can paste their x-request-id and
-# the operator runs: aws logs filter-log-events ... --filter-pattern '"<id>"'
-_current_request_id: str | None = None
-
-
-def _decimal_to_float(obj):
-    if isinstance(obj, Decimal):
-        return float(obj)
-    if isinstance(obj, dict):
-        return {k: _decimal_to_float(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_decimal_to_float(i) for i in obj]
-    return obj
-
-
-from phase_filter import with_phase_filter  # ADR-058
-
-
-def _query_source(source: str, start_date: str, end_date: str, include_pilot: bool = False) -> list:
-    """Query DynamoDB for a source within a date range. ADR-058: phase=pilot hidden by default."""
-    if start_date > end_date:
-        return []  # EXPERIMENT_START is in the future — no data yet
-    pk = f"{USER_PREFIX}{source}"
-    kwargs = with_phase_filter({
-        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(
-            f"DATE#{start_date}", f"DATE#{end_date}"
-        ),
-    }, include_pilot=include_pilot)
-    resp = table.query(**kwargs)
-    return _decimal_to_float(resp.get("Items", []))
-
-
-def _latest_item(source: str, include_pilot: bool = False) -> dict | None:
-    """Get the most recent item for a source. ADR-058: phase=pilot hidden by default."""
-    pk = f"{USER_PREFIX}{source}"
-    kwargs = with_phase_filter({
-        "KeyConditionExpression": Key("pk").eq(pk),
-        "ScanIndexForward": False,
-        "Limit": 1,
-    }, include_pilot=include_pilot)
-    resp = table.query(**kwargs)
-    items = _decimal_to_float(resp.get("Items", []))
-    return items[0] if items else None
-
-
-def _request_id_headers() -> dict:
-    """Return {x-request-id: ...} if a request id is set, else {}."""
-    if _current_request_id:
-        return {"x-request-id": _current_request_id}
-    return {}
-
-
-def _ok(data: dict, cache_seconds: int = 300) -> dict:
-    """Return a successful API response with caching headers."""
-    return {
-        "statusCode": 200,
-        "headers": {
-            **CORS_HEADERS,
-            **_request_id_headers(),
-            "Cache-Control": f"public, max-age={cache_seconds}, s-maxage={cache_seconds}",
-        },
-        "body": json.dumps({
-            "_meta": {
-                "generated_at": datetime.now(timezone.utc).isoformat(),
-                "cache_seconds": cache_seconds,
-                **({"request_id": _current_request_id} if _current_request_id else {}),
-            },
-            **data,
-        }),
-    }
-
-
-def _error(status: int, message: str) -> dict:
-    return {
-        "statusCode": status,
-        "headers": {**CORS_HEADERS, **_request_id_headers(), "Cache-Control": "no-cache, no-store"},
-        "body": json.dumps({
-            "error": message,
-            **({"request_id": _current_request_id} if _current_request_id else {}),
-        }),
-    }
 
 
 # ── Endpoint handlers ───────────────────────────────────────
@@ -6869,10 +6617,9 @@ def lambda_handler(event, context):
     # P3.4: assign a per-request correlation ID. Honor an inbound x-request-id
     # header if the client (CloudFront / a debugging operator) set one — this
     # lets the same id flow end-to-end. Otherwise generate a fresh uuid4.
-    global _current_request_id
     inbound_headers = event.get("headers") or {}
     incoming_rid = (inbound_headers.get("x-request-id") or inbound_headers.get("X-Request-Id"))
-    _current_request_id = incoming_rid if incoming_rid else _uuid.uuid4().hex[:16]
+    set_request_id(incoming_rid if incoming_rid else _uuid.uuid4().hex[:16])
 
     # Phase 2.2 (2026-05-16): centralized request envelope validation.
     # Catches oversized bodies, injection patterns, malformed user_id/date/source
@@ -6923,7 +6670,7 @@ def lambda_handler(event, context):
                 "status":     status_code,
                 "DurationMs": duration_ms,
                 "ColdStart":  1 if _COLD_START else 0,
-                "request_id": _current_request_id,
+                "request_id": get_request_id(),
                 "duration_ms": duration_ms,  # back-compat field name
                 "cold_start":  _COLD_START,
             }
