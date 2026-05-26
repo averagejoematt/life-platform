@@ -304,3 +304,17 @@ def _error(status: int, message: str) -> dict:
             **({"request_id": rid} if rid else {}),
         }),
     }
+
+
+def _load_s3_json(key: str, cache_name: str) -> dict:
+    """Load a JSON file from S3. Returns parsed dict. Caller manages caching."""
+    try:
+        S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+        s3 = boto3.client("s3", region_name=S3_REGION)
+        resp = s3.get_object(Bucket=S3_BUCKET, Key=key)
+        data = json.loads(resp["Body"].read())
+        logger.info(f"[{cache_name}] Loaded from S3: {key}")
+        return data
+    except Exception as e:
+        logger.warning(f"[{cache_name}] Failed to load {key}: {e}")
+        return {}
