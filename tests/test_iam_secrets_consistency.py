@@ -72,6 +72,8 @@ KNOWN_SECRETS = [
     "life-platform/notion",          # Notion API key (also in ingestion-keys bundle)
     "life-platform/dropbox",         # Dropbox API key (also in ingestion-keys bundle)
     "life-platform/todoist",         # Todoist API token — read by MCP write tools (mcp/tools_todoist.py:22). Created 2026-02-21. TD-23 added to mcp_server() IAM.
+    "life-platform/hevy",            # ADR-060 / SPEC_HEVY §2.4: api_key + webhook_secret for hevy-webhook + hevy-backfill. Created 2026-05-25.
+    "life-platform/macrofactor",     # ADR-061 / SPEC_HEVY §3.1: MF Firebase email/password for mf-puller. Created 2026-05-25. Tier 1 currently parked due to App Check.
     "life-platform",                 # Wildcard prefix — pipeline_health_check reads all secrets to verify they exist
 ]
 
@@ -199,8 +201,9 @@ def test_s4_known_secrets_count_matches_architecture():
     # 2026-05-03 (PR 3 / TD-13): full reconciliation against AWS. Added eightsleep-client
     # and anthropic-api-key; removed webhook-key (deleted 2026-03-14, was stale entry).
     # 2026-05-16 (Phase 1.4): soft-deleted orphan anthropic-api-key; removed from KNOWN_SECRETS.
-    # Total = 14 actual secrets + 1 wildcard = 15.
-    EXPECTED_COUNT = 15
+    # 2026-05-25 (SPEC_HEVY): added life-platform/hevy + life-platform/macrofactor.
+    # Total = 16 actual secrets + 1 wildcard = 17.
+    EXPECTED_COUNT = 17
     actual = len(KNOWN_SECRETS)
     assert actual == EXPECTED_COUNT, (
         f"S4 FAIL: KNOWN_SECRETS has {actual} entries, expected {EXPECTED_COUNT}. "
