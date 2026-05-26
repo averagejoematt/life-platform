@@ -294,40 +294,15 @@ FINDING_RATE_LIMIT = 3  # per IP per hour
 
 # ── Router ──────────────────────────────────────────────────
 
-# ── S3 config caches for data-driven pages ─────────────────
+# P1.1 Phase B step 7 (2026-05-26): removed dead code in this section:
+#   • _load_s3_json — moved to site_api_common.py (handle_protocols + handle_domains
+#     now import it from there via site_api_data.py)
+#   • handle_ai_analysis stub — the live handler is inline in lambda_handler
+#     below (/api/ai_analysis takes ?expert= query param so it never went
+#     through the ROUTES table). The stub returned None on direct call, which
+#     ROUTES handled by sending None responses — kept the inline block, removed
+#     the misleading function.
 
-def _load_s3_json(key, cache_name):
-    """Load a JSON file from S3. Returns parsed dict. Cached per Lambda container."""
-    try:
-        S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
-        s3 = boto3.client("s3", region_name=S3_REGION)
-        resp = s3.get_object(Bucket=S3_BUCKET, Key=key)
-        data = json.loads(resp["Body"].read())
-        logger.info(f"[{cache_name}] Loaded from S3: {key}")
-        return data
-    except Exception as e:
-        logger.warning(f"[{cache_name}] Failed to load {key}: {e}")
-        return {}
-
-# ── PULSE-A4: Pulse endpoint ───────────────────────────────────────────────
-
-# ── Observatory API endpoints ────────────────────────────────────────────────
-
-def handle_ai_analysis() -> dict:
-    """
-    GET /api/ai_analysis?expert=mind|nutrition|training|physical
-    Returns cached AI expert analysis from DynamoDB.
-    Cache: 300s.
-    """
-    # Note: query params handled in lambda_handler before ROUTES dispatch
-    # This function is not directly called via ROUTES; handled specially
-    pass
-
-
-# ── BL-02: Bloodwork/Labs endpoint ─────────────────────────────
-# ── Frequent Meals endpoint ───────────────────────────────────
-# ── Meal Glucose Response endpoint ─────────────────────────────
-# ── Strength Benchmarks endpoint ──────────────────────────────
 # ── Phase 1: Changes-Since endpoint ─────────────────────────────
 # ── Phase 1: Observatory Week endpoint ─────────────────────────
 # ── Benchmark trends endpoint ─────────────────────────────────
