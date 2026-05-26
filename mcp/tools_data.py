@@ -514,12 +514,14 @@ def tool_get_intelligence_quality(args):
 
     # Query all intelligence_quality records in date range
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"USER#matthew") & Key("sk").between(
+        # ADR-058: phase=pilot hidden by default.
+        from mcp.core import _apply_phase_filter
+        resp = table.query(**_apply_phase_filter({
+            "KeyConditionExpression": Key("pk").eq(f"USER#matthew") & Key("sk").between(
                 f"SOURCE#intelligence_quality#{start_date}",
                 f"SOURCE#intelligence_quality#{end_date}~",
             ),
-        )
+        }))
         items = [decimal_to_float(i) for i in resp.get("Items", [])]
     except Exception as e:
         return {"error": str(e)}
@@ -570,12 +572,14 @@ def tool_list_actions(args):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     try:
-        resp = table.query(
-            KeyConditionExpression=(
+        # ADR-058: phase=pilot hidden by default.
+        from mcp.core import _apply_phase_filter
+        resp = table.query(**_apply_phase_filter({
+            "KeyConditionExpression": (
                 Key("pk").eq("USER#matthew")
                 & Key("sk").begins_with("SOURCE#coach_actions#")
             ),
-        )
+        }))
         items = [decimal_to_float(i) for i in resp.get("Items", [])]
     except Exception as e:
         return {"error": str(e)}
