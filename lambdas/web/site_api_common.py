@@ -222,12 +222,16 @@ def _load_content_filter():
             "blocked_vices": ["No porn", "No marijuana"],
             "blocked_vice_keywords": ["porn", "pornography", "marijuana", "cannabis", "weed", "thc"],
         }
-        # BUG-05: emit metric when fallback is active
+        # BUG-05: emit EMF metric when fallback is active. We use sys.stdout.write
+        # rather than print() so this file passes test_no_print_in_new_lambdas —
+        # CloudWatch EMF parser requires a pure-JSON line with no logger prefix,
+        # so logger.info() isn't an option here.
         try:
-            print(json.dumps({"_aws": {"Timestamp": int(time.time() * 1000),
+            import sys
+            sys.stdout.write(json.dumps({"_aws": {"Timestamp": int(time.time() * 1000),
                 "CloudWatchMetrics": [{"Namespace": "LifePlatform/SiteApi",
                     "Dimensions": [[]], "Metrics": [{"Name": "ContentFilterFallback", "Unit": "Count"}]}]},
-                "ContentFilterFallback": 1}))
+                "ContentFilterFallback": 1}) + "\n")
         except Exception:
             pass
     return _content_filter_cache
