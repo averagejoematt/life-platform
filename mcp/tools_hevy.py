@@ -25,7 +25,7 @@ from mcp.core import query_source_range, table
 from boto3.dynamodb.conditions import Key
 
 
-_WORKOUT_SOURCES = ("hevy", "macrofactor_api", "macrofactor_export")
+_WORKOUT_SOURCES = ("hevy", "macrofactor_export")
 
 # Legacy daily-aggregate partitions that pre-date the per-workout schema.
 # The MCP read layer expands them into virtual per-workout records on the fly
@@ -151,7 +151,7 @@ def tool_get_workouts(args: dict) -> dict:
     Args:
       start_date:    ISO yyyy-mm-dd (default: 30 days ago)
       end_date:      ISO yyyy-mm-dd (default: today)
-      source:        'hevy' | 'macrofactor_api' | 'macrofactor_export' | None (all)
+      source:        'hevy' | 'macrofactor_export' | None (all)
       limit:         max workouts to return (default 100)
       include_pilot: include pre-genesis (phase=pilot) historical workouts.
                      Default TRUE for this tool — Matthew typically wants to
@@ -334,20 +334,9 @@ def tool_get_workout_source_status(args: dict) -> dict:
     except Exception:
         pass
 
-    # MacroFactor Tier 1 (mf-puller) status — currently disabled per ADR-061 update
-    try:
-        resp = table.get_item(Key={
-            "pk": "USER#system",
-            "sk": "INGESTION_STATE#macrofactor_api",
-        })
-        state = resp.get("Item") or {}
-        out["macrofactor_tier1"] = {
-            "healthy":         state.get("healthy"),
-            "last_error":      state.get("last_error"),
-            "blocked_reason":  state.get("blocked_reason"),
-            "updated_at":      state.get("updated_at"),
-        }
-    except Exception:
-        pass
+    # (Removed 2026-05-25: MF Tier 1 status block — the mf-puller Lambda was
+    # torn down; INGESTION_STATE#macrofactor_api will not be updated again.
+    # See ADR-061 for the attempt + tear-down rationale. MF data flows via
+    # Tier 2 Dropbox export — see dropbox-poll + macrofactor-data-ingestion.)
 
     return out

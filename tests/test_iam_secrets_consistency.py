@@ -73,7 +73,6 @@ KNOWN_SECRETS = [
     "life-platform/dropbox",         # Dropbox API key (also in ingestion-keys bundle)
     "life-platform/todoist",         # Todoist API token — read by MCP write tools (mcp/tools_todoist.py:22). Created 2026-02-21. TD-23 added to mcp_server() IAM.
     "life-platform/hevy",            # ADR-060 / SPEC_HEVY §2.4: api_key + webhook_secret for hevy-webhook + hevy-backfill. Created 2026-05-25.
-    "life-platform/macrofactor",     # ADR-061 / SPEC_HEVY §3.1: MF Firebase email/password for mf-puller. Created 2026-05-25. Tier 1 currently parked due to App Check.
     "life-platform",                 # Wildcard prefix — pipeline_health_check reads all secrets to verify they exist
 ]
 
@@ -83,6 +82,7 @@ DELETED_SECRETS = [
     "life-platform/webhook-key",       # PR 3 (2026-05-03): deleted 2026-03-14 per HANDOVER_v3.7.84. cdk/stacks/role_policies.py:326 still has a stale comment referencing it; removed in PR 3.
     "life-platform/google-calendar",   # Permanently deleted 2026-03-15 (ADR-030)
     "life-platform/anthropic-api-key", # Phase 1.4 (2026-05-16): orphan in AWS — soft-deleted with 7d recovery window. Permanent deletion 2026-05-23.
+    "life-platform/macrofactor",       # 2026-05-25: created earlier today for MF Tier 1 (unofficial Firebase API), blocked by App Check, torn down same day. ADR-061 documents the attempt + removal.
 ]
 
 # Secrets that are referenced in IAM but are known to be transitional.
@@ -202,8 +202,9 @@ def test_s4_known_secrets_count_matches_architecture():
     # and anthropic-api-key; removed webhook-key (deleted 2026-03-14, was stale entry).
     # 2026-05-16 (Phase 1.4): soft-deleted orphan anthropic-api-key; removed from KNOWN_SECRETS.
     # 2026-05-25 (SPEC_HEVY): added life-platform/hevy + life-platform/macrofactor.
-    # Total = 16 actual secrets + 1 wildcard = 17.
-    EXPECTED_COUNT = 17
+    # 2026-05-25 (later): removed life-platform/macrofactor — MF Tier 1 blocked by Firebase App Check, code path torn down. See ADR-061.
+    # Total = 15 actual secrets + 1 wildcard = 16.
+    EXPECTED_COUNT = 16
     actual = len(KNOWN_SECRETS)
     assert actual == EXPECTED_COUNT, (
         f"S4 FAIL: KNOWN_SECRETS has {actual} entries, expected {EXPECTED_COUNT}. "

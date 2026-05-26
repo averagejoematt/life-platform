@@ -1586,7 +1586,7 @@ The platform's current food-level nutrition path is a manual MacroFactor Dropbox
 
 ### Update 2026-05-25 — Tier 1 BLOCKED by Firebase App Check
 
-**Status: ⚠️ Tier 1 deployed but disabled until further notice.**
+**Status (earlier today): ⚠️ Tier 1 deployed but disabled.**
 
 First live test invocation (mf-puller against the real `life-platform/macrofactor` secret) returned:
 ```
@@ -1607,12 +1607,31 @@ The remaining theoretical paths all require either:
 - Real device attestation (DeviceCheck on iOS, Play Integrity on Android) — **impossible from a Lambda**, or
 - Capturing a live App Check token from Matthew's MF mobile app and refreshing manually every ~1 hour — too brittle to operate.
 
-**Actions taken 2026-05-25 23:50 UTC:**
-1. Disabled the EventBridge schedule `LifePlatformIngestion-MacrofactorPullerScheduleEF59-xvxKHODEy3PS` so the puller does not fire daily and create error spam.
-2. Wrote a final status record at `USER#system/INGESTION_STATE#macrofactor_api` with `healthy=false`, `blocked_reason="firebase_app_check"`, and a human-readable explanation in `last_error`.
-3. The Lambda code, IAM role, secret, and CDK definition all remain in place — no infrastructure removed. Re-enabling Tier 1 is a one-step `aws events enable-rule` command once an App Check workaround surfaces.
-4. The graceful-degradation contract worked correctly: puller caught the auth error, recorded health, returned 200 (so Lambda alarm didn't fire), surfaced the "use Dropbox export" advice — exactly the design intent.
+### Update 2026-05-25 (same day, later) — Tier 1 TORN DOWN
 
-**Practical impact:** Tier 2 (manual MacroFactor Dropbox export) is the active food-level + workout path. Hevy (ADR-060) is the active no-touch workout path. There is currently no no-touch path for food-level nutrition — the explicit "accepted risk" of WS-2 has materialized on day one.
+**Status: ❌ Tier 1 removed. Decision recorded for institutional memory.**
 
-**Re-evaluate when:** Either (a) a credible App Check workaround appears in the community libraries, OR (b) MacroFactor publishes an official API, OR (c) 6 months pass and we accept the manual export as the permanent food-level path.
+Initial "park indefinitely" plan reversed: when the disabled Tier 1 surface produced a GitHub secret-scanning alert on the hardcoded Firebase Web API key (`AIzaSy...`), it became clear that parking the code costs ongoing maintenance + audit surface without providing recoverable optionality. If a future App Check workaround appears, it will appear in updated community libraries (Rust `macro-factor-api`, npm `@sjawhar/macrofactor-mcp`); we'd re-extract from the new state of the art anyway, not from this stale code.
+
+**Removed today:**
+- `lambdas/macrofactor_client.py` (unofficial Firebase + Firestore client)
+- `lambdas/macrofactor_puller_lambda.py` (the puller Lambda code)
+- `tests/test_macrofactor_client.py` (16 tests for the deleted client)
+- `deploy/create_macrofactor_secret.sh` (the secret-creation script)
+- `MacrofactorPuller` definition in `cdk/stacks/ingestion_stack.py`
+- `ingestion_macrofactor_puller()` in `cdk/stacks/role_policies.py`
+- `life-platform/macrofactor` from `KNOWN_SECRETS` (test_iam_secrets_consistency.py)
+- `macrofactor_api` from `mcp/tools_hevy.py` `_WORKOUT_SOURCES` + `mcp/registry.py` enum
+- `macrofactor_api` from `ci/lambda_s3_paths.json` exceptions
+- AWS resources (via CDK deploy): `mf-puller` Lambda, its IAM role, the EventBridge rule
+- AWS Secrets Manager: `life-platform/macrofactor` (force-deleted, no recovery window)
+- DDB record at `USER#system/INGESTION_STATE#macrofactor_api`
+
+**What remains:**
+- This ADR — kept as institutional memory: *we already attempted this; here's why it didn't work; here's the threshold for re-attempting*. Future-Claude or future-Matthew can read it and decide whether re-attempting is worth it without re-discovering App Check independently.
+- Tier 2 (MacroFactor Dropbox export → `dropbox-poll` → `macrofactor-data-ingestion`) — unchanged, fully operational, the *only* MF path for both food and workouts.
+- The MCP workout bridge (`tool_get_workouts` with `_expand_legacy_aggregate`) — unchanged, still maps `macrofactor_workouts` legacy daily-aggregates into per-workout views with `source="macrofactor_export"`.
+
+**Re-attempt threshold:** A credible App Check workaround lands in `macro-factor-api` or `@sjawhar/macrofactor-mcp` AND someone (Matthew or future-Claude) confirms it works against a live MF account from a Lambda environment. Re-implementation would extract fresh from the new community library; this ADR documents the prior attempt's specifics.
+
+**Practical impact:** Tier 2 (manual MacroFactor Dropbox export) is the active food-level + workout path. Hevy (ADR-060) is the active no-touch workout path. There is currently no no-touch path for food-level nutrition — the explicit "accepted risk" of WS-2 has materialized on day one, and we are accepting it indefinitely.

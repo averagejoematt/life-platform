@@ -3036,7 +3036,7 @@ TOOLS = {
                     "end_date":   {"type": "string",
                                    "description": "ISO yyyy-mm-dd. Default: today."},
                     "source":     {"type": "string",
-                                   "enum": ["hevy", "macrofactor_api", "macrofactor_export"],
+                                   "enum": ["hevy", "macrofactor_export"],
                                    "description": "Optional source filter. Omit for all."},
                     "limit":      {"type": "integer", "default": 100, "minimum": 1, "maximum": 500,
                                    "description": "Max workouts to return."},

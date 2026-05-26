@@ -1,40 +1,31 @@
 {
-  "_comment": "S3 write path manifest — cross-checks CDK IAM policies against actual Lambda writes.",
-  "_convention": "Default pattern is raw/matthew/{source}/* — only non-convention paths need entries here.",
+  "_comment": "S3 write path manifest \u2014 cross-checks CDK IAM policies against actual Lambda writes.",
+  "_convention": "Default pattern is raw/matthew/{source}/* \u2014 only non-convention paths need entries here.",
   "_how_to_use": "Run tests/test_cdk_s3_paths.py. Add an entry when a Lambda deviates from convention.",
   "_last_updated": "2026-05-25 (added hevy + macrofactor_api exceptions per SPEC_HEVY_AND_NUTRITION_BRIDGE)",
-
   "exceptions": {
     "todoist": {
       "expected_prefix": "raw/todoist/",
       "iam_prefix": "raw/todoist/*",
-      "reason": "Todoist Lambda was built before the raw/{USER_ID}/ convention — writes to raw/todoist/ directly",
+      "reason": "Todoist Lambda was built before the raw/{USER_ID}/ convention \u2014 writes to raw/todoist/ directly",
       "lambda_file": "lambdas/todoist_lambda.py",
       "evidence": "lambdas/todoist_lambda.py: key = f\"raw/todoist/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json\""
     },
     "dropbox": {
       "expected_prefix": "uploads/macrofactor/",
       "iam_prefix": "uploads/macrofactor/*",
-      "reason": "Dropbox poll Lambda reads MacroFactor CSV uploads from S3 uploads/ prefix — it's a trigger path, not a raw ingest path",
+      "reason": "Dropbox poll Lambda reads MacroFactor CSV uploads from S3 uploads/ prefix \u2014 it's a trigger path, not a raw ingest path",
       "lambda_file": "lambdas/dropbox_poll_lambda.py",
       "evidence": "lambdas/dropbox_poll_lambda.py: s3_key = f\"uploads/macrofactor/{filename}\""
     },
     "hevy": {
       "expected_prefix": "raw/hevy/",
       "iam_prefix": "raw/hevy/*",
-      "reason": "ADR-060 / SPEC_HEVY §2.3: Hevy workouts archive to raw/hevy/{workout_id}.json (single-user platform, no user_id segment needed). Both hevy-webhook and hevy-backfill write here.",
+      "reason": "ADR-060 / SPEC_HEVY \u00a72.3: Hevy workouts archive to raw/hevy/{workout_id}.json (single-user platform, no user_id segment needed). Both hevy-webhook and hevy-backfill write here.",
       "lambda_file": "lambdas/hevy_common.py",
       "evidence": "lambdas/hevy_common.py: key = f\"raw/{SOURCE}/{workout_id}.json\""
-    },
-    "macrofactor_api": {
-      "expected_prefix": "raw/macrofactor_api/",
-      "iam_prefix": "raw/macrofactor_api/*",
-      "reason": "ADR-061 / SPEC_HEVY §3.1: MacroFactor Tier 1 puller archives food log + workouts under raw/macrofactor_api/. Currently parked due to Firebase App Check.",
-      "lambda_file": "lambdas/macrofactor_puller_lambda.py",
-      "evidence": "lambdas/macrofactor_puller_lambda.py: key = f\"raw/{SOURCE}/{date_str}.json\""
     }
   },
-
   "convention": {
     "default_prefix_template": "raw/matthew/{source}/",
     "default_iam_template": "raw/matthew/{source}/*",
