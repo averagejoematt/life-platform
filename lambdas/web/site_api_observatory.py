@@ -27,6 +27,7 @@ from web.site_api_common import (
     _experiment_date,
     _get_profile,
     _load_supp_metadata,
+    _load_content_filter,
     _scrub_blocked_terms,
     _is_blocked_vice,
 )
