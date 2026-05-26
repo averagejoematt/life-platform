@@ -65,8 +65,8 @@ Expected emails per day:
 ## What's tracked for post-launch
 
 See `docs/BACKLOG.md` § "2026-05-25 launch-eve bug sweep" for the full list. Key items:
-- P1.1: split `site_api_lambda.py` (7,898 lines) — paused for this morning
-- P3.1: `lambdas/` package restructure — paused, depends on P1.1
+- ~~P1.1: split `site_api_lambda.py` (7,898 lines)~~ ✅ **DONE 2026-05-26** — 7,949 → 1,216 lines (85% reduction) across 7 sibling modules in `lambdas/web/`. See ARCHITECTURE.md "Site API Lambda" section.
+- ~~P3.1: `lambdas/` package restructure~~ ✅ **DONE 2026-05-26** — 73 handler files moved into 7 subpackages (ingestion/, compute/, coach/, emails/, web/, operational/, intelligence/). Note: `email/` was renamed to `emails/` after a P0 incident — the original name shadowed Python's stdlib `email` package and broke every Lambda. See commits 0d566b0 + eecc44c + ADR follow-up.
 - P3.2: coach loop validation — gated on 30 days of post-restart data (2026-06-20)
-- Phase-filter sweep — 245 remaining callsites in 28 Lambdas (daily-brief + character-sheet already done; risk is low because DDB-level phase tags already exclude pilot data)
+- Phase-filter sweep — was 245 remaining callsites; batch 1 (4 site-api callsites) wrapped 2026-05-26. ~241 remaining, mostly mcp/tools + email Lambdas + 192 unclear sites that need per-callsite judgment. Risk is low because DDB-level phase tags already exclude pilot data.
 - Lighthouse-CI advisory in GitHub Actions — flagged, not wired yet
