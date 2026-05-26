@@ -3266,10 +3266,12 @@ def tool_log_ledger_entry(args):
             pass
     elif source_type == "challenge":
         try:
-            ch_resp = table.query(
-                KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}#SOURCE#challenges") & Key("sk").begins_with(f"CHALLENGE#{source_id}"),
-                Limit=1,
-            )
+            from mcp.core import _apply_phase_filter
+            # ADR-058: phase=pilot hidden by default.
+            ch_resp = table.query(**_apply_phase_filter({
+                "KeyConditionExpression": Key("pk").eq(f"USER#{USER_ID}#SOURCE#challenges") & Key("sk").begins_with(f"CHALLENGE#{source_id}"),
+                "Limit": 1,
+            }))
             ch_items = ch_resp.get("Items", [])
             if ch_items:
                 ch = ch_items[0]
