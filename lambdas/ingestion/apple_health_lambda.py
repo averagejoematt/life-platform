@@ -166,13 +166,15 @@ def parse_date(date_str):
 def get_latest_stored_date():
     """Query DynamoDB for the most recent apple_health record."""
     try:
-        response = table.query(
-            KeyConditionExpression=boto3.dynamodb.conditions.Key("pk").eq(
+        # ADR-058: phase=pilot hidden by default.
+        from phase_filter import with_phase_filter
+        response = table.query(**with_phase_filter({
+            "KeyConditionExpression": boto3.dynamodb.conditions.Key("pk").eq(
                 f"USER#{USER_ID}#SOURCE#apple_health"
             ),
-            ScanIndexForward=False,
-            Limit=1,
-        )
+            "ScanIndexForward": False,
+            "Limit": 1,
+        }))
         items = response.get("items") or response.get("Items", [])
         if items:
             sk = items[0].get("sk", "DATE#2000-01-01")

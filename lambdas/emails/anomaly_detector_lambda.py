@@ -201,13 +201,15 @@ def fetch_date(source, date_str):
 
 def fetch_range(source, start, end):
     try:
-        r = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={
+        # ADR-058: phase=pilot hidden by default.
+        from phase_filter import with_phase_filter
+        r = table.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {
                 ":pk": f"USER#{USER_ID}#SOURCE#{source}",
                 ":s":  f"DATE#{start}",
                 ":e":  f"DATE#{end}"
-            })
+            }}))
         return [d2f(item) for item in r.get("Items", [])]
     except Exception:
         return []

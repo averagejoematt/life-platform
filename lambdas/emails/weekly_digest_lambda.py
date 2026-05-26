@@ -627,11 +627,13 @@ def compute_sleep_debt(whoop_dict, target_hrs=7.5):
 
 def fetch_stale_insights(days_threshold=7):
     try:
-        r = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={
+        # ADR-058: phase=pilot hidden by default.
+        from phase_filter import with_phase_filter
+        r = table.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {
                 ":pk": f"USER#{USER_ID}#SOURCE#insights",
-                ":s": "INSIGHT#0", ":e": "INSIGHT#z"})
+                ":s": "INSIGHT#0", ":e": "INSIGHT#z"}}))
         items = r.get("Items", [])
     except Exception as e:
         logger.warning(f"fetch_stale_insights: {e}")
