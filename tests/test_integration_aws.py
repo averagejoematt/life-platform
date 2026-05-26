@@ -147,7 +147,15 @@ def test_i1_lambda_handlers_match_expected():
         try:
             config = lc.get_function_configuration(FunctionName=fn_name)
             actual_handler = config["Handler"]
-            actual_module = actual_handler.split(".")[0]
+            # P3.1 (2026-05-25): handlers are subpackage-qualified now, e.g.
+            # "ingestion.whoop_lambda.lambda_handler". Strip the entry-point
+            # (last component) then take the LAST module-path component as the
+            # "basename" to compare against EXPECTED_HANDLERS.
+            # Examples:
+            #   "ingestion.whoop_lambda.lambda_handler" → "whoop_lambda"
+            #   "site_api_lambda.lambda_handler" (flat) → "site_api_lambda"
+            handler_module_path = actual_handler.rsplit(".", 1)[0]  # strip entry point
+            actual_module = handler_module_path.rsplit(".", 1)[-1]   # basename
 
             if actual_module == "lambda_function":
                 failures.append(
