@@ -220,13 +220,15 @@ def gather_chronicle_data():
     # --- Active experiments ---
     experiments = []
     try:
-        resp = table.query(
-            KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
-            ExpressionAttributeValues={
+        # ADR-058: phase=pilot hidden by default.
+        from phase_filter import with_phase_filter
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+            "ExpressionAttributeValues": {
                 ":pk": f"USER#{USER_ID}#SOURCE#experiments",
                 ":prefix": "EXP#",
             },
-        )
+        }))
         for item in resp.get("Items", []):
             exp = d2f(item)
             if exp.get("status") == "active":
@@ -247,14 +249,16 @@ def gather_chronicle_data():
     # --- Previous 4 installments (for continuity) ---
     prev_installments = []
     try:
-        resp = table.query(
-            KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
-            ExpressionAttributeValues={
+        # ADR-058: phase=pilot hidden by default.
+        from phase_filter import with_phase_filter
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+            "ExpressionAttributeValues": {
                 ":pk": f"USER#{USER_ID}#SOURCE#chronicle",
                 ":prefix": "DATE#",
             },
-            ScanIndexForward=False, Limit=4,
-        )
+            "ScanIndexForward": False, "Limit": 4,
+        }))
         prev_installments = [d2f(i) for i in resp.get("Items", [])]
         logger.info(f"Previous installments: {len(prev_installments)}")
     except Exception as e:
@@ -1964,14 +1968,16 @@ def lambda_handler(event, context):
     date_str = data["dates"]["end"]
     all_installments = []
     try:
-        resp = table.query(
-            KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
-            ExpressionAttributeValues={
+        # ADR-058: phase=pilot hidden by default.
+        from phase_filter import with_phase_filter
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+            "ExpressionAttributeValues": {
                 ":pk": f"USER#{USER_ID}#SOURCE#chronicle",
                 ":prefix": "DATE#",
             },
-            ScanIndexForward=False,
-        )
+            "ScanIndexForward": False,
+        }))
         all_installments = [d2f(i) for i in resp.get("Items", [])]
     except Exception as e:
         logger.warning(f"Failed to query all installments: {e}")
