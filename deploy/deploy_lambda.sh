@@ -84,15 +84,29 @@ HANDLER=$(aws lambda get-function-configuration \
     --region "$REGION" \
     --query "Handler" --output text --no-cli-pager)
 
-# Handler format: <module_name>.lambda_handler → we need <module_name>.py
-MODULE_NAME=$(echo "$HANDLER" | cut -d'.' -f1)
-EXPECTED_FILENAME="${MODULE_NAME}.py"
+# Handler format examples:
+#   Flat:       whoop_lambda.lambda_handler           → zip entry: whoop_lambda.py
+#   Subpkg:     ingestion.whoop_lambda.lambda_handler → zip entry: ingestion/whoop_lambda.py
+# We strip the final `.lambda_handler` (or other entry-point) and convert the
+# remaining dots to slashes for the zip layout. Then the Lambda runtime can
+# import the handler module by its full qualified name (P3.1).
+HANDLER_FN="${HANDLER##*.}"                              # "lambda_handler"
+HANDLER_MODULE_PATH="${HANDLER%.*}"                      # "ingestion.whoop_lambda" or "whoop_lambda"
+EXPECTED_FILENAME="${HANDLER_MODULE_PATH//.//}.py"       # "ingestion/whoop_lambda.py" or "whoop_lambda.py"
 
 echo "   Handler: $HANDLER"
 echo "   Expected zip entry: $EXPECTED_FILENAME"
 
 # ── Step 2: Package with the correct filename ──
 WORK_DIR=$(mktemp -d)
+
+# Create any parent directories the handler needs (e.g., ingestion/)
+EXPECTED_DIR=$(dirname "$EXPECTED_FILENAME")
+if [ "$EXPECTED_DIR" != "." ]; then
+    mkdir -p "$WORK_DIR/$EXPECTED_DIR"
+    # Lambda needs __init__.py to recognize the subpackage at runtime
+    touch "$WORK_DIR/$EXPECTED_DIR/__init__.py"
+fi
 
 cp "$SOURCE_FILE" "$WORK_DIR/$EXPECTED_FILENAME"
 
@@ -106,11 +120,19 @@ for extra in "${EXTRA_FILES[@]+"${EXTRA_FILES[@]}"}"; do
 done
 
 # Build the zip — handle empty extras safely
+# P3.1: zip -r handles subdirectories (ingestion/whoop_lambda.py) + __init__.py
 if [ ${#EXTRA_BASENAMES[@]} -gt 0 ]; then
-    (cd "$WORK_DIR" && zip -q deploy.zip "$EXPECTED_FILENAME" "${EXTRA_BASENAMES[@]}")
+    (cd "$WORK_DIR" && zip -qr deploy.zip "$EXPECTED_FILENAME" "${EXTRA_BASENAMES[@]}")
+    # Include __init__.py if the handler is in a subpackage
+    if [ "$EXPECTED_DIR" != "." ]; then
+        (cd "$WORK_DIR" && zip -qr deploy.zip "${EXPECTED_DIR}/__init__.py")
+    fi
     echo "📦 Packaged $(basename "$SOURCE_FILE") + ${#EXTRA_BASENAMES[@]} extra file(s) → zip"
 else
-    (cd "$WORK_DIR" && zip -q deploy.zip "$EXPECTED_FILENAME")
+    (cd "$WORK_DIR" && zip -qr deploy.zip "$EXPECTED_FILENAME")
+    if [ "$EXPECTED_DIR" != "." ]; then
+        (cd "$WORK_DIR" && zip -qr deploy.zip "${EXPECTED_DIR}/__init__.py")
+    fi
     echo "📦 Packaged $(basename "$SOURCE_FILE") → $EXPECTED_FILENAME in zip"
 fi
 
