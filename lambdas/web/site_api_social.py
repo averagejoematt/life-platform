@@ -234,7 +234,10 @@ def _emit_rate_limit_metric(endpoint: str) -> None:
             "Endpoint": endpoint,
             "RateLimitHit": 1,
         }
-        print(_json.dumps(emf))
+        # sys.stdout.write so CloudWatch EMF parser sees pure JSON without
+        # the logger formatter prefix; same reason as site_api_common.py.
+        import sys
+        sys.stdout.write(_json.dumps(emf) + "\n")
     except Exception:
         pass
 
