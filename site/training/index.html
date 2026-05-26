@@ -402,6 +402,14 @@
       <div id="t-standings-rows">
         <div class="t-row-empty">Loading lifts…</div>
       </div>
+      <!-- Per SPEC_HEVY_AND_NUTRITION_BRIDGE §4.2: subtle source attribution.
+           Workouts can come from Hevy (auto-pulled hourly via API), MacroFactor
+           API (auto-pulled daily — currently blocked by Firebase App Check),
+           or MacroFactor Dropbox export (manual upload). The platform reads
+           all three and dedupes. -->
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);padding:var(--space-3) var(--space-4) 0;border-top:1px solid var(--border-subtle);margin-top:var(--space-3);opacity:0.7">
+        Sources: Hevy · MacroFactor
+      </div>
     </section>
 
     <!-- ═══ 5. LONG STORY — 1RM progression arc ═════════════ -->
@@ -643,7 +651,7 @@
             '<div class="fp-row__spark">' + spark + '</div>' +
           '</a>';
       });
-      rows.innerHTML = any ? html : '<div class="t-row-empty">No lifts logged in Hevy yet.</div>';
+      rows.innerHTML = any ? html : '<div class="t-row-empty">No strength workouts logged yet.</div>';
     }
 
     /* ─── Masthead + lede ────────────────────────────────── */
