@@ -53,16 +53,51 @@ def reset_run_id() -> None:
     _RUN_ID = None
 
 
-def tag_record(record: dict, source_id: str = "unknown") -> dict:
-    """Add run_id + computed_at to a compute output record. Emits metric.
+def tag_record(record: dict, source_id: str = "unknown", phase: str | None = None) -> dict:
+    """Add run_id + computed_at + phase to a compute output record. Emits metric.
 
     Mutates and returns the dict (caller can chain). Safe to call multiple
     times on the same record — last call wins.
+
+    ADR-058: every platform write should carry a `phase` attribute so the
+    default-deny phase filter (with_phase_filter) hides pre-genesis records
+    on the read path. Phase resolution order:
+      1. Explicit `phase=` argument from caller (wins always).
+      2. record["phase"] already set (preserved — no override).
+      3. Auto-infer from record["sk"] if it matches DATE#YYYY-MM-DD:
+         date < EXPERIMENT_START_DATE → "pilot", else "experiment".
+      4. Default: EXPERIMENT_PHASE_CURRENT ("experiment").
     """
     record["run_id"] = _get_run_id()
     record["computed_at"] = datetime.now(timezone.utc).isoformat()
+    if phase is not None:
+        record["phase"] = phase
+    elif "phase" not in record:
+        record["phase"] = _infer_phase_from_record(record)
     _emit_write_metric(source_id)
     return record
+
+
+def _infer_phase_from_record(record: dict) -> str:
+    """Infer phase from record sk if it embeds a date; else current phase.
+
+    Returns "pilot" for pre-EXPERIMENT_START_DATE dates, else the current
+    phase constant (typically "experiment").
+    """
+    try:
+        from constants import EXPERIMENT_START_DATE, EXPERIMENT_PHASE_CURRENT
+    except ImportError:
+        return "experiment"  # Layer not loaded (local test) — safe default
+    sk = record.get("sk", "")
+    # Try patterns: "DATE#YYYY-MM-DD", "DATE#YYYY-MM-DD#anything"
+    if isinstance(sk, str) and sk.startswith("DATE#") and len(sk) >= 15:
+        date_str = sk[5:15]  # YYYY-MM-DD
+        try:
+            datetime.strptime(date_str, "%Y-%m-%d")
+            return "pilot" if date_str < EXPERIMENT_START_DATE else EXPERIMENT_PHASE_CURRENT
+        except ValueError:
+            pass
+    return EXPERIMENT_PHASE_CURRENT
 
 
 def _emit_write_metric(source_id: str) -> None:
