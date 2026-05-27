@@ -1350,6 +1350,23 @@ def record_email_send(table, lambda_name):
 def lambda_handler(event, context):
     if event.get("healthcheck"):
         return {"statusCode": 200, "body": "ok"}
+
+    # DRY_RUN gate (added 2026-05-26): event payload `{"dry_run": true}` OR
+    # env DRY_RUN=1 — generates the brief end-to-end but skips both SES
+    # send_email calls (line ~1462 sick-day banner, line ~2004 main brief).
+    # Prevents the "5 duplicate Morning Briefs" bug class where manual
+    # invocations during testing actually ship to recipients.
+    # Caller can also pass {"force_send": true} to override env DRY_RUN
+    # for one-off real sends.
+    _dry_run = bool(event.get("dry_run")) or (
+        os.environ.get("DRY_RUN", "").lower() in ("1", "true", "yes")
+        and not event.get("force_send")
+    )
+    if _dry_run:
+        logger.info("[daily-brief] DRY_RUN mode — generating brief but skipping SES send")
+    # Stash on event so the two send_email paths can read it without plumbing
+    event["_dry_run_resolved"] = _dry_run
+
     _init_output_writers()  # late-bind; safe to call multiple times (idempotent)
 
     # Regrade mode: recompute day grades without sending email
@@ -1459,17 +1476,20 @@ def lambda_handler(event, context):
 </html>"""
 
         _sb_subject = f"Recovery Day | {_today_short} | 🤒 Rest up — no scores today"
-        ses.send_email(
-            FromEmailAddress=SENDER,
-            Destination={"ToAddresses": [RECIPIENT]},
-            Content={"Simple": {
-                "Subject": {"Data": _sb_subject, "Charset": "UTF-8"},
-                "Body":    {"Html": {"Data": _sb_html, "Charset": "UTF-8"}},
-            }},
-            ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
-            EmailTags=[{"Name": "message_type", "Value": "daily_brief_sick"}],
-        )
-        logger.info(f"Recovery brief sent: {_sb_subject}")
+        if event.get("_dry_run_resolved"):
+            logger.info(f"[DRY_RUN] would have sent: {_sb_subject} ({len(_sb_html)} bytes)")
+        else:
+            ses.send_email(
+                FromEmailAddress=SENDER,
+                Destination={"ToAddresses": [RECIPIENT]},
+                Content={"Simple": {
+                    "Subject": {"Data": _sb_subject, "Charset": "UTF-8"},
+                    "Body":    {"Html": {"Data": _sb_html, "Charset": "UTF-8"}},
+                }},
+                ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
+                EmailTags=[{"Name": "message_type", "Value": "daily_brief_sick"}],
+            )
+            logger.info(f"Recovery brief sent: {_sb_subject}")
 
         try:
             output_writers.write_buddy_json(
@@ -2001,17 +2021,20 @@ def lambda_handler(event, context):
         subject = prefix + " " + subject
         logger.info("Demo mode: sanitization applied")
 
-    ses.send_email(
-        FromEmailAddress=SENDER,
-        Destination={"ToAddresses": [RECIPIENT]},
-        Content={"Simple": {
-            "Subject": {"Data": subject, "Charset": "UTF-8"},
-            "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
-        }},
-        ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
-        EmailTags=[{"Name": "message_type", "Value": "daily_brief"}],
-    )
-    logger.info("Sent: " + subject)
+    if event.get("_dry_run_resolved"):
+        logger.info(f"[DRY_RUN] would have sent: {subject} ({len(html)} bytes)")
+    else:
+        ses.send_email(
+            FromEmailAddress=SENDER,
+            Destination={"ToAddresses": [RECIPIENT]},
+            Content={"Simple": {
+                "Subject": {"Data": subject, "Charset": "UTF-8"},
+                "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
+            }},
+            ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
+            EmailTags=[{"Name": "message_type", "Value": "daily_brief"}],
+        )
+        logger.info("Sent: " + subject)
 
     if not demo_mode:
         output_writers.write_dashboard_json(

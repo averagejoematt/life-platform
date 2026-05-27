@@ -1028,6 +1028,15 @@ def test_i16_recent_ingest_records_exist():
     Post-genesis, the system should ingest withings + whoop + macrofactor +
     todoist + notion daily. Allow 24h slop so an early-morning run before all
     ingestions complete doesn't flake.
+
+    Known behavioral flake (2026-05-27 observation): of the 5 sources, only
+    whoop is fully passive — the rest depend on user action (stepping on
+    Withings, logging food in MacroFactor, completing/creating Todoist
+    tasks, writing in Notion). On low-activity days this test correctly
+    fails with `Found: ['whoop@...']` (1 source < 2 required). This is
+    NOT a code regression — the platform is faithfully reporting that
+    you haven't been logging. Self-resolves on the first day with any
+    real user activity.
     """
     from datetime import datetime, timedelta, timezone
     boto3 = _get_boto3()
