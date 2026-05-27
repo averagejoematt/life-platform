@@ -279,7 +279,7 @@ def handle_coach_analysis(event):
         resp = {k: v for k, v in resp.items() if v is not None}
         return _ok(resp, cache_seconds=300)
     except Exception as _e:
-        print(f"[WARN] /api/coach_analysis failed: {_e}")
+        logger.warning(f"[/api/coach_analysis] {_e}")
         return _ok({"coach_id": coach_id, "domain": domain, "analysis": None}, cache_seconds=60)
 
     # Coaching Dashboard (GET — assembled dashboard data)
@@ -377,7 +377,7 @@ def handle_predictions(event):
             "predictions": all_predictions,
         }, cache_seconds=300)
     except Exception as _e:
-        print(f"[WARN] /api/predictions failed: {_e}")
+        logger.warning(f"[/api/predictions] {_e}")
         return _ok({"overall": {}, "by_coach": {}, "predictions": []}, cache_seconds=60)
 
     # Coach Learning Timeline (GET with ?coach_id= query param)
@@ -531,7 +531,7 @@ def handle_coach_timeline(event):
             "milestones": unique_milestones[:50],
         }, cache_seconds=600)
     except Exception as _e:
-        print(f"[WARN] /api/coach_timeline failed: {_e}")
+        logger.warning(f"[/api/coach_timeline] {_e}")
         return _ok({"coach_id": "", "coach_name": "", "milestones": []}, cache_seconds=60)
 
     # Weekly Priority (GET — integrator synthesis)
@@ -553,5 +553,5 @@ def handle_weekly_priority(event):
             "coach_title": "Integrative Health Director",
         }, cache_seconds=300)
     except Exception as _e:
-        print(f"[WARN] /api/weekly_priority failed: {_e}")
+        logger.warning(f"[/api/weekly_priority] {_e}")
         return _ok({"weekly_priority": None}, cache_seconds=60)

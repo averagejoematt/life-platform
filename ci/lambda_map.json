@@ -6,10 +6,14 @@
       "function": "strava-data-ingestion"
     },
     "lambdas/ingestion/hevy_webhook_lambda.py": {
-      "function": "hevy-webhook"
+      "function": "hevy-webhook",
+      "cdk_only": true,
+      "_cdk_only_reason": "Has sibling imports (web.site_api_*, hevy_common, etc.) that deploy_lambda.sh doesn't bundle. Single-file hot-deploy would break Runtime.ImportModuleError at next invoke. Only `cdk deploy` ships the full Code.from_asset('../lambdas') bundle correctly."
     },
     "lambdas/ingestion/hevy_backfill_lambda.py": {
-      "function": "hevy-backfill"
+      "function": "hevy-backfill",
+      "cdk_only": true,
+      "_cdk_only_reason": "Has sibling imports (web.site_api_*, hevy_common, etc.) that deploy_lambda.sh doesn't bundle. Single-file hot-deploy would break Runtime.ImportModuleError at next invoke. Only `cdk deploy` ships the full Code.from_asset('../lambdas') bundle correctly."
     },
     "lambdas/ingestion/whoop_lambda.py": {
       "function": "whoop-data-ingestion"
@@ -148,7 +152,9 @@
       "function": "chronicle-approve"
     },
     "lambdas/web/site_api_lambda.py": {
-      "function": "life-platform-site-api"
+      "function": "life-platform-site-api",
+      "cdk_only": true,
+      "_cdk_only_reason": "Has sibling imports (web.site_api_*, hevy_common, etc.) that deploy_lambda.sh doesn't bundle. Single-file hot-deploy would break Runtime.ImportModuleError at next invoke. Only `cdk deploy` ships the full Code.from_asset('../lambdas') bundle correctly."
     },
     "lambdas/web/site_stats_refresh_lambda.py": {
       "function": "site-stats-refresh"
