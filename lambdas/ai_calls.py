@@ -1146,6 +1146,15 @@ def daily_brief_shared_system(
         "- If a metric is missing from the user message, say so — don't extrapolate.",
         "- Coaching is direct and warm; never preachy.",
         "- Stage-appropriate: Matthew is mid-journey, not a beginner.",
+        "- **Opening-line rule (do not violate)**: Never begin your response"
+        " with the name 'Matthew' or any greeting/salutation. Open with the"
+        " *substance* — a number, an observation, a verdict."
+        " The ai_output_validator flags 'Output starts with Matthew' as a"
+        " quality warning; the training coach has been violating this"
+        " consistently. Correct openings start with data: 'HRV at 47ms tells"
+        " me…', 'Sleep dropped to 5.8 hours…', 'Two missed sessions this"
+        " week…'. Incorrect: 'Matthew, your HRV…', 'Matthew — sleep dropped…'."
+        " Treat this as a hard constraint, not a stylistic preference.",
         "",
         "Coach-specific instructions follow in each user message.",
     ])
