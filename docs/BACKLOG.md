@@ -239,7 +239,8 @@ If you do an item, move it to `docs/CHANGELOG.md` and remove from here. If you d
 
 ### Restart 2026-05-18 follow-ups
 
-- [ ] Sweep ~110 remaining direct `table.query` call sites that bypass the phase-filter chokepoints (mostly in compute Lambdas and secondary MCP tools — see `_restart_followups.txt`).
+- [x] **2026-05-27: Wrapped 20 of the original 21 clear-cut USER#-data sites** across 3 batches (commits 0bcb771 + 3796a5f + 5f4d969). Covers web (site-api family), MCP tools, ingestion (apple_health), and email Lambdas (chronicle, weekly_digest, monthly_digest, anomaly_detector). Skipped 1 intentionally (subscriber count — SUBSCRIBER records deliberately untagged per ADR-058).
+- [ ] **Deferred — remaining ~46 phase-relevant sites + 145 truly-unclear sites.** Per-callsite domain judgment needed. Highest-volume buckets: `site_api_intelligence.py` (18 sites — /api/status path, 5-min cache so leakage half-life is short), `failure_pattern_compute_lambda.py` (4 sites — high blast radius into daily compute). Risk acceptable to defer because pre-genesis records are correctly phase-tagged at write, AND `compute_metadata.tag_record()` now auto-infers phase from sk on every future write (commit 462de75).
 - [ ] Re-evaluate phase filter at 30/60/90 days post-restart (ADR-058 §13).
 - [ ] Remove orphan IAM references to `S3_KMS_KEY_ARN` in `cdk/stacks/role_policies.py` once the customer key completes its scheduled deletion (2026-06-16).
 - [x] ~~DLQ has 62 stale messages — drain via `life-platform-dlq-consumer`.~~ — drained 2026-05-24 (down to 0).
