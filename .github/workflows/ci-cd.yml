@@ -720,6 +720,19 @@ jobs:
               continue
             fi
 
+            # 2026-05-27: cdk_only flag — multi-module Lambdas that import
+            # sibling files (web.site_api_common, hevy_common, etc.) can't
+            # be hot-deployed via deploy_lambda.sh (which only zips the
+            # single source file). Only `cdk deploy` ships the full
+            # Code.from_asset('../lambdas') bundle. Skip with a clear message.
+            # P0 incident 2026-05-27: site-api went down 3 min after a CDK
+            # deploy when CI re-uploaded with a broken single-file zip.
+            CDK_ONLY=$(jq -r --arg f "$SRC" '.lambdas[$f].cdk_only // false' "${{ env.LAMBDA_MAP }}")
+            if [ "$CDK_ONLY" = "true" ]; then
+              echo "  ⚠️ SKIPPED: $FUNC is cdk_only (multi-module imports — see lambda_map.json _cdk_only_reason). Run \`cd cdk && npx cdk deploy <stack>\` locally."
+              continue
+            fi
+
             if bash deploy/deploy_lambda.sh "$FUNC" "$SRC"; then
               aws lambda wait function-updated \
                 --function-name "$FUNC" \
