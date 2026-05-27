@@ -34,7 +34,7 @@ AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 
 # Shared utils layer — update on every layer rebuild (bash deploy/build_layer.sh)
-SHARED_LAYER_VERSION = 58  # v58: P3.1 lambdas/ subpkg restructure triggered layer-asset rehash, CDK published a fresh version (2026-05-25)
+SHARED_LAYER_VERSION = 59  # v59: ai_calls.py — training-coach opening-rule prompt fix (2026-05-26/27)
 
 SHARED_LAYER_ARN = (
     f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
