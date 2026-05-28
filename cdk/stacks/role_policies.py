@@ -43,6 +43,27 @@ def _s3(*prefixes: str) -> list[str]:
     return [f"{BUCKET_ARN}/{p}" for p in prefixes]
 
 
+def _bedrock_statement() -> iam.PolicyStatement:
+    """ADR-062 (2026-05-27): bedrock:InvokeModel for Claude inference.
+
+    Migration from direct Anthropic API → Bedrock. Granted to every AI-calling
+    role (anywhere ai-keys was previously granted). Scoped to Anthropic Claude
+    only — both the cross-region inference profiles (`us.anthropic.claude-*`,
+    which on-demand 4.x models require) AND the underlying foundation-model
+    ARNs the profiles fan out to (InvokeModel is authorized against both).
+    Region wildcard because the us. profile routes across us-east-1/us-east-2/
+    us-west-2.
+    """
+    return iam.PolicyStatement(
+        sid="BedrockInvoke",
+        actions=["bedrock:InvokeModel"],
+        resources=[
+            f"arn:aws:bedrock:*:{ACCT}:inference-profile/us.anthropic.claude-*",
+            "arn:aws:bedrock:*::foundation-model/anthropic.claude-*",
+        ],
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # INGESTION STACK — 15 Lambdas
 # Pattern: DDB write, S3 raw/<source>/*, source-specific secret, DLQ
@@ -235,6 +256,7 @@ def ingestion_journal_enrichment() -> list[iam.PolicyStatement]:
             actions=["secretsmanager:GetSecretValue"],
             resources=[_secret_arn("life-platform/ai-keys")],
         ),
+        _bedrock_statement(),  # ADR-062: AI-calling enrichment role → Bedrock invoke
         iam.PolicyStatement(
             sid="DLQ",
             actions=["sqs:SendMessage"],
@@ -286,6 +308,7 @@ def ingestion_activity_enrichment() -> list[iam.PolicyStatement]:
             actions=["secretsmanager:GetSecretValue"],
             resources=[_secret_arn("life-platform/ai-keys")],
         ),
+        _bedrock_statement(),  # ADR-062: AI-calling enrichment role → Bedrock invoke
         iam.PolicyStatement(
             sid="DLQ",
             actions=["sqs:SendMessage"],
@@ -465,6 +488,10 @@ def _compute_base(
             actions=["secretsmanager:GetSecretValue"],
             resources=[_secret_arn("life-platform/ai-keys")],
         ))
+        # ADR-062: needs_ai_keys marks AI-calling roles → also grant Bedrock.
+        # (ai-keys secret kept for now; vestigial post-migration since Bedrock
+        # uses IAM auth, but harmless and eases rollback.)
+        stmts.append(_bedrock_statement())
     if needs_ses:
         stmts.append(iam.PolicyStatement(
             sid="SES",
@@ -638,6 +665,8 @@ def _email_base(
             actions=["secretsmanager:GetSecretValue"],
             resources=[_secret_arn(s) for s in ["life-platform/ai-keys"] + (extra_secrets or [])],
         ),
+        # ADR-062: all email Lambdas call AI → grant Bedrock invoke.
+        _bedrock_statement(),
         iam.PolicyStatement(
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
@@ -1063,6 +1092,9 @@ def operational_canary() -> list[iam.PolicyStatement]:
                 _secret_arn("life-platform/ai-keys"),
             ],
         ),
+        # ADR-062: canary's AI health-check now invokes Bedrock (was direct
+        # Anthropic API). Catches the Bedrock access/throttle failure modes.
+        _bedrock_statement(),
         iam.PolicyStatement(
             sid="SESAlert",
             # Canary sends an SES alert email when checks fail
@@ -1400,6 +1432,7 @@ def site_api_ai() -> list[iam.PolicyStatement]:
             actions=["secretsmanager:GetSecretValue"],
             resources=[_secret_arn("life-platform/site-api-ai-key")],
         ),
+        _bedrock_statement(),  # ADR-062: /api/ask + /api/board_ask now use Bedrock
     ]
 
 

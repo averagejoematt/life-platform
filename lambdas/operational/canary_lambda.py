@@ -305,60 +305,52 @@ def get_anthropic_api_key() -> str | None:
 
 
 def check_anthropic(canary_ts: str) -> tuple[bool, str, float]:
-    """Make a tiny ($0.0001) Anthropic call to verify auth + billing + access.
+    """Make a tiny (max_tokens=1) Bedrock call to verify Claude inference is live.
 
-    Catches the failure mode that hit on 2026-05-03 morning: Anthropic disabled
-    the platform's API key for billing reasons, daily-brief silently failed for
-    ~2 hours before the F-grade brief surfaced it.
+    ADR-062 (2026-05-27): migrated from direct Anthropic API to Bedrock. This
+    canary now catches the Bedrock-equivalent failure modes:
+      • AccessDeniedException — IAM lost bedrock:InvokeModel, OR the Anthropic
+        use-case form was never submitted / lapsed (the gate that blocked the
+        migration cutover). This is the new "key disabled / credits exhausted"
+        equivalent — surfaces within 4h instead of via an F-grade brief.
+      • ThrottlingException — account throughput limits.
+      • ResourceNotFoundException — model/profile access revoked.
 
-    Returns (None, msg, 0) if the API key is unavailable (skip — not a failure).
+    Returns (None, msg, 0) if Bedrock client can't init (skip — not a failure).
     """
-    api_key = get_anthropic_api_key()
-    if not api_key:
-        return None, "Anthropic API key unavailable — skipping", 0.0
+    t0 = time.monotonic()
+    try:
+        from bedrock_client import invoke as _bedrock_invoke
+        import botocore.exceptions as _bce
+    except Exception as e:
+        return None, f"bedrock_client import failed — skipping: {e}", 0.0
 
-    payload = json.dumps({
+    body = {
         "model": ANTHROPIC_CANARY_MODEL,
         "max_tokens": 1,
         "messages": [{"role": "user", "content": "."}],
-    }).encode("utf-8")
-
-    t0 = time.monotonic()
+    }
     try:
-        req = urllib.request.Request(
-            ANTHROPIC_API_BASE,
-            data=payload,
-            headers={
-                "Content-Type": "application/json",
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-            },
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            status = resp.status
-            body = resp.read()
+        resp = _bedrock_invoke(body)
         latency = (time.monotonic() - t0) * 1000
-        if status == 200:
-            return True, f"Anthropic OK ({status}, {len(body)}B, {ANTHROPIC_CANARY_MODEL})", latency
-        return False, f"Anthropic returned HTTP {status}", latency
-    except urllib.error.HTTPError as e:
+        # Any well-formed response = inference path healthy.
+        if resp.get("content"):
+            return True, f"Bedrock OK ({ANTHROPIC_CANARY_MODEL}, {len(str(resp))}B)", latency
+        return False, f"Bedrock returned no content: {str(resp)[:200]}", latency
+    except _bce.ClientError as e:
         latency = (time.monotonic() - t0) * 1000
-        body_preview = ""
-        try:
-            body_preview = e.read().decode("utf-8", errors="replace")[:200]
-        except Exception:
-            pass
-        if e.code in (401, 403):
-            return False, f"Anthropic auth failure HTTP {e.code} (key disabled?): {body_preview}", latency
-        if e.code == 402:
-            return False, f"Anthropic payment required HTTP 402 (credits exhausted?): {body_preview}", latency
-        if e.code == 429:
-            return False, f"Anthropic rate limit HTTP 429: {body_preview}", latency
-        return False, f"Anthropic HTTP {e.code}: {body_preview}", latency
+        code = e.response.get("Error", {}).get("Code", "Unknown")
+        msg = e.response.get("Error", {}).get("Message", "")[:200]
+        if code == "AccessDeniedException":
+            return False, f"Bedrock access denied (IAM lost bedrock:InvokeModel OR Anthropic use-case form not submitted): {msg}", latency
+        if code == "ThrottlingException":
+            return False, f"Bedrock throttled: {msg}", latency
+        if code == "ResourceNotFoundException":
+            return False, f"Bedrock model/profile not found (access revoked?): {msg}", latency
+        return False, f"Bedrock {code}: {msg}", latency
     except Exception as e:
         latency = (time.monotonic() - t0) * 1000
-        return False, f"Anthropic error: {e}", latency
+        return False, f"Bedrock error: {e}", latency
 
 
 def check_subscribe_flow(canary_ts: str) -> tuple[bool, str, float]:

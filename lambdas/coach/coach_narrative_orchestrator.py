@@ -225,69 +225,30 @@ def _call_haiku(system, user_message, max_tokens=2000, temperature=0.3):
         method="POST",
     )
 
-    for attempt in range(1, _MAX_ATTEMPTS + 1):
-        try:
-            with urllib.request.urlopen(req, timeout=60) as r:
-                resp = json.loads(r.read())
-                usage = resp.get("usage", {})
-                if usage:
-                    cache_creation = usage.get("cache_creation_input_tokens", 0)
-                    cache_read = usage.get("cache_read_input_tokens", 0)
-                    logger.info("Token usage — input: %d, output: %d, cache_creation: %d, cache_read: %d",
-                                usage.get("input_tokens", 0), usage.get("output_tokens", 0),
-                                cache_creation, cache_read)
-                    _emit_token_metrics(
-                        usage.get("input_tokens", 0),
-                        usage.get("output_tokens", 0),
-                        cache_creation_tokens=usage.get("cache_creation_input_tokens", 0),
-                        cache_read_tokens=usage.get("cache_read_input_tokens", 0),
-                    )
-                text = resp["content"][0]["text"].strip()
-                # Try to parse as JSON
+    # ADR-062 (2026-05-27): route through retry_utils.call_anthropic_raw (Bedrock).
+    from retry_utils import call_anthropic_raw
+    resp = call_anthropic_raw(req)
+    text = resp["content"][0]["text"].strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        if "```json" in text:
+            start = text.find("```json") + 7
+            end = text.find("```", start)
+            if end > start:
                 try:
-                    return json.loads(text)
+                    return json.loads(text[start:end].strip())
                 except json.JSONDecodeError:
-                    # Try extracting JSON from markdown code block
-                    # V2 (2026-05-19): defensive parse — text.index raises ValueError
-                    # ("substring not found") when LLM emits an opening fence but no
-                    # closing fence. Use .find() and fall back to raw text.
-                    if "```json" in text:
-                        start = text.find("```json") + 7
-                        end = text.find("```", start)
-                        if end > start:
-                            try:
-                                return json.loads(text[start:end].strip())
-                            except json.JSONDecodeError:
-                                pass
-                    elif "```" in text:
-                        start = text.find("```") + 3
-                        end = text.find("```", start)
-                        if end > start:
-                            try:
-                                return json.loads(text[start:end].strip())
-                            except json.JSONDecodeError:
-                                pass
-                    return text
-
-        except urllib.error.HTTPError as e:
-            logger.warning("Anthropic HTTP %d attempt %d/%d", e.code, attempt, _MAX_ATTEMPTS)
-            if e.code in _RETRYABLE_CODES and attempt < _MAX_ATTEMPTS:
-                delay = _BACKOFF_DELAYS[attempt - 1]
-                logger.info("Retrying in %ds...", delay)
-                time.sleep(delay)
-            else:
-                _emit_failure_metric()
-                raise
-
-        except urllib.error.URLError as e:
-            logger.warning("Anthropic network error attempt %d/%d: %s", attempt, _MAX_ATTEMPTS, e)
-            if attempt < _MAX_ATTEMPTS:
-                delay = _BACKOFF_DELAYS[attempt - 1]
-                logger.info("Retrying in %ds...", delay)
-                time.sleep(delay)
-            else:
-                _emit_failure_metric()
-                raise
+                    pass
+        elif "```" in text:
+            start = text.find("```") + 3
+            end = text.find("```", start)
+            if end > start:
+                try:
+                    return json.loads(text[start:end].strip())
+                except json.JSONDecodeError:
+                    pass
+        return text
 
 
 # ══════════════════════════════════════════════════════════════════════════════

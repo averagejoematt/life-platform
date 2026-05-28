@@ -375,32 +375,26 @@ If no clear signal exists, return 0 challenges. Quality over quantity."""
                  "anthropic-beta": "prompt-caching-2024-07-31"}, method="POST",
     )
 
-    for attempt in range(1, 3):
-        try:
-            with urllib.request.urlopen(req, timeout=90) as r:
-                resp = json.loads(r.read())
-                raw = resp["content"][0]["text"].strip()
-                # Strip markdown fences
-                if raw.startswith("```"):
-                    raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-                if raw.endswith("```"):
-                    raw = raw[:-3]
-                # AI-3 validation
-                if _HAS_AI_VALIDATOR:
-                    val_result = validate_ai_output(raw, AIOutputType.GENERIC)
-                    if val_result.blocked:
-                        logger.error("[AI-3] challenge generation blocked: %s", val_result.block_reason)
-                        return None
-                return json.loads(raw.strip())
-        except urllib.error.HTTPError as e:
-            logger.warning(f"Anthropic HTTP {e.code} attempt {attempt}")
-            if attempt < 2 and e.code in (429, 529, 500, 502, 503, 504):
-                time.sleep(5)
-            else:
-                raise
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Challenge parse error: {e}")
-            return None
+    # ADR-062 (2026-05-27): route through retry_utils.call_anthropic_raw (Bedrock).
+    try:
+        from retry_utils import call_anthropic_raw
+        resp = call_anthropic_raw(req)
+        raw = resp["content"][0]["text"].strip()
+        # Strip markdown fences
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+        if raw.endswith("```"):
+            raw = raw[:-3]
+        # AI-3 validation
+        if _HAS_AI_VALIDATOR:
+            val_result = validate_ai_output(raw, AIOutputType.GENERIC)
+            if val_result.blocked:
+                logger.error("[AI-3] challenge generation blocked: %s", val_result.block_reason)
+                return None
+        return json.loads(raw.strip())
+    except (json.JSONDecodeError, KeyError) as e:
+        logger.error(f"Challenge parse error: {e}")
+        return None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
