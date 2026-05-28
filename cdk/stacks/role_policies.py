@@ -1030,7 +1030,8 @@ def operational_alert_digest() -> list[iam.PolicyStatement]:
 
 
 def operational_dlq_consumer() -> list[iam.PolicyStatement]:
-    """DLQ consumer: reads from DLQ, logs dead messages, sends SES summary."""
+    """DLQ consumer: reads the DLQ, re-drives transient failures to the source
+    Lambda, archives permanent failures to S3, sends an SES summary."""
     return [
         iam.PolicyStatement(
             sid="SQS",
@@ -1046,6 +1047,24 @@ def operational_dlq_consumer() -> list[iam.PolicyStatement]:
             sid="DLQ",
             actions=["sqs:SendMessage"],
             resources=[DLQ_ARN],
+        ),
+        # Archive permanent failures for post-mortem (was AccessDenied — 2026-05-28).
+        iam.PolicyStatement(
+            sid="S3Archive",
+            actions=["s3:PutObject"],
+            resources=_s3("dead-letter-archive/*"),
+        ),
+        # Re-drive transient failures: resolve the source function from the
+        # triggering EventBridge rule, then re-invoke it (2026-05-28).
+        iam.PolicyStatement(
+            sid="ResolveRuleTarget",
+            actions=["events:ListTargetsByRule"],
+            resources=[f"arn:aws:events:{REGION}:{ACCT}:rule/LifePlatform*"],
+        ),
+        iam.PolicyStatement(
+            sid="RedriveInvoke",
+            actions=["lambda:InvokeFunction"],
+            resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:*"],
         ),
     ]
 

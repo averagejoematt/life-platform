@@ -58,6 +58,7 @@ sqs = boto3.client("sqs",        region_name=REGION)
 lam = boto3.client("lambda",     region_name=REGION)
 ses = boto3.client("sesv2",      region_name=REGION)
 s3 = boto3.client("s3",         region_name=REGION)
+events = boto3.client("events",  region_name=REGION)
 
 
 # ── Classification ─────────────────────────────────────────────────────────────
@@ -120,30 +121,63 @@ def classify_message(message: dict) -> str:
 
 # ── Retry logic ────────────────────────────────────────────────────────────────
 
+# Cache rule-name → target-function-ARN so we don't re-query EventBridge per
+# message within a single run (the same scheduled rule produces many DLQ msgs).
+_rule_fn_cache: dict[str, str | None] = {}
+
+
+def _function_from_eventbridge(body_obj: dict) -> str | None:
+    """Resolve the target Lambda for an EventBridge-triggered async failure.
+
+    A Lambda async-DLQ message is the *original invocation event*, not a wrapper
+    — so for scheduled ingestion the function name isn't in the payload. But the
+    EventBridge event carries the triggering rule ARN in `resources`, and the
+    rule has exactly one Lambda target. Look it up dynamically rather than
+    hard-coding a rule→function map (which would rot as stacks change)."""
+    for arn in body_obj.get("resources") or []:
+        if ":rule/" not in arn:
+            continue
+        rule_name = arn.split(":rule/", 1)[1]
+        if rule_name in _rule_fn_cache:
+            return _rule_fn_cache[rule_name]
+        target = None
+        try:
+            for t in events.list_targets_by_rule(Rule=rule_name).get("Targets", []):
+                if ":function:" in t.get("Arn", ""):
+                    target = t["Arn"]
+                    break
+        except Exception as e:
+            logger.warning(f"  list_targets_by_rule failed for {rule_name}: {e}")
+        _rule_fn_cache[rule_name] = target
+        if target:
+            return target
+    return None
+
+
 def extract_function_name(message: dict) -> str | None:
     """
-    Extract the original Lambda function name from SQS DLQ metadata.
-    SQS DLQs from Lambda async invocations include the source in the
-    message attributes or in the event source ARN.
-    """
-    # Check message attributes first (Lambda sets these)
-    msg_attrs = message.get("MessageAttributes", {})
-    for attr_name in ["RequestID", "ErrorCode", "ErrorMessage"]:
-        if attr_name in msg_attrs:
-            # Lambda DLQ messages don't directly include function name in attrs
-            break
+    Extract the original Lambda function name from an SQS DLQ message.
 
-    # Try to extract from body (some Lambda DLQ payloads include metadata)
+    Lambda async-DLQ messages do NOT include the function name in attributes;
+    the body is the original event. We support two shapes:
+      1. Payloads that explicitly carry the name (rare).
+      2. EventBridge scheduled events → resolve via the triggering rule's target.
+    """
     try:
         body = json.loads(message.get("Body", "{}"))
-        # Lambda async error records sometimes include the function name
-        fn = (body.get("function_name")
-              or body.get("FunctionName")
-              or body.get("lambda_function"))
-        if fn:
-            return fn
     except (json.JSONDecodeError, TypeError):
-        pass
+        return None
+    if not isinstance(body, dict):
+        return None
+
+    fn = (body.get("function_name")
+          or body.get("FunctionName")
+          or body.get("lambda_function"))
+    if fn:
+        return fn
+
+    if body.get("source") == "aws.events" or body.get("resources"):
+        return _function_from_eventbridge(body)
 
     return None
 
@@ -256,7 +290,7 @@ def send_alert(permanent_failures: list[dict]) -> None:
     {rows}
   </table>
   <div class="footer">
-    DLQ: life-platform-ingestion-dlq | 
+    DLQ: life-platform-ingestion-dlq |
     <a href="https://us-west-2.console.aws.amazon.com/sqs/v3/home?region=us-west-2#/queues" style="color:#888;">View SQS</a>
   </div>
 </div></body></html>"""
