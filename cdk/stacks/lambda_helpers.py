@@ -80,6 +80,12 @@ def create_platform_lambda(
     ses_domain: str = None,
     # ── Code override ──
     code: _lambda.Code = None,  # Override code asset (default: Code.from_asset("../lambdas"))
+    # ── Async invoke retry (EventBridge-triggered Lambdas) ──
+    # None = AWS default (2). Set 0 for sources where a failed run must NOT be
+    # auto-retried — e.g. Garmin, whose failures are OAuth-refresh 429s; retrying
+    # re-hammers the throttled endpoint and prolongs the lockout (the source then
+    # gap-fills on its next scheduled run anyway).
+    retry_attempts: int = None,
     # ── Observability ──
     # ADR-058 follow-up (2026-05-24): default to ACTIVE so all Lambdas emit X-Ray
     # traces. ~$0.50/month for this platform's volume. Enables distributed-tracing
@@ -217,6 +223,7 @@ def create_platform_lambda(
         # (was the drift class that re-emerged with coach-observatory-renderer
         # and life-platform-delete-user-data on 2026-05-17).
         log_retention=logs.RetentionDays.ONE_MONTH,
+        **({"retry_attempts": retry_attempts} if retry_attempts is not None else {}),
     )
 
     # Set DLQ via L1 escape hatch when using existing role — avoids auto-grant.
