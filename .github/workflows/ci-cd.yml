@@ -597,30 +597,22 @@ jobs:
           role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Rebuild shared layer
+      - name: Verify shared layer is current
         if: needs.plan.outputs.layer_changed == 'true'
         run: |
-          echo "═══ Rebuilding shared utils layer ═══"
-          bash deploy/p3_build_shared_utils_layer.sh
-
-          # Same pagination caveat as above — pipe through head -1 so we
-          # only get page 1's [0], not [0] from every page.
-          LAYER_ARN=$(aws lambda list-layer-versions \
-            --layer-name life-platform-shared-utils \
-            --region ${{ env.AWS_REGION }} \
-            --query 'LayerVersions[0].LayerVersionArn' \
-            --output text | head -1)
-          echo "New layer ARN: $LAYER_ARN"
-
-          echo "Attaching to consumers..."
-          bash deploy/p3_attach_shared_utils_layer.sh "$LAYER_ARN"
-
-          echo ""
-          echo "Verifying layer attachment..."
+          echo "═══ Verifying shared utils layer ═══"
+          # The layer is CDK-managed: cdk/stacks/constants.py SHARED_LAYER_VERSION
+          # is the single source of truth, and `cdk deploy` publishes the new
+          # version + attaches it to every consumer. CI does NOT publish/attach
+          # the layer itself (the old deploy/p3_*_shared_utils_layer.sh scripts
+          # were removed in the CDK migration). Instead CI verifies that all
+          # consumers are already on the latest published version, and fails with
+          # remediation steps if a manual `cdk deploy` is still outstanding.
           LATEST_VER=$(aws lambda list-layer-versions \
             --layer-name life-platform-shared-utils \
             --region ${{ env.AWS_REGION }} \
             --query 'LayerVersions[0].Version' --output text)
+          echo "Latest published layer version: v$LATEST_VER"
 
           MISMATCH=0
           while IFS= read -r consumer; do
@@ -639,7 +631,7 @@ jobs:
           done < <(jq -r '.shared_layer.consumers[]' "${{ env.LAMBDA_MAP }}")
 
           if [ "$MISMATCH" -gt 0 ]; then
-            echo "::error::$MISMATCH consumer(s) not on latest layer. Check p3_attach_shared_utils_layer.sh."
+            echo "::error::$MISMATCH consumer(s) not on layer v$LATEST_VER. Run locally: bash deploy/build_layer.sh && (cd cdk && npx cdk deploy --all), then re-push."
             exit 1
           fi
           echo "✅ All consumers verified on layer v$LATEST_VER"
