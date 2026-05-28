@@ -596,39 +596,27 @@ Return ONLY this JSON structure:
                  "anthropic-beta": "prompt-caching-2024-07-31"}, method="POST",
     )
 
-    for attempt in range(1, 3):
-        try:
-            with urllib.request.urlopen(req, timeout=90) as r:
-                resp = json.loads(r.read())
-                raw = resp["content"][0]["text"].strip()
-                if raw.startswith("```"):
-                    raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-                if raw.endswith("```"):
-                    raw = raw[:-3]
-                # AI-3: Validate raw JSON text before parsing
-                if _HAS_AI_VALIDATOR:
-                    val_result = validate_ai_output(raw, AIOutputType.GENERIC)
-                    if val_result.blocked:
-                        logger.error("[AI-3] generate_hypotheses blocked: %s", val_result.block_reason)
-                        return None
-                    if val_result.warnings:
-                        logger.warning("[AI-3] generate_hypotheses warnings: %s", val_result.warnings)
-                return json.loads(raw.strip())
-        except urllib.error.HTTPError as e:
-            # Capture response body so 4xx errors (e.g. context_length, max_tokens
-            # too high) surface their actual reason instead of just "400 Bad Request".
-            try:
-                err_body = e.read().decode('utf-8', errors='replace')[:500]
-            except Exception:
-                err_body = "(could not read body)"
-            logger.warning(f"Anthropic HTTP {e.code} attempt {attempt}: {err_body}")
-            if attempt < 2 and e.code in (429, 529, 500, 502, 503, 504):
-                time.sleep(5)
-            else:
-                raise
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Hypothesis parse error: {e}")
-            return None
+    # ADR-062 (2026-05-27): route through retry_utils.call_anthropic_raw (Bedrock).
+    try:
+        from retry_utils import call_anthropic_raw
+        resp = call_anthropic_raw(req)
+        raw = resp["content"][0]["text"].strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+        if raw.endswith("```"):
+            raw = raw[:-3]
+        # AI-3: Validate raw JSON text before parsing
+        if _HAS_AI_VALIDATOR:
+            val_result = validate_ai_output(raw, AIOutputType.GENERIC)
+            if val_result.blocked:
+                logger.error("[AI-3] generate_hypotheses blocked: %s", val_result.block_reason)
+                return None
+            if val_result.warnings:
+                logger.warning("[AI-3] generate_hypotheses warnings: %s", val_result.warnings)
+        return json.loads(raw.strip())
+    except (json.JSONDecodeError, KeyError) as e:
+        logger.error(f"Hypothesis parse error: {e}")
+        return None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -744,41 +732,42 @@ Respond ONLY with JSON: {{"verdict": "confirming|refuted|insufficient", "evidenc
         )
 
         try:
-            with urllib.request.urlopen(req, timeout=20) as r:
-                resp = json.loads(r.read())
-                raw = resp["content"][0]["text"].strip()
-                if raw.startswith("```"):
-                    raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-                if raw.endswith("```"):
-                    raw = raw[:-3]
-                result = json.loads(raw.strip())
+            # ADR-062 (2026-05-27): Bedrock via retry_utils.call_anthropic_raw.
+            from retry_utils import call_anthropic_raw
+            resp = call_anthropic_raw(req)
+            raw = resp["content"][0]["text"].strip()
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+            if raw.endswith("```"):
+                raw = raw[:-3]
+            result = json.loads(raw.strip())
 
-                # AI-4: Validate check verdict
-                is_valid, verdict, evidence = validate_check_verdict(result)
-                if not is_valid:
-                    logger.warning(f"[AI-4] Invalid check verdict for {sk[:40]}: {result}")
-                    verdict = "insufficient"
+            # AI-4: Validate check verdict
+            is_valid, verdict, evidence = validate_check_verdict(result)
+            if not is_valid:
+                logger.warning(f"[AI-4] Invalid check verdict for {sk[:40]}: {result}")
+                verdict = "insufficient"
 
-                # AI-3: Validate evidence text before storing
-                if _HAS_AI_VALIDATOR and evidence:
-                    ev_result = validate_ai_output(evidence, AIOutputType.GENERIC)
-                    if ev_result.blocked:
-                        logger.warning("[AI-3] check evidence blocked for %s: %s", sk[:40], ev_result.block_reason)
-                        evidence = ev_result.safe_fallback or "Evidence unavailable — output blocked by validator."
-                    elif ev_result.warnings:
-                        logger.warning("[AI-3] check evidence warnings for %s: %s", sk[:40], ev_result.warnings)
+            # AI-3: Validate evidence text before storing
+            if _HAS_AI_VALIDATOR and evidence:
+                ev_result = validate_ai_output(evidence, AIOutputType.GENERIC)
+                if ev_result.blocked:
+                    logger.warning("[AI-3] check evidence blocked for %s: %s", sk[:40], ev_result.block_reason)
+                    evidence = ev_result.safe_fallback or "Evidence unavailable — output blocked by validator."
+                elif ev_result.warnings:
+                    logger.warning("[AI-3] check evidence warnings for %s: %s", sk[:40], ev_result.warnings)
 
-                if verdict == "refuted":
-                    new_status = "refuted"
-                elif verdict == "confirming":
-                    # AI-4: Require 3 confirming checks (was 2) for promotion to confirmed
-                    new_status = "confirmed" if check_count >= 3 else "confirming"
-                else:
-                    new_status = hyp.get("status", "pending")
+            if verdict == "refuted":
+                new_status = "refuted"
+            elif verdict == "confirming":
+                # AI-4: Require 3 confirming checks (was 2) for promotion to confirmed
+                new_status = "confirmed" if check_count >= 3 else "confirming"
+            else:
+                new_status = hyp.get("status", "pending")
 
-                updates.append((sk, new_status, evidence))
-                logger.info(f"[AI-4] Hypothesis check: {verdict} -> {new_status} (checks: {check_count + 1})")
-                time.sleep(0.5)
+            updates.append((sk, new_status, evidence))
+            logger.info(f"[AI-4] Hypothesis check: {verdict} -> {new_status} (checks: {check_count + 1})")
+            time.sleep(0.5)
 
         except Exception as e:
             logger.warning(f"Hypothesis check failed for {sk[:40]}: {e}")

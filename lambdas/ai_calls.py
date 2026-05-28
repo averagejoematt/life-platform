@@ -1209,71 +1209,68 @@ def call_anthropic(
     if sys_block:
         body["system"] = sys_block
 
-    headers = {
-        "Content-Type": "application/json",
-        "x-api-key": api_key,
-        "anthropic-version": "2023-06-01",
-    }
-    if cache_system and system:
-        headers["anthropic-beta"] = "prompt-caching-2024-07-31"
-
-    payload = json.dumps(body).encode()
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=payload,
-        headers=headers,
-        method="POST",
-    )
+    # ADR-062 (2026-05-27): migrated from direct Anthropic API (urllib POST to
+    # api.anthropic.com) to AWS Bedrock invoke_model. Auth is IAM (api_key
+    # param now ignored — kept for signature compatibility). Prompt caching
+    # preserved via cache_control blocks in sys_block. Response shape is
+    # identical to the direct API, so parsing/validation below is unchanged.
+    from bedrock_client import invoke as _bedrock_invoke
+    import botocore.exceptions as _bce
 
     max_attempts = len(_BACKOFF_DELAYS) + 1  # 4
     for attempt in range(1, max_attempts + 1):
         try:
-            with urllib.request.urlopen(req, timeout=55) as r:
-                resp = json.loads(r.read())
-                # P1.9: emit token usage metrics
-                usage = resp.get("usage", {})
-                if usage:
-                    _emit_token_metrics(
-                        usage.get("input_tokens", 0),
-                        usage.get("output_tokens", 0),
-                        usage.get("cache_creation_input_tokens", 0),
-                        usage.get("cache_read_input_tokens", 0),
-                    )
-                text = resp["content"][0]["text"].strip()
-                # AI-3 middleware: validate output when output_type is specified
-                if output_type is not None and _AI_VALIDATOR_AVAILABLE:
-                    try:
-                        vr = _validate_ai_output(text, output_type, health_context or {})
-                        if vr.blocked:
-                            print(f"[AI-3] BLOCKED {output_type}: {vr.block_reason}")
-                        elif vr.warnings:
-                            print(f"[AI-3] WARN {output_type}: {vr.warnings}")
-                        return vr.sanitized_text
-                    except Exception as _ve:
-                        print(f"[WARN] ai_output_validator non-fatal: {_ve}")
-                return text
-        except urllib.error.HTTPError as e:
-            retryable = e.code in (429, 529, 500, 502, 503, 504)
-            print(f"[WARN] Anthropic HTTP {e.code} attempt {attempt}/{max_attempts}")
+            resp = _bedrock_invoke(body, model_name=body["model"])
+            # P1.9: emit token usage metrics
+            usage = resp.get("usage", {})
+            if usage:
+                _emit_token_metrics(
+                    usage.get("input_tokens", 0),
+                    usage.get("output_tokens", 0),
+                    usage.get("cache_creation_input_tokens", 0),
+                    usage.get("cache_read_input_tokens", 0),
+                )
+            text = resp["content"][0]["text"].strip()
+            # AI-3 middleware: validate output when output_type is specified
+            if output_type is not None and _AI_VALIDATOR_AVAILABLE:
+                try:
+                    vr = _validate_ai_output(text, output_type, health_context or {})
+                    if vr.blocked:
+                        print(f"[AI-3] BLOCKED {output_type}: {vr.block_reason}")
+                    elif vr.warnings:
+                        print(f"[AI-3] WARN {output_type}: {vr.warnings}")
+                    return vr.sanitized_text
+                except Exception as _ve:
+                    print(f"[WARN] ai_output_validator non-fatal: {_ve}")
+            return text
+        except _bce.ClientError as e:
+            code = e.response.get("Error", {}).get("Code", "Unknown")
+            # Retryable Bedrock errors: throttling + transient service issues.
+            retryable = code in (
+                "ThrottlingException", "ModelTimeoutException",
+                "ServiceUnavailableException", "InternalServerException",
+                "ModelNotReadyException",
+            )
+            print(f"[WARN] Bedrock {code} attempt {attempt}/{max_attempts}")
             if retryable and attempt < max_attempts:
                 delay = _BACKOFF_DELAYS[attempt - 1]
                 print(f"[INFO] Retrying in {delay}s...")
                 time.sleep(delay)
             else:
                 _emit_failure_metric()
-                # R17-16: graceful degradation — return sentinel so callers know AI failed
-                # (not just empty output). Callers should check for AI_UNAVAILABLE.
-                print(f"[ERROR] Anthropic unavailable after {max_attempts} attempts (HTTP {e.code}).")
+                # R17-16: graceful degradation — return sentinel so callers know AI
+                # failed (not just empty output). Callers check for AI_UNAVAILABLE.
+                print(f"[ERROR] Bedrock unavailable after {max_attempts} attempts ({code}).")
                 return "[AI_UNAVAILABLE]"
-        except urllib.error.URLError as e:
-            print(f"[WARN] Anthropic network error attempt {attempt}/{max_attempts}: {e}")
+        except Exception as e:
+            print(f"[WARN] Bedrock error attempt {attempt}/{max_attempts}: {e}")
             if attempt < max_attempts:
                 delay = _BACKOFF_DELAYS[attempt - 1]
                 print(f"[INFO] Retrying in {delay}s...")
                 time.sleep(delay)
             else:
                 _emit_failure_metric()
-                print(f"[ERROR] Anthropic network unreachable after {max_attempts} attempts: {e}.")
+                print(f"[ERROR] Bedrock unreachable after {max_attempts} attempts: {e}.")
                 return "[AI_UNAVAILABLE]"
 
 

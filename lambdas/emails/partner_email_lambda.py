@@ -480,11 +480,12 @@ def build_commentary(data):
         logger.debug("partner_ai_response_excerpt: %s", text[:300])
         return text
     except ImportError:
-        # Layer not attached — fall back to inline single-attempt for safety
-        logger.warning("retry_utils unavailable — single-attempt fallback")
-        with urllib.request.urlopen(req, timeout=45) as r:
-            resp = json.loads(r.read())
-            return resp["content"][0]["text"]
+        # ADR-062: layer not attached — fall back to bedrock_client directly
+        # (bundled in /var/task via Code.from_asset, so it imports without the layer).
+        logger.warning("retry_utils unavailable — direct bedrock_client fallback")
+        from bedrock_client import invoke as _bedrock_invoke
+        resp = _bedrock_invoke(json.loads(payload))
+        return resp["content"][0]["text"]
 
 
 # ══════════════════════════════════════════════════════════════════════════════

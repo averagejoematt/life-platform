@@ -61,7 +61,7 @@ python3 mcp_bridge.py
 
 ## Key Technical Conventions
 
-**No external HTTP libraries** — all API calls use Python's `urllib.request` stdlib. No `requests`, no `httpx`.
+**No external HTTP libraries** — all API calls use Python's `urllib.request` stdlib. No `requests`, no `httpx`. **Exception (ADR-062):** Claude inference goes through AWS Bedrock via `boto3 bedrock-runtime` (`lambdas/bedrock_client.py`), not urllib — Bedrock has no plain-HTTP endpoint and uses SigV4/IAM auth. All other HTTP (Whoop, Withings, Garmin, etc.) stays on urllib.
 
 **Decimal for DynamoDB** — boto3 rejects Python `float`; cast to `Decimal` before writing.
 

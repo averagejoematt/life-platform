@@ -1635,3 +1635,90 @@ Initial "park indefinitely" plan reversed: when the disabled Tier 1 surface prod
 **Re-attempt threshold:** A credible App Check workaround lands in `macro-factor-api` or `@sjawhar/macrofactor-mcp` AND someone (Matthew or future-Claude) confirms it works against a live MF account from a Lambda environment. Re-implementation would extract fresh from the new community library; this ADR documents the prior attempt's specifics.
 
 **Practical impact:** Tier 2 (manual MacroFactor Dropbox export) is the active food-level + workout path. Hevy (ADR-060) is the active no-touch workout path. There is currently no no-touch path for food-level nutrition — the explicit "accepted risk" of WS-2 has materialized on day one, and we are accepting it indefinitely.
+
+---
+
+## ADR-062: Migrate Claude inference from direct Anthropic API to AWS Bedrock
+
+**Date:** 2026-05-27
+**Status:** Code complete; cutover deploy gated on the Anthropic Bedrock use-case form (a one-time AWS-console action).
+
+### Context
+
+The platform called Claude via the direct Anthropic API (`urllib` POST to
+`api.anthropic.com/v1/messages`) using a prepaid-credit API key stored in
+`life-platform/ai-keys` + `life-platform/site-api-ai-key`. On 2026-05-27 the
+prepaid balance hit zero and **every** AI feature died at once — daily-brief
+coaches returned `[AI_UNAVAILABLE]`, briefs froze at Grade 43 (F), `/api/ask`
+500'd. The failure had no graceful warning; it surfaced via inbox noise hours
+later. The operator had also barely *used* the platform that month (auto-
+generated content still ran daily and burned the credits), so the spend
+produced little personal value.
+
+### Decision
+
+Move Claude inference to **AWS Bedrock** (`bedrock-runtime invoke_model`):
+- Bills through the AWS account — consolidated with the rest of the infra
+  spend, covered by Cost Explorer + the existing budget alarm. **No prepaid-
+  credit cliff**: usage just appears on the AWS bill.
+- Auth is **IAM** (`bedrock:InvokeModel`), not an API key.
+- The InvokeModel response for Claude is byte-identical to the direct
+  Anthropic Messages API, so all downstream parsing/validation is unchanged.
+
+### Key implementation facts
+
+- **Inference profiles required.** On-demand 4.x Claude models reject the bare
+  `anthropic.claude-*` model ID ("on-demand throughput isn't supported"). Must
+  use the cross-region inference profile (`us.anthropic.claude-*`). See
+  `lambdas/bedrock_client.py` `_MODEL_MAP`.
+- **`anthropic_version: "bedrock-2023-05-31"`** in the body (vs `"2023-06-01"`
+  on the direct API). Drop the top-level `model` field (→ `modelId` param).
+- **Prompt caching** is GA on Bedrock for Claude via the same `cache_control`
+  blocks — no `anthropic-beta` header needed.
+- **No API key.** `api_key` params are now vestigial (kept for signature
+  compatibility + rollback ease; the `life-platform/ai-keys` secret is
+  retained but unused by the inference path).
+
+### Code surface
+
+- New primitive: `lambdas/bedrock_client.py` (`invoke()`, `resolve_model_id()`),
+  added to the shared layer.
+- Chokepoints rewritten: `ai_calls.call_anthropic`, `retry_utils.call_anthropic_api`,
+  `retry_utils.call_anthropic_raw` (the latter still accepts a pre-built urllib
+  Request for backward-compat — it extracts the body and forwards to Bedrock).
+- Stragglers migrated (direct urllib callers): the 5 `coach_*` Lambdas,
+  `site_api_ai_lambda` (/api/ask + /api/board_ask), `hypothesis_engine`,
+  `challenge_generator`, `partner_email` (fallback path), `canary` (AI
+  health-check now probes Bedrock).
+- IAM: `_bedrock_statement()` in `role_policies.py`, wired into `_compute_base`
+  (when `needs_ai_keys`), `_email_base` (all email roles), the 2 inline
+  enrichment roles, `site_api_ai`, and `operational_canary`.
+- Error handling: botocore `ClientError` codes (ThrottlingException,
+  ModelTimeoutException, etc.) replace urllib HTTPError; graceful-degradation
+  `[AI_UNAVAILABLE]` contract preserved.
+
+### The gating step (why cutover is deferred)
+
+Bedrock requires submitting the **Anthropic use-case details form** (AWS
+console → Bedrock → Model access → Anthropic) before `InvokeModel` works.
+There is no CLI/API for this in aws-cli 2.27. Until submitted +propagated
+(~15 min), InvokeModel returns `ResourceNotFoundException: Model use case
+details have not been submitted`. The code is committed but NOT deployed until
+the form clears, so prod stays in its current state until then.
+
+### Tradeoffs (honest)
+
+- **Not cheaper per token** — Bedrock Claude pricing ≈ direct API. The win is
+  consolidation + no-cliff + IAM auth, not unit cost.
+- **Consumption discipline is separate** — Bedrock doesn't stop the platform
+  auto-generating expensive content that goes unread. An engagement-gate
+  (skip generation when briefs go unopened) is the actual money-saver and is
+  tracked separately in BACKLOG.
+- **urllib convention exception** — CLAUDE.md says "no external HTTP libraries";
+  Bedrock needs `boto3 bedrock-runtime`. Sanctioned exception, noted in CLAUDE.md.
+
+### Rollback
+
+Revert the migration commit + redeploy. The `life-platform/ai-keys` secret is
+retained, and the chokepoints' old urllib paths are in git history. (Rollback
+only useful if Anthropic credits are also topped up.)
