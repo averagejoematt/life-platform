@@ -88,16 +88,22 @@ def check_ddb_freshness():
     yesterday = yesterday_str()
     checks = []
 
+    # REQUIRED = sources that write a record EVERY day. A missing record here is
+    # a real ingestion failure. 2026-05-28 recalibration: only genuinely-daily
+    # sources stay required. macrofactor removed (MacroFactor Tier 1 torn down —
+    # dead since 2026-04-11). withings (weigh-ins) and strava (workouts) demoted
+    # to OPTIONAL: they're event-driven, so a missing day is normal, not a fault
+    # (Garmin already covers daily steps/activity). This was the source of the
+    # chronic "🔴 QA: 3 failures" emails.
     REQUIRED = [
         ("whoop",        "Sleep/Recovery"),
-        ("macrofactor",  "Nutrition"),
         ("habitify",     "Habits"),
-        ("withings",     "Weight"),
-        ("strava",       "Training"),
         ("garmin",       "Steps/Activity"),
         ("apple_health", "Apple Health"),
     ]
     OPTIONAL = [
+        ("withings",    "Weight (weigh-ins are sporadic)"),
+        ("strava",      "Strava workout (sporadic; Garmin is primary)"),
         ("eightsleep",  "Eight Sleep"),
         ("supplements", "Supplements"),
         ("journal",     "Notion Journal"),
@@ -542,12 +548,15 @@ def lambda_handler(event, context):
         fails = [c for c in all_checks if c.passed is False]
         warns = [c for c in all_checks if c.passed is None]
 
-        if not fails and not warns:
-            print(f"[QA] All clear — no email sent (green-only suppression)")
-            return {"statusCode": 200, "body": json.dumps({"failed": 0, "warned": 0, "emailed": False})}
+        # 2026-05-28: only email on real FAILURES. Warnings (sporadic optional
+        # sources with no record yesterday) are normal and were firing a yellow
+        # email almost every day — pure noise. They remain visible in logs and
+        # in the failure email's body when a failure does occur.
+        if not fails:
+            print(f"[QA] {len(warns)} warning(s), 0 failures — no email (warnings not emailed standalone)")
+            return {"statusCode": 200, "body": json.dumps({"failed": 0, "warned": len(warns), "emailed": False})}
 
-        subject = (f"⚠️ QA: {len(warns)} warning{'s' if len(warns)>1 else ''} — {run_time.strftime('%b %-d')}" if not fails
-                   else f"🔴 QA: {len(fails)} failure{'s' if len(fails)>1 else ''} — {run_time.strftime('%b %-d')}")
+        subject = f"🔴 QA: {len(fails)} failure{'s' if len(fails)>1 else ''} — {run_time.strftime('%b %-d')}"
 
         ses.send_email(
             FromEmailAddress=SENDER,
