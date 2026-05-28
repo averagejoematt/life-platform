@@ -122,10 +122,13 @@ class MonitoringStack(Stack):
         # 2026-05-03: bumped threshold 13333 → 18000. Today's healthy brief
         # used 14414 tokens (above old threshold). With IC-3 max_tokens bumped
         # to 600 + 6 coach narratives + ensemble, healthy budget is ~14-16k.
-        # 18000 leaves ~25% buffer; still alerts on a true cost spike.
+        # 2026-05-28: bumped 18000 → 30000. Normal usage had crept to ~18003
+        # (8 coach V2 narratives post-restart), so 18000 sat right at the daily
+        # baseline and false-fired almost every day into the alarm digest.
+        # 30000 alerts only on a genuine ~1.7x spike, not normal operation.
         _alarm("AiTokensDailyBriefDaily",
                "ai-tokens-daily-brief-daily",
-               "LifePlatform/AI", "AnthropicOutputTokens", 86400, "Sum", 18000, GTE,
+               "LifePlatform/AI", "AnthropicOutputTokens", 86400, "Sum", 30000, GTE,
                {"LambdaFunction": "daily-brief"}, to_digest=True)
 
         # Platform-level total (no dims)
