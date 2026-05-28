@@ -144,6 +144,82 @@ def save_secret(secret: dict):
             pass
 
 
+# ── Refresh-429 circuit breaker ──────────────────────────────────────────────
+# Garmin aggressively 429-rate-limits the OAuth2 refresh-exchange endpoint for
+# non-browser clients (their March-2026 crackdown). The OAuth1 refresh token
+# stays valid ~1 year, so a refresh SHOULD succeed whenever we're not throttled.
+# Once we hit a 429 we record a marker and skip *all* refresh attempts for a
+# cooldown window — re-hitting the endpoint only prolongs the throttle and is
+# what historically stranded us until a manual browser re-auth. Distinct from
+# the generic 401/403 auth_breaker (different trigger, recovery, and TTL).
+_REFRESH_BREAKER_SK = "REFRESH_RATELIMIT"
+_REFRESH_BREAKER_TTL = 3 * 3600  # 3h — typical window for Garmin's throttle to clear
+
+
+class GarminRefreshRateLimited(RuntimeError):
+    """OAuth2 refresh was 429-throttled (or is in cooldown). Caught in
+    lambda_handler and converted to a clean skip so the async invocation does
+    NOT error — erroring triggers EventBridge retries that re-hammer the
+    throttled endpoint and keep us stuck."""
+
+
+def _breaker_key() -> dict:
+    return {"pk": f"USER#{USER_ID}#SOURCE#garmin", "sk": _REFRESH_BREAKER_SK}
+
+
+def refresh_breaker_cooldown() -> int:
+    """Seconds remaining in the refresh-429 cooldown, or 0 if none/expired."""
+    try:
+        item = table.get_item(Key=_breaker_key()).get("Item")
+    except Exception:
+        return 0
+    if not item:
+        return 0
+    try:
+        remaining = _REFRESH_BREAKER_TTL - (time.time() - float(item.get("marked_at", 0)))
+    except (TypeError, ValueError):
+        return 0
+    return int(remaining) if remaining > 0 else 0
+
+
+def mark_refresh_breaker(err) -> None:
+    now = time.time()
+    try:
+        table.put_item(Item={
+            **_breaker_key(),
+            "marked_at": Decimal(str(int(now))),
+            "error": str(err)[:300],
+            "ttl": int(now) + _REFRESH_BREAKER_TTL,
+        })
+        logger.warning(f"Garmin refresh-429 breaker tripped — cooling down {_REFRESH_BREAKER_TTL // 3600}h")
+    except Exception as e:
+        logger.warning(f"refresh breaker mark failed: {e}")
+
+
+def clear_refresh_breaker() -> None:
+    try:
+        table.delete_item(Key=_breaker_key())
+    except Exception:
+        pass
+
+
+def _should_refresh(token, fraction: float = 0.25) -> bool:
+    """True if the OAuth2 token is already expired OR within `fraction` of the
+    end of its lifetime. Refreshing proactively (before hard expiry) means the
+    stored token never goes fully stale between scheduled runs, so a single
+    throttled refresh can't strand us — the still-valid token serves data calls
+    until the next run refreshes it."""
+    if token is None:
+        return False
+    if getattr(token, "expired", False):
+        return True
+    expires_at = getattr(token, "expires_at", None)
+    expires_in = getattr(token, "expires_in", None)
+    if not expires_at or not expires_in:
+        return False
+    return (expires_at - time.time()) < fraction * expires_in
+
+
 # ── Garmin auth ────────────────────────────────────────────────────────────────
 def get_garmin_client(secret: dict):
     """
@@ -213,40 +289,54 @@ def get_garmin_client(secret: dict):
     except Exception:
         pass
 
-    # ── Proactive token refresh (hit exchange endpoint at most once) ──
-    # Retry transient 5xx (server-side hiccups) with 2s/8s backoff before
-    # giving up; the next scheduled run is 6h away so a brief retry here
-    # avoids losing today's data to a momentary server blip.
-    # 429 is NOT retried — that signals hourly rate-limit exhaustion;
-    # backing off in-process won't help and risks getting banned.
-    refresh_backoff = [2, 8]
-    refresh_attempts = 3
-    for refresh_attempt in range(refresh_attempts):
-        try:
-            if garth.client.oauth2_token and garth.client.oauth2_token.expired:
-                logger.info(f"OAuth2 token expired — refresh attempt {refresh_attempt + 1}/{refresh_attempts}...")
+    # ── Token refresh (proactive, breaker-gated, 429-safe) ──
+    # Refresh proactively when the token is near the end of its life (not only
+    # after hard expiry), but skip entirely while the refresh-429 breaker is in
+    # cooldown so we don't re-hammer a throttled endpoint. Retry transient 5xx
+    # with 2s/8s backoff; a 429 trips the breaker and aborts cleanly.
+    token = garth.client.oauth2_token
+    need_refresh = _should_refresh(token)
+    cooldown = refresh_breaker_cooldown() if need_refresh else 0
+
+    if need_refresh and cooldown:
+        if token is None or getattr(token, "expired", False):
+            # Token unusable AND we're throttled — skip this run cleanly so the
+            # cooldown can clear. The OAuth1 token is still valid; a later run
+            # will refresh successfully once Garmin lifts the throttle.
+            raise GarminRefreshRateLimited(
+                f"OAuth2 expired but refresh in 429 cooldown ({cooldown}s left)."
+            )
+        # Only near-expiry (still valid) — serve data with the current token and
+        # defer the refresh rather than poking the throttled endpoint.
+        logger.info(f"Deferring proactive refresh — in 429 cooldown ({cooldown}s left), token still valid.")
+        need_refresh = False
+
+    if need_refresh:
+        refresh_backoff = [2, 8]
+        refresh_attempts = 3
+        for refresh_attempt in range(refresh_attempts):
+            try:
+                logger.info(f"Refreshing OAuth2 token — attempt {refresh_attempt + 1}/{refresh_attempts}...")
                 garth.client.refresh_oauth2()
                 logger.info("OAuth2 token refreshed successfully.")
-            break  # Either non-expired or refreshed successfully — proceed
-        except Exception as e:
-            err_str = str(e)
-            if "429" in err_str or "Too Many Requests" in err_str:
-                logger.error(
-                    "Garmin OAuth refresh rate-limited (429). "
-                    "Aborting to avoid hammering exchange endpoint. "
-                    "Will retry on next scheduled run."
-                )
-                raise RuntimeError("Garmin OAuth refresh rate-limited (429). Aborting.") from e
-            # Retry transient 5xx; everything else (4xx auth, malformed token) raises.
-            is_transient = any(c in err_str for c in ("500", "502", "503", "504", "timeout", "timed out"))
-            if is_transient and refresh_attempt < refresh_attempts - 1:
-                logger.info(f"OAuth refresh transient error: {e} — retry in {refresh_backoff[refresh_attempt]}s")
-                time.sleep(refresh_backoff[refresh_attempt])
-                continue
-            raise RuntimeError(
-                f"Garmin OAuth refresh failed ({e}). "
-                "Run setup_garmin_browser_auth.py locally to re-authenticate."
-            ) from e
+                clear_refresh_breaker()
+                break
+            except Exception as e:
+                err_str = str(e)
+                if "429" in err_str or "Too Many Requests" in err_str:
+                    mark_refresh_breaker(e)
+                    logger.error("Garmin OAuth refresh rate-limited (429) — tripping breaker, will retry after cooldown.")
+                    raise GarminRefreshRateLimited("Garmin OAuth refresh rate-limited (429).") from e
+                # Retry transient 5xx; everything else (4xx auth, malformed token) raises.
+                is_transient = any(c in err_str for c in ("500", "502", "503", "504", "timeout", "timed out"))
+                if is_transient and refresh_attempt < refresh_attempts - 1:
+                    logger.info(f"OAuth refresh transient error: {e} — retry in {refresh_backoff[refresh_attempt]}s")
+                    time.sleep(refresh_backoff[refresh_attempt])
+                    continue
+                raise RuntimeError(
+                    f"Garmin OAuth refresh failed ({e}). "
+                    "Run setup_garmin_browser_auth.py locally to re-authenticate."
+                ) from e
 
     # ── Save refreshed tokens eagerly (before any data calls) ──
     def _save_tokens():
@@ -857,6 +947,13 @@ def lambda_handler(event: dict, context) -> dict:
         if event.get("healthcheck"):
             return {"statusCode": 200, "body": "ok"}
         return run_ingestion(_config, authenticate, fetch_day, transform, event, context)
+    except GarminRefreshRateLimited as e:
+        # Clean skip — do NOT raise. Raising marks the async invocation failed,
+        # triggering EventBridge retries that re-hit the throttled refresh
+        # endpoint and keep us stuck. Returning 200 lets the cooldown clear so a
+        # later scheduled run refreshes normally (no manual re-auth needed).
+        logger.warning(f"garmin run skipped (refresh rate-limited): {e}")
+        return {"statusCode": 200, "body": json.dumps({"skipped": "refresh_ratelimited", "detail": str(e)})}
     except Exception as e:
         logger.error("garmin ingestion failed: %s", e, exc_info=True)
         raise

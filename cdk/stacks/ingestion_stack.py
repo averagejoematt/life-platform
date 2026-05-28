@@ -83,6 +83,10 @@ class IngestionStack(Stack):
             timeout_seconds=300, memory_mb=512, shared_layer=shared_utils_layer,
             additional_layers=[garth_layer],
             custom_policies=rp.ingestion_garmin(),
+            # No async retry: a failed run is almost always an OAuth-refresh 429.
+            # Retrying re-hammers Garmin's throttled endpoint and prolongs the
+            # lockout; the gap-fill loop recovers missed days on the next run.
+            retry_attempts=0,
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
         # garmin.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
 
