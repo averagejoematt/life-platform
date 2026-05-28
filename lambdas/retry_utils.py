@@ -142,48 +142,41 @@ def call_anthropic_api(
     if temperature is not None:
         body["temperature"] = temperature
 
-    headers = {
-        "Content-Type": "application/json",
-        "x-api-key": api_key,
-        "anthropic-version": "2023-06-01",
-    }
-    if cache_system and system:
-        headers["anthropic-beta"] = "prompt-caching-2024-07-31"
-
-    payload = json.dumps(body).encode()
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=payload,
-        headers=headers,
-        method="POST",
-    )
+    # ADR-062 (2026-05-27): Bedrock invoke_model (was urllib → api.anthropic.com).
+    # api_key param ignored (IAM auth). See lambdas/bedrock_client.py.
+    from bedrock_client import invoke as _bedrock_invoke
+    import botocore.exceptions as _bce
 
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                resp = json.loads(r.read())
-                usage = resp.get("usage", {})
-                if usage:
-                    _emit_token_metrics(
-                        usage.get("input_tokens", 0),
-                        usage.get("output_tokens", 0),
-                        usage.get("cache_creation_input_tokens", 0),
-                        usage.get("cache_read_input_tokens", 0),
-                    )
-                return resp["content"][0]["text"].strip()
+            resp = _bedrock_invoke(body, model_name=body["model"])
+            usage = resp.get("usage", {})
+            if usage:
+                _emit_token_metrics(
+                    usage.get("input_tokens", 0),
+                    usage.get("output_tokens", 0),
+                    usage.get("cache_creation_input_tokens", 0),
+                    usage.get("cache_read_input_tokens", 0),
+                )
+            return resp["content"][0]["text"].strip()
 
-        except urllib.error.HTTPError as e:
-            print(f"[WARN] Anthropic HTTP {e.code} attempt {attempt}/{_MAX_ATTEMPTS}")
-            if e.code in _RETRYABLE_CODES and attempt < _MAX_ATTEMPTS:
+        except _bce.ClientError as e:
+            code = e.response.get("Error", {}).get("Code", "Unknown")
+            retryable = code in (
+                "ThrottlingException", "ModelTimeoutException",
+                "ServiceUnavailableException", "InternalServerException",
+                "ModelNotReadyException",
+            )
+            print(f"[WARN] Bedrock {code} attempt {attempt}/{_MAX_ATTEMPTS}")
+            if retryable and attempt < _MAX_ATTEMPTS:
                 delay = _BACKOFF_DELAYS[attempt - 1]
                 print(f"[INFO] Retrying in {delay}s...")
                 time.sleep(delay)
             else:
                 _emit_failure_metric()
                 raise
-
-        except urllib.error.URLError as e:
-            print(f"[WARN] Anthropic network error attempt {attempt}/{_MAX_ATTEMPTS}: {e}")
+        except Exception as e:
+            print(f"[WARN] Bedrock error attempt {attempt}/{_MAX_ATTEMPTS}: {e}")
             if attempt < _MAX_ATTEMPTS:
                 delay = _BACKOFF_DELAYS[attempt - 1]
                 print(f"[INFO] Retrying in {delay}s...")
@@ -194,43 +187,58 @@ def call_anthropic_api(
 
 
 def call_anthropic_raw(req: urllib.request.Request, timeout: int = 55) -> dict[str, Any]:
-    """Retry wrapper for pre-built urllib Request objects (used by weekly-digest pattern).
+    """Retry wrapper — historically took a pre-built urllib Request to
+    api.anthropic.com (weekly-digest pattern).
 
-    Returns the full parsed JSON response (not just text) — callers extract
-    resp["content"][0]["text"] themselves.
-    Emits token metrics and failure metric same as call_anthropic_api.
+    ADR-062 (2026-05-27): now routes to Bedrock. Backward-compatible — callers
+    still pass a urllib.request.Request; we extract its JSON body (req.data)
+    and forward to bedrock_client.invoke(). The body is the Anthropic Messages
+    dict (model/messages/max_tokens/system), which is exactly what Bedrock
+    needs. Returns the full parsed JSON response (same shape), so existing
+    callers that read resp["content"][0]["text"] are unchanged.
 
-    Note: For prompt caching, callers building their own requests should add
-    the 'anthropic-beta: prompt-caching-2024-07-31' header and structure the
-    system message as content blocks with cache_control. Use
-    _build_system_block() helper or build manually.
+    Prompt caching: preserved if the caller's body has cache_control blocks in
+    its system message (the wire format is identical on Bedrock).
     """
+    from bedrock_client import invoke as _bedrock_invoke
+    import botocore.exceptions as _bce
+
+    # Extract the Anthropic Messages body the caller built into the Request.
+    raw = req.data
+    if isinstance(raw, (bytes, bytearray)):
+        raw = raw.decode("utf-8")
+    body = json.loads(raw) if raw else {}
+
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                resp = json.loads(r.read())
-                usage = resp.get("usage", {})
-                if usage:
-                    _emit_token_metrics(
-                        usage.get("input_tokens", 0),
-                        usage.get("output_tokens", 0),
-                        usage.get("cache_creation_input_tokens", 0),
-                        usage.get("cache_read_input_tokens", 0),
-                    )
-                return resp
+            resp = _bedrock_invoke(body, model_name=body.get("model"))
+            usage = resp.get("usage", {})
+            if usage:
+                _emit_token_metrics(
+                    usage.get("input_tokens", 0),
+                    usage.get("output_tokens", 0),
+                    usage.get("cache_creation_input_tokens", 0),
+                    usage.get("cache_read_input_tokens", 0),
+                )
+            return resp
 
-        except urllib.error.HTTPError as e:
-            print(f"[WARN] Anthropic HTTP {e.code} attempt {attempt}/{_MAX_ATTEMPTS}")
-            if e.code in _RETRYABLE_CODES and attempt < _MAX_ATTEMPTS:
+        except _bce.ClientError as e:
+            code = e.response.get("Error", {}).get("Code", "Unknown")
+            retryable = code in (
+                "ThrottlingException", "ModelTimeoutException",
+                "ServiceUnavailableException", "InternalServerException",
+                "ModelNotReadyException",
+            )
+            print(f"[WARN] Bedrock {code} attempt {attempt}/{_MAX_ATTEMPTS}")
+            if retryable and attempt < _MAX_ATTEMPTS:
                 delay = _BACKOFF_DELAYS[attempt - 1]
                 print(f"[INFO] Retrying in {delay}s...")
                 time.sleep(delay)
             else:
                 _emit_failure_metric()
                 raise
-
-        except urllib.error.URLError as e:
-            print(f"[WARN] Anthropic network error attempt {attempt}/{_MAX_ATTEMPTS}: {e}")
+        except Exception as e:
+            print(f"[WARN] Bedrock error attempt {attempt}/{_MAX_ATTEMPTS}: {e}")
             if attempt < _MAX_ATTEMPTS:
                 delay = _BACKOFF_DELAYS[attempt - 1]
                 print(f"[INFO] Retrying in {delay}s...")

@@ -549,18 +549,9 @@ def _handle_ask(event: dict) -> dict:
             "messages": [{"role": "user", "content": question}],
         })
 
-        req = urllib.request.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=req_body.encode(),
-            headers={
-                "Content-Type": "application/json",
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-            },
-        )
-
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            result = json.loads(resp.read())
+        # ADR-062 (2026-05-27): Bedrock invoke_model (was urllib → api.anthropic.com).
+        from bedrock_client import invoke as _bedrock_invoke
+        result = _bedrock_invoke(json.loads(req_body))
 
         # V2 follow-up: emit token metrics (was dark)
         _emit_token_metrics(result.get("usage", {}), endpoint="api_ask")
@@ -649,23 +640,14 @@ def _handle_board_ask(event: dict) -> dict:
                 }],
                 "messages": [{"role": "user", "content": question}],
             })
-            req = urllib.request.Request(
-                "https://api.anthropic.com/v1/messages",
-                data=req_body.encode(),
-                headers={
-                    "Content-Type": "application/json",
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                },
-            )
-            # NOTE: no retry wrapper here — site-api-ai runs without the shared
-            # layer to keep cold-start fast for public traffic. board_ask makes
-            # 6 calls per request; a transient 5xx on call N would currently
-            # surface as "[name] is temporarily unavailable" for that one
-            # persona, which degrades cleanly. Add retry only if 5xx becomes a
-            # measurable issue (currently <1/month per CloudWatch).
-            with urllib.request.urlopen(req, timeout=20) as r:
-                result = json.loads(r.read())
+            # ADR-062 (2026-05-27): Bedrock invoke_model (was urllib → api.anthropic.com).
+            # No retry wrapper — board_ask makes 6 calls/request; a transient
+            # Bedrock error on call N degrades cleanly to "[name] temporarily
+            # unavailable" for that persona. bedrock_client is bundled in
+            # /var/task via Code.from_asset, so it imports even though site-api-ai
+            # runs without the shared layer.
+            from bedrock_client import invoke as _bedrock_invoke
+            result = _bedrock_invoke(json.loads(req_body))
             # V2 follow-up: emit per-persona token metrics (was dark)
             _emit_token_metrics(result.get("usage", {}), endpoint="api_board_ask")
             responses[pid] = _scrub_blocked_terms("".join(b["text"] for b in result.get("content", []) if b.get("type") == "text"))
