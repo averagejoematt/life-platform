@@ -104,13 +104,13 @@
       "function": "dashboard-refresh"
     },
     "lambdas/operational/data_export_lambda.py": {
-      "function": "data-export"
+      "function": "life-platform-data-export"
     },
     "lambdas/operational/delete_user_data_lambda.py": {
       "function": "life-platform-delete-user-data"
     },
     "lambdas/operational/data_reconciliation_lambda.py": {
-      "function": "data-reconciliation"
+      "function": "life-platform-data-reconciliation"
     },
     "lambdas/operational/dlq_consumer_lambda.py": {
       "function": "life-platform-dlq-consumer"
@@ -122,13 +122,13 @@
       "function": "life-platform-canary"
     },
     "lambdas/operational/qa_smoke_lambda.py": {
-      "function": "qa-smoke"
+      "function": "life-platform-qa-smoke"
     },
     "lambdas/operational/key_rotator_lambda.py": {
-      "function": "mcp-key-rotator"
+      "function": "life-platform-key-rotator"
     },
     "lambdas/operational/pip_audit_lambda.py": {
-      "function": "pip-audit"
+      "function": "life-platform-pip-audit"
     },
     "lambdas/emails/brittany_email_lambda.py": {
       "function": "brittany-weekly-email"
