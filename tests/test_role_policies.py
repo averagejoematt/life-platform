@@ -78,6 +78,10 @@ WILDCARD_RESOURCE_ALLOWLIST = {
     "lambda:listfunctions",            # List operation — no resource-level support
     "cloudfront:createinvalidation",   # CloudFront invalidation requires * — no resource-level support
     "ses:sendrawemail",                # SES SendRawEmail requires * — same as SendEmail
+    "ce:getcostandusage",              # Cost Explorer has no resource-level scoping (cost-governor)
+    "cloudwatch:getmetricdata",        # CloudWatch read APIs have no resource-level scoping
+    "cloudwatch:getmetricstatistics",  # CloudWatch read APIs have no resource-level scoping
+    "cloudwatch:listmetrics",          # List operation — no resource-level support
 }
 
 
