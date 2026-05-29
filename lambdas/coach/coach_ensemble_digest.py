@@ -726,6 +726,10 @@ def lambda_handler(event, context):
     user_message = _build_user_message(coach_data, cycle_date, expected_coach_ids=coach_ids)
 
     try:
+        # Budget guardrail: at Tier ≥ 1 skip the LLM and use the default digest.
+        from budget_guard import allow as _budget_allow
+        if not _budget_allow("ensemble"):
+            raise RuntimeError("ensemble digest AI paused by budget tier — using fallback")
         result = _call_haiku(
             system=ENSEMBLE_SYSTEM_PROMPT,
             user_message=user_message,
