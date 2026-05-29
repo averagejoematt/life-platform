@@ -71,7 +71,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | Lambda Function URL (remote MCP) | Remote MCP HTTPS endpoint | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/` (OAuth 2.1 auto-approve + HMAC Bearer) |
 | API Gateway | HTTP endpoint | `health-auto-export-api` (a76xwxt2wa) — webhook ingest |
 | Secrets Manager | Credential store | **9 active secrets** at $0.40/month each = **~$3.60/month**
-| SNS topic | Alert routing | `life-platform-alerts` |
+| SNS topic | Alert routing | `life-platform-alerts` (urgent) + `life-platform-alerts-digest` (batched daily by `alert-digest-lambda` per ADR-050) |
 | CloudFront (amj) | CDN (public) | `E3S424OXQZ8NBE` → site-api Lambda + S3 `/site`, alias `averagejoematt.com` |
 | CloudFront (dash) | CDN + auth | `EM5NPX6NJN095` (`d14jnhrgfrte42.cloudfront.net`) → S3 `/dashboard`, Lambda@Edge auth, alias `dash.averagejoematt.com` |
 | CloudFront (blog) | CDN (public) | `E1JOC1V6E6DDYI` (`d1aufb59hb2r1q.cloudfront.net`) → S3 `/blog`, alias `blog.averagejoematt.com` |
@@ -79,10 +79,10 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | ACM Certificate | TLS | us-east-1 — `averagejoematt.com` + all subdomains (DNS-validated via Route 53) |
 | SES Receipt Rule Set | Inbound email routing | `life-platform-inbound` (active) — rule `insight-capture` routes `insight@aws.mattsusername.com` → S3 |
 | SES Configuration Set | Outbound delivery telemetry | `life-platform-emails` wired to `daily-brief`, `weekly-digest`, `monthly-digest`, `partner-weekly-email` |
-| CloudWatch | Alarms + logs | **~49 metric alarms**, all Lambdas monitored |
+| CloudWatch | Alarms + logs | **~49 metric alarms** (12 redundant ingestion-error alarms consolidated 2026-05-29). |
 | CDK | Infrastructure as Code | `cdk/` — 8 stacks deployed. CDK owns all Lambda IAM roles + ~50 EventBridge rules. Stacks: `core_stack`, `ingestion_stack`, `email_stack`, `compute_stack`, `mcp_stack`, `operational_stack`, `web_stack`, `monitoring_stack`. |
 | CloudTrail | Audit logging | `life-platform-trail` → S3. Data events enabled for `s3://matthew-life-platform/raw/` and `s3://matthew-life-platform/uploads/`. |
-| AWS Budget | Cost guardrail | $20/mo cap, alerts at 25%/50%/100% |
+| AWS Budget | Cost guardrail | **$75/mo all-in cap** (ADR-063), alerts at 50%/70%/85%/100%. Enforced via `cost_governor_lambda` (hourly) → SSM `/life-platform/budget-tier` → `budget_guard.py` gates AI features (1=coaches, 2=website AI, 3=hard cutoff in `bedrock_client.invoke()`). |
 | Concurrency quota | Account-level | **10** (default; quota raise request filed 2026-05-19 — AWS Support case 177921309700709) |
 
 ---
@@ -97,7 +97,7 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 
 **Schedule:** Hourly during active hours (4am–10pm PST) for most sources. Exceptions: Garmin at 4x daily (OAuth rate limits), Weather + Todoist at 2x daily (COST-OPT). Maintenance window: 10pm–4am PST (UTC 6–11 skipped).
 
-**Shared Lambda Layer:** **v51** — published 2026-05-19 (V2 follow-up: wires `coach-quality-gate` async invoke after each COACH-V2 generation in `ai_calls.call_coach_brief_v2`). Includes `ai_calls.py`, `retry_utils.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `intelligence_common.py` (P5.8 staleness signals in `build_coach_preamble`), `ingestion_framework.py` (SIMP-2 — see ADR-056), `auth_breaker.py`, `http_retry.py`, `rate_limiter.py`, `request_validator.py`, `compute_metadata.py`, `numeric.py`, `character_engine.py`, `html_builder.py`, `ai_output_validator.py`, `platform_logger.py`, `ingestion_validator.py`, `item_size_guard.py`, `digest_utils.py`, `sick_day_checker.py`, `site_writer.py`, `insight_writer.py`. **24 modules total** (`email_framework.py` DELETED in V2 cleanup — zero importers; the 7 email Lambdas were too divergent for a single framework). Rebuild with `bash deploy/build_layer.sh`. Source of truth for version: `cdk/stacks/constants.py:SHARED_LAYER_VERSION`. **Distribution:** 1 Lambda on v51, 56 on v50, 15 with no layer attached (Edge functions, webhook, freshness, dlq-consumer, etc.). Bulk v50→v51 bump deferred; only Lambdas re-deployed today are on v51.
+**Shared Lambda Layer:** **v62** — published 2026-05-29 (`restart_pipeline.py` for the May-30 genesis re-anchor). Includes `ai_calls.py`, `retry_utils.py`, **`bedrock_client.py`** (ADR-062 — all Claude calls funnel here, IAM auth via `bedrock:InvokeModel`), **`budget_guard.py`** (ADR-063 — `allow(feature)` gates AI by SSM tier), `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `intelligence_common.py`, `ingestion_framework.py` (SIMP-2 per ADR-056), `auth_breaker.py`, `http_retry.py`, `rate_limiter.py`, `request_validator.py`, `compute_metadata.py`, `constants.py` (genesis date + baseline), `phase_filter.py` (default-deny by phase), `numeric.py`, `character_engine.py`, `html_builder.py`, `ai_output_validator.py`, `platform_logger.py`, `ingestion_validator.py`, `item_size_guard.py`, `digest_utils.py`, `sick_day_checker.py`, `site_writer.py`, `insight_writer.py`. **28 modules total**. Rebuild with `bash deploy/build_layer.sh`. Source of truth: `cdk/stacks/constants.py:SHARED_LAYER_VERSION` (test `lv6` enforces consistency with the latest AWS-published layer).
 
 **Secret caching (COST-OPT-1):** 15-min in-memory TTL cache via `secret_cache.py` in shared layer. Reduces Secrets Manager API calls ~90% across 12 active Lambdas.
 
