@@ -149,8 +149,9 @@ def safe_float(rec, field, default=None):
     return default
 
 def get_secret():
-    resp = secrets.get_secret_value(SecretId=SECRET_NAME)
-    return json.loads(resp["SecretString"])
+    """ADR-062: Bedrock IAM auth — sentinel dict. Only anthropic_api_key is
+    read downstream (line ~792); see task #90 for full removal."""
+    return {"anthropic_api_key": "_BEDROCK_IAM_"}
 
 def fetch_profile():
     try:

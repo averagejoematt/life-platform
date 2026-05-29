@@ -60,8 +60,8 @@ secrets = boto3.client("secretsmanager", region_name=_REGION)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def get_api_key():
-    secret = secrets.get_secret_value(SecretId=ANTHROPIC_SECRET)
-    return json.loads(secret["SecretString"])["anthropic_api_key"]
+    """ADR-062: Bedrock IAM auth — sentinel; see task #90 for full plumbing removal."""
+    return "_BEDROCK_IAM_"
 
 def d2f(obj):
     if isinstance(obj, list): return [d2f(i) for i in obj]
