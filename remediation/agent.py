@@ -129,31 +129,48 @@ def build_prompt(mode, signals):
 
 
 async def run_agent(prompt):
-    """Invoke Claude via the Agent SDK with a scoped, read+git toolset on Bedrock."""
+    """Invoke Claude via the Agent SDK on Bedrock and return its captured text.
+
+    Headless safety: `bypassPermissions` (no interactive prompts — `acceptEdits`
+    hangs/errors on Bash/gh tools headlessly). The REAL blast-radius guard is the
+    IAM role (read-only AWS + SES + scoped S3-log) and the GITHUB_TOKEN scope
+    (contents + pull-requests write only) — the agent literally cannot deploy or
+    mutate AWS. `disallowed_tools` is best-effort defense-in-depth. We accumulate
+    text across all messages and tolerate the SDK's ResultMessage protocol /
+    end-of-stream exceptions so a partial run still produces a report."""
     from claude_agent_sdk import query, ClaudeAgentOptions  # installed in the workflow
     options = ClaudeAgentOptions(
-        permission_mode="acceptEdits",
-        allowed_tools=[
-            "Read", "Grep", "Glob",
-            "Bash(aws *describe*)", "Bash(aws *get*)", "Bash(aws *list*)",
-            "Bash(aws logs filter-log-events*)", "Bash(aws logs get-log-events*)",
-            "Bash(git checkout -b *)", "Bash(git add *)", "Bash(git commit *)",
-            "Bash(git push *)", "Bash(gh pr create *)", "Bash(gh pr view *)",
-        ],
+        permission_mode="bypassPermissions",
         disallowed_tools=[
             "Bash(git merge *)", "Bash(git push --force*)", "Bash(gh pr merge *)",
-            "Bash(aws lambda update*)", "Bash(aws iam delete*)", "Bash(cdk deploy*)",
+            "Bash(aws lambda update*)", "Bash(aws iam *)", "Bash(cdk deploy*)",
             "Bash(npx cdk deploy*)",
         ],
         cwd=ROOT,
-        max_turns=int(os.environ.get("REMEDIATION_MAX_TURNS", "12")),
+        max_turns=int(os.environ.get("REMEDIATION_MAX_TURNS", "16")),
     )
-    final_text = ""
-    async for message in query(prompt=prompt, options=options):
-        result = getattr(message, "result", None)
-        if result:
-            final_text = result
-    return final_text
+    chunks = []
+    try:
+        async for message in query(prompt=prompt, options=options):
+            # Final ResultMessage carries is_error + result; capture, don't crash.
+            if hasattr(message, "is_error"):
+                res = getattr(message, "result", None)
+                if isinstance(res, str):
+                    chunks.append(res)
+                if getattr(message, "is_error", False):
+                    print(f"[warn] agent result flagged error "
+                          f"(subtype={getattr(message, 'subtype', None)})")
+                break
+            # AssistantMessage: pull text from content blocks.
+            content = getattr(message, "content", None)
+            if isinstance(content, list):
+                for blk in content:
+                    t = getattr(blk, "text", None)
+                    if isinstance(t, str):
+                        chunks.append(t)
+    except Exception as e:
+        print(f"[warn] agent stream ended with: {e} — using captured output")
+    return "\n".join(chunks)
 
 
 def parse_report(text):
