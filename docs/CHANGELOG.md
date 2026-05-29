@@ -1,6 +1,34 @@
-## [Restart 2026-05-30] — 2026-05-29
+## [Marathon 2026-05-29] — Bedrock cutover, budget guard, self-healing
 
 ### Added
+- **ADR-062 — Bedrock cutover.** All Claude inference routed through `lambdas/bedrock_client.invoke()` (IAM auth via `bedrock:InvokeModel` + cross-region inference profiles `us.anthropic.claude-sonnet-4-6` / `us.anthropic.claude-haiku-4-5-20251001-v1:0`). `retry_utils.call_anthropic_raw` rewritten to extract the body from the legacy urllib Request and forward to Bedrock — backward-compatible plumbing across the 5 coaches + site-api-ai + hypothesis-engine + challenge-generator + partner-email + canary.
+- **ADR-063 — $75/month budget guardrails.** `lambdas/operational/cost_governor_lambda.py` (hourly) projects MTD spend (Cost Explorer non-AI + Bedrock token metrics) and writes tier 0–3 to SSM `/life-platform/budget-tier`. `lambdas/budget_guard.py` (shared layer) gates AI features by tier with the "protect daily-brief longest" priority: tier 1 pauses coach narratives + ensemble + chronicle, tier 2 pauses website AI (`/api/ask`, `/api/board_ask` return a friendly "paused" response), tier 3 hard-stops at `bedrock_client.invoke()` with `BudgetExceeded`. One `CfnBudget` `life-platform-monthly-75` with SES alerts at 50/70/85/100%. **Enforcement enabled.**
+- **ADR-064 — self-healing remediation agent.** `.github/workflows/remediation-agent.yml` runs Claude (Sonnet 4.6 on Bedrock) daily ~07:45 PT via OIDC role `github-actions-remediation-role` (read-only diagnosis + scoped log/SES, NO deploy/IAM mutate). Triages alarms / failed CI runs / DLQ depth / QA-smoke. Buckets each signal A/B/C/D per `docs/REMEDIATION_TAXONOMY.md`. Sends one curated SES email replacing the raw `[LP digest]` noise. Kill-switch: SSM `/life-platform/remediation-mode` ∈ `{off, shadow, auto}`. Tier-3 budget no-ops the run.
+- **ADR-065 — auto-merge as a deterministic gate, not the agent.** `remediation/automerge.py` is the only thing that merges `auto-fix-safe` PRs. Six guards must all hold: mode=auto, narrow ALLOWLIST (role_policies, lambda_map, monitoring_stack, freshness_checker, qa_smoke, tests/), DENYLIST clean, diff ≤ 60 lines, lint + offline unit-tests pass on the PR branch, daily cap (3) not reached. **Phase 2 enabled** (mode=auto). Does NOT bypass CI's `environment: production` approval gate.
+- **Urgent-alarm dispatcher Lambda** (`life-platform-remediation-dispatcher`). SNS subscriber on `life-platform-alerts` → GitHub `repository_dispatch` (event_type=urgent_alarm) → workflow fires immediately. Narrow URGENT_PATTERNS filter (`canary`, `dlq-depth`, `site-api-error`, `budget-tier`, `bedrock-throttle`, `slo-`). 30-min S3-marker dedupe (expires daily via lifecycle rule). Auth: fine-grained PAT `life-platform/github-dispatch-token` in Secrets Manager (operator step, see `docs/RUNBOOK.md`).
+- **S3 lifecycle rule** `remediation-dispatch-dedupe-expire-1d` on `matthew-life-platform/remediation-log/dispatch-dedupe/` (1-day expiry — markers were unbounded).
+
+### Changed
+- **Genesis re-anchored to 2026-05-30** via `deploy/restart_pipeline.py --apply` (provisional baseline 304.62 lbs from 05-29 weigh-in; re-run Saturday post-weigh-in to lock the true 05-30 baseline). Layer → v62, all stacks converged, intelligence wiped, character rebuilt at Level 1 Foundation.
+- **Anthropic-key fetches stubbed across 18 Lambdas** — `get_anthropic_key()`/`_get_api_key()`/`get_api_key()`/`get_secret()` now return a sentinel `_BEDROCK_IAM_` (or sentinel dict) without hitting Secrets Manager. Removes wasted cold-start API calls; downstream `if api_key:` gates + call-site signatures unchanged so the risk surface stays at zero. Full plumbing removal (signature changes, gate removal, layer bump v62→v63) tracked as a future focused refactor.
+- **12 redundant ingestion-error CloudWatch alarms consolidated** (~$1.20/mo saved).
+- **CI fixes**: dead-glob in `ci-cd.yml` replaced with hard-failing `find lambdas -name '*_lambda.py'`; layer-verify step rewritten as verify-only; new consistency tests (`test_lambda_handlers.py` I5, `test_layer_version_consistency.py` LV4, `test_role_policies.py` r4 allowlist for ce/cloudwatch).
+- **Coach truncation fix**: max_tokens 2000 → 6000 across coach_narrative_orchestrator + coach_ensemble_digest; prompt restructured for prompt-caching via shared-context + per-coach blocks.
+- **Coach seasonality crash fix**: `coach_computation_engine.py` defends against non-dict `month_adjustments`.
+- **Strava paused** (`schedule=None`); whoop `retry_attempts=0` to stop retry-amplification on OAuth 401s.
+- **GitHub auth audit**: rotated `gho_` keychain token; deleted the never-used `life-platform-development` classic PAT (had god-mode scopes including `delete_repo`/`admin:enterprise`).
+- **Docs refresh**: `CLAUDE.md` v51→v62 + new sections (Bedrock + budget guard, remediation agent, auto-merge gate, restart pipeline); `ARCHITECTURE.md` preamble + AWS Resources table; `RUNBOOK.md` + sections for budget tier ops, remediation kill-switch, urgent dispatcher PAT rotation; `BACKLOG.md` shipped items.
+
+### Fixed
+- **Cost-governor projection bug**: was `daily × full_month` → projected $121 on day 29 (would have false-paused all AI on enforcement enable). Fixed to `mtd + (non_ai_daily + ai_daily) × days_remaining` with `ai_daily` averaged across AI-active days. Early-month guard clamps tier to 0 when elapsed_days < 2.
+- **Remediation agent async-teardown warning** (`RuntimeError: aclose(): asynchronous generator is already running`) — explicit `aclose()` in finally block.
+- **Dispatcher IAM**: added `s3:ListBucket` (prefix-scoped) so HeadObject on missing dedupe keys returns 404 not 403.
+- **Coach orchestrator 100% fallback** — coach narratives were hitting max_tokens=2000 truncation; bumped to 6000 + cached shared context.
+
+### Removed
+- Anthropic API key as an active auth surface — `life-platform/ai-keys` secret retained for rollback only; no inference path reads it.
+
+### Added (restart-pipeline artifacts, same date)
 - `lambdas/constants.py` — runtime constants (genesis date, baseline weight). Generated from `config/user_goals.json` via `deploy/sync_constants_from_config.py`.
 - `lambdas/phase_filter.py` — `with_phase_filter()` helper. Wired into `site_api._query_source`, `mcp.core.query_source`, and all 13 queries in `intelligence_common.py`.
 - 6 restart scripts under `deploy/`: `restart_phase_tag.py`, `restart_intelligence_wipe.py`, `restart_character_rebuild.py`, `restart_chronicle_handler.py`, `restart_site_copy_sync.py`, `restart_pipeline.py`.
