@@ -86,6 +86,12 @@ def create_platform_lambda(
     # re-hammers the throttled endpoint and prolongs the lockout (the source then
     # gap-fills on its next scheduled run anyway).
     retry_attempts: int = None,
+    # ── Per-Lambda error alarm ──
+    # 2026-05-29: ingestion Lambdas set error_alarm=False — their ~46 per-Lambda
+    # ingestion-error-* alarms ($4.60/mo) are replaced by ONE metric-math
+    # aggregate in monitoring_stack. The remediation agent provides per-Lambda
+    # diagnosis from logs, so per-Lambda alarms add cost without much signal.
+    error_alarm: bool = True,
     # ── Observability ──
     # ADR-058 follow-up (2026-05-24): default to ACTIVE so all Lambdas emit X-Ray
     # traces. ~$0.50/month for this platform's volume. Enables distributed-tracing
@@ -261,7 +267,7 @@ def create_platform_lambda(
     _selected_topic = None
     if alerts_topic is not None:
         _selected_topic = digest_topic if (digest and digest_topic is not None) else alerts_topic
-    if _selected_topic:
+    if _selected_topic and error_alarm:
         _alarm_name = alarm_name if alarm_name else f"ingestion-error-{function_name}"
         # 2026-05-03 v6.9.2: period reduced 24h → 1h. Old window kept alarms in
         # ALARM state for 24h on a single transient error, and re-emailed if

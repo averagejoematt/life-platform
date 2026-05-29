@@ -50,6 +50,9 @@ class IngestionStack(Stack):
         shared = dict(
             table=local_table, bucket=local_bucket, dlq=local_dlq,
             alerts_topic=local_alerts_topic, digest_topic=local_digest_topic, digest=True,
+            # 2026-05-29: per-Lambda ingestion-error-* alarms consolidated into one
+            # metric-math aggregate (LifePlatformMonitoring). Saves ~$4.60/mo.
+            error_alarm=False,
         )
 
         # ── 1. Whoop — 5x daily ingestion + recovery refresh
