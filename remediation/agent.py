@@ -240,7 +240,14 @@ def main():
         return 0
     prompt = build_prompt(mode, signals)
     text = asyncio.run(run_agent(prompt))
-    report = parse_report(text)
+    # Prefer the file the agent wrote (robust); fall back to parsing the stream.
+    report = None
+    report_path = os.environ.get("REMEDIATION_REPORT_PATH", "/tmp/remediation_report.json")
+    try:
+        with open(report_path) as f:
+            report = json.load(f)
+    except Exception:
+        report = parse_report(text)
     email_report(report, mode)
     audit_log(report, signals, mode)
     return 0

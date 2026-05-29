@@ -41,8 +41,11 @@ what genuinely needs them.
 - If you can't confidently classify a signal, put it in C (needs-human) with your
   best diagnosis — never auto-fix on a guess.
 
-## Output (required, at the very end)
-After doing the work, emit exactly one ```json fenced block:
+## Output (REQUIRED — do this as your final action)
+Use the **Write** tool to write your report as JSON to the path in the
+`REMEDIATION_REPORT_PATH` env var (default `/tmp/remediation_report.json`). This
+file is how the operator gets the summary — if you don't write it, the run reports
+nothing. Schema:
 ```json
 {
   "auto_fixed": [{"summary": "...", "pr": "https://github.com/.../pull/NN", "template": "missing-iam"}],
@@ -51,6 +54,8 @@ After doing the work, emit exactly one ```json fenced block:
   "stale":      [{"summary": "..."}]
 }
 ```
-In `shadow` mode, `auto_fixed` is always empty (you open PRs labeled `auto-fix-safe`
-but they go under `prs` too if you want them visible — prefer listing every PR you
-opened under `prs` with its label noted in the summary). Be concise and specific.
+Always write the file, even if every bucket is empty (a clean run). In `shadow`
+mode, `auto_fixed` stays empty — list every PR you opened under `prs` (note its
+intended label in the summary). Be concise and specific. Classify ALL signals you
+were given: each alarm/CI-failure/DLQ item must land in exactly one bucket (a
+resolved/OK alarm or a CI failure already fixed by a later commit → `stale`).
