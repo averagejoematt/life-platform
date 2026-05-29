@@ -195,7 +195,7 @@ def _emit_failure_metric():
 # ANTHROPIC API CALL
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _call_haiku(system, user_message, max_tokens=2000, temperature=0.3):
+def _call_haiku(system, user_message, max_tokens=6000, temperature=0.3):
     """Call Anthropic Haiku with exponential backoff + CloudWatch metrics.
 
     Returns parsed JSON dict if the response is valid JSON, otherwise raw text.
@@ -463,7 +463,38 @@ SYSTEM_PROMPT = (
 
 
 def _build_user_message(state, coach_id, today):
-    """Build the user message with all gathered context for the orchestrator."""
+    """Build the orchestrator user message as two content blocks for prompt caching.
+
+    ADR-062 follow-up (2026-05-28): the orchestrator runs once per coach (8/day),
+    and four context blocks come from GLOBAL keys — `ensemble_digest`,
+    `influence_graph`, `computation_results`, `narrative_arc` — so they are
+    byte-identical across all 8 invocations in a run. We emit them first as a
+    single `cache_control: ephemeral` block (serialized deterministically with
+    sort_keys so the cached prefix matches exactly), and put the per-coach,
+    varying context (target/other compressed, voice, threads, predictions) +
+    instructions in a second, uncached block. Net: call 1 writes the cache,
+    calls 2-8 read it at ~0.1x. The shared block is also what pushes the cached
+    prefix over Haiku's minimum cacheable length (the old system-only block was
+    too small to cache at all — hence zero cache hits pre-fix).
+
+    Returns a list of Anthropic content blocks (not a string).
+    """
+    # ── Shared prefix (identical across all coaches this run → cacheable) ──
+    shared_parts = [
+        "## Ensemble Digest (Most Recent Cycle)",
+        json.dumps(state["ensemble_digest"], indent=2, sort_keys=True, default=str),
+        "",
+        "## Cross-Coach Influence Graph",
+        json.dumps(state["influence_graph"], indent=2, sort_keys=True, default=str),
+        "",
+        "## Computation Results Package",
+        json.dumps(state["computation_results"], indent=2, sort_keys=True, default=str),
+        "",
+        "## Narrative Arc State",
+        json.dumps(state["narrative_arc"], indent=2, sort_keys=True, default=str),
+    ]
+
+    # ── Per-coach suffix (varies per invocation → not cached) ──
     parts = [
         f"## Target Coach: {coach_id}",
         f"## Date: {today}",
@@ -473,7 +504,6 @@ def _build_user_message(state, coach_id, today):
         "",
     ]
 
-    # Other coaches' states
     if state["other_compressed"]:
         parts.append("## Other Coaches' Compressed States")
         for cid, cstate in state["other_compressed"].items():
@@ -484,32 +514,10 @@ def _build_user_message(state, coach_id, today):
         parts.append("## Other Coaches: No compressed states available yet (first cycle).")
         parts.append("")
 
-    # Ensemble digest
-    parts.append("## Ensemble Digest (Most Recent Cycle)")
-    parts.append(json.dumps(state["ensemble_digest"], indent=2, default=str))
-    parts.append("")
-
-    # Influence graph
-    parts.append("## Cross-Coach Influence Graph")
-    parts.append(json.dumps(state["influence_graph"], indent=2, default=str))
-    parts.append("")
-
-    # Computation results
-    parts.append("## Computation Results Package")
-    parts.append(json.dumps(state["computation_results"], indent=2, default=str))
-    parts.append("")
-
-    # Narrative arc
-    parts.append("## Narrative Arc State")
-    parts.append(json.dumps(state["narrative_arc"], indent=2, default=str))
-    parts.append("")
-
-    # Voice state
     parts.append("## Coach Voice State")
     parts.append(json.dumps(state["voice_state"], indent=2, default=str))
     parts.append("")
 
-    # Open threads
     parts.append("## Open Threads")
     if state["open_threads"]:
         parts.append(json.dumps(state["open_threads"], indent=2, default=str))
@@ -517,7 +525,6 @@ def _build_user_message(state, coach_id, today):
         parts.append("No open threads — this is the coach's first cycle or all threads are resolved.")
     parts.append("")
 
-    # Active predictions
     parts.append("## Active Predictions")
     if state["active_predictions"]:
         parts.append(json.dumps(state["active_predictions"], indent=2, default=str))
@@ -534,7 +541,10 @@ def _build_user_message(state, coach_id, today):
         "decision_class_ceiling, evidence_note, seasonal_flags, computation_outputs}}."
     )
 
-    return "\n".join(parts)
+    return [
+        {"type": "text", "text": "\n".join(shared_parts), "cache_control": {"type": "ephemeral"}},
+        {"type": "text", "text": "\n".join(parts)},
+    ]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -639,7 +649,12 @@ def lambda_handler(event, context):
         result = _call_haiku(
             system=SYSTEM_PROMPT,
             user_message=user_message,
-            max_tokens=2000,
+            # 2026-05-28: was 2000 — too small. A full generation brief is
+            # ~1800-3000 output tokens, so it truncated mid-JSON (stop_reason
+            # max_tokens), failed to parse, and EVERY coach silently fell back
+            # to the canned default brief while still paying for the wasted call.
+            # 6000 gives headroom; you only pay for tokens actually generated.
+            max_tokens=6000,
             temperature=0.3,
         )
 
