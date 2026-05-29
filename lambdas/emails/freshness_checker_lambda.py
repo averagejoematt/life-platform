@@ -55,6 +55,9 @@ SOURCES = {
 SOURCE_STALE_HOURS = {
     "food_delivery": 90 * 24,   # 90 days
     "measurements": 60 * 24,    # 60 days — one missed session before alert
+    # 2026-05-29: weigh-ins are sporadic (often ~weekly), so the 48h default
+    # false-fired "stale" constantly. A missed week before alerting.
+    "withings": 7 * 24,         # 7 days
 }
 
 # Field-level completeness checks — key fields that should be non-null in a healthy record.
