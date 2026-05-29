@@ -646,6 +646,11 @@ def lambda_handler(event, context):
 
     # Call Haiku to produce the generation brief
     try:
+        # Budget guardrail: at Tier ≥ 1 skip the LLM and fall back to the cached/
+        # default brief, so the coach pipeline keeps running with zero Bedrock spend.
+        from budget_guard import allow as _budget_allow
+        if not _budget_allow("coach_narrative"):
+            raise RuntimeError("coach narrative AI paused by budget tier — using fallback")
         result = _call_haiku(
             system=SYSTEM_PROMPT,
             user_message=user_message,

@@ -10,6 +10,7 @@ BUILD_DIR="$PROJ_ROOT/cdk/layer-build/python"
 
 MODULES=(
     bedrock_client.py
+    budget_guard.py
     retry_utils.py board_loader.py insight_writer.py scoring_engine.py
     character_engine.py output_writers.py ai_calls.py html_builder.py
     ai_output_validator.py platform_logger.py ingestion_framework.py
