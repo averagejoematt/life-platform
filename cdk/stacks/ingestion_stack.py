@@ -125,12 +125,15 @@ class IngestionStack(Stack):
             custom_policies=rp.ingestion_habitify(),
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
 
-        # ── 6. Strava — 5x daily (:10 stagger)
+        # ── 6. Strava — PAUSED 2026-05-28 (Strava API returns HTTP 402 since ~05-18;
+        # Garmin already covers daily activity). To re-enable: restore the schedule
+        # arg below to `schedule=f"cron(10 {INGEST_HOURLY} * * ? *)"` and re-deploy,
+        # and un-comment strava in freshness_checker_lambda.py (SOURCES/OAUTH/COMPLETENESS).
         strava = create_platform_lambda(self, "StravaIngestion",
             function_name="strava-data-ingestion",
             source_file="lambdas/ingestion/strava_lambda.py",
             handler="ingestion.strava_lambda.lambda_handler",
-            schedule=f"cron(10 {INGEST_HOURLY} * * ? *)",
+            schedule=None,  # PAUSED — was cron(10 {INGEST_HOURLY} * * ? *)
             timeout_seconds=300, alarm_name="ingestion-error-strava",
             shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_strava(), **shared)

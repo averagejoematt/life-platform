@@ -1000,13 +1000,23 @@ def operational_freshness_checker() -> list[iam.PolicyStatement]:
         ),
         iam.PolicyStatement(
             sid="OAuthSecretDescribe",
-            # R8-ST4: DescribeSecret to read LastChangedDate for OAuth token health monitoring
+            # R8-ST4: DescribeSecret to read LastChangedDate for token health monitoring.
+            # 2026-05-28: the freshness checker also monitors MANUAL_ROTATION_SECRETS
+            # (Phase 2.6) but the role only granted the 4 OAuth secrets → every run
+            # AccessDenied'd on the manual ones (swallowed), so the "catch the next
+            # dead OAuth integration" safeguard could never fire. Added the manual set.
+            # Dropped strava (paused 2026-05-28) and dropbox (secret soft-deleted).
             actions=["secretsmanager:DescribeSecret"],
             resources=[
                 _secret_arn("life-platform/whoop"),
                 _secret_arn("life-platform/withings"),
-                _secret_arn("life-platform/strava"),
                 _secret_arn("life-platform/garmin"),
+                _secret_arn("life-platform/ai-keys"),
+                _secret_arn("life-platform/site-api-ai-key"),
+                _secret_arn("life-platform/eightsleep-client"),
+                _secret_arn("life-platform/notion"),
+                _secret_arn("life-platform/todoist"),
+                _secret_arn("life-platform/ingestion-keys"),
             ],
         ),
     ]
