@@ -194,7 +194,7 @@ def _emit_failure_metric():
 # ANTHROPIC API CALL
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _call_haiku(system, user_message, max_tokens=2000, temperature=0.2):
+def _call_haiku(system, user_message, max_tokens=6000, temperature=0.2):
     """Call Anthropic Haiku with exponential backoff + CloudWatch metrics.
 
     Returns parsed JSON dict if the response is valid JSON, otherwise raw text.
@@ -729,7 +729,9 @@ def lambda_handler(event, context):
         result = _call_haiku(
             system=ENSEMBLE_SYSTEM_PROMPT,
             user_message=user_message,
-            max_tokens=2000,
+            # 2026-05-28: was 2000 — occasionally truncated the digest JSON
+            # (7 parse-fails/48h) → fell back. Same bug class as the orchestrator.
+            max_tokens=6000,
             temperature=0.2,
         )
 

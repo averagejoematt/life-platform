@@ -448,6 +448,12 @@ def _compute_seasonality_flags(all_data, seasonal_adjustments, current_month):
     month_key = str(current_month)
 
     for metric, month_adjustments in seasonal_adjustments.items():
+        # The S3 config mixes metadata string keys (_notes, version,
+        # last_reviewed) with the per-metric dicts; skip the non-dicts or
+        # .get() raises 'str' object has no attribute 'get' and the whole
+        # seasonality component is silently lost (caught by the outer handler).
+        if not isinstance(month_adjustments, dict):
+            continue
         expected_adj = month_adjustments.get(month_key)
         if expected_adj is None:
             continue
