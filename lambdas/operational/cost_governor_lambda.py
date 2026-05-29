@@ -247,16 +247,29 @@ def lambda_handler(event, context):
         ai = _ai_cost(month_start, now)
         mtd = non_ai + ai
 
-        # Project AI and non-AI separately. Non-AI (fixed infra) is uniform, so
-        # MTD/elapsed×days is right. AI only began mid-month (Bedrock migration),
-        # so project over its ACTIVE days to avoid diluting it to near-zero.
-        non_ai_proj = non_ai / elapsed_days * days_in_month
+        # Month-end = what's ALREADY spent (mtd, captured precisely) + the daily
+        # run-rate × days REMAINING. (The old `daily × days_in_month` ignored that
+        # most of the month already happened, so late in the month it massively
+        # over-projected — e.g. $35 mtd on day 29 projected $121.) Non-AI rate is
+        # uniform (per elapsed day); AI rate is per ACTIVE day since Bedrock only
+        # began mid-month, so it isn't diluted by pre-migration days.
+        days_remaining = max(days_in_month - elapsed_days, 0.0)
+        non_ai_daily = non_ai / elapsed_days
         ai_active = _ai_active_days(month_start, now)
         ai_daily = (ai / ai_active) if ai_active > 0 else 0.0
-        ai_proj = ai_daily * days_in_month
-        projected = non_ai_proj + ai_proj
+        projected = mtd + (non_ai_daily + ai_daily) * days_remaining
 
         computed_tier = _tier_for(projected)
+
+        # Early-month guard: the daily-rate × days-remaining projection is
+        # unreliable on a tiny sample (a partial first day inflates the rate), so
+        # don't let it escalate the tier in the first ~2 days — wait for enough
+        # data. Prevents a false AI pause on the 1st/2nd. mtd is still tiny then,
+        # so a genuine runaway can't reach the ceiling in 2 days anyway.
+        if elapsed_days < 2.0 and computed_tier > 0:
+            print(f"[info] only {elapsed_days:.1f}d elapsed — projection not yet "
+                  f"reliable; holding tier 0 (computed {computed_tier})")
+            computed_tier = 0
         prev = _read_tier()
 
         logger.info(
