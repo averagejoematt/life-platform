@@ -183,6 +183,28 @@ class OperationalStack(Stack):
             shared_layer=shared_utils_layer,
         )
 
+        # ── 3c. Remediation Dispatcher — SNS-subscribed urgent-alarm → GH dispatch
+        # Closes the urgent-alarm latency the daily 07:45 PT sweep can't cover.
+        # Subscribes to life-platform-alerts (urgent topic), filters to a narrow
+        # urgent-pattern list, dedupes per 30-min window, calls GH repository_dispatch.
+        # Operator step: populate life-platform/github-dispatch-token with a
+        # fine-grained PAT (Contents: read+write on this repo only).
+        dispatcher_lambda = create_platform_lambda(self, "RemediationDispatcher",
+            function_name="life-platform-remediation-dispatcher",
+            source_file="lambdas/operational/remediation_dispatcher_lambda.py",
+            handler="operational.remediation_dispatcher_lambda.lambda_handler",
+            timeout_seconds=30, memory_mb=128,
+            environment={
+                "REPO_OWNER": "averagejoematt",
+                "REPO_NAME":  "life-platform",
+                "TOKEN_SECRET": "life-platform/github-dispatch-token",
+            },
+            custom_policies=rp.operational_remediation_dispatcher(),
+            table=local_table, bucket=local_bucket, dlq=None, alerts_topic=None,
+            shared_layer=shared_utils_layer,
+        )
+        local_alerts_topic.add_subscription(sns_subs.LambdaSubscription(dispatcher_lambda))
+
         # ── 4. Pip Audit — every Monday
         create_platform_lambda(self, "PipAudit",
             function_name="life-platform-pip-audit",
