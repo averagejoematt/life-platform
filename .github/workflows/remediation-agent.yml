@@ -45,8 +45,17 @@ jobs:
 
       - name: Install agent runtime
         run: |
-          pip install --quiet boto3 claude-agent-sdk
+          pip install --quiet boto3 claude-agent-sdk pytest flake8
           npm install -g @anthropic-ai/claude-code
+
+      - name: Ensure auto-fix-safe label exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create auto-fix-safe --color "0E8A16" \
+            --description "Eligible for the remediation auto-merge gate" 2>/dev/null || true
+          gh label create needs-review --color "FBCA04" \
+            --description "Remediation PR needs human review" 2>/dev/null || true
 
       - name: Configure git identity
         run: |
@@ -67,3 +76,17 @@ jobs:
           REMEDIATION_MAX_TURNS: "16"
           DISPATCH_PAYLOAD: ${{ toJson(github.event.client_payload) }}
         run: python3 remediation/agent.py
+
+      # Deterministic auto-merge gate. Self-no-ops unless SSM mode=auto.
+      # Merges auto-fix-safe PRs that pass allowlist/denylist/diff-bound/lint/unit-tests
+      # (since GITHUB_TOKEN PRs don't trigger ci-cd.yml, the gate runs the checks here
+      # before merging; CI re-runs them on main, and the production deploy still
+      # requires manual approval). Sends the single final email in auto mode.
+      - name: Auto-merge gate
+        if: always()
+        env:
+          AWS_REGION: us-west-2
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          S3_BUCKET: matthew-life-platform
+        run: python3 remediation/automerge.py

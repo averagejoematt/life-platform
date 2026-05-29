@@ -236,7 +236,8 @@ def main():
     if not (signals["alarms"] or signals["ci_failures"]
             or (signals["dlq"] or {}).get("depth") or signals["urgent"]):
         print("no actionable signals — clean run")
-        email_report({}, mode)
+        if mode != "auto":          # in auto, automerge.py sends the single final email
+            email_report({}, mode)
         return 0
     prompt = build_prompt(mode, signals)
     text = asyncio.run(run_agent(prompt))
@@ -248,8 +249,19 @@ def main():
             report = json.load(f)
     except Exception:
         report = parse_report(text)
-    email_report(report, mode)
+        # Guarantee the file exists so the auto-merge gate can read + update it.
+        try:
+            with open(report_path, "w") as f:
+                json.dump(report, f)
+        except Exception as e:
+            print(f"[warn] write report file: {e}")
     audit_log(report, signals, mode)
+    # In auto mode the merge gate (automerge.py) processes auto-fix-safe PRs and
+    # sends the single final email; in shadow/off we email here.
+    if mode != "auto":
+        email_report(report, mode)
+    else:
+        print("auto mode — deferring report email to the merge gate")
     return 0
 
 
