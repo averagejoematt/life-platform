@@ -1110,6 +1110,15 @@ def operational_remediation_dispatcher() -> list[iam.PolicyStatement]:
             actions=["s3:GetObject", "s3:PutObject"],
             resources=_s3("remediation-log/dispatch-dedupe/*"),
         ),
+        # HeadObject on a non-existent key returns 403 instead of 404 without
+        # ListBucket — the Lambda's existence check (_seen) needs the 404 to
+        # signal "first time, go ahead and dispatch."
+        iam.PolicyStatement(
+            sid="DedupeList",
+            actions=["s3:ListBucket"],
+            resources=[f"arn:aws:s3:::{S3_BUCKET}"],
+            conditions={"StringLike": {"s3:prefix": ["remediation-log/dispatch-dedupe/*"]}},
+        ),
     ]
 
 
