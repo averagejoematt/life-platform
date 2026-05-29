@@ -198,10 +198,17 @@ def test_i5_no_orphaned_lambda_files():
     and not in skip_deploy — will be silently ignored by CI/CD and never deployed.
     This catches newly added Lambdas that were forgotten from the registry.
     """
+    # 2026-05-28: was os.listdir(LAMBDAS_DIR) — top-level only, so after the
+    # P3.1 subpackage restructure (everything moved to lambdas/<domain>/) it
+    # matched ZERO files and passed vacuously, letting unmapped Lambdas slip
+    # through. Walk recursively so nested Lambdas are checked.
     candidate_files = set()
-    for fname in os.listdir(LAMBDAS_DIR):
-        if fname.endswith("_lambda.py") or fname == "weather_handler.py":
-            candidate_files.add(f"lambdas/{fname}")
+    for dirpath, _dirs, filenames in os.walk(LAMBDAS_DIR):
+        for fname in filenames:
+            if fname.endswith("_lambda.py") or fname == "weather_handler.py":
+                candidate_files.add(
+                    os.path.relpath(os.path.join(dirpath, fname), ROOT)
+                )
 
     registered = set(_REGISTERED_SOURCES)
     mcp_source = _MCP_SOURCE  # e.g. "lambdas/mcp_server.py" — not an orphan

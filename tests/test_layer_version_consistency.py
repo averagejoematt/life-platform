@@ -189,7 +189,46 @@ def test_lv3_all_layer_modules_exist_on_disk():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# LV4 — Consumer count sanity check
+# LV4 — shared_layer.modules must match build_layer.sh
+# ══════════════════════════════════════════════════════════════════════════════
+
+def test_lv4_layer_modules_match_build_script():
+    """LV4: ci/lambda_map.json shared_layer.modules must exactly match the
+    MODULES list in deploy/build_layer.sh (the source of truth for what ships
+    in the layer).
+
+    If they drift, CI's layer-change detection (which reads lambda_map) won't
+    fire when a module that IS in the layer is edited — so new Lambda code
+    deploys against a stale layer (a silent prod-incident class). 2026-05-28:
+    they had drifted by 10 modules (bedrock_client, phase_filter, numeric, …).
+    """
+    import re
+    build_sh = os.path.join(ROOT, "deploy", "build_layer.sh")
+    inblock = False
+    build_mods = set()
+    for ln in open(build_sh).read().splitlines():
+        if re.match(r"\s*MODULES=\(", ln):
+            inblock = True
+            continue
+        if inblock:
+            if re.match(r"\s*\)\s*$", ln):
+                break
+            code = ln.split("#", 1)[0]  # strip inline comments (they contain ".py()"-like text)
+            build_mods.update(re.findall(r"[A-Za-z_][A-Za-z0-9_]*\.py", code))
+
+    map_mods = {os.path.basename(m) for m in _LAYER_MODULES}
+    only_build = build_mods - map_mods
+    only_map = map_mods - build_mods
+    assert not only_build and not only_map, (
+        "LV4 FAIL: shared_layer.modules drifted from build_layer.sh MODULES.\n"
+        f"  in build_layer.sh but missing from lambda_map: {sorted(only_build)}\n"
+        f"  in lambda_map but not in build_layer.sh: {sorted(only_map)}\n"
+        "Sync ci/lambda_map.json shared_layer.modules to deploy/build_layer.sh."
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LV5 — Layer version only in constants
 # ══════════════════════════════════════════════════════════════════════════════
 
 def test_lv5_layer_version_only_in_constants():
