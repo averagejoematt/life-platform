@@ -135,6 +135,15 @@ class MonitoringStack(Stack):
         _alarm("AiTokensPlatformTotal",   "ai-tokens-platform-daily-total",
                "LifePlatform/AI", "AnthropicOutputTokens", 86400, "Sum", 33333, GTE)
 
+        # 2026-05-29: the ~46 per-Lambda ingestion-error-* alarms ($4.60/mo) were
+        # removed (error_alarm=False in ingestion_stack). No aggregate replaces them:
+        # CloudWatch rejects SEARCH in alarms and caps metric-math alarms at ~10
+        # metrics (we have 19 ingestion fns). Sustained ingestion failure is already
+        # caught downstream by the freshness-checker (stale data → SNS), the DLQ +
+        # dlq-consumer (async failures), the canary (pipeline health), and the
+        # remediation agent (per-Lambda diagnosis from logs). The per-Lambda alarms
+        # mostly fired on transient self-healing errors — that was the noise.
+
         # ══════════════════════════════════════════════════════════════
         # OBS-01: DynamoDB throttling alarm
         # Any throttled requests means data is silently dropped.
