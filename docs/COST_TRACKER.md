@@ -1,42 +1,53 @@
 # Life Platform — Cost Tracker
 
-Last updated: 2026-05-28 (v7.21.0)
+Last updated: 2026-05-29 (v7.21.0)
 
-> Budget target: **$25/month**. Design constraint: every feature must justify its cost.
+> Budget ceiling: **$75/month all-in** (raised from $25 with the Bedrock migration + automated guardrails, 2026-05-29). Design constraint: every feature must justify its cost.
 
 ---
 
-## Current Monthly Cost Breakdown (Estimated, post-V2 cleanup)
+## Current Monthly Cost Breakdown (actuals, 2026-05-29)
 
-V2 audit delivered **$3.65/mo total savings** across 5 items: power-tuning Lambda deletion (5 functions), orphan IAM role cleanup (5 roles), duplicate alarm pruning, `api-keys`/`google-calendar`/`webhook-key` retirements, and CMK consolidation. The new steady-state baseline is ~$10/mo (post-V2 fully reflected from June onward).
+Rewritten from Cost Explorer + the cost-governor estimator. The prior "~$10/mo"
+figure was stale fiction (it predated Bedrock and three cost drivers the doc got
+wrong). Real run-rate is **~$33-36/mo** — comfortably under the $75 ceiling.
 
 | Service | Cost/Month | Notes |
 |---------|-----------|-------|
-| **Secrets Manager** | $3.60 | 9 active secrets × $0.40/secret/month. `api-keys` deleted 2026-03-14. `webhook-key` deleted 2026-03-14. `google-calendar` deleted 2026-03-15 (ADR-030). |
-| **Lambda** | ~$0.50 | ~2,500 invocations/month; 73 Lambdas deployed (5 power-tuning functions deleted in V2 P4). |
-| **DynamoDB** | ~$0.30 | On-demand pay-per-request, ~5,000 WCU + ~15,000 RCU/month |
-| **S3** | ~$0.05 | ~2.5 GB stored (raw archives + generated + site + cloudtrail). CMK consolidation pending — S3 CMK scheduled for deletion 2026-06-16 (default AWS-managed key takes over). |
-| **CloudWatch** | ~$3.10 | ~40 alarms (post-V2 P4 cleanup). 7 currently in ALARM (Garmin OAuth-related — expected to clear within 24h). |
-| **SES** | ~$0.01 | ~55 emails/month. Config set `life-platform-emails` wired to 4 email Lambdas; tracking opens/clicks/bounces/complaints. |
-| **API Gateway** | ~$0.01 | ~180 webhook invocations/month (Health Auto Export, hourly push) |
-| **SNS** | $0.00 | Free tier (alert topic, low volume) |
-| **CloudTrail** | $0.00 | Management events free; data events now enabled on `raw/*` + `uploads/*` (~$0.10 worst case, included in S3 line). |
-| **Budgets** | $0.00 | First 2 budgets free |
-| **PITR (DynamoDB)** | ~$0.10 | 35-day continuous backup on single table |
-| **CloudFront** | ~$0.01 | CDN for `averagejoematt.com` + subdomains (free tier) |
-| **Route 53** | ~$0.50 | 1 hosted zone — flat monthly fee |
-| **Total** | **~$10/month** | Well under $25 target. May 2026 MTD through 2026-05-19: **$18.58** (includes some pre-V2 spend; June expected to fully reflect the $3.65/mo savings). |
+| **CloudWatch** | ~$9.60 | **46 ingestion-error alarms + others (~112 total) × $0.10**. COST-A claimed ~40; regressed. Consolidation to metric-math is a tracked follow-up (~$4/mo). |
+| **WAF** | ~$8.78 | `life-platform-amj-waf` (CLOUDFRONT, 4 rate rules) = $5/ACL + $1/rule. Slated for deletion once the Lambda concurrency quota lands (case 177921309700709). |
+| **Secrets Manager** | ~$5.60 | 14 active secrets × $0.40. All currently referenced in code — pruning needs reference cleanup first (not a safe blind delete). |
+| **Bedrock (AI)** | ~$5-7 | Claude inference, mostly Haiku 4.5 (coaches) + Sonnet 4.6 (daily brief), prompt-cached. Tracked near-real-time by the cost-governor; Cost Explorer lags 24-48h. |
+| **Tax / Cost Explorer API** | ~$4 | CE GetCostAndUsage calls (governor, hourly) + tax. |
+| **KMS** | ~$1.00 | DynamoDB CMK. |
+| **Route 53** | ~$0.50 | 1 hosted zone — flat fee. |
+| **Lambda / DynamoDB / S3 / CloudFront / SES** | ~$0.60 | All well-managed (on-demand DDB, 30-day log retention, S3 lifecycle). |
+| **Total** | **~$33-36/month** | ~48% of the $75 ceiling. |
 
 ---
 
-## Budget Guardrails
+## Budget Guardrails (automated, 2026-05-29)
 
-| Mechanism | Threshold | Action |
-|-----------|-----------|--------|
-| AWS Budget alert | $5 (25%) | Email notification |
-| AWS Budget alert | $10 (50%) | Email notification |
-| AWS Budget alert | $20 (100%) | Email notification |
-| Hard mental limit | $25/month | Feature must be deferred or redesigned |
+Three layers — see `lambdas/budget_guard.py`, `lambdas/operational/cost_governor_lambda.py`, ADR/plan for design:
+
+1. **AWS Budget** (`life-platform-monthly-75`, CDK CoreStack): one $75 budget, email
+   notifications at **50/70/85/100% (actual + 100% forecast)** → `awsdev@mattsusername.com`.
+   Lagged backstop (Cost Explorer trails Bedrock 24-48h).
+2. **cost-governor** (hourly): estimates near-real-time spend (Cost Explorer non-AI +
+   Bedrock per-model token metrics × price, +15% buffer), projects month-end, writes a
+   **tier** to SSM `/life-platform/budget-tier`. Alerts on tier change.
+3. **budget_guard** (graceful degradation, protects the daily brief longest):
+
+   | Tier | Projected month-end | Effect |
+   |------|---------------------|--------|
+   | 0 Normal | < $55 | everything runs |
+   | 1 Caution | $55-65 | heavy coach AI paused (narrative/ensemble/chronicle) |
+   | 2 Restrict | $65-73 | + public website AI paused (friendly "paused" message) |
+   | 3 Hard stop | ≥ $73 | + ALL Bedrock paused (`bedrock_client` refuses); daily brief is data-only |
+
+   Auto-resumes at month rollover. **Status: deployed observe-only** — the governor emits
+   metrics + computes the tier but doesn't enforce yet; flip `OBSERVE_MODE=false` on
+   `life-platform-cost-governor` to enable once the estimate is validated against the real bill.
 
 Budget email: `awsdev@mattsusername.com`
 
