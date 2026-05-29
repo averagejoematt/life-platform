@@ -155,6 +155,27 @@ def _error(status: int, message: str) -> dict:
     }
 
 
+def _ai_paused_response():
+    """If the budget tier has paused website AI (Tier ≥ 2), return a friendly
+    HTTP-200 'paused' payload the frontend renders calmly; else None. Fail-open."""
+    try:
+        from budget_guard import allow
+        if not allow("website_ai"):
+            return {
+                "statusCode": 200,
+                "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+                "body": json.dumps({
+                    "answer": ("The AI assistant is paused for the rest of the month "
+                               "to stay within budget — it'll be back on the 1st."),
+                    "paused": True,
+                    "remaining": 0,
+                }),
+            }
+    except Exception:
+        pass
+    return None
+
+
 def _get_anthropic_key():
     """Fetch Anthropic API key from Secrets Manager (cached after first call)."""
     global _anthropic_key_cache
@@ -500,6 +521,9 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
 
 def _handle_ask(event: dict) -> dict:
     """POST /api/ask — AI Q&A with health data context."""
+    _paused = _ai_paused_response()
+    if _paused:
+        return _paused
     source_ip = (
         event.get("requestContext", {}).get("http", {}).get("sourceIp")
         or event.get("requestContext", {}).get("identity", {}).get("sourceIp")
@@ -570,6 +594,9 @@ def _handle_ask(event: dict) -> dict:
 
 def _handle_board_ask(event: dict) -> dict:
     """POST /api/board_ask — 6-persona board panel answers."""
+    _paused = _ai_paused_response()
+    if _paused:
+        return _paused
     source_ip = (
         event.get("requestContext", {}).get("http", {}).get("sourceIp")
         or event.get("requestContext", {}).get("identity", {}).get("sourceIp")

@@ -1832,6 +1832,16 @@ def record_email_send(table, lambda_name):
 def lambda_handler(event, context):
     logger.info("Wednesday Chronicle v1.1.0 (Board Centralization) — The Measured Life — starting...")
 
+    # Budget guardrail: at Tier ≥ 1 skip this week's chronicle entirely (weekly,
+    # non-essential, subscriber-facing) — no Bedrock spend, clean no-op.
+    try:
+        from budget_guard import allow as _budget_allow
+        if not _budget_allow("chronicle"):
+            logger.info("Budget tier active — Wednesday chronicle paused this week (no Bedrock spend)")
+            return {"statusCode": 200, "body": "skipped: budget tier"}
+    except ImportError:
+        pass
+
     data = gather_chronicle_data()
     if not data:
         return {"statusCode": 500, "body": "Failed to gather data"}

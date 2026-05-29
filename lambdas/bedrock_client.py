@@ -94,6 +94,20 @@ def invoke(body: dict, model_name: str | None = None) -> dict:
     ModelTimeoutException, ServiceUnavailableException, AccessDeniedException, …)
     — callers handle retry/backoff.
     """
+    # Budget guardrail (Tier-3 hard stop): the single backstop every AI call
+    # routes through. If the monthly $75 ceiling is reached, refuse — callers
+    # catch this and degrade (coaches → fallback brief, ai_calls → [AI_UNAVAILABLE]).
+    # Fail-open: if budget_guard is unavailable, proceed (never break AI on a blip).
+    try:
+        from budget_guard import current_tier, BudgetExceeded
+        if current_tier() >= 3:
+            raise BudgetExceeded(
+                "AI paused — monthly $75 budget ceiling reached (tier 3). "
+                "Auto-resumes at month rollover."
+            )
+    except ImportError:
+        pass
+
     model_id = resolve_model_id(model_name or body.get("model"))
     bedrock_body = {k: v for k, v in body.items() if k != "model"}
     # Bedrock requires this exact version string for the Anthropic schema.
