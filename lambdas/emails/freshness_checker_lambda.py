@@ -38,11 +38,11 @@ cw = boto3.client("cloudwatch", region_name=REGION)
 SOURCES = {
     "whoop":           "Whoop recovery/sleep",
     "withings":        "Withings weight/body comp",
-    "strava":          "Strava activities",
+    # "strava":        "Strava activities",  # PAUSED 2026-05-28 (API 402; Garmin covers activity)
     "todoist":         "Todoist tasks",
     "apple_health":    "Apple Health",
     "eightsleep":      "Eight Sleep",
-    "macrofactor":     "MacroFactor nutrition",
+    # "macrofactor":   "MacroFactor nutrition",  # dead since 2026-04-11 (Tier 1 torn down)
     "garmin":          "Garmin biometrics",
     "habitify":        "Habitify habits",
     "food_delivery":   "Food delivery behavioral signal",
@@ -65,8 +65,8 @@ FIELD_COMPLETENESS_CHECKS: dict[str, list[str]] = {
     "whoop":           ["hrv", "recovery_score", "sleep_duration_hours"],
     "garmin":          ["steps", "resting_heart_rate", "body_battery_highest"],
     "apple_health":    ["steps", "active_energy_kcal"],
-    "macrofactor":     ["total_calories_kcal", "total_protein_g"],
-    "strava":          ["activity_count"],
+    # "macrofactor":   [...],  # dead since 2026-04-11 (Tier 1 torn down)
+    # "strava":        ["activity_count"],  # PAUSED 2026-05-28
     "eightsleep":      ["sleep_efficiency_pct", "sleep_duration_hours"],
     "withings":        ["weight_lbs"],
     "habitify":        ["total_completed"],
@@ -269,7 +269,7 @@ def lambda_handler(event, context):
     OAUTH_SECRETS = [
         "life-platform/whoop",
         "life-platform/withings",
-        "life-platform/strava",
+        # "life-platform/strava",  # PAUSED 2026-05-28 (Strava API 402; Garmin covers activity)
         "life-platform/garmin",
     ]
     MANUAL_ROTATION_SECRETS = [
@@ -277,7 +277,7 @@ def lambda_handler(event, context):
         "life-platform/site-api-ai-key",  # Anthropic — separate key for site API
         "life-platform/eightsleep-client",
         "life-platform/notion",
-        "life-platform/dropbox",
+        # "life-platform/dropbox",  # removed 2026-05-28 — secret soft-deleted
         "life-platform/todoist",
         "life-platform/ingestion-keys",   # COST-B bundle: Notion + Habitify + Todoist + Dropbox + HAE
     ]
