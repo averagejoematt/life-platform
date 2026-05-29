@@ -1,5 +1,5 @@
-chronicle handler report — mode=APPLY — genesis=2026-05-25
-generated=2026-05-24T20:11:12.665114+00:00
+chronicle handler report — mode=APPLY — genesis=2026-05-30
+generated=2026-05-29T20:40:05.055268+00:00
 
 html_files_total       = 18
 html_files_archived    = 0

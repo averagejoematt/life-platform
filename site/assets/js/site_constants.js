@@ -17,15 +17,15 @@ window.AMJ = {
 
   // ── Journey ────────────────────────────────────────────────
   journey: {
-    start_weight:  297,
+    start_weight:  305,
     goal_weight:   185,
-    start_date:    '2026-05-25',
-    experiment_start: '2026-05-25',  // Day 1 of the public experiment
+    start_date:    '2026-05-30',
+    experiment_start: '2026-05-30',  // Day 1 of the public experiment
     phase:         'Foundation',
     hero_tagline:  'Day 1.',
-    hero_short:    '297 → 185. 19 data sources. Every number public.',
+    hero_short:    '305 → 185. 19 data sources. Every number public.',
     hero_copy:     'A 12-month experiment in measured living. Body, sleep, training, nutrition — every metric tracked, every change documented. Begin here.',
-    cta_sub:       '297 lbs. The work begins.',
+    cta_sub:       '305 lbs. The work begins.',
   },
 
   // ── Platform (fallbacks — overridden by /api/platform_stats) ──

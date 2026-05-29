@@ -1,87 +1,107 @@
-restart_pipeline report — target=2026-05-25 — mode=APPLY
-generated=2026-05-24T15:15:13.782709+00:00
+restart_pipeline report — target=2026-05-30 — mode=APPLY
+generated=2026-05-29T20:40:49.827812+00:00
 
-baseline_weight_lbs = 297.24
-baseline_weight_kg  = 134.825
+baseline_weight_lbs = 304.62
+baseline_weight_kg  = 138.173
 
 === sync_constants_from_config === (exit 0)
 [SYNC] Wrote lambdas/constants.py from config/user_goals.json
 
 === build_layer === (exit 0)
-✅ Layer built: 26 modules in cdk/layer-build/python/
+✅ Layer built: 28 modules in cdk/layer-build/python/
 
 === cdk_deploy === (exit 0)
+arn:aws:cloudformation:us-west-2:205930651321:stack/LifePlatformMcp/5284cbb1-1bf8-11f1-9a8e-0208388a0bd3
+arn:aws:cloudformation:us-west-2:205930651321:stack/LifePlatformMonitoring/518a97c0-1bf9-11f1-9902-0266f90be1b5
 arn:aws:cloudformation:us-west-2:205930651321:stack/LifePlatformCore/3461b5b0-1c31-11f1-bf26-0a83b3ae395d
+arn:aws:cloudformation:us-west-2:205930651321:stack/LifePlatformIngestion/68dccb20-1b75-11f1-a0e2-02461cd92c05
 arn:aws:cloudformation:us-west-2:205930651321:stack/LifePlatformCompute/d5601fd0-1b7b-11f1-9b6d-06ac7aace231
 arn:aws:cloudformation:us-west-2:205930651321:stack/LifePlatformEmail/e5201b50-1b7b-11f1-b06b-02be2d5340f9
+arn:aws:cloudformation:us-west-2:205930651321:stack/LifePlatformOperational/66101950-1bf3-11f1-817e-0a70ff347503
+arn:aws:cloudformation:us-east-1:205930651321:stack/LifePlatformWeb/89569f20-1bfc-11f1-be8f-0e018eea3d8b
 
 === restart_phase_tag === (exit 0)
-sk=DATE#2026-05-22  before='experiment'  after='pilot'
+ before=None  after='pilot'
+  sk=DATE#2026-01-07#journal#journal#1  before=None  after='pilot'
+
+[sleep_unified]
+  sk=DATE#2026-05-24  before=None  after='pilot'
+  sk=DATE#2026-05-25  before=None  after='pilot'
+  sk=DATE#2026-05-26  before='experiment'  after='pilot'
+  sk=DATE#2026-05-27  before='experiment'  after='pilot'
+  sk=DATE#2026-05-28  before='experiment'  after='pilot'
 
 [supplements]
-  sk=DATE#2026-05-19  before='experiment'  after='pilot'
-  sk=DATE#2026-05-20  before='experiment'  after='pilot'
+  sk=DATE#2026-05-29  before=None  after='pilot'
 
 [todoist]
-  sk=DATE#2026-05-18  before='experiment'  after='pilot'
-  sk=DATE#2026-05-19  before='experiment'  after='pilot'
-  sk=DATE#2026-05-20  before='experiment'  after='pilot'
-  sk=DATE#2026-05-21  before='experiment'  after='pilot'
-  sk=DATE#2026-05-22  before='experiment'  after='pilot'
+  sk=DATE#2026-05-25  before='experiment'  after='pilot'
+  sk=DATE#2026-05-26  before='experiment'  after='pilot'
+  sk=DATE#2026-05-27  before='experiment'  after='pilot'
+  sk=DATE#2026-05-28  before='experiment'  after='pilot'
 
 [weather]
-  sk=DATE#2026-05-18  before='experiment'  after='pilot'
-  sk=DATE#2026-05-19  before='experiment'  after='pilot'
-  sk=DATE#2026-05-20  before='experiment'  after='pilot'
-  sk=DATE#2026-05-21  before='experiment'  after='pilot'
-  sk=DATE#2026-05-22  before='experiment'  after='pilot'
+  sk=DATE#2026-05-25  before='experiment'  after='pilot'
+  sk=DATE#2026-05-26  before='experiment'  after='pilot'
+  sk=DATE#2026-05-27  before='experiment'  after='pilot'
+  sk=DATE#2026-05-28  before='experiment'  after='pilot'
+  sk=DATE#2026-05-29  before='experiment'  after='pilot'
 
 [whoop]
-  sk=DATE#2026-05-18  before='experiment'  after='pilot'
-  sk=DATE#2026-05-19  before='experiment'  after='pilot'
-  sk=DATE#2026-05-19#WORKOUT#28d9abfb-2890-4e6a-b80e-55442232fb9c  before='experiment'  after='pilot'
-  sk=DATE#2026-05-19#WORKOUT#62654fcb-4bfd-41a2-a97a-74ce97c09dc5  before='experiment'  after='pilot'
-  sk=DATE#2026-05-19#WORKOUT#8cd0e1d6-f422-46f9-a6d5-f94cdc923108  before='experiment'  after='pilot'
+  sk=DATE#2026-05-25  before='experiment'  after='pilot'
+  sk=DATE#2026-05-26  before='experiment'  after='pilot'
+  sk=DATE#2026-05-27  before='experiment'  after='pilot'
+  sk=DATE#2026-05-27#WORKOUT#d0d1d4db-5604-4085-9e10-64d81fea95de  before='experiment'  after='pilot'
+  sk=DATE#2026-05-28  before='experiment'  after='pilot'
 
 [withings]
-  sk=DATE#2026-05-18  before='experiment'  after='pilot'
-  sk=DATE#2026-05-19  before='experiment'  after='pilot'
-  sk=DATE#2026-05-20  before='experiment'  after='pilot'
-  sk=DATE#2026-05-21  before='experiment'  after='pilot'
+  sk=DATE#2026-05-25  before='experiment'  after='pilot'
+  sk=DATE#2026-05-29  before='experiment'  after='pilot'
 
 Report written to: docs/restart/_phase_tag_report.txt
 
 === restart_intelligence_wipe === (exit 0)
-           0          4        12        0
-----------------------------------------------------------------------------------------
-TOTAL                            616      611            0          5       611        0
+-09
 
-=== samples of items that would be tombstoned (up to 3 per partition) ===
+[coach_physical]
+  sk=BRIEF#2026-04-07
+  sk=BRIEF#2026-04-08
+  sk=BRIEF#2026-04-09
 
-[challenges]
-  sk=CHALLENGE#5k-every-day_2026-03-29
-  sk=CHALLENGE#analog-hour_2026-03-28
-  sk=CHALLENGE#connection-family-member-b_2026-03-28
+[coach_sleep]
+  sk=BRIEF#2026-04-07
+  sk=BRIEF#2026-04-08
+  sk=BRIEF#2026-04-09
 
-[character_sheet]
-  sk=DATE#2026-03-27
-  sk=DATE#2026-03-28
-  sk=DATE#2026-03-29
+[coach_training]
+  sk=BRIEF#2026-04-07
+  sk=BRIEF#2026-04-08
+  sk=BRIEF#2026-04-09
 
-[chronicle]
-  sk=DATE#2026-02-22
-  sk=DATE#2026-02-28
-  sk=DATE#2026-03-03
+[computed_insights]
+  sk=DATE#2026-03-06
+  sk=DATE#2026-03-07
+  sk=DATE#2026-03-09
 
 [computed_metrics]
   sk=DATE#2026-03-05
   sk=DATE#2026-03-06
   sk=DATE#2026-03-07
 
+[discovery_annotations]
+  sk=EVENT#14c27dfa1d6dc049
+  sk=EVENT#433f6d4121ed3719
+  sk=EVENT#5cbff38789c9a7d0
+
 [experiments]
   sk=EXP#breathwork-before-sleep
   sk=EXP#daily-8000-steps
   sk=EXP#intermittent-fasting-16-8
+
+[field_notes]
+  sk=WEEK#2026-W14
+  sk=WEEK#2026-W17
+  sk=WEEK#2026-W19
 
 [habit_scores]
   sk=DATE#2026-02-23
@@ -108,25 +128,30 @@ TOTAL                            616      611            0          5       611 
   sk=MEMORY#failure_pattern#2026-03-09#1
   sk=MEMORY#failure_pattern#2026-03-09#2
 
+[weekly_correlations]
+  sk=WEEK#2026-W11
+  sk=WEEK#2026-W13
+  sk=WEEK#2026-W14
+
 Report written to: docs/restart/_intelligence_wipe_report.txt
 
 === restart_character_rebuild === (exit 0)
-[APPLY] character rebuild starting. genesis=2026-05-25
+[APPLY] character rebuild starting. genesis=2026-05-30
 
 [1/3] Stale S3 compute_state files: 0
 
-[2/3] Days to recompute: 0 (2026-05-25 → 2026-05-23)
+[2/3] Days to recompute: 0 (2026-05-30 → 2026-05-28)
 
 [3/3] Verification hints (run via MCP after apply):
   - get_habits()              → expect streak=0 for all habits
   - get_vice_streaks()        → expect streak_days=0 for every vice
   - get_rewards()             → expect every milestone in active state, 0% progress
-  - get_character(view=sheet) → expect days_active matches day_n(2026-05-23)
+  - get_character(view=sheet) → expect days_active matches day_n(2026-05-28)
 
 Report written to: docs/restart/_character_rebuild_report.txt
 
 === restart_chronicle_handler === (exit 0)
-[APPLY] chronicle handler. genesis=2026-05-25
+[APPLY] chronicle handler. genesis=2026-05-30
 
 [1/3] Archiving chronicle HTML across 3 prefix(es):
   [blog/] 1 file(s):
@@ -134,28 +159,45 @@ Report written to: docs/restart/_character_rebuild_report.txt
   [site/chronicle/] 10 file(s):
 
 [2/3] Rewriting chronicle index pages:
-  (wrote) blog/index.html  (527 bytes, Day-1 placeholder)
-  (wrote) dashboard/chronicle/index.html  (527 bytes, Day-1 placeholder)
-  (wrote) site/chronicle/index.html  (527 bytes, Day-1 placeholder)
+  (wrote) blog/index.html  (3751 bytes, Day-1 placeholder)
+  (wrote) dashboard/chronicle/index.html  (3751 bytes, Day-1 placeholder)
+  (wrote) site/chronicle/index.html  (3751 bytes, Day-1 placeholder)
 
 [3/3] No --resurrect-sk passed: blank chronicle, fresh start on next Wed cycle.
 
 Report written to: docs/restart/_chronicle_report.txt
 
 === restart_site_copy_sync === (exit 0)
-[APPLY] site copy sync. genesis=2026-05-25 baseline=297.24
+[APPLY] site copy sync. genesis=2026-05-30 baseline=304.62
 
 [1/5] site_constants.js: CHANGED
 [2/5] content_manifest.json: CHANGED
-[3/5] HTML files updated: 0
-[4/5] builders/index.html Feb-22 strip: unchanged
-[5/5] S3 sync: 3 key(s)
-       CloudFront invalidation: 4 path(s)
+[3/8] HTML files updated: 4
+    - site/index.html
+    - site/week/index.html
+    - site/physical/index.html
+    - site/live/index.html
+[4/8] JS files updated: 0
+[5/8] builders/index.html Feb-22 strip: unchanged
+[6/8] Orphan S3 files tombstoned: 6
+    - s3://matthew-life-platform/dashboard/data.json
+    - s3://matthew-life-platform/dashboard/clinical.json
+    - s3://matthew-life-platform/dashboard/data/character_stats.json
+    - s3://matthew-life-platform/dashboard/journal/posts.json
+    - s3://matthew-life-platform/dashboard/chronicle/posts.json
+    - s3://matthew-life-platform/site/data/data_sources.json
+[7/8] S3 sync: 7 key(s)
+       CloudFront invalidation: 14 path(s)
+[8/8] Regen Lambda invocations: 4
+    - life-platform-daily-brief: err(254)
+    - character-sheet-compute: err(254)
+    - site-stats-refresh: err(254)
+    - og-image-generator: err(254)
 
 Report written to: docs/restart/_site_copy_report.txt
 
 === restart_docs_update === (exit 0)
-[APPLY] docs update. genesis=2026-05-25 baseline=297.24
+[APPLY] docs update. genesis=2026-05-30 baseline=304.62
 
   unchanged  docs/DECISIONS.md
   updated    docs/CHANGELOG.md
@@ -166,3 +208,39 @@ Report written to: docs/restart/_site_copy_report.txt
   unchanged  docs/MCP_TOOL_CATALOG.md
 
 Report written to: docs/restart/_docs_update_report.txt
+
+=== restart_verify_rendered === (exit 0)
+
+restart_verify_rendered — checking public surfaces against genesis=2026-05-30
+
+  ✓ /
+  ✓ /mission/
+  ✓ /character/
+  ✓ /achievements/
+  ✓ /field-notes/
+  ✓ /recap/
+  ✓ /week/
+  ✓ /weekly/
+  ✓ /chronicle/
+  ✓ /live/
+  ✓ /physical/
+  ✓ /glucose/
+  ✓ /nutrition/
+  ✓ /mind/
+  ✓ /training/
+  ✓ /sleep/
+  ✓ /experiments/
+  ✓ /discoveries/
+  ✓ /journal/
+  ✓ /labs/
+  ✓ /habits/
+  ✓ /story/
+  ✓ /builders/
+  ✓ /api/journey
+  ✓ /api/vitals
+  ✓ /api/character
+  ✓ /api/timeline
+
+══ summary ══
+  27/27 pages clean
+Report: docs/restart/_verify_rendered_report.txt

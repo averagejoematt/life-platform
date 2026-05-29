@@ -1,11 +1,11 @@
-site copy sync report — mode=APPLY — genesis=2026-05-25
-baseline_lbs=297.24 goal_lbs=185
+site copy sync report — mode=APPLY — genesis=2026-05-30
+baseline_lbs=304.62 goal_lbs=185
 
-site_constants_js_changed   = False
-content_manifest_changed    = False
-html_files_touched          = 2
+site_constants_js_changed   = True
+content_manifest_changed    = True
+html_files_touched          = 4
 js_files_touched            = 0
 builders_feb22_removed      = False
 orphan_s3_tombstoned        = 6
 regen_lambdas_invoked       = 0/4
-keys_synced                 = 5
+keys_synced                 = 7
