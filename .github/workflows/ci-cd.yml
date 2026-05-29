@@ -131,18 +131,23 @@ jobs:
           echo "Advisory scan complete — failures are non-blocking"
 
       - name: Check lambda_map coverage
-        # R18-F03: Detect Lambda source files missing from ci/lambda_map.json
+        # R18-F03: Detect Lambda source files missing from ci/lambda_map.json.
+        # 2026-05-28: the old `for f in lambdas/*_lambda.py` glob matched ZERO
+        # files after the P3.1 subpackage restructure (everything moved under
+        # lambdas/<domain>/), so this check silently passed and let unmapped
+        # Lambdas slip through (the qa-smoke / lambda_map drift class). Now uses
+        # a recursive find and FAILS the build — a Lambda source must be mapped.
         run: |
           MISSING=0
-          for f in lambdas/*_lambda.py lambdas/*_handler.py; do
-            [ -f "$f" ] || continue
+          while IFS= read -r f; do
             if ! grep -q "\"$f\"" ci/lambda_map.json; then
-              echo "::warning file=$f::Lambda source file not in lambda_map.json"
+              echo "::error file=$f::Lambda source file not in ci/lambda_map.json — add it to the .lambdas section"
               MISSING=$((MISSING + 1))
             fi
-          done
+          done < <(find lambdas -name '*_lambda.py' -o -name '*_handler.py')
           if [ $MISSING -gt 0 ]; then
-            echo "::warning::$MISSING Lambda source files missing from lambda_map.json"
+            echo "::error::$MISSING Lambda source file(s) missing from lambda_map.json"
+            exit 1
           else
             echo "✅ All Lambda source files present in lambda_map.json"
           fi

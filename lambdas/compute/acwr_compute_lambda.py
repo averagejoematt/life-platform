@@ -229,6 +229,14 @@ def _write_acwr(date_str, acwr, acute_7d, chronic_28d,
 # ─────────────────────────────────────────────────────────────────────────────
 
 def lambda_handler(event, context):
+    try:
+        return _lambda_handler_impl(event, context)
+    except Exception as e:
+        logger.error("Handler failed: %s", e, exc_info=True)
+        raise
+
+
+def _lambda_handler_impl(event, context):
     t0 = time.time()
     logger.info("ACWR Compute v1.0.0 starting")
 

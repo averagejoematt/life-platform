@@ -216,6 +216,18 @@
     },
     "lambdas/ingestion/weather_lambda.py": {
       "function": "weather-data-ingestion"
+    },
+    "lambdas/compute/acwr_compute_lambda.py": {
+      "function": "acwr-compute"
+    },
+    "lambdas/compute/circadian_compliance_lambda.py": {
+      "function": "circadian-compliance"
+    },
+    "lambdas/compute/sleep_reconciler_lambda.py": {
+      "function": "sleep-reconciler"
+    },
+    "lambdas/web/site_api_ai_lambda.py": {
+      "function": "life-platform-site-api-ai"
     }
   },
   "mcp": {
@@ -229,26 +241,35 @@
     ]
   },
   "shared_layer": {
-    "_comment": "Changes to these files require layer rebuild + consumer redeploy",
-    "layer_name": "life-platform-shared-utils",
+    "_comment": "Changes to these files require layer rebuild + consumer redeploy. MUST stay in sync with deploy/build_layer.sh MODULES (source of truth). 2026-05-28: synced — was missing bedrock_client/phase_filter/numeric/rate_limiter/request_validator/auth_breaker/http_retry/compute_metadata/constants/sick_day_checker, so edits to those didn't trigger CI's layer-change detection.",
     "modules": [
-      "lambdas/board_loader.py",
       "lambdas/ai_calls.py",
-      "lambdas/html_builder.py",
-      "lambdas/output_writers.py",
-      "lambdas/scoring_engine.py",
-      "lambdas/character_engine.py",
-      "lambdas/insight_writer.py",
-      "lambdas/retry_utils.py",
       "lambdas/ai_output_validator.py",
-      "lambdas/platform_logger.py",
+      "lambdas/auth_breaker.py",
+      "lambdas/bedrock_client.py",
+      "lambdas/board_loader.py",
+      "lambdas/character_engine.py",
+      "lambdas/compute_metadata.py",
+      "lambdas/constants.py",
+      "lambdas/digest_utils.py",
+      "lambdas/html_builder.py",
+      "lambdas/http_retry.py",
       "lambdas/ingestion_framework.py",
       "lambdas/ingestion_validator.py",
+      "lambdas/insight_writer.py",
+      "lambdas/intelligence_common.py",
       "lambdas/item_size_guard.py",
-      "lambdas/digest_utils.py",
-      "lambdas/site_writer.py",
+      "lambdas/numeric.py",
+      "lambdas/output_writers.py",
+      "lambdas/phase_filter.py",
+      "lambdas/platform_logger.py",
+      "lambdas/rate_limiter.py",
+      "lambdas/request_validator.py",
+      "lambdas/retry_utils.py",
+      "lambdas/scoring_engine.py",
       "lambdas/secret_cache.py",
-      "lambdas/intelligence_common.py"
+      "lambdas/sick_day_checker.py",
+      "lambdas/site_writer.py"
     ],
     "consumers": [
       "daily-brief",
