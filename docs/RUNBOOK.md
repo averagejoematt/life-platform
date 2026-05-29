@@ -1150,3 +1150,79 @@ All steps preserve original data (interpretation B for DDB, archive-not-delete f
 Roll back by removing tombstone flags (DDB) or copying from `*/archive/pilot/` (S3).
 
 See ADR-058 in `docs/DECISIONS.md` for the design rationale.
+
+## Budget Guardrails (ADR-063)
+
+The $75/month AWS budget is enforced by a two-component system:
+
+- **`life-platform-cost-governor`** Lambda (hourly) — projects month-end spend, writes tier 0–3 to SSM `/life-platform/budget-tier`.
+- **`lambdas/budget_guard.py`** (shared-layer module) — calling code uses `allow(feature)` to gate AI by tier.
+
+**Tier behavior** (priority: protect daily brief longest):
+
+| Tier | Projected | What pauses |
+|---|---|---|
+| 0 | <70% of $75 | nothing — all AI runs normally |
+| 1 | 70–85% | coach narratives + ensemble + chronicle |
+| 2 | 85–95% | + website AI (`/api/ask`, `/api/board_ask`) — returns "paused" JSON |
+| 3 | ≥95% | hard cutoff — `bedrock_client.invoke()` raises `BudgetExceeded`; daily brief skips AI |
+
+**Check current tier:**
+```bash
+aws ssm get-parameter --name /life-platform/budget-tier --region us-west-2 \
+  --query Parameter.Value --output text
+```
+
+**Reset tier (testing, or after a cost-anomaly fix):**
+```bash
+aws ssm put-parameter --name /life-platform/budget-tier --value 0 \
+  --type String --overwrite --region us-west-2
+```
+
+**Disable enforcement temporarily (emergency debugging):**
+```bash
+aws lambda update-function-configuration --function-name life-platform-cost-governor \
+  --environment 'Variables={OBSERVE_MODE=true}' --region us-west-2
+# Re-enable: --environment 'Variables={OBSERVE_MODE=false}'
+```
+
+**Email alerts:** budget `life-platform-monthly-75` notifies at 50/70/85/100% to `awsdev@mattsusername.com` via SNS.
+
+## Remediation Agent (ADR-064/065)
+
+Self-healing triage agent runs daily ~07:45 PT via `.github/workflows/remediation-agent.yml`. Auto-fixes the safe class via PR, opens PRs for the rest, emails what needs the operator. Replaces the raw `[LP digest]` noise.
+
+**Mode kill-switch (SSM `/life-platform/remediation-mode`):**
+
+| Value | Behavior |
+|---|---|
+| `off` | workflow no-ops immediately |
+| `shadow` | diagnoses + opens PRs, never auto-merges (validation mode) |
+| `auto` | `automerge.py` gate merges `auto-fix-safe` PRs that pass all guards (see ADR-065) |
+
+**Check mode:**
+```bash
+aws ssm get-parameter --name /life-platform/remediation-mode --region us-west-2 \
+  --query Parameter.Value --output text
+```
+
+**Switch mode (panic-off, or back to shadow for validation):**
+```bash
+aws ssm put-parameter --name /life-platform/remediation-mode --value shadow \
+  --type String --overwrite --region us-west-2
+```
+
+**Manual trigger (force a run now, useful after pushing a fix):**
+```bash
+gh workflow run remediation-agent.yml
+```
+
+**Audit logs:**
+- Agent decisions: `s3://matthew-life-platform/remediation-log/YYYY/MM/DD/HHMMSS.json`
+- Auto-merge gate decisions: `s3://matthew-life-platform/remediation-log/automerge/YYYY/MM/DD/pr{N}-{HHMMSS}.{merged|held}.json`
+
+**Budget Tier-3 pauses remediation automatically** — the agent's `gate()` reads `/life-platform/budget-tier` and skips the run if ≥ 3.
+
+**Classifier rubric:** `docs/REMEDIATION_TAXONOMY.md` (A=auto-fix-safe, B=fix-via-pr, C=needs-human, D=stale).
+
+**The merge gate is deterministic, not the agent.** The agent opens PRs labeled `auto-fix-safe`; `remediation/automerge.py` (separate workflow step) verifies allowlist/denylist/diff-bound/lint/unit-tests and merges if all green. The gate does NOT bypass `ci-cd.yml`'s production approval gate — even merged code needs manual deploy approval. Infra (`cdk/`) merges are flagged "needs cdk deploy."
