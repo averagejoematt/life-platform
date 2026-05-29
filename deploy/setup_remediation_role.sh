@@ -27,7 +27,9 @@ JSON
 # NO lambda update, NO IAM write — the agent proposes fixes via PR; humans/CI deploy.
 PERM=$(cat <<JSON
 {"Version":"2012-10-17","Statement":[
- {"Sid":"Bedrock","Effect":"Allow","Action":"bedrock:InvokeModel","Resource":[
+ {"Sid":"Bedrock","Effect":"Allow",
+   "Action":["bedrock:InvokeModel","bedrock:InvokeModelWithResponseStream"],
+   "Resource":[
    "arn:aws:bedrock:*:${ACCOUNT}:inference-profile/us.anthropic.claude-*",
    "arn:aws:bedrock:*::foundation-model/anthropic.claude-*"]},
  {"Sid":"Diagnose","Effect":"Allow","Action":["logs:FilterLogEvents","logs:GetLogEvents",
