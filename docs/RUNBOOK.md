@@ -1,6 +1,6 @@
 # Life Platform — Runbook
 
-Last updated: 2026-05-29 (v7.21.0 — 131 MCP tools, 36-module package, 71 Lambdas, 19 data sources)
+Last updated: 2026-05-29 (v7.21.0 — 131 MCP tools, 36-module package, 72 Lambdas, 19 data sources)
 
 **Ground truth at last verification:**
 - Lambda functions deployed: 73 (5 power-tuning Lambdas deleted in V2 P4)
@@ -1226,3 +1226,53 @@ gh workflow run remediation-agent.yml
 **Classifier rubric:** `docs/REMEDIATION_TAXONOMY.md` (A=auto-fix-safe, B=fix-via-pr, C=needs-human, D=stale).
 
 **The merge gate is deterministic, not the agent.** The agent opens PRs labeled `auto-fix-safe`; `remediation/automerge.py` (separate workflow step) verifies allowlist/denylist/diff-bound/lint/unit-tests and merges if all green. The gate does NOT bypass `ci-cd.yml`'s production approval gate — even merged code needs manual deploy approval. Infra (`cdk/`) merges are flagged "needs cdk deploy."
+
+## Urgent-Alarm Dispatcher (fast path, ADR-064)
+
+`life-platform-remediation-dispatcher` Lambda is subscribed to the `life-platform-alerts` SNS topic. On each fire it:
+1. Filters to urgent alarms (substrings: `canary`, `dlq-depth`, `site-api-error`, `budget-tier`, `bedrock-throttle`, `slo-`). Routine ingestion-source errors stay non-urgent — the daily 07:45 PT sweep handles them.
+2. Dedupes per 30-min window via S3 marker (`s3://matthew-life-platform/remediation-log/dispatch-dedupe/{alarm}-{stamp}.marker`; markers expire after 1 day via lifecycle rule).
+3. Calls GitHub `POST /repos/averagejoematt/life-platform/dispatches` with `event_type: urgent_alarm`, authenticated via a fine-grained PAT in Secrets Manager (`life-platform/github-dispatch-token`).
+4. The workflow's `repository_dispatch: [urgent_alarm]` trigger fires the agent immediately.
+
+**Inspect the dispatcher logs:**
+```bash
+aws logs tail /aws/lambda/life-platform-remediation-dispatcher --follow --region us-west-2
+```
+
+**Test the path end-to-end (synthetic alarm):**
+```bash
+cat > /tmp/test-alarm.json <<'JSON'
+{"Records":[{"Sns":{"Message":"{\"AlarmName\":\"canary-manual-test\",\"NewStateValue\":\"ALARM\",\"NewStateReason\":\"Manual test\"}"}}]}
+JSON
+aws lambda invoke --function-name life-platform-remediation-dispatcher --region us-west-2 \
+  --cli-binary-format raw-in-base64-out --payload file:///tmp/test-alarm.json /tmp/out.json
+cat /tmp/out.json   # expect dispatched:1, errors:0
+```
+A successful test triggers a real workflow run (~$0.05 of Bedrock, ~10 min). Then check `gh run list --workflow=remediation-agent.yml --limit 1` for `event=repository_dispatch`.
+
+### PAT rotation (every 90 days)
+
+The fine-grained PAT in `life-platform/github-dispatch-token` expires every 90 days by design.
+
+**Setup or rotation:**
+1. Open https://github.com/settings/personal-access-tokens → **Generate new token (fine-grained)**.
+2. Settings: name `life-platform-dispatcher`, expiry 90 days, repository access **Only `averagejoematt/life-platform`**, permissions **Contents: Read and write** ONLY (Metadata: Read-only is granted automatically — that's fine, leave it).
+3. Generate, copy. Then:
+   ```bash
+   # First time:
+   aws secretsmanager create-secret \
+     --name life-platform/github-dispatch-token \
+     --secret-string 'PASTE_TOKEN_HERE' \
+     --region us-west-2
+
+   # Rotation (subsequent times):
+   aws secretsmanager update-secret \
+     --secret-id life-platform/github-dispatch-token \
+     --secret-string 'PASTE_NEW_TOKEN_HERE' \
+     --region us-west-2
+   ```
+4. No Lambda redeploy needed — the dispatcher re-reads the secret on each cold start.
+5. Old PAT can be left to expire naturally OR deleted at github.com/settings/personal-access-tokens.
+
+**If the PAT is missing or expired**, urgent alarms still email you via the existing SNS subscriptions (no degradation); the dispatcher logs `SecretNotFound` or `GitHub HTTP 401` and the daily 07:45 PT sweep still covers the signal — just without the urgent fast path.
