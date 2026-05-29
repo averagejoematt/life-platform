@@ -173,6 +173,11 @@ class OperationalStack(Stack):
             handler="operational.cost_governor_lambda.lambda_handler",
             schedule="cron(0 * * * ? *)",  # hourly
             timeout_seconds=60, memory_mb=256,
+            # 2026-05-29: enforcement ENABLED — the projection fix makes the
+            # estimate reliable (projected ~$45, Tier 0). Writes the SSM tier +
+            # alerts on change; budget_guard then gates AI. Set OBSERVE_MODE=true
+            # to revert to observe-only.
+            environment={"OBSERVE_MODE": "false"},
             custom_policies=rp.operational_cost_governor(),
             table=local_table, bucket=local_bucket, dlq=None, alerts_topic=None,
             shared_layer=shared_utils_layer,
