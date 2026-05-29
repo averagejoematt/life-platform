@@ -64,6 +64,6 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           CDK_ACCOUNT: "205930651321"
           S3_BUCKET: matthew-life-platform
-          REMEDIATION_MAX_TURNS: "12"
+          REMEDIATION_MAX_TURNS: "16"
           DISPATCH_PAYLOAD: ${{ toJson(github.event.client_payload) }}
         run: python3 remediation/agent.py
