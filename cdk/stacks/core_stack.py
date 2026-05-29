@@ -21,6 +21,7 @@ from aws_cdk import (
     aws_lambda as _lambda,
     aws_kms as kms,
     aws_iam as iam,
+    aws_budgets as budgets,
 )
 from constructs import Construct
 
@@ -82,6 +83,39 @@ class CoreStack(Stack):
             compatible_runtimes=[_lambda.Runtime.PYTHON_3_12],
             description="Shared utils for Life Platform Lambdas",
             removal_policy=RemovalPolicy.RETAIN,
+        )
+
+        # ── AWS Budget — single $75/mo all-in ceiling (replaces 2 stale $20 manual budgets) ──
+        # Lagged secondary backstop + notice; the real-time enforcer is the
+        # cost_governor Lambda (token-metric estimate → SSM tier → bedrock_client gate).
+        # Budgets data trails Bedrock spend 24-48h, so it's notice, not the hard stop.
+        budget_email = ctx("budget_email") or "awsdev@mattsusername.com"
+        _budget_notifications = []
+        for _thr, _type in [(50, "ACTUAL"), (70, "ACTUAL"), (85, "ACTUAL"),
+                            (100, "ACTUAL"), (100, "FORECASTED")]:
+            _budget_notifications.append(
+                budgets.CfnBudget.NotificationWithSubscribersProperty(
+                    notification=budgets.CfnBudget.NotificationProperty(
+                        notification_type=_type,
+                        comparison_operator="GREATER_THAN",
+                        threshold=_thr,
+                        threshold_type="PERCENTAGE",
+                    ),
+                    subscribers=[budgets.CfnBudget.SubscriberProperty(
+                        subscription_type="EMAIL",
+                        address=budget_email,
+                    )],
+                )
+            )
+        budgets.CfnBudget(
+            self, "MonthlyBudget75",
+            budget=budgets.CfnBudget.BudgetDataProperty(
+                budget_name="life-platform-monthly-75",
+                budget_type="COST",
+                time_unit="MONTHLY",
+                budget_limit=budgets.CfnBudget.SpendProperty(amount=75, unit="USD"),
+            ),
+            notifications_with_subscribers=_budget_notifications,
         )
 
         # ── Outputs ──
