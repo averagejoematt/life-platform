@@ -162,6 +162,22 @@ class OperationalStack(Stack):
             shared_layer=shared_utils_layer,
         )
 
+        # ── 3b. Cost Governor — hourly budget-tier estimator (budget guardrails)
+        # Estimates near-real-time spend (Cost Explorer non-AI + Bedrock token
+        # metrics) and writes /life-platform/budget-tier to SSM. The AI features
+        # read it (budget_guard) to degrade gracefully; bedrock_client enforces
+        # the Tier-3 hard stop. AWS Budgets is the lagged backstop.
+        create_platform_lambda(self, "CostGovernor",
+            function_name="life-platform-cost-governor",
+            source_file="lambdas/operational/cost_governor_lambda.py",
+            handler="operational.cost_governor_lambda.lambda_handler",
+            schedule="cron(0 * * * ? *)",  # hourly
+            timeout_seconds=60, memory_mb=256,
+            custom_policies=rp.operational_cost_governor(),
+            table=local_table, bucket=local_bucket, dlq=None, alerts_topic=None,
+            shared_layer=shared_utils_layer,
+        )
+
         # ── 4. Pip Audit — every Monday
         create_platform_lambda(self, "PipAudit",
             function_name="life-platform-pip-audit",

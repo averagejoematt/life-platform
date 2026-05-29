@@ -1079,6 +1079,37 @@ def operational_dlq_consumer() -> list[iam.PolicyStatement]:
     ]
 
 
+def operational_cost_governor() -> list[iam.PolicyStatement]:
+    """Cost governor (budget guardrails): estimate spend (Cost Explorer non-AI +
+    Bedrock per-model token metrics), write the budget tier to SSM, emit metrics,
+    alert on tier change. ce:* and cloudwatch:* have no resource-level scoping."""
+    return [
+        iam.PolicyStatement(
+            sid="CostExplorer",
+            actions=["ce:GetCostAndUsage"],
+            resources=["*"],
+        ),
+        iam.PolicyStatement(
+            sid="CloudWatch",
+            actions=[
+                "cloudwatch:GetMetricData", "cloudwatch:GetMetricStatistics",
+                "cloudwatch:ListMetrics", "cloudwatch:PutMetricData",
+            ],
+            resources=["*"],
+        ),
+        iam.PolicyStatement(
+            sid="BudgetTierParam",
+            actions=["ssm:GetParameter", "ssm:PutParameter"],
+            resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier"],
+        ),
+        iam.PolicyStatement(
+            sid="Alert",
+            actions=["sns:Publish"],
+            resources=[f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"],
+        ),
+    ]
+
+
 def operational_canary() -> list[iam.PolicyStatement]:
     """Canary: write-read-delete round-trip test on DDB + S3, optional MCP check, SES alert."""
     return [
