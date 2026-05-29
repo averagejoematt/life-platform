@@ -231,6 +231,9 @@
     },
     "lambdas/operational/cost_governor_lambda.py": {
       "function": "life-platform-cost-governor"
+    },
+    "lambdas/operational/remediation_dispatcher_lambda.py": {
+      "function": "life-platform-remediation-dispatcher"
     }
   },
   "mcp": {
