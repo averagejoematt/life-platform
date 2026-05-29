@@ -1722,3 +1722,134 @@ the form clears, so prod stays in its current state until then.
 Revert the migration commit + redeploy. The `life-platform/ai-keys` secret is
 retained, and the chokepoints' old urllib paths are in git history. (Rollback
 only useful if Anthropic credits are also topped up.)
+
+---
+
+## ADR-063: $75 Monthly Budget Guardrails with Tiered AI Degradation
+
+**Date:** 2026-05-29
+**Status:** Implemented + enforcement enabled.
+
+### Context
+
+Post-Bedrock migration (ADR-062), AI spend is now on the AWS bill alongside infrastructure — no prepaid cliff, but also no built-in spend ceiling. The operator wants a hard **$75/month total cap** (all AWS, not just AI) with graceful degradation as spend climbs, auto-pause at the ceiling, and "protect daily brief longest" priority. Manual review of alerts is not enough; the platform should self-throttle.
+
+### Decision
+
+A two-component guardrail system:
+
+1. **`cost_governor_lambda`** (hourly, in `operational_stack`) — projects month-end spend using `mtd + (non_ai_daily + ai_daily) × days_remaining`. `non_ai_daily` averaged across elapsed days; `ai_daily` averaged across days that actually had AI activity (not full month). Writes the resulting **tier 0–3** to SSM `/life-platform/budget-tier`.
+2. **`lambdas/budget_guard.py`** (shared-layer module) — `current_tier()` reads SSM with 5-min cache (fail-open to 0). `allow(feature)` returns False once tier ≥ that feature's cutoff. `BudgetExceeded` raised by `bedrock_client.invoke()` at Tier 3 as a hard chokepoint failsafe.
+
+Feature → tier cutoffs (priority ordering "protect daily brief longest"):
+- `coach_narrative`, `ensemble`, `chronicle`: tier 1
+- `website_ai` (`/api/ask`, `/api/board_ask`): tier 2
+- `daily_brief_ai`: tier 3 (last to degrade)
+
+Plus a single `CfnBudget` `life-platform-monthly-75` in `core_stack` with 50/70/85/100% email alerts via SES.
+
+### Key implementation facts
+
+- **Early-month guard:** if `elapsed_days < 2`, computed tier is clamped to 0 — a tiny first-of-month sample can't false-escalate to Tier 3 and pause everything.
+- **`OBSERVE_MODE`** env var on the governor — defaults to true (shadow); CDK overrides to false (currently enforcing). Lets the system run for a week observing-only before flipping.
+- **Tier-3 hard gate at the chokepoint:** `bedrock_client.invoke()` raises `BudgetExceeded` at the top — stops bleed even if `budget_guard` was bypassed upstream.
+- **Website graceful-pause:** `site_api_ai._ai_paused_response()` returns a friendly JSON at tier 2+ rather than 500ing.
+
+### Tradeoffs
+
+- **Projection is an estimate, not a meter.** Bedrock metrics lag ~15 min; price tables can change; the guardrail prioritizes "no surprise overages" over precision. Acceptable for a $75 ceiling on a solo platform.
+- **Manual override is intentional.** `aws ssm put-parameter --name /life-platform/budget-tier --value 0 --overwrite` lets the operator reset for testing or after a cost-anomaly bug fix.
+- **Doesn't address consumption value** — auto-generating content the user doesn't read still spends. An engagement-gate (skip generation when briefs go unopened) is tracked separately in BACKLOG.
+
+### Rollback
+
+Set `OBSERVE_MODE=true` on the governor (CDK env override) to make it observe-only. Tier-3 hard-gate in bedrock_client requires a code revert (intentional — it's the failsafe).
+
+---
+
+## ADR-064: Self-healing Remediation Agent as the Default Triage Loop
+
+**Date:** 2026-05-29
+**Status:** Phase 1 (shadow) validated; Phase 2 (auto-merge) enabled.
+
+### Context
+
+The operator was the middle-person for technical signals: alerts/QA/CI/DLQ emails → screenshot to Claude → Claude diagnoses + fixes → repeat. Most fixes this quarter (~80% by count) are highly self-healable: missing IAM grants, alarm miscalibration, `lambda_map` drift, freshness/QA source-list tweaks. A small stable set genuinely needs a human (OAuth re-auth, paid-tier decisions, AWS quota escalations).
+
+### Decision
+
+A scheduled GitHub Actions workflow (`.github/workflows/remediation-agent.yml`) runs Claude (Sonnet 4.6 on Bedrock) every morning ~07:45 PT, gathers the last 24h of signals deterministically (boto3 + `gh`, no LLM), and hands them to the agent with `docs/REMEDIATION_TAXONOMY.md` as the classification rubric. The agent buckets each signal into A/B/C/D and acts:
+
+- **A — auto-fix-safe:** open a PR labeled `auto-fix-safe` (deterministic gate merges if all guards pass — see ADR-065).
+- **B — fix-via-pr:** open a PR labeled `needs-review` (always human-merged).
+- **C — needs-human:** no PR; specific action surfaced in the email.
+- **D — stale/ignore:** collapsed in the email.
+
+Plus *operational remediations* done directly via the read-only role (clearing a stale OK alarm, draining a confirmed-stale DLQ msg, re-running a gap-fill ingestion).
+
+One curated email replaces the raw `[LP digest]` noise.
+
+### Architecture
+
+- **Auth:** AWS OIDC → `github-actions-remediation-role` (`deploy/setup_remediation_role.sh`; operator-run, not agent-run). Scope: `bedrock:InvokeModel` + `InvokeModelWithResponseStream` on `us.anthropic.claude-*`, `logs:FilterLogEvents/GetLogEvents`, `cloudwatch:DescribeAlarms/GetMetric*`, `dynamodb:GetItem/Query`, `lambda:GetFunctionConfiguration`, `sqs:ReceiveMessage` (DLQ only), `ssm:GetParameter` (life-platform/*), `kms:Decrypt`, `s3:GetObject` (platform bucket), `s3:PutObject` on `remediation-log/*`, `ses:SendEmail`. **NO deploy, IAM mutate, or lambda update.**
+- **SDK:** `claude-agent-sdk` in the runner; `permission_mode="bypassPermissions"` (headless safety — `acceptEdits` hangs on Bash/gh in headless). Real blast-radius guard is the IAM role + GITHUB_TOKEN scope, not the SDK denylist (defense-in-depth only).
+- **Mode kill-switch:** SSM `/life-platform/remediation-mode` = `off | shadow | auto`. Tier-3 budget also no-ops the run.
+- **Triggers:** schedule (daily) + `repository_dispatch: urgent_alarm` (workflow wired; the urgent-dispatcher Lambda is still TODO).
+- **Reporting:** SES email (reuses the `alert_digest_lambda` pattern). Audit log → `s3://matthew-life-platform/remediation-log/`.
+
+### Why a long-running Claude agent rather than a rule-based bot
+
+Rule-based systems can clear an alarm but can't recognize that a CI failure on commit X is *stale* because the bug was fixed in commit Y three hours later. Pattern-matching the "this is already fixed" class needs reading the diff + recent commits. Claude is good at this; rules are not.
+
+### Tradeoffs
+
+- **Cost:** ~$0.05/run × 30/month ≈ $1.50/mo. Negligible vs the toil eliminated.
+- **Trust earned in phases:** shadow first (~1 week of correct calls before flipping to auto), narrow allowlist, every action a git commit/PR (revertable), audit log to S3.
+- **Failure modes:** worst case in shadow = a PR you ignore; in auto, the gate's deterministic guards (ADR-065) prevent merging anything off-template.
+
+### Rollback
+
+`aws ssm put-parameter --name /life-platform/remediation-mode --value off` — immediate; the next scheduled run is a no-op.
+
+---
+
+## ADR-065: Auto-merge as a Deterministic Gate, Not the Agent
+
+**Date:** 2026-05-29
+**Status:** Implemented + enabled (mode=auto).
+
+### Context
+
+The remediation agent (ADR-064) can OPEN PRs but should not MERGE them. Letting an LLM decide which of its own PRs to merge to a solo prod platform is the wrong trust posture even with bypass permissions — small classifier errors compound. The desired property is: **the LLM proposes, deterministic code verifies and merges**.
+
+### Decision
+
+A separate post-agent workflow step (`remediation/automerge.py`) is the **only** thing that merges. It is intentionally NOT an LLM — every decision is a small set of boolean checks. The agent's `disallowed_tools` includes `Bash(gh pr merge *)` to enforce the separation in-band.
+
+**Gate rules — ALL must hold to merge a PR:**
+
+1. SSM `/life-platform/remediation-mode == auto` AND budget tier < 3.
+2. Every changed file matches the ALLOWLIST (specific change templates, not "any small diff"):
+   `cdk/stacks/role_policies.py`, `ci/lambda_map.json`, `cdk/stacks/monitoring_stack.py`, `lambdas/emails/freshness_checker_lambda.py`, `lambdas/operational/qa_smoke_lambda.py`, `tests/`.
+3. No file matches the DENYLIST: substrings `bedrock_client`, `budget_guard`, `secret`, `credential`, `auth`, `deploy/`, `setup_github_oidc`, `setup_remediation_role`, `.github/workflows/`, `cdk/app.py`, `cdk/stacks/core_stack.py`, `remediation/`.
+4. Diff ≤ 60 lines, no new non-test top-level files.
+5. `flake8 --select=E9,F63,F7,F82` + the offline unit-test subset (`test_role_policies`, `test_lambda_handlers`, `test_layer_version_consistency`, `test_iam_secrets_consistency`, `test_shared_modules`) pass on the PR branch — **because GITHUB_TOKEN PRs don't trigger `ci-cd.yml`**, so CI-green can't be checked via `gh pr checks`. The gate runs the checks itself before merging; CI re-runs them on main after merge.
+6. Per-day merge cap (3) not reached.
+
+If a PR fails any check, it stays open with a `🤖 auto-merge gate held` comment and the reason. The agent's email surfaces held PRs distinctly from merged ones.
+
+### What auto-merge does NOT do
+
+- **Does not bypass the production deploy approval gate.** `ci-cd.yml`'s Deploy job has `environment: production` → manual approval still required. Auto-merge gets fixes into main + full CI validation, but the operator still clicks approve to deploy.
+- **Does not auto-cdk-deploy infra.** CI hot-deploys Lambda CODE only. Merges touching `cdk/` are flagged "⚠️ needs `cdk deploy` to apply" in the email; infra deploys remain a deliberate operator action.
+
+### Why this is safer than it sounds
+
+- The ALLOWLIST is *specific files*, not patterns. A bug in another file area can't be auto-merged even if the agent wants to.
+- Lint + unit-tests gate every merge, so a syntactically broken or consistency-violating "fix" can't reach main.
+- Production deploy stays human-approved → no auto-deploy to prod without a click.
+- Every gate decision logged to S3 with the diff (`remediation-log/automerge/YYYY/MM/DD/`), giving a complete audit trail.
+
+### Rollback
+
+`aws ssm put-parameter --name /life-platform/remediation-mode --value shadow` — the gate becomes a no-op next run; the agent still opens PRs but nothing merges automatically.
