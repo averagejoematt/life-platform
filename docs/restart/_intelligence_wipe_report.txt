@@ -1,38 +1,38 @@
-intelligence wipe report — mode=APPLY — genesis=2026-05-25
-reason=experiment_restart_2026-05-25  generated=2026-05-24T20:03:27.854622+00:00
+intelligence wipe report — mode=APPLY — genesis=2026-05-30
+reason=experiment_restart_2026-05-30  generated=2026-05-29T20:38:26.309388+00:00
 
 partition                 mode total  to-tomb already-tomb  skip-mode   applied   errors
 ----------------------------------------------------------------------------------------
-chronicle                  all    12        0           12          0         0        0
+chronicle                  all    12       12            0          0        12        0
 coach_threads              all     0        0            0          0         0        0
 predictions                all     0        0            0          0         0        0
-hypotheses                 all    13        4            9          0         4        0
+hypotheses                 all    13       13            0          0        13        0
 decisions                  all     0        0            0          0         0        0
-insights                   all   336        0          336          0         0        0
-challenges                 all    26        0           26          0         0        0
-experiments                all     4        0            4          0         0        0
-character_sheet            all    56        0           56          0         0        0
-habit_scores               all    81        0           81          0         0        0
-computed_metrics         prege    80        0           80          0         0        0
-ledger                   prege     6        0            5          1         0        0
-platform_memory          by_ca    18        1           12          5         1        0
+insights                   all   501      501            0          0       501        0
+challenges                 all    26       26            0          0        26        0
+experiments                all     4        4            0          0         4        0
+character_sheet            all    61       61            0          0        61        0
+habit_scores               all    86       86            0          0        86        0
+computed_metrics         prege    85       85            0          0        85        0
+ledger                   prege     6        5            0          1         5        0
+platform_memory          by_ca    18       13            0          5        13        0
 rewards                    all     0        0            0          0         0        0
 field_notes              prege     4        4            0          0         4        0
 discovery_annotation     prege     4        4            0          0         4        0
-anomalies                prege    84       84            0          0        84        0
+anomalies                prege    89       89            0          0        89        0
 weekly_correlations      prege    10       10            0          0        10        0
-computed_insights        prege    77       77            0          0        77        0
-coach_sleep                all   619        0          619          0         0        0
-coach_nutrition            all   633        0          633          0         0        0
-coach_training             all   607        0          607          0         0        0
-coach_mind                 all   608        0          608          0         0        0
-coach_physical             all   581        0          581          0         0        0
-coach_glucose              all   543        0          543          0         0        0
-coach_labs                 all   401        0          401          0         0        0
-coach_explorer             all   334        0          334          0         0        0
-coach_compute            prege     8        0            8          0         0        0
+computed_insights        prege    82       82            0          0        82        0
+coach_sleep                all   749      749            0          0       749        0
+coach_nutrition            all   729      729            0          0       729        0
+coach_training             all   711      711            0          0       711        0
+coach_mind                 all   689      689            0          0       689        0
+coach_physical             all   690      690            0          0       690        0
+coach_glucose              all   638      638            0          0       638        0
+coach_labs                 all   487      487            0          0       487        0
+coach_explorer             all   419      419            0          0       419        0
+coach_compute            prege    13       13            0          0        13        0
 ----------------------------------------------------------------------------------------
-TOTAL                           5145      184         4955          6       184        0
+TOTAL                           6126     6120            0          6      6120        0
 
 === samples of items that would be tombstoned (up to 3 per partition) ===
 
@@ -41,28 +41,115 @@ TOTAL                           5145      184         4955          6       184 
   sk=DATE#2026-02-25
   sk=DATE#2026-02-26
 
+[challenges]
+  sk=CHALLENGE#5k-every-day_2026-03-29
+  sk=CHALLENGE#analog-hour_2026-03-28
+  sk=CHALLENGE#connection-family-member-b_2026-03-28
+
+[character_sheet]
+  sk=DATE#2026-03-27
+  sk=DATE#2026-03-28
+  sk=DATE#2026-03-29
+
+[chronicle]
+  sk=DATE#2026-02-22
+  sk=DATE#2026-02-28
+  sk=DATE#2026-03-03
+
+[coach_compute]
+  sk=RESULTS#2026-04-07
+  sk=RESULTS#2026-05-18
+  sk=RESULTS#2026-05-19
+
+[coach_explorer]
+  sk=BRIEF#2026-04-07
+  sk=BRIEF#2026-04-08
+  sk=BRIEF#2026-04-09
+
+[coach_glucose]
+  sk=BRIEF#2026-04-07
+  sk=BRIEF#2026-04-08
+  sk=BRIEF#2026-04-09
+
+[coach_labs]
+  sk=BRIEF#2026-04-07
+  sk=BRIEF#2026-04-08
+  sk=BRIEF#2026-04-09
+
+[coach_mind]
+  sk=BRIEF#2026-04-07
+  sk=BRIEF#2026-04-08
+  sk=BRIEF#2026-04-09
+
+[coach_nutrition]
+  sk=BRIEF#2026-04-07
+  sk=BRIEF#2026-04-08
+  sk=BRIEF#2026-04-09
+
+[coach_physical]
+  sk=BRIEF#2026-04-07
+  sk=BRIEF#2026-04-08
+  sk=BRIEF#2026-04-09
+
+[coach_sleep]
+  sk=BRIEF#2026-04-07
+  sk=BRIEF#2026-04-08
+  sk=BRIEF#2026-04-09
+
+[coach_training]
+  sk=BRIEF#2026-04-07
+  sk=BRIEF#2026-04-08
+  sk=BRIEF#2026-04-09
+
 [computed_insights]
   sk=DATE#2026-03-06
   sk=DATE#2026-03-07
   sk=DATE#2026-03-09
+
+[computed_metrics]
+  sk=DATE#2026-03-05
+  sk=DATE#2026-03-06
+  sk=DATE#2026-03-07
 
 [discovery_annotations]
   sk=EVENT#14c27dfa1d6dc049
   sk=EVENT#433f6d4121ed3719
   sk=EVENT#5cbff38789c9a7d0
 
+[experiments]
+  sk=EXP#breathwork-before-sleep
+  sk=EXP#daily-8000-steps
+  sk=EXP#intermittent-fasting-16-8
+
 [field_notes]
   sk=WEEK#2026-W14
   sk=WEEK#2026-W17
   sk=WEEK#2026-W19
 
+[habit_scores]
+  sk=DATE#2026-02-23
+  sk=DATE#2026-02-24
+  sk=DATE#2026-02-25
+
 [hypotheses]
-  sk=HYPOTHESIS#2026-05-24T19:01:16.930290+00:00
-  sk=HYPOTHESIS#2026-05-24T19:01:17.153968+00:00
-  sk=HYPOTHESIS#2026-05-24T19:01:17.189474+00:00
+  sk=HYPOTHESIS#2026-05-10T19:01:01.432881+00:00
+  sk=HYPOTHESIS#2026-05-10T19:01:01.507348+00:00
+  sk=HYPOTHESIS#2026-05-10T19:01:01.513726+00:00
+
+[insights]
+  sk=INSIGHT#2026-02-23T02:13:57
+  sk=INSIGHT#2026-02-27T16:49:18.448301+00:00
+  sk=INSIGHT#2026-03-08T06:55:08.874Z#monday_compass
+
+[ledger]
+  sk=LEDGER#2026-05-04T00:03:00.086Z
+  sk=LEDGER#2026-05-04T00:03:00.148Z
+  sk=LEDGER#2026-05-04T00:03:00.204Z
 
 [platform_memory]
-  sk=MEMORY#hypothesis_monitoring#2026-05-24
+  sk=MEMORY#failure_pattern#2026-03-09#0
+  sk=MEMORY#failure_pattern#2026-03-09#1
+  sk=MEMORY#failure_pattern#2026-03-09#2
 
 [weekly_correlations]
   sk=WEEK#2026-W11

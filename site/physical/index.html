@@ -409,7 +409,7 @@
       </div>
       <div class="fp-arc__chart" id="ph-arc-chart"></div>
       <div class="fp-arc__caption" id="ph-arc-caption">
-        <span>Day 1 · 297 lbs</span>
+        <span>Day 1 · 305 lbs</span>
         <span>Today · — lbs</span>
       </div>
     </section>
@@ -663,7 +663,7 @@
         marks.push({
           icon: 'icon-scale',
           name: 'Weight',
-          context: (j.start_weight_lbs || 297) + ' → ' + (j.goal_weight_lbs || 297) + ' lbs goal',
+          context: (j.start_weight_lbs || 297) + ' → ' + (j.goal_weight_lbs || 305) + ' lbs goal',
           value: j.current_weight_lbs.toFixed(1),
           unit: 'lbs',
           spark: weightVals,
@@ -774,7 +774,7 @@
         document.getElementById('ph-arc-section').style.display = 'none';
         return;
       }
-      var startW = j.start_weight_lbs || 297;
+      var startW = j.start_weight_lbs || 305;
       var goalW = j.goal_weight_lbs || 185;
 
       setText('ph-arc-current', cur.toFixed(1));
