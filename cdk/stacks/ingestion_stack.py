@@ -60,6 +60,12 @@ class IngestionStack(Stack):
             schedule=f"cron(0 {INGEST_HOURLY} * * ? *)",
             timeout_seconds=300, alarm_name="ingestion-error-whoop",
             shared_layer=shared_utils_layer,
+            # No async retry: Whoop rotates its refresh token on every refresh, so
+            # a failed run is almost always a token-rotation race (HTTP 400). The
+            # default 2 EventBridge retries just re-hit it with the same stale
+            # token (the 19:00/19:01/19:03 clusters in the alarm digest); the next
+            # hourly run recovers via gap-fill. Same fix as Garmin.
+            retry_attempts=0,
             custom_policies=rp.ingestion_whoop(), **shared)
         # Second schedule: recovery refresh at 9:30 AM PT
         # OAuth race prevention: max 1 concurrent invocation per OAuth Lambda (ADR-036 fix)
