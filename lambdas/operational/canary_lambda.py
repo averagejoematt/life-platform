@@ -292,16 +292,8 @@ def check_mcp(canary_ts: str) -> tuple[bool, str, float]:
 # ── Check 4: Anthropic API reachability (reentry sweep, 2026-05-03) ─────────
 
 def get_anthropic_api_key() -> str | None:
-    """Fetch the Anthropic API key from life-platform/ai-keys."""
-    try:
-        resp = secrets.get_secret_value(SecretId=ANTHROPIC_SECRET)
-        secret = json.loads(resp["SecretString"])
-        return (secret.get("anthropic_api_key")
-                or secret.get("api_key")
-                or secret.get("ANTHROPIC_API_KEY"))
-    except Exception as e:
-        print(f"[WARN] Could not fetch Anthropic API key: {e}")
-        return None
+    """ADR-062: Bedrock IAM auth — sentinel; see task #90 for full plumbing removal."""
+    return "_BEDROCK_IAM_"
 
 
 def check_anthropic(canary_ts: str) -> tuple[bool, str, float]:

@@ -77,14 +77,12 @@ LOOKBACK_DAYS = 14
 # ══════════════════════════════════════════════════════════════════════════════
 
 def get_anthropic_key():
-    secret_name = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
-    try:
-        val = secrets.get_secret_value(SecretId=secret_name)
-        data = json.loads(val["SecretString"])
-        return data.get("ANTHROPIC_API_KEY") or data.get("anthropic_api_key")
-    except Exception as e:
-        logger.error(f"Failed to get Anthropic key: {e}")
-        raise
+    """ADR-062: Bedrock uses IAM auth — this fetch is dead. Returns a truthy
+    sentinel so callers' `api_key = get_anthropic_key()` + `if api_key:`
+    availability gates work; the value is never used for authentication
+    (ai_calls/retry_utils route to bedrock_client.invoke which uses IAM).
+    Full plumbing removal tracked as task #90."""
+    return "_BEDROCK_IAM_"
 
 
 def d2f(obj):

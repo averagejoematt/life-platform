@@ -194,25 +194,8 @@ _API_KEY_TTL = 900  # 15 minutes
 
 
 def _get_api_key():
-    """Read Anthropic API key from Secrets Manager with in-memory caching."""
-    now = time.time()
-    if _api_key_cache["key"] and (now - _api_key_cache["ts"]) < _API_KEY_TTL:
-        return _api_key_cache["key"]
-
-    secret_name = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
-    try:
-        val = secrets.get_secret_value(SecretId=secret_name)
-        data = json.loads(val["SecretString"])
-        key = data.get("ANTHROPIC_API_KEY") or data.get("anthropic_api_key")
-        if not key:
-            raise ValueError("No anthropic_api_key found in secret")
-        _api_key_cache["key"] = key
-        _api_key_cache["ts"] = now
-        logger.debug("API key fetched from Secrets Manager (cache miss)")
-        return key
-    except Exception as e:
-        logger.error("Failed to get Anthropic API key: %s", e)
-        raise
+    """ADR-062: Bedrock IAM auth — sentinel; see task #90 for full plumbing removal."""
+    return "_BEDROCK_IAM_"
 
 
 # ══════════════════════════════════════════════════════════════════════════════

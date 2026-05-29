@@ -96,8 +96,12 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def get_anthropic_key():
-    secret = secrets.get_secret_value(SecretId=os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys"))
-    return json.loads(secret["SecretString"])["anthropic_api_key"]
+    """ADR-062: Bedrock uses IAM auth — this fetch is dead. Returns a truthy
+    sentinel so callers' `api_key = get_anthropic_key()` + `if api_key:`
+    availability gates work; the value is never used for authentication
+    (ai_calls/retry_utils route to bedrock_client.invoke which uses IAM).
+    Full plumbing removal tracked as task #90."""
+    return "_BEDROCK_IAM_"
 
 # d2f, avg, fmt, fmt_num, safe_float imported from digest_utils
 
