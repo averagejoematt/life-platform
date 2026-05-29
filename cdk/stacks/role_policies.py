@@ -1090,6 +1090,29 @@ def operational_dlq_consumer() -> list[iam.PolicyStatement]:
     ]
 
 
+def operational_remediation_dispatcher() -> list[iam.PolicyStatement]:
+    """Remediation dispatcher (ADR-064 urgent fast path): subscribed to the
+    life-platform-alerts SNS topic; reads the GH dispatch PAT from Secrets
+    Manager; writes a 30-min dedupe marker to S3."""
+    return [
+        iam.PolicyStatement(
+            sid="GHToken",
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[f"arn:aws:secretsmanager:{REGION}:{ACCT}:secret:life-platform/github-dispatch-token-*"],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt"],
+            resources=[f"arn:aws:kms:{REGION}:{ACCT}:key/{KMS_KEY_ID}"],
+        ),
+        iam.PolicyStatement(
+            sid="Dedupe",
+            actions=["s3:GetObject", "s3:PutObject"],
+            resources=_s3("remediation-log/dispatch-dedupe/*"),
+        ),
+    ]
+
+
 def operational_cost_governor() -> list[iam.PolicyStatement]:
     """Cost governor (budget guardrails): estimate spend (Cost Explorer non-AI +
     Bedrock per-model token metrics), write the budget tier to SSM, emit metrics,
