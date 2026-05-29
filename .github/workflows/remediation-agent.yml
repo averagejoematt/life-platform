@@ -1,0 +1,69 @@
+name: Remediation Agent
+
+# Self-healing ops agent. Triages alarms/QA/CI/DLQ, fixes the safe class via PR,
+# reports the rest. Runs on Bedrock via OIDC (no API key). See the plan + the
+# taxonomy in docs/REMEDIATION_TAXONOMY.md. Mode is gated by SSM
+# /life-platform/remediation-mode (off|shadow|auto) — ships in shadow.
+
+on:
+  schedule:
+    - cron: "45 14 * * *"          # ~07:45 PT daily — just before the 8 AM digest
+  repository_dispatch:
+    types: [urgent_alarm]           # from the remediation-dispatcher Lambda (Phase 2)
+  workflow_dispatch: {}             # manual test
+
+permissions:
+  contents: write                   # push remediation branches
+  pull-requests: write              # open PRs (uses the built-in GITHUB_TOKEN — no PAT)
+  id-token: write                   # AWS OIDC
+
+concurrency:
+  group: remediation
+  cancel-in-progress: false
+
+jobs:
+  remediate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS credentials (OIDC → remediation role)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::205930651321:role/github-actions-remediation-role
+          aws-region: us-west-2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install agent runtime
+        run: |
+          pip install --quiet boto3 claude-agent-sdk
+          npm install -g @anthropic-ai/claude-code
+
+      - name: Configure git identity
+        run: |
+          git config user.name "remediation-agent"
+          git config user.email "awsdev@mattsusername.com"
+
+      - name: Run remediation agent
+        env:
+          CLAUDE_CODE_USE_BEDROCK: "1"
+          AWS_REGION: us-west-2
+          ANTHROPIC_MODEL: us.anthropic.claude-sonnet-4-6
+          ANTHROPIC_DEFAULT_SONNET_MODEL: us.anthropic.claude-sonnet-4-6
+          ANTHROPIC_SMALL_FAST_MODEL: us.anthropic.claude-haiku-4-5-20251001-v1:0
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CDK_ACCOUNT: "205930651321"
+          S3_BUCKET: matthew-life-platform
+          REMEDIATION_MAX_TURNS: "12"
+          DISPATCH_PAYLOAD: ${{ toJson(github.event.client_payload) }}
+        run: python3 remediation/agent.py
