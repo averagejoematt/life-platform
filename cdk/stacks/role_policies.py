@@ -580,12 +580,23 @@ def compute_weekly_correlations() -> list[iam.PolicyStatement]:
 
 
 def compute_dashboard_refresh() -> list[iam.PolicyStatement]:
-    """Dashboard refresh: reads DDB, writes dashboard/data.json + buddy/data.json to S3."""
-    return _compute_base(
+    """Dashboard refresh: reads DDB + its own dashboard/buddy JSON, writes them back."""
+    policies = _compute_base(
         needs_kms=True,  # reads CMK-encrypted DDB table
         needs_s3_config=True,
         needs_s3_write=["dashboard/*", "buddy/*"],
     )
+    # 2026-05-29: it reads back the existing dashboard/buddy data.json to PATCH them,
+    # but the role only had PutObject on those prefixes (+ GetObject on config/*) — so
+    # every read_existing_json() AccessDenied'd, swallowed as "No existing data.json —
+    # skipping". The 4x/day live-stats refresh silently never ran, leaving data.json
+    # stale between the daily primary write → recurring QA "stale dashboard" failures.
+    policies.append(iam.PolicyStatement(
+        sid="S3DashboardRead",
+        actions=["s3:GetObject"],
+        resources=_s3("dashboard/*", "buddy/*"),
+    ))
+    return policies
 
 
 def compute_acwr() -> list[iam.PolicyStatement]:
