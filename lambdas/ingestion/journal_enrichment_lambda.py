@@ -68,13 +68,12 @@ _api_key_cache = None
 
 
 def get_anthropic_key():
-    global _api_key_cache
-    if _api_key_cache:
-        return _api_key_cache
-    resp = secrets.get_secret_value(SecretId=ANTHROPIC_SECRET)
-    secret = json.loads(resp["SecretString"])
-    _api_key_cache = secret.get("anthropic_api_key") or secret.get("api_key") or secret.get("key")
-    return _api_key_cache
+    """ADR-062: Bedrock uses IAM auth — this fetch is dead. Returns a truthy
+    sentinel so callers' `api_key = get_anthropic_key()` + `if api_key:`
+    availability gates work; the value is never used for authentication
+    (ai_calls/retry_utils route to bedrock_client.invoke which uses IAM).
+    Full plumbing removal tracked as task #90."""
+    return "_BEDROCK_IAM_"
 
 
 # ── Haiku Prompt ──────────────────────────────────────────────────────────────

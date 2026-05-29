@@ -136,46 +136,51 @@ def _parse_alarm(sns_message):
 def lambda_handler(event, context):
     results = {"dispatched": 0, "skipped_filter": 0, "skipped_dedupe": 0,
                "skipped_state": 0, "errors": 0}
-    for rec in event.get("Records", []):
-        try:
-            sns = rec.get("Sns", {})
-            alarm = _parse_alarm(sns.get("Message", ""))
-            name = alarm.get("AlarmName", "")
-            state = alarm.get("NewStateValue", "")
-            reason = alarm.get("NewStateReason", "")[:500]
+    try:
+        for rec in event.get("Records", []):
+            try:
+                sns = rec.get("Sns", {})
+                alarm = _parse_alarm(sns.get("Message", ""))
+                name = alarm.get("AlarmName", "")
+                state = alarm.get("NewStateValue", "")
+                reason = alarm.get("NewStateReason", "")[:500]
 
-            if state != "ALARM":
-                results["skipped_state"] += 1
-                continue
-            if not _is_urgent(name):
-                logger.info(f"non-urgent alarm '{name}' — daily sweep will handle")
-                results["skipped_filter"] += 1
-                continue
+                if state != "ALARM":
+                    results["skipped_state"] += 1
+                    continue
+                if not _is_urgent(name):
+                    logger.info(f"non-urgent alarm '{name}' — daily sweep will handle")
+                    results["skipped_filter"] += 1
+                    continue
 
-            key = _dedupe_key(name)
-            if _seen(key):
-                logger.info(f"dedupe hit for '{name}' (key={key}) — skipping")
-                results["skipped_dedupe"] += 1
-                continue
+                key = _dedupe_key(name)
+                if _seen(key):
+                    logger.info(f"dedupe hit for '{name}' (key={key}) — skipping")
+                    results["skipped_dedupe"] += 1
+                    continue
 
-            payload = {
-                "alarm_name": name,
-                "state": state,
-                "reason": reason,
-                "timestamp": alarm.get("StateChangeTime")
-                             or datetime.now(timezone.utc).isoformat(),
-                "metric": alarm.get("Trigger", {}).get("MetricName"),
-                "namespace": alarm.get("Trigger", {}).get("Namespace"),
-            }
-            _dispatch(payload)
-            _mark(key, payload)
-            logger.info(f"dispatched urgent_alarm for '{name}'")
-            results["dispatched"] += 1
-        except urllib.error.HTTPError as e:
-            logger.error(f"GitHub HTTP {e.code}: {e.read()[:200]}")
-            results["errors"] += 1
-        except Exception as e:
-            logger.exception(f"dispatch failed: {e}")
-            results["errors"] += 1
+                payload = {
+                    "alarm_name": name,
+                    "state": state,
+                    "reason": reason,
+                    "timestamp": alarm.get("StateChangeTime")
+                                 or datetime.now(timezone.utc).isoformat(),
+                    "metric": alarm.get("Trigger", {}).get("MetricName"),
+                    "namespace": alarm.get("Trigger", {}).get("Namespace"),
+                }
+                _dispatch(payload)
+                _mark(key, payload)
+                logger.info(f"dispatched urgent_alarm for '{name}'")
+                results["dispatched"] += 1
+            except urllib.error.HTTPError as e:
+                logger.error(f"GitHub HTTP {e.code}: {e.read()[:200]}")
+                results["errors"] += 1
+            except Exception as e:
+                logger.exception(f"dispatch failed: {e}")
+                results["errors"] += 1
+    except Exception as e:
+        # I4: top-level safety — never raise out of the handler.
+        logger.exception(f"handler-level error: {e}")
+        results["errors"] += 1
 
     return {"statusCode": 200, "body": json.dumps(results)}

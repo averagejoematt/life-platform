@@ -1,9 +1,20 @@
 # Life Platform — Open Backlog
 
-**Last updated:** 2026-05-19 (v8.0.0)
-**Source:** Synthesis of V1 audit (2026-05-17, ADR-057), V2 audit (2026-05-17, `docs/V2_AUDIT_PLAN.md`), and V2 follow-up sessions (2026-05-18/19).
+**Last updated:** 2026-05-29 (v8.2.0)
+**Source:** Synthesis of V1 audit (2026-05-17, ADR-057), V2 audit (2026-05-17, `docs/V2_AUDIT_PLAN.md`), V2 follow-up sessions (2026-05-18/19), and the 2026-05-29 marathon (Bedrock cutover, budget guard, remediation agent, May-30 restart).
 
 > Single source of truth for everything **not done**. Items closed-with-rationale (ADR-057) and items shipped are not listed — see `docs/CHANGELOG.md` for what landed and `docs/DECISIONS.md` for what was formally closed.
+
+### Recently shipped (2026-05-29 marathon — moved out of backlog)
+
+- ✅ **Bedrock cutover** (ADR-062) — all Claude inference on AWS Bedrock + IAM auth.
+- ✅ **$75 budget guardrails** (ADR-063) — `cost_governor_lambda` + `budget_guard.py` + tiered AI degradation (1=coaches, 2=website AI, 3=hard cutoff). Enforcement ENABLED.
+- ✅ **Self-healing remediation agent** (ADR-064) — daily GitHub Actions workflow, Sonnet 4.6 via OIDC. Phase 1 shadow validated.
+- ✅ **Auto-merge gate** (ADR-065) — `remediation/automerge.py` deterministic gate. Phase 2 ENABLED (mode=auto).
+- ✅ **May-30 restart** — genesis re-anchored to 2026-05-30 via `restart_pipeline.py` (provisional baseline 304.62 lbs; re-run Saturday post-weigh-in to lock).
+- ✅ **Ingestion alarm consolidation** — 12 redundant per-Lambda error alarms removed (~$1.20/mo saved).
+- ✅ **Strava paused, freshness IAM fixed, coach seasonality crash fixed, CI verification holes closed, coach truncation fixed across siblings, secret pruning audit (none safely removable).**
+- ✅ **PAT rotation** — `gho_` refreshed; classic `life-platform-development` PAT (god-mode, never-used) deleted.
 
 ---
 
