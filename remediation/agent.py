@@ -149,9 +149,14 @@ async def run_agent(prompt):
         cwd=ROOT,
         max_turns=int(os.environ.get("REMEDIATION_MAX_TURNS", "16")),
     )
+    # Hold the async generator explicitly so we can aclose() it on break/exit.
+    # Without this, the `break` below leaves the generator in a yielding state
+    # and GC finalization raises `RuntimeError: aclose(): asynchronous generator
+    # is already running` at process exit — benign but noisy in the logs.
+    agen = query(prompt=prompt, options=options)
     chunks = []
     try:
-        async for message in query(prompt=prompt, options=options):
+        async for message in agen:
             # Final ResultMessage carries is_error + result; capture, don't crash.
             if hasattr(message, "is_error"):
                 res = getattr(message, "result", None)
@@ -170,6 +175,11 @@ async def run_agent(prompt):
                         chunks.append(t)
     except Exception as e:
         print(f"[warn] agent stream ended with: {e} — using captured output")
+    finally:
+        try:
+            await agen.aclose()
+        except Exception:
+            pass
     return "\n".join(chunks)
 
 
