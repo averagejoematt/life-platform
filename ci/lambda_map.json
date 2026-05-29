@@ -228,6 +228,9 @@
     },
     "lambdas/web/site_api_ai_lambda.py": {
       "function": "life-platform-site-api-ai"
+    },
+    "lambdas/operational/cost_governor_lambda.py": {
+      "function": "life-platform-cost-governor"
     }
   },
   "mcp": {
