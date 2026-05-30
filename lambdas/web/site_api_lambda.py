@@ -111,6 +111,8 @@ from web.site_api_intelligence import (
     handle_status_summary,
     handle_pulse,
     handle_pulse_history,
+    handle_hypotheses,
+    handle_intelligence_summary,
 )
 
 # P1.1 Phase B step 4 (2026-05-26): social cluster extracted to sibling module.
@@ -565,6 +567,13 @@ def lambda_handler(event, context):
     # HP-06: Correlations with optional ?featured=true&limit=N
     if path == "/api/correlations":
         return handle_correlations(event)
+
+    # PB-08 / #8: Intelligence-page data feeds (Decision: public, read-only,
+    # filters private hypotheses, evidence rules enforced inside the handlers).
+    if path == "/api/hypotheses" and method == "GET":
+        return handle_hypotheses()
+    if path == "/api/intelligence_summary" and method == "GET":
+        return handle_intelligence_summary()
 
     # Phase 1: Changes-since (GET with query params)
     if path == "/api/changes-since":
