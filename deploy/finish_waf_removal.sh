@@ -29,6 +29,14 @@ echo "[1/4] Pre-flight: confirm rate-limit code is live in email-subscriber…"
 # The rate-limit constants are easy to spot in the deployed code via a synthetic
 # probe — send a POST with no body and check the response shape. A 400 with
 # the new code path is fine; a 5xx means the deploy hasn't landed.
+#
+# CRITICAL: any POST to /api/subscribe with a parseable email triggers a real
+# SES confirmation send. For *any* smoke test or rate-limit verification, ALWAYS
+# pass `"source": "canary"` in the body — that flag (see handle_subscribe docstring
+# in lambdas/web/email_subscriber_lambda.py) skips the confirmation email so SES
+# doesn't bounce 60 fake addresses back to your inbox. 2026-05-30 incident:
+# 60-POST smoke without source=canary → 60 SES sends → 60 bounces → 60 SNS-
+# event emails → 120 inbox notifications. Don't repeat.
 PROBE=$(curl -s -o /dev/null -w "%{http_code}" \
   -X POST -H "Content-Type: application/json" -d '{}' \
   https://averagejoematt.com/api/subscribe)
