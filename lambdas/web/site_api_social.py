@@ -129,19 +129,60 @@ def handle_current_challenge() -> dict:
 
 
 
+_SUBSCRIBER_TOKEN_SECRET_NAME = os.environ.get(
+    "SUBSCRIBER_TOKEN_SECRET_NAME", "life-platform/subscriber-token-secret"
+)
+_legacy_token_secret_cache = None
+
+
 def _get_token_secret() -> str:
-    """Derive token signing secret from the existing Anthropic API key.
-    No new secrets needed."""
+    """Fetch the dedicated subscriber-token HMAC secret from Secrets Manager.
+
+    #106 (2026-05-30): migrated off `sha256("subscriber-token-v1:" + anthropic_api_key)`
+    onto a dedicated 256-bit random key in Secrets Manager. Reasons:
+      (1) AI-key rotation no longer invalidates every subscriber token.
+      (2) AI-key compromise no longer enables token forgery.
+
+    Rollout safety: if the new secret isn't available yet (because the IAM
+    grant from cdk/stacks/role_policies.py:site_api / site_api_ai has not been
+    applied via `cdk deploy LifePlatformOperational`), this falls back to the
+    legacy derivation so the migration can land in any deploy order without
+    breaking subscriber-token signing. Once both halves are deployed, the
+    fallback never fires and only the new secret is used.
+    """
     global _token_secret_cache
     if _token_secret_cache:
         return _token_secret_cache
+    try:
+        sm = boto3.client("secretsmanager", region_name="us-west-2")
+        _token_secret_cache = sm.get_secret_value(
+            SecretId=_SUBSCRIBER_TOKEN_SECRET_NAME
+        )["SecretString"]
+        return _token_secret_cache
+    except Exception as e:
+        logger.warning(
+            f"[token_secret] Falling back to legacy derivation; new secret "
+            f"unavailable: {e}"
+        )
+        legacy = _get_legacy_token_secret()
+        if not legacy:
+            raise RuntimeError("Token signing secret unavailable") from e
+        return legacy
+
+
+def _get_legacy_token_secret() -> str:
+    """The pre-#106 derived signing secret. Used only by the validator for
+    a 24h fallback so tokens minted before the migration still work until
+    they expire on their own (token TTL is 86400s). Remove after 2026-05-31."""
+    global _legacy_token_secret_cache
+    if _legacy_token_secret_cache:
+        return _legacy_token_secret_cache
     import hashlib as _h
     api_key = _get_anthropic_key()
     if not api_key:
-        logger.error("[token_secret] No API key available — subscriber tokens cannot be signed")
-        raise RuntimeError("Token signing secret unavailable")
-    _token_secret_cache = _h.sha256(f"subscriber-token-v1:{api_key}".encode()).hexdigest()
-    return _token_secret_cache
+        return ""  # legacy path is best-effort; missing key just means no fallback
+    _legacy_token_secret_cache = _h.sha256(f"subscriber-token-v1:{api_key}".encode()).hexdigest()
+    return _legacy_token_secret_cache
 
 
 

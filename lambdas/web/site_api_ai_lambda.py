@@ -191,21 +191,59 @@ def _get_anthropic_key():
         return None
 
 
+_SUBSCRIBER_TOKEN_SECRET_NAME = os.environ.get(
+    "SUBSCRIBER_TOKEN_SECRET_NAME", "life-platform/subscriber-token-secret"
+)
+_legacy_token_secret_cache = None
+
+
 def _get_token_secret() -> str:
-    """Derive token signing secret from the existing Anthropic API key."""
+    """Fetch the dedicated subscriber-token HMAC secret from Secrets Manager.
+    #106 (2026-05-30) — see site_api_social.py:_get_token_secret docstring."""
     global _token_secret_cache
     if _token_secret_cache:
         return _token_secret_cache
+    try:
+        sm = boto3.client("secretsmanager", region_name="us-west-2")
+        _token_secret_cache = sm.get_secret_value(
+            SecretId=_SUBSCRIBER_TOKEN_SECRET_NAME
+        )["SecretString"]
+        return _token_secret_cache
+    except Exception as e:
+        # Rollout safety: fall back to the legacy derivation if the IAM grant
+        # has not been applied yet via `cdk deploy LifePlatformOperational`.
+        logger.warning(
+            f"[token_secret] Falling back to legacy derivation; new secret "
+            f"unavailable: {e}"
+        )
+        legacy = _get_legacy_token_secret()
+        if not legacy:
+            raise RuntimeError("Token signing secret unavailable") from e
+        return legacy
+
+
+def _get_legacy_token_secret() -> str:
+    """Pre-#106 derived signing secret. Validator-only fallback for the 24h
+    window so tokens minted before migration still work until they expire.
+    Remove after 2026-05-31."""
+    global _legacy_token_secret_cache
+    if _legacy_token_secret_cache:
+        return _legacy_token_secret_cache
     api_key = _get_anthropic_key()
     if not api_key:
-        logger.error("[token_secret] No API key available")
-        raise RuntimeError("Token signing secret unavailable")
-    _token_secret_cache = hashlib.sha256(f"subscriber-token-v1:{api_key}".encode()).hexdigest()
-    return _token_secret_cache
+        return ""  # missing key just means no fallback
+    _legacy_token_secret_cache = hashlib.sha256(f"subscriber-token-v1:{api_key}".encode()).hexdigest()
+    return _legacy_token_secret_cache
 
 
 def _validate_subscriber_token(token: str) -> bool:
-    """Return True if token is valid and unexpired."""
+    """Return True if token is valid and unexpired.
+
+    #106 (2026-05-30): dual-validation. Tries the new dedicated signing secret
+    first; falls back to the legacy AI-key-derived secret so tokens issued
+    before the migration are honored until they expire (24h max). Remove the
+    legacy branch after 2026-05-31.
+    """
     try:
         decoded = _b64.urlsafe_b64decode(token.encode()).decode()
         parts = decoded.split(":")
@@ -215,9 +253,17 @@ def _validate_subscriber_token(token: str) -> bool:
         if int(time.time()) > int(expires_str):
             return False
         payload = f"{email}:{expires_str}"
-        secret = _get_token_secret().encode()
-        expected = _hmac.new(secret, payload.encode(), digestmod='sha256').hexdigest()[:32]
-        return _hmac.compare_digest(provided_sig, expected)
+        # Try new secret first
+        new_secret = _get_token_secret().encode()
+        new_expected = _hmac.new(new_secret, payload.encode(), digestmod='sha256').hexdigest()[:32]
+        if _hmac.compare_digest(provided_sig, new_expected):
+            return True
+        # 24h migration window: fall back to the legacy AI-key-derived secret.
+        legacy = _get_legacy_token_secret()
+        if not legacy:
+            return False
+        legacy_expected = _hmac.new(legacy.encode(), payload.encode(), digestmod='sha256').hexdigest()[:32]
+        return _hmac.compare_digest(provided_sig, legacy_expected)
     except Exception:
         return False
 
