@@ -602,7 +602,7 @@ def handle_vice_streaks() -> dict:
     latest_vs = {}
     raw_vs = latest.get("vice_streaks") or {}
     if isinstance(raw_vs, dict):
-        latest_vs = {k: int(v or 0) for k, v in raw_vs.items() if k.lower().strip() not in blocked_set}
+        latest_vs = {k: int(v or 0) for k, v in raw_vs.items() if not _is_blocked_vice(k)}
 
     vices = []
     for vice_name, history in vice_history.items():
