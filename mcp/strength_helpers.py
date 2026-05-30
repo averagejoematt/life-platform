@@ -68,6 +68,73 @@ def estimate_1rm(weight: float, reps: int) -> float | None:
     return round(weight * (1 + reps / 30), 1)
 
 
+_KG_TO_LBS = 2.20462
+
+
+def normalize_hevy_items(hevy_items: list) -> list[dict]:
+    """Returns a flat, schema-agnostic list of workouts.
+
+    The Hevy partition has lived in two shapes:
+      Old (≤ 2026-05): one DDB item per day, sk = DATE#YYYY-MM-DD,
+        item['data']['workouts'][n].exercises[n].sets[n].weight_lbs.
+      New (≥ 2026-05): one DDB item per workout, sk = DATE#YYYY-MM-DD#WORKOUT#<uuid>,
+        exercises at top level, set weights in weight_kg (Hevy's native unit).
+
+    All readers downstream want: a flat list of workouts, each with
+    {date, workout_name, exercises:[{name, sets:[{set_type, weight_lbs, reps}]}]}.
+    Weights normalized to lbs; we keep weight_kg as well for any caller that
+    wants it.
+
+    Burned in 2026-05-30: tool_get_workout_frequency was filtering on
+    item['data']['workouts'], which never matched the new shape — every
+    new-shape workout was invisible to the read tools.
+    """
+    def _set(s: dict) -> dict:
+        w_kg = s.get("weight_kg")
+        w_lbs = s.get("weight_lbs")
+        if w_kg is not None and w_lbs is None:
+            w_lbs = float(w_kg) * _KG_TO_LBS
+        elif w_lbs is not None and w_kg is None:
+            w_kg = float(w_lbs) / _KG_TO_LBS
+        return {
+            "set_type": s.get("set_type", "normal"),
+            "weight_lbs": float(w_lbs or 0),
+            "weight_kg":  float(w_kg or 0),
+            "reps":       int(s.get("reps") or 0),
+        }
+
+    def _exercise(ex: dict) -> dict:
+        return {
+            "name": ex.get("name") or ex.get("exercise_name") or "",
+            "sets": [_set(s) for s in (ex.get("sets") or [])],
+        }
+
+    out = []
+    for item in hevy_items:
+        sk = item.get("sk", "")
+        # New per-workout shape: sk contains #WORKOUT#, exercises at top.
+        if "#WORKOUT#" in sk and item.get("exercises") is not None:
+            date_str = item.get("date") or (
+                sk.split("DATE#", 1)[1].split("#", 1)[0] if "DATE#" in sk else ""
+            )
+            out.append({
+                "date": date_str,
+                "workout_name": item.get("workout_name") or item.get("title") or "",
+                "exercises": [_exercise(ex) for ex in item.get("exercises", [])],
+            })
+            continue
+        # Legacy per-day shape: workouts nested under data.workouts (or top-level workouts).
+        date_str = item.get("date") or sk[5:15]
+        workouts = item.get("data", {}).get("workouts") or item.get("workouts") or []
+        for w in workouts:
+            out.append({
+                "date": date_str,
+                "workout_name": w.get("name") or w.get("workout_name") or "",
+                "exercises": [_exercise(ex) for ex in (w.get("exercises") or [])],
+            })
+    return out
+
+
 def extract_hevy_sessions(hevy_items: list, exercise_name: str, include_warmups: bool = False) -> list:
     """
     Given raw DynamoDB hevy items and a target exercise name (fuzzy),
@@ -76,38 +143,35 @@ def extract_hevy_sessions(hevy_items: list, exercise_name: str, include_warmups:
     """
     target = exercise_name.lower()
     sessions = []
-    for item in hevy_items:
-        day_data = item.get("data", {})
-        workouts = day_data.get("workouts", [])
-        date_str = item.get("date") or item.get("sk", "")[:10]
-        for workout in workouts:
-            for ex in workout.get("exercises", []):
-                ex_name = ex.get("name", "")
-                if target not in ex_name.lower():
+    for workout in normalize_hevy_items(hevy_items):
+        date_str = workout["date"]
+        for ex in workout["exercises"]:
+            ex_name = ex["name"]
+            if target not in ex_name.lower():
+                continue
+            sets_out = []
+            for s in ex["sets"]:
+                st = s["set_type"]
+                if not include_warmups and st == "warmup":
                     continue
-                sets_out = []
-                for s in ex.get("sets", []):
-                    st = s.get("set_type", "normal")
-                    if not include_warmups and st == "warmup":
-                        continue
-                    w = float(s.get("weight_lbs", 0) or 0)
-                    r = int(s.get("reps", 0) or 0)
-                    e1rm = None if is_bodyweight(ex_name) else estimate_1rm(w, r)
-                    sets_out.append({"set_type": st, "weight_lbs": w, "reps": r, "estimated_1rm": e1rm})
-                if not sets_out:
-                    continue
-                best_1rm = max((s["estimated_1rm"] for s in sets_out if s["estimated_1rm"]), default=None)
-                best_weight = max((s["weight_lbs"] for s in sets_out), default=0)
-                volume = sum(s["weight_lbs"] * s["reps"] for s in sets_out)
-                sessions.append({
-                    "date": date_str,
-                    "exercise_name": ex_name,
-                    "sets": sets_out,
-                    "best_1rm": best_1rm,
-                    "best_weight": best_weight,
-                    "volume_lbs": round(volume, 1),
-                    "set_count": len(sets_out),
-                })
+                w = s["weight_lbs"]
+                r = s["reps"]
+                e1rm = None if is_bodyweight(ex_name) else estimate_1rm(w, r)
+                sets_out.append({"set_type": st, "weight_lbs": w, "reps": r, "estimated_1rm": e1rm})
+            if not sets_out:
+                continue
+            best_1rm = max((s["estimated_1rm"] for s in sets_out if s["estimated_1rm"]), default=None)
+            best_weight = max((s["weight_lbs"] for s in sets_out), default=0)
+            volume = sum(s["weight_lbs"] * s["reps"] for s in sets_out)
+            sessions.append({
+                "date": date_str,
+                "exercise_name": ex_name,
+                "sets": sets_out,
+                "best_1rm": best_1rm,
+                "best_weight": best_weight,
+                "volume_lbs": round(volume, 1),
+                "set_count": len(sets_out),
+            })
     sessions.sort(key=lambda x: x["date"])
     return sessions
 

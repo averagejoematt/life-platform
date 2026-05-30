@@ -26,7 +26,7 @@ from mcp.helpers import (
 )
 from mcp.strength_helpers import (
     classify_exercise, is_bodyweight, estimate_1rm,
-    extract_hevy_sessions, volume_status, classify_standard,
+    extract_hevy_sessions, normalize_hevy_items, volume_status, classify_standard,
     attia_benchmark_status,
     _VOLUME_LANDMARKS, _STRENGTH_STANDARDS, _STANDARD_LEVELS, _ATTIA_TARGETS,
 )
@@ -325,12 +325,9 @@ def tool_get_workout_frequency(args):
     end_date = args.get("end_date", date.today().isoformat())
 
     items = query_source_range("hevy", start_date, end_date)
+    workouts = normalize_hevy_items(items)
 
-    workout_dates = sorted({
-        (item.get("date") or item.get("sk", "")[:10])
-        for item in items
-        if item.get("data", {}).get("workouts")
-    })
+    workout_dates = sorted({w["date"] for w in workouts if w.get("date")})
     if not workout_dates:
         return {"error": "No workout data found"}
 
@@ -360,12 +357,11 @@ def tool_get_workout_frequency(args):
 
     # Top 15 exercises by frequency
     exercise_counts: dict[str, int] = {}
-    for item in items:
-        for workout in item.get("data", {}).get("workouts", []):
-            for ex in workout.get("exercises", []):
-                name = ex.get("name", "")
-                if name:
-                    exercise_counts[name] = exercise_counts.get(name, 0) + 1
+    for workout in workouts:
+        for ex in workout.get("exercises", []):
+            name = ex.get("name", "")
+            if name:
+                exercise_counts[name] = exercise_counts.get(name, 0) + 1
     top_exercises = sorted(exercise_counts.items(), key=lambda x: x[1], reverse=True)[:15]
 
     return {
