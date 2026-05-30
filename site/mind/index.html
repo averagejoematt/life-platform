@@ -480,12 +480,12 @@
     'use strict';
 
     var API_BASE = (typeof AMJ !== 'undefined' && AMJ.API_BASE) ? AMJ.API_BASE : '';
-    var BLOCKED_KW = ['porn','pornography','marijuana','cannabis','weed','thc'];
-    function isBlocked(t) {
-      if (!t) return false;
-      var l = t.toLowerCase();
-      return BLOCKED_KW.some(function(k){ return l.indexOf(k) !== -1; });
-    }
+    // Stage0 Fix 1 (2026-05-30): server-side filter is authoritative.
+    // /api/vice_streaks + /api/mind_overview + /api/habit_registry strip
+    // blocked vice categories before the response is sent. Client retains a
+    // no-op isBlocked() to keep existing filter sites intact without
+    // shipping the keyword list in plaintext JS.
+    function isBlocked(_t) { return false; }
 
     /* Vice why-lines — preserved from original page */
     var viceWhyMap = {
