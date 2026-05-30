@@ -106,7 +106,7 @@ class ComputeStack(Stack):
             **shared,
         )
 
-        create_platform_lambda(
+        daily_metrics_fn = create_platform_lambda(
             self, "DailyMetricsCompute",
             function_name="daily-metrics-compute",
             handler="compute.daily_metrics_compute_lambda.lambda_handler",
@@ -116,6 +116,17 @@ class ComputeStack(Stack):
             custom_policies=rp.compute_daily_metrics(),
             **shared,
         )
+
+        # #109 (2026-05-30): second daily run at 5 PM PT (00:00 UTC) so
+        # workouts logged after the 9:40 AM PT compute (e.g. Hevy sessions
+        # logged mid-morning) surface on averagejoematt.com + coach insights
+        # the same day instead of waiting for tomorrow's run. Event-driven
+        # recompute is the proper fix (Option A), but this twice-daily
+        # schedule covers ~90% of late-arrival cases at a single CDK line.
+        events.Rule(
+            self, "DailyMetricsComputeEvening",
+            schedule=events.Schedule.expression("cron(0 0 * * ? *)"),
+        ).add_target(targets.LambdaFunction(daily_metrics_fn))
 
         create_platform_lambda(
             self, "DailyInsightCompute",
