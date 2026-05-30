@@ -1492,6 +1492,11 @@ def site_api() -> list[iam.PolicyStatement]:
             actions=["secretsmanager:GetSecretValue"],
             resources=[_secret_arn("life-platform/site-api-ai-key")],
         ),
+        iam.PolicyStatement(
+            sid="SubscriberTokenSecret",  # #106 (2026-05-30): HMAC signing key for subscriber tokens.
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/subscriber-token-secret")],
+        ),
     ]
 
 
@@ -1534,6 +1539,11 @@ def site_api_ai() -> list[iam.PolicyStatement]:
             sid="AiKeySecret",
             actions=["secretsmanager:GetSecretValue"],
             resources=[_secret_arn("life-platform/site-api-ai-key")],
+        ),
+        iam.PolicyStatement(
+            sid="SubscriberTokenSecret",  # #106 (2026-05-30): HMAC signing key for subscriber tokens.
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/subscriber-token-secret")],
         ),
         _bedrock_statement(),  # ADR-062: /api/ask + /api/board_ask now use Bedrock
     ]
