@@ -252,22 +252,38 @@ def transform(raw: dict, date_str: str) -> list[dict]:
 
     total_possible = sum(len(v) for v in group_habits_possible.values())
     total_completed = sum(len(v) for v in group_habits_done.values())
+
+    # TD-11 Phase 2: count habits still pending (today, deadline not yet passed).
+    # Excluding these from the denominator is the phantom-fail fix — mid-day
+    # `completion_pct` was reading near-zero because Habitify's in_progress was
+    # being treated as failure. For past days `pending_count` is always 0, so
+    # the math is identical for historical records.
+    pending_count = sum(1 for hs in habit_statuses.values() if hs["status"] == "pending")
+    resolved_possible = max(total_possible - pending_count, 0)
     completion_pct = (
+        Decimal(str(round(total_completed / resolved_possible, 4)))
+        if resolved_possible > 0 else Decimal("0")
+    )
+    # Legacy completion_pct kept under a clearly-named slot in case any reader
+    # wants the strict "pending counts as miss" interpretation for comparison.
+    completion_pct_strict = (
         Decimal(str(round(total_completed / total_possible, 4)))
         if total_possible > 0 else Decimal("0")
     )
 
     record = {
-        "source":          "habitify",
-        "date":            date_str,
-        "habits":          habits,
-        "habit_statuses":  habit_statuses,  # TD-11 Phase 1 — structured status alongside binary
-        "by_group":        by_group,
-        "total_completed": total_completed,
-        "total_possible":  total_possible,
-        "completion_pct":  completion_pct,
-        "skipped_count":   skipped_count,
-        "updated_at":      datetime.now(timezone.utc).isoformat(),
+        "source":               "habitify",
+        "date":                 date_str,
+        "habits":               habits,
+        "habit_statuses":       habit_statuses,  # TD-11 Phase 1 — structured status alongside binary
+        "by_group":             by_group,
+        "total_completed":      total_completed,
+        "total_possible":       total_possible,
+        "pending_count":        pending_count,        # TD-11 Phase 2
+        "completion_pct":       completion_pct,       # pending-aware (the bug fix)
+        "completion_pct_strict": completion_pct_strict, # legacy interpretation, for comparison
+        "skipped_count":        skipped_count,
+        "updated_at":           datetime.now(timezone.utc).isoformat(),
     }
 
     if moods:
