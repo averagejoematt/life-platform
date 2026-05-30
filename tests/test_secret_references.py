@@ -66,6 +66,8 @@ KNOWN_SECRETS = {
     "life-platform/todoist",  # TD-23 (2026-05-02): added to KNOWN; Phase 2.6 (2026-05-16) added to freshness checker monitoring
     "life-platform/site-api-ai-key",
     "life-platform/eightsleep-client",
+    "life-platform/hevy",                   # ADR-060 / SPEC_HEVY (2026-05-25)
+    "life-platform/github-dispatch-token",  # ADR-064 (2026-05-29): remediation dispatcher PAT
     # life-platform/google-calendar removed — retired ADR-030 (v3.7.46)
 }
 
