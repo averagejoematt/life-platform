@@ -138,6 +138,59 @@ def test_scheduled_today_is_true_for_current_registry():
     assert out[0]["habit_statuses"]["Any Habit"]["scheduled_today"] is True
 
 
+# ── TD-11 Phase 2: pending-aware completion_pct ─────────────
+
+def test_completion_pct_excludes_pending_today():
+    """The phantom-fail fix: mid-day, pending habits do not pull completion_pct
+    down. With 1 completed + 3 pending today, the pending-aware pct is 100%
+    (1/1 resolved), while the strict legacy interpretation is 25% (1/4)."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    out = transform(_raw([
+        _entry("A", "completed", current=1),
+        _entry("B", "in_progress"),
+        _entry("C", "in_progress"),
+        _entry("D", "in_progress"),
+    ], today), today)
+    record = out[0]
+    assert record["pending_count"] == 3
+    assert record["total_possible"] == 4
+    # 1 completed / (4 - 3 pending) = 1.0
+    assert float(record["completion_pct"]) == 1.0
+    # Legacy: 1 / 4 = 0.25 — preserved under completion_pct_strict
+    assert float(record["completion_pct_strict"]) == 0.25
+
+
+def test_completion_pct_past_day_unchanged():
+    """Past-day records have no pending (Habitify flips at end-of-UTC-day),
+    so pending-aware and strict interpretations agree — past-data behavior
+    is identical to pre-fix."""
+    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    out = transform(_raw([
+        _entry("A", "completed", current=1),
+        _entry("B", "failed"),
+        _entry("C", "failed"),
+        _entry("D", "skipped"),
+    ], yesterday), yesterday)
+    record = out[0]
+    assert record["pending_count"] == 0
+    # 1 / 4 = 0.25 both ways.
+    assert float(record["completion_pct"]) == 0.25
+    assert float(record["completion_pct_strict"]) == 0.25
+
+
+def test_completion_pct_all_pending_today_returns_zero_not_nan():
+    """Edge case: every habit pending today → 0 resolved → completion_pct must
+    NOT divide by zero. Returns 0 to keep downstream code safe."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    out = transform(_raw([
+        _entry("A", "in_progress"),
+        _entry("B", "in_progress"),
+    ], today), today)
+    record = out[0]
+    assert record["pending_count"] == 2
+    assert float(record["completion_pct"]) == 0.0  # safe fallback
+
+
 if __name__ == "__main__":
     # `python tests/test_habitify_status_resolution.py` to run standalone.
     for name, fn in sorted(globals().items()):

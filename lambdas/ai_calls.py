@@ -1174,7 +1174,7 @@ def _build_system_block(system, cache_system):
 
 def call_anthropic(
     prompt: str,
-    api_key: str,
+    api_key: str = "",  # ADR-062: ignored — Bedrock uses IAM auth. Kept default for compat.
     max_tokens: int = 200,
     system: Union[str, list[dict[str, Any]], None] = None,
     output_type: Any = None,
@@ -1368,7 +1368,7 @@ def _build_acwr_coaching_context(data):
 # AI CALLS
 # ==============================================================================
 
-def call_training_nutrition_coach(data: dict[str, Any], profile: dict[str, Any], api_key: str, shared_system: Optional[str] = None) -> str:
+def call_training_nutrition_coach(data: dict[str, Any], profile: dict[str, Any], api_key: str = "", shared_system: Optional[str] = None) -> str:
     """AI call: Training coach + Nutritionist combined. (P2+P3+P5 aware)
     Phase 3.8: optional shared_system reused across 4 daily-brief calls (cached)."""
     data_summary = build_data_summary(data, profile)
@@ -1450,7 +1450,7 @@ Respond in EXACTLY this JSON format, no other text:
         return {}
 
 
-def call_journal_coach(data: dict[str, Any], profile: dict[str, Any], api_key: str, shared_system: Optional[str] = None) -> str:
+def call_journal_coach(data: dict[str, Any], profile: dict[str, Any], api_key: str = "", shared_system: Optional[str] = None) -> str:
     journal_entries = data.get("journal_entries", [])
     if not journal_entries:
         return ""
@@ -1550,7 +1550,7 @@ Tone: direct, empathetic, no-BS.{protocol_note}"""
     return intro
 
 
-def call_board_of_directors(data, profile, day_grade, grade, component_scores, api_key,
+def call_board_of_directors(data, profile, day_grade, grade, component_scores, api_key="",
                              character_sheet=None, brief_mode="standard", shared_system=None):
     data_summary = build_data_summary(data, profile)
     comp_lines = []
@@ -2205,17 +2205,17 @@ def _build_training_data(data):
     }
 
 
-def call_sleep_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str) -> str:
+def call_sleep_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str = "") -> str:
     """Run Coach Intelligence pipeline for sleep coach. Returns text or None."""
     return _run_coach_v2_pipeline("sleep_coach", _build_sleep_data(data), "sleep", data, api_key)
 
 
-def call_nutrition_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str) -> str:
+def call_nutrition_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str = "") -> str:
     """Run Coach Intelligence pipeline for nutrition coach. Returns text or None."""
     return _run_coach_v2_pipeline("nutrition_coach", _build_nutrition_data(data), "nutrition", data, api_key)
 
 
-def call_training_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str) -> str:
+def call_training_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str = "") -> str:
     """Run Coach Intelligence pipeline for training coach. Returns text or None."""
     return _run_coach_v2_pipeline("training_coach", _build_training_data(data), "training", data, api_key)
 
@@ -2290,26 +2290,26 @@ def _build_explorer_data(data):
     }
 
 
-def call_mind_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str) -> str:
+def call_mind_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str = "") -> str:
     """Run Coach Intelligence pipeline for mind coach. Returns text or None."""
     return _run_coach_v2_pipeline("mind_coach", _build_mind_data(data), "mind", data, api_key)
 
 
-def call_physical_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str) -> str:
+def call_physical_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str = "") -> str:
     """Run Coach Intelligence pipeline for physical coach. Returns text or None."""
     return _run_coach_v2_pipeline("physical_coach", _build_physical_data(data), "physical", data, api_key)
 
 
-def call_glucose_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str) -> str:
+def call_glucose_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str = "") -> str:
     """Run Coach Intelligence pipeline for glucose coach. Returns text or None."""
     return _run_coach_v2_pipeline("glucose_coach", _build_glucose_data(data), "glucose", data, api_key)
 
 
-def call_labs_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str) -> str:
+def call_labs_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str = "") -> str:
     """Run Coach Intelligence pipeline for labs coach. Returns text or None."""
     return _run_coach_v2_pipeline("labs_coach", _build_labs_data(data), "labs", data, api_key)
 
 
-def call_explorer_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str) -> str:
+def call_explorer_coach_v2(data: dict[str, Any], profile: dict[str, Any], api_key: str = "") -> str:
     """Run Coach Intelligence pipeline for explorer coach. Returns text or None."""
     return _run_coach_v2_pipeline("explorer_coach", _build_explorer_data(data), "cross-domain exploration", data, api_key)
