@@ -101,32 +101,32 @@ def tool_get_strength_prs(args):
     items = query_source_range("hevy", start_date, end_date)
 
     # Collect per-exercise: best weight, best 1rm, session count
+    # #110: normalize_hevy_items handles both per-day (legacy) and per-workout
+    # (current) schemas, returning a flat list with weights in lbs.
     exercise_data: dict = {}
-    for item in items:
-        day_data = item.get("data", {})
-        date_str = item.get("date") or item.get("sk", "")[:10]
-        for workout in day_data.get("workouts", []):
-            for ex in workout.get("exercises", []):
-                name = ex.get("name", "")
-                if not name or is_bodyweight(name):
+    for workout in normalize_hevy_items(items):
+        date_str = workout["date"]
+        for ex in workout["exercises"]:
+            name = ex["name"]
+            if not name or is_bodyweight(name):
+                continue
+            if name not in exercise_data:
+                exercise_data[name] = {"sessions": set(), "best_weight": 0, "best_1rm": 0,
+                                        "best_1rm_date": "", "best_weight_date": ""}
+            ed = exercise_data[name]
+            ed["sessions"].add(date_str)
+            for s in ex["sets"]:
+                if s["set_type"] == "warmup":
                     continue
-                if name not in exercise_data:
-                    exercise_data[name] = {"sessions": set(), "best_weight": 0, "best_1rm": 0,
-                                            "best_1rm_date": "", "best_weight_date": ""}
-                ed = exercise_data[name]
-                ed["sessions"].add(date_str)
-                for s in ex.get("sets", []):
-                    if s.get("set_type") == "warmup":
-                        continue
-                    w = float(s.get("weight_lbs", 0) or 0)
-                    r = int(s.get("reps", 0) or 0)
-                    e1rm = estimate_1rm(w, r)
-                    if w > ed["best_weight"]:
-                        ed["best_weight"] = w
-                        ed["best_weight_date"] = date_str
-                    if e1rm and e1rm > ed["best_1rm"]:
-                        ed["best_1rm"] = e1rm
-                        ed["best_1rm_date"] = date_str
+                w = s["weight_lbs"]
+                r = s["reps"]
+                e1rm = estimate_1rm(w, r)
+                if w > ed["best_weight"]:
+                    ed["best_weight"] = w
+                    ed["best_weight_date"] = date_str
+                if e1rm and e1rm > ed["best_1rm"]:
+                    ed["best_1rm"] = e1rm
+                    ed["best_1rm_date"] = date_str
 
     rows = []
     for name, ed in exercise_data.items():
@@ -182,23 +182,22 @@ def tool_get_muscle_volume(args):
     muscle_volume: dict[str, float] = {}
     push_sets = pull_sets = leg_sets = core_sets = 0
 
-    for item in items:
-        day_data = item.get("data", {})
-        for workout in day_data.get("workouts", []):
-            for ex in workout.get("exercises", []):
-                name = ex.get("name", "")
-                cls = classify_exercise(name)
-                normal_sets = [s for s in ex.get("sets", []) if s.get("set_type", "normal") != "warmup"]
-                n = len(normal_sets)
-                vol = sum(float(s.get("weight_lbs", 0) or 0) * int(s.get("reps", 0) or 0) for s in normal_sets)
-                for m in cls["muscle_groups"]:
-                    muscle_sets[m] = muscle_sets.get(m, 0) + n
-                    muscle_volume[m] = muscle_volume.get(m, 0.0) + vol
-                pattern = cls["movement_pattern"]
-                if pattern == "Push":   push_sets += n
-                elif pattern == "Pull": pull_sets += n
-                elif pattern == "Legs": leg_sets += n
-                elif pattern == "Core": core_sets += n
+    # #110: normalize_hevy_items handles both schemas.
+    for workout in normalize_hevy_items(items):
+        for ex in workout["exercises"]:
+            name = ex["name"]
+            cls = classify_exercise(name)
+            normal_sets = [s for s in ex["sets"] if s["set_type"] != "warmup"]
+            n = len(normal_sets)
+            vol = sum(s["weight_lbs"] * s["reps"] for s in normal_sets)
+            for m in cls["muscle_groups"]:
+                muscle_sets[m] = muscle_sets.get(m, 0) + n
+                muscle_volume[m] = muscle_volume.get(m, 0.0) + vol
+            pattern = cls["movement_pattern"]
+            if pattern == "Push":   push_sets += n
+            elif pattern == "Pull": pull_sets += n
+            elif pattern == "Legs": leg_sets += n
+            elif pattern == "Core": core_sets += n
 
     period_label = "week" if period == "week" else "month"
     volume_report = {}
@@ -407,23 +406,23 @@ def tool_get_strength_standards(args):
     }
 
     best_1rms: dict[str, tuple[float, str]] = {}  # lift_key -> (1rm, date)
-    for item in items:
-        date_str = item.get("date") or item.get("sk", "")[:10]
-        for workout in item.get("data", {}).get("workouts", []):
-            for ex in workout.get("exercises", []):
-                name = ex.get("name", "").lower()
-                for lift_key in standard_lifts:
-                    if lift_key not in name:
+    # #110: normalize_hevy_items handles both schemas.
+    for workout in normalize_hevy_items(items):
+        date_str = workout["date"]
+        for ex in workout["exercises"]:
+            name = ex["name"].lower()
+            for lift_key in standard_lifts:
+                if lift_key not in name:
+                    continue
+                for s in ex["sets"]:
+                    if s["set_type"] == "warmup":
                         continue
-                    for s in ex.get("sets", []):
-                        if s.get("set_type") == "warmup":
-                            continue
-                        w = float(s.get("weight_lbs", 0) or 0)
-                        r = int(s.get("reps", 0) or 0)
-                        e1rm = estimate_1rm(w, r)
-                        if e1rm:
-                            if lift_key not in best_1rms or e1rm > best_1rms[lift_key][0]:
-                                best_1rms[lift_key] = (e1rm, date_str)
+                    w = s["weight_lbs"]
+                    r = s["reps"]
+                    e1rm = estimate_1rm(w, r)
+                    if e1rm:
+                        if lift_key not in best_1rms or e1rm > best_1rms[lift_key][0]:
+                            best_1rms[lift_key] = (e1rm, date_str)
 
     results = {}
     levels_found = []
@@ -488,22 +487,22 @@ def tool_get_centenarian_benchmarks(args):
     hevy_items = query_source("hevy", "2000-01-01", end_date)
 
     best_1rms: dict[str, tuple[float, str]] = {}
-    for item in hevy_items:
-        date_str = item.get("date") or item.get("sk", "")[:10]
-        for workout in item.get("data", {}).get("workouts", []):
-            for ex in workout.get("exercises", []):
-                name_lc = ex.get("name", "").lower()
-                for lift_key, keyword in _LIFT_SEARCH.items():
-                    if keyword not in name_lc:
+    # #110: normalize_hevy_items handles both schemas.
+    for workout in normalize_hevy_items(hevy_items):
+        date_str = workout["date"]
+        for ex in workout["exercises"]:
+            name_lc = ex["name"].lower()
+            for lift_key, keyword in _LIFT_SEARCH.items():
+                if keyword not in name_lc:
+                    continue
+                for s in ex["sets"]:
+                    if s["set_type"] == "warmup":
                         continue
-                    for s in ex.get("sets", []):
-                        if s.get("set_type") == "warmup":
-                            continue
-                        w = float(s.get("weight_lbs", 0) or 0)
-                        r = int(s.get("reps", 0) or 0)
-                        e1rm = estimate_1rm(w, r)
-                        if e1rm and (lift_key not in best_1rms or e1rm > best_1rms[lift_key][0]):
-                            best_1rms[lift_key] = (e1rm, date_str)
+                    w = s["weight_lbs"]
+                    r = s["reps"]
+                    e1rm = estimate_1rm(w, r)
+                    if e1rm and (lift_key not in best_1rms or e1rm > best_1rms[lift_key][0]):
+                        best_1rms[lift_key] = (e1rm, date_str)
 
     lifts_out = {}
     statuses = []
