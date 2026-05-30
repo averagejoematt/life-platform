@@ -73,6 +73,7 @@ KNOWN_SECRETS = [
     "life-platform/dropbox",         # Dropbox API key (also in ingestion-keys bundle)
     "life-platform/todoist",         # Todoist API token — read by MCP write tools (mcp/tools_todoist.py:22). Created 2026-02-21. TD-23 added to mcp_server() IAM.
     "life-platform/hevy",            # ADR-060 / SPEC_HEVY §2.4: api_key + webhook_secret for hevy-webhook + hevy-backfill. Created 2026-05-25.
+    "life-platform/github-dispatch-token",  # ADR-064 (2026-05-29): fine-grained PAT for remediation-dispatcher Lambda → GitHub repository_dispatch. Rotates ~2026-08-27.
     "life-platform",                 # Wildcard prefix — pipeline_health_check reads all secrets to verify they exist
 ]
 
@@ -203,8 +204,9 @@ def test_s4_known_secrets_count_matches_architecture():
     # 2026-05-16 (Phase 1.4): soft-deleted orphan anthropic-api-key; removed from KNOWN_SECRETS.
     # 2026-05-25 (SPEC_HEVY): added life-platform/hevy + life-platform/macrofactor.
     # 2026-05-25 (later): removed life-platform/macrofactor — MF Tier 1 blocked by Firebase App Check, code path torn down. See ADR-061.
-    # Total = 15 actual secrets + 1 wildcard = 16.
-    EXPECTED_COUNT = 16
+    # 2026-05-29 (ADR-064): added life-platform/github-dispatch-token for the remediation dispatcher.
+    # Total = 16 actual secrets + 1 wildcard = 17.
+    EXPECTED_COUNT = 17
     actual = len(KNOWN_SECRETS)
     assert actual == EXPECTED_COUNT, (
         f"S4 FAIL: KNOWN_SECRETS has {actual} entries, expected {EXPECTED_COUNT}. "

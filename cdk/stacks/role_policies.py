@@ -1098,7 +1098,7 @@ def operational_remediation_dispatcher() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="GHToken",
             actions=["secretsmanager:GetSecretValue"],
-            resources=[f"arn:aws:secretsmanager:{REGION}:{ACCT}:secret:life-platform/github-dispatch-token-*"],
+            resources=[_secret_arn("life-platform/github-dispatch-token")],
         ),
         iam.PolicyStatement(
             sid="KMS",
