@@ -126,7 +126,7 @@ The ~8x gap between the upper-bound table ($34 / 7d) and the real bill (~$4 / 30
 1. **DELETE the orphaned WAF.** `life-platform-amj-waf` in us-east-1 (CLOUDFRONT scope). Saves ~$8/mo, flips budget tier back to 0. P1.4 evidently failed silently — write a post-mortem about what got missed.
 2. **Drop cache_control on daily-brief.** Cache TTL << invocation interval = wasted writes. Net savings small (cents/mo) but it's the right shape.
 3. **Investigate coach-narrative-orchestrator cache hit rate.** 1.3% with 76k reads vs 15k writes — close to one-shot per run. Verify the sibling-coach cache pattern is actually shared, not per-Lambda-per-run.
-4. **Audit `AnthropicAPIFailure` = 312 (7d)** with daily-brief leading at 139. Could be Bedrock throttle / concurrency / token-limit retries. Pull a CloudWatch Logs Insights query against `bedrock_client.invoke` error paths.
+4. ~~Audit `AnthropicAPIFailure` = 312 (7d)~~ **RESOLVED 2026-05-29.** All 312 failures occurred on 2026-05-27, before the layer-v62 deploy. Log sample: `"Anthropic unavailable after 4 attempts (HTTP 400)"` — pre-v62 message format, malformed-request error (NOT throttle). Last-24h count is **0**. The v62 cleanup (sentinel-stub for dead Anthropic-key fetches) appears to have fixed whatever was producing the HTTP-400.
 5. **(Later)** Configure SES `CustomRedirectDomain` so click tracking works. Per-event MessageTags is a smaller cleanup — only useful once opens/clicks are actually measurable.
 6. **(Later)** Prune Secrets Manager (Task #88 follow-up). Each retired anthropic-* secret is $0.40/mo.
 
