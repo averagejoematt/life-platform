@@ -1167,7 +1167,7 @@ def handle_mind_overview() -> dict:
         if isinstance(raw_vs, dict):
             streaks = {}
             for name, val in raw_vs.items():
-                if name.lower().strip() in blocked_set:
+                if _is_blocked_vice(name):
                     continue
                 streaks[name] = int(val or 0)
             day_entry["streaks"] = streaks
