@@ -27,9 +27,22 @@ from web.site_api_common import (
     logger,
     table,
     USER_ID, USER_PREFIX,
+    EXPERIMENT_START, PT,
     _ok, _error,
     _query_source, _latest_item, _decimal_to_float,
 )
+
+
+def _current_day_n() -> int:
+    """Day-of-experiment (1-indexed) under the active EXPERIMENT_START_DATE.
+    Used by Stage0 Fix 3 freshness guard to refuse to serve generated
+    narrative that claims a day count newer than the live experiment."""
+    today = datetime.now(PT).date()
+    try:
+        start = datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()
+    except Exception:
+        return 0
+    return max((today - start).days + 1, 0)
 
 
 def handle_field_notes(event):
@@ -84,6 +97,27 @@ def handle_ai_analysis(event):
     if not ai_item:
         return _ok({"expert_key": expert_key, "analysis": None, "generated_at": None}, cache_seconds=300)
     ai_item = _decimal_to_float(ai_item)
+    # Stage0 Fix 3 (2026-05-30): freshness guard. The Brandt block on /explorer/
+    # was rendering "still 268 lbs over fifty-five days" because a pre-restart
+    # analysis record survived the genesis re-anchor. If the record's
+    # days_in_experiment is newer than the live experiment day count, the
+    # narrative is from a previous experiment cycle — refuse to serve it.
+    rec_days = ai_item.get("days_in_experiment")
+    if rec_days is not None:
+        try:
+            if int(rec_days) > _current_day_n():
+                logger.info(
+                    f"[ai_analysis] {expert_key} record claims day {rec_days} "
+                    f"but current is day {_current_day_n()} — withholding stale narrative"
+                )
+                return _ok({
+                    "expert_key": expert_key,
+                    "analysis": None,
+                    "generated_at": None,
+                    "stale": True,
+                }, cache_seconds=300)
+        except (TypeError, ValueError):
+            pass
     analysis_val = ai_item.get("analysis", "")
     if "[AI_UNAVAILABLE]" in (analysis_val or ""):
         analysis_val = None

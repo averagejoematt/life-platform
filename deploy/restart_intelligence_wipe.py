@@ -89,6 +89,14 @@ PARTITIONS = [
     ("anomalies",             "pregenesis", {}),  # DATE# keyed daily anomaly flags
     ("weekly_correlations",   "pregenesis", {}),  # WEEK# keyed correlations
     ("computed_insights",     "pregenesis", {}),  # DATE# keyed daily insight blobs
+
+    # Stage0 Fix 3 (2026-05-30): the per-expert AI analyses (Brandt et al.) were
+    # missed by the wipe. They're singleton EXPERT#<key> records keyed only by
+    # expert, not by date — "all" mode is correct since every active record
+    # encodes the pre-restart day count and would otherwise leak onto the live
+    # /explorer/ page. The site-api now also guards against this at render time
+    # (handle_ai_analysis returns null when days_in_experiment > current day_n).
+    ("ai_analysis",           "all",        {}),
 ]
 
 # Coach state lives under pk=COACH#<coach_id>, NOT under USER#matthew#SOURCE#*.

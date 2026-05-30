@@ -1026,8 +1026,11 @@
 
 // ── Habit Registry (behavioral habits only — supplements + hygiene excluded) ──
 // Organized by purpose groups for Zone 2
-var BLOCKED_KW = ['porn','pornography','marijuana','cannabis','weed','thc'];
-function isBlocked(t){ if(!t)return false; var l=t.toLowerCase(); return BLOCKED_KW.some(function(k){return l.indexOf(k)!==-1}); }
+// Stage0 Fix 1 (2026-05-30): server-side filter is authoritative — see
+// lambdas/web/site_api_data.py:handle_habit_registry + handle_vice_streaks.
+// Client retains a no-op so existing call sites stay clean and we don't
+// ship the keyword list in plaintext JS.
+function isBlocked(_t){ return false; }
 
 // ── Habit data: loaded from /api/habit_registry (DynamoDB PROFILE#v1) ──
 // These are populated by fetchHabitRegistry() before render
