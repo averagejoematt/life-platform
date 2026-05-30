@@ -613,9 +613,14 @@ jobs:
           # were removed in the CDK migration). Instead CI verifies that all
           # consumers are already on the latest published version, and fails with
           # remediation steps if a manual `cdk deploy` is still outstanding.
+          # --no-paginate is required: AWS CLI default page-size is 50, and once
+          # the layer crossed v50 the unpaginated query returned a multi-line
+          # value (62 from page 1, 12 from page 2) which made every consumer
+          # look mismatched ("on layer v62, expected v62\n12"). 2026-05-29 fix.
           LATEST_VER=$(aws lambda list-layer-versions \
             --layer-name life-platform-shared-utils \
             --region ${{ env.AWS_REGION }} \
+            --no-paginate \
             --query 'LayerVersions[0].Version' --output text)
           echo "Latest published layer version: v$LATEST_VER"
 
