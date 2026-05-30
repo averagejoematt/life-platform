@@ -110,6 +110,50 @@ def _redirect(url: str) -> dict:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# RATE LIMIT (replaces WAF SubscribeRateLimit: 60 req / 5min / IP)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_RATE_LIMIT_MAX = 60
+_RATE_LIMIT_WINDOW_SEC = 300
+_RATE_LIMIT_PK = "SUBSCRIBE#rate_limit"
+
+
+def _check_subscribe_rate_limit(source_ip: str) -> tuple[bool, int]:
+    """Per-IP rate-limit via DDB atomic counter on a 5-min time bucket.
+
+    Mirrors the WAF rule it replaces (60 requests / 5min window / source IP).
+    Fail-open on DDB errors — we'd rather accept a request than lock out a
+    legitimate user on a transient hiccup.
+
+    Returns (allowed, count_in_window).
+    """
+    if not source_ip or source_ip == "unknown":
+        return True, 0
+
+    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    now_epoch = int(datetime.now(timezone.utc).timestamp())
+    bucket = now_epoch // _RATE_LIMIT_WINDOW_SEC
+    sk = f"IP#{ip_hash}#BUCKET#{bucket}"
+    # TTL one hour past bucket end — long enough for DDB cleanup, short enough
+    # to not waste storage.
+    ttl = (bucket * _RATE_LIMIT_WINDOW_SEC) + 3600
+
+    try:
+        result = table.update_item(
+            Key={"pk": _RATE_LIMIT_PK, "sk": sk},
+            UpdateExpression="ADD req_count :one SET expires_at = if_not_exists(expires_at, :ttl)",
+            ExpressionAttributeValues={":one": 1, ":ttl": ttl},
+            ReturnValues="UPDATED_NEW",
+        )
+        count = int(result.get("Attributes", {}).get("req_count", 1))
+    except Exception as e:
+        logger.warning(f"Subscribe rate-limit check failed (fail-open): {e}")
+        return True, 0
+
+    return (count <= _RATE_LIMIT_MAX), count
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SUBSCRIBE
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -409,6 +453,13 @@ def lambda_handler(event, context):
 
         # Default: subscribe (POST body)
         if method == "POST":
+            # Replaces WAF SubscribeRateLimit: 60 requests / 5min / IP.
+            allowed, count = _check_subscribe_rate_limit(source_ip)
+            if not allowed:
+                logger.info(f"Subscribe rate-limit hit ip={source_ip[:8]}... count={count}")
+                return _json_response(429, {
+                    "error": "Too many requests. Try again in a few minutes."
+                })
             try:
                 body = json.loads(event.get("body") or "{}")
                 email = body.get("email", "").strip()
