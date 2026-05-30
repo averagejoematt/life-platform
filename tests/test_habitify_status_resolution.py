@@ -18,16 +18,16 @@ sys.path.insert(0, os.path.join(ROOT, "lambdas", "ingestion"))
 
 # Stub the framework — transform() doesn't depend on it, but the module-level
 # `from ingestion_framework import …` would fail without this shim.
+# NOTE: do NOT pre-stub http_retry here. transform() never calls api_get()
+# (the only path that imports http_retry), so we don't need the stub — and
+# polluting sys.modules with a partial fake breaks test_http_retry.py when
+# the full suite runs in alphabetical order.
 import types
 if "ingestion_framework" not in sys.modules:
     fake = types.ModuleType("ingestion_framework")
     fake.IngestionConfig = lambda **kw: kw
     fake.run_ingestion = lambda *a, **kw: {}
     sys.modules["ingestion_framework"] = fake
-if "http_retry" not in sys.modules:
-    fake_hr = types.ModuleType("http_retry")
-    fake_hr.urlopen_with_retry = lambda *a, **kw: None
-    sys.modules["http_retry"] = fake_hr
 
 from habitify_lambda import transform
 
