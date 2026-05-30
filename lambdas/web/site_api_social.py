@@ -56,6 +56,27 @@ from web.site_api_common import (
 # touched by the handlers in this file, so they move with the cluster.
 _token_secret_cache = None
 _nudge_rate_store: dict = {}   # ACCT-2: ip_hash+category -> list of timestamps
+
+
+def _extract_client_ip(event: dict) -> str:
+    """Return the original client IP behind CloudFront.
+
+    requestContext.http.sourceIp is the CloudFront edge IP — varies per
+    request, useless for IP-based rate-limiting. CloudFront forwards the
+    real client in x-forwarded-for; take the first entry. Falls back to
+    sourceIp (and "unknown") only if the header is missing.
+
+    Matches the pattern in email_subscriber_lambda.py:lambda_handler;
+    same bug, same shape. (Task #108 — burned in 2026-05-29.)
+    """
+    headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
+    xff = (headers.get("x-forwarded-for") or "").split(",")[0].strip()
+    return (
+        xff
+        or event.get("requestContext", {}).get("http", {}).get("sourceIp")
+        or event.get("requestContext", {}).get("identity", {}).get("sourceIp")
+        or "unknown"
+    )
 _nudge_counts: dict = {}        # ACCT-2: category -> approximate count
 _finding_rate_store: dict = {}  # NEW-1: ip_hash -> list of timestamps for submit_finding
 # S3 config caches for experiment + challenge endpoints
@@ -263,11 +284,7 @@ def _handle_nudge(event: dict) -> dict:
     NOTE: Persisting counts to DynamoDB requires a CDK write-permission change (future work).
     """
     import time as _time
-    source_ip = (
-        event.get("requestContext", {}).get("http", {}).get("sourceIp")
-        or event.get("requestContext", {}).get("identity", {}).get("sourceIp")
-        or "unknown"
-    )
+    source_ip = _extract_client_ip(event)
     try:
         body = json.loads(event.get("body") or "{}")
     except Exception:
@@ -318,11 +335,7 @@ def _handle_submit_finding(event: dict) -> dict:
     Rate limit: 3 per IP per hour.
     """
     import time as _time
-    source_ip = (
-        event.get("requestContext", {}).get("http", {}).get("sourceIp")
-        or event.get("requestContext", {}).get("identity", {}).get("sourceIp")
-        or "unknown"
-    )
+    source_ip = _extract_client_ip(event)
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
     now = int(_time.time())
     hour_ago = now - 3600
@@ -539,11 +552,7 @@ def _handle_experiment_vote(event: dict) -> dict:
     Body: {"library_id": "post-dinner-walk"}
     Rate limit: 1 vote per IP per experiment per 24 hours via DynamoDB TTL.
     """
-    source_ip = (
-        event.get("requestContext", {}).get("http", {}).get("sourceIp")
-        or event.get("requestContext", {}).get("identity", {}).get("sourceIp")
-        or "unknown"
-    )
+    source_ip = _extract_client_ip(event)
     try:
         body = json.loads(event.get("body") or "{}")
     except Exception:
@@ -615,11 +624,7 @@ def _handle_experiment_follow(event: dict) -> dict:
     Stores interest so we can notify when experiment completes.
     Rate limit: 10 follows per IP per hour.
     """
-    source_ip = (
-        event.get("requestContext", {}).get("http", {}).get("sourceIp")
-        or event.get("requestContext", {}).get("identity", {}).get("sourceIp")
-        or "unknown"
-    )
+    source_ip = _extract_client_ip(event)
     try:
         body = json.loads(event.get("body") or "{}")
     except Exception:
@@ -808,11 +813,7 @@ def _handle_challenge_vote(event: dict) -> dict:
     Body: {"catalog_id": "cold-shower-finish"}
     Rate limit: 1 vote per IP per challenge per 24 hours via DynamoDB TTL.
     """
-    source_ip = (
-        event.get("requestContext", {}).get("http", {}).get("sourceIp")
-        or event.get("requestContext", {}).get("identity", {}).get("sourceIp")
-        or "unknown"
-    )
+    source_ip = _extract_client_ip(event)
     try:
         body = json.loads(event.get("body") or "{}")
     except Exception:
@@ -882,11 +883,7 @@ def _handle_challenge_follow(event: dict) -> dict:
     Body: {"email": "user@example.com", "catalog_id": "cold-shower-finish"}
     Rate limit: 10 follows per IP per hour.
     """
-    source_ip = (
-        event.get("requestContext", {}).get("http", {}).get("sourceIp")
-        or event.get("requestContext", {}).get("identity", {}).get("sourceIp")
-        or "unknown"
-    )
+    source_ip = _extract_client_ip(event)
     try:
         body = json.loads(event.get("body") or "{}")
     except Exception:
