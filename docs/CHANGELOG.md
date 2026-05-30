@@ -1,3 +1,45 @@
+## [Evening 2026-05-29] — Backlog #2–10 sweep + WAF removal + CI bug-hunt
+
+### Added (work-product)
+- **Audits.** `docs/audits/COST_CACHE_SES_VERIFICATION_2026-05-29.md` (Bedrock $4.27 MTD, daily-brief cache 0% read, SES opens 0 from Apple Mail Privacy). `docs/audits/VERIFY_SWEEP_2026-05-29.md` (3 PR1 bugs confirmed FIXED, IA fragmentation persists → #9 GO).
+- **#101 TD-11 Phase 2 — pending-aware completion_pct.** `lambdas/ingestion/habitify_lambda.py` `transform()` now writes `pending_count`, `completion_pct_strict` (legacy interpretation), and a corrected `completion_pct` that excludes today's in_progress habits from the denominator. Past-day records unchanged. 12 unit tests cover today/past/all-pending edges. `backfill/backfill_habitify_v2_schema.py` re-invokes the Lambda per date for ≤60-day history fill (dry-run default).
+- **#8 Phase 1 — Intelligence API.** `lambdas/web/site_api_intelligence.py` + router wiring for `GET /api/hypotheses` (public-filtered, evidence-aware) and `GET /api/intelligence_summary` (counts + last-week markers, 1800s cache). Unblocks the tabbed-page rebuild.
+- **#7 Email dark mode.** Audit found 4 of 5 light-default emails already had `prefers-color-scheme: dark` CSS. The sick-brief template inside `daily_brief_lambda.py` was the missing one — added.
+- **#4 Reserved concurrency staged.** `deploy/stage_reserved_concurrency.sh` — gate-checks the account ConcurrentExecutions limit and refuses to run until AWS case 177921309700709 raises it 10→100. Allocates mcp:30, site-api:20, site-api-ai:5, daily-brief:5, hae-webhook:20.
+- **#9 IA restructuring.** `/achievements/` → `/character/` redirect (was 38KB live), `/data/` moved under `/platform/data/` + redirect, `/progress/`/`/results/`/`/start/` redirects already existed. Nav (`components.js` + `nav.js`) and `sitemap.xml` pruned.
+- **In-Lambda subscribe rate-limit** (`email_subscriber_lambda.py:_check_subscribe_rate_limit`) — 60 req / 5-min window per IP via DDB atomic counter on a time-bucketed key. Fail-open on DDB errors. Replaces the WAF's `SubscribeRateLimit` rule.
+- **`deploy/finish_waf_removal.sh`** — post-deploy script that detaches the WAF from CloudFront, waits for the distribution to converge, then deletes the web ACL. Executed successfully.
+- **Region-aware deploy script.** `deploy/deploy_lambda.sh` now reads per-Lambda `region` from `ci/lambda_map.json` (default us-west-2) and **preflight-verifies** the function exists in the chosen region — fails loudly instead of silently no-opping against a vestigial twin. `ci/lambda_map.json` annotated `email-subscriber` with `"region": "us-east-1"`. `tests/test_lambda_map_regions.py` (R1/R2/R3) guarantees the bug class never recurs.
+
+### Changed
+- **PLATFORM_STATS corrected** in `lambdas/web/site_api_common.py` against live AWS state: 62→87 Lambdas, 121→138 tools, 66→94 alarms, 10→15 secrets, 45→65 ADRs, 1075→303 tests, 72→77 site pages. Static-HTML duplicates patched in `site_constants.js`, `cost/index.html`, `index.html` (SEO `<h1>` and twitter:description).
+- **Subscribe rate-limit uses x-forwarded-for** behind CloudFront. The first deploy used `requestContext.http.sourceIp` which is the CloudFront edge IP — varies per request, so the counter never accumulated. Fixed to read `x-forwarded-for[0]` (the original client) and fall back to sourceIp.
+- **ai_calls.py signatures softened.** `call_anthropic`, the 8 `call_*_v2` coaches, `call_journal_coach`, `call_training_nutrition_coach`, `call_board_of_directors` now have `api_key: str = ""` (Bedrock uses IAM auth per ADR-062). Backward-compatible.
+
+### Removed
+- **WAF `life-platform-amj-waf` deleted.** Saves ~$8/mo. Detached from CloudFront `E3S424OXQZ8NBE` first; web ACL deleted after distribution converged. With this gone, MTD drops by ~$8 → projected budget tier should flip 1→0.
+
+### Fixed
+- **CI was silently failing for weeks.** Cleared five blockers in succession:
+  - `tests/test_iam_secrets_consistency.py` — `KNOWN_SECRETS` missing `life-platform/github-dispatch-token`; fixed + bumped `EXPECTED_COUNT` 16→17.
+  - `cdk/stacks/role_policies.py:1101` — dispatcher policy hardcoded ARN `…/github-dispatch-token-*` (literal dash) instead of using `_secret_arn()`; now standardized.
+  - `tests/test_secret_references.py` — `KNOWN_SECRETS` (sibling list) was missing both `life-platform/hevy` and `life-platform/github-dispatch-token`.
+  - `tests/test_habitify_status_resolution.py` — was stubbing `http_retry` in `sys.modules` unnecessarily, breaking `test_http_retry.py` when the full suite ran in alphabetical order.
+  - `.github/workflows/ci-cd.yml` layer-verify — `aws lambda list-layer-versions` paginates at 50 items; with the layer at v62 it returned `62\n12` (the `LayerVersions[0].Version` per page), making every consumer look mismatched against the multi-line `LATEST_VER`. Fixed with `--no-paginate`.
+  - `deploy/deploy_lambda.sh` region-blindness — was hardcoded to us-west-2 and silently updated a vestigial us-west-2 copy of `email-subscriber` while production us-east-1 stayed stale. CI reported "success" but production never moved.
+- **AnthropicAPIFailure 312-over-7d signal** resolved as a layer-v62 artifact — last-24h count is 0.
+
+### Known follow-ups
+- **#103** — WAF removed; awaiting end-to-end smoke to confirm rate-limit hits 429 after x-forwarded-for fix deploys.
+- **#101 backfill** — script ready, not yet run (`python3 backfill/backfill_habitify_v2_schema.py --apply` when ready; ~60 Lambda invocations).
+- **#90** — sentinel-stub dead code in 18 Lambdas left in place; safe + harmless, removal deferred.
+- **#102** — Intelligence page tabbed UI build (API plumbing live).
+- **#98** — WR-47 Phase 2 Pause Mode (multi-session; TD-11 Phase 2 dependency cleared).
+- **#106** — subscriber-token HMAC uses Anthropic API key as the signing secret. AI-key rotation invalidates all subscriber tokens; AI-key leak makes tokens forgeable. Provision dedicated `life-platform/subscriber-token-secret`.
+- **#108** — same x-forwarded-for bug exists in `site_api_social.py` vote/follow/checkin/nudge rate-limiters. Vote-stuffing possible. Low severity for a personal demo site, but real.
+
+---
+
 ## [Marathon 2026-05-29] — Bedrock cutover, budget guard, self-healing
 
 ### Added
