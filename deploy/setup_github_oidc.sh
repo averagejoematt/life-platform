@@ -122,7 +122,9 @@ PERMISSION_POLICY=$(cat <<EOF
       ],
       "Resource": [
         "arn:aws:lambda:us-west-2:${ACCOUNT}:function:*",
-        "arn:aws:lambda:us-west-2:${ACCOUNT}:layer:*"
+        "arn:aws:lambda:us-west-2:${ACCOUNT}:layer:*",
+        "arn:aws:lambda:us-east-1:${ACCOUNT}:function:*",
+        "arn:aws:lambda:us-east-1:${ACCOUNT}:layer:*"
       ]
     },
     {
