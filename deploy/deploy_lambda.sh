@@ -20,7 +20,13 @@
 
 set -euo pipefail
 
-REGION="us-west-2"
+# Default region. Per-Lambda overrides come from ci/lambda_map.json's "region"
+# field — see the resolution block below. 2026-05-29 incident: email-subscriber
+# lives in us-east-1 (CloudFront origin) but a vestigial twin exists in us-west-2.
+# Without per-Lambda regions, this script silently updated the dead twin while
+# production stayed stale — CI reported "success" but the change wasn't live.
+DEFAULT_REGION="us-west-2"
+LAMBDA_MAP="${LAMBDA_MAP:-ci/lambda_map.json}"
 BUCKET="matthew-life-platform"
 
 if [ $# -lt 2 ]; then
@@ -32,6 +38,28 @@ fi
 FUNCTION_NAME="$1"
 SOURCE_FILE="$2"
 shift 2
+
+# ── Resolve region (per-Lambda override) ──
+# 1. Read region from lambda_map.json if present.
+# 2. Else default to us-west-2.
+# 3. Verify the function actually exists in the chosen region — fail loudly
+#    if it doesn't. Crossing regions silently is exactly what broke 2026-05-29.
+REGION="$DEFAULT_REGION"
+if [ -f "$LAMBDA_MAP" ] && command -v jq >/dev/null 2>&1; then
+    MAP_REGION=$(jq -r --arg f "$SOURCE_FILE" '.lambdas[$f].region // empty' "$LAMBDA_MAP")
+    if [ -n "$MAP_REGION" ]; then
+        REGION="$MAP_REGION"
+        echo "🌎 Region override from $LAMBDA_MAP: $REGION"
+    fi
+fi
+if ! aws lambda get-function-configuration --function-name "$FUNCTION_NAME" --region "$REGION" \
+        --query 'FunctionName' --output text --no-cli-pager > /dev/null 2>&1; then
+    echo "❌ Function '$FUNCTION_NAME' not found in region '$REGION'."
+    echo "   If it lives in another region, add"
+    echo "     \"region\": \"us-east-1\""
+    echo "   to its entry in $LAMBDA_MAP and re-run."
+    exit 1
+fi
 
 # ── Parse --extra-files (safe with empty set) ──
 declare -a EXTRA_FILES=()
