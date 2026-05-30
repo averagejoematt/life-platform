@@ -13,10 +13,24 @@ Source-specific concerns:
     separate `USER#matthew#SOURCE#supplements` partition. Framework's
     post_store_fn callback is the right hook for this.
 
-DDB shape unchanged from pre-migration (chronicling-compatible format):
+DDB shape (TD-11 Phase 1, 2026-05-29 — backward-compatible producer):
   pk: USER#matthew#SOURCE#habitify
   sk: DATE#YYYY-MM-DD
-  habits: {name: 0/1}, by_group: {group: {...}}, total_*, completion_pct, mood
+  habits: {name: 0/1}                — UNCHANGED, legacy readers still work
+  habit_statuses: {name: {...}}      — NEW: per-habit structured status
+  by_group, total_*, completion_pct, mood — unchanged
+
+`habit_statuses[name]` carries:
+  status           one of completed | pending | failed | skipped (TD-11 enum)
+  current_value    Decimal — from Habitify progress.current_value
+  target_value     Decimal — from Habitify progress.target_value
+  periodicity      "daily" | "weekly" | "monthly" — for aggregate habits
+  scheduled_today  bool — always True today (registry is all RRULE=DAILY per audit)
+  completed_at     iso8601 string OR null
+
+The "pending" state (today's in_progress, deadline not yet passed) is the
+phantom-failed bug fix — scoring engine consumers can stop treating it as 0/miss.
+Consumer-side read changes are TD-11 Phase 2 (planned, not yet shipped).
 """
 
 import json
@@ -165,9 +179,16 @@ def transform(raw: dict, date_str: str) -> list[dict]:
     moods = raw["moods"]
 
     habits = {}
+    habit_statuses = {}  # TD-11 Phase 1: structured per-habit state alongside binary
     group_habits_done = {}
     group_habits_possible = {}
     skipped_count = 0
+
+    # `date_str` is the date we're ingesting for (UTC-anchored). We compare it
+    # to today (UTC) to disambiguate Habitify's `in_progress` between "pending"
+    # (today's deadline hasn't passed) and "failed" (past day, never resolved).
+    # End-of-UTC-day is Habitify's source-of-truth flip point per the TD-11 audit.
+    today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     for entry in journal:
         if entry.get("is_archived"):
@@ -181,6 +202,34 @@ def transform(raw: dict, date_str: str) -> list[dict]:
         habits[name] = Decimal("1") if is_completed else Decimal("0")
         if is_skipped:
             skipped_count += 1
+
+        # TD-11 Phase 1: resolve API status → TD-11 enum.
+        if status == "completed":
+            resolved = "completed"
+        elif status == "skipped":
+            resolved = "skipped"
+        elif status == "failed":
+            resolved = "failed"
+        elif status == "in_progress":
+            # in_progress on today = pending (correct). On a past day = failed
+            # (Habitify normally flips this at end-of-UTC-day; carryover is rare
+            # but the audit found 1–2 per day, so handle it).
+            resolved = "pending" if date_str >= today_utc else "failed"
+        else:
+            resolved = status or "unknown"
+
+        progress = entry.get("progress") or {}
+        habit_statuses[name] = {
+            "status":           resolved,
+            "current_value":    Decimal(str(progress.get("current_value", 0))),
+            "target_value":     Decimal(str(progress.get("target_value", 1))),
+            "periodicity":      progress.get("periodicity", "daily"),
+            "scheduled_today":  True,  # All current habits are RRULE=DAILY per audit
+        }
+        if is_completed:
+            # Habitify doesn't expose a per-completion timestamp on the journal
+            # endpoint observed in the audit; record the ingestion observation time.
+            habit_statuses[name]["completed_at"] = datetime.now(timezone.utc).isoformat()
 
         area = entry.get("area")
         group = area_map.get(area["id"]) if area and area.get("id") else None
@@ -212,6 +261,7 @@ def transform(raw: dict, date_str: str) -> list[dict]:
         "source":          "habitify",
         "date":            date_str,
         "habits":          habits,
+        "habit_statuses":  habit_statuses,  # TD-11 Phase 1 — structured status alongside binary
         "by_group":        by_group,
         "total_completed": total_completed,
         "total_possible":  total_possible,
@@ -284,7 +334,7 @@ _config = IngestionConfig(
     source_name="habitify",
     secret_id=SECRET_NAME,
     s3_archive_prefix="raw/matthew/habitify",
-    schema_version=1,
+    schema_version=2,  # TD-11 Phase 1: added habit_statuses alongside habits
     enable_gap_detection=True,
     lookback_days=int(os.environ.get("LOOKBACK_DAYS", "7")),
     enable_item_size_guard=True,

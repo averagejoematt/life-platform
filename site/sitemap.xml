@@ -183,11 +183,6 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://averagejoematt.com/achievements/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
     <loc>https://averagejoematt.com/stack/</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -216,21 +211,6 @@
     <loc>https://averagejoematt.com/journal/</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://averagejoematt.com/progress/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://averagejoematt.com/results/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://averagejoematt.com/start/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
   </url>
   <url>
     <loc>https://averagejoematt.com/builders/</loc>
