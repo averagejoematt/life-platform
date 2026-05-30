@@ -1047,9 +1047,9 @@ def handle_mind_overview() -> dict:
         avg_valence = round(sum(vals) / len(vals), 2)
 
     # ── 3. Vice streaks from habit_scores ──
-    content_filter = _load_content_filter()
-    blocked_set = set(v.lower().strip() for v in content_filter.get("blocked_vices", []))
-
+    # Stage0 Fix 1 (2026-05-30): use _is_blocked_vice (matches both
+    # blocked_vices full names AND blocked_vice_keywords substrings) so the
+    # client doesn't have to ship a keyword list to filter what we missed.
     hs_pk = f"{USER_PREFIX}habit_scores"
     hs_resp = table.query(
         KeyConditionExpression=Key("pk").eq(hs_pk),
@@ -1063,7 +1063,7 @@ def handle_mind_overview() -> dict:
         raw_vs = latest_hs.get("vice_streaks") or {}
         if isinstance(raw_vs, dict):
             for name, streak_val in raw_vs.items():
-                if name.lower().strip() in blocked_set:
+                if _is_blocked_vice(name):
                     continue
                 vice_data.append({
                     "name": name,

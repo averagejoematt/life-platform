@@ -41,6 +41,7 @@ from web.site_api_common import (
     _load_supp_metadata,
     _load_content_filter,
     _load_s3_json,
+    _is_blocked_vice,
 )
 
 # Module-owned S3 config caches (read by handle_protocols + handle_domains)
@@ -564,9 +565,10 @@ def handle_vice_streaks() -> dict:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     ninety_days_ago = _experiment_date(90)
 
-    content_filter = _load_content_filter()
-    blocked_set = set(v.lower().strip() for v in content_filter.get("blocked_vices", []))
-
+    # Stage0 Fix 1 (2026-05-30): _is_blocked_vice catches both blocked_vices
+    # (exact full names) AND blocked_vice_keywords (substring match). Previously
+    # only the former was filtered here, while the client shipped the keyword
+    # list to do the substring check itself — leaking the keywords in JS.
     pk = f"{USER_PREFIX}habit_scores"
     resp = table.query(
         KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(
@@ -586,7 +588,7 @@ def handle_vice_streaks() -> dict:
         if not isinstance(vs, dict):
             continue
         for vice_name, streak_val in vs.items():
-            if vice_name.lower().strip() in blocked_set:
+            if _is_blocked_vice(vice_name):
                 continue
             if vice_name not in vice_history:
                 vice_history[vice_name] = []
@@ -1326,13 +1328,20 @@ def handle_domains() -> dict:
 
 
 def handle_habit_registry() -> dict:
-    """GET /api/habit_registry — Return habit registry from DynamoDB PROFILE#v1."""
+    """GET /api/habit_registry — Return habit registry from DynamoDB PROFILE#v1.
+
+    Stage0 Fix 1 (2026-05-30): blocked vice/habit names are stripped here so
+    the client never sees them. Previously the client filtered, which shipped
+    the keyword list in plaintext JS.
+    """
     try:
         resp = table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"})
         profile = resp.get("Item", {})
         registry = profile.get("habit_registry", {})
         habits = []
         for name, meta in registry.items():
+            if _is_blocked_vice(name):
+                continue
             h = {"name": name}
             for k, v in meta.items():
                 h[k] = float(v) if isinstance(v, Decimal) else v
