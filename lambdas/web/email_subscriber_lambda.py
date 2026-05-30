@@ -435,8 +435,14 @@ def lambda_handler(event, context):
         if method == "OPTIONS":
             return {"statusCode": 204, "headers": _cors_headers(), "body": ""}
 
+        # Behind CloudFront, requestContext.http.sourceIp is the edge IP — varies
+        # per request and would defeat IP-based rate-limiting. CloudFront forwards
+        # the real client IP in x-forwarded-for; take the first entry (the client).
+        headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
+        xff = (headers.get("x-forwarded-for") or "").split(",")[0].strip()
         source_ip = (
-            event.get("requestContext", {}).get("http", {}).get("sourceIp", "")
+            xff
+            or event.get("requestContext", {}).get("http", {}).get("sourceIp", "")
             or event.get("requestContext", {}).get("identity", {}).get("sourceIp", "")
         )
 
