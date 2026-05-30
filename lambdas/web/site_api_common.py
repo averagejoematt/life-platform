@@ -96,19 +96,21 @@ CORS_HEADERS = {
 
 
 # ── Platform stats — single source of truth for all site pages ──
+# Verified 2026-05-29 against live AWS state. Lambdas counted across both
+# regions; alarms us-west-2; secrets under the life-platform/ namespace.
 PLATFORM_STATS = {
     "data_sources": 26,
-    "mcp_tools": 121,
-    "lambdas": 62,
+    "mcp_tools": 138,
+    "lambdas": 87,            # us-west-2: 82 + us-east-1: 5
     "cdk_stacks": 8,
-    "alarms": 66,
-    "adrs": 45,
-    "monthly_cost": "$19",
+    "alarms": 94,
+    "adrs": 65,
+    "monthly_cost": "$19",    # editorial: the "single-person platform" narrative anchor
     "review_count": 19,
     "review_grade": "A",
-    "active_secrets": 10,
-    "site_pages": 72,
-    "test_count": 1075,
+    "active_secrets": 15,
+    "site_pages": 77,
+    "test_count": 303,
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,

@@ -14,7 +14,7 @@
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="The $19/Month AI Health OS — Matthew">
-  <meta name="twitter:description" content="Real AWS cost breakdown. 26 data sources. 62 Lambdas. 121 AI tools. $19/month.">
+  <meta name="twitter:description" content="Real AWS cost breakdown. 26 data sources. 87 Lambdas. 138 AI tools. $19/month.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <title>The $19/Month Story — Matthew</title>
     <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
@@ -478,7 +478,7 @@
       <div class="decision-card__tag">Compute</div>
       <div class="decision-card__title">No always-on servers</div>
       <div class="decision-card__desc">
-        Every computation is event-driven Lambda. Ingestion runs on a cron (14 Lambdas × once/day).
+        Every computation is event-driven Lambda. Ingestion runs on a cron (15 Lambdas, hourly).
         The site API fires only when someone visits. Zero idle cost — you pay per invocation, not per hour running.
       </div>
       <div class="decision-card__saving">Saves ~$40&ndash;$80/mo vs always-on EC2 or ECS</div>
