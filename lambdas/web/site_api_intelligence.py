@@ -1055,3 +1055,120 @@ def handle_pulse_history() -> dict:
     return _ok({"pulse_history": days}, cache_seconds=3600)
 
 
+# ── PB-08 / #8: Hypotheses + Intelligence summary ─────────
+# Both are public read-only routes that feed the Intelligence-page tabbed
+# rebuild. Henning/Anika evidence rules apply: hypotheses MUST carry a status
+# and confidence, never causal claims; the summary surfaces counts only.
+
+_HYPOTHESES_PK = f"{USER_PREFIX}hypotheses"
+
+
+def handle_hypotheses() -> dict:
+    """
+    GET /api/hypotheses
+    Returns active hypotheses with status + confidence + domain.
+    Filters out `public: false` so private records never leak.
+    Cache: 3600s (hypothesis engine runs daily; data shifts slowly).
+    """
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(_HYPOTHESES_PK)
+                                   & Key("sk").begins_with("HYPOTHESIS#"),
+            ScanIndexForward=False,  # newest first
+            Limit=50,
+        )
+    except Exception as e:
+        logger.warning(f"hypotheses query failed: {e}")
+        return _error(503, "Hypotheses unavailable.")
+
+    items = _decimal_to_float(resp.get("Items", []))
+    hypotheses = []
+    for it in items:
+        # Hide explicitly-private hypotheses. Default is public for hypotheses
+        # written by the IC-18 engine, which produces user-visible findings.
+        if it.get("public") is False:
+            continue
+        hypotheses.append({
+            "hypothesis_id": it.get("hypothesis_id") or it.get("sk", "").replace("HYPOTHESIS#", ""),
+            "hypothesis":    it.get("hypothesis", ""),
+            "domains":       it.get("domains", []),
+            "status":        it.get("status", "pending"),
+            "confidence":    it.get("confidence"),
+            "created_at":    it.get("created_at"),
+            "check_count":   it.get("check_count", 0),
+            "evidence":      it.get("evidence", {}),
+        })
+
+    return _ok({
+        "hypotheses": hypotheses,
+        "count": len(hypotheses),
+        "_notice": "N=1 personal-platform observations — not population claims.",
+    }, cache_seconds=3600)
+
+
+def handle_intelligence_summary() -> dict:
+    """
+    GET /api/intelligence_summary
+    Top-line counts for the Intelligence page hero strip:
+      - active hypotheses
+      - validated discoveries / correlations
+      - experiments active
+      - last computed-at timestamps per signal class
+    Cache: 1800s.
+    """
+    summary = {
+        "hypotheses": {"count": 0, "by_status": {}},
+        "correlations": {"count": 0, "last_week": None},
+        "experiments": {"active": 0},
+        "_meta": {"computed_at": datetime.now(timezone.utc).isoformat()},
+    }
+    # Hypotheses count + by-status
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(_HYPOTHESES_PK)
+                                   & Key("sk").begins_with("HYPOTHESIS#"),
+            Limit=200,
+        )
+        items = _decimal_to_float(resp.get("Items", []))
+        public_items = [it for it in items if it.get("public") is not False]
+        summary["hypotheses"]["count"] = len(public_items)
+        by_status = {}
+        for it in public_items:
+            s = it.get("status", "pending")
+            by_status[s] = by_status.get(s, 0) + 1
+        summary["hypotheses"]["by_status"] = by_status
+    except Exception as e:
+        logger.warning(f"intel summary: hypotheses count failed: {e}")
+
+    # Latest weekly correlation matrix
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}weekly_correlations"),
+            ScanIndexForward=False,
+            Limit=1,
+        )
+        items = _decimal_to_float(resp.get("Items", []))
+        if items:
+            record = items[0]
+            corrs = record.get("correlations", {})
+            summary["correlations"]["count"] = (
+                len(corrs) if isinstance(corrs, (dict, list)) else 0
+            )
+            summary["correlations"]["last_week"] = record.get("sk", "").replace("WEEK#", "")
+    except Exception as e:
+        logger.warning(f"intel summary: correlations failed: {e}")
+
+    # Active experiments — query the experiments partition (best-effort)
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}experiments"),
+            Limit=100,
+        )
+        items = _decimal_to_float(resp.get("Items", []))
+        summary["experiments"]["active"] = sum(
+            1 for it in items if it.get("status") == "active"
+        )
+    except Exception as e:
+        logger.warning(f"intel summary: experiments failed: {e}")
+
+    return _ok(summary, cache_seconds=1800)

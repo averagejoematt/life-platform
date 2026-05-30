@@ -91,7 +91,7 @@
   var path = window.location.pathname;
   // Map bottom nav hrefs to the full set of paths each owns
   var BOTTOM_NAV_OWNS = {
-    '/':           ['/', '/story/', '/about/', '/achievements/'],
+    '/':           ['/', '/story/', '/about/'],
     '/sleep/':     ['/sleep/', '/glucose/', '/nutrition/', '/training/', '/physical/', '/mind/', '/benchmarks/', '/explorer/'],
     '/live/':      ['/live/', '/character/', '/habits/', '/accountability/'],
     '/chronicle/': ['/chronicle/', '/weekly/', '/ask/', '/subscribe/'],
@@ -169,7 +169,7 @@
   // ── GAM-01 / DPR-1.20: Since Your Last Visit badges (per-page tracking) ──
   // Bottom nav → which paths it owns (6-section IA, Decision 1c)
   var BADGE_MAP = {
-    '/':           ['/story/', '/about/', '/achievements/', '/first-person/'],
+    '/':           ['/story/', '/about/', '/first-person/'],
     '/sleep/':     ['/sleep/', '/glucose/', '/nutrition/', '/training/', '/physical/', '/mind/', '/benchmarks/', '/explorer/'],
     '/stack/':     ['/stack/', '/protocols/', '/supplements/', '/experiments/', '/challenges/', '/discoveries/'],
     '/live/':      ['/live/', '/character/', '/habits/', '/accountability/'],
@@ -217,7 +217,6 @@
     // The Story flow
     '/story/':              { href: '/live/',             title: 'See Today\u2019s Data \u2192',      sub: 'What the sensors say right now' },
     '/about/':              { href: '/story/',            title: 'The Story \u2192',              sub: 'Read the full transformation narrative' },
-    '/achievements/':       { href: '/character/',        title: 'The Score \u2192',              sub: 'How it all adds up into one score' },
     // The Evidence flow
     '/sleep/':              { href: '/glucose/',          title: 'Glucose Data \u2192',           sub: '30-day CGM time-in-range' },
     '/glucose/':            { href: '/nutrition/',        title: 'Nutrition Data \u2192',          sub: 'Macro tracking, protein targets, TDEE' },

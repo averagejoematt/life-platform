@@ -30,7 +30,6 @@
       { href: '/',               text: 'Home' },
       { href: '/story/',         text: 'My Story' },
       { href: '/mission/',       text: 'The Mission' },
-      { href: '/achievements/',  text: 'Milestones' },
       { href: '/field-notes/',   text: 'Field Notes' },
       { href: '/first-person/',  text: 'First Person' },
     ]},
@@ -199,7 +198,6 @@
         { href: '/', text: 'Home' },
         { href: '/story/', text: 'My Story' },
         { href: '/mission/', text: 'The Mission' },
-        { href: '/achievements/', text: 'Milestones' },
         { href: '/field-notes/', text: 'Field Notes' },
       ]},
       { heading: 'The Data', links: [
