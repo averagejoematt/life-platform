@@ -169,7 +169,8 @@
       "function": "og-image-generator"
     },
     "lambdas/web/email_subscriber_lambda.py": {
-      "function": "email-subscriber"
+      "function": "email-subscriber",
+      "region": "us-east-1"
     },
     "lambdas/web/subscriber_onboarding_lambda.py": {
       "function": "subscriber-onboarding"
