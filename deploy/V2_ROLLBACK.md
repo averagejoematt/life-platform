@@ -122,6 +122,21 @@ already existed in v1; the redirect HTML just replaces the original index.
   - `/platform/index.html`      — three new sections (`#the-ai`, `#ai-board`,
     `#coaching-team`) added. Rollback via `git checkout site-v1`.
 
+**Stage 3 (Supplement + weekly dedupe + footer cleanup, 2026-05-31):**
+  - `/stack/index.html`               (redirect → /supplements/) — original at
+                                       `site/archive/v1/stack/`.
+  - `/supplements/protocol/index.html` (redirect → /supplements/) — original at
+                                       `site/archive/v1/supplements_protocol/`.
+  - `/weekly/index.html`              (redirect → /chronicle/archive/) — original at
+                                       `site/archive/v1/weekly/`.
+  - `/recap/index.html`               (redirect → /chronicle/) — original at
+                                       `site/archive/v1/recap/`.
+  - Footer "Internal" column removed from public footer; pages remain live
+    (`/status/` etc., reachable directly). The status-dot JS no-ops cleanly
+    when the column is absent.
+  - No orphan cleanup needed on rollback — all redirected routes existed
+    in v1.
+
 ---
 
 ## Stage status
@@ -129,6 +144,7 @@ already existed in v1; the redirect HTML just replaces the original index.
 - [x] **Stage 0** — tag `site-v1` + branch `redesign/v2-consolidation` + this runbook (2026-05-31)
 - [x] **Stage 1** — Observatory hub at `/observatory/`; nav collapsed 8 dispatches → 1 entry (2026-05-31)
 - [x] **Stage 2** — How It Works absorbs The AI + AI Board + Coaching Team; Character methodology dup pointed at standalone /methodology/ (2026-05-31)
+- [x] **Stage 3** — Supplement trio → /supplements/ (stack + supp/protocol redirect); weekly trio → /chronicle/ (weekly + recap redirect); footer Internal column dropped (2026-05-31)
 - [ ] Stage 3 — Supplement + weekly dedupe + footer cleanup
 - [ ] Stage 4 — ~13-spine nav rebuild + final verification
 

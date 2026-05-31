@@ -165,16 +165,6 @@
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://averagejoematt.com/weekly/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://averagejoematt.com/stack/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://averagejoematt.com/challenges/</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>

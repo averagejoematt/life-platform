@@ -46,12 +46,13 @@
       { href: '/habits/',         text: 'Habits' },
       { href: '/accountability/', text: 'Accountability' },
     ]},
+    // v2 Stage 3 (2026-05-31): supplements trio collapsed to one canonical
+    // entry. /stack/ + /supplements/protocol/ redirect to /supplements/;
+    // originals archived.
     { label: 'The Practice', groups: [
       { heading: 'The System', items: [
-        { href: '/stack/',       text: 'The Stack' },
-        { href: '/protocols/',   text: 'Protocols' },
         { href: '/supplements/', text: 'Supplements' },
-        { href: '/supplements/protocol/', text: 'Supp Protocol (v2)' },
+        { href: '/protocols/',   text: 'Protocols' },
       ]},
       { heading: 'The Pipeline', items: [
         { href: '/experiments/', text: 'Experiments' },
@@ -68,12 +69,14 @@
       { href: '/tools/',        text: 'Tools' },
       { href: '/builders/',     text: 'For Builders' },
     ]},
+    // v2 Stage 3 (2026-05-31): weekly trio collapsed to one Chronicle entry.
+    // /weekly/ + /recap/ redirect to /chronicle/; originals archived.
+    // Chronicle archive (per-week back issues) remains at /chronicle/archive/.
     { label: 'The Chronicle', items: [
-      { href: '/chronicle/', text: 'Chronicle' },
-      { href: '/weekly/',    text: 'Weekly Snapshots' },
-      { href: '/recap/',     text: 'Weekly Recap' },
-      { href: '/ask/',       text: 'Ask the Data' },
-      { href: '/subscribe/', text: 'Subscribe' },
+      { href: '/chronicle/',         text: 'Chronicle' },
+      { href: '/chronicle/archive/', text: 'Archive' },
+      { href: '/ask/',               text: 'Ask the Data' },
+      { href: '/subscribe/',         text: 'Subscribe' },
     ]},
   ];
 
@@ -205,11 +208,13 @@
         { href: '/habits/', text: 'Habits' },
         { href: '/accountability/', text: 'Accountability' },
       ]},
+      // v2 Stage 3 (2026-05-31): supplements dedupe (stack/supp/supp-v2 → /supplements/),
+      // weekly dedupe (chronicle/weekly/recap → /chronicle/), and the Internal
+      // column trimmed of public-facing platform tooling. Pages all still exist
+      // — just unlinked from the public footer.
       { heading: 'The Practice', links: [
-        { href: '/stack/', text: 'The Stack' },
-        { href: '/protocols/', text: 'Protocols' },
         { href: '/supplements/', text: 'Supplements' },
-        { href: '/supplements/protocol/', text: 'Supp Protocol (v2)' },
+        { href: '/protocols/', text: 'Protocols' },
         { href: '/experiments/', text: 'Experiments' },
         { href: '/challenges/',  text: 'Challenges' },
         { href: '/discoveries/', text: 'Discoveries' },
@@ -223,15 +228,11 @@
       ]},
       { heading: 'The Chronicle', links: [
         { href: '/chronicle/', text: 'Chronicle' },
-        { href: '/weekly/', text: 'Weekly Snapshots' },
-        { href: '/recap/', text: 'Weekly Recap' },
+        { href: '/chronicle/archive/', text: 'Archive' },
         { href: '/ask/', text: 'Ask the Data' },
         { href: '/subscribe/', text: 'Subscribe' },
       ]},
-      { heading: 'Internal', links: [
-        { href: '/status/', text: 'System Status', id: 'footer-status-link' },
-        { href: 'https://dash.averagejoematt.com/clinical.html', text: 'Clinician View', locked: true, external: true },
-        { href: '/accountability/', text: 'Buddy Dashboard' },
+      { heading: 'Connect', links: [
         { href: 'https://discord.gg/T4Ndt2WsU', text: 'Join the community', external: true, community: true },
         { href: '/rss.xml', text: 'RSS Feed' },
         { href: '/ledger/', text: 'Snake Fund' },

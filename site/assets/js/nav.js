@@ -175,7 +175,8 @@
     '/':              ['/story/', '/about/', '/first-person/'],
     // v2 Stage 1: badges now anchored to /observatory/ for the data domain cluster.
     '/observatory/':  ['/observatory/', '/sleep/', '/glucose/', '/nutrition/', '/training/', '/physical/', '/mind/', '/labs/', '/benchmarks/', '/explorer/'],
-    '/stack/':        ['/stack/', '/protocols/', '/supplements/', '/experiments/', '/challenges/', '/discoveries/'],
+    // v2 Stage 3 (2026-05-31): /stack/ redirects to /supplements/; slot anchor moved.
+    '/supplements/':  ['/supplements/', '/protocols/', '/experiments/', '/challenges/', '/discoveries/'],
     '/live/':         ['/live/', '/character/', '/habits/', '/accountability/'],
     '/chronicle/':    ['/chronicle/', '/chronicle/archive/', '/weekly/', '/ask/', '/subscribe/'],
   };
@@ -236,7 +237,9 @@
     '/habits/':             { href: '/accountability/',   title: 'Accountability \u2192',          sub: 'The public commitment' },
     '/accountability/':     { href: '/sleep/',            title: 'The Evidence \u2192',            sub: 'Start with sleep data' },
     // The Practice flow
-    '/stack/':              { href: '/protocols/',        title: 'Protocols \u2192',              sub: 'The strategy layer beneath the stack' },
+    // v2 Stage 3: /stack/ redirects to /supplements/; throughline now anchored
+    // on /supplements/ \u2192 /protocols/.
+    '/supplements/':        { href: '/protocols/',        title: 'Protocols \u2192',              sub: 'The strategy layer beneath the supplements' },
     '/protocols/':          { href: '/experiments/',      title: 'Experiments \u2192',            sub: 'What\u2019s being actively tested' },
     '/supplements/':        { href: '/protocols/',        title: 'All Protocols \u2192',          sub: 'Sleep, training, nutrition, supplements' },
     '/experiments/':        { href: '/challenges/',       title: 'Challenges \u2192',             sub: 'Action-oriented goals from the data' },
