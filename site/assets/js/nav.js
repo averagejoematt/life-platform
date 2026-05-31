@@ -91,10 +91,13 @@
   var path = window.location.pathname;
   // Map bottom nav hrefs to the full set of paths each owns
   var BOTTOM_NAV_OWNS = {
-    '/':           ['/', '/story/', '/about/'],
-    '/sleep/':     ['/sleep/', '/glucose/', '/nutrition/', '/training/', '/physical/', '/mind/', '/benchmarks/', '/explorer/'],
-    '/live/':      ['/live/', '/character/', '/habits/', '/accountability/'],
-    '/chronicle/': ['/chronicle/', '/weekly/', '/ask/', '/subscribe/'],
+    '/':              ['/', '/story/', '/about/'],
+    // v2 Stage 1: bottom-nav slot now points at the Observatory hub; the 8
+    // dispatches + /explorer/ still highlight that slot since they live in
+    // the same domain cluster.
+    '/observatory/':  ['/observatory/', '/sleep/', '/glucose/', '/nutrition/', '/training/', '/physical/', '/mind/', '/labs/', '/benchmarks/', '/explorer/'],
+    '/live/':         ['/live/', '/character/', '/habits/', '/accountability/'],
+    '/chronicle/':    ['/chronicle/', '/weekly/', '/ask/', '/subscribe/'],
   };
   var bottomLinks = document.querySelectorAll('.bottom-nav__link:not(.bottom-nav__more)');
   bottomLinks.forEach(function(link) {
@@ -169,11 +172,12 @@
   // ── GAM-01 / DPR-1.20: Since Your Last Visit badges (per-page tracking) ──
   // Bottom nav → which paths it owns (6-section IA, Decision 1c)
   var BADGE_MAP = {
-    '/':           ['/story/', '/about/', '/first-person/'],
-    '/sleep/':     ['/sleep/', '/glucose/', '/nutrition/', '/training/', '/physical/', '/mind/', '/benchmarks/', '/explorer/'],
-    '/stack/':     ['/stack/', '/protocols/', '/supplements/', '/experiments/', '/challenges/', '/discoveries/'],
-    '/live/':      ['/live/', '/character/', '/habits/', '/accountability/'],
-    '/chronicle/': ['/chronicle/', '/chronicle/archive/', '/weekly/', '/ask/', '/subscribe/'],
+    '/':              ['/story/', '/about/', '/first-person/'],
+    // v2 Stage 1: badges now anchored to /observatory/ for the data domain cluster.
+    '/observatory/':  ['/observatory/', '/sleep/', '/glucose/', '/nutrition/', '/training/', '/physical/', '/mind/', '/labs/', '/benchmarks/', '/explorer/'],
+    '/stack/':        ['/stack/', '/protocols/', '/supplements/', '/experiments/', '/challenges/', '/discoveries/'],
+    '/live/':         ['/live/', '/character/', '/habits/', '/accountability/'],
+    '/chronicle/':    ['/chronicle/', '/chronicle/archive/', '/weekly/', '/ask/', '/subscribe/'],
   };
 
   try {

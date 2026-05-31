@@ -100,14 +100,18 @@ Each consolidation stage adds entries here. On rollback, the routes listed
 below MUST be tombstoned (Step 3 above) — they don't exist in v1 and would
 otherwise 404 on the live site.
 
-*(none yet — Stage 0 only ships infra/branch, no new routes)*
+**Stage 1 (Observatory hub, 2026-05-31):**
+  - `/observatory/index.html` — new hub. On rollback, tombstone:
+    `aws s3 cp /dev/null s3://matthew-life-platform/site/observatory/index.html`
+
+*(Stage 1 only adds the hub route. All 8 dispatch sub-pages remain live at their original URLs per the brief's "keep sub-pages for rollback" call.)*
 
 ---
 
 ## Stage status
 
 - [x] **Stage 0** — tag `site-v1` + branch `redesign/v2-consolidation` + this runbook (2026-05-31)
-- [ ] Stage 1 — Observatory hub
+- [x] **Stage 1** — Observatory hub at `/observatory/`; nav collapsed 8 dispatches → 1 entry (2026-05-31)
 - [ ] Stage 2 — How It Works absorbs explainers
 - [ ] Stage 3 — Supplement + weekly dedupe + footer cleanup
 - [ ] Stage 4 — ~13-spine nav rebuild + final verification
