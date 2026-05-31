@@ -33,15 +33,11 @@
       { href: '/field-notes/',   text: 'Field Notes' },
       { href: '/first-person/',  text: 'First Person' },
     ]},
-    { label: 'The Data', items: [
-      { href: '/sleep/',       text: 'Sleep' },
-      { href: '/glucose/',     text: 'Glucose' },
-      { href: '/nutrition/',   text: 'Nutrition' },
-      { href: '/training/',    text: 'Training' },
-      { href: '/physical/',   text: 'Physical' },
-      { href: '/mind/',        text: 'Inner Life' },
-      { href: '/labs/',        text: 'Labs' },
-      { href: '/benchmarks/',  text: 'Benchmarks' },
+    // v2 Stage 1 (2026-05-31): 8 dispatches collapsed into one Observatory entry.
+    // Sub-pages remain live + reachable from /observatory/ hub for rollback (brief
+    // requirement). Explorer kept here since it is cross-domain, not a dispatch.
+    { label: 'The Observatory', items: [
+      { href: '/observatory/', text: 'Observatory hub' },
       { href: '/explorer/',    text: 'Data Explorer' },
     ]},
     { label: 'The Pulse', items: [
@@ -200,14 +196,8 @@
         { href: '/mission/', text: 'The Mission' },
         { href: '/field-notes/', text: 'Field Notes' },
       ]},
-      { heading: 'The Data', links: [
-        { href: '/sleep/', text: 'Sleep' },
-        { href: '/glucose/', text: 'Glucose' },
-        { href: '/nutrition/', text: 'Nutrition' },
-        { href: '/training/', text: 'Training' },
-        { href: '/mind/', text: 'Inner Life' },
-        { href: '/labs/', text: 'Labs' },
-        { href: '/benchmarks/', text: 'Benchmarks' },
+      { heading: 'The Observatory', links: [
+        { href: '/observatory/', text: 'Observatory hub' },
         { href: '/explorer/', text: 'Data Explorer' },
       ]},
       { heading: 'The Pulse', links: [
