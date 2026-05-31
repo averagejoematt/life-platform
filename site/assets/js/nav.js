@@ -91,10 +91,13 @@
   var path = window.location.pathname;
   // Map bottom nav hrefs to the full set of paths each owns
   var BOTTOM_NAV_OWNS = {
-    '/':           ['/', '/story/', '/about/'],
-    '/sleep/':     ['/sleep/', '/glucose/', '/nutrition/', '/training/', '/physical/', '/mind/', '/benchmarks/', '/explorer/'],
-    '/live/':      ['/live/', '/character/', '/habits/', '/accountability/'],
-    '/chronicle/': ['/chronicle/', '/weekly/', '/ask/', '/subscribe/'],
+    '/':              ['/', '/story/', '/about/'],
+    // v2 Stage 1: bottom-nav slot now points at the Observatory hub; the 8
+    // dispatches + /explorer/ still highlight that slot since they live in
+    // the same domain cluster.
+    '/observatory/':  ['/observatory/', '/sleep/', '/glucose/', '/nutrition/', '/training/', '/physical/', '/mind/', '/labs/', '/benchmarks/', '/explorer/'],
+    '/live/':         ['/live/', '/character/', '/habits/', '/accountability/'],
+    '/chronicle/':    ['/chronicle/', '/weekly/', '/ask/', '/subscribe/'],
   };
   var bottomLinks = document.querySelectorAll('.bottom-nav__link:not(.bottom-nav__more)');
   bottomLinks.forEach(function(link) {
@@ -169,11 +172,13 @@
   // ── GAM-01 / DPR-1.20: Since Your Last Visit badges (per-page tracking) ──
   // Bottom nav → which paths it owns (6-section IA, Decision 1c)
   var BADGE_MAP = {
-    '/':           ['/story/', '/about/', '/first-person/'],
-    '/sleep/':     ['/sleep/', '/glucose/', '/nutrition/', '/training/', '/physical/', '/mind/', '/benchmarks/', '/explorer/'],
-    '/stack/':     ['/stack/', '/protocols/', '/supplements/', '/experiments/', '/challenges/', '/discoveries/'],
-    '/live/':      ['/live/', '/character/', '/habits/', '/accountability/'],
-    '/chronicle/': ['/chronicle/', '/chronicle/archive/', '/weekly/', '/ask/', '/subscribe/'],
+    '/':              ['/story/', '/about/', '/first-person/'],
+    // v2 Stage 1: badges now anchored to /observatory/ for the data domain cluster.
+    '/observatory/':  ['/observatory/', '/sleep/', '/glucose/', '/nutrition/', '/training/', '/physical/', '/mind/', '/labs/', '/benchmarks/', '/explorer/'],
+    // v2 Stage 3 (2026-05-31): /stack/ redirects to /supplements/; slot anchor moved.
+    '/supplements/':  ['/supplements/', '/protocols/', '/experiments/', '/challenges/', '/discoveries/'],
+    '/live/':         ['/live/', '/character/', '/habits/', '/accountability/'],
+    '/chronicle/':    ['/chronicle/', '/chronicle/archive/', '/weekly/', '/ask/', '/subscribe/'],
   };
 
   try {
@@ -232,18 +237,20 @@
     '/habits/':             { href: '/accountability/',   title: 'Accountability \u2192',          sub: 'The public commitment' },
     '/accountability/':     { href: '/sleep/',            title: 'The Evidence \u2192',            sub: 'Start with sleep data' },
     // The Practice flow
-    '/stack/':              { href: '/protocols/',        title: 'Protocols \u2192',              sub: 'The strategy layer beneath the stack' },
+    // v2 Stage 3: /stack/ redirects to /supplements/; throughline now anchored
+    // on /supplements/ \u2192 /protocols/.
+    '/supplements/':        { href: '/protocols/',        title: 'Protocols \u2192',              sub: 'The strategy layer beneath the supplements' },
     '/protocols/':          { href: '/experiments/',      title: 'Experiments \u2192',            sub: 'What\u2019s being actively tested' },
     '/supplements/':        { href: '/protocols/',        title: 'All Protocols \u2192',          sub: 'Sleep, training, nutrition, supplements' },
     '/experiments/':        { href: '/challenges/',       title: 'Challenges \u2192',             sub: 'Action-oriented goals from the data' },
     '/challenges/':         { href: '/discoveries/',      title: 'Discoveries \u2192',            sub: 'What the data proved' },
-    '/discoveries/':        { href: '/intelligence/',     title: 'The Intelligence Layer \u2192',  sub: 'How the AI finds these patterns' },
+    '/discoveries/':        { href: '/platform/#the-ai',  title: 'The Intelligence Layer \u2192',  sub: 'How the AI finds these patterns' },
     // The Platform flow
-    '/platform/':           { href: '/intelligence/',     title: 'The AI \u2192',                 sub: 'What the intelligence layer actually does' },
-    '/intelligence/':       { href: '/board/',            title: 'AI Board \u2192',               sub: 'The advisory personas shaping this platform' },
-    '/board/':              { href: '/board/technical/',  title: 'Technical Board \u2192',        sub: '12 personas keeping the architecture honest' },
-    '/board/technical/':    { href: '/board/product/',    title: 'Product Board \u2192',          sub: '8 personas shaping what this site becomes' },
-    '/board/product/':      { href: '/methodology/',      title: 'Methodology \u2192',            sub: 'How the science works' },
+    // v2 Stage 2: intelligence/board/coaches absorbed into /platform/ as
+    // anchored sections. Old per-page reading paths collapsed to a single
+    // platform\u2192methodology hand-off; the in-page sections are reachable via
+    // anchor links from the Platform CTA grid.
+    '/platform/':           { href: '/methodology/',      title: 'Methodology \u2192',            sub: 'The credibility anchor \u2014 Pearson r, BH-FDR, N=1' },
     '/methodology/':        { href: '/cost/',             title: 'The Real Cost \u2192',          sub: 'Running a full health OS for $19/month' },
     '/cost/':               { href: '/tools/',            title: 'Tools \u2192',                  sub: 'Every tool in the platform' },
     '/tools/':              { href: '/builders/',         title: 'For Builders \u2192',           sub: 'Build your own health platform' },

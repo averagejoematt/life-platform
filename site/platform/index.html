@@ -666,7 +666,7 @@
   <div>
     <div style="text-align:center;padding:var(--space-8) 0;">
       <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-3);">The platform runs 14 intelligence systems every morning.</div>
-      <a href="/intelligence/" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-tag);">See what the AI does &rarr;</a>
+      <a href="/platform/#the-ai" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-tag);">See what the AI does &rarr;</a>
     </div>
   </div>
 </section>
@@ -848,12 +848,152 @@
   <span class="zone-divider__sub">every page · every data stream · every tool</span>
 </div>
 
+<!-- ──────────────────────────────────────────────────────────────────────
+     v2 Stage 2 (2026-05-31): three explainer pages absorbed as sections.
+     Originals archived to site/archive/v1/{intelligence,board,coaches}/
+     and 301-redirected to the anchors below. Methodology stays standalone
+     per Brandt/Lena hard-gate; the Character-page methodology duplicate is
+     removed in this same commit.
+     ────────────────────────────────────────────────────────────────────── -->
+
+<!-- ── The AI (was /intelligence/) ─────────────────────────────────────── -->
+<section class="reveal" id="the-ai" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">The AI</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">14 intelligence systems running every day</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);max-width:680px;margin-bottom:var(--space-8)">
+    Correlation engine. Hypothesis generator. Adaptive mode. Metabolic-adaptation detector. Anomaly scanner. Each one runs on a schedule, writes structured findings to a single record, and surfaces in the morning brief. The architecture is documented above; this is what those Lambdas actually <em>do</em>.
+  </p>
+
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border);border:1px solid var(--border);">
+    <div style="background:var(--surface);padding:var(--space-6)">
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2)">Correlation Engine</div>
+      <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.6;margin:0">Weekly Pearson r across all measured variables, Benjamini–Hochberg-corrected at p&lt;0.05. Flags the top 3 non-trivial relationships and the 3 it specifically rules out.</p>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6)">
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2)">Hypothesis Generator</div>
+      <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.6;margin:0">Reads the unified record, drafts testable hypotheses with priors, tracks each one to confirmation/refutation/abandonment. Visible on the Intelligence page.</p>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6)">
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2)">Adaptive Mode</div>
+      <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.6;margin:0">Senses whether today is a flourishing / standard / struggling day from sleep, HRV, mood, and adherence — and shifts the brief's tone + asks accordingly.</p>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6)">
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2)">Metabolic Adaptation Detector</div>
+      <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.6;margin:0">Watches for the divergence between expected and actual weight loss given the deficit. Surfaces a flag, not a verdict; pairs it with what to ask next.</p>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6)">
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2)">Anomaly Scanner</div>
+      <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.6;margin:0">Per-metric residuals against the 30-day baseline. Anything &gt;2σ ends up in the brief with the contextual signal that should have predicted it (or didn't).</p>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6)">
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2)">+ 9 more</div>
+      <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.6;margin:0">Character engine, journal enrichment, freshness checker, cost governor, budget guard, predictions ledger, cycle-pause sentinel, daily-brief composer, board orchestrator.</p>
+    </div>
+  </div>
+
+  <p style="font-size:var(--text-sm);color:var(--text-muted);margin-top:var(--space-6)">
+    <a href="/archive/v1/intelligence/" style="color:var(--accent);font-family:var(--font-mono);font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase">Read the full Intelligence essay →</a>
+  </p>
+</section>
+
+<!-- ── AI Board (was /board/) ──────────────────────────────────────────── -->
+<section class="reveal" id="ai-board" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">The Board</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Six advisors. One question.</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);max-width:680px;margin-bottom:var(--space-8)">
+    The AI Board is the cross-disciplinary panel the platform consults when a question is too complex for a single coach. Each advisor reads the same unified record but answers from their own domain. Disagreements are surfaced, not hidden — that's the point.
+  </p>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border)">
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Dr. Henning Brandt</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Biostatistics · N=1 research</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Dr. Amara Patel</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Metabolic health · CGM</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Dr. Lisa Park</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Sleep · circadian rhythm</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Dr. Marcus Webb</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Evidence-based nutrition</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Dr. Sarah Chen</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Exercise physiology · strength</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Dr. Nathan Reeves</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Psychiatry · behavioral patterns</div>
+    </div>
+  </div>
+
+  <p style="font-size:var(--text-sm);color:var(--text-muted);margin-top:var(--space-6)">
+    Each advisor's perspective is rendered by Bedrock Claude (Sonnet for narrative, Haiku for structured) with the same prompt template, the same data context, and explicit instructions never to defer to consensus. The point is to <em>see</em> them disagree.
+    &nbsp;
+    <a href="/archive/v1/board/" style="color:var(--accent);font-family:var(--font-mono);font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase">Ask the Board →</a>
+  </p>
+</section>
+
+<!-- ── Coaching Team (was /coaches/) ───────────────────────────────────── -->
+<section class="reveal" id="coaching-team" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">The Coaches</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Eight specialists, one body</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);max-width:680px;margin-bottom:var(--space-8)">
+    The coaching team is the daily layer — eight domain specialists who each track their slice of the unified record and write a paragraph in the morning brief. Unlike the Board (consulted), the Coaches are <em>always on</em>.
+  </p>
+
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border)">
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Sleep</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Dr. Lisa Park</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Nutrition</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Dr. Marcus Webb</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Training</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Dr. Sarah Chen</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Mind</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Dr. Nathan Reeves</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Physical</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Dr. Victor Reyes</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Glucose</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Dr. Amara Patel</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Labs</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Dr. James Okafor</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Explorer</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Dr. Henning Brandt</div>
+    </div>
+  </div>
+
+  <p style="font-size:var(--text-sm);color:var(--text-muted);margin-top:var(--space-6)">
+    Each coach runs as a separate Lambda. Shared context (yesterday's brief, the 7-day window, current goal) is cached for prompt-caching efficiency. Outputs go through a quality gate before the orchestrator stitches them into the brief.
+    &nbsp;
+    <a href="/archive/v1/coaches/" style="color:var(--accent);font-family:var(--font-mono);font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase">Open the live coaching dashboard →</a>
+  </p>
+</section>
+
 <!-- Explore deeper CTA (replaces hub grid) -->
 <section class="reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);text-align:center;">
   <div class="eyebrow" style="margin-bottom:var(--space-4)">Go deeper</div>
   <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-6)">Explore the Build</h2>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);max-width:800px;margin:0 auto;">
-    <a href="/intelligence/" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+    <a href="/platform/#the-ai" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
       <div style="font-size:24px;margin-bottom:var(--space-2)">🤖</div>
       <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">The AI</div>
       <div style="font-size:var(--text-2xs);color:var(--text-faint)">14 systems running daily</div>
@@ -863,7 +1003,7 @@
       <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">The Cost</div>
       <div style="font-size:var(--text-2xs);color:var(--text-faint)">Every line item, explained</div>
     </a>
-    <a href="/board/" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+    <a href="/platform/#ai-board" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
       <div style="font-size:24px;margin-bottom:var(--space-2)">🎯</div>
       <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Ask the Board</div>
       <div style="font-size:var(--text-2xs);color:var(--text-faint)">6 AI advisors, one question</div>
@@ -899,7 +1039,7 @@
     <span class="reading-path-v2__dir">← Previous</span>
     <span class="reading-path-v2__title">Discoveries</span>
   </a>
-  <a href="/intelligence/" class="reading-path-v2__link reading-path-v2__link--next">
+  <a href="/platform/#the-ai" class="reading-path-v2__link reading-path-v2__link--next">
     <span class="reading-path-v2__dir">Next →</span>
     <span class="reading-path-v2__title">The AI</span>
   </a>

@@ -1576,24 +1576,28 @@
 </section>
 
 <!-- ═══ METHODOLOGY ═══ -->
+<!-- v2 Stage 2 (2026-05-31): the long pillar-weights essay that used to sit here
+     was duplicated from /methodology/ — the canonical home. Replaced with a
+     one-paragraph pointer + the score-mechanics deep-dive ("THE MATH" below)
+     which IS character-specific and stays. -->
 <section class="method-section reveal" id="method-section">
   <div class="eyebrow">Methodology</div>
   <h2 class="text-h3" style="color:var(--text)">How the score works</h2>
   <div class="method-grid">
     <div>
       <p>Every night, 26 data sources — wearables, food logs, habit trackers, blood work, journals — feed a scoring engine. No self-reporting. The engine grades yesterday across 7 pillars and updates the character level.</p>
-      <p>Leveling up isn't about having one great day. It requires <strong>sustained performance</strong> — consecutive days above your current level. And the higher you climb, the longer you have to prove it. Early levels come in days. Higher levels take weeks. The top requires months of consistency across every pillar.</p>
-      <p>Leveling down is harder than leveling up. The system is designed to reward progress, not punish bad days. A rough week won't erase months of work — but a rough month will get your attention.</p>
+      <p>Pillar weights, source attributions, and the statistical framework (Pearson r, Benjamini–Hochberg FDR at p&lt;0.05) live on the dedicated <a href="/methodology/">Methodology</a> page — the credibility anchor. The character-specific scoring mechanics (smoothing rates, level-change thresholds, the streak rules) stay below in <em>The Math</em>.</p>
     </div>
     <div class="sources-table">
-      <div class="sources-table__header">Pillar weights & sources</div>
-      <div class="sources-row"><span class="sources-row__name">Sleep <span style="color:var(--text-faint)">(20%)</span></span><span class="sources-row__desc">Whoop + Eight Sleep: duration, efficiency, deep/REM %, onset consistency</span></div>
-      <div class="sources-row"><span class="sources-row__name">Movement <span style="color:var(--text-faint)">(18%)</span></span><span class="sources-row__desc">Strava + Garmin + Apple: training frequency, Zone 2, load balance, steps</span></div>
-      <div class="sources-row"><span class="sources-row__name">Nutrition <span style="color:var(--text-faint)">(18%)</span></span><span class="sources-row__desc">MacroFactor + Withings: calorie/protein adherence, body composition progress</span></div>
-      <div class="sources-row"><span class="sources-row__name">Mind <span style="color:var(--text-faint)">(15%)</span></span><span class="sources-row__desc">Habitify + Notion + How We Feel: habits, journaling, emotional state, vices</span></div>
-      <div class="sources-row"><span class="sources-row__name">Metabolic <span style="color:var(--text-faint)">(12%)</span></span><span class="sources-row__desc">CGM + labs + Withings: glucose control, biomarkers, blood pressure, body fat</span></div>
-      <div class="sources-row"><span class="sources-row__name">Consistency <span style="color:var(--text-faint)">(10%)</span></span><span class="sources-row__desc">Cross-pillar balance, data completeness, streak maintenance</span></div>
-      <div class="sources-row"><span class="sources-row__name">Social <span style="color:var(--text-faint)">(7%)</span></span><span class="sources-row__desc">Journal-derived social interaction frequency and quality</span></div>
+      <div class="sources-table__header">Pillar weights</div>
+      <div class="sources-row"><span class="sources-row__name">Sleep</span><span class="sources-row__desc">20%</span></div>
+      <div class="sources-row"><span class="sources-row__name">Movement</span><span class="sources-row__desc">18%</span></div>
+      <div class="sources-row"><span class="sources-row__name">Nutrition</span><span class="sources-row__desc">18%</span></div>
+      <div class="sources-row"><span class="sources-row__name">Mind</span><span class="sources-row__desc">15%</span></div>
+      <div class="sources-row"><span class="sources-row__name">Metabolic</span><span class="sources-row__desc">12%</span></div>
+      <div class="sources-row"><span class="sources-row__name">Consistency</span><span class="sources-row__desc">10%</span></div>
+      <div class="sources-row"><span class="sources-row__name">Social</span><span class="sources-row__desc">7%</span></div>
+      <div style="margin-top:var(--space-3);font-size:var(--text-2xs);color:var(--text-faint)"><a href="/methodology/#pillar-sources" style="color:var(--accent)">Source attributions →</a></div>
     </div>
   </div>
 </section>
