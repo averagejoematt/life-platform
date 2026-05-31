@@ -26,57 +26,47 @@
 
   // ── Section mapping — 6-section IA (Decision 1a) ──────────
   var SECTIONS = [
-    { label: 'The Story', items: [
-      { href: '/',               text: 'Home' },
-      { href: '/story/',         text: 'My Story' },
-      { href: '/mission/',       text: 'The Mission' },
-      { href: '/field-notes/',   text: 'Field Notes' },
-      { href: '/first-person/',  text: 'First Person' },
+    // v2 Stage 4 (2026-05-31): primary nav rebuilt to the ~13-spine called
+    // for in the brief. Eight top-level destinations + utility (Methodology,
+    // About, Cost) reachable from cluster heads. Dropdowns retained per
+    // destination but trimmed to ~1-2 items each — the cluster head + the
+    // single most-important sibling. Deep discovery moves to footer + the
+    // cluster head pages themselves.
+    { label: 'Story', items: [
+      { href: '/',          text: 'Home' },
+      { href: '/story/',    text: 'My Story' },
+      { href: '/about/',    text: 'About' },
     ]},
-    // v2 Stage 1 (2026-05-31): 8 dispatches collapsed into one Observatory entry.
-    // Sub-pages remain live + reachable from /observatory/ hub for rollback (brief
-    // requirement). Explorer kept here since it is cross-domain, not a dispatch.
+    { label: 'The Pulse', items: [
+      { href: '/live/',         text: 'Today' },
+      { href: '/habits/',       text: 'Habits' },
+      { href: '/accountability/', text: 'Accountability' },
+    ]},
     { label: 'The Observatory', items: [
       { href: '/observatory/', text: 'Observatory hub' },
       { href: '/explorer/',    text: 'Data Explorer' },
     ]},
-    { label: 'The Pulse', items: [
-      { href: '/live/',           text: 'Today' },
-      { href: '/character/',      text: 'The Score' },
-      { href: '/habits/',         text: 'Habits' },
-      { href: '/accountability/', text: 'Accountability' },
+    { label: 'The Score', items: [
+      { href: '/character/', text: 'Character Sheet' },
     ]},
-    // v2 Stage 3 (2026-05-31): supplements trio collapsed to one canonical
-    // entry. /stack/ + /supplements/protocol/ redirect to /supplements/;
-    // originals archived.
-    { label: 'The Practice', groups: [
-      { heading: 'The System', items: [
-        { href: '/supplements/', text: 'Supplements' },
-        { href: '/protocols/',   text: 'Protocols' },
-      ]},
-      { heading: 'The Pipeline', items: [
-        { href: '/experiments/', text: 'Experiments' },
-        { href: '/challenges/',  text: 'Challenges' },
-        { href: '/discoveries/', text: 'Discoveries' },
-      ]},
+    { label: 'The Practice', items: [
+      { href: '/protocols/',   text: 'Protocols' },
+      { href: '/supplements/', text: 'Supplements' },
+      { href: '/experiments/', text: 'Experiments' },
+      { href: '/challenges/',  text: 'Challenges' },
+      { href: '/discoveries/', text: 'Discoveries' },
     ]},
-    // v2 Stage 2 (2026-05-31): The AI / AI Board / Coaching Team absorbed
-    // as sections within /platform/. Methodology stays standalone.
-    { label: 'The Platform', items: [
-      { href: '/platform/',     text: 'How It Works' },
-      { href: '/methodology/',  text: 'Methodology' },
-      { href: '/cost/',         text: 'Cost' },
-      { href: '/tools/',        text: 'Tools' },
-      { href: '/builders/',     text: 'For Builders' },
-    ]},
-    // v2 Stage 3 (2026-05-31): weekly trio collapsed to one Chronicle entry.
-    // /weekly/ + /recap/ redirect to /chronicle/; originals archived.
-    // Chronicle archive (per-week back issues) remains at /chronicle/archive/.
     { label: 'The Chronicle', items: [
       { href: '/chronicle/',         text: 'Chronicle' },
       { href: '/chronicle/archive/', text: 'Archive' },
       { href: '/ask/',               text: 'Ask the Data' },
-      { href: '/subscribe/',         text: 'Subscribe' },
+    ]},
+    { label: 'How It Works', items: [
+      { href: '/platform/',    text: 'How It Works' },
+      { href: '/methodology/', text: 'Methodology' },
+      { href: '/cost/',        text: 'Cost' },
+      { href: '/tools/',       text: 'Tools' },
+      { href: '/builders/',    text: 'For Builders' },
     ]},
   ];
 
