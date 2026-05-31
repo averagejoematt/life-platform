@@ -145,6 +145,7 @@ already existed in v1; the redirect HTML just replaces the original index.
 - [x] **Stage 1** — Observatory hub at `/observatory/`; nav collapsed 8 dispatches → 1 entry (2026-05-31)
 - [x] **Stage 2** — How It Works absorbs The AI + AI Board + Coaching Team; Character methodology dup pointed at standalone /methodology/ (2026-05-31)
 - [x] **Stage 3** — Supplement trio → /supplements/ (stack + supp/protocol redirect); weekly trio → /chronicle/ (weekly + recap redirect); footer Internal column dropped (2026-05-31)
+- [x] **Stage 4** — Top nav rebuilt to flat 8-spine (Story · Pulse · Observatory · Score · Practice · Chronicle · How It Works · Subscribe); 49-route crawl clean: 36 full + 13 redirects + 0 missing (2026-05-31)
 - [ ] Stage 3 — Supplement + weekly dedupe + footer cleanup
 - [ ] Stage 4 — ~13-spine nav rebuild + final verification
 
