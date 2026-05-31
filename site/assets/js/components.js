@@ -26,59 +26,47 @@
 
   // ── Section mapping — 6-section IA (Decision 1a) ──────────
   var SECTIONS = [
-    { label: 'The Story', items: [
-      { href: '/',               text: 'Home' },
-      { href: '/story/',         text: 'My Story' },
-      { href: '/mission/',       text: 'The Mission' },
-      { href: '/field-notes/',   text: 'Field Notes' },
-      { href: '/first-person/',  text: 'First Person' },
-    ]},
-    { label: 'The Data', items: [
-      { href: '/sleep/',       text: 'Sleep' },
-      { href: '/glucose/',     text: 'Glucose' },
-      { href: '/nutrition/',   text: 'Nutrition' },
-      { href: '/training/',    text: 'Training' },
-      { href: '/physical/',   text: 'Physical' },
-      { href: '/mind/',        text: 'Inner Life' },
-      { href: '/labs/',        text: 'Labs' },
-      { href: '/benchmarks/',  text: 'Benchmarks' },
-      { href: '/explorer/',    text: 'Data Explorer' },
+    // v2 Stage 4 (2026-05-31): primary nav rebuilt to the ~13-spine called
+    // for in the brief. Eight top-level destinations + utility (Methodology,
+    // About, Cost) reachable from cluster heads. Dropdowns retained per
+    // destination but trimmed to ~1-2 items each — the cluster head + the
+    // single most-important sibling. Deep discovery moves to footer + the
+    // cluster head pages themselves.
+    { label: 'Story', items: [
+      { href: '/',          text: 'Home' },
+      { href: '/story/',    text: 'My Story' },
+      { href: '/about/',    text: 'About' },
     ]},
     { label: 'The Pulse', items: [
-      { href: '/live/',           text: 'Today' },
-      { href: '/character/',      text: 'The Score' },
-      { href: '/habits/',         text: 'Habits' },
+      { href: '/live/',         text: 'Today' },
+      { href: '/habits/',       text: 'Habits' },
       { href: '/accountability/', text: 'Accountability' },
     ]},
-    { label: 'The Practice', groups: [
-      { heading: 'The System', items: [
-        { href: '/stack/',       text: 'The Stack' },
-        { href: '/protocols/',   text: 'Protocols' },
-        { href: '/supplements/', text: 'Supplements' },
-        { href: '/supplements/protocol/', text: 'Supp Protocol (v2)' },
-      ]},
-      { heading: 'The Pipeline', items: [
-        { href: '/experiments/', text: 'Experiments' },
-        { href: '/challenges/',  text: 'Challenges' },
-        { href: '/discoveries/', text: 'Discoveries' },
-      ]},
+    { label: 'The Observatory', items: [
+      { href: '/observatory/', text: 'Observatory hub' },
+      { href: '/explorer/',    text: 'Data Explorer' },
     ]},
-    { label: 'The Platform', items: [
-      { href: '/platform/',     text: 'How It Works' },
-      { href: '/intelligence/', text: 'The AI' },
-      { href: '/board/',        text: 'AI Board' },
-      { href: '/coaches/',      text: 'Coaching Team' },
-      { href: '/methodology/',  text: 'Methodology' },
-      { href: '/cost/',         text: 'Cost' },
-      { href: '/tools/',        text: 'Tools' },
-      { href: '/builders/',     text: 'For Builders' },
+    { label: 'The Score', items: [
+      { href: '/character/', text: 'Character Sheet' },
+    ]},
+    { label: 'The Practice', items: [
+      { href: '/protocols/',   text: 'Protocols' },
+      { href: '/supplements/', text: 'Supplements' },
+      { href: '/experiments/', text: 'Experiments' },
+      { href: '/challenges/',  text: 'Challenges' },
+      { href: '/discoveries/', text: 'Discoveries' },
     ]},
     { label: 'The Chronicle', items: [
-      { href: '/chronicle/', text: 'Chronicle' },
-      { href: '/weekly/',    text: 'Weekly Snapshots' },
-      { href: '/recap/',     text: 'Weekly Recap' },
-      { href: '/ask/',       text: 'Ask the Data' },
-      { href: '/subscribe/', text: 'Subscribe' },
+      { href: '/chronicle/',         text: 'Chronicle' },
+      { href: '/chronicle/archive/', text: 'Archive' },
+      { href: '/ask/',               text: 'Ask the Data' },
+    ]},
+    { label: 'How It Works', items: [
+      { href: '/platform/',    text: 'How It Works' },
+      { href: '/methodology/', text: 'Methodology' },
+      { href: '/cost/',        text: 'Cost' },
+      { href: '/tools/',       text: 'Tools' },
+      { href: '/builders/',    text: 'For Builders' },
     ]},
   ];
 
@@ -200,14 +188,8 @@
         { href: '/mission/', text: 'The Mission' },
         { href: '/field-notes/', text: 'Field Notes' },
       ]},
-      { heading: 'The Data', links: [
-        { href: '/sleep/', text: 'Sleep' },
-        { href: '/glucose/', text: 'Glucose' },
-        { href: '/nutrition/', text: 'Nutrition' },
-        { href: '/training/', text: 'Training' },
-        { href: '/mind/', text: 'Inner Life' },
-        { href: '/labs/', text: 'Labs' },
-        { href: '/benchmarks/', text: 'Benchmarks' },
+      { heading: 'The Observatory', links: [
+        { href: '/observatory/', text: 'Observatory hub' },
         { href: '/explorer/', text: 'Data Explorer' },
       ]},
       { heading: 'The Pulse', links: [
@@ -216,20 +198,19 @@
         { href: '/habits/', text: 'Habits' },
         { href: '/accountability/', text: 'Accountability' },
       ]},
+      // v2 Stage 3 (2026-05-31): supplements dedupe (stack/supp/supp-v2 → /supplements/),
+      // weekly dedupe (chronicle/weekly/recap → /chronicle/), and the Internal
+      // column trimmed of public-facing platform tooling. Pages all still exist
+      // — just unlinked from the public footer.
       { heading: 'The Practice', links: [
-        { href: '/stack/', text: 'The Stack' },
-        { href: '/protocols/', text: 'Protocols' },
         { href: '/supplements/', text: 'Supplements' },
-        { href: '/supplements/protocol/', text: 'Supp Protocol (v2)' },
+        { href: '/protocols/', text: 'Protocols' },
         { href: '/experiments/', text: 'Experiments' },
         { href: '/challenges/',  text: 'Challenges' },
         { href: '/discoveries/', text: 'Discoveries' },
       ]},
       { heading: 'The Platform', links: [
         { href: '/platform/', text: 'How It Works' },
-        { href: '/intelligence/', text: 'The AI' },
-        { href: '/board/', text: 'AI Board' },
-        { href: '/coaches/', text: 'Coaching Team' },
         { href: '/methodology/', text: 'Methodology' },
         { href: '/cost/', text: 'Cost' },
         { href: '/tools/', text: 'Tools' },
@@ -237,15 +218,11 @@
       ]},
       { heading: 'The Chronicle', links: [
         { href: '/chronicle/', text: 'Chronicle' },
-        { href: '/weekly/', text: 'Weekly Snapshots' },
-        { href: '/recap/', text: 'Weekly Recap' },
+        { href: '/chronicle/archive/', text: 'Archive' },
         { href: '/ask/', text: 'Ask the Data' },
         { href: '/subscribe/', text: 'Subscribe' },
       ]},
-      { heading: 'Internal', links: [
-        { href: '/status/', text: 'System Status', id: 'footer-status-link' },
-        { href: 'https://dash.averagejoematt.com/clinical.html', text: 'Clinician View', locked: true, external: true },
-        { href: '/accountability/', text: 'Buddy Dashboard' },
+      { heading: 'Connect', links: [
         { href: 'https://discord.gg/T4Ndt2WsU', text: 'Join the community', external: true, community: true },
         { href: '/rss.xml', text: 'RSS Feed' },
         { href: '/ledger/', text: 'Snake Fund' },

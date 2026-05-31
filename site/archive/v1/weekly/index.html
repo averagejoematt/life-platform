@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Weekly Snapshots — walk the entire journey, one week at a time. Empty weeks tell the story too.">
+  <meta property="og:title" content="Weekly Snapshots — Matthew">
+  <meta property="og:description" content="One page per week. The arc of a transformation, including the gaps.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-weekly.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta property="og:type" content="website">
+  <title>Weekly Snapshots — Matthew</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .snap-header {
+      padding: var(--space-16) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border); max-width: var(--max-width); margin: 0 auto;
+    }
+    .snap-header__kicker { margin-bottom: var(--space-4); }
+    .snap-header__title { font-family: var(--font-display); font-size: var(--text-h1); line-height: var(--lh-display); letter-spacing: var(--ls-display); color: var(--text); margin-bottom: var(--space-4); }
+    .snap-header__title span { color: var(--accent); }
+    .snap-header__sub { font-family: var(--font-mono); font-size: var(--text-base); color: var(--text-muted); line-height: var(--lh-body); max-width: 600px; }
+
+    /* Week navigation */
+    .week-nav { max-width: var(--max-width); margin: 0 auto; padding: var(--space-6) var(--page-padding); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+    .week-nav__btn { background: none; border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-xs); padding: var(--space-2) var(--space-4); cursor: pointer; transition: all var(--dur-fast); letter-spacing: var(--ls-label); }
+    .week-nav__btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .week-nav__btn:disabled { opacity: 0.3; cursor: default; }
+    .week-nav__current { font-family: var(--font-display); font-size: 28px; color: var(--text); letter-spacing: var(--ls-display); text-align: center; }
+    .week-nav__dates { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-muted); letter-spacing: var(--ls-label); text-align: center; margin-top: var(--space-1); }
+
+    /* Snapshot body */
+    .snap-body { max-width: var(--max-width); margin: 0 auto; padding: var(--space-10) var(--page-padding) var(--space-20); }
+
+    /* Key numbers grid */
+    .key-nums { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); margin-bottom: var(--space-8); }
+    .key-num { background: var(--surface); padding: var(--space-6); text-align: center; }
+    .key-num__value { font-family: var(--font-display); font-size: 40px; color: var(--text); letter-spacing: var(--ls-display); line-height: 1; }
+    .key-num__value.accent { color: var(--accent); }
+    .key-num__delta { font-family: var(--font-mono); font-size: var(--text-xs); margin-top: var(--space-2); }
+    .key-num__delta.up { color: var(--accent); }
+    .key-num__delta.down { color: #ff5252; }
+    .key-num__delta.neutral { color: var(--text-muted); }
+    .key-num__label { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-top: var(--space-2); }
+
+    /* Heatmap strip */
+    .heat-strip { display: flex; gap: 2px; margin-bottom: var(--space-8); }
+    .heat-day { flex: 1; height: 28px; position: relative; transition: transform var(--dur-fast); }
+    .heat-day:hover { transform: scaleY(1.3); }
+    .heat-day.green { background: var(--accent); opacity: 0.9; }
+    .heat-day.amber { background: var(--c-yellow-status); opacity: 0.8; }
+    .heat-day.red { background: var(--c-red-status); opacity: 0.7; }
+    .heat-day.gray { background: var(--surface-raised); }
+    .heat-day__label { position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%); font-size:var(--text-3xs); color: var(--text-faint); font-family: var(--font-mono); letter-spacing: 0.05em; }
+
+    /* Sections */
+    .snap-section { border: 1px solid var(--border); background: var(--surface); margin-bottom: var(--space-6); }
+    .snap-section__header { padding: var(--space-5) var(--space-6); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .snap-section__title { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--accent-dim); }
+    .snap-section__badge { font-family: var(--font-mono); font-size: var(--text-2xs); padding: 2px var(--space-3); border: 1px solid var(--border); color: var(--text-muted); }
+    .snap-section__body { padding: var(--space-6); }
+    .snap-section__body p { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); line-height: var(--lh-mono); }
+    .snap-section__body p + p { margin-top: var(--space-3); }
+    .snap-section__body strong { color: var(--text); }
+
+    /* Pillar scores row */
+    .pillars-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border); }
+    .pillar-cell { background: var(--surface); padding: var(--space-4); text-align: center; }
+    .pillar-cell__emoji { font-size: 20px; margin-bottom: var(--space-1); }
+    .pillar-cell__score { font-family: var(--font-display); font-size: 20px; color: var(--text); letter-spacing: var(--ls-display); }
+    .pillar-cell__name { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-top: var(--space-1); }
+
+    /* Empty week */
+    .empty-week { text-align: center; padding: var(--space-20) 0; }
+    .empty-week__title { font-family: var(--font-display); font-size: var(--text-h2); color: var(--text-muted); letter-spacing: var(--ls-display); margin-bottom: var(--space-4); }
+    .empty-week__sub { font-family: var(--font-mono); font-size: var(--text-base); color: var(--text-faint); line-height: var(--lh-body); max-width: 480px; margin: 0 auto; }
+    .empty-week__quote { font-family: var(--font-serif); font-size: var(--text-lg); font-style: italic; color: var(--c-amber-400); margin-top: var(--space-8); max-width: 500px; margin-left: auto; margin-right: auto; line-height: var(--lh-body); }
+
+    /* Archive grid */
+    .archive-heading { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--accent-dim); margin-bottom: var(--space-5); margin-top: var(--space-12); }
+    .archive-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 3px; }
+    .archive-cell {
+      aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: var(--ls-label);
+      border: 1px solid var(--border-subtle); cursor: pointer; transition: all var(--dur-fast);
+    }
+    .archive-cell:hover { border-color: var(--accent); color: var(--accent); }
+    .archive-cell.active { border-color: var(--accent); background: var(--accent-bg-subtle); color: var(--accent); }
+    .archive-cell.has-data { color: var(--text); background: var(--surface); }
+    .archive-cell.no-data { color: var(--text-faint); background: var(--bg); }
+
+    @media (max-width: 768px) {
+      .key-nums { grid-template-columns: 1fr 1fr; }
+      .pillars-row { grid-template-columns: repeat(4, 1fr); }
+    }
+  </style>
+  <link rel="canonical" href="https://averagejoematt.com/weekly/">
+</head>
+<body>
+
+<div id="amj-nav"></div>
+<div id="amj-hierarchy-nav"></div>
+
+
+<div class="snap-header animate-in">
+  <div class="snap-header__kicker">The Chronicle</div>
+  <h1 class="snap-header__title">Weekly <span>Snapshots</span></h1>
+  <p class="snap-header__sub">Walk the entire journey, one week at a time. The empty weeks tell the story as much as the full ones.</p>
+</div>
+
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-3) var(--page-padding);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);border-bottom:1px solid var(--border);">
+  The data companion to <a href="/chronicle/" style="color:var(--accent);text-decoration:none;">The Chronicle</a>. Same week, different lens. &middot; <a href="/subscribe/" style="color:var(--accent);text-decoration:none;">Get both weekly</a>
+</div>
+
+<div class="week-nav" id="week-nav">
+  <button class="week-nav__btn" id="btn-prev">&larr; Previous</button>
+  <div>
+    <div class="week-nav__current" id="week-label">Loading&hellip;</div>
+    <div class="week-nav__dates" id="week-dates"></div>
+  </div>
+  <button class="week-nav__btn" id="btn-next">Next &rarr;</button>
+</div>
+
+<div class="snap-body">
+  <!-- DPR-2.12: Week at a Glance (merged from Recap) -->
+  <div id="week-glance" style="display:none;max-width:var(--max-width);margin:0 auto;padding:var(--space-6) var(--page-padding) var(--space-8);border-bottom:1px solid var(--border)">
+    <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent);margin-bottom:var(--space-3)">Week at a glance</div>
+    <div id="week-glance-headline" style="font-family:var(--font-display);font-size:var(--text-xl);color:var(--text);margin-bottom:var(--space-4)"></div>
+    <div id="week-glance-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:var(--space-4)"></div>
+  </div>
+
+  <!-- Key numbers -->
+  <div class="key-nums" id="key-nums" style="display:none"></div>
+
+  <!-- 7-day heatmap strip -->
+  <div class="heat-strip" id="heat-strip" style="display:none"></div>
+
+  <div id="heat-legend" style="max-width:var(--max-width);margin:0 auto;padding:0 var(--page-padding) var(--space-4);display:flex;gap:var(--space-4);font-family:var(--font-mono);font-size:var(--text-3xs);color:var(--text-faint);letter-spacing:var(--ls-tag);">
+    <span><span style="display:inline-block;width:10px;height:10px;background:var(--accent);vertical-align:middle;margin-right:3px;"></span> All core habits</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:var(--c-yellow-status);vertical-align:middle;margin-right:3px;"></span> Partial</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:var(--c-red-status);vertical-align:middle;margin-right:3px;"></span> Missed / poor recovery</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:var(--surface-raised);vertical-align:middle;margin-right:3px;"></span> No data</span>
+  </div>
+
+  <!-- Pillar scores -->
+  <div class="snap-section" id="pillars-section" style="display:none">
+    <div class="snap-section__header">
+      <div class="snap-section__title">Character Pillars</div>
+      <div class="snap-section__badge" id="char-level"></div>
+    </div>
+    <div class="pillars-row" id="pillars-row"></div>
+  </div>
+
+  <!-- Summary narrative -->
+  <div class="snap-section" id="summary-section" style="display:none">
+    <div class="snap-section__header"><div class="snap-section__title">Week Summary</div></div>
+    <div class="snap-section__body" id="summary-body"></div>
+  </div>
+
+  <!-- Notable events -->
+  <div class="snap-section" id="events-section" style="display:none">
+    <div class="snap-section__header"><div class="snap-section__title">Notable Events</div></div>
+    <div class="snap-section__body" id="events-body"></div>
+  </div>
+
+  <!-- Rest / Sick Days -->
+  <div class="snap-section" id="sick-days-section" style="display:none">
+    <div class="snap-section__header">
+      <div class="snap-section__title">Rest / Sick Days</div>
+    </div>
+    <div class="snap-section__body" id="sick-days-body">
+      <p>No sick or rest days this week.</p>
+    </div>
+  </div>
+
+  <!-- Empty week state -->
+  <div class="empty-week" id="empty-week" style="display:none">
+    <div class="empty-week__title">Silence</div>
+    <div class="empty-week__sub">No data this week. The gap is the story. Not every week gets logged, and that's honest.</div>
+    <div class="empty-week__quote">"The weeks I'm not logging, that's the report in itself."</div>
+  </div>
+
+  <!-- Archive grid -->
+  <div class="archive-heading">All weeks</div>
+  <div class="archive-grid" id="archive-grid"></div>
+</div>
+
+<!-- Email CTA -->
+<div id="amj-subscribe"></div>
+
+<!-- Reading path -->
+<div id="amj-reading-path"></div>
+
+<!-- Mobile bottom nav -->
+<div id="amj-bottom-nav"></div>
+
+<div id="amj-footer"></div>
+
+<script>
+(function() {
+  'use strict';
+
+  var JOURNEY_START = ((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25');
+  var DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  var PILLAR_EMOJI = {sleep:'\uD83D\uDE34',movement:'\uD83C\uDFCB\uFE0F',nutrition:'\uD83E\uDD57',metabolic:'\uD83D\uDCCA',mind:'\uD83E\uDDE0',relationships:'\uD83D\uDCAC',consistency:'\uD83C\uDFAF'};
+
+  // Week helpers
+  function getISOWeek(d) {
+    var dt = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    dt.setDate(dt.getDate() + 3 - (dt.getDay() + 6) % 7);
+    var yearStart = new Date(dt.getFullYear(), 0, 4);
+    var weekNum = 1 + Math.round(((dt - yearStart) / 86400000 - 3 + (yearStart.getDay() + 6) % 7) / 7);
+    return dt.getFullYear() + '-W' + String(weekNum).padStart(2,'0');
+  }
+
+  function weekStartEnd(weekStr) {
+    var parts = weekStr.split('-W');
+    var year = parseInt(parts[0]);
+    var week = parseInt(parts[1]);
+    var jan4 = new Date(year, 0, 4);
+    var d = new Date(jan4);
+    d.setDate(jan4.getDate() - (jan4.getDay() || 7) + 1 + (week - 1) * 7);
+    var start = new Date(d);
+    var end = new Date(d); end.setDate(end.getDate() + 6);
+    return { start: start, end: end };
+  }
+
+  function fmtDate(d) {
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  function allWeeks() {
+    var weeks = [];
+    var start = new Date(JOURNEY_START + 'T12:00:00');
+    var now = new Date();
+    var current = start;
+    while (current <= now) {
+      weeks.push(getISOWeek(current));
+      current = new Date(current); current.setDate(current.getDate() + 7);
+    }
+    // Deduplicate
+    return [...new Set(weeks)];
+  }
+
+  var weeks = allWeeks();
+  if (!weeks.length) {
+    var startD = new Date(JOURNEY_START + 'T12:00:00');
+    document.getElementById('week-label').textContent = 'Not yet started';
+    document.getElementById('week-dates').textContent = 'The journey begins ' + startD.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    document.getElementById('btn-prev').disabled = true;
+    document.getElementById('btn-next').disabled = true;
+    document.getElementById('empty-week').style.display = '';
+    return;
+  }
+  var currentIdx = weeks.length - 1;
+
+  // UI refs
+  var weekLabel = document.getElementById('week-label');
+  var weekDates = document.getElementById('week-dates');
+  var btnPrev = document.getElementById('btn-prev');
+  var btnNext = document.getElementById('btn-next');
+
+  function updateNav() {
+    var w = weeks[currentIdx];
+    var se = weekStartEnd(w);
+    var weekNum = currentIdx + 1;
+    weekLabel.textContent = 'Week ' + weekNum;
+    weekDates.textContent = fmtDate(se.start) + ' \u2013 ' + fmtDate(se.end) + ', ' + se.start.getFullYear();
+    btnPrev.disabled = currentIdx === 0;
+    btnNext.disabled = currentIdx === weeks.length - 1;
+
+    // Highlight archive cell
+    document.querySelectorAll('.archive-cell').forEach(function(c) {
+      c.classList.toggle('active', parseInt(c.dataset.idx) === currentIdx);
+    });
+
+    loadWeek(w);
+  }
+
+  btnPrev.addEventListener('click', function() { if (currentIdx > 0) { currentIdx--; updateNav(); } });
+  btnNext.addEventListener('click', function() { if (currentIdx < weeks.length - 1) { currentIdx++; updateNav(); } });
+
+  // Build archive grid
+  var archiveGrid = document.getElementById('archive-grid');
+  weeks.forEach(function(w, i) {
+    var cell = document.createElement('div');
+    cell.className = 'archive-cell has-data';
+    cell.dataset.idx = i;
+    cell.textContent = 'W' + (i + 1);
+    cell.addEventListener('click', function() { currentIdx = i; updateNav(); window.scrollTo({top: 0, behavior: 'smooth'}); });
+    archiveGrid.appendChild(cell);
+  });
+
+  function loadWeek(weekStr) {
+    // Use snapshot endpoint. Falls back to composing from vitals+character+habits
+    var se = weekStartEnd(weekStr);
+    var startStr = se.start.toISOString().split('T')[0];
+    var endStr = se.end.toISOString().split('T')[0];
+
+    // Fetch snapshot, vitals, character, habits, and waveform for this week
+    Promise.all([
+      fetch('/api/snapshot').then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; }),
+      fetch('/api/journey_waveform').then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; }),
+    ]).then(function(results) {
+      var snap = results[0];
+      var wave = results[1];
+
+      // Determine if we have data for this week
+      var hasData = false;
+
+      // Key numbers from snapshot
+      var keyNums = document.getElementById('key-nums');
+      var vitals = (snap && snap.vitals) ? (snap.vitals.vitals || {}) : {};
+      var journey = (snap && snap.journey) ? (snap.journey.journey || {}) : {};
+      var character = (snap && snap.character) ? {} : {};
+      var charData = (snap && snap.character) ? (snap.character.character || {}) : {};
+      var pillarsData = (snap && snap.character) ? (snap.character.pillars || []) : [];
+
+      // For the current week, show data. For past weeks, show what we have
+      var weight = vitals.weight_lbs || (journey.current_weight_lbs);
+      var hrv = vitals.hrv_ms;
+      var sleep = vitals.sleep_hours;
+      var recovery = vitals.recovery_pct;
+
+      if (weight || hrv || sleep || recovery) hasData = true;
+
+      // DPR-2.12: Week at a Glance (merged from Recap)
+      if (hasData) {
+        var glance = document.getElementById('week-glance');
+        var glanceHL = document.getElementById('week-glance-headline');
+        var glanceGrid = document.getElementById('week-glance-grid');
+        var lost = journey.lost_lbs || 0;
+        glanceHL.textContent = lost > 0 ? Math.round(lost) + ' lbs down. Day ' + (journey.days_in || '?') + '.' : 'Week ' + currentWeek;
+        var cards = [];
+        if (weight) cards.push({label:'Weight', val:Math.round(weight*10)/10+' lbs', color:'var(--accent)'});
+        if (hrv) cards.push({label:'HRV', val:Math.round(hrv)+'ms', color:'#60a5fa'});
+        if (sleep) cards.push({label:'Sleep', val:sleep.toFixed(1)+'h', color:'#818cf8'});
+        if (recovery) cards.push({label:'Recovery', val:Math.round(recovery)+'%', color:recovery>=67?'var(--accent)':recovery>=34?'var(--c-yellow-status)':'var(--c-red-status)'});
+        glanceGrid.innerHTML = cards.map(function(c){
+          return '<div style="text-align:center;padding:var(--space-4);border:1px solid var(--border);background:var(--surface)">' +
+            '<div style="font-family:var(--font-display);font-size:var(--text-xl);color:'+c.color+'">'+c.val+'</div>' +
+            '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:2px">'+c.label+'</div></div>';
+        }).join('');
+        glance.style.display = '';
+      }
+
+      // Compute week-over-week deltas from snapshot averages if available
+      var prevWeight = (snap && snap.vitals && snap.vitals.prev_weight_lbs) ? snap.vitals.prev_weight_lbs : null;
+      var prevHrv = (snap && snap.vitals && snap.vitals.prev_hrv_ms) ? snap.vitals.prev_hrv_ms : null;
+      var prevSleep = (snap && snap.vitals && snap.vitals.prev_sleep_hours) ? snap.vitals.prev_sleep_hours : null;
+      var prevRecovery = (snap && snap.vitals && snap.vitals.prev_recovery_pct) ? snap.vitals.prev_recovery_pct : null;
+
+      function deltaHtml(current, previous, unit, decimals, invertColor) {
+        if (current == null) return '<div class="key-num__delta neutral">\u2014</div>';
+        if (previous == null) return '<div class="key-num__delta neutral">no prior week</div>';
+        var diff = current - previous;
+        var sign = diff > 0 ? '+' : '';
+        var formatted = sign + diff.toFixed(decimals) + (unit || '');
+        // invertColor: true means lower is better (e.g. weight)
+        var cls = 'neutral';
+        if (Math.abs(diff) > 0.01) {
+          if (invertColor) {
+            cls = diff < 0 ? 'up' : 'down';
+          } else {
+            cls = diff > 0 ? 'up' : 'down';
+          }
+        }
+        return '<div class="key-num__delta ' + cls + '">' + formatted + ' vs last week</div>';
+      }
+
+      if (hasData) {
+        keyNums.innerHTML =
+          '<div class="key-num"><div class="key-num__value accent">' + (weight ? weight.toFixed(1) : '\u2014') + '</div>' + deltaHtml(weight, prevWeight, ' lbs', 1, true) + '<div class="key-num__label">Avg Weight (lbs)</div></div>' +
+          '<div class="key-num"><div class="key-num__value">' + (hrv ? hrv.toFixed(0) : '\u2014') + '</div>' + deltaHtml(hrv, prevHrv, ' ms', 0, false) + '<div class="key-num__label">Avg HRV (ms)</div></div>' +
+          '<div class="key-num"><div class="key-num__value">' + (sleep ? sleep.toFixed(1) : '\u2014') + '</div>' + deltaHtml(sleep, prevSleep, ' hrs', 1, false) + '<div class="key-num__label">Avg Sleep (hrs)</div></div>' +
+          '<div class="key-num"><div class="key-num__value">' + (recovery ? recovery.toFixed(0) + '%' : '\u2014') + '</div>' + deltaHtml(recovery, prevRecovery, '%', 0, false) + '<div class="key-num__label">Avg Recovery</div></div>';
+        keyNums.style.display = '';
+      } else {
+        keyNums.style.display = 'none';
+      }
+
+      // Heatmap strip from waveform data (filter to this week's dates)
+      var heatStrip = document.getElementById('heat-strip');
+      if (wave && wave.days) {
+        var weekDays = wave.days.filter(function(d) { return d.date >= startStr && d.date <= endStr; });
+        if (weekDays.length > 0) {
+          hasData = true;
+          heatStrip.innerHTML = weekDays.map(function(d, i) {
+            var dayLabel = DAYS[i] || '';
+            return '<div class="heat-day ' + d.color + '" title="' + d.date + ': ' + (d.score != null ? d.score : 'no data') + '"><div class="heat-day__label">' + dayLabel + '</div></div>';
+          }).join('');
+          heatStrip.style.display = '';
+        } else {
+          heatStrip.style.display = 'none';
+        }
+      } else {
+        heatStrip.style.display = 'none';
+      }
+
+      // Pillar scores
+      var pillarsSection = document.getElementById('pillars-section');
+      if (pillarsData.length && charData.level) {
+        hasData = true;
+        document.getElementById('char-level').textContent = 'Level ' + Math.floor(charData.level) + ' \u00b7 ' + (charData.tier || 'Foundation');
+        document.getElementById('pillars-row').innerHTML = pillarsData.map(function(p) {
+          return '<div class="pillar-cell"><div class="pillar-cell__emoji">' + (PILLAR_EMOJI[p.name] || '') + '</div><div class="pillar-cell__score">' + p.raw_score.toFixed(0) + '</div><div class="pillar-cell__name">' + p.name + '</div></div>';
+        }).join('');
+        pillarsSection.style.display = '';
+      } else {
+        pillarsSection.style.display = 'none';
+      }
+
+      // Summary section (auto-generated narrative)
+      var summarySection = document.getElementById('summary-section');
+      if (hasData && weight) {
+        var progressPct = journey.progress_pct ? journey.progress_pct.toFixed(1) : '?';
+        var weeklyRate = journey.weekly_rate_lbs ? journey.weekly_rate_lbs.toFixed(1) : '?';
+        var summaryText = '<p><strong>Average weight:</strong> ' + (weight ? weight.toFixed(1) + ' lbs' : 'No reading') +
+          ' (' + progressPct + '% to goal). Weekly rate: ' + weeklyRate + ' lbs/week.</p>';
+        if (hrv) summaryText += '<p><strong>Weekly recovery avg:</strong> HRV ' + hrv.toFixed(0) + 'ms, recovery ' + (recovery||0).toFixed(0) + '%, average sleep ' + (sleep||0).toFixed(1) + 'h.</p>';
+        if (charData.level) summaryText += '<p><strong>Character:</strong> Level ' + Math.floor(charData.level) + ' (' + (charData.tier||'Foundation') + ').</p>';
+        document.getElementById('summary-body').innerHTML = summaryText;
+        summarySection.style.display = '';
+      } else {
+        summarySection.style.display = 'none';
+      }
+
+      // Events section (placeholder)
+      document.getElementById('events-section').style.display = 'none';
+
+      // Rest / Sick Days section
+      var sickSection = document.getElementById('sick-days-section');
+      var sickBody = document.getElementById('sick-days-body');
+      var sickDays = (snap && snap.sick_days) ? snap.sick_days : [];
+      // Also check for rest_days key as alternative
+      if (!sickDays.length && snap && snap.rest_days) sickDays = snap.rest_days;
+      // Check within waveform data for sick/rest markers
+      if (!sickDays.length && wave && wave.days) {
+        wave.days.filter(function(d) {
+          return d.date >= startStr && d.date <= endStr && (d.tag === 'sick' || d.tag === 'rest');
+        }).forEach(function(d) {
+          sickDays.push({ date: d.date, type: d.tag || 'rest', note: d.note || '' });
+        });
+      }
+      if (sickDays.length > 0) {
+        hasData = true;
+        var sickHtml = sickDays.map(function(d) {
+          var typeLabel = (d.type === 'sick') ? 'Sick day' : 'Rest day';
+          var note = d.note ? ' \u2014 ' + d.note : '';
+          return '<p><strong>' + d.date + ':</strong> ' + typeLabel + note + '</p>';
+        }).join('');
+        sickBody.innerHTML = sickHtml;
+        sickSection.style.display = '';
+      } else if (hasData) {
+        // Show section with "none" message when there IS data for the week
+        sickBody.innerHTML = '<p>No sick or rest days this week.</p>';
+        sickSection.style.display = '';
+      } else {
+        sickSection.style.display = 'none';
+      }
+
+      // Empty week
+      document.getElementById('empty-week').style.display = hasData ? 'none' : '';
+    });
+  }
+
+  // Initial load
+  updateNav();
+})();
+</script>
+<script src="/assets/js/reveal.js"></script>
+<script src="/assets/js/site_constants.js"></script>
+<script src="/assets/js/components.js"></script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>
