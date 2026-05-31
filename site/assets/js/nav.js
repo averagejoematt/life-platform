@@ -241,13 +241,13 @@
     '/supplements/':        { href: '/protocols/',        title: 'All Protocols \u2192',          sub: 'Sleep, training, nutrition, supplements' },
     '/experiments/':        { href: '/challenges/',       title: 'Challenges \u2192',             sub: 'Action-oriented goals from the data' },
     '/challenges/':         { href: '/discoveries/',      title: 'Discoveries \u2192',            sub: 'What the data proved' },
-    '/discoveries/':        { href: '/intelligence/',     title: 'The Intelligence Layer \u2192',  sub: 'How the AI finds these patterns' },
+    '/discoveries/':        { href: '/platform/#the-ai',  title: 'The Intelligence Layer \u2192',  sub: 'How the AI finds these patterns' },
     // The Platform flow
-    '/platform/':           { href: '/intelligence/',     title: 'The AI \u2192',                 sub: 'What the intelligence layer actually does' },
-    '/intelligence/':       { href: '/board/',            title: 'AI Board \u2192',               sub: 'The advisory personas shaping this platform' },
-    '/board/':              { href: '/board/technical/',  title: 'Technical Board \u2192',        sub: '12 personas keeping the architecture honest' },
-    '/board/technical/':    { href: '/board/product/',    title: 'Product Board \u2192',          sub: '8 personas shaping what this site becomes' },
-    '/board/product/':      { href: '/methodology/',      title: 'Methodology \u2192',            sub: 'How the science works' },
+    // v2 Stage 2: intelligence/board/coaches absorbed into /platform/ as
+    // anchored sections. Old per-page reading paths collapsed to a single
+    // platform\u2192methodology hand-off; the in-page sections are reachable via
+    // anchor links from the Platform CTA grid.
+    '/platform/':           { href: '/methodology/',      title: 'Methodology \u2192',            sub: 'The credibility anchor \u2014 Pearson r, BH-FDR, N=1' },
     '/methodology/':        { href: '/cost/',             title: 'The Real Cost \u2192',          sub: 'Running a full health OS for $19/month' },
     '/cost/':               { href: '/tools/',            title: 'Tools \u2192',                  sub: 'Every tool in the platform' },
     '/tools/':              { href: '/builders/',         title: 'For Builders \u2192',           sub: 'Build your own health platform' },

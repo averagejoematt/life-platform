@@ -106,13 +106,29 @@ otherwise 404 on the live site.
 
 *(Stage 1 only adds the hub route. All 8 dispatch sub-pages remain live at their original URLs per the brief's "keep sub-pages for rollback" call.)*
 
+**Stage 2 (How It Works absorbs explainers, 2026-05-31):**
+Three explainer pages folded into /platform/ as anchored sections. Originals
+archived to site/archive/v1/, and the original routes now serve a meta-refresh
+redirect to the anchor. On rollback, NO orphan cleanup needed — these routes
+already existed in v1; the redirect HTML just replaces the original index.
+  - `/intelligence/index.html` (redirect) — v1 original archived at
+    `site/archive/v1/intelligence/`. `git checkout site-v1` restores the
+    original full content.
+  - `/board/index.html`         (redirect) — original at `site/archive/v1/board/`.
+  - `/coaches/index.html`       (redirect) — original at `site/archive/v1/coaches/`.
+  - `/character/index.html`     — the long methodology essay block was replaced
+    with a pointer to /methodology/. Character-specific scoring mechanics
+    ("THE MATH" details block) stay. Rollback via `git checkout site-v1`.
+  - `/platform/index.html`      — three new sections (`#the-ai`, `#ai-board`,
+    `#coaching-team`) added. Rollback via `git checkout site-v1`.
+
 ---
 
 ## Stage status
 
 - [x] **Stage 0** — tag `site-v1` + branch `redesign/v2-consolidation` + this runbook (2026-05-31)
 - [x] **Stage 1** — Observatory hub at `/observatory/`; nav collapsed 8 dispatches → 1 entry (2026-05-31)
-- [ ] Stage 2 — How It Works absorbs explainers
+- [x] **Stage 2** — How It Works absorbs The AI + AI Board + Coaching Team; Character methodology dup pointed at standalone /methodology/ (2026-05-31)
 - [ ] Stage 3 — Supplement + weekly dedupe + footer cleanup
 - [ ] Stage 4 — ~13-spine nav rebuild + final verification
 

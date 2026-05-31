@@ -59,11 +59,10 @@
         { href: '/discoveries/', text: 'Discoveries' },
       ]},
     ]},
+    // v2 Stage 2 (2026-05-31): The AI / AI Board / Coaching Team absorbed
+    // as sections within /platform/. Methodology stays standalone.
     { label: 'The Platform', items: [
       { href: '/platform/',     text: 'How It Works' },
-      { href: '/intelligence/', text: 'The AI' },
-      { href: '/board/',        text: 'AI Board' },
-      { href: '/coaches/',      text: 'Coaching Team' },
       { href: '/methodology/',  text: 'Methodology' },
       { href: '/cost/',         text: 'Cost' },
       { href: '/tools/',        text: 'Tools' },
@@ -217,9 +216,6 @@
       ]},
       { heading: 'The Platform', links: [
         { href: '/platform/', text: 'How It Works' },
-        { href: '/intelligence/', text: 'The AI' },
-        { href: '/board/', text: 'AI Board' },
-        { href: '/coaches/', text: 'Coaching Team' },
         { href: '/methodology/', text: 'Methodology' },
         { href: '/cost/', text: 'Cost' },
         { href: '/tools/', text: 'Tools' },
