@@ -31,7 +31,7 @@ REGISTRY_PATH = os.path.join(MCP_DIR, "registry.py")
 
 # Expected tool count range — update when consolidating or adding tools
 EXPECTED_MIN_TOOLS = 75   # updated for SIMP-1 Phase 1c+1d (86 tools as of v3.7.19)
-EXPECTED_MAX_TOOLS = 140  # upper bound: bumped 2026-05-31 for ADR-066 manage_hevy_routine fat tool
+EXPECTED_MAX_TOOLS = 141  # upper bound: bumped 2026-06-01 for get_vacation_fund
 
 
 def _read(path):
