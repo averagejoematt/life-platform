@@ -211,11 +211,71 @@ def test_draft_custom_unknown_offers_index_suggestions():
     with patch.object(t, "_template_index", return_value=fake_index), \
          patch.object(t, "_live_template_id_by_title", return_value=None):
         out = t.tool_manage_hevy_routine({
-            "action": "draft_custom",
+            "action": "draft_custom", "create_missing": False,
             "exercises": [{"title": "barbell bench zzz", "sets": [{"reps": 5}]}],
         })
     assert "MOVEMENT_UNMAPPABLE" in str(out)
     assert "Bench Press (Barbell)" in str(out)
+
+
+def test_draft_custom_auto_creates_missing_exercise():
+    """A title Hevy doesn't have is created (create_missing defaults on) and used,
+    and reported under created_exercises — the draft does not get stuck."""
+    captured: dict = {}
+
+    def fake_put(ir):
+        captured["ir"] = ir
+        return ir
+
+    create_calls = []
+
+    def fake_create(body):
+        create_calls.append(body)
+        return body["exercise"]["title"]  # Hevy returns a bare id-ish string
+
+    # live lookup MISSES during resolution, then HITS on the post-create reconcile
+    with patch("routine_repo.put_versioned", side_effect=fake_put), \
+         patch.object(t, "_template_index", return_value={}), \
+         patch("hevy_write_client.create_template", side_effect=fake_create), \
+         patch.object(t, "_live_template_id_by_title", side_effect=[None, "NEWID123"]):
+        out = t.tool_manage_hevy_routine({
+            "action": "draft_custom", "archetype": "push",
+            "exercises": [
+                {"title": "Landmine Snatch", "equipment_category": "barbell",
+                 "muscle_group": "full_body", "sets": [{"weight_lbs": 95, "reps": 5}]},
+            ],
+        })
+    assert out["status"] == "drafted_custom"
+    assert len(create_calls) == 1
+    body = create_calls[0]["exercise"]
+    assert body["title"] == "Landmine Snatch"
+    assert body["muscle_group"] == "full_body"           # explicit override honored
+    assert body["equipment_category"] == "barbell"
+    assert body["exercise_type"] == "weight_reps"        # inferred from weight+reps
+    assert out["created_exercises"][0]["id"] == "NEWID123"
+    assert captured["ir"].exercises[0].movement_key == "tmpl:NEWID123"
+
+
+def test_draft_custom_does_not_create_from_bare_movement_key():
+    """A bare unresolved movement_key (no human title) is treated as a likely typo —
+    never auto-created — even with create_missing on."""
+    with patch("hevy_write_client.create_template") as create_mock, \
+         patch.object(t, "_template_index", return_value={}), \
+         patch.object(t, "_live_template_id_by_title", return_value=None):
+        out = t.tool_manage_hevy_routine({
+            "action": "draft_custom",
+            "exercises": [{"movement_key": "jetpack_press", "sets": [{"reps": 5}]}],
+        })
+    create_mock.assert_not_called()
+    assert "MOVEMENT_UNMAPPABLE" in str(out)
+
+
+def test_infer_exercise_type_from_set_shape():
+    assert t._infer_exercise_type({"sets": [{"weight_lbs": 95, "reps": 5}]}) == "weight_reps"
+    assert t._infer_exercise_type({"sets": [{"reps": 15}]}) == "reps_only"
+    assert t._infer_exercise_type({"sets": [{"duration_seconds": 600}]}) == "duration"
+    assert t._infer_exercise_type({"sets": [{"distance_meters": 1000}]}) == "distance_duration"
+    assert t._infer_exercise_type({"exercise_type": "duration", "sets": [{"reps": 5}]}) == "duration"
 
 
 def test_dry_run_falls_back_to_reconcile_by_title():
