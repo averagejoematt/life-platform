@@ -263,6 +263,95 @@
         "end": 20
       },
       "equipment": "dumbbell"
+    },
+    "barbell_bench_press": {
+      "title": "Bench Press (Barbell)",
+      "_resolves_by_title": "No hevy_template_id_hint on purpose (ADR-069): resolved against the live Hevy template list by exact title at dry_run/commit, then cached. A wrong title fails loudly rather than mis-mapping.",
+      "primary_muscle": "chest",
+      "secondary_muscles": ["triceps", "shoulders"],
+      "skill_tier": 3,
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 5,
+        "end": 8
+      },
+      "equipment": "barbell"
+    },
+    "db_shoulder_press": {
+      "title": "Shoulder Press (Dumbbell)",
+      "_resolves_by_title": "No hevy_template_id_hint on purpose (ADR-069): resolved by title at dry_run/commit.",
+      "primary_muscle": "shoulders",
+      "secondary_muscles": ["triceps"],
+      "skill_tier": 2,
+      "joint_friendly_score": 2,
+      "default_rep_range": {
+        "start": 6,
+        "end": 10
+      },
+      "equipment": "dumbbell"
+    },
+    "reverse_pec_deck": {
+      "title": "Rear Delt Reverse Fly (Machine)",
+      "_resolves_by_title": "No hevy_template_id_hint on purpose (ADR-069): resolved by title at dry_run/commit. If the title is off, fix this string — Hevy's exact built-in name wins.",
+      "primary_muscle": "shoulders",
+      "secondary_muscles": [],
+      "skill_tier": 1,
+      "joint_friendly_score": 3,
+      "default_rep_range": {
+        "start": 12,
+        "end": 15
+      },
+      "equipment": "machine"
+    },
+    "cycling": {
+      "title": "Cycling",
+      "hevy_template_id_hint": "D8F7F851",
+      "_cardio": "Duration-based. Author via draft_custom with sets:[{duration_seconds:N}] (e.g. 2700 = 45 min). No weight/reps. Use for recumbent/upright bike Zone 2 finishers. Template id verified against the live Hevy list 2026-06-01.",
+      "primary_muscle": "cardio",
+      "secondary_muscles": [],
+      "skill_tier": 1,
+      "joint_friendly_score": 3,
+      "equipment": "machine"
+    },
+    "rowing_machine": {
+      "title": "Rowing Machine",
+      "hevy_template_id_hint": "0222DB42",
+      "_cardio": "Duration-based. sets:[{duration_seconds:N}] or {distance_meters:N}. Template id verified 2026-06-01.",
+      "primary_muscle": "cardio",
+      "secondary_muscles": [],
+      "skill_tier": 1,
+      "joint_friendly_score": 3,
+      "equipment": "machine"
+    },
+    "treadmill": {
+      "title": "Treadmill",
+      "hevy_template_id_hint": "243710DE",
+      "_cardio": "Duration-based. sets:[{duration_seconds:N}] or {distance_meters:N}. Template id verified 2026-06-01.",
+      "primary_muscle": "cardio",
+      "secondary_muscles": [],
+      "skill_tier": 1,
+      "joint_friendly_score": 2,
+      "equipment": "machine"
+    },
+    "elliptical": {
+      "title": "Elliptical Trainer",
+      "hevy_template_id_hint": "3303376C",
+      "_cardio": "Duration-based. sets:[{duration_seconds:N}]. Template id verified 2026-06-01.",
+      "primary_muscle": "cardio",
+      "secondary_muscles": [],
+      "skill_tier": 1,
+      "joint_friendly_score": 3,
+      "equipment": "machine"
+    },
+    "air_bike": {
+      "title": "Air Bike",
+      "hevy_template_id_hint": "43573BB8",
+      "_cardio": "Duration-based. sets:[{duration_seconds:N}]. Template id verified 2026-06-01.",
+      "primary_muscle": "cardio",
+      "secondary_muscles": [],
+      "skill_tier": 1,
+      "joint_friendly_score": 2,
+      "equipment": "machine"
     }
   }
 }

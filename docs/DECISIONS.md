@@ -2053,3 +2053,38 @@ Legacy daily-aggregate records (no `source_workout_id` field) are intentionally 
 ### Rollback
 
 `training_week.json:exercise_notes_mode = "off"` and re-sync to S3. The generator skips the DDB load entirely (verified by `test_exercise_notes_off_mode_yields_empty_notes`), and notes ship as empty strings. No code redeploy needed.
+
+## ADR-069: Custom Routine Authoring — `draft_custom` Escape Hatch for Hand-Designed Sessions
+
+**Date:** 2026-05-31
+**Status:** Implemented (chat path only; cron unchanged).
+**Related:** ADR-066 (write-loop), ADR-067 (title), ADR-068 (per-exercise notes), `mcp/tools_hevy_routine.py`, `config/movement_catalog.json`, `lambdas/hevy_template_cache.py`.
+
+### Context
+
+ADR-066 shipped the write-loop with a single authoring front door: `action=draft`, which runs the deterministic volume-landmark programmer (`routine_generator.generate_routines`). That path builds its *own* routine from recovery/volume/ACWR state and, by design (ADR-068, "LLM never computes"), never accepts an exercise list. In practice this meant a hand-designed session — "barbell bench ramping to 185×5, incline 70s, a lateral/reverse-pec/pushdown tri-set" — could **not** be pushed from chat at all. The only channels were the browser (Claude-in-Chrome) or manual entry, both of which failed or stalled in real use. Three walls blocked it: (1) no action accepted an explicit exercise/set/weight list; (2) several common movements (barbell bench, DB shoulder press, reverse pec deck) weren't in the 18-movement catalog; (3) the generator's loads are subtract-only and `add_load_enabled=False`, so it structurally can't emit user-chosen heavy loads.
+
+### Decision
+
+1. **New action `draft_custom`** on `manage_hevy_routine`. It accepts an explicit `exercises` list (`movement_key` or human `title`/`name`, `sets[{weight_lbs|weight_kg, reps|rep_range, type, count}]`, `rest_seconds`, `superset_id`, per-exercise `notes`), converts lbs→kg, expands a set's `count`, and persists a normal `RoutineSpec` IR with `source_action="draft_custom"`. Because it stops at the same IR, the existing `dry_run → commit` chain pushes it to Hevy unchanged — one write path is preserved (ADR-066 §1 intact). Loads are taken **verbatim**; the platform does not compute them. ADR-068's "LLM never computes" governs the *deterministic* path only — `draft_custom` is explicitly the user authoring their own session, not the system inventing loads.
+
+2. **Resolve-by-title fallback for unmapped movements.** New catalog movements ship their exact Hevy *title* and **no** `hevy_template_id_hint`. `_make_resolver()` (in the MCP tool) tries `resolve_movement` first, then falls back to `reconcile_custom`, which searches the live Hevy template list by title and caches the real id. Rationale: a hand-transcribed 8-char template id that's wrong would **silently mis-map** to the wrong exercise; a title miss instead fails **loudly** (`MovementUnmappable`) and is fixed with a one-line title correction. Loud-wrong beats silent-wrong.
+
+3. **Catalog +3 movements:** `barbell_bench_press`, `db_shoulder_press`, `reverse_pec_deck` — title-only, resolved per (2).
+
+4. **No silent caps.** `draft_custom` does not hard-assert the session ceiling (the user authored it deliberately); it returns a `warnings[]` advisory when `total_sets` exceeds `session_set_ceiling` rather than truncating.
+
+### Consequences
+
+- A hand-designed session pushes from chat with no browser: `draft_custom → dry_run → commit`.
+- Titles still follow ADR-067 at commit (archetype drives the `<Phase> - <Type> - <N> - <Y>` form); the WHY-note surfaces the user's own first note line (new `format_why_note` branch) instead of a generator-flavored rationale.
+- The deterministic `draft` path, cron, autoreg, and the subtract-only gate are **untouched**.
+- Public-site framing unchanged: still "deterministic volume-landmark programming," and a custom session is plainly user-authored, never described as autoregulated.
+
+### Rollback
+
+Remove `"draft_custom"` from `_VALID_ACTIONS`/`_DISPATCH` in `mcp/tools_hevy_routine.py` and redeploy MCP; the catalog additions and the resolve-by-title fallback are inert without it (the generator never selects title-only movements because they lack a `default_rep_range`-driven selection advantage — and are harmless if it does). The `format_why_note` custom branch is a no-op for non-custom IRs.
+
+---
+
+**Verified:** 2026-05-31 (ADR-069 — custom authoring escape hatch)
