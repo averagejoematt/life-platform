@@ -2,7 +2,7 @@
 
 > **Companion to:** `docs/SPEC_HEVY_ROUTINE_WRITELOOP_2026_05_31.md` §10
 > **Date:** 2026-05-31
-> **Status:** §A, §B, §C drafted; §D pending Matthew approval
+> **Status:** §A, §B, §C, §D all closed (§D Option 1 approved 2026-05-31)
 
 Closes (or stages) the four open items blocking Phase 1 build.
 
@@ -270,6 +270,9 @@ Coach Maya (concurrent training) and Dr. Nathan (re-entry / dropout) already cov
 ### D.3 Recommendation
 **Option 1 for Phase 1 only**, with explicit sunset trigger: retire interim persona when a named Sports Med voice fills the real seat. Captured in `docs/BOARDS.md` change log if approved.
 
+### D.4 Decision (2026-05-31)
+**Approved: Option 1.** Interim "Dr. Iris Tanaka — Sports Medicine (interim)" placeholder noted in `docs/BOARDS.md`. Live S3 board config (`board_of_directors.json`) update deferred to Hevy write-loop Phase 1 build commit — keeps the BOARDS.md table accurate to the live config until the generator code actually invokes the persona.
+
 ---
 
 ## Status against SPEC §10
@@ -277,6 +280,6 @@ Coach Maya (concurrent training) and Dr. Nathan (re-entry / dropout) already cov
 - [x] **A. Hevy API contract** — verified from OpenAPI spec; SPEC implications listed in §A.11
 - [x] **B. Deterministic generation engine design** — pseudocode + tests defined
 - [x] **C. Readiness-signal validation plan** — pre-registered design
-- [ ] **D. Sports Med seat** — interim persona drafted; awaits Matthew approval before BOARDS.md update
+- [x] **D. Sports Med seat** — Option 1 approved (2026-05-31); interim "Dr. Iris Tanaka — Sports Medicine (interim)" noted in `docs/BOARDS.md`; live S3 board config update deferred to Phase 1 build commit
 
-Phase 1 build is unblocked on (A) (B) (C). (D) blocks only the catalog-tagging step inside §B.2, which can ship with placeholder tags pending the seat decision.
+Phase 1 build is fully unblocked. All four prereqs closed.
