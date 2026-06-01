@@ -3091,21 +3091,43 @@ TOOLS = {
             "name": "manage_hevy_routine",
             "description": (
                 "Author, preview, push, list, fetch, archive, or score adherence on Hevy "
-                "training routines. One tool, action-dispatched. Actions: 'draft' (generate + "
-                "persist IR — no Hevy write), 'dry_run' (compile a draft into the Hevy POST "
-                "body for preview), 'commit' (push to Hevy — requires explicit routine_id), "
-                "'list' (date range), 'get' (one IR by routine_id), 'archive' (rename + "
-                "folder-move; Hevy has no DELETE), 'floor' (≈20-min variant), 're_entry' "
-                "(deliberately easy after a break), 'adherence' (programmed-vs-performed). "
-                "Subtract-only autoregulation by default. Honest framing: 'deterministic "
-                "volume-landmark programming with red-day deload guard' — never describe as "
-                "'autoregulated' publicly until the readiness signal is validated."
+                "training routines. One tool, action-dispatched. Actions: 'draft' (the "
+                "deterministic programmer builds its OWN routine from your state — does NOT "
+                "take an exercise list), 'draft_custom' (author a routine from an explicit "
+                "exercise/set/weight list you supply — use this to push a hand-designed "
+                "session), 'dry_run' (compile a draft into the Hevy POST body for preview), "
+                "'commit' (push to Hevy — requires explicit routine_id), 'list' (date range), "
+                "'get' (one IR by routine_id), 'archive' (rename + folder-move; Hevy has no "
+                "DELETE), 'floor' (≈20-min variant), 're_entry' (deliberately easy after a "
+                "break), 'adherence' (programmed-vs-performed). Typical custom flow: "
+                "draft_custom → dry_run → commit. Subtract-only autoregulation on the 'draft' "
+                "path. Honest framing: 'deterministic volume-landmark programming with red-day "
+                "deload guard' — never describe as 'autoregulated' publicly until the "
+                "readiness signal is validated."
             ),
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "action": {"type": "string",
-                               "description": "One of: draft, dry_run, commit, list, get, archive, floor, re_entry, adherence."},
+                               "description": "One of: draft, draft_custom, dry_run, commit, list, get, archive, floor, re_entry, adherence."},
+                    "exercises": {
+                        "type": "array",
+                        "description": (
+                            "draft_custom only: ordered exercise list. Each item: "
+                            "{movement_key (or title/name matched to the catalog), "
+                            "sets:[{weight_lbs OR weight_kg, reps OR rep_range_start+rep_range_end, "
+                            "type?, count? (repeat the set N times), duration_seconds?}], "
+                            "rest_seconds?, superset_id? (same int = superset/tri-set), notes?}. "
+                            "Loads are taken verbatim — the platform does not compute them."
+                        ),
+                        "items": {"type": "object"},
+                    },
+                    "archetype": {"type": "string",
+                                  "description": "draft_custom only: session type for the title (e.g. 'push', 'pull', 'upper'). Defaults to 'custom'."},
+                    "title": {"type": "string",
+                              "description": "draft_custom only: optional literal title fallback (commit normally renders the ADR-067 convention from archetype)."},
+                    "notes": {"type": "string",
+                              "description": "draft_custom only: one-line session WHY-note shown in Hevy."},
                     "routine_id": {"type": "string",
                                    "description": "Platform routine_id. Required for dry_run, commit, get, archive, adherence."},
                     "target_date": {"type": "string",
