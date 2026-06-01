@@ -20,6 +20,7 @@
 | Shared layer | **AWS v70 — fleet uniform.** Initially only MCP was repointed (surgical), then all 62 layer-using functions were reconciled to v70 via config-only `update-function-configuration --layers` (matches the committed `SHARED_LAYER_VERSION = 70`). `test_i2_lambda_layer_version_current` green. |
 | Movement catalog | **S3 synced — 26 movements** (+barbell_bench_press, db_shoulder_press, reverse_pec_deck, +cardio: cycling, rowing_machine, treadmill, elliptical, air_bike). |
 | Hevy template index | **`config/hevy_template_index.json` synced to S3 — 789 templates** (430 built-in + 359 account custom). `draft_custom` resolves ANY Hevy exercise by exact title (`tmpl:<id>`), with a live-lookup self-heal. Circuits = shared `superset_id`. |
+| Auto-create missing | **`draft_custom create_missing` defaults true.** A human title Hevy lacks is created (`POST /v1/exercise_templates` → `{"exercise":{title,muscle_group,exercise_type,equipment_category}}`, reconcile id by title) and reported under `created_exercises`; the draft never gets stuck. Never creates from a bare `movement_key`. `"Landmine Snatch"` (`8e9304f9-ca3d-4874-b55f-f20570c8799e`) created during contract verification. |
 | EXPERIMENT_START_DATE | 2026-06-01 — unchanged from prior session. |
 | Branch / main | **In sync.** ADR-069 + amendment merged (PRs #1, #2). |
 
