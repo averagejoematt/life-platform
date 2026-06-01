@@ -159,6 +159,28 @@ def lambda_handler(event, context):
                 _emit_metric("RoutinePushed")
                 summary.append({"routine_id": ir.routine_id, "variant": ir.variant,
                                 "pushed": True, "hevy_routine_id": ir.hevy_routine_id})
+            except wc.HevyOrphanCreated as e:
+                logger.warning(
+                    f"HevyOrphanCreated on push for {ir.routine_id}: "
+                    f"Hevy returned {e.status} but created {e.hevy_routine_id}. Linking."
+                )
+                ir.hevy_routine_id = e.hevy_routine_id
+                ir.hevy_updated_at = e.hevy_updated_at
+                ir.hevy_pushed_at = datetime.now(timezone.utc).isoformat()
+                ir.status = "active"
+                ir.version += 1
+                ir.parent_version = ir.version - 1
+                repo.put_versioned(ir)
+                if ir.hevy_routine_id:
+                    try:
+                        repo.upsert_id_map(ir.routine_id, ir.hevy_routine_id)
+                    except Exception:
+                        pass
+                _emit_metric("RoutineOrphanRecovered")
+                summary.append({"routine_id": ir.routine_id, "variant": ir.variant,
+                                "pushed": True, "hevy_routine_id": ir.hevy_routine_id,
+                                "warning": f"orphan-recovered (status={e.status})"})
+                pushed_one = True
             except wc.HevyConflict as e:
                 logger.warning(f"HevyConflict on push for {ir.routine_id}: {e}")
                 _emit_metric("RoutineConflict")

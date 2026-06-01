@@ -88,6 +88,43 @@ def test_update_with_guard_passes_through_on_match():
     assert calls == ["GET", "PUT"]
 
 
+def test_create_routine_recovers_orphan():
+    """Hevy quirk: 400 on POST can still create the routine. Probe + raise HevyOrphanCreated."""
+    import urllib.error
+    from datetime import datetime, timezone
+    calls: list[str] = []
+    now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    def fake_urlopen(req, timeout=30):
+        calls.append(req.get_method())
+        if req.get_method() == "POST":
+            raise urllib.error.HTTPError(req.full_url, 400, "Bad Request", {}, io.BytesIO(b'{"error":"x"}'))
+        # GET list -> return a matching just-created routine
+        return _mock_response({"routines": [
+            {"id": "orphan-id", "title": "Upper — 2026-06-01",
+             "created_at": now_iso, "updated_at": now_iso},
+        ]})
+    with _mock_secret(), patch.object(wc, "urlopen_with_retry", side_effect=fake_urlopen):
+        with pytest.raises(wc.HevyOrphanCreated) as exc:
+            wc.create_routine({"routine": {"title": "Upper — 2026-06-01", "exercises": []}})
+    assert exc.value.hevy_routine_id == "orphan-id"
+    assert exc.value.status == 400
+    assert calls == ["POST", "GET"]
+
+
+def test_create_routine_no_orphan_match_reraises_400():
+    """If the title-match probe finds nothing, the original HTTPError surfaces."""
+    import urllib.error
+    def fake_urlopen(req, timeout=30):
+        if req.get_method() == "POST":
+            raise urllib.error.HTTPError(req.full_url, 400, "Bad Request", {}, io.BytesIO(b''))
+        return _mock_response({"routines": [
+            {"id": "unrelated", "title": "Something else", "created_at": "2020-01-01T00:00:00Z"},
+        ]})
+    with _mock_secret(), patch.object(wc, "urlopen_with_retry", side_effect=fake_urlopen):
+        with pytest.raises(urllib.error.HTTPError):
+            wc.create_routine({"routine": {"title": "Upper — 2026-06-01", "exercises": []}})
+
+
 def test_throttle_holds_calls_apart(monkeypatch):
     monkeypatch.setattr(wc, "MIN_INTERVAL_SECONDS", 0.05)
     sleeps: list[float] = []

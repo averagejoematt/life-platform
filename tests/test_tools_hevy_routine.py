@@ -67,6 +67,34 @@ def test_archive_calls_update_not_delete():
     assert result["archive_folder_id"] == 99
 
 
+def test_commit_handles_orphan_created():
+    """When Hevy 400s but the routine was actually created, link the id and return a warning."""
+    import hevy_write_client as wc
+    ir = RoutineSpec(
+        routine_id="r-orphan", target_date="2026-06-01", archetype="upper",
+        exercises=[ExerciseBlock(movement_key="db_bench_press_flat",
+                                 sets=[Set(reps=10)])],
+    )
+    captured: dict = {}
+    def fake_put(updated):
+        captured["last"] = updated
+        return updated
+    orphan_exc = wc.HevyOrphanCreated(
+        hevy_routine_id="orphan-id",
+        hevy_updated_at="2026-06-01T03:00:00Z",
+        status=400, body='{"error":"x"}',
+    )
+    with patch("routine_repo.get_current", return_value=ir), \
+         patch("routine_repo.put_versioned", side_effect=fake_put), \
+         patch("routine_repo.upsert_id_map") as upsert_mock, \
+         patch("hevy_template_cache.resolve_movement", return_value="55E6546B"), \
+         patch("hevy_write_client.create_routine", side_effect=orphan_exc):
+        result = t.tool_manage_hevy_routine({"action": "commit", "routine_id": "r-orphan"})
+    assert "HEVY_ORPHAN_CREATED" in str(result)
+    assert captured["last"].hevy_routine_id == "orphan-id"
+    upsert_mock.assert_called_once_with("r-orphan", "orphan-id")
+
+
 def test_archive_local_only_when_never_pushed():
     ir = RoutineSpec(
         routine_id="r-2", target_date="2026-06-01", archetype="upper",
