@@ -47,6 +47,8 @@ MODULES=(
     routine_title.py
     # ADR-068 (2026-05-31): per-exercise factual history cues
     exercise_history.py
+    # 2026-06-01: vacation fund tracker ($1/workout-mile) — shared by MCP, site-api, daily-brief
+    vacation_fund.py
 )
 
 rm -rf "$PROJ_ROOT/cdk/layer-build"

@@ -34,7 +34,7 @@ AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 
 # Shared utils layer — update on every layer rebuild (bash deploy/build_layer.sh)
-SHARED_LAYER_VERSION = 70  # v70: ADR-069 custom routine authoring (routine_title format_why_note custom branch). Published 2026-05-31; MCP repointed directly (no cdk deploy --all).
+SHARED_LAYER_VERSION = 71  # v71: vacation fund tracker (lambdas/vacation_fund.py) + daily-brief banner (html_builder). Published 2026-06-01.
 
 SHARED_LAYER_ARN = (
     f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
