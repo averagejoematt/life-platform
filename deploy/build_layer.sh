@@ -43,6 +43,8 @@ MODULES=(
     routine_repo.py
     routine_generator.py
     adherence_calc.py
+    # ADR-067 (2026-05-31): title convention + WHY-note + phase counters
+    routine_title.py
 )
 
 rm -rf "$PROJ_ROOT/cdk/layer-build"

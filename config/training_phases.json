@@ -1,0 +1,8 @@
+{
+  "_comment": "Ordered training phases. `current` is the source of truth for routine titles (consumed by routine_title.format_title). Manually advanced by Matthew — no auto/milestone-driven transitions. Add or rename phases in `phases`; flip `current` to advance. `current_started` is the calendar-date boundary used to count N (per-phase per-type) — bump it whenever current changes.",
+  "_version": 1,
+  "_authors": "ADR-067",
+  "phases": ["Foundation", "Build", "Forge", "Sustain"],
+  "current": "Foundation",
+  "current_started": "2026-05-31"
+}

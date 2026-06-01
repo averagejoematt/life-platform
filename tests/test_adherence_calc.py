@@ -20,9 +20,10 @@ def _ir() -> RoutineSpec:
 
 
 def test_full_completion_is_100():
+    # Hevy template IDs sourced from the live reconciled catalog (commit 989cbdf).
     performed = {"exercises": [
-        {"exercise_template_id": "55E6546B", "sets": [{}, {}, {}]},   # db_bench_press_flat
-        {"exercise_template_id": "6A6C31A2", "sets": [{}, {}, {}]},   # lat_pulldown
+        {"exercise_template_id": "3601968B", "sets": [{}, {}, {}]},   # db_bench_press_flat
+        {"exercise_template_id": "6A6C31A5", "sets": [{}, {}, {}]},   # lat_pulldown
     ]}
     result = calculate_adherence(_ir(), performed)
     assert result["overall_pct"] == 100.0
@@ -33,7 +34,7 @@ def test_full_completion_is_100():
 
 def test_partial_completion_reports_per_muscle():
     performed = {"exercises": [
-        {"exercise_template_id": "55E6546B", "sets": [{}, {}]},        # 2 of 3
+        {"exercise_template_id": "3601968B", "sets": [{}, {}]},        # 2 of 3
     ]}
     result = calculate_adherence(_ir(), performed)
     assert result["per_muscle"]["chest"] < 100.0
@@ -43,8 +44,8 @@ def test_partial_completion_reports_per_muscle():
 
 def test_extra_exercises_listed():
     performed = {"exercises": [
-        {"exercise_template_id": "55E6546B", "sets": [{}, {}, {}]},
-        {"exercise_template_id": "6A6C31A2", "sets": [{}, {}, {}]},
+        {"exercise_template_id": "3601968B", "sets": [{}, {}, {}]},
+        {"exercise_template_id": "6A6C31A5", "sets": [{}, {}, {}]},
         {"exercise_template_id": "DEADBEEF", "sets": [{}]},  # unprogrammed
     ]}
     result = calculate_adherence(_ir(), performed)

@@ -289,7 +289,8 @@
       "lambdas/hevy_template_cache.py",
       "lambdas/routine_repo.py",
       "lambdas/routine_generator.py",
-      "lambdas/adherence_calc.py"
+      "lambdas/adherence_calc.py",
+      "lambdas/routine_title.py"
     ],
     "consumers": [
       "daily-brief",

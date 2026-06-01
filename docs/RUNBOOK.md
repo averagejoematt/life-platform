@@ -1388,3 +1388,75 @@ The cron emits a `RoutineConflict` CloudWatch metric and returns `pushed=false` 
 ### Public-site copy reminder
 
 Never describe this feature as "autoregulated" on averagejoematt.com or in the chronicle while the readiness signal is unvalidated. Correct phrasing: **deterministic volume-landmark programming with red-day deload guard.**
+
+---
+
+## Hevy Routine Title Convention — Deploy Steps (ADR-067)
+
+Code is on `main`; layer v69 not yet published. Run these in order from the repo root.
+
+```bash
+# 1. Sync the new phase config to S3 (read by Lambda at runtime).
+aws s3 cp config/training_phases.json s3://matthew-life-platform/config/ --region us-west-2
+
+# 2. Build the layer bundle locally (includes routine_title.py).
+bash deploy/build_layer.sh
+ls cdk/layer-build/python/routine_title.py   # sanity check
+
+# 3. Publish the layer + propagate to all consumers. Core publishes v69;
+#    the rest pick it up via SHARED_LAYER_VERSION=69 in cdk/stacks/constants.py.
+cd cdk
+npx cdk deploy LifePlatformCore --require-approval never
+npx cdk deploy \
+  LifePlatformMcp \
+  LifePlatformOperational \
+  LifePlatformIngestion \
+  LifePlatformEmail \
+  LifePlatformCompute \
+  --require-approval never --concurrency 3
+cd ..
+
+# 4. Verify all 36 layer-using Lambdas are on v69.
+aws lambda list-functions --output json --region us-west-2 --no-paginate | \
+  python3 -c "import json,sys; d=json.load(sys.stdin); vs={}; \
+    [vs.setdefault((l['Arn'].rsplit(':',1)[-1]), []).append(f['FunctionName']) \
+     for f in d['Functions'] for l in (f.get('Layers') or []) if 'shared-utils' in l['Arn']]; \
+    [print(f'v{v}: {len(fns)}') for v, fns in sorted(vs.items())]"
+
+# 5. Smoke-test the new title via MCP. (Force a cold start so the in-memory
+#    phase-config cache reloads from S3.)
+CUR=$(aws lambda get-function-configuration --function-name life-platform-mcp \
+        --query 'Environment.Variables' --output json --region us-west-2)
+ENV_PAYLOAD=$(python3 -c "
+import json
+env = json.loads('''$CUR''')
+env['DEPLOY_VERSION'] = '2.74.4'
+print(json.dumps({'Variables': env}))")
+aws lambda update-function-configuration --function-name life-platform-mcp \
+  --environment "$ENV_PAYLOAD" --region us-west-2 --query LastModified --output text
+
+# 6. Re-commit an existing routine to see the new title applied in Hevy.
+# (Use any active routine_id from `manage_hevy_routine action=list` via claude.ai.)
+```
+
+### Advancing the phase later
+
+```bash
+# Edit config/training_phases.json — change `current` + `current_started`.
+# Then push to S3:
+aws s3 cp config/training_phases.json s3://matthew-life-platform/config/ --region us-west-2
+# Force cold start so warm containers reload the config:
+aws lambda update-function-configuration --function-name life-platform-mcp \
+  --environment "$ENV_PAYLOAD_WITH_NEW_DEPLOY_VERSION" --region us-west-2
+```
+
+N resets to 1 for each archetype the first time it's committed in the new phase. Y keeps counting up.
+
+### Rollback (if titles look wrong)
+
+```bash
+# Revert the caller edits — title_context=None falls back to ir.title.
+git revert --no-commit <commit-sha-of-adr-067>
+# Or just unset title_context in mcp/tools_hevy_routine.py + cron_lambda.py and
+# redeploy the MCP Lambda. The layer itself stays — routine_title.py is dormant.
+```
