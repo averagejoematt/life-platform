@@ -322,10 +322,26 @@ _BEARER_TOKEN_CACHE = {}
 _BEARER_CACHE_TTL = 300  # 5 min — ensures warm containers pick up new key after rotation
 
 # R13-F12: Per-invocation write tool rate limiting.
-# In-memory only — resets on each Lambda cold start / invocation context.
-# Prevents accidental runaway loops from hammering write operations.
-_WRITE_TOOL_CALLS: dict = {}
-_WRITE_TOOL_RATE_LIMIT = 10  # max calls per write tool per Lambda invocation
+# Rolling-window rate limit (in-memory, per warm container).
+#
+# HISTORY: this was a per-tool lifetime counter that the docstring claimed
+# "resets every invocation" — but the dict is module-level, so it actually
+# accumulated across every request a warm container served (i.e. across the
+# whole conversation AND unrelated prior sessions) and only cleared on a cold
+# start. Result: legitimate multi-step flows (draft -> dry_run -> commit, with a
+# couple of retries) intermittently tripped RATE_LIMIT and the only "fix" was
+# forcing a cold start. Since one Lambda invocation handles exactly one tool
+# call (see _process_jsonrpc), a true per-invocation reset would also be wrong —
+# it could never exceed 1, defeating the runaway-loop guard entirely.
+#
+# FIX: a rolling time window. At most _WRITE_TOOL_RATE_LIMIT calls to a given
+# write tool within _WRITE_TOOL_RATE_WINDOW_SECS. A runaway loop (many calls/sec)
+# trips within ~a second; a human-paced multi-step flow never does; and it
+# self-heals as the window slides — no cold start required. Lambda serializes
+# invocations within a container, so no lock is needed.
+_WRITE_TOOL_CALLS: dict[str, list] = {}   # tool -> recent call epoch timestamps
+_WRITE_TOOL_RATE_LIMIT = 20               # max calls per tool within the window
+_WRITE_TOOL_RATE_WINDOW_SECS = 60         # rolling window
 
 _RATE_LIMITED_TOOLS = {
     "create_todoist_task",
@@ -334,32 +350,38 @@ _RATE_LIMITED_TOOLS = {
     "write_platform_memory",
     "delete_platform_memory",
     # ADR-066: fat tool — cap covers worst-case write loop (commit/archive).
-    # Read actions (list/get/dry_run) also count toward the 10-per-invocation
-    # cap; trade-off accepted to keep one tool surface rather than splitting.
+    # Read actions (list/get/dry_run) also count toward the window; trade-off
+    # accepted to keep one tool surface rather than splitting.
     "manage_hevy_routine",
 }
 
 
 def _check_write_rate_limit(tool_name: str):
-    """R13-F12: Check if a write tool has exceeded its per-invocation rate limit.
+    """R13-F12: rolling-window write-tool rate limit.
 
-    Returns an error message string if limit exceeded, None if OK.
-    In-memory counter resets on every Lambda invocation — prevents runaway
-    loops within a single session, not across sessions.
+    Returns an error message string if the limit is exceeded within the window,
+    else None (and records the call). Stops runaway loops without penalizing a
+    normal human-paced sequence of writes.
     """
     if tool_name not in _RATE_LIMITED_TOOLS:
         return None
-    count = _WRITE_TOOL_CALLS.get(tool_name, 0)
-    if count >= _WRITE_TOOL_RATE_LIMIT:
+    now = time.time()
+    cutoff = now - _WRITE_TOOL_RATE_WINDOW_SECS
+    recent = [t for t in _WRITE_TOOL_CALLS.get(tool_name, []) if t >= cutoff]
+    if len(recent) >= _WRITE_TOOL_RATE_LIMIT:
+        _WRITE_TOOL_CALLS[tool_name] = recent  # keep pruned list
         logger.warning(
             f"[R13-F12] Write rate limit hit for '{tool_name}': "
-            f"{count} calls this invocation (limit {_WRITE_TOOL_RATE_LIMIT})"
+            f"{len(recent)} calls in {_WRITE_TOOL_RATE_WINDOW_SECS}s "
+            f"(limit {_WRITE_TOOL_RATE_LIMIT})"
         )
         return (
-            f"Tool '{tool_name}' has been called {count} times this invocation "
-            f"(limit: {_WRITE_TOOL_RATE_LIMIT}). Rate limit prevents runaway write loops."
+            f"Tool '{tool_name}' exceeded {_WRITE_TOOL_RATE_LIMIT} calls in "
+            f"{_WRITE_TOOL_RATE_WINDOW_SECS}s. Pause a few seconds and retry — "
+            f"the limit clears as the window slides (no new conversation needed)."
         )
-    _WRITE_TOOL_CALLS[tool_name] = count + 1
+    recent.append(now)
+    _WRITE_TOOL_CALLS[tool_name] = recent
     return None
 
 def _get_bearer_token():
