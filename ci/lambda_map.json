@@ -2,6 +2,11 @@
   "_comment": "Lambda source file \u2192 AWS function name mapping for CI/CD. Used by .github/workflows/ci-cd.yml",
   "_updated": "2026-03-28 v4.3.1",
   "lambdas": {
+    "lambdas/operational/hevy_routine_cron_lambda.py": {
+      "function": "hevy-routine-cron",
+      "cdk_only": true,
+      "_cdk_only_reason": "Imports many sibling layer modules (routine_ir, hevy_compiler, hevy_write_client, hevy_template_cache, routine_repo, routine_generator). Single-file hot-deploy via deploy_lambda.sh would miss them. Only `cdk deploy` ships the full Lambda layer bundle."
+    },
     "lambdas/ingestion/strava_lambda.py": {
       "function": "strava-data-ingestion"
     },
@@ -277,7 +282,14 @@
       "lambdas/scoring_engine.py",
       "lambdas/secret_cache.py",
       "lambdas/sick_day_checker.py",
-      "lambdas/site_writer.py"
+      "lambdas/site_writer.py",
+      "lambdas/routine_ir.py",
+      "lambdas/hevy_compiler.py",
+      "lambdas/hevy_write_client.py",
+      "lambdas/hevy_template_cache.py",
+      "lambdas/routine_repo.py",
+      "lambdas/routine_generator.py",
+      "lambdas/adherence_calc.py"
     ],
     "consumers": [
       "daily-brief",

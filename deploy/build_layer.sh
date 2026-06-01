@@ -35,6 +35,14 @@ MODULES=(
     rate_limiter.py
     # Phase 2.2 (2026-05-16): request envelope validator
     request_validator.py
+    # Hevy routine write-loop (SPEC_HEVY_ROUTINE_WRITELOOP_2026_05_31, ADR-066)
+    routine_ir.py
+    hevy_compiler.py
+    hevy_write_client.py
+    hevy_template_cache.py
+    routine_repo.py
+    routine_generator.py
+    adherence_calc.py
 )
 
 rm -rf "$PROJ_ROOT/cdk/layer-build"

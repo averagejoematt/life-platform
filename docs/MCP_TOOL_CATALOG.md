@@ -1,6 +1,6 @@
 # Life Platform — MCP Tool Catalog
 
-**Version:** v7.21.0 | **Last updated:** 2026-05-29 | **Total tools:** 131
+**Version:** v7.21.0 | **Last updated:** 2026-06-01 | **Total tools:** 131
 
 > Source of truth: `grep -E '^\s*"name":\s*"[a-z_]+"' mcp/registry.py | wc -l` → **127**.
 >
@@ -81,6 +81,7 @@
 | `get_exercise_history` | exercise_name, start_date=, end_date=, include_warmups= | Deep dive on a single exercise |
 | `get_muscle_volume` | start_date=, end_date=, period= | Weekly sets per muscle group vs MEV/MAV/MRV |
 | `get_workout_frequency` | start_date=, end_date= | Adherence, streaks, top exercises |
+| `manage_hevy_routine` | action= (draft\|dry_run\|commit\|list\|get\|archive\|floor\|re_entry\|adherence), routine_id=, target_date=, start_date=, end_date=, recovery_tier=, acwr_flag=, volume_7d=, z2_minutes_7d=, days_since_last_workout= | **WRITE TOOL** (ADR-066). Author / preview / push / archive Hevy routines, score programmed-vs-performed adherence. `commit` and `archive` require explicit `routine_id` — no inferred intent. Subtract-only autoregulation. Honest framing: "deterministic volume-landmark programming with red-day deload guard" — never call this "autoregulated" publicly. |
 
 ### Character Sheet
 | Tool | Key Params | Description |

@@ -1,0 +1,34 @@
+{
+  "_comment": "Schedule shape + session bounds + autoregulation knobs. day_of_week is 0=Monday .. 6=Sunday. archetype names match those handled by routine_generator. Edit to change weekly programming shape.",
+  "_version": 1,
+  "schedule": {
+    "0": {"archetype": "upper",    "label": "Monday upper"},
+    "1": {"archetype": "aerobic",  "label": "Tuesday Zone 2"},
+    "2": {"archetype": "lower",    "label": "Wednesday lower"},
+    "3": {"archetype": "mobility", "label": "Thursday mobility"},
+    "4": {"archetype": "upper",    "label": "Friday upper"},
+    "5": {"archetype": "full",     "label": "Saturday full body"},
+    "6": {"archetype": "rest",     "label": "Sunday rest"}
+  },
+  "archetype_targets": {
+    "upper": ["chest", "back", "shoulders", "biceps", "triceps"],
+    "lower": ["quadriceps", "hamstrings", "glutes", "calves"],
+    "full":  ["chest", "back", "shoulders", "quadriceps", "hamstrings", "glutes"],
+    "aerobic":  [],
+    "mobility": [],
+    "rest":     []
+  },
+  "session_set_ceiling": 25,
+  "session_minutes_ceiling": 75,
+  "weekly_volume_cap_per_muscle": 22,
+  "skill_ceiling": 2,
+  "re_entry_days_threshold": 7,
+  "z2_floor_minutes": 90,
+  "floor_session_set_count": 6,
+  "floor_session_minutes": 20,
+  "_notes": [
+    "session_set_ceiling=25 caps total hard sets per session.",
+    "skill_ceiling=2 means barbell tier-3 movements are excluded until the Sports Medicine seat is fully staffed (interim).",
+    "weekly_volume_cap_per_muscle=22 is an absolute fail-safe; landmarks per muscle may set tighter MRV."
+  ]
+}

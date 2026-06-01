@@ -1853,3 +1853,50 @@ If a PR fails any check, it stays open with a `🤖 auto-merge gate held` commen
 ### Rollback
 
 `aws ssm put-parameter --name /life-platform/remediation-mode --value shadow` — the gate becomes a no-op next run; the agent still opens PRs but nothing merges automatically.
+
+## ADR-066: Hevy Routine Write-Loop — One Path, Two Front Doors, Cron Disabled at Birth
+
+**Date:** 2026-05-31
+**Status:** Implemented (chat path + cron Lambda + adherence shipped; cron runtime-disabled, add-load runtime-disabled).
+**Related:** `SPEC_HEVY_ROUTINE_WRITELOOP_2026_05_31.md`, `..._PREREQS.md`, `reviews/REVIEW_HEVY_ROUTINE_WRITELOOP_2026_05_31.md`.
+
+### Context
+
+Hevy is the strength-training source of truth (per ADR-060). The platform reads workouts via webhook + backfill. Closing the **program → perform → adapt** loop requires WRITING routines back to Hevy — informed by data Hevy lacks (recovery, volume landmarks, labs) — then reading what was actually performed. Boards approved "to outline" with strict phasing: ship the chat path first; cron only after Phase 1 usage clears Viktor's "meaningfully better than hand-built" bar; "add load" autoregulation only after Henning's N≥30 validation.
+
+### Decision
+
+Five tightly coupled subdecisions, all shipped together because splitting them would have caused multi-layer redeploys:
+
+1. **One write path, two front doors.** Both the chat path (`manage_hevy_routine` MCP tool) and the cron (`hevy-routine-cron` Lambda) stop at a shared `RoutineSpec` IR and hand off to a single `hevy_compiler` module that owns the Hevy wire format. Isolation enforced by `tests/test_hevy_compiler_isolation.py` (AST scan: `exercise_template_id` only appears in the compiler/client). An API change touches one file.
+
+2. **Subtract-only autoregulation by default.** Honors Henning's dissent. Red recovery / high ACWR may shrink the budget; green recovery may not enlarge it. `add_load_enabled` flag exists in `routine_generator.py` but is a no-op until the readiness signal validates per PREREQS §C. SSM `/life-platform/hevy/autoreg_add_load_enabled` ships `false`.
+
+3. **Cron disabled by default at TWO layers.** The EventBridge rule is created with `enabled=False` AND SSM `/life-platform/hevy/cron_enabled` defaults to `false`. The Lambda no-ops on either gate, on Pause-Mode = `paused`, or on budget tier ≥ 3. Operator flips both ON after Phase 1 usage justifies it; no code redeploy needed.
+
+4. **Write-key bundling decision: separate secret.** `life-platform/hevy-write` is its own Secrets Manager secret, read by exactly two Lambdas (`hevy-routine-cron` and `life-platform-mcp`). The pre-existing `life-platform/hevy` (read) is unchanged. Yael's bundling rule: same creds + same Lambda set only. A leaked write key cannot read; a leaked read key cannot write.
+
+5. **One fat MCP tool, not five thin ones.** `manage_hevy_routine` dispatches on an `action` param (9 actions). Respects SPEC §9's "fewer fat tools" guidance. Acknowledged tension: the platform is already at 130 tools, above the SIMP-1 Phase 2 ≤80 target; this build does not address the underlying overshoot, but adds 1 fat tool rather than 5 thin ones to avoid widening the gap.
+
+### Architecture details captured elsewhere
+
+- IR schema, partition keys, ID-map: SCHEMA.md (ROUTINE# section).
+- Generator algorithm and guardrails (MEV default, asymmetric autoreg, floor + re-entry variants, joint-friendly bias, portfolio guard, bounded outputs): PREREQS §B.
+- API contract surprises (no DELETE, no webhooks, no documented rate limits, `updated_at`-only conflict guard): PREREQS §A.
+- Interim Sports Med seat appointment: BOARDS.md + `config/board_of_directors.json:iris_tanaka_interim`.
+- Operator procedures (provision secret, flip cron on, flip add-load on, archive routine, conflict playbook): RUNBOOK.md.
+
+### Consequences
+
+- Phase 1 chat-path authoring is usable day one via the MCP tool.
+- Phase 2 adherence readback is wired (`action=adherence`) but only useful once routines exist.
+- Phase 3 cron will fire weekly **only after** the operator flips both gates. The Lambda + IAM + DLQ are pre-provisioned so flip-on is configuration-only.
+- "Add load" autoregulation requires a separate SSM flip (also operator-only) after the N≥30 validation completes; the generator code path is present but inert until then.
+- Public-site copy: per Lena's dissent, this feature is **never** to be described as "autoregulated" while the readiness signal is unvalidated. Correct framing: "deterministic volume-landmark programming with red-day deload guard."
+
+### Rollback
+
+- Chat tool: remove `manage_hevy_routine` from `mcp/registry.py` + redeploy MCP.
+- Cron: `aws events disable-rule --name hevy-routine-cron-weekly` (already disabled at birth); set SSM `cron_enabled=false` (already false). The Lambda + IAM can stay parked indefinitely with zero invocation cost.
+- Secret: rotate `life-platform/hevy-write` via Secrets Manager; no Lambda redeploy needed (secret_cache TTL is 15 min).
+- Interim Iris Tanaka: delete `iris_tanaka_interim` from `config/board_of_directors.json` and re-sync to S3. The `_sunset_trigger` field documents the procedure.

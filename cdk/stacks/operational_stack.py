@@ -538,6 +538,43 @@ class OperationalStack(Stack):
             event=events.RuleTargetInput.from_object({"check_compute_outputs": True}),
         ))
 
+        # ── 14. Hevy Routine Cron (ADR-066) — Phase 3 scheduled generator ──
+        # SHIPS DISABLED at the EventBridge level AND SSM /life-platform/hevy/cron_enabled
+        # defaults to "false" (belt-and-suspenders gate). Operator flips both ON
+        # after ~3 weeks of Phase 1 chat-path usage justifies it (SPEC §2).
+        # Schedule expression below is for the eventual cadence — Sunday 06:30 PT
+        # (13:30 UTC, UTC-fixed, no DST). Until enabled, the cron does not fire.
+        hevy_routine_cron = create_platform_lambda(self, "HevyRoutineCron",
+            function_name="hevy-routine-cron",
+            source_file="lambdas/operational/hevy_routine_cron_lambda.py",
+            handler="operational.hevy_routine_cron_lambda.lambda_handler",
+            timeout_seconds=120, memory_mb=256,
+            environment={
+                "TABLE_NAME": "life-platform",
+                "USER_ID": "matthew",
+                "S3_BUCKET": "matthew-life-platform",
+                "PAUSE_MODE_PARAM": "/life-platform/pause-mode",
+                "BUDGET_TIER_PARAM": "/life-platform/budget-tier",
+                "HEVY_CRON_ENABLED_PARAM": "/life-platform/hevy/cron_enabled",
+                "HEVY_ADD_LOAD_PARAM": "/life-platform/hevy/autoreg_add_load_enabled",
+                "HEVY_WRITE_SECRET": "life-platform/hevy-write",
+            },
+            custom_policies=rp.hevy_routine_cron(),
+            table=local_table, bucket=local_bucket, dlq=None,
+            alerts_topic=local_alerts_topic, digest_topic=local_digest_topic, digest=True,
+            alarm_name="hevy-routine-cron-errors",
+            shared_layer=shared_utils_layer,
+        )
+        # Manual events.Rule escape hatch — create_platform_lambda's schedule= shortcut
+        # auto-enables the rule. ADR-066 ships disabled. Do NOT collapse this back.
+        hevy_routine_cron_rule = events.Rule(self, "HevyRoutineCronRule",
+            rule_name="hevy-routine-cron-weekly",
+            description="ADR-066 ships disabled; operator enables after Phase 1 use justifies it.",
+            schedule=events.Schedule.expression("cron(30 13 ? * SUN *)"),
+            enabled=False,
+        )
+        hevy_routine_cron_rule.add_target(targets.LambdaFunction(hevy_routine_cron))
+
         cdk.CfnOutput(self, "FreshnessCheckerArn", value=freshness.function_arn, description="Freshness checker Lambda ARN")
         cdk.CfnOutput(self, "CanaryArn", value=canary.function_arn, description="Canary Lambda ARN")
         cdk.CfnOutput(self, "SiteApiFunctionUrl",
