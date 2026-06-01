@@ -263,6 +263,45 @@
         "end": 20
       },
       "equipment": "dumbbell"
+    },
+    "barbell_bench_press": {
+      "title": "Bench Press (Barbell)",
+      "_resolves_by_title": "No hevy_template_id_hint on purpose (ADR-069): resolved against the live Hevy template list by exact title at dry_run/commit, then cached. A wrong title fails loudly rather than mis-mapping.",
+      "primary_muscle": "chest",
+      "secondary_muscles": ["triceps", "shoulders"],
+      "skill_tier": 3,
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 5,
+        "end": 8
+      },
+      "equipment": "barbell"
+    },
+    "db_shoulder_press": {
+      "title": "Shoulder Press (Dumbbell)",
+      "_resolves_by_title": "No hevy_template_id_hint on purpose (ADR-069): resolved by title at dry_run/commit.",
+      "primary_muscle": "shoulders",
+      "secondary_muscles": ["triceps"],
+      "skill_tier": 2,
+      "joint_friendly_score": 2,
+      "default_rep_range": {
+        "start": 6,
+        "end": 10
+      },
+      "equipment": "dumbbell"
+    },
+    "reverse_pec_deck": {
+      "title": "Rear Delt Reverse Fly (Machine)",
+      "_resolves_by_title": "No hevy_template_id_hint on purpose (ADR-069): resolved by title at dry_run/commit. If the title is off, fix this string — Hevy's exact built-in name wins.",
+      "primary_muscle": "shoulders",
+      "secondary_muscles": [],
+      "skill_tier": 1,
+      "joint_friendly_score": 3,
+      "default_rep_range": {
+        "start": 12,
+        "end": 15
+      },
+      "equipment": "machine"
     }
   }
 }
