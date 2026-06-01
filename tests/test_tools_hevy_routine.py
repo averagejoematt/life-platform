@@ -170,6 +170,54 @@ def test_draft_custom_builds_ir_lb_to_kg_count_and_supersets():
     assert rpd.sets[0].weight_kg is None and rpd.sets[0].reps == 15
 
 
+def test_draft_custom_resolves_arbitrary_exercise_via_index():
+    """ADR-069 index: an exercise not in the curated catalog resolves by exact
+    title against the full Hevy template index -> movement_key 'tmpl:<id>'."""
+    captured: dict = {}
+
+    def fake_put(ir):
+        captured["ir"] = ir
+        return ir
+
+    # Both movements are deliberately NOT in the curated catalog, so resolution
+    # must fall through to the index (curated keys would short-circuit at step 2).
+    fake_index = {"burpee": {"id": "BB792A36", "title": "Burpee"},
+                  "mountain climber": {"id": "F49E31D6", "title": "Mountain Climber"}}
+    with patch("routine_repo.put_versioned", side_effect=fake_put), \
+         patch.object(t, "_template_index", return_value=fake_index):
+        out = t.tool_manage_hevy_routine({
+            "action": "draft_custom", "target_date": "2026-06-09", "archetype": "circuit",
+            "exercises": [
+                {"title": "Burpee", "sets": [{"reps": 15, "count": 3}], "superset_id": 1},
+                {"title": "Mountain Climber", "sets": [{"duration_seconds": 60}], "superset_id": 1},
+            ],
+        })
+    assert out["status"] == "drafted_custom"
+    ir = captured["ir"]
+    assert [b.movement_key for b in ir.exercises] == ["tmpl:BB792A36", "tmpl:F49E31D6"]
+    assert ir.exercises[0].rationale_tag == "Burpee"   # human label preserved
+    assert len(ir.exercises[0].sets) == 3              # count expansion
+    assert ir.exercises[1].sets[0].duration_seconds == 60
+
+
+def test_make_resolver_short_circuits_tmpl_keys():
+    """A 'tmpl:<id>' movement_key resolves to the bare id, no catalog/Hevy lookup."""
+    assert t._make_resolver()("tmpl:D8F7F851") == "D8F7F851"
+
+
+def test_draft_custom_unknown_offers_index_suggestions():
+    """A near-miss title fails loudly but suggests close index titles."""
+    fake_index = {"bench press (barbell)": {"id": "79D0BB3A", "title": "Bench Press (Barbell)"}}
+    with patch.object(t, "_template_index", return_value=fake_index), \
+         patch.object(t, "_live_template_id_by_title", return_value=None):
+        out = t.tool_manage_hevy_routine({
+            "action": "draft_custom",
+            "exercises": [{"title": "barbell bench zzz", "sets": [{"reps": 5}]}],
+        })
+    assert "MOVEMENT_UNMAPPABLE" in str(out)
+    assert "Bench Press (Barbell)" in str(out)
+
+
 def test_dry_run_falls_back_to_reconcile_by_title():
     """A movement without a template-id hint resolves via the live Hevy
     template list (reconcile_custom), not a loud failure."""
