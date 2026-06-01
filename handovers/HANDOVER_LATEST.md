@@ -2,7 +2,7 @@
 
 **Previous handover:** `handovers/HANDOVER_2026-05-31_HevyTitles.md` (title convention).
 **This session covers:** Two coupled commits — (A) final experiment reset to 2026-06-01 + ADR-067 amendment flipping N to all-time-since-experiment, (B) ADR-068 per-exercise notes with anti-hallucination guard.
-**HEAD on push:** `094e8c6` (Commit A) → `<sha>` (Commit B). **Layer SOURCE v70; AWS still v68.** All deploys pending.
+**HEAD on push:** `094e8c6` (Commit A reset+N flip) → `b1e42e4` (Commit B per-exercise notes) → `ac55818` (hotfix: layer constant 71→69) → final cleanup. **Layer v69 LIVE on all 36 Lambdas. Reset APPLIED. Chat-path Hevy write-loop READY.**
 
 ---
 
@@ -13,8 +13,8 @@
 | Hevy write-loop (chat path) | Code-current on v70. Live on v68 (ADR-067 first version). |
 | Hevy write-loop (cron) | DISABLED — EventBridge rule + SSM `/life-platform/hevy/cron_enabled=false`. Unchanged. |
 | Add-load autoreg | OFF: SSM `/life-platform/hevy/autoreg_add_load_enabled=false`. Unchanged. |
-| Shared layer | **AWS: v68. Source: v70.** Two ADRs since the AWS state — title convention (v69 source) + amendment/per-exercise notes (v70 source). |
-| EXPERIMENT_START_DATE | Source: **2026-06-01** (Sunday). DDB / Lambda live env: still 2026-05-30 — flipped by `restart_pipeline`. |
+| Shared layer | **DEPLOYED — AWS: v69, all 36 layer-using Lambdas on v69.** restart_pipeline bumped to source v71 but never published; hotfix `ac55818` re-pinned source to v69 to match the next AWS publish. |
+| EXPERIMENT_START_DATE | **2026-06-01 (Monday) — LIVE.** Restart_pipeline applied; DDB phase-tagged, intelligence wiped, character rebuilt, 27/27 pages clean. Baseline 304.3 lbs locked via `--override-weight-lbs`. |
 | Phase config | `current=Foundation`, `current_started=2026-06-01`. Phase is now decorative only — does NOT bound N. |
 | Per-exercise notes mode | `training_week.json:exercise_notes_mode="one_best_line"` (default). `show_both` / `off` available. |
 
@@ -50,7 +50,7 @@ Format: `Last: 60kg 8/8/7 (24 May)`
 
 ## What ADR-067 amendment + reset actually does
 
-**Reset:** `EXPERIMENT_START_DATE = "2026-06-01"` (Sunday). Source updated in:
+**Reset:** `EXPERIMENT_START_DATE = "2026-06-01"` (Monday). Source updated in:
 - `config/user_goals.json` (timeline.start_date + end_date)
 - `lambdas/constants.py` (EXPERIMENT_START_DATE + DOW)
 - `config/training_phases.json` (current_started)

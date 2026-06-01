@@ -5,7 +5,10 @@
       "WebFetch(domain:averagejoematt.com)",
       "WebFetch(domain:www.averagejoematt.com)",
       "mcp__life-platform__get_cgm",
-      "mcp__life-platform__get_nutrition"
+      "mcp__life-platform__get_nutrition",
+      "WebFetch(domain:api.hevyapp.com)",
+      "WebSearch",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   },
   "enableAllProjectMcpServers": true,

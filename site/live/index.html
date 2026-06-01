@@ -171,7 +171,7 @@
       </div>
       <div class="fp-arc__chart" id="fp-arc-chart"></div>
       <div class="fp-arc__caption" id="fp-arc-caption">
-        <span>Day 1 · 305 lbs</span>
+        <span>Day 1 · 304 lbs</span>
         <span>Today · — lbs</span>
       </div>
     </section>
@@ -377,7 +377,7 @@
         return;
       }
       document.getElementById('fp-arc-current').textContent = cur.toFixed(1);
-      // Stats — pull from journey_summary if present, else compute against 305→185 scaffold.
+      // Stats — pull from journey_summary if present, else compute against 304→185 scaffold.
       var lost = (297 - cur).toFixed(1);
       var togo = (cur - 185).toFixed(1);
       document.getElementById('fp-arc-lost').textContent = lost + ' lbs';

@@ -11,7 +11,7 @@ Part of the shared Lambda layer (ADR-058). Changes require layer rebuild
 from datetime import date
 
 EXPERIMENT_START_DATE = "2026-06-01"
-EXPERIMENT_START_DOW = "Sunday"
+EXPERIMENT_START_DOW = "Monday"
 EXPERIMENT_TZ = "America/Los_Angeles"
 
 EXPERIMENT_PHASE_CURRENT = "experiment"
