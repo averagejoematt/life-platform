@@ -35,11 +35,28 @@ CONFIG_DIR = os.environ.get(
     "TRAINING_CONFIG_DIR",
     os.path.join(os.path.dirname(__file__), "..", "config"),
 )
+S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+S3_CONFIG_PREFIX = os.environ.get("TRAINING_CONFIG_S3_PREFIX", "config/")
+
+_s3_loader_client = None
 
 
 def _load_json(name: str) -> dict[str, Any]:
-    with open(os.path.join(CONFIG_DIR, name), encoding="utf-8") as f:
-        return json.load(f)
+    """Load a config JSON. Tries local CONFIG_DIR first (tests + bundled
+    Lambdas), then falls back to S3 (s3://${S3_BUCKET}/config/<name>) which
+    is the Lambda runtime path. Result is not cached here — Lambda warm
+    containers naturally cache the parsed dict via the generator caller.
+    """
+    local = os.path.join(CONFIG_DIR, name)
+    if os.path.exists(local):
+        with open(local, encoding="utf-8") as f:
+            return json.load(f)
+    global _s3_loader_client
+    if _s3_loader_client is None:
+        import boto3
+        _s3_loader_client = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2"))
+    obj = _s3_loader_client.get_object(Bucket=S3_BUCKET, Key=f"{S3_CONFIG_PREFIX}{name}")
+    return json.loads(obj["Body"].read())
 
 
 def _config_hash(payload: dict[str, Any]) -> str:
