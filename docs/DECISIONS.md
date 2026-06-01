@@ -2095,6 +2095,16 @@ The initial cut required every authorable movement to be a curated `movement_cat
 
 Config-only + MCP code; no layer change. Rollback: delete the index file (resolution falls back to curated catalog + live lookup) or revert the resolver edits.
 
+### ADR-069 Amendment (2026-06-01): Auto-create missing exercises (no-stuck authoring)
+
+Even with the full index, an exercise Hevy simply doesn't have (e.g. "Landmine Snatch") would dead-end the draft. `draft_custom` now **creates** the missing exercise so the routine isn't blocked:
+
+- **Default `create_missing: true`.** When a title resolves to nothing (curated → index → live) and the caller gave a **human title** (never a bare `movement_key` — that's treated as a likely typo), the exercise is created via `POST /v1/exercise_templates` and then used. Created exercises are reported under `created_exercises` (the visibility net against typos); `create_missing: false` reverts to loud-fail-with-suggestions.
+- **Verified Hevy create contract (2026-06-01):** body is `{"exercise": {title, muscle_group, exercise_type, equipment_category}}` — create-side field names + the `exercise_type` enum DIFFER from the GET-side object, and the response is a bare id string. So we create, then **reconcile the canonical id by title** (handles the bare-string / PREREQS integer-id quirk + eventual consistency). Metadata comes from optional per-exercise overrides (`muscle_group`/`exercise_type`/`equipment_category`) or is inferred from the set shape + title keywords.
+- **Idempotent** across drafts (resolve-first → already-created exercises are found, not duplicated) and within a draft (created titles memoized). A failed create lands in `creation_errors` and that one exercise is skipped — the rest still drafts (never stuck).
+
+MCP code only; no layer/index change required (re-pull the index later to fold new exercises in).
+
 ---
 
-**Verified:** 2026-05-31 (ADR-069 — custom authoring escape hatch) · amended 2026-06-01 (full Hevy template index)
+**Verified:** 2026-05-31 (ADR-069 — custom authoring escape hatch) · amended 2026-06-01 (full Hevy template index; auto-create missing exercises)

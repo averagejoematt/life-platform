@@ -3121,10 +3121,21 @@ TOOLS = {
                             "type?, count? (repeat the set N times), duration_seconds? (cardio), "
                             "distance_meters?}], "
                             "rest_seconds?, superset_id? (same int = superset/circuit/tri-set), notes?}. "
+                            "If a title doesn't exist in Hevy yet it is auto-created (see "
+                            "create_missing); to control the new exercise pass muscle_group, "
+                            "exercise_type, and/or equipment_category on that item (else inferred). "
                             "Loads are taken verbatim — the platform does not compute them."
                         ),
                         "items": {"type": "object"},
                     },
+                    "create_missing": {
+                        "type": "boolean", "default": True,
+                        "description": (
+                            "draft_custom only: when an exercise title isn't found in Hevy, "
+                            "create it (so the draft never gets stuck) and report it under "
+                            "created_exercises. Set false to instead fail loudly with "
+                            "suggestions. Only creates from a human title, never a bare movement_key."
+                        )},
                     "archetype": {"type": "string",
                                   "description": "draft_custom only: session type for the title (e.g. 'push', 'pull', 'upper'). Defaults to 'custom'."},
                     "title": {"type": "string",

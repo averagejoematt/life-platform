@@ -214,6 +214,127 @@ def _resolve_movement_key(ex: dict[str, Any], catalog: dict[str, Any]) -> str | 
     return None
 
 
+# Hevy create-side enums (POST /v1/exercise_templates — verified live 2026-06-01).
+# NOTE: the create-side field names + type enum DIFFER from the GET-side object
+# (create wants muscle_group/exercise_type/equipment_category; GET returns
+# primary_muscle_group/type/equipment). Body wrapper is {"exercise": {...}}.
+_HEVY_MUSCLE_GROUPS = {
+    "abdominals", "shoulders", "biceps", "triceps", "forearms", "quadriceps",
+    "hamstrings", "calves", "glutes", "abductors", "adductors", "lats",
+    "upper_back", "traps", "lower_back", "chest", "cardio", "neck",
+    "full_body", "other",
+}
+_HEVY_EXERCISE_TYPES = {
+    "weight_reps", "reps_only", "bodyweight_reps", "bodyweight_assisted_reps",
+    "duration", "weight_duration", "distance_duration", "short_distance_weight",
+}
+_HEVY_EQUIPMENT = {
+    "none", "barbell", "dumbbell", "kettlebell", "machine", "plate",
+    "resistance_band", "suspension", "other",
+}
+
+# Title-keyword hints for inferring create metadata when the caller omits it.
+_EQUIP_KEYWORDS = [
+    ("barbell", "barbell"), ("landmine", "barbell"), ("ez bar", "barbell"),
+    ("dumbbell", "dumbbell"), ("db ", "dumbbell"),
+    ("kettlebell", "kettlebell"), ("kb ", "kettlebell"),
+    ("cable", "machine"), ("machine", "machine"), ("smith", "machine"),
+    ("band", "resistance_band"), ("suspension", "suspension"), ("trx", "suspension"),
+    ("plate", "plate"),
+]
+_MUSCLE_KEYWORDS = [
+    ("bench", "chest"), ("chest", "chest"), ("fly", "chest"), ("pec", "chest"),
+    ("press", "shoulders"), ("shoulder", "shoulders"), ("delt", "shoulders"),
+    ("lateral raise", "shoulders"), ("snatch", "full_body"), ("clean", "full_body"),
+    ("thruster", "full_body"), ("burpee", "full_body"),
+    ("row", "upper_back"), ("pulldown", "lats"), ("pull-up", "lats"), ("pullup", "lats"),
+    ("curl", "biceps"), ("tricep", "triceps"), ("pushdown", "triceps"), ("dip", "triceps"),
+    ("squat", "quadriceps"), ("lunge", "quadriceps"), ("leg press", "quadriceps"),
+    ("deadlift", "hamstrings"), ("hamstring", "hamstrings"), ("leg curl", "hamstrings"),
+    ("hip thrust", "glutes"), ("glute", "glutes"), ("calf", "calves"),
+    ("crunch", "abdominals"), ("plank", "abdominals"), ("ab ", "abdominals"),
+    ("run", "cardio"), ("cycl", "cardio"), ("bike", "cardio"), ("row erg", "cardio"),
+    ("climber", "cardio"), ("jump rope", "cardio"),
+]
+
+
+def _infer_exercise_type(ex: dict[str, Any]) -> str:
+    """Pick a create-side exercise_type. Explicit override wins; else infer from
+    the set shape (duration/distance/reps/weight)."""
+    override = (ex.get("exercise_type") or ex.get("type") or "").strip().lower()
+    if override in _HEVY_EXERCISE_TYPES:
+        return override
+    sets = ex.get("sets") or []
+    has_dur = any(isinstance(s, dict) and s.get("duration_seconds") is not None for s in sets)
+    has_dist = any(isinstance(s, dict) and s.get("distance_meters") is not None for s in sets)
+    has_weight = any(isinstance(s, dict) and (s.get("weight_lbs") is not None or s.get("weight_kg") is not None) for s in sets)
+    has_reps = any(isinstance(s, dict) and s.get("reps") is not None for s in sets)
+    if has_dist:
+        return "distance_duration"
+    if has_dur and not has_weight:
+        return "duration"
+    if has_dur and has_weight:
+        return "weight_duration"
+    if has_reps and not has_weight:
+        return "reps_only"
+    return "weight_reps"
+
+
+def _infer_from_keywords(name: str, keywords: list, allowed: set, default: str) -> str:
+    n = " " + _normalize_title(name) + " "
+    for kw, val in keywords:
+        if kw in n and val in allowed:
+            return val
+    return default
+
+
+def _infer_muscle_group(ex: dict[str, Any], name: str) -> str:
+    override = (ex.get("muscle_group") or ex.get("primary_muscle") or "").strip().lower()
+    if override in _HEVY_MUSCLE_GROUPS:
+        return override
+    return _infer_from_keywords(name, _MUSCLE_KEYWORDS, _HEVY_MUSCLE_GROUPS, "other")
+
+
+def _infer_equipment(ex: dict[str, Any], name: str) -> str:
+    override = (ex.get("equipment_category") or ex.get("equipment") or "").strip().lower()
+    if override in _HEVY_EQUIPMENT:
+        return override
+    return _infer_from_keywords(name, _EQUIP_KEYWORDS, _HEVY_EQUIPMENT, "none")
+
+
+def _create_template_for(ex: dict[str, Any], title: str) -> tuple[str, dict[str, Any]]:
+    """Create a custom Hevy exercise and return (canonical_id, metadata).
+
+    Hevy's create response is a bare id string (not reliable JSON), and the
+    PREREQS warn the id may come back in a non-canonical form — so we create,
+    then RECONCILE the canonical string id by title (a couple of retries for
+    eventual consistency). A real validation failure (bad enum) surfaces because
+    the title never appears in the list.
+    """
+    import hevy_write_client as wc
+    meta = {
+        "title": title,
+        "muscle_group": _infer_muscle_group(ex, title),
+        "exercise_type": _infer_exercise_type(ex),
+        "equipment_category": _infer_equipment(ex, title),
+    }
+    create_exc = None
+    try:
+        wc.create_template({"exercise": meta})
+    except Exception as e:  # noqa: BLE001 — response may be a bare-string body
+        create_exc = e
+    tid = None
+    for _ in range(3):
+        tid = _live_template_id_by_title(title)
+        if tid:
+            break
+    if not tid:
+        raise RuntimeError(
+            f"could not create/resolve Hevy exercise {title!r}"
+            + (f" (create error: {create_exc})" if create_exc else ""))
+    return tid, {**meta, "id": tid}
+
+
 def _index_suggestions(name: str, limit: int = 8) -> list[str]:
     """Closest index titles sharing a token with `name` — for loud-error help."""
     tokens = {w for w in _normalize_title(name).split() if len(w) > 2}
@@ -276,18 +397,41 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
             error_code="MISSING_ARG",
         )
 
+    create_missing = args.get("create_missing", True)
+    if isinstance(create_missing, str):
+        create_missing = create_missing.lower() not in ("false", "0", "no")
+
     catalog = _catalog_movements()
     blocks: list = []
-    unknown: list[str] = []
+    unknown: list[str] = []           # unresolved + (no human title OR create disabled)
+    created: list[dict] = []          # newly created Hevy exercises this draft
+    creation_errors: list[str] = []   # create attempts that failed
+    newly_created: dict[str, str] = {}  # norm-title -> "tmpl:<id>" (dedupe within draft)
     for ex in raw_exercises:
         if not isinstance(ex, dict):
             continue
         raw_label = str(ex.get("title") or ex.get("name") or ex.get("movement_key") or "?")
+        human_title = (ex.get("title") or ex.get("name") or "").strip()
         mk = _resolve_movement_key(ex, catalog)
         if not mk:
-            unknown.append(raw_label)
-            continue
-        mdef = catalog.get(mk, {})  # empty for index-resolved ("tmpl:") movements
+            norm = _normalize_title(human_title)
+            if norm and norm in newly_created:        # already created earlier this draft
+                mk = newly_created[norm]
+            elif create_missing and human_title:
+                # Don't get stuck: create the missing exercise in Hevy, then use it.
+                # Only from a human title — never from a bare movement_key (likely a typo).
+                try:
+                    new_id, cmeta = _create_template_for(ex, human_title)
+                    mk = "tmpl:" + new_id
+                    newly_created[norm] = mk
+                    created.append(cmeta)
+                except Exception as e:  # noqa: BLE001
+                    creation_errors.append(f"{raw_label}: {e}")
+                    continue
+            else:
+                unknown.append(raw_label)
+                continue
+        mdef = catalog.get(mk, {})  # empty for index-resolved / created ("tmpl:") movements
         blocks.append(ExerciseBlock(
             movement_key=mk,
             sets=_coerce_sets(ex.get("sets")),
@@ -297,14 +441,16 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
             joint_friendly_score=int(mdef.get("joint_friendly_score", 3)),
             skill_tier=int(mdef.get("skill_tier", 1)),
             # human label for traceability — curated movements keep "custom",
-            # index-resolved ones record the title that mapped to the template id.
+            # index-resolved / created ones record the title behind the template id.
             rationale_tag=(mdef.get("title") or raw_label) if mk.startswith("tmpl:") else "custom",
         ))
 
+    # Unresolvable with no way to create (bare movement_key, or create disabled) → loud fail.
     if unknown:
         msg = ("Unknown movement(s): " + ", ".join(unknown) + ". "
                "Pass a curated movement_key or an exact Hevy exercise title "
-               "(any built-in or custom Hevy exercise resolves by title).")
+               "(any built-in or custom Hevy exercise resolves by title; a new one "
+               "is auto-created when you give a human title and create_missing is on).")
         suggestions = []
         for u in unknown:
             suggestions += _index_suggestions(u, limit=6)
@@ -312,7 +458,10 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
             msg += " Did you mean: " + ", ".join(sorted(set(suggestions))) + "?"
         return mcp_error(msg, error_code="MOVEMENT_UNMAPPABLE")
     if not blocks:
-        return mcp_error("No valid exercises after parsing 'exercises'", error_code="MISSING_ARG")
+        return mcp_error(
+            "No valid exercises after parsing 'exercises'"
+            + (f" (creation errors: {'; '.join(creation_errors)})" if creation_errors else ""),
+            error_code="MISSING_ARG")
 
     archetype = (args.get("archetype") or "custom").strip().lower()
     target_date = args.get("target_date") or datetime.now(timezone.utc).date().isoformat()
@@ -344,7 +493,8 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         exercises=blocks,
         budget_used={},
         inputs_snapshot={"authored": "custom", "total_sets": total_sets,
-                         "exercise_count": len(blocks)},
+                         "exercise_count": len(blocks),
+                         "created_exercises": created},
         rationale=[
             "custom-authored via chat (action=draft_custom)",
             "loads + sets are user-specified; the generator did NOT compute them",
@@ -353,7 +503,7 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         caps={},
     )
     put_versioned(ir)
-    return {
+    resp = {
         "status": "drafted_custom",
         "routine_id": ir.routine_id,
         "target_date": target_date,
@@ -364,6 +514,15 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         "note": "Run action=dry_run with this routine_id to preview the exact Hevy "
                 "body, then action=commit to push. Commit requires explicit routine_id.",
     }
+    if created:
+        resp["created_exercises"] = created
+        resp["note"] = (f"Created {len(created)} new Hevy exercise(s): "
+                        + ", ".join(f"{c['title']} ({c['muscle_group']}/{c['exercise_type']})"
+                                    for c in created)
+                        + ". " + resp["note"])
+    if creation_errors:
+        resp["creation_errors"] = creation_errors
+    return resp
 
 
 def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
