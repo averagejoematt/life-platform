@@ -1981,3 +1981,15 @@ Then `aws s3 cp config/training_phases.json s3://matthew-life-platform/config/`.
 ### Rollback
 
 Pass `title_context=None` (and omit `why_note`) at every caller site. Compiler falls back to `ir.title` + `ir.notes`, restoring the ADR-066 placeholder behavior. No deploy needed beyond reverting the two caller edits in `mcp/tools_hevy_routine.py` and `lambdas/operational/hevy_routine_cron_lambda.py`.
+
+### ADR-067 Amendment (2026-05-31): N is all-time-per-type since EXPERIMENT_START_DATE
+
+The original ADR-067 shipped per-phase N. After a same-day review, Matthew flipped to **all-time-per-type-since-experiment-start**:
+
+- N counts pushed routines of this archetype since `EXPERIMENT_START_DATE` (set to 2026-06-01 by the same change).
+- Phase boundaries no longer reset N. Phase becomes a decorative narrative marker in the title — "you are in Build phase" — but the Push sequence continues across phase transitions.
+- Y counts performed Hevy workouts since `EXPERIMENT_START_DATE`. Pre-experiment Hevy workouts stay in DDB (preserved by the restart-pipeline's phase-tag stage) but are excluded from these counters so they reflect *this experiment's* journey, not lifetime.
+
+Reasoning: the experiment is the anchor that gives N and Y their meaning. Per-phase resets fragment the arc and create same-name collisions (`Foundation - Push - 3` and `Build - Push - 3`); all-time-since-experiment keeps the sequence intact and self-correcting. Y's honesty argument (don't inflate on skipped sessions) carries over.
+
+`count_phase_archetype_routines` → renamed `count_experiment_archetype_routines`. `count_total_performed_workouts` → renamed `count_performed_workouts_since(start_date)` with the experiment date pinned in `build_title_context`. Tests updated accordingly. Layer v69 → v70.
