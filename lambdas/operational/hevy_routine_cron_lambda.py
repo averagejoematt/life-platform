@@ -129,6 +129,7 @@ def lambda_handler(event, context):
         import hevy_write_client as wc
         import routine_repo as repo
         from routine_generator import generate_routines
+        from routine_title import build_title_context, format_why_note
 
         routines = generate_routines(inputs)
         logger.info(f"generated {len(routines)} variant(s) for {target_date}: "
@@ -142,7 +143,10 @@ def lambda_handler(event, context):
                 summary.append({"routine_id": ir.routine_id, "variant": ir.variant, "pushed": False})
                 continue
             try:
-                body = to_create_body(ir, resolve_movement)
+                title_ctx = build_title_context(ir)
+                why = format_why_note(ir)
+                body = to_create_body(ir, resolve_movement,
+                                      title_context=title_ctx, why_note=why)
                 resp = wc.create_routine(body)
                 from hevy_compiler import from_hevy_response
                 parsed = from_hevy_response(resp)

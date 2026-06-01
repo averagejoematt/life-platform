@@ -69,6 +69,30 @@ def test_from_hevy_response_extracts_diff_keys():
     assert parsed["exercises"][0]["set_count"] == 2
 
 
+def test_title_context_overrides_default_title():
+    """ADR-067: when a title_context is supplied, the compiler uses format_title."""
+    ctx = {"phase": "Foundation", "type_count_in_phase": 3, "all_time_count": 47}
+    body = to_create_body(_ir(), _resolver_fn, title_context=ctx)
+    assert body["routine"]["title"] == "Foundation - Upper - 3 - 47"
+
+
+def test_why_note_overrides_default_notes():
+    """ADR-067: WHY-note projected into Hevy notes; IR notes ignored."""
+    ir = _ir()
+    ir.notes = "multi\nline\nrationale\nthat should not reach Hevy"
+    body = to_create_body(ir, _resolver_fn, why_note="Readiness green. Programmed.")
+    assert body["routine"]["notes"] == "Readiness green. Programmed."
+
+
+def test_update_body_also_takes_title_context():
+    ctx = {"phase": "Build", "type_count_in_phase": 2, "all_time_count": 99}
+    body = to_update_body(_ir(), _resolver_fn,
+                         title_context=ctx, why_note="x")
+    assert body["routine"]["title"] == "Build - Upper - 2 - 99"
+    assert body["routine"]["notes"] == "x"
+    assert "folder_id" not in body["routine"]
+
+
 def test_round_trip_response_to_diff():
     body = to_create_body(_ir(), _resolver_fn)
     simulated_response = {"routine": {

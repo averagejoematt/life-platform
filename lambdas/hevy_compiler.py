@@ -58,24 +58,55 @@ def _exercise_to_wire(ex: ExerciseBlock, template_resolver: Callable[[str], str]
     }
 
 
-def to_create_body(ir: RoutineSpec, template_resolver: Callable[[str], str]) -> dict[str, Any]:
-    """IR -> POST /v1/routines body. Includes folder_id (set-on-create only)."""
+def _resolve_title(ir: RoutineSpec, title_context: dict[str, Any] | None) -> str:
+    """If a title_context is supplied use the ADR-067 format; otherwise keep
+    the IR title (or a deterministic fallback). Lazy-imports routine_title so
+    compiler unit tests can omit context and stay I/O-free.
+    """
+    if title_context is None:
+        return (ir.title or f"{ir.archetype}-{ir.target_date}")[:60]
+    from routine_title import format_title
+    return format_title(ir, title_context)
+
+
+def to_create_body(
+    ir: RoutineSpec,
+    template_resolver: Callable[[str], str],
+    title_context: dict[str, Any] | None = None,
+    why_note: str | None = None,
+) -> dict[str, Any]:
+    """IR -> POST /v1/routines body. Includes folder_id (set-on-create only).
+
+    title_context: optional ADR-067 context (phase / type_count_in_phase /
+    all_time_count). If supplied, the compiler renders the title via
+    routine_title.format_title. If None, falls back to ir.title.
+
+    why_note: optional one-line WHY summary projected into the Hevy notes
+    field. If None, falls back to ir.notes.
+    """
     return {
         "routine": {
-            "title": ir.title or f"{ir.archetype}-{ir.target_date}",
+            "title": _resolve_title(ir, title_context),
             "folder_id": ir.hevy_folder_id,
-            "notes": ir.notes or "",
+            "notes": why_note if why_note is not None else (ir.notes or ""),
             "exercises": [_exercise_to_wire(ex, template_resolver) for ex in ir.exercises],
         },
     }
 
 
-def to_update_body(ir: RoutineSpec, template_resolver: Callable[[str], str]) -> dict[str, Any]:
-    """IR -> PUT /v1/routines/{id} body. folder_id deliberately omitted (immutable per Hevy)."""
+def to_update_body(
+    ir: RoutineSpec,
+    template_resolver: Callable[[str], str],
+    title_context: dict[str, Any] | None = None,
+    why_note: str | None = None,
+) -> dict[str, Any]:
+    """IR -> PUT /v1/routines/{id} body. folder_id deliberately omitted
+    (immutable per Hevy). title_context + why_note semantics match
+    to_create_body."""
     return {
         "routine": {
-            "title": ir.title or f"{ir.archetype}-{ir.target_date}",
-            "notes": ir.notes or "",
+            "title": _resolve_title(ir, title_context),
+            "notes": why_note if why_note is not None else (ir.notes or ""),
             "exercises": [_exercise_to_wire(ex, template_resolver) for ex in ir.exercises],
         },
     }

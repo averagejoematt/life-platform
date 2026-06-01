@@ -1900,3 +1900,84 @@ Five tightly coupled subdecisions, all shipped together because splitting them w
 - Cron: `aws events disable-rule --name hevy-routine-cron-weekly` (already disabled at birth); set SSM `cron_enabled=false` (already false). The Lambda + IAM can stay parked indefinitely with zero invocation cost.
 - Secret: rotate `life-platform/hevy-write` via Secrets Manager; no Lambda redeploy needed (secret_cache TTL is 15 min).
 - Interim Iris Tanaka: delete `iris_tanaka_interim` from `config/board_of_directors.json` and re-sync to S3. The `_sunset_trigger` field documents the procedure.
+
+## ADR-067: Hevy Routine Title Convention — "<Phase> - <Type> - <N> - <Y>"
+
+**Date:** 2026-05-31
+**Status:** Implemented (code shipped; layer rebuild + cdk deploy pending — see RUNBOOK §"Hevy Routine Title Convention — Deploy Steps").
+**Related:** ADR-066 (Hevy routine write-loop), `lambdas/routine_title.py`, `config/training_phases.json`.
+
+### Context
+
+ADR-066 shipped the write-loop with a placeholder title ("`<archetype> — <date>`") and the IR's multi-line rationale dumped into Hevy's notes field. Both surfaces are wrong for the actual user experience in the Hevy app:
+
+- The routine list in Hevy shows the title as a one-line label. The placeholder doesn't carry the information that's useful in a glance — *what phase am I in? how many of this type? how deep into the journey?*
+- The notes field is shown as a free-form description. A multi-line rationale dump is noisy and reads as machine output.
+
+### Decision
+
+Adopt a single title convention used by every variant except re-entry:
+
+```
+<Phase> - <Type> - <N> - <Y>
+```
+
+- **Phase** — current training-phase name from `config/training_phases.json`. Phases ship as `["Foundation", "Build", "Forge", "Sustain"]`; rename as the program matures. `current` is manually advanced — no auto/milestone-driven transitions. Phase boundary date lives in `current_started` and is the inclusive lower bound for N.
+- **Type** — `ir.archetype` title-cased (Upper / Lower / Full / Aerobic / Mobility). Push/Pull/Legs would require an archetype refactor; not in scope.
+- **N** — count of **pushed** routines of this archetype within the current phase + 1. 1-based; resets at phase boundary.
+- **Y** — total **performed** Hevy workouts to date + 1. Computed at generation time from a DDB COUNT query against `USER#matthew#SOURCE#hevy` `DATE#`.
+
+Examples:
+- `Foundation - Upper - 3 - 47`
+- `Build - Lower - 1 - 51`
+
+Re-entry variant overrides the convention entirely:
+
+```
+Welcome back · <Type>
+```
+
+No counters surface in the title. Y and N still flow through the IR for analytics — they're kept out of the title to honor the no-guilt-debt principle (Coach Maya / Dr. Reeves in REVIEW §5). "You missed N" framing is unkind and unhelpful.
+
+A one-line **WHY note** is projected into Hevy's notes field, replacing the rationale dump. Variants:
+
+- `re_entry`  → "Easing back in after a gap. Take it gently today."
+- `floor`     → "Floor session — minimum effective dose for a low-energy day."
+- red recovery → "Recovery red. Deloading today; protect joints."
+- portfolio guard active → "Aerobic base low. Holding strength flat to protect Zone 2."
+- yellow recovery → "Readiness yellow. Holding steady."
+- green recovery → "Readiness green. Programmed against weekly volume targets."
+
+### Why Y is performed-based but N is pushed-based
+
+The spec is explicit: **Y derives from performed-workout history so it's honest and self-correcting** — skipping a planned session never inflates Y. A naive ever-incrementing counter would drift away from physical reality every time a session is missed; that drift is corrosive over months. The cumulative tally is the most prominent "deep into the journey" signal, so it has to be honest.
+
+**N is pushed-based for sequencing simplicity.** When Matthew looks at his Hevy routine list, he sees the sequence of routines we've sent him; numbering them in that order matches the mental model of "I just pushed Push-3." A performance-based N would require cross-referencing each routine to a Hevy workout on the same target_date — possible (the linkage is in DDB) but adds two more DDB queries per commit and a subtler semantic ("this routine is N=3 but you've only performed 1 push so far"). Phase 1 prefers the simpler interpretation; Phase 2 can revisit if the drift turns out to matter.
+
+### Open call: per-phase vs all-time-per-type N
+
+The default ships per-phase (N resets when `current_started` moves). The alternative is all-time-per-type (Push #47 forever). Flagged in the handover; flipping is a one-helper change in `routine_title.count_phase_archetype_routines` (drop the `phase_start` filter). Matthew's call.
+
+### Phase advancement
+
+Manual only. Update `config/training_phases.json`:
+
+```json
+{
+  "phases": ["Foundation", "Build", "Forge", "Sustain"],
+  "current": "Build",
+  "current_started": "2026-09-01"
+}
+```
+
+Then `aws s3 cp config/training_phases.json s3://matthew-life-platform/config/`. The next commit picks up the new phase from S3 (15-min secret/config TTL on warm containers; cold start is instant). N resets to 1 for each archetype at the boundary.
+
+### Consequences
+
+- The existing routine `75e4268c-...` (already committed under the old title) will get retitled at next `commit` (which is a PUT). No data loss; the IR keeps its full rationale and prior title in the version history.
+- Hevy app routine-list scanning becomes meaningful: at a glance, phase + type + sequence + journey tally.
+- The chat path and the cron path use the same title convention via the shared `routine_title.build_title_context` helper. Two routines for the same target_date generated on the same day will share the same N and Y — appropriate, since they reflect "where you are right now" not "where this specific routine fits in the pushed sequence."
+
+### Rollback
+
+Pass `title_context=None` (and omit `why_note`) at every caller site. Compiler falls back to `ir.title` + `ir.notes`, restoring the ADR-066 placeholder behavior. No deploy needed beyond reverting the two caller edits in `mcp/tools_hevy_routine.py` and `lambdas/operational/hevy_routine_cron_lambda.py`.

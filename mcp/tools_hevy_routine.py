@@ -104,17 +104,22 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
     from hevy_template_cache import resolve_movement
     import hevy_write_client as wc
     from routine_repo import get_current, put_versioned, upsert_id_map
+    from routine_title import build_title_context, format_why_note
     ir = get_current(routine_id)
     if not ir:
         return mcp_error(f"routine_id={routine_id} not found", error_code="NOT_FOUND")
     try:
+        title_ctx = build_title_context(ir)
+        why = format_why_note(ir)
         if ir.hevy_routine_id:
-            body = to_update_body(ir, resolve_movement)
+            body = to_update_body(ir, resolve_movement,
+                                  title_context=title_ctx, why_note=why)
             resp = wc.update_routine_with_guard(
                 ir.hevy_routine_id, body, expected_updated_at=ir.hevy_updated_at,
             )
         else:
-            body = to_create_body(ir, resolve_movement)
+            body = to_create_body(ir, resolve_movement,
+                                  title_context=title_ctx, why_note=why)
             resp = wc.create_routine(body)
         parsed = from_hevy_response(resp)
         ir.hevy_routine_id = parsed["hevy_routine_id"] or ir.hevy_routine_id
