@@ -2108,3 +2108,38 @@ MCP code only; no layer/index change required (re-pull the index later to fold n
 ---
 
 **Verified:** 2026-05-31 (ADR-069 — custom authoring escape hatch) · amended 2026-06-01 (full Hevy template index; auto-create missing exercises)
+
+## ADR-070: Vacation Fund Tracker — $1 per workout mile, additive across sources
+
+**Date:** 2026-06-01
+**Status:** Implemented (MCP + site-api + daily brief; live on layer v71).
+**Related:** `lambdas/vacation_fund.py`, `config/vacation_fund.json`, `mcp/tools_vacation.py`, `lambdas/web/site_api_lambda.py` (`/api/vacation_fund`), `lambdas/emails/daily_brief_lambda.py` + `lambdas/html_builder.py`, `handovers/HANDOVER_2026-06-01_VacationFund.md`.
+
+### Context
+
+A motivation game: every mile of workout distance since `EXPERIMENT_START_DATE` (2026-06-01) earns $1 toward a shared vacation fund. Needed to total *Matthew's* miles from existing data, convert to dollars, and surface it easily.
+
+### Decision
+
+1. **One shared compute in the layer, three thin consumers.** `lambdas/vacation_fund.py:compute_vacation_fund(start?, end?)` owns the miles→USD math; the MCP tool (`get_vacation_fund`), the site-api route (`/api/vacation_fund`), and the daily-brief banner all call it. No new compute Lambda/schedule — on-demand (data is small, grows slowly).
+
+2. **Strava base + additive opt-in Hevy/MacroFactor (user's choice).** Strava daily `total_distance_miles` is the base (Zwift `VirtualRide`s, Garmin auto-syncs, and outdoor walks/runs all already flow into Strava). Hevy (`exercises[].sets[].distance_m`÷1609.34) and MacroFactor (`distance_miles` or `distance_yards`÷1760) are **added on top** because Matthew logs some cardio only there. **Garmin is never counted separately** (double-count). Overlap (a ride in both Strava and Hevy) is accepted and made visible via a per-source breakdown + a warning; `manual_adjustment_usd` corrects it.
+
+3. **Config in S3, not code.** `config/vacation_fund.json`: `rate_per_mile` (1.0), `start_date` (null→genesis), `included_sport_types` ("all" or a Strava sport_type list), `extra_sources` (["hevy","macrofactor_export"]), `manual_adjustment_usd`. Loaded local-first (tests) then S3; missing/partial config falls back to defaults and never errors.
+
+4. **Read-only.** Every consumer only reads DDB/S3; the tool/endpoint never write. Genesis day returns zeros + a clear warning rather than erroring.
+
+### Consequences
+
+- Layer **v70 → v71** (`vacation_fund.py` added to `build_layer.sh` + `ci/lambda_map.json`; `html_builder.py` edited for the banner). Fleet repointed to v71.
+- Activity-type filtering, when set, restricts Strava sport_types and skips Hevy/MacroFactor (they have no sport_type to filter on) — surfaced in `warnings`.
+- The girlfriend's miles are out of scope for auto-counting (not in Matthew's Strava); can be folded in as a `manual_adjustment_usd` lump sum.
+- Optional future: same-day Strava↔Hevy distance-match dedup (not built — additive by design).
+
+### Rollback
+
+Remove `get_vacation_fund` from `mcp/registry.py` + redeploy MCP; remove the `/api/vacation_fund` route + the brief's `compute_vacation_fund` call. `vacation_fund.py` and the config become inert. No data migration (read-only).
+
+---
+
+**Verified:** 2026-06-01 (ADR-070 — vacation fund tracker)
