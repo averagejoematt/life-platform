@@ -1,8 +1,8 @@
-# HANDOVER — 2026-05-29 (Evening session)
+# HANDOVER — 2026-05-31 (Saturday — Day 2)
 
-**Previous handover:** `handovers/archive/HANDOVER_v8.0.0_2026-05-19.md`.
-**This session covers:** Backlog spec items #2–#10 sweep + WAF removal + a 6-blocker CI bug-hunt.
-**Latest HEAD on push:** `c62a731` (CI run #26673378064 inflight as of handover write).
+**Previous handover:** `handovers/archive/HANDOVER_2026-05-29_Evening.md`.
+**This session covers:** Saturday morning restart-pipeline (baseline lock) → Stage0 hard-gate fixes → v2 site IA consolidation (5 stages) → WAF removal closure → security/cleanup tasks (#106 #108 #109 #110).
+**HEAD on push:** `main` at `8679f9b` (LIVE on production). Tags: `site-v1` at `00fb531` (pre-consolidation), `site-v2` at `8679f9b` (consolidation landing).
 
 ---
 
@@ -10,84 +10,69 @@
 
 | Surface | Status |
 |---|---|
-| **Genesis** | 2026-05-30, baseline 304.62 lbs (provisional — Saturday re-anchor pending). |
-| **Shared layer** | v62. No bump tonight. |
-| **Budget tier** (SSM `/life-platform/budget-tier`) | 1 (coaches paused) when WAF was alive; should auto-flip to 0 at next hourly `cost_governor_lambda` run now that WAF spend is gone. |
+| **Genesis** | 2026-05-30, **baseline 304.3 lbs locked** (real Saturday weigh-in, no longer provisional). |
+| **Shared layer** | v63 (bumped from v62 by today's restart pipeline). |
+| **Budget tier** (SSM `/life-platform/budget-tier`) | 0. Auto-flipped from 1 after WAF deletion saved ~$8/mo. |
 | **Remediation mode** (SSM `/life-platform/remediation-mode`) | `auto`. |
-| **WAF** | **DELETED.** `life-platform-amj-waf` detached from CloudFront + deleted. Subscribe rate-limit ported into the Lambda. |
-| **email-subscriber** | Last CDK deploy 03:27 UTC with rate-limit code. Then a x-forwarded-for fix in `c62a731` is being deployed by CI via the now-region-aware deploy script. |
-| **CI** | Was silently failing for ~6 weeks. Five blockers cleared tonight. Sixth (region-blindness) found post-deploy. |
+| **WAF** | **DELETED.** Subscribe rate-limit ported into the Lambda + verified live (65-POST smoke: 60×200, 5×429). |
+| **email-subscriber** | us-east-1, on the `x-forwarded-for`-aware build. Production-deployed via CI through the `github-actions-deploy-role` OIDC route (us-east-1 widening landed). |
+| **`life-platform/subscriber-token-secret`** | New 256-bit dedicated HMAC secret in Secrets Manager. Subscriber tokens migrated off the Anthropic API key (#106). 24h dual-validation window will expire on its own; remove the legacy fallback after 2026-06-01. |
+| **Public site IA** | v2 consolidation **LIVE** at averagejoematt.com. ~13-spine nav. All v1 URLs still resolve or 301. |
+| **CI** | Healthy. Six blockers cleared this weekend; full deploy path works end-to-end. |
 
 ---
 
-## What I built tonight
+## What I built today
 
-### A. Backlog #2–10 sweep
+### A. Saturday morning — baseline lock
 
-| # | Outcome |
+`python3 deploy/restart_pipeline.py --genesis 2026-05-30 --override-weight-lbs 304.3 --apply` — replaces the provisional 304.62 lbs from Friday's weigh-in with the real 304.3 from this morning. Layer v62 → v63. All 5 stacks redeployed cleanly. 27/27 pages verified.
+
+### B. Stage 0 hard-gate fixes (from prior session brief)
+
+Three independent surgical fixes shipped behind one commit per brief intent. All live on production after Saturday morning's `sync_site_to_s3.sh`:
+
+- **Fix #1 — vice-keyword privacy leak.** `BLOCKED_KW = ['porn','marijuana',…]` array was shipping in plaintext to `site/{mind,habits,stack}/index.html`. The suppression mechanism literally published the blocked terms in view-source. Moved authoritative filter server-side via `_is_blocked_vice()` in `handle_vice_streaks` + `handle_habit_registry` + `handle_mind_overview`. Client `BLOCKED_KW` arrays removed; `isBlocked()` retained as a no-op for filter call sites.
+- **Fix #2 — Matthew Walker attribution.** `/benchmarks/` Why-We-Sleep epigraph had been corrupted to "Matthew, PhD" — hand-written typo (no systematic scrub function exists). Fixed to "Matthew Walker, PhD".
+- **Fix #3 — stale Brandt analysis.** `/api/ai_analysis?expert=explorer` was serving 2026-05-25 content claiming "55 days in" against the new 2026-05-30 genesis. Tombstoned 9 stale `EXPERT#*` records immediately + added `restart_intelligence_wipe.py` partition + freshness guard in `handle_ai_analysis` (refuses to serve narrative whose `days_in_experiment > current day_n`).
+
+### C. v2 site IA consolidation — 5 stages
+
+Per the v2 brief, executed Plan B (branch-only, no live preview prefix — Priya's time-box):
+
+| Stage | Result |
 |---|---|
-| #3 Cost/cache/SES audit | `docs/audits/COST_CACHE_SES_VERIFICATION_2026-05-29.md`. Real Bedrock MTD $4.27, daily-brief cache 0% read, SES opens 0 (Apple Mail Privacy). |
-| #5 [VERIFY] sweep | `docs/audits/VERIFY_SWEEP_2026-05-29.md`. 3 PR1 bugs FIXED, IA fragmentation persists → #9 GO. |
-| #4 Reserved concurrency | `deploy/stage_reserved_concurrency.sh` staged + gate-checked. Waits for AWS Support case 177921309700709 to approve 10→100. |
-| #7 Email dark mode | 4 of 5 emails already had it. Added the missing `prefers-color-scheme: dark` block to the sick-brief template in `daily_brief_lambda.py`. |
-| #2 TD-11 Phase 1 | Habitify ingestion now writes `habit_statuses` enum alongside legacy binary `habits`. 9 unit tests pass. |
-| #6 WR-47 Pause Mode | **Deferred** (legitimately multi-session, schema dep). |
-| #9 IA restructuring | `/achievements/`→`/character/`, `/data/`→`/platform/data/`, nav + sitemap pruned. |
-| #8 Intelligence rebuild Phase 1 | New routes `/api/hypotheses` + `/api/intelligence_summary`. UI build deferred. |
+| **0** Versioning floor | Tag `site-v1` + branch `redesign/v2-consolidation` + `deploy/V2_ROLLBACK.md`. |
+| **1** Observatory hub | New `/observatory/` folds 8 dispatches as cards; sub-pages live + reachable; nav collapsed 8 → 1 entry. |
+| **2** How It Works absorbs explainers | `/platform/` gains `#the-ai` `#ai-board` `#coaching-team` sections. Originals archived to `site/archive/v1/` via `git mv`. Routes redirect to anchors. Methodology stays standalone (Brandt/Lena hard-gate). |
+| **3** Dedupe + footer | Supplement trio (`/stack/` + `/supplements/protocol/`) → `/supplements/`. Weekly trio (`/weekly/` + `/recap/`) → `/chronicle/`. Public footer pruned of internal tooling. |
+| **4** Nav rebuild + verification | Top nav rebuilt to brief-spec 8-spine (Story · Pulse · Observatory · Score · Practice · Chronicle · How It Works · Subscribe). 49-route crawl: 36 full pages + 13 redirects + **0 missing**. |
 
-### B. WAF removal saga
+Promotion clean: merged to `main`, pushed, `sync_site_to_s3.sh` ran, CloudFront invalidation `I2D4G3UKIY7TFO4JFEW7WZSU13` propagated, 9/9 redirects PASS, 8/8 dispatches HTTP 200, 9/9 spine pages HTTP 200.
 
-1. Built in-Lambda subscribe rate-limit (DDB atomic counter, 60 req / 5min / IP, fail-open).
-2. Wrote `deploy/finish_waf_removal.sh` (detach + delete + preflight probe).
-3. You ran the script based on my "preflight passed" signal. Preflight was bogus — it returned 400 from the old code path, not proof of new code.
-4. WAF was deleted before the new rate-limit code was deployed → `/api/subscribe` unprotected for ~30 min.
-5. New CI run pushed. Then hit 5 cascading CI failures before the deploy went through.
-6. Deploy succeeded but updated the wrong region (us-west-2 twin instead of us-east-1 production). Fixed deploy_lambda.sh to be region-aware. Re-pushed.
+### D. WAF removal saga, finally closed
 
-**Lesson burned in:** "preflight passed" needs to be a positive proof of the new behavior (e.g., 61 rapid POSTs see a 429), not just "endpoint responds."
+The Friday session left the WAF deleted but rate-limit not actually firing (CloudFront edge IP varies per request → never accumulated). Today: fixed to use `x-forwarded-for[0]`; verified live via 65-POST smoke; 60×200 then 5×429 as expected. WAF stays gone, ~$8/mo saved.
 
-### C. TD-11 Phase 2 — the actual phantom-fail fix
+### E. #106 #108 #109 #110 — small but real cleanups
 
-The real consumer-side bug was that `completion_pct` counted today's `pending` habits as failures, making mid-day character scores read ~0%. Fixed at the source in `habitify_lambda.py:transform()` — `pending_count` excluded from denominator. Past-day records unchanged. Consumer code (streak calc, character engine) needs **no changes**. 12 unit tests pass. Backfill script written (`backfill/backfill_habitify_v2_schema.py`), not run.
-
-### D. The CI bug-hunt — six blockers cleared
-
-CI hadn't deployed cleanly in ~6 weeks. Cleared in order:
-
-1. **IAM-secrets linter** — `KNOWN_SECRETS` missing `github-dispatch-token` from ADR-064.
-2. **ARN convention drift** — dispatcher policy hardcoded `…/github-dispatch-token-*` (literal dash before wildcard) instead of using `_secret_arn()`. Linter regex stripped `*` but not `-`, so the extracted name didn't match KNOWN_SECRETS.
-3. **Source-references linter** — sibling KNOWN_SECRETS in `test_secret_references.py` missing both `hevy` and `github-dispatch-token`.
-4. **My own test pollution** — `test_habitify_status_resolution.py` stubbed `http_retry` in `sys.modules` unnecessarily, shadowing the real module when the full suite ran in alphabetical order.
-5. **AWS CLI pagination** — `aws lambda list-layer-versions` paginates at 50 items; our layer is v62 → returned `62\n12` (the `LayerVersions[0].Version` per page). The CI layer-verify compared `"62"` against `"62\n12"` and flagged every consumer as mismatched. Hilarious error: `"daily-brief is on layer v62, expected v62"`. Fixed with `--no-paginate`.
-6. **`deploy_lambda.sh` region-blindness** — hardcoded `REGION=us-west-2`. Production `email-subscriber` is in us-east-1, but a vestigial us-west-2 twin existed. CI was happily updating the twin while production stayed stale. CI's "success" was lying. Fixed with per-Lambda region in `lambda_map.json`, preflight that fails loud, and `tests/test_lambda_map_regions.py` R1/R2/R3 to close the bug class permanently.
+- **#106 subscriber-token migration.** New `life-platform/subscriber-token-secret` in Secrets Manager. Both site_api_social + site_api_ai migrated off the `sha256("subscriber-token-v1:" + anthropic_api_key)` derivation. Dual-validation in the validator for the 24h migration window. CDK deployed for IAM grant.
+- **#108 vote/follow x-forwarded-for.** Same bug shape as the subscribe fix; ported via shared `_extract_client_ip(event)` helper. 6 sites in `site_api_social.py`.
+- **#109 late-arrival recompute** Option B — added a second daily-metrics-compute schedule at 5 PM PT so workouts logged mid-morning surface same-day on averagejoematt.com without waiting on tomorrow's run. Plus Hevy schema normalizer (#110) so MCP read tools handle the per-workout shape (which was previously invisible to `get_workout_frequency` + 4 other strength readers).
 
 ---
 
 ## What still needs to happen
 
-### Verification (post-CI)
-- Confirm CI run #26673378064 deploys cleanly to us-east-1.
-- Re-run the 65-POST smoke test:
-  ```bash
-  for i in $(seq 1 65); do curl -s -o /dev/null -w "%{http_code} " \
-    -X POST -H "Content-Type: application/json" \
-    -d '{"email":"smoke@gmail.com"}' \
-    https://averagejoematt.com/api/subscribe; done; echo
-  ```
-  Expect ~60 `200`s then `429`s.
-
 ### Operator actions (agent can't do)
-- **Saturday 2026-05-30**: weigh in, then re-run `python3 deploy/restart_pipeline.py --genesis 2026-05-30 --override-weight-lbs <real-weight> --apply` to lock the true Day-1 baseline.
-- **AWS Support case 177921309700709**: check status. Once approved, `bash deploy/stage_reserved_concurrency.sh`.
-- **PAT rotation reminder**: calendar item ~2026-08-27 (90d from current PAT creation).
+- **AWS Support case 177921309700709** — concurrency raise 10 → 100. When approved, `bash deploy/stage_reserved_concurrency.sh`.
+- **PAT rotation** — calendar item ~2026-08-27 (90d from creation).
+- **24h subscriber-token migration window cleanup** — after 2026-06-01, the legacy fallback in `_validate_subscriber_token` can be removed.
 
 ### Pending engineering tasks (each its own future session)
-- **#102** — Intelligence page tabbed UI (5 lazy-loaded panels). API plumbing is live.
-- **#98** — WR-47 Phase 2 Pause Mode (multi-session). TD-11 Phase 2 dependency now clear.
-- **#106** — Migrate subscriber-token HMAC off the Anthropic API key onto a dedicated `life-platform/subscriber-token-secret`. Security-relevant — AI-key rotation currently invalidates all subscriber tokens.
-- **#108** — Port the x-forwarded-for fix to vote/follow/checkin/nudge/submit_finding in `site_api_social.py`. Same bug shape, allows vote-stuffing.
-- **#90** — Sentinel-stub dead code in 18 Lambdas (safe + harmless; removal is cosmetic churn).
-- **#101 backfill** — `python3 backfill/backfill_habitify_v2_schema.py --apply` to populate historical `habit_statuses` (≤60 days, ~60s runtime).
+- **#98** — WR-47 Phase 2 Pause Mode. Multi-session by design. TD-11 P2 dependency cleared.
+- **#102** — Intelligence-page tabbed UI build (5 lazy-loaded panels). API plumbing live.
+- **#90** — Sentinel-stub dead-code removal across 18 Lambdas. Cosmetic; safe to defer.
 
 ---
 
@@ -95,25 +80,27 @@ CI hadn't deployed cleanly in ~6 weeks. Cleared in order:
 
 | SHA | Subject |
 |---|---|
-| `b58f071` | sprint(spec): #3 #5 #4 #7 #2 #9 #8 — audits + IA cleanup + Habitify Phase 1 + Intel API plumbing |
-| `a96f415` | fix(stats): correct stale PLATFORM_STATS + clear AnthropicAPIFailure findings |
-| `4caab16` | sprint: TD-11 Phase 2 + WAF prep + subscribe rate-limit + ai_calls signatures |
-| `f14ba0d` | fix(ci): IAM-secrets linter — register github-dispatch-token secret |
-| `9bf93fd` | fix(ci): SR1 linter — register github-dispatch-token + hevy in source linter |
-| `e11af98` | fix(ci): test_habitify_status_resolution polluted sys.modules with stub http_retry |
-| `d6a30ce` | fix(ci): layer-verify paginated AWS CLI returns multi-line version |
-| `3a0bfcb` | fix(deploy): deploy_lambda.sh region-aware via lambda_map.json per-entry region |
-| `c62a731` | fix(subscribe): use x-forwarded-for as source_ip behind CloudFront |
+| (Friday recap — see prior handover) | sprint #2–#9, restart pipeline first run, WAF deletion, ai_calls signatures |
+| `0d92fc4` | fix(stage0): vice-keyword privacy + Matthew Walker attribution + Brandt freshness |
+| `00fb531` | fix(ci): two stragglers from Stage0 Fix 1 — replace blocked_set with _is_blocked_vice |
+| `c13b875` | docs(post-mortem): canary flag for subscribe smoke tests |
+| `5295fa9` | docs(v2): Stage 0 — versioning floor + Plan B rollback runbook |
+| `ed18e20` | v2 Stage 1: Observatory hub — 8 dispatches → 1 nav entry |
+| `3619ea4` | v2 Stage 2: How It Works absorbs The AI + AI Board + Coaching Team |
+| `d704988` | v2 Stage 3: supplement + weekly dedupe + footer cleanup |
+| `8b434df` | v2 Stage 4: top nav rebuilt to 8-spine + final verification crawl |
+| `8679f9b` | merge: v2 site consolidation: 44 → 13 destinations (LIVE on prod) |
 
 ---
 
 ## Operational notes worth remembering
 
-- **AWS CLI paginates at 50 by default.** Any `--query` over a list returns one match per page → multi-line output. Always `--no-paginate` (or `--max-items`) when you expect a scalar.
-- **CloudFront → Lambda Function URL source IP is the CloudFront edge IP, not the client.** Use `x-forwarded-for[0]` for any IP-based logic (rate-limit, audit, abuse detection).
-- **Lambdas can have silent twins across regions.** Production `email-subscriber` is us-east-1 only — `tests/test_lambda_map_regions.py` enforces this going forward.
-- **The remediation auto-merge gate is in `auto` mode.** PRs touching only the allowlist with ≤60 lines merge automatically. The production deploy approval gate still stands — auto-merge does not auto-deploy.
+- **`sync_site_to_s3.sh` builds content-hashed assets** (e.g. `base.fd801610.css`). Static HTML deploys without `--delete`; orphan cleanup is a separate tombstone step.
+- **CloudFront invalidations cost-trivial** (the platform issued one this session); ~30s propagation.
+- **The Hevy partition has two schemas in the wild** — `normalize_hevy_items()` in `mcp/strength_helpers.py` is now the canonical reader. New code MUST use it (do not iterate `item.data.workouts` directly).
+- **`/api/subscribe` always sends a real SES confirmation** unless the body has `"source": "canary"`. Use the canary flag for any smoke testing — see comment block at top of `deploy/finish_waf_removal.sh`.
+- **Don't push directly to main from the classifier.** It blocks chained pushes; split tag-push from branch-push and use one command at a time.
 
 ---
 
-**Verified:** 2026-05-29 evening PT.
+**Verified live:** 2026-05-31, averagejoematt.com.

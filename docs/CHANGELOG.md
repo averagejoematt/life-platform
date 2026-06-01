@@ -1,3 +1,62 @@
+## [Saturday 2026-05-31] — Stage0 fixes + v2 IA consolidation (LIVE)
+
+### Added
+- **`/observatory/` hub** — folds 8 data dispatches (Sleep · Glucose · Nutrition · Training · Physical · Inner Life · Labs · Benchmarks) into one nav entry + hub page. Sub-pages all remain live per the brief's "keep sub-pages for rollback" call.
+- **`/platform/` absorbs three explainers** — The AI / AI Board / Coaching Team folded into anchored sections (`#the-ai`, `#ai-board`, `#coaching-team`). Originals archived to `site/archive/v1/{intelligence,board,coaches}/` via `git mv`. Original routes serve meta-refresh redirects to the anchors.
+- **`deploy/V2_ROLLBACK.md`** — promotion + rollback runbook. Tags: `site-v1` at `00fb531` (pre-consolidation floor) and `site-v2` at `8679f9b` (consolidation landing).
+- **In-Lambda subscribe rate-limit** (60 req / 5min / IP, DDB atomic counter, `x-forwarded-for`-aware) — replaces the deleted WAF rule.
+- **`/api/hypotheses` + `/api/intelligence_summary`** — public read-only routes for the deferred Intelligence-page rebuild.
+- **`life-platform/subscriber-token-secret`** — dedicated 256-bit HMAC signing secret. Subscriber tokens no longer derived from the Anthropic API key (#106). Dual-validation for the 24h migration window.
+- **`tests/test_lambda_map_regions.py`** — R1/R2/R3 catch silent-us-east-1-only deploy drift (#107).
+- **`backfill/backfill_habitify_v2_schema.py`** — 60-day fill of historical `habit_statuses`. 61/61 ran clean.
+
+### Changed
+- **Genesis re-anchored to the real Saturday weigh-in** (304.3 lbs) via `deploy/restart_pipeline.py --override-weight-lbs 304.3 --apply`. Layer v62 → v63. 27/27 pages clean.
+- **Public IA collapsed `~44 → ~13 destinations`** — 8-spine top nav (Story · Pulse · Observatory · Score · Practice · Chronicle · How It Works · Subscribe). Supplement trio → `/supplements/`. Weekly trio → `/chronicle/`. Internal pages removed from public footer (pages retained, just unlinked).
+- **`tool_get_workout_frequency` + `extract_hevy_sessions` + 4 strength readers** ported to `normalize_hevy_items()` — handles both per-day legacy and per-workout new Hevy schemas; unit conversion to lbs from kg (#110).
+- **`deploy/deploy_lambda.sh`** region-aware via `ci/lambda_map.json` per-Lambda `region`. Preflight verifies function exists in declared region; fails loudly instead of silently no-opping (#107).
+- **`.github/workflows/ci-cd.yml` layer-verify** — `--no-paginate` on `aws lambda list-layer-versions` (AWS CLI's 50-item default broke the scalar query once layer crossed v50).
+- **`github-actions-deploy-role`** IAM widened to include us-east-1 Lambda + layer ARNs. Was us-west-2-only; had been silently blocking email-subscriber deploys to production.
+- **PLATFORM_STATS corrected** against live AWS: 87 Lambdas, 138 tools, 94 alarms, 15 secrets, 65 ADRs, 303 tests, 77 pages.
+- **`handle_ai_analysis` freshness guard** — refuses to serve narrative whose `days_in_experiment > current day_n` (Stage0 #3, the "Brandt analysis claiming day 55 on day 1" bug class).
+
+### Removed
+- **WAF `life-platform-amj-waf`** — detached from CloudFront `E3S424OXQZ8NBE` and deleted. ~$8/mo saved. Budget tier flipped 1 → 0.
+- **9 pre-restart `ai_analysis` records** tombstoned — `/api/ai_analysis` returns `analysis: null` everywhere until next compute writes fresh records.
+- **Plaintext vice-keyword arrays from client JS** — `site/{mind,habits,stack}/index.html` no longer ship `BLOCKED_KW = ['porn', …]` in view-source. Server-side `_is_blocked_vice()` is authoritative.
+- **Stage0 #2** — "Matthew, PhD" attribution on `/benchmarks/` Why-We-Sleep epigraph corrected to "Matthew Walker, PhD".
+
+### Fixed
+- **CI six-blocker gauntlet** — IAM-secrets drift; ARN-convention drift; source-references drift; my own `http_retry` sys.modules pollution; AWS CLI pagination on layer-verify; deploy_lambda.sh region-blindness. CI hadn't deployed cleanly in ~6 weeks; closed end-to-end this session.
+- **Subscribe rate-limit `sourceIp`** was CloudFront edge IP (varies per request → never accumulated). Switched to `x-forwarded-for[0]`. 65-POST smoke went from "all 200" to "60×200, 5×429".
+- **TD-11 Phase 2 pending-aware `completion_pct`** — Habitify ingestion no longer counts today's `in_progress` habits as failures (the mid-day "0% completion" phantom).
+
+### Known follow-ups (deferred future sessions)
+- **#98** WR-47 Phase 2 Pause Mode (multi-session by design).
+- **#102** Intelligence-page tabbed UI build (API plumbing live).
+- **#90** sentinel-stub dead-code removal across 18 Lambdas (cosmetic).
+- **AWS Support case 177921309700709** concurrency raise. When approved → `bash deploy/stage_reserved_concurrency.sh`.
+- **PAT rotation** calendar item ~2026-08-27.
+
+---
+
+## [Restart 2026-05-30] — 2026-05-30
+
+### Added
+- `lambdas/constants.py` — runtime constants (genesis date, baseline weight). Generated from `config/user_goals.json` via `deploy/sync_constants_from_config.py`.
+- `lambdas/phase_filter.py` — `with_phase_filter()` helper. Wired into `site_api._query_source`, `mcp.core.query_source`, and all 13 queries in `intelligence_common.py`.
+- 6 restart scripts under `deploy/`: `restart_phase_tag.py`, `restart_intelligence_wipe.py`, `restart_character_rebuild.py`, `restart_chronicle_handler.py`, `restart_site_copy_sync.py`, `restart_pipeline.py`.
+
+### Changed
+- Genesis re-anchored to **2026-05-30**. Baseline weight: **304.3 lbs** (Withings).
+- All Lambda code that referenced `"2026-04-01"` or `307` literals migrated to import from `lambdas.constants`.
+- `character_sheet_lambda.fetch_date` now filters tombstones (clean-slate cascade).
+
+### Removed
+- `S3DataKey` customer-managed KMS key resource from `cdk/stacks/core_stack.py`. Bucket already on AES256.
+- Public-facing references to prior attempts: hero copy, CTA, build-history references on `site/builders/`.
+
+
 ## [Evening 2026-05-29] — Backlog #2–10 sweep + WAF removal + CI bug-hunt
 
 ### Added (work-product)
