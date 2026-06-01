@@ -34,7 +34,7 @@ AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 
 # Shared utils layer — update on every layer rebuild (bash deploy/build_layer.sh)
-SHARED_LAYER_VERSION = 70  # v70: ADR-067 amendment + ADR-068 per-exercise notes (2026-05-31)
+SHARED_LAYER_VERSION = 69  # v69: ADR-067 amendment + ADR-068 per-exercise notes (next available after AWS v68). Restart_pipeline bumped to 71 in source but never published; AWS asks the next publish to be v69.
 
 SHARED_LAYER_ARN = (
     f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
