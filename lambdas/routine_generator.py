@@ -169,7 +169,12 @@ def _select_movements_for_muscle(
     return [(chosen[0], chosen[1] | {"_sets": set_count})]
 
 
-def _block_from_pick(movement_key: str, movement_def: dict[str, Any], rationale_tag: str) -> ExerciseBlock:
+def _block_from_pick(
+    movement_key: str,
+    movement_def: dict[str, Any],
+    rationale_tag: str,
+    note: str = "",
+) -> ExerciseBlock:
     set_count = movement_def["_sets"]
     rep_range = movement_def.get("default_rep_range") or {"start": 8, "end": 12}
     sets = [
@@ -184,11 +189,32 @@ def _block_from_pick(movement_key: str, movement_def: dict[str, Any], rationale_
         movement_key=movement_key,
         sets=sets,
         rest_seconds=120,
-        notes="",
+        notes=note,
         joint_friendly_score=movement_def.get("joint_friendly_score", 3),
         skill_tier=movement_def.get("skill_tier", 1),
         rationale_tag=rationale_tag,
     )
+
+
+def _build_exercise_note(
+    movement_key: str,
+    catalog: dict[str, Any],
+    history_index: dict[str, list],
+    notes_mode: str,
+) -> str:
+    """ADR-068: deterministic per-exercise note from real workout records.
+
+    No LLM, no math. The hevy_template_id_hint is the lookup key into the
+    pre-loaded history_index; render_history_cue formats the facts. AI
+    comment hook is wired but currently always None — see ADR-068.
+    """
+    from exercise_history import history_facts, pick_note, render_history_cue
+    template_id = (catalog.get("movements", {})
+                          .get(movement_key, {})
+                          .get("hevy_template_id_hint"))
+    facts = history_facts(template_id, history_index)
+    history_cue = render_history_cue(facts)
+    return pick_note(history_cue, ai_comment=None, mode=notes_mode)
 
 
 def _portfolio_guard(z2_minutes_7d: float, z2_floor: float) -> bool:
@@ -242,9 +268,22 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
         rationale.append(f"z2 7d={inputs.z2_minutes_7d:.0f} < floor {week_cfg['z2_floor_minutes']}; portfolio guard active")
 
     skill_ceiling = week_cfg.get("skill_ceiling", 2)
+    notes_mode = week_cfg.get("exercise_notes_mode", "one_best_line")
     rng = _seeded_random(inputs.target_date, "ideal")
     budget_used: dict[str, int] = {}
     exercises: list[ExerciseBlock] = []
+
+    # ADR-068: pre-load exercise history once per generation. Pure data;
+    # downstream renderers can quote but cannot invent.
+    history_index: dict[str, list] = {}
+    if notes_mode != "off":
+        try:
+            from exercise_history import load_recent_history
+            history_index = load_recent_history(
+                lookback_days=int(week_cfg.get("exercise_notes_lookback_days", 180)),
+            )
+        except Exception as e:
+            logger.warning(f"exercise_history load failed (notes will be empty): {e}")
 
     for muscle in targets:
         budget = _muscle_budget(muscle, landmarks, week_cfg, inputs.volume_7d, autoreg, inputs.add_load_enabled)
@@ -259,7 +298,8 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
         muscle_sets = 0
         for movement_key, mdef in picks:
             tag = f"{muscle}_MEV_{landmarks['muscles'][muscle]['MEV']}_remaining_{max(0, landmarks['muscles'][muscle]['MEV'] - inputs.volume_7d.get(muscle, 0))}"
-            exercises.append(_block_from_pick(movement_key, mdef, tag))
+            note = _build_exercise_note(movement_key, catalog, history_index, notes_mode)
+            exercises.append(_block_from_pick(movement_key, mdef, tag, note=note))
             muscle_sets += mdef["_sets"]
         budget_used[muscle] = muscle_sets
         rationale.append(f"{muscle}: {muscle_sets} sets ({len(picks)} movements)")

@@ -1502,3 +1502,54 @@ aws lambda update-function-configuration --function-name life-platform-mcp \
 ```
 
 Then from claude.ai: `manage_hevy_routine action=draft target_date=2026-06-01` → `action=dry_run routine_id=<id>` to see the new title. Y will start at 1 (no performed workouts since experiment start yet); N starts at 1 for each archetype.
+
+---
+
+## Per-Exercise Notes — Deploy Steps (ADR-068)
+
+Bundled with the ADR-067-amendment reset; both ship under layer v70. After `restart_pipeline` lands the reset, propagate v70 to all consumers and force the MCP cold start so the new modules + configs are read fresh:
+
+```bash
+# (1) Configs (re-sync; harmless if already in S3 from prior steps)
+aws s3 cp config/training_week.json s3://matthew-life-platform/config/ --region us-west-2
+
+# (2) Layer + cdk are handled by restart_pipeline above. If you only want
+#     to ship ADR-068 without re-running restart_pipeline:
+bash deploy/build_layer.sh
+cd cdk
+npx cdk deploy LifePlatformCore --require-approval never
+npx cdk deploy LifePlatformMcp LifePlatformOperational LifePlatformIngestion \
+               LifePlatformEmail LifePlatformCompute \
+               --require-approval never --concurrency 3
+cd ..
+
+# (3) MCP cold start (preserves env vars)
+CUR=$(aws lambda get-function-configuration --function-name life-platform-mcp \
+        --query 'Environment.Variables' --output json --region us-west-2)
+ENV_PAYLOAD=$(python3 -c "
+import json
+env = json.loads('''$CUR''')
+env['DEPLOY_VERSION'] = '2.74.6'
+print(json.dumps({'Variables': env}))")
+aws lambda update-function-configuration --function-name life-platform-mcp \
+  --environment "$ENV_PAYLOAD" --region us-west-2 --query LastModified --output text
+
+# (4) From claude.ai:
+#       manage_hevy_routine action=draft target_date=2026-06-02
+#       manage_hevy_routine action=dry_run routine_id=<id>
+#     Inspect wire_body.routine.exercises[*].notes — populated lifts get
+#     "Last: 60kg 8/8/7 (24 May)"-style cues; lifts with no SOURCE#hevy
+#     history get empty notes.
+```
+
+### Flipping the notes mode
+
+```bash
+# Edit config/training_week.json:exercise_notes_mode (one_best_line | show_both | off)
+aws s3 cp config/training_week.json s3://matthew-life-platform/config/ --region us-west-2
+# Force MCP cold start as above.
+```
+
+### Disabling per-exercise notes entirely
+
+Set `exercise_notes_mode = "off"`. The generator skips the DDB exercise-history load (verified by `test_exercise_notes_off_mode_yields_empty_notes`); per-exercise notes ship as empty strings. No code redeploy needed.

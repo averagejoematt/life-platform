@@ -1993,3 +1993,63 @@ The original ADR-067 shipped per-phase N. After a same-day review, Matthew flipp
 Reasoning: the experiment is the anchor that gives N and Y their meaning. Per-phase resets fragment the arc and create same-name collisions (`Foundation - Push - 3` and `Build - Push - 3`); all-time-since-experiment keeps the sequence intact and self-correcting. Y's honesty argument (don't inflate on skipped sessions) carries over.
 
 `count_phase_archetype_routines` → renamed `count_experiment_archetype_routines`. `count_total_performed_workouts` → renamed `count_performed_workouts_since(start_date)` with the experiment date pinned in `build_title_context`. Tests updated accordingly. Layer v69 → v70.
+
+## ADR-068: Per-Exercise Notes — Deterministic History Cues, LLM Never Computes
+
+**Date:** 2026-05-31
+**Status:** Implemented (code shipped; layer rebuild + cdk deploy pending — see RUNBOOK §"Per-Exercise Notes — Deploy Steps").
+**Related:** ADR-066 (write-loop), ADR-067 (title + WHY-note), `lambdas/exercise_history.py`, `config/training_week.json:exercise_notes_mode`.
+
+### Context
+
+The Hevy routine surface has three text fields per push: routine title (ADR-067), routine notes (ADR-067 WHY-line), and per-exercise notes. ADR-067 covered the first two. This ADR covers the third — one short line per exercise, set at generation time, visible mid-set on the phone.
+
+Hevy's routine create/update API accepts a `notes (string, nullable)` field on each exercise. Verified live 2026-05-31 by PUT-ing a routine with an `exercises[].notes` field and reading it back round-tripped intact.
+
+### Decision
+
+**Default note shape** (one_best_line mode, default): `Last: 60kg 8/8/7 (24 May)` — the top-set weight from the last performed session, the per-set reps preserved (so drop-off is visible), and a friendly short date.
+
+Rendering is **pure Python** from real DDB records. No LLM call at the rendering step.
+
+Two cue sources are wired in `pick_note`:
+- **history_cue** — deterministic, always computed from `USER#matthew#SOURCE#hevy` records via `exercise_history.render_history_cue`.
+- **ai_comment** — optional, scoped to one short coaching line. Wiring exists; **no module emits one today.** Reserved for a future coach-layer output. When that layer ships, `pick_note` will prefer it over the history cue (one_best_line) or show both (show_both).
+
+**Config flag:** `training_week.json:exercise_notes_mode` ∈ `one_best_line` | `show_both` | `off`. Default `one_best_line`. Easy to flip per Matthew's preference.
+
+**Cutoffs for honesty (Henning standard):**
+- 0 prior sessions of this movement → empty note (no fluff).
+- 1+ prior sessions → factual history cue.
+- (Future: progression cues will require N ≥ a configured floor; not in scope here.)
+
+### Anti-hallucination guard
+
+Two-layer enforcement:
+
+1. **Structural** — no LLM in the rendering path. The renderer reads facts and formats. No model means no invented numbers.
+2. **Test** — `tests/test_exercise_history.py::test_anti_hallucination_render_quotes_only_source_numbers` regex-extracts every numeric token from the rendered cue and asserts each one traces back to the source `history_facts` dict (weight, reps, date day). A `pick_note` companion test enforces the same on the combiner output.
+
+When a future AI comment is wired, the same anti-hallucination test will run against its output — the LLM may only phrase facts that the Python-computed facts dict already contains. **The LLM never does math.** This is the platform invariant; the test is the gate.
+
+### Numbers vs prescribed load — strict separation
+
+Per spec: a note may *report* "Last: 60kg 8/8/7" or (in future) *suggest* "Try 60kg ×8/8/8 today," but the **prescribed** sets/weights in the routine's exercise blocks are still bound by `autoreg_add_load_enabled=false` (subtract-only). The note is advisory text on a separate field; it does NOT feed back into the generator's budget math. Code path: `_build_exercise_note` reads history and renders text; the generator's `_muscle_budget` is untouched and still respects all autoreg gates.
+
+### Data + performance
+
+`exercise_history.load_recent_history(lookback_days=180)` performs **one batched DDB Query** per generation over `USER#matthew#SOURCE#hevy` with `sk >= DATE#<today-180>`, paginates via `LastEvaluatedKey`, and builds an in-memory index keyed by Hevy `template_id`. Subsequent per-exercise lookups are O(1) dict access. A routine with 8 exercises makes 1 DDB call total, not 8.
+
+Legacy daily-aggregate records (no `source_workout_id` field) are intentionally skipped — pre-write-loop history stays in DDB but does not surface into notes. Post-reset, the SOURCE#hevy partition is the canonical history.
+
+### Out of scope (explicitly not built)
+
+- AI-trainer comment generation (coach-layer hook documented; no emitter today).
+- Progression cues — bound to future N≥validation-floor decision.
+- Cross-routine PR detection / streak surfacing.
+- Mood / journal / sensitive content in notes. **Training only.**
+- Changes to cron, autoreg, or the subtract-only gate.
+
+### Rollback
+
+`training_week.json:exercise_notes_mode = "off"` and re-sync to S3. The generator skips the DDB load entirely (verified by `test_exercise_notes_off_mode_yields_empty_notes`), and notes ship as empty strings. No code redeploy needed.

@@ -290,7 +290,8 @@
       "lambdas/routine_repo.py",
       "lambdas/routine_generator.py",
       "lambdas/adherence_calc.py",
-      "lambdas/routine_title.py"
+      "lambdas/routine_title.py",
+      "lambdas/exercise_history.py"
     ],
     "consumers": [
       "daily-brief",

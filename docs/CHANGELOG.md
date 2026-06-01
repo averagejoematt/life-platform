@@ -1,5 +1,8 @@
 ## [Saturday 2026-05-31] — Stage0 fixes + v2 IA consolidation (LIVE)
 
+### Added
+- **Per-exercise notes (ADR-068)** — each generated routine now attaches one short factual line per exercise (default mode `one_best_line`): `Last: 60kg 8/8/7 (24 May)`. Rendered in pure Python from real `SOURCE#hevy` workout records — **no LLM math**. Anti-hallucination guard is structural (no model) AND tested (every numeric token in a rendered cue must trace back to the source facts dict). Lifts with no prior sessions render empty. AI-trainer-comment hook wired but inert until the coach layer emits one. Config flag in `training_week.json` (`one_best_line` / `show_both` / `off`). New shared-layer module `lambdas/exercise_history.py`. Layer v70.
+
 ### Changed
 - **Final experiment reset → 2026-06-01 + ADR-067 amendment.** `EXPERIMENT_START_DATE` advanced from 2026-05-30 to 2026-06-01 (Sunday). Withings baseline override `--override-weight-lbs 304.3` keeps the start weight stable. N in the Hevy routine title convention flipped from per-phase to **all-time-per-type since EXPERIMENT_START_DATE** — phase becomes a decorative narrative marker, not an N-resetter. Y also rebased to "performed Hevy workouts since EXPERIMENT_START_DATE + 1". Layer v69 → v70. Deploy via `python3 deploy/restart_pipeline.py --genesis 2026-06-01 --override-weight-lbs 304.3 --apply`.
 
