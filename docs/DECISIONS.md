@@ -2085,6 +2085,16 @@ ADR-066 shipped the write-loop with a single authoring front door: `action=draft
 
 Remove `"draft_custom"` from `_VALID_ACTIONS`/`_DISPATCH` in `mcp/tools_hevy_routine.py` and redeploy MCP; the catalog additions and the resolve-by-title fallback are inert without it (the generator never selects title-only movements because they lack a `default_rep_range`-driven selection advantage — and are harmless if it does). The `format_why_note` custom branch is a no-op for non-custom IRs.
 
+### ADR-069 Amendment (2026-06-01): Full Hevy template index — author any exercise by title
+
+The initial cut required every authorable movement to be a curated `movement_catalog.json` entry, so anything outside the ~26-movement pool (circuits, varied cardio, accessories) threw `MOVEMENT_UNMAPPABLE` until someone hand-added it. Closing that gap properly without polluting the generator's curated pool:
+
+- **`config/hevy_template_index.json`** — the full Hevy template list (built-in + the account's custom exercises) pulled via `hevy_write_client.list_templates`, normalized to `title → {id}`. **Distinct from `movement_catalog.json`** (which stays the generator's small curated pool with selection metadata). Rebuild any time by re-pulling the live list.
+- **`draft_custom` resolution order** (`_resolve_movement_key`, conservative — exact before fuzzy, curated before index): curated key → curated exact-title → index exact normalized-title → **live Hevy lookup (self-heal for templates newer than the index)** → loose contains within the curated catalog only. An index/live hit returns a synthetic `movement_key="tmpl:<id>"`; `_make_resolver` short-circuits those straight to the id (no catalog/cache needed). A true miss fails **loudly** with close-title suggestions — never a silent fuzzy mis-map.
+- **Result:** any built-in or custom Hevy exercise is authorable by its exact title with zero catalog edits; circuits are just shared `superset_id`s, already supported. The deterministic generator is untouched (it never sees `tmpl:` keys or cardio movements — `primary_muscle:"cardio"` keeps them out of its selection).
+
+Config-only + MCP code; no layer change. Rollback: delete the index file (resolution falls back to curated catalog + live lookup) or revert the resolver edits.
+
 ---
 
-**Verified:** 2026-05-31 (ADR-069 — custom authoring escape hatch)
+**Verified:** 2026-05-31 (ADR-069 — custom authoring escape hatch) · amended 2026-06-01 (full Hevy template index)

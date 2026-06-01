@@ -68,6 +68,11 @@ def _make_resolver():
     import hevy_write_client as wc
 
     def _resolve(movement_key: str) -> str:
+        # ADR-069 (template index): keys of the form "tmpl:<id>" are already
+        # resolved (draft_custom matched a title against the full Hevy index or
+        # a live lookup). Short-circuit straight to the id — no catalog needed.
+        if movement_key.startswith("tmpl:"):
+            return movement_key[len("tmpl:"):]
         try:
             return resolve_movement(movement_key)
         except MovementUnmappable:
@@ -114,27 +119,114 @@ def _catalog_movements() -> dict[str, Any]:
     return (_load_json("movement_catalog.json") or {}).get("movements", {})
 
 
-def _resolve_movement_key(ex: dict[str, Any], catalog: dict[str, Any]) -> str | None:
-    """Map a caller-supplied exercise onto a catalog movement_key.
+def _normalize_title(t: str) -> str:
+    """Normalize a title for index lookup: lowercase, collapse whitespace, strip."""
+    import re
+    return re.sub(r"\s+", " ", (t or "").strip().lower())
 
-    Accepts an explicit `movement_key`, or a human `title`/`name` matched against
-    catalog titles (exact case-insensitive first, then a loose contains match).
+
+def _template_index() -> dict[str, Any]:
+    """Full Hevy template index (ADR-069): normalized_title -> {id, title}.
+
+    Covers every built-in Hevy exercise plus the account's custom ones, so
+    draft_custom can author any exercise by name without a curated catalog
+    entry. Distinct from movement_catalog.json (the generator's curated pool).
+    Returns {} if the index is absent — resolution then falls back to a live
+    Hevy lookup.
+    """
+    from routine_generator import _load_json
+    try:
+        return (_load_json("hevy_template_index.json") or {}).get("templates", {})
+    except Exception:
+        return {}
+
+
+def _live_template_id_by_title(name: str) -> str | None:
+    """Self-heal: search the live Hevy template list for an exact title match.
+
+    Triggered only when the static index misses (e.g. a template created in
+    Hevy after the index was last built). Exact normalized-title match only —
+    never a fuzzy guess, to avoid silently pushing the wrong exercise.
+    """
+    import hevy_write_client as wc
+    target = _normalize_title(name)
+    page = 1
+    while page <= 30:
+        try:
+            resp = wc.list_templates(page=page, page_size=100)
+        except Exception:
+            return None
+        items = resp.get("exercise_templates") or resp.get("templates") or []
+        if not items:
+            return None
+        for t in items:
+            if _normalize_title(t.get("title")) == target and t.get("id"):
+                return str(t["id"])
+        if len(items) < 100:
+            return None
+        page += 1
+    return None
+
+
+def _resolve_movement_key(ex: dict[str, Any], catalog: dict[str, Any]) -> str | None:
+    """Map a caller-supplied exercise onto a resolvable movement key.
+
+    Resolution order (conservative — exact matches before fuzzy, curated before
+    index, to avoid silent mis-maps):
+      1. explicit `movement_key` that is a curated catalog key (keeps generator
+         metadata + ADR-067/068 semantics)
+      2. exact title match against the curated catalog
+      3. exact normalized-title match against the full Hevy index -> "tmpl:<id>"
+      4. exact title match against the live Hevy list (self-heal) -> "tmpl:<id>"
+      5. loose contains match within the small curated catalog only
+
     Returns None when nothing maps — caller surfaces a loud, listy error.
     """
     mk = (ex.get("movement_key") or "").strip()
     if mk and mk in catalog:
         return mk
-    name = (ex.get("title") or ex.get("name") or mk or "").strip().lower()
+    name = (ex.get("title") or ex.get("name") or mk or "").strip()
     if not name:
         return None
+    nlow = name.lower()
+
+    # 2. curated catalog, exact title
     for k, v in catalog.items():
-        if (v.get("title") or "").strip().lower() == name:
+        if (v.get("title") or "").strip().lower() == nlow:
             return k
+
+    # 3. full Hevy index, exact normalized title
+    norm = _normalize_title(name)
+    hit = _template_index().get(norm)
+    if hit and hit.get("id"):
+        return "tmpl:" + str(hit["id"])
+
+    # 4. live Hevy lookup (self-heal for templates newer than the index)
+    live_id = _live_template_id_by_title(name)
+    if live_id:
+        return "tmpl:" + live_id
+
+    # 5. loose contains within the curated catalog only (small + trusted)
     for k, v in catalog.items():
         title = (v.get("title") or "").strip().lower()
-        if title and (name in title or title in name):
+        if title and (nlow in title or title in nlow):
             return k
     return None
+
+
+def _index_suggestions(name: str, limit: int = 8) -> list[str]:
+    """Closest index titles sharing a token with `name` — for loud-error help."""
+    tokens = {w for w in _normalize_title(name).split() if len(w) > 2}
+    if not tokens:
+        return []
+    out = []
+    for v in _template_index().values():
+        title = v.get("title") or ""
+        if tokens & set(_normalize_title(title).split()):
+            out.append(title)
+            if len(out) >= limit:
+                break
+    return out
 
 
 def _coerce_sets(raw_sets: list[dict[str, Any]] | None) -> list:
@@ -190,11 +282,12 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
     for ex in raw_exercises:
         if not isinstance(ex, dict):
             continue
+        raw_label = str(ex.get("title") or ex.get("name") or ex.get("movement_key") or "?")
         mk = _resolve_movement_key(ex, catalog)
         if not mk:
-            unknown.append(str(ex.get("movement_key") or ex.get("title") or ex.get("name") or "?"))
+            unknown.append(raw_label)
             continue
-        mdef = catalog.get(mk, {})
+        mdef = catalog.get(mk, {})  # empty for index-resolved ("tmpl:") movements
         blocks.append(ExerciseBlock(
             movement_key=mk,
             sets=_coerce_sets(ex.get("sets")),
@@ -203,18 +296,21 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
             notes=(ex.get("notes") or ""),
             joint_friendly_score=int(mdef.get("joint_friendly_score", 3)),
             skill_tier=int(mdef.get("skill_tier", 1)),
-            rationale_tag="custom",
+            # human label for traceability — curated movements keep "custom",
+            # index-resolved ones record the title that mapped to the template id.
+            rationale_tag=(mdef.get("title") or raw_label) if mk.startswith("tmpl:") else "custom",
         ))
 
     if unknown:
-        return mcp_error(
-            "Unknown movement(s): " + ", ".join(unknown) + ". "
-            "Pass a catalog movement_key or an exact title. Valid keys: "
-            + ", ".join(sorted(catalog.keys()))
-            + ". To add a new movement, put its exact Hevy title in "
-            "config/movement_catalog.json (no template id needed — it resolves by title).",
-            error_code="MOVEMENT_UNMAPPABLE",
-        )
+        msg = ("Unknown movement(s): " + ", ".join(unknown) + ". "
+               "Pass a curated movement_key or an exact Hevy exercise title "
+               "(any built-in or custom Hevy exercise resolves by title).")
+        suggestions = []
+        for u in unknown:
+            suggestions += _index_suggestions(u, limit=6)
+        if suggestions:
+            msg += " Did you mean: " + ", ".join(sorted(set(suggestions))) + "?"
+        return mcp_error(msg, error_code="MOVEMENT_UNMAPPABLE")
     if not blocks:
         return mcp_error("No valid exercises after parsing 'exercises'", error_code="MISSING_ARG")
 
