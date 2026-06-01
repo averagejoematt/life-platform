@@ -17,10 +17,11 @@
 | `draft_custom` | **LIVE + smoke-verified in prod.** Authors an IR from an explicit exercise/set/weight list; flows through the existing `dry_run → commit` chain. |
 | Hevy write-loop (cron) | DISABLED — EventBridge rule + SSM `/life-platform/hevy/cron_enabled=false`. Unchanged. |
 | Add-load autoreg | OFF — SSM `/life-platform/hevy/autoreg_add_load_enabled=false`. Unchanged. |
-| Shared layer | **AWS v70 published.** Only `life-platform-mcp` repointed to v70 (surgical). Other 35 layer-using Lambdas remain on v69 — intentional (see "Surgical deploy" below). `cdk/stacks/constants.py:SHARED_LAYER_VERSION = 70`. |
-| Movement catalog | **S3 synced — 21 movements** (was 18; +barbell_bench_press, db_shoulder_press, reverse_pec_deck). |
+| Shared layer | **AWS v70 — fleet uniform.** Initially only MCP was repointed (surgical), then all 62 layer-using functions were reconciled to v70 via config-only `update-function-configuration --layers` (matches the committed `SHARED_LAYER_VERSION = 70`). `test_i2_lambda_layer_version_current` green. |
+| Movement catalog | **S3 synced — 26 movements** (+barbell_bench_press, db_shoulder_press, reverse_pec_deck, +cardio: cycling, rowing_machine, treadmill, elliptical, air_bike). |
+| Hevy template index | **`config/hevy_template_index.json` synced to S3 — 789 templates** (430 built-in + 359 account custom). `draft_custom` resolves ANY Hevy exercise by exact title (`tmpl:<id>`), with a live-lookup self-heal. Circuits = shared `superset_id`. |
 | EXPERIMENT_START_DATE | 2026-06-01 — unchanged from prior session. |
-| Branch / main | `main` does NOT have ADR-069 yet. Merge the PR. |
+| Branch / main | **In sync.** ADR-069 + amendment merged (PRs #1, #2). |
 
 ---
 
@@ -71,10 +72,16 @@
 
 ## Open items / follow-ups
 
-1. **Merge the PR.** `main` is behind production until then.
-2. **Optional: `cdk deploy --all`** to move the other 35 Lambdas from layer v69 → v70 (cosmetic; only matters if/when `routine_title.py` is consumed elsewhere). Watch for unrelated stack drift if you do.
-3. **Title accuracy for the 3 new movements.** If Hevy's exact built-in name for DB shoulder press or reverse pec deck differs from the strings used, the first `dry_run` on that movement fails loudly (`MovementUnmappable`); fix the `title` in `config/movement_catalog.json` and re-sync to S3 — no code redeploy. (`barbell_bench_press` already confirmed = `79D0BB3A`.)
-4. **The real "Push — Day 1" (2026-06-01)** was NOT committed to Hevy — left for the user to trigger `draft_custom → dry_run → commit` (commit creates the routine; Hevy has no delete, only archive).
+1. ~~Merge the PR~~ — DONE (PRs #1, #2 merged to `main`).
+2. ~~Move the fleet to v70~~ — DONE (all 62 layer-using functions reconciled via config-only repoint; I2 green).
+3. **Separate, deliberate: `cdk deploy --all`** remains the canonical reconciler for *other* deployed-vs-source drift — notably the site-api `EXPERIMENT_START_DATE` staleness that `test_i19_site_api_journey_contract` flags. NOT bundled with the layer bump on purpose; review before running.
+4. **Title accuracy for hand-added movements.** If a movement's exact Hevy title differs from the catalog string, the first `dry_run` fails loudly (`MovementUnmappable`) with close-title suggestions — fix the `title` and re-sync, no code redeploy. (With the full template index, almost anything resolves by title already.)
+5. **Rebuild `hevy_template_index.json`** by re-pulling `list_templates` whenever you add many new custom exercises in Hevy (the live-lookup self-heal covers one-offs in the meantime).
+6. **The real "Push — Day 1" (2026-06-01)** WAS committed to Hevy this session (`24869bbd-2c2e-4b84-89a5-28f922faf6c1`); the cycling finisher was added manually in-app — leave it (re-committing would clobber it / trip the conflict guard).
+
+## Rate-limit follow-up (open)
+
+`mcp/handler.py:_check_write_rate_limit` documents "resets every Lambda invocation" but `_WRITE_TOOL_CALLS` is module-level → really per *container*. Repeated draft/dry_run/commit in one session can hit the 10-call cap and only clears on a cold start (forced here via an env-var bump). Likely the cause of intermittent chat `RATE_LIMIT` errors. Fix = reset the dict at the top of each invocation. Not yet done.
 
 ---
 
