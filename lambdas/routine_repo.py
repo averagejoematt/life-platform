@@ -46,8 +46,10 @@ def _pk(routine_id: str) -> str:
     return f"{PK_PREFIX}{routine_id}"
 
 
-def _version_sk(version: int) -> str:
-    return f"VERSION#{version:06d}"
+def _version_sk(version) -> str:
+    # DDB round-trips Decimal -> float in deserialize, so `version` may arrive
+    # as 1.0 rather than 1. Cast defensively.
+    return f"VERSION#{int(version):06d}"
 
 
 def get_current(routine_id: str) -> RoutineSpec | None:
@@ -69,6 +71,10 @@ def put_versioned(ir: RoutineSpec) -> RoutineSpec:
     the caller is responsible for setting ir.parent_version = previous version
     and bumping ir.version. Refuses to overwrite an existing VERSION#<n>.
     """
+    # DDB round-trip may have turned version into a float; coerce.
+    ir.version = int(ir.version)
+    if ir.parent_version is not None:
+        ir.parent_version = int(ir.parent_version)
     body = serialize(ir)
     pk = _pk(ir.routine_id)
     history_sk = _version_sk(ir.version)

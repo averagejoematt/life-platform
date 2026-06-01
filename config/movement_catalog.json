@@ -5,83 +5,124 @@
   "movements": {
     "db_bench_press_flat": {
       "title": "Bench Press (Dumbbell)",
-      "hevy_template_id_hint": "55E6546B",
+      "hevy_template_id_hint": "3601968B",
       "primary_muscle": "chest",
-      "secondary_muscles": ["triceps", "shoulders"],
+      "secondary_muscles": [
+        "triceps",
+        "shoulders"
+      ],
       "skill_tier": 2,
       "joint_friendly_score": 3,
-      "default_rep_range": {"start": 8, "end": 12},
+      "default_rep_range": {
+        "start": 8,
+        "end": 12
+      },
       "equipment": "dumbbell",
       "notes": "Lower than barbell-flat skill demand; safer with no spotter."
     },
     "machine_chest_press": {
       "title": "Chest Press (Machine)",
-      "hevy_template_id_hint": "79D0BB16",
+      "hevy_template_id_hint": "7EB3F7C3",
       "primary_muscle": "chest",
-      "secondary_muscles": ["triceps", "shoulders"],
+      "secondary_muscles": [
+        "triceps",
+        "shoulders"
+      ],
       "skill_tier": 1,
       "joint_friendly_score": 3,
-      "default_rep_range": {"start": 10, "end": 15},
+      "default_rep_range": {
+        "start": 10,
+        "end": 15
+      },
       "equipment": "machine"
     },
     "incline_db_press": {
-      "title": "Incline Dumbbell Press",
+      "title": "Incline Bench Press (Dumbbell)",
       "hevy_template_id_hint": "07B38369",
       "primary_muscle": "chest",
-      "secondary_muscles": ["shoulders", "triceps"],
+      "secondary_muscles": [
+        "shoulders",
+        "triceps"
+      ],
       "skill_tier": 2,
       "joint_friendly_score": 2,
-      "default_rep_range": {"start": 8, "end": 12},
+      "default_rep_range": {
+        "start": 8,
+        "end": 12
+      },
       "equipment": "dumbbell"
     },
     "cable_chest_fly": {
       "title": "Cable Fly Crossovers",
-      "hevy_template_id_hint": "FB91DBD0",
+      "hevy_template_id_hint": "651F844C",
       "primary_muscle": "chest",
       "secondary_muscles": [],
       "skill_tier": 2,
       "joint_friendly_score": 2,
-      "default_rep_range": {"start": 12, "end": 15},
+      "default_rep_range": {
+        "start": 12,
+        "end": 15
+      },
       "equipment": "cable"
     },
     "lat_pulldown": {
       "title": "Lat Pulldown (Cable)",
-      "hevy_template_id_hint": "6A6C31A2",
+      "hevy_template_id_hint": "6A6C31A5",
       "primary_muscle": "back",
-      "secondary_muscles": ["biceps"],
+      "secondary_muscles": [
+        "biceps"
+      ],
       "skill_tier": 1,
       "joint_friendly_score": 3,
-      "default_rep_range": {"start": 10, "end": 15},
+      "default_rep_range": {
+        "start": 10,
+        "end": 15
+      },
       "equipment": "cable"
     },
     "machine_row": {
       "title": "Seated Row (Machine)",
-      "hevy_template_id_hint": "C6272009",
+      "hevy_template_id_hint": "1DF4A847",
       "primary_muscle": "back",
-      "secondary_muscles": ["biceps"],
+      "secondary_muscles": [
+        "biceps"
+      ],
       "skill_tier": 1,
       "joint_friendly_score": 3,
-      "default_rep_range": {"start": 10, "end": 15},
+      "default_rep_range": {
+        "start": 10,
+        "end": 15
+      },
       "equipment": "machine"
     },
     "one_arm_db_row": {
-      "title": "Bent Over One Arm Row (Dumbbell)",
-      "hevy_template_id_hint": "5E16ACA6",
+      "title": "Dumbbell Row",
+      "hevy_template_id_hint": "F1E57334",
       "primary_muscle": "back",
-      "secondary_muscles": ["biceps"],
+      "secondary_muscles": [
+        "biceps"
+      ],
       "skill_tier": 2,
       "joint_friendly_score": 3,
-      "default_rep_range": {"start": 10, "end": 12},
+      "default_rep_range": {
+        "start": 10,
+        "end": 12
+      },
       "equipment": "dumbbell"
     },
     "machine_shoulder_press": {
-      "title": "Shoulder Press (Machine)",
-      "hevy_template_id_hint": "9E167816",
+      "title": "Seated Shoulder Press (Machine)",
+      "hevy_template_id_hint": "9237BAD1",
       "primary_muscle": "shoulders",
-      "secondary_muscles": ["triceps"],
+      "secondary_muscles": [
+        "triceps"
+      ],
       "skill_tier": 1,
       "joint_friendly_score": 3,
-      "default_rep_range": {"start": 10, "end": 12},
+      "default_rep_range": {
+        "start": 10,
+        "end": 12
+      },
       "equipment": "machine"
     },
     "db_lateral_raise": {
@@ -91,97 +132,136 @@
       "secondary_muscles": [],
       "skill_tier": 1,
       "joint_friendly_score": 3,
-      "default_rep_range": {"start": 12, "end": 15},
+      "default_rep_range": {
+        "start": 12,
+        "end": 15
+      },
       "equipment": "dumbbell"
     },
     "db_curl": {
       "title": "Bicep Curl (Dumbbell)",
       "hevy_template_id_hint": "37FCC2BB",
       "primary_muscle": "biceps",
-      "secondary_muscles": ["forearms"],
+      "secondary_muscles": [
+        "forearms"
+      ],
       "skill_tier": 1,
       "joint_friendly_score": 3,
-      "default_rep_range": {"start": 10, "end": 15},
+      "default_rep_range": {
+        "start": 10,
+        "end": 15
+      },
       "equipment": "dumbbell"
     },
     "cable_tricep_pushdown": {
       "title": "Triceps Pushdown",
-      "hevy_template_id_hint": "EFE25CA3",
+      "hevy_template_id_hint": "93A552C6",
       "primary_muscle": "triceps",
       "secondary_muscles": [],
       "skill_tier": 1,
       "joint_friendly_score": 3,
-      "default_rep_range": {"start": 10, "end": 15},
+      "default_rep_range": {
+        "start": 10,
+        "end": 15
+      },
       "equipment": "cable"
     },
     "leg_press": {
       "title": "Leg Press (Machine)",
-      "hevy_template_id_hint": "C5DD8E0B",
+      "hevy_template_id_hint": "C7973E0E",
       "primary_muscle": "quadriceps",
-      "secondary_muscles": ["glutes", "hamstrings"],
+      "secondary_muscles": [
+        "glutes",
+        "hamstrings"
+      ],
       "skill_tier": 1,
       "joint_friendly_score": 3,
-      "default_rep_range": {"start": 10, "end": 15},
+      "default_rep_range": {
+        "start": 10,
+        "end": 15
+      },
       "equipment": "machine"
     },
     "goblet_squat": {
-      "title": "Goblet Squat (Dumbbell)",
-      "hevy_template_id_hint": "21CDF5E4",
+      "title": "Goblet Squat",
+      "hevy_template_id_hint": "3D0C7C75",
       "primary_muscle": "quadriceps",
-      "secondary_muscles": ["glutes"],
+      "secondary_muscles": [
+        "glutes"
+      ],
       "skill_tier": 2,
       "joint_friendly_score": 2,
-      "default_rep_range": {"start": 10, "end": 12},
+      "default_rep_range": {
+        "start": 10,
+        "end": 12
+      },
       "equipment": "dumbbell"
     },
     "leg_curl": {
       "title": "Lying Leg Curl (Machine)",
-      "hevy_template_id_hint": "5DD8E68E",
+      "hevy_template_id_hint": "B8127AD1",
       "primary_muscle": "hamstrings",
       "secondary_muscles": [],
       "skill_tier": 1,
       "joint_friendly_score": 3,
-      "default_rep_range": {"start": 10, "end": 15},
+      "default_rep_range": {
+        "start": 10,
+        "end": 15
+      },
       "equipment": "machine"
     },
     "machine_hip_thrust": {
       "title": "Hip Thrust (Machine)",
-      "hevy_template_id_hint": "F6F46358",
+      "hevy_template_id_hint": "68CE0B9B",
       "primary_muscle": "glutes",
-      "secondary_muscles": ["hamstrings"],
+      "secondary_muscles": [
+        "hamstrings"
+      ],
       "skill_tier": 1,
       "joint_friendly_score": 3,
-      "default_rep_range": {"start": 10, "end": 12},
+      "default_rep_range": {
+        "start": 10,
+        "end": 12
+      },
       "equipment": "machine"
     },
     "calf_raise_machine": {
       "title": "Standing Calf Raise (Machine)",
-      "hevy_template_id_hint": "07DEC110",
+      "hevy_template_id_hint": "E05C2C38",
       "primary_muscle": "calves",
       "secondary_muscles": [],
       "skill_tier": 1,
       "joint_friendly_score": 3,
-      "default_rep_range": {"start": 12, "end": 20},
+      "default_rep_range": {
+        "start": 12,
+        "end": 20
+      },
       "equipment": "machine"
     },
     "machine_crunch": {
       "title": "Crunch (Machine)",
-      "hevy_template_id_hint": "AC7D7244",
+      "hevy_template_id_hint": "EB43ADD4",
       "primary_muscle": "abs",
       "secondary_muscles": [],
       "skill_tier": 1,
       "joint_friendly_score": 3,
-      "default_rep_range": {"start": 12, "end": 20},
+      "default_rep_range": {
+        "start": 12,
+        "end": 20
+      },
       "equipment": "machine"
     },
     "db_wrist_curl": {
-      "title": "Wrist Curl (Dumbbell)",
-      "hevy_template_id_hint": "98F5BFE7",
+      "title": "Seated Palms Up Wrist Curl",
+      "hevy_template_id_hint": "1006DF48",
       "primary_muscle": "forearms",
       "secondary_muscles": [],
       "skill_tier": 1,
       "joint_friendly_score": 3,
-      "default_rep_range": {"start": 12, "end": 20},
+      "default_rep_range": {
+        "start": 12,
+        "end": 20
+      },
       "equipment": "dumbbell"
     }
   }
