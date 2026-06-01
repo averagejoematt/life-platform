@@ -1460,3 +1460,45 @@ git revert --no-commit <commit-sha-of-adr-067>
 # Or just unset title_context in mcp/tools_hevy_routine.py + cron_lambda.py and
 # redeploy the MCP Lambda. The layer itself stays — routine_title.py is dormant.
 ```
+
+---
+
+## Final Experiment Reset → 2026-06-01 (ADR-067 amendment)
+
+Source code already reflects the new genesis date (`lambdas/constants.py:EXPERIMENT_START_DATE = "2026-06-01"`, `config/user_goals.json:timeline.start_date`, `config/training_phases.json:current_started`). Run the restart-pipeline to apply everything else (phase-tag DDB, wipe intelligence, rebuild character, sync site/docs, layer publish, cdk deploy chain):
+
+```bash
+python3 deploy/restart_pipeline.py \
+  --genesis 2026-06-01 \
+  --override-weight-lbs 304.3 \
+  --apply
+```
+
+The `--override-weight-lbs` is needed because 2026-06-01 has no Withings weigh-in yet; 304.3 lbs is the locked baseline from 2026-05-30 we're preserving.
+
+After it completes, verify:
+
+```bash
+aws lambda list-functions --output json --region us-west-2 --no-paginate | \
+  python3 -c "import json,sys; d=json.load(sys.stdin); vs={}; \
+    [vs.setdefault(l['Arn'].rsplit(':',1)[-1], []).append(f['FunctionName']) \
+     for f in d['Functions'] for l in (f.get('Layers') or []) if 'shared-utils' in l['Arn']]; \
+    [print(f'v{v}: {len(fns)}') for v,fns in sorted(vs.items())]"
+# Expect: v70: 36
+```
+
+Then force MCP cold start so the new constants are picked up:
+
+```bash
+CUR=$(aws lambda get-function-configuration --function-name life-platform-mcp \
+        --query 'Environment.Variables' --output json --region us-west-2)
+ENV_PAYLOAD=$(python3 -c "
+import json
+env = json.loads('''$CUR''')
+env['DEPLOY_VERSION'] = '2.74.5'
+print(json.dumps({'Variables': env}))")
+aws lambda update-function-configuration --function-name life-platform-mcp \
+  --environment "$ENV_PAYLOAD" --region us-west-2 --query LastModified --output text
+```
+
+Then from claude.ai: `manage_hevy_routine action=draft target_date=2026-06-01` → `action=dry_run routine_id=<id>` to see the new title. Y will start at 1 (no performed workouts since experiment start yet); N starts at 1 for each archetype.

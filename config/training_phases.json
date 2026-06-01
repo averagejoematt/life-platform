@@ -4,5 +4,5 @@
   "_authors": "ADR-067",
   "phases": ["Foundation", "Build", "Forge", "Sustain"],
   "current": "Foundation",
-  "current_started": "2026-05-31"
+  "current_started": "2026-06-01"
 }

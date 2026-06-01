@@ -1,13 +1,19 @@
 """
-routine_title.py — Title + WHY-note formatting for Hevy routines (ADR-067).
+routine_title.py — Title + WHY-note formatting for Hevy routines
+(ADR-067, amended 2026-05-31 — see Commit-A handover for the per-phase ->
+all-time-since-experiment-start flip).
 
 Title format:  "<Phase> - <Type> - <N> - <Y>"
-  Phase  — current phase from config/training_phases.json
+  Phase  — current phase name from config/training_phases.json. Decorative
+           context only — does NOT bound N anymore.
   Type   — ir.archetype title-cased (Upper, Lower, Full, Aerobic, Mobility…)
-  N      — count of *pushed* routines of THIS type within CURRENT phase + 1.
-           Resets at phase boundary (config.current_started). 1-based.
-  Y      — total *performed* Hevy workouts to date + 1. Honest + self-
-           correcting per the spec (skipped sessions never inflate Y).
+  N      — count of *pushed* routines of THIS type since EXPERIMENT_START_DATE
+           + 1. Does NOT reset on phase change. 1-based. Phases are now
+           narrative markers; the experiment is the anchor.
+  Y      — count of *performed* Hevy workouts since EXPERIMENT_START_DATE
+           + 1. Same anchor — both counters measure progress within the
+           current experiment, not lifetime. Pre-experiment Hevy history
+           is preserved in DDB but excluded from these counters.
 
 Variant overrides:
   variant=re_entry → "Welcome back · <Type>" (no counters surfaced — kind
@@ -27,6 +33,7 @@ from typing import Any
 import boto3
 from boto3.dynamodb.conditions import Key
 
+from constants import EXPERIMENT_START_DATE
 from routine_ir import RoutineSpec
 
 CONFIG_DIR = os.environ.get(
@@ -75,14 +82,14 @@ def load_phase_state() -> dict[str, Any]:
     return json.loads(obj["Body"].read())
 
 
-def count_total_performed_workouts() -> int:
-    """All Hevy workouts ever recorded in DDB for matthew. Paginates via Query."""
+def count_performed_workouts_since(start_date: str) -> int:
+    """Performed Hevy workouts in DDB on or after start_date. Paginates."""
     pk = f"USER#{USER_ID}#SOURCE#hevy"
     total = 0
     last_key = None
     while True:
         kwargs: dict[str, Any] = {
-            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with("DATE#"),
+            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").gte(f"DATE#{start_date}"),
             "Select": "COUNT",
         }
         if last_key:
@@ -95,19 +102,19 @@ def count_total_performed_workouts() -> int:
     return total
 
 
-def count_phase_archetype_routines(
-    phase_start: str, archetype: str, target_date_exclusive: str
+def count_experiment_archetype_routines(
+    archetype: str, target_date_exclusive: str
 ) -> int:
-    """Count ROUTINE_INDEX entries with this archetype since phase_start,
-    excluding any with target_date >= target_date_exclusive (the routine
-    being committed now). Skips floor/re_entry variants so paired sessions
-    don't double-count.
+    """Count ROUTINE_INDEX entries with this archetype since EXPERIMENT_START_DATE,
+    excluding any with target_date >= target_date_exclusive (the routine being
+    committed now). Skips floor/re_entry variants so paired sessions don't
+    double-count. ADR-067 amendment: no longer bounded by phase boundary.
     """
     pk = f"USER#{USER_ID}#SOURCE#routine_index"
     resp = _table().query(
         KeyConditionExpression=Key("pk").eq(pk)
         & Key("sk").between(
-            f"DATE#{phase_start}", f"DATE#{target_date_exclusive}"
+            f"DATE#{EXPERIMENT_START_DATE}", f"DATE#{target_date_exclusive}"
         ),
     )
     seen_routine_ids: set[str] = set()
@@ -130,17 +137,22 @@ def count_phase_archetype_routines(
 
 
 def build_title_context(ir: RoutineSpec) -> dict[str, Any]:
-    """Compose the full context dict the compiler needs. Pure read-side."""
+    """Compose the title-context dict.
+
+    Both N and Y are counted since EXPERIMENT_START_DATE (the user's anchor).
+    Phase is decorative — it goes into the title for narrative context but
+    doesn't reset N. Phase advancement leaves N untouched; users see Push
+    sequence continue across Foundation -> Build -> ... .
+    """
     state = load_phase_state()
     phase = state.get("current") or (state.get("phases") or ["Phase"])[0]
-    phase_start = state.get("current_started") or ir.target_date
-    in_phase = count_phase_archetype_routines(phase_start, ir.archetype, ir.target_date)
-    total = count_total_performed_workouts()
+    in_experiment = count_experiment_archetype_routines(ir.archetype, ir.target_date)
+    total = count_performed_workouts_since(EXPERIMENT_START_DATE)
     return {
         "phase": phase,
-        "type_count_in_phase": in_phase + 1,
+        "type_count_in_phase": in_experiment + 1,
         "all_time_count": total + 1,
-        "phase_started": phase_start,
+        "experiment_started": EXPERIMENT_START_DATE,
     }
 
 

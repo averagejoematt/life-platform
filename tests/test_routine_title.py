@@ -84,40 +84,40 @@ def test_why_note_floor_variant_is_explicit():
     assert "floor" in note.lower() or "minimum" in note.lower()
 
 
-# ── build_title_context: N reset-per-phase + Y from performed history ──
+# ── build_title_context: all-time-per-type since EXPERIMENT_START_DATE ──
 
-def _phase_state(current="Foundation", started="2026-06-01"):
+def _phase_state(current="Foundation"):
     return {
         "phases": ["Foundation", "Build", "Forge", "Sustain"],
         "current": current,
-        "current_started": started,
+        "current_started": "2026-06-01",
     }
 
 
-def test_build_context_y_counts_performed_workouts_plus_one():
-    """Y = total Hevy workouts performed + 1 (this routine)."""
+def test_build_context_y_counts_performed_workouts_since_experiment_start():
+    """Y = workouts performed since EXPERIMENT_START_DATE + 1."""
     with patch.object(rt, "load_phase_state", return_value=_phase_state()), \
-         patch.object(rt, "count_total_performed_workouts", return_value=46), \
-         patch.object(rt, "count_phase_archetype_routines", return_value=2):
+         patch.object(rt, "count_performed_workouts_since", return_value=46), \
+         patch.object(rt, "count_experiment_archetype_routines", return_value=2):
         ctx = rt.build_title_context(_ir(target_date="2026-06-15"))
     assert ctx["all_time_count"] == 47
     assert ctx["type_count_in_phase"] == 3
     assert ctx["phase"] == "Foundation"
+    assert ctx["experiment_started"] == rt.EXPERIMENT_START_DATE
 
 
-def test_build_context_first_routine_in_phase_n_is_1():
-    """No prior routines of this type in current phase → N=1."""
-    with patch.object(rt, "load_phase_state",
-                      return_value=_phase_state(current="Build", started="2026-09-01")), \
-         patch.object(rt, "count_total_performed_workouts", return_value=99), \
-         patch.object(rt, "count_phase_archetype_routines", return_value=0):
+def test_build_context_first_routine_n_is_1():
+    """No prior routines of this type since experiment start → N=1."""
+    with patch.object(rt, "load_phase_state", return_value=_phase_state(current="Build")), \
+         patch.object(rt, "count_performed_workouts_since", return_value=99), \
+         patch.object(rt, "count_experiment_archetype_routines", return_value=0):
         ctx = rt.build_title_context(_ir(target_date="2026-09-02"))
     assert ctx["type_count_in_phase"] == 1
     assert ctx["all_time_count"] == 100
     assert ctx["phase"] == "Build"
 
 
-def test_count_phase_archetype_routines_filters_archetype_and_variant():
+def test_count_experiment_archetype_filters_archetype_and_variant():
     """Index Query result filtered by archetype + skipping floor/re_entry variants."""
     fake_items = [
         {"routine_id": "r1", "target_date": "2026-06-02", "archetype": "upper", "variant": "ideal"},
@@ -133,13 +133,13 @@ def test_count_phase_archetype_routines_filters_archetype_and_variant():
 
     with patch.object(rt, "_table", return_value=_FakeTable()):
         # target_date_exclusive=2026-06-15 → r5 is the one being committed, excluded
-        n = rt.count_phase_archetype_routines("2026-06-01", "upper", "2026-06-15")
+        n = rt.count_experiment_archetype_routines("upper", "2026-06-15")
     # r1 + r3 = 2; r4 dropped (floor); r2 dropped (lower); r5 excluded (current)
     assert n == 2
 
 
-def test_phase_change_resets_n():
-    """When current_started moves forward, prior-phase routines drop out of N."""
+def test_n_does_not_reset_on_phase_change():
+    """ADR-067 amendment: N counts from EXPERIMENT_START_DATE regardless of phase."""
     fake_items = [
         {"routine_id": "old1", "target_date": "2026-06-02", "archetype": "upper", "variant": "ideal"},
         {"routine_id": "old2", "target_date": "2026-08-05", "archetype": "upper", "variant": "ideal"},
@@ -147,28 +147,19 @@ def test_phase_change_resets_n():
     ]
 
     class _FakeTable:
-        def query(self, **kwargs):
-            from boto3.dynamodb.conditions import Key
-            # Honor the sk-between bounds for the test
-            cond = kwargs["KeyConditionExpression"]
-            # very small filter — return items whose sk would fall in DATE# range
-            # Bounds string-compare on YYYY-MM-DD subsection.
-            start_marker = "2026-09-01"
-            return {"Items": [
-                it for it in fake_items
-                if it["target_date"] >= start_marker
-            ]}
+        def query(self, **_kwargs):
+            return {"Items": fake_items}
 
     with patch.object(rt, "_table", return_value=_FakeTable()):
-        n = rt.count_phase_archetype_routines("2026-09-01", "upper", "2026-09-09")
-    # Only `new1` (2026-09-02) counts — old phase entries excluded.
-    assert n == 1
+        n = rt.count_experiment_archetype_routines("upper", "2026-09-09")
+    # All 3 prior routines count, even though we'd be in a later phase.
+    assert n == 3
 
 
-def test_count_total_performed_workouts_paginates():
-    """COUNT-only Query that paginates via LastEvaluatedKey."""
+def test_count_performed_workouts_since_paginates():
+    """COUNT-only Query with sk>=DATE#... that paginates via LastEvaluatedKey."""
     pages = [
-        {"Count": 100, "LastEvaluatedKey": {"pk": "USER#matthew#SOURCE#hevy", "sk": "DATE#2025"}},
+        {"Count": 100, "LastEvaluatedKey": {"pk": "USER#matthew#SOURCE#hevy", "sk": "DATE#2026-08"}},
         {"Count": 23},
     ]
     call_count = {"n": 0}
@@ -180,6 +171,6 @@ def test_count_total_performed_workouts_paginates():
             return pages[i]
 
     with patch.object(rt, "_table", return_value=_FakeTable()):
-        total = rt.count_total_performed_workouts()
+        total = rt.count_performed_workouts_since("2026-06-01")
     assert total == 123
     assert call_count["n"] == 2
