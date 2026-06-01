@@ -99,7 +99,7 @@ Prereq closures captured in `SPEC_HEVY_ROUTINE_WRITELOOP_2026_05_31_PREREQS.md` 
 - [x] Verify **Hevy API contract** — OpenAPI spec pulled; key surprises: no routine DELETE, no webhooks, no documented rate limits, `updated_at`-only conflict detection. Implications listed in PREREQS §A.11.
 - [x] Decide **deterministic generation engine** design — pseudocode + test plan in PREREQS §B. Subtract-only autoregulation; MEV default; floor + re-entry variants; bounded outputs.
 - [x] Define **readiness-signal validation** plan — pre-registered N≥30 design in PREREQS §C. Decision rule and public-site framing locked.
-- [ ] Fill or stand up interim **Sports Medicine / Movement Quality** Personal Board seat — interim persona drafted (PREREQS §D); awaits Matthew approval before BOARDS.md update. Only blocks the catalog joint-friendliness tagging step; Phase 1 can ship with placeholder tags.
+- [x] Fill or stand up interim **Sports Medicine / Movement Quality** Personal Board seat — Option 1 approved (2026-05-31); interim "Dr. Iris Tanaka — Sports Medicine (interim)" noted in `docs/BOARDS.md`. Live S3 board config update deferred to Phase 1 build commit. Phase 1 fully unblocked.
 
 ## 11. Doc-update implications (when this lands)
 

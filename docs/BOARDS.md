@@ -42,6 +42,8 @@ aws s3 cp s3://matthew-life-platform/config/board_of_directors.json - | python3 
 
 **Backlog addition**: Sports Medicine / Movement Quality specialist — injury prevention, biomechanics of training at higher body weight, joint health screening.
 
+**Interim placeholder (2026-05-31)**: "Dr. Iris Tanaka — Sports Medicine (interim)" drafted in `SPEC_HEVY_ROUTINE_WRITELOOP_2026_05_31_PREREQS.md` §D. Narrow mandate (don't-get-hurt only — high-skill-exercise veto, joint-friendliness rubric, re-entry sign-off). Not yet in the live S3 board config; will be added at Hevy write-loop Phase 1 build time. Retires when a named Sports Med voice fills the real seat.
+
 ---
 
 ## 2. Technical Board of Directors
