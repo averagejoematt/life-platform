@@ -1,9 +1,11 @@
 # V2 site consolidation — rollback runbook
 
 **Source brief:** `~/Desktop/BRIEF_claude_code_v2_consolidation.md` (2026-05-31)
-**Pre-consolidation rollback floor:** tag `site-v1` (pushed to origin 2026-05-31).
-**Working branch:** `redesign/v2-consolidation`.
+**Pre-consolidation rollback floor:** tag `site-v1` (pushed to origin 2026-05-31, at `00fb531`).
+**Consolidation landing tag:** `site-v2` (pushed 2026-05-31, at `8679f9b`).
+**Working branch:** `redesign/v2-consolidation` (merged to `main` 2026-05-31).
 **Active path chosen:** **Plan B** (branch-only, no live preview prefix).
+**Promotion status:** ✅ **LIVE on production averagejoematt.com as of 2026-05-31.** CloudFront invalidation `I2D4G3UKIY7TFO4JFEW7WZSU13`. Smoke test PASSED — 9/9 redirect targets correct, 8/8 dispatches still HTTP 200, 9/9 spine pages HTTP 200.
 
 ---
 
