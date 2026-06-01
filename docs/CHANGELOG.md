@@ -1,10 +1,27 @@
+## [Restart 2026-06-01] — 2026-05-31
+
+### Added
+- `lambdas/constants.py` — runtime constants (genesis date, baseline weight). Generated from `config/user_goals.json` via `deploy/sync_constants_from_config.py`.
+- `lambdas/phase_filter.py` — `with_phase_filter()` helper. Wired into `site_api._query_source`, `mcp.core.query_source`, and all 13 queries in `intelligence_common.py`.
+- 6 restart scripts under `deploy/`: `restart_phase_tag.py`, `restart_intelligence_wipe.py`, `restart_character_rebuild.py`, `restart_chronicle_handler.py`, `restart_site_copy_sync.py`, `restart_pipeline.py`.
+
+### Changed
+- Genesis re-anchored to **2026-06-01**. Baseline weight: **304.3 lbs** (Withings).
+- All Lambda code that referenced `"2026-04-01"` or `307` literals migrated to import from `lambdas.constants`.
+- `character_sheet_lambda.fetch_date` now filters tombstones (clean-slate cascade).
+
+### Removed
+- `S3DataKey` customer-managed KMS key resource from `cdk/stacks/core_stack.py`. Bucket already on AES256.
+- Public-facing references to prior attempts: hero copy, CTA, build-history references on `site/builders/`.
+
+
 ## [Saturday 2026-05-31] — Stage0 fixes + v2 IA consolidation (LIVE)
 
 ### Added
 - **Per-exercise notes (ADR-068)** — each generated routine now attaches one short factual line per exercise (default mode `one_best_line`): `Last: 60kg 8/8/7 (24 May)`. Rendered in pure Python from real `SOURCE#hevy` workout records — **no LLM math**. Anti-hallucination guard is structural (no model) AND tested (every numeric token in a rendered cue must trace back to the source facts dict). Lifts with no prior sessions render empty. AI-trainer-comment hook wired but inert until the coach layer emits one. Config flag in `training_week.json` (`one_best_line` / `show_both` / `off`). New shared-layer module `lambdas/exercise_history.py`. Layer v70.
 
 ### Changed
-- **Final experiment reset → 2026-06-01 + ADR-067 amendment.** `EXPERIMENT_START_DATE` advanced from 2026-05-30 to 2026-06-01 (Sunday). Withings baseline override `--override-weight-lbs 304.3` keeps the start weight stable. N in the Hevy routine title convention flipped from per-phase to **all-time-per-type since EXPERIMENT_START_DATE** — phase becomes a decorative narrative marker, not an N-resetter. Y also rebased to "performed Hevy workouts since EXPERIMENT_START_DATE + 1". Layer v69 → v70. Deploy via `python3 deploy/restart_pipeline.py --genesis 2026-06-01 --override-weight-lbs 304.3 --apply`.
+- **Final experiment reset → 2026-06-01 + ADR-067 amendment.** `EXPERIMENT_START_DATE` advanced from 2026-05-30 to 2026-06-01 (Monday). Withings baseline override `--override-weight-lbs 304.3` keeps the start weight stable. N in the Hevy routine title convention flipped from per-phase to **all-time-per-type since EXPERIMENT_START_DATE** — phase becomes a decorative narrative marker, not an N-resetter. Y also rebased to "performed Hevy workouts since EXPERIMENT_START_DATE + 1". Layer v69 → v70. Deploy via `python3 deploy/restart_pipeline.py --genesis 2026-06-01 --override-weight-lbs 304.3 --apply`.
 
 ### Added
 - **Hevy routine title convention (ADR-067)** — every committed routine now titled `<Phase> - <Type> - <N> - <Y>` (e.g. `Foundation - Upper - 3 - 47`). Y is performed-Hevy-workout tally (honest, self-correcting per spec); N is pushed-routines-of-this-type-in-current-phase (sequencing simplicity; open call to flip to all-time-per-type). Re-entry variant titles gently as `Welcome back · <Type>` — no counters surfaced, no guilt framing. One-line WHY-note replaces the multi-line rationale dump in Hevy's notes field. Phases (`Foundation → Build → Forge → Sustain`) ship in `config/training_phases.json`; advance manually. New shared-layer module `routine_title.py`. Layer v68 → v69. Deploy steps in RUNBOOK §"Hevy Routine Title Convention — Deploy Steps".

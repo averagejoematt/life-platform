@@ -1,231 +1,184 @@
-phase-tag report — mode=APPLY — genesis=2026-05-30
-generated 2026-05-29T20:38:26.023202+00:00
-scanned 19990 items across 57 partitions
+phase-tag report — mode=APPLY — genesis=2026-06-01
+generated 2026-06-01T03:37:44.901610+00:00
+scanned 20151 items across 59 partitions
 
 partition (source)                      total    pilot    exper    no-date ok-correct  to-update  applied  errors
 -----------------------------------------------------------------------------------------------------------------
-adaptive_mode                              90       90        0          0         85          5        5       0
-ai_analysis                                 9        9        0          0          0          9        9       0
-anomalies                                  89       89        0          0         84          5        5       0
-apple_health                             3961     3961        0          0       3956          5        5       0
-centenarian_progress                        9        9        0          0          9          0        0       0
+adaptive_mode                              92       92        0          0         91          1        1       0
+ai_analysis                                 9        0        0          9          0          0        0       0
+anomalies                                  91       91        0          0         90          1        1       0
+apple_health                             3964     3963        1          0       3961          3        3       0
+centenarian_progress                       10       10        0          0          9          1        1       0
 challenges                                 26       26        0          0         26          0        0       0
-character_sheet                            61       61        0          0         57          4        4       0
+character_sheet                            63       63        0          0         62          1        1       0
 chronicle                                  12       12        0          0         12          0        0       0
 chronicling                                16       16        0          0         16          0        0       0
-circadian                                  74       74        0          0         69          5        5       0
+circadian                                  77       76        1          0         75          2        2       0
 composite_scores                            1        1        0          0          1          0        0       0
-computed_insights                          82       82        0          0         78          4        4       0
-computed_metrics                           85       85        0          0         80          5        5       0
-day_grade                                1036     1036        0          0       1031          5        5       0
+computed_insights                          84       84        0          0         83          1        1       0
+computed_metrics                           88       88        0          0         86          2        2       0
+day_grade                                1039     1039        0          0       1037          2        2       0
 dexa                                        2        2        0          0          2          0        0       0
 discovery_annotations                       4        4        0          0          4          0        0       0
 dropbox_tracker                            38       37        0          1         37          0        0       0
-eightsleep                                959      959        0          0        954          5        5       0
-email_log#anomaly_detector                 62       62        0          0         57          5        5       0
-email_log#daily_brief                      48       48        0          0         43          5        5       0
-email_log#monday_compass                   10       10        0          0          9          1        1       0
+eightsleep                                962      961        1          0        960          2        2       0
+email_log#anomaly_detector                 64       64        0          0         62          2        2       0
+email_log#daily_brief                      50       50        0          0         48          2        2       0
+email_log#monday_compass                   10       10        0          0         10          0        0       0
 email_log#nutrition_review                  3        3        0          0          3          0        0       0
 email_log#wednesday_chronicle               7        7        0          0          7          0        0       0
-email_log#weekly_digest                     9        9        0          0          9          0        0       0
+email_log#weekly_digest                    10       10        0          0          9          1        1       0
 email_log#weekly_plate                      4        4        0          0          4          0        0       0
 experiments                                 4        4        0          0          4          0        0       0
 field_notes                                 4        0        0          4          0          0        0       0
 food_delivery                            1718     1717        0          1       1717          0        0       0
-garmin                                   1453     1453        0          0       1448          5        5       0
+garmin                                   1453     1453        0          0       1453          0        0       0
 genome                                    111        0        0        111          0          0        0       0
 google_calendar                            10       10        0          0         10          0        0       0
-habit_scores                               86       86        0          0         81          5        5       0
-habitify                                   95       95        0          0         90          5        5       0
-health_check                               62       62        0          0         57          5        5       0
-hevy                                      892      892        0          0        891          1        1       0
-hypotheses                                 13       13        0          0         13          0        0       0
-insights                                  501      501        0          0        398        103      103       0
+habit_scores                               89       89        0          0         87          2        2       0
+habitify                                   98       97        1          0         96          2        2       0
+health_check                               65       64        1          0         62          3        3       0
+hevy                                      894      894        0          0        892          2        2       0
+hevy_id_map                                 2        0        0          2          0          0        0       0
+hypotheses                                 16       16        0          0         13          3        3       0
+insights                                  516      516        0          0        508          8        8       0
 journal_analysis                            4        4        0          0          4          0        0       0
 labs                                        9        8        0          1          8          0        0       0
 ledger                                      6        5        0          1          5          0        0       0
 macrofactor                               114      114        0          0        114          0        0       0
 macrofactor_workouts                      431      431        0          0        431          0        0       0
 measurements                                1        1        0          0          1          0        0       0
-notion                                     49       49        0          0         23         26       26       0
+notion                                     50       50        0          0         37         13       13       0
 nutrition_review                            5        5        0          0          5          0        0       0
-platform_memory                            18       18        0          0         18          0        0       0
+platform_memory                            20       20        0          0         18          2        2       0
 protocols                                   9        3        0          6          3          0        0       0
+routine_index                               2        0        2          0          0          2        2       0
 sick_days                                   8        8        0          0          8          0        0       0
-sleep_unified                             109      109        0          0        104          5        5       0
+sleep_unified                             111      111        0          0        110          1        1       0
 strava                                   1188     1188        0          0       1188          0        0       0
-subscribers                                68        0        0         68          0          0        0       0
-supplements                                23       23        0          0         22          1        1       0
-todoist                                   359      359        0          0        355          4        4       0
-weather                                    93       93        0          0         88          5        5       0
-weekly_correlations                        10       10        0          0         10          0        0       0
-whoop                                    4663     4663        0          0       4656          7        7       0
-withings                                 1177     1177        0          0       1175          2        2       0
+subscribers                               148        0        0        148          0          0        0       0
+supplements                                23       23        0          0         23          0        0       0
+todoist                                   361      361        0          0        360          1        1       0
+weather                                    96       95        1          0         94          2        2       0
+weekly_correlations                        11       11        0          0         10          1        1       0
+whoop                                    4669     4668        1          0       4664          5        5       0
+withings                                 1179     1179        0          0       1177          2        2       0
 -----------------------------------------------------------------------------------------------------------------
-TOTAL                                   19990    19797        0        193      19560        237      237       0
+TOTAL                                   20151    19858        9        284      19797         70       70       0
 
 === samples of items that would be updated (up to 5 per partition) ===
 
 [adaptive_mode]
-  sk=DATE#2026-05-24  before=None  after='pilot'
-  sk=DATE#2026-05-25  before=None  after='pilot'
-  sk=DATE#2026-05-26  before='experiment'  after='pilot'
-  sk=DATE#2026-05-27  before='experiment'  after='pilot'
-  sk=DATE#2026-05-28  before='experiment'  after='pilot'
-
-[ai_analysis]
-  sk=EXPERT#explorer  before=None  after='pilot'
-  sk=EXPERT#glucose  before=None  after='pilot'
-  sk=EXPERT#integrator  before=None  after='pilot'
-  sk=EXPERT#labs  before=None  after='pilot'
-  sk=EXPERT#mind  before=None  after='pilot'
+  sk=DATE#2026-05-30  before='experiment'  after='pilot'
 
 [anomalies]
-  sk=DATE#2026-05-24  before=None  after='pilot'
-  sk=DATE#2026-05-25  before=None  after='pilot'
-  sk=DATE#2026-05-26  before=None  after='pilot'
-  sk=DATE#2026-05-27  before=None  after='pilot'
-  sk=DATE#2026-05-28  before=None  after='pilot'
+  sk=DATE#2026-05-30  before=None  after='pilot'
 
 [apple_health]
-  sk=DATE#2026-05-25  before='experiment'  after='pilot'
-  sk=DATE#2026-05-26  before=None  after='pilot'
-  sk=DATE#2026-05-27  before=None  after='pilot'
-  sk=DATE#2026-05-28  before=None  after='pilot'
-  sk=DATE#2026-05-29  before=None  after='pilot'
+  sk=DATE#2026-05-30  before='experiment'  after='pilot'
+  sk=DATE#2026-05-31  before=None  after='pilot'
+  sk=DATE#2026-06-01  before=None  after='experiment'
+
+[centenarian_progress]
+  sk=WEEK#2026-W22  before=None  after='pilot'
 
 [character_sheet]
-  sk=DATE#2026-05-25  before=None  after='pilot'
-  sk=DATE#2026-05-26  before=None  after='pilot'
-  sk=DATE#2026-05-27  before='experiment'  after='pilot'
-  sk=DATE#2026-05-28  before='experiment'  after='pilot'
+  sk=DATE#2026-05-30  before='experiment'  after='pilot'
 
 [circadian]
-  sk=DATE#2026-05-25  before='experiment'  after='pilot'
-  sk=DATE#2026-05-26  before=None  after='pilot'
-  sk=DATE#2026-05-27  before=None  after='pilot'
-  sk=DATE#2026-05-28  before='experiment'  after='pilot'
-  sk=DATE#2026-05-29  before='experiment'  after='pilot'
+  sk=DATE#2026-05-30  before='experiment'  after='pilot'
+  sk=DATE#2026-05-31  before='experiment'  after='pilot'
 
 [computed_insights]
-  sk=DATE#2026-05-25  before=None  after='pilot'
-  sk=DATE#2026-05-26  before='experiment'  after='pilot'
-  sk=DATE#2026-05-27  before='experiment'  after='pilot'
-  sk=DATE#2026-05-28  before='experiment'  after='pilot'
+  sk=DATE#2026-05-30  before='experiment'  after='pilot'
 
 [computed_metrics]
-  sk=DATE#2026-05-24  before=None  after='pilot'
-  sk=DATE#2026-05-25  before=None  after='pilot'
-  sk=DATE#2026-05-26  before='experiment'  after='pilot'
-  sk=DATE#2026-05-27  before='experiment'  after='pilot'
-  sk=DATE#2026-05-28  before='experiment'  after='pilot'
+  sk=DATE#2026-05-30  before='experiment'  after='pilot'
+  sk=DATE#2026-05-31  before='experiment'  after='pilot'
 
 [day_grade]
-  sk=DATE#2026-05-24  before=None  after='pilot'
-  sk=DATE#2026-05-25  before=None  after='pilot'
-  sk=DATE#2026-05-26  before=None  after='pilot'
-  sk=DATE#2026-05-27  before=None  after='pilot'
-  sk=DATE#2026-05-28  before=None  after='pilot'
+  sk=DATE#2026-05-30  before=None  after='pilot'
+  sk=DATE#2026-05-31  before=None  after='pilot'
 
 [eightsleep]
-  sk=DATE#2026-05-25  before='experiment'  after='pilot'
-  sk=DATE#2026-05-26  before='experiment'  after='pilot'
-  sk=DATE#2026-05-27  before='experiment'  after='pilot'
-  sk=DATE#2026-05-28  before='experiment'  after='pilot'
-  sk=DATE#2026-05-29  before='experiment'  after='pilot'
+  sk=DATE#2026-05-30  before='experiment'  after='pilot'
+  sk=DATE#2026-05-31  before='experiment'  after='pilot'
 
 [email_log#anomaly_detector]
-  sk=DATE#2026-05-25  before=None  after='pilot'
-  sk=DATE#2026-05-26  before=None  after='pilot'
-  sk=DATE#2026-05-27  before=None  after='pilot'
-  sk=DATE#2026-05-28  before=None  after='pilot'
-  sk=DATE#2026-05-29  before=None  after='pilot'
+  sk=DATE#2026-05-30  before='experiment'  after='pilot'
+  sk=DATE#2026-05-31  before=None  after='pilot'
 
 [email_log#daily_brief]
-  sk=DATE#2026-05-25  before=None  after='pilot'
-  sk=DATE#2026-05-26  before=None  after='pilot'
-  sk=DATE#2026-05-27  before=None  after='pilot'
-  sk=DATE#2026-05-28  before=None  after='pilot'
-  sk=DATE#2026-05-29  before=None  after='pilot'
+  sk=DATE#2026-05-30  before='experiment'  after='pilot'
+  sk=DATE#2026-05-31  before=None  after='pilot'
 
-[email_log#monday_compass]
-  sk=DATE#2026-05-25  before=None  after='pilot'
-
-[garmin]
-  sk=DATE#2026-05-25  before='experiment'  after='pilot'
-  sk=DATE#2026-05-26  before='experiment'  after='pilot'
-  sk=DATE#2026-05-27  before='experiment'  after='pilot'
-  sk=DATE#2026-05-28  before='experiment'  after='pilot'
-  sk=DATE#2026-05-29  before='experiment'  after='pilot'
+[email_log#weekly_digest]
+  sk=DATE#2026-05-31  before=None  after='pilot'
 
 [habit_scores]
-  sk=DATE#2026-05-24  before=None  after='pilot'
-  sk=DATE#2026-05-25  before=None  after='pilot'
-  sk=DATE#2026-05-26  before=None  after='pilot'
-  sk=DATE#2026-05-27  before=None  after='pilot'
-  sk=DATE#2026-05-28  before=None  after='pilot'
+  sk=DATE#2026-05-30  before=None  after='pilot'
+  sk=DATE#2026-05-31  before=None  after='pilot'
 
 [habitify]
-  sk=DATE#2026-05-25  before='experiment'  after='pilot'
-  sk=DATE#2026-05-26  before='experiment'  after='pilot'
-  sk=DATE#2026-05-27  before='experiment'  after='pilot'
-  sk=DATE#2026-05-28  before='experiment'  after='pilot'
-  sk=DATE#2026-05-29  before='experiment'  after='pilot'
+  sk=DATE#2026-05-30  before='experiment'  after='pilot'
+  sk=DATE#2026-05-31  before='experiment'  after='pilot'
 
 [health_check]
-  sk=DATE#2026-05-25  before=None  after='pilot'
-  sk=DATE#2026-05-26  before=None  after='pilot'
-  sk=DATE#2026-05-27  before=None  after='pilot'
-  sk=DATE#2026-05-28  before=None  after='pilot'
-  sk=DATE#2026-05-29  before=None  after='pilot'
+  sk=DATE#2026-05-30  before=None  after='pilot'
+  sk=DATE#2026-05-31  before=None  after='pilot'
+  sk=DATE#2026-06-01  before=None  after='experiment'
 
 [hevy]
-  sk=DATE#2026-05-29#WORKOUT#9d1b1091-ae7e-4314-b97e-3d38f66c0265  before='experiment'  after='pilot'
+  sk=DATE#2026-05-30#WORKOUT#4e8a426f-adea-457e-8509-bca74aa6534f  before='experiment'  after='pilot'
+  sk=DATE#2026-05-31#WORKOUT#c3250e08-a320-4819-91b1-8a2a4bea881a  before='experiment'  after='pilot'
+
+[hypotheses]
+  sk=HYPOTHESIS#2026-05-31T19:01:15.741841+00:00  before='experiment'  after='pilot'
+  sk=HYPOTHESIS#2026-05-31T19:01:15.922610+00:00  before='experiment'  after='pilot'
+  sk=HYPOTHESIS#2026-05-31T19:01:15.962309+00:00  before='experiment'  after='pilot'
 
 [insights]
-  sk=INSIGHT#2026-05-25T15:01:28.976Z#monday_compass  before=None  after='pilot'
-  sk=INSIGHT#2026-05-25T17:05:25.801Z#daily_brief  before=None  after='pilot'
-  sk=INSIGHT#2026-05-25T17:05:25.860Z#daily_brief  before=None  after='pilot'
-  sk=INSIGHT#2026-05-25T17:05:25.918Z#daily_brief  before=None  after='pilot'
-  sk=INSIGHT#2026-05-25T17:05:25.975Z#daily_brief  before=None  after='pilot'
+  sk=INSIGHT#2026-05-31T16:01:23.559Z#weekly_digest  before=None  after='pilot'
+  sk=INSIGHT#2026-05-31T17:02:56.074Z#daily_brief  before=None  after='pilot'
+  sk=INSIGHT#2026-05-31T17:02:56.134Z#daily_brief  before=None  after='pilot'
+  sk=INSIGHT#2026-05-31T17:02:56.190Z#daily_brief  before=None  after='pilot'
+  sk=INSIGHT#2026-05-31T17:02:56.246Z#daily_brief  before=None  after='pilot'
 
 [notion]
-  sk=DATE#2026-01-01#journal#journal#1  before=None  after='pilot'
   sk=DATE#2026-01-03#journal#journal#1  before=None  after='pilot'
-  sk=DATE#2026-01-03#journal#journal#2  before=None  after='pilot'
-  sk=DATE#2026-01-03#journal#journal#3  before=None  after='pilot'
   sk=DATE#2026-01-07#journal#journal#1  before=None  after='pilot'
+  sk=DATE#2026-01-11#journal#journal#1  before=None  after='pilot'
+  sk=DATE#2026-01-19#journal#journal#1  before=None  after='pilot'
+  sk=DATE#2026-01-21#journal#journal#1  before=None  after='pilot'
+
+[platform_memory]
+  sk=MEMORY#failure_patterns#2026-05-31  before='experiment'  after='pilot'
+  sk=MEMORY#hypothesis_monitoring#2026-05-31  before='experiment'  after='pilot'
+
+[routine_index]
+  sk=DATE#2026-06-01#ROUTINE#fd188365baac469babdb3e38513e98bd  before=None  after='experiment'
+  sk=DATE#2026-06-02#ROUTINE#2af150189cdb413e97b3de585385abde  before=None  after='experiment'
 
 [sleep_unified]
-  sk=DATE#2026-05-24  before=None  after='pilot'
-  sk=DATE#2026-05-25  before=None  after='pilot'
-  sk=DATE#2026-05-26  before='experiment'  after='pilot'
-  sk=DATE#2026-05-27  before='experiment'  after='pilot'
-  sk=DATE#2026-05-28  before='experiment'  after='pilot'
-
-[supplements]
-  sk=DATE#2026-05-29  before=None  after='pilot'
+  sk=DATE#2026-05-30  before='experiment'  after='pilot'
 
 [todoist]
-  sk=DATE#2026-05-25  before='experiment'  after='pilot'
-  sk=DATE#2026-05-26  before='experiment'  after='pilot'
-  sk=DATE#2026-05-27  before='experiment'  after='pilot'
-  sk=DATE#2026-05-28  before='experiment'  after='pilot'
+  sk=DATE#2026-05-30  before='experiment'  after='pilot'
 
 [weather]
-  sk=DATE#2026-05-25  before='experiment'  after='pilot'
-  sk=DATE#2026-05-26  before='experiment'  after='pilot'
-  sk=DATE#2026-05-27  before='experiment'  after='pilot'
-  sk=DATE#2026-05-28  before='experiment'  after='pilot'
-  sk=DATE#2026-05-29  before='experiment'  after='pilot'
+  sk=DATE#2026-05-30  before='experiment'  after='pilot'
+  sk=DATE#2026-05-31  before='experiment'  after='pilot'
+
+[weekly_correlations]
+  sk=WEEK#2026-W22  before='experiment'  after='pilot'
 
 [whoop]
-  sk=DATE#2026-05-25  before='experiment'  after='pilot'
-  sk=DATE#2026-05-26  before='experiment'  after='pilot'
-  sk=DATE#2026-05-27  before='experiment'  after='pilot'
-  sk=DATE#2026-05-27#WORKOUT#d0d1d4db-5604-4085-9e10-64d81fea95de  before='experiment'  after='pilot'
-  sk=DATE#2026-05-28  before='experiment'  after='pilot'
+  sk=DATE#2026-05-30  before='experiment'  after='pilot'
+  sk=DATE#2026-05-30#WORKOUT#869b33c6-cb9a-4c72-8091-9945d8310103  before='experiment'  after='pilot'
+  sk=DATE#2026-05-30#WORKOUT#b4c79e6e-0fa2-4811-ab45-685df4e68263  before='experiment'  after='pilot'
+  sk=DATE#2026-05-31  before='experiment'  after='pilot'
+  sk=DATE#2026-05-31#WORKOUT#e1fd1991-a776-4efd-b4ea-81963ec8eeb0  before='experiment'  after='pilot'
 
 [withings]
-  sk=DATE#2026-05-25  before='experiment'  after='pilot'
-  sk=DATE#2026-05-29  before='experiment'  after='pilot'
+  sk=DATE#2026-05-30  before='experiment'  after='pilot'
+  sk=DATE#2026-05-31  before='experiment'  after='pilot'

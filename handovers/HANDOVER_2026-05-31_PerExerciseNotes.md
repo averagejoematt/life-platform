@@ -14,7 +14,7 @@
 | Hevy write-loop (cron) | DISABLED — EventBridge rule + SSM `/life-platform/hevy/cron_enabled=false`. Unchanged. |
 | Add-load autoreg | OFF: SSM `/life-platform/hevy/autoreg_add_load_enabled=false`. Unchanged. |
 | Shared layer | **AWS: v68. Source: v70.** Two ADRs since the AWS state — title convention (v69 source) + amendment/per-exercise notes (v70 source). |
-| EXPERIMENT_START_DATE | Source: **2026-06-01** (Sunday). DDB / Lambda live env: still 2026-05-30 — flipped by `restart_pipeline`. |
+| EXPERIMENT_START_DATE | Source: **2026-06-01** (Monday). DDB / Lambda live env: still 2026-05-30 — flipped by `restart_pipeline`. |
 | Phase config | `current=Foundation`, `current_started=2026-06-01`. Phase is now decorative only — does NOT bound N. |
 | Per-exercise notes mode | `training_week.json:exercise_notes_mode="one_best_line"` (default). `show_both` / `off` available. |
 
@@ -50,7 +50,7 @@ Format: `Last: 60kg 8/8/7 (24 May)`
 
 ## What ADR-067 amendment + reset actually does
 
-**Reset:** `EXPERIMENT_START_DATE = "2026-06-01"` (Sunday). Source updated in:
+**Reset:** `EXPERIMENT_START_DATE = "2026-06-01"` (Monday). Source updated in:
 - `config/user_goals.json` (timeline.start_date + end_date)
 - `lambdas/constants.py` (EXPERIMENT_START_DATE + DOW)
 - `config/training_phases.json` (current_started)

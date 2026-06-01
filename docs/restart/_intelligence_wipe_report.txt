@@ -1,40 +1,46 @@
-intelligence wipe report — mode=APPLY — genesis=2026-05-30
-reason=experiment_restart_2026-05-30  generated=2026-05-29T20:38:26.309388+00:00
+intelligence wipe report — mode=APPLY — genesis=2026-06-01
+reason=experiment_restart_2026-06-01  generated=2026-06-01T03:37:45.126491+00:00
 
 partition                 mode total  to-tomb already-tomb  skip-mode   applied   errors
 ----------------------------------------------------------------------------------------
 chronicle                  all    12       12            0          0        12        0
 coach_threads              all     0        0            0          0         0        0
 predictions                all     0        0            0          0         0        0
-hypotheses                 all    13       13            0          0        13        0
+hypotheses                 all    16       16            0          0        16        0
 decisions                  all     0        0            0          0         0        0
-insights                   all   501      501            0          0       501        0
+insights                   all   516      516            0          0       516        0
 challenges                 all    26       26            0          0        26        0
 experiments                all     4        4            0          0         4        0
-character_sheet            all    61       61            0          0        61        0
-habit_scores               all    86       86            0          0        86        0
-computed_metrics         prege    85       85            0          0        85        0
+character_sheet            all    63       63            0          0        63        0
+habit_scores               all    89       89            0          0        89        0
+computed_metrics         prege    88       88            0          0        88        0
 ledger                   prege     6        5            0          1         5        0
-platform_memory          by_ca    18       13            0          5        13        0
+platform_memory          by_ca    20       14            0          6        14        0
 rewards                    all     0        0            0          0         0        0
 field_notes              prege     4        4            0          0         4        0
 discovery_annotation     prege     4        4            0          0         4        0
-anomalies                prege    89       89            0          0        89        0
-weekly_correlations      prege    10       10            0          0        10        0
-computed_insights        prege    82       82            0          0        82        0
-coach_sleep                all   749      749            0          0       749        0
-coach_nutrition            all   729      729            0          0       729        0
-coach_training             all   711      711            0          0       711        0
-coach_mind                 all   689      689            0          0       689        0
-coach_physical             all   690      690            0          0       690        0
-coach_glucose              all   638      638            0          0       638        0
-coach_labs                 all   487      487            0          0       487        0
-coach_explorer             all   419      419            0          0       419        0
-coach_compute            prege    13       13            0          0        13        0
+anomalies                prege    91       91            0          0        91        0
+weekly_correlations      prege    11       11            0          0        11        0
+computed_insights        prege    84       84            0          0        84        0
+ai_analysis                all     9        9            0          0         9        0
+coach_sleep                all   767      767            0          0       767        0
+coach_nutrition            all   743      743            0          0       743        0
+coach_training             all   731      731            0          0       731        0
+coach_mind                 all   705      705            0          0       705        0
+coach_physical             all   710      710            0          0       710        0
+coach_glucose              all   651      651            0          0       651        0
+coach_labs                 all   506      506            0          0       506        0
+coach_explorer             all   435      435            0          0       435        0
+coach_compute            prege    15       15            0          0        15        0
 ----------------------------------------------------------------------------------------
-TOTAL                           6126     6120            0          6      6120        0
+TOTAL                           6306     6299            0          7      6299        0
 
 === samples of items that would be tombstoned (up to 3 per partition) ===
+
+[ai_analysis]
+  sk=EXPERT#explorer
+  sk=EXPERT#glucose
+  sk=EXPERT#integrator
 
 [anomalies]
   sk=DATE#2026-02-22
