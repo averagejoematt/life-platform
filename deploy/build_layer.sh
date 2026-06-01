@@ -45,6 +45,8 @@ MODULES=(
     adherence_calc.py
     # ADR-067 (2026-05-31): title convention + WHY-note + phase counters
     routine_title.py
+    # ADR-068 (2026-05-31): per-exercise factual history cues
+    exercise_history.py
 )
 
 rm -rf "$PROJ_ROOT/cdk/layer-build"

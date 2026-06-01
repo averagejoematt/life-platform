@@ -26,6 +26,8 @@
   "z2_floor_minutes": 90,
   "floor_session_set_count": 6,
   "floor_session_minutes": 20,
+  "exercise_notes_mode": "one_best_line",
+  "exercise_notes_lookback_days": 180,
   "_notes": [
     "session_set_ceiling=25 caps total hard sets per session.",
     "skill_ceiling=2 means barbell tier-3 movements are excluded until the Sports Medicine seat is fully staffed (interim).",
