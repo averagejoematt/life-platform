@@ -291,7 +291,8 @@
       "lambdas/routine_generator.py",
       "lambdas/adherence_calc.py",
       "lambdas/routine_title.py",
-      "lambdas/exercise_history.py"
+      "lambdas/exercise_history.py",
+      "lambdas/vacation_fund.py"
     ],
     "consumers": [
       "daily-brief",

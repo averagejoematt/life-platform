@@ -1,0 +1,8 @@
+{
+  "_comment": "Vacation fund tracker config. Every mile of workout distance since start_date earns rate_per_mile USD. Loaded by lambdas/vacation_fund.py (local first for tests, then s3://matthew-life-platform/config/vacation_fund.json at runtime). Edit + re-sync to S3 to change.",
+  "rate_per_mile": 1.0,
+  "start_date": null,
+  "included_sport_types": "all",
+  "extra_sources": ["hevy", "macrofactor_export"],
+  "manual_adjustment_usd": 0.0
+}

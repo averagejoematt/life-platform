@@ -309,9 +309,21 @@ AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME",  "life-platform/site-api-ai-ke
 # ── Benchmark trends endpoint ─────────────────────────────────
 # ── Meal responses endpoint ───────────────────────────────────
 # ── Experiment suggestion POST handler ────────────────────────
+def handle_vacation_fund() -> dict:
+    """GET /api/vacation_fund — workout miles since experiment start → USD fund.
+    Read-only; delegates the math to the shared vacation_fund layer module."""
+    try:
+        from vacation_fund import compute_vacation_fund
+        return _ok(compute_vacation_fund(), cache_seconds=900)
+    except Exception as e:
+        logger.error(f"[site_api] /api/vacation_fund failed: {e}")
+        return _error(500, "vacation fund unavailable")
+
+
 ROUTES = {
     "/api/vitals":          handle_vitals,
     "/api/journey":         handle_journey,
+    "/api/vacation_fund":   handle_vacation_fund,
     "/api/character":       handle_character,
     "/api/status":          handle_status,
     "/api/status/summary":  handle_status_summary,
