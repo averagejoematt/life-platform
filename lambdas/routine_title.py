@@ -171,6 +171,12 @@ def format_title(ir: RoutineSpec, ctx: dict[str, Any]) -> str:
 
 def format_why_note(ir: RoutineSpec) -> str:
     """One short plain-language line. No raw metrics, no guilt framing."""
+    if getattr(ir, "source_action", "") == "draft_custom":
+        # Custom-authored session (ADR-069): surface the user's own first note
+        # line rather than a generator-flavored rationale that doesn't apply.
+        lines = [ln for ln in (ir.notes or "").splitlines() if ln.strip()]
+        return (lines[0].strip()[:140] if lines
+                else "Custom session — manually programmed.")
     if ir.variant == "re_entry":
         return "Easing back in after a gap. Take it gently today."
     if ir.variant == "floor":
