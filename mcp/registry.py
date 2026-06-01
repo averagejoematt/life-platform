@@ -155,6 +155,8 @@ from mcp.tools_protocols import (
 from mcp.tools_food_delivery import tool_get_food_delivery
 # ADR-066 (2026-05-31): Hevy routine write-loop fat tool.
 from mcp.tools_hevy_routine import tool_manage_hevy_routine
+# Vacation fund tracker ($1/workout-mile since experiment start).
+from mcp.tools_vacation import tool_get_vacation_fund
 
 TOOLS = {
     "get_sources": {
@@ -3162,6 +3164,33 @@ TOOLS = {
                     "days_since_last_workout": {"type": "integer"},
                 },
                 "required": ["action"],
+            },
+        },
+    },
+
+    "get_vacation_fund": {
+        "fn": tool_get_vacation_fund,
+        "schema": {
+            "name": "get_vacation_fund",
+            "description": (
+                "Vacation fund tracker: total workout MILES since the experiment start "
+                "date (2026-06-01) converted to USD at a configurable rate ($1/mile by "
+                "default). Strava is the base (it already holds Zwift rides, Garmin "
+                "auto-syncs, and outdoor walks/runs); Hevy + MacroFactor cardio distance "
+                "are added on top (may overlap Strava — a per-source breakdown shows each). "
+                "Returns total_miles, total_usd, per-sport and per-source breakdowns, the "
+                "date range, and a pace projection. Defaults to experiment-start → today; "
+                "pass start_date/end_date to override. Read-only."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "start_date": {"type": "string",
+                                   "description": "ISO YYYY-MM-DD. Defaults to experiment start (2026-06-01)."},
+                    "end_date": {"type": "string",
+                                 "description": "ISO YYYY-MM-DD. Defaults to today (Pacific)."},
+                },
+                "required": [],
             },
         },
     },

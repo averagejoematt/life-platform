@@ -344,7 +344,8 @@ def build_html(data, profile, day_grade_score, grade, component_scores, componen
                physical_coach_v2_text=None,
                glucose_coach_v2_text=None,
                labs_coach_v2_text=None,
-               explorer_coach_v2_text=None):
+               explorer_coach_v2_text=None,
+               vacation_fund=None):
     """Build the full daily brief HTML email.
 
     triggered_rewards and protocol_recs are pre-computed by lambda_handler
@@ -452,6 +453,24 @@ def build_html(data, profile, day_grade_score, grade, component_scores, componen
         html += _section_error_html("Travel", _e)
 
     html += '</div>'  # end header
+
+    # --- Vacation Fund banner (every workout mile = $1) ---
+    try:
+        if vacation_fund and isinstance(vacation_fund, dict):
+            _vf_usd = vacation_fund.get("total_usd")
+            _vf_miles = vacation_fund.get("total_miles")
+            if _vf_usd is not None and _vf_miles is not None:
+                html += (
+                    '<div style="background:linear-gradient(135deg,#0e7490,#0891b2);'
+                    'border-radius:12px;padding:12px 16px;margin:0 0 12px;color:#ecfeff;'
+                    'display:flex;justify-content:space-between;align-items:center;">'
+                    '<span style="font-size:13px;">🏝️ Vacation fund</span>'
+                    '<span style="font-size:15px;font-weight:600;">'
+                    f'${_vf_usd:,.0f} '
+                    f'<span style="font-size:11px;font-weight:400;opacity:0.85;">'
+                    f'· {_vf_miles:,.1f} mi</span></span></div>')
+    except Exception as _vf_e:
+        html += _section_error_html("Vacation Fund", _vf_e)
 
     # --- Character Sheet Section ---
     try:

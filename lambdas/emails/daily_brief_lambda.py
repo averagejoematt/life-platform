@@ -1916,6 +1916,15 @@ def lambda_handler(event, context):
     except Exception as _whr_err:
         logger.warning("S2-T1-10: Weekly habit review failed (non-fatal): " + str(_whr_err))
 
+    # Vacation fund: workout miles since experiment start → USD ($1/mile).
+    # Non-fatal — a failure here must never block the brief.
+    _vacation_fund = None
+    try:
+        from vacation_fund import compute_vacation_fund
+        _vacation_fund = compute_vacation_fund()
+    except Exception as _vf_err:
+        logger.warning("vacation fund compute failed (non-fatal): " + str(_vf_err))
+
     try:
         html = html_builder.build_html(
             data, profile, day_grade_score, grade, component_scores, component_details,
@@ -1933,7 +1942,8 @@ def lambda_handler(event, context):
             physical_coach_v2_text=physical_coach_v2_text,
             glucose_coach_v2_text=glucose_coach_v2_text,
             labs_coach_v2_text=labs_coach_v2_text,
-            explorer_coach_v2_text=explorer_coach_v2_text)
+            explorer_coach_v2_text=explorer_coach_v2_text,
+            vacation_fund=_vacation_fund)
     except Exception as e:
         logger.error("build_html crashed, sending minimal brief: " + str(e))
         html = ('<!DOCTYPE html><html><body style="font-family:sans-serif;padding:20px;">'
