@@ -10,7 +10,7 @@ Deep documentation lives in `docs/`. Start here when context is needed:
 - `docs/ARCHITECTURE.md` — full system design, 80 Lambdas (us-west-2) + 5 (us-east-1), 8 CDK stacks, data flows (updated v8.1.0)
 - `docs/SCHEMA.md` — DynamoDB field reference (authoritative)
 - `docs/RUNBOOK.md` — daily operations, troubleshooting
-- `docs/DECISIONS.md` — ADRs (ADR-001 through ADR-069), why things are the way they are
+- `docs/DECISIONS.md` — ADRs (ADR-001 through ADR-070), why things are the way they are
 - `docs/REMEDIATION_TAXONOMY.md` — classifier rubric for the self-healing agent (auto-fix-safe / fix-via-pr / needs-human / stale)
 - `docs/DATA_GOVERNANCE.md` — PII classification + retention policy (added v7.2.0)
 - `docs/BOARDS.md` — the three AI persona boards (Personal, Technical, Product)
@@ -54,11 +54,11 @@ python3 mcp_bridge.py
 2. **Store**: Raw JSON in S3 (`raw/{source}/{datatype}/{YYYY}/{MM}/{DD}.json`), normalized metrics in DynamoDB single-table (`life-platform`, PK `USER#matthew#SOURCE#{source}`, SK `DATE#{YYYY-MM-DD}`).
 
 3. **Serve/Compute**:
-   - **MCP Lambda** — 138 tools across 27 domain modules (`mcp/tools_*.py`, including `tools_hevy.py` added 2026-05-25 per ADR-060), accessed via Claude Desktop and claude.ai. `grep -c '"name":' mcp/registry.py` is source of truth. **Note (V2 P4.1):** only ~11 tools used in last 30 days per EMF telemetry; bulk pruning planned.
+   - **MCP Lambda** — 140 tools across 29 domain modules (`mcp/tools_*.py`, including `tools_hevy.py` per ADR-060 and `tools_vacation.py` (vacation-fund tracker, 2026-06-01)), accessed via Claude Desktop and claude.ai. `grep -c '"name":' mcp/registry.py` is source of truth. **Note (V2 P4.1):** only ~11 tools used in last 30 days per EMF telemetry; bulk pruning planned.
    - **Compute Lambdas** (5) — run before 11 AM daily: `character-sheet`, `adaptive-mode`, `daily-metrics-compute`, `daily-insight-compute`, `hypothesis-engine`; store pre-computed results to DynamoDB
    - **Email Lambdas** (7) — daily brief at 11 AM reads pre-computed results
    - **OG Image Lambda** — generates 6 data-driven PNG share cards daily at 11:30 AM PT using Pillow
-   - **Site API Lambda** (us-west-2, read-only) — serves averagejoematt.com with 60+ endpoints including `/api/vitals`, `/api/labs`, `/api/changes-since`, `/api/observatory_week`
+   - **Site API Lambda** (us-west-2, read-only) — serves averagejoematt.com with 60+ endpoints including `/api/vitals`, `/api/labs`, `/api/changes-since`, `/api/observatory_week`, `/api/vacation_fund`. **Multi-module package** (`web/*.py`): deploy the full `web/` dir, never single-file (see `.claude/commands/deploy.md`).
 
 ## Key Technical Conventions
 
@@ -80,7 +80,7 @@ python3 mcp_bridge.py
 
 **EventBridge crons use fixed UTC** — no DST drift. All schedules in `cdk/stacks/` must be UTC-fixed.
 
-**Lambda Layer** — shared modules (`ai_calls.py`, `retry_utils.py`, `bedrock_client.py`, `budget_guard.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `site_writer.py`, `character_engine.py`, `intelligence_common.py`, `auth_breaker.py`, `compute_metadata.py`, `http_retry.py`, `numeric.py`, `platform_logger.py`, `rate_limiter.py`, `request_validator.py`, + others) are deployed as a layer (currently **v70**, mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`). Note: `email_framework.py` was deleted in V2 (replaced inline). Changes here require a layer rebuild (`bash deploy/build_layer.sh`) before deploying dependent functions. Source of truth: `aws lambda list-layer-versions --layer-name life-platform-shared-utils --query 'LayerVersions[0].Version'`.
+**Lambda Layer** — shared modules (`ai_calls.py`, `retry_utils.py`, `bedrock_client.py`, `budget_guard.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `site_writer.py`, `character_engine.py`, `intelligence_common.py`, `auth_breaker.py`, `compute_metadata.py`, `http_retry.py`, `numeric.py`, `platform_logger.py`, `rate_limiter.py`, `request_validator.py`, + others) are deployed as a layer (currently **v71**, mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`). Note: `email_framework.py` was deleted in V2 (replaced inline). Changes here require a layer rebuild (`bash deploy/build_layer.sh`) before deploying dependent functions. Source of truth: `aws lambda list-layer-versions --layer-name life-platform-shared-utils --query 'LayerVersions[0].Version'`.
 
 **Prompt caching (COST-OPT-2)** — `ai_calls.py` and `retry_utils.py` auto-wrap system messages as Anthropic cached content blocks (90% discount). Model tiering: structured tasks use Haiku, narrative content uses Sonnet. All model assignments configurable via `AI_MODEL` env var. See ADR-049.
 
