@@ -32,6 +32,7 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 PK_PREFIX = f"USER#{USER_ID}#ROUTINE#"
 ID_MAP_PK = f"USER#{USER_ID}#SOURCE#hevy_id_map"
+INDEX_PK = f"USER#{USER_ID}#SOURCE#routine_index"
 
 _ddb = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "us-west-2"))
 _table = _ddb.Table(TABLE_NAME)
@@ -85,29 +86,42 @@ def put_versioned(ir: RoutineSpec) -> RoutineSpec:
 
     pointer_item = {**body, "pk": pk, "sk": "VERSION#current"}
     _table.put_item(Item=pointer_item)
+    # Date-sorted index for list_by_date_range; idempotent put (same routine
+    # writes the same index sk every time).
+    _table.put_item(Item={
+        "pk": INDEX_PK,
+        "sk": f"DATE#{ir.target_date}#ROUTINE#{ir.routine_id}",
+        "routine_id": ir.routine_id,
+        "target_date": ir.target_date,
+        "archetype": ir.archetype,
+        "variant": ir.variant,
+        "status": ir.status,
+    })
     return ir
 
 
 def list_by_date_range(start_date: str, end_date: str, limit: int = 100) -> list[RoutineSpec]:
-    """Scan current-version pointers in the date range. Routine_ids are random
-    UUIDs so we can't query by date directly without a GSI; scan the partition
-    space narrowly via a Query on each per-routine partition. For Phase 1 small
-    routine counts this is fine.
+    """Query the date-sorted index partition (cheap), then GetItem each
+    current-version pointer. Replaces an earlier Scan that hit the whole
+    table and missed records when Limit cut off the page before the matches.
     """
-    resp = _table.scan(
-        FilterExpression=(
-            "begins_with(pk, :pk_prefix) AND sk = :pointer_sk "
-            "AND target_date BETWEEN :start AND :end"
-        ),
-        ExpressionAttributeValues={
-            ":pk_prefix": PK_PREFIX,
-            ":pointer_sk": "VERSION#current",
-            ":start": start_date,
-            ":end": end_date,
-        },
+    from boto3.dynamodb.conditions import Key
+    resp = _table.query(
+        KeyConditionExpression=Key("pk").eq(INDEX_PK)
+            & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}#￿"),
         Limit=limit,
     )
-    return [deserialize(it) for it in resp.get("Items", [])]
+    routines: list[RoutineSpec] = []
+    seen: set[str] = set()
+    for idx in resp.get("Items", []):
+        rid = idx.get("routine_id")
+        if not rid or rid in seen:
+            continue
+        seen.add(rid)
+        ir = get_current(rid)
+        if ir:
+            routines.append(ir)
+    return routines
 
 
 def upsert_id_map(routine_id: str, hevy_routine_id: str) -> None:

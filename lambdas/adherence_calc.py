@@ -30,11 +30,23 @@ CONFIG_DIR = os.environ.get(
     "TRAINING_CONFIG_DIR",
     os.path.join(os.path.dirname(__file__), "..", "config"),
 )
+S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+S3_CONFIG_PREFIX = os.environ.get("TRAINING_CONFIG_S3_PREFIX", "config/")
+
+_s3_loader_client = None
 
 
 def _load_catalog() -> dict[str, Any]:
-    with open(os.path.join(CONFIG_DIR, "movement_catalog.json"), encoding="utf-8") as f:
-        return json.load(f)
+    local = os.path.join(CONFIG_DIR, "movement_catalog.json")
+    if os.path.exists(local):
+        with open(local, encoding="utf-8") as f:
+            return json.load(f)
+    global _s3_loader_client
+    if _s3_loader_client is None:
+        import boto3
+        _s3_loader_client = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2"))
+    obj = _s3_loader_client.get_object(Bucket=S3_BUCKET, Key=f"{S3_CONFIG_PREFIX}movement_catalog.json")
+    return json.loads(obj["Body"].read())
 
 
 def _ir_movement_to_template(catalog: dict[str, Any], movement_key: str) -> str | None:

@@ -61,6 +61,16 @@ class McpStack(Stack):
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         mcp_code = _lambda.Code.from_asset(_stage)
 
+        # ADR-066 (2026-05-31): MCP gets the shared layer so manage_hevy_routine
+        # can import routine_ir / hevy_compiler / hevy_write_client / routine_repo /
+        # routine_generator / hevy_template_cache / adherence_calc at runtime.
+        # Historically MCP ran with `Layers: null` — no other tool needed cross-layer
+        # modules. This attaches the layer so the Hevy write loop works end-to-end.
+        from stacks.constants import SHARED_LAYER_ARN
+        shared_utils_layer = _lambda.LayerVersion.from_layer_version_arn(
+            self, "SharedUtilsLayer", SHARED_LAYER_ARN,
+        )
+
         # ── MCP Server Lambda (request-serving) ───────────────────────────────
         # R13-XR: ACTIVE tracing enables X-Ray for every invocation.
         # Lambda runtime auto-instruments boto3 calls (DDB queries, Secrets reads)
@@ -77,7 +87,8 @@ class McpStack(Stack):
             tracing=_lambda.Tracing.ACTIVE,  # R13-XR: X-Ray active tracing
             environment={"DEPLOY_VERSION": "2.74.0"},
             custom_policies=rp.mcp_server(),
-            table=local_table, bucket=local_bucket, dlq=None, alerts_topic=None)
+            table=local_table, bucket=local_bucket, dlq=None, alerts_topic=None,
+            shared_layer=shared_utils_layer)
 
         # Existing EventBridge permission kept for legacy nightly-warmer rule.
         # The new dedicated warmer Lambda (below) is the primary warmer from v3.7.22.
@@ -108,7 +119,8 @@ class McpStack(Stack):
             environment={"DEPLOY_VERSION": "2.74.0"},
             custom_policies=rp.mcp_server(),
             table=local_table, bucket=local_bucket, dlq=None,
-            alerts_topic=local_alerts_topic, digest_topic=local_digest_topic, digest=True)
+            alerts_topic=local_alerts_topic, digest_topic=local_digest_topic, digest=True,
+            shared_layer=shared_utils_layer)
 
         # ── MCP Server alarms ─────────────────────────────────────────────────
         duration_alarm = cloudwatch.Alarm(self, "McpDurationHighAlarm",
