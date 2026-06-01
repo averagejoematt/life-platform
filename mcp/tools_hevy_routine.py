@@ -135,6 +135,27 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
             "hevy_routine_id": ir.hevy_routine_id,
             "version": ir.version,
         }
+    except wc.HevyOrphanCreated as e:
+        # Hevy returned 4xx but created the routine anyway. Link the id locally
+        # so future updates target it (instead of POSTing a third copy).
+        ir.hevy_routine_id = e.hevy_routine_id
+        ir.hevy_updated_at = e.hevy_updated_at
+        ir.hevy_pushed_at = _ts_now()
+        ir.status = "active"
+        ir.parent_version = ir.version
+        ir.version += 1
+        put_versioned(ir)
+        try:
+            upsert_id_map(ir.routine_id, ir.hevy_routine_id)
+        except Exception:
+            pass
+        return mcp_error(
+            f"Hevy returned {e.status} but created routine {e.hevy_routine_id}. "
+            f"Local IR linked to it so future commits target the same routine. "
+            f"Inspect in the Hevy app and delete or fix as needed. "
+            f"Original Hevy body: {e.body[:200]}",
+            error_code="HEVY_ORPHAN_CREATED",
+        )
     except wc.HevyConflict as e:
         return mcp_error(
             f"Hevy in-app edit detected — refusing to clobber. {e}",

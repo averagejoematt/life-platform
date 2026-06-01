@@ -59,6 +59,28 @@ class HevyRetryable(Exception):
     pass
 
 
+class HevyOrphanCreated(Exception):
+    """Hevy returned a 4xx on POST /v1/routines but ALSO created the routine
+    (a quirk of Hevy's create-then-validate flow we observed on 2026-05-31:
+    a body with unrecognized exercise_template_id values returned HTTP 400
+    "Found invalid exercise template id" while still persisting the routine
+    with title only).
+
+    Carriers: hevy_routine_id + hevy_updated_at + the original status/body
+    so the caller can link the orphan to the local IR and surface a warning
+    instead of silently leaving an untracked routine behind.
+    """
+    def __init__(self, hevy_routine_id: str, hevy_updated_at: str | None,
+                 status: int, body: str):
+        self.hevy_routine_id = hevy_routine_id
+        self.hevy_updated_at = hevy_updated_at
+        self.status = status
+        self.body = body
+        super().__init__(
+            f"Hevy returned {status} but created routine {hevy_routine_id}"
+        )
+
+
 def _api_key() -> str:
     s = get_secret_json(WRITE_SECRET_NAME, _sm)
     key = s.get("api_key") or s.get("apiKey")
@@ -109,8 +131,59 @@ def get_routine(routine_id: str) -> dict[str, Any]:
     return _request("GET", f"/v1/routines/{routine_id}")
 
 
+_ORPHAN_PROBE_WINDOW_SECONDS = 180
+
+
+def _maybe_recover_orphan(title: str | None, http_error: urllib.error.HTTPError) -> None:
+    """Look for a routine matching `title` created in the last few minutes.
+
+    Hevy can return HTTP 4xx on POST /v1/routines AND still persist the
+    routine — observed 2026-05-31 with bad exercise_template_id values.
+    If we find a match within the probe window, raise HevyOrphanCreated so
+    the caller can link the id; otherwise return None (caller re-raises the
+    original HTTPError).
+    """
+    if not title:
+        return
+    try:
+        listing = list_routines(page=1, page_size=10)
+    except Exception:
+        return
+    routines = listing.get("routines") or []
+    now = time.time()
+    for r in routines:
+        if (r.get("title") or "") != title:
+            continue
+        created_at = r.get("created_at") or ""
+        try:
+            from datetime import datetime
+            iso = created_at.replace("Z", "+00:00")
+            age = now - datetime.fromisoformat(iso).timestamp()
+        except Exception:
+            age = 0
+        if age <= _ORPHAN_PROBE_WINDOW_SECONDS:
+            try:
+                body_text = (http_error.read() or b"").decode("utf-8", errors="replace")
+            except Exception:
+                body_text = ""
+            raise HevyOrphanCreated(
+                hevy_routine_id=r.get("id"),
+                hevy_updated_at=r.get("updated_at"),
+                status=http_error.code,
+                body=body_text,
+            )
+
+
 def create_routine(body: dict[str, Any]) -> dict[str, Any]:
-    return _request("POST", "/v1/routines", body=body)
+    try:
+        return _request("POST", "/v1/routines", body=body)
+    except urllib.error.HTTPError as e:
+        # Auth + retryable are already wrapped by _request; anything else that
+        # surfaces here is a non-retryable 4xx (typically 400/422). Probe for
+        # an orphan-created routine matching the title.
+        title = (body.get("routine") or {}).get("title") if isinstance(body, dict) else None
+        _maybe_recover_orphan(title, e)
+        raise
 
 
 def update_routine_with_guard(routine_id: str, body: dict[str, Any],
