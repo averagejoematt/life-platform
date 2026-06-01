@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-06-01 (v7.21.0 — 131 tools, 36-module MCP package, 19 data sources, 72 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed). 138 MCP tools, 27-module MCP package, 20 data sources (`hevy` active). **81 Lambdas in us-west-2 + 5 in us-east-1 = 86 total** (added `life-platform-cost-governor` 2026-05-29 for the $75 budget tier projector). 14 active secrets. ~92 CloudWatch alarms (12 redundant ingestion-error alarms consolidated 2026-05-29 per the alarm cleanup pass). 8 CDK stacks deployed. S3 default encryption AES256 (KMS CMK retained, scheduled for deletion 2026-06-16; ADR-053/054). SIMP-2 framework adopted by 8 of 14 ingestion Lambdas (ADR-056). Coach prediction loop closed end-to-end (ADR-055). Shared layer **v62** (mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`; bumped 2026-05-29 by `restart_pipeline` for the May-30 genesis re-anchor). **65 ADRs** (ADR-001 → ADR-065; newest: ADR-062 Bedrock migration, ADR-063 $75 budget guardrails, ADR-064 self-healing remediation agent, ADR-065 auto-merge as a deterministic gate). Genesis date: 2026-05-30 (`lambdas/constants.py:EXPERIMENT_START_DATE`). Total active CDK-managed IAM roles: see `aws iam list-roles --query 'Roles[?starts_with(RoleName, \`life-platform-\`)]'` for live count.
+Last updated: 2026-06-01 (v7.21.0 — 132 tools, 37-module MCP package, 19 data sources, 73 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed). 138 MCP tools, 27-module MCP package, 20 data sources (`hevy` active). **81 Lambdas in us-west-2 + 5 in us-east-1 = 86 total** (added `life-platform-cost-governor` 2026-05-29 for the $75 budget tier projector). 14 active secrets. ~92 CloudWatch alarms (12 redundant ingestion-error alarms consolidated 2026-05-29 per the alarm cleanup pass). 8 CDK stacks deployed. S3 default encryption AES256 (KMS CMK retained, scheduled for deletion 2026-06-16; ADR-053/054). SIMP-2 framework adopted by 8 of 14 ingestion Lambdas (ADR-056). Coach prediction loop closed end-to-end (ADR-055). Shared layer **v62** (mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`; bumped 2026-05-29 by `restart_pipeline` for the May-30 genesis re-anchor). **65 ADRs** (ADR-001 → ADR-065; newest: ADR-062 Bedrock migration, ADR-063 $75 budget guardrails, ADR-064 self-healing remediation agent, ADR-065 auto-merge as a deterministic gate). Genesis date: 2026-05-30 (`lambdas/constants.py:EXPERIMENT_START_DATE`). Total active CDK-managed IAM roles: see `aws iam list-roles --query 'Roles[?starts_with(RoleName, \`life-platform-\`)]'` for live count.
 
 ---
 
@@ -143,6 +143,31 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 | Hypothesis Engine (IC-18) | `hypothesis-engine` | `cron(0 19 ? * SUN *)` | Sun 12:00 PM |
 | Weekly Correlation Compute | `weekly-correlation-compute` | `cron(30 18 ? * SUN *)` | Sun 11:30 AM |
 | Weekly Signal (PB-06) | `weekly-signal` | `cron(30 16 ? * SUN *)` | Sun 09:30 AM |
+| Hevy Routine Cron (ADR-066) | `hevy-routine-cron` | `cron(30 13 ? * SUN *)` *(rule starts disabled)* | Sun 06:30 AM |
+
+### Hevy Routine Write-Loop (ADR-066, 2026-05-31)
+
+Closes the **program → perform → adapt** loop with Hevy. One write path, two front doors:
+
+```
+coaching / generation logic
+        │
+        ▼
+  routine-spec IR  ◄── system of record (ROUTINE# DDB partition)
+        │
+        ▼
+   hevy_compiler   ◄── sole owner of Hevy wire format (one module)
+        │
+        ▼
+ create_routine / update_routine_with_guard  →  Hevy
+```
+
+- **Front door 1 — chat:** `manage_hevy_routine` MCP fat tool (9 actions: draft / dry_run / commit / list / get / archive / floor / re_entry / adherence).
+- **Front door 2 — cron:** `hevy-routine-cron` Lambda, EventBridge rule `enabled=False` at birth + SSM `/life-platform/hevy/cron_enabled=false` (belt-and-suspenders).
+- **Shared modules (layer v64):** `routine_ir`, `hevy_compiler`, `hevy_write_client`, `hevy_template_cache`, `routine_repo`, `routine_generator`, `adherence_calc`.
+- **Subtract-only autoregulation** until N≥30 readiness validation passes (PREREQS §C). Add-load SSM (`/life-platform/hevy/autoreg_add_load_enabled`) defaults `false`.
+- **Conflict guard:** GET-before-PUT compares `updated_at`; refuses to clobber in-app edits.
+- **Hevy API surprises:** no DELETE (archive = rename + folder-move), no webhooks (Phase 2 adherence polls `/v1/workouts/events`), no documented rate limits (client-side ≤1 req/s throttle).
 
 ### File-triggered ingestion (S3 → Lambda)
 

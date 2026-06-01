@@ -83,6 +83,8 @@ ALL_LAMBDAS = [
     "canary_lambda.py", "qa_smoke_lambda.py", "dlq_consumer_lambda.py",
     "key_rotator_lambda.py", "pip_audit_lambda.py",
     "data_export_lambda.py", "data_reconciliation_lambda.py",
+    # ADR-066 (2026-05-31): Hevy routine write-loop cron
+    "hevy_routine_cron_lambda.py",
 ]
 
 # Ingestion Lambdas — must wire ingestion_validator (DATA-2)

@@ -1,6 +1,6 @@
 # Life Platform — Runbook
 
-Last updated: 2026-05-29 (v7.21.0 — 131 MCP tools, 36-module package, 72 Lambdas, 19 data sources)
+Last updated: 2026-06-01 (v7.21.0 — 131 MCP tools, 36-module package, 72 Lambdas, 19 data sources)
 
 **Ground truth at last verification:**
 - Lambda functions deployed: 73 (5 power-tuning Lambdas deleted in V2 P4)
@@ -1276,3 +1276,115 @@ The fine-grained PAT in `life-platform/github-dispatch-token` expires every 90 d
 5. Old PAT can be left to expire naturally OR deleted at github.com/settings/personal-access-tokens.
 
 **If the PAT is missing or expired**, urgent alarms still email you via the existing SNS subscriptions (no degradation); the dispatcher logs `SecretNotFound` or `GitHub HTTP 401` and the daily 07:45 PT sweep still covers the signal — just without the urgent fast path.
+
+---
+
+## Hevy Routine Write-Loop Operations (ADR-066)
+
+The Hevy routine write-loop ships with two layers of safety gates. Operator actions documented here are configuration-only; no code redeploy is required to flip any gate.
+
+### Pre-deploy provisioning (one-time, blocks first deploy)
+
+Before the first `cdk deploy` of layer v64+ / OperationalStack / McpStack:
+
+```bash
+# 1. Create the WRITE secret. Use a SEPARATE Hevy API key from the read one
+#    (life-platform/hevy). Generate at hevy.com/settings?developer.
+aws secretsmanager create-secret \
+  --name life-platform/hevy-write \
+  --description "ADR-066: write-capable Hevy API key (cron + MCP). Separate from read." \
+  --secret-string '{"api_key":"<paste-write-key>"}' \
+  --region us-west-2
+
+# 2. Create the two SSM gates (both default false — the cron stays off).
+aws ssm put-parameter --name /life-platform/hevy/cron_enabled \
+  --value false --type String --region us-west-2 \
+  --description "ADR-066: master cron switch. Flip true after Phase 1 use justifies it."
+aws ssm put-parameter --name /life-platform/hevy/autoreg_add_load_enabled \
+  --value false --type String --region us-west-2 \
+  --description "ADR-066: add-load autoregulation. Flip true only after PREREQS §C N≥30 passes."
+
+# 3. Verify /life-platform/pause-mode exists; create if not (WR-47 default).
+aws ssm get-parameter --name /life-platform/pause-mode --region us-west-2 \
+  || aws ssm put-parameter --name /life-platform/pause-mode \
+       --value active --type String --region us-west-2
+
+# 4. Sync static configs to S3.
+aws s3 cp config/training_landmarks.json s3://matthew-life-platform/config/
+aws s3 cp config/movement_catalog.json   s3://matthew-life-platform/config/
+aws s3 cp config/training_week.json      s3://matthew-life-platform/config/
+aws s3 cp config/board_of_directors.json s3://matthew-life-platform/config/
+```
+
+### Post-deploy verification
+
+```bash
+# Layer v64 attached?
+aws lambda get-function-configuration --function-name hevy-routine-cron \
+  --query 'Layers[*].Arn' --output text
+
+# Cron rule is disabled?
+aws events describe-rule --name hevy-routine-cron-weekly --query 'State' --output text   # → DISABLED
+
+# Both SSM gates default false?
+aws ssm get-parameter --name /life-platform/hevy/cron_enabled --query 'Parameter.Value' --output text   # → false
+aws ssm get-parameter --name /life-platform/hevy/autoreg_add_load_enabled --query 'Parameter.Value' --output text   # → false
+```
+
+### Flip the cron ON (after ~3 weeks of chat-path usage)
+
+```bash
+aws ssm put-parameter --name /life-platform/hevy/cron_enabled --value true --overwrite
+aws events enable-rule --name hevy-routine-cron-weekly
+```
+
+To turn it back off — flip either gate to false. The Lambda no-ops on the next fire.
+
+### Flip "add load" ON (after PREREQS §C validation passes)
+
+```bash
+aws ssm put-parameter --name /life-platform/hevy/autoreg_add_load_enabled --value true --overwrite
+```
+
+NOTE: the generator code path is currently inert even with this flag on; enabling it future-proofs the SSM signal but the symmetric autoregulation logic still needs the §C decision-rule branch wired in.
+
+### Retire the interim Iris Tanaka seat
+
+When a named Sports Medicine voice fills the seat:
+
+```bash
+# Remove the entry from the live config.
+python3 -c "import json; \
+  c = json.load(open('config/board_of_directors.json')); \
+  c['members'].pop('iris_tanaka_interim', None); \
+  c['_meta']['member_count'] -= 1; \
+  c['_meta']['last_updated'] = '$(date +%F)'; \
+  json.dump(c, open('config/board_of_directors.json','w'), indent=2)"
+
+aws s3 cp config/board_of_directors.json s3://matthew-life-platform/config/
+
+# Remove the placeholder note in docs/BOARDS.md (manual edit).
+```
+
+### Conflict-guard playbook (HevyConflict on PUT)
+
+The write client refuses to clobber a routine that was edited in-app since our last push. When the cron or chat tool reports `HevyConflict`:
+
+1. Inspect the in-app edit (open Hevy on phone or hevy.com).
+2. Decide whether to re-author from the in-app state or overwrite it.
+3. To overwrite: `aws ssm get-parameter --name /life-platform/hevy/cron_enabled` first to confirm cron is off, then GET the current routine via the MCP `get_routine` (Phase 2 helper TBD) or directly via `aws lambda invoke` of a small one-off probe; update the IR's `hevy_updated_at` to the latest value and re-commit.
+
+The cron emits a `RoutineConflict` CloudWatch metric and returns `pushed=false` for that routine but does **not** raise — DLQ does not poison-pill on conflicts.
+
+### DLQ playbook (HevyRetryable flood)
+
+`HevyRetryable` (Hevy 429 or 5xx after retries) propagates from the cron, triggering Lambda async retry → DLQ. If the DLQ depth alarm fires:
+
+1. Check Hevy status (`https://status.hevyapp.com/`).
+2. Inspect failed payloads in the DLQ (CloudWatch logs for `hevy-routine-cron` log the throw).
+3. If transient: redrive via the existing DLQ consumer (`life-platform-dlq-consumer`, every 6h).
+4. If persistent: disable the cron (`aws events disable-rule --name hevy-routine-cron-weekly`) until Hevy recovers.
+
+### Public-site copy reminder
+
+Never describe this feature as "autoregulated" on averagejoematt.com or in the chronicle while the readiness signal is unvalidated. Correct phrasing: **deterministic volume-landmark programming with red-day deload guard.**

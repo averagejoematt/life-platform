@@ -153,6 +153,8 @@ from mcp.tools_protocols import (
     tool_list_protocols, tool_retire_protocol,
 )
 from mcp.tools_food_delivery import tool_get_food_delivery
+# ADR-066 (2026-05-31): Hevy routine write-loop fat tool.
+from mcp.tools_hevy_routine import tool_manage_hevy_routine
 
 TOOLS = {
     "get_sources": {
@@ -3077,6 +3079,54 @@ TOOLS = {
                 "'why are no recent workouts showing up?', dashboard sync indicator."
             ),
             "inputSchema": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+
+    # ADR-066 (2026-05-31): Hevy routine write-loop. Single fat tool with action
+    # dispatcher; respects SPEC §9 "fewer fat tools" guidance. Cron + add-load
+    # both ship gated off (SSM defaults false). See docs/SPEC_HEVY_ROUTINE_WRITELOOP_2026_05_31.md.
+    "manage_hevy_routine": {
+        "fn": tool_manage_hevy_routine,
+        "schema": {
+            "name": "manage_hevy_routine",
+            "description": (
+                "Author, preview, push, list, fetch, archive, or score adherence on Hevy "
+                "training routines. One tool, action-dispatched. Actions: 'draft' (generate + "
+                "persist IR — no Hevy write), 'dry_run' (compile a draft into the Hevy POST "
+                "body for preview), 'commit' (push to Hevy — requires explicit routine_id), "
+                "'list' (date range), 'get' (one IR by routine_id), 'archive' (rename + "
+                "folder-move; Hevy has no DELETE), 'floor' (≈20-min variant), 're_entry' "
+                "(deliberately easy after a break), 'adherence' (programmed-vs-performed). "
+                "Subtract-only autoregulation by default. Honest framing: 'deterministic "
+                "volume-landmark programming with red-day deload guard' — never describe as "
+                "'autoregulated' publicly until the readiness signal is validated."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string",
+                               "description": "One of: draft, dry_run, commit, list, get, archive, floor, re_entry, adherence."},
+                    "routine_id": {"type": "string",
+                                   "description": "Platform routine_id. Required for dry_run, commit, get, archive, adherence."},
+                    "target_date": {"type": "string",
+                                    "description": "ISO YYYY-MM-DD. Defaults to today (UTC)."},
+                    "start_date": {"type": "string",
+                                   "description": "List action: range start (YYYY-MM-DD)."},
+                    "end_date": {"type": "string",
+                                 "description": "List action: range end (YYYY-MM-DD)."},
+                    "limit": {"type": "integer", "default": 50,
+                              "description": "Max items returned by list."},
+                    "recovery_tier": {"type": "string",
+                                      "description": "green | yellow | red — overrides default yellow for draft/floor/re_entry."},
+                    "acwr_flag": {"type": "string",
+                                  "description": "safe | caution | high | very_high."},
+                    "volume_7d": {"type": "object",
+                                  "description": "Optional map of muscle->sets completed in last 7d."},
+                    "z2_minutes_7d": {"type": "number"},
+                    "days_since_last_workout": {"type": "integer"},
+                },
+                "required": ["action"],
+            },
         },
     },
 

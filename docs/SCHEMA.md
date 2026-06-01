@@ -2,7 +2,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs — ADR-005)
-**Last updated:** 2026-05-29 (v8.2.0 — 138 MCP tools, 20 data sources, 86 Lambdas, 12 cached tools, shared layer v62)
+**Last updated:** 2026-06-01 (v7.21.0 — 131 MCP tools, 19 data sources, 72 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -2000,3 +2000,51 @@ platform_memory categories) additionally carry `tombstone=true`, `tombstoned_at`
 `tombstoned_reason` after the §5 wipe. `hidden=true` on chronicle items specifically.
 
 Read-path filtering is supplied by `lambdas/phase_filter.py::with_phase_filter()`.
+
+---
+
+## ROUTINE# Partition (ADR-066, 2026-05-31)
+
+Hevy routine write-loop IR (system of record). Versioned, audit-replayable, indexed by random platform UUID.
+
+### Per-routine items
+
+| pk | sk | Notes |
+|---|---|---|
+| `USER#matthew#ROUTINE#<routine_id>` | `VERSION#<padded_version>` (e.g. `VERSION#000001`) | Immutable history item. `attribute_not_exists` ConditionExpression on write so concurrent first-writes can't collide. |
+| `USER#matthew#ROUTINE#<routine_id>` | `VERSION#current` | Mutable pointer to the latest version; overwritten on every version bump. |
+
+`routine_id` is a 32-char hex UUID assigned by the platform on `draft`/cron-generation; stable across all versions of that routine.
+
+### ID-map items (platform ↔ Hevy)
+
+| pk | sk | Fields | Notes |
+|---|---|---|---|
+| `USER#matthew#SOURCE#hevy_id_map` | `PLATFORM#<routine_id>` | `hevy_routine_id` (8-char hex) | Forward lookup. Conditional write — never overwritten. |
+| `USER#matthew#SOURCE#hevy_id_map` | `HEVY#<hevy_routine_id>` | `routine_id` | Reverse lookup, mirrors the forward write. |
+
+### Versioned-item fields (selected — full shape in `lambdas/routine_ir.py:RoutineSpec`)
+
+| Field | Type | Notes |
+|---|---|---|
+| `schema_version` | int | Pinned to `IR_SCHEMA_VERSION = 1`. Bumps require write-side migration. |
+| `version` | int | Monotonic per `routine_id`. |
+| `parent_version` | int \| null | Lineage. `null` on first write. |
+| `target_date` | ISO date | The day this routine is for. |
+| `archetype` | string | `upper` \| `lower` \| `full` \| `aerobic` \| `mobility` \| `rest`. |
+| `variant` | string | `ideal` \| `floor` \| `re_entry`. |
+| `status` | string | `draft` \| `active` \| `archived` \| `superseded`. |
+| `sibling_routine_id` | string \| null | Pairs ideal ↔ floor. |
+| `exercises[]` | list | Each has `movement_key`, `sets[]`, `joint_friendly_score`, `skill_tier`, `rationale_tag`. |
+| `budget_used` | map | `muscle -> set_count`. |
+| `inputs_snapshot` | map | Volume/recovery/ACWR/z2/landmarks_hash/catalog_hash at generation time — replayable audit trail. |
+| `rationale` | list[string] | Human-readable log of why each block was chosen. |
+| `caps` | map | `total_sets`, `session_minutes`, `weekly_volume_per_muscle`. Hard asserts in the generator. |
+| `hevy_routine_id` | string \| null | Populated on push; null while local draft. |
+| `hevy_updated_at` | ISO8601 \| null | Last value Hevy returned. Drives GET-before-PUT conflict guard. |
+| `hevy_pushed_at` | ISO8601 \| null | When we last sent the body to Hevy. |
+| `hevy_folder_id` | int \| null | Hevy routine folder. Immutable post-create per Hevy API (`folder_id` is absent from PUT body). |
+
+### Retention
+
+Indefinite — mirrors the `decisions` partition stance. The IR is the only audit trail of "what was programmed when, and why." Routines may be marked `status=archived` (renamed in Hevy + folder-moved to "Archive"; Hevy has no DELETE), but their IR history stays.

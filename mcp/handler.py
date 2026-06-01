@@ -333,6 +333,10 @@ _RATE_LIMITED_TOOLS = {
     "log_supplement",
     "write_platform_memory",
     "delete_platform_memory",
+    # ADR-066: fat tool — cap covers worst-case write loop (commit/archive).
+    # Read actions (list/get/dry_run) also count toward the 10-per-invocation
+    # cap; trade-off accepted to keep one tool surface rather than splitting.
+    "manage_hevy_routine",
 }
 
 

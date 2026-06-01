@@ -1606,6 +1606,10 @@ def mcp_server() -> list[iam.PolicyStatement]:
       - config/*                      board personas, character config, profile
       - raw/matthew/cgm_readings/*    5-min glucose readings for CGM tools
     ListBucket scoped to cgm_readings prefix only.
+
+    ADR-066 (2026-05-31): Hevy routine write-loop adds the hevy-write secret +
+    the hevy/* SSM params for the `manage_hevy_routine` fat tool's commit and
+    dry-run actions.
     """
     return [
         iam.PolicyStatement(
@@ -1646,12 +1650,79 @@ def mcp_server() -> list[iam.PolicyStatement]:
                 # via mcp/tools_todoist.py:22. Without it, all create/update/close
                 # Todoist tools fail with AccessDeniedException.
                 _secret_arn("life-platform/todoist"),
+                # ADR-066: manage_hevy_routine commits/dry-runs through the write secret.
+                # Distinct from life-platform/hevy (read) per Yael bundling rule.
+                _secret_arn("life-platform/hevy-write"),
+            ],
+        ),
+        iam.PolicyStatement(
+            sid="HevySsmParams",
+            # ADR-066: cron + add-load gates read from SSM.
+            actions=["ssm:GetParameter"],
+            resources=[
+                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/hevy/cron_enabled",
+                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/hevy/autoreg_add_load_enabled",
             ],
         ),
         iam.PolicyStatement(
             sid="DLQ",
             actions=["sqs:SendMessage"],
             resources=[DLQ_ARN],
+        ),
+    ]
+
+
+def hevy_routine_cron() -> list[iam.PolicyStatement]:
+    """Hevy routine cron (ADR-066): generates RoutineSpec IRs, persists to
+    ROUTINE# partition, compiles via hevy_compiler, pushes to Hevy via the
+    write secret. Reads SSM gates so it no-ops under Pause-Mode or while
+    cron_enabled=false (default).
+    """
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem", "dynamodb:UpdateItem"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="S3ConfigRead",
+            actions=["s3:GetObject"],
+            resources=_s3("config/*"),
+        ),
+        iam.PolicyStatement(
+            sid="S3TemplateCacheWrite",
+            actions=["s3:PutObject"],
+            resources=_s3("config/hevy_template_cache.json"),
+        ),
+        iam.PolicyStatement(
+            sid="HevyWriteSecret",
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/hevy-write")],
+        ),
+        iam.PolicyStatement(
+            sid="SsmGates",
+            actions=["ssm:GetParameter"],
+            resources=[
+                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/pause-mode",
+                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier",
+                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/hevy/cron_enabled",
+                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/hevy/autoreg_add_load_enabled",
+            ],
+        ),
+        iam.PolicyStatement(
+            sid="DLQ",
+            actions=["sqs:SendMessage"],
+            resources=[DLQ_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="CloudWatchMetrics",
+            actions=["cloudwatch:PutMetricData"],
+            resources=["*"],
         ),
     ]
 
