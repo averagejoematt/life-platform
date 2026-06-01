@@ -1,0 +1,3952 @@
+{
+ "_comment": "Full Hevy exercise-template index for draft_custom title resolution (ADR-069). Built from hevy_write_client.list_templates (built-in + account custom exercises). Keys are normalized titles (lowercased, whitespace-collapsed). draft_custom resolves any exercise by exact normalized title -> tmpl:<id>; a live Hevy lookup self-heals brand-new templates not yet in this index. NOT the generator's curated pool (that is movement_catalog.json).",
+ "_built_from": "live Hevy account template list",
+ "count": 789,
+ "templates": {
+  "1 arm clean and press": {
+   "id": "779bf654-f55d-4dcc-a220-e23dd038bad9",
+   "title": "1 Arm Clean And Press",
+   "muscle": "other"
+  },
+  "1 arm high cable row": {
+   "id": "252fc3a5-1423-49c0-a532-880b327c06ba",
+   "title": "1 Arm High Cable Row",
+   "muscle": "upper_back"
+  },
+  "1 arm push up": {
+   "id": "420ab5f7-ca70-4ec6-8403-23a07485cdac",
+   "title": "1 Arm Push Up",
+   "muscle": "other"
+  },
+  "1 arm snatch": {
+   "id": "54fb68c3-8fc3-4af8-8141-2ac2176597a0",
+   "title": "1 Arm Snatch",
+   "muscle": "other"
+  },
+  "1 legged squat": {
+   "id": "95f27c7c-97d4-4d3f-af04-9bc43afbb8be",
+   "title": "1 Legged Squat",
+   "muscle": "other"
+  },
+  "10 yard sprints to back pedals": {
+   "id": "2c03345f-414f-4737-9d52-707990c6e116",
+   "title": "10 Yard Sprints To Back Pedals",
+   "muscle": "cardio"
+  },
+  "180 squat jumps": {
+   "id": "d5ac3808-b3a8-4044-ba20-53ddb08702d5",
+   "title": "180 Squat Jumps",
+   "muscle": "hamstrings"
+  },
+  "200 yard shuttle runs": {
+   "id": "ec2f49ae-223c-4d81-bdab-31254d6c4b55",
+   "title": "200 Yard Shuttle Runs",
+   "muscle": "cardio"
+  },
+  "21s": {
+   "id": "6cb744a3-2830-4fd4-a208-d6fecd2f730c",
+   "title": "21s",
+   "muscle": "other"
+  },
+  "21s bicep curl": {
+   "id": "3BC06AD3",
+   "title": "21s Bicep Curl",
+   "muscle": "biceps"
+  },
+  "3 way lunge": {
+   "id": "540aa2a7-abe1-46c7-baee-46089a5c4894",
+   "title": "3 Way Lunge",
+   "muscle": "hamstrings"
+  },
+  "3 way rdl": {
+   "id": "be2fe24e-9168-480f-8e48-9e70b421fd87",
+   "title": "3 Way RDL",
+   "muscle": "hamstrings"
+  },
+  "30 yard s runs": {
+   "id": "3beaa0af-5a86-4fad-92b6-95e75e30e709",
+   "title": "30 Yard S Runs",
+   "muscle": "cardio"
+  },
+  "3d curls": {
+   "id": "71acb4a4-9f8f-4c86-8798-a05b9872f521",
+   "title": "3D Curls",
+   "muscle": "biceps"
+  },
+  "5-10-5s": {
+   "id": "f04f6dba-4d28-4a8d-930e-24e174f3ff66",
+   "title": "5-10-5s",
+   "muscle": "cardio"
+  },
+  "7s": {
+   "id": "68ec90fb-7490-4b93-99d0-5136efbc07a4",
+   "title": "7S",
+   "muscle": "other"
+  },
+  "90 degree max jump turns": {
+   "id": "4cd284cd-1a06-4aeb-8328-95fa9f63f5e9",
+   "title": "90 Degree Max Jump Turns",
+   "muscle": "hamstrings"
+  },
+  "90/90 hip stretch": {
+   "id": "19b422d3-0def-425e-83e4-53ed7824b33c",
+   "title": "90/90 Hip Stretch",
+   "muscle": "abductors"
+  },
+  "ab scissors": {
+   "id": "B4F2FF72",
+   "title": "Ab Scissors",
+   "muscle": "abdominals"
+  },
+  "ab wheel": {
+   "id": "99D5F10E",
+   "title": "Ab Wheel",
+   "muscle": "abdominals"
+  },
+  "aerobics": {
+   "id": "5E0DDACE",
+   "title": "Aerobics",
+   "muscle": "cardio"
+  },
+  "air bike": {
+   "id": "43573BB8",
+   "title": "Air Bike",
+   "muscle": "cardio"
+  },
+  "ali shuffle": {
+   "id": "1e070356-3fe8-447d-b14e-9ebd94f02847",
+   "title": "Ali Shuffle",
+   "muscle": "cardio"
+  },
+  "alternate db press neutral grip": {
+   "id": "da8704da-417a-41e4-8f8d-dc9da8170b21",
+   "title": "Alternate DB Press Neutral Grip",
+   "muscle": "chest"
+  },
+  "alternating db curtsy lunges": {
+   "id": "9291ce65-858e-478e-82ac-1fb307ad933c",
+   "title": "Alternating DB Curtsy Lunges",
+   "muscle": "hamstrings"
+  },
+  "alternating rotation shoulder press": {
+   "id": "61da72c5-01cc-4d25-b1f4-8b0536368eb4",
+   "title": "Alternating Rotation Shoulder Press",
+   "muscle": "shoulders"
+  },
+  "alternating side kickthrough": {
+   "id": "bc53a10c-786a-4a99-91c4-9e98bdb94609",
+   "title": "Alternating Side Kickthrough",
+   "muscle": "forearms"
+  },
+  "angels and devils": {
+   "id": "584d4370-0d2d-4489-9a4e-99690a9bbce8",
+   "title": "Angels And Devils",
+   "muscle": "biceps"
+  },
+  "arnold press (dumbbell)": {
+   "id": "A69FF221",
+   "title": "Arnold Press (Dumbbell)",
+   "muscle": "shoulders"
+  },
+  "around the world": {
+   "id": "D4A2FE7E",
+   "title": "Around The World",
+   "muscle": "chest"
+  },
+  "assisted pistol squats": {
+   "id": "5BFF35BA",
+   "title": "Assisted Pistol Squats",
+   "muscle": "quadriceps"
+  },
+  "back extension (hyperextension)": {
+   "id": "4F5866F8",
+   "title": "Back Extension (Hyperextension)",
+   "muscle": "lower_back"
+  },
+  "back extension (machine)": {
+   "id": "A05C064D",
+   "title": "Back Extension (Machine)",
+   "muscle": "lower_back"
+  },
+  "back extension (weighted hyperextension)": {
+   "id": "091737FA",
+   "title": "Back Extension (Weighted Hyperextension)",
+   "muscle": "lower_back"
+  },
+  "ball slams": {
+   "id": "F51D9080",
+   "title": "Ball Slams",
+   "muscle": "full_body"
+  },
+  "band pullaparts": {
+   "id": "E8D86EE8",
+   "title": "Band Pullaparts",
+   "muscle": "shoulders"
+  },
+  "banded alt cross body hammer curls": {
+   "id": "75e619fe-46b1-4d94-8d29-a0880593e6b8",
+   "title": "Banded Alt Cross Body Hammer Curls",
+   "muscle": "biceps"
+  },
+  "banded bridge curls": {
+   "id": "a9c79751-9dd9-43aa-ab63-ee11285b848a",
+   "title": "Banded Bridge Curls",
+   "muscle": "abdominals"
+  },
+  "banded clam shells": {
+   "id": "a2780398-d41c-43e6-b84b-e6a524a5feb4",
+   "title": "Banded Clam Shells",
+   "muscle": "hamstrings"
+  },
+  "banded curls": {
+   "id": "ba1a347a-4044-4b64-8257-fa0d9f94c092",
+   "title": "Banded Curls",
+   "muscle": "biceps"
+  },
+  "banded db alternate reverse lunge": {
+   "id": "3bcab034-b635-43dd-b1c2-aea8f19b0f38",
+   "title": "Banded DB Alternate Reverse Lunge",
+   "muscle": "hamstrings"
+  },
+  "banded db curls": {
+   "id": "9e6feafe-9fe0-4151-9b99-a898a6fc0a83",
+   "title": "Banded DB Curls",
+   "muscle": "biceps"
+  },
+  "banded er pause squats": {
+   "id": "c0af487a-a570-4927-bdd1-5820c9bccc48",
+   "title": "Banded ER Pause Squats",
+   "muscle": "hamstrings"
+  },
+  "banded er step outs": {
+   "id": "f761c62a-b369-4e6f-a79d-2019a748570b",
+   "title": "Banded ER Step Outs",
+   "muscle": "shoulders"
+  },
+  "banded good mornings": {
+   "id": "a970d976-de0b-464a-b26a-a9758316a5ca",
+   "title": "Banded Good Mornings",
+   "muscle": "hamstrings"
+  },
+  "banded lying hamstring curls": {
+   "id": "d8ff50ea-7975-4c16-9a92-e30a41031e0a",
+   "title": "Banded Lying Hamstring Curls",
+   "muscle": "hamstrings"
+  },
+  "banded overhead squats": {
+   "id": "8f5c9c0f-c0be-4645-96ca-848e3be7d149",
+   "title": "Banded Overhead Squats",
+   "muscle": "hamstrings"
+  },
+  "banded prone press": {
+   "id": "f65bf245-f9a5-4b0a-9be5-031e5d8538bd",
+   "title": "Banded Prone Press",
+   "muscle": "shoulders"
+  },
+  "banded retractions": {
+   "id": "a41e2c89-d3b9-4ddf-ada7-e95af93a3f81",
+   "title": "Banded Retractions",
+   "muscle": "traps"
+  },
+  "banded row ups": {
+   "id": "6b88b0ab-0477-4546-b703-798c66b42fd3",
+   "title": "Banded Row UPS",
+   "muscle": "shoulders"
+  },
+  "banded static bridge curls": {
+   "id": "17fbac6e-d29c-45ea-a027-01e275dcc56a",
+   "title": "Banded Static Bridge Curls",
+   "muscle": "abdominals"
+  },
+  "banded trap raises retreats": {
+   "id": "bf35cae1-acca-4741-8590-5a6e5bfa6e25",
+   "title": "Banded Trap Raises Retreats",
+   "muscle": "traps"
+  },
+  "barbell cheat curls": {
+   "id": "a2a5f579-8621-4a98-8d5d-75bb796159d7",
+   "title": "Barbell Cheat Curls",
+   "muscle": "biceps"
+  },
+  "barbell dead rows": {
+   "id": "f9789a26-9c8d-43c0-9d4c-8e82bf8d0609",
+   "title": "Barbell Dead Rows",
+   "muscle": "lower_back"
+  },
+  "barbell high pulls": {
+   "id": "d5ca687b-c387-4f5b-a5b5-ea7a4bf8e8d6",
+   "title": "Barbell High Pulls",
+   "muscle": "shoulders"
+  },
+  "barbell plyo curls": {
+   "id": "1e507dc2-2b3f-4d08-8dec-ea88bf009aaa",
+   "title": "Barbell Plyo Curls",
+   "muscle": "biceps"
+  },
+  "battle ropes": {
+   "id": "084A67CA",
+   "title": "Battle Ropes",
+   "muscle": "cardio"
+  },
+  "behind the back bicep wrist curl (barbell)": {
+   "id": "DDB29047",
+   "title": "Behind the Back Bicep Wrist Curl (Barbell)",
+   "muscle": "forearms"
+  },
+  "behind the back curl (cable)": {
+   "id": "2DBCA395",
+   "title": "Behind the Back Curl (Cable)",
+   "muscle": "biceps"
+  },
+  "belt squat (machine)": {
+   "id": "3D1CDC75",
+   "title": "Belt Squat (Machine)",
+   "muscle": "quadriceps"
+  },
+  "bench dip": {
+   "id": "CD6DC8E5",
+   "title": "Bench Dip",
+   "muscle": "triceps"
+  },
+  "bench press (barbell)": {
+   "id": "79D0BB3A",
+   "title": "Bench Press (Barbell)",
+   "muscle": "chest"
+  },
+  "bench press (cable)": {
+   "id": "99C1F2AD",
+   "title": "Bench Press (Cable)",
+   "muscle": "chest"
+  },
+  "bench press (dumbbell)": {
+   "id": "3601968B",
+   "title": "Bench Press (Dumbbell)",
+   "muscle": "chest"
+  },
+  "bench press (smith machine)": {
+   "id": "0FBF7195",
+   "title": "Bench Press (Smith Machine)",
+   "muscle": "chest"
+  },
+  "bench press - close grip (barbell)": {
+   "id": "35B51B87",
+   "title": "Bench Press - Close Grip (Barbell)",
+   "muscle": "triceps"
+  },
+  "bench press - wide grip (barbell)": {
+   "id": "E644F828",
+   "title": "Bench Press - Wide Grip (Barbell)",
+   "muscle": "chest"
+  },
+  "bench press neutral grip": {
+   "id": "390b314c-98eb-4f3e-ae0f-36bb55a1d9ec",
+   "title": "Bench Press Neutral Grip",
+   "muscle": "chest"
+  },
+  "bent arm lateral raises": {
+   "id": "8093c9ec-b359-44a7-b3de-275359cb957b",
+   "title": "Bent Arm Lateral Raises",
+   "muscle": "shoulders"
+  },
+  "bent over lateral raise": {
+   "id": "144d4d82-224a-4e73-8d8a-f38eb5715d6e",
+   "title": "Bent Over Lateral Raise",
+   "muscle": "other"
+  },
+  "bent over row (band)": {
+   "id": "EA820646",
+   "title": "Bent Over Row (Band)",
+   "muscle": "upper_back"
+  },
+  "bent over row (barbell)": {
+   "id": "55E6546F",
+   "title": "Bent Over Row (Barbell)",
+   "muscle": "upper_back"
+  },
+  "bent over row (dumbbell)": {
+   "id": "23E92538",
+   "title": "Bent Over Row (Dumbbell)",
+   "muscle": "upper_back"
+  },
+  "bicep curl (barbell)": {
+   "id": "A5AC6449",
+   "title": "Bicep Curl (Barbell)",
+   "muscle": "biceps"
+  },
+  "bicep curl (cable)": {
+   "id": "ADA8623C",
+   "title": "Bicep Curl (Cable)",
+   "muscle": "biceps"
+  },
+  "bicep curl (dumbbell)": {
+   "id": "37FCC2BB",
+   "title": "Bicep Curl (Dumbbell)",
+   "muscle": "biceps"
+  },
+  "bicep curl (machine)": {
+   "id": "AF328E3D",
+   "title": "Bicep Curl (Machine)",
+   "muscle": "biceps"
+  },
+  "bicep curl (suspension)": {
+   "id": "0B4C1902",
+   "title": "Bicep Curl (Suspension)",
+   "muscle": "biceps"
+  },
+  "bicep curl for time": {
+   "id": "4fa36099-45b9-47fe-8d09-9f10e0492305",
+   "title": "Bicep Curl For Time",
+   "muscle": "biceps"
+  },
+  "bicycle crunch": {
+   "id": "A41C7261",
+   "title": "Bicycle Crunch",
+   "muscle": "abdominals"
+  },
+  "bicycle crunch raised legs": {
+   "id": "594450D2",
+   "title": "Bicycle Crunch Raised Legs",
+   "muscle": "abdominals"
+  },
+  "bird dog": {
+   "id": "BD0AD077",
+   "title": "Bird Dog",
+   "muscle": "glutes"
+  },
+  "bodyweight tricep extensions": {
+   "id": "1b647346-10f9-4fb3-8898-1c1d22c0b821",
+   "title": "Bodyweight Tricep Extensions",
+   "muscle": "triceps"
+  },
+  "bottomed out squat reaches": {
+   "id": "3853966e-7650-408f-b40f-1772f56c42a0",
+   "title": "Bottomed Out Squat Reaches",
+   "muscle": "abdominals"
+  },
+  "box drill": {
+   "id": "2b2f0440-2847-4ab6-8770-a628075e770a",
+   "title": "Box Drill",
+   "muscle": "cardio"
+  },
+  "box jump": {
+   "id": "56092DD1",
+   "title": "Box Jump",
+   "muscle": "quadriceps"
+  },
+  "box squat (barbell)": {
+   "id": "38FC1AB9",
+   "title": "Box Squat (Barbell)",
+   "muscle": "quadriceps"
+  },
+  "boxing": {
+   "id": "A0D8FA1B",
+   "title": "Boxing",
+   "muscle": "cardio"
+  },
+  "bridge and reach over": {
+   "id": "78bba97d-fa91-44d7-bf31-aeaac767ff7f",
+   "title": "Bridge And Reach Over",
+   "muscle": "abdominals"
+  },
+  "bridge knee to chest": {
+   "id": "766a1c38-a7c1-4aa8-a6d9-5c86536b8227",
+   "title": "Bridge Knee To Chest",
+   "muscle": "glutes"
+  },
+  "broad jump retreats": {
+   "id": "6cfc85ee-9841-4014-93a2-82e607471945",
+   "title": "Broad Jump Retreats",
+   "muscle": "hamstrings"
+  },
+  "build up sprints 40": {
+   "id": "429625ae-09df-4c66-85c2-51c017c7ff9c",
+   "title": "Build Up Sprints 40",
+   "muscle": "cardio"
+  },
+  "build up sprints 60": {
+   "id": "0629dbc2-f04c-403b-89b2-164ab1abacfe",
+   "title": "Build Up Sprints 60",
+   "muscle": "cardio"
+  },
+  "bulgarian split squat": {
+   "id": "B5D3A742",
+   "title": "Bulgarian Split Squat",
+   "muscle": "quadriceps"
+  },
+  "bulgarian split squat jump": {
+   "id": "cf34deb5-459d-41ee-92db-3ebb297ef035",
+   "title": "Bulgarian Split Squat Jump",
+   "muscle": "hamstrings"
+  },
+  "bulgarian split squat with twist": {
+   "id": "57479a6c-b4a4-491b-a9db-4e9180109b57",
+   "title": "Bulgarian Split squat with Twist",
+   "muscle": "hamstrings"
+  },
+  "burpee": {
+   "id": "BB792A36",
+   "title": "Burpee",
+   "muscle": "full_body"
+  },
+  "burpee broad jumps": {
+   "id": "115CC72C",
+   "title": "Burpee Broad Jumps",
+   "muscle": "full_body"
+  },
+  "burpee over the bar": {
+   "id": "86B00DDE",
+   "title": "Burpee Over the Bar",
+   "muscle": "full_body"
+  },
+  "burpee w pushup pyramid (8-6-4-2)": {
+   "id": "53b7025c-50eb-4540-ae3b-54cf69f7d1c5",
+   "title": "Burpee W Pushup Pyramid (8-6-4-2)",
+   "muscle": "chest"
+  },
+  "butterfly (pec deck)": {
+   "id": "9DCE2D64",
+   "title": "Butterfly (Pec Deck)",
+   "muscle": "chest"
+  },
+  "cable 3d crossovers": {
+   "id": "cf48306f-7006-4c45-94b2-31a7e21404af",
+   "title": "Cable 3D Crossovers",
+   "muscle": "chest"
+  },
+  "cable core pallof press": {
+   "id": "CC55119B",
+   "title": "Cable Core Pallof Press",
+   "muscle": "abdominals"
+  },
+  "cable crunch": {
+   "id": "23A48484",
+   "title": "Cable Crunch",
+   "muscle": "abdominals"
+  },
+  "cable fly crossovers": {
+   "id": "651F844C",
+   "title": "Cable Fly Crossovers",
+   "muscle": "chest"
+  },
+  "cable kickback": {
+   "id": "1ff06a4f-7a12-40ad-9514-0b3c89d65380",
+   "title": "Cable Kickback",
+   "muscle": "other"
+  },
+  "cable low to high crossovers": {
+   "id": "16cf4af3-1dea-4f72-8956-d85e242e9198",
+   "title": "Cable Low To High Crossovers",
+   "muscle": "traps"
+  },
+  "cable pull through": {
+   "id": "8C331CD8",
+   "title": "Cable Pull Through",
+   "muscle": "glutes"
+  },
+  "cable squat to standing row": {
+   "id": "41c15169-c356-48f8-9a72-7cc26f55085a",
+   "title": "Cable Squat To Standing Row",
+   "muscle": "triceps"
+  },
+  "cable stretch curls": {
+   "id": "f03b93bd-493e-489d-af65-c49769d10a89",
+   "title": "Cable Stretch Curls",
+   "muscle": "biceps"
+  },
+  "cable stretch front raises": {
+   "id": "95fbd3b9-3647-4de9-8802-399b9d07d304",
+   "title": "Cable Stretch Front Raises",
+   "muscle": "shoulders"
+  },
+  "cable twist (down to up)": {
+   "id": "92D858EA",
+   "title": "Cable Twist (Down to up)",
+   "muscle": "abdominals"
+  },
+  "cable twist (up to down)": {
+   "id": "A2D838BD",
+   "title": "Cable Twist (Up to down)",
+   "muscle": "abdominals"
+  },
+  "calf extension (machine)": {
+   "id": "47B9DF13",
+   "title": "Calf Extension (Machine)",
+   "muscle": "calves"
+  },
+  "calf press (machine)": {
+   "id": "91237BDD",
+   "title": "Calf Press (Machine)",
+   "muscle": "calves"
+  },
+  "canoes": {
+   "id": "b7a55fb1-75c6-4e23-933e-468b4e8ae524",
+   "title": "Canoes",
+   "muscle": "abdominals"
+  },
+  "cavaliere crossover": {
+   "id": "8134d2b5-3ac7-4796-9ae2-b252f09cddf8",
+   "title": "Cavaliere Crossover",
+   "muscle": "chest"
+  },
+  "chest dip": {
+   "id": "6FCD7755",
+   "title": "Chest Dip",
+   "muscle": "chest"
+  },
+  "chest dip (assisted)": {
+   "id": "E9E4089F",
+   "title": "Chest Dip (Assisted)",
+   "muscle": "chest"
+  },
+  "chest dip (weighted)": {
+   "id": "29472BE1",
+   "title": "Chest Dip (Weighted)",
+   "muscle": "chest"
+  },
+  "chest fly (band)": {
+   "id": "DDB7C19F",
+   "title": "Chest Fly (Band)",
+   "muscle": "chest"
+  },
+  "chest fly (dumbbell)": {
+   "id": "12017185",
+   "title": "Chest Fly (Dumbbell)",
+   "muscle": "chest"
+  },
+  "chest fly (machine)": {
+   "id": "78683336",
+   "title": "Chest Fly (Machine)",
+   "muscle": "chest"
+  },
+  "chest fly (suspension)": {
+   "id": "720B0D70",
+   "title": "Chest Fly (Suspension)",
+   "muscle": "chest"
+  },
+  "chest press (band)": {
+   "id": "EAC7D9C5",
+   "title": "Chest Press (Band)",
+   "muscle": "chest"
+  },
+  "chest press (machine)": {
+   "id": "7EB3F7C3",
+   "title": "Chest Press (Machine)",
+   "muscle": "chest"
+  },
+  "chest supported incline row (dumbbell)": {
+   "id": "914F3A96",
+   "title": "Chest Supported Incline Row (Dumbbell)",
+   "muscle": "upper_back"
+  },
+  "chest supported reverse fly (dumbbell)": {
+   "id": "B582299E",
+   "title": "Chest Supported Reverse Fly (Dumbbell)",
+   "muscle": "shoulders"
+  },
+  "chest supported y raise (dumbbell)": {
+   "id": "F21D5693",
+   "title": "Chest Supported Y Raise (Dumbbell)",
+   "muscle": "shoulders"
+  },
+  "chin up": {
+   "id": "29083183",
+   "title": "Chin Up",
+   "muscle": "lats"
+  },
+  "chin up (assisted)": {
+   "id": "D23C609B",
+   "title": "Chin Up (Assisted)",
+   "muscle": "lats"
+  },
+  "chin up (weighted)": {
+   "id": "023943F1",
+   "title": "Chin Up (Weighted)",
+   "muscle": "lats"
+  },
+  "chinnies": {
+   "id": "b5970124-d383-41a6-b6a9-35f4f8e7585f",
+   "title": "Chinnies",
+   "muscle": "other"
+  },
+  "clamshell": {
+   "id": "CC016611",
+   "title": "Clamshell",
+   "muscle": "glutes"
+  },
+  "clap push ups": {
+   "id": "10D76E8F",
+   "title": "Clap Push Ups",
+   "muscle": "chest"
+  },
+  "clean": {
+   "id": "ABB00838",
+   "title": "Clean",
+   "muscle": "full_body"
+  },
+  "clean and jerk": {
+   "id": "9E09CEC3",
+   "title": "Clean and Jerk",
+   "muscle": "full_body"
+  },
+  "clean and press": {
+   "id": "D3095577",
+   "title": "Clean and Press",
+   "muscle": "full_body"
+  },
+  "clean and press db": {
+   "id": "ca5fae57-7095-44c0-96f9-be43bd000e36",
+   "title": "Clean And Press DB",
+   "muscle": "shoulders"
+  },
+  "clean pull": {
+   "id": "652FEA39",
+   "title": "Clean Pull",
+   "muscle": "full_body"
+  },
+  "climbing": {
+   "id": "E23F1F2B",
+   "title": "Climbing",
+   "muscle": "cardio"
+  },
+  "cobra pushups": {
+   "id": "84baf2b6-c3de-4c66-a5cc-087cdf6c80a0",
+   "title": "Cobra Pushups",
+   "muscle": "triceps"
+  },
+  "concentration curl": {
+   "id": "724CDE60",
+   "title": "Concentration Curl",
+   "muscle": "biceps"
+  },
+  "cross body hammer curl": {
+   "id": "32C4D4A2",
+   "title": "Cross Body Hammer Curl",
+   "muscle": "biceps"
+  },
+  "cross body hammer curls": {
+   "id": "8b718143-5f98-407e-bb19-afbb0d18d9f3",
+   "title": "Cross Body Hammer Curls",
+   "muscle": "forearms"
+  },
+  "crossover stepup": {
+   "id": "efa2a122-87e4-4d97-9f3d-468009b4448c",
+   "title": "Crossover Stepup",
+   "muscle": "quadriceps"
+  },
+  "crunch": {
+   "id": "DCF3B31B",
+   "title": "Crunch",
+   "muscle": "abdominals"
+  },
+  "crunch (machine)": {
+   "id": "EB43ADD4",
+   "title": "Crunch (Machine)",
+   "muscle": "abdominals"
+  },
+  "crunch (weighted)": {
+   "id": "D928C232",
+   "title": "Crunch (Weighted)",
+   "muscle": "abdominals"
+  },
+  "crush grip db press": {
+   "id": "41d6b732-e2c4-42d9-aaa6-b519ccefb25f",
+   "title": "Crush Grip DB Press",
+   "muscle": "chest"
+  },
+  "curl and press": {
+   "id": "0cbcd45f-a064-4ac4-a1da-cda4089f89d7",
+   "title": "Curl And Press",
+   "muscle": "biceps"
+  },
+  "curtsy lunge (dumbbell)": {
+   "id": "D39EC9EB",
+   "title": "Curtsy Lunge (Dumbbell)",
+   "muscle": "quadriceps"
+  },
+  "cycling": {
+   "id": "D8F7F851",
+   "title": "Cycling",
+   "muscle": "cardio"
+  },
+  "cyclone ninja box jumps": {
+   "id": "680dc1c1-b8e7-4185-b11f-17684e4c08e3",
+   "title": "Cyclone Ninja Box Jumps",
+   "muscle": "hamstrings"
+  },
+  "db abduction rows": {
+   "id": "bf8366be-b3d6-4651-b30f-5cba495d2cc9",
+   "title": "DB Abduction Rows",
+   "muscle": "shoulders"
+  },
+  "db adductor slides": {
+   "id": "3bcf02db-ed27-43e6-aa35-bc335c3ad3da",
+   "title": "DB Adductor Slides",
+   "muscle": "hamstrings"
+  },
+  "db alt reverse sprinter lunges": {
+   "id": "37ea389c-1bad-444b-ab03-9338c108be32",
+   "title": "Db Alt Reverse Sprinter Lunges",
+   "muscle": "hamstrings"
+  },
+  "db alt side lunges": {
+   "id": "26821c97-c068-4c31-ba91-229567fa3c6e",
+   "title": "DB Alt Side Lunges",
+   "muscle": "hamstrings"
+  },
+  "db bench front squats": {
+   "id": "13bc6c47-ada9-4d31-92af-3d85daefcf4e",
+   "title": "DB Bench Front Squats",
+   "muscle": "glutes"
+  },
+  "db cheat laterals": {
+   "id": "b01ecbf6-6f07-40a1-bea8-004517aa3ad4",
+   "title": "DB Cheat laterals",
+   "muscle": "shoulders"
+  },
+  "db chest supported rows": {
+   "id": "62113540-ad5f-4ade-a862-acfd1d3a6228",
+   "title": "DB Chest Supported Rows",
+   "muscle": "upper_back"
+  },
+  "db cossack squats": {
+   "id": "d636d0b1-e9bd-44ec-9fc8-31713ea59cf3",
+   "title": "DB Cossack squats",
+   "muscle": "glutes"
+  },
+  "db crush grip squats": {
+   "id": "a07f789c-9ac0-4001-92dc-6e9ed0afb7ef",
+   "title": "DB Crush Grip Squats",
+   "muscle": "hamstrings"
+  },
+  "db diamond press": {
+   "id": "70d37fd7-f157-4189-a671-02536bcc130e",
+   "title": "DB Diamond Press",
+   "muscle": "triceps"
+  },
+  "db drag curls": {
+   "id": "ee45a70f-348f-4fc9-8eb0-cee88919588b",
+   "title": "DB Drag Curls",
+   "muscle": "biceps"
+  },
+  "db external rotation": {
+   "id": "767bb8bf-019a-49e6-88e0-250f687df56f",
+   "title": "DB External Rotation",
+   "muscle": "shoulders"
+  },
+  "db floor flyes": {
+   "id": "9b39ca35-71d3-4069-9765-f99549d32ed9",
+   "title": "DB Floor Flyes",
+   "muscle": "chest"
+  },
+  "db frog press": {
+   "id": "8f0b2f1f-6c44-4df5-8bf3-b5cb99df221a",
+   "title": "DB Frog Press",
+   "muscle": "glutes"
+  },
+  "db gravediggers": {
+   "id": "406bad3a-ff27-499a-9b8c-c54e68e3382a",
+   "title": "DB Gravediggers",
+   "muscle": "lower_back"
+  },
+  "db gun carries": {
+   "id": "e6867d9a-350b-4f12-9803-e3f643d12d4b",
+   "title": "DB Gun carries",
+   "muscle": "biceps"
+  },
+  "db haney shrugs": {
+   "id": "6122e1cf-3155-45a6-be27-3590eda59819",
+   "title": "DB Haney Shrugs",
+   "muscle": "shoulders"
+  },
+  "db heel touch squats": {
+   "id": "885e345c-fed2-41c6-87c6-7cd9a852263e",
+   "title": "DB Heel Touch Squats",
+   "muscle": "hamstrings"
+  },
+  "db high pulls": {
+   "id": "f9b19661-45f6-4eb1-8ebc-958ba4c263b1",
+   "title": "DB High Pulls",
+   "muscle": "upper_back"
+  },
+  "db hip huggers": {
+   "id": "0cce8fe5-ec67-4030-b583-d1a7905b336b",
+   "title": "DB Hip huggers",
+   "muscle": "shoulders"
+  },
+  "db hip thrust": {
+   "id": "c8dfd1f9-b434-4aca-9c95-fa9774bafcfe",
+   "title": "DB Hip Thrust",
+   "muscle": "glutes"
+  },
+  "db incline curls": {
+   "id": "26eb93b5-ad81-409d-b151-dbc2106636a6",
+   "title": "DB Incline Curls",
+   "muscle": "biceps"
+  },
+  "db incline power bombs": {
+   "id": "36263ee6-eccf-4d18-afb0-acda363b3458",
+   "title": "DB Incline power Bombs",
+   "muscle": "triceps"
+  },
+  "db incline variable curls": {
+   "id": "eee5bdbd-69d9-4613-9446-d6a035c2d493",
+   "title": "DB Incline Variable Curls",
+   "muscle": "biceps"
+  },
+  "db jm press": {
+   "id": "ce6df3e2-84aa-41b0-bb69-6046e65ac577",
+   "title": "DB JM Press",
+   "muscle": "triceps"
+  },
+  "db lat pullovers": {
+   "id": "85470542-9d6e-4573-9d4f-8aa88ea03f8f",
+   "title": "DB Lat Pullovers",
+   "muscle": "lats"
+  },
+  "db no money curls": {
+   "id": "0a030723-d433-476c-9dca-b185f9e065c5",
+   "title": "DB No Money Curls",
+   "muscle": "biceps"
+  },
+  "db over and backs": {
+   "id": "1a9af5f3-1155-4e0f-b466-af696efd90d3",
+   "title": "DB Over And Backs",
+   "muscle": "shoulders"
+  },
+  "db overhead farmers carry": {
+   "id": "2290e78f-d549-47fb-ad6b-b12e5b08eb30",
+   "title": "DB Overhead Farmers Carry",
+   "muscle": "shoulders"
+  },
+  "db power incline bombs": {
+   "id": "64b06015-871c-46e0-8fbd-c2f1aee2a9d0",
+   "title": "DB Power Incline Bombs",
+   "muscle": "triceps"
+  },
+  "db push press": {
+   "id": "7426a917-46f1-46fd-ba62-e19c978d4f95",
+   "title": "DB Push Press",
+   "muscle": "other"
+  },
+  "db reach across single leg rdl": {
+   "id": "69c914a2-efd7-4012-a7b4-0219b352d181",
+   "title": "DB Reach Across Single Leg RDL",
+   "muscle": "hamstrings"
+  },
+  "db rear delt rows": {
+   "id": "6e1f6811-3457-40da-ab93-92de19b84707",
+   "title": "DB Rear Delt Rows",
+   "muscle": "shoulders"
+  },
+  "db reverse lunge": {
+   "id": "1510df83-b0ac-4d65-8cc5-626ed6123cb9",
+   "title": "DB Reverse Lunge",
+   "muscle": "hamstrings"
+  },
+  "db rocket squats": {
+   "id": "560c3e35-2a2a-4ab8-b660-af3c5efd421e",
+   "title": "DB Rocket Squats",
+   "muscle": "hamstrings"
+  },
+  "db scoop press": {
+   "id": "7b349596-7440-4bd5-8cb8-1eb8fd0a409d",
+   "title": "DB Scoop Press",
+   "muscle": "shoulders"
+  },
+  "db shot put": {
+   "id": "83868ab6-e6a6-4f3c-9a32-7777d848c3ac",
+   "title": "DB Shot Put",
+   "muscle": "other"
+  },
+  "db shovel curls": {
+   "id": "8727f39e-9421-4df0-8add-3ea1556b758d",
+   "title": "DB Shovel Curls",
+   "muscle": "biceps"
+  },
+  "db single arm overhead press": {
+   "id": "59967867-c189-4965-aaa1-43de798c6df1",
+   "title": "DB Single Arm Overhead Press",
+   "muscle": "shoulders"
+  },
+  "db single leg rdl calf raises": {
+   "id": "36e3eb05-b4fa-45e2-ac88-eed4eb50905c",
+   "title": "DB Single leg RDL calf Raises",
+   "muscle": "calves"
+  },
+  "db speed press": {
+   "id": "a267d4e0-46a9-43a8-8d7d-d1d1125b0689",
+   "title": "DB Speed Press",
+   "muscle": "shoulders"
+  },
+  "db split snatch front variation": {
+   "id": "0c78fbc4-5d18-4da9-ab8b-1c2df3636bd4",
+   "title": "Db Split Snatch Front Variation",
+   "muscle": "other"
+  },
+  "db split snatch side variation": {
+   "id": "fee13408-83bd-4a40-b12f-f833c6387a14",
+   "title": "DB Split Snatch Side Variation",
+   "muscle": "other"
+  },
+  "db step up": {
+   "id": "86ca13da-35e0-4c89-8e5d-cd383c38eb58",
+   "title": "Db Step Up",
+   "muscle": "hamstrings"
+  },
+  "db stiff legged deadlift": {
+   "id": "97620ad8-cbdb-48d7-aaa1-3df90b4f2e6b",
+   "title": "DB Stiff Legged Deadlift",
+   "muscle": "hamstrings"
+  },
+  "db straight bar curls": {
+   "id": "57c76d82-84af-478a-b035-f8229872bbfe",
+   "title": "Db Straight Bar Curls",
+   "muscle": "biceps"
+  },
+  "db sumo drop squat": {
+   "id": "e334695e-7798-4412-8b74-0e5a93eef529",
+   "title": "DB Sumo Drop Squat",
+   "muscle": "hamstrings"
+  },
+  "db t bar rows": {
+   "id": "870f10d8-c7d2-40a6-9bf0-c2ae00e0f8db",
+   "title": "DB T Bar rows",
+   "muscle": "lower_back"
+  },
+  "db tripod rows": {
+   "id": "7c76d9a1-36e5-4537-8afa-447fcbd44249",
+   "title": "DB Tripod Rows",
+   "muscle": "triceps"
+  },
+  "db ucv raise": {
+   "id": "c27fa0ed-5c8b-45f9-b105-c61c592c9262",
+   "title": "DB UCV Raise",
+   "muscle": "chest"
+  },
+  "db underhand dip": {
+   "id": "0b543cd5-d503-4d96-a975-d537c319b928",
+   "title": "DB Underhand Dip",
+   "muscle": "chest"
+  },
+  "db urlachers": {
+   "id": "033203d8-614a-4f09-89c5-b4cd8dca8fe2",
+   "title": "DB Urlachers",
+   "muscle": "upper_back"
+  },
+  "db waiter curls": {
+   "id": "dcdd0d05-5f46-4e00-a7b2-ddaf68199383",
+   "title": "DB Waiter Curls",
+   "muscle": "biceps"
+  },
+  "db wide arc shoulder press": {
+   "id": "d65d21a8-c3b6-488e-b60c-0639655c72ee",
+   "title": "DB Wide Arc Shoulder Press",
+   "muscle": "shoulders"
+  },
+  "db/bw calf jumps": {
+   "id": "cd434c92-5a02-4f50-817e-fe03ccf62b4d",
+   "title": "DB/BW Calf Jumps",
+   "muscle": "calves"
+  },
+  "dead arm hang": {
+   "id": "50c6f8e4-f219-4b4d-9d93-6f56208f2b78",
+   "title": "Dead Arm Hang",
+   "muscle": "shoulders"
+  },
+  "dead arm scap rows": {
+   "id": "3cccb01b-5643-4306-b76b-87ea7af6ed4a",
+   "title": "Dead Arm Scap Rows",
+   "muscle": "lats"
+  },
+  "dead arm switch grip hang": {
+   "id": "1211f57c-ab54-4489-9daf-514337decede",
+   "title": "Dead Arm Switch Grip Hang",
+   "muscle": "lats"
+  },
+  "dead bug": {
+   "id": "D8911FC4",
+   "title": "Dead Bug",
+   "muscle": "abdominals"
+  },
+  "dead hang": {
+   "id": "B9380898",
+   "title": "Dead Hang",
+   "muscle": "upper_back"
+  },
+  "deadlift (band)": {
+   "id": "99507114",
+   "title": "Deadlift (Band)",
+   "muscle": "glutes"
+  },
+  "deadlift (barbell)": {
+   "id": "C6272009",
+   "title": "Deadlift (Barbell)",
+   "muscle": "glutes"
+  },
+  "deadlift (dumbbell)": {
+   "id": "5F4E6DD3",
+   "title": "Deadlift (Dumbbell)",
+   "muscle": "glutes"
+  },
+  "deadlift (smith machine)": {
+   "id": "20870ED5",
+   "title": "Deadlift (Smith Machine)",
+   "muscle": "glutes"
+  },
+  "deadlift (trap bar)": {
+   "id": "B923B230",
+   "title": "Deadlift (Trap bar)",
+   "muscle": "glutes"
+  },
+  "deadlift high pull": {
+   "id": "FA5D0DE1",
+   "title": "Deadlift High Pull",
+   "muscle": "full_body"
+  },
+  "deadlift twist": {
+   "id": "d348d144-da66-4e2c-bf9c-87e0129a5d28",
+   "title": "Deadlift Twist",
+   "muscle": "other"
+  },
+  "decline bench press (barbell)": {
+   "id": "DA0F0470",
+   "title": "Decline Bench Press (Barbell)",
+   "muscle": "chest"
+  },
+  "decline bench press (dumbbell)": {
+   "id": "18487FA7",
+   "title": "Decline Bench Press (Dumbbell)",
+   "muscle": "chest"
+  },
+  "decline bench press (machine)": {
+   "id": "FAF31231",
+   "title": "Decline Bench Press (Machine)",
+   "muscle": "chest"
+  },
+  "decline bench press (smith machine)": {
+   "id": "FFC106CB",
+   "title": "Decline Bench Press (Smith Machine)",
+   "muscle": "chest"
+  },
+  "decline chest fly (dumbbell)": {
+   "id": "A351AED7",
+   "title": "Decline Chest Fly (Dumbbell)",
+   "muscle": "chest"
+  },
+  "decline crunch": {
+   "id": "BC10A922",
+   "title": "Decline Crunch",
+   "muscle": "abdominals"
+  },
+  "decline crunch (weighted)": {
+   "id": "B2398CD1",
+   "title": "Decline Crunch (Weighted)",
+   "muscle": "abdominals"
+  },
+  "decline push up": {
+   "id": "C43825EA",
+   "title": "Decline Push Up",
+   "muscle": "chest"
+  },
+  "depth jumps": {
+   "id": "b36f8c08-fcbf-447f-8ab5-a64f79a8beef",
+   "title": "Depth Jumps",
+   "muscle": "hamstrings"
+  },
+  "depth ploymetric push-up": {
+   "id": "f6655881-aaa2-4e5e-ad1a-b8f176be431a",
+   "title": "Depth Ploymetric Push-up ",
+   "muscle": "other"
+  },
+  "diamond cutter pushups": {
+   "id": "4b4fd552-ef34-4b45-bfe1-8020ac25feaa",
+   "title": "Diamond Cutter Pushups",
+   "muscle": "triceps"
+  },
+  "diamond push up": {
+   "id": "6575F52D",
+   "title": "Diamond Push Up",
+   "muscle": "triceps"
+  },
+  "dive bomber pushups": {
+   "id": "4e0c3a16-9479-4aa3-965e-f53f92da06d2",
+   "title": "Dive Bomber Pushups",
+   "muscle": "chest"
+  },
+  "doorway face pulls": {
+   "id": "f78f086f-8e04-4032-860a-df4dc124e5fe",
+   "title": "Doorway Face Pulls",
+   "muscle": "chest"
+  },
+  "double broad jump": {
+   "id": "3c8ec4fd-2349-46d7-a909-0474c93b72b7",
+   "title": "Double Broad Jump",
+   "muscle": "cardio"
+  },
+  "double db frog press": {
+   "id": "4fb1d33c-ea87-4d5f-aeac-f7a82c604f71",
+   "title": "Double DB Frog press",
+   "muscle": "glutes"
+  },
+  "double swings": {
+   "id": "d8eeceda-ff22-42bc-8023-44e4f05b9cf5",
+   "title": "Double Swings",
+   "muscle": "other"
+  },
+  "downward dog": {
+   "id": "7DA843A3",
+   "title": "Downward Dog",
+   "muscle": "full_body"
+  },
+  "drag curl": {
+   "id": "D950429E",
+   "title": "Drag Curl",
+   "muscle": "biceps"
+  },
+  "dragon flag": {
+   "id": "AFC29472",
+   "title": "Dragon Flag",
+   "muscle": "abdominals"
+  },
+  "dragonfly": {
+   "id": "B7192800",
+   "title": "Dragonfly",
+   "muscle": "abdominals"
+  },
+  "drop squat": {
+   "id": "9c0dcb5c-9fd4-4a7d-a1ca-21d30af736a4",
+   "title": "Drop Squat",
+   "muscle": "hamstrings"
+  },
+  "drop step lunges": {
+   "id": "8253a81e-bf2e-4c3a-9520-0a91ab4b4224",
+   "title": "Drop Step Lunges",
+   "muscle": "hamstrings"
+  },
+  "dual handle underhand pulldowns": {
+   "id": "04a11714-5f60-43f8-be94-eadec9a688fb",
+   "title": "Dual Handle Underhand Pulldowns",
+   "muscle": "lats"
+  },
+  "dual lip busters": {
+   "id": "46e2193c-1b89-4ee2-8f84-0322c9de8324",
+   "title": "Dual Lip Busters",
+   "muscle": "biceps"
+  },
+  "dumbbell row": {
+   "id": "F1E57334",
+   "title": "Dumbbell Row",
+   "muscle": "lats"
+  },
+  "dumbbell snatch": {
+   "id": "F3717B0E",
+   "title": "Dumbbell Snatch",
+   "muscle": "full_body"
+  },
+  "dumbbell squeeze press": {
+   "id": "F72FA239",
+   "title": "Dumbbell Squeeze Press",
+   "muscle": "chest"
+  },
+  "dumbbell squeeze ups": {
+   "id": "146dd51b-b4f3-4c68-8385-c79d1f7c12d8",
+   "title": "Dumbbell Squeeze Ups",
+   "muscle": "chest"
+  },
+  "dumbbell step up": {
+   "id": "BF6ECE89",
+   "title": "Dumbbell Step Up",
+   "muscle": "quadriceps"
+  },
+  "dumbbell twists": {
+   "id": "196a6fc7-9382-4937-87fd-ad9dbbd6bce7",
+   "title": "Dumbbell Twists",
+   "muscle": "other"
+  },
+  "eccentric step aways": {
+   "id": "41b2a44e-0923-4e9d-a3fe-07f82ad70e52",
+   "title": "Eccentric Step Aways",
+   "muscle": "shoulders"
+  },
+  "eccentric trap raises": {
+   "id": "ccea2514-c3b4-4f77-9114-00eb2aa2daf7",
+   "title": "Eccentric Trap Raises",
+   "muscle": "traps"
+  },
+  "elbow to knee": {
+   "id": "A01BE509",
+   "title": "Elbow to Knee",
+   "muscle": "abdominals"
+  },
+  "elbows tucked db bench": {
+   "id": "61e973b9-08a9-44da-869d-4efd8c5084bf",
+   "title": "Elbows Tucked DB Bench",
+   "muscle": "triceps"
+  },
+  "elliptical trainer": {
+   "id": "3303376C",
+   "title": "Elliptical Trainer",
+   "muscle": "cardio"
+  },
+  "er wall slides": {
+   "id": "064c4446-9621-45a1-8a09-9746aa69f50e",
+   "title": "ER Wall slides",
+   "muscle": "shoulders"
+  },
+  "external rotation": {
+   "id": "1b48d059-902f-4809-b693-74e427b37941",
+   "title": "External Rotation",
+   "muscle": "shoulders"
+  },
+  "ez bar biceps curl": {
+   "id": "01A35BF9",
+   "title": "EZ Bar Biceps Curl",
+   "muscle": "biceps"
+  },
+  "face pull": {
+   "id": "BE640BA0",
+   "title": "Face Pull",
+   "muscle": "shoulders"
+  },
+  "farmers walk": {
+   "id": "50C613D0",
+   "title": "Farmers Walk",
+   "muscle": "full_body"
+  },
+  "feet up bench press (barbell)": {
+   "id": "867AC3B6",
+   "title": "Feet Up Bench Press (Barbell)",
+   "muscle": "chest"
+  },
+  "finger tip mountain climbers": {
+   "id": "65b59e4b-29a9-48ba-8084-1c1fad1147bc",
+   "title": "Finger Tip Mountain Climbers",
+   "muscle": "forearms"
+  },
+  "finger tip pushups": {
+   "id": "3cec96ea-4ab5-4ef6-96b0-6ca2edfae3b9",
+   "title": "Finger Tip Pushups",
+   "muscle": "chest"
+  },
+  "fire hydrants": {
+   "id": "2AF8B552",
+   "title": "Fire Hydrants",
+   "muscle": "glutes"
+  },
+  "flag": {
+   "id": "a2d9be09-c672-4f8e-ad47-c1b8c48f3e5d",
+   "title": "Flag",
+   "muscle": "other"
+  },
+  "floor hamstring curl": {
+   "id": "a3861ff2-443f-41e7-9e79-d5acd2346b6a",
+   "title": "Floor Hamstring Curl",
+   "muscle": "hamstrings"
+  },
+  "floor press (barbell)": {
+   "id": "D53F2886",
+   "title": "Floor Press (Barbell)",
+   "muscle": "chest"
+  },
+  "floor press (dumbbell)": {
+   "id": "756EE329",
+   "title": "Floor Press (Dumbbell)",
+   "muscle": "chest"
+  },
+  "floor triceps dip": {
+   "id": "A57D38D5",
+   "title": "Floor Triceps Dip",
+   "muscle": "triceps"
+  },
+  "flutter kicks": {
+   "id": "2FA77B28",
+   "title": "Flutter Kicks",
+   "muscle": "abdominals"
+  },
+  "forearm curl": {
+   "id": "5baa4f35-ac8f-4d4d-a0c5-54079fdf28f3",
+   "title": "Forearm Curl",
+   "muscle": "forearms"
+  },
+  "frog jumps": {
+   "id": "207DC636",
+   "title": "Frog Jumps",
+   "muscle": "quadriceps"
+  },
+  "frog pumps (dumbbell)": {
+   "id": "F6948F17",
+   "title": "Frog Pumps (Dumbbell)",
+   "muscle": "glutes"
+  },
+  "front lat pulldown": {
+   "id": "b70298e6-0895-4c97-b4fa-c5f536f64748",
+   "title": "Front Lat Pulldown",
+   "muscle": "lats"
+  },
+  "front lever hold": {
+   "id": "0E608350",
+   "title": "Front Lever Hold",
+   "muscle": "full_body"
+  },
+  "front lever raise": {
+   "id": "30F03BF0",
+   "title": "Front Lever Raise",
+   "muscle": "full_body"
+  },
+  "front raise (band)": {
+   "id": "47B036EF",
+   "title": "Front Raise (Band)",
+   "muscle": "shoulders"
+  },
+  "front raise (barbell)": {
+   "id": "BD86EFD5",
+   "title": "Front Raise (Barbell)",
+   "muscle": "shoulders"
+  },
+  "front raise (cable)": {
+   "id": "DBB91A3C",
+   "title": "Front Raise (Cable)",
+   "muscle": "shoulders"
+  },
+  "front raise (dumbbell)": {
+   "id": "8293E554",
+   "title": "Front Raise (Dumbbell)",
+   "muscle": "shoulders"
+  },
+  "front raise (suspension)": {
+   "id": "796E8E2C",
+   "title": "Front Raise (Suspension)",
+   "muscle": "shoulders"
+  },
+  "front squat": {
+   "id": "5046D0A9",
+   "title": "Front Squat",
+   "muscle": "quadriceps"
+  },
+  "full squat": {
+   "id": "1283BBA6",
+   "title": "Full Squat",
+   "muscle": "quadriceps"
+  },
+  "glute bridge": {
+   "id": "CDA23948",
+   "title": "Glute Bridge",
+   "muscle": "glutes"
+  },
+  "glute ham raise": {
+   "id": "68B83EE0",
+   "title": "Glute Ham Raise",
+   "muscle": "hamstrings"
+  },
+  "glute ham raise pushup": {
+   "id": "8c23db5b-8d59-4780-b31d-df40b70f5f3b",
+   "title": "Glute Ham Raise Pushup",
+   "muscle": "hamstrings"
+  },
+  "glute kickback (machine)": {
+   "id": "CBA02382",
+   "title": "Glute Kickback (Machine)",
+   "muscle": "glutes"
+  },
+  "glute kickback on floor": {
+   "id": "987234AB",
+   "title": "Glute Kickback on Floor",
+   "muscle": "glutes"
+  },
+  "goblet squat": {
+   "id": "3D0C7C75",
+   "title": "Goblet Squat",
+   "muscle": "quadriceps"
+  },
+  "good morning (barbell)": {
+   "id": "4180C405",
+   "title": "Good Morning (Barbell)",
+   "muscle": "hamstrings"
+  },
+  "gorilla row (kettlebell)": {
+   "id": "05487216",
+   "title": "Gorilla Row (Kettlebell)",
+   "muscle": "upper_back"
+  },
+  "gorilla rows": {
+   "id": "d5ae0257-c096-4fa5-bc56-118827897c56",
+   "title": "Gorilla Rows",
+   "muscle": "lower_back"
+  },
+  "grape vines": {
+   "id": "12a7373e-40ac-4236-a983-f3c19054c9ce",
+   "title": "Grape Vines",
+   "muscle": "calves"
+  },
+  "hack squat": {
+   "id": "AC5A4C58",
+   "title": "Hack Squat",
+   "muscle": "quadriceps"
+  },
+  "hack squat (machine)": {
+   "id": "1E42FD5F",
+   "title": "Hack Squat (Machine)",
+   "muscle": "quadriceps"
+  },
+  "half crunch": {
+   "id": "4e42354c-ba03-4c01-9bea-b06c3038aa2d",
+   "title": "Half Crunch",
+   "muscle": "abdominals"
+  },
+  "half push up": {
+   "id": "071c36ab-1bb4-4fec-963b-5b548248f1ec",
+   "title": "Half Push Up",
+   "muscle": "chest"
+  },
+  "half rachet 30s": {
+   "id": "e4777900-d9d7-4e18-9341-d4055c623355",
+   "title": "Half Rachet 30s",
+   "muscle": "cardio"
+  },
+  "hammer curl (band)": {
+   "id": "1D4B3D6B",
+   "title": "Hammer Curl (Band)",
+   "muscle": "biceps"
+  },
+  "hammer curl (cable)": {
+   "id": "36E8F14E",
+   "title": "Hammer Curl (Cable)",
+   "muscle": "biceps"
+  },
+  "hammer curl (dumbbell)": {
+   "id": "7E3BC8B6",
+   "title": "Hammer Curl (Dumbbell)",
+   "muscle": "biceps"
+  },
+  "handstand hold": {
+   "id": "BE3615CF",
+   "title": "Handstand Hold",
+   "muscle": "full_body"
+  },
+  "handstand push up": {
+   "id": "90B04F96",
+   "title": "Handstand Push Up",
+   "muscle": "shoulders"
+  },
+  "hang clean": {
+   "id": "BD4E7E53",
+   "title": "Hang Clean",
+   "muscle": "full_body"
+  },
+  "hang clean and lunge complex": {
+   "id": "3087c0c4-eceb-466a-9238-df7e160eb928",
+   "title": "Hang Clean And Lunge Complex",
+   "muscle": "hamstrings"
+  },
+  "hang clean and press": {
+   "id": "b8842a4c-4251-4427-a678-d3266d80b611",
+   "title": "Hang Clean And Press",
+   "muscle": "lower_back"
+  },
+  "hang snatch": {
+   "id": "F4E77594",
+   "title": "Hang Snatch",
+   "muscle": "full_body"
+  },
+  "hanging knee raise": {
+   "id": "08590920",
+   "title": "Hanging Knee Raise",
+   "muscle": "abdominals"
+  },
+  "hanging leg raise": {
+   "id": "F8356514",
+   "title": "Hanging Leg Raise",
+   "muscle": "abdominals"
+  },
+  "hanging scap pulls": {
+   "id": "9726ee62-4178-48d2-aaf9-8b29b6ff952e",
+   "title": "Hanging Scap Pulls",
+   "muscle": "upper_back"
+  },
+  "heel taps": {
+   "id": "567FB505",
+   "title": "Heel Taps",
+   "muscle": "abdominals"
+  },
+  "heels to the heavens": {
+   "id": "c6e1dc66-3874-4afd-8fdd-b1858ffa72ff",
+   "title": "Heels To The Heavens",
+   "muscle": "abdominals"
+  },
+  "hex press (dumbbell)": {
+   "id": "BE89C631",
+   "title": "Hex Press (Dumbbell)",
+   "muscle": "chest"
+  },
+  "high cable row": {
+   "id": "66c5f2b5-c975-4118-b8d0-25b2ada11a62",
+   "title": "High Cable Row",
+   "muscle": "chest"
+  },
+  "high knee flying 20s": {
+   "id": "119a7419-8416-470a-9380-3459d3d915c4",
+   "title": "High Knee Flying 20s",
+   "muscle": "cardio"
+  },
+  "high knee skips": {
+   "id": "C9CCB878",
+   "title": "High Knee Skips",
+   "muscle": "full_body"
+  },
+  "high knees": {
+   "id": "150E076B",
+   "title": "High Knees",
+   "muscle": "full_body"
+  },
+  "high pogos": {
+   "id": "63aa92c3-07ff-4959-9af9-b8d854168b5f",
+   "title": "High Pogos",
+   "muscle": "hamstrings"
+  },
+  "high y pull": {
+   "id": "78015684-3ace-497f-9e9f-ac20dc6200a9",
+   "title": "High Y Pull",
+   "muscle": "upper_back"
+  },
+  "hiit": {
+   "id": "023947AB",
+   "title": "HIIT",
+   "muscle": "cardio"
+  },
+  "hiking": {
+   "id": "1C34A172",
+   "title": "Hiking",
+   "muscle": "cardio"
+  },
+  "hip abduction (machine)": {
+   "id": "F4B4C6EE",
+   "title": "Hip Abduction (Machine)",
+   "muscle": "abductors"
+  },
+  "hip adduction (machine)": {
+   "id": "8BEBFED6",
+   "title": "Hip Adduction (Machine)",
+   "muscle": "adductors"
+  },
+  "hip band ladder": {
+   "id": "63652d50-a70d-440f-b99c-22caa43e0237",
+   "title": "Hip Band Ladder",
+   "muscle": "abductors"
+  },
+  "hip buck": {
+   "id": "09e29312-2f45-4876-a96b-bd775d0a1b1c",
+   "title": "Hip Buck",
+   "muscle": "glutes"
+  },
+  "hip drops": {
+   "id": "b7700fd2-f4c4-40da-a17d-5d472a0ba5e3",
+   "title": "Hip Drops",
+   "muscle": "quadriceps"
+  },
+  "hip thrust": {
+   "id": "92B8C7E1",
+   "title": "Hip Thrust",
+   "muscle": "glutes"
+  },
+  "hip thrust (barbell)": {
+   "id": "D57C2EC7",
+   "title": "Hip Thrust (Barbell)",
+   "muscle": "glutes"
+  },
+  "hip thrust (machine)": {
+   "id": "68CE0B9B",
+   "title": "Hip Thrust (Machine)",
+   "muscle": "glutes"
+  },
+  "hip thrust (smith machine)": {
+   "id": "291ABA92",
+   "title": "Hip Thrust (Smith Machine)",
+   "muscle": "glutes"
+  },
+  "hollow rock": {
+   "id": "970ADF87",
+   "title": "Hollow Rock",
+   "muscle": "abdominals"
+  },
+  "hover hold": {
+   "id": "e3d81156-ebcf-408d-b153-4d6de1c10567",
+   "title": "Hover Hold",
+   "muscle": "abdominals"
+  },
+  "hover hold time": {
+   "id": "4cfeb90b-9650-4231-813b-f369b2f7f76d",
+   "title": "Hover Hold Time",
+   "muscle": "abductors"
+  },
+  "hurdle over unders": {
+   "id": "915ee7ee-2e28-4245-a564-5bbf8286fa13",
+   "title": "Hurdle Over Unders",
+   "muscle": "hamstrings"
+  },
+  "icky shuffle": {
+   "id": "991b3852-6fd7-4546-a030-c2e823803da5",
+   "title": "Icky Shuffle",
+   "muscle": "cardio"
+  },
+  "inchworms": {
+   "id": "51795d7c-9420-4073-b51f-2917617ba58a",
+   "title": "Inchworms",
+   "muscle": "triceps"
+  },
+  "incline bench press (barbell)": {
+   "id": "50DFDFAB",
+   "title": "Incline Bench Press (Barbell)",
+   "muscle": "chest"
+  },
+  "incline bench press (dumbbell)": {
+   "id": "07B38369",
+   "title": "Incline Bench Press (Dumbbell)",
+   "muscle": "chest"
+  },
+  "incline bench press (smith machine)": {
+   "id": "3A6FA3D1",
+   "title": "Incline Bench Press (Smith Machine)",
+   "muscle": "chest"
+  },
+  "incline chest fly (dumbbell)": {
+   "id": "D3E2AB55",
+   "title": "Incline Chest Fly (Dumbbell)",
+   "muscle": "chest"
+  },
+  "incline chest press (machine)": {
+   "id": "FBF92739",
+   "title": "Incline Chest Press (Machine)",
+   "muscle": "chest"
+  },
+  "incline db front raises": {
+   "id": "4a3456e3-2725-49c9-bce5-e7d12c29afd2",
+   "title": "Incline DB Front Raises",
+   "muscle": "shoulders"
+  },
+  "incline db kickbacks": {
+   "id": "fdacbd3b-d6f6-44d1-915e-980a4ba4b87a",
+   "title": "Incline DB Kickbacks",
+   "muscle": "triceps"
+  },
+  "incline db skull crushers": {
+   "id": "2f2426eb-90a4-40bd-9914-9ce15bdc4a79",
+   "title": "Incline DB Skull crushers",
+   "muscle": "triceps"
+  },
+  "incline db squeeze press": {
+   "id": "4c410e05-c938-4c60-99d8-da8aa6158c01",
+   "title": "Incline DB Squeeze Press",
+   "muscle": "chest"
+  },
+  "incline db triceps x-tensions": {
+   "id": "8b1076b4-a4a6-4fda-a6f3-694bff21c414",
+   "title": "Incline DB Triceps X-Tensions",
+   "muscle": "triceps"
+  },
+  "incline push ups": {
+   "id": "39C99849",
+   "title": "Incline Push Ups",
+   "muscle": "chest"
+  },
+  "inverted chin curls": {
+   "id": "8ddfff0c-ccbd-4089-97de-c0888e9d759b",
+   "title": "Inverted Chin Curls",
+   "muscle": "biceps"
+  },
+  "inverted db tricep kickbacks": {
+   "id": "21613a6d-e1b2-453a-bb72-41291069e1fc",
+   "title": "Inverted DB Tricep Kickbacks",
+   "muscle": "triceps"
+  },
+  "inverted row": {
+   "id": "425805F4",
+   "title": "Inverted Row",
+   "muscle": "upper_back"
+  },
+  "iso-lateral chest press (machine)": {
+   "id": "24706DCD",
+   "title": "Iso-Lateral Chest Press (Machine)",
+   "muscle": "chest"
+  },
+  "iso-lateral high row (machine)": {
+   "id": "BC3492DA",
+   "title": "Iso-Lateral High Row (Machine)",
+   "muscle": "lats"
+  },
+  "iso-lateral low row": {
+   "id": "91FAFBA3",
+   "title": "Iso-Lateral Low Row",
+   "muscle": "upper_back"
+  },
+  "iso-lateral row (machine)": {
+   "id": "AA1EB7D8",
+   "title": "Iso-Lateral Row (Machine)",
+   "muscle": "upper_back"
+  },
+  "jack knife (suspension)": {
+   "id": "D410F649",
+   "title": "Jack Knife (Suspension)",
+   "muscle": "abdominals"
+  },
+  "jackhammer pushdowns": {
+   "id": "6a480fc1-be84-459b-8977-06616e447269",
+   "title": "Jackhammer Pushdowns",
+   "muscle": "triceps"
+  },
+  "jackknife sit up": {
+   "id": "32B0B590",
+   "title": "Jackknife Sit Up",
+   "muscle": "abdominals"
+  },
+  "jane fondas": {
+   "id": "38c7181a-ce19-4fde-a354-93a46cc1ff44",
+   "title": "Jane Fondas",
+   "muscle": "hamstrings"
+  },
+  "jm press (barbell)": {
+   "id": "74103F24",
+   "title": "JM Press (Barbell)",
+   "muscle": "triceps"
+  },
+  "jump back start 10 yard sprint": {
+   "id": "bb156967-073b-44ef-b1dd-fb79c936f379",
+   "title": "Jump Back Start 10 Yard Sprint",
+   "muscle": "cardio"
+  },
+  "jump rope": {
+   "id": "040BA2E3",
+   "title": "Jump Rope",
+   "muscle": "cardio"
+  },
+  "jump rope drill": {
+   "id": "d79fee75-c779-4a15-8dcd-c15001c301e3",
+   "title": "Jump Rope Drill",
+   "muscle": "cardio"
+  },
+  "jump shrug": {
+   "id": "BA3DE542",
+   "title": "Jump Shrug",
+   "muscle": "full_body"
+  },
+  "jump squat": {
+   "id": "70D4EBBF",
+   "title": "Jump Squat",
+   "muscle": "quadriceps"
+  },
+  "jumping jack": {
+   "id": "991833C2",
+   "title": "Jumping Jack",
+   "muscle": "full_body"
+  },
+  "jumping lunge": {
+   "id": "5CC07A1F",
+   "title": "Jumping Lunge",
+   "muscle": "quadriceps"
+  },
+  "kb/db skier hop switch": {
+   "id": "cfc7182c-5087-43dd-901f-be21bea6d748",
+   "title": "KB/DB Skier Hop Switch",
+   "muscle": "hamstrings"
+  },
+  "kettlebell around the world": {
+   "id": "55BA475A",
+   "title": "Kettlebell Around the World",
+   "muscle": "shoulders"
+  },
+  "kettlebell clean": {
+   "id": "F99C211D",
+   "title": "Kettlebell Clean",
+   "muscle": "full_body"
+  },
+  "kettlebell curl": {
+   "id": "4E239ED8",
+   "title": "Kettlebell Curl",
+   "muscle": "biceps"
+  },
+  "kettlebell goblet squat": {
+   "id": "A127DA73",
+   "title": "Kettlebell Goblet Squat",
+   "muscle": "quadriceps"
+  },
+  "kettlebell halo": {
+   "id": "4288G454",
+   "title": "Kettlebell Halo",
+   "muscle": "shoulders"
+  },
+  "kettlebell high pull": {
+   "id": "9B13BA4B",
+   "title": "Kettlebell High Pull",
+   "muscle": "full_body"
+  },
+  "kettlebell press outs": {
+   "id": "7924b939-5d60-4e5e-870a-7af173cb7c73",
+   "title": "Kettlebell Press Outs",
+   "muscle": "chest"
+  },
+  "kettlebell shoulder press": {
+   "id": "6433CD93",
+   "title": "Kettlebell Shoulder Press",
+   "muscle": "shoulders"
+  },
+  "kettlebell snatch": {
+   "id": "89304423",
+   "title": "Kettlebell Snatch",
+   "muscle": "full_body"
+  },
+  "kettlebell step back curl": {
+   "id": "cac50bfd-ab8f-47dd-9845-2e461275becb",
+   "title": "Kettlebell Step Back Curl",
+   "muscle": "hamstrings"
+  },
+  "kettlebell swing": {
+   "id": "F8A0FCCA",
+   "title": "Kettlebell Swing",
+   "muscle": "full_body"
+  },
+  "kettlebell thrusters": {
+   "id": "e80aaa48-ff17-46d4-be77-28a287ea87b8",
+   "title": "Kettlebell Thrusters",
+   "muscle": "shoulders"
+  },
+  "kettlebell turkish get up": {
+   "id": "5F8903BF",
+   "title": "Kettlebell Turkish Get Up",
+   "muscle": "full_body"
+  },
+  "kipping pull up": {
+   "id": "A91838C0",
+   "title": "Kipping Pull Up",
+   "muscle": "lats"
+  },
+  "knee cobra push up": {
+   "id": "2353e102-8453-4915-a0e2-c0dc77f84bc0",
+   "title": "Knee Cobra Push Up",
+   "muscle": "triceps"
+  },
+  "knee hugs": {
+   "id": "f5961972-de9b-48fc-b05f-0a14cfc5ef20",
+   "title": "Knee Hugs",
+   "muscle": "other"
+  },
+  "knee push-up": {
+   "id": "bb86460c-aa4c-401c-ad2d-6c9ca13edb4a",
+   "title": "Knee Push-up",
+   "muscle": "chest"
+  },
+  "knee raise parallel bars": {
+   "id": "98237BA2",
+   "title": "Knee Raise Parallel Bars",
+   "muscle": "abdominals"
+  },
+  "kneeling banded hip thrusts": {
+   "id": "0990198e-96a7-4e09-a317-bf57f329b47b",
+   "title": "Kneeling Banded Hip Thrusts",
+   "muscle": "glutes"
+  },
+  "kneeling pulldown (band)": {
+   "id": "D82EA543",
+   "title": "Kneeling Pulldown (band)",
+   "muscle": "lats"
+  },
+  "kneeling push up": {
+   "id": "B74A95BB",
+   "title": "Kneeling Push Up",
+   "muscle": "chest"
+  },
+  "kneeling straight arm pulldown": {
+   "id": "f5b59ccd-2dff-4a79-a5bc-03cb1f2db4d1",
+   "title": "Kneeling Straight Arm Pulldown",
+   "muscle": "shoulders"
+  },
+  "kneeling tricep pushaway": {
+   "id": "6b223d9b-46e8-492e-88c9-51272b801bf5",
+   "title": "Kneeling Tricep Pushaway",
+   "muscle": "triceps"
+  },
+  "l raise": {
+   "id": "588f91bd-32c6-4132-aa7f-6104dca44bfb",
+   "title": "L Raise",
+   "muscle": "shoulders"
+  },
+  "l-sit hold": {
+   "id": "6D54A050",
+   "title": "L-Sit Hold",
+   "muscle": "abdominals"
+  },
+  "landmine 1 arm dead row": {
+   "id": "200267b0-58fa-4b1c-8cd4-affe63dba85c",
+   "title": "Landmine 1 Arm Dead Row",
+   "muscle": "lower_back"
+  },
+  "landmine 180": {
+   "id": "923874CA",
+   "title": "Landmine 180",
+   "muscle": "abdominals"
+  },
+  "landmine clean": {
+   "id": "96f95f5b-f038-42e4-bc73-eaddc5e42f15",
+   "title": "Landmine Clean",
+   "muscle": "lower_back"
+  },
+  "landmine jump squats": {
+   "id": "e552788e-b437-4e17-bc77-aa00950199b2",
+   "title": "Landmine Jump Squats",
+   "muscle": "hamstrings"
+  },
+  "landmine leaning knee drives": {
+   "id": "6611dd73-f480-4fa4-9452-953d22a7b66f",
+   "title": "Landmine Leaning Knee Drives",
+   "muscle": "glutes"
+  },
+  "landmine offset underhand row": {
+   "id": "2136b2f2-40de-4ad5-8885-9a37cae12548",
+   "title": "Landmine Offset Underhand Row",
+   "muscle": "traps"
+  },
+  "landmine parallel rows": {
+   "id": "f35bac20-4a41-4c50-a4a2-7616bf00ed97",
+   "title": "Landmine Parallel Rows",
+   "muscle": "lower_back"
+  },
+  "landmine pivot press": {
+   "id": "e7b92b86-d385-47e0-bf43-fe2297b3aad3",
+   "title": "Landmine Pivot Press",
+   "muscle": "lower_back"
+  },
+  "landmine power twists": {
+   "id": "17d73f83-2468-4d16-9197-d72fd484518d",
+   "title": "Landmine Power Twists",
+   "muscle": "traps"
+  },
+  "landmine pushaway presses": {
+   "id": "b2fc75cc-7eea-470b-aeac-7ee581c96296",
+   "title": "Landmine Pushaway Presses",
+   "muscle": "shoulders"
+  },
+  "landmine row": {
+   "id": "D7D7FCCE",
+   "title": "Landmine Row",
+   "muscle": "upper_back"
+  },
+  "landmine shoulder press": {
+   "id": "202ab50a-2fb5-46bc-a5ab-53a91f56bda0",
+   "title": "Landmine Shoulder Press",
+   "muscle": "shoulders"
+  },
+  "landmine split squat hops": {
+   "id": "a8acf8ee-9bb5-4652-aece-726fe984ad1a",
+   "title": "Landmine Split Squat Hops",
+   "muscle": "hamstrings"
+  },
+  "landmine squat and press": {
+   "id": "983274DD",
+   "title": "Landmine Squat and Press",
+   "muscle": "full_body"
+  },
+  "landmine thrusters": {
+   "id": "355df689-0e1b-4cb6-b0be-4e4a6ee9fb92",
+   "title": "Landmine Thrusters",
+   "muscle": "hamstrings"
+  },
+  "lat pulldown (band)": {
+   "id": "D2FE7B2E",
+   "title": "Lat Pulldown (Band)",
+   "muscle": "lats"
+  },
+  "lat pulldown (cable)": {
+   "id": "6A6C31A5",
+   "title": "Lat Pulldown (Cable)",
+   "muscle": "lats"
+  },
+  "lat pulldown (machine)": {
+   "id": "473CF5B8",
+   "title": "Lat Pulldown (Machine)",
+   "muscle": "lats"
+  },
+  "lat pulldown - close grip (cable)": {
+   "id": "4E5257DE",
+   "title": "Lat Pulldown - Close Grip (Cable)",
+   "muscle": "lats"
+  },
+  "lat pulldown - wide grip (cable)": {
+   "id": "041f1bf8-beba-412a-859f-c1312dc0ffa6",
+   "title": "Lat Pulldown - Wide Grip (Cable)",
+   "muscle": "other"
+  },
+  "lateral band walks": {
+   "id": "EC02979E",
+   "title": "Lateral Band Walks",
+   "muscle": "glutes"
+  },
+  "lateral box jump": {
+   "id": "07EBC4DC",
+   "title": "Lateral Box Jump",
+   "muscle": "quadriceps"
+  },
+  "lateral frog jumps": {
+   "id": "9da07147-236d-4a58-944c-754652915ae9",
+   "title": "Lateral Frog Jumps",
+   "muscle": "hamstrings"
+  },
+  "lateral leg raises": {
+   "id": "DC59D143",
+   "title": "Lateral Leg Raises",
+   "muscle": "glutes"
+  },
+  "lateral lunge": {
+   "id": "F2A37357",
+   "title": "Lateral Lunge",
+   "muscle": "quadriceps"
+  },
+  "lateral raise (band)": {
+   "id": "DF200976",
+   "title": "Lateral Raise (Band)",
+   "muscle": "shoulders"
+  },
+  "lateral raise (cable)": {
+   "id": "BE289E45",
+   "title": "Lateral Raise (Cable)",
+   "muscle": "shoulders"
+  },
+  "lateral raise (dumbbell)": {
+   "id": "422B08F1",
+   "title": "Lateral Raise (Dumbbell)",
+   "muscle": "shoulders"
+  },
+  "lateral raise (machine)": {
+   "id": "D5D0354D",
+   "title": "Lateral Raise (Machine)",
+   "muscle": "shoulders"
+  },
+  "lateral squat": {
+   "id": "D731CCA8",
+   "title": "Lateral Squat",
+   "muscle": "quadriceps"
+  },
+  "leaning bulgarian split squats": {
+   "id": "f961d941-2afe-40b9-a1b9-b4bc020b2878",
+   "title": "Leaning Bulgarian Split Squats",
+   "muscle": "hamstrings"
+  },
+  "leaning scapular push up": {
+   "id": "f2e30d0d-7f5d-4c3e-ac3a-b621cfcde7db",
+   "title": "Leaning Scapular Push Up",
+   "muscle": "triceps"
+  },
+  "leaning speed step ups": {
+   "id": "7582ff23-fd68-4859-bbc9-2a033e034b51",
+   "title": "Leaning Speed Step Ups",
+   "muscle": "hamstrings"
+  },
+  "leaning step ups": {
+   "id": "58cb5225-7cba-4faa-a2d6-4a8e11ca64ff",
+   "title": "Leaning Step Ups",
+   "muscle": "hamstrings"
+  },
+  "leg extension (machine)": {
+   "id": "75A4F6C4",
+   "title": "Leg Extension (Machine)",
+   "muscle": "quadriceps"
+  },
+  "leg press (machine)": {
+   "id": "C7973E0E",
+   "title": "Leg Press (Machine)",
+   "muscle": "quadriceps"
+  },
+  "leg press horizontal (machine)": {
+   "id": "0EB695C9",
+   "title": "Leg Press Horizontal (Machine)",
+   "muscle": "quadriceps"
+  },
+  "leg raise parallel bars": {
+   "id": "0482DA98",
+   "title": "Leg Raise Parallel Bars",
+   "muscle": "abdominals"
+  },
+  "leg swings": {
+   "id": "cb6c1a40-3dd2-4e78-8334-730ae819ee74",
+   "title": "Leg Swings",
+   "muscle": "hamstrings"
+  },
+  "linear leg press": {
+   "id": "cb2d3813-d5b7-4c2e-a85e-6508c4a18d8b",
+   "title": "Linear Leg Press",
+   "muscle": "other"
+  },
+  "long leg marches": {
+   "id": "df52e075-7fa8-469a-ad2e-a76394a18880",
+   "title": "Long Leg Marches",
+   "muscle": "abdominals"
+  },
+  "low cable fly crossovers": {
+   "id": "293483AD",
+   "title": "Low Cable Fly Crossovers",
+   "muscle": "chest"
+  },
+  "low cable rotational row": {
+   "id": "95e0e809-638b-4ed1-8683-93cd6a72d394",
+   "title": "Low Cable Rotational Row",
+   "muscle": "traps"
+  },
+  "low pogos": {
+   "id": "9604b93f-a487-4865-b44a-fe467a221e1b",
+   "title": "Low Pogos",
+   "muscle": "hamstrings"
+  },
+  "low row (suspension)": {
+   "id": "8A2E6481",
+   "title": "Low Row (Suspension)",
+   "muscle": "upper_back"
+  },
+  "lunge": {
+   "id": "5E1A7777",
+   "title": "Lunge",
+   "muscle": "quadriceps"
+  },
+  "lunge & reach": {
+   "id": "adb23648-6de2-4ed3-a5ee-5073d57be06e",
+   "title": "Lunge & Reach",
+   "muscle": "shoulders"
+  },
+  "lunge (barbell)": {
+   "id": "6E6EE645",
+   "title": "Lunge (Barbell)",
+   "muscle": "quadriceps"
+  },
+  "lunge (dumbbell)": {
+   "id": "B537D09F",
+   "title": "Lunge (Dumbbell)",
+   "muscle": "quadriceps"
+  },
+  "lunge and reach bodyweight": {
+   "id": "a5ca4701-2d5c-403b-a0b4-a4470e4b47b4",
+   "title": "Lunge And reach Bodyweight",
+   "muscle": "shoulders"
+  },
+  "lunge jumps": {
+   "id": "e053dd15-3955-4c4d-9db5-50aab66a00d5",
+   "title": "Lunge Jumps",
+   "muscle": "other"
+  },
+  "lying db tricep extension": {
+   "id": "2affffa8-bd9f-4f27-bb8c-159c2875c4b1",
+   "title": "Lying Db Tricep Extension",
+   "muscle": "triceps"
+  },
+  "lying knee raise": {
+   "id": "BD5935CF",
+   "title": "Lying Knee Raise",
+   "muscle": "abdominals"
+  },
+  "lying leg curl (machine)": {
+   "id": "B8127AD1",
+   "title": "Lying Leg Curl (Machine)",
+   "muscle": "hamstrings"
+  },
+  "lying leg raise": {
+   "id": "09C9F635",
+   "title": "Lying Leg Raise",
+   "muscle": "abdominals"
+  },
+  "lying neck curls": {
+   "id": "22FEDCA4",
+   "title": "Lying Neck Curls",
+   "muscle": "neck"
+  },
+  "lying neck curls (weighted)": {
+   "id": "31B8DA0F",
+   "title": "Lying Neck Curls (Weighted)",
+   "muscle": "neck"
+  },
+  "lying neck extension": {
+   "id": "0910BD28",
+   "title": "Lying Neck Extension",
+   "muscle": "neck"
+  },
+  "lying neck extension (weighted)": {
+   "id": "D6A73CF2",
+   "title": "Lying Neck Extension (Weighted)",
+   "muscle": "neck"
+  },
+  "lying on back to 10 yard sprint": {
+   "id": "737e21bf-7005-432a-a3e1-06e41864c450",
+   "title": "Lying On Back To 10 Yard Sprint",
+   "muscle": "cardio"
+  },
+  "meadows rows (barbell)": {
+   "id": "C732C341",
+   "title": "Meadows Rows (Barbell)",
+   "muscle": "upper_back"
+  },
+  "medicine ball slams": {
+   "id": "49c9481c-8ac6-43ec-ac30-26c83fa5c5d5",
+   "title": "Medicine Ball Slams",
+   "muscle": "other"
+  },
+  "medicine ball twist throws": {
+   "id": "00293b3e-5df0-450a-8c6e-4e8250761cfd",
+   "title": "Medicine Ball Twist Throws",
+   "muscle": "other"
+  },
+  "military press": {
+   "id": "bbc3a43f-2414-4c85-8113-abeb1f4f0860",
+   "title": "Military Press",
+   "muscle": "other"
+  },
+  "modified db bradford press": {
+   "id": "11d1be68-9cf7-44b4-a36f-ac9dcfa354fa",
+   "title": "Modified DB Bradford Press",
+   "muscle": "shoulders"
+  },
+  "mountain climber": {
+   "id": "F49E31D6",
+   "title": "Mountain Climber",
+   "muscle": "full_body"
+  },
+  "mountain climber time": {
+   "id": "381929bc-369b-4d06-93c6-c30b53efccc8",
+   "title": "Mountain Climber Time",
+   "muscle": "cardio"
+  },
+  "muscle up": {
+   "id": "9F9C164B",
+   "title": "Muscle Up",
+   "muscle": "full_body"
+  },
+  "negative bicep hang": {
+   "id": "3c3b37e7-fed8-48e3-8792-931b11d568ed",
+   "title": "Negative Bicep Hang",
+   "muscle": "biceps"
+  },
+  "negative pull up": {
+   "id": "F60BDDF8",
+   "title": "Negative Pull Up",
+   "muscle": "lats"
+  },
+  "ninja tuck jumps": {
+   "id": "657e346c-6b6f-4f09-9589-97f45e818afd",
+   "title": "Ninja Tuck Jumps",
+   "muscle": "hamstrings"
+  },
+  "ninja tuck jumps quantity": {
+   "id": "08e34e6f-4a91-4683-a11a-63a78e22192b",
+   "title": "Ninja Tuck Jumps Quantity",
+   "muscle": "hamstrings"
+  },
+  "no mo curls": {
+   "id": "00189613-f42f-4d57-95e1-87563c75b734",
+   "title": "No Mo Curls",
+   "muscle": "biceps"
+  },
+  "no money zottman curls": {
+   "id": "50a27c12-5c99-4f97-b337-31e62678cadc",
+   "title": "No Money Zottman curls",
+   "muscle": "forearms"
+  },
+  "nordic hamstrings curls": {
+   "id": "108D7A14",
+   "title": "Nordic Hamstrings Curls",
+   "muscle": "hamstrings"
+  },
+  "nsfw": {
+   "id": "b918f3a0-20ca-478b-801f-40ec37713b07",
+   "title": "NSFW",
+   "muscle": "hamstrings"
+  },
+  "oblique crunch": {
+   "id": "DBE341AA",
+   "title": "Oblique Crunch",
+   "muscle": "abdominals"
+  },
+  "offset lunges": {
+   "id": "ca86c591-21dd-4c78-992f-c66c41ba57be",
+   "title": "Offset Lunges",
+   "muscle": "hamstrings"
+  },
+  "one arm bench press": {
+   "id": "c2ee34b2-cc04-4efe-8fbe-92d728b212be",
+   "title": "One Arm Bench Press",
+   "muscle": "other"
+  },
+  "one arm push up": {
+   "id": "B140095E",
+   "title": "One Arm Push Up",
+   "muscle": "chest"
+  },
+  "overhand reverse barbell wiring out": {
+   "id": "26cfe402-c915-4c6e-9d7c-08ff2a334b59",
+   "title": "Overhand Reverse Barbell Wiring Out",
+   "muscle": "forearms"
+  },
+  "overhead curl (cable)": {
+   "id": "582ADA23",
+   "title": "Overhead Curl (Cable)",
+   "muscle": "biceps"
+  },
+  "overhead dumbbell lunge": {
+   "id": "4C6721B9",
+   "title": "Overhead Dumbbell Lunge",
+   "muscle": "quadriceps"
+  },
+  "overhead hold": {
+   "id": "2f9e5895-87cd-4c51-baca-3cbd2b910d67",
+   "title": "Overhead Hold",
+   "muscle": "shoulders"
+  },
+  "overhead plate raise": {
+   "id": "54E60954",
+   "title": "Overhead Plate Raise",
+   "muscle": "shoulders"
+  },
+  "overhead press": {
+   "id": "762d4033-d156-4bae-9e9a-b59d49b18708",
+   "title": "Overhead Press",
+   "muscle": "shoulders"
+  },
+  "overhead press (barbell)": {
+   "id": "7B8D84E8",
+   "title": "Overhead Press (Barbell)",
+   "muscle": "shoulders"
+  },
+  "overhead press (dumbbell)": {
+   "id": "6AC96645",
+   "title": "Overhead Press (Dumbbell)",
+   "muscle": "shoulders"
+  },
+  "overhead press (smith machine)": {
+   "id": "B09A1304",
+   "title": "Overhead Press (Smith Machine)",
+   "muscle": "shoulders"
+  },
+  "overhead squat": {
+   "id": "2CFED196",
+   "title": "Overhead Squat",
+   "muscle": "full_body"
+  },
+  "overhead tricep extension": {
+   "id": "9651a7bb-d948-4f56-aa67-c1e1cf7c9044",
+   "title": "Overhead Tricep Extension",
+   "muscle": "other"
+  },
+  "overhead triceps extension (cable)": {
+   "id": "B5EFBF9C",
+   "title": "Overhead Triceps Extension (Cable)",
+   "muscle": "triceps"
+  },
+  "partial glute bridge (barbell)": {
+   "id": "FBEE8279",
+   "title": "Partial Glute Bridge (Barbell)",
+   "muscle": "glutes"
+  },
+  "pause squat (barbell)": {
+   "id": "CE1054CE",
+   "title": "Pause Squat (Barbell)",
+   "muscle": "quadriceps"
+  },
+  "pectoral fly": {
+   "id": "0daf2cff-c438-434c-85c0-c6498eca62ef",
+   "title": "Pectoral Fly",
+   "muscle": "chest"
+  },
+  "pendlay row (barbell)": {
+   "id": "018ADC12",
+   "title": "Pendlay Row (Barbell)",
+   "muscle": "upper_back"
+  },
+  "pendulum squat (machine)": {
+   "id": "30E293E3",
+   "title": "Pendulum Squat (Machine)",
+   "muscle": "quadriceps"
+  },
+  "physio ball glute / ham raise": {
+   "id": "fc36aa13-d04c-4693-be4a-6da791a496ba",
+   "title": "Physio Ball Glute / Ham Raise",
+   "muscle": "hamstrings"
+  },
+  "physio ball hamstring curls": {
+   "id": "64f5b090-67da-41a4-90b7-22611cd86550",
+   "title": "Physio Ball Hamstring Curls",
+   "muscle": "hamstrings"
+  },
+  "physioball leg": {
+   "id": "227418b7-31da-4876-9f0c-e361985931fb",
+   "title": "Physioball Leg",
+   "muscle": "hamstrings"
+  },
+  "pike pushup": {
+   "id": "0EFE8162",
+   "title": "Pike Pushup",
+   "muscle": "shoulders"
+  },
+  "pilates": {
+   "id": "EC2510CD",
+   "title": "Pilates",
+   "muscle": "full_body"
+  },
+  "pinwheel curl (dumbbell)": {
+   "id": "942BAD12",
+   "title": "Pinwheel Curl (Dumbbell)",
+   "muscle": "biceps"
+  },
+  "pistol squat": {
+   "id": "3FF6A22E",
+   "title": "Pistol Squat",
+   "muscle": "quadriceps"
+  },
+  "plank": {
+   "id": "C6C9B8A0",
+   "title": "Plank",
+   "muscle": "abdominals"
+  },
+  "plank pushup": {
+   "id": "31436F5D",
+   "title": "Plank Pushup",
+   "muscle": "chest"
+  },
+  "plank tuck knee drives": {
+   "id": "dd7a37b4-2500-42b0-b5ba-d32ca7309f28",
+   "title": "Plank Tuck Knee Drives",
+   "muscle": "abdominals"
+  },
+  "plate curl": {
+   "id": "9283ABD5",
+   "title": "Plate Curl",
+   "muscle": "biceps"
+  },
+  "plate front raise": {
+   "id": "DBF9273A",
+   "title": "Plate Front Raise",
+   "muscle": "shoulders"
+  },
+  "plate press": {
+   "id": "982734D4",
+   "title": "Plate Press",
+   "muscle": "chest"
+  },
+  "plate squeeze": {
+   "id": "d2a1cddd-0a73-444a-aad1-032c75afc5ed",
+   "title": "Plate Squeeze",
+   "muscle": "chest"
+  },
+  "plate squeeze (svend press)": {
+   "id": "9373FSD1",
+   "title": "Plate Squeeze (Svend Press)",
+   "muscle": "chest"
+  },
+  "plyo inverted chins": {
+   "id": "2493f9b1-9f9e-4cfb-9844-5d6863f13d23",
+   "title": "Plyo Inverted Chins",
+   "muscle": "upper_back"
+  },
+  "plyo inverted rows": {
+   "id": "6bc1a89d-9add-4bb8-a4ad-9615f88c9094",
+   "title": "Plyo Inverted Rows",
+   "muscle": "chest"
+  },
+  "plyo push-up": {
+   "id": "109d72dc-e9f2-4817-a6e4-22a69054ffa3",
+   "title": "Plyo Push-up",
+   "muscle": "chest"
+  },
+  "plyo step ups": {
+   "id": "ef4bdb88-695f-40e2-9954-4fc253ef48bd",
+   "title": "Plyo Step Ups",
+   "muscle": "glutes"
+  },
+  "power clean": {
+   "id": "C628D768",
+   "title": "Power Clean",
+   "muscle": "full_body"
+  },
+  "power clean complex": {
+   "id": "33c991f5-3c0e-49fb-b56f-07b14bafa159",
+   "title": "Power Clean Complex",
+   "muscle": "lower_back"
+  },
+  "power snatch": {
+   "id": "E22F9358",
+   "title": "Power Snatch",
+   "muscle": "full_body"
+  },
+  "preacher curl (barbell)": {
+   "id": "4F942934",
+   "title": "Preacher Curl (Barbell)",
+   "muscle": "biceps"
+  },
+  "preacher curl (dumbbell)": {
+   "id": "FAB6EB2F",
+   "title": "Preacher Curl (Dumbbell)",
+   "muscle": "biceps"
+  },
+  "preacher curl (machine)": {
+   "id": "1E9A6B8E",
+   "title": "Preacher Curl (Machine)",
+   "muscle": "biceps"
+  },
+  "press outs": {
+   "id": "fef96171-bc36-4f97-bea3-d3dfc7dbd1c6",
+   "title": "Press Outs",
+   "muscle": "chest"
+  },
+  "press under": {
+   "id": "84A77566",
+   "title": "Press Under",
+   "muscle": "full_body"
+  },
+  "prisoner squats": {
+   "id": "a1cc7fc2-92e0-45dc-8666-c27dcf9471ad",
+   "title": "Prisoner Squats",
+   "muscle": "hamstrings"
+  },
+  "prone grip dual handle pulldowns": {
+   "id": "3d0e23b1-97b8-4d2a-8703-db61539c250b",
+   "title": "Prone Grip Dual Handle Pulldowns",
+   "muscle": "lats"
+  },
+  "prone leg curl": {
+   "id": "a971b35f-b915-4a9d-a8aa-4000db397a70",
+   "title": "Prone Leg Curl",
+   "muscle": "other"
+  },
+  "prone w raise": {
+   "id": "59cea5c4-f24c-415a-9cfb-21aa07227e14",
+   "title": "Prone W Raise",
+   "muscle": "chest"
+  },
+  "prowler pushup": {
+   "id": "278d5caa-a5ba-41b0-8ffd-fd9fb71f7ebe",
+   "title": "Prowler Pushup",
+   "muscle": "chest"
+  },
+  "pull up": {
+   "id": "1B2B1E7C",
+   "title": "Pull Up",
+   "muscle": "lats"
+  },
+  "pull up (assisted)": {
+   "id": "2C37EC5E",
+   "title": "Pull Up (Assisted)",
+   "muscle": "lats"
+  },
+  "pull up (band)": {
+   "id": "56808FD2",
+   "title": "Pull Up (Band)",
+   "muscle": "lats"
+  },
+  "pull up (weighted)": {
+   "id": "729237D1",
+   "title": "Pull Up (Weighted)",
+   "muscle": "lats"
+  },
+  "pullover (dumbbell)": {
+   "id": "67280085",
+   "title": "Pullover (Dumbbell)",
+   "muscle": "lats"
+  },
+  "pullover (machine)": {
+   "id": "B123DD01",
+   "title": "Pullover (Machine)",
+   "muscle": "lats"
+  },
+  "push press": {
+   "id": "542F3CD5",
+   "title": "Push Press",
+   "muscle": "shoulders"
+  },
+  "push up": {
+   "id": "392887AA",
+   "title": "Push Up",
+   "muscle": "chest"
+  },
+  "push up (weighted)": {
+   "id": "19372ABC",
+   "title": "Push Up (Weighted)",
+   "muscle": "chest"
+  },
+  "push up - close grip": {
+   "id": "947DAC23",
+   "title": "Push Up - Close Grip",
+   "muscle": "chest"
+  },
+  "rack pull": {
+   "id": "FE389074",
+   "title": "Rack Pull",
+   "muscle": "upper_back"
+  },
+  "reactive dumbbell box jumps": {
+   "id": "b77524d2-2d33-401f-b342-cffb7bb2635b",
+   "title": "Reactive Dumbbell Box jumps",
+   "muscle": "hamstrings"
+  },
+  "rear delt fly": {
+   "id": "dfb5ae0b-3b13-4290-abbe-691ef1ced607",
+   "title": "Rear Delt fly",
+   "muscle": "other"
+  },
+  "rear delt reverse fly (cable)": {
+   "id": "C315DC2A",
+   "title": "Rear Delt Reverse Fly (Cable)",
+   "muscle": "shoulders"
+  },
+  "rear delt reverse fly (dumbbell)": {
+   "id": "E5988A0A",
+   "title": "Rear Delt Reverse Fly (Dumbbell)",
+   "muscle": "shoulders"
+  },
+  "rear delt reverse fly (machine)": {
+   "id": "D8281C62",
+   "title": "Rear Delt Reverse Fly (Machine)",
+   "muscle": "shoulders"
+  },
+  "rear kick (machine)": {
+   "id": "1ADF8723",
+   "title": "Rear Kick (Machine)",
+   "muscle": "glutes"
+  },
+  "renegade row (dumbbell)": {
+   "id": "1B89CA1B",
+   "title": "Renegade Row (Dumbbell)",
+   "muscle": "upper_back"
+  },
+  "reverse crunch": {
+   "id": "7952B5CD",
+   "title": "Reverse Crunch",
+   "muscle": "abdominals"
+  },
+  "reverse curl (barbell)": {
+   "id": "112FC6B7",
+   "title": "Reverse Curl (Barbell)",
+   "muscle": "biceps"
+  },
+  "reverse curl (cable)": {
+   "id": "9F48F858",
+   "title": "Reverse Curl (Cable)",
+   "muscle": "biceps"
+  },
+  "reverse curl (dumbbell)": {
+   "id": "B567DD46",
+   "title": "Reverse Curl (Dumbbell)",
+   "muscle": "biceps"
+  },
+  "reverse fly single arm (cable)": {
+   "id": "9264ADA1",
+   "title": "Reverse Fly Single Arm (Cable)",
+   "muscle": "shoulders"
+  },
+  "reverse grip concentration curl": {
+   "id": "1FF4097B",
+   "title": "Reverse Grip Concentration Curl",
+   "muscle": "biceps"
+  },
+  "reverse grip lat pulldown (cable)": {
+   "id": "046E25A2",
+   "title": "Reverse Grip Lat Pulldown (Cable)",
+   "muscle": "lats"
+  },
+  "reverse hyperextension": {
+   "id": "7C0028C3",
+   "title": "Reverse Hyperextension",
+   "muscle": "glutes"
+  },
+  "reverse iron cross": {
+   "id": "26fad5d4-6c87-48b4-92ec-2b0817bb3882",
+   "title": "Reverse Iron Cross",
+   "muscle": "triceps"
+  },
+  "reverse lunge": {
+   "id": "C284D923",
+   "title": "Reverse Lunge",
+   "muscle": "quadriceps"
+  },
+  "reverse lunge (barbell)": {
+   "id": "818BA121",
+   "title": "Reverse Lunge (Barbell)",
+   "muscle": "quadriceps"
+  },
+  "reverse lunge (dumbbell)": {
+   "id": "FFDA283B",
+   "title": "Reverse Lunge (Dumbbell)",
+   "muscle": "quadriceps"
+  },
+  "reverse lunge curls": {
+   "id": "3cf3a877-8a36-4ade-8347-0dc3f1520f4a",
+   "title": "Reverse Lunge Curls",
+   "muscle": "biceps"
+  },
+  "reverse lunge front rack": {
+   "id": "0b711f88-12aa-4952-9c72-8c47fc7d3e45",
+   "title": "Reverse Lunge Front Rack",
+   "muscle": "hamstrings"
+  },
+  "reverse plank": {
+   "id": "99B49684",
+   "title": "Reverse Plank",
+   "muscle": "abdominals"
+  },
+  "reverse woodchopper extension": {
+   "id": "36c93027-759c-4002-add8-6df768eb1473",
+   "title": "Reverse Woodchopper Extension",
+   "muscle": "triceps"
+  },
+  "ring dips": {
+   "id": "51A0EDAA",
+   "title": "Ring Dips",
+   "muscle": "chest"
+  },
+  "ring inverted rows": {
+   "id": "67b4de60-ad81-4b15-84fc-ce6d72478b40",
+   "title": "Ring Inverted Rows",
+   "muscle": "chest"
+  },
+  "ring pull up": {
+   "id": "5F09F0FC",
+   "title": "Ring Pull Up",
+   "muscle": "lats"
+  },
+  "ring push up": {
+   "id": "AEA56BDC",
+   "title": "Ring Push Up",
+   "muscle": "chest"
+  },
+  "rkc plank": {
+   "id": "cb0788bb-7825-400c-a30f-ffe000834426",
+   "title": "RKC Plank",
+   "muscle": "abdominals"
+  },
+  "rocket jumps": {
+   "id": "921178c0-46f9-4a24-a386-9e615853de62",
+   "title": "Rocket Jumps",
+   "muscle": "hamstrings"
+  },
+  "rocking pulldown": {
+   "id": "5776dd49-3d42-4dbd-b6bb-3f950d353d93",
+   "title": "Rocking Pulldown",
+   "muscle": "lats"
+  },
+  "rocking tricep pushdown": {
+   "id": "b95e20f3-bfc9-43d7-9173-f3fbc157f6ac",
+   "title": "Rocking Tricep Pushdown",
+   "muscle": "triceps"
+  },
+  "romanian deadlift (barbell)": {
+   "id": "2B4B7310",
+   "title": "Romanian Deadlift (Barbell)",
+   "muscle": "hamstrings"
+  },
+  "romanian deadlift (dumbbell)": {
+   "id": "72CFFAD5",
+   "title": "Romanian Deadlift (Dumbbell)",
+   "muscle": "hamstrings"
+  },
+  "rope cable curl": {
+   "id": "234897AB",
+   "title": "Rope Cable Curl",
+   "muscle": "biceps"
+  },
+  "rope pulling": {
+   "id": "1ba0e7fd-5f2f-4743-b1b0-523d9809a83d",
+   "title": "Rope Pulling",
+   "muscle": "traps"
+  },
+  "rope straight arm pulldown": {
+   "id": "9273BA17",
+   "title": "Rope Straight Arm Pulldown",
+   "muscle": "lats"
+  },
+  "rotational high row": {
+   "id": "40feecf1-fadf-4d68-b2ad-98d6e429171e",
+   "title": "Rotational High Row",
+   "muscle": "lats"
+  },
+  "rotational landmine split snatch": {
+   "id": "271c4b85-e032-4571-a1fd-eb805b19afe3",
+   "title": "Rotational Landmine Split Snatch",
+   "muscle": "traps"
+  },
+  "rotational single-arm press": {
+   "id": "f56bcec0-dd0b-4819-a1ef-c158c167d574",
+   "title": "Rotational Single-Arm Press",
+   "muscle": "shoulders"
+  },
+  "rotator cuff external rotation": {
+   "id": "fda0298c-dca2-4b05-9292-c323e7cb0b1d",
+   "title": "Rotator Cuff External Rotation",
+   "muscle": "shoulders"
+  },
+  "rotatory calf": {
+   "id": "04a67430-1322-4166-9bc4-3d985e9e6da7",
+   "title": "Rotatory Calf",
+   "muscle": "calves"
+  },
+  "row and kickback": {
+   "id": "86b2dec8-d8fc-4932-bfaf-c0950f98656c",
+   "title": "Row And Kickback",
+   "muscle": "lower_back"
+  },
+  "rowing machine": {
+   "id": "0222DB42",
+   "title": "Rowing Machine",
+   "muscle": "cardio"
+  },
+  "running": {
+   "id": "AC1BB830",
+   "title": "Running",
+   "muscle": "cardio"
+  },
+  "russian twist (bodyweight)": {
+   "id": "BB83BDDE",
+   "title": "Russian Twist (Bodyweight)",
+   "muscle": "abdominals"
+  },
+  "russian twist (weighted)": {
+   "id": "2982AA23",
+   "title": "Russian Twist (Weighted)",
+   "muscle": "abdominals"
+  },
+  "russian v ups": {
+   "id": "93967421-5b5b-4e88-baf9-764f27d44835",
+   "title": "Russian V Ups",
+   "muscle": "abdominals"
+  },
+  "sandbag carry": {
+   "id": "7eda6b0c-f334-444a-b8e8-e8b3c9e43cc0",
+   "title": "Sandbag Carry",
+   "muscle": "other"
+  },
+  "sandbag clean": {
+   "id": "e4a45a2c-687e-4a99-84dc-3288f6228447",
+   "title": "Sandbag Clean",
+   "muscle": "hamstrings"
+  },
+  "sandbag shouldering": {
+   "id": "85285284-baf2-4310-8619-70a6f85e357b",
+   "title": "Sandbag Shouldering",
+   "muscle": "other"
+  },
+  "saxon side bends": {
+   "id": "490cd7ab-4c26-4806-aa19-291f8e22bf8b",
+   "title": "Saxon Side Bends",
+   "muscle": "other"
+  },
+  "scap pulldowns": {
+   "id": "9dbcc941-b4d0-4710-84d7-60cf1c10bc04",
+   "title": "Scap Pulldowns",
+   "muscle": "traps"
+  },
+  "scapular pull ups": {
+   "id": "C7AE420A",
+   "title": "Scapular Pull Ups",
+   "muscle": "upper_back"
+  },
+  "scarecrow": {
+   "id": "ac425584-7785-40bc-af88-e20e7205dfc0",
+   "title": "Scarecrow",
+   "muscle": "other"
+  },
+  "scott curls": {
+   "id": "46f003e8-5406-4dc7-bfa9-b4b310d7141f",
+   "title": "Scott Curls",
+   "muscle": "biceps"
+  },
+  "seated bicep curls": {
+   "id": "f8f1fec1-212a-4452-942a-1c5c8d97c725",
+   "title": "Seated Bicep Curls",
+   "muscle": "other"
+  },
+  "seated cable row - bar grip": {
+   "id": "F1D60854",
+   "title": "Seated Cable Row - Bar Grip",
+   "muscle": "upper_back"
+  },
+  "seated cable row - bar wide grip": {
+   "id": "C3BCABB3",
+   "title": "Seated Cable Row - Bar Wide Grip",
+   "muscle": "upper_back"
+  },
+  "seated cable row - v grip (cable)": {
+   "id": "0393F233",
+   "title": "Seated Cable Row - V Grip (Cable)",
+   "muscle": "upper_back"
+  },
+  "seated calf raise": {
+   "id": "062AB91A",
+   "title": "Seated Calf Raise",
+   "muscle": "calves"
+  },
+  "seated chest flys (cable)": {
+   "id": "6B4C797E",
+   "title": "Seated Chest Flys (Cable)",
+   "muscle": "chest"
+  },
+  "seated dip machine": {
+   "id": "5122E7D9",
+   "title": "Seated Dip Machine",
+   "muscle": "triceps"
+  },
+  "seated incline curl (dumbbell)": {
+   "id": "8BAB2735",
+   "title": "Seated Incline Curl (Dumbbell)",
+   "muscle": "biceps"
+  },
+  "seated lateral raise (dumbbell)": {
+   "id": "9372FFAA",
+   "title": "Seated Lateral Raise (Dumbbell)",
+   "muscle": "shoulders"
+  },
+  "seated leg curl (machine)": {
+   "id": "11A123F3",
+   "title": "Seated Leg Curl (Machine)",
+   "muscle": "hamstrings"
+  },
+  "seated overhead press (barbell)": {
+   "id": "91AF29E0",
+   "title": "Seated Overhead Press (Barbell)",
+   "muscle": "shoulders"
+  },
+  "seated overhead press (dumbbell)": {
+   "id": "9930DF71",
+   "title": "Seated Overhead Press (Dumbbell)",
+   "muscle": "shoulders"
+  },
+  "seated palms up wrist curl": {
+   "id": "1006DF48",
+   "title": "Seated Palms Up Wrist Curl",
+   "muscle": "forearms"
+  },
+  "seated row (machine)": {
+   "id": "1DF4A847",
+   "title": "Seated Row (Machine)",
+   "muscle": "upper_back"
+  },
+  "seated shoulder press (machine)": {
+   "id": "9237BAD1",
+   "title": "Seated Shoulder Press (Machine)",
+   "muscle": "shoulders"
+  },
+  "seated shrugs": {
+   "id": "62fdea29-5208-4eb7-8a34-388fc67049ca",
+   "title": "Seated Shrugs",
+   "muscle": "shoulders"
+  },
+  "seated triceps press": {
+   "id": "234BC743",
+   "title": "Seated Triceps Press",
+   "muscle": "triceps"
+  },
+  "seated wrist extension (barbell)": {
+   "id": "9202CC23",
+   "title": "Seated Wrist Extension (Barbell)",
+   "muscle": "forearms"
+  },
+  "shoulder press": {
+   "id": "50d36bab-913e-427e-b703-dbfc6e8645a4",
+   "title": "Shoulder Press",
+   "muscle": "other"
+  },
+  "shoulder press (dumbbell)": {
+   "id": "878CD1D0",
+   "title": "Shoulder Press (Dumbbell)",
+   "muscle": "shoulders"
+  },
+  "shoulder press (machine plates)": {
+   "id": "059E835D",
+   "title": "Shoulder Press (Machine Plates)",
+   "muscle": "shoulders"
+  },
+  "shoulder pushdown": {
+   "id": "5f8ca03c-c71b-4353-a0df-c5749666e7d3",
+   "title": "Shoulder Pushdown",
+   "muscle": "other"
+  },
+  "shoulder taps": {
+   "id": "502FCE31",
+   "title": "Shoulder Taps",
+   "muscle": "shoulders"
+  },
+  "shrug (barbell)": {
+   "id": "0B841777",
+   "title": "Shrug (Barbell)",
+   "muscle": "traps"
+  },
+  "shrug (cable)": {
+   "id": "FFABC123",
+   "title": "Shrug (Cable)",
+   "muscle": "traps"
+  },
+  "shrug (dumbbell)": {
+   "id": "ABEC557F",
+   "title": "Shrug (Dumbbell)",
+   "muscle": "traps"
+  },
+  "shrug (machine)": {
+   "id": "19A38071",
+   "title": "Shrug (Machine)",
+   "muscle": "traps"
+  },
+  "shrug (smith machine)": {
+   "id": "742E5BD5",
+   "title": "Shrug (Smith Machine)",
+   "muscle": "traps"
+  },
+  "side bend": {
+   "id": "37F9EDA7",
+   "title": "Side Bend",
+   "muscle": "abdominals"
+  },
+  "side bend (dumbbell)": {
+   "id": "026FD047",
+   "title": "Side Bend (Dumbbell)",
+   "muscle": "abdominals"
+  },
+  "side crunch slow cadence": {
+   "id": "f3794807-9a23-4be8-a989-f6a4ef3d9d87",
+   "title": "Side Crunch Slow Cadence",
+   "muscle": "other"
+  },
+  "side lateral raises": {
+   "id": "9e47fc66-d39d-4d0a-b098-ff2f34d60131",
+   "title": "Side lateral Raises",
+   "muscle": "traps"
+  },
+  "side lunge": {
+   "id": "7afe367d-2910-4870-8ef1-69444f5ffa0c",
+   "title": "Side Lunge",
+   "muscle": "hamstrings"
+  },
+  "side plank": {
+   "id": "E3EDA509",
+   "title": "Side Plank",
+   "muscle": "abdominals"
+  },
+  "side to side hops": {
+   "id": "0925edd1-5a44-489e-94e9-fd9bae121cf7",
+   "title": "Side To Side Hops",
+   "muscle": "cardio"
+  },
+  "single arm cable crossover": {
+   "id": "8372BBCC",
+   "title": "Single Arm Cable Crossover",
+   "muscle": "chest"
+  },
+  "single arm cable row": {
+   "id": "D0C4A899",
+   "title": "Single Arm Cable Row",
+   "muscle": "upper_back"
+  },
+  "single arm curl (cable)": {
+   "id": "B33B526E",
+   "title": "Single Arm Curl (Cable)",
+   "muscle": "biceps"
+  },
+  "single arm landmine press (barbell)": {
+   "id": "1837BA23",
+   "title": "Single Arm Landmine Press (Barbell)",
+   "muscle": "shoulders"
+  },
+  "single arm lat pulldown": {
+   "id": "2EE45F81",
+   "title": "Single Arm Lat Pulldown",
+   "muscle": "lats"
+  },
+  "single arm lateral raise (cable)": {
+   "id": "DE68C825",
+   "title": "Single Arm Lateral Raise (Cable)",
+   "muscle": "shoulders"
+  },
+  "single arm tricep extension (dumbbell)": {
+   "id": "8347DFD1",
+   "title": "Single Arm Tricep Extension (Dumbbell)",
+   "muscle": "triceps"
+  },
+  "single arm triceps pushdown (cable)": {
+   "id": "552AB030",
+   "title": "Single Arm Triceps Pushdown (Cable)",
+   "muscle": "triceps"
+  },
+  "single db press outs": {
+   "id": "7c0e688d-c13f-4dfd-afee-be50ab96762c",
+   "title": "Single DB Press Outs",
+   "muscle": "shoulders"
+  },
+  "single db split squat": {
+   "id": "ef13fb87-beee-4211-9c85-f419ea306418",
+   "title": "Single DB Split Squat",
+   "muscle": "hamstrings"
+  },
+  "single db split squats": {
+   "id": "683e918f-2353-4055-9959-4a5e697a79d8",
+   "title": "Single DB Split Squats",
+   "muscle": "hamstrings"
+  },
+  "single leg cable rdl": {
+   "id": "3a625031-71bb-4f03-882f-9f00a910188a",
+   "title": "Single Leg Cable RDL",
+   "muscle": "hamstrings"
+  },
+  "single leg drop sticks": {
+   "id": "2f8a7cfc-214c-478f-aae3-4ecab774e989",
+   "title": "Single Leg Drop Sticks",
+   "muscle": "hamstrings"
+  },
+  "single leg extensions": {
+   "id": "629AE73D",
+   "title": "Single Leg Extensions",
+   "muscle": "quadriceps"
+  },
+  "single leg glute bridge": {
+   "id": "CBC0D834",
+   "title": "Single Leg Glute Bridge",
+   "muscle": "glutes"
+  },
+  "single leg hip thrust": {
+   "id": "487B3755",
+   "title": "Single Leg Hip Thrust",
+   "muscle": "glutes"
+  },
+  "single leg hip thrust (dumbbell)": {
+   "id": "D1CD146F",
+   "title": "Single Leg Hip Thrust (Dumbbell)",
+   "muscle": "glutes"
+  },
+  "single leg press (machine)": {
+   "id": "3FD83744",
+   "title": "Single Leg Press (Machine)",
+   "muscle": "quadriceps"
+  },
+  "single leg romanian deadlift (barbell)": {
+   "id": "93472AC1",
+   "title": "Single Leg Romanian Deadlift (Barbell)",
+   "muscle": "hamstrings"
+  },
+  "single leg romanian deadlift (dumbbell)": {
+   "id": "937292AB",
+   "title": "Single Leg Romanian Deadlift (Dumbbell)",
+   "muscle": "hamstrings"
+  },
+  "single leg slick floor bridge curl": {
+   "id": "cd485817-7d28-463c-a2db-36799dc62503",
+   "title": "Single Leg Slick Floor Bridge Curl",
+   "muscle": "hamstrings"
+  },
+  "single leg squat with jump": {
+   "id": "08e35b78-5e62-4eb2-b8be-8647c359b1a7",
+   "title": "Single Leg Squat With Jump",
+   "muscle": "hamstrings"
+  },
+  "single leg standing calf raise": {
+   "id": "238BA231",
+   "title": "Single Leg Standing Calf Raise",
+   "muscle": "calves"
+  },
+  "single leg standing calf raise (barbell)": {
+   "id": "E51CCBE5",
+   "title": "Single Leg Standing Calf Raise (Barbell)",
+   "muscle": "calves"
+  },
+  "single leg standing calf raise (dumbbell)": {
+   "id": "5DA40761",
+   "title": "Single Leg Standing Calf Raise (Dumbbell)",
+   "muscle": "calves"
+  },
+  "single leg standing calf raise (machine)": {
+   "id": "B05C2C29",
+   "title": "Single Leg Standing Calf Raise (Machine)",
+   "muscle": "calves"
+  },
+  "single leg static balance with eyes closed": {
+   "id": "49aabf2a-b67f-4ce8-8273-9d4563af2ffa",
+   "title": "Single Leg Static Balance With Eyes Closed",
+   "muscle": "hamstrings"
+  },
+  "single leg wall sit": {
+   "id": "985ef237-1c3f-42fe-82b4-69d2006851d7",
+   "title": "Single Leg Wall Sit",
+   "muscle": "hamstrings"
+  },
+  "single leg wall sit time": {
+   "id": "e22e5257-128f-48f6-9e6e-061aa48c9324",
+   "title": "Single Leg Wall Sit Time",
+   "muscle": "hamstrings"
+  },
+  "sissy squat (weighted)": {
+   "id": "F5DEF1EB",
+   "title": "Sissy Squat (Weighted)",
+   "muscle": "quadriceps"
+  },
+  "sit up": {
+   "id": "022DF610",
+   "title": "Sit Up",
+   "muscle": "abdominals"
+  },
+  "sit up (weighted)": {
+   "id": "9237BA12",
+   "title": "Sit Up (Weighted)",
+   "muscle": "abdominals"
+  },
+  "skating": {
+   "id": "24A809EF",
+   "title": "Skating",
+   "muscle": "cardio"
+  },
+  "ski erg": {
+   "id": "5D99A2FA",
+   "title": "Ski Erg",
+   "muscle": "cardio"
+  },
+  "ski hop": {
+   "id": "be606b31-dbb6-4c51-b85f-1f98ee37c488",
+   "title": "Ski Hop",
+   "muscle": "hamstrings"
+  },
+  "skier hops": {
+   "id": "ae2847ce-31a2-4692-8e2f-a20fff895320",
+   "title": "Skier Hops",
+   "muscle": "hamstrings"
+  },
+  "skiing": {
+   "id": "84325755",
+   "title": "Skiing",
+   "muscle": "cardio"
+  },
+  "skullcrusher (barbell)": {
+   "id": "875F585F",
+   "title": "Skullcrusher (Barbell)",
+   "muscle": "triceps"
+  },
+  "skullcrusher (dumbbell)": {
+   "id": "68F8A292",
+   "title": "Skullcrusher (Dumbbell)",
+   "muscle": "triceps"
+  },
+  "sled pull": {
+   "id": "7D1BD41D",
+   "title": "Sled Pull",
+   "muscle": "full_body"
+  },
+  "sled push": {
+   "id": "7757171F",
+   "title": "Sled Push",
+   "muscle": "full_body"
+  },
+  "sledgehammer swings": {
+   "id": "2b2095ae-9534-4d84-be61-d377319163b5",
+   "title": "Sledgehammer Swings",
+   "muscle": "other"
+  },
+  "slick floor bridge curls": {
+   "id": "7993e821-f649-4871-be32-a86005857cdb",
+   "title": "Slick Floor Bridge Curls",
+   "muscle": "hamstrings"
+  },
+  "slick floor bridge hammer curls": {
+   "id": "67e97baa-d76a-4e13-a6a3-f9dc04a6325f",
+   "title": "Slick Floor Bridge Hammer Curls",
+   "muscle": "abdominals"
+  },
+  "snatch": {
+   "id": "FB09C938",
+   "title": "Snatch",
+   "muscle": "full_body"
+  },
+  "snowboarding": {
+   "id": "911A58D3",
+   "title": "Snowboarding",
+   "muscle": "cardio"
+  },
+  "solo donkey calf raise": {
+   "id": "eac08260-3ff6-4e8c-bf92-3bd674babc60",
+   "title": "Solo Donkey Calf Raise",
+   "muscle": "calves"
+  },
+  "spider curl": {
+   "id": "610e3cbe-3eca-4651-9a9f-85761c9afe7c",
+   "title": "Spider Curl",
+   "muscle": "biceps"
+  },
+  "spider curl (barbell)": {
+   "id": "2348AB72",
+   "title": "Spider Curl (Barbell)",
+   "muscle": "biceps"
+  },
+  "spider curl (dumbbell)": {
+   "id": "90427D4A",
+   "title": "Spider Curl (Dumbbell)",
+   "muscle": "biceps"
+  },
+  "spiderman": {
+   "id": "C10A5AC9",
+   "title": "Spiderman",
+   "muscle": "abdominals"
+  },
+  "spiderman crawls": {
+   "id": "7b972876-0b6b-4983-93bd-a6bfa2bf53bd",
+   "title": "Spiderman Crawls",
+   "muscle": "chest"
+  },
+  "spinning": {
+   "id": "213AB238",
+   "title": "Spinning",
+   "muscle": "cardio"
+  },
+  "split jerk": {
+   "id": "E764B907",
+   "title": "Split Jerk",
+   "muscle": "full_body"
+  },
+  "split squat (dumbbell)": {
+   "id": "20C1A3CB",
+   "title": "Split Squat (Dumbbell)",
+   "muscle": "quadriceps"
+  },
+  "split squat jumps": {
+   "id": "24ac0d9a-a7db-4647-aace-b33cd17257c7",
+   "title": "Split Squat Jumps",
+   "muscle": "hamstrings"
+  },
+  "split squat switches": {
+   "id": "513c55d9-4cac-47fe-ab8e-a659e99742d3",
+   "title": "Split Squat Switches",
+   "muscle": "hamstrings"
+  },
+  "sprinter switches": {
+   "id": "fcc034da-5095-48a7-bb5f-feb089749e5b",
+   "title": "Sprinter Switches",
+   "muscle": "hamstrings"
+  },
+  "sprints": {
+   "id": "9283BABA",
+   "title": "Sprints",
+   "muscle": "cardio"
+  },
+  "squat (band)": {
+   "id": "F1258206",
+   "title": "Squat (Band)",
+   "muscle": "quadriceps"
+  },
+  "squat (barbell)": {
+   "id": "D04AC939",
+   "title": "Squat (Barbell)",
+   "muscle": "quadriceps"
+  },
+  "squat (bodyweight)": {
+   "id": "9694DA61",
+   "title": "Squat (Bodyweight)",
+   "muscle": "quadriceps"
+  },
+  "squat (dumbbell)": {
+   "id": "DCFF3E9F",
+   "title": "Squat (Dumbbell)",
+   "muscle": "quadriceps"
+  },
+  "squat (machine)": {
+   "id": "CC35A01F",
+   "title": "Squat (Machine)",
+   "muscle": "quadriceps"
+  },
+  "squat (smith machine)": {
+   "id": "DDCC3821",
+   "title": "Squat (Smith Machine)",
+   "muscle": "quadriceps"
+  },
+  "squat (suspension)": {
+   "id": "B82D6418",
+   "title": "Squat (Suspension)",
+   "muscle": "quadriceps"
+  },
+  "squat jumps": {
+   "id": "61048f61-d94b-4b79-9156-843ca6e68373",
+   "title": "Squat Jumps",
+   "muscle": "other"
+  },
+  "squat row": {
+   "id": "A8814C06",
+   "title": "Squat Row",
+   "muscle": "full_body"
+  },
+  "stagger plyos": {
+   "id": "68320930-44a4-46b1-939f-db37ebdf7fba",
+   "title": "Stagger Plyos",
+   "muscle": "chest"
+  },
+  "stair machine (floors)": {
+   "id": "4377A52B",
+   "title": "Stair Machine (Floors)",
+   "muscle": "cardio"
+  },
+  "stair machine (steps)": {
+   "id": "4377A52C",
+   "title": "Stair Machine (Steps)",
+   "muscle": "cardio"
+  },
+  "standing banded fondas": {
+   "id": "689357fc-2080-4a85-864d-42990813801d",
+   "title": "Standing Banded Fondas",
+   "muscle": "glutes"
+  },
+  "standing cable glute kickbacks": {
+   "id": "ACB2751D",
+   "title": "Standing Cable Glute Kickbacks",
+   "muscle": "glutes"
+  },
+  "standing calf raise": {
+   "id": "06745E58",
+   "title": "Standing Calf Raise",
+   "muscle": "calves"
+  },
+  "standing calf raise (barbell)": {
+   "id": "E53CCBE5",
+   "title": "Standing Calf Raise (Barbell)",
+   "muscle": "calves"
+  },
+  "standing calf raise (dumbbell)": {
+   "id": "6DA40660",
+   "title": "Standing Calf Raise (Dumbbell)",
+   "muscle": "calves"
+  },
+  "standing calf raise (machine)": {
+   "id": "E05C2C38",
+   "title": "Standing Calf Raise (Machine)",
+   "muscle": "calves"
+  },
+  "standing calf raise (smith)": {
+   "id": "AA52E8D2",
+   "title": "Standing Calf Raise (Smith)",
+   "muscle": "calves"
+  },
+  "standing leg curls": {
+   "id": "6120CAAB",
+   "title": "Standing Leg Curls",
+   "muscle": "hamstrings"
+  },
+  "standing military press (barbell)": {
+   "id": "073032BB",
+   "title": "Standing Military Press (Barbell)",
+   "muscle": "shoulders"
+  },
+  "starfish crunch": {
+   "id": "22fb4122-84c9-4caa-ac3a-108f026a98e6",
+   "title": "Starfish Crunch",
+   "muscle": "abdominals"
+  },
+  "static broad jumps": {
+   "id": "28265a7b-1dac-425f-beff-2d363df5dd3e",
+   "title": "Static Broad Jumps",
+   "muscle": "hamstrings"
+  },
+  "static creeping lunges": {
+   "id": "efccc88c-388d-4ad2-9243-989415767703",
+   "title": "Static Creeping Lunges",
+   "muscle": "hamstrings"
+  },
+  "static knee drives": {
+   "id": "0b4c3976-b635-4f16-9d9a-59013f1f46f6",
+   "title": "Static Knee Drives",
+   "muscle": "hamstrings"
+  },
+  "step up": {
+   "id": "128A2381",
+   "title": "Step Up",
+   "muscle": "quadriceps"
+  },
+  "step up thrusts": {
+   "id": "bc922cc1-f3be-4ceb-b361-2e1b59bdbeff",
+   "title": "Step Up Thrusts",
+   "muscle": "hamstrings"
+  },
+  "sternum pull up (gironda)": {
+   "id": "EE2938D1",
+   "title": "Sternum Pull up (Gironda)",
+   "muscle": "lats"
+  },
+  "stiff legged deadlift": {
+   "id": "d0a5429b-40dc-4209-9e61-10475347b520",
+   "title": "Stiff Legged Deadlift",
+   "muscle": "hamstrings"
+  },
+  "straight arm lat pulldown (cable)": {
+   "id": "D2387AB1",
+   "title": "Straight Arm Lat Pulldown (Cable)",
+   "muscle": "lats"
+  },
+  "straight arm pulldown": {
+   "id": "442dfb3f-5c4b-439c-8088-96bdc90a2433",
+   "title": "Straight Arm Pulldown",
+   "muscle": "other"
+  },
+  "straight leg deadlift": {
+   "id": "2A48E443",
+   "title": "Straight Leg Deadlift",
+   "muscle": "hamstrings"
+  },
+  "stretching": {
+   "id": "527DA061",
+   "title": "Stretching",
+   "muscle": "other"
+  },
+  "sumo deadlift": {
+   "id": "D20D7BBE",
+   "title": "Sumo Deadlift",
+   "muscle": "glutes"
+  },
+  "sumo squat": {
+   "id": "3F5F8D40",
+   "title": "Sumo Squat",
+   "muscle": "quadriceps"
+  },
+  "sumo squat (barbell)": {
+   "id": "6622E5A0",
+   "title": "Sumo Squat (Barbell)",
+   "muscle": "quadriceps"
+  },
+  "sumo squat (dumbbell)": {
+   "id": "05293BCA",
+   "title": "Sumo Squat (Dumbbell)",
+   "muscle": "quadriceps"
+  },
+  "sumo squat (kettlebell)": {
+   "id": "5E10D0E6",
+   "title": "Sumo Squat (Kettlebell)",
+   "muscle": "quadriceps"
+  },
+  "superman": {
+   "id": "218DA87C",
+   "title": "Superman",
+   "muscle": "lower_back"
+  },
+  "superman press outs": {
+   "id": "137dc79c-62cb-4fda-86b5-2073571ebfe6",
+   "title": "Superman Press Outs",
+   "muscle": "abdominals"
+  },
+  "swimming": {
+   "id": "B60A678F",
+   "title": "Swimming",
+   "muscle": "cardio"
+  },
+  "swing": {
+   "id": "2cfa90eb-d60c-4ae1-bad9-fb242ec4bfb1",
+   "title": "Swing",
+   "muscle": "other"
+  },
+  "switch grip barbell wiring out": {
+   "id": "1f9cb597-9e70-479b-9ca5-3ff04262b8a3",
+   "title": "Switch Grip Barbell Wiring Out",
+   "muscle": "forearms"
+  },
+  "sword raise": {
+   "id": "64b05f5f-13f7-4e40-96d8-fe81b61a9ef2",
+   "title": "Sword Raise",
+   "muscle": "shoulders"
+  },
+  "t bar row": {
+   "id": "08A2974E",
+   "title": "T Bar Row",
+   "muscle": "upper_back"
+  },
+  "t spine rotations": {
+   "id": "d6ff5f88-2466-4e34-9fdb-c2253a037372",
+   "title": "T Spine Rotations",
+   "muscle": "upper_back"
+  },
+  "thoracic extension": {
+   "id": "06b86a8a-aacb-4cae-8a04-f61c2f568411",
+   "title": "Thoracic Extension",
+   "muscle": "shoulders"
+  },
+  "thruster (barbell)": {
+   "id": "90E506D5",
+   "title": "Thruster (Barbell)",
+   "muscle": "full_body"
+  },
+  "thruster (kettlebell)": {
+   "id": "10313AFD",
+   "title": "Thruster (Kettlebell)",
+   "muscle": "full_body"
+  },
+  "tke split squat drops": {
+   "id": "fc0f5b18-ba13-4371-a743-c4eb2d4a803f",
+   "title": "TKE Split Squat Drops",
+   "muscle": "hamstrings"
+  },
+  "toe touch": {
+   "id": "75BAC5C3",
+   "title": "Toe Touch",
+   "muscle": "abdominals"
+  },
+  "toes to bar": {
+   "id": "B94E35E1",
+   "title": "Toes to Bar",
+   "muscle": "abdominals"
+  },
+  "torso rotation": {
+   "id": "FBB62888",
+   "title": "Torso Rotation",
+   "muscle": "abdominals"
+  },
+  "trap pulldown": {
+   "id": "a8d8b82c-b1a1-4862-a301-8f1033eb09df",
+   "title": "Trap Pulldown",
+   "muscle": "traps"
+  },
+  "trcep extensions plyometric": {
+   "id": "dcf565fc-0f05-4bc3-a27c-8261496a9cde",
+   "title": "Trcep Extensions Plyometric",
+   "muscle": "triceps"
+  },
+  "treadmill": {
+   "id": "243710DE",
+   "title": "Treadmill",
+   "muscle": "cardio"
+  },
+  "tricep extension": {
+   "id": "e0faa936-1eee-47a3-8307-0acbe553f6cf",
+   "title": "Tricep Extension",
+   "muscle": "other"
+  },
+  "tricep pushaway": {
+   "id": "98b814db-04b7-43ce-823e-126f1c84ccc7",
+   "title": "Tricep Pushaway",
+   "muscle": "triceps"
+  },
+  "tricep pushaways": {
+   "id": "a4889c38-4c2c-4e77-a92d-98953e6b1f5f",
+   "title": "Tricep Pushaways",
+   "muscle": "triceps"
+  },
+  "tricep pushdown": {
+   "id": "d1945b6e-1ca3-4d45-985c-15af96088b40",
+   "title": "Tricep Pushdown",
+   "muscle": "other"
+  },
+  "tricep pushdown and twist": {
+   "id": "ea412727-5bb2-4a2d-8a65-fe6d57b1c8d2",
+   "title": "Tricep Pushdown And Twist",
+   "muscle": "triceps"
+  },
+  "tricep pushdowns for time": {
+   "id": "1b05be4a-8d1d-4f04-a133-09da6e1db043",
+   "title": "Tricep Pushdowns For Time",
+   "muscle": "triceps"
+  },
+  "triceps dip": {
+   "id": "28BB4A95",
+   "title": "Triceps Dip",
+   "muscle": "triceps"
+  },
+  "triceps dip (assisted)": {
+   "id": "4B4BF8C2",
+   "title": "Triceps Dip (Assisted)",
+   "muscle": "triceps"
+  },
+  "triceps dip (weighted)": {
+   "id": "10347BAC",
+   "title": "Triceps Dip (Weighted)",
+   "muscle": "triceps"
+  },
+  "triceps extension (barbell)": {
+   "id": "2F8D3067",
+   "title": "Triceps Extension (Barbell)",
+   "muscle": "triceps"
+  },
+  "triceps extension (cable)": {
+   "id": "21310F5F",
+   "title": "Triceps Extension (Cable)",
+   "muscle": "triceps"
+  },
+  "triceps extension (dumbbell)": {
+   "id": "3765684D",
+   "title": "Triceps Extension (Dumbbell)",
+   "muscle": "triceps"
+  },
+  "triceps extension (machine)": {
+   "id": "3092FADD",
+   "title": "Triceps Extension (Machine)",
+   "muscle": "triceps"
+  },
+  "triceps extension (suspension)": {
+   "id": "6182EE83",
+   "title": "Triceps Extension (Suspension)",
+   "muscle": "triceps"
+  },
+  "triceps kickback (cable)": {
+   "id": "EC3B69A3",
+   "title": "Triceps Kickback (Cable)",
+   "muscle": "triceps"
+  },
+  "triceps kickback (dumbbell)": {
+   "id": "6127A3AD",
+   "title": "Triceps Kickback (Dumbbell)",
+   "muscle": "triceps"
+  },
+  "triceps pressdown": {
+   "id": "CDC472B1",
+   "title": "Triceps Pressdown",
+   "muscle": "triceps"
+  },
+  "triceps pushdown": {
+   "id": "93A552C6",
+   "title": "Triceps Pushdown",
+   "muscle": "triceps"
+  },
+  "triceps rope pushdown": {
+   "id": "94B7239B",
+   "title": "Triceps Rope Pushdown",
+   "muscle": "triceps"
+  },
+  "underhand barbell dead rows": {
+   "id": "b2888f6e-6516-413a-b3fe-57c3f55b524c",
+   "title": "Underhand Barbell Dead Rows",
+   "muscle": "lower_back"
+  },
+  "underhand barbell wiring out": {
+   "id": "e81c3e99-15b4-48b9-9507-c5bc21de21b6",
+   "title": "Underhand Barbell Wiring Out",
+   "muscle": "forearms"
+  },
+  "underhand bench press": {
+   "id": "f75a2ca5-c5ff-4f0d-ad34-4f20e1799031",
+   "title": "Underhand Bench Press",
+   "muscle": "chest"
+  },
+  "underhand lat pulldowns": {
+   "id": "98863f51-d393-4550-b09f-8bc9c0950486",
+   "title": "Underhand Lat Pulldowns",
+   "muscle": "lats"
+  },
+  "upright row (barbell)": {
+   "id": "7AB9A362",
+   "title": "Upright Row (Barbell)",
+   "muscle": "shoulders"
+  },
+  "upright row (cable)": {
+   "id": "286C1D0B",
+   "title": "Upright Row (Cable)",
+   "muscle": "shoulders"
+  },
+  "upright row (dumbbell)": {
+   "id": "797F0782",
+   "title": "Upright Row (Dumbbell)",
+   "muscle": "shoulders"
+  },
+  "v up": {
+   "id": "6BE68B62",
+   "title": "V Up",
+   "muscle": "abdominals"
+  },
+  "vertical jump": {
+   "id": "8c2a4ca7-8a34-4978-b4f4-8c1193643703",
+   "title": "Vertical Jump",
+   "muscle": "hamstrings"
+  },
+  "vertical traction (machine)": {
+   "id": "72880C57",
+   "title": "Vertical Traction (Machine)",
+   "muscle": "lats"
+  },
+  "waiter curl (dumbbell)": {
+   "id": "72297E8C",
+   "title": "Waiter Curl (Dumbbell)",
+   "muscle": "biceps"
+  },
+  "walking": {
+   "id": "33EDD7DB",
+   "title": "Walking",
+   "muscle": "cardio"
+  },
+  "walking hip circles": {
+   "id": "c4fc052b-d914-4126-90b4-72052a069274",
+   "title": "Walking Hip Circles",
+   "muscle": "hamstrings"
+  },
+  "walking lunge": {
+   "id": "32HKJ34K",
+   "title": "Walking Lunge",
+   "muscle": "quadriceps"
+  },
+  "walking lunge (dumbbell)": {
+   "id": "A733CC5B",
+   "title": "Walking Lunge (Dumbbell)",
+   "muscle": "quadriceps"
+  },
+  "walking lunge (sandbag)": {
+   "id": "F30A4F01",
+   "title": "Walking Lunge (Sandbag)",
+   "muscle": "quadriceps"
+  },
+  "walking reverse lunge and twist": {
+   "id": "592e2c62-2a97-4a1f-acfa-238c92f01f3e",
+   "title": "Walking Reverse Lunge And Twist",
+   "muscle": "hamstrings"
+  },
+  "wall ball": {
+   "id": "A1F47ACC",
+   "title": "Wall Ball",
+   "muscle": "full_body"
+  },
+  "wall sit": {
+   "id": "C8706C80",
+   "title": "Wall Sit",
+   "muscle": "quadriceps"
+  },
+  "wall squat": {
+   "id": "8563fd70-05b3-49cc-b407-98d46b28ac83",
+   "title": "Wall Squat",
+   "muscle": "other"
+  },
+  "warm up": {
+   "id": "79EF4E4F",
+   "title": "Warm Up",
+   "muscle": "full_body"
+  },
+  "wide pull up": {
+   "id": "7C50F118",
+   "title": "Wide Pull Up",
+   "muscle": "lats"
+  },
+  "wide-elbow triceps press (dumbbell)": {
+   "id": "B31EB524",
+   "title": "Wide-Elbow Triceps Press (Dumbbell)",
+   "muscle": "triceps"
+  },
+  "windshield wipers": {
+   "id": "1eb33e3b-813c-4c45-a664-e23d71e0ef69",
+   "title": "Windshield Wipers",
+   "muscle": "abdominals"
+  },
+  "wrap around row": {
+   "id": "3a3a1d82-9824-451d-97c0-058177d3b6c6",
+   "title": "Wrap Around Row",
+   "muscle": "traps"
+  },
+  "wrist roller": {
+   "id": "0E4523F4",
+   "title": "Wrist Roller",
+   "muscle": "forearms"
+  },
+  "x crossovers": {
+   "id": "d7b9a5c7-4714-45a1-97f0-4dd2a3983c76",
+   "title": "X Crossovers",
+   "muscle": "chest"
+  },
+  "yoga": {
+   "id": "8C9D2928",
+   "title": "Yoga",
+   "muscle": "full_body"
+  },
+  "z press": {
+   "id": "6ed57dc7-b443-45bf-886e-938b0e8d18e1",
+   "title": "Z Press",
+   "muscle": "shoulders"
+  },
+  "zercher squat": {
+   "id": "40C6A9FC",
+   "title": "Zercher Squat",
+   "muscle": "quadriceps"
+  },
+  "zottman curl (dumbbell)": {
+   "id": "123EE239",
+   "title": "Zottman Curl (Dumbbell)",
+   "muscle": "biceps"
+  }
+ }
+}

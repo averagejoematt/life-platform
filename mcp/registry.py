@@ -3114,10 +3114,13 @@ TOOLS = {
                         "type": "array",
                         "description": (
                             "draft_custom only: ordered exercise list. Each item: "
-                            "{movement_key (or title/name matched to the catalog), "
+                            "{movement_key OR title/name (ANY built-in or custom Hevy exercise "
+                            "resolves by its exact Hevy title — e.g. 'Cycling', 'Burpee', "
+                            "'Kettlebell Swing'; no catalog edit needed), "
                             "sets:[{weight_lbs OR weight_kg, reps OR rep_range_start+rep_range_end, "
-                            "type?, count? (repeat the set N times), duration_seconds?}], "
-                            "rest_seconds?, superset_id? (same int = superset/tri-set), notes?}. "
+                            "type?, count? (repeat the set N times), duration_seconds? (cardio), "
+                            "distance_meters?}], "
+                            "rest_seconds?, superset_id? (same int = superset/circuit/tri-set), notes?}. "
                             "Loads are taken verbatim — the platform does not compute them."
                         ),
                         "items": {"type": "object"},
