@@ -80,9 +80,9 @@
 5. **Rebuild `hevy_template_index.json`** by re-pulling `list_templates` whenever you add many new custom exercises in Hevy (the live-lookup self-heal covers one-offs in the meantime).
 6. **The real "Push — Day 1" (2026-06-01)** WAS committed to Hevy this session (`24869bbd-2c2e-4b84-89a5-28f922faf6c1`); the cycling finisher was added manually in-app — leave it (re-committing would clobber it / trip the conflict guard).
 
-## Rate-limit follow-up (open)
+## Rate-limit follow-up — FIXED (2026-06-01)
 
-`mcp/handler.py:_check_write_rate_limit` documents "resets every Lambda invocation" but `_WRITE_TOOL_CALLS` is module-level → really per *container*. Repeated draft/dry_run/commit in one session can hit the 10-call cap and only clears on a cold start (forced here via an env-var bump). Likely the cause of intermittent chat `RATE_LIMIT` errors. Fix = reset the dict at the top of each invocation. Not yet done.
+`mcp/handler.py:_check_write_rate_limit` was a module-level lifetime counter (the docstring's "resets every invocation" was false), so it accumulated across the warm container's whole life and only cleared on a cold start — the cause of intermittent chat `RATE_LIMIT` errors. A true per-invocation reset would also be wrong (one invocation = one tool call → never exceeds 1). Replaced with a **rolling time window**: ≤20 calls per write tool per 60s per container — trips runaway loops, never blocks human-paced flows, self-heals as the window slides. Deployed (MCP code only); verified live (12 sequential calls, 0 RATE_LIMIT). 4 tests in `tests/test_mcp_rate_limit.py`. The env-var-bump cold-start trick is no longer needed.
 
 ---
 
