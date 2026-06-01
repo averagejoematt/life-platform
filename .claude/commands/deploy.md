@@ -40,6 +40,21 @@ zip -r $ZIP mcp/ -x 'mcp/__pycache__/*' 'mcp/*.pyc'
 aws lambda update-function-code --function-name life-platform-mcp --zip-file fileb://$ZIP --region us-west-2
 ```
 
+**Special case — `life-platform-site-api` (MULTI-MODULE — do NOT single-file deploy):**
+The handler is `web.site_api_lambda.lambda_handler` and `site_api_lambda.py` imports many siblings (`web/site_api_common.py`, `site_api_vitals.py`, `site_api_data.py`, `site_api_intelligence.py`, `site_api_social.py`, `site_api_observatory.py`, `site_api_coach.py`). A single-file `deploy_lambda.sh` ships only `site_api_lambda.py` and drops the siblings → `Runtime.ImportModuleError: No module named 'web.site_api_common'` (broke prod 2026-06-01). **`rollback_lambda.sh` does NOT reliably recover it** — site-api is normally CDK-deployed, so the saved `previous.zip` may also be single-file/incomplete. Deploy the FULL `web/` package:
+```bash
+rm -rf /tmp/siteapi && mkdir -p /tmp/siteapi/web && cp lambdas/web/*.py /tmp/siteapi/web/
+(cd /tmp/siteapi && zip -r /tmp/siteapi.zip web/ -x '*__pycache__*' '*.pyc')
+aws lambda update-function-code --function-name life-platform-site-api --zip-file fileb:///tmp/siteapi.zip --region us-west-2
+```
+Then verify imports loaded (not just a 200 via CloudFront, which can cache a prior 500):
+```bash
+aws lambda invoke --function-name life-platform-site-api --region us-west-2 --cli-binary-format raw-in-base64-out \
+  --payload '{"rawPath":"/api/status","requestContext":{"http":{"method":"GET","path":"/api/status"}}}' /tmp/st.json >/dev/null
+python3 -c "import json; d=json.load(open('/tmp/st.json')); assert 'errorType' not in d, d; print('site-api OK', d.get('statusCode'))"
+```
+(Other `web/` handlers — `site_api_ai_lambda`, `email_subscriber_lambda`, `og_image_lambda`, `site_stats_refresh_lambda`, `subscriber_onboarding_lambda` — import NO siblings, so single-file deploy is fine for them. Only `site_api_lambda` needs the full package.)
+
 ## Function Name → Source File Mapping
 
 **Ingestion:**
@@ -100,7 +115,7 @@ aws lambda update-function-code --function-name life-platform-mcp --zip-file fil
 - life-platform-data-export → data_export_lambda.py
 - life-platform-data-reconciliation → data_reconciliation_lambda.py
 - insight-email-parser → insight_email_parser_lambda.py
-- life-platform-site-api → site_api_lambda.py
+- life-platform-site-api → SPECIAL BUILD — full `web/` package (see Special case above; NOT single-file)
 - life-platform-site-api-ai → site_api_ai_lambda.py
 - site-stats-refresh → site_stats_refresh_lambda.py
 - pipeline-health-check → pipeline_health_check_lambda.py
