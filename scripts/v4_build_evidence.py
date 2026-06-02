@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
 """
-v4_build_evidence.py — generate Door 3 (The Evidence) from a topic registry.
+v4_build_evidence.py — generate Door 3 (The Evidence) as a master-detail app.
 
-Emits site/evidence/index.html (archival index, grouped) and
-site/evidence/<slug>/index.html for every topic in REGISTRY. Pages are static
-and consistent; the shared assets/js/evidence.js does the live, honest readout.
-
-Two modes per topic:
-  - "data":    fetches a published /api endpoint and renders the actual data
-               (correlative framing applied client-side).
-  - "archive": a v4-styled intro that links into the preserved /legacy view
-               (used for interactive/meta sections not yet rebuilt bespoke).
-
-Every topic links "deeper →" to its preserved legacy page so nothing is lost.
+Emits an app shell (horizontal GROUP tabs · left topic TILES · center readout
+that loads dynamically) at site/evidence/index.html AND a per-slug shell at
+site/evidence/<slug>/index.html (same app, pre-selected slug) so deep links and
+the old-URL redirects resolve on static hosting. The full registry is embedded
+as window.__EVIDENCE_REGISTRY__; assets/js/evidence.js does tabs/sidebar/routing
+and the bespoke, data-bound readouts. Editorial topics carry authored content;
+archive topics link to their preserved /legacy view.
 
 Read-only inputs; writes only under site/evidence/. Run from repo root:
     python3 scripts/v4_build_evidence.py
@@ -25,7 +21,9 @@ from pathlib import Path
 
 OUT = Path("site/evidence")
 
-# slug, title, blurb, group, mode, endpoint, root(json key or None), legacy
+# slug, title, blurb, group, mode, endpoint, root, legacy
+#   mode: data (fetch+render) · interactive (render+wire, no fetch) ·
+#         editorial (authored content) · archive (link to preserved legacy)
 REGISTRY = [
     # ── The body ───────────────────────────────────────────────────────────
     ("physical",    "Body composition", "DEXA: body fat, lean mass, visceral fat, bone density, biological age.", "The body", "data", "/api/physical_overview", None, "/legacy/physical/"),
@@ -47,126 +45,104 @@ REGISTRY = [
     ("discoveries", "Discoveries", "Active hypotheses and the findings the engine surfaces.",             "Protocol & experiments", "data", "/api/discoveries", None, "/legacy/discoveries/"),
     # ── Credibility & the machine ──────────────────────────────────────────
     ("board",       "The board",   "The named AI experts who argue about the data — reads & roster.",     "Credibility & the machine", "data", "/api/coaching-dashboard", None, "/legacy/coaches/"),
-    ("intelligence","Intelligence","Cross-source correlations the engine surfaces (correlative only).",   "Credibility & the machine", "data", "/api/correlations", None, "/legacy/intelligence/"),
+    ("methodology", "Methodology", "How inputs become scores — N=1, the correlation engine, confidence.", "Credibility & the machine", "editorial", None, None, "/legacy/methodology/"),
+    ("intelligence", "Intelligence", "Cross-source correlations the engine surfaces (correlative only).", "Credibility & the machine", "data", "/api/correlations", None, "/legacy/intelligence/"),
     ("predictions", "Predictions", "The model's forward calls — logged, then scored against reality.",    "Credibility & the machine", "data", "/api/predictions", None, "/legacy/predictions/"),
     ("benchmarks",  "Benchmarks",  "Where the numbers sit vs age-band and centenarian targets.",          "Credibility & the machine", "data", "/api/benchmark_trends", None, "/legacy/benchmarks/"),
     ("biology",     "Biology & genome", "Genome risk by category — the baseline biology behind the numbers.", "Credibility & the machine", "data", "/api/genome_risks", None, "/legacy/biology/"),
-    ("methodology", "Methodology", "How the scoring, pillars, and confidence rules actually work.",        "Credibility & the machine", "archive", None, None, "/legacy/methodology/"),
-    ("cost",        "Cost",        "What running this costs to run — the radical-accessibility receipt.", "Credibility & the machine", "archive", None, None, "/legacy/cost/"),
-    ("data",        "Data sources","Every source feeding the platform, and its freshness.",              "Credibility & the machine", "archive", None, None, "/legacy/data/"),
-    ("platform",    "The platform","The architecture behind the three doors.",                           "Credibility & the machine", "archive", None, None, "/legacy/platform/"),
-    ("results",     "Results",     "Outcomes to date — what moved, what didn't.",                        "Credibility & the machine", "archive", None, None, "/legacy/results/"),
-    ("stack",       "The stack",   "The hardware and services feeding the experiment.",                  "Credibility & the machine", "archive", None, None, "/legacy/stack/"),
-    ("kitchen",     "The kitchen", "How the food actually gets made on a deficit.",                      "Credibility & the machine", "archive", None, None, "/legacy/kitchen/"),
-    ("tools",       "Tools",       "The MCP tools Claude uses to read the data back.",                   "Credibility & the machine", "archive", None, None, "/legacy/tools/"),
-    ("explorer",    "Explorer",    "Browse the raw daily record yourself.",                              "Credibility & the machine", "archive", None, None, "/legacy/explorer/"),
-    ("ask",         "Ask the data","Put a question to the experiment's data directly.",                  "Credibility & the machine", "archive", None, None, "/legacy/ask/"),
+    ("platform",    "The platform", "The architecture by the numbers — sources, tools, lambdas, tests.",  "Credibility & the machine", "data", "/api/platform_stats", None, "/legacy/platform/"),
+    ("data",        "Data sources", "Every source feeding the platform, what it measures, how often.",    "Credibility & the machine", "data", "/data/data_sources.json", None, "/legacy/data/"),
+    ("tools",       "Tools",       "The MCP tools Claude uses to read the data back.",                    "Credibility & the machine", "data", "/api/platform_stats", None, "/legacy/tools/"),
+    ("cost",        "Cost",        "What running this costs — the radical-accessibility receipt.",        "Credibility & the machine", "data", "/api/platform_stats", None, "/legacy/cost/"),
+    ("results",     "Results",     "Outcomes to date — what moved, and where the mechanisms live.",       "Credibility & the machine", "data", "/api/journey", None, "/legacy/results/"),
+    ("explorer",    "Explorer",    "Today's raw record, straight from the pipeline.",                     "Credibility & the machine", "data", "/api/snapshot", None, "/legacy/explorer/"),
+    ("ask",         "Ask the data", "Put a question to the experiment's data directly.",                  "Credibility & the machine", "interactive", None, None, "/legacy/ask/"),
+    ("kitchen",     "The kitchen", "Meal intelligence from CGM + macros — fills as data accrues.",        "Credibility & the machine", "editorial", None, None, "/legacy/kitchen/"),
 ]
 
 GROUP_ORDER = ["The body", "Mind & accountability", "Protocol & experiments", "Credibility & the machine"]
 
-# Self-hosted fonts (CSP: font-src 'self') — never the blocked Google CDN.
+# Authored editorial content (faithful to the preserved legacy + the locked docs).
+EDITORIAL = {
+    "methodology": (
+        '<p class="rd-lede">How raw inputs become scores — and why an experiment of one is built the way it is.</p>'
+        '<section class="rd-sec"><h2 class="rd-h">Why N=1</h2>'
+        '<p class="rd-prose">Population studies find the average effect across a group — real signal, but a statistical composite that may not resemble any individual. The N=1 approach turns that limitation into a feature: one subject means every measurement is directly relevant, with no between-person noise. The trade-off is external validity — you cannot generalise these results to you, and that is fine. <strong>The value is the framework, not the conclusions.</strong></p></section>'
+        '<section class="rd-sec"><h2 class="rd-h">The correlation engine</h2>'
+        '<p class="rd-prose">The core analytical layer is a rolling correlation engine that continuously computes Pearson <em>r</em> across metric pairs (sleep, recovery, nutrition, training, glucose). Running ~23 pairs at once creates a multiple-comparisons problem — the more tests you run, the more likely one is a false positive. So a Benjamini-Hochberg FDR correction controls the false-discovery rate across all simultaneous comparisons, and a minimum sample size is required before any correlation is surfaced.</p>'
+        '<p class="rd-prose">A finding is only reported with its <em>p</em>-value alongside <em>r</em>, and an FDR-adjusted <em>q</em>-value used for filtering. Example: a confirmed pattern at p=0.003, n=47 paired days, BH-FDR q=0.014 — survives correction.</p></section>'
+        '<section class="rd-sec"><h2 class="rd-h">Confidence vocabulary</h2>'
+        '<p class="rd-prose">Everything is correlative, never causal. Fewer than 12 observations is a <strong>preliminary pattern</strong>; fewer than 30 is <strong>low confidence</strong>. The character model rolls these into a Level (1–100) across five tiers — Foundation → Momentum → Discipline → Mastery → Elite — over seven pillars: Sleep, Movement, Nutrition, Metabolic, Mind, Relationships, and Consistency.</p></section>'
+        '<p class="correlative">The model never computes in prose — it interprets pre-computed numbers only. <span class="confidence conf-low">N=1</span></p>'
+    ),
+    "kitchen": (
+        '<p class="rd-archive">The Kitchen is personalised meal intelligence — built from CGM response, macro tracking, and your real eating patterns. It needs data to work, and fills in automatically once daily nutrition logging and CGM readings accumulate over the first weeks. Until then, see Nutrition and Glucose &amp; meals for what\'s already flowing.</p>'
+    ),
+}
+
 FONTS = '<link rel="stylesheet" href="/assets/css/fonts.css">'
-
-THEME_INIT = ('<script>(function(){try{var t=localStorage.getItem("ajm-theme");'
-              'if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>')
-
-TOPBAR = ('<header class="ev-top">\n'
-          '    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span>'
-          '<span class="brand-name">averagejoematt</span> <span class="brand-door label">evidence</span></a>\n'
-          '    <nav class="doors" aria-label="Doors"><a href="/now/">the cockpit</a><a href="/">the story</a>'
-          '<button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button></nav>\n'
-          '  </header>')
+THEME = ('<script>(function(){try{var t=localStorage.getItem("ajm-theme");'
+         'if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>')
+TOPBAR = ('<header class="ev-top"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span>'
+          '<span class="brand-name">averagejoematt</span> <span class="brand-door label">evidence</span></a>'
+          '<nav class="doors" aria-label="Doors"><a href="/now/">the cockpit</a><a href="/">the story</a>'
+          '<button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button></nav></header>')
 
 
-def esc(s: str) -> str:
+def esc(s):
     return html.escape(str(s), quote=True)
 
 
-def index_html() -> str:
-    groups = {g: [] for g in GROUP_ORDER}
-    for i, t in enumerate(REGISTRY):
-        slug, title, blurb, group, mode, *_ = t
-        groups.setdefault(group, []).append((i, slug, title, blurb, mode))
-    sections = []
-    for g in GROUP_ORDER:
-        cards = []
-        for i, slug, title, blurb, mode in groups.get(g, []):
-            tag = "live readout" if mode == "data" else "archive"
-            cards.append(
-                f'<a class="ev-card" data-mode="{mode}" href="/evidence/{slug}/">'
-                f'<span class="idx">{i+1:02d}</span>'
-                f'<span class="ev-title">{esc(title)}</span>'
-                f'<span class="ev-blurb">{esc(blurb)}</span>'
-                f'<span class="ev-tag">{tag}</span></a>')
-        sections.append(
-            f'<section class="ev-group"><span class="label">{esc(g)}</span>'
-            f'<div class="ev-list">{"".join(cards)}</div></section>')
+def registry_json():
+    out = []
+    for slug, title, blurb, group, mode, endpoint, root, legacy in REGISTRY:
+        e = {"slug": slug, "title": title, "blurb": blurb, "group": group, "mode": mode,
+             "endpoint": endpoint, "root": root, "legacy": legacy}
+        if mode == "editorial":
+            e["editorial"] = EDITORIAL.get(slug, "")
+        out.append(e)
+    return out
+
+
+def shell(start_slug: str, canonical: str, title: str, desc: str) -> str:
+    reg = json.dumps(registry_json())
     return f"""<!DOCTYPE html>
 <html lang="en" data-door="evidence">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>The Evidence — averagejoematt</title>
-  <meta name="description" content="What's the protocol, what's it built on, and does the data hold up? The archival index of the experiment — correlative, read-only, honest.">
-  <link rel="canonical" href="https://averagejoematt.com/evidence/">
+  <title>{esc(title)}</title>
+  <meta name="description" content="{esc(desc)}">
+  <link rel="canonical" href="https://averagejoematt.com{canonical}">
   <link rel="icon" href="/favicon.ico">
   {FONTS}
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/evidence.css">
-  {THEME_INIT}
+  {THEME}
 </head>
 <body>
-  <a class="skip" href="#ev">Skip to the index</a>
+  <a class="skip" href="#ev">Skip to the evidence</a>
   {TOPBAR}
-  <main id="ev" class="ev">
+  <main id="ev" class="ev-app">
     <div class="ev-head">
       <h1 class="ev-h1">The Evidence</h1>
-      <p class="ev-lede">What's the protocol, what's it built on, and does it hold up? Everything here is correlative and read-only — an N=1 instrument exposed as proof, with thin data flagged as preliminary.</p>
+      <p class="ev-lede">What's the protocol, what's it built on, and does it hold up? Pick a section, then a topic — everything's correlative, read-only, and flagged when thin.</p>
     </div>
-    {"".join(sections)}
+    <nav class="ev-tabs" data-tabs aria-label="Evidence sections"></nav>
+    <div class="ev-layout">
+      <aside class="ev-side" data-side aria-label="Topics"></aside>
+      <section class="ev-main" data-main>
+        <p class="ev-crumbs" data-crumb></p>
+        <h2 class="topic-h1" data-title></h2>
+        <p class="topic-lede" data-blurb></p>
+        <div class="readout" data-readout></div>
+        <p class="deeper" data-deeper></p>
+      </section>
+    </div>
   </main>
   <footer class="ev-foot"><span class="label">averagejoematt · the evidence</span>
     <span class="label"><a href="/">← the story</a></span></footer>
-</body>
-</html>
-"""
-
-
-def topic_html(i: int, t: tuple) -> str:
-    slug, title, blurb, group, mode, endpoint, root, legacy = t
-    cfg = {"slug": slug, "mode": mode, "endpoint": endpoint, "root": root,
-           "archive_note": f"{title} is preserved in full below while this section is rebuilt into the new Evidence readout."}
-    cfg_json = json.dumps(cfg)
-    deeper = (f'<p class="deeper"><a href="{esc(legacy)}">Open the full {esc(title.lower())} view (preserved) →</a></p>'
-              if legacy else "")
-    return f"""<!DOCTYPE html>
-<html lang="en" data-door="evidence">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>{esc(title)} — The Evidence — averagejoematt</title>
-  <meta name="description" content="{esc(blurb)}">
-  <link rel="canonical" href="https://averagejoematt.com/evidence/{slug}/">
-  <link rel="icon" href="/favicon.ico">
-  {FONTS}
-  <link rel="stylesheet" href="/assets/css/tokens.css">
-  <link rel="stylesheet" href="/assets/css/evidence.css">
-  {THEME_INIT}
-</head>
-<body>
-  <a class="skip" href="#topic">Skip to the readout</a>
-  {TOPBAR}
-  <main id="topic" class="ev">
-    <p class="ev-crumbs"><a href="/evidence/">evidence</a> / {esc(slug)} · {i+1:02d}</p>
-    <h1 class="topic-h1">{esc(title)}</h1>
-    <p class="topic-lede">{esc(blurb)}</p>
-    <div class="readout" data-readout><p class="ev-note"><span class="shimmer">Loading the readout…</span></p></div>
-    {deeper}
-  </main>
-  <footer class="ev-foot"><span class="label">averagejoematt · the evidence</span>
-    <span class="label"><a href="/evidence/">← all evidence</a></span></footer>
-  <script>window.__EVIDENCE_TOPIC__ = {cfg_json};</script>
+  <script>window.__EVIDENCE_REGISTRY__ = {reg}; window.__START_SLUG__ = {json.dumps(start_slug)};</script>
   <script type="module" src="/assets/js/evidence.js"></script>
 </body>
 </html>
@@ -175,17 +151,22 @@ def topic_html(i: int, t: tuple) -> str:
 
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / "index.html").write_text(index_html(), encoding="utf-8")
+    first = REGISTRY[0][0]
+    (OUT / "index.html").write_text(
+        shell(first, "/evidence/", "The Evidence — averagejoematt",
+              "The archival index of the experiment — correlative, read-only, browsable."),
+        encoding="utf-8")
     n = 0
-    for i, t in enumerate(REGISTRY):
-        slug = t[0]
+    for slug, title, blurb, *_ in REGISTRY:
         d = OUT / slug
         d.mkdir(parents=True, exist_ok=True)
-        (d / "index.html").write_text(topic_html(i, t), encoding="utf-8")
+        (d / "index.html").write_text(
+            shell(slug, f"/evidence/{slug}/", f"{title} — The Evidence — averagejoematt", blurb),
+            encoding="utf-8")
         n += 1
-    print(f"evidence: wrote index + {n} topic pages under {OUT}/")
-    data_topics = sum(1 for t in REGISTRY if t[4] == "data")
-    print(f"  {data_topics} live-readout, {n - data_topics} archive (link to preserved /legacy).")
+    data_n = sum(1 for t in REGISTRY if t[4] in ("data", "interactive"))
+    print(f"evidence app: index + {n} per-slug shells under {OUT}/ "
+          f"({data_n} data/interactive, {n - data_n} editorial).")
     return 0
 
 
