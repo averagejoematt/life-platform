@@ -52,7 +52,7 @@
         <p class="sub-meta-h">First issue</p>
         <p class="sub-meta-b">A new dispatch lands every week. Subscribe and the next one is the first thing in your inbox.</p>
       </div>
-      <p class="sub-count-line">Join <b id="sub-count">—</b> <span id="sub-word">people</span> following the experiment.</p>
+      <p class="sub-count-line" id="sub-count-line">Be one of the first to follow the experiment.</p>
       <p class="sub-road">On the roadmap: <strong>The Kitchen</strong> — weekly AI-generated meal prep from real nutrition data.</p>
     </div>
 
@@ -157,9 +157,10 @@
 
     // subscriber count (pluralised)
     fetch('/api/sub_count').then(r => r.ok ? r.json() : null).then(d => {
-      if (d && d.count != null) {
-        document.getElementById('sub-count').textContent = d.count;
-        document.getElementById('sub-word').textContent = d.count === 1 ? 'person' : 'people';
+      const line = document.getElementById('sub-count-line');
+      // Below ~10, a raw "Join 1 person" reads as weak proof — lead with "be one of the first".
+      if (line && d && d.count != null && d.count >= 10) {
+        line.textContent = `Join ${d.count} people following the experiment.`;
       }
     }).catch(() => {});
   </script>

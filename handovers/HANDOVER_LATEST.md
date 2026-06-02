@@ -22,6 +22,14 @@ Multi-lens sweep (reader/UX/content + engineering/architecture + simulated fresh
 
 **Known follow-ups (not yet done):** (a) deploy Tier 3 (above) via the CI/CD production gate; (b) optional: also write `rss.xml` from `lambdas/emails/chronicle_approve_lambda.py::_publish_to_s3` so the feed refreshes the instant an issue is approved (today it refreshes on the next site deploy).
 
+### Reader-experience sweep #2 (2026-06-02, screenshot-based)
+Reviewed every page as a human reader (full-page screenshots) + verified against live APIs. Shipped (`d5d47f8` + subscribe):
+- **Honest weight direction (integrity).** `/api/journey lost_lbs=-1.9` with `start 304.3 → current 306` = genuinely **up ~1.9 lb**; the home hero dumped raw "−1.9" in ember (read as a loss/win) and Results labeled it "down". Now `story.js` (+ `.figure.is-up` muted style) and `evidence.js renderResults` interpret the sign → "1.9 lbs up" in muted ink, consistent with Vitals.
+- **Full chronicle/journal readable.** Reader showed only excerpt + "1403 words". Added "Read the full piece →" (`dispatches.js` → `post.url`) and stopped redirecting `/chronicle/posts/*` + `/journal/posts/*` (guard in `v4_migration_inventory.py`; regenerated redirects.map 73 301s + CF function) so the full pages serve (200). *Note: the full post pages are still old-design — optional follow-up to re-theme to v4, or render the body inline (needs a `body` field in the posts.json generators — backend).*
+- **No more 2-point straight-line charts.** `charts.js lineChart` now needs ≥4 points; for <4 shows "Latest <v> · N readings so far — the trend line draws in at 4+".
+- **Subscribe social proof.** "Join 1 person" → "Be one of the first to follow the experiment" under ~10 subscribers (`subscribe/index.html`).
+- Left as optional polish: figure dual-unit density (now labelled), cockpit genesis-phase framing, home Third-Wall contrast.
+
 ### First-cutover failures + fixes (ALL RESOLVED — keep as lessons)
 1. **CSP blocked Google Fonts.** CSP is `style-src 'self' 'unsafe-inline'; font-src 'self' data:` → the Google CDN type triad was blocked, whole site fell back to default fonts. **FIXED:** `scripts/v4_vendor_fonts.py` self-hosts Fraunces/Instrument Sans/IBM Plex Mono → `site/assets/fonts/v4/*.woff2` (18 files, 418KB) + `site/assets/css/fonts.css`; doors link the local sheet. ⚠️ `sync_site_to_s3.sh` does NOT upload `assets/**` woff2 (its catch-all excludes `assets/*`) → fonts need an explicit `aws s3 sync site/assets/fonts/ …` step (done at deploy).
 2. **Scroll-reveal hid all below-hero content** (`.beat` started at `opacity:0`, revealed only on scroll → blank first glance). **FIXED:** reveal is now TRANSFORM-ONLY (opacity stays 1) in `story.css` — content is never invisible.
