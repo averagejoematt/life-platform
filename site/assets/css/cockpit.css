@@ -1,0 +1,223 @@
+/*
+  cockpit.css — Door 1: The Cockpit (/now)
+  ----------------------------------------------------------------------------
+  Pattern: focus / logbook (LOCKED — Design System §4 Cockpit).
+  Job (acceptance test): in ONE glance — "Am I winning, and what's the one
+  thing right now?" Stays a one-second read; editorial drama is NOT here.
+  Reads /api/snapshot + /api/weekly_priority; per-pillar detail lazy-loaded.
+  Mobile-first (the daily glance happens on a phone), richer on desktop.
+  All colour / type / spacing from tokens.css.
+*/
+
+/* ── Page frame ──────────────────────────────────────────────────────────── */
+body { min-height: 100svh; display: flex; flex-direction: column; }
+
+.skip {
+  position: absolute; left: 0; top: -3rem; z-index: var(--z-overlay);
+  background: var(--surface); color: var(--ink);
+  padding: var(--sp-2) var(--sp-4); border: var(--border-hair);
+  border-radius: var(--radius-sm); transition: top var(--dur-fast);
+}
+.skip:focus { top: var(--sp-2); left: var(--sp-2); }
+
+.cockpit-top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sp-4); flex-wrap: wrap;
+  padding: var(--sp-4) var(--gutter);
+  max-width: var(--container); width: 100%; margin-inline: auto;
+}
+
+.brand { display: inline-flex; align-items: center; gap: var(--sp-2); text-decoration: none; }
+.brand-mark {
+  width: 11px; height: 11px; border-radius: 2px;
+  background: var(--ember); box-shadow: 0 0 0 3px var(--ember-wash);
+}
+.brand-name { font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.02em; }
+.brand-door { color: var(--ember); }
+
+.top-controls { display: flex; align-items: center; gap: var(--sp-3); }
+
+/* Time-scope: one global control that re-scopes everything */
+.scope { display: inline-flex; gap: 2px; padding: 3px; border: var(--border-hair); border-radius: var(--radius-sm); }
+.scope-btn {
+  appearance: none; border: 0; background: transparent; cursor: pointer;
+  font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-faint);
+  padding: var(--sp-2) var(--sp-3); border-radius: var(--radius-xs);
+  transition: color var(--dur-fast), background var(--dur-fast);
+}
+.scope-btn:hover { color: var(--ink-muted); }
+.scope-btn.is-active { color: var(--ink); background: color-mix(in oklch, var(--ink) 8%, transparent); }
+
+.theme-toggle {
+  appearance: none; cursor: pointer; background: transparent;
+  border: var(--border-hair); border-radius: 50%; width: 30px; height: 30px;
+  display: grid; place-items: center;
+}
+.theme-dot {
+  width: 13px; height: 13px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--ink) 0 50%, transparent 50% 100%);
+  border: 1px solid var(--ink-muted);
+}
+
+/* ── The panel (with the rule-spine) ─────────────────────────────────────── */
+.cockpit {
+  flex: 1; width: 100%; max-width: var(--container-read);
+  margin-inline: auto; padding: var(--sp-2) var(--gutter) var(--sp-8);
+}
+
+.panel {
+  background: var(--surface);
+  border: var(--border-hair); border-radius: var(--radius);
+  display: flex; overflow: hidden;
+  box-shadow: var(--shadow-panel);
+}
+
+/* Signature 1 — the measuring-rule spine */
+.spine {
+  width: var(--spine-width); flex-shrink: 0; position: relative;
+  border-right: var(--spine-border); padding-top: var(--sp-5);
+}
+.spine-day {
+  display: block; text-align: center;
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em;
+  color: var(--ink-faint);
+}
+.spine::after {
+  content: ""; position: absolute; right: 0; top: calc(var(--sp-5) + 26px);
+  bottom: var(--sp-5); width: var(--spine-tick-w); background: var(--spine-ticks);
+}
+
+.panel-body { flex: 1; min-width: 0; padding: var(--sp-6) clamp(1.1rem, 0.6rem + 2vw, 1.9rem) var(--sp-5); }
+
+.cap { margin-bottom: var(--sp-2); }
+
+/* The hub — biggest, calmest element. Score in big tabular mono. */
+.hub { display: flex; align-items: flex-end; gap: var(--sp-4); flex-wrap: wrap; margin-top: var(--sp-1); }
+.big {
+  font-family: var(--font-mono); font-weight: var(--weight-med);
+  font-size: var(--fs-data-xl); line-height: 0.8; letter-spacing: var(--tracking-tight);
+}
+.tier { font-family: var(--font-serif); font-weight: var(--weight-med); font-size: var(--fs-h1); line-height: 1; padding-bottom: 0.35rem; }
+.movement {
+  font-family: var(--font-mono); font-size: var(--fs-small); padding-bottom: 0.5rem;
+  color: var(--ink-muted); letter-spacing: 0.02em;
+}
+.movement[data-dir="up"] { color: var(--ember); }
+.movement[data-dir="down"], .movement[data-dir="flat"] { color: var(--ink-muted); }
+
+/* Honesty chip — muted ink, dashed hairline, plain language. Never red. */
+.honest {
+  margin-top: var(--sp-3); display: inline-block;
+  font-family: var(--font-mono); font-size: var(--fs-small);
+  color: var(--honest-ink); border: var(--honest-border);
+  border-radius: var(--radius-xs); padding: var(--sp-2) var(--sp-3);
+  letter-spacing: 0.01em; max-width: var(--measure);
+}
+
+/* Signature 2 — the machine ↔ human dialogue */
+.dialogue { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: var(--border-hair); }
+.voice { display: flex; gap: var(--sp-3); padding: var(--sp-2) 0; }
+.voice .who {
+  font-family: var(--voice-who-font); font-size: var(--voice-who-size);
+  letter-spacing: var(--voice-who-tracking); text-transform: uppercase;
+  color: var(--voice-who-ink); width: 62px; flex-shrink: 0; padding-top: 0.4rem;
+}
+.voice.machine .what {
+  font-family: var(--voice-machine-font); font-size: var(--voice-machine-size);
+  line-height: var(--voice-machine-lh); color: var(--voice-machine-ink); max-width: var(--measure);
+}
+.voice.machine .what b, .voice.machine .what .mark { color: var(--voice-machine-mark); font-weight: var(--weight-reg); }
+.voice.human .what {
+  font-family: var(--voice-human-font); font-style: var(--voice-human-style);
+  font-size: var(--voice-human-size); line-height: var(--voice-human-lh); color: var(--voice-human-ink);
+}
+
+/* ── The two glance domains (bento) ──────────────────────────────────────── */
+.domains { margin-top: var(--sp-5); display: grid; gap: var(--bento-gap); }
+.domain { border-top: var(--border-hair); padding-top: var(--sp-3); }
+.domain[data-domain="body"] { --domain-tint: var(--body-tint); }
+.domain[data-domain="mind"] { --domain-tint: var(--mind-tint); }
+.domain-head { display: flex; align-items: baseline; justify-content: space-between; }
+.domain-roll { font-size: var(--fs-data-lg); font-weight: var(--weight-med); color: var(--ink); }
+
+/* Pillar rows — label · track · value · trend (the reference language) */
+.rows { margin-top: var(--sp-2); }
+.row {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-3) 0; border-top: var(--border-hair);
+  width: 100%; background: transparent; border-left: 0; border-right: 0; border-bottom: 0;
+  cursor: pointer; text-align: left; color: inherit; font: inherit;
+}
+.row:first-child { border-top: 0; }
+.rows .row:hover .lab { color: var(--ink); }
+.row .lab { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-muted); width: 106px; flex-shrink: 0; letter-spacing: 0.02em; text-transform: capitalize; }
+.row .track { flex: 1; height: 2px; background: var(--rule); border-radius: 2px; overflow: hidden; }
+.row .track i { display: block; height: 100%; background: var(--down-fill); transition: width var(--dur) var(--ease-out); }
+.row.up .track i { background: var(--up-fill); }
+.row .val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 1rem; width: 30px; text-align: right; }
+.row .tr { font-family: var(--font-mono); font-size: var(--fs-small); width: 16px; text-align: center; color: var(--ink-faint); }
+.row.up .tr { color: var(--ember); }
+.row .chev { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-faint); width: 12px; text-align: center; transition: transform var(--dur-fast); }
+.row[aria-expanded="true"] .chev { transform: rotate(90deg); color: var(--ink-muted); }
+
+/* In-place pillar disclosure (View Transitions) — detail opens on the surface */
+.pillar-detail {
+  grid-column: 1 / -1; overflow: hidden;
+  border-top: var(--honest-border); margin-top: -1px;
+  padding: var(--sp-3) 0 var(--sp-4); padding-left: calc(106px + var(--sp-3));
+}
+.pillar-detail .pd-read { font-family: var(--voice-machine-font); font-size: var(--voice-machine-size); line-height: var(--voice-machine-lh); color: var(--ink); max-width: var(--measure); }
+.pillar-detail .pd-who { color: var(--ink-faint); }
+.pillar-detail .pd-action { margin-top: var(--sp-2); color: var(--ember); font-family: var(--font-mono); font-size: var(--fs-small); }
+.pillar-detail .pd-meta { margin-top: var(--sp-2); display: flex; gap: var(--sp-4); color: var(--ink-faint); }
+.pillar-detail .pd-conf { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.08em; text-transform: uppercase; }
+@media (prefers-reduced-motion: no-preference) {
+  .pillar-detail { animation: pd-open var(--dur) var(--ease-out); }
+  @keyframes pd-open { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+}
+
+/* Consistency band — discipline strip, not a peer tile */
+.band {
+  margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: var(--border-hair);
+  display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;
+  width: 100%; cursor: pointer; background: transparent; text-align: left; color: inherit;
+}
+.band .meter { flex: 1; min-width: 120px; height: 3px; background: var(--rule); border-radius: 3px; overflow: hidden; }
+.band .meter i { display: block; height: 100%; background: var(--ember); transition: width var(--dur) var(--ease-out); }
+.band-val { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-muted); }
+
+.boardline {
+  margin-top: var(--sp-4); font-family: var(--font-serif); font-style: italic;
+  font-size: var(--fs-quote); line-height: 1.4; color: var(--ink-muted); max-width: var(--measure);
+}
+
+/* Foot + states */
+.cockpit-foot { margin-top: var(--sp-5); display: flex; gap: var(--sp-5); flex-wrap: wrap; align-items: baseline; }
+.cockpit-foot a { color: var(--ink-faint); text-decoration: none; }
+.cockpit-foot a:hover { color: var(--ember); }
+.cockpit-foot .asof { margin-left: auto; color: var(--ink-faint); }
+.cockpit-error { margin-top: var(--sp-4); color: var(--ink-muted); font-family: var(--font-mono); font-size: var(--fs-small); }
+
+/* Loading shimmer (calm, not a spinner) */
+.shimmer { color: var(--ink-faint); }
+@media (prefers-reduced-motion: no-preference) {
+  .shimmer { animation: pulse 1.6s var(--ease-inout) infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.9; } }
+  .panel { opacity: 0; animation: rise var(--dur-slow) var(--ease-out) 0.06s forwards; }
+  @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+}
+.cockpit[data-state="ready"] .shimmer { animation: none; }
+
+/* ── Desktop: the deep read gets two columns for the domains ─────────────── */
+@media (min-width: 680px) {
+  .domains { grid-template-columns: 1fr 1fr; }
+  .domain { border-top: 0; }
+  .panel-body { padding: var(--sp-7) var(--sp-7) var(--sp-6); }
+  .spine { width: calc(var(--spine-width) + 8px); }
+}
+
+/* View-transition naming for the door + hub (door-to-door continuity) */
+@media (prefers-reduced-motion: no-preference) {
+  .panel { view-transition-name: cockpit-panel; }
+}

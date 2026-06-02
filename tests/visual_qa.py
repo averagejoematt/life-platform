@@ -60,12 +60,44 @@ KNOWN_JS_ISSUES = {
 # (per docs/SPEC_CYCLE_PAUSE_VIZ_2026_05_03.md — 6 observatory pages, 11 charts).
 # Default 30d/90d window WILL intersect Apr 12 → May 1, so band must be visible.
 PAGES = [
+    # ── v4 "Measured Life" doors (Story / Cockpit / Evidence) ──────────────
+    # NOTE (v4 cutover): the deep entries below still point at old URLs. Post-
+    # cutover they 301 into /legacy/* (preserved verbatim) — repoint them to
+    # /legacy/<path> in a follow-up sweep, or drop them as each is rebuilt.
     {
         "path": "/",
-        "name": "Homepage",
+        "name": "Story (door)",
+        "wait_for": ".constellation svg .node",
         "checks": [
-            {"selector": ".h-gauge__num", "min_count": 6, "not_empty": True, "desc": "6 gauge numbers with values"},
-            {"selector": ".h-obs-card__metric", "not_empty": True, "desc": "observatory tile metrics populated"},
+            {"selector": ".constellation svg .node", "min_count": 7, "desc": "all 7 pillar nodes drawn in the constellation"},
+            {"selector": ".hero-elena", "not_empty": True, "desc": "Elena hero line populated"},
+            {"selector": ".beat", "min_count": 4, "desc": "scrollytelling beats present"},
+        ],
+    },
+    {
+        "path": "/now",
+        "name": "Cockpit (door)",
+        "wait_for": '[data-bind="level"]',
+        "checks": [
+            {"selector": ".big", "not_empty": True, "desc": "character level rendered"},
+            {"selector": ".voice.machine .what", "not_empty": True, "desc": "the Chair's verdict rendered"},
+            {"selector": ".row", "min_count": 1, "desc": "at least one pillar row"},
+        ],
+    },
+    {
+        "path": "/evidence/",
+        "name": "Evidence (door index)",
+        "wait_for": ".ev-card",
+        "checks": [
+            {"selector": ".ev-card", "min_count": 10, "desc": "evidence index cards present"},
+        ],
+    },
+    {
+        "path": "/evidence/supplements/",
+        "name": "Evidence — supplements (readout)",
+        "wait_for": "[data-readout]",
+        "checks": [
+            {"selector": "[data-readout]", "not_empty": True, "desc": "supplements readout rendered"},
         ],
     },
     {
