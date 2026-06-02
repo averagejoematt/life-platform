@@ -75,7 +75,7 @@ def classify(url: str) -> str | None:
 
 def new_url(url: str, dest: str) -> str:
     if dest == "cockpit":
-        return "/now"
+        return "/now/"   # trailing slash: bare /now 302s to /site/now/ via the S3 origin
     if dest == "story":
         return "/"
     if dest == "evidence":
