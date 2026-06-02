@@ -173,7 +173,7 @@ PLATFORM_FACTS = {
     "module_count":     31,       # fallback: all mcp/*.py except __init__.py
     "secret_count":     9,        # active secrets (webhook-key deleted 2026-03-14, google-calendar deleted 2026-03-15)
     "alarm_count":      49,
-    "data_sources":     19,       # google_calendar retired (ADR-030, v3.7.46)
+    "data_sources":     20,       # google_calendar retired (ADR-030); hevy active (ADR-060)
     "cdk_stacks":       8,
     "iam_roles":        43,
 

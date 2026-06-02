@@ -1,3 +1,24 @@
+## v8.3.0 — 2026-06-02 (v4 polish: world-class QA sweep, /subscribe re-skin, RSS generator)
+
+Front-end hardening pass over the live v4 site (engine untouched except read-only/graceful edits):
+
+### Added
+- **`/story/` writing hub** — chronicle · AI lab notes · journal · timeline · about (master-detail, `dispatches.js` + `scripts/v4_build_dispatches.py`); "the story" in every door's nav. Renamed from the short-lived `/dispatches/` (301s). Home (`/`) is a separate cinematic landing. (ADR-071)
+- **`/subscribe` re-skinned to v4** — new `assets/css/subscribe.css`; form/flow preserved.
+- **RSS generator** — `scripts/v4_build_rss.py` builds `rss.xml` from the live chronicle (correct pubDates, deep-links into `/story/chronicle/`); wired into `sync_site_to_s3.sh`.
+- **Dual units (kg · lb)** across all weights; full habits registry inline; constellation pillars + story beats link into the site.
+
+### Fixed
+- **Mobile overflow eliminated** on every page (topbar nav, Evidence tile-strip grid blowout, wide tables) — 0 page-overflow at 320–414px.
+- **`/story/` back/forward routing** (stale `/dispatches/` popstate regex).
+- **Graceful API empty-states** — `nutrition_overview`/`correlations`/`habit_streaks`/`supplements`/`genome_risks` return shaped-empty `200` instead of `503` on sparse data (ADR-073). *(committed; deploys via CI/CD production gate)*
+- Accessibility: focus-visible parity, chart aria trend summaries, consistent toggle sizing.
+
+### Changed
+- **Experiment restart now zeroes the accountability ledger** (`deploy/restart_ledger_reset.py`, wired into `restart_pipeline.py`) — ADR-072.
+
+---
+
 ## [v4 "The Measured Life"] — 2026-06-01 (DEPLOYED LIVE)
 
 Front-end rebuild into the locked Direction 05 design system — one engine, three doors — with the old site preserved verbatim under `/legacy`. Cut over via `deploy/v4_cutover.sh` + CloudFront redirect function; rolled back once same-day, root-caused (CSP-blocked fonts, scroll-reveal hiding content, raw error sentinels), fixed, and re-deployed. Then extended to full completeness:

@@ -1,6 +1,8 @@
 # Life Platform — Architecture
 
-Last updated: 2026-06-02 (v7.21.0 — 133 tools, 38-module MCP package, 19 data sources, 73 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed). **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **three doors:** Cockpit (`/now/`, live data), Story (`/story/`, the writing hub), Evidence (`/evidence/`, the data archive); the pre-v4 site is preserved verbatim at `/legacy`. **140 MCP tools across 29 `tools_*.py` modules** (`grep -c '"name":' mcp/registry.py` is source of truth). **80 Lambdas in us-west-2 + 5 in us-east-1 = 85 total** (`life-platform-cost-governor` projects the $75/mo budget tier — ADR-063). 20 data sources (`hevy` active). 14 active secrets. ~92 CloudWatch alarms. 8 CDK stacks deployed. Shared layer **v71** (mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`). **73 ADRs** (ADR-001 → ADR-073; newest: ADR-071 v4 front-end, ADR-072 restart ledger reset, ADR-073 graceful shaped-empty 200s). S3 default encryption AES256 (KMS CMK scheduled for deletion 2026-06-16; ADR-053/054). SIMP-2 framework adopted by 8 of 14 ingestion Lambdas (ADR-056). Genesis date: 2026-05-30 (`lambdas/constants.py:EXPERIMENT_START_DATE`). Live IAM-role count: `aws iam list-roles --query 'Roles[?starts_with(RoleName, \`life-platform-\`)]'`.
+Last updated: 2026-06-02 (v8.3.0 — 133 tools, 38-module MCP package, 20 data sources, 73 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed).
+
+> **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **three doors:** Cockpit (`/now/`, live data), Story (`/story/`, the writing hub), Evidence (`/evidence/`, the data archive); the pre-v4 site is preserved verbatim at `/legacy`. Shared layer **v71**. **73 ADRs** (ADR-001 → ADR-073; newest: ADR-071 v4 front-end, ADR-072 restart ledger reset, ADR-073 graceful shaped-empty 200s). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
 ---
 
@@ -45,14 +47,14 @@ The life platform is a personal health intelligence system built on AWS. It inge
 │  nutrition-review (Sat 9am) · anomaly-detector (8:05am)     │
 │  freshness-checker (9:45am) · insight-email-parser (S3 trig)│
 │                                                             │
-│  WEB LAYER                                                  │
-│  averagejoematt.com (72 pages) · CloudFront → S3 /site      │
-│  site-api Lambda (us-west-2): /api/ask · /api/board_ask     │
-│  /api/verify_subscriber · /api/vitals · /api/journey        │
-│  /api/character · /api/timeline · /api/correlations         │
-│  dash.averagejoematt.com → S3 /dashboard (Lambda@Edge auth) │
-│  blog.averagejoematt.com → S3 /blog (Elena Voss Chronicle)  │
-│  buddy.averagejoematt.com → S3 /buddy (Tom accountability)  │
+│  WEB LAYER — v4 "The Measured Life" (ADR-071)              │
+│  averagejoematt.com · CloudFront E3S424OXQZ8NBE → S3 /site  │
+│  Three doors: / (landing) · /now/ (Cockpit) ·              │
+│    /story/ (the writing) · /evidence/ (data archive)        │
+│  Old site preserved at /legacy (private; 301s via the       │
+│    v4-redirects CF function from redirects.map)             │
+│  site-api Lambda (read-only): /api/ask · /api/board_ask ·   │
+│    /api/pulse · /api/journey · /api/workouts · /api/labs …  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
