@@ -28,7 +28,7 @@ LEGACY_DIR = Path("site/legacy")
 # Top-level segment (of the ORIGINAL url) -> v4 destination.
 RULES: dict[str, str] = {
     # Cockpit — daily state, score, time-views
-    "character": "cockpit", "observatory": "cockpit", "live": "cockpit",
+    "character": "cockpit", "observatory": "cockpit",
     "week": "cockpit", "weekly": "cockpit", "recap": "cockpit",
     "status": "cockpit", "achievements": "cockpit",
     # Story — narrative, journey, the cast, public face
@@ -46,7 +46,7 @@ RULES: dict[str, str] = {
     "challenges": "evidence", "benchmarks": "evidence", "methodology": "evidence",
     "intelligence": "evidence", "predictions": "evidence", "stack": "evidence",
     "board": "evidence", "coaches": "evidence", "ledger": "evidence",
-    "discoveries": "evidence", "accountability": "evidence",
+    "discoveries": "evidence", "accountability": "evidence", "live": "evidence",
     "kitchen": "evidence", "results": "evidence", "cost": "evidence",
     "explorer": "evidence", "data": "evidence", "tools": "evidence",
     "platform": "evidence", "ask": "evidence",
@@ -83,7 +83,7 @@ def new_url(url: str, dest: str) -> str:
                 "field-notes": "/#dispatches/labnotes", "first-person": "/#dispatches/labnotes"}
         return deep.get(seg_of(url), "/")   # narrative URLs deep-link to the Dispatches reader
     if dest == "evidence":
-        remap = {"coaches": "board", "accountability": "vices"}
+        remap = {"coaches": "board", "accountability": "vices", "live": "vitals"}
         seg = seg_of(url)
         return f"/evidence/{remap.get(seg, seg)}/"   # collapse subpaths; remap rehomed slugs
     if dest == "legacy":
