@@ -206,6 +206,7 @@ body { overflow-x: hidden; }
 /* ── Narrow-screen topbar: stop the doors nav overflowing ~375px ──────────── */
 @media (max-width: 480px) {
   .story-top { padding: var(--sp-3) var(--sp-4); gap: var(--sp-3); }
+  .brand-door { display: none; }   /* drop the section tag; keep wordmark + nav */
   .doors { gap: var(--sp-3); }
   .doors a { font-size: 0.625rem; letter-spacing: 0.04em; }
 }
