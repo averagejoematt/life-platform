@@ -51,8 +51,12 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 
 .theme-toggle {
   appearance: none; cursor: pointer; background: transparent;
-  border: var(--border-hair); border-radius: 50%; width: 30px; height: 30px;
+  border: var(--border-hair); border-radius: 50%; width: 28px; height: 28px;
   display: grid; place-items: center;
+}
+/* keyboard focus parity with the other doors (pillar rows are <button>s) */
+.row:focus-visible, .theme-toggle:focus-visible, .scope-btn:focus-visible, .cockpit-foot a:focus-visible {
+  outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs);
 }
 .theme-dot {
   width: 13px; height: 13px; border-radius: 50%;
@@ -196,6 +200,7 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .cockpit-foot { margin-top: var(--sp-5); display: flex; gap: var(--sp-5); flex-wrap: wrap; align-items: baseline; }
 .cockpit-foot a { color: var(--ink-faint); text-decoration: none; }
 .cockpit-foot a:hover { color: var(--ember); }
+.cockpit-foot .cockpit-follow { color: var(--ember); }
 .cockpit-foot .asof { margin-left: auto; color: var(--ink-faint); }
 .cockpit-error { margin-top: var(--sp-4); color: var(--ink-muted); font-family: var(--font-mono); font-size: var(--fs-small); }
 
