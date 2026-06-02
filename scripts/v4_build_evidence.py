@@ -27,38 +27,43 @@ OUT = Path("site/evidence")
 
 # slug, title, blurb, group, mode, endpoint, root(json key or None), legacy
 REGISTRY = [
-    # ── Protocol & inputs ──────────────────────────────────────────────────
-    ("nutrition",   "Nutrition",   "Intake, macros, and how the plate tracks against the deficit.", "Protocol & inputs", "data", "/api/observatory_week?domain=nutrition", None, "/legacy/nutrition/"),
-    ("training",    "Training",    "The work: sessions, load, and how movement scores accrue.",     "Protocol & inputs", "data", "/api/observatory_week?domain=training",   None, "/legacy/training/"),
-    ("sleep",       "Sleep",       "Duration, quality, and the recovery it does (or doesn't) buy.",  "Protocol & inputs", "data", "/api/observatory_week?domain=sleep",      None, "/legacy/sleep/"),
-    ("supplements", "Supplements", "What's taken, why, and what the evidence actually supports.",     "Protocol & inputs", "data", "/api/supplements", None, "/legacy/supplements/"),
-    ("protocols",   "Protocols",   "Active protocols — the deliberate interventions under test.",     "Protocol & inputs", "data", "/api/protocols", None, "/legacy/protocols/"),
-    ("habits",      "Habits",      "The daily adherence layer the consistency pillar is built on.",   "Protocol & inputs", "data", "/api/habits", None, "/legacy/habits/"),
-    ("stack",       "The stack",   "The hardware and services feeding the experiment.",               "Protocol & inputs", "archive", None, None, "/legacy/stack/"),
-    ("kitchen",     "The kitchen", "How the food actually gets made on a deficit.",                   "Protocol & inputs", "archive", None, None, "/legacy/kitchen/"),
-    # ── Body & biomarkers ──────────────────────────────────────────────────
-    ("labs",        "Bloodwork",   "Lab panels over time — the inside view the wearables can't see.",  "Body & biomarkers", "data", "/api/labs", None, "/legacy/labs/"),
-    ("biology",     "Biology",     "Genome and baseline biology context behind the numbers.",          "Body & biomarkers", "archive", None, None, "/legacy/biology/"),
-    ("glucose",     "Glucose",     "Continuous glucose: meal response and metabolic flexibility.",      "Body & biomarkers", "archive", None, None, "/legacy/glucose/"),
-    ("physical",    "Physical",    "Body composition, measurements, and the physical trend.",           "Body & biomarkers", "data", "/api/observatory_week?domain=physical", None, "/legacy/physical/"),
-    ("mind",        "Mind",        "Mood, stress, and the autonomic picture.",                          "Body & biomarkers", "data", "/api/observatory_week?domain=mind", None, "/legacy/mind/"),
-    ("benchmarks",  "Benchmarks",  "Where the numbers sit against age-band and centenarian targets.",   "Body & biomarkers", "archive", None, None, "/legacy/benchmarks/"),
-    ("predictions", "Predictions", "The model's forward calls — logged, then scored against reality.",  "Body & biomarkers", "data", "/api/predictions", None, "/legacy/predictions/"),
-    # ── Method & machine ───────────────────────────────────────────────────
-    ("experiments", "Experiments", "The N=1 instrument: hypotheses run as read-only proof.",            "Method & machine", "data", "/api/experiments", None, "/legacy/experiments/"),
-    ("challenges",  "Challenges",  "Time-boxed challenges — read-only here, by design.",                "Method & machine", "archive", None, None, "/legacy/challenges/"),
-    ("methodology", "Methodology", "How the scoring, pillars, and confidence rules actually work.",      "Method & machine", "archive", None, None, "/legacy/methodology/"),
-    ("intelligence","Intelligence","Cross-source correlations the engine surfaces (correlative only).",  "Method & machine", "data", "/api/correlations", None, "/legacy/intelligence/"),
-    ("results",     "Results",     "Outcomes to date — what moved, what didn't.",                       "Method & machine", "archive", None, None, "/legacy/results/"),
-    ("cost",        "Cost",        "What running this costs to run — the radical-accessibility receipt.","Method & machine", "archive", None, None, "/legacy/cost/"),
-    ("data",        "Data sources","Every source feeding the platform, and its freshness.",             "Method & machine", "archive", None, None, "/legacy/data/"),
-    ("platform",    "The platform","The architecture behind the three doors.",                          "Method & machine", "archive", None, None, "/legacy/platform/"),
-    ("tools",       "Tools",       "The MCP tools Claude uses to read the data back.",                  "Method & machine", "archive", None, None, "/legacy/tools/"),
-    ("explorer",    "Explorer",    "Browse the raw daily record yourself.",                             "Method & machine", "archive", None, None, "/legacy/explorer/"),
-    ("ask",         "Ask the data","Put a question to the experiment's data directly.",                 "Method & machine", "archive", None, None, "/legacy/ask/"),
+    # ── The body ───────────────────────────────────────────────────────────
+    ("physical",    "Body composition", "DEXA: body fat, lean mass, visceral fat, bone density, biological age.", "The body", "data", "/api/physical_overview", None, "/legacy/physical/"),
+    ("labs",        "Bloodwork",   "153 biomarkers over time — the inside view the wearables can't see.", "The body", "data", "/api/labs", None, "/legacy/labs/"),
+    ("glucose",     "Glucose & meals", "Continuous glucose married to what you ate — peak, rise, return.", "The body", "data", "/api/glucose", None, "/legacy/glucose/"),
+    ("sleep",       "Sleep",       "Score, efficiency, deep/REM, HRV, and the recovery it buys.",        "The body", "data", "/api/sleep_detail", None, "/legacy/sleep/"),
+    ("training",    "Training & workouts", "Sessions, Zone-2, strain, steps, and strength 1RMs.",          "The body", "data", "/api/training_overview", None, "/legacy/training/"),
+    ("nutrition",   "Nutrition",   "Intake, macros, frequent meals, and protein sources vs the deficit.", "The body", "data", "/api/nutrition_overview", None, "/legacy/nutrition/"),
+    # ── Mind & accountability ──────────────────────────────────────────────
+    ("mind",        "Mind & inner life", "Mood, journal, temptations resisted, and meditation.",          "Mind & accountability", "data", "/api/mind_overview", None, "/legacy/mind/"),
+    ("habits",      "Habits",      "The daily adherence layer the Consistency pillar is built on.",       "Mind & accountability", "data", "/api/habits", None, "/legacy/habits/"),
+    ("vices",       "Vice streaks", "Days held across the tracked vices — shown honestly, named privately.", "Mind & accountability", "data", "/api/vice_streaks", None, "/legacy/accountability/"),
+    ("ledger",      "The ledger",  "Skin in the game — bounties earned, punishments donated.",            "Mind & accountability", "data", "/api/ledger", None, "/legacy/ledger/"),
+    # ── Protocol & experiments ─────────────────────────────────────────────
+    ("supplements", "Supplements", "What's taken, why, and what the evidence actually supports.",         "Protocol & experiments", "data", "/api/supplements", None, "/legacy/supplements/"),
+    ("protocols",   "Protocols",   "Active deliberate interventions under test.",                         "Protocol & experiments", "data", "/api/protocols", None, "/legacy/protocols/"),
+    ("experiments", "Experiments", "The N=1 instrument: hypotheses run as read-only proof.",              "Protocol & experiments", "data", "/api/experiments", None, "/legacy/experiments/"),
+    ("challenges",  "Challenges",  "Time-boxed challenges — activated, completed, XP earned. Read-only.", "Protocol & experiments", "data", "/api/challenges", None, "/legacy/challenges/"),
+    ("discoveries", "Discoveries", "Active hypotheses and the findings the engine surfaces.",             "Protocol & experiments", "data", "/api/discoveries", None, "/legacy/discoveries/"),
+    # ── Credibility & the machine ──────────────────────────────────────────
+    ("board",       "The board",   "The named AI experts who argue about the data — reads & roster.",     "Credibility & the machine", "data", "/api/coaching-dashboard", None, "/legacy/coaches/"),
+    ("intelligence","Intelligence","Cross-source correlations the engine surfaces (correlative only).",   "Credibility & the machine", "data", "/api/correlations", None, "/legacy/intelligence/"),
+    ("predictions", "Predictions", "The model's forward calls — logged, then scored against reality.",    "Credibility & the machine", "data", "/api/predictions", None, "/legacy/predictions/"),
+    ("benchmarks",  "Benchmarks",  "Where the numbers sit vs age-band and centenarian targets.",          "Credibility & the machine", "data", "/api/benchmark_trends", None, "/legacy/benchmarks/"),
+    ("biology",     "Biology & genome", "Genome risk by category — the baseline biology behind the numbers.", "Credibility & the machine", "data", "/api/genome_risks", None, "/legacy/biology/"),
+    ("methodology", "Methodology", "How the scoring, pillars, and confidence rules actually work.",        "Credibility & the machine", "archive", None, None, "/legacy/methodology/"),
+    ("cost",        "Cost",        "What running this costs to run — the radical-accessibility receipt.", "Credibility & the machine", "archive", None, None, "/legacy/cost/"),
+    ("data",        "Data sources","Every source feeding the platform, and its freshness.",              "Credibility & the machine", "archive", None, None, "/legacy/data/"),
+    ("platform",    "The platform","The architecture behind the three doors.",                           "Credibility & the machine", "archive", None, None, "/legacy/platform/"),
+    ("results",     "Results",     "Outcomes to date — what moved, what didn't.",                        "Credibility & the machine", "archive", None, None, "/legacy/results/"),
+    ("stack",       "The stack",   "The hardware and services feeding the experiment.",                  "Credibility & the machine", "archive", None, None, "/legacy/stack/"),
+    ("kitchen",     "The kitchen", "How the food actually gets made on a deficit.",                      "Credibility & the machine", "archive", None, None, "/legacy/kitchen/"),
+    ("tools",       "Tools",       "The MCP tools Claude uses to read the data back.",                   "Credibility & the machine", "archive", None, None, "/legacy/tools/"),
+    ("explorer",    "Explorer",    "Browse the raw daily record yourself.",                              "Credibility & the machine", "archive", None, None, "/legacy/explorer/"),
+    ("ask",         "Ask the data","Put a question to the experiment's data directly.",                  "Credibility & the machine", "archive", None, None, "/legacy/ask/"),
 ]
 
-GROUP_ORDER = ["Protocol & inputs", "Body & biomarkers", "Method & machine"]
+GROUP_ORDER = ["The body", "Mind & accountability", "Protocol & experiments", "Credibility & the machine"]
 
 # Self-hosted fonts (CSP: font-src 'self') — never the blocked Google CDN.
 FONTS = '<link rel="stylesheet" href="/assets/css/fonts.css">'
