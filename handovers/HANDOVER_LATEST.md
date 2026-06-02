@@ -27,7 +27,7 @@
 
 ## Validation + cutover
 
-- **Migration gate:** `scripts/v4_migration_inventory.py` now scans the preserved `site/legacy/` tree → **cockpit 8 · story 37 · evidence 30 · legacy 9 · 0 unmapped** (matches the map exactly). Writes `redirects.map` (**83** 301s; all evidence targets verified to exist). Wire into `ci-cd.yml` as a gate.
+- **Migration gate:** `scripts/v4_migration_inventory.py` now scans the preserved `site/legacy/` tree → **cockpit 8 · story 37 · evidence 30 · legacy 9 · 0 unmapped** (matches the map exactly). Writes `redirects.map` (**83** 301s; all evidence targets verified to exist). Enforced by a dedicated, deploy-free workflow `.github/workflows/v4-gate.yml` (PRs to main + pushes to main; self-skips pre-relocation) — kept OUT of the Lambda deploy pipeline (`ci-cd.yml`) on purpose.
 - **a11y tests:** `tests/test_site_a11y_landmarks.py` updated — original guarantees repointed to the preserved legacy pages; new tests pin skip-link + `<main>` + tokens (reduced-motion, light mode, ember) across the three doors. All site tests green.
 - **visual_qa:** `tests/visual_qa.py` PAGES updated with the three doors (+ supplements readout). It runs against the **live authenticated site post-deploy** (Playwright + cf-auth) — so it's a post-cutover check, not local. ⚠️ its deep legacy-page entries still use old URLs; repoint them to `/legacy/<path>` (or drop as each is rebuilt).
 - **Cutover:** `deploy/v4_cutover.sh` (Matthew runs; Claude does not). Pre-flight gates (inventory 0-unmapped, doors+tokens present, legacy ≥80 pages, HTML well-formed) → generates a CloudFront redirect Function from `redirects.map` → safe `site/` sync → invalidation → prints verify commands. **Rollback** documented in the header (git revert + re-deploy, or disassociate the CF function; S3 versioning retains prior objects).
@@ -42,5 +42,5 @@
 - **Evidence depth:** 14 archive topics + interactive ones (ask/explorer/tools) link to preserved legacy until rebuilt bespoke; deepen as time allows.
 - **Cockpit:** week/month/journey deeper series; human-voice daily reply source if/when published.
 - **visual_qa:** repoint legacy-page entries to `/legacy/`.
-- **Docs/CI:** wire the inventory gate into `ci-cd.yml`; run `python3 deploy/sync_doc_metadata.py --apply` (pre-commit hook also does this).
+- **Docs/CI:** migration gate runs via `.github/workflows/v4-gate.yml` (done); `python3 deploy/sync_doc_metadata.py --apply` run (pre-commit hook also does this).
 - Source-of-truth docs: `docs/{V4_DESIGN_CONSTITUTION,CLAUDE_DESIGN_BRIEF_V4,DESIGN_SYSTEM_V4_THE_MEASURED_LIFE,MIGRATION_MAP_V4}_2026_06_01.md`.

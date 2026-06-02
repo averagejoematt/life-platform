@@ -1,0 +1,65 @@
+# v4 "The Measured Life" front-end gate.
+# Deliberately separate from ci-cd.yml: this guards the static site (three doors
+# + /legacy coverage) and has NO AWS access and NO deploy capability. It runs on
+# PRs into main and on pushes to main, so the migration coverage can never
+# regress below 0-unmapped before/at the cutover. Self-skips until the /legacy
+# relocation exists, so it's a no-op for unrelated history.
+name: v4 site gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'scripts/v4_*.py'
+      - '.github/workflows/v4-gate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'scripts/v4_*.py'
+
+permissions:
+  contents: read
+
+jobs:
+  site-gate:
+    name: Migration coverage + HTML well-formedness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Migration coverage gate (0 unmapped)
+        run: |
+          if [ -d site/legacy ]; then
+            echo "::group::v4 migration inventory"
+            python3 scripts/v4_migration_inventory.py
+            echo "::endgroup::"
+          else
+            echo "site/legacy/ not present — v4 migration gate skipped (pre-relocation)."
+          fi
+
+      - name: HTML well-formedness (all of site/)
+        run: |
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          import glob, sys
+          bad = 0
+          for f in glob.glob("site/**/*.html", recursive=True):
+              try:
+                  HTMLParser(convert_charrefs=True).feed(open(f, encoding="utf-8").read())
+              except Exception as e:
+                  print(f"  PARSE FAIL {f}: {e}"); bad += 1
+          print(f"checked HTML files; {bad} parse error(s)")
+          sys.exit(1 if bad else 0)
+          PY
+
+      - name: Three v4 doors present
+        run: |
+          for f in site/index.html site/now/index.html site/evidence/index.html site/assets/css/tokens.css; do
+            test -f "$f" || { echo "::error::missing required v4 file: $f"; exit 1; }
+          done
+          echo "✓ Story, Cockpit, Evidence + tokens present"
