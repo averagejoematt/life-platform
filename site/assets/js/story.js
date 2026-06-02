@@ -38,6 +38,12 @@ const NODES = {
   relationships:{ x: 68,  y: 118, label: "People" },
   consistency:  { x: 180, y: 185, label: "Hold" },
 };
+// Each pillar in the hero links into its deeper Evidence page (the story → sub-pages).
+const NODE_LINK = {
+  sleep: "/evidence/sleep/", movement: "/evidence/training/", nutrition: "/evidence/nutrition/",
+  metabolic: "/evidence/glucose/", mind: "/evidence/mind/", relationships: "/evidence/mind/",
+  consistency: "/evidence/habits/",
+};
 // How the pillars pull on each other (the synthesis, drawn).
 const EDGES = [
   ["sleep", "movement"], ["sleep", "mind"], ["movement", "metabolic"],
@@ -81,7 +87,16 @@ function drawConstellation(pillars) {
     tLab.setAttribute("x", pos.x); tLab.setAttribute("y", pos.y + r + 12);
     tLab.textContent = pos.label;
     g.append(c, tScore, tLab);
-    nodeG.appendChild(g);
+    const href = NODE_LINK[name];
+    if (href) {
+      const a = document.createElementNS(SVGNS, "a");
+      a.setAttribute("href", href);
+      a.setAttribute("aria-label", `${pos.label} — open the evidence`);
+      a.appendChild(g);
+      nodeG.appendChild(a);
+    } else {
+      nodeG.appendChild(g);
+    }
   }
 }
 
