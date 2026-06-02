@@ -217,6 +217,29 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
   .spine { width: calc(var(--spine-width) + 8px); }
 }
 
+/* ── Journey scope: timeline + achievements ──────────────────────────────── */
+.journey { margin-top: var(--sp-5); }
+.jr-block { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: var(--border-hair); }
+.jr-block .cap { margin-bottom: var(--sp-3); }
+.ach-count { color: var(--ember); margin-left: var(--sp-2); }
+
+.timeline { list-style: none; }
+.tl-item { display: flex; gap: var(--sp-4); padding: var(--sp-3) 0 var(--sp-3) var(--sp-4); border-top: var(--honest-border); position: relative; }
+.tl-item:first-child { border-top: 0; }
+.tl-item::before { content: ""; position: absolute; left: 0; top: calc(var(--sp-3) + 6px); width: 6px; height: 6px; border-radius: 50%; background: var(--ember); }
+.tl-date { color: var(--ink-faint); width: 88px; flex-shrink: 0; padding-top: 1px; }
+.tl-title { font-family: var(--font-serif); font-size: var(--fs-h3); line-height: 1.15; }
+.tl-note { margin-top: var(--sp-1); color: var(--ink-muted); font-size: var(--fs-small); }
+.tl-empty { color: var(--ink-muted); font-family: var(--font-mono); font-size: var(--fs-small); padding: var(--sp-3) 0; }
+
+.ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--sp-2); }
+.ach { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); border: var(--border-hair); border-radius: var(--radius-sm); opacity: 0.5; }
+.ach.is-earned { opacity: 1; border-color: var(--ember-line); }
+.ach-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); flex-shrink: 0; }
+.ach.is-earned .ach-dot { background: var(--ember); }
+.ach-label { font-family: var(--font-mono); font-size: var(--fs-small); flex: 1; min-width: 0; }
+.ach-when { color: var(--ink-faint); }
+
 /* View-transition naming for the door + hub (door-to-door continuity) */
 @media (prefers-reduced-motion: no-preference) {
   .panel { view-transition-name: cockpit-panel; }
