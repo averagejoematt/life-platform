@@ -91,6 +91,7 @@ from web.site_api_common import (
 from web.site_api_observatory import (
     handle_nutrition_overview,
     handle_training_overview,
+    handle_workouts,
     handle_weekly_physical_summary,
     handle_protein_sources,
     handle_physical_overview,
@@ -376,6 +377,7 @@ ROUTES = {
     # Observatory pages
     "/api/nutrition_overview":  handle_nutrition_overview,
     "/api/training_overview":   handle_training_overview,
+    "/api/workouts":            handle_workouts,
     "/api/mind_overview":       handle_mind_overview,
     "/api/physical_overview":   handle_physical_overview,
     "/api/journal_analysis":    handle_journal_analysis,
