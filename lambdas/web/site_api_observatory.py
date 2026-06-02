@@ -47,7 +47,21 @@ def handle_nutrition_overview() -> dict:
 
     items = _query_source("macrofactor", d30, today)
     if not items:
-        return _error(503, "No nutrition data available.")
+        # Genesis week / no logging yet — return a shaped-but-empty 200 so the
+        # site renders an honest empty state instead of a console 503.
+        _empty_grp = {"avg_calories": None, "avg_protein_g": None, "avg_carbs_g": None,
+                      "avg_fat_g": None, "avg_fiber_g": None, "days": 0, "count": 0, "protein_hit_pct": 0}
+        return _ok({
+            "nutrition": {"avg_calories": None, "avg_protein_g": None, "avg_carbs_g": None,
+                          "avg_fat_g": None, "avg_fiber_g": None, "protein_target_g": 190,
+                          "protein_hit_pct": 0, "protein_hit_days": 0, "days_logged": 0,
+                          "tdee": None, "avg_deficit": None, "cal_7d_avg": None, "pro_7d_avg": None,
+                          "latest_date": today, "latest_calories": None, "latest_protein_g": None},
+            "nutrition_trend": [],
+            "weekday_vs_weekend": {"weekday": dict(_empty_grp), "weekend": dict(_empty_grp)},
+            "eating_window": None,
+            "periodization": {"training_day": dict(_empty_grp), "rest_day": dict(_empty_grp)},
+        }, cache_seconds=300)
 
     items.sort(key=lambda x: x.get("sk", ""))
 
@@ -678,7 +692,7 @@ def handle_protein_sources() -> dict:
 
     items = _query_source("macrofactor", d30, today)
     if not items:
-        return _error(503, "No nutrition data available.")
+        return _ok({"sources": [], "as_of_date": today}, cache_seconds=300)
 
     from collections import defaultdict
     # Aggregate protein contribution by food name
