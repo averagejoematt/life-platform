@@ -180,6 +180,17 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .coach-badge { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-mono); font-size: var(--fs-small); color: var(--coach, var(--ember)); border: 1px solid var(--coach, var(--ember-line)); background: color-mix(in oklch, var(--coach, var(--ember)) 10%, transparent); }
 .coach-name { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.1; }
 .coach-title { color: var(--ink-faint); text-transform: none; letter-spacing: 0; margin-top: 2px; }
+/* clickable expert picker + the selected coach's read */
+.coach-pick { cursor: pointer; text-align: left; width: 100%; font: inherit; }
+.coach-pick:hover { border-color: var(--coach, var(--ember)); }
+.coach-pick.is-active { background: color-mix(in oklch, var(--coach, var(--ember)) 12%, var(--surface)); border-left-width: 3px; }
+.coach-pick:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+.coach-read { margin-top: var(--sp-5); }
+.coach-detail .rd-prose { margin-top: var(--sp-3); color: var(--ink); font-size: var(--fs-body-lg); line-height: var(--lh-relaxed); max-width: var(--measure); }
+.coach-detail .dx-kicker { color: var(--ember); }
+.coach-tl { list-style: none; margin-top: var(--sp-2); }
+.coach-tl li { padding: var(--sp-2) 0; border-top: var(--border-hair); font-size: var(--fs-small); color: var(--ink-muted); }
+.coach-tl .label { color: var(--ink-faint); margin-right: var(--sp-2); }
 
 /* Archive topics — a real editorial card, not a thin stub */
 .rd-archive { margin-top: var(--sp-5); color: var(--ink-muted); font-family: var(--font-serif); font-style: italic;
