@@ -76,8 +76,10 @@ echo "  Hashed ${FILE_COUNT} files."
 
 # Update all HTML references to use hashed filenames
 if [[ -n "$SED_EXPR" ]]; then
-  echo "→ Updating HTML references..."
-  find "$BUILD_DIR" -name "*.html" -exec sed -i '' "$SED_EXPR" {} +
+  echo "→ Updating HTML references (excluding /legacy — its assets stay unhashed)..."
+  # v4: legacy/ is served verbatim with UNHASHED assets at /legacy/assets/*. Never
+  # rewrite its references to the hashed v4 names, or legacy CSS/JS 404s.
+  find "$BUILD_DIR" -name "*.html" -not -path "*/legacy/*" -exec sed -i '' "$SED_EXPR" {} +
   echo "  Done."
 fi
 
