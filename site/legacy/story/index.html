@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="robots" content="noindex">
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="The Story — why Matthew built an AI operating system for his body, and what happened next.">
+  <meta property="og:title" content="The Story — Matthew">
+  <meta property="og:description" content="Multiple relapses. One question: why does it keep coming back? The story behind the measured life experiment.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://averagejoematt.com/story/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="The Story — Matthew">
+  <meta name="twitter:description" content="Multiple relapses. One question: why does it keep coming back? The story behind the measured life experiment.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <title>Story — averagejoematt.com</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/legacy/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/legacy/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/legacy/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/legacy/assets/css/tokens.css">
+  <link rel="stylesheet" href="/legacy/assets/css/base.css">
+  <style>
+    /* /story/ — partial Front Page pattern. Page-scope additions only,
+       namespace .st- (story; .s- collides with sleep). */
+    .st-page { padding-top: var(--nav-height); }
+
+    .st-prose {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 56px;
+    }
+    .st-chapter { margin-bottom: var(--space-16); }
+    .st-chapter:last-child { margin-bottom: 0; }
+    .st-chapter__num {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-3);
+    }
+    .st-chapter__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+      margin-bottom: var(--space-6);
+    }
+    .st-chapter__body {
+      font-family: var(--font-serif);
+      font-size: 18px;
+      color: var(--text-muted);
+      line-height: 1.9;
+    }
+    .st-chapter__body p { margin-bottom: var(--space-5); }
+    .st-chapter__body p:last-child { margin-bottom: 0; }
+    .st-chapter__body strong { color: var(--text); font-weight: 600; }
+    .st-chapter__body em { color: var(--text); font-style: italic; }
+    .st-chapter__body a {
+      color: var(--accent);
+      border-bottom: 1px solid var(--accent-dim);
+      transition: border-color var(--dur-fast);
+    }
+    .st-chapter__body a:hover { border-color: var(--accent); }
+
+    .st-pullquote {
+      border-left: 3px solid var(--accent);
+      padding: var(--space-5) var(--space-7);
+      margin: var(--space-8) 0;
+      font-family: var(--font-serif);
+      font-size: 22px;
+      font-style: italic;
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    .st-divider {
+      border: none;
+      border-top: 1px solid var(--border-subtle);
+      margin: var(--space-12) 0;
+    }
+
+    .st-throughline {
+      margin: var(--space-8) 0;
+      padding: var(--space-4) var(--space-5);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+    }
+    .st-throughline__text { color: var(--text-muted); flex: 1; }
+    .st-throughline__link {
+      color: var(--accent);
+      text-decoration: none;
+      letter-spacing: var(--ls-tag);
+      white-space: nowrap;
+    }
+    .st-throughline__link:hover { text-decoration: underline; }
+
+    @media (max-width: 720px) {
+      .st-prose { padding: 28px 20px; }
+      .st-chapter__body { font-size: 16px; line-height: 1.75; }
+    }
+  </style>
+  <link rel="canonical" href="https://averagejoematt.com/story/">
+</head>
+<body class="body-story">
+
+<div id="amj-nav"></div>
+<div id="amj-hierarchy-nav"></div>
+
+<div class="fp-page st-page">
+
+  <!-- ═══ MASTHEAD ═══ -->
+  <header class="fp-masthead">
+    <div class="fp-masthead__top">
+      <div>
+        <div class="fp-masthead__brow">The Story · Vol I · Dispatch №01</div>
+        <div class="fp-masthead__title">STORY</div>
+      </div>
+      <div class="fp-masthead__meta">
+        <div id="st-date">—</div>
+        <div>~10 min read · Five chapters</div>
+      </div>
+    </div>
+    <div class="fp-masthead__strip">
+      <div>
+        <a href="/legacy/about/" style="color:inherit;text-decoration:none">← About</a>
+        <span class="fp-masthead__strip-sep">·</span>
+        Where this began
+        <span class="fp-masthead__strip-sep">·</span>
+        <a href="/legacy/character/" style="color:var(--accent-dim);text-decoration:none">Character →</a>
+      </div>
+      <div>Filed March 2026</div>
+    </div>
+  </header>
+
+  <!-- ═══ LEDE ═══ -->
+  <section class="fp-lede">
+    <div>
+      <div class="fp-lede__num-brow">Year</div>
+      <div class="fp-lede__num">2026</div>
+      <div class="fp-lede__num-cap">the experiment begins</div>
+    </div>
+    <div>
+      <div class="fp-lede__status fp-lede__status--strong">▸ The Origin · State: Ongoing</div>
+      <div class="fp-lede__narrative">
+        "Most people optimize in the dark — gut feelings, Instagram advice, someone's podcast take. I decided to build the infrastructure to know. This is what that actually looks like."
+      </div>
+      <div class="fp-lede__delta">
+        <span class="fp-lede__delta-label">The arc:</span>
+        <span class="fp-delta--bad">Start: <span data-const="journey.start_weight">307</span> lbs</span>
+        <span class="fp-delta--flat">Today: <span id="st-current-weight">—</span> lbs</span>
+        <span class="fp-delta--good">Goal: <span data-const="journey.goal_weight">185</span> lbs</span>
+        <span class="fp-delta--flat">Day <span id="st-day-x">—</span></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ PROSE BODY (chapters preserved from prior content) ═══ -->
+  <section class="st-prose">
+
+    <!-- Chapter 1 -->
+    <div class="st-chapter">
+      <p class="st-chapter__num">Chapter 01</p>
+      <h2 class="st-chapter__title">The Moment</h2>
+      <div class="st-chapter__body">
+        <p>
+          I've lost 100 pounds before. Multiple times. I know how to do it. I know the meal prep, the progressive overload, the morning walks that turn into rucks that turn into mountain trails. I know what it feels like when people start noticing. When old clothes fit again. When strangers at the gym nod at you like you belong there.
+        </p>
+        <p>
+          In May 2025, I was there. I'd spent nine months being ruthless — daily 5am gym sessions, clean eating for months on end, rucking Washington mountains with 25 pounds on my back, running 10-mile Saturday sessions and then lifting afterwards. I was stretching every day, doing everything right. I was down to 190 and felt like a different person. An old man at the gym came up to me and told me how determined I was. My girlfriend's dad said he couldn't recognize me. I bought myself a Rolex — not because I'm flashy, but because I'd never let myself have something like that, and I wanted a permanent reminder that I'd done it. I threw out every piece of large clothing I owned.
+        </p>
+        <p>
+          And then life happened. Within a few months, I lost a family member to cancer — the second time cancer had taken someone close to me. Work became uncertain in ways that affected not just me but people I was responsible for. The travel, the grief, the stress — each one alone might have been manageable. Together, they dismantled everything.
+        </p>
+        <p>
+          The slide didn't happen all at once. It never does. I was back home with my family after the loss, away from my routine, away from the gym that had anchored everything. The structure that held it all together was thousands of miles away. Coming back, I told myself I'd pick it up again. One DoorDash order — a gentleman's agreement with myself that it would be the last. Or I'd start Monday. Then the next Monday. Then the Mondays stopped meaning anything, and by the time I noticed, it wasn't five months that had gone by — it was a hundred pounds.
+        </p>
+        <p>
+          By March 2026, I stepped on the scale and saw 307.
+        </p>
+        <p>
+          The disappointment wasn't new. But this time there was something else underneath it — something heavier. I'd made promises to myself about this for years. Dozens of them. Too many to count, too many to trust. But the last one had been different — or I'd convinced myself it was. I'd bought the Rolex not as a reward but as a covenant: this time I meant it more than I'd ever meant anything I'd said to myself. And I still broke it.
+        </p>
+        <p>
+          If the most sincere, most deliberate promise I'd ever made to myself couldn't hold — how could I ever trust my own word again?
+        </p>
+        <p>
+          That's the real question this platform is trying to answer. Not "how do I lose weight again?" I know how. The question is: <strong>why does it keep coming back — and can a system catch what willpower can't?</strong>
+        </p>
+      </div>
+    </div>
+
+    <hr class="st-divider">
+
+    <!-- Chapter 2 -->
+    <div class="st-chapter">
+      <p class="st-chapter__num">Chapter 02</p>
+      <h2 class="st-chapter__title">The Problem With Previous Attempts</h2>
+      <div class="st-chapter__body">
+        <p>
+          The pattern goes back to my teens. I've cycled through this more times than I can count — months of relentless discipline followed by months of nothing. And within those good stretches, it wasn't just "eating well and going for walks." I was lifting 300+ pounds. Running 16 miles on a Saturday morning for fun. Playing sports at a competitive level. I thrive when I'm in that mode — physically, socially, mentally, everything clicks.
+        </p>
+        <p>
+          The trigger used to be the good times — beers, parties, the social gravity of being in your twenties. Now it's the opposite. The collapses come from isolation and eating alone at home. The mechanism changed, but the pattern didn't.
+        </p>
+        <p>
+          The worst chapter came when a promotion, a relocation to a city where I knew nobody, and my mum's stage 4 cancer diagnosis all landed at the same time. That was when the eating stopped being about hunger or convenience and became something else. A release. A way to feel something good in the middle of something terrible.
+        </p>
+
+        <div class="st-pullquote">
+          "Every previous attempt treated this as a weight problem. Calories in, calories out. But the weight was never the root issue. It was the coping mechanism."
+        </div>
+
+        <p>
+          Here's the pattern, if I'm honest about it: I can do the work. That's never been the issue. When I'm locked in, I'm relentless — 5am gym sessions, two-hour workouts, eating clean every day, no alcohol, running mountains on weekends. And maybe the fitness isn't just fitness. Maybe it's purpose. Maybe it puts everything else — the stress, the noise in my head — on standby. Because I don't notice it when I'm moving.
+        </p>
+        <p>
+          But the moment something disrupts that, it's not just the routine that breaks — it's like a switch flips. The prefrontal cortex goes offline and the limbic system takes over. Suddenly it's DoorDash at midnight, evenings lost to video games instead of reading, later and later nights — anything that delivers instant relief from whatever I was outrunning. The gym doesn't disappear because I'm lazy. It disappears because the thing it was holding at bay comes flooding back, and the dopamine hits are the only thing that quiets it.
+        </p>
+        <p>
+          The cruelest part is the embarrassment. When you've been visibly in shape — when people have congratulated you, when you've bought the watch and thrown out the clothes — regaining everything doesn't just feel like failure. It feels like fraud. The gap between who you were and who you are now becomes deafening. You don't want anyone who remembers the other version to see this one.
+        </p>
+      </div>
+    </div>
+
+    <hr class="st-divider">
+
+    <!-- Chapter 3 -->
+    <div class="st-chapter">
+      <p class="st-chapter__num">Chapter 03</p>
+      <h2 class="st-chapter__title">The Build</h2>
+      <div class="st-chapter__body">
+        <p>The first thing I built had nothing to do with a website.</p>
+        <p>
+          I'd been using AI for a while — first as something like a thinking partner, working through things alongside real therapy. Then for optimization: sleep protocols, supplement stacks, training plans. I've always been a systems person, someone who likes to understand how things connect.
+        </p>
+        <p>
+          But I noticed the same limitation every time. My prompts were getting more ambitious, but the feedback was still based on general evidence. I'd try to tailor it to my circumstances, but I was filtering everything through memory — which meant I was rationalizing before the AI even had a chance to help.
+        </p>
+        <p>
+          That's when the real insight landed. Every tracker I was already using had its own AI. Whoop analyzed my sleep. My CGM analyzed my glucose. MacroFactor analyzed my nutrition. But each one saw only its own slice — completely blind to what the other ten were picking up. And none of them touched the part that might matter most: the mental health layer. What I was writing in my journal. The emotional weight sitting underneath every other number. <strong>What if I could take those words — raw, what I actually felt — and cross-reference them with biometric data from ten different sources, then anchor all of it in scientific evidence? Not generic health advice. Something built specifically for me, from everything I am.</strong>
+        </p>
+        <p>
+          Once that door opened, my mind started spiraling. What about connecting my sleep data? My glucose? What if someone could read my journal entries and find patterns I couldn't see? What could we correlate between different domains? When I slip — and I always slip eventually — could the data tell me why?
+        </p>
+        <p>
+          Today it's <span data-const="platform.lambdas">62</span> Lambda functions, <span data-const="platform.data_sources">26</span> data sources, <span data-const="platform.mcp_tools">121</span> intelligence tools — the whole thing runs on AWS for about <span data-const="platform.monthly_cost">$19</span> a month.
+        </p>
+        <p>
+          I've been in IT my entire career — applications, data, operations, startups. I understand how systems fit together, even if it's been a long time since I built something myself. Claude handled the code. I handled the architecture, the product decisions, and every single deploy.
+        </p>
+        <p>
+          What I bring is the thing no language model can simulate: I know what it's like to be me. I know which patterns matter and which are noise. I know that my relationship with food isn't about macros — it's about coping. The platform I'm building isn't something a prompt could decode, because the person it's designed for is too specific, too contradictory, and too stubborn to fit in a template.
+        </p>
+        <div class="st-throughline">
+          <span class="st-throughline__text">See exactly how the platform is built — architecture, data flow, cost breakdown.</span>
+          <a href="/legacy/platform/" class="st-throughline__link">The Platform →</a>
+        </div>
+      </div>
+    </div>
+
+    <hr class="st-divider">
+
+    <!-- Chapter 4 -->
+    <div class="st-chapter">
+      <p class="st-chapter__num">Chapter 04</p>
+      <h2 class="st-chapter__title">What the Data Has Shown — So Far</h2>
+      <div class="st-chapter__body">
+        <p>
+          What I do have is history. Ten years of weight scale logs. Years of workout data, Strava runs, gym check-ins. When you plot it all on a graph, the pattern is unmistakable: this is a person who operates at either peak performance or severe under-performance. The scale chart looks like a stock ticker with accelerated market crashes — all-time highs followed by freefall. There is no middle.
+        </p>
+        <p>
+          What I don't have — what nobody has — is good data on my mind. My insight. My patterns of thought when things start to slip. How impactful is journaling, really? When I do it consistently, do the other numbers improve? When I stop, is there a measurable lag before the physical metrics follow?
+        </p>
+        <p>
+          That's what April 1 is for. The backfilled data tells the story of what happened. The platform is designed to tell me <strong>why</strong> — and, eventually, to catch it before it happens again.
+        </p>
+        <p>This chapter will grow as the data does.</p>
+        <div class="st-throughline">
+          <span class="st-throughline__text">Explore the real correlation data, FDR-corrected, as it accumulates.</span>
+          <a href="/legacy/explorer/" class="st-throughline__link">Data Explorer →</a>
+        </div>
+      </div>
+    </div>
+
+    <hr class="st-divider">
+
+    <!-- Chapter 5 -->
+    <div class="st-chapter">
+      <p class="st-chapter__num">Chapter 05</p>
+      <h2 class="st-chapter__title">Why Public</h2>
+      <div class="st-chapter__body">
+        <p>
+          I've noticed something about myself recently: I'm more willing to be honest about what I'm going through than I used to be. With friends, with family, with people I barely know. And every time I am, I find out they're dealing with something too. Different shape, same weight.
+        </p>
+        <p>
+          The public part isn't about performance. It's about a pattern I can't seem to break on my own: when things get hard, I disappear. I pull away from friends, cancel plans, stop answering texts. Not because I'm angry or antisocial — but because the gap between who I was a few months ago and who I am now feels too loud. I don't want anyone to see it.
+        </p>
+        <p>
+          Publishing everything removes that option. The numbers are right there. If my gym check-ins vanish for two weeks, that's visible. If my journal goes quiet, that's visible. The people who care about me won't have to wonder whether I've gone quiet because I'm busy or because I'm in a spiral. They'll know.
+        </p>
+        <p>
+          That might sound suffocating. Maybe it will be. But I want to try it — because the alternative is disappearing again, and I know exactly where that leads.
+        </p>
+        <p>
+          Every week, an AI journalist named Elena Voss reads <span data-const="platform.data_sources">26</span> data sources and writes a chronicle of what the numbers say. She doesn't soften bad weeks. She doesn't celebrate plateaus as progress. The point is that the data tells the truth, even when I don't want it to.
+        </p>
+        <p>You're welcome to watch.</p>
+        <div class="st-throughline">
+          <span class="st-throughline__text">Follow the weekly chronicle — every number, every failure, every week.</span>
+          <a href="/legacy/chronicle/" class="st-throughline__link">The Chronicle →</a>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ═══ CROSS-LINK FOOTER ═══ -->
+  <nav class="fp-cross-footer">
+    <div class="fp-cross-footer__prev"><a href="/legacy/about/">← About</a></div>
+    <div class="fp-cross-footer__mid">
+      Where this began, and why
+    </div>
+    <div class="fp-cross-footer__next"><a href="/legacy/character/">Character →</a></div>
+  </nav>
+
+</div>
+
+<div id="amj-subscribe"></div>
+<div id="amj-bottom-nav"></div>
+<div id="amj-footer"></div>
+
+<script src="/legacy/assets/js/site_constants.js"></script>
+<script src="/legacy/assets/js/components.js"></script>
+<script src="/legacy/assets/js/nav.js"></script>
+<script>
+(function() {
+  // Date stamp in masthead meta
+  var dEl = document.getElementById('st-date');
+  if (dEl) {
+    var d = new Date();
+    dEl.textContent = d.toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    }).toUpperCase();
+  }
+
+  // Live weight + day counter for lede delta
+  fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(d) {
+      if (!d) return;
+      var w = (d.vitals || {}).weight_lbs || (d.hero || {}).current_weight_lbs;
+      if (w) {
+        var el = document.getElementById('st-current-weight');
+        if (el) el.textContent = Math.round(w);
+      }
+      var daysIn = (d.journey || {}).days_in || (d.platform || {}).days_in;
+      var dxEl = document.getElementById('st-day-x');
+      if (dxEl) {
+        if (daysIn != null) {
+          dxEl.textContent = daysIn;
+        } else {
+          var msIn = Date.now() - new Date(((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25') + 'T07:00:00-07:00').getTime();
+          dxEl.textContent = msIn >= 0 ? Math.max(1, Math.floor(msIn / 86400000) + 1) : '—';
+        }
+      }
+    })
+    .catch(function() {});
+})();
+</script>
+<script src="/legacy/assets/js/animations.js" defer></script>
+</body>
+</html>

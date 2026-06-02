@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>averagejoematt v4 — direction 05 · The Measured Life</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400;1,9..144,500&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#16130E;--ink:#ECE3D2;--ink2:#A99F8C;--ink3:#6B6253;
+    --accent:#DD7A37;--rule:rgba(236,227,210,0.12);--tick:rgba(236,227,210,0.28);
+    --serif:'Fraunces',serif;--sans:'Instrument Sans',sans-serif;--mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-font-smoothing:antialiased}
+  body{background:#0E0C08;color:var(--ink);font-family:var(--sans);padding:40px 22px 64px;line-height:1.6}
+  .wrap{max-width:760px;margin:0 auto}
+  .lead{font-family:var(--mono);font-size:11px;letter-spacing:0.1em;color:#857C6C;margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:baseline}
+  .lead .n{color:var(--accent)}
+  .lead .nm{color:var(--ink);text-transform:uppercase;letter-spacing:0.16em;font-weight:500}
+
+  .panel{background:var(--bg);border:1px solid var(--rule);border-radius:10px;display:flex;overflow:hidden;
+    box-shadow:0 22px 50px rgba(0,0,0,0.32)}
+  .spine{width:46px;flex-shrink:0;position:relative;border-right:1px solid var(--rule);padding-top:18px}
+  .spine .d{font-family:var(--mono);font-size:9px;letter-spacing:0.12em;color:var(--ink3);text-align:center;transform:rotate(0)}
+  .spine::after{content:"";position:absolute;right:0;top:44px;bottom:18px;width:8px;
+    background:repeating-linear-gradient(to bottom,var(--tick) 0 1px,transparent 1px 15px)}
+  .body{flex:1;padding:28px 30px 24px;min-width:0}
+
+  .cap{font-family:var(--mono);font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:var(--ink3)}
+  .hub{display:flex;align-items:flex-end;gap:18px;margin-top:6px;flex-wrap:wrap}
+  .big{font-family:var(--mono);font-weight:500;font-size:84px;line-height:0.8;letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
+  .tier{font-family:var(--serif);font-weight:500;font-size:34px;line-height:1;color:var(--ink);padding-bottom:8px}
+  .honest{margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--ink2);border:1px dashed var(--rule);border-radius:3px;padding:5px 9px;display:inline-block;letter-spacing:0.02em}
+
+  .dialogue{margin-top:22px;padding-top:18px;border-top:1px solid var(--rule)}
+  .voice{display:flex;gap:12px;padding:7px 0}
+  .voice .who{font-family:var(--mono);font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink3);width:62px;flex-shrink:0;padding-top:5px}
+  .voice.machine .what{font-family:var(--mono);font-size:13.5px;line-height:1.55;color:var(--ink)}
+  .voice.machine .what b{color:var(--accent);font-weight:400}
+  .voice.human .what{font-family:var(--serif);font-style:italic;font-size:19px;line-height:1.4;color:var(--ink)}
+
+  .rows{margin-top:18px}
+  .row{display:flex;align-items:center;gap:14px;padding:11px 0;border-top:1px solid var(--rule)}
+  .row .lab{font-family:var(--mono);font-size:12px;color:var(--ink2);width:106px;flex-shrink:0;letter-spacing:0.04em}
+  .row .track{flex:1;height:2px;background:var(--rule);border-radius:2px;overflow:hidden}
+  .row .track i{display:block;height:100%;background:var(--ink3)}
+  .row.up .track i{background:var(--accent)}
+  .row .val{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:16px;width:30px;text-align:right}
+  .row .tr{font-family:var(--mono);font-size:12px;width:14px;text-align:center;color:var(--ink3)}
+  .row.up .tr{color:var(--accent)}.row.dn .tr{color:var(--ink2)}
+  .band{margin-top:16px;padding-top:15px;border-top:1px solid var(--rule);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .band .bl{font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink3)}
+  .band .meter{flex:1;min-width:120px;height:3px;background:var(--rule);border-radius:3px;overflow:hidden}
+  .band .meter i{display:block;height:100%;width:86%;background:var(--accent)}
+  .band .br{font-family:var(--mono);font-size:11px;color:var(--ink2)}
+
+  .sig{margin-top:16px;font-family:var(--mono);font-size:11px;color:#857C6C;letter-spacing:0.04em;display:flex;gap:18px;flex-wrap:wrap}
+  .sig b{color:var(--accent);font-weight:400}
+  @media (prefers-reduced-motion: no-preference){
+    .panel{opacity:0;animation:rise .7s cubic-bezier(.2,.7,.2,1) .08s forwards}
+    @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="lead"><span class="n">05</span><span class="nm">The Measured Life</span><span>— the consultants' synthesis · Logbook base + Dispatch scale + two signatures</span></div>
+
+  <div class="panel">
+    <div class="spine"><div class="d">062</div></div>
+    <div class="body">
+      <div class="cap">character level · today</div>
+      <div class="hub"><span class="big">41</span><span class="tier">Discipline</span></div>
+      <div class="honest">▼ 2 this week — down week: travel, two missed sessions. shown, not hidden.</div>
+
+      <div class="dialogue">
+        <div class="voice machine"><span class="who">The board</span><span class="what"><b>&rsaquo;</b> Protein's lagging on training days. Everything else holds — fix the post-lift meal and the week turns.</span></div>
+        <div class="voice human"><span class="who">Matthew</span><span class="what">Knew it. Felt flat in the gym, skipped the meal again. Logged it honestly instead of pretending.</span></div>
+      </div>
+
+      <div class="rows">
+        <div class="row up"><span class="lab">Movement</span><span class="track"><i style="width:80%"></i></span><span class="val">80</span><span class="tr">▲</span></div>
+        <div class="row dn"><span class="lab">Nutrition</span><span class="track"><i style="width:61%"></i></span><span class="val">61</span><span class="tr">▼</span></div>
+        <div class="row"><span class="lab">Sleep</span><span class="track"><i style="width:70%"></i></span><span class="val">70</span><span class="tr">›</span></div>
+      </div>
+      <div class="band"><span class="bl">Consistency</span><span class="meter"><i></i></span><span class="br">12-day streak</span></div>
+
+      <div class="sig"><span><b>signature 1</b> · the measuring-rule spine</span><span><b>signature 2</b> · the machine ↔ human dialogue (your Third Wall)</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

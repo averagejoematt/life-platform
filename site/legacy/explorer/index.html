@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="robots" content="noindex">
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Data Explorer — cross-domain intelligence from 26 data sources. Discover what predicts what.">
+  <meta property="og:title" content="Data Explorer — Matthew">
+  <meta property="og:description" content="Cross-domain intelligence — pick any two health metrics and see the real correlation. N=1 data science from 26 live sources.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta property="og:type" content="website">
+  <title>Data Explorer — Matthew</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/legacy/assets/icons/favicon.svg">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/legacy/assets/css/tokens.css">
+  <link rel="stylesheet" href="/legacy/assets/css/base.css">
+  <style>
+    .exp-header {
+      padding: var(--space-16) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+      max-width: var(--max-width); margin: 0 auto;
+    }
+    .exp-header__kicker { margin-bottom: var(--space-4); }
+    .exp-header__title {
+      font-family: var(--font-display); font-size: var(--text-h1);
+      line-height: var(--lh-display); letter-spacing: var(--ls-display); color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .exp-header__title span { color: var(--accent); }
+    .exp-header__subtitle {
+      font-family: var(--font-mono); font-size: var(--text-sm);
+      color: var(--accent-dim); letter-spacing: var(--ls-label);
+      margin-bottom: var(--space-4);
+    }
+    .exp-header__sub {
+      font-family: var(--font-mono); font-size: var(--text-base);
+      color: var(--text-muted); line-height: var(--lh-body); max-width: 600px;
+    }
+
+    /* Stats strip */
+    .exp-stats { display: flex; gap: var(--space-8); margin-top: var(--space-8); flex-wrap: wrap; }
+    .exp-stat { border-left: 2px solid var(--accent); padding-left: var(--space-4); }
+    .exp-stat__label { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-1); }
+    .exp-stat__value { font-family: var(--font-display); font-size: 28px; color: var(--text); letter-spacing: var(--ls-display); }
+
+    /* Explorer body */
+    .explorer-body { max-width: var(--max-width); margin: 0 auto; padding: var(--space-10) var(--page-padding) var(--space-20); }
+
+    /* 14a: Hero feature cards */
+    .hero-findings {
+      max-width: var(--max-width); margin: 0 auto;
+      padding: var(--space-12) var(--page-padding) var(--space-10);
+      border-bottom: 1px solid var(--border);
+    }
+    .hero-findings__kicker {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      color: var(--accent-dim); margin-bottom: var(--space-4);
+    }
+    .hero-findings__title {
+      font-family: var(--font-display); font-size: var(--text-h2);
+      letter-spacing: var(--ls-display); color: var(--text); margin-bottom: var(--space-8);
+    }
+    .hero-findings__title span { color: var(--accent); }
+    .hero-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: var(--space-4);
+    }
+    .hero-card {
+      border: 1px solid var(--border); background: var(--surface);
+      padding: var(--space-6); position: relative; overflow: hidden;
+      transition: border-color var(--dur-fast);
+    }
+    .hero-card:hover { border-color: var(--accent-dim); }
+    .hero-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--accent) 0%, transparent 100%);
+    }
+    .hero-card__headline {
+      font-family: var(--font-display); font-size: var(--text-h4);
+      letter-spacing: var(--ls-display); color: var(--text);
+      line-height: var(--lh-display); margin-bottom: var(--space-3);
+    }
+    .hero-card__evidence {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-label); color: var(--accent-dim);
+      margin-bottom: var(--space-3);
+    }
+    .hero-card__so-what {
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      color: var(--text-muted); line-height: var(--lh-mono);
+    }
+    .hero-card__link {
+      display: inline-block; margin-top: var(--space-3);
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      color: var(--accent); text-decoration: none;
+      transition: color var(--dur-fast);
+    }
+    .hero-card__link:hover { color: var(--text); }
+
+    /* 14b: Predictive section */
+    .predictive-section {
+      max-width: var(--max-width); margin: 0 auto;
+      padding: var(--space-10) var(--page-padding) var(--space-8);
+      border-bottom: 1px solid var(--border);
+    }
+    .predictive-section__kicker {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      color: var(--c-amber-500); margin-bottom: var(--space-4);
+    }
+    .predictive-section__title {
+      font-family: var(--font-display); font-size: var(--text-h2);
+      letter-spacing: var(--ls-display); color: var(--text); margin-bottom: var(--space-3);
+    }
+    .predictive-section__title span { color: var(--c-amber-500); }
+    .predictive-section__sub {
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      color: var(--text-muted); line-height: var(--lh-mono); margin-bottom: var(--space-8);
+      max-width: 520px;
+    }
+    .predictive-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: var(--space-4);
+    }
+    .predictive-card {
+      border: 1px solid var(--border); background: var(--surface);
+      padding: var(--space-5) var(--space-6); position: relative; overflow: hidden;
+      display: grid; grid-template-columns: auto 1fr; gap: var(--space-5); align-items: center;
+      transition: border-color var(--dur-fast); cursor: pointer;
+    }
+    .predictive-card:hover { border-color: var(--c-amber-400); }
+    .predictive-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--c-amber-500) 0%, transparent 100%);
+    }
+    .predictive-card__r {
+      font-family: var(--font-display); font-size: 36px; line-height: 1;
+      letter-spacing: var(--ls-display); min-width: 75px; text-align: center;
+    }
+    .predictive-card__text {
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      color: var(--text-muted); line-height: var(--lh-mono);
+    }
+    .predictive-card__text strong { color: var(--text); }
+    .predictive-card__lag {
+      font-size: var(--text-2xs); color: var(--c-amber-400);
+      letter-spacing: var(--ls-label); margin-top: var(--space-1);
+    }
+
+    /* 14d: Narrative anchor */
+    .narrative-anchor {
+      max-width: var(--max-width); margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .narrative-anchor__inner {
+      border-left: 3px solid var(--accent); padding-left: var(--space-6);
+      max-width: var(--prose-width);
+    }
+    .narrative-anchor__kicker {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      color: var(--accent-dim); margin-bottom: var(--space-3);
+    }
+    .narrative-anchor__text {
+      font-family: var(--font-mono); font-size: var(--text-sm);
+      color: var(--text-muted); line-height: 1.7;
+    }
+    .narrative-anchor__text strong { color: var(--text); }
+
+    /* 14h: Cross-domain callout */
+    .cross-domain-callout {
+      border: 1px solid var(--accent-dim); background: var(--accent-bg-subtle);
+      padding: var(--space-6); margin-bottom: var(--space-8); position: relative;
+      overflow: hidden;
+    }
+    .cross-domain-callout::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--accent) 0%, var(--c-amber-500) 50%, transparent 100%);
+    }
+    .cross-domain-callout__kicker {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      color: var(--accent); margin-bottom: var(--space-3);
+    }
+    .cross-domain-callout__text {
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      color: var(--text-muted); line-height: var(--lh-mono); max-width: var(--prose-width);
+    }
+    .cross-domain-callout__text strong { color: var(--text); }
+
+    /* 14e: Pick Two Metrics */
+    .pick-two {
+      border: 1px solid var(--border); background: var(--surface);
+      padding: var(--space-6); margin-bottom: var(--space-8);
+      position: relative; overflow: hidden;
+    }
+    .pick-two::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--accent) 0%, transparent 100%);
+    }
+    .pick-two__title {
+      font-family: var(--font-display); font-size: var(--text-h4);
+      letter-spacing: var(--ls-display); color: var(--text); margin-bottom: var(--space-4);
+    }
+    .pick-two__row {
+      display: flex; gap: var(--space-3); align-items: end; flex-wrap: wrap;
+    }
+    .pick-two__field { flex: 1; min-width: 180px; }
+    .pick-two__label {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      color: var(--text-muted); margin-bottom: var(--space-2); display: block;
+    }
+    .pick-two__select {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      color: var(--text); font-family: var(--font-mono); font-size: var(--text-xs);
+      padding: var(--space-3) var(--space-4); outline: none;
+      transition: border-color var(--dur-fast); appearance: none;
+      -webkit-appearance: none; cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2388a090' stroke-width='1.5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center;
+    }
+    .pick-two__select:focus { border-color: var(--accent); }
+    .pick-two__btn {
+      background: var(--accent); border: 1px solid var(--accent);
+      color: var(--bg); font-family: var(--font-mono); font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      padding: var(--space-3) var(--space-6); cursor: pointer;
+      transition: all var(--dur-fast); white-space: nowrap;
+    }
+    .pick-two__btn:hover { background: transparent; color: var(--accent); }
+    .pick-two__result {
+      margin-top: var(--space-6); padding: var(--space-5);
+      border-left: 3px solid var(--accent); background: var(--accent-bg-subtle);
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      color: var(--text-muted); line-height: var(--lh-mono);
+      display: none;
+    }
+    .pick-two__result.is-visible { display: block; }
+    .pick-two__result strong { color: var(--text); }
+
+    /* 14i: Elevated Submit Finding CTA */
+    .finding-cta {
+      margin-bottom: var(--space-8); padding: var(--space-6);
+      border: 1px solid var(--c-amber-500); background: var(--surface);
+      display: flex; align-items: center; justify-content: space-between;
+      gap: var(--space-4); flex-wrap: wrap; position: relative; overflow: hidden;
+    }
+    .finding-cta::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--c-amber-500) 0%, var(--accent-dim) 50%, transparent 100%);
+    }
+    .finding-cta__text {
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      color: var(--text-muted); line-height: var(--lh-mono);
+    }
+    .finding-cta__text strong { color: var(--text); }
+    .finding-cta__btn {
+      background: var(--c-amber-500); border: 1px solid var(--c-amber-500);
+      color: var(--bg); font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      padding: var(--space-2) var(--space-5); cursor: pointer;
+      transition: all var(--dur-fast); white-space: nowrap;
+    }
+    .finding-cta__btn:hover { background: transparent; color: var(--c-amber-500); }
+
+    /* Correlation cards grid */
+    .corr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--space-4); }
+
+    /* 14f: Visual hierarchy by significance */
+    .corr-card {
+      border: 1px solid var(--border); background: var(--surface);
+      transition: border-color var(--dur-fast); cursor: pointer; position: relative; overflow: hidden;
+    }
+    .corr-card:hover { border-color: var(--accent-dim); }
+    .corr-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--bar-color, var(--accent)) 0%, transparent 100%);
+    }
+    /* Strong FDR-significant: larger, more prominent */
+    .corr-card--prominent {
+      grid-column: span 1; border-color: var(--accent-dim);
+    }
+    .corr-card--prominent .corr-card__r { font-size: 56px; }
+    .corr-card--prominent .corr-card__header { border-bottom-color: var(--accent-dim); }
+    /* Negligible: muted, smaller */
+    .corr-card--muted {
+      opacity: 0.55; border-color: var(--border-subtle);
+    }
+    .corr-card--muted .corr-card__r { font-size: 36px; }
+    .corr-card--muted:hover { opacity: 0.8; }
+
+    .corr-card__header { padding: var(--space-5) var(--space-6); border-bottom: 1px solid var(--border-subtle); }
+    .corr-card__pair {
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      color: var(--text); line-height: var(--lh-mono);
+    }
+    .corr-card__pair em { color: var(--accent); font-style: normal; }
+    .corr-card__body { display: grid; grid-template-columns: auto 1fr; gap: var(--space-6); padding: var(--space-5) var(--space-6); align-items: center; }
+    .corr-card__r {
+      font-family: var(--font-display); font-size: 48px; line-height: 1;
+      letter-spacing: var(--ls-display); min-width: 90px; text-align: center;
+    }
+    .corr-card__r.positive { color: var(--accent); }
+    .corr-card__r.negative { color: #ff5252; }
+    .corr-card__r.weak { color: var(--text-muted); }
+    .corr-card__meta { display: flex; flex-direction: column; gap: var(--space-2); }
+    .corr-meta-row {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-label); color: var(--text-muted);
+    }
+    .corr-meta-row strong { color: var(--text); }
+    /* DPR-1.19: Discovery of the Week */
+    .dotw-section {
+      max-width: var(--max-width, 1200px);
+      margin: 0 auto;
+      padding: 0 var(--page-padding) var(--space-8);
+    }
+    .dotw-card {
+      border: 1px solid var(--accent);
+      border-left: 4px solid var(--accent);
+      background: linear-gradient(135deg, rgba(0,229,160,0.04), transparent 60%);
+      padding: var(--space-6) var(--space-8);
+    }
+    .dotw-card__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: var(--space-3);
+    }
+    .dotw-card__finding {
+      font-family: var(--font-display);
+      font-size: var(--text-lg);
+      color: var(--text);
+      line-height: 1.3;
+      margin-bottom: var(--space-2);
+    }
+    .dotw-card__interpretation {
+      font-family: var(--font-serif);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: var(--space-2);
+    }
+    .dotw-card__date {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-tag);
+    }
+    /* DPR-1.18: Plain-language interpretation */
+    .corr-card__interpretation {
+      padding: var(--space-3) var(--space-6);
+      border-top: 1px solid var(--border);
+      font-family: var(--font-serif);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: 1.5;
+      font-style: italic;
+    }
+    /* 14g: Observatory link in card */
+    .corr-card__obs-link {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      color: var(--accent-dim); text-decoration: none;
+      transition: color var(--dur-fast); margin-top: var(--space-1);
+      display: inline-block;
+    }
+    .corr-card__obs-link:hover { color: var(--accent); }
+
+    /* Strength bar */
+    .strength-bar { height: 3px; background: var(--surface-raised); margin-top: var(--space-2); overflow: hidden; }
+    .strength-bar__fill { height: 100%; transition: width 0.8s var(--ease-out); }
+
+    /* Filters */
+    .filter-row { display: flex; gap: var(--space-2); margin-bottom: var(--space-8); flex-wrap: wrap; }
+    .filter-chip {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      padding: var(--space-2) var(--space-4); border: 1px solid var(--border);
+      color: var(--text-muted); background: transparent; cursor: pointer;
+      transition: all var(--dur-fast);
+    }
+    .filter-chip:hover, .filter-chip.active {
+      border-color: var(--accent); color: var(--accent); background: var(--accent-bg-subtle);
+    }
+
+    /* Detail panel */
+    .detail-panel {
+      border: 1px solid var(--accent); background: var(--surface);
+      padding: var(--space-8); margin-bottom: var(--space-8);
+      display: none; position: relative;
+    }
+    .detail-panel::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--accent) 0%, var(--accent-dim) 50%, transparent 100%);
+    }
+    .detail-panel.is-open { display: block; }
+    .detail-close {
+      position: absolute; top: var(--space-4); right: var(--space-4);
+      background: none; border: none; color: var(--text-muted); cursor: pointer;
+      font-size: 20px; line-height: 1;
+    }
+    .detail-title {
+      font-family: var(--font-display); font-size: var(--text-h3);
+      letter-spacing: var(--ls-display); color: var(--text); margin-bottom: var(--space-6);
+    }
+    .detail-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); }
+    .detail-cell { background: var(--surface); padding: var(--space-4) var(--space-5); }
+    .detail-cell__label { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-1); }
+    .detail-cell__value { font-family: var(--font-display); font-size: 24px; color: var(--text); letter-spacing: var(--ls-display); }
+    .detail-interpretation {
+      margin-top: var(--space-6); padding: var(--space-5);
+      border-left: 3px solid var(--accent); background: var(--accent-bg-subtle);
+      font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); line-height: var(--lh-mono);
+    }
+    .detail-interpretation strong { color: var(--text); }
+
+    /* Scatter canvas container */
+    .scatter-container { margin-top: var(--space-6); border: 1px solid var(--border-subtle); padding: var(--space-4); background: var(--bg); }
+    .scatter-container canvas { width: 100%; height: 220px; }
+
+    /* Methodology note */
+    .meth-note {
+      margin-top: var(--space-10); padding: var(--space-6);
+      border: 1px solid var(--border-subtle); background: var(--surface);
+    }
+    .meth-note__heading {
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      color: var(--accent-dim); margin-bottom: var(--space-4);
+    }
+    .meth-note__text {
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      color: var(--text-muted); line-height: var(--lh-mono);
+    }
+    .meth-note__text strong { color: var(--text); }
+
+    /* Loading */
+    .loading-pulse { animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:1} }
+
+    /* Submit Finding */
+    .finding-section {
+      margin-top: var(--space-10); padding: var(--space-8);
+      border: 1px solid var(--border); background: var(--surface); position: relative;
+    }
+    .finding-section::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--c-amber-500) 0%, var(--accent-dim) 50%, transparent 100%);
+    }
+    .finding-section__heading {
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      color: var(--c-amber-500); margin-bottom: var(--space-2);
+    }
+    .finding-section__title {
+      font-family: var(--font-display); font-size: var(--text-h3);
+      letter-spacing: var(--ls-display); color: var(--text); margin-bottom: var(--space-2);
+    }
+    .finding-section__sub {
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      color: var(--text-muted); line-height: var(--lh-mono); margin-bottom: var(--space-6);
+    }
+    .finding-form { display: grid; gap: var(--space-4); max-width: 560px; }
+    .finding-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+    .finding-input, .finding-textarea {
+      background: var(--bg); border: 1px solid var(--border); color: var(--text);
+      font-family: var(--font-mono); font-size: var(--text-xs); padding: var(--space-3) var(--space-4);
+      outline: none; transition: border-color var(--dur-fast); width: 100%; box-sizing: border-box;
+    }
+    .finding-input:focus, .finding-textarea:focus { border-color: var(--accent); }
+    .finding-input::placeholder, .finding-textarea::placeholder { color: var(--text-faint); }
+    .finding-textarea { min-height: 80px; resize: vertical; }
+    .finding-label {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      color: var(--text-muted); margin-bottom: var(--space-1); display: block;
+    }
+    .finding-submit {
+      background: var(--c-amber-500); border: 1px solid var(--c-amber-500);
+      color: var(--bg); font-family: var(--font-mono); font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      padding: var(--space-3) var(--space-6); cursor: pointer; transition: all var(--dur-fast);
+      justify-self: start;
+    }
+    .finding-submit:hover { background: transparent; color: var(--c-amber-500); }
+    .finding-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+    .finding-msg {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-label); min-height: 1.2em;
+    }
+    .finding-success { color: var(--accent); }
+    .finding-error { color: #ff5252; }
+    @media (max-width: 768px) { .finding-row { grid-template-columns: 1fr; } }
+
+    @media (max-width: 768px) {
+      .corr-grid { grid-template-columns: 1fr; }
+      .detail-grid { grid-template-columns: 1fr 1fr; }
+      .hero-grid { grid-template-columns: 1fr; }
+      .predictive-grid { grid-template-columns: 1fr; }
+      .pick-two__row { flex-direction: column; }
+      .finding-cta { flex-direction: column; text-align: center; }
+    }
+  </style>
+  <link rel="canonical" href="https://averagejoematt.com/explorer/">
+</head>
+<body class="body-signal">
+
+<div id="amj-nav"></div>
+<div id="amj-hierarchy-nav"></div>
+
+<!-- 14a: Hero feature cards — populated dynamically from /api/correlations -->
+<section class="hero-findings animate-in">
+  <div class="hero-findings__kicker">Start here</div>
+  <h2 class="hero-findings__title">What the Data <span>Actually Says</span></h2>
+  <div class="hero-grid" id="hero-grid">
+    <div style="grid-column:1/-1;text-align:center;padding:var(--space-10) 0">
+      <div class="loading-pulse" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">Loading top findings&hellip;</div>
+    </div>
+  </div>
+</section>
+
+<!-- DPR-1.19: Discovery of the Week -->
+<section class="dotw-section animate-in" id="dotw-section" style="display:none">
+  <div class="dotw-card">
+    <div class="dotw-card__label">Discovery of the Week</div>
+    <div class="dotw-card__finding" id="dotw-finding"></div>
+    <div class="dotw-card__interpretation" id="dotw-interp"></div>
+    <div class="dotw-card__date" id="dotw-date"></div>
+  </div>
+</section>
+
+<!-- 14b: Predictive (lagged) correlations section -->
+<section class="predictive-section animate-in" id="predictive-section">
+  <div class="predictive-section__kicker">Predictive intelligence</div>
+  <h2 class="predictive-section__title">What Today Predicts About <span>Tomorrow</span></h2>
+  <p class="predictive-section__sub">Lagged correlations test whether today's value of one metric predicts tomorrow's value of another. These are the closest thing to causal signals in N=1 data.</p>
+  <div class="predictive-grid" id="predictive-grid">
+    <div style="grid-column:1/-1;text-align:center;padding:var(--space-10) 0">
+      <div class="loading-pulse" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">Loading predictive correlations...</div>
+    </div>
+  </div>
+</section>
+
+<!-- 14d: AI commentary — auto-updates daily from ai-expert-analyzer -->
+<section class="narrative-anchor animate-in" id="narrative-anchor" style="display:none">
+  <div class="narrative-anchor__inner">
+    <div class="narrative-anchor__kicker">Dr. Brandt's Analysis</div>
+    <div class="narrative-anchor__text" id="narrative-anchor-text"></div>
+  </div>
+</section>
+<script>
+  fetch('/api/ai_analysis?expert=explorer').then(function(r){return r.ok?r.json():null;}).then(function(d){
+    if(!d) return;
+    if(d.analysis){
+      document.getElementById('narrative-anchor').style.display='';
+      document.getElementById('narrative-anchor-text').innerHTML=d.analysis.split('\n\n').map(function(p){return '<p style="margin-top:12px">'+p+'</p>';}).join('');
+    }
+  }).catch(function(){});
+</script>
+
+
+<!-- 14k: Subtitle under title reflecting new framing -->
+<div class="exp-header animate-in">
+  <div class="exp-header__kicker">The Data</div>
+  <h1 class="exp-header__title">Data <span>Explorer</span></h1>
+  <div class="exp-header__subtitle">Cross-Domain Intelligence &mdash; What Predicts What</div>
+  <p class="exp-header__sub">Every metric pair tells a story. Pick two variables and see what the data says. 90-day rolling correlations, FDR-corrected, from 26 live data sources.</p>
+  <div class="exp-stats">
+    <div class="exp-stat"><div class="exp-stat__label">Metric pairs</div><div class="exp-stat__value" id="stat-pairs">&mdash;</div></div>
+    <div class="exp-stat"><div class="exp-stat__label">Significant</div><div class="exp-stat__value" id="stat-sig">&mdash;</div></div>
+    <div class="exp-stat"><div class="exp-stat__label">Week</div><div class="exp-stat__value" id="stat-week">&mdash;</div></div>
+  </div>
+</div>
+
+<div class="explorer-body" id="explorer-section">
+
+  <!-- 14h: Cross-domain differentiator callout -->
+  <div class="cross-domain-callout">
+    <div class="cross-domain-callout__kicker">Why this matters</div>
+    <div class="cross-domain-callout__text">
+      <strong>Cross-domain findings are what single-tracker apps cannot show.</strong> Your Whoop cannot tell you that your sleep predicts your glucose response. Your CGM does not know about your training load. This explorer connects 26 data sources to surface relationships that no single device can see.
+    </div>
+  </div>
+
+  <!-- 14e: Pick Two Metrics query mode -->
+  <div class="pick-two" id="pick-two">
+    <div class="pick-two__title">Pick Two Metrics</div>
+    <div class="pick-two__row">
+      <div class="pick-two__field">
+        <label class="pick-two__label" for="metric-a">Metric A</label>
+        <select class="pick-two__select" id="metric-a">
+          <option value="">Select a metric...</option>
+        </select>
+      </div>
+      <div class="pick-two__field">
+        <label class="pick-two__label" for="metric-b">Metric B</label>
+        <select class="pick-two__select" id="metric-b">
+          <option value="">Select a metric...</option>
+        </select>
+      </div>
+      <button class="pick-two__btn" id="compare-btn" onclick="compareTwoMetrics()">Compare</button>
+    </div>
+    <div class="pick-two__result" id="pick-two-result"></div>
+  </div>
+
+  <!-- 14i: Elevated Submit Finding CTA -->
+  <div class="finding-cta">
+    <div class="finding-cta__text"><strong>See a pattern we missed?</strong> Submit your own finding and help build the evidence base.</div>
+    <button class="finding-cta__btn" onclick="document.getElementById('finding-section').scrollIntoView({behavior:'smooth',block:'start'})">Submit a Finding &rarr;</button>
+  </div>
+
+  <!-- Detail panel (shown on card click) -->
+  <div class="detail-panel" id="detail-panel">
+    <button class="detail-close" id="detail-close">&times;</button>
+    <div class="detail-title" id="detail-title"></div>
+    <div class="detail-grid" id="detail-grid"></div>
+    <div class="detail-interpretation" id="detail-interp"></div>
+  </div>
+
+  <!-- 14c: Filter row - default to FDR Significant, All Pairs becomes power-user option at end -->
+  <div class="filter-row">
+    <button class="filter-chip active" data-filter="significant">FDR Significant</button>
+    <button class="filter-chip" data-filter="strong">Strong (|r| &ge; 0.5)</button>
+    <button class="filter-chip" data-filter="lagged">Predictive (lagged)</button>
+    <button class="filter-chip" data-filter="positive">Positive</button>
+    <button class="filter-chip" data-filter="negative">Negative</button>
+    <button class="filter-chip" data-filter="all">All Pairs</button>
+  </div>
+
+  <!-- Cards grid -->
+  <div class="corr-grid" id="corr-grid">
+    <div style="grid-column:1/-1;text-align:center;padding:var(--space-20) 0">
+      <div class="loading-pulse" style="font-family:var(--font-display);font-size:36px;color:var(--text-muted);letter-spacing:var(--ls-display)">Loading correlations&hellip;</div>
+    </div>
+  </div>
+
+  <!-- Submit a Finding (full form) -->
+  <div class="finding-section" id="finding-section">
+    <div class="finding-section__heading">See a pattern we missed?</div>
+    <div class="finding-section__title">Submit a Finding</div>
+    <p class="finding-section__sub">Spotted an interesting correlation? Submit it for review. If validated, it could become a Discovery or seed a new Experiment.</p>
+    <div class="finding-form" id="finding-form">
+      <div class="finding-row">
+        <div><label class="finding-label" for="f-metric-a">Metric A</label><input id="f-metric-a" class="finding-input" placeholder="e.g. Sleep Hours" maxlength="100"></div>
+        <div><label class="finding-label" for="f-metric-b">Metric B</label><input id="f-metric-b" class="finding-input" placeholder="e.g. Next-day HRV" maxlength="100"></div>
+      </div>
+      <div><label class="finding-label" for="f-finding">What did you find?</label><textarea id="f-finding" class="finding-textarea" placeholder="Describe the pattern you noticed..." maxlength="500"></textarea></div>
+      <div><label class="finding-label" for="f-email">Email (optional -- get notified if promoted)</label><input id="f-email" class="finding-input" type="email" placeholder="your@email.com" maxlength="254"></div>
+      <button class="finding-submit" id="f-submit" onclick="submitFinding()">Submit Finding</button>
+      <div class="finding-msg" id="f-msg"></div>
+    </div>
+  </div>
+
+  <!-- Methodology -->
+  <div class="meth-note">
+    <div class="meth-note__heading">Methodology</div>
+    <div class="meth-note__text">
+      <p><strong>Pearson r</strong> computed over a 90-day rolling window. Pairs require a minimum of 14 matched data points. Significance testing uses <strong>Benjamini-Hochberg FDR correction</strong> at q=0.05 to control false discovery rate across all pairs tested simultaneously.</p>
+      <p style="margin-top:var(--space-3)"><strong>Lagged correlations</strong> test whether today's value of metric A predicts tomorrow's (or later) value of metric B. This is closer to causation than cross-sectional correlation, but still not proof. N=1 data with known confounders.</p>
+      <p style="margin-top:var(--space-3)"><strong>Strength labels</strong>: |r| &ge; 0.7 = strong, |r| &ge; 0.5 = moderate, |r| &ge; 0.3 = weak, below 0.3 = negligible. These are conservative thresholds appropriate for noisy biometric data.</p>
+    </div>
+  </div>
+</div>
+
+<!-- N=1 Disclaimer -->
+<aside style="max-width:var(--prose-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border-subtle)">
+  <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label)">
+    <span style="color:var(--accent-dim)">// N=1 DISCLAIMER</span><br>
+    Correlations shown here are from one person's data. They do not establish causation and may not generalize. Confounders are real and not fully controlled for. This is an exploration tool, not a clinical study.
+  </p>
+</aside>
+
+<!-- Email CTA -->
+<nav class="reading-path-v2">
+  <a href="/legacy/benchmarks/" class="reading-path-v2__link">
+    <span class="reading-path-v2__dir">&larr; Previous</span>
+    <span class="reading-path-v2__title">Benchmarks</span>
+  </a>
+  <a href="/legacy/protocols/" class="reading-path-v2__link reading-path-v2__link--next">
+    <span class="reading-path-v2__dir">Next &rarr;</span>
+    <span class="reading-path-v2__title">Protocols</span>
+  </a>
+</nav>
+
+<div id="amj-subscribe"></div>
+
+<!-- Reading path -->
+<div id="amj-reading-path"></div>
+
+<!-- Mobile bottom nav -->
+<div id="amj-bottom-nav"></div>
+
+<div id="amj-footer"></div>
+
+<script>
+(function() {
+  'use strict';
+
+  var allPairs = [];
+  var currentFilter = 'significant'; // 14c: Default to FDR Significant
+
+  // 14g: Metric-to-observatory link mapping
+  var obsLinks = {
+    'sleep': '/sleep/', 'sleep_hours': '/sleep/', 'sleep_duration': '/sleep/', 'sleep_quality': '/sleep/',
+    'sleep_score': '/sleep/', 'bedtime': '/sleep/', 'wake_time': '/sleep/', 'rem': '/sleep/',
+    'deep_sleep': '/sleep/', 'sleep_latency': '/sleep/', 'sleep_efficiency': '/sleep/',
+    'hrv': '/sleep/', 'resting_heart_rate': '/sleep/', 'recovery': '/sleep/', 'recovery_score': '/sleep/',
+    'glucose': '/glucose/', 'glucose_variability': '/glucose/', 'glucose_mean': '/glucose/',
+    'glucose_std': '/glucose/', 'time_in_range': '/glucose/', 'cgm': '/glucose/',
+    'calories': '/nutrition/', 'protein': '/nutrition/', 'carbs': '/nutrition/',
+    'fat': '/nutrition/', 'fiber': '/nutrition/', 'nutrition': '/nutrition/',
+    'training': '/training/', 'strain': '/training/', 'workout': '/training/',
+    'steps': '/training/', 'active_minutes': '/training/', 'training_load': '/training/',
+    'strength': '/training/', 'vo2': '/training/',
+    'journal': '/journal/', 'mood': '/journal/', 'energy': '/journal/',
+    'stress': '/journal/', 'gratitude': '/journal/',
+    'weight': '/biology/', 'body_fat': '/biology/', 'muscle_mass': '/biology/',
+    'supplements': '/supplements/', 'creatine': '/supplements/', 'magnesium': '/supplements/'
+  };
+
+  // 14a: Render hero cards from top correlations
+  function renderHeroCards(pairs) {
+    var grid = document.getElementById('hero-grid');
+    if (!grid) return;
+
+    // Pick the top 5 significant correlations by |r|, preferring cross-domain pairs
+    var significant = pairs.filter(function(p) { return p.fdr_significant; });
+    significant.sort(function(a, b) { return Math.abs(b.r) - Math.abs(a.r); });
+
+    // Prefer cross-domain: source_a !== source_b
+    var crossDomain = significant.filter(function(p) { return p.source_a !== p.source_b; });
+    var pool = crossDomain.length >= 5 ? crossDomain : significant;
+    var top = pool.slice(0, 5);
+
+    if (top.length === 0) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:var(--space-8) 0;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">Not enough significant correlations yet. Check back after the next weekly compute.</div>';
+      return;
+    }
+
+    grid.innerHTML = top.map(function(p) {
+      var a = prettyLabel(p.label_a);
+      var b = prettyLabel(p.label_b);
+      var dir = p.r > 0 ? 'positively' : 'inversely';
+      var lagNote = p.correlation_type === 'lagged' ? ' (' + p.lag_days + '-day lag)' : '';
+      var rSign = p.r > 0 ? '+' : '';
+      var headline = a + ' ' + dir + ' correlates with ' + b + lagNote;
+      var evidence = 'r = ' + rSign + p.r.toFixed(2) + ' | ' + (p.fdr_significant ? 'FDR significant' : 'not significant') + ' | n=' + p.n + ' days';
+      var soWhat = p.description || interpret(p);
+      var obsLink = getObsLink(p.label_a) || getObsLink(p.label_b);
+      var linkHtml = obsLink ? '<a href="' + obsLink + '" class="hero-card__link">Explore data &rarr;</a>' : '';
+
+      return '<div class="hero-card">' +
+        '<div class="hero-card__headline">' + headline + '</div>' +
+        '<div class="hero-card__evidence">' + evidence + '</div>' +
+        '<div class="hero-card__so-what">' + soWhat + '</div>' +
+        linkHtml +
+        '</div>';
+    }).join('');
+  }
+
+  function getObsLink(label) {
+    var key = label.toLowerCase().replace(/\s+/g, '_');
+    if (obsLinks[key]) return obsLinks[key];
+    // Try partial match
+    var keys = Object.keys(obsLinks);
+    for (var i = 0; i < keys.length; i++) {
+      if (key.indexOf(keys[i]) !== -1) return obsLinks[keys[i]];
+    }
+    return null;
+  }
+
+  function strengthColor(r) {
+    var abs = Math.abs(r);
+    if (abs >= 0.7) return r > 0 ? 'var(--accent)' : '#ff5252';
+    if (abs >= 0.5) return r > 0 ? 'var(--c-green-400)' : '#ff8a80';
+    if (abs >= 0.3) return r > 0 ? 'var(--c-green-300)' : '#ffab91';
+    return 'var(--text-faint)';
+  }
+
+  function rClass(r) {
+    if (Math.abs(r) < 0.3) return 'weak';
+    return r > 0 ? 'positive' : 'negative';
+  }
+
+  function strengthLabel(s) {
+    var labels = {strong:'Strong',moderate:'Moderate',weak:'Weak',negligible:'Negligible'};
+    return labels[s] || s;
+  }
+
+  function lagLabel(p) {
+    if (p.correlation_type === 'lagged' && p.lag_days > 0) return p.lag_days + '-day lag (predictive)';
+    return 'Same-day (cross-sectional)';
+  }
+
+  function prettyLabel(label) {
+    return label.replace(/_/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+  }
+
+  function interpret(p) {
+    var dir = p.r > 0 ? 'higher' : 'lower';
+    var outcome = p.r > 0 ? 'higher' : 'lower';
+    var a = prettyLabel(p.label_a);
+    var b = prettyLabel(p.label_b);
+    var abs = Math.abs(p.r).toFixed(2);
+    var sig = p.fdr_significant ? ' This passed FDR significance testing.' : ' This did not pass FDR correction \u2014 treat with caution.';
+    if (p.correlation_type === 'lagged') {
+      return '<strong>' + a + '</strong> on a given day predicts <strong>' + outcome + ' ' + b + '</strong> ' + p.lag_days + ' day(s) later (r=' + p.r.toFixed(3) + ', n=' + p.n + ').' + sig;
+    }
+    return 'Days with <strong>' + dir + ' ' + a + '</strong> tend to also show <strong>' + outcome + ' ' + b + '</strong> (r=' + p.r.toFixed(3) + ', n=' + p.n + ').' + sig;
+  }
+
+  // 14f: Determine card prominence class based on significance and strength
+  function cardClass(p) {
+    if (p.fdr_significant && Math.abs(p.r) >= 0.5) return 'corr-card corr-card--prominent';
+    if (Math.abs(p.r) < 0.3 || p.strength === 'negligible') return 'corr-card corr-card--muted';
+    return 'corr-card';
+  }
+
+  // DPR-1.18: Plain-language interpretation map
+  var INTERPRETATIONS = {
+    'heart_rate_variability__recovery_score': {pos:'On days when HRV is higher, recovery is almost always better too', neg:'Higher HRV days tend to show lower recovery (unusual \u2014 investigate)'},
+    'sleep_score__recovery_score': {pos:'Better sleep nights reliably predict better recovery the next day', neg:'Higher sleep scores correlate with lower recovery (unexpected)'},
+    'resting_heart_rate__recovery_score': {pos:'Higher resting HR days show better recovery (unusual)', neg:'Lower resting heart rate is associated with better recovery'},
+    'sleep_duration_hours__recovery_score': {pos:'More sleep hours consistently lead to better recovery scores', neg:'Longer sleep associated with lower recovery \u2014 may indicate illness'},
+    'steps__recovery_score': {pos:'More active days tend to have better recovery', neg:'Higher step counts associated with lower recovery \u2014 possible overtraining'},
+    'water_intake_ml__sleep_duration_hours': {pos:'Days with better hydration tend to be followed by better sleep', neg:'More water associated with shorter sleep \u2014 possibly late-night intake'},
+  };
+  function getInterpretation(p) {
+    var keyA = (p.metric_a || p.label_a || '').toLowerCase().replace(/[\s-]+/g, '_');
+    var keyB = (p.metric_b || p.label_b || '').toLowerCase().replace(/[\s-]+/g, '_');
+    var lookup = INTERPRETATIONS[keyA + '__' + keyB] || INTERPRETATIONS[keyB + '__' + keyA];
+    if (lookup) return p.r > 0 ? lookup.pos : lookup.neg;
+    var dir = p.r > 0 ? 'higher' : 'lower';
+    var also = p.r > 0 ? 'higher' : 'lower';
+    return 'Days with ' + dir + ' ' + prettyLabel(p.label_a) + ' tend to also show ' + also + ' ' + prettyLabel(p.label_b);
+  }
+
+  function renderCard(p) {
+    var color = strengthColor(p.r);
+    var absR = Math.abs(p.r);
+    var barW = Math.min(100, absR * 100);
+    var lagTag = p.correlation_type === 'lagged' ? ' <span style="color:var(--c-amber-400)">\u23F1 ' + p.lag_days + 'd lag</span>' : '';
+    var sigTag = p.fdr_significant ? '<span style="color:var(--accent)">FDR \u2713</span>' : '<span style="color:var(--text-faint)">not sig</span>';
+    var interp = getInterpretation(p);
+
+    // 14g: Observatory link
+    var obsLink = getObsLink(p.label_a) || getObsLink(p.label_b);
+    var obsLinkHtml = obsLink ? '<a class="corr-card__obs-link" href="' + obsLink + '" onclick="event.stopPropagation()">View observatory &rarr;</a>' : '';
+
+    return '<div class="' + cardClass(p) + '" style="--bar-color:' + color + '" data-r="' + p.r + '" data-strength="' + p.strength + '" data-sig="' + p.fdr_significant + '" data-type="' + p.correlation_type + '">' +
+      '<div class="corr-card__header"><div class="corr-card__pair"><em>' + prettyLabel(p.label_a) + '</em> \u00D7 <em>' + prettyLabel(p.label_b) + '</em>' + lagTag + '</div></div>' +
+      '<div class="corr-card__body">' +
+        '<div class="corr-card__r ' + rClass(p.r) + '">' + (p.r > 0 ? '+' : '') + p.r.toFixed(2) + '</div>' +
+        '<div class="corr-card__meta">' +
+          '<div class="corr-meta-row"><strong>' + strengthLabel(p.strength) + '</strong> \u00b7 ' + sigTag + '</div>' +
+          '<div class="corr-meta-row">' + lagLabel(p) + '</div>' +
+          '<div class="corr-meta-row">n=' + p.n + ' days</div>' +
+          obsLinkHtml +
+          '<div class="strength-bar"><div class="strength-bar__fill" style="width:' + barW + '%;background:' + color + '"></div></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="corr-card__interpretation">' + interp + '</div>' +
+    '</div>';
+  }
+
+  function showDetail(p) {
+    var panel = document.getElementById('detail-panel');
+    document.getElementById('detail-title').textContent = prettyLabel(p.label_a) + ' \u00D7 ' + prettyLabel(p.label_b);
+
+    // 14g: Include observatory link in detail panel
+    var obsLink = getObsLink(p.label_a) || getObsLink(p.label_b);
+    var obsCell = obsLink
+      ? '<div class="detail-cell"><div class="detail-cell__label">Observatory</div><div class="detail-cell__value"><a href="' + obsLink + '" style="color:var(--accent);text-decoration:none;font-size:var(--text-sm)">View &rarr;</a></div></div>'
+      : '<div class="detail-cell"><div class="detail-cell__label">Type</div><div class="detail-cell__value">' + (p.correlation_type === 'lagged' ? 'Lagged' : 'Same-day') + '</div></div>';
+
+    document.getElementById('detail-grid').innerHTML =
+      '<div class="detail-cell"><div class="detail-cell__label">Correlation (r)</div><div class="detail-cell__value">' + (p.r>0?'+':'') + p.r.toFixed(3) + '</div></div>' +
+      '<div class="detail-cell"><div class="detail-cell__label">Strength</div><div class="detail-cell__value">' + strengthLabel(p.strength) + '</div></div>' +
+      '<div class="detail-cell"><div class="detail-cell__label">Sample Size</div><div class="detail-cell__value">n=' + p.n + '</div></div>' +
+      obsCell;
+    document.getElementById('detail-interp').innerHTML = interpret(p) +
+      '<div style="margin-top:var(--space-4)"><button style="background:none;border:1px solid var(--c-amber-500);color:var(--c-amber-500);font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;padding:var(--space-2) var(--space-4);cursor:pointer" onclick="prefillFinding(\'' + p.label_a.replace(/'/g,"") + '\',\'' + p.label_b.replace(/'/g,"") + '\')">Submit a finding about this pair &rarr;</button></div>';
+    panel.classList.add('is-open');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function applyFilter(filter) {
+    currentFilter = filter;
+    document.querySelectorAll('.filter-chip').forEach(function(c) { c.classList.toggle('active', c.dataset.filter === filter); });
+    var filtered = allPairs;
+    if (filter === 'strong') filtered = allPairs.filter(function(p){ return Math.abs(p.r) >= 0.5; });
+    else if (filter === 'significant') filtered = allPairs.filter(function(p){ return p.fdr_significant; });
+    else if (filter === 'lagged') filtered = allPairs.filter(function(p){ return p.correlation_type === 'lagged'; });
+    else if (filter === 'positive') filtered = allPairs.filter(function(p){ return p.r > 0; });
+    else if (filter === 'negative') filtered = allPairs.filter(function(p){ return p.r < 0; });
+
+    var grid = document.getElementById('corr-grid');
+    if (!filtered.length) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:var(--space-16) 0"><div style="font-family:var(--font-display);font-size:28px;color:var(--text-muted)">No pairs match this filter</div></div>';
+      return;
+    }
+
+    // 14f: Sort by significance and strength -- prominent first, muted last
+    filtered = filtered.slice().sort(function(a, b) {
+      var scoreA = (a.fdr_significant ? 100 : 0) + Math.abs(a.r) * 10;
+      var scoreB = (b.fdr_significant ? 100 : 0) + Math.abs(b.r) * 10;
+      return scoreB - scoreA;
+    });
+
+    grid.innerHTML = filtered.map(renderCard).join('');
+    // Attach click handlers
+    grid.querySelectorAll('.corr-card').forEach(function(card, i) {
+      card.addEventListener('click', function() { showDetail(filtered[i]); });
+    });
+  }
+
+  // Filter buttons
+  document.querySelectorAll('.filter-chip').forEach(function(c) {
+    c.addEventListener('click', function() { applyFilter(c.dataset.filter); });
+  });
+
+  // Close detail
+  document.getElementById('detail-close').addEventListener('click', function() {
+    document.getElementById('detail-panel').classList.remove('is-open');
+  });
+
+  // 14b: Render predictive (lagged) correlations in dedicated section
+  function renderPredictiveSection(pairs) {
+    var lagged = pairs.filter(function(p) { return p.correlation_type === 'lagged' && p.fdr_significant; });
+    // Sort by absolute r descending
+    lagged.sort(function(a, b) { return Math.abs(b.r) - Math.abs(a.r); });
+    lagged = lagged.slice(0, 6); // Top 6 most interesting
+
+    var grid = document.getElementById('predictive-grid');
+    if (!lagged.length) {
+      // Fallback to all lagged if none are FDR significant
+      lagged = pairs.filter(function(p) { return p.correlation_type === 'lagged'; });
+      lagged.sort(function(a, b) { return Math.abs(b.r) - Math.abs(a.r); });
+      lagged = lagged.slice(0, 6);
+    }
+    if (!lagged.length) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:var(--space-8) 0;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">No predictive correlations available yet. Check back after the next weekly compute.</div>';
+      return;
+    }
+    grid.innerHTML = lagged.map(function(p) {
+      var rColor = p.r > 0 ? 'var(--accent)' : '#ff5252';
+      return '<div class="predictive-card" onclick="document.getElementById(\'explorer-section\').scrollIntoView({behavior:\'smooth\'})">' +
+        '<div class="predictive-card__r" style="color:' + rColor + '">' + (p.r > 0 ? '+' : '') + p.r.toFixed(2) + '</div>' +
+        '<div>' +
+          '<div class="predictive-card__text"><strong>' + prettyLabel(p.label_a) + '</strong> today predicts <strong>' + (p.r > 0 ? 'higher' : 'lower') + ' ' + prettyLabel(p.label_b) + '</strong> tomorrow</div>' +
+          '<div class="predictive-card__lag">' + p.lag_days + '-day lag | n=' + p.n + ' | ' + (p.fdr_significant ? 'FDR significant' : 'not yet significant') + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // 14e: Populate Pick Two dropdowns and handle comparison
+  function populateDropdowns(pairs) {
+    var metrics = {};
+    pairs.forEach(function(p) {
+      metrics[p.label_a] = p.label_a;
+      metrics[p.label_b] = p.label_b;
+    });
+    var sorted = Object.keys(metrics).sort();
+    var selA = document.getElementById('metric-a');
+    var selB = document.getElementById('metric-b');
+    sorted.forEach(function(m) {
+      var optA = document.createElement('option');
+      optA.value = m; optA.textContent = prettyLabel(m);
+      selA.appendChild(optA);
+      var optB = document.createElement('option');
+      optB.value = m; optB.textContent = prettyLabel(m);
+      selB.appendChild(optB);
+    });
+  }
+
+  // Expose compareTwoMetrics globally
+  window.compareTwoMetrics = function() {
+    var a = document.getElementById('metric-a').value;
+    var b = document.getElementById('metric-b').value;
+    var result = document.getElementById('pick-two-result');
+
+    if (!a || !b) {
+      result.innerHTML = 'Please select both metrics.';
+      result.classList.add('is-visible');
+      return;
+    }
+    if (a === b) {
+      result.innerHTML = 'Please select two different metrics.';
+      result.classList.add('is-visible');
+      return;
+    }
+
+    // Find the pair
+    var found = null;
+    for (var i = 0; i < allPairs.length; i++) {
+      var p = allPairs[i];
+      if ((p.label_a === a && p.label_b === b) || (p.label_a === b && p.label_b === a)) {
+        found = p; break;
+      }
+    }
+
+    if (!found) {
+      result.innerHTML = '<strong>No data found</strong> for this pair. Either we have not computed this correlation yet, or there were not enough matched data points (minimum 14 days required).';
+      result.classList.add('is-visible');
+      return;
+    }
+
+    var sig = found.fdr_significant ? '<span style="color:var(--accent)">Yes (FDR-corrected)</span>' : '<span style="color:var(--text-faint)">No (did not pass FDR correction)</span>';
+    result.innerHTML = '<strong>' + prettyLabel(found.label_a) + ' \u00D7 ' + prettyLabel(found.label_b) + '</strong><br><br>' +
+      'Correlation: <strong style="font-size:var(--text-sm)">' + (found.r > 0 ? '+' : '') + found.r.toFixed(3) + '</strong> (' + strengthLabel(found.strength) + ')<br>' +
+      'Significant: ' + sig + '<br>' +
+      'Type: ' + lagLabel(found) + '<br>' +
+      'Sample: n=' + found.n + ' days<br><br>' +
+      interpret(found);
+    result.classList.add('is-visible');
+
+    // Also open the detail panel
+    showDetail(found);
+  };
+
+  // Load data
+  fetch('/api/correlations')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if (!data || !data.correlations) throw new Error('No data');
+      var corr = data.correlations;
+      allPairs = corr.pairs || [];
+      document.getElementById('stat-pairs').textContent = corr.count || allPairs.length;
+      document.getElementById('stat-sig').textContent = allPairs.filter(function(p){return p.fdr_significant;}).length;
+      document.getElementById('stat-week').textContent = corr.week || '\u2014';
+
+      // 14a: Populate hero cards from live data
+      renderHeroCards(allPairs);
+
+      // Show narrative anchor only when we have significant findings
+      var sigCount = allPairs.filter(function(p){return p.fdr_significant;}).length;
+      if (sigCount > 0) {
+        document.getElementById('narrative-anchor').style.display = '';
+      }
+
+      // DPR-1.19: Discovery of the Week — pick the strongest FDR-significant cross-domain pair
+      (function() {
+        var sig = allPairs.filter(function(p) { return p.fdr_significant; });
+        sig.sort(function(a, b) { return Math.abs(b.r) - Math.abs(a.r); });
+        var discovery = sig[0];
+        if (discovery) {
+          document.getElementById('dotw-finding').textContent =
+            prettyLabel(discovery.label_a) + ' now significantly ' + (discovery.r > 0 ? 'predicts' : 'inversely predicts') +
+            ' ' + prettyLabel(discovery.label_b) + ' (r=' + (discovery.r > 0 ? '+' : '') + discovery.r.toFixed(2) + ', FDR \u2713)';
+          document.getElementById('dotw-interp').textContent = getInterpretation(discovery);
+          document.getElementById('dotw-date').textContent = 'Week of ' + (corr.week || new Date().toISOString().slice(0, 10));
+          document.getElementById('dotw-section').style.display = '';
+        }
+      })();
+
+      // 14c: Default filter is now 'significant'
+      applyFilter('significant');
+
+      // 14b: Populate predictive section
+      renderPredictiveSection(allPairs);
+
+      // 14e: Populate Pick Two dropdowns
+      populateDropdowns(allPairs);
+    })
+    .catch(function() {
+      // Pre-launch / no data state
+      document.getElementById('hero-grid').innerHTML =
+        '<div style="grid-column:1/-1;text-align:center;padding:var(--space-10) 0">' +
+        '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:0.15em;color:var(--accent);text-transform:uppercase;margin-bottom:var(--space-4)">Coming Soon</div>' +
+        '<div style="font-family:var(--font-serif);font-size:18px;color:var(--text-muted);line-height:1.7;max-width:480px;margin:0 auto">' +
+        'Cross-domain findings will appear here as data accumulates. ' +
+        'Correlations require a minimum of 14 matched data points &mdash; expect the first cards within 2&ndash;3 weeks.</div></div>';
+      document.getElementById('predictive-grid').innerHTML =
+        '<div style="grid-column:1/-1;text-align:center;padding:var(--space-8) 0;font-family:var(--font-serif);font-size:15px;color:var(--text-faint)">' +
+        'Predictive correlations will emerge once enough daily data has been collected.</div>';
+      var corrGrid = document.getElementById('corr-grid');
+      if (corrGrid) corrGrid.innerHTML =
+        '<div style="grid-column:1/-1;text-align:center;padding:var(--space-20) 0">' +
+        '<div style="font-family:var(--font-display);font-size:36px;color:var(--text-muted)">No correlation data yet</div>' +
+        '<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);margin-top:var(--space-4)">First correlations compute after ~14 days of data.</div></div>';
+    });
+})();
+</script>
+<script>
+function prefillFinding(a, b) {
+  document.getElementById('f-metric-a').value = a.replace(/_/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+  document.getElementById('f-metric-b').value = b.replace(/_/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+  document.getElementById('finding-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(function(){ document.getElementById('f-finding').focus(); }, 400);
+}
+function submitFinding() {
+  var btn = document.getElementById('f-submit');
+  var msg = document.getElementById('f-msg');
+  var metricA = document.getElementById('f-metric-a').value.trim();
+  var metricB = document.getElementById('f-metric-b').value.trim();
+  var finding = document.getElementById('f-finding').value.trim();
+  var email   = document.getElementById('f-email').value.trim();
+
+  msg.textContent = ''; msg.className = 'finding-msg';
+
+  if (!metricA || !metricB) { msg.textContent = 'Both metrics are required.'; msg.classList.add('finding-error'); return; }
+  if (!finding || finding.length < 10) { msg.textContent = 'Please describe your finding (at least 10 characters).'; msg.classList.add('finding-error'); return; }
+  if (email && !email.includes('@')) { msg.textContent = 'Enter a valid email or leave blank.'; msg.classList.add('finding-error'); return; }
+
+  btn.disabled = true;
+  msg.textContent = 'Submitting\u2026'; msg.style.color = 'var(--text-muted)';
+
+  fetch('/api/submit_finding', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ metric_a: metricA, metric_b: metricB, finding: finding, email: email || undefined })
+  })
+  .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, status: r.status, data: d }; }); })
+  .then(function(res) {
+    btn.disabled = false;
+    if (res.ok && res.data.success) {
+      msg.textContent = '\u2713 ' + res.data.message;
+      msg.className = 'finding-msg finding-success';
+      document.getElementById('f-metric-a').value = '';
+      document.getElementById('f-metric-b').value = '';
+      document.getElementById('f-finding').value = '';
+      document.getElementById('f-email').value = '';
+      if (res.data.remaining !== undefined) {
+        msg.textContent += ' (' + res.data.remaining + ' submissions remaining this hour)';
+      }
+    } else {
+      msg.textContent = res.data.error || 'Something went wrong.';
+      msg.className = 'finding-msg finding-error';
+    }
+  })
+  .catch(function() {
+    btn.disabled = false;
+    msg.textContent = 'Network error \u2014 try again.';
+    msg.className = 'finding-msg finding-error';
+  });
+}
+</script>
+<script src="/legacy/assets/js/reveal.js"></script>
+<script src="/legacy/assets/js/site_constants.js"></script>
+<script src="/legacy/assets/js/components.js"></script>
+<script src="/legacy/assets/js/nav.js"></script>
+<script src="/legacy/assets/js/animations.js" defer></script>
+</body>
+</html>
