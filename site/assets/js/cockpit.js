@@ -82,17 +82,21 @@ function renderHub(character) {
   }
 }
 
+// True for missing/sentinel/error values so they never render raw to a visitor
+// (e.g. "[AI_UNAVAILABLE]", "", "N/A", any "[...]" placeholder).
+function isBad(v) {
+  if (v == null) return true;
+  const s = String(v).trim();
+  return s === "" || s.toUpperCase() === "N/A" || /^\[.*\]$/.test(s);
+}
+
 function renderVerdict(priority) {
   const v = bind("verdict");
   const text = priority && priority.weekly_priority;
-  if (text) {
+  if (!isBad(text)) {
     v.innerHTML = `<span class="mark">&rsaquo;</span> ${escapeHTML(text)}`;
   } else {
-    v.innerHTML = `<span class="mark">&rsaquo;</span> The board hasn't filed this week's read yet.`;
-  }
-  if (priority && priority.coach_name) {
-    $(".voice.machine .who").textContent = priority.coach_name.split(" ").slice(-1)[0]
-      ? "The board" : "The board";
+    v.innerHTML = `<span class="mark">&rsaquo;</span> The board's weekly read isn't in yet — it posts after the next briefing.`;
   }
 }
 
@@ -211,7 +215,7 @@ async function loadPillarRead(key) {
 function renderBoardline(priority) {
   const notes = priority && priority.cross_domain_notes;
   const line = notes && (typeof notes === "string" ? notes : Object.values(notes).find(Boolean));
-  if (line) {
+  if (line && !isBad(line)) {
     const who = (priority.coach_name || "The integrator");
     bind("boardline").textContent = `“${String(line).trim()}” — ${who}`;
     bind("boardline").hidden = false;
@@ -258,12 +262,15 @@ async function load() {
     ]);
 
     const snapV = snap.status === "fulfilled" ? snap.value : null;
-    const character = snapV?.character?.character || snapV?.character || null;
-    const pillarList = snapV?.character?.pillars || snapV?.pillars || [];
+    const charBody = snapV?.character || null;   // handle_character body (or {error} on 503)
+    const character = charBody?.character || (charBody && !charBody.error ? charBody : null);
+    const pillarList = charBody?.pillars || character?.pillars || [];
     state.pillars = {};
     for (const p of pillarList) state.pillars[p.name] = p;
 
-    if (!character) throw new Error("character sheet unavailable");
+    // No real sheet today (uncomputed / pre-experiment / error) → calm empty state,
+    // never misleading zeros.
+    if (!character || charBody.error || !pillarList.length) throw new Error("character sheet unavailable");
 
     renderHub(character);
     renderDomains();
@@ -275,11 +282,18 @@ async function load() {
     main.dataset.state = "ready";
     $(".panel").setAttribute("aria-busy", "false");
   } catch (e) {
-    main.dataset.state = "error";
-    const err = bind("error");
-    err.textContent = "The cockpit couldn't reach today's numbers. They recompute every morning — try again shortly.";
-    err.hidden = false;
-    bind("verdict").textContent = "";
+    // Calm, honest empty state — no misleading zeros, no raw error tokens, no
+    // stuck shimmer. Force display:none (the [hidden] attr is overridden by the
+    // author display rules on .domains/.band/.voice). The score recomputes daily.
+    main.dataset.state = "ready";
+    const gone = (sel) => { const el = typeof sel === "string" ? $(sel) : sel; if (el) el.style.display = "none"; };
+    bind("level").textContent = "—";
+    bind("tier").textContent = "";
+    bind("day").textContent = "";
+    gone(bind("movement")); gone(bind("honest")); gone(bind("boardline"));
+    gone(".domains"); gone(".band"); gone(".voice.human");
+    bind("verdict").innerHTML = "Today's score hasn't computed yet — the numbers refresh each morning. Check back shortly.";
+    $(".panel").setAttribute("aria-busy", "false");
   }
 }
 

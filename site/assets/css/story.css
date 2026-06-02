@@ -82,11 +82,13 @@ body { overflow-x: hidden; }
 .beat-kicker { color: var(--ink-faint); }
 .beat-h { font-family: var(--font-serif); font-weight: var(--weight-med); font-size: var(--fs-h1); line-height: 1.1; margin-top: var(--sp-3); max-width: 22ch; }
 
-/* Scroll-driven reveal — native, with a static fallback below. */
+/* Scroll-driven reveal — TRANSFORM ONLY. Content is never hidden (opacity stays
+   1), so a first glance or a browser without scroll-timeline support always sees
+   the full page; the slide is pure enhancement. */
 @media (prefers-reduced-motion: no-preference) {
   @supports (animation-timeline: view()) {
-    .beat { animation: beat-in linear both; animation-timeline: view(); animation-range: entry 5% cover 22%; }
-    @keyframes beat-in { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: none; } }
+    .beat { animation: beat-in linear both; animation-timeline: view(); animation-range: entry 0% cover 18%; }
+    @keyframes beat-in { from { transform: translateY(16px); } to { transform: none; } }
   }
 }
 
