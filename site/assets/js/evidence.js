@@ -90,7 +90,7 @@ async function renderCenter() {
   main.querySelector("[data-blurb]").textContent = t.blurb;
   const ro = main.querySelector("[data-readout]");
   const deeper = main.querySelector("[data-deeper]");
-  deeper.innerHTML = t.legacy ? `<a href="${esc(t.legacy)}">Open the full ${esc(t.title.toLowerCase())} view (preserved) →</a>` : "";
+  deeper.innerHTML = t.legacy ? `<a href="${esc(t.legacy)}">Full historical ${esc(t.title.toLowerCase())} view (archive) →</a>` : "";
   if (t.mode === "editorial") { ro.innerHTML = t.editorial || empty("—"); return; }
   if (t.mode === "interactive") { ro.innerHTML = (RENDERERS[t.slug] || renderGeneric)({}, t); if (WIRE[t.slug]) WIRE[t.slug](); return; }
   if (t.mode !== "data" || !t.endpoint) { ro.innerHTML = empty(t.archive_note || "This section lives in the archive while it's rebuilt."); return; }
