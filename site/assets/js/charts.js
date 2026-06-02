@@ -7,6 +7,14 @@
 */
 const escAttr = (s) => String(s == null ? "" : s).replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
+// Dual-unit weight: always show kg AND lb. `unit` is the NATIVE unit of v.
+function _w(n) { const r = Math.round(n * 10) / 10; return Number.isInteger(r) ? String(r) : r.toFixed(1); }
+export function dualWeight(v, unit = "kg") {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  return unit === "lb" ? `${_w(n)} lb · ${_w(n * 0.453592)} kg` : `${_w(n)} kg · ${_w(n * 2.20462)} lb`;
+}
+
 function _points(data, valueKey, dateKey) {
   return data
     .map((d) => (typeof d === "number" ? { v: d } : { v: Number(d[valueKey]), d: d[dateKey] }))
