@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="robots" content="noindex">
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Matthew's public accountability contract — every commitment tracked live. The unedited record. No hiding.">
+  <meta property="og:title" content="Accountability — Matthew">
+  <meta property="og:description" content="A public contract. Every commitment tracked. The unedited record.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/accountability/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Accountability — Matthew">
+  <meta name="twitter:description" content="A public contract. Every commitment tracked. The unedited record.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <title>Accountability — Matthew</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/legacy/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/legacy/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/legacy/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/legacy/assets/css/tokens.css">
+  <link rel="stylesheet" href="/legacy/assets/css/base.css">
+  <style>
+    /* ─── Accountability page — warm social-contract aesthetic ─── */
+    /* Override accent to amber/coral for visual warmth */
+    .acct-page { --acct-accent: var(--c-amber-500); --acct-accent-dim: var(--c-amber-300); --acct-coral: var(--c-coral-500); }
+
+    /* ─── Commitment Hero (6b) ─── */
+    .commitment-hero {
+      padding-top: var(--nav-height);
+      border-bottom: 1px solid var(--border);
+    }
+    .commitment-hero__inner {
+      max-width: var(--prose-width);
+      margin: 0 auto;
+      padding: var(--space-16, 6rem) var(--page-padding) var(--space-12);
+    }
+    .commitment-hero blockquote {
+      margin: 0;
+      padding: var(--space-10) var(--space-10);
+      border-left: 4px solid var(--acct-accent);
+      background: var(--surface);
+      position: relative;
+    }
+    .commitment-hero blockquote::before {
+      content: '\201C';
+      font-family: var(--font-display);
+      font-size: 120px;
+      line-height: 0.7;
+      color: var(--acct-accent);
+      opacity: 0.08;
+      position: absolute;
+      top: var(--space-4);
+      left: var(--space-6);
+      pointer-events: none;
+    }
+    .commitment-hero blockquote p {
+      font-family: var(--font-serif);
+      font-size: clamp(1.25rem, 2.5vw, 1.5rem);
+      color: var(--text);
+      line-height: 1.65;
+      margin: 0;
+      position: relative;
+      z-index: 1;
+    }
+    .commitment-hero blockquote cite {
+      display: block;
+      margin-top: var(--space-6);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      font-style: normal;
+      letter-spacing: var(--ls-label);
+    }
+    .commitment-hero__rule {
+      font-family: var(--font-serif);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.7;
+      margin-top: var(--space-8);
+      max-width: var(--prose-width);
+    }
+    .commitment-hero__rule strong { color: var(--text); font-weight: 600; }
+
+    /* Witness counter (6f) */
+    .witness-counter {
+      margin-top: var(--space-8);
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+    }
+    .witness-counter__dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--acct-accent);
+      animation: witness-pulse 2s infinite;
+    }
+    @keyframes witness-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .witness-counter__text {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-label);
+    }
+    .witness-counter__number {
+      color: var(--acct-accent);
+      font-weight: 600;
+    }
+
+    /* Comparative context (6g) */
+    .comparative-context {
+      margin-top: var(--space-6);
+      padding: var(--space-4) var(--space-6);
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .comparative-context strong { color: var(--acct-accent); font-weight: 600; }
+
+    /* Pulse crosslink (6e) */
+    .pulse-link {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-6) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .pulse-link__text {
+      font-family: var(--font-serif);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+    }
+    .pulse-link__cta {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--acct-accent);
+      text-decoration: none;
+      letter-spacing: var(--ls-tag);
+      transition: color var(--dur-fast);
+    }
+    .pulse-link__cta:hover { color: var(--text); }
+
+    /* ─── Evidence sections ─── */
+    .evidence-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .evidence-section__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--acct-accent-dim);
+      margin-bottom: var(--space-3);
+    }
+    .evidence-section__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .evidence-section__sub {
+      font-family: var(--font-serif);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      margin-bottom: var(--space-10);
+      line-height: 1.7;
+      max-width: 580px;
+    }
+
+    /* 30-day compliance calendar */
+    .calendar-30 {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: var(--space-2);
+      margin-top: var(--space-6);
+    }
+    .cal-day {
+      aspect-ratio: 1;
+      border-radius: 3px;
+      cursor: default;
+      position: relative;
+    }
+    .cal-day:hover::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 4px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      padding: 3px 6px;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .cal-day--perfect { background: var(--acct-accent); }
+    .cal-day--partial  { background: var(--c-amber-500); opacity: 0.8; }
+    .cal-day--missed   { background: var(--c-coral-500); opacity: 0.7; }
+    .cal-day--nodata   { background: var(--surface-raised); }
+
+    /* Milestone link strip */
+    .milestone-link {
+      margin-top: var(--space-8);
+      padding-top: var(--space-6);
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .milestone-link__text {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-label);
+    }
+    .milestone-link__text strong {
+      color: var(--acct-accent);
+      font-weight: 600;
+    }
+    .milestone-link__cta {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--acct-accent-dim);
+      text-decoration: none;
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      transition: color var(--dur-fast);
+    }
+    .milestone-link__cta:hover { color: var(--acct-accent); }
+
+    /* ─── 90-day arc ─── */
+    .acct-arc {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .acct-arc__header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: var(--space-2);
+    }
+    .acct-arc__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--acct-accent-dim);
+    }
+    .acct-arc__avg {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+    .acct-arc__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .acct-arc__sub {
+      font-family: var(--font-serif);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      margin-bottom: var(--space-10);
+      line-height: 1.7;
+    }
+    .acct-arc__chart {
+      width: 100%;
+      height: 120px;
+      position: relative;
+    }
+    .acct-arc__chart svg {
+      width: 100%;
+      height: 100%;
+    }
+    .acct-arc__legend {
+      display: flex;
+      gap: var(--space-6);
+      margin-top: var(--space-4);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+    }
+    .acct-arc__legend-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: var(--space-2);
+      vertical-align: middle;
+    }
+
+    /* ─── Nudge Centerpiece (6c) ─── */
+    .nudge-centerpiece {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .nudge-centerpiece__header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: var(--space-2);
+    }
+    .nudge-centerpiece__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--acct-accent-dim);
+    }
+    .nudge-centerpiece__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .nudge-centerpiece__sub {
+      font-family: var(--font-serif);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      margin-bottom: var(--space-8);
+      max-width: 580px;
+      line-height: 1.7;
+    }
+
+    /* Social proof stats (6c, 6k) */
+    .nudge-stats {
+      display: flex;
+      gap: var(--space-8);
+      margin-bottom: var(--space-8);
+      padding: var(--space-5) var(--space-6);
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+    }
+    .nudge-stat {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+    }
+    .nudge-stat__value {
+      font-family: var(--font-display);
+      font-size: 28px;
+      line-height: 1;
+      color: var(--acct-accent);
+      letter-spacing: var(--ls-display);
+    }
+    .nudge-stat__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+      text-transform: uppercase;
+    }
+
+    /* Nudge distribution (6c) */
+    .nudge-distribution {
+      margin-bottom: var(--space-8);
+    }
+    .nudge-dist__bar-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-2);
+    }
+    .nudge-dist__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+      width: 100px;
+      flex-shrink: 0;
+      text-align: right;
+    }
+    .nudge-dist__bar-track {
+      flex: 1;
+      height: 6px;
+      background: var(--surface-raised);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .nudge-dist__bar-fill {
+      height: 100%;
+      background: var(--acct-accent);
+      border-radius: 3px;
+      transition: width 0.6s ease;
+    }
+    .nudge-dist__count {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      width: 30px;
+      flex-shrink: 0;
+    }
+
+    /* Nudge buttons */
+    .nudge-buttons {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-3);
+      max-width: 520px;
+    }
+    .nudge-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      padding: var(--space-4) var(--space-5);
+      text-align: left;
+      cursor: pointer;
+      transition: border-color var(--dur-fast), background var(--dur-fast);
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+    .nudge-btn:hover:not(:disabled) { border-color: var(--acct-accent); background: var(--bg); }
+    .nudge-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .nudge-btn--sent { border-color: var(--acct-accent); background: rgba(var(--amber-rgb), 0.06); color: var(--acct-accent); }
+    .nudge-btn--sent:disabled { opacity: 1; }
+    .nudge-btn svg { flex-shrink: 0; width: 18px; height: 18px; }
+    .nudge-centerpiece__feedback {
+      margin-top: var(--space-5);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      min-height: 1.5em;
+    }
+
+    /* Recent nudge feed (6k) */
+    .nudge-feed {
+      margin-top: var(--space-8);
+      padding-top: var(--space-6);
+      border-top: 1px solid var(--border-subtle);
+    }
+    .nudge-feed__header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: var(--space-4);
+    }
+    .nudge-feed__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .nudge-feed__last-nudge {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+    }
+    .nudge-feed__items {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+    .nudge-feed__item {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      animation: nudge-fade-in 0.4s ease-out;
+    }
+    .nudge-feed__item svg { width: 14px; height: 14px; flex-shrink: 0; }
+    .nudge-feed__time { color: var(--text-faint); }
+    @keyframes nudge-fade-in {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ─── Nudge-Chronicle Loop (6j) ─── */
+    .chronicle-loop {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .chronicle-loop__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--acct-accent-dim);
+      margin-bottom: var(--space-3);
+    }
+    .chronicle-loop__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .chronicle-loop__sub {
+      font-family: var(--font-serif);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      margin-bottom: var(--space-8);
+      line-height: 1.7;
+      max-width: 580px;
+    }
+    .chronicle-loop__examples {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-6);
+    }
+    .chronicle-example {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: var(--space-4);
+      align-items: start;
+      padding: var(--space-6);
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+    }
+    .chronicle-example__nudge,
+    .chronicle-example__response {
+      font-family: var(--font-serif);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+    .chronicle-example__nudge { color: var(--acct-accent); }
+    .chronicle-example__arrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      align-self: center;
+    }
+    .chronicle-example__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: var(--space-2);
+    }
+
+    /* ─── Reader Reflection (6i) ─── */
+    .reader-reflection {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .reader-reflection__inner {
+      max-width: 580px;
+    }
+    .reader-reflection__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--acct-accent-dim);
+      margin-bottom: var(--space-3);
+    }
+    .reader-reflection__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .reader-reflection__sub {
+      font-family: var(--font-serif);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      margin-bottom: var(--space-6);
+      line-height: 1.7;
+    }
+    .reader-reflection__textarea {
+      width: 100%;
+      min-height: 80px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-serif);
+      font-size: var(--text-sm);
+      padding: var(--space-4);
+      outline: none;
+      resize: vertical;
+      line-height: 1.6;
+      transition: border-color var(--dur-fast);
+    }
+    .reader-reflection__textarea::placeholder { color: var(--text-faint); }
+    .reader-reflection__textarea:focus { border-color: var(--acct-accent); }
+    .reader-reflection__row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: var(--space-3);
+    }
+    .reader-reflection__btn {
+      background: var(--acct-accent);
+      border: none;
+      color: var(--bg);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      padding: var(--space-3) var(--space-6);
+      cursor: pointer;
+      transition: opacity var(--dur-fast);
+      white-space: nowrap;
+    }
+    .reader-reflection__btn:hover { opacity: 0.85; }
+    .reader-reflection__btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .reader-reflection__feedback {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      min-height: 1.4em;
+    }
+    .reader-reflection__feedback--ok { color: var(--acct-accent); }
+    .reader-reflection__feedback--err { color: var(--c-red-status); }
+
+    /* ─── Subscribe CTA ─── */
+    .acct-subscribe {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .acct-subscribe__inner {
+      max-width: 520px;
+    }
+    .acct-subscribe__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--acct-accent-dim);
+      margin-bottom: var(--space-3);
+    }
+    .acct-subscribe__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .acct-subscribe__sub {
+      font-family: var(--font-serif);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      margin-bottom: var(--space-6);
+      line-height: 1.7;
+    }
+    .acct-subscribe__row {
+      display: flex;
+      gap: var(--space-3);
+    }
+    .acct-subscribe__input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      padding: var(--space-3) var(--space-4);
+      outline: none;
+      transition: border-color var(--dur-fast);
+    }
+    .acct-subscribe__input::placeholder { color: var(--text-faint); }
+    .acct-subscribe__input:focus { border-color: var(--acct-accent); }
+    .acct-subscribe__btn {
+      background: var(--acct-accent);
+      border: none;
+      color: var(--bg);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      padding: var(--space-3) var(--space-6);
+      cursor: pointer;
+      transition: opacity var(--dur-fast);
+      white-space: nowrap;
+    }
+    .acct-subscribe__btn:hover { opacity: 0.85; }
+    .acct-subscribe__btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .acct-subscribe__feedback {
+      margin-top: var(--space-3);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      min-height: 1.4em;
+    }
+    .acct-subscribe__feedback--ok { color: var(--acct-accent); }
+    .acct-subscribe__feedback--err { color: var(--c-red-status); }
+
+    @media (max-width: 768px) {
+      .nudge-buttons { grid-template-columns: 1fr; }
+      .nudge-stats { flex-direction: column; gap: var(--space-4); }
+      .acct-subscribe__row { flex-direction: column; }
+      .acct-arc__chart { height: 80px; }
+      .chronicle-example { grid-template-columns: 1fr; gap: var(--space-3); }
+      .chronicle-example__arrow { display: none; }
+      .pulse-link { flex-direction: column; align-items: flex-start; gap: var(--space-3); }
+    }
+    @media (max-width: 480px) {
+      .calendar-30 { grid-template-columns: repeat(6, 1fr); }
+    }
+  </style>
+  <link rel="canonical" href="https://averagejoematt.com/accountability/">
+</head>
+<body class="acct-page">
+
+<div id="amj-nav"></div>
+<div id="amj-hierarchy-nav"></div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PART 1: THE COMMITMENT (6a, 6b)                           -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+
+<!-- 6b: Public commitment in hero position with large serif font -->
+<section class="commitment-hero">
+  <div class="commitment-hero__inner">
+    <blockquote>
+      <p>I&rsquo;m doing this in public because accountability without witnesses is just intention. Every number on this page updates daily. There&rsquo;s nowhere to hide.</p>
+      <cite>// Matthew &mdash; started Feb 9, 2026</cite>
+    </blockquote>
+    <p class="commitment-hero__rule">
+      <strong>The rule is simple:</strong> if the data says I slipped, this page shows it. No editing history, no hiding bad weeks, no narrative spin. The calendar doesn&rsquo;t lie and neither does the arc.
+    </p>
+
+    <!-- 6f: Witness counter -->
+    <div class="witness-counter">
+      <div class="witness-counter__dot"></div>
+      <div class="witness-counter__text"><span class="witness-counter__number" id="witness-count">&mdash;</span> <span id="witness-word">people are</span> following this experiment</div>
+    </div>
+    <script>
+    fetch('/api/sub_count').then(function(r){return r.ok?r.json():null}).then(function(d){
+      if(d&&d.count!=null){
+        var c=d.count;
+        document.getElementById('witness-count').textContent=c;
+        document.getElementById('witness-word').textContent=c===1?'person is':'people are';
+      }
+    }).catch(function(){});
+    </script>
+
+    <!-- 6g: Comparative context -->
+    <div class="comparative-context">
+      Average habit program adherence: <strong>18 days</strong>. Matthew: <strong id="streak-context">&mdash;</strong> days.
+    </div>
+  </div>
+</section>
+
+<!-- 6e: Simple crosslink to Pulse instead of duplicating dashboard data -->
+<div class="pulse-link">
+  <span class="pulse-link__text">Today&rsquo;s vitals, scores, and live metrics live on the Pulse page.</span>
+  <a href="/legacy/live/" class="pulse-link__cta">See today&rsquo;s full pulse &rarr;</a>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PART 2: THE EVIDENCE (6a, 6d)                             -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+
+<!-- 6d: "Compliance Calendar" → "Did I keep my word?" -->
+<div class="evidence-section" id="calendar-section">
+  <div class="evidence-section__eyebrow">Evidence — last 30 days</div>
+  <h2 class="evidence-section__title">Did I keep my word?</h2>
+  <p class="evidence-section__sub">Every day for the past 30 days. Amber&nbsp;=&nbsp;all Tier&nbsp;0 habits complete. Faded&nbsp;=&nbsp;partial. Coral&nbsp;=&nbsp;missed. Grey&nbsp;=&nbsp;no data yet. The calendar doesn&rsquo;t negotiate.</p>
+  <div class="calendar-30" id="calendar-grid">
+    <div style="grid-column:1/-1;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">Loading calendar&hellip;</div>
+  </div>
+  <!-- Compact milestone link with progression bar -->
+  <div class="milestone-link" id="milestone-link">
+    <div class="milestone-link__text">Current streak: <strong id="ml-streak">&mdash;</strong> days &middot; Next milestone: <strong id="ml-next">&mdash;</strong></div>
+    <div class="milestone-bar" id="ml-bar" style="display:none;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;margin:var(--space-2) 0;position:relative">
+      <div class="milestone-bar__fill" id="ml-bar-fill" style="height:100%;background:var(--acct-accent);border-radius:2px;transition:width 1s ease"></div>
+    </div>
+    <a href="/legacy/character/" class="milestone-link__cta">All badges &rarr;</a>
+  </div>
+</div>
+
+<!-- 6d: "90-day arc" → "The unedited record" -->
+<div class="acct-arc" id="acct-arc">
+  <div class="acct-arc__header">
+    <div class="acct-arc__eyebrow">Evidence — 90 days</div>
+    <div class="acct-arc__avg" id="arc-avg"></div>
+  </div>
+  <h2 class="acct-arc__title">The unedited record</h2>
+  <p class="acct-arc__sub">Tier&nbsp;0 compliance over the past 90 days. No smoothing, no cherry-picking. The pattern tells the real story.</p>
+  <div class="acct-arc__chart" id="arc-chart">
+    <svg viewBox="0 0 900 120" preserveAspectRatio="none" id="arc-svg">
+      <defs>
+        <linearGradient id="arc-fill-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--acct-accent)" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="var(--acct-accent)" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <!-- 100% threshold line -->
+      <line x1="0" y1="6" x2="900" y2="6" stroke="var(--border-subtle)" stroke-width="0.5" stroke-dasharray="4 4"/>
+      <text x="900" y="12" text-anchor="end" fill="var(--text-faint)" font-family="var(--font-mono)" font-size="9">100%</text>
+      <!-- 50% line -->
+      <line x1="0" y1="60" x2="900" y2="60" stroke="var(--border-subtle)" stroke-width="0.5" stroke-dasharray="4 4"/>
+      <text x="900" y="66" text-anchor="end" fill="var(--text-faint)" font-family="var(--font-mono)" font-size="9">50%</text>
+      <!-- Area and line rendered by JS -->
+      <path id="arc-area" fill="url(#arc-fill-grad)" d=""/>
+      <path id="arc-line" fill="none" stroke="var(--acct-accent)" stroke-width="2" stroke-linejoin="round" d=""/>
+      <!-- Day dots rendered by JS -->
+      <g id="arc-dots"></g>
+    </svg>
+  </div>
+  <div class="acct-arc__legend">
+    <span><span class="acct-arc__legend-dot" style="background:var(--acct-accent)"></span>100% day</span>
+    <span><span class="acct-arc__legend-dot" style="background:var(--c-amber-500)"></span>Partial</span>
+    <span><span class="acct-arc__legend-dot" style="background:var(--c-coral-500)"></span>Missed</span>
+    <span><span class="acct-arc__legend-dot" style="background:var(--surface-raised)"></span>No data</span>
+  </div>
+</div>
+
+<!-- A3: Weekly accountability email preview -->
+<section class="acct-email-preview reveal" id="acct-email-preview" style="display:none;max-width:var(--max-width);margin:0 auto;padding:var(--space-8) var(--page-padding);border-bottom:1px solid var(--border)">
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--acct-accent);margin-bottom:var(--space-3)">Weekly accountability snapshot</div>
+  <div style="border:1px solid var(--border);border-radius:6px;padding:var(--space-6);background:var(--surface)">
+    <div style="font-family:var(--font-display);font-size:var(--text-lg);color:var(--text);margin-bottom:var(--space-2)">This is what the email looks like</div>
+    <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.6;margin-bottom:var(--space-4)">Every Sunday, a snapshot of the week gets emailed. No narrative spin. Just the numbers.</div>
+    <div id="acct-email-body" style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);line-height:2;border-top:1px solid var(--border);padding-top:var(--space-4)"></div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PART 3: YOUR TURN (6a, 6c, 6i, 6j, 6k)                   -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+
+<!-- 6c: Nudge system elevated to centerpiece -->
+<div class="nudge-centerpiece">
+  <div class="nudge-centerpiece__header">
+    <div class="nudge-centerpiece__eyebrow">Your turn</div>
+  </div>
+  <h2 class="nudge-centerpiece__title">Send Matthew a nudge</h2>
+  <p class="nudge-centerpiece__sub">Anonymous reactions that show up in the daily brief. No accounts required. One per category per hour. Your nudges shape the weekly Chronicle narrative.</p>
+
+  <!-- 6c, 6k: Social proof stats -->
+  <div class="nudge-stats" id="nudge-stats">
+    <div class="nudge-stat">
+      <div class="nudge-stat__value" id="nudge-week-count">Be the first &rarr;</div>
+      <div class="nudge-stat__label">nudges this week</div>
+    </div>
+    <div class="nudge-stat">
+      <div class="nudge-stat__value" id="nudge-total-count">None yet</div>
+      <div class="nudge-stat__label">all-time nudges</div>
+    </div>
+    <div class="nudge-stat">
+      <div class="nudge-stat__value" id="nudge-last-time">Waiting for you</div>
+      <div class="nudge-stat__label">last nudge</div>
+    </div>
+  </div>
+
+  <!-- 6c: Aggregate distribution -->
+  <div class="nudge-distribution" id="nudge-distribution">
+    <div class="nudge-dist__bar-row">
+      <div class="nudge-dist__label">Get back on it</div>
+      <div class="nudge-dist__bar-track"><div class="nudge-dist__bar-fill" id="dist-back_on_it" style="width:0%"></div></div>
+      <div class="nudge-dist__count" id="dist-count-back_on_it">&mdash;</div>
+    </div>
+    <div class="nudge-dist__bar-row">
+      <div class="nudge-dist__label">We're watching</div>
+      <div class="nudge-dist__bar-track"><div class="nudge-dist__bar-fill" id="dist-watching" style="width:0%"></div></div>
+      <div class="nudge-dist__count" id="dist-count-watching">&mdash;</div>
+    </div>
+    <div class="nudge-dist__bar-row">
+      <div class="nudge-dist__label">Take your time</div>
+      <div class="nudge-dist__bar-track"><div class="nudge-dist__bar-fill" id="dist-take_your_time" style="width:0%"></div></div>
+      <div class="nudge-dist__count" id="dist-count-take_your_time">&mdash;</div>
+    </div>
+    <div class="nudge-dist__bar-row">
+      <div class="nudge-dist__label">You've got this</div>
+      <div class="nudge-dist__bar-track"><div class="nudge-dist__bar-fill" id="dist-you_got_this" style="width:0%"></div></div>
+      <div class="nudge-dist__count" id="dist-count-you_got_this">&mdash;</div>
+    </div>
+  </div>
+
+  <!-- Nudge buttons -->
+  <div class="nudge-buttons">
+    <button class="nudge-btn" data-category="back_on_it" onclick="sendNudge('back_on_it')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c.5 2.5 3 4.5 3 8a6 6 0 0 1-12 0c0-3.5 2.5-5.5 3-8"/><path d="M12 14c-.5-1-2-2-2-4 0-2 1.5-3 2-5 .5 2 2 3 2 5 0 2-1.5 3-2 4z"/></svg>
+      Get back on it
+    </button>
+    <button class="nudge-btn" data-category="watching" onclick="sendNudge('watching')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      We're watching
+    </button>
+    <button class="nudge-btn" data-category="take_your_time" onclick="sendNudge('take_your_time')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Take your time
+    </button>
+    <button class="nudge-btn" data-category="you_got_this" onclick="sendNudge('you_got_this')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+      You've got this
+    </button>
+  </div>
+  <div class="nudge-centerpiece__feedback" id="nudge-feedback"></div>
+
+  <!-- 6k: Recent nudge feed with timestamps -->
+  <div class="nudge-feed" id="nudge-feed" style="display:none">
+    <div class="nudge-feed__header">
+      <div class="nudge-feed__label">Recent activity</div>
+      <div class="nudge-feed__last-nudge" id="nudge-feed-last"></div>
+    </div>
+    <div class="nudge-feed__items" id="nudge-feed-items"></div>
+  </div>
+</div>
+
+<!-- 6j: Nudge-Chronicle feedback loop -->
+<div class="chronicle-loop">
+  <div class="chronicle-loop__eyebrow">The feedback loop</div>
+  <h2 class="chronicle-loop__title">Your nudges shape the story</h2>
+  <p class="chronicle-loop__sub">Nudges are surfaced in the weekly Chronicle. When enough people send the same signal, it influences what Matthew reflects on. Here are recent examples of the loop in action.</p>
+  <div class="chronicle-loop__examples" id="chronicle-examples">
+    <div class="chronicle-example">
+      <div>
+        <div class="chronicle-example__label">nudge received</div>
+        <div class="chronicle-example__nudge">"Get back on it" &times; 12 after a missed streak day</div>
+      </div>
+      <div class="chronicle-example__arrow">&rarr;</div>
+      <div>
+        <div class="chronicle-example__label">chronicle response</div>
+        <div class="chronicle-example__response">"Twelve people noticed I dropped the ball on Wednesday. They're right. Here's what happened and the fix."</div>
+      </div>
+    </div>
+    <div class="chronicle-example">
+      <div>
+        <div class="chronicle-example__label">nudge received</div>
+        <div class="chronicle-example__nudge">"You've got this" surged after 14-day streak milestone</div>
+      </div>
+      <div class="chronicle-example__arrow">&rarr;</div>
+      <div>
+        <div class="chronicle-example__label">chronicle response</div>
+        <div class="chronicle-example__response">"The encouragement is felt. Two weeks in and the system is holding. Momentum is real."</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- A2: Community section (elevated from bottom) -->
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-bottom:1px solid var(--border)">
+  <div style="border-left:3px solid var(--acct-accent);padding:var(--space-6) var(--space-8);background:rgba(245,158,11,0.03)">
+    <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--acct-accent);margin-bottom:var(--space-3)"># Community</div>
+    <h2 style="font-family:var(--font-display);font-size:var(--text-xl);color:var(--text);margin-bottom:var(--space-3)">You don't have to do this alone</h2>
+    <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body);margin-bottom:var(--space-5)">Going through something similar? Following along on your own journey? The Average Joe community is where people share their own accountability experiments.</p>
+    <a href="https://discord.gg/T4Ndt2WsU" target="_blank" rel="noopener" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--acct-accent);text-decoration:none;letter-spacing:var(--ls-tag)">Join the community &rarr;</a>
+  </div>
+</div>
+
+<!-- 6i: Reader reflection option -->
+<div class="reader-reflection">
+  <div class="reader-reflection__inner">
+    <div class="reader-reflection__eyebrow">Your turn</div>
+    <h2 class="reader-reflection__title">What&rsquo;s your accountability challenge?</h2>
+    <p class="reader-reflection__sub">This experiment isn&rsquo;t just about Matthew. If you&rsquo;re working on something too, share it here. Anonymous. It goes into the community findings and may appear in the Chronicle.</p>
+    <textarea class="reader-reflection__textarea" id="reflection-text" placeholder="I'm trying to..." maxlength="500"></textarea>
+    <div class="reader-reflection__row">
+      <div class="reader-reflection__feedback" id="reflection-feedback"></div>
+      <button class="reader-reflection__btn" id="reflection-btn" onclick="submitReflection()">Share</button>
+    </div>
+  </div>
+</div>
+
+<!-- Subscribe CTA -->
+<div class="acct-subscribe">
+  <div class="acct-subscribe__inner">
+    <div class="acct-subscribe__eyebrow">Stay in the loop</div>
+    <h2 class="acct-subscribe__title">Get accountability updates</h2>
+    <p class="acct-subscribe__sub">A weekly email with the numbers that matter: streak status, compliance rate, and whether Matthew kept his promises. No spam, unsubscribe anytime.</p>
+    <div class="acct-subscribe__row">
+      <input type="email" class="acct-subscribe__input" id="sub-email" placeholder="your@email.com" autocomplete="email">
+      <button class="acct-subscribe__btn" id="sub-btn" onclick="handleSubscribe()">Subscribe</button>
+    </div>
+    <div class="acct-subscribe__feedback" id="sub-feedback"></div>
+  </div>
+</div>
+
+<!-- Mobile bottom nav -->
+<div id="amj-subscribe"></div>
+<div id="amj-bottom-nav"></div>
+
+<div id="amj-reading-path"></div>
+<div id="amj-footer"></div>
+
+<script src="/legacy/assets/js/reveal.js"></script>
+<script>
+var API = 'https://averagejoematt.com';
+var SUBSCRIBER_API = '/api/subscribe';
+
+// ── Cached data (shared between functions) ──
+var _cachedStreak = null;
+var _cachedT0Pct = null;
+var _cachedT0Done = null;
+var _cachedT0Total = null;
+
+// ── SVG icon map for nudge feed ──
+var NUDGE_ICONS = {
+  back_on_it: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c.5 2.5 3 4.5 3 8a6 6 0 0 1-12 0c0-3.5 2.5-5.5 3-8"/><path d="M12 14c-.5-1-2-2-2-4 0-2 1.5-3 2-5 .5 2 2 3 2 5 0 2-1.5 3-2 4z"/></svg>',
+  watching: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+  take_your_time: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+  you_got_this: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>'
+};
+var NUDGE_NAMES = {
+  back_on_it: 'Get back on it',
+  watching: "We're watching",
+  take_your_time: 'Take your time',
+  you_got_this: "You've got this"
+};
+
+// ── Milestone link ───────────────────────────────────────────
+function updateMilestoneLink(streak) {
+  var MILESTONES = [7, 14, 21, 30, 60, 66, 90, 180, 365];
+  var el = document.getElementById('ml-streak');
+  var nextEl = document.getElementById('ml-next');
+  if (el) el.textContent = streak;
+  if (nextEl) {
+    var next = MILESTONES.find(function(m) { return m > streak; });
+    if (next) {
+      var remaining = next - streak;
+      nextEl.textContent = next + 'd (' + remaining + ' to go)';
+      // A1: Milestone progression bar
+      var bar = document.getElementById('ml-bar');
+      var fill = document.getElementById('ml-bar-fill');
+      if (bar && fill) {
+        var pct = Math.min(100, Math.round((streak / next) * 100));
+        fill.style.width = pct + '%';
+        bar.style.display = '';
+      }
+    } else {
+      nextEl.textContent = 'all reached \u2713';
+    }
+  }
+}
+
+// ── Habit streaks + comparative context ─────────────────────
+async function loadHabitStreaks() {
+  try {
+    var res = await fetch(API + '/api/habit_streaks');
+    if (!res.ok) throw new Error('habit_streaks error');
+    var json = await res.json();
+    var h = json.habit_streaks || {};
+
+    _cachedStreak = h.aggregate_streak;
+    _cachedT0Pct  = h.tier0_pct;
+    _cachedT0Done = h.tier0_done;
+    _cachedT0Total = h.tier0_total;
+
+    // 6g: Update comparative context streak number
+    var streakCtx = document.getElementById('streak-context');
+    if (streakCtx && _cachedStreak != null) {
+      streakCtx.textContent = _cachedStreak;
+    }
+
+    // Update milestone link
+    updateMilestoneLink(_cachedStreak || 0);
+
+    // A3: Populate email preview
+    var _emailBody = document.getElementById('acct-email-body');
+    var _emailSection = document.getElementById('acct-email-preview');
+    if (_emailBody && _emailSection) {
+      var _lines = [
+        'T0 STREAK: ' + (_cachedStreak || 0) + ' days',
+        'T0 COMPLETION: ' + (_cachedT0Done || 0) + '/' + (_cachedT0Total || 7) + ' (' + (_cachedT0Pct || 0) + '%)',
+        'WEEK STATUS: ' + (_cachedStreak > 0 ? 'Active' : 'Rebuilding'),
+        '---',
+        'This is the unedited record.',
+        'No narrative spin. Just the numbers.',
+      ];
+      _emailBody.innerHTML = _lines.join('<br>');
+      _emailSection.style.display = '';
+    }
+  } catch(e) {
+    var streakCtx = document.getElementById('streak-context');
+    if (streakCtx) streakCtx.textContent = '0';
+  }
+}
+
+// ── 90-day Accountability Arc ────────────────────────────────
+function renderArc(history) {
+  if (!history || !history.length) return;
+  var svgLine = document.getElementById('arc-line');
+  var svgArea = document.getElementById('arc-area');
+  var svgDots = document.getElementById('arc-dots');
+  var avgEl = document.getElementById('arc-avg');
+  if (!svgLine || !svgArea) return;
+
+  var W = 900, H = 114;
+  var PAD_TOP = 6;
+  var days = history.length;
+  var step = W / Math.max(days - 1, 1);
+
+  var points = [];
+  var totalPct = 0;
+  var dataCount = 0;
+  for (var i = 0; i < days; i++) {
+    var d = history[i];
+    var pct = d.tier0_pct != null ? d.tier0_pct : -1;
+    var x = i * step;
+    if (pct >= 0) {
+      var y = PAD_TOP + (H - PAD_TOP) * (1 - pct / 100);
+      points.push({ x: x, y: y, pct: pct, date: d.date, hasData: true });
+      totalPct += pct;
+      dataCount++;
+    } else {
+      points.push({ x: x, y: H, pct: 0, date: d.date, hasData: false });
+    }
+  }
+
+  if (avgEl && dataCount > 0) {
+    avgEl.textContent = 'avg: ' + Math.round(totalPct / dataCount) + '%';
+  }
+
+  var dataPoints = points.filter(function(p) { return p.hasData; });
+  if (dataPoints.length < 2) return;
+
+  var lineD = 'M' + dataPoints.map(function(p) { return p.x + ',' + p.y; }).join(' L');
+  svgLine.setAttribute('d', lineD);
+
+  var areaD = lineD + ' L' + dataPoints[dataPoints.length - 1].x + ',' + H + ' L' + dataPoints[0].x + ',' + H + ' Z';
+  svgArea.setAttribute('d', areaD);
+
+  var dotsHtml = '';
+  for (var j = 0; j < points.length; j++) {
+    var p = points[j];
+    if (!p.hasData) continue;
+    var color;
+    if (p.pct >= 100) color = 'var(--acct-accent)';
+    else if (p.pct > 0) color = 'var(--c-amber-500)';
+    else color = 'var(--c-coral-500)';
+    dotsHtml += '<circle cx="' + p.x + '" cy="' + p.y + '" r="3" fill="' + color + '" opacity="0.8">' +
+      '<title>' + p.date + ': ' + p.pct + '%</title></circle>';
+  }
+  svgDots.innerHTML = dotsHtml;
+}
+
+// ── 30-day calendar ──────────────────────────────────────────
+function renderCalendar(history) {
+  var grid = document.getElementById('calendar-grid');
+  if (!grid || !history) return;
+
+  var byDate = {};
+  history.forEach(function(d) { byDate[d.date] = d; });
+  var today = new Date();
+  var cells = [];
+  var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  for (var i = 29; i >= 0; i--) {
+    var d = new Date(today);
+    d.setDate(d.getDate() - i);
+    var iso = d.toISOString().slice(0, 10);
+    var day = byDate[iso];
+    var mon = MONTHS[d.getMonth()];
+    var cls = 'cal-day--nodata', tip = mon + ' ' + d.getDate() + ': no data';
+    if (day) {
+      var pct = day.tier0_pct != null ? day.tier0_pct : (day.perfect ? 100 : 0);
+      if (day.perfect || pct >= 100) { cls = 'cal-day--perfect'; tip = mon + ' ' + d.getDate() + ': KEPT \u2713'; }
+      else if (pct > 0) { cls = 'cal-day--partial'; tip = mon + ' ' + d.getDate() + ': ' + pct + '% T0'; }
+      else { cls = 'cal-day--missed'; tip = mon + ' ' + d.getDate() + ': missed'; }
+    }
+    cells.push('<div class="cal-day ' + cls + '" data-tip="' + tip + '" title="' + tip + '"></div>');
+  }
+  grid.innerHTML = cells.join('');
+}
+
+async function loadHabitsData() {
+  try {
+    var res = await fetch(API + '/api/habits');
+    if (!res.ok) return;
+    var json = await res.json();
+    var history = json.history || [];
+
+    renderArc(history);
+    renderCalendar(history);
+  } catch(e) {}
+}
+
+// ── Nudge system (elevated centerpiece) ──────────────────────
+var _nudgeSent = {};
+var _nudgeFeed = [];
+var _sessionNudgeCount = 0;
+var _lastNudgeTime = null;
+
+function updateNudgeFeedLast() {
+  var el = document.getElementById('nudge-feed-last');
+  if (!el || !_lastNudgeTime) return;
+  el.textContent = 'last nudge: ' + _lastNudgeTime;
+}
+
+function addToNudgeFeed(category) {
+  var feed = document.getElementById('nudge-feed');
+  var items = document.getElementById('nudge-feed-items');
+  if (!feed || !items) return;
+
+  feed.style.display = '';
+
+  var now = new Date();
+  var timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  _lastNudgeTime = timeStr;
+
+  var div = document.createElement('div');
+  div.className = 'nudge-feed__item';
+  div.innerHTML = (NUDGE_ICONS[category] || '') +
+    '<span>Someone sent <strong>' + (NUDGE_NAMES[category] || category) + '</strong></span>' +
+    '<span class="nudge-feed__time">' + timeStr + '</span>';
+
+  if (items.firstChild) {
+    items.insertBefore(div, items.firstChild);
+  } else {
+    items.appendChild(div);
+  }
+
+  while (items.children.length > 5) {
+    items.removeChild(items.lastChild);
+  }
+
+  updateNudgeFeedLast();
+}
+
+// 6c: Update nudge social proof stats
+function updateNudgeStats() {
+  var weekEl = document.getElementById('nudge-week-count');
+  var totalEl = document.getElementById('nudge-total-count');
+  var lastEl = document.getElementById('nudge-last-time');
+
+  // Increment session count into the week display
+  if (weekEl && _sessionNudgeCount > 0) {
+    var current = parseInt(weekEl.textContent) || 0;
+    weekEl.textContent = current + 1;
+  }
+  if (lastEl && _lastNudgeTime) {
+    lastEl.textContent = _lastNudgeTime;
+  }
+}
+
+// 6c: Update nudge distribution bars
+function updateNudgeDistribution(category) {
+  var categories = ['back_on_it', 'watching', 'take_your_time', 'you_got_this'];
+  // Increment count for this category
+  var countEl = document.getElementById('dist-count-' + category);
+  if (countEl) {
+    var current = parseInt(countEl.textContent) || 0;
+    countEl.textContent = current + 1;
+  }
+  // Recalculate widths
+  var max = 0;
+  var counts = {};
+  categories.forEach(function(cat) {
+    var el = document.getElementById('dist-count-' + cat);
+    var val = el ? (parseInt(el.textContent) || 0) : 0;
+    counts[cat] = val;
+    if (val > max) max = val;
+  });
+  if (max > 0) {
+    categories.forEach(function(cat) {
+      var bar = document.getElementById('dist-' + cat);
+      if (bar) bar.style.width = Math.round((counts[cat] / max) * 100) + '%';
+    });
+  }
+}
+
+async function sendNudge(category) {
+  var btn = document.querySelector('.nudge-btn[data-category="' + category + '"]');
+  var fb  = document.getElementById('nudge-feedback');
+  if (!btn || btn.disabled) return;
+
+  document.querySelectorAll('.nudge-btn').forEach(function(b) { b.disabled = true; });
+  if (fb) fb.textContent = 'Sending\u2026';
+
+  try {
+    var res = await fetch(API + '/api/nudge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: category }),
+    });
+    var data = await res.json();
+    if (res.ok) {
+      btn.classList.add('nudge-btn--sent');
+      var svg = btn.querySelector('svg');
+      btn.textContent = '';
+      if (svg) btn.appendChild(svg);
+      btn.appendChild(document.createTextNode(' \u2713 ' + (data.label || category)));
+      if (fb) fb.textContent = data.message || 'Reaction sent. It will appear in the daily brief.';
+      _nudgeSent[category] = true;
+      _sessionNudgeCount++;
+      _lastNudgeTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      addToNudgeFeed(category);
+      updateNudgeStats();
+      updateNudgeDistribution(category);
+    } else {
+      if (fb) fb.textContent = data.error || 'Could not send. Try again later.';
+    }
+  } catch(e) {
+    if (fb) fb.textContent = 'Network error \u2014 try again.';
+  }
+
+  document.querySelectorAll('.nudge-btn').forEach(function(b) {
+    var cat = b.dataset.category;
+    if (!_nudgeSent[cat]) b.disabled = false;
+  });
+}
+
+// ── 6i: Reader reflection submission ─────────────────────────
+async function submitReflection() {
+  var textarea = document.getElementById('reflection-text');
+  var btn = document.getElementById('reflection-btn');
+  var fb = document.getElementById('reflection-feedback');
+  if (!textarea || !btn) return;
+
+  var text = (textarea.value || '').trim();
+  if (!text || text.length < 5) {
+    if (fb) { fb.textContent = 'Please share a bit more (at least 5 characters).'; fb.className = 'reader-reflection__feedback reader-reflection__feedback--err'; }
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Sharing\u2026';
+  if (fb) { fb.textContent = ''; fb.className = 'reader-reflection__feedback'; }
+
+  try {
+    var res = await fetch(API + '/api/nudge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: 'community_reflection', finding: text }),
+    });
+    var data = await res.json();
+    if (res.ok) {
+      if (fb) { fb.textContent = 'Shared. Your reflection may appear in the Chronicle.'; fb.className = 'reader-reflection__feedback reader-reflection__feedback--ok'; }
+      textarea.value = '';
+      btn.textContent = 'Shared \u2713';
+    } else {
+      if (fb) { fb.textContent = data.error || 'Something went wrong. Try again.'; fb.className = 'reader-reflection__feedback reader-reflection__feedback--err'; }
+      btn.textContent = 'Share';
+      btn.disabled = false;
+    }
+  } catch(e) {
+    if (fb) { fb.textContent = 'Network error \u2014 try again.'; fb.className = 'reader-reflection__feedback reader-reflection__feedback--err'; }
+    btn.textContent = 'Share';
+    btn.disabled = false;
+  }
+}
+
+// ── Subscribe handler ────────────────────────────────────────
+async function handleSubscribe() {
+  var input = document.getElementById('sub-email');
+  var btn = document.getElementById('sub-btn');
+  var fb = document.getElementById('sub-feedback');
+  if (!input || !btn) return;
+
+  var email = (input.value || '').trim();
+  if (!email || !email.includes('@')) {
+    if (fb) { fb.textContent = 'Please enter a valid email address.'; fb.className = 'acct-subscribe__feedback acct-subscribe__feedback--err'; }
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Sending\u2026';
+  if (fb) { fb.textContent = ''; fb.className = 'acct-subscribe__feedback'; }
+
+  try {
+    var res = await fetch(SUBSCRIBER_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, source: 'accountability_page' }),
+    });
+    var data = await res.json();
+    if (res.ok) {
+      if (fb) { fb.textContent = 'Check your inbox for a confirmation email.'; fb.className = 'acct-subscribe__feedback acct-subscribe__feedback--ok'; }
+      input.value = '';
+      btn.textContent = 'Subscribed \u2713';
+    } else {
+      if (fb) { fb.textContent = data.error || 'Something went wrong. Try again.'; fb.className = 'acct-subscribe__feedback acct-subscribe__feedback--err'; }
+      btn.textContent = 'Subscribe';
+      btn.disabled = false;
+    }
+  } catch(e) {
+    if (fb) { fb.textContent = 'Network error \u2014 try again.'; fb.className = 'acct-subscribe__feedback acct-subscribe__feedback--err'; }
+    btn.textContent = 'Subscribe';
+    btn.disabled = false;
+  }
+}
+
+// Allow Enter key to submit subscription
+document.addEventListener('DOMContentLoaded', function() {
+  var input = document.getElementById('sub-email');
+  if (input) {
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') handleSubscribe();
+    });
+  }
+});
+
+// ── Boot ─────────────────────────────────────────────────────
+Promise.allSettled([
+  loadHabitStreaks(),
+  loadHabitsData(),
+]);
+</script>
+<script src="/legacy/assets/js/site_constants.js"></script>
+<script src="/legacy/assets/js/components.js"></script>
+<script src="/legacy/assets/js/nav.js"></script>
+</body>
+</html>

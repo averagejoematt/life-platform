@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="robots" content="noindex">
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Board — averagejoematt.com</title>
+  <meta name="description" content="Get personalized health perspectives from a curated panel of expert AI advisors — in the domains of metabolic medicine, neuroscience, nutrition, and more.">
+  <meta property="og:title" content="Ask My Health Board — Average Joe Matt">
+  <meta property="og:description" content="AI-powered responses from 6 expert advisors — metabolic medicine, neuroscience, nutrition, habit architecture, and mental performance.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="canonical" href="https://averagejoematt.com/board/">
+  <link rel="stylesheet" href="/legacy/assets/css/tokens.css">
+  <link rel="stylesheet" href="/legacy/assets/css/base.css">
+  <style>
+    /* ── Layout ──────────────────────────────────────────── */
+    .board-hero {
+      text-align: center;
+      padding: var(--space-16) var(--page-padding) var(--space-10);
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    .board-hero .eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: var(--space-4);
+    }
+    .board-hero h1 {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      font-weight: 400;
+      line-height: var(--lh-heading);
+      letter-spacing: var(--ls-display);
+      color: var(--text);
+      margin: 0 0 var(--space-5);
+    }
+    .board-hero p { color: var(--text-muted); font-size: var(--text-base); line-height: var(--lh-body); max-width: 560px; margin: 0 auto var(--space-3); }
+
+    /* ── Board tabs ────────────────────────────────── */
+    .board-tabs {
+      max-width: 800px;
+      margin: 0 auto var(--space-8);
+      padding: 0 var(--page-padding);
+      display: flex;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+    }
+    .board-tab {
+      flex: 1;
+      text-align: center;
+      padding: var(--space-4) var(--space-3);
+      background: var(--surface);
+      text-decoration: none;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      transition: all var(--dur-mid);
+    }
+    .board-tab:hover { color: var(--accent); }
+    .board-tab.active { color: var(--accent); background: var(--accent-bg-subtle); }
+
+    /* ── Meet the Board grid ─────────────────────────────── */
+    .board-roster {
+      max-width: 800px;
+      margin: 0 auto var(--space-10);
+      padding: 0 var(--page-padding);
+    }
+    .board-roster__heading {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: var(--space-5);
+    }
+    .board-roster__grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+    }
+    .roster-card {
+      background: var(--surface);
+      padding: var(--space-5);
+    }
+    .roster-card__icon { font-size: 1.25rem; margin-bottom: var(--space-2); display: block; }
+    .roster-card__name { font-size: var(--text-sm); font-weight: 600; color: var(--text); margin-bottom: var(--space-1); }
+    .roster-card__domain {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-label);
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: var(--space-2);
+    }
+    .roster-card__focus { font-size: var(--text-2xs); color: var(--text-faint); line-height: var(--lh-body); }
+
+    /* ── Board selector ──────────────────────────────────── */
+    .board-selector { max-width: 800px; margin: 0 auto var(--space-8); padding: 0 var(--page-padding); }
+    .board-selector h2 { font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-4); }
+    .board-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: var(--space-3); }
+    .board-member { background: var(--surface); border: 1px solid var(--border); padding: var(--space-4) var(--space-4) var(--space-3); cursor: pointer; transition: border-color var(--dur-mid), background var(--dur-mid); user-select: none; }
+    .board-member:hover { border-color: rgba(255,255,255,0.15); }
+    .board-member.selected { border-color: var(--accent); background: var(--accent-bg-subtle); }
+    .board-member[data-color].selected { border-color: attr(data-color); }
+    .board-member .member-icon { font-size: 1.4rem; margin-bottom: var(--space-2); display: block; }
+    .board-member .member-name { font-weight: 600; font-size: var(--text-sm); color: var(--text); margin-bottom: 2px; }
+    .board-member .member-title { font-size: var(--text-2xs); color: var(--text-muted); line-height: 1.3; }
+    .select-controls { margin-top: var(--space-3); display: flex; gap: var(--space-3); align-items: center; }
+    .select-controls button { background: none; border: none; color: var(--text-muted); font-size: var(--text-xs); cursor: pointer; padding: 0; text-decoration: underline; }
+    .select-controls button:hover { color: var(--accent); }
+    .selected-count { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--accent); margin-left: auto; }
+
+    /* ── Question area ───────────────────────────────────── */
+    .question-area { max-width: 800px; margin: 0 auto var(--space-8); padding: 0 var(--page-padding); }
+    .question-area label { display: block; font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-3); }
+    .question-input-wrap { position: relative; }
+    .question-input-wrap textarea { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text); font-family: var(--font-sans, sans-serif); font-size: var(--text-base); line-height: var(--lh-body); padding: var(--space-4) 120px var(--space-4) var(--space-5); resize: vertical; min-height: 90px; outline: none; transition: border-color var(--dur-mid); box-sizing: border-box; }
+    .question-input-wrap textarea:focus { border-color: var(--accent); }
+    .question-input-wrap textarea::placeholder { color: var(--text-faint); }
+    .ask-btn { position: absolute; right: var(--space-4); bottom: var(--space-4); background: var(--accent); color: var(--bg); border: none; padding: var(--space-3) var(--space-5); font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; cursor: pointer; transition: opacity var(--dur-mid); white-space: nowrap; }
+    .ask-btn:hover { opacity: 0.85; }
+    .ask-btn:disabled { opacity: 0.4; cursor: default; }
+
+    .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+    .chip { background: var(--surface); border: 1px solid var(--border); padding: var(--space-2) var(--space-4); font-size: var(--text-xs); color: var(--text-muted); cursor: pointer; transition: all var(--dur-fast); }
+    .chip:hover { border-color: var(--accent); color: var(--accent); }
+
+    .rate-notice { text-align: center; font-size: var(--text-xs); color: var(--text-muted); margin-top: var(--space-3); }
+    .rate-notice span { color: var(--accent); }
+
+    /* ── Results ─────────────────────────────────────────── */
+    .results-area { max-width: 800px; margin: 0 auto; padding: 0 var(--page-padding) var(--space-16); }
+    .result-header { font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-5); }
+    .result-header span { color: var(--accent); }
+
+    .response-skeleton { padding: var(--space-5); background: var(--surface); border: 1px solid var(--border); margin-bottom: var(--space-3); animation: pulse 1.4s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+    .skel-name { height: 14px; width: 120px; background: var(--border); margin-bottom: var(--space-3); }
+    .skel-line { height: 10px; background: var(--border-subtle, rgba(255,255,255,0.05)); margin-bottom: var(--space-2); }
+    .skel-line.short { width: 60%; }
+
+    .persona-card { background: var(--surface); border: 1px solid var(--border); padding: var(--space-5) var(--space-6); margin-bottom: var(--space-3); animation: fadeIn var(--dur-slow) var(--ease-out); }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .persona-header { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
+    .persona-avatar { width: 36px; height: 36px; background: var(--accent); color: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+    .persona-meta .name { font-weight: 600; font-size: var(--text-base); color: var(--text); }
+    .persona-meta .title-tag { font-size: var(--text-2xs); color: var(--text-muted); font-family: var(--font-mono); letter-spacing: var(--ls-label); }
+    .persona-body { color: var(--text-muted); font-size: var(--text-sm); line-height: var(--lh-body); }
+    .persona-body strong { color: var(--text); }
+
+    .error-msg { background: rgba(255,82,82,0.08); border: 1px solid rgba(255,82,82,0.3); padding: var(--space-4) var(--space-5); color: var(--c-red-status); font-size: var(--text-sm); }
+
+    .results-cta { margin-top: var(--space-8); padding: var(--space-6); background: var(--accent-bg-subtle); border: 1px solid var(--accent); text-align: center; }
+    .results-cta p { color: var(--text-muted); font-size: var(--text-sm); margin-bottom: var(--space-4); line-height: var(--lh-body); }
+    .results-cta a.primary-cta { background: var(--accent); color: var(--bg); font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; padding: var(--space-3) var(--space-6); text-decoration: none; display: inline-block; transition: opacity var(--dur-mid); }
+    .results-cta a.primary-cta:hover { opacity: 0.85; }
+    .results-cta .secondary-link { display: block; margin-top: var(--space-3); color: var(--text-muted); font-size: var(--text-xs); text-decoration: underline; }
+
+    /* ── Tips ────────────────────────────────────────────── */
+    .ask-tips { max-width: 800px; margin: var(--space-6) auto 0; padding: 0 var(--page-padding) var(--space-12); }
+    .ask-tips__heading { font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-4); }
+    .ask-tips__list { list-style: none; padding: 0; margin: 0; border: 1px solid var(--border); background: var(--surface); }
+    .ask-tips__list li { padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--border); font-size: var(--text-sm); color: var(--text-muted); line-height: var(--lh-body); display: grid; grid-template-columns: auto 1fr; gap: var(--space-3); align-items: baseline; }
+    .ask-tips__list li:last-child { border-bottom: none; }
+    .ask-tips__num { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--accent); flex-shrink: 0; letter-spacing: var(--ls-tag); }
+
+    @media (max-width: 720px) {
+      .board-roster__grid { grid-template-columns: repeat(2, 1fr); }
+      .board-tabs { flex-direction: column; }
+      .board-hero { padding: var(--space-10) var(--page-padding-sm) var(--space-8); }
+      .board-selector, .question-area, .results-area, .ask-tips, .board-roster { padding: 0 var(--page-padding-sm); }
+    }
+    @media (max-width: 480px) {
+      .board-roster__grid { grid-template-columns: 1fr; }
+    }
+
+    /* ── /board/ partial Front Page additions (.b- namespace) ──── */
+    .b-page { padding-top: var(--nav-height); }
+
+    /* MEMBERS list — repurpose .fp-row 5-col grid for board members:
+       icon · name · role+one-line bio · (blank) · (blank) */
+    .b-members__icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+  </style>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+</head>
+<body>
+
+<div id="amj-nav"></div>
+<div id="amj-hierarchy-nav"></div>
+
+<div class="fp-page b-page">
+
+  <!-- ═══ MASTHEAD ═══ -->
+  <header class="fp-masthead">
+    <div class="fp-masthead__top">
+      <div>
+        <div class="fp-masthead__brow">The Board · Vol I · Dispatch №01</div>
+        <div class="fp-masthead__title">BOARD</div>
+      </div>
+      <div class="fp-masthead__meta">
+        <div id="b-date">—</div>
+        <div>Six advisors · open to questions</div>
+      </div>
+    </div>
+    <div class="fp-masthead__strip">
+      <div>
+        <a href="/legacy/coaches/" style="color:inherit;text-decoration:none">← Coaches</a>
+        <span class="fp-masthead__strip-sep">·</span>
+        Ask the panel
+        <span class="fp-masthead__strip-sep">·</span>
+        <a href="/legacy/" style="color:var(--accent-dim);text-decoration:none">Home →</a>
+      </div>
+      <div>Filed continuously</div>
+    </div>
+  </header>
+
+  <!-- ═══ LEDE ═══ -->
+  <section class="fp-lede">
+    <div>
+      <div class="fp-lede__num-brow">Seated</div>
+      <div class="fp-lede__num">6</div>
+      <div class="fp-lede__num-cap">advisors at the table</div>
+    </div>
+    <div>
+      <div class="fp-lede__status fp-lede__status--strong">▸ The Advisory Board · State: Seated</div>
+      <div class="fp-lede__narrative">
+        "Six AI personas, each with a distinct domain, a different lens, and genuinely different answers to the same question. The tension between them is the point."
+      </div>
+      <div style="margin-top:var(--space-4);padding:var(--space-3) var(--space-4);background:rgba(239,68,68,0.08);border-left:3px solid #ef4444;font-size:var(--text-sm);color:var(--text-muted);line-height:1.6;">
+        <strong style="color:#ef4444;">Disclosure:</strong> Every name on this page is an <strong>AI persona</strong>, prompted with the published frameworks of real researchers (Attia, Huberman, Seiler, Norton, and others). None are real clinicians. Their output is AI analysis — useful for pattern-finding, not a substitute for medical advice.
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ MEMBERS LIST ═══ -->
+  <section class="fp-standings">
+    <div class="fp-standings__head">
+      <div class="fp-standings__title">MEMBERS</div>
+      <div class="fp-standings__meta">Six perspectives · One question</div>
+    </div>
+    <div>
+      <div class="fp-row" style="cursor:default">
+        <div class="fp-row__icon"><div class="b-members__icon" style="background:rgba(61,184,138,0.15)">💪</div></div>
+        <div class="fp-row__name">Dr. Sarah Chen</div>
+        <div class="fp-row__context">Training &amp; Exercise Physiology — Zone 2, periodization, exercise as medicine</div>
+        <div class="fp-row__value"></div>
+        <div class="fp-row__spark"></div>
+      </div>
+      <div class="fp-row" style="cursor:default">
+        <div class="fp-row__icon"><div class="b-members__icon" style="background:rgba(240,165,0,0.15)">🍎</div></div>
+        <div class="fp-row__name">Dr. Marcus Webb</div>
+        <div class="fp-row__context">Evidence-Based Nutrition — macros, deficit optimization, protein synthesis</div>
+        <div class="fp-row__value"></div>
+        <div class="fp-row__spark"></div>
+      </div>
+      <div class="fp-row" style="cursor:default">
+        <div class="fp-row__icon"><div class="b-members__icon" style="background:rgba(129,140,248,0.15)">🌙</div></div>
+        <div class="fp-row__name">Dr. Lisa Park</div>
+        <div class="fp-row__context">Sleep Science &amp; Circadian Biology — sleep architecture, light protocols, HRV</div>
+        <div class="fp-row__value"></div>
+        <div class="fp-row__spark"></div>
+      </div>
+      <div class="fp-row" style="cursor:default">
+        <div class="fp-row__icon"><div class="b-members__icon" style="background:rgba(91,164,207,0.15)">🧬</div></div>
+        <div class="fp-row__name">Dr. James Okafor</div>
+        <div class="fp-row__context">Longevity &amp; Preventive Medicine — biomarkers, decade-scale trajectory</div>
+        <div class="fp-row__value"></div>
+        <div class="fp-row__spark"></div>
+      </div>
+      <div class="fp-row" style="cursor:default">
+        <div class="fp-row__icon"><div class="b-members__icon" style="background:rgba(78,205,196,0.15)">⚡</div></div>
+        <div class="fp-row__name">Coach Maya Rodriguez</div>
+        <div class="fp-row__context">Behavioral Performance — habit architecture, identity change, accountability</div>
+        <div class="fp-row__value"></div>
+        <div class="fp-row__spark"></div>
+      </div>
+      <div class="fp-row" style="cursor:default">
+        <div class="fp-row__icon"><div class="b-members__icon" style="background:rgba(224,224,224,0.12)">👁</div></div>
+        <div class="fp-row__name">The Chair</div>
+        <div class="fp-row__context">Synthesis &amp; Priority — cross-domain integration, verdict synthesis</div>
+        <div class="fp-row__value"></div>
+        <div class="fp-row__spark"></div>
+      </div>
+    </div>
+  </section>
+
+
+
+
+<div class="board-hero reveal">
+  <div class="eyebrow">The Build</div>
+  <h1>Ask My Health Board</h1>
+  <p>I've assembled six AI advisors — each with a distinct domain, a different lens, and genuinely different answers to the same question. The tension between them is the point.</p>
+  <p style="font-size:var(--text-xs); color: var(--text-faint); margin-top:var(--space-2);">
+    AI personas drawing on published research. Not medical advice.
+  </p>
+</div>
+
+<div style="max-width:var(--max-width);margin:0 auto;padding:0 var(--page-padding) var(--space-6);" class="reveal">
+  <div style="border-left:3px solid var(--accent);padding:var(--space-5) var(--space-6);background:var(--accent-bg-subtle,rgba(61,184,138,0.04));">
+    <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-wide);text-transform:uppercase;color:var(--accent);margin-bottom:var(--space-3);">AI Advisory Framework</div>
+    <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.7;margin:0;">
+      These advisors are AI-generated personas, not real individuals. Each represents a distinct domain of expertise &mdash; designed with deliberate tension pairs to prevent groupthink and ensure rigorous, multi-perspective analysis.
+    </p>
+    <a href="/legacy/methodology/" style="display:inline-block;margin-top:var(--space-3);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-subtle);">Learn how the advisory system works &rarr;</a>
+  </div>
+</div>
+
+<div class="board-tabs reveal">
+  <a href="/legacy/board/" class="board-tab active">Health Board</a>
+  <a href="/legacy/board/technical/" class="board-tab">Technical Board</a>
+</div>
+
+<!-- BOARD-2: Meet the Board roster -->
+<div class="board-roster reveal">
+  <div class="board-roster__heading">The advisors — six perspectives, one question</div>
+  <div class="board-roster__grid">
+    <div class="roster-card">
+      <span class="roster-card__icon">💪</span>
+      <div class="roster-card__name">Dr. Sarah Chen</div>
+      <div class="roster-card__domain">Training & Exercise Physiology</div>
+      <div class="roster-card__focus">Zone 2, strength periodization, VO2max, exercise as medicine. Analytical, precise, encourages process over outcomes.</div>
+      <div class="roster-card__focus" style="margin-top:var(--space-2);font-style:italic;opacity:0.65;">Voice shaped by Peter Attia's exercise-as-medicine framework</div>
+    </div>
+    <div class="roster-card">
+      <span class="roster-card__icon">🍎</span>
+      <div class="roster-card__name">Dr. Marcus Webb</div>
+      <div class="roster-card__domain">Evidence-Based Nutrition</div>
+      <div class="roster-card__focus">Macros, meal timing, deficit optimization, protein synthesis. Practical, food-focused, builds from what's working.</div>
+      <div class="roster-card__focus" style="margin-top:var(--space-2);font-style:italic;opacity:0.65;">Voice shaped by Layne Norton's evidence-first approach</div>
+    </div>
+    <div class="roster-card">
+      <span class="roster-card__icon">🌙</span>
+      <div class="roster-card__name">Dr. Lisa Park</div>
+      <div class="roster-card__domain">Sleep Science & Circadian Biology</div>
+      <div class="roster-card__focus">Sleep architecture, circadian rhythm, light protocols, HRV. Warm but firm — treats sleep as non-negotiable infrastructure.</div>
+      <div class="roster-card__focus" style="margin-top:var(--space-2);font-style:italic;opacity:0.65;">Voice shaped by Andrew Huberman's protocol-driven neuroscience</div>
+    </div>
+    <div class="roster-card">
+      <span class="roster-card__icon">🧬</span>
+      <div class="roster-card__name">Dr. James Okafor</div>
+      <div class="roster-card__domain">Longevity & Preventive Medicine</div>
+      <div class="roster-card__focus">Biomarkers, metabolic health, CGM, decade-scale trajectory. Strategic, long-horizon thinking — trajectory over snapshots.</div>
+      <div class="roster-card__focus" style="margin-top:var(--space-2);font-style:italic;opacity:0.65;">Voice shaped by Peter Attia's lifespan framework</div>
+    </div>
+    <div class="roster-card">
+      <span class="roster-card__icon">⚡</span>
+      <div class="roster-card__name">Coach Maya Rodriguez</div>
+      <div class="roster-card__domain">Behavioral Performance</div>
+      <div class="roster-card__focus">Habit architecture, identity change, accountability, mental toughness. Direct, human — speaks to the gap between knowing and doing.</div>
+      <div class="roster-card__focus" style="margin-top:var(--space-2);font-style:italic;opacity:0.65;">Voice shaped by James Clear + BJ Fogg + Goggins' directness</div>
+    </div>
+    <div class="roster-card">
+      <span class="roster-card__icon">👁</span>
+      <div class="roster-card__name">The Chair</div>
+      <div class="roster-card__domain">Synthesis & Priority</div>
+      <div class="roster-card__focus">Cross-domain integration, risk assessment, verdict synthesis. Cuts through noise to name the one thing that matters most.</div>
+      <div class="roster-card__focus" style="margin-top:var(--space-2);font-style:italic;opacity:0.65;">The integrating voice — no single inspiration</div>
+    </div>
+  </div>
+</div>
+
+<div class="board-selector reveal">
+  <h2>Choose Your Advisors</h2>
+  <div class="board-grid" id="boardGrid"></div>
+  <div class="select-controls">
+    <button onclick="selectAll()">Select all</button>
+    <button onclick="selectNone()">Clear</button>
+    <span class="selected-count" id="selectedCount">6 selected</span>
+  </div>
+</div>
+
+<div class="question-area reveal">
+  <label for="questionInput">Your Question</label>
+  <div class="question-input-wrap">
+    <textarea id="questionInput" placeholder="e.g. Should I train fasted or fed? How do I optimize sleep? What's the minimum effective dose of cardio?" rows="3"></textarea>
+    <button class="ask-btn" id="askBtn" onclick="askBoard()">Ask →</button>
+  </div>
+  <div class="chips" id="chipContainer"></div>
+  <div class="rate-notice">
+    <span id="questionsLeft">5</span> free questions remaining ·
+    <a href="/subscribe/" style="color:var(--accent); text-decoration:none;">Subscribe</a> for unlimited
+  </div>
+</div>
+
+<div class="results-area" id="resultsArea" style="display:none;">
+  <div class="result-header">
+    Board response to: <span id="questionDisplay"></span>
+  </div>
+  <div id="responsesContainer"></div>
+  <div class="results-cta" id="resultsCta" style="display:none;">
+    <p>Want daily AI coaching from your own board? I get a briefing like this every morning — automated from 26 live data sources.</p>
+    <a href="/subscribe/" class="primary-cta">Get The Measured Life →</a>
+    <a href="/legacy/platform/" class="secondary-link">See how it's built →</a>
+  </div>
+</div>
+
+<div class="ask-tips reveal">
+  <div class="ask-tips__heading">How to ask the right question</div>
+  <ul class="ask-tips__list">
+    <li><span class="ask-tips__num">01</span><span>Ask something <strong>specific</strong>, not general. "Should I eat more protein?" gets a generic answer. "I'm eating 140g of protein daily in a 400-calorie deficit — is that enough to preserve muscle?" gets a useful one.</span></li>
+    <li><span class="ask-tips__num">02</span><span>Include <strong>context about your current state</strong>. Mention your goal, relevant recent data, and what you've already tried. The advisors can only reason with what you give them.</span></li>
+    <li><span class="ask-tips__num">03</span><span>Ask each advisor <strong>separately</strong> to surface disagreement. Select just one at a time and compare. The gap between how Dr. Chen and Coach Rodriguez answer "should I train today?" reveals more than either answer alone.</span></li>
+    <li><span class="ask-tips__num">04</span><span>Treat the answers as <strong>perspectives, not prescriptions</strong>. These are AI personas inspired by real thinkers — not medical advice. Use them to pressure-test your reasoning, not to replace a real doctor.</span></li>
+  </ul>
+</div>
+
+<script>
+  const BOARD_MEMBERS = [
+    { id: 'sarah_chen', name: 'Dr. Sarah Chen', title: 'Training & Exercise Physiology', icon: '💪', focus: 'Zone 2, strength periodization, VO2max, exercise as medicine', color: '#3db88a', inspired: 'Peter Attia\'s exercise-as-medicine framework' },
+    { id: 'marcus_webb', name: 'Dr. Marcus Webb', title: 'Evidence-Based Nutrition', icon: '🍎', focus: 'macros, meal timing, deficit optimization, protein synthesis', color: '#f0a500', inspired: 'Layne Norton\'s evidence-first approach' },
+    { id: 'lisa_park', name: 'Dr. Lisa Park', title: 'Sleep Science & Circadian Biology', icon: '🌙', focus: 'sleep architecture, circadian rhythm, light protocols, HRV', color: '#818cf8', inspired: 'Andrew Huberman\'s protocol-driven neuroscience' },
+    { id: 'james_okafor', name: 'Dr. James Okafor', title: 'Longevity & Preventive Medicine', icon: '🧬', focus: 'biomarkers, metabolic health, CGM, decade-scale trajectory', color: '#5ba4cf', inspired: 'Peter Attia\'s lifespan framework' },
+    { id: 'maya_rodriguez', name: 'Coach Maya Rodriguez', title: 'Behavioral Performance', icon: '⚡', focus: 'habit architecture, identity change, accountability, mental toughness', color: '#4ecdc4', inspired: 'James Clear + BJ Fogg + Goggins\' directness' },
+    { id: 'the_chair', name: 'The Chair', title: 'Synthesis & Priority', icon: '👁', focus: 'cross-domain integration, risk assessment, verdict synthesis', color: '#e0e0e0', inspired: 'The integrating voice — no single inspiration' },
+  ];
+
+  const CHIPS = [
+    "Should I train fasted or fed?",
+    "How do I optimize sleep quality?",
+    "What's the minimum effective dose of cardio?",
+    "How much protein do I actually need?",
+    "How do I make habits stick?",
+    "Is cold exposure worth it?",
+    "How do I break through a plateau?",
+    "What does research say about Zone 2?",
+  ];
+
+  const BOARD_LIMIT = 5;
+  let selected = new Set(BOARD_MEMBERS.map(m => m.id));
+  let sessionCount = parseInt(sessionStorage.getItem('lp_board_count') || '0');
+
+  function renderGrid() {
+    document.getElementById('boardGrid').innerHTML = BOARD_MEMBERS.map(m => `
+      <div class="board-member${selected.has(m.id) ? ' selected' : ''}" onclick="toggleMember('${m.id}')" title="${m.focus}">
+        <span class="member-icon">${m.icon}</span>
+        <div class="member-name">${m.name}</div>
+        <div class="member-title">${m.title}</div>
+        <div style="font-size:var(--text-2xs);color:var(--text-faint);margin-top:4px;font-style:italic;line-height:1.3;">${m.inspired}</div>
+      </div>`).join('');
+    document.getElementById('selectedCount').textContent = `${selected.size} selected`;
+  }
+
+  function toggleMember(id) {
+    if (selected.has(id)) { if (selected.size <= 1) return; selected.delete(id); }
+    else selected.add(id);
+    renderGrid();
+  }
+  function selectAll() { BOARD_MEMBERS.forEach(m => selected.add(m.id)); renderGrid(); }
+  function selectNone() { selected.clear(); selected.add(BOARD_MEMBERS[0].id); renderGrid(); }
+
+  function renderChips() {
+    const shuffled = [...CHIPS].sort(() => Math.random() - 0.5).slice(0, 5);
+    document.getElementById('chipContainer').innerHTML = shuffled.map(q =>
+      `<div class="chip" onclick="useChip(this)">${q}</div>`).join('');
+  }
+  function useChip(el) { document.getElementById('questionInput').value = el.textContent; document.getElementById('questionInput').focus(); }
+
+  function updateRateDisplay() {
+    const left = Math.max(0, BOARD_LIMIT - sessionCount);
+    document.getElementById('questionsLeft').textContent = left;
+    if (sessionCount >= BOARD_LIMIT) document.getElementById('askBtn').disabled = true;
+  }
+
+  function renderSkeletons(n) {
+    return Array.from({length: n}).map(() => `
+      <div class="response-skeleton">
+        <div class="skel-name"></div>
+        <div class="skel-line"></div><div class="skel-line"></div><div class="skel-line short"></div>
+      </div>`).join('');
+  }
+
+  async function askBoard() {
+    const question = document.getElementById('questionInput').value.trim();
+    if (!question) { document.getElementById('questionInput').focus(); return; }
+    if (sessionCount >= BOARD_LIMIT) {
+      document.getElementById('resultsArea').style.display = 'block';
+      document.getElementById('responsesContainer').innerHTML = `
+        <div class="error-msg">You've used your ${BOARD_LIMIT} free questions this session.
+          <a href="/subscribe/" style="color:var(--accent);text-decoration:none;margin-left:6px;">Subscribe for unlimited →</a>
+        </div>`;
+      return;
+    }
+
+    const members = BOARD_MEMBERS.filter(m => selected.has(m.id));
+    if (!members.length) return;
+
+    const btn = document.getElementById('askBtn');
+    btn.disabled = true;
+    btn.textContent = 'Asking...';
+
+    document.getElementById('resultsArea').style.display = 'block';
+    document.getElementById('questionDisplay').textContent = question.length > 80 ? question.slice(0, 77) + '...' : question;
+    document.getElementById('responsesContainer').innerHTML = renderSkeletons(members.length);
+    document.getElementById('resultsCta').style.display = 'none';
+    document.getElementById('resultsArea').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    try {
+      const resp = await fetch('/api/board_ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, personas: members.map(m => m.id) })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Request failed');
+
+      document.getElementById('responsesContainer').innerHTML = members.map(m => {
+        const text = (data.responses[m.id] || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        return renderPersonaCard(m, text);
+      }).join('');
+
+      sessionCount++;
+      sessionStorage.setItem('lp_board_count', sessionCount);
+      updateRateDisplay();
+      setTimeout(() => { document.getElementById('resultsCta').style.display = 'block'; }, 800);
+
+    } catch (err) {
+      document.getElementById('responsesContainer').innerHTML =
+        `<div class="error-msg">Something went wrong: ${err.message}. Please try again.</div>`;
+    } finally {
+      btn.disabled = sessionCount >= BOARD_LIMIT;
+      btn.textContent = 'Ask →';
+    }
+  }
+
+  function renderPersonaCard(m, text) {
+    const c = m.color || 'var(--accent)';
+    return `<div class="persona-card" style="border-left:3px solid ${c};">
+      <div class="persona-header">
+        <div class="persona-avatar" style="background:${c};">${m.icon}</div>
+        <div class="persona-meta">
+          <div class="name">${m.name}</div>
+          <div class="title-tag" style="color:${c};">${m.title}</div>
+        </div>
+      </div>
+      <div class="persona-body">${text}</div>
+    </div>`;
+  }
+
+  // Demo response shown on page load — no question required
+  const DEMO_QUESTION = 'Should I prioritize sleep or exercise if I can only optimize one?';
+  const DEMO_RESPONSES = {
+    sarah_chen: "<strong>Exercise is medicine, but sleep is the pharmacy.</strong> Your Zone 2 base, VO2max progression, and strength periodization all depend on recovery — and recovery is sleep. Train on poor sleep and your CTL stalls while ATL accumulates. Fix sleep architecture first; your training adaptations will compound on top of it. The Banister model doesn't lie.",
+    marcus_webb: "<strong>Context matters more than the binary.</strong> If you're sleeping 4 hours, obviously fix that. But if you're getting 6.5 hours and zero exercise, the marginal return on 30 minutes of resistance training is enormous — muscle protein synthesis, GLUT4 translocation, bone density. Don't let perfect sleep become an excuse to skip the gym. Both are non-negotiable for body composition.",
+    lisa_park: "<strong>Sleep is not a reward for finishing your day. It's the foundation for tomorrow.</strong> During deep sleep, your glymphatic system clears metabolic waste at 10x the waking rate. Architecture matters more than duration — 7 hours of quality sleep beats 9 hours of fragmented sleep. Without it, HRV tanks, recovery scores plummet, and every other optimization you're attempting degrades.",
+    james_okafor: "<strong>Think in decades, not days.</strong> Sleep deprivation accelerates every biomarker trajectory you're trying to bend — insulin resistance, inflammatory markers, cortisol dysregulation. At current trajectory, chronic sleep debt compounds into metabolic dysfunction years before you'd notice symptoms. Fix the foundation. The exercise benefits layer on top.",
+    maya_rodriguez: "<strong>Optimize the one that makes the other easier.</strong> For most people, that's sleep. When you sleep well, you have the energy and willpower to exercise. The gap between knowing and doing — that's where sleep deprivation lives. Build the sleep habit first; let it create the conditions for the exercise habit. Motivation follows action, but action requires not being exhausted.",
+    the_chair: "<strong>The board is aligned: sleep first.</strong> Five of six advisors prioritize sleep as the foundational layer. The lone dissent — Dr. Webb — isn't disagreeing, he's adding nuance: don't use sleep optimization as an excuse to avoid training entirely. The verdict: fix sleep architecture this week. Add structured exercise once sleep is consistent. One priority at a time."
+  };
+
+  function showDemoResponse() {
+    const area = document.getElementById('resultsArea');
+    const container = document.getElementById('responsesContainer');
+    document.getElementById('questionDisplay').textContent = DEMO_QUESTION;
+    area.style.display = 'block';
+    container.innerHTML = '<div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);font-family:var(--font-mono);margin-bottom:var(--space-4);padding:var(--space-3) var(--space-4);background:var(--accent-bg-subtle);border:1px solid var(--accent);display:inline-block;">// SAMPLE RESPONSE — ask your own question above</div>' +
+      BOARD_MEMBERS.map(m => renderPersonaCard(m, DEMO_RESPONSES[m.id])).join('');
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    renderGrid();
+    renderChips();
+    updateRateDisplay();
+    showDemoResponse();
+    document.getElementById('questionInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); askBoard(); }
+    });
+  });
+</script>
+
+  <!-- ═══ CROSS-LINK FOOTER ═══ -->
+  <nav class="fp-cross-footer">
+    <div class="fp-cross-footer__prev"><a href="/legacy/coaches/">← Coaches</a></div>
+    <div class="fp-cross-footer__mid">
+      The voices that govern direction
+    </div>
+    <div class="fp-cross-footer__next"><a href="/legacy/">Home →</a></div>
+  </nav>
+
+</div><!-- /.fp-page -->
+
+<!-- Mobile bottom nav -->
+<div id="amj-subscribe"></div>
+<div id="amj-bottom-nav"></div>
+
+<div id="amj-reading-path"></div>
+<div id="amj-footer"></div>
+
+<script>
+(function() {
+  // Date stamp in masthead meta
+  var dEl = document.getElementById('b-date');
+  if (dEl) {
+    var d = new Date();
+    dEl.textContent = d.toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    }).toUpperCase();
+  }
+})();
+</script>
+<script src="/legacy/assets/js/reveal.js"></script>
+<script src="/legacy/assets/js/site_constants.js"></script>
+<script src="/legacy/assets/js/components.js"></script>
+<script src="/legacy/assets/js/nav.js"></script>
+</body>
+</html>

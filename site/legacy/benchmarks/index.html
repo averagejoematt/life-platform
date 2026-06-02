@@ -1,0 +1,1613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="robots" content="noindex">
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Research-backed targets for body, mind, sleep, connection, discipline, and emotional health. The standards science says matter — and where Matthew measures against them.">
+  <meta property="og:title" content="The Standards — Matthew">
+  <meta property="og:description" content="Research-backed targets for the body, mind, and life you're building. What does 'good' look like according to the science?">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/benchmarks/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="The Standards — Matthew">
+  <meta name="twitter:description" content="Research-backed targets for the body, mind, and life you're building.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <title>The Standards — Matthew</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/legacy/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/legacy/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/legacy/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/legacy/assets/css/tokens.css">
+  <link rel="stylesheet" href="/legacy/assets/css/base.css">
+  <style>
+    /* ═══════════════════════════════════════════════════════════
+       THE STANDARDS — page-specific styles
+       ═══════════════════════════════════════════════════════════ */
+
+    /* ── Hero ──────────────────────────────────────────────── */
+    .std-hero {
+      padding: var(--space-20) var(--page-padding) var(--space-16);
+      max-width: var(--max-width);
+      margin: 0 auto;
+      text-align: center;
+    }
+    .std-hero__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-6);
+    }
+    .std-hero__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      color: var(--text);
+      line-height: var(--lh-heading);
+      margin-bottom: var(--space-6);
+    }
+    .std-hero__title span { color: var(--accent); }
+    .std-hero__sub {
+      font-family: var(--font-serif);
+      font-size: var(--text-xl);
+      color: var(--text-muted);
+      max-width: 640px;
+      margin: 0 auto var(--space-10);
+      line-height: var(--lh-body);
+      font-style: italic;
+    }
+
+    /* ── Self-check hero quiz (13a) ─────────────────────────── */
+    .sc-hero {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 var(--page-padding) var(--space-16);
+    }
+    .sc-hero__inner {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--accent);
+      padding: var(--space-8);
+    }
+    .sc-hero__header {
+      text-align: center;
+      margin-bottom: var(--space-8);
+    }
+    .sc-hero__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-3);
+    }
+    .sc-hero__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .sc-hero__sub {
+      font-family: var(--font-serif);
+      font-style: italic;
+      color: var(--text-muted);
+      font-size: var(--text-base);
+      max-width: 520px;
+      margin: 0 auto;
+      line-height: var(--lh-body);
+    }
+    .sc-hero__grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-4);
+    }
+    .sc-hero-card {
+      background: var(--bg);
+      border: 1px solid var(--border-subtle);
+      padding: var(--space-5);
+      transition: border-color var(--dur-fast);
+    }
+    .sc-hero-card:focus-within { border-color: var(--accent-dim); }
+    .sc-hero-card__domain {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      margin-bottom: var(--space-2);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .sc-hero-card__q {
+      font-family: var(--font-serif);
+      font-size: var(--text-sm);
+      color: var(--text);
+      margin-bottom: var(--space-3);
+      line-height: var(--lh-body);
+      min-height: 36px;
+    }
+    .sc-hero-card__input-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin-bottom: var(--space-2);
+    }
+    .sc-hero-card__input {
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: var(--text-base);
+      padding: var(--space-2) var(--space-3);
+      width: 72px;
+      outline: none;
+      transition: border-color var(--dur-fast);
+    }
+    .sc-hero-card__input:focus { border-color: var(--accent); }
+    .sc-hero-card__unit {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+    }
+    .sc-hero-card__grade {
+      width: 42px;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-size: 22px;
+      line-height: 1;
+      border: 2px solid var(--border);
+      color: var(--text-faint);
+      background: var(--surface);
+      margin-left: auto;
+      transition: all var(--dur-mid);
+    }
+    .sc-hero-card__grade.sga { border-color: var(--accent); color: var(--accent); background: var(--accent-bg-subtle); }
+    .sc-hero-card__grade.sgb { border-color: var(--c-green-400); color: var(--c-green-400); }
+    .sc-hero-card__grade.sgc { border-color: var(--c-amber-500); color: var(--c-amber-500); }
+    .sc-hero-card__grade.sgd { border-color: var(--c-red-status); color: var(--c-red-status); }
+    .sc-hero-card__grade.sgf { border-color: var(--c-red-status); color: var(--c-red-status); opacity: 0.7; }
+    .sc-hero__actions {
+      text-align: center;
+      margin-top: var(--space-6);
+    }
+    .sc-hero__result-summary {
+      display: none;
+      margin-top: var(--space-6);
+      padding: var(--space-5);
+      background: var(--bg);
+      border: 1px solid var(--border-subtle);
+      text-align: center;
+    }
+    .sc-hero__result-summary.visible { display: block; }
+    .sc-hero__result-grades {
+      display: flex;
+      justify-content: center;
+      gap: var(--space-6);
+      margin-bottom: var(--space-4);
+    }
+    .sc-hero__result-item {
+      text-align: center;
+    }
+    .sc-hero__result-label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-top: var(--space-1);
+    }
+    .sc-hero__result-letter {
+      font-family: var(--font-display);
+      font-size: 28px;
+      line-height: 1;
+    }
+    .sc-hero__share-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-3);
+      margin-top: var(--space-4);
+    }
+    .sc-hero__share-btn {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent);
+      background: var(--accent-bg-subtle);
+      border: 1px solid var(--accent-dim);
+      padding: var(--space-2) var(--space-4);
+      cursor: pointer;
+      transition: all var(--dur-fast);
+    }
+    .sc-hero__share-btn:hover { background: var(--accent); color: var(--bg); }
+    .sc-hero__share-confirm {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--accent);
+      opacity: 0;
+      transition: opacity var(--dur-fast);
+    }
+    .sc-hero__share-confirm.visible { opacity: 1; }
+    .sc-hero__privacy {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+      margin-top: var(--space-3);
+    }
+
+    /* ── Narrative moment (13b) ──────────────────────────────── */
+    .narrative-moment {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 var(--page-padding) var(--space-10);
+    }
+    .narrative-moment__inner {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent-dim);
+      padding: var(--space-6) var(--space-8);
+    }
+    .narrative-moment__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-3);
+    }
+    .narrative-moment__text {
+      font-family: var(--font-serif);
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      font-style: italic;
+    }
+    .narrative-moment__text strong { color: var(--text); font-style: normal; }
+
+    /* ── Domain overview strip ────────────────────────────── */
+    .domain-strip {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      max-width: var(--max-width);
+      margin: 0 auto var(--space-16);
+    }
+    .domain-strip__item {
+      background: var(--surface);
+      padding: var(--space-5) var(--space-4);
+      text-align: center;
+      cursor: pointer;
+      transition: background var(--dur-fast), border-color var(--dur-fast);
+      position: relative;
+      text-decoration: none;
+    }
+    .domain-strip__item:hover { background: var(--surface-raised); }
+    .domain-strip__icon {
+      font-size: 22px;
+      margin-bottom: var(--space-2);
+      display: block;
+    }
+    .domain-strip__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .domain-strip__count {
+      font-family: var(--font-display);
+      font-size: 18px;
+      color: var(--accent);
+      margin-top: var(--space-1);
+    }
+
+    /* ── Domain section ───────────────────────────────────── */
+    .domain {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-16) var(--page-padding);
+      border-top: 1px solid var(--border);
+    }
+    .domain__header {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-10);
+      margin-bottom: var(--space-10);
+      align-items: start;
+    }
+    /* 13i: Consistent domain header styling */
+    .domain__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-3);
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+    .domain__eyebrow::before {
+      content: '';
+      width: 20px;
+      height: 1px;
+      background: var(--accent-dim);
+    }
+    /* 13i: Domain icon badge — consistent across all 6 headers */
+    .domain__icon-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      font-size: 18px;
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      margin-right: var(--space-2);
+      flex-shrink: 0;
+    }
+    .domain__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      line-height: var(--lh-heading);
+      margin-bottom: var(--space-5);
+    }
+    /* 13i: Consistent accent bar on domain titles */
+    .domain__accent-bar {
+      width: 40px;
+      height: 3px;
+      margin-bottom: var(--space-4);
+    }
+    .domain--survival .domain__accent-bar { background: var(--accent); }
+    .domain--quality .domain__accent-bar { background: var(--c-amber-500); }
+    .domain__quote {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      border-left: 2px solid var(--accent-dim);
+      padding-left: var(--space-5);
+    }
+    .domain__quote cite {
+      display: block;
+      margin-top: var(--space-2);
+      font-style: normal;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+    }
+    .domain__visual {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 180px;
+    }
+    /* 13d: Cross-link to observatory */
+    .domain__crosslink {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent);
+      text-decoration: none;
+      margin-top: var(--space-4);
+      padding: var(--space-2) 0;
+      border-bottom: 1px solid transparent;
+      transition: border-color var(--dur-fast);
+    }
+    .domain__crosslink:hover { border-bottom-color: var(--accent); }
+
+    /* ── 13e: Importance gradient ────────────────────────────── */
+    .domain--survival { }
+    .domain--survival .domain__eyebrow::after {
+      content: 'SURVIVAL';
+      font-size:var(--text-3xs);
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      background: var(--accent-bg-subtle);
+      padding: 2px 6px;
+      margin-left: var(--space-2);
+    }
+    .domain--quality .domain__eyebrow::after {
+      content: 'QUALITY';
+      font-size:var(--text-3xs);
+      letter-spacing: 0.12em;
+      color: var(--c-amber-500);
+      background: rgba(200, 132, 58, 0.1);
+      padding: 2px 6px;
+      margin-left: var(--space-2);
+    }
+    .bench-card--survival {
+      border-left: 3px solid var(--accent);
+    }
+
+    /* ── Benchmark cards ──────────────────────────────────── */
+    .bench-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: var(--space-4);
+    }
+    .bench-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-6);
+      position: relative;
+      transition: border-color var(--dur-mid);
+    }
+    .bench-card:hover { border-color: var(--accent-dim); }
+
+    /* Grade badge */
+    .bench-card__grade {
+      position: absolute;
+      top: var(--space-4);
+      right: var(--space-4);
+      width: 46px;
+      height: 46px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-size: 26px;
+      line-height: 1;
+      border: 2px solid var(--border);
+      color: var(--text-faint);
+      background: var(--surface-raised);
+      transition: all var(--dur-mid) var(--ease-out);
+    }
+    .bench-card__grade.ga { border-color: var(--accent); color: var(--accent); background: var(--accent-bg-subtle); }
+    .bench-card__grade.gb { border-color: var(--c-green-400); color: var(--c-green-400); }
+    .bench-card__grade.gc { border-color: var(--c-amber-500); color: var(--c-amber-500); }
+    .bench-card__grade.gd { border-color: var(--c-red-status); color: var(--c-red-status); }
+    .bench-card__grade.gf { border-color: var(--c-red-status); color: var(--c-red-status); opacity: 0.7; }
+    .bench-card__grade-pct {
+      position: absolute;
+      top: 54px;
+      right: var(--space-4);
+      font-family: var(--font-mono);
+      font-size:var(--text-3xs);
+      letter-spacing: var(--ls-tag);
+      color: var(--text-faint);
+      text-align: center;
+      width: 46px;
+    }
+
+    /* Trend indicator */
+    .bench-card__trend {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      background: var(--surface-raised);
+      border: 1px solid var(--border-subtle);
+      margin-bottom: var(--space-4);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-label);
+      color: var(--text-faint);
+      transition: opacity var(--dur-mid);
+    }
+    .bench-card__trend.hidden { display: none; }
+    .bench-card__trend-arrow {
+      font-size: 14px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .bench-card__trend-arrow.up { color: var(--accent); }
+    .bench-card__trend-arrow.flat { color: var(--text-faint); }
+    .bench-card__trend-arrow.down { color: var(--c-amber-500); }
+    .bench-card__trend-delta {
+      color: var(--text-muted);
+    }
+    .bench-card__trend-delta strong { color: var(--text); }
+    .bench-card__trend-delta .positive { color: var(--accent); }
+    .bench-card__trend-delta .negative { color: var(--c-amber-500); }
+    .bench-card__trend-period {
+      margin-left: auto;
+      color: var(--text-faint);
+      white-space: nowrap;
+    }
+
+    .bench-card__top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: var(--space-4);
+      padding-right: 58px;
+    }
+    .bench-card__name {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--text);
+      line-height: 1.1;
+    }
+    .bench-card__evidence {
+      display: flex;
+      gap: 3px;
+      flex-shrink: 0;
+      margin-left: var(--space-3);
+    }
+    .ev-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    .ev-dot.empty {
+      background: transparent;
+      border: 1px solid var(--text-faint);
+    }
+    .bench-card__target-row {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+    }
+    .bench-card__target {
+      font-family: var(--font-display);
+      font-size: 36px;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .bench-card__target-label {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+    }
+
+    /* Progress bar */
+    .bench-card__bar { margin-bottom: var(--space-4); }
+    .bb-track {
+      height: 6px;
+      background: var(--surface-raised);
+      border: 1px solid var(--border-subtle);
+      overflow: hidden;
+      margin-bottom: var(--space-2);
+    }
+    .bb-fill {
+      height: 100%;
+      background: var(--accent);
+      transition: width 1.4s var(--ease-out);
+      width: 0%;
+    }
+    .bb-fill.amber { background: var(--c-amber-500); }
+    .bb-fill.red { background: var(--c-red-status); }
+    .bb-labels {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+    }
+
+    /* 13j: Day 1 vs Now journey row */
+    .bench-card__journey {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr;
+      gap: var(--space-2);
+      align-items: center;
+      margin-bottom: var(--space-4);
+      padding: var(--space-3);
+      background: var(--surface-raised);
+      border: 1px solid var(--border-subtle);
+    }
+    .bench-card__journey-point {
+      text-align: center;
+    }
+    .bench-card__journey-value {
+      font-family: var(--font-display);
+      font-size: var(--text-base);
+      color: var(--text);
+      line-height: 1;
+    }
+    .bench-card__journey-value.journey-target { color: var(--accent); }
+    .bench-card__journey-label {
+      font-family: var(--font-mono);
+      font-size:var(--text-3xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-top: 2px;
+    }
+    .bench-card__journey-arrow {
+      color: var(--text-faint);
+      font-size: 12px;
+    }
+
+    /* 13k: Research vs Personal separator */
+    .bench-card__layers {
+      margin-bottom: var(--space-4);
+    }
+    .bench-card__layer-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: var(--space-3);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .bench-card__layer-tab {
+      font-family: var(--font-mono);
+      font-size:var(--text-3xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      padding: var(--space-2) var(--space-3);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      background: none;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+      transition: all var(--dur-fast);
+    }
+    .bench-card__layer-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .bench-card__layer-content {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      min-height: 48px;
+    }
+    .bench-card__layer-content[data-layer="personal"] { display: none; }
+    .bench-card__layer-content.active { display: block; }
+
+    /* 13c: Math of decline callout */
+    .bench-card__decline {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-label);
+      color: var(--text-faint);
+      padding: var(--space-2) var(--space-3);
+      background: rgba(200, 132, 58, 0.06);
+      border-left: 2px solid var(--c-amber-500);
+      margin-bottom: var(--space-3);
+      line-height: var(--lh-mono);
+    }
+
+    .bench-card__why {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      margin-bottom: var(--space-4);
+    }
+    .bench-card__source {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+      border-top: 1px solid var(--border-subtle);
+      padding-top: var(--space-3);
+    }
+
+    /* 13l: Honest "not yet tracked" styling */
+    .bench-card--planned {
+      opacity: 0.7;
+    }
+    .bench-card__planned-tag {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--c-amber-500);
+      background: rgba(200, 132, 58, 0.08);
+      padding: 2px 8px;
+      display: inline-block;
+      margin-bottom: var(--space-3);
+    }
+
+    /* ── 13h: Cognitive-physical crossover callout ─────────── */
+    .crossover-callout {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 var(--page-padding);
+    }
+    .crossover-callout__inner {
+      background: var(--accent-bg-subtle);
+      border: 1px solid var(--accent-dim);
+      padding: var(--space-5) var(--space-6);
+      display: flex;
+      gap: var(--space-4);
+      align-items: start;
+    }
+    .crossover-callout__icon {
+      font-size: 20px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .crossover-callout__text {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .crossover-callout__text strong { color: var(--accent); }
+
+    /* ── Domain visuals ───────────────────────────────────── */
+    .phys-gauges { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); width: 100%; }
+    .mg { text-align: center; }
+    .mg__label { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); letter-spacing: var(--ls-label); text-transform: uppercase; margin-top: var(--space-1); }
+    .mg__bg { fill: none; stroke: var(--surface-raised); stroke-width: 8; stroke-linecap: round; }
+    .mg__fill { fill: none; stroke: var(--accent); stroke-width: 8; stroke-linecap: round; stroke-dasharray: 110; stroke-dashoffset: 110; transition: stroke-dashoffset 1.6s var(--ease-out); }
+    .mg__fill.amber { stroke: var(--c-amber-500); }
+    .mg__text { font-family: var(--font-display); font-size: 18px; fill: var(--text); }
+    .mg__unit { font-family: var(--font-mono); font-size:var(--text-3xs); fill: var(--text-faint); }
+
+    .sleep-arch { width: 100%; }
+    .sl-row { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); }
+    .sl-label { font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--text-muted); width: 50px; flex-shrink: 0; text-align: right; }
+    .sl-track { flex: 1; height: 18px; background: var(--surface-raised); border: 1px solid var(--border-subtle); overflow: hidden; position: relative; }
+    .sl-fill { height: 100%; transition: width 1.4s var(--ease-out); width: 0%; }
+    .sl-fill.deep { background: #1a6b4a; } .sl-fill.rem { background: #2d8a6a; } .sl-fill.light { background: #4a6050; }
+    .sl-target { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); opacity: 0.7; }
+    .sl-val { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); width: 36px; flex-shrink: 0; }
+
+    .bookshelf { display: flex; align-items: flex-end; gap: 3px; height: 120px; padding: var(--space-3); background: var(--surface); border: 1px solid var(--border-subtle); width: 100%; }
+    .book-spine { border-radius: 1px 1px 0 0; transition: height 0.8s var(--ease-out); }
+    .book-spine.read { opacity: 1; } .book-spine.unread { opacity: 0.15; border: 1px dashed var(--text-faint); background: transparent !important; }
+
+    .dunbar { position: relative; width: 200px; height: 200px; }
+    .dring { position: absolute; border-radius: 50%; border: 1px solid var(--border); }
+    .dring.r150 { width: 200px; height: 200px; top: 0; left: 0; }
+    .dring.r50  { width: 140px; height: 140px; top: 30px; left: 30px; }
+    .dring.r15  { width: 90px;  height: 90px;  top: 55px; left: 55px; }
+    .dring.r5   { width: 50px;  height: 50px;  top: 75px; left: 75px; background: var(--accent-bg-subtle); display:flex;align-items:center;justify-content:center; }
+    .dlabel { font-family: var(--font-mono); font-size: 8px; color: var(--text-faint); letter-spacing: var(--ls-tag); position: absolute; }
+    .dlabel.l150 { bottom: -16px; left: 50%; transform: translateX(-50%); }
+    .dlabel.l50  { bottom: 26px; right: -8px; } .dlabel.l15  { top: 52px; right: -22px; }
+    .dlabel.l5   { font-size: 10px; color: var(--accent); }
+    .ddot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); position: absolute; opacity: 0.6; }
+
+    .heatmap { display: grid; grid-template-columns: repeat(26, 1fr); gap: 2px; width: 100%; }
+    .hc { aspect-ratio: 1; border-radius: 1px; background: var(--surface-raised); transition: background 0.4s; }
+    .hc.l1 { background: rgba(0, 229, 160, 0.15); } .hc.l2 { background: rgba(0, 229, 160, 0.35); }
+    .hc.l3 { background: rgba(0, 229, 160, 0.55); } .hc.l4 { background: rgba(0, 229, 160, 0.8); }
+
+    .wave-wrap { width: 100%; height: 100px; } .wave-wrap svg { width: 100%; height: 100%; }
+
+    /* ── Evidence legend ──────────────────────────────────── */
+    .ev-legend { max-width: var(--max-width); margin: 0 auto; padding: var(--space-6) var(--page-padding); display: flex; gap: var(--space-8); align-items: center; flex-wrap: wrap; }
+    .ev-legend__item { display: flex; align-items: center; gap: var(--space-2); font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); letter-spacing: var(--ls-label); }
+
+    /* ── How-to callout ───────────────────────────────────── */
+    .std-intro { max-width: var(--max-width); margin: 0 auto var(--space-4); padding: 0 var(--page-padding); }
+    .std-intro__inner { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); padding: var(--space-5) var(--space-8); display: flex; gap: var(--space-6); align-items: start; }
+    .std-intro__label { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--accent-dim); white-space: nowrap; padding-top: 2px; }
+    .std-intro__text { font-size: var(--text-sm); color: var(--text-muted); line-height: var(--lh-body); }
+    .std-intro__text strong { color: var(--text); }
+
+    /* ── Responsive ───────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .domain__header { grid-template-columns: 1fr; }
+      .domain-strip { grid-template-columns: repeat(3, 1fr); }
+      .bench-grid { grid-template-columns: 1fr 1fr; }
+      .sc-hero__grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 560px) {
+      .domain-strip { grid-template-columns: repeat(2, 1fr); }
+      .bench-grid { grid-template-columns: 1fr; }
+      .std-intro__inner { flex-direction: column; gap: var(--space-3); }
+      .sc-hero__grid { grid-template-columns: 1fr; }
+      .sc-hero__result-grades { flex-wrap: wrap; }
+    }
+  </style>
+  <link rel="canonical" href="https://averagejoematt.com/benchmarks/">
+</head>
+<body class="body-signal">
+
+<div id="amj-nav"></div>
+<div id="amj-hierarchy-nav"></div>
+
+<div class="experiment-thread">The science behind every target → <a href="/legacy/character/">See your Character Score →</a></div>
+
+<header class="std-hero reveal">
+  <div class="std-hero__eyebrow">Evidence · 6 Domains · 27 Benchmarks</div>
+  <h1 class="std-hero__title">The <span>Standards</span></h1>
+  <p class="std-hero__sub">What does "good" actually look like — according to the research? Not opinions. Not influencer goals. The numbers that science says predict a longer, sharper, more connected life.</p>
+</header>
+
+<!-- ═══ 13a: SELF-CHECK HERO QUIZ ═════════════════════════ -->
+<div class="sc-hero reveal">
+  <div class="sc-hero__inner">
+    <div class="sc-hero__header">
+      <div class="sc-hero__eyebrow">Quick check</div>
+      <h2 class="sc-hero__title">Before You Look at Anyone Else's Numbers — Where Do You Stand?</h2>
+      <p class="sc-hero__sub">Six questions. Six domains. Instant letter grades. No data stored, no account needed.</p>
+    </div>
+    <div class="sc-hero__grid">
+      <div class="sc-hero-card">
+        <div class="sc-hero-card__domain" style="color:var(--accent)">Sleep</div>
+        <div class="sc-hero-card__q">Average hours of sleep per night this week?</div>
+        <div class="sc-hero-card__input-row">
+          <input type="number" class="sc-hero-card__input" id="sq-sleep" min="3" max="12" step="0.5" placeholder="7.5">
+          <div class="sc-hero-card__unit">hrs</div>
+          <div class="sc-hero-card__grade" id="sg-sleep">--</div>
+        </div>
+      </div>
+      <div class="sc-hero-card">
+        <div class="sc-hero-card__domain" style="color:var(--accent)">Exercise</div>
+        <div class="sc-hero-card__q">Minutes of deliberate exercise this week?</div>
+        <div class="sc-hero-card__input-row">
+          <input type="number" class="sc-hero-card__input" id="sq-exercise" min="0" max="1000" step="10" placeholder="150">
+          <div class="sc-hero-card__unit">min</div>
+          <div class="sc-hero-card__grade" id="sg-exercise">--</div>
+        </div>
+      </div>
+      <div class="sc-hero-card">
+        <div class="sc-hero-card__domain" style="color:var(--c-amber-500)">Body Comp</div>
+        <div class="sc-hero-card__q">Roughly how many seconds can you dead-hang?</div>
+        <div class="sc-hero-card__input-row">
+          <input type="number" class="sc-hero-card__input" id="sq-body" min="0" max="300" step="5" placeholder="30">
+          <div class="sc-hero-card__unit">sec</div>
+          <div class="sc-hero-card__grade" id="sg-body">--</div>
+        </div>
+      </div>
+      <div class="sc-hero-card">
+        <div class="sc-hero-card__domain" style="color:var(--c-amber-500)">Cognitive</div>
+        <div class="sc-hero-card__q">Books finished in the last 12 months?</div>
+        <div class="sc-hero-card__input-row">
+          <input type="number" class="sc-hero-card__input" id="sq-cognitive" min="0" max="200" step="1" placeholder="12">
+          <div class="sc-hero-card__unit">books</div>
+          <div class="sc-hero-card__grade" id="sg-cognitive">--</div>
+        </div>
+      </div>
+      <div class="sc-hero-card">
+        <div class="sc-hero-card__domain" style="color:var(--accent)">Social</div>
+        <div class="sc-hero-card__q">People you'd call in a 3am emergency?</div>
+        <div class="sc-hero-card__input-row">
+          <input type="number" class="sc-hero-card__input" id="sq-social" min="0" max="20" step="1" placeholder="3">
+          <div class="sc-hero-card__unit">people</div>
+          <div class="sc-hero-card__grade" id="sg-social">--</div>
+        </div>
+      </div>
+      <div class="sc-hero-card">
+        <div class="sc-hero-card__domain" style="color:var(--c-amber-500)">Nutrition</div>
+        <div class="sc-hero-card__q">How many servings of vegetables yesterday?</div>
+        <div class="sc-hero-card__input-row">
+          <input type="number" class="sc-hero-card__input" id="sq-nutrition" min="0" max="20" step="1" placeholder="4">
+          <div class="sc-hero-card__unit">servings</div>
+          <div class="sc-hero-card__grade" id="sg-nutrition">--</div>
+        </div>
+      </div>
+    </div>
+    <div class="sc-hero__actions">
+      <button class="btn btn--primary" onclick="runHeroCheck()">Grade Me</button>
+    </div>
+    <!-- 13f: Shareable result summary -->
+    <div class="sc-hero__result-summary" id="hero-result-summary">
+      <div class="sc-hero__result-grades" id="hero-result-grades"></div>
+      <div class="sc-hero__share-row">
+        <button class="sc-hero__share-btn" onclick="shareHeroScores()">Share Your Scores</button>
+        <span class="sc-hero__share-confirm" id="hero-share-confirm">Copied to clipboard</span>
+      </div>
+      <div class="sc-hero__privacy">Your answers stay in your browser. Nothing is stored or sent anywhere.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 13b: NARRATIVE MOMENT ═════════════════════════════ -->
+<div class="narrative-moment reveal">
+  <div class="narrative-moment__inner">
+    <div class="narrative-moment__label">Honest note from Matthew</div>
+    <div class="narrative-moment__text">Benchmarks don't tell me what to care about. They tell me where I stand so I can make a deliberate choice. Is running distance more important right now, or should I be getting my deadlift up? Is my sleep efficiency actually good, or just good enough? Having the reference points turns vague intentions into real trade-offs.</div>
+  </div>
+</div>
+
+<div class="std-intro reveal">
+  <div class="std-intro__inner">
+    <div class="std-intro__label">How this works</div>
+    <div class="std-intro__text">Each benchmark comes with a <strong>research-backed target</strong>, an <strong>evidence rating</strong> (●●● = meta-analysis/RCT, ●● = observational, ● = framework), a <strong>letter grade</strong> (A through F based on % to target), a <strong>trend arrow</strong> showing direction vs 30 days ago, and a <strong>Day 1 → Now → Target</strong> journey view. Research and personal data are separated so you can see the science independently from Matthew's progress.</div>
+  </div>
+</div>
+
+<div class="ev-legend reveal">
+  <div class="ev-legend__item"><div style="display:flex;gap:3px"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot"></div></div> Strong (RCT / meta-analysis)</div>
+  <div class="ev-legend__item"><div style="display:flex;gap:3px"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot empty"></div></div> Moderate (observational)</div>
+  <div class="ev-legend__item"><div style="display:flex;gap:3px"><div class="ev-dot"></div><div class="ev-dot empty"></div><div class="ev-dot empty"></div></div> Framework (directional)</div>
+  <div class="ev-legend__item" style="margin-left:auto"><div style="display:flex;gap:6px;font-family:var(--font-display);font-size:14px"><span style="color:var(--accent)">A</span> ≥90% <span style="color:var(--c-green-400)">B</span> ≥75% <span style="color:var(--c-amber-500)">C</span> ≥55% <span style="color:var(--c-red-status)">D</span> ≥35% <span style="color:var(--c-red-status);opacity:0.7">F</span> &lt;35%</div></div>
+</div>
+<div class="ev-legend reveal" style="padding-top:0">
+  <div class="ev-legend__item"><span style="color:var(--accent)">▲</span> Improving vs 30d ago</div>
+  <div class="ev-legend__item"><span style="color:var(--text-faint)">▶</span> Flat (±2%)</div>
+  <div class="ev-legend__item"><span style="color:var(--c-amber-500)">▼</span> Declining vs 30d ago</div>
+  <div class="ev-legend__item" style="margin-left:auto"><div style="display:flex;gap:8px;font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)"><span style="border-left:3px solid var(--accent);padding-left:6px">Survival benchmark</span> <span style="border-left:3px solid transparent;padding-left:6px">Quality benchmark</span></div></div>
+</div>
+
+<div class="domain-strip reveal">
+  <a class="domain-strip__item" href="#physical"><span class="domain-strip__icon">💪</span><div class="domain-strip__label">Physical</div><div class="domain-strip__count">6</div></a>
+  <a class="domain-strip__item" href="#sleep"><span class="domain-strip__icon">🌙</span><div class="domain-strip__label">Sleep</div><div class="domain-strip__count">5</div></a>
+  <a class="domain-strip__item" href="#cognitive"><span class="domain-strip__icon">📚</span><div class="domain-strip__label">Cognitive</div><div class="domain-strip__count">4</div></a>
+  <a class="domain-strip__item" href="#emotional"><span class="domain-strip__icon">🧠</span><div class="domain-strip__label">Emotional</div><div class="domain-strip__count">4</div></a>
+  <a class="domain-strip__item" href="#social"><span class="domain-strip__icon">🤝</span><div class="domain-strip__label">Connection</div><div class="domain-strip__count">4</div></a>
+  <a class="domain-strip__item" href="#discipline"><span class="domain-strip__icon">🔥</span><div class="domain-strip__label">Discipline</div><div class="domain-strip__count">4</div></a>
+</div>
+
+<!-- ═══ DOMAIN 1 — PHYSICAL ═══════════════════════════════ -->
+<section class="domain domain--survival reveal" id="physical">
+  <div class="domain__header">
+    <div class="domain__lead">
+      <div class="domain__eyebrow"><span class="domain__icon-badge">💪</span> 01 — Physical Capacity</div>
+      <div class="domain__accent-bar"></div>
+      <h2 class="domain__title">Can Your Body Do What It Needs To — At 85?</h2>
+      <div class="domain__quote">"The single strongest predictor of all-cause mortality — stronger than smoking, hypertension, or heart disease — is low cardiorespiratory fitness."<cite>— Mandsager et al., JAMA Network Open, 2018</cite></div>
+      <!-- 13d: Cross-link -->
+      <a href="/legacy/training/" class="domain__crosslink">See the full evidence in Training Observatory →</a>
+    </div>
+    <div class="domain__visual">
+      <div class="phys-gauges">
+        <div class="mg"><svg width="80" height="50" viewBox="0 0 80 50"><path class="mg__bg" d="M 8 45 A 35 35 0 0 1 72 45"/><path class="mg__fill" id="mg-deadlift" d="M 8 45 A 35 35 0 0 1 72 45"/><text class="mg__text" x="40" y="36" text-anchor="middle" id="mg-dl-v">—</text><text class="mg__unit" x="40" y="46" text-anchor="middle">%</text></svg><div class="mg__label">Deadlift</div></div>
+        <div class="mg"><svg width="80" height="50" viewBox="0 0 80 50"><path class="mg__bg" d="M 8 45 A 35 35 0 0 1 72 45"/><path class="mg__fill" id="mg-squat" d="M 8 45 A 35 35 0 0 1 72 45"/><text class="mg__text" x="40" y="36" text-anchor="middle" id="mg-sq-v">—</text><text class="mg__unit" x="40" y="46" text-anchor="middle">%</text></svg><div class="mg__label">Squat</div></div>
+        <div class="mg"><svg width="80" height="50" viewBox="0 0 80 50"><path class="mg__bg" d="M 8 45 A 35 35 0 0 1 72 45"/><path class="mg__fill" id="mg-vo2" d="M 8 45 A 35 35 0 0 1 72 45"/><text class="mg__text" x="40" y="36" text-anchor="middle" id="mg-vo2-v">—</text><text class="mg__unit" x="40" y="46" text-anchor="middle">VO2</text></svg><div class="mg__label">VO2 Max</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="bench-grid">
+    <!-- 13g: id for deep-link -->
+    <div class="bench-card bench-card--survival" id="deadlift"><div class="bench-card__top"><div class="bench-card__name">Deadlift</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">2.0×</div><div class="bench-card__target-label">bodyweight</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-dl"></div></div><div class="bb-labels"><span id="bl-dl-c">—</span><span id="bl-dl-t">—</span></div></div><!-- 13j: Journey --><div class="bench-card__journey" id="journey-dl"><div class="bench-card__journey-point"><div class="bench-card__journey-value">135 lbs</div><div class="bench-card__journey-label">Day 1</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value" id="journey-dl-now">—</div><div class="bench-card__journey-label">Now</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value journey-target" id="journey-dl-target">—</div><div class="bench-card__journey-label">Target</div></div></div><!-- 13c: Math of decline --><div class="bench-card__decline">Why 2x bodyweight at 40? We lose 3-8% strength per decade after 30. The target is the reserve that keeps you independent at 85.</div><!-- 13k: Research vs Personal --><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Posterior chain strength — the ability to pick things up off the floor safely at any age. Functional independence reserve for the Centenarian Decathlon.</div><div class="bench-card__layer-content" data-layer="personal">Current tracking via Hevy. Building from a baseline of 135 lbs toward 2x bodyweight. Progressive overload protocol: 3x/week deadlift variations.</div></div><div class="bench-card__source">Centenarian Decathlon · Functional independence reserve</div></div>
+
+    <div class="bench-card bench-card--survival" id="back-squat"><div class="bench-card__top"><div class="bench-card__name">Back Squat</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">1.75×</div><div class="bench-card__target-label">bodyweight</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-sq"></div></div><div class="bb-labels"><span id="bl-sq-c">—</span><span id="bl-sq-t">—</span></div></div><div class="bench-card__journey" id="journey-sq"><div class="bench-card__journey-point"><div class="bench-card__journey-value">95 lbs</div><div class="bench-card__journey-label">Day 1</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value" id="journey-sq-now">—</div><div class="bench-card__journey-label">Now</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value journey-target" id="journey-sq-target">—</div><div class="bench-card__journey-label">Target</div></div></div><div class="bench-card__decline">Why 1.75x bodyweight? Quad and glute strength directly predict fall risk. At 80+, a hip fracture carries 30% one-year mortality.</div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Quad and glute strength — fall prevention, stairs, getting out of chairs unassisted. Directly tied to functional independence in old age.</div><div class="bench-card__layer-content" data-layer="personal">Progressing from 95 lbs baseline. Current squat program: 3x/week with linear periodization. Mobility work is the bottleneck.</div></div><div class="bench-card__source">Centenarian Decathlon · Leong et al., Lancet 2015</div></div>
+
+    <div class="bench-card bench-card--survival" id="grip-strength"><div class="bench-card__top"><div class="bench-card__name">Grip Strength</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">>40</div><div class="bench-card__target-label">kg per hand</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-grip"></div></div><div class="bb-labels"><span id="bl-grip-c">—</span><span>40 kg</span></div></div><div class="bench-card__journey" id="journey-grip"><div class="bench-card__journey-point"><div class="bench-card__journey-value">—</div><div class="bench-card__journey-label">Day 1</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value" id="journey-grip-now">—</div><div class="bench-card__journey-label">Now</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value journey-target">40 kg</div><div class="bench-card__journey-label">Target</div></div></div><div class="bench-card__decline">Grip strength declines ~2-5% per year after 50. Building reserve now means maintaining independence decades later.</div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">One of the single strongest predictors of all-cause mortality — stronger than blood pressure in some analyses. 140,000 participants across 17 countries.</div><div class="bench-card__layer-content" data-layer="personal">Dynamometer baseline pending. Currently training grip via dead hangs, farmer carries, and barbell holds.</div></div><div class="bench-card__source">Leong et al., Lancet 2015 · 140,000 participants, 17 countries</div></div>
+
+    <div class="bench-card bench-card--survival" id="vo2-max"><div class="bench-card__top"><div class="bench-card__name">VO2 Max</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">50+</div><div class="bench-card__target-label">ml/kg/min</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-vo2"></div></div><div class="bb-labels"><span id="bl-vo2-c">—</span><span>50 ml/kg/min</span></div></div><div class="bench-card__journey" id="journey-vo2"><div class="bench-card__journey-point"><div class="bench-card__journey-value">~38</div><div class="bench-card__journey-label">Day 1</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value" id="journey-vo2-now">—</div><div class="bench-card__journey-label">Now</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value journey-target">50+</div><div class="bench-card__journey-label">Target</div></div></div><div class="bench-card__decline">VO2 max drops ~10% per decade after 30. At 50 ml/kg/min now, you're buying yourself functional capacity at 80 that most people lose at 60.</div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Elite fitness = 5x mortality reduction vs low fitness. The most powerful longevity lever measured. Stronger predictor than smoking cessation.</div><div class="bench-card__layer-content" data-layer="personal">Estimated via Apple Watch + zone 2 training. Target: 3-4 zone 2 sessions/week (45+ min) plus 1 high-intensity interval session.</div></div><div class="bench-card__source">Mandsager et al., JAMA Network Open, 2018</div></div>
+
+    <div class="bench-card" id="dead-hang"><div class="bench-card__top"><div class="bench-card__name">Dead Hang</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot empty"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">60+</div><div class="bench-card__target-label">seconds</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-hang"></div></div><div class="bb-labels"><span id="bl-hang-c">—</span><span>60s</span></div></div><div class="bench-card__journey" id="journey-hang"><div class="bench-card__journey-point"><div class="bench-card__journey-value">~20s</div><div class="bench-card__journey-label">Day 1</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value" id="journey-hang-now">—</div><div class="bench-card__journey-label">Now</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value journey-target">60s</div><div class="bench-card__journey-label">Target</div></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Shoulder health, grip endurance, upper body hanging reserve. A functional marker for joint integrity and overhead mobility.</div><div class="bench-card__layer-content" data-layer="personal">Training dead hangs 3x/week at end of pulling sessions. Progressing from ~20 seconds baseline.</div></div><div class="bench-card__source">Centenarian Decathlon · Functional reserve framework</div></div>
+
+    <div class="bench-card bench-card--survival" id="resting-heart-rate"><div class="bench-card__top"><div class="bench-card__name">Resting Heart Rate</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">&lt;60</div><div class="bench-card__target-label">bpm</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-rhr"></div></div><div class="bb-labels"><span id="bl-rhr-c">—</span><span>&lt;60 bpm</span></div></div><div class="bench-card__journey" id="journey-rhr"><div class="bench-card__journey-point"><div class="bench-card__journey-value">~68</div><div class="bench-card__journey-label">Day 1</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value" id="journey-rhr-now">—</div><div class="bench-card__journey-label">Now</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value journey-target">&lt;60</div><div class="bench-card__journey-label">Target</div></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Cardiovascular efficiency. Lower resting HR consistently linked to lower cardiovascular mortality across 46 cohort studies.</div><div class="bench-card__layer-content" data-layer="personal">Tracked daily via Whoop. Zone 2 training is the primary driver. Seeing gradual downward trend from baseline ~68 bpm.</div></div><div class="bench-card__source">Zhang et al., CMAJ 2016 · Meta-analysis, 46 cohorts</div></div>
+  </div>
+</section>
+
+<!-- ═══ DOMAIN 2 — SLEEP ══════════════════════════════════ -->
+<section class="domain domain--survival reveal" id="sleep">
+  <div class="domain__header">
+    <div class="domain__lead">
+      <div class="domain__eyebrow"><span class="domain__icon-badge">🌙</span> 02 — Sleep & Recovery</div>
+      <div class="domain__accent-bar"></div>
+      <h2 class="domain__title">The Foundation Everything Else Is Built On</h2>
+      <div class="domain__quote">"There is no major organ in the body, and no process within the brain, that isn't optimally enhanced by sleep and demonstrably impaired when you don't get enough."<cite>— Matthew Walker, PhD · "Why We Sleep"</cite></div>
+      <a href="/legacy/sleep/" class="domain__crosslink">See the full evidence in Sleep Observatory →</a>
+    </div>
+    <div class="domain__visual">
+      <div class="sleep-arch">
+        <div class="sl-row"><div class="sl-label">Deep</div><div class="sl-track"><div class="sl-fill deep" id="sl-deep"></div><div class="sl-target" style="left:20%"></div></div><div class="sl-val" id="sl-deep-v">—%</div></div>
+        <div class="sl-row"><div class="sl-label">REM</div><div class="sl-track"><div class="sl-fill rem" id="sl-rem"></div><div class="sl-target" style="left:22%"></div></div><div class="sl-val" id="sl-rem-v">—%</div></div>
+        <div class="sl-row"><div class="sl-label">Light</div><div class="sl-track"><div class="sl-fill light" id="sl-light"></div></div><div class="sl-val" id="sl-light-v">—%</div></div>
+        <div style="margin-top:var(--space-3);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-label)">▎ = research target &nbsp;(7-day avg from Whoop)</div>
+      </div>
+    </div>
+  </div>
+  <div class="bench-grid">
+    <div class="bench-card bench-card--survival" id="total-sleep"><div class="bench-card__top"><div class="bench-card__name">Total Sleep</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">7–9</div><div class="bench-card__target-label">hours / night</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-slp"></div></div><div class="bb-labels"><span id="bl-slp-c">—</span><span>7–9 hrs</span></div></div><div class="bench-card__journey" id="journey-slp"><div class="bench-card__journey-point"><div class="bench-card__journey-value">~6.2 hrs</div><div class="bench-card__journey-label">Day 1</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value" id="journey-slp-now">—</div><div class="bench-card__journey-label">Now</div></div><div class="bench-card__journey-arrow">→</div><div class="bench-card__journey-point"><div class="bench-card__journey-value journey-target">7-9 hrs</div><div class="bench-card__journey-label">Target</div></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">&lt;6 hours associated with 12% higher all-cause mortality. Cognitive decline, immune suppression, metabolic disruption. 1.3M participants in the Cappuccio meta-analysis.</div><div class="bench-card__layer-content" data-layer="personal">Whoop-tracked nightly. Started averaging ~6.2 hours. Sleep hygiene protocol: consistent bed/wake times, cool room, no screens after 9pm.</div></div><div class="bench-card__source">Cappuccio et al., Sleep 2010 · 1.3M participants</div></div>
+
+    <div class="bench-card bench-card--survival" id="deep-sleep"><div class="bench-card__top"><div class="bench-card__name">Deep Sleep %</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">>15–20%</div><div class="bench-card__target-label">of total sleep</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-deep"></div></div><div class="bb-labels"><span id="bl-deep-c">—</span><span>20%</span></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Glymphatic clearance — the brain's waste removal system. Deep sleep flushes amyloid-beta plaques linked to Alzheimer's.</div><div class="bench-card__layer-content" data-layer="personal">7-day rolling average from Whoop. Training and alcohol are the biggest disruptors. Evening sauna protocol appears to help.</div></div><div class="bench-card__source">Xie et al., Science 2013 · Glymphatic system research</div></div>
+
+    <div class="bench-card bench-card--survival" id="rem-sleep"><div class="bench-card__top"><div class="bench-card__name">REM Sleep %</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">>20%</div><div class="bench-card__target-label">of total sleep</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-rem"></div></div><div class="bb-labels"><span id="bl-rem-c">—</span><span>20%</span></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Memory consolidation, emotional processing, creative problem-solving. REM deprivation linked to anxiety and cognitive rigidity.</div><div class="bench-card__layer-content" data-layer="personal">Whoop-tracked. REM tends to cluster in the last 2-3 hours of sleep — another reason total duration matters.</div></div><div class="bench-card__source">Boyce et al., Science 2016 · Walker, "Why We Sleep"</div></div>
+
+    <div class="bench-card" id="hrv"><div class="bench-card__top"><div class="bench-card__name">HRV (Resting)</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot empty"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">Top 25%</div><div class="bench-card__target-label">age-adjusted percentile</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-hrv"></div></div><div class="bb-labels"><span id="bl-hrv-c">—</span><span>Top quartile</span></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Autonomic flexibility. Higher HRV = better stress resilience, recovery capacity, and cardiac health.</div><div class="bench-card__layer-content" data-layer="personal">Whoop RMSSD during sleep. Primary drivers: sleep quality, zone 2 training volume, alcohol avoidance.</div></div><div class="bench-card__source">Thayer et al., Neuroscience & Biobehavioral Reviews 2012</div></div>
+
+    <div class="bench-card bench-card--survival" id="sleep-consistency"><div class="bench-card__top"><div class="bench-card__name">Sleep Consistency</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot empty"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">&lt;30</div><div class="bench-card__target-label">min variability bed/wake</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-slcons"></div></div><div class="bb-labels"><span id="bl-slcons-c">—</span><span>&lt;30 min</span></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Circadian alignment. Irregular timing disrupts metabolic hormones regardless of total sleep duration. Social jet lag is real.</div><div class="bench-card__layer-content" data-layer="personal">Whoop bed/wake timestamps. Weekends are the vulnerability. Alarm-free wake protocol helps keep variance low.</div></div><div class="bench-card__source">Huang et al., Sleep 2021 · Social jet lag research</div></div>
+  </div>
+</section>
+
+<!-- ═══ 13h: COGNITIVE-PHYSICAL CROSSOVER CALLOUT ═════════ -->
+<div class="crossover-callout reveal">
+  <div class="crossover-callout__inner">
+    <div class="crossover-callout__icon">⚡</div>
+    <div class="crossover-callout__text"><strong>The strongest cognitive reserve builders are cardiovascular exercise and sleep quality.</strong> The physical and sleep domains above aren't just body metrics — they're brain metrics. VO2 max and deep sleep percentage have stronger associations with long-term cognitive function than any nootropic, brain training app, or puzzle. If you want to protect your mind, start with your body and your bed.</div>
+  </div>
+</div>
+
+<!-- ═══ DOMAIN 3 — COGNITIVE ══════════════════════════════ -->
+<section class="domain domain--quality reveal" id="cognitive">
+  <div class="domain__header">
+    <div class="domain__lead">
+      <div class="domain__eyebrow"><span class="domain__icon-badge">📚</span> 03 — Cognitive & Intellectual</div>
+      <div class="domain__accent-bar"></div>
+      <h2 class="domain__title">Are You Building Cognitive Reserve?</h2>
+      <div class="domain__quote">"Individuals who read books survived approximately 23 months longer than non-readers, with a survival advantage regardless of gender, wealth, or education."<cite>— Bavishi et al., Social Science &amp; Medicine, 2016</cite></div>
+      <a href="/legacy/journal/" class="domain__crosslink">See the full evidence in Journal Observatory →</a>
+    </div>
+    <div class="domain__visual"><div class="bookshelf" id="bookshelf"></div></div>
+  </div>
+  <div class="bench-grid">
+    <!-- 13l: Books — honest status -->
+    <div class="bench-card bench-card--planned" id="books-read"><div class="bench-card__top"><div class="bench-card__name">Books Read / Year</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot empty"></div></div></div><div class="bench-card__planned-tag">Not yet tracked — planned for Month 3</div><div class="bench-card__target-row"><div class="bench-card__target">24+</div><div class="bench-card__target-label">books per year</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-books"></div></div><div class="bb-labels"><span id="bl-books-c">—</span><span>24 / year</span></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">US average is ~12/year. Readers live ~2 years longer. Each book builds cognitive reserve against decline.</div><div class="bench-card__layer-content" data-layer="personal">Tracking via manual log — automation planned for Month 3. Currently reading but not yet systematically recording.</div></div><div class="bench-card__source">Bavishi et al., Social Science &amp; Medicine 2016 · 3,635 participants, 12 years</div></div>
+
+    <div class="bench-card" id="journaling-frequency"><div class="bench-card__top"><div class="bench-card__name">Journaling Frequency</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot empty"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">5+</div><div class="bench-card__target-label">sessions / week</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-jrnl"></div></div><div class="bb-labels"><span id="bl-jrnl-c">—</span><span>5 / week</span></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Expressive writing improves immune function, reduces stress hormones, and strengthens emotional regulation. 40+ years of replication.</div><div class="bench-card__layer-content" data-layer="personal">Tracked via platform journal entries. AI-analyzed for sentiment, themes, and consistency patterns.</div></div><div class="bench-card__source">Pennebaker &amp; Beall, 1986 · 40+ years of replication</div></div>
+
+    <!-- 13l: Learning Hours — honest status -->
+    <div class="bench-card bench-card--planned" id="learning-hours"><div class="bench-card__top"><div class="bench-card__name">Learning Hours / Week</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot empty"></div><div class="ev-dot empty"></div></div></div><div class="bench-card__planned-tag">Not yet tracked — planned for Month 3</div><div class="bench-card__target-row"><div class="bench-card__target">5+</div><div class="bench-card__target-label">hours deliberate learning</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-learn"></div></div><div class="bb-labels"><span id="bl-learn-c">—</span><span>5 hrs/wk</span></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Neuroplasticity requires active challenge. Passive consumption doesn't build new pathways the way deliberate learning does.</div><div class="bench-card__layer-content" data-layer="personal">Currently learning platform engineering and data architecture — but not yet tracking hours systematically.</div></div><div class="bench-card__source">Stern, Neuropsychologia 2009 · Cognitive reserve hypothesis</div></div>
+
+    <div class="bench-card" id="new-skills"><div class="bench-card__top"><div class="bench-card__name">New Skills / Year</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot empty"></div><div class="ev-dot empty"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">1+</div><div class="bench-card__target-label">meaningful skill per year</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-skill"></div></div><div class="bb-labels"><span>Platform engineering (2025–)</span><span>1+ / year</span></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Novel skill acquisition maintains cognitive plasticity. The discomfort of being a beginner is the signal of growth.</div><div class="bench-card__layer-content" data-layer="personal">2025-2026: Full-stack platform engineering — AWS, CDK, Python, data pipelines. Beginner to builder in 6 months.</div></div><div class="bench-card__source">Park et al., Psychological Science 2014</div></div>
+  </div>
+</section>
+
+<!-- ═══ DOMAIN 4 — EMOTIONAL ══════════════════════════════ -->
+<section class="domain domain--quality reveal" id="emotional">
+  <div class="domain__header">
+    <div class="domain__lead">
+      <div class="domain__eyebrow"><span class="domain__icon-badge">🧠</span> 04 — Emotional & Psychological</div>
+      <div class="domain__accent-bar"></div>
+      <h2 class="domain__title">Are You Actually Getting Happier?</h2>
+      <div class="domain__quote">"Happiness is not something that happens. It is not the result of good fortune or random chance. It is something that each person must cultivate and defend."<cite>— Mihaly Csikszentmihalyi · "Flow"</cite></div>
+      <a href="/legacy/journal/" class="domain__crosslink">See the full evidence in Journal Observatory →</a>
+    </div>
+    <div class="domain__visual">
+      <div class="wave-wrap"><svg viewBox="0 0 400 100" preserveAspectRatio="none"><defs><linearGradient id="wg" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="var(--accent)" stop-opacity="0.3"/><stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs><line x1="0" y1="50" x2="400" y2="50" stroke="var(--text-faint)" stroke-width="1" stroke-dasharray="4,4"/><path id="wave-area" fill="url(#wg)" opacity="0.3" d="M0,50 L400,50 L400,100 L0,100Z"/><path id="wave-line" fill="none" stroke="var(--accent)" stroke-width="2" d="M0,50 L400,50"/><text x="5" y="15" font-family="var(--font-mono)" font-size="8" fill="var(--text-faint)">POSITIVE</text><text x="5" y="95" font-family="var(--font-mono)" font-size="8" fill="var(--text-faint)">NEGATIVE</text><text x="355" y="15" font-family="var(--font-mono)" font-size="8" fill="var(--text-faint)">NOW →</text></svg></div>
+    </div>
+  </div>
+  <div class="bench-grid">
+    <div class="bench-card" id="subjective-wellbeing"><div class="bench-card__top"><div class="bench-card__name">Subjective Wellbeing</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">≥ 70</div><div class="bench-card__target-label">WHO-5 score (0–100)</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-who5"></div></div><div class="bb-labels"><span id="bl-who5-c">—</span><span>70+</span></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">WHO-5 is the most widely validated wellbeing measure. Below 50 suggests clinical screening is warranted.</div><div class="bench-card__layer-content" data-layer="personal">Derived from journal sentiment analysis and periodic self-assessment. Tracked as a rolling 30-day composite.</div></div><div class="bench-card__source">WHO-5 Index · Topp et al., Psychotherapy &amp; Psychosomatics 2015</div></div>
+
+    <div class="bench-card" id="journal-sentiment"><div class="bench-card__top"><div class="bench-card__name">Journal Sentiment Trend</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot empty"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">↑</div><div class="bench-card__target-label">positive trajectory over 90 days</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-sent"></div></div><div class="bb-labels"><span id="bl-sent-c">—</span><span>Improving</span></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Not about being positive every day — it's whether the arc bends toward self-compassion and agency over time.</div><div class="bench-card__layer-content" data-layer="personal">AI-analyzed using Pennebaker linguistic markers. Tracking emotional valence, agency words, and cognitive complexity.</div></div><div class="bench-card__source">Platform AI analysis · Pennebaker linguistic markers</div></div>
+
+    <!-- 13l: Gratitude — honest status -->
+    <div class="bench-card bench-card--planned" id="gratitude-practice"><div class="bench-card__top"><div class="bench-card__name">Gratitude Practice</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot empty"></div></div></div><div class="bench-card__planned-tag">Not yet tracked — planned for Month 3</div><div class="bench-card__target-row"><div class="bench-card__target">3+</div><div class="bench-card__target-label">instances / week</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-grat"></div></div><div class="bb-labels"><span id="bl-grat-c">—</span><span>3 / week</span></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Gratitude journaling showed 25% improvement in happiness scores and fewer physical symptoms vs controls.</div><div class="bench-card__layer-content" data-layer="personal">Plan: integrate gratitude prompts into the daily journal. Will track as a tagged journal entry type.</div></div><div class="bench-card__source">Emmons &amp; McCullough, JPSP 2003 · RCT</div></div>
+
+    <div class="bench-card" id="stress-recovery"><div class="bench-card__top"><div class="bench-card__name">Stress Recovery</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot empty"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">Daily</div><div class="bench-card__target-label">deliberate decompression</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-stress"></div></div><div class="bb-labels"><span id="bl-stress-c">—</span><span>Daily</span></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Chronic stress without recovery accelerates telomere shortening and immune senescence. Consistency matters more than method.</div><div class="bench-card__layer-content" data-layer="personal">Current protocol: evening walk, reading, sauna. Tracked via habit completion system.</div></div><div class="bench-card__source">Epel et al., PNAS 2004 · Telomere-stress research</div></div>
+  </div>
+</section>
+
+<!-- ═══ DOMAIN 5 — SOCIAL ═════════════════════════════════ -->
+<section class="domain domain--survival reveal" id="social">
+  <div class="domain__header">
+    <div class="domain__lead">
+      <div class="domain__eyebrow"><span class="domain__icon-badge">🤝</span> 05 — Social Connection</div>
+      <div class="domain__accent-bar"></div>
+      <h2 class="domain__title">The Loneliness Epidemic Is a Health Crisis</h2>
+      <div class="domain__quote">"Lacking social connections carries a risk comparable to smoking 15 cigarettes a day, and is more harmful than obesity, physical inactivity, or air pollution."<cite>— Holt-Lunstad et al., PLOS Medicine, 2010 · 308,849 participants</cite></div>
+      <a href="/legacy/accountability/" class="domain__crosslink">See the full evidence in Accountability →</a>
+    </div>
+    <div class="domain__visual">
+      <div class="dunbar" id="dunbar-viz">
+        <div class="dring r150"><div class="dlabel l150">150 · acquaintances</div></div>
+        <div class="dring r50"><div class="dlabel l50">50</div></div>
+        <div class="dring r15"><div class="dlabel l15">15 · close</div></div>
+        <div class="dring r5"><div class="dlabel l5">5</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="bench-grid">
+    <div class="bench-card bench-card--survival" id="support-clique"><div class="bench-card__top"><div class="bench-card__name">Support Clique</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">5+</div><div class="bench-card__target-label">people you'd call in a crisis</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-cliq"></div></div><div class="bb-labels"><span id="bl-cliq-c">—</span><span>5 people</span></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Dunbar's innermost circle. Your survival network — the people who would drop everything. Most adults have 2-3.</div><div class="bench-card__layer-content" data-layer="personal">Self-assessed quarterly. This is the benchmark Matthew is most honest about failing. Building, not there yet.</div></div><div class="bench-card__source">Dunbar, 2010 · Social Brain Hypothesis</div></div>
+
+    <div class="bench-card bench-card--survival" id="social-hours"><div class="bench-card__top"><div class="bench-card__name">Social Hours / Week</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">6–7+</div><div class="bench-card__target-label">hours meaningful interaction</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-sochrs"></div></div><div class="bb-labels"><span id="bl-sochrs-c">—</span><span>6–7 hrs/wk</span></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Not passive co-presence — meaningful conversation, shared activity, emotional engagement. Quality over quantity.</div><div class="bench-card__layer-content" data-layer="personal">Tracked via calendar + journal tags. Biggest gap is weekday social interaction outside of family.</div></div><div class="bench-card__source">Holt-Lunstad et al., 2010 · Social integration meta-analysis</div></div>
+
+    <div class="bench-card" id="relationship-depth"><div class="bench-card__top"><div class="bench-card__name">Relationship Depth</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot empty"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">5 / 15 / 50</div><div class="bench-card__target-label">Dunbar layer distribution</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-dunb"></div></div><div class="bb-labels"><span id="bl-dunb-c">—</span><span>Healthy layers</span></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Not just "do you have friends?" — it's whether connections are distributed across intimate, close, and broader layers.</div><div class="bench-card__layer-content" data-layer="personal">Quarterly self-assessment mapping relationships to Dunbar layers. The 15-layer (close friends) is the thinnest.</div></div><div class="bench-card__source">Dunbar, 2010 · Concentric relationship model</div></div>
+
+    <!-- 13l: Generosity — honest status -->
+    <div class="bench-card bench-card--planned" id="acts-of-generosity"><div class="bench-card__top"><div class="bench-card__name">Acts of Generosity</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot empty"></div></div></div><div class="bench-card__planned-tag">Not yet tracked — planned for Month 3</div><div class="bench-card__target-row"><div class="bench-card__target">Weekly</div><div class="bench-card__target-label">intentional giving or service</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-gen"></div></div><div class="bb-labels"><span id="bl-gen-c">—</span><span>Weekly</span></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">Altruistic behavior activates reward circuits, lowers inflammation, and predicts greater life satisfaction.</div><div class="bench-card__layer-content" data-layer="personal">Plan: track via journal tags for intentional acts of generosity — time, money, or emotional support.</div></div><div class="bench-card__source">Post, Int J Behavioral Medicine 2005 · "It's Good to Be Good"</div></div>
+  </div>
+</section>
+
+<!-- ═══ DOMAIN 6 — DISCIPLINE ═════════════════════════════ -->
+<section class="domain domain--quality reveal" id="discipline">
+  <div class="domain__header">
+    <div class="domain__lead">
+      <div class="domain__eyebrow"><span class="domain__icon-badge">🔥</span> 06 — Behavioral Discipline</div>
+      <div class="domain__accent-bar"></div>
+      <h2 class="domain__title">Do You Do What You Say You'll Do?</h2>
+      <div class="domain__quote">"On average, it takes more than 2 months for a new behaviour to become automatic — 66 days specifically. There is no 21-day myth."<cite>— Lally et al., European Journal of Social Psychology, 2010</cite></div>
+      <a href="/legacy/habits/" class="domain__crosslink">See the full evidence in Habits Observatory →</a>
+    </div>
+    <div class="domain__visual">
+      <div><div class="heatmap" id="heatmap"></div><div style="margin-top:var(--space-3);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-label);text-align:center">26 weeks · habit completion density</div></div>
+    </div>
+  </div>
+  <div class="bench-grid">
+    <div class="bench-card" id="core-habit-completion"><div class="bench-card__top"><div class="bench-card__name">Core Habit Completion</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot empty"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">>80%</div><div class="bench-card__target-label">on Tier 0 habits</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-hab"></div></div><div class="bb-labels"><span id="bl-hab-c">—</span><span>80%+</span></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">80% is the threshold where a behavior system becomes self-sustaining. Below 60%, motivation erodes faster than habit forms.</div><div class="bench-card__layer-content" data-layer="personal">Tracked daily via platform habit system. Tier 0 = non-negotiable habits. 7-day rolling average.</div></div><div class="bench-card__source">Lally et al., 2010 · Habit automaticity research</div></div>
+
+    <div class="bench-card" id="vice-streak"><div class="bench-card__top"><div class="bench-card__name">Vice Streak</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot"></div><div class="ev-dot"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">90+</div><div class="bench-card__target-label">days clean per vice</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-vice"></div></div><div class="bb-labels"><span id="bl-vice-c">—</span><span>90 days</span></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">90 days is the neurological threshold where cue-response pathways meaningfully weaken. Before that, relapse risk is highest.</div><div class="bench-card__layer-content" data-layer="personal">Tracked via accountability system. Each vice has an independent streak counter. Minimum streak across all vices is the reported number.</div></div><div class="bench-card__source">Volkow et al., Neuropsychopharmacology 2004 · Dopamine recovery</div></div>
+
+    <div class="bench-card" id="knowing-doing-gap"><div class="bench-card__top"><div class="bench-card__name">Knowing-Doing Gap</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot empty"></div><div class="ev-dot empty"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">&lt;20%</div><div class="bench-card__target-label">gap between intention and action</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-kdg"></div></div><div class="bb-labels"><span id="bl-kdg-c">—</span><span>&lt;20% gap</span></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">How often do you know the right thing and still not do it? The truest measure of self-governance.</div><div class="bench-card__layer-content" data-layer="personal">Computed from planned vs completed actions across all tracked habits and goals. The honest gap metric.</div></div><div class="bench-card__source">Platform intelligence layer · Behavioral adherence ratio</div></div>
+
+    <div class="bench-card" id="tracking-consistency"><div class="bench-card__top"><div class="bench-card__name">Tracking Consistency</div><div class="bench-card__evidence"><div class="ev-dot"></div><div class="ev-dot empty"></div><div class="ev-dot empty"></div></div></div><div class="bench-card__target-row"><div class="bench-card__target">>95%</div><div class="bench-card__target-label">days with complete data</div></div><div class="bench-card__bar"><div class="bb-track"><div class="bb-fill" id="bar-trk"></div></div><div class="bb-labels"><span id="bl-trk-c">—</span><span>95%+</span></div></div><div class="bench-card__layers"><div class="bench-card__layer-tabs"><button class="bench-card__layer-tab active" onclick="switchLayer(this,'research')">Research</button><button class="bench-card__layer-tab" onclick="switchLayer(this,'personal')">Matthew's Data</button></div><div class="bench-card__layer-content active" data-layer="research">You can't improve what you don't measure. Consistency of tracking is itself a discipline benchmark — the meta-habit.</div><div class="bench-card__layer-content" data-layer="personal">Automated via platform ingestion. Gaps detected and reported daily. Current uptime tracked across all data sources.</div></div><div class="bench-card__source">Platform-defined · The habit of measuring habits</div></div>
+  </div>
+</section>
+
+<div class="reading-path reveal">
+  <div class="reading-path__label">Next →</div>
+  <a href="/legacy/character/" class="reading-path__link"><span class="reading-path__title">Character Sheet</span><span class="reading-path__sub">— see how these benchmarks feed your score</span></a>
+</div>
+
+<nav class="reading-path-v2">
+  <a href="/legacy/glucose/" class="reading-path-v2__link">
+    <span class="reading-path-v2__dir">← Previous</span>
+    <span class="reading-path-v2__title">Glucose</span>
+  </a>
+  <a href="/legacy/explorer/" class="reading-path-v2__link reading-path-v2__link--next">
+    <span class="reading-path-v2__dir">Next →</span>
+    <span class="reading-path-v2__title">Data Explorer</span>
+  </a>
+</nav>
+
+<div id="amj-subscribe"></div>
+<div id="amj-bottom-nav"></div>
+<div id="amj-footer"></div>
+
+<script src="/legacy/assets/js/reveal.js"></script>
+<script>
+const API = 'https://averagejoematt.com';
+
+/* ── Bookshelf ────────────────────────────────────────── */
+(function(){const shelf=document.getElementById('bookshelf');if(!shelf)return;const colors=['#1a6b4a','#2d8a6a','#00a370','#c8843a','#a06820','#4a6050','#006c4a','#2d8a6a'];const booksRead=6,total=24;for(let i=0;i<total;i++){const s=document.createElement('div');s.className='book-spine '+(i<booksRead?'read':'unread');const h=40+Math.random()*60;s.style.height='0px';s.style.background=colors[i%colors.length];s.style.width=(8+Math.random()*8)+'px';shelf.appendChild(s);setTimeout(()=>{s.style.height=h+'px';},200+i*50);}})();
+
+/* ── Heatmap ──────────────────────────────────────────── */
+(function(){const hm=document.getElementById('heatmap');if(!hm)return;for(let r=0;r<7;r++){for(let c=0;c<26;c++){const cell=document.createElement('div');cell.className='hc';const prob=0.3+(c/26)*0.5+Math.random()*0.2;const x=Math.random();if(x<prob*0.3)cell.classList.add('l1');else if(x<prob*0.55)cell.classList.add('l2');else if(x<prob*0.75)cell.classList.add('l3');else if(x<prob*0.9)cell.classList.add('l4');hm.appendChild(cell);}}})();
+
+/* ── Waveform ─────────────────────────────────────────── */
+(function(){const wl=document.getElementById('wave-line');const wa=document.getElementById('wave-area');if(!wl)return;const pts=[];let y=55;for(let x=0;x<=400;x+=10){y+=(Math.random()-0.45)*8;y=Math.max(15,Math.min(85,y));pts.push(x+','+y);}const d='M'+pts.join(' L');wl.setAttribute('d',d);wa.setAttribute('d',d+' L400,100 L0,100Z');})();
+
+/* ── Dunbar dots ──────────────────────────────────────── */
+(function(){const c=document.getElementById('dunbar-viz');if(!c)return;[{n:3,min:0,max:20},{n:8,min:25,max:38},{n:12,min:42,max:60},{n:15,min:65,max:90}].forEach(ring=>{for(let i=0;i<ring.n;i++){const a=(Math.PI*2*i)/ring.n+Math.random()*0.4;const r=ring.min+Math.random()*(ring.max-ring.min);const dot=document.createElement('div');dot.className='ddot';dot.style.left=(100+r*Math.cos(a)-2.5)+'px';dot.style.top=(100+r*Math.sin(a)-2.5)+'px';dot.style.opacity=0.3+Math.random()*0.7;c.appendChild(dot);}});})();
+
+/* ── Helpers ──────────────────────────────────────────── */
+function setBar(id, pct, cls) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.width = Math.min(100, Math.max(0, pct)) + '%';
+  if (cls) el.classList.add(cls);
+}
+function setGauge(id, pct) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const p = Math.min(100, Math.max(0, pct));
+  el.style.strokeDashoffset = 110 - (110 * p / 100);
+  if (p < 50) el.classList.add('amber');
+}
+function setText(id, txt) { const el = document.getElementById(id); if (el) el.textContent = txt; }
+
+/* ── 13k: Layer tab switching ─────────────────────────── */
+function switchLayer(btn, layer) {
+  const card = btn.closest('.bench-card');
+  if (!card) return;
+  card.querySelectorAll('.bench-card__layer-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  card.querySelectorAll('.bench-card__layer-content').forEach(c => {
+    c.classList.toggle('active', c.dataset.layer === layer);
+    c.style.display = c.dataset.layer === layer ? 'block' : 'none';
+  });
+}
+
+/* ── Grade badges — inject into every bench-card ──────── */
+function pctToGrade(pct) {
+  if (pct >= 90) return { letter: 'A', cls: 'ga' };
+  if (pct >= 75) return { letter: 'B', cls: 'gb' };
+  if (pct >= 55) return { letter: 'C', cls: 'gc' };
+  if (pct >= 35) return { letter: 'D', cls: 'gd' };
+  return { letter: 'F', cls: 'gf' };
+}
+
+(function() {
+  document.querySelectorAll('.bench-card').forEach((card, i) => {
+    // Grade badge
+    const badge = document.createElement('div');
+    badge.className = 'bench-card__grade';
+    badge.id = 'grade-' + i;
+    badge.textContent = '—';
+    card.appendChild(badge);
+    const pctEl = document.createElement('div');
+    pctEl.className = 'bench-card__grade-pct';
+    pctEl.id = 'gpct-' + i;
+    card.appendChild(pctEl);
+    // Trend indicator — inject after the bar, before the journey or layers
+    const barDiv = card.querySelector('.bench-card__bar');
+    const nextSibling = barDiv ? barDiv.nextElementSibling : null;
+    if (barDiv && nextSibling) {
+      const trend = document.createElement('div');
+      trend.className = 'bench-card__trend hidden';
+      trend.innerHTML = '<span class="bench-card__trend-arrow">—</span><span class="bench-card__trend-delta"></span><span class="bench-card__trend-period"></span>';
+      barDiv.after(trend);
+    }
+    const barFill = card.querySelector('.bb-fill');
+    if (barFill) card.dataset.barId = barFill.id;
+  });
+})();
+
+function setGradeByBar(barId, pct) {
+  const card = document.querySelector('[data-bar-id="' + barId + '"]') ||
+    (document.getElementById(barId) && document.getElementById(barId).closest('.bench-card'));
+  if (!card) return;
+  const badge = card.querySelector('.bench-card__grade');
+  const pctEl = card.querySelector('.bench-card__grade-pct');
+  if (!badge) return;
+  const g = pctToGrade(pct);
+  badge.textContent = g.letter;
+  badge.className = 'bench-card__grade ' + g.cls;
+  if (pctEl) pctEl.textContent = Math.round(pct) + '%';
+}
+
+const _origSetBar = setBar;
+setBar = function(id, pct, cls) {
+  _origSetBar(id, pct, cls);
+  setGradeByBar(id, pct);
+};
+
+/* ── Trend indicators ─────────────────────────────────── */
+function setTrend(barId, direction, delta, period) {
+  const card = document.querySelector('[data-bar-id="' + barId + '"]') ||
+    (document.getElementById(barId) && document.getElementById(barId).closest('.bench-card'));
+  if (!card) return;
+  const trend = card.querySelector('.bench-card__trend');
+  if (!trend) return;
+  const arrow = trend.querySelector('.bench-card__trend-arrow');
+  const deltaEl = trend.querySelector('.bench-card__trend-delta');
+  const periodEl = trend.querySelector('.bench-card__trend-period');
+
+  const arrows = { up: '▲', flat: '▶', down: '▼' };
+  arrow.textContent = arrows[direction] || '▶';
+  arrow.className = 'bench-card__trend-arrow ' + direction;
+
+  const colorClass = direction === 'up' ? 'positive' : direction === 'down' ? 'negative' : '';
+  deltaEl.innerHTML = colorClass ? '<span class="' + colorClass + '">' + delta + '</span>' : delta;
+  periodEl.textContent = period || 'vs 30d ago';
+  trend.classList.remove('hidden');
+}
+
+function computeTrend(current, previous, higherIsBetter) {
+  if (current == null || previous == null) return null;
+  const diff = current - previous;
+  const pctChange = previous !== 0 ? (diff / previous) * 100 : 0;
+  const threshold = 2;
+  let direction;
+  if (Math.abs(pctChange) < threshold) direction = 'flat';
+  else if (higherIsBetter) direction = diff > 0 ? 'up' : 'down';
+  else direction = diff < 0 ? 'up' : 'down';
+  return { direction, diff, pctChange };
+}
+
+/* ── Load benchmark trends from API ───────────────────── */
+async function loadTrends() {
+  try {
+    const res = await fetch(API + '/api/benchmark_trends');
+    if (!res.ok) return;
+    const data = await res.json();
+    const trends = data.trends || data;
+
+    const trendMap = {
+      'bar-slp':    { key: 'sleep_hours', hib: true, unit: ' hrs', fmt: v => v.toFixed(1) },
+      'bar-deep':   { key: 'deep_sleep_pct', hib: true, unit: '%', fmt: v => v.toFixed(0) },
+      'bar-rem':    { key: 'rem_sleep_pct', hib: true, unit: '%', fmt: v => v.toFixed(0) },
+      'bar-hrv':    { key: 'hrv', hib: true, unit: ' ms', fmt: v => Math.round(v) },
+      'bar-rhr':    { key: 'resting_hr', hib: false, unit: ' bpm', fmt: v => Math.round(v) },
+      'bar-dl':     { key: 'deadlift', hib: true, unit: ' lbs', fmt: v => Math.round(v) },
+      'bar-sq':     { key: 'squat', hib: true, unit: ' lbs', fmt: v => Math.round(v) },
+      'bar-vo2':    { key: 'vo2_max', hib: true, unit: '', fmt: v => v.toFixed(1) },
+      'bar-hab':    { key: 'habit_completion', hib: true, unit: '%', fmt: v => v.toFixed(0) },
+      'bar-vice':   { key: 'vice_streak_min', hib: true, unit: ' days', fmt: v => Math.round(v) },
+      'bar-cliq':   { key: 'support_clique', hib: true, unit: '', fmt: v => Math.round(v) },
+      'bar-sochrs': { key: 'social_hours', hib: true, unit: ' hrs', fmt: v => v.toFixed(1) },
+      'bar-jrnl':   { key: 'journal_freq', hib: true, unit: '/wk', fmt: v => v.toFixed(1) },
+    };
+
+    Object.entries(trendMap).forEach(([barId, cfg]) => {
+      const t = trends[cfg.key];
+      if (!t || t.current == null || t.previous == null) return;
+      const result = computeTrend(t.current, t.previous, cfg.hib);
+      if (!result) return;
+      const sign = result.diff > 0 ? '+' : '';
+      const delta = sign + cfg.fmt(result.diff) + cfg.unit;
+      const period = t.period || 'vs 30d ago';
+      setTrend(barId, result.direction, delta, period);
+    });
+  } catch(e) {
+    console.warn('[standards] trends not available yet', e);
+  }
+}
+
+/* ── Load API data ────────────────────────────────────── */
+async function loadData() {
+  try {
+    const [vitR, habR, viceR] = await Promise.all([
+      fetch(API+'/api/vitals').catch(()=>null),
+      fetch(API+'/api/habits').catch(()=>null),
+      fetch(API+'/api/vice_streaks').catch(()=>null),
+    ]);
+
+    // ── VITALS: sleep, HRV, RHR, weight ──────────────────
+    if (vitR && vitR.ok) {
+      const vRaw = await vitR.json();
+      const v = vRaw.vitals || vRaw || {};
+
+      // Sleep duration
+      if (v.sleep_hours) {
+        const pct = Math.min(100, (v.sleep_hours / 8) * 100);
+        setBar('bar-slp', pct);
+        setText('bl-slp-c', v.sleep_hours.toFixed(1) + ' hrs');
+        setText('journey-slp-now', v.sleep_hours.toFixed(1) + ' hrs');
+      }
+
+      // HRV
+      if (v.hrv_ms) {
+        setText('bl-hrv-c', Math.round(v.hrv_ms) + ' ms');
+        setBar('bar-hrv', Math.min(100, (v.hrv_ms / 80) * 100));
+      }
+
+      // Resting heart rate (lower is better)
+      if (v.rhr_bpm) {
+        const rhr = v.rhr_bpm;
+        setText('bl-rhr-c', Math.round(rhr) + ' bpm');
+        setText('journey-rhr-now', Math.round(rhr) + ' bpm');
+        const pct = rhr <= 60 ? 100 : Math.max(0, 100 - ((rhr - 60) * 5));
+        setBar('bar-rhr', pct, rhr > 70 ? 'amber' : null);
+      }
+
+      // Weight for lift target calculations
+      const bw = v.weight_lbs;
+      if (bw) {
+        setText('bl-dl-t', Math.round(bw * 2.0) + ' lbs');
+        setText('bl-sq-t', Math.round(bw * 1.75) + ' lbs');
+        setText('journey-dl-target', Math.round(bw * 2.0) + ' lbs');
+        setText('journey-sq-target', Math.round(bw * 1.75) + ' lbs');
+      }
+    }
+
+    // ── HABITS: completion rate from history ──────────────
+    if (habR && habR.ok) {
+      const hRaw = await habR.json();
+      const history = hRaw.history || [];
+      if (history.length > 0) {
+        const recent = history.slice(-7);
+        const avgPct = recent.reduce((sum, d) => sum + (d.tier0_pct || 0), 0) / recent.length;
+        setBar('bar-hab', avgPct);
+        setText('bl-hab-c', Math.round(avgPct) + '%');
+      }
+      if (hRaw.days_tracked) {
+        setText('bl-jrnl-c', (hRaw.days_tracked / 13).toFixed(1) + '/wk avg');
+      }
+    }
+
+    // ── VICE STREAKS ─────────────────────────────────────
+    if (viceR && viceR.ok) {
+      const vd = await viceR.json();
+      const vices = vd.vices || [];
+      if (vices.length > 0) {
+        const minStreak = Math.min(...vices.map(v => v.current_streak || 0));
+        setBar('bar-vice', Math.min(100, (minStreak / 90) * 100));
+        setText('bl-vice-c', minStreak + ' days (shortest)');
+      }
+    }
+
+  } catch(e) { console.warn('[standards] data load error:', e); }
+}
+
+/* ── 13a: Hero Self-Check Quiz ─────────────────────────── */
+// Grade thresholds for each domain
+const heroGraders = {
+  sleep: v => {
+    if (v >= 7 && v <= 9) return { pct: 95, letter: 'A' };
+    if (v >= 6.5) return { pct: 80, letter: 'B' };
+    if (v >= 6) return { pct: 60, letter: 'C' };
+    if (v >= 5) return { pct: 40, letter: 'D' };
+    return { pct: 20, letter: 'F' };
+  },
+  exercise: v => {
+    if (v >= 150) return { pct: 95, letter: 'A' };
+    if (v >= 120) return { pct: 80, letter: 'B' };
+    if (v >= 75) return { pct: 60, letter: 'C' };
+    if (v >= 30) return { pct: 40, letter: 'D' };
+    return { pct: 20, letter: 'F' };
+  },
+  body: v => {
+    if (v >= 60) return { pct: 95, letter: 'A' };
+    if (v >= 45) return { pct: 80, letter: 'B' };
+    if (v >= 30) return { pct: 60, letter: 'C' };
+    if (v >= 15) return { pct: 40, letter: 'D' };
+    return { pct: 20, letter: 'F' };
+  },
+  cognitive: v => {
+    if (v >= 24) return { pct: 95, letter: 'A' };
+    if (v >= 18) return { pct: 80, letter: 'B' };
+    if (v >= 12) return { pct: 60, letter: 'C' };
+    if (v >= 4) return { pct: 40, letter: 'D' };
+    return { pct: 20, letter: 'F' };
+  },
+  social: v => {
+    if (v >= 5) return { pct: 95, letter: 'A' };
+    if (v >= 4) return { pct: 80, letter: 'B' };
+    if (v >= 3) return { pct: 60, letter: 'C' };
+    if (v >= 2) return { pct: 40, letter: 'D' };
+    return { pct: 20, letter: 'F' };
+  },
+  nutrition: v => {
+    if (v >= 5) return { pct: 95, letter: 'A' };
+    if (v >= 4) return { pct: 80, letter: 'B' };
+    if (v >= 3) return { pct: 60, letter: 'C' };
+    if (v >= 1) return { pct: 40, letter: 'D' };
+    return { pct: 20, letter: 'F' };
+  }
+};
+
+const heroGradeColors = {
+  A: 'sga', B: 'sgb', C: 'sgc', D: 'sgd', F: 'sgf'
+};
+const heroGradeTextColors = {
+  A: 'var(--accent)', B: 'var(--c-green-400)', C: 'var(--c-amber-500)', D: 'var(--c-red-status)', F: 'var(--c-red-status)'
+};
+
+let heroScores = {};
+
+function runHeroCheck() {
+  const domains = ['sleep', 'exercise', 'body', 'cognitive', 'social', 'nutrition'];
+  const labels = { sleep: 'Sleep', exercise: 'Exercise', body: 'Body', cognitive: 'Cognitive', social: 'Social', nutrition: 'Nutrition' };
+  heroScores = {};
+
+  domains.forEach(d => {
+    const input = document.getElementById('sq-' + d);
+    const badge = document.getElementById('sg-' + d);
+    if (!input || !badge) return;
+    const v = parseFloat(input.value);
+    if (isNaN(v)) {
+      badge.textContent = '--';
+      badge.className = 'sc-hero-card__grade';
+      return;
+    }
+    const result = heroGraders[d](v);
+    heroScores[d] = result.letter;
+    badge.textContent = result.letter;
+    badge.className = 'sc-hero-card__grade ' + heroGradeColors[result.letter];
+  });
+
+  // Show result summary if at least one domain filled
+  const filled = Object.keys(heroScores);
+  if (filled.length > 0) {
+    const summary = document.getElementById('hero-result-summary');
+    const gradesEl = document.getElementById('hero-result-grades');
+    gradesEl.innerHTML = '';
+    domains.forEach(d => {
+      const item = document.createElement('div');
+      item.className = 'sc-hero__result-item';
+      const letter = heroScores[d] || '--';
+      const color = heroGradeTextColors[letter] || 'var(--text-faint)';
+      item.innerHTML = '<div class="sc-hero__result-letter" style="color:' + color + '">' + letter + '</div><div class="sc-hero__result-label">' + labels[d] + '</div>';
+      gradesEl.appendChild(item);
+    });
+    summary.classList.add('visible');
+
+    // B2: "How I compare" — show Matthew's grades alongside visitor's
+    if (window._matthewGrades && Object.keys(window._matthewGrades).length) {
+      var compareEl = document.getElementById('hero-compare');
+      if (!compareEl) {
+        compareEl = document.createElement('div');
+        compareEl.id = 'hero-compare';
+        compareEl.style.cssText = 'margin-top:var(--space-4);padding-top:var(--space-4);border-top:1px solid var(--border);display:flex;justify-content:center;gap:var(--space-6);flex-wrap:wrap';
+        summary.appendChild(compareEl);
+      }
+      compareEl.innerHTML = '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);width:100%;text-align:center;margin-bottom:var(--space-2)">MATTHEW\'S GRADES</div>' +
+        domains.map(function(d) {
+          var mg = window._matthewGrades[d] || '--';
+          var mc = heroGradeTextColors[mg] || 'var(--text-faint)';
+          return '<div style="text-align:center"><div style="font-family:var(--font-display);font-size:20px;color:' + mc + '">' + mg + '</div><div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint)">' + labels[d] + '</div></div>';
+        }).join('');
+    }
+  }
+}
+
+/* ── B1: Share hero scores as image (canvas-based) ──── */
+function shareHeroScores() {
+  var domains = ['sleep', 'exercise', 'body', 'cognitive', 'social', 'nutrition'];
+  var labels = { sleep: 'SLEEP', exercise: 'EXERCISE', body: 'BODY', cognitive: 'COGNITIVE', social: 'SOCIAL', nutrition: 'NUTRITION' };
+  var gradeColors = { A: '#22c55e', B: '#60a5fa', C: '#f59e0b', D: '#ef4444', F: '#ff5252' };
+
+  try {
+    var c = document.createElement('canvas');
+    c.width = 1200; c.height = 630;
+    var ctx = c.getContext('2d');
+    // Background
+    ctx.fillStyle = '#080c0a';
+    ctx.fillRect(0, 0, 1200, 630);
+    // Title
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 36px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('My Health Benchmarks', 600, 80);
+    // Grades in a 3x2 grid
+    var cols = 3, gw = 300, gh = 180, ox = 150, oy = 130;
+    domains.forEach(function(d, i) {
+      var col = i % cols, row = Math.floor(i / cols);
+      var x = ox + col * gw + gw / 2;
+      var y = oy + row * gh + gh / 2;
+      var grade = heroScores[d] || '--';
+      var color = gradeColors[grade.charAt(0)] || '#666';
+      // Grade letter
+      ctx.fillStyle = color;
+      ctx.font = 'bold 72px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(grade, x, y + 15);
+      // Label
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.font = '16px monospace';
+      ctx.fillText(labels[d], x, y + 50);
+    });
+    // Footer
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.font = '14px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('averagejoematt.com/benchmarks/', 600, 590);
+
+    c.toBlob(function(blob) {
+      if (navigator.share && blob) {
+        var file = new File([blob], 'benchmarks.png', { type: 'image/png' });
+        navigator.share({ files: [file], title: 'My Health Benchmarks' }).catch(function() {});
+      } else if (blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = 'my-benchmarks.png';
+        a.click();
+        setTimeout(function() { URL.revokeObjectURL(url); }, 5000);
+      }
+      var confirm = document.getElementById('hero-share-confirm');
+      if (confirm) { confirm.classList.add('visible'); setTimeout(function() { confirm.classList.remove('visible'); }, 2500); }
+    }, 'image/png');
+  } catch(e) {
+    // Fallback to text clipboard
+    var text = 'My Health Benchmarks:\n' + domains.map(function(d) { return labels[d] + ': ' + (heroScores[d] || '--'); }).join('\n') + '\naveragejoem att.com/benchmarks/';
+    if (navigator.clipboard) navigator.clipboard.writeText(text);
+  }
+}
+
+// Auto-grade on input for hero quiz
+document.querySelectorAll('.sc-hero-card__input').forEach(inp => {
+  inp.addEventListener('keydown', e => { if(e.key==='Enter') runHeroCheck(); });
+});
+
+/* ── Boot ─────────────────────────────────────────────── */
+setBar('bar-skill', 100);
+loadData();
+
+// Auto-fill hero quiz with Matthew's real data from APIs, then auto-grade
+(async function prefillHeroQuiz() {
+  try {
+    const [vitR, habR] = await Promise.all([
+      fetch(API+'/api/vitals').catch(()=>null),
+      fetch(API+'/api/habits').catch(()=>null),
+    ]);
+    if (vitR && vitR.ok) {
+      const v = (await vitR.json()).vitals || {};
+      if (v.sleep_hours) { var el = document.getElementById('sq-sleep'); if (el) el.value = v.sleep_hours.toFixed(1); }
+    }
+    if (habR && habR.ok) {
+      const h = await habR.json();
+      // Exercise: weekly active minutes from history
+      var hist = h.history || [];
+      if (hist.length >= 7) {
+        var recent = hist.slice(-7);
+        var exMin = recent.reduce(function(s,d) { return s + (d.exercise_minutes || 0); }, 0);
+        var el = document.getElementById('sq-exercise');
+        if (el) el.value = Math.round(exMin);
+      }
+    }
+    // Auto-run the grade check, then store Matthew's grades for B2 comparison
+    setTimeout(function() {
+      runHeroCheck();
+      window._matthewGrades = Object.assign({}, heroScores);
+    }, 500);
+  } catch(e) { /* non-critical */ }
+})();
+loadTrends();
+(function(){const el=document.getElementById('nav-date');if(el)el.textContent=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});})();
+</script>
+<script src="/legacy/assets/js/site_constants.js"></script>
+<script src="/legacy/assets/js/components.js"></script>
+<script src="/legacy/assets/js/nav.js"></script>
+<script src="/legacy/assets/js/animations.js" defer></script>
+</body>
+</html>

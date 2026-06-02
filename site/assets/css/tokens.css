@@ -1,279 +1,309 @@
 /*
-  tokens.css — Design token system for averagejoematt.com
-  NOTE: The /experiments page exists at site/experiments/index.html
-  and is served at averagejoematt.com/experiments/
-  Signal aesthetic: dark biopunk data terminal → Signal Doctrine
-  Board directive: "Bloomberg Terminal × Patagonia documentary"
-  
-  HOW TO USE:
-    All pages import this file first.
-    Never hardcode a color, font, or spacing value outside this file.
-    Journal pages use --accent-journal instead of --accent.
-    Story pages use .body-story class (Lora serif).
-    Signal/data pages use .body-signal class (Inter sans).
-    
-  SECTIONS:
-    1. Color primitives
-    2. Semantic tokens (light/dark mode)
-    3. Typography
-    4. Spacing
-    5. Animation
-    6. Z-index
+  tokens.css — averagejoematt.com v4 — "The Measured Life" (Direction 05)
+  ----------------------------------------------------------------------------
+  Source of truth: docs/DESIGN_SYSTEM_V4_THE_MEASURED_LIFE.md (§2 palette, §3 type),
+  visual reference: docs/v4_art_direction_05_the_measured_life.html.
+  Locked board-unanimous 2026-06-01.
+
+  The concept: a measured life rendered as a beautifully made instrument log kept
+  by a real person. Warm, crafted, honest — the opposite of clinical biohacking
+  gloss AND of generic AI-template aesthetics.
+
+  RULES (enforced everywhere downstream):
+    - Never hardcode a colour, font, radius, or spacing outside this file.
+    - Palette: locked hexes are the primitives; tints are derived with
+      color-mix(in oklch, …) so the ramp stays perceptually even.
+    - One ember accent only, used sparingly for "this is alive / this is up".
+      Down / flat states use muted ink, NEVER red.
+    - Type triad has fixed jobs: Fraunces = human voice, Instrument Sans =
+      interface, IBM Plex Mono = machine voice & data (always tabular-nums).
+    - No Inter / Roboto / system fonts. No purple gradients. No shadcn cards.
+
+  The two ownable signatures (protect — do not let them metastasise):
+    1. the measuring-rule spine     → --rule, --tick, --spine-* tokens (§ Spine)
+    2. the machine ↔ human dialogue → --voice-* tokens (§ Two-voice)
+
+  Fonts are <link>ed in each door's <head> (preconnect + the css2 request from the
+  visual reference). This file only declares the family tokens.
+
+  SECTIONS
+    1. Palette — dark (primary)
+    2. Typography
+    3. Spacing & layout
+    4. The measuring-rule spine (signature 1)
+    5. The two-voice dialogue (signature 2)
+    6. Honesty vocabulary
+    7. Radii, borders, elevation
+    8. Motion & z-index
+    9. Light mode (Daybook-informed)
+   10. Minimal base (applies the tokens)
 */
 
-/* ── 1. Color primitives ─────────────────────────────────── */
+/* ── 1. Palette — dark (primary) ─────────────────────────────────────────── */
 :root {
-  /* Base */
-  --c-black:          #080c0a;
-  --c-surface-1:      #0f1612;  /* DB-01: +2% brightness for card separation */
-  --c-surface-2:      #141f17;
-  --c-surface-3:      #1a2c1e;
+  color-scheme: dark;
 
-  /* SLOP-1 ROLLBACK: Original neon green values
-     --c-green-500: #00e5a0;
-     --c-green-400: #00c98c;
-     --c-green-300: #00a370;
-     --c-green-200: #007a50;
-     --c-green-100: rgba(0, 229, 160, 0.12);
-     --c-green-050: rgba(0, 229, 160, 0.06);
-     --accent-rgb: 0, 229, 160;
-     To rollback: replace current values with these originals */
+  /* Locked primitives (DESIGN_SYSTEM §2). Hex is the source of truth;
+     OKLCH equivalents noted for reference. */
+  --page:        #0E0C08;   /* oklch(.15 .008 75)  — behind the paper */
+  --surface:     #16130E;   /* oklch(.19 .010 75)  — paper / panels   */
+  --ink:         #ECE3D2;   /* oklch(.91 .022 88)  — primary text      */
+  --ink-muted:   #A99F8C;   /* oklch(.69 .020 84)  — secondary         */
+  --ink-faint:   #6B6253;   /* oklch(.46 .018 82)  — labels, ticks     */
+  --ember:       #DD7A37;   /* oklch(.69 .145 52)  — the one live accent */
 
-  /* Signal green (primary accent) — SLOP-1: desaturated warm teal */
-  --c-green-500:      #3db88a;
-  --c-green-400:      #2fa37a;
-  --c-green-300:      #2da97e;   /* 5.5:1 on #0f1612 ✅ (was #258a68 / 4.29:1) */
-  --c-green-200:      #1a6b50;
-  --c-green-100:      rgba(61, 184, 138, 0.12);
-  --c-green-050:      rgba(61, 184, 138, 0.06);
+  /* Derived tints (OKLCH mixing keeps the ramp even). */
+  --surface-raised: color-mix(in oklch, var(--surface) 88%, var(--ink) 12%);
+  --surface-sunken: color-mix(in oklch, var(--surface) 80%, var(--page) 20%);
+  --ink-dim:        color-mix(in oklch, var(--ink) 70%, transparent);
+  --ember-soft:     color-mix(in oklch, var(--ember) 18%, transparent);
+  --ember-line:     color-mix(in oklch, var(--ember) 42%, transparent);
+  --ember-wash:     color-mix(in oklch, var(--ember) 9%, transparent);
 
-  /* Journal amber (journal/blog accent) */
-  --c-amber-500:      #c8843a;
-  --c-amber-400:      #e09a4a;
-  --c-amber-300:      #a06820;
-  --c-amber-100:      rgba(200, 132, 58, 0.12);
-  --c-amber-050:      rgba(200, 132, 58, 0.06);
+  /* Hairlines & ticks (the rule system) */
+  --rule:        rgba(236, 227, 210, 0.12);   /* structural hairline */
+  --rule-strong: rgba(236, 227, 210, 0.20);
+  --tick:        rgba(236, 227, 210, 0.28);   /* measuring-rule ticks */
 
-  /* DB-02: CTA coral (subscribe, follow, try-this — distinct from data green) */
-  --c-coral-500:      #ff6b6b;
-  --c-coral-400:      #ee5a5a;
-  --c-coral-300:      #cc4444;
-  --c-coral-100:      rgba(255, 107, 107, 0.12);
-  --c-coral-050:      rgba(255, 107, 107, 0.06);
-  --coral-rgb:        255, 107, 107;
+  /* Muted category tints for the two glance domains (low-sat, calm). */
+  --body-tint: color-mix(in oklch, var(--ember) 6%, var(--surface));   /* Body domain */
+  --mind-tint: color-mix(in oklch, var(--ink) 5%, var(--surface));     /* Mind domain */
 
-  /* Text scale */
-  --c-text-primary:   #e8ede9;
-  --c-text-secondary: #8aaa90;  /* PRE-5 ROLLBACK: was #7a9080 */
-  --c-text-muted:     #708a7a;   /* 5.2:1 ✅ on #080c0a (was #5a7565 / 3.9:1) */
-  --c-text-disabled:  #2a3c30;
-
-  /* Borders */
-  --c-border-strong:  rgba(0, 229, 160, 0.25);
-  --c-border-mid:     rgba(0, 229, 160, 0.12);
-  --c-border-subtle:  rgba(0, 229, 160, 0.06);
-  --c-border-neutral: rgba(255, 255, 255, 0.06);
-
-  /* RGB triplets for rgba() usage */
-  --accent-rgb:       61, 184, 138;  /* SLOP-1: was 0, 229, 160 */
-  --amber-rgb:        200, 132, 58;
-
-  /* Status */
-  --c-green-status:   #22f574;
-  --c-yellow-status:  #f5a623;
-  --c-red-status:     #ff4d4d;
-
-  /* DB-03: Seven pillar colors — Character Score, challenges, habits, observatories */
-  --pillar-movement:   #3ecf8e;
-  --pillar-nutrition:  #f59e0b;
-  --pillar-sleep:      #818cf8;
-  --pillar-mind:       #a78bfa;
-  --pillar-body:       #ef4444;
-  --pillar-social:     #06b6d4;
-  --pillar-discipline: #f97316;
+  /* Semantic aliases (components reference these, not raw primitives). */
+  --bg:          var(--page);
+  --fg:          var(--ink);
+  --accent:      var(--ember);
+  --signal:      var(--ember);   /* "this is alive / this is up" */
 }
 
-/* ── 2. Semantic tokens ──────────────────────────────────── */
+/* ── 2. Typography ───────────────────────────────────────────────────────── */
 :root {
-  --bg:               var(--c-black);
-  --surface:          var(--c-surface-1);
-  --surface-raised:   var(--c-surface-2);
-  --surface-high:     var(--c-surface-3);
+  /* The triad — each font has one job (DESIGN_SYSTEM §3). */
+  --font-serif: "Fraunces", ui-serif, Georgia, "Times New Roman", serif;        /* human voice */
+  --font-sans:  "Instrument Sans", ui-sans-serif, "Helvetica Neue", Arial, sans-serif; /* interface */
+  --font-mono:  "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;      /* machine & data */
 
-  --accent:           var(--c-green-500);
-  --accent-dim:       var(--c-green-300);
-  --accent-bg:        var(--c-green-100);
-  --accent-bg-subtle: var(--c-green-050);
+  /* Fraunces variable axes */
+  --fraunces-opsz-display: 144;
+  --fraunces-opsz-text:    24;
 
-  /* CTA accent — used for subscribe, follow, conversion buttons */
-  --cta:              var(--c-coral-500);
-  --cta-dim:          var(--c-coral-300);
-  --cta-bg:           var(--c-coral-100);
-  --cta-bg-subtle:    var(--c-coral-050);
+  /* Fluid type scale. editorial display → data display → body → label. */
+  --fs-display:  clamp(2.6rem, 1.4rem + 6vw, 5.5rem);   /* Fraunces, Story heroes */
+  --fs-h1:       clamp(2rem, 1.3rem + 3.2vw, 3.25rem);  /* Fraunces */
+  --fs-h2:       clamp(1.5rem, 1.1rem + 1.8vw, 2.25rem);
+  --fs-h3:       clamp(1.2rem, 1rem + 0.9vw, 1.5rem);
+  --fs-data-xl:  clamp(3.5rem, 2rem + 7vw, 5.25rem);    /* Plex Mono, the score */
+  --fs-data-lg:  clamp(1.6rem, 1.2rem + 1.6vw, 2.25rem);
+  --fs-body:     1.0625rem;                              /* Instrument Sans */
+  --fs-body-lg:  1.1875rem;
+  --fs-small:    0.875rem;
+  --fs-label:    0.6875rem;                              /* Plex Mono uppercase, tracked */
+  --fs-quote:    clamp(1.15rem, 1rem + 0.7vw, 1.45rem);  /* Fraunces italic, human reply */
 
-  /* Journal pages override these two */
-  --accent-journal:        var(--c-amber-500);
-  --accent-journal-dim:    var(--c-amber-300);
-  --accent-journal-bg:     var(--c-amber-100);
+  --lh-tight:    1.05;
+  --lh-snug:     1.25;
+  --lh-body:     1.6;
+  --lh-relaxed:  1.7;
 
-  --text:             var(--c-text-primary);
-  --text-muted:       var(--c-text-secondary);
-  --text-faint:       var(--c-text-muted);
+  --tracking-label: 0.16em;   /* uppercase mono labels */
+  --tracking-tight: -0.02em;  /* big mono numerals */
 
-  --border:           var(--c-border-mid);
-  --border-strong:    var(--c-border-strong);
-  --border-subtle:    var(--c-border-subtle);
+  --weight-reg:    400;
+  --weight-med:    500;
 }
 
-/* ── 2b. Light mode overrides ─────────────────────────────── */
+/* ── 3. Spacing & layout ─────────────────────────────────────────────────── */
+:root {
+  /* 4px base rhythm */
+  --sp-1:  0.25rem;  --sp-2:  0.5rem;   --sp-3:  0.75rem;  --sp-4:  1rem;
+  --sp-5:  1.5rem;   --sp-6:  2rem;     --sp-7:  3rem;     --sp-8:  4rem;
+  --sp-9:  6rem;     --sp-10: 8rem;
+
+  --measure:        68ch;     /* readable body line length */
+  --measure-narrow: 46ch;
+  --container:      1200px;   /* desktop max */
+  --container-read: 760px;    /* Story / longform (matches reference .wrap) */
+  --gutter:         clamp(1rem, 0.5rem + 2.5vw, 2.5rem);
+  --bento-gap:      clamp(0.75rem, 0.4rem + 1.2vw, 1.25rem);
+}
+
+/* ── 4. The measuring-rule spine (SIGNATURE 1) ───────────────────────────── */
+/*  A tick-marked rule as a structural element: anchors the Cockpit edge,
+    segments the Story timeline, indexes the Evidence. Connective tissue across
+    all three doors. Use with intent — not on every element. */
+:root {
+  --spine-width:   46px;          /* rail width (matches reference) */
+  --spine-tick-gap: 15px;         /* distance between ticks */
+  --spine-tick-w:   8px;          /* tick length into the rail */
+  --spine-ticks: repeating-linear-gradient(
+                   to bottom, var(--tick) 0 1px, transparent 1px var(--spine-tick-gap));
+  --spine-border: 1px solid var(--rule);
+}
+
+/* ── 5. The two-voice dialogue (SIGNATURE 2) ─────────────────────────────── */
+/*  Machine voice (mono) and human voice (serif) set in literal conversation —
+    the Third Wall turned into the type system. The most on-brand device. */
+:root {
+  --voice-machine-font: var(--font-mono);
+  --voice-machine-size: 0.84375rem;        /* 13.5px @16 */
+  --voice-machine-lh:   1.55;
+  --voice-machine-ink:  var(--ink);
+  --voice-machine-mark: var(--ember);      /* the › lead glyph + emphasis */
+
+  --voice-human-font:   var(--font-serif);
+  --voice-human-style:  italic;
+  --voice-human-size:   1.1875rem;         /* 19px */
+  --voice-human-lh:     1.4;
+  --voice-human-ink:    var(--ink);
+
+  --voice-who-font:     var(--font-mono);  /* the speaker label */
+  --voice-who-size:     0.5625rem;         /* 9px */
+  --voice-who-ink:      var(--ink-faint);
+  --voice-who-tracking: var(--tracking-label);
+}
+
+/* ── 6. Honesty vocabulary ───────────────────────────────────────────────── */
+/*  Down weeks & pauses: muted ink + a DASHED hairline marker + plain language.
+    First-class, never alarm-red, never hidden. The anti-Blueprint anchor. */
+:root {
+  --honest-ink:    var(--ink-muted);
+  --honest-border: 1px dashed var(--rule);
+  --honest-mark:   "▼";        /* down */
+  --flat-mark:     "›";        /* holding */
+  --up-mark:       "▲";        /* up — the only place ember is earned on a trend */
+  --down-fill:     var(--ink-faint);   /* progress fill for a down pillar (muted, not red) */
+  --up-fill:       var(--ember);       /* progress fill for an up pillar */
+}
+
+/* ── 7. Radii, borders, elevation ────────────────────────────────────────── */
+:root {
+  --radius-xs: 3px;    /* honesty chip, tags */
+  --radius-sm: 6px;
+  --radius:    10px;   /* panels (matches reference) */
+  --radius-lg: 16px;
+
+  --border-hair:   1px solid var(--rule);
+  --border-strong: 1px solid var(--rule-strong);
+
+  /* Restrained elevation — flat surfaces, soft depth. No neon glow. */
+  --shadow-panel: 0 22px 50px rgba(0, 0, 0, 0.32);
+  --shadow-soft:  0 6px 18px rgba(0, 0, 0, 0.22);
+}
+
+/* ── 8. Motion & z-index ─────────────────────────────────────────────────── */
+:root {
+  --ease-out:   cubic-bezier(0.2, 0.7, 0.2, 1);   /* reveal / rise */
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast:   0.18s;
+  --dur:        0.36s;
+  --dur-slow:   0.7s;        /* page-load rise (reference) */
+  --stagger:    0.06s;       /* between bento items on the orchestrated reveal */
+
+  /* View Transitions: door-to-door + in-place pillar disclosure. */
+  --vt-dur:     0.4s;
+
+  --z-base: 0; --z-spine: 5; --z-sticky: 50; --z-overlay: 100; --z-toast: 200;
+}
+
+/* ── 9. Light mode (Daybook-informed) ────────────────────────────────────── */
+/*  Real, first-class light mode. Activated by [data-theme="light"] OR by the OS
+    when the user hasn't explicitly chosen dark. */
+:root[data-theme="light"],
+:root:not([data-theme="dark"]) {
+  /* placeholder so the cascade below can override cleanly */
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --page:      #F4EFE4;   /* oklch(.95 .012 88) */
+    --surface:   #FBF8F1;   /* oklch(.98 .008 88) */
+    --ink:       #221E17;   /* oklch(.26 .012 78) */
+    --ink-muted: #6E665A;   /* oklch(.49 .015 82) */
+    --ink-faint: #A39A8A;   /* oklch(.67 .015 84) */
+    --ember:     #C2611F;   /* oklch(.58 .145 50) — deepened for AA on paper */
+    --rule:        rgba(34, 30, 23, 0.13);
+    --rule-strong: rgba(34, 30, 23, 0.22);
+    --tick:        rgba(34, 30, 23, 0.30);
+    --shadow-panel: 0 18px 44px rgba(34, 30, 23, 0.12);
+    --shadow-soft:  0 6px 16px rgba(34, 30, 23, 0.08);
+  }
+}
+
+/* Explicit user choice always wins over the OS preference. */
 :root[data-theme="light"] {
-  /* DB-04: Warm off-white surfaces (was cool-green #f4f7f5 — now warm neutral) */
-  --c-black:          #fafaf8;
-  --c-surface-1:      #f0eeeb;
-  --c-surface-2:      #e8e5e0;
-  --c-surface-3:      #dddad4;
-
-  /* Signal green — SLOP-1: desaturated warm teal for light mode (was #008f5f) */
-  --c-green-500:      #2a8a62;
-  --c-green-400:      #237a55;
-  --c-green-300:      #1c6a48;
-  --c-green-100:      rgba(42, 138, 98, 0.10);
-  --c-green-050:      rgba(42, 138, 98, 0.05);
-
-  /* Journal amber — richer for light mode */
-  --c-amber-500:      #a06820;
-  --c-amber-400:      #c8843a;
-  --c-amber-300:      #7a5018;
-  --c-amber-100:      rgba(160, 104, 32, 0.10);
-  --c-amber-050:      rgba(160, 104, 32, 0.05);
-
-  /* CTA coral — darker for light bg (5.8:1 on #fafaf8 ✅) */
-  --c-coral-500:      #cc4444;
-  --c-coral-400:      #b83a3a;
-  --c-coral-300:      #a03030;
-  --c-coral-100:      rgba(204, 68, 68, 0.10);
-  --c-coral-050:      rgba(204, 68, 68, 0.05);
-  --coral-rgb:        204, 68, 68;
-
-  /* Text — dark greens on warm light */
-  --c-text-primary:   #1a2c1e;   /* 13.2:1 on #fafaf8 ✅ */
-  --c-text-secondary: #4a6050;   /* 5.6:1 ✅ */
-  --c-text-muted:     #556a62;   /* 5.1:1 ✅ */
-  --c-text-disabled:  #b0c0b5;
-
-  /* Borders — stronger for card/surface visibility on warm bg */
-  --c-border-strong:  rgba(0, 108, 74, 0.40);
-  --c-border-mid:     rgba(0, 108, 74, 0.22);
-  --c-border-subtle:  rgba(0, 108, 74, 0.10);
-  --c-border-neutral: rgba(0, 0, 0, 0.10);
-
-  /* RGB triplets — light mode */
-  --accent-rgb:       42, 138, 98;  /* SLOP-1: was 0, 143, 95 */
-  --amber-rgb:        160, 104, 32;
-
-  /* Status — adjusted for light bg readability */
-  --c-green-status:   #008f5f;
-  --c-yellow-status:  #c47d10;
-  --c-red-status:     #d43030;
-
-  /* DB-06: Pillar colors — slightly deeper for light backgrounds */
-  --pillar-movement:   #1a9e6a;
-  --pillar-nutrition:  #c47d10;
-  --pillar-sleep:      #6366f1;
-  --pillar-mind:       #7c3aed;
-  --pillar-body:       #dc2626;
-  --pillar-social:     #0891b2;
-  --pillar-discipline: #ea580c;
+  color-scheme: light;
+  --page:      #F4EFE4;
+  --surface:   #FBF8F1;
+  --ink:       #221E17;
+  --ink-muted: #6E665A;
+  --ink-faint: #A39A8A;
+  --ember:     #C2611F;
+  --rule:        rgba(34, 30, 23, 0.13);
+  --rule-strong: rgba(34, 30, 23, 0.22);
+  --tick:        rgba(34, 30, 23, 0.30);
+  --shadow-panel: 0 18px 44px rgba(34, 30, 23, 0.12);
+  --shadow-soft:  0 6px 16px rgba(34, 30, 23, 0.08);
 }
 
-/* ── 3. Typography ───────────────────────────────────────── */
-:root {
-  /* Fonts */
-  --font-display:  'Bebas Neue', 'Impact', sans-serif;
-  --font-nav:      'Barlow Condensed', 'Arial Narrow', sans-serif; /* DB-22: wayfinding voice — nav, CTAs, footers */
-  --font-mono:     'Space Mono', 'Courier New', monospace;
-  --font-serif:    'Lora', 'Georgia', 'Times New Roman', serif;
-  --font-sans:     'Inter', system-ui, sans-serif;
+/* ── 10. Minimal base — applies the tokens so every door starts honest ───── */
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; }
 
-  /* Scale (display) */
-  --text-hero:     clamp(72px, 9vw, 140px);
-  --text-h1:       clamp(48px, 6vw, 88px);
-  --text-h2:       clamp(36px, 4vw, 56px);
-  --text-h3:       clamp(24px, 3vw, 36px);
-
-  /* Scale (body) */
-  --text-xl:       20px;
-  --text-lg:       16px;
-  --text-base:     14px;
-  --text-sm:       12px;
-  --text-xs:       11px;
-  --text-2xs:      10px;
-  --text-3xs:      9px;
-
-  /* DB-07: Two-mode body typography */
-  --text-body-signal: 15px;
-  --text-body-story:  17px;
-
-  /* Line heights */
-  --lh-display:    0.92;
-  --lh-heading:    1.05;
-  --lh-body:       1.75;
-  --lh-mono:       1.6;
-  --lh-signal:     1.65;
-  --lh-story:      1.85;
-
-  /* Letter spacing */
-  --ls-display:    0.02em;
-  --ls-heading:    0.01em;
-  --ls-label:      0.12em;
-  --ls-wide:       0.1em;
-  --ls-subtle:     0.06em;
-  --ls-tag:        0.2em;
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-size-adjust: 100%;
 }
 
-/* ── 4. Spacing ──────────────────────────────────────────── */
-:root {
-  --space-1:    4px;
-  --space-2:    8px;
-  --space-3:    12px;
-  --space-4:    16px;
-  --space-5:    20px;
-  --space-6:    24px;
-  --space-8:    32px;
-  --space-10:   40px;
-  --space-12:   48px;
-  --space-16:   64px;
-  --space-20:   80px;
-  --space-24:   96px;
-  --space-32:   128px;
-
-  /* Layout */
-  --nav-height:     64px;
-  --max-width:      1280px;
-  --content-width:  1100px;
-  --prose-width:    680px;
-  --page-padding:   48px;
-  --page-padding-sm: 24px;
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-synthesis: none;
 }
 
-/* ── 5. Animation ────────────────────────────────────────── */
-:root {
-  --ease-out:     cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-in-out:  cubic-bezier(0.83, 0, 0.17, 1);
-  --ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);
+/* Headings carry the human voice unless a component opts out. */
+h1, h2, h3 {
+  font-family: var(--font-serif);
+  font-weight: var(--weight-med);
+  line-height: var(--lh-tight);
+  text-wrap: balance;
+}
+p { text-wrap: pretty; max-width: var(--measure); }
 
-  --dur-fast:     120ms;
-  --dur-mid:      240ms;
-  --dur-slow:     400ms;
-  --dur-page:     600ms;
+/* Every number / label is mono + tabular by default. */
+.mono, [data-voice="machine"], .data, .num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
 
-/* ── 6. Z-index ──────────────────────────────────────────── */
-:root {
-  --z-base:     0;
-  --z-raised:   10;
-  --z-overlay:  50;
-  --z-nav:      100;
-  --z-modal:    200;
-  --z-toast:    300;
+/* The label primitive (Plex Mono, uppercase, tracked). */
+.label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+a { color: inherit; text-underline-offset: 0.18em; }
+
+:where(a, button, [tabindex]):focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+/* The orchestrated page-load reveal — motion earns its weight, or it's cut. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

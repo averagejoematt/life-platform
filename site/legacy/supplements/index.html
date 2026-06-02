@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="robots" content="noindex">
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="21 supplements in 3 tiers. Evidence-rated. Genome-informed. Cost-transparent. No affiliate links. No sponsorships. Just the data behind every pill.">
+  <meta property="og:title" content="The Pharmacy — Matthew">
+  <meta property="og:description" content="21 supplements rated by evidence strength. No affiliate links. No sponsorships. Genome-informed, N=1 tracked.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/supplements/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="The Pharmacy — Matthew">
+  <meta name="twitter:description" content="21 supplements. Evidence-rated. No affiliate links. Just data.">
+  <meta name="keywords" content="supplement stack, evidence-based supplements, supplement review no affiliate, genome supplement, longevity supplements, sleep supplements">
+  <title>The Pharmacy — Matthew</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/legacy/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/legacy/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/legacy/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/legacy/assets/css/tokens.css">
+  <link rel="stylesheet" href="/legacy/assets/css/base.css">
+  <style>
+/* ═══════════════════════════════════════════════════════
+   THE PHARMACY — Supplements Page
+   Design: Clinical data terminal meets apothecary catalog
+   Evidence-first visual hierarchy
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Hero ── */
+.rx-hero {
+  padding: var(--space-16) var(--page-padding) var(--space-12);
+  border-bottom: 1px solid var(--border);
+  position: relative; overflow: hidden;
+}
+.rx-hero::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at 70% 80%, rgba(0,229,160,0.05) 0%, transparent 60%);
+  pointer-events: none;
+}
+.rx-hero__eyebrow {
+  font-size: var(--text-2xs); letter-spacing: var(--ls-tag);
+  text-transform: uppercase; color: var(--accent-dim);
+  font-family: var(--font-mono); margin-bottom: var(--space-4);
+}
+.rx-hero__title {
+  font-family: var(--font-display); font-size: clamp(32px, 5vw, 56px);
+  line-height: 1.1; color: var(--text); margin-bottom: var(--space-3);
+}
+.rx-hero__title em { color: var(--accent); font-style: normal; }
+.rx-hero__sub {
+  font-size: var(--text-base); color: var(--text-muted);
+  max-width: 580px; line-height: var(--lh-body); margin-bottom: var(--space-6);
+}
+
+/* No-affiliate banner */
+.rx-integrity {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  border: 1px solid var(--accent); background: rgba(0,229,160,0.04);
+  padding: var(--space-3) var(--space-5); margin-bottom: var(--space-8);
+}
+.rx-integrity__icon { font-size: 18px; }
+.rx-integrity__text {
+  font-family: var(--font-mono); font-size: var(--text-xs);
+  color: var(--accent); letter-spacing: var(--ls-label);
+}
+
+/* Hero stats */
+.rx-hero__stats { display: flex; gap: var(--space-8); flex-wrap: wrap; }
+.rx-stat { border-left: 2px solid var(--border); padding-left: var(--space-4); }
+.rx-stat:first-child { border-left-color: var(--accent); }
+.rx-stat__label {
+  font-size: var(--text-2xs); letter-spacing: var(--ls-tag);
+  text-transform: uppercase; color: var(--text-muted);
+  font-family: var(--font-mono); margin-bottom: 2px;
+}
+.rx-stat__val { font-family: var(--font-display); font-size: 28px; color: var(--text); line-height: 1; }
+.rx-stat:first-child .rx-stat__val { color: var(--accent); }
+
+/* ── Evidence Legend ── */
+.ev-legend {
+  max-width: var(--max-width); margin: 0 auto;
+  padding: var(--space-6) var(--page-padding);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: var(--space-6); flex-wrap: wrap;
+}
+.ev-legend__label {
+  font-size: var(--text-2xs); letter-spacing: var(--ls-tag);
+  text-transform: uppercase; color: var(--text-faint);
+  font-family: var(--font-mono);
+}
+.ev-legend__item { display: flex; align-items: center; gap: var(--space-2); }
+.ev-ring-mini { width: 20px; height: 20px; }
+.ev-ring-mini circle.bg { fill: none; stroke: var(--surface-raised); stroke-width: 2.5; }
+.ev-ring-mini circle.fill { fill: none; stroke-width: 2.5; stroke-linecap: round; }
+.ev-legend__text {
+  font-size: var(--text-2xs); color: var(--text-muted);
+  font-family: var(--font-mono); letter-spacing: var(--ls-label);
+}
+
+/* ── Body ── */
+.rx-body {
+  max-width: var(--max-width); margin: 0 auto;
+  padding: var(--space-10) var(--page-padding);
+}
+
+/* ── Purpose Group ── */
+.rx-group { margin-bottom: var(--space-12); }
+.rx-group__header {
+  display: flex; align-items: center; gap: var(--space-3);
+  margin-bottom: var(--space-6); padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+.rx-group__icon { font-size: 20px; }
+.rx-group__name {
+  font-family: var(--font-display); font-size: 22px; color: var(--text);
+}
+.rx-group__name em { color: var(--accent); font-style: normal; }
+.rx-group__count {
+  font-family: var(--font-mono); font-size: var(--text-2xs);
+  color: var(--text-faint); letter-spacing: var(--ls-label);
+  margin-left: auto;
+}
+.rx-group__desc {
+  font-size: var(--text-xs); color: var(--text-faint);
+  line-height: var(--lh-body); margin-bottom: var(--space-5);
+  padding-left: var(--space-4); border-left: 2px solid var(--border);
+  max-width: 640px;
+}
+.rx-group__grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: var(--space-4);
+}
+
+/* ═══════ SUPPLEMENT CARD ═══════ */
+.rx-card {
+  background: var(--surface); border: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+  position: relative;
+}
+.rx-card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
+}
+/* Evidence strength left accent */
+.rx-card--strong  { border-left: 3px solid var(--accent); }
+.rx-card--moderate { border-left: 3px solid var(--c-amber-400); }
+.rx-card--emerging { border-left: 3px solid var(--text-faint); }
+
+/* Card header */
+.rx-card__head {
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  display: flex; gap: var(--space-4); align-items: flex-start;
+}
+/* Evidence confidence ring */
+.rx-ring { width: 48px; height: 48px; flex-shrink: 0; }
+.rx-ring__bg { fill: none; stroke: var(--surface-raised); stroke-width: 3.5; }
+.rx-ring__fill { fill: none; stroke-width: 3.5; stroke-linecap: round; }
+.rx-ring__label {
+  font-family: var(--font-mono); font-size:var(--text-3xs);
+  text-anchor: middle; dominant-baseline: central;
+}
+.rx-card__info { flex: 1; min-width: 0; }
+.rx-card__name {
+  font-family: var(--font-display); font-size: 18px;
+  color: var(--text); line-height: 1.2; margin-bottom: 4px;
+}
+.rx-card__dose {
+  font-family: var(--font-mono); font-size: var(--text-xs);
+  color: var(--accent); background: var(--accent-bg-subtle);
+  border: 1px solid rgba(0,229,160,0.15);
+  padding: 1px 6px; display: inline-block;
+}
+
+/* Purpose + meta badges row */
+.rx-card__badges {
+  display: flex; gap: var(--space-2); flex-wrap: wrap;
+  padding: 0 var(--space-5) var(--space-3);
+}
+.rx-badge {
+  font-size:var(--text-3xs); font-family: var(--font-mono);
+  letter-spacing: 0.04em; padding: 2px 6px;
+  border: 1px solid var(--border); color: var(--text-faint);
+  display: inline-flex; align-items: center; gap: 3px;
+}
+.rx-badge--purpose { }
+.rx-badge--timing { color: var(--accent-dim); border-color: rgba(0,229,160,0.12); }
+.rx-badge--advisor { color: var(--text-muted); border-color: var(--border); background: rgba(255,255,255,0.02); }
+.rx-badge--genome { color: var(--accent); border-color: rgba(0,229,160,0.2); background: rgba(0,229,160,0.04); }
+.rx-badge--synergy { color: var(--c-amber-400); border-color: rgba(200,132,58,0.15); }
+.rx-badge--experiment { color: #a78bfa; border-color: rgba(167,139,250,0.25); background: rgba(167,139,250,0.04); }
+
+/* Tier badges */
+.rx-tier {
+  font-family: var(--font-mono); font-size:var(--text-3xs); letter-spacing: 0.08em;
+  text-transform: uppercase; padding: 2px 6px; display: inline-block;
+  margin-bottom: 4px;
+}
+.rx-tier--1 { border: 1px solid var(--accent); color: var(--accent); }
+.rx-tier--2 { border: 1px solid var(--c-amber-500, var(--c-amber-400)); color: var(--c-amber-500, var(--c-amber-400)); }
+.rx-tier--3 { border: 1px solid var(--text-faint); color: var(--text-faint); }
+
+/* Paused card state */
+.rx-card--paused { opacity: 0.55; border-left-color: var(--border) !important; }
+.rx-card--paused:hover { opacity: 0.75; }
+.rx-badge--paused {
+  font-size:var(--text-3xs); font-family: var(--font-mono); letter-spacing:var(--ls-subtle);
+  padding: 2px 6px; border: 1px solid var(--c-amber-400);
+  color: var(--c-amber-400); background: rgba(200,132,58,0.06);
+  text-transform: uppercase;
+}
+.rx-card__paused-reason {
+  font-size: var(--text-2xs); color: var(--text-faint); font-family: var(--font-mono);
+  padding: 0 var(--space-5) var(--space-3); letter-spacing: var(--ls-label);
+}
+
+/* Cost badge on card */
+.rx-badge--cost { color: var(--text-muted); border-color: var(--border); }
+
+/* Experiment link */
+.rx-card__experiment-link {
+  display: block; padding: var(--space-2) var(--space-5);
+  font-size: var(--text-2xs); font-family: var(--font-mono);
+  color: #a78bfa; letter-spacing: var(--ls-label);
+  text-decoration: none; border-top: 1px solid var(--border-subtle);
+}
+.rx-card__experiment-link:hover { color: #c4b5fd; }
+
+/* Expandable sections */
+.rx-card__section {
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+}
+.rx-card__section-label {
+  font-size: var(--text-2xs); letter-spacing: var(--ls-tag);
+  text-transform: uppercase; color: var(--text-faint);
+  font-family: var(--font-mono); margin-bottom: var(--space-2);
+  cursor: pointer; display: flex; align-items: center; gap: var(--space-2);
+}
+.rx-card__section-label .arrow {
+  font-size: 8px; color: var(--accent-dim);
+  transition: transform var(--dur-fast);
+}
+.rx-card__section-label[aria-expanded="true"] .arrow { transform: rotate(90deg); }
+.rx-card__section-body {
+  font-size: var(--text-xs); color: var(--text-muted);
+  line-height: 1.6;
+}
+.rx-card__section-body.collapsed { display: none; }
+
+/* Why quote */
+.rx-card__why {
+  font-style: italic;
+  border-left: 2px solid rgba(0,229,160,0.15);
+  padding-left: var(--space-3);
+}
+/* Science points */
+.rx-card__sci-point {
+  padding-left: var(--space-3); position: relative;
+  margin-bottom: var(--space-1);
+}
+.rx-card__sci-point::before {
+  content: '—'; position: absolute; left: 0;
+  color: var(--accent-dim); font-family: var(--font-mono);
+}
+
+/* What I'm watching */
+.rx-card__watch {
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2);
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  background: rgba(0,0,0,0.1);
+}
+.rx-card__watch-item { }
+.rx-card__watch-label {
+  font-size: var(--text-2xs); letter-spacing: var(--ls-tag);
+  text-transform: uppercase; color: var(--text-faint);
+  font-family: var(--font-mono); margin-bottom: 2px;
+}
+.rx-card__watch-val {
+  font-size: var(--text-xs); color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* ═══════ GENOME SECTION ═══════ */
+.rx-genome {
+  border: 1px solid var(--accent); background: rgba(0,229,160,0.02);
+  padding: var(--space-8); margin-bottom: var(--space-10);
+  position: relative; overflow: hidden;
+}
+.rx-genome::after {
+  content: '🧬'; position: absolute; right: var(--space-6); top: var(--space-6);
+  font-size: 48px; opacity: 0.08; pointer-events: none;
+}
+.rx-genome__title {
+  font-family: var(--font-display); font-size: 24px; color: var(--text);
+  margin-bottom: var(--space-3);
+}
+.rx-genome__title em { color: var(--accent); font-style: normal; }
+.rx-genome__body {
+  font-size: var(--text-sm); color: var(--text-muted);
+  line-height: var(--lh-body); max-width: 640px; margin-bottom: var(--space-6);
+}
+.rx-genome__snp {
+  display: grid; grid-template-columns: 140px 1fr; gap: var(--space-3);
+  padding: var(--space-3) 0; border-bottom: 1px solid rgba(0,229,160,0.1);
+  font-size: var(--text-xs);
+}
+.rx-genome__snp:last-child { border-bottom: none; }
+.rx-genome__snp-id { color: var(--accent); font-family: var(--font-mono); }
+.rx-genome__snp-note { color: var(--text-muted); line-height: 1.5; }
+
+/* ═══════ HONEST ASSESSMENT ═══════ */
+.rx-honest {
+  border: 1px solid var(--c-amber-100); background: rgba(200,132,58,0.02);
+  padding: var(--space-6); margin-bottom: var(--space-8);
+}
+.rx-honest__title {
+  font-family: var(--font-display); font-size: 20px; color: var(--text);
+  margin-bottom: var(--space-2);
+}
+.rx-honest__title em { color: var(--c-amber-400); font-style: normal; }
+.rx-honest__sub {
+  font-size: var(--text-xs); color: var(--text-faint);
+  font-family: var(--font-mono); margin-bottom: var(--space-5);
+}
+.rx-honest__item {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+  padding: var(--space-3) 0; border-bottom: 1px solid rgba(200,132,58,0.08);
+}
+.rx-honest__item:last-child { border-bottom: none; }
+.rx-honest__icon { color: var(--c-amber-400); font-size: 14px; flex-shrink: 0; margin-top: 2px; }
+.rx-honest__name { font-size: var(--text-sm); color: var(--text); min-width: 120px; }
+.rx-honest__reason { font-size: var(--text-xs); color: var(--text-faint); line-height: 1.5; }
+
+/* ═══════ DISCONTINUED ═══════ */
+.rx-discontinued {
+  margin-top: var(--space-10);
+  padding-top: var(--space-8);
+  border-top: 1px solid var(--border);
+}
+.rx-discontinued__title {
+  font-family: var(--font-display); font-size: 24px; color: var(--text);
+  margin-bottom: var(--space-2);
+}
+.rx-discontinued__title em { color: var(--text-faint); font-style: normal; }
+.rx-discontinued__sub {
+  font-size: var(--text-xs); color: var(--text-faint);
+  font-family: var(--font-mono); letter-spacing: var(--ls-label);
+  margin-bottom: var(--space-6); line-height: var(--lh-body);
+  max-width: 640px;
+}
+.rx-disc-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--text-faint);
+  padding: var(--space-5); margin-bottom: var(--space-3);
+  opacity: 0.8;
+}
+.rx-disc-card__head {
+  display: flex; align-items: center; gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+.rx-disc-card__name {
+  font-family: var(--font-display); font-size: 18px; color: var(--text);
+}
+.rx-disc-card__status {
+  font-family: var(--font-mono); font-size: var(--text-2xs);
+  letter-spacing: var(--ls-tag); text-transform: uppercase;
+  color: var(--text-faint); background: var(--surface-raised);
+  border: 1px solid var(--border); padding: 1px 8px;
+}
+.rx-disc-card__reason {
+  font-size: var(--text-sm); color: var(--text-muted);
+  line-height: var(--lh-body); padding-left: var(--space-4);
+  border-left: 2px solid var(--border);
+}
+
+/* ── Skeleton ── */
+.skel { animation: pulse 1.5s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
+
+/* ── Responsive ── */
+@media(max-width:768px) {
+  .rx-hero { padding: var(--space-10) var(--page-padding-sm) var(--space-8); }
+  .rx-body { padding: var(--space-8) var(--page-padding-sm); }
+  .rx-group__grid { grid-template-columns: 1fr; }
+  .ev-legend { padding: var(--space-4) var(--page-padding-sm); gap: var(--space-3); }
+  .rx-card__watch { grid-template-columns: 1fr; }
+  .rx-genome__snp { grid-template-columns: 1fr; }
+  .rx-timing-grid { grid-template-columns: 1fr !important; }
+}
+
+/* ── Reveal ── */
+.reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.reveal.is-visible { opacity: 1; transform: none; }
+  </style>
+  <link rel="canonical" href="https://averagejoematt.com/supplements/">
+</head>
+<body class="body-signal">
+
+<div id="amj-nav"></div>
+
+<div id="amj-hierarchy-nav"></div>
+
+<!-- ═══════ HERO ═══════ -->
+<header class="rx-hero reveal">
+  <h1 class="rx-hero__title"><em>The</em> Pharmacy</h1>
+  <p class="rx-hero__sub">I've never been particularly methodical about supplements. I find someone credible — a researcher, a practitioner whose thinking I respect — and I take their advice. That's gotten me this far. But supplements get expensive fast, and the range of opinion is enormous. This page is my attempt to be more disciplined: everything I take, graded by the actual evidence, sourced to scientific literature, including anything that argues against it.</p>
+
+  <p class="rx-hero__sub" style="margin-top:var(--space-4);font-style:italic;color:var(--text-muted);">I tend to trust people I find credible &mdash; Rhonda Patrick, researchers whose work has been stress-tested &mdash; and use their frameworks as a starting point. Occasionally I&rsquo;m more experimental: lions mane, ashwaganda, something that enough credentialed people have made a compelling case for. The goal now is to be more methodical. Every supplement here is evidence-rated and tracked against what the data says it&rsquo;s supposed to do.</p>
+
+  <div class="rx-integrity">
+    <span class="rx-integrity__icon">🚫</span>
+    <span class="rx-integrity__text">No affiliate links · No sponsorships · No brand promotions · Just the data</span>
+  </div>
+
+  <div class="rx-hero__stats">
+    <div class="rx-stat">
+      <div class="rx-stat__label">Active Stack</div>
+      <div class="rx-stat__val" id="stat-total">—</div>
+    </div>
+    <div class="rx-stat">
+      <div class="rx-stat__label">Strong Evidence</div>
+      <div class="rx-stat__val" id="stat-strong">—</div>
+    </div>
+    <div class="rx-stat">
+      <div class="rx-stat__label">Moderate</div>
+      <div class="rx-stat__val" id="stat-moderate">—</div>
+    </div>
+    <div class="rx-stat">
+      <div class="rx-stat__label">Emerging</div>
+      <div class="rx-stat__val" id="stat-emerging">—</div>
+    </div>
+    <div class="rx-stat">
+      <div class="rx-stat__label">Genome-Linked</div>
+      <div class="rx-stat__val" id="stat-genome">—</div>
+    </div>
+    <div class="rx-stat">
+      <div class="rx-stat__label">Monthly Cost</div>
+      <div class="rx-stat__val" id="stat-cost">—</div>
+    </div>
+    <div class="rx-stat">
+      <div class="rx-stat__label">Paused</div>
+      <div class="rx-stat__val" id="stat-paused">—</div>
+    </div>
+  </div>
+  <div style="margin-top:var(--space-4);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);">Part of <a href="/legacy/stack/" style="color:var(--accent);text-decoration:none;">The Stack</a> — the complete operating system</div>
+</header>
+
+<!-- Daily Timing Timeline (16c) -->
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-8) var(--page-padding);border-bottom:1px solid var(--border);">
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-6);">Daily Timing</div>
+  <div class="rx-timing-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-6);">
+    <div style="border:1px solid var(--border);padding:var(--space-5);">
+      <div style="font-family:var(--font-display);font-size:var(--text-lg);color:var(--accent);margin-bottom:var(--space-2);">AM Stack</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);margin-bottom:var(--space-3);">With breakfast</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);line-height:2;">Omega-3 · Vitamin D3 · Creatine · Electrolytes</div>
+    </div>
+    <div style="border:1px solid var(--border);padding:var(--space-5);">
+      <div style="font-family:var(--font-display);font-size:var(--text-lg);color:var(--accent);margin-bottom:var(--space-2);">Pre-Training</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);margin-bottom:var(--space-3);">30 min before workout</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);line-height:2;">Whey Protein · Creatine (if missed AM)</div>
+    </div>
+    <div style="border:1px solid var(--border);padding:var(--space-5);">
+      <div style="font-family:var(--font-display);font-size:var(--text-lg);color:var(--accent);margin-bottom:var(--space-2);">PM Stack</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);margin-bottom:var(--space-3);">Before bed</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);line-height:2;">Magnesium L-Threonate · Apigenin · L-Theanine · Glycine</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ EVIDENCE LEGEND ═══════ -->
+<div class="ev-legend reveal">
+  <span class="ev-legend__label">Evidence rating:</span>
+  <div class="ev-legend__item">
+    <svg class="ev-ring-mini" viewBox="0 0 20 20"><circle class="bg" cx="10" cy="10" r="7.5"/><circle class="fill" cx="10" cy="10" r="7.5" stroke="var(--accent)" stroke-dasharray="47.1" stroke-dashoffset="0" transform="rotate(-90 10 10)"/></svg>
+    <span class="ev-legend__text">Strong — peer-reviewed, meta-analyses</span>
+  </div>
+  <div class="ev-legend__item">
+    <svg class="ev-ring-mini" viewBox="0 0 20 20"><circle class="bg" cx="10" cy="10" r="7.5"/><circle class="fill" cx="10" cy="10" r="7.5" stroke="var(--c-amber-400)" stroke-dasharray="47.1" stroke-dashoffset="15.7" transform="rotate(-90 10 10)"/></svg>
+    <span class="ev-legend__text">Moderate — promising RCTs, mechanistic</span>
+  </div>
+  <div class="ev-legend__item">
+    <svg class="ev-ring-mini" viewBox="0 0 20 20"><circle class="bg" cx="10" cy="10" r="7.5"/><circle class="fill" cx="10" cy="10" r="7.5" stroke="var(--text-faint)" stroke-dasharray="47.1" stroke-dashoffset="35.3" transform="rotate(-90 10 10)"/></svg>
+    <span class="ev-legend__text">Emerging — early data, N=1 hypothesis</span>
+  </div>
+  <span class="ev-legend__label" style="margin-left:var(--space-4)">Tier hierarchy:</span>
+  <div class="ev-legend__item"><span class="rx-tier rx-tier--1" style="margin-bottom:0">Tier 1</span><span class="ev-legend__text">Essential</span></div>
+  <div class="ev-legend__item"><span class="rx-tier rx-tier--2" style="margin-bottom:0">Tier 2</span><span class="ev-legend__text">Supporting</span></div>
+  <div class="ev-legend__item"><span class="rx-tier rx-tier--3" style="margin-bottom:0">Tier 3</span><span class="ev-legend__text">Experimental</span></div>
+</div>
+
+<!-- ═══════ MAIN BODY ═══════ -->
+<div class="rx-body">
+
+  <!-- Skeleton -->
+  <div id="rx-skeleton">
+    <div class="skel" style="height:300px;border:1px solid var(--border);background:var(--surface);margin-bottom:var(--space-6)"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4)">
+      <div class="skel" style="height:250px;border:1px solid var(--border);background:var(--surface)"></div>
+      <div class="skel" style="height:250px;border:1px solid var(--border);background:var(--surface)"></div>
+    </div>
+  </div>
+
+  <!-- Dynamic content -->
+  <div id="rx-content" style="display:none"></div>
+
+  <!-- Genome section -->
+  <div class="rx-genome reveal" id="rx-genome" style="display:none">
+    <div class="rx-genome__title">Why <em>Genome-Informed</em>?</div>
+    <p class="rx-genome__body">Genetic variants affect how you absorb, convert, and utilize nutrients. A 110-SNP analysis identified variants that directly influence supplementation decisions — these aren't generic recommendations.</p>
+    <div id="rx-genome-snps"></div>
+    <a href="/legacy/biology/" style="font-size:var(--text-xs);color:var(--accent-dim);font-family:var(--font-mono);text-decoration:none;margin-top:var(--space-4);display:inline-block">See full genome data →</a>
+  </div>
+
+  <!-- Honest Assessment -->
+  <div class="rx-honest" id="rx-honest" style="display:none">
+    <div class="rx-honest__title">Supplements I'm <em>Questioning</em></div>
+    <div class="rx-honest__sub">Transparency most supplement sites will never show you</div>
+    <div id="rx-honest-list"></div>
+  </div>
+
+  <!-- Discontinued -->
+  <div class="rx-discontinued reveal">
+    <div class="rx-discontinued__title">Supplements I've <em>Stopped Taking</em></div>
+    <div class="rx-discontinued__sub">Not everything makes the cut. These left the stack — and here's why.</div>
+
+    <div class="rx-disc-card">
+      <div class="rx-disc-card__head">
+        <div class="rx-disc-card__name">AG1 (Athletic Greens)</div>
+        <span class="rx-disc-card__status">Discontinued</span>
+      </div>
+      <div class="rx-disc-card__reason">
+        I genuinely enjoyed the routine — the ritual of it felt like a positive start to the morning. But the evidence for greens powders at this price point is thin. Independent analyses show most claimed benefits come from ingredients you can get for a fraction of the cost. At ~$3/day, that's $90/month better allocated toward whole foods, targeted supplements with strong evidence, or lab work that actually changes decisions.
+      </div>
+    </div>
+  </div>
+
+  <!-- N=1 disclaimer -->
+  <aside style="padding:var(--space-8) 0;border-top:1px solid var(--border-subtle)">
+    <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label);max-width:var(--prose-width)">
+      <span style="color:var(--accent-dim)">// N=1 DISCLAIMER</span><br>
+      This is one person's protocol. Nothing here is medical advice. Supplement needs depend on diet, genetics, existing conditions, and lab results. Consult a clinician before starting any supplement protocol.
+    </p>
+  </aside>
+</div>
+
+<nav class="reading-path-v2">
+  <a href="/legacy/protocols/" class="reading-path-v2__link">
+    <span class="reading-path-v2__dir">← Previous</span>
+    <span class="reading-path-v2__title">Protocols</span>
+  </a>
+  <a href="/legacy/experiments/" class="reading-path-v2__link reading-path-v2__link--next">
+    <span class="reading-path-v2__dir">Next →</span>
+    <span class="reading-path-v2__title">The Lab</span>
+  </a>
+</nav>
+
+<div id="amj-subscribe"></div>
+<div id="amj-bottom-nav"></div>
+<div id="amj-reading-path"></div>
+<div id="amj-footer"></div>
+
+<script>
+(function(){
+'use strict';
+
+// ── Supplement data loaded from API (config/supplement_registry.json via /api/supplements) ──
+// No longer hardcoded — managed as S3 config, queryable by MCP tools + Chronicle Lambda.
+var SUPP_REGISTRY = {};
+var GENOME_SNPS = [];
+
+// ── Helpers ──
+function evColor(ev) {
+  if(ev==='strong') return 'var(--accent)';
+  if(ev==='moderate') return 'var(--c-amber-400)';
+  return 'var(--text-faint)';
+}
+
+function getTier(ev) {
+  if(ev==='strong') return {num:1,label:'Tier 1 — Essential',cls:'rx-tier--1'};
+  if(ev==='moderate') return {num:2,label:'Tier 2 — Supporting',cls:'rx-tier--2'};
+  return {num:3,label:'Tier 3 — Experimental',cls:'rx-tier--3'};
+}
+
+function ringSVG(pct, ev, size) {
+  var r = (size-8)/2, c = 2*Math.PI*r;
+  var offset = c - (pct/100)*c;
+  var color = evColor(ev);
+  var label = ev==='strong'?'A':ev==='moderate'?'B':'C';
+  return '<svg class="rx-ring" viewBox="0 0 '+size+' '+size+'" width="'+size+'" height="'+size+'">' +
+    '<circle class="rx-ring__bg" cx="'+(size/2)+'" cy="'+(size/2)+'" r="'+r+'"/>' +
+    '<circle class="rx-ring__fill" cx="'+(size/2)+'" cy="'+(size/2)+'" r="'+r+'" stroke="'+color+'" ' +
+      'stroke-dasharray="'+c+'" stroke-dashoffset="'+offset+'" transform="rotate(-90 '+(size/2)+' '+(size/2)+')"/>' +
+    '<text class="rx-ring__label" x="'+(size/2)+'" y="'+(size/2)+'" fill="'+color+'">'+label+'</text></svg>';
+}
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function toggleSection(btn) {
+  var body = btn.nextElementSibling;
+  var open = !body.classList.contains('collapsed');
+  body.classList.toggle('collapsed', !open ? false : true);
+  btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+}
+
+// ── Build Card ──
+function buildCard(s) {
+  var purposeIcons = {sleep:'😴',muscle:'💪',cognitive:'🧠',longevity:'❤️',metabolic:'🔬'};
+  var tier = getTier(s.ev);
+  var sciHTML = (s.science||[]).map(function(p){
+    return '<div class="rx-card__sci-point">'+esc(p)+'</div>';
+  }).join('');
+  if (s.sources && s.sources.length) {
+    var forSources = s.sources.filter(function(x){ return x.stance === 'supports'; });
+    var againstSources = s.sources.filter(function(x){ return x.stance === 'challenges'; });
+    sciHTML += '<div style="margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--border);">';
+    if (forSources.length) {
+      sciHTML += '<div style="font-family:var(--font-mono);font-size:var(--text-3xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent);margin-bottom:var(--space-2);">Evidence for</div>';
+      forSources.forEach(function(src) {
+        sciHTML += '<div style="margin-bottom:var(--space-2);padding-left:12px;border-left:2px solid var(--accent);"><a href="' + esc(src.url) + '" target="_blank" rel="noopener" style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);text-decoration:none;border-bottom:1px solid var(--border);">' + esc(src.title) + '</a></div>';
+      });
+    }
+    if (againstSources.length) {
+      sciHTML += '<div style="font-family:var(--font-mono);font-size:var(--text-3xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:#ef4444;margin-top:var(--space-3);margin-bottom:var(--space-2);">Evidence against</div>';
+      againstSources.forEach(function(src) {
+        sciHTML += '<div style="margin-bottom:var(--space-2);padding-left:12px;border-left:2px solid #ef4444;"><a href="' + esc(src.url) + '" target="_blank" rel="noopener" style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);text-decoration:none;border-bottom:1px solid var(--border);">' + esc(src.title) + '</a></div>';
+      });
+    }
+    sciHTML += '</div>';
+  }
+
+  var badges = '';
+  badges += '<span class="rx-badge rx-badge--timing">'+esc(s.timing)+'</span>';
+  badges += '<span class="rx-badge rx-badge--advisor">'+esc(s.board)+'</span>';
+  if(s.cost_monthly) badges += '<span class="rx-badge rx-badge--cost">$'+s.cost_monthly+'/mo</span>';
+  if(s.synergy) badges += '<span class="rx-badge rx-badge--synergy">'+esc(s.synergy.replace(/_/g,' '))+'</span>';
+  if(s.genome) badges += '<span class="rx-badge rx-badge--genome">🧬 '+esc(s.genome)+'</span>';
+
+  var pausedClass = s.paused ? ' rx-card--paused' : '';
+  var pausedBadge = s.paused ? '<span class="rx-badge rx-badge--paused">PAUSED</span>' : '';
+  var pausedReason = s.paused ? '<div class="rx-card__paused-reason">'+esc(s.pausedReason)+'</div>' : '';
+
+  var experimentLink = '';
+  if(s.experiment) {
+    experimentLink = '<a href="/legacy/experiments/" class="rx-card__experiment-link">Active experiment → see results</a>';
+  }
+
+  var whyLabel = s.paused ? 'Why I was taking it' : 'Why I take it';
+
+  return '<div class="rx-card rx-card--'+s.ev+pausedClass+'">' +
+    '<div class="rx-card__head">' +
+      ringSVG(s.evPct, s.ev, 48) +
+      '<div class="rx-card__info">' +
+        '<span class="rx-tier '+tier.cls+'">'+tier.label+'</span>' +
+        '<div class="rx-card__name">'+esc(s.name)+'</div>' +
+        '<span class="rx-card__dose">'+esc(s.dose)+'</span>' +
+      '</div>' +
+    '</div>' +
+    '<div class="rx-card__badges">'+pausedBadge+badges+'</div>' +
+    pausedReason +
+    '<div class="rx-card__section">' +
+      '<div class="rx-card__section-label" aria-expanded="true" onclick="(function(b){var body=b.nextElementSibling;body.classList.toggle(\'collapsed\');b.setAttribute(\'aria-expanded\',body.classList.contains(\'collapsed\')?\'false\':\'true\')})(this)"><span class="arrow">▼</span> '+whyLabel+'</div>' +
+      '<div class="rx-card__section-body rx-card__why">"'+esc(s.why)+'"</div>' +
+    '</div>' +
+    '<div class="rx-card__section">' +
+      '<div class="rx-card__section-label" aria-expanded="false" onclick="(function(b){var body=b.nextElementSibling;body.classList.toggle(\'collapsed\');b.setAttribute(\'aria-expanded\',body.classList.contains(\'collapsed\')?\'false\':\'true\')})(this)"><span class="arrow">▶</span> What the science says</div>' +
+      '<div class="rx-card__section-body collapsed">'+sciHTML+'</div>' +
+    '</div>' +
+    (s.rationale ? '<div style="padding:var(--space-3) var(--space-5);border-top:1px solid var(--border);background:var(--accent-bg-subtle);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body)"><span style="color:var(--accent);font-family:var(--font-mono);font-size:var(--text-3xs);letter-spacing:var(--ls-tag);text-transform:uppercase">Why I favor it: </span>' + esc(s.rationale) + '</div>' : '') +
+    experimentLink +
+    '<div class="rx-card__watch">' +
+      '<div class="rx-card__watch-item">' +
+        '<div class="rx-card__watch-label">Expected impact</div>' +
+        '<div class="rx-card__watch-val">'+esc(s.impact)+'</div>' +
+      '</div>' +
+      '<div class="rx-card__watch-item">' +
+        '<div class="rx-card__watch-label">What I\'m watching</div>' +
+        '<div class="rx-card__watch-val">'+esc(s.watching)+'</div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--border)">' +
+      '<button onclick="navigator.clipboard.writeText(window.location.href+\'#\'+\''+s.key+'\');this.textContent=\'Copied!\';setTimeout(()=>this.textContent=\'Share this supplement\',2000)" style="background:none;border:1px solid var(--border);color:var(--text-faint);font-family:var(--font-mono);font-size:var(--text-2xs);padding:var(--space-1) var(--space-3);cursor:pointer;letter-spacing:var(--ls-tag);">Share this supplement</button>' +
+    '</div>' +
+  '</div>';
+}
+
+// ── Build Page ──
+function buildPage() {
+  var content = document.getElementById('rx-content');
+  var html = '';
+  var totalCount = 0, strongCount = 0, moderateCount = 0, emergingCount = 0, genomeCount = 0;
+  var totalCost = 0, pausedCount = 0, activeCount = 0;
+  var questioning = [];
+
+  ['longevity','muscle','metabolic','sleep','cognitive'].forEach(function(gKey) {
+    var g = SUPP_REGISTRY[gKey];
+    var items = g.items;
+    totalCount += items.length;
+    items.forEach(function(s){
+      if(s.ev==='strong') strongCount++;
+      else if(s.ev==='moderate') moderateCount++;
+      else emergingCount++;
+      if(s.genome) genomeCount++;
+      if(s.paused) { pausedCount++; }
+      else { if(s.cost_monthly) totalCost += s.cost_monthly; activeCount++; }
+      if(s.questioning) questioning.push({name:s.name, reason:s.questionReason});
+    });
+
+    html += '<div class="rx-group">';
+    html += '<div class="rx-group__header">';
+    html += '<span class="rx-group__icon">'+g.icon+'</span>';
+    html += '<div class="rx-group__name">'+g.name+'</div>';
+    html += '<span class="rx-group__count">'+items.length+' supplement'+(items.length===1?'':'s')+'</span>';
+    html += '</div>';
+    html += '<div class="rx-group__desc">'+g.desc+'</div>';
+    html += '<div class="rx-group__grid">';
+    items.forEach(function(s){ html += buildCard(s); });
+    html += '</div></div>';
+  });
+
+  content.innerHTML = html;
+  content.style.display = '';
+  document.getElementById('rx-skeleton').style.display = 'none';
+
+  // Stats
+  document.getElementById('stat-total').textContent = activeCount;
+  document.getElementById('stat-strong').textContent = strongCount;
+  document.getElementById('stat-moderate').textContent = moderateCount;
+  document.getElementById('stat-emerging').textContent = emergingCount;
+  document.getElementById('stat-genome').textContent = genomeCount;
+  document.getElementById('stat-cost').textContent = '~$' + totalCost + '/mo';
+  document.getElementById('stat-paused').textContent = pausedCount;
+
+  // Genome section
+  if(genomeCount > 0) {
+    var snpHTML = GENOME_SNPS.map(function(s){
+      return '<div class="rx-genome__snp">' +
+        '<div class="rx-genome__snp-id">'+esc(s.id)+'</div>' +
+        '<div class="rx-genome__snp-note">'+esc(s.note)+'</div>' +
+      '</div>';
+    }).join('');
+    document.getElementById('rx-genome-snps').innerHTML = snpHTML;
+    document.getElementById('rx-genome').style.display = '';
+  }
+
+  // Honest assessment
+  if(questioning.length > 0) {
+    document.getElementById('rx-honest-list').innerHTML = questioning.map(function(q){
+      return '<div class="rx-honest__item">' +
+        '<span class="rx-honest__icon">⚠️</span>' +
+        '<span class="rx-honest__name">'+esc(q.name)+'</span>' +
+        '<span class="rx-honest__reason">'+esc(q.reason)+'</span>' +
+      '</div>';
+    }).join('');
+    document.getElementById('rx-honest').style.display = '';
+  }
+}
+
+// ── Load from API ──
+fetch('/api/supplements')
+  .then(function(r) { return r.ok ? r.json() : null; })
+  .then(function(data) {
+    if (!data || !data.groups) {
+      document.getElementById('rx-skeleton').innerHTML =
+        '<div style="padding:var(--space-12);text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);">Supplement data unavailable. Check back soon.</div>';
+      return;
+    }
+    SUPP_REGISTRY = data.groups;
+    GENOME_SNPS = data.genome_snps || [];
+    buildPage();
+  })
+  .catch(function() {
+    document.getElementById('rx-skeleton').innerHTML =
+      '<div style="padding:var(--space-12);text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);">Supplement data unavailable. Check back soon.</div>';
+  });
+})();
+</script>
+
+<script src="/legacy/assets/js/reveal.js"></script>
+<script src="/legacy/assets/js/site_constants.js"></script>
+<script src="/legacy/assets/js/components.js"></script>
+<script src="/legacy/assets/js/nav.js"></script>
+<script src="/legacy/assets/js/animations.js" defer></script>
+</body>
+</html>

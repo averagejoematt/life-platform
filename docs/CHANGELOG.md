@@ -1,3 +1,22 @@
+## [v4 "The Measured Life"] — 2026-06-01 (built, not yet deployed)
+
+Front-end rebuild into the locked Direction 05 design system — one engine, three doors — with the old site preserved verbatim under `/legacy`. **No engine/pipeline/schema/Lambda/MCP changes.** Big-bang cutover is `deploy/v4_cutover.sh` (Matthew runs).
+
+### Added
+- **`site/assets/css/tokens.css`** — v4 token system (rebuilt). Locked hexes + OKLCH `color-mix()` tints; dark-first + Daybook light mode; the Fraunces/Instrument Sans/IBM Plex Mono triad; the two ownable signatures tokenized (`--spine-*` measuring-rule, `--voice-*` machine↔human dialogue); honesty vocabulary; motion + reduced-motion.
+- **Cockpit `/now`** — `site/now/index.html` + `assets/css/cockpit.css` + `assets/js/cockpit.js`. Focus/logbook: rule-spine, big tabular-mono Level+tier, Chair verdict two-voice, Body/Mind bento, Consistency band, global scope + theme toggles, in-place pillar disclosure via View Transitions. Binds `/api/snapshot` + `/api/weekly_priority`.
+- **Story `/`** — `site/index.html` + `assets/css/story.css` + `assets/js/story.js`. Scrollytelling default door: relational constellation hero, numbers + honest 42-day waveform (`/api/journey`, `/api/journey_waveform`), the Third Wall (`/api/field_notes`), Elena chronicle spine, reachable close.
+- **Evidence `/evidence/**`** — `scripts/v4_build_evidence.py` generates the index + 26 topic pages (12 live-readout, 14 archive→`/legacy`) over `assets/css/evidence.css` + `assets/js/evidence.js` (generic honest readout, correlative framing + confidence labels).
+- **`scripts/v4_relocate_legacy.py`** — preserves the old site verbatim under `/legacy` (84 pages, noindex; 552 asset refs + internal nav rewritten; `/api`/`/config`/`/data` left live). Idempotent, git-reversible.
+- **`deploy/v4_cutover.sh`** — gated big-bang cutover (Matthew runs): pre-flight gates, CloudFront redirect Function from `redirects.map`, safe `site/` sync, invalidation, rollback in header.
+- **v4 a11y tests** — `tests/test_site_a11y_landmarks.py` adds skip-link/`<main>`/tokens checks across the three doors; original guarantees repointed to preserved legacy pages.
+
+### Changed
+- **`scripts/v4_migration_inventory.py`** — post-relocation mode: scans `site/legacy/`, emits `redirects.map` (83 301s), gate reports cockpit 8 · story 37 · evidence 30 · legacy 9 · **0 unmapped**.
+- **`tests/visual_qa.py`** — PAGES now cover the three doors (post-deploy live sweep).
+- System pages (`privacy`, `subscribe`, `404`) stay at root, ported as-is. The old 7-section nav is retired in favour of the three doors routed by depth.
+
+
 ## [Restart 2026-06-01] — 2026-05-31
 
 ### Added

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="robots" content="noindex">
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Complete archive of The Measured Life — a weekly chronicle by Elena Voss following Matthew's N=1 health experiment.">
+  <meta property="og:title" content="Chronicle Archive — Matthew">
+  <meta property="og:description" content="Every installment of The Measured Life, in order. One subject. Full transparency.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/chronicle/archive/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Chronicle Archive — Matthew">
+  <meta name="twitter:description" content="Every weekly chronicle installment in order. The Measured Life by Elena Voss.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <title>Chronicle Archive — Matthew</title>
+  <link rel="icon" type="image/svg+xml" href="/legacy/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/legacy/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/legacy/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/legacy/assets/css/tokens.css">
+  <link rel="stylesheet" href="/legacy/assets/css/base.css">
+  <style>
+    /* Journal amber accent override */
+    :root {
+      --accent:           var(--c-amber-500);
+      --accent-dim:       var(--c-amber-300);
+      --accent-bg:        var(--c-amber-100);
+      --accent-bg-subtle: var(--c-amber-050);
+    }
+
+    /* ── Header ──────────────────────────────────────────── */
+    .archive-header {
+      padding: var(--space-16) var(--page-padding) var(--space-10);
+      border-bottom: 1px solid var(--border);
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+    .archive-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      line-height: var(--lh-display);
+      letter-spacing: var(--ls-display);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+    }
+    .archive-header__sub {
+      font-family: var(--font-mono);
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      max-width: 560px;
+    }
+    .archive-header__back {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      text-decoration: none;
+      margin-bottom: var(--space-6);
+      transition: color var(--dur-fast);
+    }
+    .archive-header__back:hover { color: var(--accent); }
+
+    /* ── List ────────────────────────────────────────────── */
+    .archive-list {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding) var(--space-20);
+    }
+
+    /* ── Coming placeholder ──────────────────────────────── */
+    .archive-coming {
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: var(--space-8);
+      padding: var(--space-8) 0;
+      border-bottom: 1px solid var(--border-subtle);
+      opacity: 0.5;
+    }
+    .archive-coming__date {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      padding-top: 3px;
+    }
+    .archive-coming__tag {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-2);
+    }
+    .archive-coming__title {
+      font-family: var(--font-display);
+      font-size: 28px;
+      letter-spacing: var(--ls-display);
+      color: var(--text-faint);
+      line-height: 1.1;
+      margin-bottom: var(--space-2);
+    }
+    .archive-coming__note {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      letter-spacing:var(--ls-subtle);
+      text-transform: uppercase;
+      border: 1px dashed var(--border);
+      display: inline-block;
+      padding: 2px 8px;
+    }
+
+    /* ── Post entry ──────────────────────────────────────── */
+    .archive-post {
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: var(--space-8);
+      padding: var(--space-8) 0;
+      border-bottom: 1px solid var(--border-subtle);
+      text-decoration: none;
+      transition: all var(--dur-fast);
+    }
+    .archive-post:hover {
+      background: var(--accent-bg-subtle);
+      padding-left: var(--space-3);
+    }
+    .archive-post:hover .archive-post__title { color: var(--accent); }
+    .archive-post:last-of-type { border-bottom: none; }
+
+    .archive-post__date {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding-top: 3px;
+    }
+    .archive-post__week {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-2);
+    }
+    .archive-post__title {
+      font-family: var(--font-display);
+      font-size: 28px;
+      letter-spacing: var(--ls-display);
+      color: var(--text);
+      line-height: 1.1;
+      margin-bottom: var(--space-2);
+      transition: color var(--dur-fast);
+    }
+    .archive-post__desc {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-mono);
+      letter-spacing: 0.01em;
+    }
+
+    /* ── Count strip ─────────────────────────────────────── */
+    .archive-meta {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      padding: var(--space-5) 0 var(--space-6);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: var(--space-6);
+    }
+    .archive-meta__count { color: var(--accent); }
+
+    @media (max-width: 768px) {
+      .archive-coming { grid-template-columns: 1fr; gap: var(--space-2); }
+      .archive-post { grid-template-columns: 1fr; gap: var(--space-2); }
+    }
+  </style>
+  <link rel="canonical" href="https://averagejoematt.com/chronicle/archive/">
+</head>
+<body>
+
+<div id="amj-nav"></div>
+</div>
+
+
+
+
+
+
+
+<header class="archive-header reveal">
+  <a href="/legacy/chronicle/" class="archive-header__back">&larr; Back to Chronicle</a>
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">Full archive</div>
+  <h1 class="archive-header__title">The Chronicle</h1>
+  <p class="archive-header__sub">
+    Every installment of The Measured Life &mdash; a weekly journal by Elena Voss following
+    one man&rsquo;s N=1 health experiment from the inside. Published every Wednesday.
+  </p>
+</header>
+
+<div class="archive-list" id="archive-list">
+  <div class="archive-meta">
+    <span><span class="archive-meta__count" id="archive-count">&mdash;</span>&nbsp;installments published</span>
+    <span>By Elena Voss</span>
+  </div>
+  <div style="text-align:center;padding:var(--space-10);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">Loading archive&hellip;</div>
+</div>
+
+<!-- Email CTA -->
+<div id="amj-subscribe"></div>
+
+<!-- Mobile bottom nav -->
+<div id="amj-bottom-nav"></div>
+<div id="amj-footer"></div>
+<script src="/legacy/assets/js/reveal.js"></script>
+<script src="/legacy/assets/js/site_constants.js"></script>
+<script src="/legacy/assets/js/countdown.js"></script>
+<script src="/legacy/assets/js/components.js"></script>
+<script src="/legacy/assets/js/nav.js"></script>
+<script>
+(function() {
+  fetch('/chronicle/posts.json')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if (!data || !data.posts) return;
+      var posts = data.posts.filter(function(p) { return !p.coming_soon; });
+      var list = document.getElementById('archive-list');
+      document.getElementById('archive-count').textContent = posts.length;
+
+      var html = '<div class="archive-meta"><span><span class="archive-meta__count">' + posts.length + '</span>&nbsp;installments published</span><span>By Elena Voss</span></div>';
+
+      posts.forEach(function(p) {
+        var weekLabel = p.week >= 1 ? 'Week ' + p.week : (p.phase === 'prequel' ? 'Prequel' : 'Week ' + p.week);
+        html += '<a href="' + p.url + '" class="archive-post reveal">' +
+          '<div class="archive-post__date">' + p.date + '</div>' +
+          '<div>' +
+            '<div class="archive-post__week">' + weekLabel + '</div>' +
+            '<div class="archive-post__title">&ldquo;' + p.title + '&rdquo;</div>' +
+            '<div class="archive-post__desc">' + (p.excerpt || '') + '</div>' +
+          '</div></a>';
+      });
+
+      if (posts.length === 0) {
+        html += '<div style="text-align:center;padding:var(--space-10);font-family:var(--font-serif);font-size:15px;color:var(--text-faint)">The first chronicle installment will publish after the first full week of the experiment.</div>';
+      }
+
+      list.innerHTML = html;
+    })
+    .catch(function() {
+      document.getElementById('archive-list').innerHTML =
+        '<div style="text-align:center;padding:var(--space-10);font-family:var(--font-serif);font-size:15px;color:var(--text-faint)">Could not load archive.</div>';
+    });
+})();
+</script>
+</body>
+</html>

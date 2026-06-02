@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="robots" content="noindex">
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="The Mind Dispatch — daily inner-life signals: mood, willpower, journal cadence, vice streaks, connection. The pillar most platforms don't measure.">
+  <meta property="og:title" content="The Mind Dispatch — Matthew">
+  <meta property="og:description" content="Mood, willpower, journal cadence, connection — the inner life pillar tracked honestly.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-mind.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>The Mind Dispatch — Matthew</title>
+  <link rel="icon" type="image/svg+xml" href="/legacy/assets/icons/favicon.svg">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/legacy/assets/css/tokens.css">
+  <link rel="stylesheet" href="/legacy/assets/css/base.css">
+  <style>
+    /* /mind/ — Front Page pattern (.fp-*); see assets/css/frontpage.css.
+       Mind-specific additions only — namespace .m- (mind page). */
+    .m-page { padding-top: var(--nav-height); }
+
+    /* Skeleton placeholder for pre-fetch state */
+    .m-skeleton {
+      background: linear-gradient(90deg, var(--surface) 25%, var(--surface-raised) 50%, var(--surface) 75%);
+      background-size: 200% 100%;
+      animation: m-shimmer 1.5s infinite;
+      border-radius: 2px;
+      display: inline-block;
+    }
+    @keyframes m-shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    .m-row-empty {
+      padding: 28px 22px;
+      border-top: 1px solid var(--border-subtle);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      color: var(--text-faint);
+      text-transform: uppercase;
+    }
+
+    /* Strip nav buttons (kept inert; entries don't paginate yet) */
+    .m-strip-btn {
+      cursor: not-allowed;
+      opacity: 0.5;
+      color: inherit;
+      text-decoration: none;
+    }
+
+    /* ── Extra mind-only sections (after long story, before footer) ── */
+
+    /* Vice streaks card grid */
+    .m-extras {
+      padding: 32px 56px;
+      border-top: 1px solid var(--border);
+    }
+    .m-extras__head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--border-strong);
+    }
+    .m-extras__title {
+      font-family: var(--font-display);
+      font-size: 24px;
+      letter-spacing: 0.04em;
+      color: var(--text);
+    }
+    .m-extras__meta {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .m-vice-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 14px;
+      margin-top: 18px;
+    }
+    .m-vice-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      padding: 16px 14px 18px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .m-vice-card.is-broken { border-left-color: var(--c-red-status); }
+    .m-vice-card__name {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .m-vice-card__streak {
+      font-family: var(--font-display);
+      font-size: 36px;
+      line-height: 1;
+      color: var(--accent);
+    }
+    .m-vice-card.is-broken .m-vice-card__streak { color: var(--c-red-status); }
+    .m-vice-card__unit {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+    .m-vice-card__why {
+      font-family: var(--font-serif);
+      font-size: 11px;
+      color: var(--text-faint);
+      line-height: 1.5;
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border-subtle);
+      font-style: italic;
+    }
+
+    /* Connection / Willpower bar pair */
+    .m-bars {
+      padding: 32px 56px;
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    .m-bar-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 22px 22px 18px;
+    }
+    .m-bar-card__title {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 18px;
+    }
+    .m-bar-row {
+      display: grid;
+      grid-template-columns: 90px 1fr 50px;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .m-bar-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.06em;
+    }
+    .m-bar-track {
+      height: 6px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .m-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: var(--accent);
+      transition: width 1s ease;
+    }
+    .m-bar-fill--good { background: var(--c-green-500, #3ecf8e); }
+    .m-bar-fill--bad  { background: var(--c-red-status); }
+    .m-bar-fill--warn { background: var(--c-yellow-status); }
+    .m-bar-val {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: right;
+    }
+
+    /* Connection list (Murthy threshold) */
+    .m-conn {
+      padding: 32px 56px;
+      border-top: 1px solid var(--border);
+    }
+    .m-conn__threshold {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin: 6px 0 18px;
+      padding: 8px 12px;
+      background: var(--accent-bg-subtle, rgba(167,139,250,0.06));
+      border-left: 2px solid var(--accent);
+      display: inline-block;
+    }
+    .m-conn__grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 14px;
+    }
+    .m-conn__intent {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      padding: 16px 18px;
+    }
+    .m-conn__who {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--accent);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .m-conn__text {
+      font-family: var(--font-serif);
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 12px;
+      font-style: italic;
+    }
+    .m-conn__progress {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .m-conn__bar {
+      flex: 1;
+      height: 4px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .m-conn__fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+    }
+    .m-conn__hours {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      white-space: nowrap;
+    }
+
+    /* Confessional pull-out (preserves the page's editorial voice) */
+    .m-confessional {
+      padding: 32px 56px;
+      border-top: 1px solid var(--border);
+      max-width: 760px;
+      margin: 0 auto;
+    }
+    .m-confessional__brow {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: 12px;
+    }
+    .m-confessional__body {
+      font-family: var(--font-serif);
+      font-size: 16px;
+      color: var(--text-muted);
+      line-height: 1.85;
+    }
+    .m-confessional__body p { margin: 0 0 14px; }
+    .m-confessional__body strong { color: var(--text); font-weight: 600; }
+    .m-confessional__body em { color: var(--accent); font-style: italic; }
+
+    @media (max-width: 720px) {
+      .m-extras { padding: 20px 20px 24px; }
+      .m-bars { padding: 20px; grid-template-columns: 1fr; }
+      .m-conn { padding: 20px; }
+      .m-confessional { padding: 24px 20px; }
+    }
+  </style>
+  <link rel="canonical" href="https://averagejoematt.com/mind/">
+</head>
+<body class="body-signal">
+  <div id="amj-nav"></div>
+  <div id="amj-hierarchy-nav"></div>
+
+  <div class="fp-page m-page" style="--accent: #8b7ad8; --accent-dim: #6857b0;">
+
+    <!-- ═══ 1. MASTHEAD ═════════════════════════════════════ -->
+    <header class="fp-masthead">
+      <div class="fp-masthead__top">
+        <div>
+          <div class="fp-masthead__brow">
+            The Mind Dispatch · Vol I · Dispatch №<span id="m-dispatch">—</span>
+          </div>
+          <div class="fp-masthead__title">MIND</div>
+        </div>
+        <div class="fp-masthead__meta">
+          <div id="m-date"><span class="m-skeleton" style="width:160px;height:10px"></span></div>
+          <div id="m-meta-status">Reporting from one inner life</div>
+        </div>
+      </div>
+      <div class="fp-masthead__strip">
+        <div>
+          <span class="m-strip-btn" title="Yesterday's entry">← Yesterday</span>
+          <span class="fp-masthead__strip-sep">·</span>
+          Entry day <span id="m-day-strip">—</span> of 365
+          <span class="fp-masthead__strip-sep">·</span>
+          <span class="m-strip-btn" title="Tomorrow's entry isn't here yet">Tomorrow →</span>
+        </div>
+        <div id="m-filed">Filed —</div>
+      </div>
+    </header>
+
+    <!-- ═══ 2. LEDE ═════════════════════════════════════════ -->
+    <section class="fp-lede">
+      <div>
+        <div class="fp-lede__num-brow">Entry day</div>
+        <div class="fp-lede__num" id="m-day">—</div>
+        <div class="fp-lede__num-cap">of 365</div>
+      </div>
+      <div>
+        <div class="fp-lede__status" id="m-status">▸ TODAY'S ENTRY · STATE: LOADING</div>
+        <div class="fp-lede__narrative" id="m-narrative">
+          "<span class="m-skeleton" style="width:80%;height:18px"></span>"
+        </div>
+        <div class="fp-lede__delta" id="m-delta" style="display:none">
+          <span class="fp-lede__delta-label">Since yesterday:</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 3. WATCH BANNER (optional) ══════════════════════ -->
+    <div class="fp-watch" id="m-watch" style="display:none">
+      <span class="fp-watch__label" id="m-watch-label">Watch</span>
+      <span id="m-watch-text"></span>
+    </div>
+
+    <!-- ═══ 4. STANDINGS ════════════════════════════════════ -->
+    <section class="fp-standings">
+      <div class="fp-standings__head">
+        <div class="fp-standings__title">ENTRIES</div>
+        <div class="fp-standings__meta">7-day trend · last reading</div>
+      </div>
+      <div id="m-standings-rows">
+        <div class="m-row-empty">Loading inner-life signals…</div>
+      </div>
+    </section>
+
+    <!-- ═══ 5. LONG STORY (30-day mood arc) ═════════════════ -->
+    <section class="fp-arc" id="m-arc-section">
+      <div class="fp-arc__head">
+        <div>
+          <div class="fp-arc__brow">The Long Story · 30-day mood valence</div>
+          <div class="fp-arc__num" id="m-arc-num">
+            <span id="m-arc-first">—</span> → <span class="fp-arc__num-current" id="m-arc-current">—</span>
+          </div>
+        </div>
+        <div class="fp-arc__stats" id="m-arc-stats">
+          <div>
+            <div class="fp-arc__stat-label">30d avg</div>
+            <div class="fp-arc__stat-val fp-arc__stat-val--accent" id="m-arc-avg">—</div>
+          </div>
+          <div>
+            <div class="fp-arc__stat-label">Days tracked</div>
+            <div class="fp-arc__stat-val" id="m-arc-tracked">—</div>
+          </div>
+          <div>
+            <div class="fp-arc__stat-label">Pleasant share</div>
+            <div class="fp-arc__stat-val" id="m-arc-pleasant">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="fp-arc__chart" id="m-arc-chart"></div>
+      <div class="fp-arc__caption" id="m-arc-caption">
+        <span>30 days ago · —</span>
+        <span>Today · —</span>
+      </div>
+    </section>
+
+    <!-- ═══ EXTRAS — vice streaks, willpower/connection bars,
+            people I'm reconnecting with, confessional voice.
+            All sit AFTER the long story, BEFORE cross-link footer. ═════ -->
+
+    <!-- Vice streak portfolio -->
+    <section class="m-extras">
+      <div class="m-extras__head">
+        <div class="m-extras__title">VICE STREAKS</div>
+        <div class="m-extras__meta">Each day held is a vote · current streak</div>
+      </div>
+      <div class="m-vice-grid" id="m-vice-grid">
+        <div class="m-row-empty">Loading streaks…</div>
+      </div>
+    </section>
+
+    <!-- Connection depth + Willpower (bars) -->
+    <section class="m-bars">
+      <div class="m-bar-card">
+        <div class="m-bar-card__title">Connection depth · 30 days</div>
+        <div class="m-bar-row">
+          <div class="m-bar-label">Deep</div>
+          <div class="m-bar-track"><div class="m-bar-fill" id="bar-deep" style="width:0%"></div></div>
+          <div class="m-bar-val" id="pct-deep">—</div>
+        </div>
+        <div class="m-bar-row">
+          <div class="m-bar-label">Meaningful</div>
+          <div class="m-bar-track"><div class="m-bar-fill m-bar-fill--good" id="bar-meaning" style="width:0%"></div></div>
+          <div class="m-bar-val" id="pct-meaning">—</div>
+        </div>
+        <div class="m-bar-row">
+          <div class="m-bar-label">Surface</div>
+          <div class="m-bar-track"><div class="m-bar-fill m-bar-fill--warn" id="bar-surface" style="width:0%"></div></div>
+          <div class="m-bar-val" id="pct-surface">—</div>
+        </div>
+      </div>
+      <div class="m-bar-card">
+        <div class="m-bar-card__title">Willpower · 90 days</div>
+        <div class="m-bar-row">
+          <div class="m-bar-label">Resisted</div>
+          <div class="m-bar-track"><div class="m-bar-fill m-bar-fill--good" id="bar-resisted" style="width:0%"></div></div>
+          <div class="m-bar-val" id="pct-resisted">—</div>
+        </div>
+        <div class="m-bar-row">
+          <div class="m-bar-label">Succumbed</div>
+          <div class="m-bar-track"><div class="m-bar-fill m-bar-fill--bad" id="bar-succumbed" style="width:0%"></div></div>
+          <div class="m-bar-val" id="pct-succumbed">—</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Connection / people I'm reconnecting with -->
+    <section class="m-conn" id="m-conn-section">
+      <div class="m-extras__head" style="border:none;padding:0;margin-bottom:0">
+        <div class="m-extras__title">PEOPLE</div>
+        <div class="m-extras__meta">Murthy threshold · 150 hrs/year per close friendship</div>
+      </div>
+      <div class="m-conn__threshold">~3 hours/week per person to qualify as close</div>
+      <div class="m-conn__grid" id="m-conn-grid">
+        <div class="m-row-empty">Loading connections…</div>
+      </div>
+    </section>
+
+    <!-- Editorial confessional (preserves the page's voice) -->
+    <section class="m-confessional">
+      <div class="m-confessional__brow">Editor's note · why this page exists</div>
+      <div class="m-confessional__body">
+        <p>For most of my adult life, the relapses made sense. I'd get into shape, life would get full — parties, travel, people, things happening — and the discipline would relax into it. That was almost a good problem.</p>
+        <p>What's different about the recent cycles is harder to explain. The disruptions aren't coming from abundance anymore. I can build a platform that measures my cortisol. I find it harder to ask <em>why it's elevated.</em></p>
+        <p><strong>This is the measurement I've been avoiding the longest.</strong> Probably the one that matters the most.</p>
+      </div>
+    </section>
+
+    <!-- ═══ 6. CROSS-LINK FOOTER ════════════════════════════ -->
+    <nav class="fp-cross-footer">
+      <div class="fp-cross-footer__prev"><a href="/legacy/training/">← Training</a></div>
+      <div class="fp-cross-footer__mid">
+        How a mind feels shows up in tomorrow's writing →
+        <a href="/legacy/chronicle/">Chronicle</a>
+      </div>
+      <div class="fp-cross-footer__next"><a href="/legacy/physical/">Physical →</a></div>
+    </nav>
+
+  </div>
+
+  <div id="amj-subscribe"></div>
+  <div id="amj-bottom-nav"></div>
+  <div id="amj-footer"></div>
+
+  <script src="/legacy/assets/js/site_constants.js"></script>
+  <script src="/legacy/assets/js/components.js"></script>
+  <script src="/legacy/assets/js/nav.js"></script>
+  <script>
+  (function() {
+    'use strict';
+
+    var API_BASE = (typeof AMJ !== 'undefined' && AMJ.API_BASE) ? AMJ.API_BASE : '';
+    // Stage0 Fix 1 (2026-05-30): server-side filter is authoritative.
+    // /api/vice_streaks + /api/mind_overview + /api/habit_registry strip
+    // blocked vice categories before the response is sent. Client retains a
+    // no-op isBlocked() to keep existing filter sites intact without
+    // shipping the keyword list in plaintext JS.
+    function isBlocked(_t) { return false; }
+
+    /* Vice why-lines — preserved from original page */
+    var viceWhyMap = {
+      'alcohol': "Tracking sleep impact on alcohol vs. non-alcohol nights.",
+      'sugar': "Glucose spikes feed the anxiety loop. Stable sugar, stable mood.",
+      'fast food': "Inflammation is the hidden cost. Every skip is a vote for lower CRP.",
+      'social media': "Comparison is the thief of contentment.",
+      'caffeine after 12pm': "Adenosine debt compounds. Afternoon caffeine steals tomorrow's recovery.",
+      'nicotine': "The calm it promises is the calm it stole.",
+      'gambling': "Dopamine hijacking dressed as entertainment.",
+      'junk food': "Gut inflammation feeds brain fog.",
+      'energy drinks': "Borrowed energy with compounding interest.",
+      'vaping': "Lung capacity matters for training.",
+      'soda': "Empty calories, glucose spike, crash.",
+      'late night eating': "Eating after 8pm disrupts sleep architecture."
+    };
+    function getViceWhy(name) {
+      if (!name) return "Each day held is a vote for who I'm becoming.";
+      var key = name.toLowerCase();
+      for (var k in viceWhyMap) {
+        if (key.indexOf(k) !== -1 || k.indexOf(key) !== -1) return viceWhyMap[k];
+      }
+      return "Each day held is a vote for who I'm becoming.";
+    }
+
+    function fmtDate(s) {
+      try {
+        var d = new Date(s + 'T12:00:00');
+        return d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' }).toUpperCase();
+      } catch(e) { return s; }
+    }
+
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setWidth(id, p) { var el = document.getElementById(id); if (el) el.style.width = Math.max(0, Math.min(100, p)) + '%'; }
+
+    /* ── Spark renderer (vertical bars, last is opaque) ── */
+    function renderSpark(values, state) {
+      if (!values || values.length === 0) return '';
+      var clean = values.filter(function(v) { return v != null; });
+      if (clean.length === 0) return '';
+      var max = Math.max.apply(null, clean);
+      var min = Math.min.apply(null, clean);
+      var range = max - min || 1;
+      var cls = 'fp-spark fp-spark--' + (state || 'green');
+      var html = '<div class="' + cls + '">';
+      clean.forEach(function(v) {
+        var pct = Math.max(10, ((v - min) / range) * 100);
+        html += '<div class="fp-spark__bar" style="height:' + pct + '%"></div>';
+      });
+      html += '</div>';
+      return html;
+    }
+
+    function moodWord(v) {
+      if (v == null) return 'QUIET';
+      if (v >= 0.5) return 'CENTERED';
+      if (v >= 0.2) return 'STEADY';
+      if (v >= -0.2) return 'MIXED';
+      if (v >= -0.5) return 'TENSE';
+      return 'FOGGY';
+    }
+    function statusClass(word) {
+      if (word === 'CENTERED' || word === 'STEADY') return 'fp-lede__status--strong';
+      if (word === 'TENSE' || word === 'FOGGY')    return 'fp-lede__status--attention';
+      return 'fp-lede__status--watch';
+    }
+    function timePrefix() {
+      var h = new Date().getHours();
+      if (h < 10) return 'Morning read: ';
+      if (h < 14) return 'Midday check: ';
+      if (h < 18) return 'Afternoon: ';
+      return 'End of day: ';
+    }
+
+    /* ── Day-of-year for dispatch number ── */
+    function dayOfYear(d) {
+      d = d || new Date();
+      var start = new Date(d.getFullYear(), 0, 0);
+      var diff = d - start;
+      return Math.floor(diff / (1000 * 60 * 60 * 24));
+    }
+
+    /* ── Render masthead from mood + vices ── */
+    function renderMasthead(latestMood) {
+      var entryDay = dayOfYear();
+      setText('m-dispatch', entryDay);
+      setText('m-day-strip', entryDay);
+      setText('m-day', entryDay);
+      var dateStr = latestMood && latestMood.date ? latestMood.date : new Date().toISOString().slice(0,10);
+      setText('m-date', fmtDate(dateStr));
+      var now = new Date();
+      var hh = String(now.getHours()).padStart(2,'0');
+      var mm = String(now.getMinutes()).padStart(2,'0');
+      setText('m-filed', 'Filed ' + hh + ':' + mm + ' · Auto-synthesis');
+    }
+
+    /* ── Lede ── */
+    function renderLede(payload) {
+      var mood = payload.mood_trend || [];
+      var latest = mood.length ? mood[mood.length - 1] : null;
+      var word = moodWord(latest ? latest.valence : null);
+      var statusEl = document.getElementById('m-status');
+      statusEl.textContent = "▸ TODAY'S ENTRY · STATE: " + word;
+      statusEl.className = 'fp-lede__status ' + statusClass(word);
+
+      var narr;
+      var m = payload.mind || {};
+      var vices = (payload.vice_streaks || []).filter(function(v){ return !isBlocked(v.name); });
+      var holding = vices.filter(function(v){ return v.holding; }).length;
+      var resist = m.resist_rate_pct;
+      var jc = m.journal_entries_30d || 0;
+
+      if (latest && latest.label) {
+        narr = 'Mood read as ' + latest.label.toLowerCase() + '.';
+      } else if (latest && latest.valence != null) {
+        narr = 'Latest mood valence ' + (latest.valence >= 0 ? '+' : '') + latest.valence.toFixed(2) + ' on the pleasant/unpleasant scale.';
+      } else {
+        narr = 'No state-of-mind reading filed today.';
+      }
+      var addons = [];
+      if (vices.length) addons.push(holding + ' of ' + vices.length + ' vice streaks holding');
+      if (resist != null) addons.push('willpower resisting at ' + resist + '%');
+      if (jc) addons.push(jc + ' journal entries in 30 days');
+      if (addons.length) narr += ' ' + addons.join(', ') + '.';
+
+      document.getElementById('m-narrative').textContent = '"' + timePrefix() + narr + '"';
+      renderDelta(payload, latest);
+    }
+
+    function renderDelta(payload, latest) {
+      var el = document.getElementById('m-delta');
+      var mood = payload.mood_trend || [];
+      var prev = mood.length >= 2 ? mood[mood.length - 2] : null;
+      var items = [];
+      if (latest && prev && latest.valence != null && prev.valence != null) {
+        var dv = +(latest.valence - prev.valence).toFixed(2);
+        items.push({ text: 'Mood ' + (dv >= 0 ? '+' : '') + dv, delta: dv, signal: 'mood' });
+      }
+      var m = payload.mind || {};
+      if (m.resist_rate_pct != null && m.resist_rate_pct_prev != null) {
+        var dr = m.resist_rate_pct - m.resist_rate_pct_prev;
+        items.push({ text: 'Resist ' + (dr >= 0 ? '+' : '') + dr + '%', delta: dr, signal: 'resist' });
+      }
+      if (!items.length) { el.style.display = 'none'; return; }
+      el.style.display = '';
+      var html = '<span class="fp-lede__delta-label">Since yesterday:</span>';
+      html += items.map(function(d) {
+        var good = d.delta > 0;
+        var cls = d.delta === 0 ? 'fp-delta--flat' : (good ? 'fp-delta--good' : 'fp-delta--bad');
+        return '<span class="' + cls + '">' + d.text + '</span>';
+      }).join('');
+      el.innerHTML = html;
+    }
+
+    /* ── Watch banner — surface low-mood or broken-streak warnings ── */
+    function renderWatch(payload) {
+      var w = document.getElementById('m-watch');
+      var mood = payload.mood_trend || [];
+      var latest = mood.length ? mood[mood.length - 1] : null;
+      var msg = null, sev = 'watch';
+      if (latest && latest.valence != null && latest.valence <= -0.4) {
+        msg = "Mood valence in the unpleasant range. Consider what's driving it before powering through.";
+        sev = 'attention';
+      } else {
+        var vices = (payload.vice_streaks || []).filter(function(v){ return !isBlocked(v.name); });
+        var brokenToday = vices.filter(function(v){ return !v.holding && v.current_streak === 0; });
+        if (brokenToday.length) {
+          msg = brokenToday.length + ' vice streak' + (brokenToday.length > 1 ? 's' : '') + ' broken. The break is data, not failure.';
+        }
+      }
+      if (!msg) { w.style.display = 'none'; return; }
+      w.style.display = '';
+      w.classList.toggle('fp-watch--attention', sev === 'attention');
+      document.getElementById('m-watch-label').textContent = sev === 'attention' ? 'Attention' : 'Watch';
+      document.getElementById('m-watch-text').textContent = msg;
+    }
+
+    /* ── Standings rows: one per signal ── */
+    function buildStandings(payload) {
+      var m = payload.mind || {};
+      var mood = payload.mood_trend || [];
+      var latestMood = mood.length ? mood[mood.length - 1] : null;
+      var vices = (payload.vice_streaks || []).filter(function(v){ return !isBlocked(v.name); });
+      var holding = vices.filter(function(v){ return v.holding; }).length;
+      var dc = m.depth_counts || {};
+      var totConn = (dc.deep || 0) + (dc.meaningful || 0) + (dc.surface || 0);
+      var med = payload.meditation || {};
+
+      var rows = [];
+
+      // Mood / state of mind
+      if (latestMood && latestMood.valence != null) {
+        var v = latestMood.valence;
+        var state = v >= 0.2 ? 'green' : (v >= -0.2 ? 'amber' : 'red');
+        rows.push({
+          name: 'Mood',
+          context: latestMood.label || moodWord(v).toLowerCase(),
+          value: (v >= 0 ? '+' : '') + v.toFixed(2),
+          unit: 'valence',
+          spark: mood.slice(-7).map(function(d){ return d.valence; }),
+          state: state,
+          href: '#m-arc-section'
+        });
+      }
+
+      // Mind pillar level
+      if (m.mind_pillar && m.mind_pillar.level != null) {
+        var lvl = m.mind_pillar.level;
+        rows.push({
+          name: 'Pillar',
+          context: 'Mind pillar score',
+          value: 'L' + Math.round(lvl),
+          unit: '/ 100',
+          spark: null,
+          state: lvl >= 70 ? 'green' : lvl >= 40 ? 'amber' : 'red',
+          href: '/character/'
+        });
+      }
+
+      // Resist rate
+      if (m.resist_rate_pct != null) {
+        var r = m.resist_rate_pct;
+        rows.push({
+          name: 'Willpower',
+          context: 'Temptations resisted, 90d',
+          value: r,
+          unit: '%',
+          spark: null,
+          state: r >= 80 ? 'green' : r >= 50 ? 'amber' : 'red',
+          href: '#'
+        });
+      }
+
+      // Journal cadence
+      var jc = m.journal_entries_30d || 0;
+      rows.push({
+        name: 'Journal',
+        context: 'Entries in last 30 days',
+        value: jc,
+        unit: '/ 30',
+        spark: null,
+        state: jc >= 20 ? 'green' : jc >= 10 ? 'amber' : 'red',
+        href: '/chronicle/'
+      });
+
+      // Vice streaks holding
+      if (vices.length) {
+        rows.push({
+          name: 'Streaks',
+          context: 'Vice streaks holding',
+          value: holding,
+          unit: '/ ' + vices.length,
+          spark: null,
+          state: holding === vices.length ? 'green' : holding >= vices.length * 0.7 ? 'amber' : 'red',
+          href: '#'
+        });
+      }
+
+      // Connection depth
+      if (totConn > 0) {
+        rows.push({
+          name: 'Connection',
+          context: (dc.deep || 0) + ' deep · ' + (dc.meaningful || 0) + ' meaningful · ' + (dc.surface || 0) + ' surface',
+          value: totConn,
+          unit: 'logged',
+          spark: null,
+          state: (dc.deep || 0) >= 3 ? 'green' : 'amber',
+          href: '#m-conn-section'
+        });
+      }
+
+      // Meditation
+      if (med.sessions_30d != null) {
+        rows.push({
+          name: 'Meditation',
+          context: med.sessions_30d + ' sessions · ' + (med.total_minutes_30d || 0) + ' min',
+          value: med.sessions_30d,
+          unit: 'sessions',
+          spark: null,
+          state: med.sessions_30d >= 15 ? 'green' : med.sessions_30d >= 5 ? 'amber' : 'red',
+          href: '#'
+        });
+      }
+
+      return rows;
+    }
+
+    function renderStandings(payload) {
+      var rows = buildStandings(payload);
+      var el = document.getElementById('m-standings-rows');
+      if (!rows.length) {
+        el.innerHTML = '<div class="m-row-empty">No inner-life signals reporting yet.</div>';
+        return;
+      }
+      el.innerHTML = rows.map(function(r) {
+        var spark = r.spark ? renderSpark(r.spark, r.state) : '';
+        return '<a class="fp-row" href="' + (r.href || '#') + '">' +
+            '<div class="fp-row__icon"></div>' +
+            '<div class="fp-row__name">' + r.name + '</div>' +
+            '<div class="fp-row__context">' + (r.context || '') + '</div>' +
+            '<div class="fp-row__value">' +
+              '<span class="fp-row__num">' + r.value + '</span>' +
+              '<span class="fp-row__unit">' + (r.unit || '') + '</span>' +
+            '</div>' +
+            '<div class="fp-row__spark">' + spark + '</div>' +
+          '</a>';
+      }).join('');
+    }
+
+    /* ── Long-arc: 30-day mood valence ── */
+    function renderArc(payload) {
+      var mood = payload.mood_trend || [];
+      var section = document.getElementById('m-arc-section');
+      if (!mood.length) { section.style.display = 'none'; return; }
+      var vals = mood.map(function(d){ return d.valence; }).filter(function(v){ return v != null; });
+      if (!vals.length) { section.style.display = 'none'; return; }
+      var first = vals[0], last = vals[vals.length - 1];
+      var avg = vals.reduce(function(a,b){ return a + b; }, 0) / vals.length;
+      var pleasant = vals.filter(function(v){ return v >= 0.2; }).length;
+      var pleasantPct = Math.round(pleasant / vals.length * 100);
+
+      function fmtVal(v) { return (v >= 0 ? '+' : '') + v.toFixed(2); }
+      setText('m-arc-first', fmtVal(first));
+      setText('m-arc-current', fmtVal(last));
+      setText('m-arc-avg', fmtVal(avg));
+      setText('m-arc-tracked', vals.length + '/30');
+      setText('m-arc-pleasant', pleasantPct + '%');
+
+      // Build SVG line+area chart
+      var w = 1100, h = 80, pad = 4;
+      var max = Math.max.apply(null, vals);
+      var min = Math.min.apply(null, vals);
+      // anchor to ±1 if range is small for context
+      if (max < 1) max = Math.max(max, 0.5);
+      if (min > -1) min = Math.min(min, -0.5);
+      var range = max - min || 1;
+      var pts = vals.map(function(v, i) {
+        var x = pad + (i / (vals.length - 1)) * (w - 2 * pad);
+        var y = pad + (1 - (v - min) / range) * (h - 2 * pad);
+        return x.toFixed(1) + ',' + y.toFixed(1);
+      });
+      var area = pts.join(' ') + ' ' + (w - pad) + ',' + (h - pad) + ' ' + pad + ',' + (h - pad);
+      document.getElementById('m-arc-chart').innerHTML =
+        '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
+          '<polygon class="fp-arc__chart-area" points="' + area + '"/>' +
+          '<polyline class="fp-arc__chart-line" points="' + pts.join(' ') + '"/>' +
+        '</svg>';
+
+      var firstDate = mood[0].date || '';
+      var lastDate = mood[mood.length - 1].date || '';
+      document.getElementById('m-arc-caption').innerHTML =
+        '<span>' + (firstDate || '30 days ago') + ' · ' + fmtVal(first) + '</span>' +
+        '<span>Today · ' + fmtVal(last) + '</span>';
+    }
+
+    /* ── Vice streak cards ── */
+    function renderViceCards(payload) {
+      var vices = (payload.vice_streaks || []).filter(function(v){ return !isBlocked(v.name); });
+      var grid = document.getElementById('m-vice-grid');
+      if (!vices.length) {
+        grid.innerHTML = '<div class="m-row-empty">No vice streaks tracked yet.</div>';
+        return;
+      }
+      grid.innerHTML = vices.map(function(v) {
+        var why = getViceWhy(v.name);
+        return '<div class="m-vice-card' + (v.holding ? '' : ' is-broken') + '">' +
+            '<div class="m-vice-card__name">' + v.name + '</div>' +
+            '<div class="m-vice-card__streak">' + v.current_streak + '</div>' +
+            '<div class="m-vice-card__unit">' + (v.holding ? 'days' : 'broken') + '</div>' +
+            '<div class="m-vice-card__why">' + why + '</div>' +
+          '</div>';
+      }).join('');
+    }
+
+    /* ── Connection / willpower bars ── */
+    function renderBars(payload) {
+      var m = payload.mind || {};
+      var dc = m.depth_counts || {};
+      var tot = m.total_interactions_30d || ((dc.deep || 0) + (dc.meaningful || 0) + (dc.surface || 0)) || 1;
+      setWidth('bar-deep', (dc.deep || 0) / tot * 100);
+      setText('pct-deep', dc.deep || 0);
+      setWidth('bar-meaning', (dc.meaningful || 0) / tot * 100);
+      setText('pct-meaning', dc.meaningful || 0);
+      setWidth('bar-surface', (dc.surface || 0) / tot * 100);
+      setText('pct-surface', dc.surface || 0);
+
+      if (m.total_temptations_90d > 0) {
+        var tt = m.total_temptations_90d;
+        setWidth('bar-resisted', (m.resisted_90d / tt) * 100);
+        setText('pct-resisted', m.resisted_90d);
+        setWidth('bar-succumbed', ((tt - m.resisted_90d) / tt) * 100);
+        setText('pct-succumbed', tt - m.resisted_90d);
+      }
+    }
+
+    /* ── Connection challenges (separate endpoint) ── */
+    function renderConnections() {
+      fetch(API_BASE + '/api/challenges')
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) {
+          var grid = document.getElementById('m-conn-grid');
+          if (!grid) return;
+          if (!data || !data.challenges) {
+            grid.innerHTML = '<div class="m-row-empty">No active connections tracked.</div>';
+            return;
+          }
+          var connections = data.challenges.filter(function(c) {
+            return c.challenge_type === 'connection' && c.status === 'active';
+          });
+          if (!connections.length) {
+            grid.innerHTML = '<div class="m-row-empty">No active connection challenges yet.</div>';
+            return;
+          }
+          grid.innerHTML = connections.map(function(c) {
+            var target = c.target_hours || 150;
+            var checkins = c.daily_checkins || [];
+            var logged = 0;
+            checkins.forEach(function(ci){ logged += parseFloat(ci.hours || 0); });
+            var pct = Math.min(100, Math.round(logged / target * 100));
+            var label = c.public_label || c.name || 'Anonymous';
+            var desc = c.description || '';
+            return '<div class="m-conn__intent">' +
+                '<div class="m-conn__who">' + label + '</div>' +
+                '<div class="m-conn__text">' + desc + '</div>' +
+                '<div class="m-conn__progress">' +
+                  '<div class="m-conn__bar"><div class="m-conn__fill" style="width:' + pct + '%"></div></div>' +
+                  '<div class="m-conn__hours">' + logged + ' / ' + target + ' hrs</div>' +
+                '</div>' +
+              '</div>';
+          }).join('');
+        })
+        .catch(function() {
+          var grid = document.getElementById('m-conn-grid');
+          if (grid) grid.innerHTML = '<div class="m-row-empty">Could not load connections.</div>';
+        });
+    }
+
+    /* ── Boot ── */
+    fetch(API_BASE + '/api/mind_overview')
+      .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function(data) {
+        var mood = data.mood_trend || [];
+        var latestMood = mood.length ? mood[mood.length - 1] : null;
+        renderMasthead(latestMood);
+        renderLede(data);
+        renderWatch(data);
+        renderStandings(data);
+        renderArc(data);
+        renderViceCards(data);
+        renderBars(data);
+      })
+      .catch(function(err) {
+        console.error('[mind] fetch failed:', err);
+        renderMasthead(null);
+        document.getElementById('m-narrative').textContent = "Could not load today's inner-life data. Refresh to try again.";
+        document.getElementById('m-standings-rows').innerHTML = '<div class="m-row-empty">No data available.</div>';
+        document.getElementById('m-arc-section').style.display = 'none';
+        document.getElementById('m-vice-grid').innerHTML = '<div class="m-row-empty">No streaks available.</div>';
+      });
+
+    renderConnections();
+  })();
+  </script>
+
+  <script src="/legacy/assets/js/animations.js" defer></script>
+</body>
+</html>

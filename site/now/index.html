@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en" data-door="cockpit">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>The Cockpit — averagejoematt</title>
+  <meta name="description" content="Am I winning, and what's the one thing right now? The daily instrument.">
+  <!-- Cockpit is the daily tool, not a public landing page. -->
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/favicon.ico">
+
+  <!-- The type triad (Design System §3): Fraunces=human, Instrument Sans=interface, IBM Plex Mono=machine -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400;1,9..144,500&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/cockpit.css">
+
+  <!-- No-flash theme: honour saved choice before first paint. -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("ajm-theme");
+        if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+  <a class="skip" href="#cockpit">Skip to the cockpit</a>
+
+  <header class="cockpit-top">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">averagejoematt</span>
+      <span class="brand-door label">cockpit</span>
+    </a>
+
+    <div class="top-controls">
+      <nav class="scope" aria-label="Time scope">
+        <button class="scope-btn is-active" data-scope="today" aria-pressed="true">Today</button>
+        <button class="scope-btn" data-scope="week" aria-pressed="false">Week</button>
+        <button class="scope-btn" data-scope="month" aria-pressed="false">Month</button>
+        <button class="scope-btn" data-scope="journey" aria-pressed="false">Journey</button>
+      </nav>
+      <button class="theme-toggle" type="button" aria-label="Toggle light and dark">
+        <span class="theme-dot" aria-hidden="true"></span>
+      </button>
+    </div>
+  </header>
+
+  <main id="cockpit" class="cockpit" data-state="loading">
+    <article class="panel" aria-busy="true">
+      <!-- Signature 1: the measuring-rule spine -->
+      <div class="spine" aria-hidden="true">
+        <span class="spine-day" data-bind="day">···</span>
+      </div>
+
+      <div class="panel-body">
+        <p class="cap label">character level · <span data-bind="scopeLabel">today</span></p>
+
+        <!-- The hub: the single largest, calmest element -->
+        <div class="hub">
+          <span class="big num" data-bind="level">··</span>
+          <span class="tier" data-bind="tier">&nbsp;</span>
+          <span class="movement" data-bind="movement" hidden></span>
+        </div>
+
+        <!-- Honesty vocabulary: down/flat states, muted, never red, never hidden -->
+        <p class="honest" data-bind="honest" hidden></p>
+
+        <!-- Signature 2: the machine ↔ human dialogue (the Third Wall) -->
+        <section class="dialogue" aria-label="The board's read, and Matthew's reply">
+          <div class="voice machine">
+            <span class="who">The board</span>
+            <p class="what" data-bind="verdict"><span class="shimmer">Reading the week…</span></p>
+          </div>
+          <div class="voice human" data-bind="replyWrap" hidden>
+            <span class="who">Matthew</span>
+            <p class="what" data-bind="reply"></p>
+          </div>
+        </section>
+
+        <!-- Two glance domains; the seven pillars live one drill beneath -->
+        <section class="domains" aria-label="Pillar domains">
+          <div class="domain" data-domain="body">
+            <header class="domain-head">
+              <span class="label">Body</span>
+              <span class="domain-roll num" data-bind="roll-body">··</span>
+            </header>
+            <div class="rows" data-rows="body"></div>
+          </div>
+          <div class="domain" data-domain="mind">
+            <header class="domain-head">
+              <span class="label">Mind</span>
+              <span class="domain-roll num" data-bind="roll-mind">··</span>
+            </header>
+            <div class="rows" data-rows="mind"></div>
+          </div>
+        </section>
+
+        <!-- Consistency: a cross-cutting discipline band, not a sixth peer tile -->
+        <div class="band" data-pillar="consistency" tabindex="0" role="button"
+             aria-label="Consistency — open detail">
+          <span class="label">Consistency</span>
+          <span class="meter"><i data-bind="consistency-fill" style="width:0%"></i></span>
+          <span class="band-val num" data-bind="consistency-val">··</span>
+        </div>
+
+        <!-- A named persona's read, made glanceable -->
+        <p class="boardline" data-bind="boardline" hidden></p>
+      </div>
+    </article>
+
+    <p class="cockpit-foot label">
+      <a href="/">the story →</a>
+      <a href="/evidence/">the evidence →</a>
+      <span class="asof" data-bind="asof"></span>
+    </p>
+
+    <p class="cockpit-error" data-bind="error" hidden></p>
+  </main>
+
+  <script type="module" src="/assets/js/cockpit.js"></script>
+</body>
+</html>
