@@ -26,6 +26,7 @@ OUT = Path("site/evidence")
 #         editorial (authored content) · archive (link to preserved legacy)
 REGISTRY = [
     # ── The body ───────────────────────────────────────────────────────────
+    ("vitals",      "Vitals & pulse", "Today's pulse + the daily trend — weight, recovery, sleep, HRV, steps.", "The body", "data", "/api/pulse", None, "/legacy/live/"),
     ("physical",    "Body composition", "DEXA: body fat, lean mass, visceral fat, bone density, biological age.", "The body", "data", "/api/physical_overview", None, "/legacy/physical/"),
     ("labs",        "Bloodwork",   "153 biomarkers over time — the inside view the wearables can't see.", "The body", "data", "/api/labs", None, "/legacy/labs/"),
     ("glucose",     "Glucose & meals", "Continuous glucose married to what you ate — peak, rise, return.", "The body", "data", "/api/glucose", None, "/legacy/glucose/"),
