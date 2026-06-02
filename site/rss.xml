@@ -1,37 +1,51 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>The Measured Life — Matthew Walker</title>
-    <link>https://averagejoematt.com/journal/</link>
-    <description>Weekly chronicles from 19 data sources. Every number, every failure, every week. Written by Elena Voss.</description>
+    <title>The Measured Life — averagejoematt</title>
+    <link>https://averagejoematt.com/story/chronicle/</link>
+    <description>The weekly chronicle of an ordinary life, measured in full — every number, every week, including the weeks it dips. Written by Elena Voss.</description>
     <language>en-us</language>
-    <lastBuildDate>Tue, 02 Jun 2026 12:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Tue, 02 Jun 2026 21:13:01 +0000</lastBuildDate>
     <atom:link href="https://averagejoematt.com/rss.xml" rel="self" type="application/rss+xml"/>
     <image>
       <url>https://averagejoematt.com/assets/images/og-image.png</url>
-      <title>The Measured Life</title>
-      <link>https://averagejoematt.com/journal/</link>
+      <title>The Measured Life — averagejoematt</title>
+      <link>https://averagejoematt.com/story/chronicle/</link>
     </image>
     <item>
-      <title>The Interview — The Measured Life</title>
-      <link>https://averagejoematt.com/chronicle/posts/interview/</link>
-      <guid isPermaLink="true">https://averagejoematt.com/chronicle/posts/interview/</guid>
-      <description>Special Edition · April 1, 2026 · The night before Day 1.</description>
-      <pubDate>Wed, 01 Apr 2026 12:00:00 +0000</pubDate>
-    </item>
-    <item>
-      <title>The Architecture of Absence — The Measured Life</title>
-      <link>https://averagejoematt.com/chronicle/posts/issue-05/</link>
-      <guid isPermaLink="true">https://averagejoematt.com/chronicle/posts/issue-05/</guid>
-      <description>Special Edition · Issue 5 · Days off-grid: 19 · April experiments: 5 of 5 failed · Re-entry: May 4, 2026</description>
+      <title>The Architecture of Absence</title>
+      <link>https://averagejoematt.com/story/chronicle/#5</link>
+      <guid isPermaLink="true">https://averagejoematt.com/story/chronicle/#5</guid>
+      <description>The platform he built to catch him had been awake the whole time. The dashboards refreshed at three in the morning, the way they always do. Whoop and Eight Sleep and Garmin and the rest of them kept transmitting some version of him until the silences spread, source by source, like a power outage moving across a city…</description>
       <pubDate>Sun, 03 May 2026 12:00:00 +0000</pubDate>
     </item>
     <item>
-      <title>Prologue: Before the Numbers — The Measured Life</title>
-      <link>https://averagejoematt.com/chronicle/posts/week-00/</link>
-      <guid isPermaLink="true">https://averagejoematt.com/chronicle/posts/week-00/</guid>
-      <description>Prologue · February 2026 · Seattle, WA</description>
-      <pubDate>Thu, 12 Feb 2026 12:00:00 +0000</pubDate>
+      <title>The Interview</title>
+      <link>https://averagejoematt.com/story/chronicle/#-1</link>
+      <guid isPermaLink="true">https://averagejoematt.com/story/chronicle/#-1</guid>
+      <description>Six days before Day 1. Elena Voss sits down with Matthew for the first time — no data cards, no board verdicts. Just a conversation about what went wrong, what he learned, and what April 1 actually means.</description>
+      <pubDate>Wed, 01 Apr 2026 12:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>The DoorDash Chronicle</title>
+      <link>https://averagejoematt.com/story/chronicle/#-3</link>
+      <guid isPermaLink="true">https://averagejoematt.com/story/chronicle/#-3</guid>
+      <description>He has nineteen data sources. He has a platform that generates a daily briefing, tracks his HRV to two decimal places, and maintains a gamified character sheet scoring seven dimensions of his health. He has, in other words, built an extraordinarily sophisticated apparatus for listening to his body.</description>
+      <pubDate>Wed, 11 Mar 2026 12:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>The Empty Journal</title>
+      <link>https://averagejoematt.com/story/chronicle/#-4</link>
+      <guid isPermaLink="true">https://averagejoematt.com/story/chronicle/#-4</guid>
+      <description>Here is something I did not expect to find two weeks into this assignment: a man who has built twenty-seven automated programs to monitor his sleep, his blood glucose, his heart rate recovery, his gait symmetry, and whether he remembered to take his apigenin before bed — who has not written a single journal entry since the day he started.</description>
+      <pubDate>Tue, 03 Mar 2026 12:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Before the Numbers</title>
+      <link>https://averagejoematt.com/story/chronicle/#0</link>
+      <guid isPermaLink="true">https://averagejoematt.com/story/chronicle/#0</guid>
+      <description>The first thing you notice about Matthew's apartment is the charging cables. There's one snaking from the nightstand — that's the Whoop strap, a fitness tracker that monitors his heart rate variability while he sleeps.</description>
+      <pubDate>Sun, 22 Feb 2026 12:00:00 +0000</pubDate>
     </item>
   </channel>
 </rss>

@@ -17,6 +17,12 @@
 
 set -euo pipefail
 
+# Regenerate rss.xml from the live published chronicle (best-effort — never block a
+# deploy if offline). Keeps the feed's pubDates/lastBuildDate correct on every sync.
+if [ "${1:-}" != "--dry-run" ]; then
+  python3 "$(dirname "$0")/../scripts/v4_build_rss.py" || echo "  ⚠️  rss build skipped (offline?) — keeping existing site/rss.xml"
+fi
+
 BUCKET="matthew-life-platform"
 SITE_DIR="/Users/matthewwalker/Documents/Claude/life-platform/site"
 S3_PREFIX="site"
