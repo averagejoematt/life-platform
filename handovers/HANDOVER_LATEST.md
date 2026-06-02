@@ -20,6 +20,13 @@
 - **Phase 3 · UX polish:** consistent cross-door top-bar nav (Cockpit got door links); Cockpit Week/Month now honest (no false re-run); explicit `:focus-visible` on all tab/tile/row nav; locked achievements use honesty vocabulary (dashed); mobile Cockpit spine shrunk; Evidence "deeper" links reworded to "(archive)"; Third Wall human voice tinted.
 - Commits `9250942` (Phase 1), `98506d3` (Phase 2), + Phase 3. Plan: `~/.claude/plans/generic-swimming-dragon.md`.
 
+**LATER ADDITIONS (2026-06-02):**
+- **No more `/legacy` links in the live UI** — removed the Evidence "deeper → archive" link from every topic; `/legacy` is now reachable only by direct URL (private rollback). Everything renders inline.
+- **Full habits registry inline** — `renderHabits` fetches `/api/habit_registry` (63 habits) + streak/dow.
+- **Dual units (kg · lb)** everywhere weight shows — `charts.js dualWeight()`; Hevy strength-log sets, 1RM + targets, session volume, DEXA lean/visceral mass, weight-loss results.
+- **Protocols/experiments** sort active/running first (inactive/completed below).
+- **Ledger reset to $0** — NEW `deploy/restart_ledger_reset.py` (deletes `LEDGER#` txns + zeros `TOTALS#current`; the site reads `TOTALS#current` directly and doesn't honour tombstones, so the old "pregenesis tombstone" never zeroed it). Ran `--apply` (5 pre-genesis txns cleared, verified `/api/ledger` $0) and **wired into `deploy/restart_pipeline.py`** after `restart_intelligence_wipe` so every future restart zeros it.
+
 **⚠️ Remaining (ENGINE/data, off-limits to the front-end):** the Cockpit is intentionally empty because `character-sheet-compute` hasn't produced today's record (`/api/character` 503 — `test_i17`) and the AI budget tier has paused Bedrock (`/api/weekly_priority` = `[AI_UNAVAILABLE]`). The Story/Evidence use other live endpoints and are full. The Cockpit fills automatically once the compute runs / budget resets — investigate `/aws/lambda/character-sheet-compute` + the budget tier if they stay stale.
 
 **ROLLBACK reference:** disassociate `v4-redirects` (FunctionAssociations Quantity=0, `update-distribution`); restore overwritten shared files (`index.html`, `assets/css/tokens.css`, `sitemap.xml`) from the pre-v4 commit `84e98e4` to S3; invalidate. Old per-page files were never deleted (additive sync) so they serve immediately once redirects are removed.
