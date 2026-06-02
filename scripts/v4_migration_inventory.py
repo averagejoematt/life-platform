@@ -79,12 +79,12 @@ def new_url(url: str, dest: str) -> str:
     if dest == "cockpit":
         return "/now/"   # trailing slash: bare /now 302s to /site/now/ via the S3 origin
     if dest == "story":
-        deep = {"chronicle": "/dispatches/chronicle/", "elena": "/dispatches/chronicle/",
-                "journal": "/dispatches/journal/",
-                "field-notes": "/dispatches/lab-notes/", "first-person": "/dispatches/lab-notes/",
-                "recap": "/dispatches/timeline/", "progress": "/dispatches/timeline/",
-                "about": "/dispatches/about/", "mission": "/dispatches/about/"}
-        return deep.get(seg_of(url), "/")   # narrative URLs land on their native Dispatches sub-page
+        deep = {"chronicle": "/story/chronicle/", "elena": "/story/chronicle/",
+                "journal": "/story/journal/",
+                "field-notes": "/story/lab-notes/", "first-person": "/story/lab-notes/",
+                "recap": "/story/timeline/", "progress": "/story/timeline/",
+                "about": "/story/about/", "mission": "/story/about/"}
+        return deep.get(seg_of(url), "/")   # narrative URLs land on their native Story sub-page
     if dest == "evidence":
         remap = {"coaches": "board", "accountability": "vices", "live": "vitals"}
         seg = seg_of(url)
@@ -112,9 +112,18 @@ def main() -> int:
             unmapped.append(url)
             continue
         buckets[dest].append(url)
+        # The new "the story" hub owns the /story/* namespace — never 301 it away
+        # (the old top-level /story/ page is preserved at /legacy/story/ for rollback).
+        if url == "/story/" or url.startswith("/story/"):
+            continue
         new = new_url(url, dest)
         if new != url:           # legacy pages already live at /legacy/* — still record the 301
             redirects.append((url, new))
+
+    # Non-legacy 301s: /dispatches/* briefly shipped before "the story" rename — keep them alive.
+    redirects.append(("/dispatches/", "/story/"))
+    for seg in ("chronicle", "lab-notes", "journal", "timeline", "about"):
+        redirects.append((f"/dispatches/{seg}/", f"/story/{seg}/"))
 
     print(f"\nv4 migration inventory - {len(pages)} preserved page(s) under {LEGACY_DIR}/\n")
     for d in DEST_ORDER:

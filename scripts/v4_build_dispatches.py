@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
 """
-v4_build_dispatches.py — generate Door 2's narrative sub-pages (/dispatches/).
+v4_build_dispatches.py — generate "The Story" hub: the writing sub-pages (/story/).
 
-The slower "overlay of what's going on" — the writing and context, distinct
-from the real-time data in the Cockpit/Evidence. Emits an app shell at
-site/dispatches/index.html AND a per-section shell at
-site/dispatches/<section>/index.html (same app, pre-selected section) so the
-sub-page URLs and old-URL redirects resolve on static hosting. The section list
-is defined in assets/js/dispatches.js; the shell only embeds
-window.__DISPATCH_START__. Reuses the dx-* master-detail styles from story.css.
+"The Story" is the writing/context — the chronicle, AI lab notes, journal,
+timeline, and about — distinct from the real-time data (Cockpit/Evidence) and
+from the separate cinematic landing at "/". Emits an app shell at
+site/story/index.html AND a per-section shell at site/story/<section>/index.html
+(same app, pre-selected section) so the sub-page URLs and old-URL redirects
+resolve on static hosting. The section list is defined in assets/js/dispatches.js;
+the shell only embeds window.__DISPATCH_START__. Reuses the dx-* styles from
+story.css.
 
-Read-only; writes only under site/dispatches/. Run from repo root:
+Read-only; writes only under site/story/. Run from repo root:
     python3 scripts/v4_build_dispatches.py
 """
 from __future__ import annotations
 
 from pathlib import Path
 
-OUT = Path("site/dispatches")
+OUT = Path("site/story")
 
 # key, label, one-line description (for the per-section <meta>/<title>)
 SECTIONS = [
@@ -35,7 +36,7 @@ SHELL = """<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>{title}</title>
   <meta name="description" content="{desc}">
-  <link rel="canonical" href="https://averagejoematt.com/dispatches/{canon}">
+  <link rel="canonical" href="https://averagejoematt.com/story/{canon}">
   <link rel="icon" href="/favicon.ico">
   <link rel="alternate" type="application/rss+xml" title="averagejoematt" href="/rss.xml">
   <link rel="stylesheet" href="/assets/css/fonts.css">
@@ -44,30 +45,29 @@ SHELL = """<!DOCTYPE html>
   <script>(function(){{try{{var t=localStorage.getItem("ajm-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}}catch(e){{}}}})();</script>
 </head>
 <body class="dx-page">
-  <a class="skip" href="#dx">Skip to the dispatches</a>
+  <a class="skip" href="#dx">Skip to the story</a>
   <header class="story-top">
-    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">dispatches</span></a>
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">the story</span></a>
     <nav class="doors" aria-label="Doors">
       <a href="/now/">the cockpit</a>
-      <a href="/">the story</a>
       <a href="/evidence/">the evidence</a>
       <button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button>
     </nav>
   </header>
   <main id="dx" class="dx-main">
     <div class="dx-head">
-      <p class="beat-kicker label">dispatches · the writing &amp; the context</p>
-      <h1 class="dx-h1">Dispatches</h1>
-      <p class="dx-lede">The slower layer — the chronicle, the AI's weekly lab notes, the journal, the timeline, and what this whole experiment is for. The data lives in <a href="/now/">the cockpit</a> and <a href="/evidence/">the evidence</a>; this is the why.</p>
+      <p class="beat-kicker label">the story · the writing &amp; the context</p>
+      <h1 class="dx-h1">The Story</h1>
+      <p class="dx-lede">The chronicle, the AI's weekly lab notes, the journal, the timeline, and what this whole experiment is for. The live data lives in <a href="/now/">the cockpit</a> and <a href="/evidence/">the evidence</a>; this is the why.</p>
     </div>
-    <nav class="dx-tabs" data-dx-tabs aria-label="Dispatch sections"></nav>
+    <nav class="dx-tabs" data-dx-tabs aria-label="Story sections"></nav>
     <div class="dx-layout">
       <ul class="dx-list" data-dx-list aria-label="Entries"></ul>
       <article class="dx-read" data-dx-read></article>
     </div>
   </main>
-  <footer class="dx-foot-bar"><span class="label">averagejoematt · dispatches</span>
-    <span class="label"><a href="/">← the story</a></span></footer>
+  <footer class="dx-foot-bar"><span class="label">averagejoematt · the story</span>
+    <span class="label"><a href="/">← home</a></span></footer>
   <script>window.__DISPATCH_START__ = "{start}";</script>
   <script type="module" src="/assets/js/dispatches.js"></script>
 </body>
@@ -83,15 +83,15 @@ def write(path: Path, html_text: str) -> None:
 def main() -> None:
     # hub (defaults to chronicle)
     write(OUT / "index.html", SHELL.format(
-        title="Dispatches — averagejoematt",
+        title="The Story — averagejoematt",
         desc="The chronicle, the AI's weekly lab notes, the journal, the timeline, and the context behind the experiment.",
         canon="", start="chronicle"))
     # per-section sub-pages
     for key, label, desc in SECTIONS:
         write(OUT / key / "index.html", SHELL.format(
-            title=f"{label} — Dispatches — averagejoematt",
+            title=f"{label} — The Story — averagejoematt",
             desc=desc, canon=f"{key}/", start=key))
-    print(f"✅ wrote site/dispatches/index.html + {len(SECTIONS)} section shells: " + ", ".join(k for k, _, _ in SECTIONS))
+    print(f"✅ wrote site/story/index.html + {len(SECTIONS)} section shells: " + ", ".join(k for k, _, _ in SECTIONS))
 
 
 if __name__ == "__main__":

@@ -1,10 +1,10 @@
 /*
-  dispatches.js — Door 2's narrative/context sub-pages (/dispatches/).
+  dispatches.js — Door 2's narrative/context sub-pages (/story/).
   ----------------------------------------------------------------------------
   The slower "overlay of what's going on" — distinct from the real-time data in
   Evidence/Cockpit. Master-detail: section nav (Chronicle · AI lab notes · In my
   own words · Timeline · About) → entry list → reader. Real sub-page URLs
-  (/dispatches/<section>/) + #<entry> deep links; back/forward via History API.
+  (/story/<section>/) + #<entry> deep links; back/forward via History API.
   Chronicle/journal indexes from posts.json (native excerpts); lab notes fully
   native from /api/field_notes; timeline from /api/journey_timeline.
 */
@@ -69,14 +69,14 @@ async function renderRead(s, id) {
 
 function selectEntry(s, id, silent) {
   document.querySelectorAll(".dx-item").forEach((b) => b.classList.toggle("is-active", String(b.dataset.id) === String(id)));
-  if (!silent) { try { history.replaceState({ sec: s.key, id }, "", `/dispatches/${s.key}/#${id}`); } catch (e) {} }
+  if (!silent) { try { history.replaceState({ sec: s.key, id }, "", `/story/${s.key}/#${id}`); } catch (e) {} }
   renderRead(s, id);
 }
 async function selectSection(key, preId, push = true) {
   const s = BYKEY[key]; if (!s) return;
   document.querySelectorAll(".dx-tab").forEach((t) => { const on = t.dataset.sec === key; t.classList.toggle("is-active", on); t.setAttribute("aria-pressed", String(on)); });
-  if (push) { try { history.pushState({ sec: key }, "", `/dispatches/${key}/`); } catch (e) {} }
-  document.title = `${s.label} — Dispatches — averagejoematt`;
+  if (push) { try { history.pushState({ sec: key }, "", `/story/${key}/`); } catch (e) {} }
+  document.title = `${s.label} — The Story — averagejoematt`;
   const listEl = $("[data-dx-list]");
   if (s.kind === "about" || s.kind === "timeline") { listEl.innerHTML = `<li class="dx-empty">${esc(s.kicker)}</li>`; renderRead(s, null); return; }
   listEl.innerHTML = `<li class="dx-empty"><span class="shimmer">Loading…</span></li>`;

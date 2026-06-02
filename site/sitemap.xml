@@ -1,12 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://averagejoematt.com/</loc><lastmod>2026-06-02</lastmod><priority>1.0</priority></url>
-  <url><loc>https://averagejoematt.com/dispatches/</loc><lastmod>2026-06-02</lastmod><priority>0.6</priority></url>
-  <url><loc>https://averagejoematt.com/dispatches/about/</loc><lastmod>2026-06-02</lastmod><priority>0.6</priority></url>
-  <url><loc>https://averagejoematt.com/dispatches/chronicle/</loc><lastmod>2026-06-02</lastmod><priority>0.6</priority></url>
-  <url><loc>https://averagejoematt.com/dispatches/journal/</loc><lastmod>2026-06-02</lastmod><priority>0.6</priority></url>
-  <url><loc>https://averagejoematt.com/dispatches/lab-notes/</loc><lastmod>2026-06-02</lastmod><priority>0.6</priority></url>
-  <url><loc>https://averagejoematt.com/dispatches/timeline/</loc><lastmod>2026-06-02</lastmod><priority>0.6</priority></url>
   <url><loc>https://averagejoematt.com/evidence/</loc><lastmod>2026-06-02</lastmod><priority>0.8</priority></url>
   <url><loc>https://averagejoematt.com/evidence/ask/</loc><lastmod>2026-06-02</lastmod><priority>0.6</priority></url>
   <url><loc>https://averagejoematt.com/evidence/benchmarks/</loc><lastmod>2026-06-02</lastmod><priority>0.6</priority></url>
@@ -40,6 +34,12 @@
   <url><loc>https://averagejoematt.com/evidence/vices/</loc><lastmod>2026-06-02</lastmod><priority>0.6</priority></url>
   <url><loc>https://averagejoematt.com/evidence/vitals/</loc><lastmod>2026-06-02</lastmod><priority>0.6</priority></url>
   <url><loc>https://averagejoematt.com/privacy/</loc><lastmod>2026-06-02</lastmod><priority>0.6</priority></url>
+  <url><loc>https://averagejoematt.com/story/</loc><lastmod>2026-06-02</lastmod><priority>0.6</priority></url>
+  <url><loc>https://averagejoematt.com/story/about/</loc><lastmod>2026-06-02</lastmod><priority>0.6</priority></url>
+  <url><loc>https://averagejoematt.com/story/chronicle/</loc><lastmod>2026-06-02</lastmod><priority>0.6</priority></url>
+  <url><loc>https://averagejoematt.com/story/journal/</loc><lastmod>2026-06-02</lastmod><priority>0.6</priority></url>
+  <url><loc>https://averagejoematt.com/story/lab-notes/</loc><lastmod>2026-06-02</lastmod><priority>0.6</priority></url>
+  <url><loc>https://averagejoematt.com/story/timeline/</loc><lastmod>2026-06-02</lastmod><priority>0.6</priority></url>
   <url><loc>https://averagejoematt.com/subscribe</loc><lastmod>2026-06-02</lastmod><priority>0.6</priority></url>
   <url><loc>https://averagejoematt.com/subscribe/</loc><lastmod>2026-06-02</lastmod><priority>0.6</priority></url>
   <url><loc>https://averagejoematt.com/subscribe/confirm/</loc><lastmod>2026-06-02</lastmod><priority>0.6</priority></url>
