@@ -185,3 +185,50 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .rd-archive { margin-top: var(--sp-5); color: var(--ink-muted); font-family: var(--font-serif); font-style: italic;
   font-size: var(--fs-quote); line-height: 1.5; max-width: var(--measure);
   border-left: 2px solid var(--rule); padding-left: var(--sp-4); }
+
+/* ── Master-detail app: tabs (top) · tiles (left) · readout (center) ───────── */
+.ev-app { flex: 1; max-width: var(--container); width: 100%; margin-inline: auto; padding: var(--sp-6) var(--gutter) var(--sp-9); }
+.ev-head { max-width: var(--measure); }
+.ev-h1 { font-family: var(--font-serif); font-weight: var(--weight-med); font-size: var(--fs-h1); line-height: 1.08; }
+.ev-lede { margin-top: var(--sp-3); color: var(--ink-muted); }
+
+/* Horizontal group tabs */
+.ev-tabs { display: flex; gap: var(--sp-1); margin-top: var(--sp-6); border-bottom: var(--border-hair); overflow-x: auto; scrollbar-width: none; }
+.ev-tabs::-webkit-scrollbar { display: none; }
+.ev-tab { appearance: none; background: transparent; border: 0; cursor: pointer; white-space: nowrap;
+  font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-faint); padding: var(--sp-3) var(--sp-3); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color var(--dur-fast); }
+.ev-tab:hover { color: var(--ink-muted); }
+.ev-tab.is-active { color: var(--ink); border-bottom-color: var(--ember); }
+
+/* Two-pane layout */
+.ev-layout { display: grid; gap: clamp(1.25rem, 0.5rem + 3vw, 3rem); margin-top: var(--sp-5); align-items: start; }
+@media (min-width: 820px) { .ev-layout { grid-template-columns: 264px 1fr; } }
+
+/* Left tiles */
+.ev-side { display: grid; gap: var(--sp-2); position: sticky; top: var(--sp-4); }
+@media (max-width: 819px) { .ev-side { position: static; grid-auto-flow: column; grid-auto-columns: 78%; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: var(--sp-2); } .ev-side .ev-tile { scroll-snap-align: start; } }
+.ev-tile { text-align: left; cursor: pointer; background: var(--surface); border: var(--border-hair); border-left: 2px solid transparent;
+  border-radius: var(--radius); padding: var(--sp-3) var(--sp-4); display: grid; gap: 3px; transition: border-color var(--dur-fast), background var(--dur-fast); color: inherit; }
+.ev-tile:hover { border-color: var(--rule-strong); }
+.ev-tile.is-active { border-left-color: var(--ember); background: color-mix(in oklch, var(--ember) 7%, var(--surface)); }
+.ev-tile-t { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.1; }
+.ev-tile-b { font-family: var(--font-sans); font-size: var(--fs-small); color: var(--ink-faint); line-height: 1.35; }
+.ev-tile.is-active .ev-tile-t { color: var(--ink); }
+
+/* Center pane (reuses .topic-h1 / .topic-lede / .readout / .deeper) */
+.ev-main { min-width: 0; scroll-margin-top: var(--sp-4); }
+.rd-lede { color: var(--ink-muted); font-size: var(--fs-body-lg); max-width: var(--measure); }
+.rd-prose { margin-top: var(--sp-3); color: var(--ink); line-height: var(--lh-relaxed); max-width: var(--measure); }
+.rd-prose em { font-style: italic; } .rd-prose strong { color: var(--ink); font-weight: var(--weight-med); }
+
+/* Ask the data — interactive */
+.ask-form { margin-top: var(--sp-5); }
+.ask-row { display: flex; gap: var(--sp-2); margin-top: var(--sp-2); max-width: var(--measure); }
+.ask-in { flex: 1; background: var(--surface); border: var(--border-hair); border-radius: var(--radius-sm); color: var(--ink);
+  font-family: var(--font-sans); font-size: var(--fs-body); padding: var(--sp-3) var(--sp-4); }
+.ask-in:focus-visible { outline: 2px solid var(--ember); outline-offset: 1px; }
+.ask-btn { cursor: pointer; background: var(--ember); color: var(--page); border: 0; border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.04em; padding: 0 var(--sp-5); }
+.ask-out { margin-top: var(--sp-4); }
+.ask-answer { font-family: var(--font-serif); font-size: var(--fs-quote); line-height: 1.5; max-width: var(--measure); color: var(--ink); }
