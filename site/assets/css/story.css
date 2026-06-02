@@ -202,3 +202,15 @@ body { overflow-x: hidden; }
 .dxt-date { color: var(--ink-faint); }
 .dxt-title { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.2; }
 .dxt-note { color: var(--ink-muted); font-size: var(--fs-body); line-height: var(--lh-relaxed); margin-top: 2px; }
+
+/* ── Narrow-screen topbar: stop the doors nav overflowing ~375px ──────────── */
+@media (max-width: 480px) {
+  .story-top { padding: var(--sp-3) var(--sp-4); gap: var(--sp-3); }
+  .doors { gap: var(--sp-3); }
+  .doors a { font-size: 0.625rem; letter-spacing: 0.04em; }
+}
+@media (max-width: 360px) {
+  .brand-name, .brand-door { display: none; }   /* keep the mark; reclaim ~100px */
+  .doors { gap: var(--sp-2); }
+  .doors a { font-size: 0.5625rem; }
+}

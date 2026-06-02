@@ -262,3 +262,24 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .theme-toggle:focus-visible, .ask-in:focus-visible, .ask-btn:focus-visible {
   outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs);
 }
+
+/* ── Mobile overflow fixes ────────────────────────────────────────────────
+   1) topbar doors shrink so they don't push past ~375px;
+   2) .ev-side is a grid item — needs min-width:0 for its overflow-x:auto swipe
+      strip to engage (otherwise the tiles blow the page out to 1900–3800px);
+   3) wide data tables scroll inside their section, not the whole page. */
+@media (max-width: 480px) {
+  .ev-top { padding: var(--sp-3) var(--sp-4); gap: var(--sp-3); }
+  .doors { gap: var(--sp-3); }
+  .doors a { font-size: 0.625rem; letter-spacing: 0.04em; }
+}
+@media (max-width: 360px) {
+  .brand-name, .brand-door { display: none; }   /* keep the mark; reclaim ~100px */
+  .doors { gap: var(--sp-2); }
+  .doors a { font-size: 0.5625rem; }
+}
+@media (max-width: 819px) {
+  .ev-layout { grid-template-columns: minmax(0, 1fr); }
+  .ev-side { min-width: 0; }
+  .rd-sec { overflow-x: auto; }
+}
