@@ -96,7 +96,7 @@ function build() {
   const hashId = (location.hash || "").replace("#", "") || undefined;
   selectSection(start, hashId, false);
 }
-window.addEventListener("popstate", (e) => { const sec = (e.state && e.state.sec) || (location.pathname.match(/\/dispatches\/([^/]+)\//) || [])[1] || "chronicle"; selectSection(sec, e.state && e.state.id, false); });
+window.addEventListener("popstate", (e) => { const sec = (e.state && e.state.sec) || (location.pathname.match(/\/story\/([^/]+)\//) || [])[1] || "chronicle"; selectSection(sec, e.state && e.state.id, false); });
 
 function wireTheme() {
   const b = $(".theme-toggle"); if (!b) return;
