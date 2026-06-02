@@ -60,9 +60,8 @@ REGISTRY = [
 
 GROUP_ORDER = ["Protocol & inputs", "Body & biomarkers", "Method & machine"]
 
-FONTS = ('<link rel="preconnect" href="https://fonts.googleapis.com">\n'
-         '  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
-         '  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400;1,9..144,500&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500&display=swap" rel="stylesheet">')
+# Self-hosted fonts (CSP: font-src 'self') — never the blocked Google CDN.
+FONTS = '<link rel="stylesheet" href="/assets/css/fonts.css">'
 
 THEME_INIT = ('<script>(function(){try{var t=localStorage.getItem("ajm-theme");'
               'if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>')
