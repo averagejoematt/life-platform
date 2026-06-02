@@ -165,3 +165,9 @@ body { overflow-x: hidden; }
 
 .shimmer { color: var(--ink-faint); }
 @media (prefers-reduced-motion: no-preference) { .shimmer { animation: pulse 1.6s var(--ease-inout) infinite; } @keyframes pulse { 0%,100% { opacity: 0.45; } 50% { opacity: 0.9; } } }
+
+/* Phase 3: keyboard focus + sharper Third Wall voice separation */
+.dx-tab:focus-visible, .dx-item:focus-visible, .doors a:focus-visible, .theme-toggle:focus-visible, .cta:focus-visible {
+  outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs);
+}
+.wall .voice.human { background: var(--ember-wash); border-radius: var(--radius-sm); padding: var(--sp-3) var(--sp-4); margin-top: var(--sp-2); }

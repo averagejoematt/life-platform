@@ -244,3 +244,25 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 @media (prefers-reduced-motion: no-preference) {
   .panel { view-transition-name: cockpit-panel; }
 }
+
+/* ── Phase 3 polish: nav · a11y · honesty · mobile ────────────────────────── */
+.cockpit-top .doors { display: inline-flex; align-items: center; gap: var(--sp-4); }
+.cockpit-top .doors a { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); text-decoration: none; }
+.cockpit-top .doors a:hover { color: var(--ember); }
+.top-controls { flex-wrap: wrap; }
+
+/* Explicit, always-visible keyboard focus */
+.scope-btn:focus-visible, .row:focus-visible, .band:focus-visible,
+.theme-toggle:focus-visible, .cockpit-top .doors a:focus-visible,
+.scope-btn:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
+
+/* Locked achievements wear the honesty vocabulary (dashed, muted) — not just faded */
+.ach:not(.is-earned) { border-style: dashed; opacity: 0.6; }
+
+/* Mobile: shrink the spine + tighten labels so the glance isn't cramped */
+@media (max-width: 480px) {
+  .spine { width: 20px; }
+  .spine::after { width: 5px; }
+  .row .lab, .voice .who { width: 84px; }
+  .hub { gap: var(--sp-3); }
+}

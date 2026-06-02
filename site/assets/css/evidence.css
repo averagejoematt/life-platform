@@ -232,3 +232,9 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
   font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.04em; padding: 0 var(--sp-5); }
 .ask-out { margin-top: var(--sp-4); }
 .ask-answer { font-family: var(--font-serif); font-size: var(--fs-quote); line-height: 1.5; max-width: var(--measure); color: var(--ink); }
+
+/* Phase 3: always-visible keyboard focus on the tab/tile nav */
+.ev-tab:focus-visible, .ev-tile:focus-visible, .doors a:focus-visible,
+.theme-toggle:focus-visible, .ask-in:focus-visible, .ask-btn:focus-visible {
+  outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs);
+}

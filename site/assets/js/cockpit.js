@@ -248,6 +248,16 @@ async function renderJourney() {
     : `<p class="tl-empty">Achievements are defined and ready — they unlock as you go.</p>`;
 }
 
+// Week/Month: honest "not yet" view, never a re-run of Today (no false affordance).
+function showScopeSoon(scope) {
+  document.querySelector("[data-journey]").hidden = true;
+  [".domains", ".band"].forEach((s) => { const el = $(s); if (el) el.style.display = "none"; });
+  const hr = $(".voice.human"); if (hr) hr.style.display = "none";
+  bind("boardline").hidden = true; bind("honest").hidden = true; bind("movement").hidden = true;
+  const wm = $(".voice.machine .who"); if (wm) wm.textContent = "Scope";
+  bind("verdict").innerHTML = `The ${scope} view fills in as the record deepens — for now, the 42-day arc lives in <a href="/">the Story</a> and longer trends in <a href="/evidence/">the Evidence</a>.`;
+}
+
 /* ── scope + theme controls ──────────────────────────────────────────────── */
 function wireScope() {
   document.querySelectorAll(".scope-btn").forEach((b) => {
@@ -261,6 +271,7 @@ function wireScope() {
       state.scope = b.dataset.scope;
       bind("scopeLabel").textContent = b.textContent.toLowerCase();
       if (state.scope === "journey") renderJourney();
+      else if (state.scope === "week" || state.scope === "month") showScopeSoon(state.scope);
       else { showJourney(false); load(); }
     });
   });
