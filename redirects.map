@@ -1,5 +1,5 @@
 /about/	/
-/accountability/	/
+/accountability/	/evidence/vices/
 /achievements/	/now/
 /archive/v1/board/	/legacy/archive/v1/board/
 /archive/v1/board/product/	/legacy/archive/v1/board/product/
@@ -13,7 +13,7 @@
 /ask/	/evidence/ask/
 /benchmarks/	/evidence/benchmarks/
 /biology/	/evidence/biology/
-/board/	/
+/board/	/evidence/board/
 /builders/	/
 /challenges/	/evidence/challenges/
 /character/	/now/
@@ -28,11 +28,11 @@
 /chronicle/posts/week-03/	/
 /chronicle/posts/week-04/	/
 /chronicle/sample/	/
-/coaches/	/
+/coaches/	/evidence/board/
 /community/	/
 /cost/	/evidence/cost/
 /data/	/evidence/data/
-/discoveries/	/
+/discoveries/	/evidence/discoveries/
 /elena/	/
 /experiments/	/evidence/experiments/
 /experiments/detail/	/evidence/experiments/
@@ -54,7 +54,7 @@
 /journal/sample/	/
 /kitchen/	/evidence/kitchen/
 /labs/	/evidence/labs/
-/ledger/	/
+/ledger/	/evidence/ledger/
 /live/	/now/
 /methodology/	/evidence/methodology/
 /mind/	/evidence/mind/

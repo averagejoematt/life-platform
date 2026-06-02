@@ -222,6 +222,32 @@ function renderBoardline(priority) {
   }
 }
 
+/* ── Journey scope: level-up timeline + achievements (gamified layer) ──────── */
+const DAILY_SEL = [".dialogue", ".domains", ".band"];
+function showJourney(on) {
+  DAILY_SEL.forEach((s) => { const el = $(s); if (el) el.style.display = on ? "none" : ""; });
+  if (on) bind("boardline").hidden = true;
+  const jr = document.querySelector("[data-journey]"); if (jr) jr.hidden = !on;
+}
+
+async function renderJourney() {
+  showJourney(true);
+  const [tl, ach] = await Promise.all([
+    getJSON(`${API}/journey_timeline`).catch(() => null),
+    getJSON(`${API}/achievements`).catch(() => null),
+  ]);
+  const events = (tl && tl.events) || [];
+  bind("timeline").innerHTML = events.length
+    ? events.map((e) => `<li class="tl-item"><span class="tl-date label">${escapeHTML(String(e.date || "").slice(0, 10))}</span><div class="tl-body"><p class="tl-title">${escapeHTML(e.title || e.type || "")}</p>${e.body ? `<p class="tl-note">${escapeHTML(e.body)}</p>` : ""}</div></li>`).join("")
+    : `<li class="tl-empty">No level-ups logged yet — the timeline fills as the score climbs. Day 1 starts the clock.</li>`;
+  const list = (ach && ach.achievements) || [];
+  const sm = (ach && ach.summary) || {};
+  bind("ach-count").textContent = list.length ? `${sm.earned ?? list.filter((a) => a.earned).length}/${sm.total ?? list.length}` : "";
+  bind("achievements").innerHTML = list.length
+    ? list.map((a) => `<div class="ach ${a.earned ? "is-earned" : ""}" title="${escapeHTML(a.description || "")}"><span class="ach-dot" aria-hidden="true"></span><span class="ach-label">${escapeHTML(a.label || a.id)}</span>${a.earned && a.earned_date ? `<span class="ach-when label">${escapeHTML(String(a.earned_date).slice(0, 10))}</span>` : ""}</div>`).join("")
+    : `<p class="tl-empty">Achievements are defined and ready — they unlock as you go.</p>`;
+}
+
 /* ── scope + theme controls ──────────────────────────────────────────────── */
 function wireScope() {
   document.querySelectorAll(".scope-btn").forEach((b) => {
@@ -234,9 +260,8 @@ function wireScope() {
       });
       state.scope = b.dataset.scope;
       bind("scopeLabel").textContent = b.textContent.toLowerCase();
-      // Re-render honesty wording for the active scope; deeper scope data
-      // (week/month/journey series) is layered in by the Story/Evidence doors.
-      load();
+      if (state.scope === "journey") renderJourney();
+      else { showJourney(false); load(); }
     });
   });
 }

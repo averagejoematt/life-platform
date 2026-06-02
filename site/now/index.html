@@ -107,6 +107,18 @@
 
         <!-- A named persona's read, made glanceable -->
         <p class="boardline" data-bind="boardline" hidden></p>
+
+        <!-- Journey scope: the level-up timeline + achievements (empty-but-ready) -->
+        <section class="journey" data-journey hidden aria-label="The journey so far">
+          <div class="jr-block">
+            <p class="cap label">level-ups &amp; milestones</p>
+            <ol class="timeline" data-bind="timeline"></ol>
+          </div>
+          <div class="jr-block">
+            <p class="cap label">achievements <span class="ach-count num" data-bind="ach-count"></span></p>
+            <div class="ach-grid" data-bind="achievements"></div>
+          </div>
+        </section>
       </div>
     </article>
 

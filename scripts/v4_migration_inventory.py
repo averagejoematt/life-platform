@@ -35,9 +35,9 @@ RULES: dict[str, str] = {
     "": "story",  # the old root index.html
     "chronicle": "story", "journal": "story", "elena": "story", "story": "story",
     "mission": "story", "about": "story", "first-person": "story",
-    "field-notes": "story", "discoveries": "story", "progress": "story",
-    "builders": "story", "community": "story", "accountability": "story",
-    "ledger": "story", "board": "story", "coaches": "story", "start": "story",
+    "field-notes": "story", "progress": "story",
+    "builders": "story", "community": "story",
+    "start": "story",
     # Evidence — depth, protocols, data, credibility
     "nutrition": "evidence", "sleep": "evidence", "training": "evidence",
     "physical": "evidence", "mind": "evidence", "supplements": "evidence",
@@ -45,6 +45,8 @@ RULES: dict[str, str] = {
     "protocols": "evidence", "habits": "evidence", "experiments": "evidence",
     "challenges": "evidence", "benchmarks": "evidence", "methodology": "evidence",
     "intelligence": "evidence", "predictions": "evidence", "stack": "evidence",
+    "board": "evidence", "coaches": "evidence", "ledger": "evidence",
+    "discoveries": "evidence", "accountability": "evidence",
     "kitchen": "evidence", "results": "evidence", "cost": "evidence",
     "explorer": "evidence", "data": "evidence", "tools": "evidence",
     "platform": "evidence", "ask": "evidence",
@@ -79,7 +81,9 @@ def new_url(url: str, dest: str) -> str:
     if dest == "story":
         return "/"
     if dest == "evidence":
-        return f"/evidence/{seg_of(url)}/"   # collapse subpaths to the topic page
+        remap = {"coaches": "board", "accountability": "vices"}
+        seg = seg_of(url)
+        return f"/evidence/{remap.get(seg, seg)}/"   # collapse subpaths; remap rehomed slugs
     if dest == "legacy":
         return f"/legacy{url}"               # served verbatim from its preserved location
     return url
