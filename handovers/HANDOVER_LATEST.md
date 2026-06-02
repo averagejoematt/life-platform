@@ -2,7 +2,11 @@
 
 **Previous handover:** `handovers/HANDOVER_2026-06-01_VacationFund.md` (vacation fund + site-api deploy lesson).
 **This session covers:** the front-end rebuild of averagejoematt.com into the locked **Direction 05 "The Measured Life"** design system — Cockpit / Story / Evidence over the unchanged engine, with the old site preserved verbatim under `/legacy`. Built per `docs/CLAUDE_CODE_PROMPT_V4_PASTE_READY.md` + the four source-of-truth docs (Constitution, Design Brief, Design System, Migration Map).
-**State:** built + locally verified on a working branch; **NOT yet deployed** (big-bang cutover is `deploy/v4_cutover.sh`, which Matthew runs). No engine/pipeline/schema/Lambda/MCP changes — diff is confined to `site/`, `scripts/`, `deploy/`, `tests/`, `docs/`.
+**State:** ✅ **DEPLOYED LIVE 2026-06-01.** PR #10 merged to `main` (`466b76f`); content synced to S3, invalidation `IA3BK4HI0KKFACZN460SKP1ZOT`; redirect CloudFront Function `v4-redirects` (LIVE, ARN `arn:aws:cloudfront::205930651321:function/v4-redirects`) associated as viewer-request on the default behaviour of distribution `E3S424OXQZ8NBE`. Smoke-verified: all three doors 200; old URLs 301 to their door (`/training/`→`/evidence/training/`, `/character/`→`/now/`, `/about/`→`/`); `/legacy/*` + system pages 200; `/api/*` untouched. No engine/pipeline/schema/Lambda/MCP changes — diff confined to `site/`, `scripts/`, `deploy/`, `tests/`, `docs/`, `.github/`.
+
+**⚠️ Live data note (NOT a cutover defect):** `/api/character` returns **503** ("Character sheet not yet computed today") — the same condition `test_i17` flagged pre-deploy; `character-sheet-compute` hasn't produced today's record. The Cockpit degrades to its honest "couldn't reach today's numbers — recompute every morning" state; the Story constellation uses fallback sizing. Resolves when the compute Lambda runs (daily pre-11am). Investigate `/aws/lambda/character-sheet-compute` if it stays stale.
+
+**ROLLBACK:** disassociate the `v4-redirects` function (set DefaultCacheBehavior `FunctionAssociations.Quantity=0`, `update-distribution`) to restore old-URL serving; `git revert` the merge + re-run `deploy/sync_site_to_s3.sh` to restore old content (old pages still present in S3 — additive sync never deleted them). S3 versioning retains prior objects.
 
 ---
 
