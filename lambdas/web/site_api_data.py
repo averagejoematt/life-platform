@@ -387,7 +387,9 @@ def handle_habit_streaks() -> dict:
     record = items[0] if items else None
 
     if not record:
-        return _error(503, "Habit scores not available")
+        # Genesis week — shaped-empty 200 (the Essential-Seven badge shows 0, not an error).
+        return _ok({"habit_streaks": {"as_of_date": yesterday, "tier0_pct": 0, "tier0_done": 0,
+                                      "tier0_total": 1, "aggregate_streak": 0}}, cache_seconds=300)
 
     t0_done = int(record.get("tier0_done", 0))
     t0_total = int(record.get("tier0_total", 1))
@@ -506,7 +508,9 @@ def handle_supplements() -> dict:
     """
     registry = _load_supp_metadata()
     if not registry or not registry.get("groups"):
-        return _error(503, "Supplement data not available")
+        # Registry config unavailable — shaped-empty 200 rather than a console 503.
+        return _ok({"groups": {}, "total_count": 0, "genome_snps": [],
+                    "as_of_date": datetime.now(timezone.utc).strftime("%Y-%m-%d")}, cache_seconds=300)
 
     # Try to merge DynamoDB adherence data
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -873,7 +877,10 @@ def handle_correlations(event: dict = None) -> dict:
     }))
     items = _decimal_to_float(resp.get("Items", []))
     if not items:
-        return _error(503, "No correlation data available yet.")
+        # Genesis week / weekly-correlation compute hasn't run — shaped-empty 200
+        # so the site shows an honest "fills as data accrues" state, not a 503.
+        return _ok({"correlations": [], "week": None, "start_date": None,
+                    "end_date": None, "count": 0}, cache_seconds=300)
 
     record = items[0]
     week = record.get("sk", "").replace("WEEK#", "")
@@ -1001,7 +1008,10 @@ def handle_genome_risks() -> dict:
     items = _decimal_to_float(resp.get("Items", []))
 
     if not items:
-        return _error(503, "No genome data available.")
+        # No genome uploaded yet — shaped-empty 200 so the page shows "not yet published".
+        return _ok({"genome": {"total_snps": 0,
+                               "risk_summary": {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0},
+                               "categories": {}}}, cache_seconds=3600)
 
     categories = {}
     risk_summary = {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}
