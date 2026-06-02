@@ -99,3 +99,79 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 
 .shimmer { color: var(--ink-faint); }
 @media (prefers-reduced-motion: no-preference) { .shimmer { animation: pulse 1.6s var(--ease-inout) infinite; } @keyframes pulse { 0%,100% { opacity: 0.45; } 50% { opacity: 0.9; } } }
+
+/* ── Bespoke readouts (the archival / Readout treatment) ──────────────────── */
+.rd-sec { margin-top: var(--sp-7); }
+.rd-grouphead { border-top: var(--border-hair); padding-top: var(--sp-3); }
+.rd-h { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+  text-transform: uppercase; color: var(--ink-faint); font-weight: var(--weight-reg);
+  border-top: var(--border-hair); padding-top: var(--sp-3); margin-bottom: var(--sp-3); }
+.rd-grouphead .rd-h { border-top: 0; padding-top: 0; margin-bottom: var(--sp-1); }
+.rd-desc { color: var(--ink-muted); max-width: var(--measure); margin-bottom: var(--sp-4); }
+
+/* Supplements — what / why / what's-backed cards */
+.supp-grid { display: grid; gap: var(--bento-gap); }
+@media (min-width: 640px) { .supp-grid { grid-template-columns: 1fr 1fr; } }
+.supp { border: var(--border-hair); border-radius: var(--radius); background: var(--surface); padding: var(--sp-4); }
+.supp-top { display: flex; align-items: baseline; gap: var(--sp-3); flex-wrap: wrap; }
+.supp-name { font-family: var(--font-serif); font-size: var(--fs-h3); line-height: 1.1; flex: 1; min-width: 0; }
+.supp-dose { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink); }
+.supp-timing { color: var(--ember); border: 1px solid var(--ember-line); border-radius: var(--radius-xs); padding: 1px 6px; }
+.supp-why { margin-top: var(--sp-2); color: var(--ink-muted); font-size: var(--fs-small); line-height: var(--lh-body); }
+.supp-ev { margin-top: var(--sp-3); display: flex; align-items: center; gap: var(--sp-3); }
+.supp-evlabel { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
+.supp-meter { flex: 1; height: 3px; background: var(--rule); border-radius: 3px; overflow: hidden; }
+.supp-meter i { display: block; height: 100%; }
+.supp-evpct { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-muted); width: 36px; text-align: right; }
+.supp-meta { margin-top: var(--sp-2); color: var(--ink-faint); text-transform: none; letter-spacing: 0; }
+.backed-strong { color: var(--ember); } .backed-strong i, i.backed-strong { background: var(--ember); }
+.backed-some { color: var(--ink-muted); } .backed-some i, i.backed-some { background: var(--ink-muted); }
+.backed-thin { color: var(--ink-faint); } .backed-thin i, i.backed-thin { background: var(--ink-faint); }
+
+/* Biomarker / generic readout tables */
+.rd-tbl { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: var(--fs-small); }
+.rd-tbl th { text-align: left; color: var(--ink-faint); font-weight: var(--weight-reg); letter-spacing: 0.04em;
+  text-transform: uppercase; font-size: var(--fs-label); padding: var(--sp-2) var(--sp-3); border-bottom: var(--border-hair); }
+.rd-tbl td { padding: var(--sp-2) var(--sp-3); border-bottom: var(--border-hair); font-variant-numeric: tabular-nums; vertical-align: baseline; }
+.rd-tbl .rd-name { font-family: var(--font-sans); color: var(--ink); }
+.rd-unit { color: var(--ink-faint); }
+.rd-range { color: var(--ink-faint); }
+.rd-tbl tr.rd-flag td { background: var(--ember-wash); }
+.rd-flagmark { color: var(--ember); font-weight: var(--weight-med); }
+.rd-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, transparent); }
+
+/* Protocol / experiment cards */
+.rd-cards { display: grid; gap: var(--bento-gap); margin-top: var(--sp-3); }
+@media (min-width: 720px) { .rd-cards { grid-template-columns: 1fr 1fr; } }
+.rd-card { border: var(--border-hair); border-radius: var(--radius); background: var(--surface); padding: var(--sp-4); }
+.rd-cardhead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); }
+.rd-cardname { font-family: var(--font-serif); font-size: var(--fs-h3); line-height: 1.12; }
+.rd-badge { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-faint); border: var(--border-hair); border-radius: var(--radius-xs); padding: 1px 7px; white-space: nowrap; }
+.rd-badge-live { color: var(--ember); border-color: var(--ember-line); }
+.rd-why { margin-top: var(--sp-2); color: var(--ink-muted); font-size: var(--fs-small); line-height: var(--lh-body); }
+.rd-line { margin-top: var(--sp-2); font-size: var(--fs-small); color: var(--ink-muted); }
+.rd-line .label { display: inline; margin-right: var(--sp-2); }
+.rd-line.rd-up .label { color: var(--ember); } .rd-line.rd-down .label { color: var(--ink-muted); }
+.rd-meta { margin-top: var(--sp-3); color: var(--ink-faint); text-transform: none; letter-spacing: 0; }
+
+/* Habits day-of-week chart */
+.hb-chart { display: flex; align-items: flex-end; gap: var(--sp-2); height: 120px; }
+.hb-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: var(--sp-1); height: 100%; justify-content: flex-end; }
+.hb-bar { width: 70%; background: var(--ember); border-radius: 2px 2px 0 0; min-height: 4px; }
+.hb-day { color: var(--ink-faint); }
+
+/* Observatory weekly summary */
+.rd-obs { margin-top: var(--sp-5); }
+.rd-obsfigs { gap: clamp(1.5rem, 1rem + 4vw, 4rem); margin-top: var(--sp-6); }
+.rd-obsfigs .fig { gap: var(--sp-2); }
+.rd-delta { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.04em; color: var(--ink-faint); }
+.rd-delta.rd-up { color: var(--ember); } .rd-delta.rd-down { color: var(--ink-muted); }
+.rd-primary { font-family: var(--font-serif); font-size: var(--fs-h2); line-height: 1.15; max-width: var(--measure); }
+.rd-notable { margin-top: var(--sp-4); font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-muted);
+  border-left: 2px solid var(--ember-line); padding-left: var(--sp-3); }
+
+/* Archive topics — a real editorial card, not a thin stub */
+.rd-archive { margin-top: var(--sp-5); color: var(--ink-muted); font-family: var(--font-serif); font-style: italic;
+  font-size: var(--fs-quote); line-height: 1.5; max-width: var(--measure);
+  border-left: 2px solid var(--rule); padding-left: var(--sp-4); }
