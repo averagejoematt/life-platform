@@ -71,6 +71,15 @@ body { overflow-x: hidden; }
 .constellation .node text { font-family: var(--font-mono); font-size: 9px; fill: var(--ink-muted); text-anchor: middle; }
 .constellation .node .score { fill: var(--ink); font-size: 11px; }
 .constellation figcaption { color: var(--ink-faint); max-width: 38ch; }
+/* pillars are links into their Evidence pages */
+.constellation a { cursor: pointer; }
+.constellation a .node circle { transition: r var(--dur-fast), stroke var(--dur-fast); }
+.constellation a:hover .node circle, .constellation a:focus-visible .node circle { stroke: var(--ember); stroke-width: 1.5; }
+.constellation a:focus-visible { outline: none; }
+.constellation a:hover .node text { fill: var(--ink); }
+
+/* per-beat "go deeper" link into the rest of the site */
+.beat-deeper { margin-top: var(--sp-5); }
 
 .scroll-rule { display: grid; place-items: center; margin-top: var(--sp-6); }
 .scroll-rule span { display: block; width: 1px; height: 46px; background: linear-gradient(var(--tick), transparent); }
