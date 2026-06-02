@@ -11,6 +11,8 @@
     /api/character            pillar scores for the constellation
 */
 
+import { lineChart } from "/assets/js/charts.js";
+
 const $ = (s, r = document) => r.querySelector(s);
 const bind = (n, r = document) => r.querySelector(`[data-bind="${n}"]`);
 const SVGNS = "http://www.w3.org/2000/svg";
@@ -238,11 +240,12 @@ async function load() {
   wireTheme();
   renderWall();
 
-  const [stats, journey, wave, character] = await Promise.allSettled([
+  const [stats, journey, wave, character, weight] = await Promise.allSettled([
     getJSON("/public_stats.json"),
     getJSON("/api/journey"),
     getJSON("/api/journey_waveform"),
     getJSON("/api/character"),
+    getJSON("/api/weight_progress"),
   ]);
 
   const statsV = stats.status === "fulfilled" ? stats.value : null;
@@ -254,6 +257,10 @@ async function load() {
 
   const journeyV = journey.status === "fulfilled" ? (journey.value.journey || journey.value) : null;
   renderNumbers(journeyV);
+
+  const wp = weight.status === "fulfilled" ? (weight.value.weight_progress || weight.value) : [];
+  const wc = bind("weightchart");
+  if (wc) wc.innerHTML = lineChart(Array.isArray(wp) ? wp : [], { valueKey: "weight_lbs", goal: journeyV && journeyV.goal_weight_lbs, unit: " lb", label: "Weight · the actual line", emptyMsg: "The weight line fills in as weigh-ins accrue." });
 
   const waveV = wave.status === "fulfilled" ? (wave.value.days || wave.value.waveform || wave.value) : null;
   renderWave(Array.isArray(waveV) ? waveV : (waveV && waveV.days) || []);
