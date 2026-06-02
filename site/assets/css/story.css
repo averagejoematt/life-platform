@@ -180,3 +180,25 @@ body { overflow-x: hidden; }
   outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs);
 }
 .wall .voice.human { background: var(--ember-wash); border-radius: var(--radius-sm); padding: var(--sp-3) var(--sp-4); margin-top: var(--sp-2); }
+
+/* ── /dispatches/ standalone page (Door 2's narrative sub-pages) ──────────── */
+.dx-main { max-width: var(--container); margin-inline: auto; padding: var(--sp-6) var(--gutter) var(--sp-8); }
+.dx-head { max-width: var(--measure); }
+.dx-h1 { font-family: var(--font-serif); font-size: var(--fs-h1); line-height: 1.06; margin-top: var(--sp-2); }
+.dx-lede { margin-top: var(--sp-3); color: var(--ink-muted); font-size: var(--fs-body-lg); line-height: var(--lh-relaxed); }
+.dx-lede a { color: var(--ember); text-decoration: none; }
+.dx-lede a:hover { text-decoration: underline; }
+.dx-page .dx-tabs { flex-wrap: wrap; }
+.dx-foot-bar { max-width: var(--container); margin-inline: auto; padding: var(--sp-6) var(--gutter) var(--sp-8); display: flex; justify-content: space-between; gap: var(--sp-4); flex-wrap: wrap; color: var(--ink-faint); border-top: var(--border-hair); }
+.dx-foot-bar a { color: var(--ink-faint); text-decoration: none; }
+.dx-foot-bar a:hover { color: var(--ember); }
+.dx-loading { color: var(--ink-faint); margin-top: var(--sp-4); }
+
+/* Timeline view */
+.dx-timeline { list-style: none; margin-top: var(--sp-5); display: grid; gap: 0; border-left: var(--border-hair); padding-left: var(--sp-5); }
+.dxt-item { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; position: relative; padding: var(--sp-3) 0; border-top: var(--border-hair); }
+.dxt-item:first-child { border-top: 0; }
+.dxt-item::before { content: ""; position: absolute; left: calc(-1 * var(--sp-5) - 4px); top: calc(var(--sp-3) + 6px); width: 7px; height: 7px; border-radius: 50%; background: var(--ember); }
+.dxt-date { color: var(--ink-faint); }
+.dxt-title { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.2; }
+.dxt-note { color: var(--ink-muted); font-size: var(--fs-body); line-height: var(--lh-relaxed); margin-top: 2px; }

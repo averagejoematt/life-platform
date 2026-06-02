@@ -29,7 +29,7 @@ LEGACY_DIR = Path("site/legacy")
 RULES: dict[str, str] = {
     # Cockpit — daily state, score, time-views
     "character": "cockpit", "observatory": "cockpit",
-    "week": "cockpit", "weekly": "cockpit", "recap": "cockpit",
+    "week": "cockpit", "weekly": "cockpit", "recap": "story",
     "status": "cockpit", "achievements": "cockpit",
     # Story — narrative, journey, the cast, public face
     "": "story",  # the old root index.html
@@ -79,9 +79,12 @@ def new_url(url: str, dest: str) -> str:
     if dest == "cockpit":
         return "/now/"   # trailing slash: bare /now 302s to /site/now/ via the S3 origin
     if dest == "story":
-        deep = {"chronicle": "/#dispatches/chronicle", "journal": "/#dispatches/journal",
-                "field-notes": "/#dispatches/labnotes", "first-person": "/#dispatches/labnotes"}
-        return deep.get(seg_of(url), "/")   # narrative URLs deep-link to the Dispatches reader
+        deep = {"chronicle": "/dispatches/chronicle/", "elena": "/dispatches/chronicle/",
+                "journal": "/dispatches/journal/",
+                "field-notes": "/dispatches/lab-notes/", "first-person": "/dispatches/lab-notes/",
+                "recap": "/dispatches/timeline/", "progress": "/dispatches/timeline/",
+                "about": "/dispatches/about/", "mission": "/dispatches/about/"}
+        return deep.get(seg_of(url), "/")   # narrative URLs land on their native Dispatches sub-page
     if dest == "evidence":
         remap = {"coaches": "board", "accountability": "vices", "live": "vitals"}
         seg = seg_of(url)

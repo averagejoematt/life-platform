@@ -86,7 +86,7 @@ THEME = ('<script>(function(){try{var t=localStorage.getItem("ajm-theme");'
          'if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>')
 TOPBAR = ('<header class="ev-top"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span>'
           '<span class="brand-name">averagejoematt</span> <span class="brand-door label">evidence</span></a>'
-          '<nav class="doors" aria-label="Doors"><a href="/now/">the cockpit</a><a href="/">the story</a>'
+          '<nav class="doors" aria-label="Doors"><a href="/now/">the cockpit</a><a href="/">the story</a><a href="/dispatches/">the dispatches</a>'
           '<button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button></nav></header>')
 
 
