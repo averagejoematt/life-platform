@@ -1,6 +1,23 @@
-## [v4 "The Measured Life"] — 2026-06-01 (built, not yet deployed)
+## [v4 "The Measured Life"] — 2026-06-01 (DEPLOYED LIVE)
 
-Front-end rebuild into the locked Direction 05 design system — one engine, three doors — with the old site preserved verbatim under `/legacy`. **No engine/pipeline/schema/Lambda/MCP changes.** Big-bang cutover is `deploy/v4_cutover.sh` (Matthew runs).
+Front-end rebuild into the locked Direction 05 design system — one engine, three doors — with the old site preserved verbatim under `/legacy`. Cut over via `deploy/v4_cutover.sh` + CloudFront redirect function; rolled back once same-day, root-caused (CSP-blocked fonts, scroll-reveal hiding content, raw error sentinels), fixed, and re-deployed. Then extended to full completeness:
+
+### Added (post-cutover, same day)
+- **Dispatches reader** in the Story (chronicle · AI lab notes · journal) — lab notes fully native from `/api/field_notes`.
+- **Trend charts** — `site/assets/js/charts.js` (inline-SVG line/spark/bar): weight, sleep, glucose, training, vitals.
+- **AI experts reader** — Evidence → board: pick a coach → `/api/coach_analysis` read + `/api/coach_timeline`.
+- **Vitals & pulse** page (`/api/pulse` + `/api/pulse_history`); old `/live` 301s here.
+- **Per-exercise Hevy strength log** — NEW read-only `GET /api/workouts` (`handle_workouts`, `lambdas/web/site_api_observatory.py`) + Evidence → Training expandable log (session → exercises → sets×reps×weight). The one deliberate engine change; deployed full-`web/`-package, import-verified.
+- Self-hosted fonts (`assets/css/fonts.css`, CSP-safe); per-domain Evidence renderers bound to real shapes.
+
+### Fixed
+- **CI red on `main`**: `test_tools_hevy_routine.py::test_commit_handles_orphan_created` hit live DynamoDB (`build_title_context`) → `NoCredentialsError` in CI, halting Unit Tests → Deploy. Now hermetic (mocked).
+
+---
+
+## [v4 "The Measured Life"] — 2026-06-01 (initial build)
+
+Front-end rebuild into the locked Direction 05 design system — one engine, three doors — with the old site preserved verbatim under `/legacy`. **No engine/pipeline/schema/Lambda/MCP changes** (the one read-only `/api/workouts` endpoint came later). Big-bang cutover via `deploy/v4_cutover.sh`.
 
 ### Added
 - **`site/assets/css/tokens.css`** — v4 token system (rebuilt). Locked hexes + OKLCH `color-mix()` tints; dark-first + Daybook light mode; the Fraunces/Instrument Sans/IBM Plex Mono triad; the two ownable signatures tokenized (`--spine-*` measuring-rule, `--voice-*` machine↔human dialogue); honesty vocabulary; motion + reduced-motion.
