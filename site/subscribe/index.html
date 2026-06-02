@@ -1,328 +1,167 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-door="story">
 <head>
   <meta charset="UTF-8">
-  <style>.nav-overlay{display:none}</style>
-    <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Subscribe — The Measured Life</title>
+  <meta name="description" content="Follow the experiment. One email a week — real numbers, the AI's read, and the chronicle. No filtered highlight reel.">
+  <link rel="canonical" href="https://averagejoematt.com/subscribe/">
+  <meta property="og:title" content="Subscribe — The Measured Life">
+  <meta property="og:description" content="Real health data, every week — the same numbers and patterns the system surfaces, including the bad weeks.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-    <meta property="og:title" content="Subscribe — The Measured Life">
-  <meta property="og:description" content="Get real health data from 26 sources every week. No highlight reel.">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Follow the experiment. Weekly data, real numbers, no filtered highlight reel.">
-  <title>Subscribe — The Measured Life</title>
-  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
-  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
-  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
   <meta name="theme-color" content="#080c0a">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="alternate" type="application/rss+xml" title="averagejoematt" href="/rss.xml">
+  <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/tokens.css">
-  <link rel="stylesheet" href="/assets/css/base.css">
-  <style>
-    .subscribe-layout {
-      min-height: 100vh;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      border-bottom: 1px solid var(--border);
-    }
-    .subscribe-left {
-      padding: var(--space-20) var(--page-padding) var(--space-20);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-    }
-    .subscribe-right {
-      padding: var(--space-20) var(--page-padding) var(--space-20);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-    }
-    .subscribe-title {
-      font-family: var(--font-display);
-      font-size: var(--text-h1);
-      line-height: var(--lh-display);
-      letter-spacing: var(--ls-display);
-      color: var(--text);
-      margin-bottom: var(--space-6);
-    }
-    .subscribe-title span { color: var(--accent); }
-    .subscribe-desc {
-      font-size: var(--text-lg);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-      max-width: 420px;
-      margin-bottom: var(--space-10);
-    }
-    .what-you-get {
-      border: 1px solid var(--border);
-      background: var(--surface);
-    }
-    .wyg-header {
-      padding: var(--space-4) var(--space-6);
-      border-bottom: 1px solid var(--border);
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent-dim);
-    }
-    .wyg-row {
-      display: flex;
-      gap: var(--space-4);
-      padding: var(--space-4) var(--space-6);
-      border-bottom: 1px solid var(--border-subtle);
-      align-items: flex-start;
-    }
-    .wyg-row:last-child { border-bottom: none; }
-    .wyg-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
-    .wyg-text { font-size: var(--text-base); color: var(--text-muted); line-height: var(--lh-body); }
-    .wyg-text strong { color: var(--text); font-weight: 500; }
-
-    .form-block { border: 1px solid var(--border); background: var(--surface); }
-    .form-block__header {
-      padding: var(--space-5) var(--space-6);
-      border-bottom: 1px solid var(--border);
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent-dim);
-    }
-    .form-block__body {
-      padding: var(--space-8) var(--space-6);
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-5);
-    }
-    .form-field { display: flex; flex-direction: column; gap: var(--space-2); }
-    .form-label {
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--text-muted);
-    }
-    .form-input {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-family: var(--font-mono);
-      font-size: var(--text-base);
-      padding: var(--space-3) var(--space-4);
-      outline: none;
-      transition: border-color var(--dur-fast);
-      width: 100%;
-    }
-    .form-input::placeholder { color: var(--text-faint); }
-    .form-input:focus { border-color: var(--accent); }
-    .form-note {
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      color: var(--text-faint);
-      line-height: 1.6;
-    }
-    .form-submit { width: 100%; padding: var(--space-4); text-align: center; }
-    .form-status {
-      font-size: var(--text-xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--text-muted);
-      text-align: center;
-      min-height: 20px;
-    }
-    .success-block {
-      display: none;
-      border: 1px solid var(--border-strong);
-      background: var(--accent-bg-subtle);
-      padding: var(--space-8) var(--space-6);
-      text-align: center;
-    }
-    .success-block__icon { font-size: 32px; margin-bottom: var(--space-4); }
-    .success-block__title {
-      font-family: var(--font-display);
-      font-size: var(--text-h3);
-      color: var(--accent);
-      letter-spacing: var(--ls-display);
-      margin-bottom: var(--space-3);
-    }
-    .success-block__body {
-      font-size: var(--text-base);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-    }
-
-    @media (max-width: 900px) {
-      .subscribe-layout { grid-template-columns: 1fr; }
-      .subscribe-left { border-right: none; border-bottom: 1px solid var(--border); }
-    }
-  </style>
-  <link rel="canonical" href="https://averagejoematt.com/subscribe/">
+  <link rel="stylesheet" href="/assets/css/story.css">
+  <link rel="stylesheet" href="/assets/css/subscribe.css">
+  <script>(function(){try{var t=localStorage.getItem("ajm-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>
 </head>
-<body>
+<body class="dx-page">
+  <a class="skip" href="#main">Skip to the form</a>
+  <header class="story-top">
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">subscribe</span></a>
+    <nav class="doors" aria-label="Doors">
+      <a href="/now/">the cockpit</a>
+      <a href="/story/">the story</a>
+      <a href="/evidence/">the evidence</a>
+      <button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button>
+    </nav>
+  </header>
 
-<a href="#main" class="skip-link">Skip to main content</a>
+  <main id="main" class="sub-main">
+    <div class="sub-pitch">
+      <p class="sub-eyebrow">the chronicle</p>
+      <h1 class="sub-title">Follow the experiment.</h1>
+      <p class="sub-lede">A documentary of one measured life, published in full — every week, including the weeks it dips.</p>
+      <p class="sub-sub">The same numbers and patterns the system surfaces — weight, recovery, sleep, glucose, habits — plus the AI's weekly read and the chronicle. No filter, no highlight reel, no affiliate links.</p>
 
-<div id="amj-nav"></div>
-<div id="amj-hierarchy-nav"></div>
-
-<main id="main">
-
-
-<div class="subscribe-layout">
-  <div class="subscribe-left animate-in">
-    <div class="eyebrow" style="margin-bottom:var(--space-6)">The Chronicle</div>
-    <h1 class="subscribe-title">The<br>measured<br><span>life</span></h1>
-    <p class="subscribe-desc" style="font-size:var(--text-lg);font-weight:500;color:var(--text);margin-bottom:var(--space-3);">A 12-month experiment in measured living — published in full, every week.</p>
-    <p class="subscribe-desc">19 data sources. AI synthesis. No filter, no highlight reel, no affiliate links. You see the same numbers and patterns the system surfaces — including the bad weeks.</p>
-    <div class="what-you-get">
-      <div class="wyg-header">What lands in your inbox</div>
-      <div class="wyg-row">
-        <div class="wyg-icon">📊</div>
-        <div class="wyg-text"><strong>The week's data signal.</strong> Weight, HRV, recovery, sleep, glucose, habits — with commentary from the platform's AI specialists (sleep, nutrition, training, mind, metabolic, glucose, labs, behavioral).</div>
+      <div class="wyg">
+        <p class="wyg-h">What lands in your inbox</p>
+        <div class="wyg-row"><span class="wyg-ic" aria-hidden="true">›</span><p class="wyg-t"><strong>The week's data signal.</strong> Weight, HRV, recovery, sleep, glucose, habits — with the read from the platform's AI specialists.</p></div>
+        <div class="wyg-row"><span class="wyg-ic" aria-hidden="true">›</span><p class="wyg-t"><strong>The chronicle.</strong> A weekly narrative dispatch from Elena Voss, the platform's embedded AI journalist. What actually happened — no spin.</p></div>
+        <div class="wyg-row"><span class="wyg-ic" aria-hidden="true">›</span><p class="wyg-t"><strong>Anomalies, surfaced.</strong> When the data shows something genuinely worth noticing — a correlation, a regression, a new pattern — you hear it first.</p></div>
+        <div class="wyg-row"><span class="wyg-ic" aria-hidden="true">›</span><p class="wyg-t"><strong>Nothing else.</strong> No ads, no affiliate links, no "10 tips for…". One email a week, then quiet until next Wednesday.</p></div>
       </div>
-      <div class="wyg-row">
-        <div class="wyg-icon">📝</div>
-        <div class="wyg-text"><strong>Elena's chronicle.</strong> A weekly narrative dispatch from Elena Voss — the platform's embedded AI journalist. What actually happened. No spin.</div>
+
+      <div class="sub-meta">
+        <p class="sub-meta-h">First issue</p>
+        <p class="sub-meta-b">A new dispatch lands every week. Subscribe and the next one is the first thing in your inbox.</p>
       </div>
-      <div class="wyg-row">
-        <div class="wyg-icon">🔔</div>
-        <div class="wyg-text"><strong>Anomalies, surfaced.</strong> When the data shows something genuinely worth noticing — a correlation, a regression, a new pattern — you hear about it first.</div>
-      </div>
-      <div class="wyg-row">
-        <div class="wyg-icon">⚡</div>
-        <div class="wyg-text"><strong>Nothing else.</strong> No ads. No affiliate links. No "10 tips for…" content. One email a week, then nothing until next Wednesday.</div>
-      </div>
+      <p class="sub-count-line">Join <b id="sub-count">—</b> <span id="sub-word">people</span> following the experiment.</p>
+      <p class="sub-road">On the roadmap: <strong>The Kitchen</strong> — weekly AI-generated meal prep from real nutrition data.</p>
     </div>
 
-    <!-- Previous installments block removed (ADR-058: pre-restart chronicle archived) -->
-    <div style="margin-top:var(--space-6);border:1px solid var(--border);background:var(--surface);padding:var(--space-4) var(--space-6);">
-      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-3);font-family:var(--font-mono);">First issue</div>
-      <div style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.6;">
-        The first installment of The Measured Life publishes Wednesday — the first full week of the experiment. Subscribe today and it'll be the first thing in your inbox.
-    </div>
-
-    <!-- Subscriber count (22c) -->
-    <div style="margin-top:var(--space-4);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);letter-spacing:var(--ls-tag);">
-      Join <span id="sub-count" style="color:var(--accent);">&mdash;</span> <span id="sub-word">people</span> following the experiment
-    </div>
-
-    <!-- Timing urgency -->
-    <div style="margin-top:var(--space-4);padding:var(--space-3) var(--space-5);border:1px solid var(--accent);background:rgba(0,229,160,0.04);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);letter-spacing:var(--ls-label);">
-      A new dispatch lands every week. Subscribe to follow the experiment as it unfolds.
-    </div>
-
-    <!-- Coming soon (22-S2) -->
-    <div style="margin-top:var(--space-4);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);">
-      On the roadmap: <strong style="color:var(--text-muted);">The Kitchen</strong> — weekly AI-generated meal prep from real nutrition data
-    </div>
-  </div>
-
-  <div class="subscribe-right animate-in">
-    <div class="form-block" id="form-block">
-      <div class="form-block__header">Join the experiment</div>
-      <div class="form-block__body">
-        <div class="form-field">
-          <label class="form-label" for="email">Email address</label>
-          <input type="email" class="form-input" id="email" placeholder="your@email.com" autocomplete="email">
+    <div class="sub-form">
+      <div class="sub-card" id="form-block">
+        <p class="sub-card-h">Join the experiment</p>
+        <div class="sub-card-b">
+          <div class="sub-field">
+            <label class="sub-label" for="email">Email address</label>
+            <input type="email" class="sub-input" id="email" placeholder="your@email.com" autocomplete="email">
+          </div>
+          <div class="sub-field">
+            <label class="sub-label" for="source-field">How'd you find this? <span class="opt">(optional)</span></label>
+            <input type="text" class="sub-input" id="source-field" placeholder="Twitter, friend, search…">
+          </div>
+          <p class="sub-note">You'll get a confirmation email. Double opt-in — no surprises. Unsubscribe anytime. <a href="/privacy/">Privacy policy →</a></p>
+          <button class="sub-btn" id="submit-btn">Subscribe to The Measured Life →</button>
+          <p class="sub-status" id="form-status"></p>
         </div>
-        <div class="form-field">
-          <label class="form-label" for="source-field">How'd you find this? <span style="color:var(--text-faint)">(optional)</span></label>
-          <input type="text" class="form-input" id="source-field" placeholder="Twitter, friend, search...">
-        </div>
-        <div class="form-note">You'll get a confirmation email. Double opt-in — no surprises. Unsubscribe anytime, no questions asked. <a href="/privacy/" style="color:var(--text-muted);text-decoration:underline;">Privacy policy →</a></div>
-        <button class="btn btn--cta form-submit" id="submit-btn">Subscribe to The Measured Life →</button>
-        <div class="form-status" id="form-status"></div>
+      </div>
+      <div class="sub-success" id="success-block">
+        <div class="si" aria-hidden="true">✓</div>
+        <p class="st">Check your inbox</p>
+        <p class="sb">Confirmation email sent. Click the link to confirm and you're in.<br><br><a href="/">← back to the experiment</a></p>
       </div>
     </div>
-    <div class="success-block" id="success-block">
-      <div class="success-block__icon">✓</div>
-      <div class="success-block__title">Check your inbox</div>
-      <div class="success-block__body">
-        Confirmation email sent. Click the link to confirm and you're in.<br><br>
-        <a href="/" style="color:var(--accent);font-size:var(--text-xs);letter-spacing:var(--ls-label);text-transform:uppercase;">← Back to the experiment</a>
-      </div>
-    </div>
-  </div>
-</div>
+  </main>
 
-</main>
+  <footer class="dx-foot-bar"><span class="label">averagejoematt · subscribe</span>
+    <span class="label"><a href="/">← home</a></span></footer>
 
-<!-- Mobile bottom nav -->
-<div id="amj-bottom-nav"></div>
-
-<div id="amj-reading-path"></div>
-<div id="amj-footer"></div>
-
-<script>
-  const params = new URLSearchParams(window.location.search);
-  const action = params.get('action');
-  const token = params.get('token');
-
-  if (action === 'confirmed') {
-    document.getElementById('form-block').style.display = 'none';
-    const sb = document.getElementById('success-block');
-    sb.style.display = 'block';
-    sb.querySelector('.success-block__title').textContent = "You're in.";
-    sb.querySelector('.success-block__body').innerHTML = 'Subscription confirmed. You\'ll get The Measured Life every Wednesday.<br><br><a href="/chronicle/" style="color:var(--accent);font-size:var(--text-xs);letter-spacing:var(--ls-label);text-transform:uppercase;">Read the prequels while you wait →</a>';
-  }
-  if (action === 'unsubscribed') {
-    document.getElementById('form-block').style.display = 'none';
-    const sb = document.getElementById('success-block');
-    sb.style.display = 'block';
-    sb.querySelector('.success-block__title').textContent = 'Unsubscribed.';
-    sb.querySelector('.success-block__body').innerHTML = 'You\'ve been removed. No hard feelings.<br><br><a href="/" style="color:var(--accent);font-size:var(--text-xs);letter-spacing:var(--ls-label);text-transform:uppercase;">← Back to the experiment</a>';
-  }
-  if (action === 'confirm' && token) {
-    fetch('/api/subscribe?action=confirm&token=' + encodeURIComponent(token))
-      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(() => { window.location.search = '?action=confirmed'; })
-      .catch(() => { document.getElementById('form-status').textContent = 'Confirmation failed — try the link again.'; });
-  }
-  if (action === 'unsubscribe' && token) {
-    fetch('/api/subscribe?action=unsubscribe&token=' + encodeURIComponent(token))
-      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(() => { window.location.search = '?action=unsubscribed'; })
-      .catch(() => { document.getElementById('form-status').textContent = 'Error — try again.'; });
-  }
-
-  document.getElementById('submit-btn').addEventListener('click', async () => {
-    const email = document.getElementById('email').value.trim();
-    const src = document.getElementById('source-field').value.trim();
-    const status = document.getElementById('form-status');
-    if (!email || !email.includes('@')) {
-      status.textContent = 'Enter a valid email address.';
-      status.style.color = 'var(--c-yellow-status)';
-      return;
-    }
-    status.textContent = 'Sending...';
-    status.style.color = 'var(--text-muted)';
-    try {
-      const res = await fetch('/api/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, source: src || 'subscribe-page' }),
+  <script>
+    (function(){
+      // theme toggle parity with the doors
+      var tb = document.querySelector(".theme-toggle");
+      if (tb) tb.addEventListener("click", function(){
+        var cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+        document.documentElement.dataset.theme = cur === "light" ? "dark" : "light";
+        try { localStorage.setItem("ajm-theme", document.documentElement.dataset.theme); } catch (e) {}
       });
-      const data = await res.json();
-      if (res.ok) {
-        document.getElementById('form-block').style.display = 'none';
-        document.getElementById('success-block').style.display = 'block';
-      } else {
-        status.textContent = data.error || 'Something went wrong — try again.';
-        status.style.color = 'var(--c-yellow-status)';
-      }
-    } catch { status.textContent = 'Network error — try again.'; status.style.color = 'var(--c-yellow-status)'; }
-  });
-  document.getElementById('email').addEventListener('keydown', e => {
-    if (e.key === 'Enter') document.getElementById('submit-btn').click();
-  });
+    })();
 
-  // 22c: Fetch subscriber count (DPR-2.02: pluralization fix)
-  fetch('/api/sub_count').then(r => r.ok ? r.json() : null).then(d => {
-    if (d && d.count != null) {
-      document.getElementById('sub-count').textContent = d.count;
-      document.getElementById('sub-word').textContent = d.count === 1 ? 'person' : 'people';
+    const params = new URLSearchParams(window.location.search);
+    const action = params.get('action');
+    const token = params.get('token');
+
+    if (action === 'confirmed') {
+      document.getElementById('form-block').style.display = 'none';
+      const sb = document.getElementById('success-block');
+      sb.style.display = 'block';
+      sb.querySelector('.st').textContent = "You're in.";
+      sb.querySelector('.sb').innerHTML = "Subscription confirmed. You'll get The Measured Life every Wednesday.<br><br><a href=\"/story/chronicle/\">Read the chronicle while you wait →</a>";
     }
-  }).catch(() => {});
-</script>
-<script src="/assets/js/site_constants.js"></script>
-<script src="/assets/js/components.js"></script>
-<script src="/assets/js/nav.js"></script>
+    if (action === 'unsubscribed') {
+      document.getElementById('form-block').style.display = 'none';
+      const sb = document.getElementById('success-block');
+      sb.style.display = 'block';
+      sb.querySelector('.st').textContent = 'Unsubscribed.';
+      sb.querySelector('.sb').innerHTML = "You've been removed. No hard feelings.<br><br><a href=\"/\">← back to the experiment</a>";
+    }
+    if (action === 'confirm' && token) {
+      fetch('/api/subscribe?action=confirm&token=' + encodeURIComponent(token))
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(() => { window.location.search = '?action=confirmed'; })
+        .catch(() => { document.getElementById('form-status').textContent = 'Confirmation failed — try the link again.'; });
+    }
+    if (action === 'unsubscribe' && token) {
+      fetch('/api/subscribe?action=unsubscribe&token=' + encodeURIComponent(token))
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(() => { window.location.search = '?action=unsubscribed'; })
+        .catch(() => { document.getElementById('form-status').textContent = 'Error — try again.'; });
+    }
+
+    document.getElementById('submit-btn').addEventListener('click', async () => {
+      const email = document.getElementById('email').value.trim();
+      const src = document.getElementById('source-field').value.trim();
+      const status = document.getElementById('form-status');
+      if (!email || !email.includes('@')) {
+        status.textContent = 'Enter a valid email address.';
+        status.style.color = 'var(--ember)';
+        return;
+      }
+      status.textContent = 'Sending…';
+      status.style.color = 'var(--ink-muted)';
+      try {
+        const res = await fetch('/api/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, source: src || 'subscribe-page' }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          document.getElementById('form-block').style.display = 'none';
+          document.getElementById('success-block').style.display = 'block';
+        } else {
+          status.textContent = data.error || 'Something went wrong — try again.';
+          status.style.color = 'var(--ember)';
+        }
+      } catch { status.textContent = 'Network error — try again.'; status.style.color = 'var(--ember)'; }
+    });
+    document.getElementById('email').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('submit-btn').click();
+    });
+
+    // subscriber count (pluralised)
+    fetch('/api/sub_count').then(r => r.ok ? r.json() : null).then(d => {
+      if (d && d.count != null) {
+        document.getElementById('sub-count').textContent = d.count;
+        document.getElementById('sub-word').textContent = d.count === 1 ? 'person' : 'people';
+      }
+    }).catch(() => {});
+  </script>
 </body>
 </html>

@@ -270,6 +270,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
    3) wide data tables scroll inside their section, not the whole page. */
 @media (max-width: 480px) {
   .ev-top { padding: var(--sp-3) var(--sp-4); gap: var(--sp-3); }
+  .brand-door { display: none; }   /* drop the section tag; keep wordmark + nav */
   .doors { gap: var(--sp-3); }
   .doors a { font-size: 0.625rem; letter-spacing: 0.04em; }
 }
