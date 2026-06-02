@@ -307,3 +307,21 @@ a { color: inherit; text-underline-offset: 0.18em; }
     scroll-behavior: auto !important;
   }
 }
+
+/* ── Charts (shared, token-driven — see assets/js/charts.js) ──────────────── */
+.chart { margin-top: var(--sp-4); }
+.chart svg { width: 100%; height: clamp(110px, 8vw + 80px, 150px); display: block; overflow: visible; }
+.chart-line { fill: none; stroke: var(--ember); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart-fill { fill: var(--ember-wash); stroke: none; }
+.chart-goal { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 3 4; }
+.chart-dot { fill: var(--ember); }
+.chart-cap { display: block; margin-top: var(--sp-2); color: var(--ink-faint); }
+.chart--empty { border: var(--honest-border); border-radius: var(--radius-xs); padding: var(--sp-4); text-align: center; }
+.chart--empty .chart-cap { margin: 0; }
+.spark { width: 96px; height: 28px; vertical-align: middle; }
+.spark .chart-line { stroke-width: 1.5; }
+.spark--empty { display: inline-block; width: 96px; height: 1px; background: var(--rule); }
+.cbars { display: flex; align-items: flex-end; gap: 3px; height: var(--cbar-h, 130px); margin-top: var(--sp-3); }
+.cbar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: var(--sp-1); height: 100%; justify-content: flex-end; min-width: 0; }
+.cbar-fill { width: 76%; background: var(--ember); border-radius: 2px 2px 0 0; min-height: 3px; }
+.cbar-l { color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
