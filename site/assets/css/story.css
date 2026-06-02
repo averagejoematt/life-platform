@@ -123,14 +123,37 @@ body { overflow-x: hidden; }
 .wall .voice.human .what { font-family: var(--voice-human-font); font-style: italic; font-size: var(--fs-quote); line-height: 1.45; color: var(--ink); }
 .wall-foot { margin-top: var(--sp-3); color: var(--ink-faint); }
 
-/* Chronicle spine */
-.chronicle-cards { margin-top: var(--sp-5); display: grid; gap: var(--bento-gap); }
-@media (min-width: 680px) { .chronicle-cards { grid-template-columns: repeat(3, 1fr); } }
-.chron-card { display: block; text-decoration: none; color: inherit; border: var(--border-hair); border-radius: var(--radius); padding: var(--sp-4); background: var(--surface); transition: border-color var(--dur-fast), transform var(--dur-fast); }
-.chron-card:hover { border-color: var(--ember-line); transform: translateY(-2px); }
-.chron-week { color: var(--ember); }
-.chron-title { font-family: var(--font-serif); font-size: var(--fs-h3); line-height: 1.2; margin-top: var(--sp-2); }
-.chron-date { margin-top: var(--sp-2); color: var(--ink-faint); }
+/* Dispatches reader — chronicle · lab notes · journal (master-detail) */
+.dx-tabs { display: flex; gap: var(--sp-1); margin-top: var(--sp-5); border-bottom: var(--border-hair); }
+.dx-tab { appearance: none; background: transparent; border: 0; cursor: pointer; font-family: var(--font-mono);
+  font-size: var(--fs-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint);
+  padding: var(--sp-3) var(--sp-3); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.dx-tab:hover { color: var(--ink-muted); }
+.dx-tab.is-active { color: var(--ink); border-bottom-color: var(--ember); }
+.dx-layout { display: grid; gap: clamp(1.25rem, 0.6rem + 3vw, 3rem); margin-top: var(--sp-5); align-items: start; }
+@media (min-width: 760px) { .dx-layout { grid-template-columns: 260px 1fr; } }
+.dx-list { list-style: none; display: grid; gap: var(--sp-2); }
+@media (min-width: 760px) { .dx-list { position: sticky; top: var(--sp-4); } }
+.dx-item { width: 100%; text-align: left; cursor: pointer; background: var(--surface); border: var(--border-hair);
+  border-left: 2px solid transparent; border-radius: var(--radius-sm); padding: var(--sp-3) var(--sp-4); display: grid; gap: 2px; color: inherit; }
+.dx-item:hover { border-color: var(--rule-strong); }
+.dx-item.is-active { border-left-color: var(--ember); background: color-mix(in oklch, var(--ember) 7%, var(--surface)); }
+.dx-item-t { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.15; }
+.dx-item-d { color: var(--ink-faint); }
+.dx-empty { color: var(--ink-muted); font-family: var(--font-mono); font-size: var(--fs-small); padding: var(--sp-3) 0; }
+.dx-read { min-width: 0; }
+.dx-kicker { color: var(--ember); }
+.dx-title { font-family: var(--font-serif); font-size: var(--fs-h2); line-height: 1.12; margin-top: var(--sp-2); }
+.dx-stats { color: var(--ink-faint); margin-top: var(--sp-2); }
+.dx-prose { margin-top: var(--sp-4); color: var(--ink); font-size: var(--fs-body-lg); line-height: var(--lh-relaxed); max-width: var(--measure); }
+.dx-foot { color: var(--ink-faint); margin-top: var(--sp-4); }
+/* lab-note two-voice inside the reader (reuses the Third Wall device) */
+.dx-read .voice { display: grid; gap: var(--sp-1); padding: var(--sp-3) 0; border-top: var(--border-hair); }
+.dx-read .voice:first-of-type { border-top: 0; }
+.dx-read .voice .who { font-family: var(--voice-who-font); font-size: var(--voice-who-size); letter-spacing: var(--voice-who-tracking); text-transform: uppercase; color: var(--ink-faint); }
+.dx-read .voice.machine .what { font-family: var(--voice-machine-font); font-size: 1rem; line-height: 1.6; color: var(--ink); }
+.dx-read .voice.human { border-top: var(--honest-border); }
+.dx-read .voice.human .what { font-family: var(--voice-human-font); font-style: italic; font-size: var(--fs-quote); line-height: 1.45; color: var(--ink); }
 
 /* Close */
 .beat-close { text-align: center; border-top: var(--border-hair); }

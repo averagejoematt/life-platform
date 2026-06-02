@@ -142,28 +142,78 @@ async function renderWall() {
   }
 }
 
-/* ── Elena's chronicle spine ─────────────────────────────────────────────── */
-function renderChronicle(stats) {
-  const wrap = bind("chronicle");
-  const recent = (stats && stats.chronicle_recent) || [];
-  const latest = stats && stats.chronicle_latest;
-  if (latest && latest.headline) bind("chronicle-headline").textContent = latest.headline;
-  const items = recent.length ? recent : (latest ? [latest] : []);
-  if (!items.length) {
-    wrap.innerHTML = `<p class="beat-note">Elena's weekly chronicle is published here as the experiment runs.</p>`;
+/* ── Dispatches reader — the native narrative archive ─────────────────────── */
+/*  Chronicle (Elena), Lab notes (the AI↔Matthew field notes), and the Journal.
+    Lab notes render fully native from /api/field_notes; chronicle/journal render
+    their real excerpts + metadata from posts.json. Master-detail, deep-linkable. */
+const DX = [
+  { key: "chronicle", label: "Chronicle", url: "/chronicle/posts.json" },
+  { key: "labnotes", label: "Lab notes", url: "/api/field_notes" },
+  { key: "journal", label: "Journal", url: "/journal/posts.json" },
+];
+const dxState = { src: "chronicle", cache: {} };
+
+async function dxFetch(src) {
+  if (dxState.cache[src]) return dxState.cache[src];
+  const cfg = DX.find((d) => d.key === src);
+  try { const d = await getJSON(cfg.url); dxState.cache[src] = d; return d; } catch (e) { return null; }
+}
+function dxEntries(src, data) {
+  if (!data) return [];
+  if (src === "labnotes") return (data.entries || []).map((e) => ({ id: e.week, title: `Week ${e.week} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "", meta: e.ai_tone }));
+  const posts = data.posts || data.entries || (Array.isArray(data) ? data : []);
+  return posts.map((p) => ({ id: p.week, title: p.title || `Week ${p.week}`, date: p.date, meta: p.stats_line, excerpt: p.excerpt, word_count: p.word_count }));
+}
+
+async function dxRenderRead(src, id) {
+  const read = document.querySelector("[data-dx-read]");
+  if (src === "labnotes") {
+    read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the field note…</span></p>`;
+    try {
+      const d = await getJSON(`/api/field_notes?week=${encodeURIComponent(id)}`);
+      const e = d.entry || {};
+      const voices = [["The AI", e.ai_present, "machine"], ["Worth watching", e.ai_cautionary, "machine"], ["Worth celebrating", e.ai_affirming, "machine"], ["Matthew", e.matthew_agreement, "human"]].filter((v) => v[1]);
+      read.innerHTML = `<p class="dx-kicker label">field note · week ${esc(id)}${e.ai_tone ? ` · ${esc(e.ai_tone)}` : ""}</p>` +
+        (voices.length ? voices.map(([who, txt, cls]) => `<div class="voice ${cls}"><span class="who">${esc(who)}</span><p class="what">${esc(txt)}</p></div>`).join("")
+          : `<p class="beat-note">No field note recorded for this week yet.</p>`);
+    } catch (e) { read.innerHTML = `<p class="beat-note">Couldn't load this field note just now.</p>`; }
     return;
   }
-  wrap.replaceChildren(...items.slice(0, 3).map((c) => {
-    const a = document.createElement("a");
-    a.className = "chron-card";
-    // Chronicle posts are preserved verbatim under /legacy until rehomed into the Story.
-    a.href = c.url || c.path || (c.week ? `/legacy/chronicle/week-${esc(c.week)}/` : "/legacy/chronicle/");
-    a.innerHTML =
-      `<span class="chron-week label">${c.week != null ? "week " + esc(c.week) : "chronicle"}</span>` +
-      `<span class="chron-title">${esc(c.headline || c.title || "A week in the experiment")}</span>` +
-      (c.date ? `<span class="chron-date label">${esc(c.date)}</span>` : "");
-    return a;
-  }));
+  const data = await dxFetch(src);
+  const ent = dxEntries(src, data).find((x) => String(x.id) === String(id));
+  if (!ent) { read.innerHTML = `<p class="beat-note">Pick an entry to read it here.</p>`; return; }
+  read.innerHTML =
+    `<p class="dx-kicker label">${src === "chronicle" ? "chronicle · Elena Voss" : "journal"} · week ${esc(ent.id)}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
+    `<h3 class="dx-title">${esc(ent.title)}</h3>` +
+    (ent.meta ? `<p class="dx-stats label">${esc(ent.meta)}</p>` : "") +
+    `<p class="dx-prose">${esc(ent.excerpt || "")}</p>` +
+    (ent.word_count ? `<p class="dx-foot label">${esc(ent.word_count)} words · full dispatch publishes here as the chronicle fills in</p>` : "");
+}
+
+function dxSelectEntry(src, id, silent) {
+  document.querySelectorAll(".dx-item").forEach((b) => b.classList.toggle("is-active", String(b.dataset.id) === String(id)));
+  if (!silent) { try { history.replaceState(null, "", `#dispatches/${src}/${id}`); } catch (e) {} }
+  dxRenderRead(src, id);
+}
+async function dxSelectSrc(src, preId) {
+  dxState.src = src;
+  document.querySelectorAll(".dx-tab").forEach((t) => { const on = t.dataset.src === src; t.classList.toggle("is-active", on); t.setAttribute("aria-pressed", String(on)); });
+  const listEl = document.querySelector("[data-dx-list]");
+  listEl.innerHTML = `<li class="dx-empty"><span class="shimmer">Loading…</span></li>`;
+  const entries = dxEntries(src, await dxFetch(src));
+  if (!entries.length) { listEl.innerHTML = `<li class="dx-empty">Nothing published here yet — it fills as the experiment runs.</li>`; document.querySelector("[data-dx-read]").innerHTML = ""; return; }
+  listEl.innerHTML = entries.map((e) => `<li><button class="dx-item" data-id="${esc(e.id)}"><span class="dx-item-t">${esc(e.title)}</span><span class="dx-item-d label">${esc(e.date || "")}</span></button></li>`).join("");
+  listEl.querySelectorAll(".dx-item").forEach((b) => b.addEventListener("click", () => dxSelectEntry(src, b.dataset.id)));
+  const initId = preId && entries.some((e) => String(e.id) === String(preId)) ? preId : entries[0].id;
+  dxSelectEntry(src, initId, true);
+}
+function dxBuild() {
+  const tabsEl = document.querySelector("[data-dx-tabs]");
+  if (!tabsEl) return;
+  tabsEl.innerHTML = DX.map((d) => `<button class="dx-tab" data-src="${d.key}" aria-pressed="false">${d.label}</button>`).join("");
+  tabsEl.querySelectorAll(".dx-tab").forEach((b) => b.addEventListener("click", () => dxSelectSrc(b.dataset.src)));
+  const m = location.hash.match(/#dispatches\/([a-z]+)(?:\/([\w-]+))?/) || [];
+  dxSelectSrc(m[1] && DX.some((d) => d.key === m[1]) ? m[1] : "chronicle", m[2]);
 }
 
 /* ── theme ───────────────────────────────────────────────────────────────── */
@@ -198,9 +248,9 @@ async function load() {
   const statsV = stats.status === "fulfilled" ? stats.value : null;
   if (statsV) {
     if (statsV.elena_hero_line) bind("elena").textContent = statsV.elena_hero_line;
-    renderChronicle(statsV);
     if (statsV._meta && statsV._meta.generated_at) bind("asof").textContent = `updated ${String(statsV._meta.generated_at).slice(0, 10)}`;
   }
+  dxBuild();   // the native Dispatches reader (chronicle · lab notes · journal)
 
   const journeyV = journey.status === "fulfilled" ? (journey.value.journey || journey.value) : null;
   renderNumbers(journeyV);

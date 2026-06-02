@@ -79,7 +79,9 @@ def new_url(url: str, dest: str) -> str:
     if dest == "cockpit":
         return "/now/"   # trailing slash: bare /now 302s to /site/now/ via the S3 origin
     if dest == "story":
-        return "/"
+        deep = {"chronicle": "/#dispatches/chronicle", "journal": "/#dispatches/journal",
+                "field-notes": "/#dispatches/labnotes", "first-person": "/#dispatches/labnotes"}
+        return deep.get(seg_of(url), "/")   # narrative URLs deep-link to the Dispatches reader
     if dest == "evidence":
         remap = {"coaches": "board", "accountability": "vices"}
         seg = seg_of(url)
