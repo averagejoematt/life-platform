@@ -1,4 +1,6 @@
-# HANDOVER — 2026-06-01 (v4 "The Measured Life" — one engine, three doors)
+# HANDOVER — 2026-06-02 (v4 "The Measured Life" — live, QA-swept; one engine, three doors)
+
+> **Latest session (2026-06-02):** full multi-lens QA sweep + 5-tier remediation (mobile overflow eliminated, routing fix, graceful empty-states, content/return + a11y), `/subscribe` re-skinned to v4, and a real RSS generator. New decisions recorded as **ADR-071/072/073**. Details in the sections below (search "World-class QA sweep", "/subscribe re-skinned", "RSS generator"). Outstanding: deploy Tier 3 via the CI/CD production gate.
 
 **Previous handover:** `handovers/HANDOVER_2026-06-01_VacationFund.md` (vacation fund + site-api deploy lesson).
 **This session covers:** the front-end rebuild of averagejoematt.com into the locked **Direction 05 "The Measured Life"** design system — Cockpit / Story / Evidence over the unchanged engine, with the old site preserved verbatim under `/legacy`. Built per `docs/CLAUDE_CODE_PROMPT_V4_PASTE_READY.md` + the four source-of-truth docs (Constitution, Design Brief, Design System, Migration Map).

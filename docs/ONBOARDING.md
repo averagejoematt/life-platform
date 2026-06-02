@@ -1,7 +1,7 @@
 # Life Platform — Onboarding Guide
 
 > First-day mental model. For commands (AWS auth, deploy, rollback), see `docs/QUICKSTART.md`.
-> Last updated: 2026-05-19 (v8.0.0 — post V2 audit + closure ADR-057)
+> Last updated: 2026-06-02 (v8.3.0 — v4 "The Measured Life" front-end live; ADR-071/072/073)
 >
 > **Resuming a Claude chat session?** Read `handovers/HANDOVER_LATEST.md` first — that's the canonical "what's the current state" doc. This file is the slower onboarding for a fresh contributor.
 
@@ -13,7 +13,7 @@ A personal health intelligence system built on AWS for a single user (Matthew). 
 
 The end result: ask Claude a question about your health, and it queries actual readings rather than relying on memory or estimates.
 
-Public surface: `averagejoematt.com` (blog + observatory cards) and `dash.averagejoematt.com` (private dashboard, Lambda@Edge auth).
+Public surface: `averagejoematt.com` — the v4 "The Measured Life" site (ADR-071): three doors over the engine — **Cockpit** (`/now/`, live data), **Story** (`/story/`, the writing), **Evidence** (`/evidence/`, the data archive), with a cinematic landing at `/`. The pre-v4 site is preserved verbatim at `/legacy` (private rollback). Served static from S3 + CloudFront; the engine is read-only from the front-end.
 
 ---
 

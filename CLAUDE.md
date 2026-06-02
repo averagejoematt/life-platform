@@ -136,8 +136,12 @@ python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --apply
 python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --override-weight-lbs <weight> --apply
 ```
 
-Regenerates constants, bumps the layer, deploys Core/Compute/Email, phase-tags DDB, wipes intelligence, rebuilds character, syncs site + docs, verifies 27 rendered pages. Rollback: `deploy/restart_rollback.py`.
+Regenerates constants, bumps the layer, deploys Core/Compute/Email, phase-tags DDB, wipes intelligence, **zeroes the accountability ledger** (`deploy/restart_ledger_reset.py` — ADR-072; the site reads `TOTALS#current` directly and ignores phase tombstones), rebuilds character, syncs site + docs, verifies 27 rendered pages. Rollback: `deploy/restart_rollback.py`.
+
+## Public Website (v4 "The Measured Life" — ADR-071)
+
+`averagejoematt.com` is a static site (S3 + CloudFront `E3S424OXQZ8NBE`) over the unchanged engine — **three doors:** **Cockpit** (`/now/`, live data), **Story** (`/story/`, the writing hub — chronicle · AI lab notes · journal · timeline · about), **Evidence** (`/evidence/`, the data archive). Home (`/`) is a cinematic landing. The old site is preserved verbatim at `/legacy` (private rollback, no UI links); old URLs 301 via the CloudFront `v4-redirects` function (regenerated from `redirects.map` by `scripts/v4_migration_inventory.py`). No framework/deps: `tokens.css` design system + vanilla-JS ES modules, self-hosted fonts, inline-SVG charts. Build helpers: `scripts/v4_build_{evidence,dispatches,rss}.py`. Deploy: `bash deploy/sync_site_to_s3.sh` (content-hashed, self-invalidates; also regenerates `rss.xml`) + explicit `aws s3 sync site/assets/fonts/`. **Never link `/legacy` from the UI; engine/`/api/*` contracts are read-only from the front-end.**
 
 ---
 
-**Verified:** 2026-05-29 (v8.2.0 — Bedrock + budget guard + remediation agent + auto-merge gate)
+**Verified:** 2026-06-02 (v8.3.0 — v4 front-end live + QA sweep + restart ledger reset + graceful empty-states)

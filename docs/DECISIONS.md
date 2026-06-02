@@ -2,8 +2,8 @@
 
 > Permanent log of significant architectural, design, and operational decisions.
 > Each ADR captures the decision, context, alternatives considered, and outcome.
-> Last updated: 2026-05-19 (v8.0.0 — V2 audit closure)
-> 57 ADRs total (ADR-001 → ADR-057).
+> Last updated: 2026-06-02 (v8.3.0 — v4 front-end + restart ledger reset + graceful empty-states)
+> 73 ADRs total (ADR-001 → ADR-073).
 
 ---
 
@@ -2143,3 +2143,70 @@ Remove `get_vacation_fund` from `mcp/registry.py` + redeploy MCP; remove the `/a
 ---
 
 **Verified:** 2026-06-01 (ADR-070 — vacation fund tracker)
+
+---
+
+## ADR-071: v4 "The Measured Life" front-end — one engine, three doors
+
+**Date:** 2026-06-01 (rebuilt + cut over), refined 2026-06-02
+**Status:** Live on `averagejoematt.com`.
+**Related:** `docs/CLAUDE_CODE_PROMPT_V4_PASTE_READY.md` + the four source-of-truth design docs; `site/index.html`, `site/now/`, `site/story/`, `site/evidence/`, `site/subscribe/`; `site/assets/js/{story,cockpit,evidence,dispatches,charts}.js`; `scripts/v4_build_evidence.py`, `scripts/v4_build_dispatches.py`, `scripts/v4_build_rss.py`, `scripts/v4_migration_inventory.py`, `scripts/v4_vendor_fonts.py`; CloudFront `v4-redirects` function; `site/legacy/`; `handovers/HANDOVER_LATEST.md`.
+
+### Context
+
+The pre-v4 site was a sprawl of ~40 standalone pages. Goal: a world-class, intuitive, repeat-visitor experience that keeps all the depth but is easy to navigate — over the **unchanged** engine (read existing `/api/*` contracts only; no engine/schema/Lambda changes).
+
+### Decision
+
+1. **Three doors over one engine.** **Cockpit** (`/now/`, today's live data — noindex, the daily tool), **Story** (`/story/`, the narrative/writing hub: chronicle · AI lab notes · journal · timeline · about — a master-detail reader), **Evidence** (`/evidence/`, the browsable data archive — horizontal group tabs → topic tiles → data-bound readout). The home landing (`/`) is a separate cinematic scroll; the brand/logo is the only link to it.
+2. **Old site preserved verbatim at `/legacy`** — private rollback, **no UI links**; old URLs 301 to their v4 home via the CloudFront `v4-redirects` function generated from `redirects.map` (`v4_migration_inventory.py`, 0 unmapped enforced).
+3. **No framework, no deps.** Static HTML + `tokens.css` design system (OKLCH, Fraunces/Instrument Sans/IBM Plex Mono, ember accent) + vanilla-JS ES modules. Self-hosted fonts (CSP `font-src 'self'`). Charts are inline SVG (`charts.js`). Weights shown dual-unit (kg · lb).
+4. **Naming:** "the story" is the writing hub at `/story/` (renamed from the short-lived `/dispatches/`, which 301s); the home page is a separate landing, not "the story."
+
+### Outcome
+
+Live; the 2026-06-02 QA sweep verified all 36 routes render with 0 HTTP/JS/CSP errors and 0 mobile overflow (320–414px). `/subscribe` re-skinned to v4 (2026-06-02). Engine untouched throughout.
+
+---
+
+## ADR-072: Experiment restart zeroes the accountability ledger
+
+**Date:** 2026-06-02
+**Status:** Implemented — `deploy/restart_ledger_reset.py`, wired into `deploy/restart_pipeline.py`.
+**Related:** `lambdas/web/site_api_data.py::handle_ledger`, `restart_intelligence_wipe`.
+
+### Context
+
+The site's `/api/ledger` reads `TOTALS#current` **directly** and does not honour the phase/tombstone filter the rest of the restart pipeline relies on. So re-anchoring the experiment left pre-genesis ledger dollars still showing on the site.
+
+### Decision
+
+New idempotent `restart_ledger_reset.py` deletes every `LEDGER#` transaction under `pk=USER#matthew#SOURCE#ledger` and writes a zeroed `TOTALS#current`. Dry-run by default, `--apply` to execute. Wired as a step **after** `restart_intelligence_wipe` in `restart_pipeline.py` so every future restart zeroes the ledger automatically.
+
+### Outcome
+
+Ran `--apply` (5 pre-genesis txns cleared, `/api/ledger` verified `$0`). Future re-anchors are clean with no manual step.
+
+---
+
+## ADR-073: Site API returns shaped-empty 200 on sparse data (not 503)
+
+**Date:** 2026-06-02
+**Status:** Code committed; deploys via the CI/CD production-approval gate (full `web/` package).
+**Related:** `lambdas/web/site_api_observatory.py`, `lambdas/web/site_api_data.py`.
+
+### Context
+
+On genesis week / before compute runs, several read-only endpoints returned `503` (`/api/nutrition_overview`, `/api/correlations`, and code paths in `habit_streaks`/`supplements`/`genome_risks`). The v4 front-end degrades gracefully, but the contract was dishonest and the browser console showed 503s.
+
+### Decision
+
+Genesis-sensitive read handlers return a **200 with the success contract's keys at empty/null values** + a short cache, instead of a 503. Read-only correctness preserved (no writes). The pattern is restart-safe — endpoints behave honestly the first week of any re-anchor.
+
+### Outcome
+
+Confirmed live 503s (nutrition_overview, correlations) fixed in code; the rest audited to match. Cleaner console, honest empty states.
+
+---
+
+**Verified:** 2026-06-02 (ADR-071/072/073 — v4 front-end + restart ledger reset + graceful empty-states)
