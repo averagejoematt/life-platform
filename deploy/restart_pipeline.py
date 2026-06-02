@@ -22,6 +22,7 @@ Steps (each can be skipped with --skip-<name>):
     5. bash deploy/build_layer.sh + cdk deploy (Core, Compute, Email)
     6. restart_phase_tag.py
     7. restart_intelligence_wipe.py
+    7b. restart_ledger_reset.py   (zero the accountability ledger → $0)
     8. restart_character_rebuild.py
     9. restart_chronicle_handler.py
    10. restart_site_copy_sync.py
@@ -256,6 +257,7 @@ def main():
     sub_scripts = [
         ("restart_phase_tag",         ["python3", "deploy/restart_phase_tag.py", "--apply"]),
         ("restart_intelligence_wipe", ["python3", "deploy/restart_intelligence_wipe.py", "--apply"]),
+        ("restart_ledger_reset",      ["python3", "deploy/restart_ledger_reset.py", "--apply"]),
         ("restart_character_rebuild", ["python3", "deploy/restart_character_rebuild.py", "--apply"]),
         ("restart_site_copy_sync",    ["python3", "deploy/restart_site_copy_sync.py", "--apply"]),
         ("restart_docs_update",       ["python3", "deploy/restart_docs_update.py", "--apply"]),
