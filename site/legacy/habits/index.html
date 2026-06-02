@@ -1,0 +1,1572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="robots" content="noindex">
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="The operating system behind a body transformation — 37 behavioral habits across 3 tiers, organized by purpose.">
+  <meta property="og:title" content="The Operating System — Matthew">
+  <meta property="og:description" content="37 behaviors. 3 tiers. 1 system. The daily habits driving a 117-lb transformation.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/habits/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="The Operating System — Matthew">
+  <meta name="twitter:description" content="37 behaviors. 3 tiers. 1 system driving a 117-lb body transformation.">
+  <meta name="keywords" content="habit system, gamify health, habit stacking, RPG habits, health transformation, longevity habits, tier system">
+  <title>The Operating System — Matthew</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/legacy/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/legacy/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/legacy/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/legacy/assets/css/tokens.css">
+  <link rel="stylesheet" href="/legacy/assets/css/base.css">
+  <link rel="stylesheet" href="/legacy/assets/css/observatory-v3.css">
+  <style>
+/* ═══════════════════════════════════════════════════════
+   THE OPERATING SYSTEM — Habits Page
+   Design: RPG system manual meets biopunk data terminal
+   Three zones: Foundation → System → Horizon
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Hero ── */
+.os-hero {
+  padding: var(--space-16) var(--page-padding) var(--space-12);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+.os-hero::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at 30% 80%, rgba(0,229,160,0.06) 0%, transparent 60%);
+  pointer-events: none;
+}
+.os-hero__eyebrow {
+  font-size: var(--text-2xs); letter-spacing: var(--ls-tag);
+  text-transform: uppercase; color: var(--accent-dim);
+  font-family: var(--font-mono); margin-bottom: var(--space-4);
+}
+.os-hero__title {
+  font-family: var(--font-display); font-size: clamp(32px, 5vw, 56px);
+  line-height: 1.1; color: var(--text); margin-bottom: var(--space-3);
+}
+.os-hero__title em { color: var(--accent); font-style: normal; }
+.os-hero__sub {
+  font-size: var(--text-base); color: var(--text-muted);
+  max-width: 560px; line-height: var(--lh-body); margin-bottom: var(--space-8);
+}
+.os-hero__stats {
+  display: flex; gap: var(--space-8); flex-wrap: wrap;
+}
+.os-hero-stat {
+  border-left: 2px solid var(--border); padding-left: var(--space-4);
+}
+.os-hero-stat:first-child { border-left-color: var(--accent); }
+.os-hero-stat__label {
+  font-size: var(--text-2xs); letter-spacing: var(--ls-tag);
+  text-transform: uppercase; color: var(--text-muted);
+  font-family: var(--font-mono); margin-bottom: 2px;
+}
+.os-hero-stat__val {
+  font-family: var(--font-display); font-size: 28px; color: var(--text); line-height: 1;
+}
+.os-hero-stat:first-child .os-hero-stat__val { color: var(--accent); }
+
+/* ── Tier banner (colored strip above each zone) ── */
+.tier-banner {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  font-family: var(--font-mono); font-size: var(--text-2xs);
+  letter-spacing: var(--ls-tag); text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+.tier-banner__dot {
+  width: 8px; height: 8px; border-radius: 50%;
+}
+.tier-banner--t0 { color: var(--accent); background: rgba(0,229,160,0.04); }
+.tier-banner--t0 .tier-banner__dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.tier-banner--vice { color: var(--c-amber-400); background: rgba(200,132,58,0.04); }
+.tier-banner--vice .tier-banner__dot { background: var(--c-amber-400); box-shadow: 0 0 8px var(--c-amber-400); }
+.tier-banner--t1 { color: var(--text-muted); background: var(--surface); }
+.tier-banner--t1 .tier-banner__dot { background: var(--text-muted); }
+.tier-banner--t2 { color: var(--text-faint); background: rgba(255,255,255,0.01); }
+.tier-banner--t2 .tier-banner__dot { background: var(--text-faint); opacity: 0.5; }
+
+/* ── Zone wrapper ── */
+.os-zone {
+  max-width: var(--max-width); margin: 0 auto;
+  padding: var(--space-10) var(--page-padding);
+}
+
+/* ── Zone header ── */
+.zone-head {
+  margin-bottom: var(--space-8);
+}
+.zone-head__title {
+  font-family: var(--font-display); font-size: 28px; color: var(--text);
+  margin-bottom: var(--space-2);
+}
+.zone-head__title em { color: var(--accent); font-style: normal; }
+.zone-head__sub {
+  font-size: var(--text-xs); color: var(--text-faint);
+  font-family: var(--font-mono); letter-spacing: var(--ls-label);
+}
+
+/* ═══════ ZONE 1: THE FOUNDATION (T0) ═══════ */
+
+/* T0 streak hero */
+.t0-streak-hero {
+  display: flex; align-items: center; gap: var(--space-8);
+  padding: var(--space-8);
+  border: 1px solid var(--accent);
+  background: linear-gradient(135deg, rgba(0,229,160,0.06), transparent 60%);
+  margin-bottom: var(--space-8);
+  position: relative;
+  overflow: hidden;
+}
+.t0-streak-hero::after {
+  content: '';
+  position: absolute; right: -40px; top: -40px;
+  width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(0,229,160,0.08), transparent 70%);
+  pointer-events: none;
+}
+.t0-streak__num {
+  font-family: var(--font-display); font-size: 80px;
+  color: var(--accent); line-height: 1; min-width: 100px; text-align: center;
+}
+.t0-streak__meta { flex: 1; }
+.t0-streak__label {
+  font-family: var(--font-mono); font-size: var(--text-xs);
+  letter-spacing: var(--ls-tag); text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: var(--space-2);
+}
+.t0-streak__desc {
+  font-size: var(--text-sm); color: var(--text-faint); line-height: var(--lh-body);
+}
+
+/* T0 habit cards — rich visual treatment */
+.t0-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-4);
+}
+.t0-card {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: var(--space-6);
+  display: flex; flex-direction: column; gap: var(--space-4);
+  position: relative;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+}
+.t0-card:hover {
+  border-color: var(--accent);
+  background: linear-gradient(180deg, rgba(0,229,160,0.03), transparent);
+}
+.t0-card__top {
+  display: flex; align-items: center; gap: var(--space-4);
+}
+/* SVG circular progress ring */
+.t0-ring {
+  width: 56px; height: 56px; flex-shrink: 0;
+}
+.t0-ring__bg { fill: none; stroke: var(--surface-raised); stroke-width: 4; }
+.t0-ring__fill {
+  fill: none; stroke: var(--accent); stroke-width: 4;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.t0-ring__pct {
+  font-family: var(--font-mono); font-size: 11px;
+  fill: var(--accent); text-anchor: middle; dominant-baseline: central;
+}
+.t0-card__info { flex: 1; min-width: 0; }
+.t0-card__name {
+  font-family: var(--font-display); font-size: var(--text-base);
+  color: var(--text); line-height: 1.2; margin-bottom: 4px;
+}
+.t0-card__pillar {
+  font-family: var(--font-mono); font-size:var(--text-3xs);
+  letter-spacing: var(--ls-tag); color: var(--accent-dim);
+  text-transform: uppercase;
+}
+/* Sparkline row */
+.t0-card__spark {
+  display: flex; align-items: flex-end; gap: 1px; height: 20px;
+}
+.t0-spark-bar {
+  flex: 1; border-radius: 1px 1px 0 0; min-height: 2px;
+  transition: height 0.6s ease;
+}
+/* Why quote */
+.t0-card__why {
+  font-size: var(--text-xs); color: var(--text-muted);
+  line-height: 1.6; font-style: italic;
+  border-left: 2px solid rgba(0,229,160,0.2);
+  padding-left: var(--space-3);
+}
+/* Science line */
+.t0-card__science {
+  font-size: 10px; color: var(--text-faint);
+  font-family: var(--font-mono); line-height: 1.5;
+}
+/* Evidence badge */
+.ev-badge {
+  display: inline-block; font-size:var(--text-3xs); font-family: var(--font-mono);
+  letter-spacing: 0.04em; padding: 1px 6px; border-radius: 2px;
+  margin-top: var(--space-1);
+}
+.ev-badge--strong { background: rgba(0,229,160,0.1); color: var(--accent); border: 1px solid rgba(0,229,160,0.2); }
+.ev-badge--moderate { background: rgba(200,132,58,0.08); color: var(--c-amber-400); border: 1px solid rgba(200,132,58,0.15); }
+.ev-badge--emerging { background: rgba(255,255,255,0.03); color: var(--text-faint); border: 1px solid var(--border); }
+
+/* ═══════ VICE DISCIPLINE GATES ═══════ */
+
+.vice-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-3);
+}
+.vice-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
+  padding: var(--space-5); display: flex; align-items: center; gap: var(--space-4);
+  transition: background var(--dur-fast);
+}
+.vice-card:hover { background: var(--surface-raised); }
+.vice-card--holding { border-left-color: var(--accent); }
+.vice-card--broken { border-left-color: var(--c-red-status); }
+.vice-num {
+  font-family: var(--font-display); font-size: 40px; line-height: 1;
+  min-width: 54px; text-align: right;
+}
+.vice-num--holding { color: var(--accent); }
+.vice-num--broken { color: var(--c-red-status); opacity: 0.7; }
+.vice-info { flex: 1; min-width: 0; }
+.vice-name { font-size: var(--text-sm); color: var(--text); margin-bottom: 2px; }
+.vice-meta {
+  font-size: var(--text-2xs); color: var(--text-faint);
+  font-family: var(--font-mono); letter-spacing: var(--ls-label);
+}
+.vice-why {
+  font-size: 10px; color: var(--text-faint); font-style: italic;
+  margin-top: var(--space-2); line-height: 1.5;
+  max-height: 0; overflow: hidden; transition: max-height 0.3s ease;
+}
+.vice-card:hover .vice-why { max-height: 60px; }
+.vice-summary-row {
+  display: flex; gap: var(--space-8); margin-bottom: var(--space-6);
+}
+.vice-sum__val {
+  font-family: var(--font-display); font-size: 36px; line-height: 1;
+}
+.vice-sum__val--accent { color: var(--accent); }
+.vice-sum__label {
+  font-size: var(--text-2xs); text-transform: uppercase;
+  letter-spacing: var(--ls-tag); color: var(--text-faint);
+  font-family: var(--font-mono); margin-top: 2px;
+}
+
+/* ═══════ ZONE 2: THE SYSTEM (T1 purpose groups) ═══════ */
+
+.purpose-group { margin-bottom: var(--space-6); }
+.purpose-toggle {
+  display: flex; align-items: center; gap: var(--space-3);
+  width: 100%; background: var(--surface); border: 1px solid var(--border);
+  padding: var(--space-4) var(--space-5); cursor: pointer;
+  transition: background var(--dur-fast), border-color var(--dur-fast);
+  text-align: left;
+}
+.purpose-toggle:hover { background: var(--surface-raised); border-color: var(--border-strong); }
+.purpose-toggle[aria-expanded="true"] { border-color: var(--accent); background: rgba(0,229,160,0.02); }
+.purpose-icon {
+  width: 32px; height: 32px; display: flex;
+  align-items: center; justify-content: center;
+  border-radius: 4px; flex-shrink: 0;
+  font-size: 16px;
+}
+.purpose-toggle__info { flex: 1; min-width: 0; }
+.purpose-toggle__name {
+  font-family: var(--font-display); font-size: var(--text-base);
+  color: var(--text); line-height: 1.2;
+}
+.purpose-toggle__count {
+  font-family: var(--font-mono); font-size: var(--text-2xs);
+  color: var(--text-faint); letter-spacing: var(--ls-label);
+  margin-top: 2px;
+}
+.purpose-toggle__bar {
+  width: 80px; height: 6px; background: var(--surface-raised);
+  border-radius: 3px; overflow: hidden;
+}
+.purpose-toggle__fill {
+  height: 100%; border-radius: 3px;
+  transition: width 1s var(--ease-out);
+}
+.purpose-toggle__pct {
+  font-family: var(--font-mono); font-size: var(--text-xs);
+  color: var(--text-muted); min-width: 36px; text-align: right;
+}
+.purpose-arrow {
+  font-size: var(--text-sm); color: var(--accent-dim);
+  transition: transform var(--dur-fast);
+}
+.purpose-toggle[aria-expanded="true"] .purpose-arrow { transform: rotate(90deg); }
+.purpose-body {
+  display: none; border: 1px solid var(--border); border-top: none;
+  background: var(--bg); padding: var(--space-5);
+}
+.purpose-body.open { display: block; }
+.purpose-body__desc {
+  font-size: var(--text-xs); color: var(--text-faint);
+  line-height: var(--lh-body); margin-bottom: var(--space-5);
+  padding-left: var(--space-3); border-left: 2px solid var(--border);
+}
+
+/* T1 habit row (compact but rich) */
+.t1-list { display: flex; flex-direction: column; gap: 1px; background: var(--border); }
+.t1-row {
+  display: grid; grid-template-columns: 1fr 80px 60px;
+  align-items: center; gap: var(--space-3);
+  background: var(--surface); padding: var(--space-3) var(--space-4);
+}
+.t1-row__name { font-size: var(--text-sm); color: var(--text); }
+.t1-row__spark {
+  display: flex; align-items: flex-end; gap: 1px; height: 16px;
+}
+.t1-spark { flex: 1; min-height: 1px; border-radius: 1px 1px 0 0; }
+.t1-row__tag {
+  font-family: var(--font-mono); font-size:var(--text-3xs);
+  color: var(--text-faint); letter-spacing: var(--ls-label);
+  text-align: right;
+}
+
+/* ═══════ ZONE 3: THE HORIZON (T2) ═══════ */
+
+.horizon-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1px; background: var(--border); border: 1px solid var(--border);
+}
+.horizon-card {
+  background: var(--surface); padding: var(--space-4);
+  opacity: 0.5; transition: opacity var(--dur-fast);
+  position: relative;
+}
+.horizon-card:hover { opacity: 0.85; }
+.horizon-card__lock {
+  position: absolute; top: var(--space-3); right: var(--space-3);
+  font-size: 10px; color: var(--text-faint); opacity: 0.4;
+}
+.horizon-card__name {
+  font-size: var(--text-xs); color: var(--text); margin-bottom: 2px;
+}
+.horizon-card__cat {
+  font-size:var(--text-3xs); color: var(--text-faint); font-family: var(--font-mono);
+  letter-spacing: var(--ls-tag);
+}
+.horizon-card__freq {
+  font-size:var(--text-3xs); color: var(--text-faint); font-family: var(--font-mono);
+  margin-top: var(--space-2);
+}
+.horizon-activation {
+  font-size: var(--text-2xs); font-family: var(--font-mono);
+  color: var(--text-faint); letter-spacing: var(--ls-label);
+  padding: var(--space-4) var(--space-5); border: 1px solid var(--border);
+  border-top: none; text-align: center;
+}
+
+/* ═══════ INTELLIGENCE SECTIONS ═══════ */
+
+.intel-zone {
+  max-width: var(--max-width); margin: 0 auto;
+  padding: var(--space-10) var(--page-padding);
+  border-top: 1px solid var(--border);
+}
+
+/* Heatmap */
+.heatmap-wrap {
+  background: var(--surface); border: 1px solid var(--border);
+  padding: var(--space-6); overflow-x: auto; -webkit-overflow-scrolling: touch;
+  margin-bottom: var(--space-8);
+}
+.heatmap-grid { display: flex; gap: 2px; }
+.heatmap-week { display: flex; flex-direction: column; gap: 2px; }
+.hm-cell {
+  width: 11px; height: 11px; border-radius: 2px;
+  cursor: pointer; transition: transform var(--dur-fast);
+}
+.hm-cell:hover { transform: scale(1.5); z-index: 5; }
+.hm-cell.empty { background: transparent; cursor: default; }
+.hm-cell.empty:hover { transform: none; }
+.hm-0 { background: var(--surface-raised); }
+.hm-1 { background: rgba(200,132,58,0.25); }
+.hm-2 { background: rgba(200,132,58,0.65); }
+.hm-3 { background: rgba(0,229,160,0.40); }
+.hm-4 { background: var(--accent); }
+.heatmap-legend {
+  display: flex; align-items: center; gap: var(--space-3);
+  margin-top: var(--space-3); flex-wrap: wrap;
+}
+.heatmap-legend span {
+  font-size: var(--text-2xs); color: var(--text-faint);
+  font-family: var(--font-mono);
+}
+.legend-dot { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
+
+/* Correlation + DOW */
+.intel-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6);
+  margin-bottom: var(--space-8);
+}
+.intel-card {
+  border: 1px solid var(--border); background: var(--surface);
+  padding: var(--space-6);
+}
+.intel-card__title {
+  font-family: var(--font-display); font-size: 18px;
+  color: var(--text); margin-bottom: var(--space-2);
+}
+.intel-card__title em { color: var(--accent); font-style: normal; }
+.intel-card__sub {
+  font-size: var(--text-2xs); color: var(--text-faint);
+  font-family: var(--font-mono); margin-bottom: var(--space-5);
+}
+.corr-row {
+  display: grid; grid-template-columns: 24px 1fr 80px 48px;
+  align-items: center; gap: var(--space-2);
+  padding: var(--space-2) 0; border-bottom: 1px solid var(--border-subtle);
+}
+.corr-row:last-child { border-bottom: none; }
+.corr-rank { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); }
+.corr-name { font-size: var(--text-sm); color: var(--text); }
+.corr-bar { height: 5px; background: var(--surface-raised); border-radius: 2px; overflow: hidden; }
+.corr-bar__fill { height: 100%; border-radius: 2px; background: var(--accent); }
+.corr-r { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--accent); text-align: right; }
+.dow-bars {
+  display: grid; grid-template-columns: repeat(7,1fr);
+  gap: var(--space-2); align-items: flex-end; height: 80px;
+}
+.dow-col {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: flex-end; gap: var(--space-1); height: 100%;
+}
+.dow-bar {
+  width: 100%; border-radius: 2px 2px 0 0;
+  transition: height 0.8s var(--ease-out); min-height: 2px;
+}
+.dow-bar--best { background: var(--accent); }
+.dow-bar--worst { background: rgba(255,82,82,0.55); }
+.dow-bar--mid { background: rgba(200,132,58,0.5); }
+.dow-label {
+  font-size:var(--text-3xs); font-family: var(--font-mono); color: var(--text-faint);
+}
+
+/* Pipeline visualization */
+.pipeline-wrap {
+  border: 1px solid var(--border); background: var(--surface);
+  padding: var(--space-6); margin-bottom: var(--space-8);
+}
+.pipeline-flow {
+  display: flex; align-items: center; justify-content: center;
+  gap: var(--space-3); flex-wrap: wrap;
+}
+.pipeline-node {
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border); background: var(--bg);
+  font-family: var(--font-mono); font-size: var(--text-2xs);
+  color: var(--text-muted); letter-spacing: var(--ls-label);
+  text-transform: uppercase; white-space: nowrap;
+}
+.pipeline-node--active { border-color: var(--accent); color: var(--accent); }
+.pipeline-arrow { color: var(--accent-dim); font-size: var(--text-xs); }
+
+/* ── Tooltip ── */
+#hm-tooltip {
+  position: fixed; background: var(--surface-high);
+  border: 1px solid var(--border-strong);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs); font-family: var(--font-mono);
+  color: var(--text); pointer-events: none;
+  z-index: var(--z-toast); white-space: nowrap;
+  opacity: 0; transition: opacity var(--dur-fast);
+}
+#hm-tooltip.visible { opacity: 1; }
+
+/* ── Decision Fatigue (compact) ── */
+.fatigue-bar-wrap {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--border); background: var(--surface);
+}
+.fatigue-score {
+  font-family: var(--font-display); font-size: 36px; line-height: 1;
+  min-width: 60px; text-align: center;
+}
+.fatigue-detail { flex: 1; }
+.fatigue-label {
+  font-size: var(--text-2xs); letter-spacing: var(--ls-tag);
+  text-transform: uppercase; color: var(--text-muted); font-family: var(--font-mono);
+}
+.fatigue-spark {
+  display: flex; gap: 1px; height: 16px; align-items: flex-end; margin-top: var(--space-2);
+}
+
+/* ── Skeletons ── */
+.skel { animation: pulse 1.5s ease-in-out infinite; }
+.skel-box { background: var(--surface-raised); border-radius: 2px; }
+@keyframes pulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
+
+/* ── Responsive ── */
+@media(max-width:768px) {
+  .os-hero { padding: var(--space-10) var(--page-padding-sm) var(--space-8); }
+  .os-zone { padding: var(--space-8) var(--page-padding-sm); }
+  .t0-grid { grid-template-columns: 1fr; }
+  .t0-streak-hero { flex-direction: column; align-items: flex-start; gap: var(--space-4); }
+  .t0-streak__num { font-size: 56px; }
+  .intel-grid { grid-template-columns: 1fr; }
+  .vice-grid { grid-template-columns: 1fr; }
+  .horizon-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  .pipeline-flow { justify-content: flex-start; }
+}
+
+/* ═══════ TIER VISUAL IDENTITY (5e) ═══════ */
+
+/* T0: Heavy/anchored — solid borders, bold accent */
+.t0-card {
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 12px rgba(0,229,160,0.08);
+}
+.t0-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 20px rgba(0,229,160,0.15);
+}
+
+/* T1: Flowing — gradient left accent, medium weight */
+.t1-row {
+  position: relative;
+}
+.t1-row::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: linear-gradient(180deg, var(--accent-dim), var(--c-amber-400));
+}
+.purpose-group {
+  position: relative;
+}
+.purpose-group::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: linear-gradient(180deg, rgba(0,229,160,0.4), rgba(200,132,58,0.4));
+  z-index: 1;
+}
+
+/* T2: Light/aspirational — dashed borders, faint colors */
+.horizon-card {
+  border: 1px dashed var(--border);
+  background: rgba(255,255,255,0.01);
+}
+.horizon-card:hover {
+  border-color: var(--text-faint);
+  border-style: dashed;
+}
+.horizon-grid {
+  background: transparent;
+  border: 1px dashed var(--border);
+  gap: 0;
+}
+
+/* ═══════ PIPELINE HERO (5a) ═══════ */
+.pipeline-hero {
+  border: 2px solid var(--accent);
+  background: linear-gradient(135deg, rgba(0,229,160,0.04), transparent 60%);
+  padding: var(--space-8);
+  margin-bottom: var(--space-8);
+  position: relative;
+}
+.pipeline-hero .pipeline-flow {
+  display: flex; align-items: stretch; justify-content: center;
+  gap: var(--space-2); flex-wrap: wrap;
+}
+.pipeline-hero .pipeline-node {
+  padding: var(--space-3) var(--space-4) var(--space-2);
+  border: 1px solid var(--border); background: var(--bg);
+  font-family: var(--font-mono); font-size: var(--text-2xs);
+  color: var(--text-muted); letter-spacing: var(--ls-label);
+  text-transform: uppercase; text-align: center;
+  min-width: 90px;
+}
+.pipeline-hero .pipeline-node--active {
+  border-color: var(--accent); color: var(--accent);
+}
+.pipeline-node__rationale {
+  display: block; font-size:var(--text-3xs); color: var(--text-faint);
+  letter-spacing: 0; text-transform: none;
+  margin-top: 4px; line-height: 1.3;
+  font-style: italic; opacity: 0.8;
+}
+.pipeline-hero .pipeline-arrow {
+  color: var(--accent-dim); font-size: var(--text-xs);
+  display: flex; align-items: center;
+}
+.pipeline-share-btn {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-faint); font-family: var(--font-mono);
+  font-size: var(--text-2xs); letter-spacing: var(--ls-label);
+  cursor: pointer; transition: all var(--dur-fast);
+  text-transform: uppercase;
+}
+.pipeline-share-btn:hover {
+  border-color: var(--accent); color: var(--accent);
+}
+.pipeline-share-btn.copied {
+  border-color: var(--accent); color: var(--accent);
+}
+
+/* ═══════ JOURNAL QUOTE (5c) ═══════ */
+.journal-quote {
+  max-width: var(--max-width); margin: 0 auto;
+  padding: var(--space-6) var(--page-padding);
+}
+.journal-quote blockquote {
+  border-left: 3px solid var(--accent);
+  padding: var(--space-5) var(--space-6);
+  background: linear-gradient(135deg, rgba(0,229,160,0.03), transparent 60%);
+  margin: 0;
+  font-size: var(--text-base); color: var(--text-muted);
+  line-height: var(--lh-body); font-style: italic;
+}
+.journal-quote cite {
+  display: block; margin-top: var(--space-3);
+  font-size: var(--text-2xs); color: var(--text-faint);
+  font-family: var(--font-mono); letter-spacing: var(--ls-label);
+  font-style: normal; text-transform: uppercase;
+}
+
+/* ═══════ START HERE RAMP (5k) ═══════ */
+.start-here {
+  max-width: var(--max-width); margin: 0 auto;
+  padding: var(--space-8) var(--page-padding);
+  border-bottom: 1px solid var(--border);
+}
+.start-here__header {
+  display: flex; align-items: center; gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.start-here__badge {
+  display: inline-block; padding: var(--space-1) var(--space-3);
+  background: var(--accent); color: var(--bg);
+  font-family: var(--font-mono); font-size: var(--text-2xs);
+  letter-spacing: var(--ls-tag); text-transform: uppercase;
+  font-weight: 700;
+}
+.start-here__title {
+  font-family: var(--font-display); font-size: 22px; color: var(--text);
+}
+.start-here__intro {
+  font-size: var(--text-sm); color: var(--text-muted);
+  line-height: var(--lh-body); margin-bottom: var(--space-5);
+  max-width: 560px;
+}
+.start-here__list {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-3);
+}
+.start-here__item {
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--accent);
+  background: rgba(0,229,160,0.03);
+  font-size: var(--text-sm); color: var(--text);
+  display: flex; align-items: center; gap: var(--space-2);
+}
+.start-here__item-icon {
+  font-size: 16px; flex-shrink: 0;
+}
+.start-here__item-name {
+  font-family: var(--font-display); font-size: var(--text-sm);
+}
+
+/* ═══════ DOMAIN FILTER (5h) ═══════ */
+.domain-filter {
+  max-width: var(--max-width); margin: 0 auto;
+  padding: var(--space-4) var(--page-padding);
+  display: flex; align-items: center; gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.domain-filter__label {
+  font-family: var(--font-mono); font-size: var(--text-2xs);
+  letter-spacing: var(--ls-tag); text-transform: uppercase;
+  color: var(--text-faint); margin-right: var(--space-2);
+}
+.domain-chip {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-faint); font-family: var(--font-mono);
+  font-size: var(--text-2xs); letter-spacing: var(--ls-label);
+  cursor: pointer; transition: all var(--dur-fast);
+  text-transform: uppercase;
+}
+.domain-chip:hover {
+  border-color: var(--accent-dim); color: var(--text-muted);
+}
+.domain-chip.active {
+  border-color: var(--accent); color: var(--accent);
+  background: rgba(0,229,160,0.06);
+}
+
+/* ═══════ COMPASSIONATE FRAMING (5d) ═══════ */
+.compassion-note {
+  font-size: var(--text-xs); color: var(--text-muted);
+  font-style: italic; line-height: var(--lh-body);
+  padding: var(--space-3) var(--space-4);
+  border-left: 2px solid rgba(0,229,160,0.3);
+  margin-top: var(--space-4);
+  background: rgba(0,229,160,0.02);
+}
+
+/* ── Reveal animation ── */
+.reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.reveal.is-visible { opacity: 1; transform: none; }
+  </style>
+  <link rel="canonical" href="https://averagejoematt.com/habits/">
+</head>
+<body class="body-signal">
+
+<div id="amj-nav"></div>
+
+
+<div id="amj-hierarchy-nav"></div>
+
+<!-- ═══════ HERO ═══════ -->
+<header class="os-hero reveal">
+  <div class="os-hero__eyebrow">The Method</div>
+  <h1 class="os-hero__title"><em>The Operating</em> System</h1>
+  <details class="obs-depth-section" style="margin-top:var(--space-4);border:1px solid var(--border);border-radius:4px;">
+    <summary style="font-family:var(--font-mono);font-size:12px;letter-spacing:0.08em;color:var(--text-muted);padding:var(--space-4) var(--space-5);cursor:pointer;">About this system</summary>
+    <div style="padding:0 var(--space-5) var(--space-5);font-family:var(--font-serif);font-size:14px;line-height:1.75;color:var(--text-muted);">
+      <p>I've read enough books and listened to enough podcasts to know that if I tried to do everything everyone recommends, I'd have no time to actually live. So I don't. I picked the habits that matter most — the ones I know work but consistently forget when life gets loud — and made them non-negotiable.</p>
+      <p>The ones I kept skipping before were always the soft ones. Journaling. Breathing. Calling a friend. I left them off the scorecard and then wondered why nothing felt different. This time they're in the system. Not as a burden — as a reminder that this is bigger than the number on the scale.</p>
+      <p>Everything else I just want to do more of. The goal isn't a perfect checklist. It's becoming someone who does most of this without thinking.</p>
+    </div>
+  </details>
+  <div class="os-hero__stats">
+    <div class="os-hero-stat">
+      <div class="os-hero-stat__label">T0 Streak</div>
+      <div class="os-hero-stat__val" id="hero-streak">—</div>
+    </div>
+    <div class="os-hero-stat">
+      <div class="os-hero-stat__label">Avg Completion</div>
+      <div class="os-hero-stat__val" id="hero-avg">—</div>
+    </div>
+    <div class="os-hero-stat">
+      <div class="os-hero-stat__label">Days Tracked</div>
+      <div class="os-hero-stat__val" id="hero-days">—</div>
+    </div>
+    <div class="os-hero-stat">
+      <div class="os-hero-stat__label">Behavioral Habits</div>
+      <div class="os-hero-stat__val" id="hero-count">37</div>
+    </div>
+  </div>
+</header>
+
+<!-- H1: Day N perspective banner (shown when < 21 days tracked) -->
+<div class="habits-perspective" id="habits-perspective" style="display:none">
+  <div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-3) var(--page-padding);font-family:var(--font-serif);font-size:var(--text-sm);color:var(--text-muted);text-align:center;border-bottom:1px solid var(--border);background:rgba(0,229,160,0.03)">
+    You're building the measurement system. Completion rates typically stabilize by Week 3.
+  </div>
+</div>
+
+<!-- ═══════ TIER CONTEXT ═══════ -->
+<div class="reveal" style="max-width:var(--max-width);margin:0 auto;padding:var(--space-8) var(--page-padding);border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-5);">
+  <div style="border-left:2px solid var(--accent);padding-left:var(--space-4);">
+    <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent);font-family:var(--font-mono);margin-bottom:4px">Tier 0 — Foundation</div>
+    <p style="font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body)">7 habits. The non-negotiable operating floor. Streaks measure consistency, not worth.</p>
+  </div>
+  <div style="border-left:2px solid var(--border);padding-left:var(--space-4);">
+    <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:4px">Tier 1 — The System</div>
+    <p style="font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body)">15 daily habits grouped by purpose. Not streak-critical, but feeds Character Score.</p>
+  </div>
+  <div style="border-left:2px solid var(--border);padding-left:var(--space-4);">
+    <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:4px">Tier 2 — The Horizon</div>
+    <p style="font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body)">Aspirational habits. Activates when T0 + T1 consistency exceeds 90%.</p>
+  </div>
+</div>
+
+<!-- ═══════ DAILY PIPELINE (elevated — 5a/5j) ═══════ -->
+<div class="os-zone reveal" id="pipeline-section">
+  <div class="zone-head">
+    <div class="zone-head__title">Daily <em>Pipeline</em></div>
+    <div class="zone-head__sub">How the habit stacks flow through the day — each step sequenced for a reason</div>
+  </div>
+  <div class="pipeline-hero">
+    <div class="pipeline-flow" id="pipeline-flow">
+      <div class="pipeline-node pipeline-node--active">5 AM Wake<span class="pipeline-node__rationale">Cortisol peak drives alertness</span></div>
+      <span class="pipeline-arrow">→</span>
+      <div class="pipeline-node pipeline-node--active">Weigh-in<span class="pipeline-node__rationale">Lowest variance measurement window</span></div>
+      <span class="pipeline-arrow">→</span>
+      <div class="pipeline-node pipeline-node--active">Morning Light<span class="pipeline-node__rationale">Anchors circadian clock via melanopsin</span></div>
+      <span class="pipeline-arrow">→</span>
+      <div class="pipeline-node pipeline-node--active">Journal<span class="pipeline-node__rationale">Clears cognitive load before execution</span></div>
+      <span class="pipeline-arrow">→</span>
+      <div class="pipeline-node pipeline-node--active">Exercise<span class="pipeline-node__rationale">BDNF + cortisol regulation peaks AM</span></div>
+      <span class="pipeline-arrow">→</span>
+      <div class="pipeline-node">Deep Work<span class="pipeline-node__rationale">Post-exercise focus window is 2-4 hrs</span></div>
+      <span class="pipeline-arrow">→</span>
+      <div class="pipeline-node">Walk 5k<span class="pipeline-node__rationale">NEAT burn + afternoon cortisol clearing</span></div>
+      <span class="pipeline-arrow">→</span>
+      <div class="pipeline-node">Evening Journal<span class="pipeline-node__rationale">Cognitive offload before wind-down</span></div>
+      <span class="pipeline-arrow">→</span>
+      <div class="pipeline-node pipeline-node--active">Red Light Glasses<span class="pipeline-node__rationale">Blocks blue light, protects melatonin onset</span></div>
+      <span class="pipeline-arrow">→</span>
+      <div class="pipeline-node pipeline-node--active">No Phone<span class="pipeline-node__rationale">Removes dopamine stimulation before sleep</span></div>
+      <span class="pipeline-arrow">→</span>
+      <div class="pipeline-node pipeline-node--active">Sleep Stack<span class="pipeline-node__rationale">Thermoregulation + supplement timing</span></div>
+    </div>
+    <button class="pipeline-share-btn" id="pipeline-share" onclick="(function(btn){
+      var nodes = document.querySelectorAll('#pipeline-flow .pipeline-node');
+      var text = 'My Daily Pipeline:\n';
+      nodes.forEach(function(n,i){
+        var name = n.childNodes[0].textContent.trim();
+        var rationale = n.querySelector('.pipeline-node__rationale');
+        text += (i+1) + '. ' + name;
+        if(rationale) text += ' — ' + rationale.textContent.trim();
+        text += '\n';
+      });
+      navigator.clipboard.writeText(text).then(function(){
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(function(){ btn.textContent = 'Copy pipeline as text'; btn.classList.remove('copied'); }, 2000);
+      });
+    })(this)">Copy pipeline as text</button>
+  </div>
+</div>
+
+<!-- ═══════ INTELLIGENCE LAYER (elevated — 5b) ═══════ -->
+<div class="intel-zone reveal">
+  <div class="zone-head">
+    <div class="zone-head__title">Habit <em>Intelligence</em></div>
+    <div class="zone-head__sub">Since experiment start — patterns, correlations, and the heatmap</div>
+  </div>
+
+  <!-- Heatmap -->
+  <div class="heatmap-wrap">
+    <div class="heatmap-grid" id="hm-grid"></div>
+    <div class="heatmap-legend">
+      <span>Less</span>
+      <span class="legend-dot hm-0"></span><span>0%</span>
+      <span class="legend-dot hm-1"></span><span>1-49%</span>
+      <span class="legend-dot hm-2"></span><span>50-79%</span>
+      <span class="legend-dot hm-3"></span><span>80-99%</span>
+      <span class="legend-dot hm-4"></span><span>Perfect</span>
+      <span>More</span>
+    </div>
+  </div>
+
+  <!-- Correlations + DOW -->
+  <div class="intel-grid">
+    <div class="intel-card" id="corr-card" style="display:none">
+      <div class="intel-card__title">Keystone <em>Correlations</em></div>
+      <div class="intel-card__sub">Habit groups by Pearson r vs Character Score</div>
+      <div id="corr-rows"></div>
+    </div>
+    <div class="intel-card" id="dow-card" style="display:none">
+      <div class="intel-card__title">Day of Week <em>Pattern</em></div>
+      <div class="intel-card__sub" id="dow-sub">T0 completion by day</div>
+      <div class="dow-bars" id="dow-bars"></div>
+      <div id="dow-insight" style="font-size:var(--text-2xs);font-family:var(--font-mono);color:var(--text-faint);margin-top:var(--space-3)"></div>
+    </div>
+  </div>
+
+  <!-- Decision Fatigue -->
+  <div class="fatigue-bar-wrap" id="fatigue-section" style="display:none">
+    <div class="fatigue-score" id="fatigue-score">—</div>
+    <div class="fatigue-detail">
+      <div class="fatigue-label">Decision Fatigue Index</div>
+      <div id="fatigue-insight" style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-1)"></div>
+      <div class="fatigue-spark" id="fatigue-spark"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ JOURNAL QUOTE (5c) ═══════ -->
+<div class="journal-quote reveal">
+  <blockquote>
+    "The hardest habit wasn't the workout. It was the journal. Writing down what I was thinking meant I couldn't pretend I wasn't thinking it."
+    <cite>// from a previous attempt &mdash; the lesson that brought journaling into this system</cite>
+  </blockquote>
+</div>
+
+<!-- ═══════ START HERE ENTRY RAMP (5k) ═══════ -->
+<div class="start-here reveal" id="start-here">
+  <div class="start-here__header">
+    <span class="start-here__badge">Start here</span>
+    <span class="start-here__title">The 7 that matter</span>
+  </div>
+  <p class="start-here__intro">New here? These are the Tier 0 habits — the non-negotiable foundation. Every metric on this site traces back to whether these seven happened today. Master these before adding anything else.</p>
+  <div class="start-here__list" id="start-here-list">
+    <!-- Populated by JS from T0_HABITS -->
+  </div>
+</div>
+
+<!-- ═══════ DOMAIN FILTER (5h) ═══════ -->
+<div class="domain-filter reveal" id="domain-filter">
+  <span class="domain-filter__label">Filter by domain:</span>
+  <button class="domain-chip active" data-domain="all" onclick="filterByDomain('all')">All</button>
+  <button class="domain-chip" data-domain="sleep" onclick="filterByDomain('sleep')">Sleep</button>
+  <button class="domain-chip" data-domain="movement" onclick="filterByDomain('movement')">Movement</button>
+  <button class="domain-chip" data-domain="nutrition" onclick="filterByDomain('nutrition')">Nutrition</button>
+  <button class="domain-chip" data-domain="recovery" onclick="filterByDomain('recovery')">Recovery</button>
+  <button class="domain-chip" data-domain="mind" onclick="filterByDomain('mind')">Mind</button>
+  <button class="domain-chip" data-domain="discipline" onclick="filterByDomain('discipline')">Discipline</button>
+  <button class="domain-chip" data-domain="data" onclick="filterByDomain('data')">Data</button>
+</div>
+
+<!-- Tooltip -->
+<div id="hm-tooltip"><div id="tt-date"></div><div id="tt-pct" style="color:var(--accent)"></div></div>
+
+<!-- ═══════ ZONE 1: THE FOUNDATION ═══════ -->
+<div class="tier-banner tier-banner--t0 reveal">
+  <span class="tier-banner__dot"></span>
+  Zone 1 — The Foundation · 7 Non-Negotiables
+</div>
+<div class="os-zone" id="zone-t0">
+  <div class="zone-head">
+    <div class="zone-head__title">The <em>Foundation</em></div>
+    <div class="zone-head__sub">The non-negotiable operating floor — everything else is built on these</div>
+  </div>
+
+  <!-- T0 Streak Hero -->
+  <div class="t0-streak-hero reveal" id="t0-streak-hero">
+    <div class="t0-streak__num" id="streak-big">—</div>
+    <div class="t0-streak__meta">
+      <div class="t0-streak__label">Day Tier 0 Streak — current run</div>
+    </div>
+  </div>
+
+  <!-- T0 Cards (populated by JS) -->
+  <div class="t0-grid" id="t0-grid">
+    <div class="skel" style="height:200px;border:1px solid var(--border);background:var(--surface)"></div>
+    <div class="skel" style="height:200px;border:1px solid var(--border);background:var(--surface)"></div>
+    <div class="skel" style="height:200px;border:1px solid var(--border);background:var(--surface)"></div>
+  </div>
+</div>
+
+<!-- ═══════ DISCIPLINE GATES (VICES) ═══════ -->
+<div class="tier-banner tier-banner--vice reveal">
+  <span class="tier-banner__dot"></span>
+  Discipline Gates — The habits of not doing
+</div>
+<div class="os-zone" id="zone-vices">
+  <div class="zone-head">
+    <div class="zone-head__title">Discipline <em>Gates</em></div>
+    <div class="zone-head__sub">Every day held compounds — building identity through restraint</div>
+  </div>
+  <div class="vice-summary-row" id="vice-summary"></div>
+  <div class="vice-grid" id="vice-grid"></div>
+  <div class="compassion-note">Streaks reset but progress doesn't. Every day you showed up still counts. A break isn't failure — it's data.</div>
+</div>
+
+<!-- ═══════ ZONE 2: THE SYSTEM (T1 by purpose) — V3-lite: collapsed by default ═══════ -->
+<details class="obs-depth-section" style="max-width:var(--max-width);margin:var(--space-4) auto;border:1px solid var(--border);border-radius:4px;">
+  <summary style="font-family:var(--font-mono);font-size:12px;letter-spacing:0.08em;color:var(--text-muted);padding:var(--space-4) var(--space-5);cursor:pointer;">Zone 2 — The System · Daily Practice by Purpose</summary>
+  <div style="padding:0 var(--space-5) var(--space-5);">
+    <div class="os-zone" id="zone-t1">
+      <div class="zone-head">
+        <div class="zone-head__title">The <em>System</em></div>
+        <div class="zone-head__sub">Tracked daily, grouped by purpose — not streak-critical but feeds your Character Score</div>
+      </div>
+      <div id="purpose-groups"></div>
+    </div>
+  </div>
+</details>
+
+<!-- ═══════ ZONE 3: THE HORIZON (T2) — V3-lite: collapsed by default ═══════ -->
+<details class="obs-depth-section" style="max-width:var(--max-width);margin:var(--space-4) auto;border:1px solid var(--border);border-radius:4px;">
+  <summary style="font-family:var(--font-mono);font-size:12px;letter-spacing:0.08em;color:var(--text-muted);padding:var(--space-4) var(--space-5);cursor:pointer;">Zone 3 — The Horizon · Aspirational</summary>
+  <div style="padding:0 var(--space-5) var(--space-5);">
+    <div class="os-zone" id="zone-t2">
+      <div class="zone-head">
+        <div class="zone-head__title">The <em>Horizon</em></div>
+        <div class="zone-head__sub">Queued for activation — these unlock when the foundation is solid</div>
+      </div>
+      <div class="horizon-grid" id="horizon-grid"></div>
+      <div class="horizon-activation">Activates progressively when Tier 0 + Tier 1 consistency exceeds 90%</div>
+    </div>
+  </div>
+</details>
+
+
+
+<!-- Subscribe CTA -->
+<nav class="reading-path-v2">
+  <a href="/legacy/character/" class="reading-path-v2__link">
+    <span class="reading-path-v2__dir">← Previous</span>
+    <span class="reading-path-v2__title">Character</span>
+  </a>
+  <a href="/legacy/sleep/" class="reading-path-v2__link reading-path-v2__link--next">
+    <span class="reading-path-v2__dir">Next →</span>
+    <span class="reading-path-v2__title">Sleep</span>
+  </a>
+</nav>
+
+<div id="amj-subscribe"></div>
+<div id="amj-bottom-nav"></div>
+<div id="amj-reading-path"></div>
+<div id="amj-footer"></div>
+
+<script>
+(function(){
+'use strict';
+
+// ── Habit Registry (behavioral habits only — supplements + hygiene excluded) ──
+// Organized by purpose groups for Zone 2
+// Stage0 Fix 1 (2026-05-30): server-side filter is authoritative — see
+// lambdas/web/site_api_data.py:handle_habit_registry + handle_vice_streaks.
+// Client retains a no-op so existing call sites stay clean and we don't
+// ship the keyword list in plaintext JS.
+function isBlocked(_t){ return false; }
+
+// ── Habit data: loaded from /api/habit_registry (DynamoDB PROFILE#v1) ──
+// These are populated by fetchHabitRegistry() before render
+var T0_HABITS = [];
+var PURPOSE_GROUPS = [];
+var T2_HABITS = [];
+
+// Pillar icon map (registry doesn’t store icons)
+var PILLAR_ICONS = {
+  'Nutrition':'🎯','Sleep':'☀️','Discipline':'🚫','Movement':'🏋️',
+  'Recovery':'❄️','Data':'📊','Wellbeing':'🧠','Growth':'📚','Training':'⚡','Metabolic':'🔬'
+};
+// Synergy group metadata (display names, icons, descriptions)
+var GROUP_META = {
+  'sleep_stack':     {id:'sleep',name:'Sleep Architecture',icon:'🌙',desc:'Protecting the master variable. Everything from circadian anchoring to wind-down protocols.'},
+  'morning_routine': {id:'morning',name:'Morning Routine',icon:'☀️',desc:'The first 90 minutes. Light, movement, journaling — sets the day.'},
+  'training':        {id:'train',name:'Training Engine',icon:'⚡',desc:'Movement and recovery protocols that preserve lean mass during the deficit.'},
+  'fuel':            {id:'fuel',name:'Fuel & Metabolic',icon:'🔬',desc:'Nutrition tracking, fasting protocols, and the metabolic levers that drive body composition.'},
+  'mind':            {id:'mind',name:'Mind & Growth',icon:'🧠',desc:'Journaling, deep work, and the cognitive habits that compound beyond the physical.'},
+  'discipline':      {id:'discipline',name:'Discipline Gates',icon:'🛡️',desc:'The "not doing" habits. Identity-level commitments that protect the system.'},
+  'data':            {id:'data',name:'Data Signals',icon:'📊',desc:'The nervous system of the platform. No signal in = no intelligence out.'},
+  'sleep_supps':     {id:'sleep_supps',name:'Sleep Supplements',icon:'💊',desc:'The supplement stack that supports sleep architecture.'},
+  'recovery':        {id:'recovery',name:'Recovery & Restoration',icon:'❄️',desc:'Active and passive recovery protocols.'},
+};
+// Fallback group for habits without synergy_group
+var DEFAULT_GROUP = {id:'other',name:'Other',icon:'◆',desc:'Habits not yet assigned to a synergy group.'};
+
+function freqLabel(tf) {
+  if (!tf) return 'daily';
+  if (tf >= 7) return 'daily';
+  if (tf >= 5) return tf + '×/week';
+  return tf + '×/week';
+}
+
+function transformRegistry(habits) {
+  // Split by tier
+  var t0raw = habits.filter(function(h){ return h.tier === 'T0' || h.tier === 0; });
+  var t1raw = habits.filter(function(h){ return h.tier === 'T1' || h.tier === 1; });
+  var t2raw = habits.filter(function(h){ return h.tier === 'T2' || h.tier === 2; });
+
+  // T0: map to {name, pillar, icon, why, science, ev}
+  T0_HABITS = t0raw.filter(function(h){ return !h.vice && !isBlocked(h.name); }).map(function(h){
+    var pillar = (h.maps_to_primary || h.category || 'Other');
+    pillar = pillar.charAt(0).toUpperCase() + pillar.slice(1);
+    return {
+      name: h.name,
+      pillar: pillar,
+      domain: pillar.toLowerCase(),
+      icon: PILLAR_ICONS[pillar] || PILLAR_ICONS[h.category] || '●',
+      why: h.expected_impact || '',
+      science: h.science || '',
+      ev: h.science && h.science.toLowerCase().indexOf('peer') !== -1 ? 'strong' : 'personal protocol'
+    };
+  });
+
+  // T1: group by synergy_group into purpose groups
+  var groupMap = {};
+  t1raw.filter(function(h){ return !isBlocked(h.name); }).forEach(function(h){
+    var sg = h.synergy_group || 'other';
+    if (!groupMap[sg]) groupMap[sg] = [];
+    groupMap[sg].push({
+      name: h.name,
+      why: h.expected_impact || '',
+      ev: h.science ? (h.science.length > 50 ? 'strong' : 'moderate') : 'emerging',
+      freq: freqLabel(h.target_frequency),
+      domain: (h.maps_to_primary || h.category || 'other').toLowerCase()
+    });
+  });
+  PURPOSE_GROUPS = Object.keys(groupMap).map(function(sg){
+    var meta = GROUP_META[sg] || {id:sg, name:sg.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();}), icon:'◆', desc:''};
+    return {
+      id: meta.id,
+      name: meta.name,
+      icon: meta.icon,
+      desc: meta.desc,
+      habits: groupMap[sg]
+    };
+  });
+
+  // T2: map to {name, cat, freq, why}
+  T2_HABITS = t2raw.filter(function(h){ return !isBlocked(h.name); }).map(function(h){
+    return {
+      name: h.name,
+      cat: h.category || 'Other',
+      freq: freqLabel(h.target_frequency),
+      why: h.expected_impact || ''
+    };
+  });
+}
+
+// ── SVG helpers ──
+function ringSVG(pct, size){
+  var r = (size-8)/2, c = 2*Math.PI*r;
+  var offset = c - (pct/100)*c;
+  return '<svg class="t0-ring" viewBox="0 0 '+size+' '+size+'" width="'+size+'" height="'+size+'">' +
+    '<circle class="t0-ring__bg" cx="'+(size/2)+'" cy="'+(size/2)+'" r="'+r+'"/>' +
+    '<circle class="t0-ring__fill" cx="'+(size/2)+'" cy="'+(size/2)+'" r="'+r+'" ' +
+      'stroke-dasharray="'+c+'" stroke-dashoffset="'+offset+'" transform="rotate(-90 '+(size/2)+' '+(size/2)+')"/>' +
+    '<text class="t0-ring__pct" x="'+(size/2)+'" y="'+(size/2)+'">'+(pct != null ? pct+'%' : '—')+'</text></svg>';
+}
+
+function sparkHTML(vals, h, colorFn){
+  var mx = Math.max.apply(null, vals.filter(function(v){return v!=null})) || 100;
+  return vals.map(function(v){
+    if(v==null) return '<div style="flex:1;height:2px;background:var(--surface-raised)"></div>';
+    var bh = Math.max(2, Math.round((v/mx)*h));
+    var c = colorFn ? colorFn(v) : (v>=80?'var(--accent)':v>=50?'var(--c-amber-400)':'rgba(255,82,82,0.6)');
+    return '<div style="flex:1;height:'+bh+'px;background:'+c+';border-radius:1px 1px 0 0;opacity:0.8"></div>';
+  }).join('');
+}
+
+function evBadge(ev){
+  var cls = ev==='strong'?'ev-badge--strong':ev==='moderate'?'ev-badge--moderate':ev==='personal protocol'?'ev-badge--moderate':'ev-badge--emerging';
+  return '<span class="ev-badge '+cls+'">'+ev+'</span>';
+}
+
+function cellClass(p){
+  if(p==null||p===0) return 'hm-0';
+  if(p<50) return 'hm-1';
+  if(p<80) return 'hm-2';
+  if(p<100) return 'hm-3';
+  return 'hm-4';
+}
+
+// ── Tooltip ──
+var tooltip=document.getElementById('hm-tooltip');
+function showTip(e,d,p){
+  document.getElementById('tt-date').textContent=d;
+  document.getElementById('tt-pct').textContent=p+'%';
+  tooltip.classList.add('visible');
+  tooltip.style.left=(e.clientX+12)+'px';
+  tooltip.style.top=(e.clientY-30)+'px';
+}
+function hideTip(){ tooltip.classList.remove('visible'); }
+
+// ── Build T0 cards ──
+function buildT0(history){
+  var grid = document.getElementById('t0-grid');
+  // Get last 30 days of T0 pct
+  var last30 = history.slice(-30).map(function(d){return d.tier0_pct||0});
+  var avgPct = last30.length ? Math.round(last30.reduce(function(a,b){return a+b},0)/last30.length) : 0;
+
+  // Build per-habit sparkline data from history (5f fix)
+  var habitSparkData = {};
+  history.slice(-30).forEach(function(d){
+    var completions = d.habit_completions || d.habits || {};
+    Object.keys(completions).forEach(function(hName){
+      if(!habitSparkData[hName]) habitSparkData[hName] = [];
+      habitSparkData[hName].push(completions[hName] ? 100 : 0);
+    });
+  });
+
+  grid.innerHTML = T0_HABITS.map(function(h){
+    // 5f: use per-habit completion data for sparkline, fallback to T0 aggregate
+    var sparkData = habitSparkData[h.name] || last30;
+    var domain = h.pillar.toLowerCase();
+    return '<div class="t0-card" data-habit-name="'+h.name+'" data-domain="'+domain+'">' +
+      '<div class="t0-card__top">' +
+        ringSVG(avgPct, 56) +
+        '<div class="t0-card__info">' +
+          '<div class="t0-card__name">'+h.icon+' '+h.name+'</div>' +
+          '<div class="t0-card__pillar">'+h.pillar+'</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="t0-card__spark">'+sparkHTML(sparkData, 20)+'</div>' +
+      '<div class="t0-card__why">"'+h.why+'"</div>' +
+      '<div class="t0-card__science">// '+h.science+' '+evBadge(h.ev)+'</div>' +
+    '</div>';
+  }).join('');
+
+  // 5k: Populate the "Start Here" list with T0 habits
+  var startList = document.getElementById('start-here-list');
+  if(startList){
+    startList.innerHTML = T0_HABITS.map(function(h){
+      return '<div class="start-here__item">' +
+        '<span class="start-here__item-icon">'+h.icon+'</span>' +
+        '<span class="start-here__item-name">'+h.name+'</span>' +
+      '</div>';
+    }).join('');
+  }
+}
+
+// ── Build Vice Section ──
+function buildVices(viceData){
+  var vices = (viceData.vices||[]).filter(function(v){ return !isBlocked(v.name); });
+  if(!vices.length) return;
+
+  var holding = vices.filter(function(v){return v.holding}).length;
+  document.getElementById('vice-summary').innerHTML =
+    '<div><div class="vice-sum__val vice-sum__val--accent">'+holding+'</div><div class="vice-sum__label">holding today</div></div>' +
+    '<div><div class="vice-sum__val">'+vices.length+'</div><div class="vice-sum__label">tracked</div></div>';
+
+  document.getElementById('vice-grid').innerHTML = vices.map(function(v){
+    var cls = v.holding ? 'vice-card--holding' : 'vice-card--broken';
+    var numCls = v.holding ? 'vice-num--holding' : 'vice-num--broken';
+    var name = v.name.replace(/^No /i,'');
+    var label = v.holding ? 'No '+name : name+' — rebuilding';
+    var meta = 'best: '+v.best_streak+'d';
+    if(v.relapses_90d>0) meta += ' · '+v.relapses_90d+' relapse'+(v.relapses_90d===1?'':'s')+' (90d)';
+    return '<div class="vice-card '+cls+'">' +
+      '<div class="vice-num '+numCls+'">'+v.current_streak+'</div>' +
+      '<div class="vice-info">' +
+        '<div class="vice-name">'+label+'</div>' +
+        '<div class="vice-meta">'+meta+'</div>' +
+      '</div></div>';
+  }).join('');
+
+  document.getElementById('zone-vices').style.display = '';
+}
+
+// ── Build Purpose Groups (T1) — 5i: visible by default, 5f: per-habit sparklines ──
+function buildPurposeGroups(history){
+  var container = document.getElementById('purpose-groups');
+
+  // Build per-habit completion lookup from history (5f fix)
+  // Each history entry may have a habit_completions map: {habit_name: true/false}
+  var habitSparkData = {};
+  var last7 = history.slice(-7);
+  last7.forEach(function(d){
+    var completions = d.habit_completions || d.habits || {};
+    Object.keys(completions).forEach(function(hName){
+      if(!habitSparkData[hName]) habitSparkData[hName] = [];
+      habitSparkData[hName].push(completions[hName] ? 100 : 0);
+    });
+  });
+
+  container.innerHTML = PURPOSE_GROUPS.map(function(g){
+    var habCount = g.habits.length;
+    // 5i: purpose groups open by default (aria-expanded=true, body has .open)
+    return '<div class="purpose-group" data-group-id="'+g.id+'">' +
+      '<button class="purpose-toggle" aria-expanded="true" onclick="(function(b){' +
+        'var body=b.nextElementSibling;var open=body.classList.contains(\'open\');' +
+        'body.classList.toggle(\'open\',!open);b.setAttribute(\'aria-expanded\',!open?\'true\':\'false\');' +
+      '})(this)">' +
+        '<div class="purpose-icon">'+g.icon+'</div>' +
+        '<div class="purpose-toggle__info">' +
+          '<div class="purpose-toggle__name">'+g.name+'</div>' +
+          '<div class="purpose-toggle__count">'+habCount+' habit'+(habCount===1?'':'s')+'</div>' +
+        '</div>' +
+        '<span class="purpose-arrow" style="transform:rotate(90deg)">▶</span>' +
+      '</button>' +
+      '<div class="purpose-body open">' +
+        '<div class="purpose-body__desc">'+g.desc+'</div>' +
+        '<div class="t1-list">' +
+          g.habits.map(function(h){
+            if(isBlocked(h.name)) return '';
+            // 5f: use per-habit sparkline data, not global T0 data
+            var perHabitData = habitSparkData[h.name];
+            if(!perHabitData || perHabitData.length === 0) {
+              // Fallback: generate neutral placeholder instead of T0 data
+              perHabitData = [null, null, null, null, null, null, null];
+            }
+            return '<div class="t1-row" data-habit-name="'+h.name+'" data-domain="'+(h.domain||g.id)+'">' +
+              '<div class="t1-row__name">'+h.name+'</div>' +
+              '<div class="t1-row__spark">'+sparkHTML(perHabitData.slice(-7), 14)+'</div>' +
+              '<div class="t1-row__tag">'+h.freq+' '+evBadge(h.ev)+'</div>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+        '<div style="margin-top:var(--space-4);font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono)">' +
+          g.habits.filter(function(h){return !isBlocked(h.name)}).map(function(h){
+            return '→ <em style="color:var(--text-muted)">'+h.name+'</em>: '+h.why;
+          }).join('<br>') +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ── Build Horizon (T2) ──
+function buildHorizon(){
+  var grid = document.getElementById('horizon-grid');
+  grid.innerHTML = T2_HABITS.filter(function(h){return !isBlocked(h.name)}).map(function(h){
+    return '<div class="horizon-card" data-domain="'+(h.cat||'other').toLowerCase()+'">' +
+      '<div class="horizon-card__lock">🔒</div>' +
+      '<div class="horizon-card__name">'+h.name+'</div>' +
+      '<div class="horizon-card__cat">'+h.cat+'</div>' +
+      '<div class="horizon-card__freq">'+h.freq+'</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ── Build Heatmap ──
+function buildHeatmap(history){
+  var EXPERIMENT_START = ((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) || '2026-05-25');
+  var byDate = {};
+  history.forEach(function(d){if(d.date>=EXPERIMENT_START) byDate[d.date]=d});
+  var today = new Date();
+  var expStart = new Date(EXPERIMENT_START + 'T00:00:00');
+  // Calculate total days from experiment start to today
+  var totalDays = Math.floor((today - expStart) / 86400000) + 1;
+  if(totalDays<1) totalDays = 1;
+  // Start from the Monday on or before experiment start
+  var expDow = (expStart.getDay()+6)%7; // 0=Mon
+  var gridStart = new Date(expStart);
+  gridStart.setDate(gridStart.getDate() - expDow);
+  // End on today
+  var todayDow = (today.getDay()+6)%7;
+  var WEEKS = Math.ceil((totalDays + expDow) / 7);
+  if(WEEKS<1) WEEKS = 1;
+  var gridEl = document.getElementById('hm-grid');
+  gridEl.innerHTML = '';
+  for(var c=0;c<WEEKS;c++){
+    var weekDiv = document.createElement('div');
+    weekDiv.className = 'heatmap-week';
+    for(var r=0;r<7;r++){
+      var cell = document.createElement('div');
+      var dt = new Date(gridStart);
+      dt.setDate(dt.getDate() + c*7 + r);
+      var iso = dt.toISOString().slice(0,10);
+      if(iso < EXPERIMENT_START || dt > today){
+        cell.className='hm-cell empty';
+      } else {
+        var day = byDate[iso];
+        var pct = day ? (day.tier0_pct||0) : null;
+        cell.className = 'hm-cell '+(pct!=null?cellClass(pct):'hm-0');
+        if(day){
+          (function(d,p,i){
+            cell.addEventListener('mouseenter',function(e){showTip(e,i,p)});
+            cell.addEventListener('mouseleave',hideTip);
+          })(day,pct!=null?pct:0,iso);
+        }
+      }
+      weekDiv.appendChild(cell);
+    }
+    gridEl.appendChild(weekDiv);
+  }
+}
+
+// ── Build Correlations ──
+function buildCorrelations(data){
+  var corrs = data.keystone_correlations;
+  if(!corrs||!corrs.length) return;
+  var card = document.getElementById('corr-card');
+  var rows = document.getElementById('corr-rows');
+  var maxR = Math.max.apply(null,corrs.map(function(c){return Math.abs(c.correlation_r)}));
+  rows.innerHTML = corrs.map(function(c,i){
+    var pct = maxR>0?Math.round((Math.abs(c.correlation_r)/maxR)*100):0;
+    var r = c.correlation_r;
+    return '<div class="corr-row">' +
+      '<div class="corr-rank">'+(i+1)+'</div>' +
+      '<div class="corr-name">'+c.group+'</div>' +
+      '<div class="corr-bar"><div class="corr-bar__fill" style="width:'+pct+'%"></div></div>' +
+      '<div class="corr-r">'+(r>=0?'+':'')+r.toFixed(3)+'</div>' +
+    '</div>';
+  }).join('');
+  card.style.display = '';
+}
+
+// ── Build DOW ──
+function buildDOW(data){
+  var avgs = data.day_of_week_avgs;
+  if(!avgs||!avgs.length) return;
+  var DOW = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  var daysTracked = data.days_tracked || (data.history ? data.history.length : 0);
+  var subEl = document.getElementById('dow-sub');
+  if(subEl) subEl.textContent = daysTracked < 28
+    ? 'T0 completion by day \u2014 ' + daysTracked + ' days tracked \u2014 patterns emerge after 4+ weeks'
+    : 'T0 completion by day \u2014 last 90 days';
+  var valid = avgs.map(function(v,i){return{i:i,v:v}}).filter(function(x){return x.v!=null});
+  var bestI = valid.length ? valid.reduce(function(a,b){return a.v>b.v?a:b}).i : null;
+  var worstI = valid.length ? valid.reduce(function(a,b){return a.v<b.v?a:b}).i : null;
+
+  document.getElementById('dow-bars').innerHTML = avgs.map(function(p,i){
+    if(p==null) return '<div class="dow-col"><div class="dow-bar dow-bar--mid" style="height:4px;opacity:0.25"></div><div class="dow-label">'+DOW[i]+'</div></div>';
+    var h = Math.max(4,Math.round((p/100)*72));
+    var cls = i===bestI?'dow-bar--best':i===worstI?'dow-bar--worst':'dow-bar--mid';
+    return '<div class="dow-col"><div class="dow-bar '+cls+'" style="height:'+h+'px"></div><div class="dow-label">'+DOW[i]+'</div></div>';
+  }).join('');
+
+  if(bestI!=null){
+    document.getElementById('dow-insight').textContent =
+      '// peak: '+DOW[bestI]+' ('+avgs[bestI]+'%) — vulnerable: '+DOW[worstI]+' ('+avgs[worstI]+'%)';
+  }
+  document.getElementById('dow-card').style.display = '';
+}
+
+// ── Build Fatigue ──
+function buildFatigue(history){
+  if(history.length<1) return;
+  var recent = history.slice(-14);
+  var pcts = recent.map(function(d){return d.tier0_pct||0});
+  var avg = pcts.reduce(function(a,b){return a+b},0)/pcts.length;
+  var idx = Math.round(100-avg);
+  var color = idx<=25?'var(--accent)':idx<=50?'var(--c-amber-400)':'var(--c-red-status)';
+
+  document.getElementById('fatigue-score').textContent = idx;
+  document.getElementById('fatigue-score').style.color = color;
+  document.getElementById('fatigue-insight').textContent =
+    idx<=25 ? 'Low fatigue — system holding ('+Math.round(avg)+'% avg)' :
+    idx<=50 ? 'Moderate — watch for cascading drops ('+Math.round(avg)+'% avg)' :
+    'Elevated — consider T0-only focus ('+Math.round(avg)+'% avg)';
+  document.getElementById('fatigue-spark').innerHTML = sparkHTML(pcts, 16);
+  document.getElementById('fatigue-section').style.display = '';
+}
+
+// ── Compute Stats ──
+function computeStats(data){
+  var history = data.history||[];
+  var avg = history.length ? Math.round(history.reduce(function(s,d){return s+(d.tier0_pct||0)},0)/history.length) : 0;
+  var streak = data.current_streak || 0;
+  var days = data.days_tracked || history.length;
+
+  document.getElementById('hero-streak').textContent = streak+' days';
+  document.getElementById('hero-avg').textContent = avg+'%';
+  document.getElementById('hero-days').textContent = days;
+  document.getElementById('streak-big').textContent = streak;
+  // H1: Show perspective banner when early
+  if (days < 21) { var _pp = document.getElementById('habits-perspective'); if (_pp) _pp.style.display = ''; }
+}
+
+// ── Domain Filter (5h) ──
+// Exposed globally for onclick handlers
+window.filterByDomain = function(domain) {
+  // Update chip states
+  document.querySelectorAll('.domain-chip').forEach(function(chip){
+    chip.classList.toggle('active', chip.getAttribute('data-domain') === domain);
+  });
+
+  // Domain mapping: chip value -> habit pillar/domain keywords
+  var domainMap = {
+    'sleep': ['sleep'],
+    'movement': ['movement', 'training', 'exercise'],
+    'nutrition': ['nutrition', 'fuel', 'metabolic'],
+    'recovery': ['recovery', 'restoration'],
+    'mind': ['mind', 'wellbeing', 'growth', 'journal'],
+    'discipline': ['discipline'],
+    'data': ['data']
+  };
+
+  var showAll = domain === 'all';
+  var keywords = domainMap[domain] || [];
+
+  function matchesDomain(el) {
+    if (showAll) return true;
+    var d = (el.getAttribute('data-domain') || '').toLowerCase();
+    return keywords.some(function(kw){ return d.indexOf(kw) !== -1; });
+  }
+
+  // Filter T0 cards
+  document.querySelectorAll('.t0-card').forEach(function(card){
+    card.style.display = matchesDomain(card) ? '' : 'none';
+  });
+
+  // Filter T1 rows
+  document.querySelectorAll('.t1-row').forEach(function(row){
+    row.style.display = matchesDomain(row) ? '' : 'none';
+  });
+
+  // Filter purpose groups — hide group if all habits hidden
+  document.querySelectorAll('.purpose-group').forEach(function(group){
+    var rows = group.querySelectorAll('.t1-row');
+    var anyVisible = false;
+    rows.forEach(function(r){ if(r.style.display !== 'none') anyVisible = true; });
+    group.style.display = (showAll || anyVisible) ? '' : 'none';
+  });
+
+  // Filter horizon cards
+  document.querySelectorAll('.horizon-card').forEach(function(card){
+    card.style.display = matchesDomain(card) ? '' : 'none';
+  });
+};
+
+// ── Main Load ──
+async function load(){
+  try {
+    // Step 1: Fetch habit registry (source of truth for definitions)
+    var regRes = await fetch('/api/habit_registry');
+    if (regRes.ok) {
+      var regData = await regRes.json();
+      transformRegistry(regData.habits || []);
+      // Update hero count with actual number
+      var countEl = document.getElementById('hero-count');
+      if (countEl) countEl.textContent = T0_HABITS.length + PURPOSE_GROUPS.reduce(function(s,g){return s+g.habits.length},0) + T2_HABITS.length;
+    }
+
+    // Step 2: Fetch live data (adherence, streaks, history)
+    var [habRes, viceRes, streakRes] = await Promise.all([
+      fetch('/api/habits'),
+      fetch('/api/vice_streaks'),
+      fetch('/api/habit_streaks'),
+    ]);
+    if(!habRes.ok) throw new Error('HTTP '+habRes.status);
+    var data = await habRes.json();
+
+    // Merge streak data
+    if(streakRes.ok){
+      var sData = await streakRes.json();
+      var hs = sData.habit_streaks||{};
+      if(hs.aggregate_streak!=null && data.current_streak==null) data.current_streak = hs.aggregate_streak;
+      if(hs.best_streak!=null && data.best_streak==null) data.best_streak = hs.best_streak;
+    }
+
+    var history = data.history||[];
+    computeStats(data);
+    buildT0(history);
+    // H2: Best day highlight
+    (function() {
+      if (!history.length) return;
+      var best = history.reduce(function(a, b) { return (b.tier0_pct || 0) > (a.tier0_pct || 0) ? b : a; });
+      if (!best || !best.tier0_pct) return;
+      var d = new Date(best.date + 'T12:00:00');
+      var dow = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()];
+      var el = document.getElementById('habits-perspective');
+      if (!el) return;
+      var card = document.createElement('div');
+      card.style.cssText = 'max-width:var(--max-width);margin:0 auto;padding:var(--space-3) var(--page-padding);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);text-align:center;letter-spacing:var(--ls-tag)';
+      card.textContent = 'Your best day: ' + best.date + ' (' + dow + ') \u2014 ' + best.tier0_pct + '% T0 complete';
+      el.appendChild(card);
+    })();
+    buildPurposeGroups(history);
+    buildHorizon();
+    buildHeatmap(history);
+    buildCorrelations(data);
+    buildDOW(data);
+    buildFatigue(history);
+
+    // Vice streaks
+    if(viceRes.ok){
+      var viceData = await viceRes.json();
+      buildVices(viceData);
+    }
+  } catch(e){
+    console.warn('[habits] API error:',e);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', load);
+})();
+</script>
+
+<script src="/legacy/assets/js/reveal.js"></script>
+<script src="/legacy/assets/js/site_constants.js"></script>
+<script src="/legacy/assets/js/components.js"></script>
+<script src="/legacy/assets/js/nav.js"></script>
+<script src="/legacy/assets/js/animations.js" defer></script>
+</body>
+</html>

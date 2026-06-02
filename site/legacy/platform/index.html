@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="robots" content="noindex">
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="The Platform — a single-person health intelligence system built entirely on AWS serverless. 62 Lambda functions, 121 AI tools, 26 data sources, ~$19/month.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="The Platform — Matthew">
+  <meta name="twitter:description" content="62 Lambda functions. 121 AI tools. 26 data sources. $19/month. A single-person health intelligence system on AWS serverless.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:title" content="The Platform — Matthew">
+  <meta property="og:description" content="62 Lambda functions. 121 AI tools. 26 data sources. $19/month. A single-person health intelligence system on AWS serverless.">
+  <meta property="og:type" content="website">
+  <title>The Platform — Matthew</title>
+    <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/legacy/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/legacy/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/legacy/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/legacy/assets/css/tokens.css">
+  <link rel="stylesheet" href="/legacy/assets/css/base.css">
+  <style>
+    .page-header {
+      padding: var(--space-16) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-12);
+      align-items: end;
+    }
+    .page-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      line-height: var(--lh-display);
+      color: var(--text);
+    }
+    .page-header__title span { color: var(--accent); }
+    .page-header__meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+    }
+    .meta-stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-4) var(--space-5);
+    }
+    .meta-stat__label { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-1); }
+    .meta-stat__value { font-family: var(--font-display); font-size: 36px; color: var(--accent); line-height: 1; }
+    .meta-stat__unit { font-size: var(--text-sm); color: var(--text-muted); }
+
+    /* Architecture diagram */
+    .arch-section {
+      padding: var(--space-16) var(--page-padding);
+      border-top: 1px solid var(--border);
+    }
+    .arch-layers {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-top: var(--space-8);
+    }
+    .arch-layer {
+      background: var(--surface);
+      display: grid;
+      grid-template-columns: 180px 1fr;
+    }
+    .arch-layer__label {
+      padding: var(--space-6);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .arch-layer__name {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--accent);
+      letter-spacing: var(--ls-display);
+      margin-bottom: var(--space-1);
+    }
+    .arch-layer__sub { font-size: var(--text-2xs); color: var(--text-muted); letter-spacing: var(--ls-tag); text-transform: uppercase; }
+    .arch-layer__content { padding: var(--space-6); }
+    .arch-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+    }
+    .chip {
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      padding: var(--space-1) var(--space-3);
+      white-space: nowrap;
+    }
+    .chip.active { color: var(--accent); border-color: var(--accent-dim); background: var(--accent-bg-subtle); }
+
+    /* Stack section */
+    .stack-section {
+      padding: var(--space-16) var(--page-padding);
+      border-top: 1px solid var(--border);
+    }
+    .stack-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-top: var(--space-8);
+    }
+    .stack-card {
+      background: var(--surface);
+      padding: var(--space-8) var(--space-6);
+    }
+    .stack-card:hover { background: var(--surface-raised); }
+    .stack-card__category {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-4);
+    }
+    .stack-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+      padding-bottom: var(--space-4);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .stack-item:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+    .stack-item__bullet {
+      width: 6px; height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 5px;
+    }
+    .stack-item__name { font-size: var(--text-sm); color: var(--text); font-weight: 700; margin-bottom: 2px; }
+    .stack-item__desc { font-size: var(--text-xs); color: var(--text-muted); line-height: 1.5; }
+
+    /* AI section */
+    .ai-section {
+      padding: var(--space-16) var(--page-padding);
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-12);
+    }
+    .ai-section__left { }
+    .ai-section__body p {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      margin-bottom: var(--space-4);
+    }
+    .ai-section__body p strong { color: var(--text); }
+    .ai-tools-sample {
+      margin-top: var(--space-6);
+      border: 1px solid var(--border);
+    }
+    .tool-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: var(--text-xs);
+    }
+    .tool-row:last-child { border-bottom: none; }
+    .tool-name { color: var(--accent); font-family: var(--font-mono); }
+    .tool-desc { color: var(--text-muted); }
+
+    /* Review history */
+    .reviews-section {
+      padding: var(--space-16) var(--page-padding);
+      border-top: 1px solid var(--border);
+    }
+    .review-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-top: var(--space-8);
+    }
+    .review-card {
+      background: var(--surface);
+      padding: var(--space-6);
+    }
+    .review-card__num { font-family: var(--font-display); font-size: 42px; color: var(--accent); line-height: 1; margin-bottom: var(--space-2); }
+    .review-card__grade { font-family: var(--font-display); font-size: 28px; color: var(--text); }
+    .review-card__date { font-size: var(--text-xs); color: var(--text-muted); letter-spacing: var(--ls-tag); text-transform: uppercase; margin-bottom: var(--space-3); }
+    .review-card__note { font-size: var(--text-xs); color: var(--text-muted); line-height: 1.5; }
+
+    /* Feature hub */
+    .hub-section {
+      border-top: 1px solid var(--border);
+      padding: var(--space-16) var(--page-padding);
+    }
+    .hub-category {
+      margin-bottom: var(--space-10);
+    }
+    .hub-category__label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-4);
+    }
+    .hub-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+    }
+    .hub-card {
+      background: var(--surface);
+      padding: var(--space-5) var(--space-5);
+      text-decoration: none;
+      display: block;
+      transition: background var(--dur-fast);
+    }
+    .hub-card:hover { background: var(--surface-raised); }
+    .hub-card__icon { font-size: 20px; margin-bottom: var(--space-2); }
+    .hub-card__title {
+      font-family: var(--font-display);
+      font-size: var(--text-base);
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+      margin-bottom: var(--space-1);
+    }
+    .hub-card__desc {
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* ── PLAT-3: Zone dividers ── */
+    .zone-divider {
+      display: flex;
+      align-items: center;
+      gap: var(--space-6);
+      padding: var(--space-6) var(--page-padding);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--surface);
+    }
+    .zone-divider__num {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--accent-dim);
+      letter-spacing: var(--ls-tag);
+      border: 1px solid var(--accent-dim);
+      padding: 2px var(--space-3);
+      flex-shrink: 0;
+    }
+    .zone-divider__label {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+    }
+    .zone-divider__sub {
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      letter-spacing: var(--ls-label);
+      margin-left: auto;
+    }
+
+    @media (max-width: 900px) {
+      .page-header { grid-template-columns: 1fr; }
+      .arch-layer { grid-template-columns: 1fr; }
+      .arch-layer__label { border-right: none; border-bottom: 1px solid var(--border); }
+      .stack-grid { grid-template-columns: 1fr; }
+      .ai-section { grid-template-columns: 1fr; }
+      .review-grid { grid-template-columns: 1fr 1fr; }
+      .hub-grid { grid-template-columns: repeat(2, 1fr); }
+      .zone-divider__sub { display: none; }
+    }
+    @media (max-width: 480px) {
+      .hub-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+  <link rel="canonical" href="https://averagejoematt.com/platform/">
+</head>
+<body class="body-signal">
+
+<div id="amj-nav"></div>
+<div id="amj-hierarchy-nav"></div>
+
+</div>
+
+
+
+
+
+
+<!-- Page header -->
+<div class="page-header">
+  <div>
+    <div class="eyebrow">The Build</div>
+    <h1 class="page-header__title">The<br><span>Platform</span></h1>
+    <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);margin-top:var(--space-5);max-width:420px">One person's answer to: what if AI could see the full picture?</p>
+    <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body);margin-top:var(--space-4);max-width:480px;font-style:italic;">The question from the Story page &mdash; can a system catch what willpower can&rsquo;t? &mdash; led to this.</p>
+  </div>
+  <div class="page-header__meta">
+    <div class="meta-stat">
+      <div class="meta-stat__label">MCP tools</div>
+      <div class="meta-stat__value" id="plat-mcp-tools" data-const="platform.mcp_tools">121</div>
+    </div>
+    <div class="meta-stat">
+      <div class="meta-stat__label">Data sources</div>
+      <div class="meta-stat__value" id="plat-data-sources" data-const="platform.data_sources">26</div>
+    </div>
+    <div class="meta-stat">
+      <div class="meta-stat__label">AWS Lambdas</div>
+      <div class="meta-stat__value" id="plat-lambdas" data-const="platform.lambdas">62</div>
+    </div>
+    <div class="meta-stat">
+      <div class="meta-stat__label">Arch grade</div>
+      <div class="meta-stat__value" data-const="platform.review_grade">A</div>
+    </div>
+  </div>
+</div>
+
+<!-- 26b: Tweetable stats -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border-bottom:1px solid var(--border);">
+  <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
+    <div style="font-family:var(--font-display);font-size:42px;color:var(--accent);line-height:1;" data-const="platform.monthly_cost">$19</div>
+    <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-top:var(--space-2)">Per month to operate</div>
+  </div>
+  <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
+    <div style="font-family:var(--font-display);font-size:42px;color:var(--c-amber-500);line-height:1;">0</div>
+    <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-top:var(--space-2)">Engineers on team</div>
+  </div>
+  <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
+    <div style="font-family:var(--font-display);font-size:42px;color:var(--text);line-height:1;" data-const="platform.data_sources">26</div>
+    <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-top:var(--space-2)">Data sources integrated</div>
+  </div>
+</div>
+
+<!-- PLAT-3: Zone 1 divider -->
+<div class="zone-divider">
+  <span class="zone-divider__num">ZONE 01</span>
+  <span class="zone-divider__label">The Pipeline</span>
+  <span class="zone-divider__sub">architecture · ingest · compute · intelligence · tech stack</span>
+</div>
+
+<!-- PLAT-2: Architecture diagram SVG -->
+<section class="reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);overflow-x:auto;">
+  <div class="eyebrow">Architecture</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">The system — every component</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">26 data sources → 13 ingest Lambdas → S3 + DynamoDB → 5 compute Lambdas → 4 output channels. All on AWS. Costs ~$19/month. Built by one person using AI as a development partner.</p>
+  <div style="border:1px solid var(--border);background:var(--surface);padding:var(--space-6);overflow-x:auto;">
+    <svg viewBox="0 0 1060 340" style="width:100%;min-width:900px;display:block;font-family:'Space Mono','Courier New',monospace;" xmlns="http://www.w3.org/2000/svg">
+
+      <!-- ── Zone headers ── -->
+      <!-- Sources -->
+      <text x="90" y="18" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8" letter-spacing="2">DATA SOURCES</text>
+      <!-- Ingest -->
+      <text x="320" y="18" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8" letter-spacing="2">INGEST</text>
+      <!-- Store -->
+      <text x="540" y="18" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8" letter-spacing="2">STORE</text>
+      <!-- Compute -->
+      <text x="730" y="18" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8" letter-spacing="2">COMPUTE</text>
+      <!-- Outputs -->
+      <text x="950" y="18" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8" letter-spacing="2">OUTPUTS</text>
+      <!-- Vertical dividers -->
+      <line x1="210" y1="22" x2="210" y2="330" stroke="rgba(0,229,160,0.06)" stroke-width="1"/>
+      <line x1="435" y1="22" x2="435" y2="330" stroke="rgba(0,229,160,0.06)" stroke-width="1"/>
+      <line x1="640" y1="22" x2="640" y2="330" stroke="rgba(0,229,160,0.06)" stroke-width="1"/>
+      <line x1="840" y1="22" x2="840" y2="330" stroke="rgba(0,229,160,0.06)" stroke-width="1"/>
+
+      <!-- ── Data source groups ── -->
+      <!-- Wearables group -->
+      <rect x="10" y="28" width="155" height="78" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(0,229,160,0.2)" stroke-width="1"/>
+      <text x="87" y="42" text-anchor="middle" fill="var(--accent)" font-size="8" letter-spacing="1.5">WEARABLES</text>
+      <text x="87" y="57" text-anchor="middle" fill="#7a9080" font-size="9">Whoop · Eight Sleep</text>
+      <text x="87" y="71" text-anchor="middle" fill="#7a9080" font-size="9">Garmin · Apple Health</text>
+      <text x="87" y="85" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">HRV · Sleep · Steps · HR</text>
+      <!-- Nutrition group -->
+      <rect x="10" y="114" width="155" height="68" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(0,229,160,0.2)" stroke-width="1"/>
+      <text x="87" y="128" text-anchor="middle" fill="var(--accent)" font-size="8" letter-spacing="1.5">NUTRITION + METABOLIC</text>
+      <text x="87" y="143" text-anchor="middle" fill="#7a9080" font-size="9">MacroFactor · Dexcom CGM</text>
+      <text x="87" y="157" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">Calories · Macros · Glucose</text>
+      <text x="87" y="172" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">Withings · Blood Pressure</text>
+      <!-- Behavioral group -->
+      <rect x="10" y="190" width="155" height="68" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(0,229,160,0.2)" stroke-width="1"/>
+      <text x="87" y="204" text-anchor="middle" fill="var(--accent)" font-size="8" letter-spacing="1.5">BEHAVIORAL</text>
+      <text x="87" y="219" text-anchor="middle" fill="#7a9080" font-size="9">Habitify · Notion · Todoist</text>
+      <text x="87" y="233" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">Strava · State of Mind</text>
+      <text x="87" y="248" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">Weather · Supplements</text>
+      <!-- Manual group -->
+      <rect x="10" y="266" width="155" height="60" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(0,229,160,0.2)" stroke-width="1"/>
+      <text x="87" y="280" text-anchor="middle" fill="var(--accent)" font-size="8" letter-spacing="1.5">LAB + CLINICAL</text>
+      <text x="87" y="295" text-anchor="middle" fill="#7a9080" font-size="9">Labs ×7 · DEXA Scans</text>
+      <text x="87" y="310" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">Genome 110 SNPs</text>
+
+      <!-- ── Arrows: sources → ingest ── -->
+      <line x1="165" y1="67" x2="218" y2="110" stroke="rgba(0,229,160,0.2)" stroke-width="1"/>
+      <line x1="165" y1="148" x2="218" y2="148" stroke="rgba(0,229,160,0.2)" stroke-width="1"/>
+      <line x1="165" y1="224" x2="218" y2="185" stroke="rgba(0,229,160,0.2)" stroke-width="1"/>
+      <line x1="165" y1="296" x2="218" y2="222" stroke="rgba(0,229,160,0.2)" stroke-width="1"/>
+
+      <!-- ── Ingest layer ── -->
+      <!-- EventBridge -->
+      <rect x="218" y="32" width="155" height="48" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(240,165,0,0.3)" stroke-width="1"/>
+      <text x="295" y="48" text-anchor="middle" fill="#c8843a" font-size="9" letter-spacing="0.5">EventBridge cron</text>
+      <text x="295" y="62" text-anchor="middle" fill="#7a9080" font-size="8">06:45–11:00 AM PDT</text>
+      <text x="295" y="75" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7">gap-aware backfill</text>
+      <!-- 13 Lambda ingest -->
+      <rect x="218" y="88" width="155" height="58" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(0,229,160,0.25)" stroke-width="1"/>
+      <text x="295" y="104" text-anchor="middle" fill="var(--accent)" font-size="9" letter-spacing="0.5">13 Ingest Lambdas</text>
+      <text x="295" y="118" text-anchor="middle" fill="#7a9080" font-size="8">Python 3.12 · stdlib only</text>
+      <text x="295" y="132" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">urllib · no external deps</text>
+      <text x="295" y="143" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7">Secrets Manager auth</text>
+      <!-- Webhooks/manual -->
+      <rect x="218" y="155" width="155" height="44" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(0,229,160,0.15)" stroke-width="1"/>
+      <text x="295" y="171" text-anchor="middle" fill="#7a9080" font-size="9">Manual + Webhooks</text>
+      <text x="295" y="185" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">Labs · DEXA · Genome</text>
+      <text x="295" y="196" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7">S3 upload → Lambda trigger</text>
+
+      <!-- ── Arrows: ingest → store ── -->
+      <line x1="373" y1="56" x2="443" y2="100" stroke="rgba(240,165,0,0.25)" stroke-width="1"/>
+      <line x1="373" y1="117" x2="443" y2="130" stroke="rgba(0,229,160,0.25)" stroke-width="1"/>
+      <line x1="373" y1="177" x2="443" y2="175" stroke="rgba(0,229,160,0.15)" stroke-width="1"/>
+      <text x="408" y="95" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7">triggers</text>
+
+      <!-- ── Store layer ── -->
+      <!-- S3 -->
+      <rect x="443" y="32" width="155" height="58" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(240,165,0,0.3)" stroke-width="1"/>
+      <text x="520" y="48" text-anchor="middle" fill="#c8843a" font-size="9" letter-spacing="0.5">S3 Raw Store</text>
+      <text x="520" y="62" text-anchor="middle" fill="#7a9080" font-size="8">matthew-life-platform</text>
+      <text x="520" y="76" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">raw/{src}/{type}/{Y}/{M}/{D}</text>
+      <text x="520" y="87" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7">KMS encrypted · delete-protected</text>
+      <!-- DynamoDB -->
+      <rect x="443" y="99" width="155" height="78" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(91,164,207,0.4)" stroke-width="1"/>
+      <text x="520" y="115" text-anchor="middle" fill="#5ba4cf" font-size="9" letter-spacing="0.5">DynamoDB</text>
+      <text x="520" y="129" text-anchor="middle" fill="#7a9080" font-size="8">life-platform table</text>
+      <text x="520" y="143" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">PK: USER#matthew#SOURCE#*</text>
+      <text x="520" y="157" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">SK: DATE#YYYY-MM-DD</text>
+      <text x="520" y="169" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7">single-table · no GSIs · us-west-2</text>
+      <text x="520" y="174" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7"> </text>
+      <!-- Lambda layer shared -->
+      <rect x="443" y="186" width="155" height="44" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(0,229,160,0.15)" stroke-width="1"/>
+      <text x="520" y="202" text-anchor="middle" fill="#7a9080" font-size="9">Lambda Layer</text>
+      <text x="520" y="216" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">ai_calls · scoring_engine</text>
+      <text x="520" y="227" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7">board_loader · output_writers</text>
+
+      <!-- ── Arrows: store → compute ── -->
+      <line x1="598" y1="75" x2="648" y2="120" stroke="rgba(240,165,0,0.2)" stroke-width="1"/>
+      <line x1="598" y1="138" x2="648" y2="138" stroke="rgba(91,164,207,0.3)" stroke-width="1"/>
+      <line x1="598" y1="208" x2="648" y2="195" stroke="rgba(0,229,160,0.15)" stroke-width="1"/>
+
+      <!-- ── Compute layer ── -->
+      <!-- 5 compute lambdas -->
+      <rect x="648" y="32" width="155" height="78" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(0,229,160,0.25)" stroke-width="1"/>
+      <text x="725" y="48" text-anchor="middle" fill="var(--accent)" font-size="9" letter-spacing="0.5">5 Compute Lambdas</text>
+      <text x="725" y="62" text-anchor="middle" fill="#7a9080" font-size="8">character-sheet</text>
+      <text x="725" y="74" text-anchor="middle" fill="#7a9080" font-size="8">adaptive-mode · daily-metrics</text>
+      <text x="725" y="86" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">daily-insight · hypothesis-engine</text>
+      <text x="725" y="97" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7">→ pre-computed before 11 AM</text>
+      <!-- MCP server -->
+      <rect x="648" y="119" width="155" height="64" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(109,186,109,0.4)" stroke-width="1"/>
+      <text x="725" y="135" text-anchor="middle" fill="#6dba6d" font-size="9" letter-spacing="0.5">MCP Lambda</text>
+      <text x="725" y="149" text-anchor="middle" fill="#7a9080" font-size="8">121 tools · 35 modules</text>
+      <text x="725" y="163" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">Claude Desktop + claude.ai</text>
+      <text x="725" y="174" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7">OAuth 2.1 · natural language</text>
+      <!-- Email lambdas -->
+      <rect x="648" y="193" width="155" height="54" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(0,229,160,0.2)" stroke-width="1"/>
+      <text x="725" y="209" text-anchor="middle" fill="#7a9080" font-size="9">7 Email Lambdas</text>
+      <text x="725" y="223" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">daily-brief fires at 11 AM</text>
+      <text x="725" y="235" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">Amazon SES · templates</text>
+      <text x="725" y="244" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7">weekly chronicle · digests</text>
+
+      <!-- ── Arrows: compute → outputs ── -->
+      <line x1="803" y1="71" x2="848" y2="90" stroke="rgba(0,229,160,0.25)" stroke-width="1"/>
+      <line x1="803" y1="151" x2="848" y2="151" stroke="rgba(109,186,109,0.3)" stroke-width="1"/>
+      <line x1="803" y1="220" x2="848" y2="215" stroke="rgba(0,229,160,0.2)" stroke-width="1"/>
+
+      <!-- ── Outputs ── -->
+      <!-- Daily brief email -->
+      <rect x="848" y="30" width="155" height="48" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(0,229,160,0.25)" stroke-width="1"/>
+      <text x="925" y="47" text-anchor="middle" fill="var(--accent)" font-size="9" letter-spacing="0.5">Daily Brief Email</text>
+      <text x="925" y="61" text-anchor="middle" fill="#7a9080" font-size="8">11 AM · personal coaching</text>
+      <text x="925" y="70" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7">26 sources → 1 insight</text>
+      <!-- Public website -->
+      <rect x="848" y="87" width="155" height="48" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(0,229,160,0.25)" stroke-width="1"/>
+      <text x="925" y="104" text-anchor="middle" fill="var(--accent)" font-size="9" letter-spacing="0.5">averagejoematt.com</text>
+      <text x="925" y="118" text-anchor="middle" fill="#7a9080" font-size="8">S3 + CloudFront CDN</text>
+      <text x="925" y="130" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7">Site API Lambda us-east-1</text>
+      <!-- Claude MCP -->
+      <rect x="848" y="144" width="155" height="48" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(109,186,109,0.4)" stroke-width="1"/>
+      <text x="925" y="161" text-anchor="middle" fill="#6dba6d" font-size="9" letter-spacing="0.5">Claude Desktop / AI</text>
+      <text x="925" y="175" text-anchor="middle" fill="#7a9080" font-size="8">MCP protocol · 121 tools</text>
+      <text x="925" y="186" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7">natural language queries</text>
+      <!-- Public API + subscribe -->
+      <rect x="848" y="201" width="155" height="48" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(0,229,160,0.15)" stroke-width="1"/>
+      <text x="925" y="218" text-anchor="middle" fill="#7a9080" font-size="9">/ask · /subscribe</text>
+      <text x="925" y="232" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">rate-limited public API</text>
+      <text x="925" y="244" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7">anon 3/hr · subscriber 20/hr</text>
+
+      <!-- ── Cost annotation ── -->
+      <rect x="848" y="262" width="155" height="38" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(240,165,0,0.25)" stroke-width="1"/>
+      <text x="925" y="277" text-anchor="middle" fill="#c8843a" font-size="10" letter-spacing="0.5">~$19 / month</text>
+      <text x="925" y="293" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">DynamoDB + Lambda + S3 + CF</text>
+
+      <!-- ── Schedule annotation ── -->
+      <rect x="218" y="260" width="155" height="38" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(240,165,0,0.2)" stroke-width="1"/>
+      <text x="295" y="275" text-anchor="middle" fill="#c8843a" font-size="8" letter-spacing="1">DAILY SCHEDULE</text>
+      <text x="295" y="289" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">06:45–11:00 AM PDT</text>
+      <text x="295" y="298" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7">EventBridge cron · UTC-fixed</text>
+
+    </svg>
+  </div>
+  <div style="margin-top:var(--space-4);display:flex;gap:var(--space-6);flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);">
+      <div style="width:10px;height:2px;background:rgba(0,229,160,0.4)"></div> Python Lambda
+    </div>
+    <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);">
+      <div style="width:10px;height:2px;background:rgba(91,164,207,0.5)"></div> DynamoDB
+    </div>
+    <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);">
+      <div style="width:10px;height:2px;background:rgba(240,165,0,0.4)"></div> S3 / EventBridge
+    </div>
+    <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);">
+      <div style="width:10px;height:2px;background:rgba(109,186,109,0.5)"></div> MCP / Claude
+    </div>
+    <span style="font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);">Region: us-west-2 (us-east-1 for Site API)</span>
+  </div>
+</section>
+
+<!-- Architecture layers -->
+<section class="arch-section reveal">
+  <div class="eyebrow">System design</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Five-layer architecture</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body)">All data converges to a single DynamoDB table (no GSIs, PK+SK only). Compute Lambdas pre-calculate intelligence results before the email delivery window. The MCP server exposes 121 tools to Claude over OAuth 2.1 — queries stay in natural language, not SQL.</p>
+
+  <div class="arch-layers">
+    <div class="arch-layer">
+      <div class="arch-layer__label">
+        <div class="arch-layer__name">INGEST</div>
+        <div class="arch-layer__sub">26 sources → DynamoDB</div>
+      </div>
+      <div class="arch-layer__content">
+        <div class="arch-chips">
+          <span class="chip active">Whoop</span>
+          <span class="chip active">Withings</span>
+          <span class="chip active">Strava</span>
+          <span class="chip active">Apple Health</span>
+          <span class="chip active">MacroFactor</span>
+          <span class="chip active">Eight Sleep</span>
+          <span class="chip active">Garmin</span>
+          <span class="chip active">Hevy</span>
+          <span class="chip active">Habitify</span>
+          <span class="chip active">Notion Journal</span>
+          <span class="chip active">Todoist</span>
+          <span class="chip active">Dexcom CGM</span>
+          <span class="chip active">Lab Draws ×7</span>
+          <span class="chip active">DEXA Scans</span>
+          <span class="chip active">Genome 110 SNPs</span>
+          <span class="chip active">Blood Pressure</span>
+          <span class="chip active">State of Mind</span>
+          <span class="chip active">Weather</span>
+          <span class="chip active">Supplements</span>
+        </div>
+      </div>
+    </div>
+    <div class="arch-layer">
+      <div class="arch-layer__label">
+        <div class="arch-layer__name">STORE</div>
+        <div class="arch-layer__sub">Single-table DynamoDB</div>
+      </div>
+      <div class="arch-layer__content">
+        <div class="arch-chips">
+          <span class="chip active">DynamoDB on-demand</span>
+          <span class="chip active">S3 raw + config</span>
+          <span class="chip active">Single-table design</span>
+          <span class="chip active">PITR 35-day</span>
+          <span class="chip active">KMS CMK encryption</span>
+          <span class="chip active">Deletion protection</span>
+          <span class="chip">No GSI — PK+SK only</span>
+          <span class="chip">TTL on cache partition</span>
+        </div>
+      </div>
+    </div>
+    <div class="arch-layer">
+      <div class="arch-layer__label">
+        <div class="arch-layer__name">COMPUTE</div>
+        <div class="arch-layer__sub">Pre-brief intelligence</div>
+      </div>
+      <div class="arch-layer__content">
+        <div class="arch-chips">
+          <span class="chip active">character-sheet-compute</span>
+          <span class="chip active">daily-metrics-compute</span>
+          <span class="chip active">daily-insight-compute</span>
+          <span class="chip active">adaptive-mode-compute</span>
+          <span class="chip active">hypothesis-engine (Sun)</span>
+          <span class="chip active">weekly-correlation-compute</span>
+          <span class="chip">IC-4 failure patterns (May)</span>
+          <span class="chip">IC-5 momentum warning (May)</span>
+        </div>
+      </div>
+    </div>
+    <div class="arch-layer">
+      <div class="arch-layer__label">
+        <div class="arch-layer__name">SERVE</div>
+        <div class="arch-layer__sub">121 MCP tools → Claude</div>
+      </div>
+      <div class="arch-layer__content">
+        <div class="arch-chips">
+          <span class="chip active">Remote MCP (OAuth 2.1)</span>
+          <span class="chip active">Claude Desktop (local)</span>
+          <span class="chip active">claude.ai + mobile</span>
+          <span class="chip active">Lambda Function URL</span>
+          <span class="chip active">HMAC Bearer auth</span>
+          <span class="chip active">26h TTL cache</span>
+          <span class="chip active">Nightly warmer (13 tools)</span>
+          <span class="chip">1024MB / 300s timeout</span>
+        </div>
+      </div>
+    </div>
+    <div class="arch-layer">
+      <div class="arch-layer__label">
+        <div class="arch-layer__name">EMAIL</div>
+        <div class="arch-layer__sub">7 AI digests / week</div>
+      </div>
+      <div class="arch-layer__content">
+        <div class="arch-chips">
+          <span class="chip active">Daily Brief (11 AM)</span>
+          <span class="chip active">Monday Compass</span>
+          <span class="chip active">Wednesday Chronicle</span>
+          <span class="chip active">Weekly Digest (Sun)</span>
+          <span class="chip active">Nutrition Review (Sat)</span>
+          <span class="chip active">Weekly Plate (Fri)</span>
+          <span class="chip active">Monthly Digest</span>
+          <span class="chip active">Anomaly Detector</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Intelligence Layer -->
+<section class="ai-section reveal">
+  <div>
+    <div class="eyebrow">Intelligence layer</div>
+    <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-4)">121 tools across 35 domain modules</h2>
+    <div class="ai-section__body">
+      <p>The MCP server is a Lambda-backed tool registry exposing direct read access to every metric in DynamoDB. Claude calls tools in natural language; the server handles query composition, DynamoDB projection expressions, and result formatting.</p>
+      <p><strong>Domain modules</strong> cover sleep, training, nutrition, CGM, labs, journal, correlation, character, board, lifestyle, and strength — each with dedicated tools purpose-built for their data shapes.</p>
+      <p><strong>Daily brief pipeline:</strong> compute Lambdas run first (character-sheet, adaptive-mode, insight, hypothesis-engine), pre-calculating scores and hypotheses. The email Lambda reads these cached results rather than re-querying live data, keeping latency under 2 seconds.</p>
+      <p><strong>Weekly hypothesis engine</strong> runs a Pearson correlation matrix across 23 metric pairs with Benjamini-Hochberg FDR correction, then feeds statistically significant findings to Claude for biological hypothesis generation.</p>
+    </div>
+  </div>
+  <div>
+    <div style="text-align:center;padding:var(--space-8) 0;">
+      <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-3);">The platform runs 14 intelligence systems every morning.</div>
+      <a href="/legacy/platform/#the-ai" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-tag);">See what the AI does &rarr;</a>
+    </div>
+  </div>
+</section>
+
+<!-- WR-44: Tool of the Week -->
+<section class="reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
+  <div class="eyebrow">Tool spotlight</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Tool of the week</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">One of <span data-const="platform.mcp_tools">121</span> MCP tools that Claude uses to query health data. Inputs, outputs, and a representative finding.</p>
+  <div style="border:1px solid var(--border);background:var(--surface);">
+    <div style="padding:var(--space-4) var(--space-6);border-bottom:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--accent)">get_sleep_environment_analysis</span>
+      <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint)">BS-SL1 · Opus</span>
+    </div>
+    <div style="padding:var(--space-6);">
+      <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body);margin-bottom:var(--space-4)">Cross-references Eight Sleep bed temperature data with Whoop sleep staging to find the optimal temperature for deep sleep. Runs multi-signal analysis across 14+ nights.</p>
+      <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);border-top:1px solid var(--border-subtle);padding-top:var(--space-4);">
+        <div style="margin-bottom:var(--space-2);"><span style="color:var(--accent-dim)">Input:</span> date range, Eight Sleep + Whoop data</div>
+        <div style="margin-bottom:var(--space-2);"><span style="color:var(--accent-dim)">Output:</span> optimal temperature range, deep sleep correlation, adjustment recommendations</div>
+        <div><span style="color:var(--accent-dim)">Finding:</span> Lowering bed temp by 2°F added +18 min deep sleep per night</div>
+      </div>
+    </div>
+  </div>
+  <p style="font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);letter-spacing:var(--ls-label);margin-top:var(--space-4)">// Tool spotlight rotates periodically. <a href="/legacy/ask/" style="color:var(--accent-dim);text-decoration:none">Ask the platform anything →</a></p>
+</section>
+
+<!-- Tech stack -->
+<section class="stack-section reveal">
+  <div class="eyebrow">Tech stack</div>
+  <h2 class="text-h3" style="color:var(--text)">What it's built on</h2>
+  <div class="stack-grid">
+    <div class="stack-card">
+      <div class="stack-card__category">Infrastructure</div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">AWS Lambda + CDK</div><div class="stack-item__desc"><span data-const="platform.lambdas">62</span> functions across <span data-const="platform.cdk_stacks">8</span> CDK stacks. All IAM roles dedicated and least-privilege. EventBridge scheduling on fixed UTC crons (no DST drift).</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">DynamoDB + S3</div><div class="stack-item__desc">Single-table design. On-demand billing. PITR 35-day. KMS CMK encryption. Raw JSON archived to S3 at <code>raw/{source}/{datatype}/{YYYY}/{MM}/{DD}.json</code>.</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">SES + SNS + SQS</div><div class="stack-item__desc">Email delivery via SES, alert routing through SNS, dead-letter queues for failed Lambda invocations.</div></div></div>
+    </div>
+    <div class="stack-card">
+      <div class="stack-card__category">AI / Intelligence</div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">Claude (Anthropic)</div><div class="stack-item__desc">Sonnet for coaching and analysis, Haiku for classification. ~$3/month API cost. MCP protocol for tool calls.</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">MCP Server (custom)</div><div class="stack-item__desc"><span data-const="platform.mcp_tools">121</span>-tool Lambda backed by DynamoDB. OAuth 2.1 + HMAC auth. 35-module package. 26h TTL cache with nightly warmer across 13 high-cost tools.</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">Hypothesis Engine</div><div class="stack-item__desc">Weekly Pearson correlation matrix (23 pairs, BH FDR correction) feeds Claude for biological hypothesis generation.</div></div></div>
+    </div>
+    <div class="stack-card">
+      <div class="stack-card__category">Quality + CI/CD</div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">853 automated tests</div><div class="stack-item__desc">CDK handler consistency, S3 path linting, IAM/secrets cross-check, MCP registry integrity, DynamoDB key pattern validation.</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">GitHub Actions CI</div><div class="stack-item__desc">Lint → test → plan → deploy (manual approval gate). OIDC federation — no long-lived AWS keys. Auto-rollback on smoke test failure.</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">Synthetic canary</div><div class="stack-item__desc">Every 4 hours: DynamoDB round-trip, S3 round-trip, MCP endpoint health check. SES alert on any failure.</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- PLAT-3: Zone 2 divider -->
+<div class="zone-divider">
+  <span class="zone-divider__num">ZONE 02</span>
+  <span class="zone-divider__label">The Guarantees</span>
+  <span class="zone-divider__sub">security · cost · architecture reviews</span>
+</div>
+
+<!-- Security posture -->
+<section class="reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
+  <div class="eyebrow">Security posture</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Hardened by default</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">Every architectural decision includes a security dimension. The site-facing API is read-only by design; the data layer is air-gapped from public writes.</p>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);">
+    <div style="background:var(--surface);padding:var(--space-6);">
+      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-4)">Access control</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.7;">
+        <div style="margin-bottom:var(--space-2);">— One IAM role per Lambda (least-privilege)</div>
+        <div style="margin-bottom:var(--space-2);">— Secrets Manager only — no .env files</div>
+        <div style="margin-bottom:var(--space-2);">— OIDC federation for CI/CD (no static keys)</div>
+        <div style="margin-bottom:var(--space-2);">— OAuth 2.1 + HMAC auth on MCP endpoint</div>
+        <div>— Rate limiting: 3 anon / 20 subscriber per hour on /ask</div>
+      </div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6);">
+      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-4)">Data protection</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.7;">
+        <div style="margin-bottom:var(--space-2);">— KMS CMK encryption on DynamoDB + S3</div>
+        <div style="margin-bottom:var(--space-2);">— DynamoDB deletion protection enabled</div>
+        <div style="margin-bottom:var(--space-2);">— S3 bucket policy blocks DeleteObject on <code>raw/*</code></div>
+        <div style="margin-bottom:var(--space-2);">— PITR 35-day point-in-time recovery</div>
+        <div>— Site API Lambda: read-only, never writes to DynamoDB</div>
+      </div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6);">
+      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-4)">Observability</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.7;">
+        <div style="margin-bottom:var(--space-2);">— X-Ray tracing on all Lambdas</div>
+        <div style="margin-bottom:var(--space-2);">— CloudWatch alarms on error rate + latency</div>
+        <div style="margin-bottom:var(--space-2);">— Dead-letter queues on all async invocations</div>
+        <div style="margin-bottom:var(--space-2);">— Synthetic canary every 4 hours</div>
+        <div>— SES alert on any canary failure</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WR-35: Cost transparency section -->
+<section class="arch-section reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
+  <div class="eyebrow">FinOps</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">What it costs to run</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)"><span data-const="platform.lambdas">62</span> Lambda functions, DynamoDB on-demand, S3, CloudFront, SES, 7 AI-generated digests per week, and a public site with live data. All serverless — no EC2, no containers, no reserved capacity.</p>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);">
+    <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
+      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-2)">Total monthly</div>
+      <div style="font-family:var(--font-display);font-size:42px;color:var(--accent);line-height:1;" data-const="platform.monthly_cost">$19</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">/month</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
+      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-2)">Claude API</div>
+      <div style="font-family:var(--font-display);font-size:42px;color:var(--text);line-height:1;">$3</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">Sonnet + Haiku</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
+      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-2)">AWS infra</div>
+      <div style="font-family:var(--font-display);font-size:42px;color:var(--text);line-height:1;">$10</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">Lambda + DDB + S3</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
+      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-2)">Engineers on team</div>
+      <div style="font-family:var(--font-display);font-size:42px;color:var(--c-amber-500);line-height:1;">0</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">Built with Claude</div>
+    </div>
+  </div>
+  <p style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono);margin-top:var(--space-4);letter-spacing:var(--ls-label)">// Pay only for what runs. Full breakdown at <a href="/legacy/cost/" style="color:var(--accent-dim);text-decoration:none">/cost/ →</a></p>
+</section>
+
+<!-- Architecture reviews -->
+<section class="reviews-section reveal">
+  <div class="eyebrow">Architecture reviews</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Reviewed <span data-const="platform.review_count">19</span> times by a <span data-const="platform.board_technical">12</span>-member AI board</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-4)">Every major change triggers a structured architecture review. <span data-const="platform.board_technical">12</span> expert AI personas — cloud architect, security lead, statistician, product architect, adversarial reviewer — vote, score, and issue findings against a fixed rubric.</p>
+  <p style="margin-bottom:var(--space-8)"><a href="/legacy/platform/reviews/" class="btn btn--ghost" style="font-size:var(--text-xs)">Read the latest review (R20: A) &rarr;</a></p>
+  <div class="review-grid">
+    <div class="review-card">
+      <div class="review-card__num">R20</div>
+      <div class="review-card__date">Apr 4, 2026</div>
+      <div class="review-card__grade">A</div>
+      <div class="review-card__note">DPR-1 deep page review. 43 findings across 13 pages. ADR-046 S3 prefix separation. Hourly ingestion. Secret caching.</div>
+    </div>
+    <div class="review-card">
+      <div class="review-card__num">R19</div>
+      <div class="review-card__date">Mar 30, 2026</div>
+      <div class="review-card__grade">A</div>
+      <div class="review-card__note">Full 6-phase remediation. 100% CDK adoption, 100% alarm coverage, PITR drill passed, /api/healthz. All R18 findings resolved.</div>
+    </div>
+    <div class="review-card">
+      <div class="review-card__num">R18</div>
+      <div class="review-card__date">Mar 28, 2026</div>
+      <div class="review-card__grade">B+</div>
+      <div class="review-card__note">v4.3.0 sprint review. CDK drift + doc mismatch flagged. 9 findings, all remediated in R19.</div>
+    </div>
+    <div class="review-card">
+      <div class="review-card__num">R17</div>
+      <div class="review-card__date">Mar 22, 2026</div>
+      <div class="review-card__grade">A-</div>
+      <div class="review-card__note">WAF deployed, rate limiting, privacy policy. Cross-region latency flagged.</div>
+    </div>
+    <div class="review-card">
+      <div class="review-card__num">R16</div>
+      <div class="review-card__date">Mar 15, 2026</div>
+      <div class="review-card__grade">A</div>
+      <div class="review-card__note">CI/CD activation, Google Calendar retired. All 6 R15 findings resolved.</div>
+    </div>
+    <div class="review-card">
+      <div class="review-card__num">R15</div>
+      <div class="review-card__date">Mar 15, 2026</div>
+      <div class="review-card__grade">A</div>
+      <div class="review-card__note">Platform steady state. Zero dimension changes from R14.</div>
+    </div>
+  </div>
+</section>
+
+<!-- PLAT-3: Zone 3 divider -->
+<div class="zone-divider">
+  <span class="zone-divider__num">ZONE 03</span>
+  <span class="zone-divider__label">The Surfaces</span>
+  <span class="zone-divider__sub">every page · every data stream · every tool</span>
+</div>
+
+<!-- ──────────────────────────────────────────────────────────────────────
+     v2 Stage 2 (2026-05-31): three explainer pages absorbed as sections.
+     Originals archived to site/archive/v1/{intelligence,board,coaches}/
+     and 301-redirected to the anchors below. Methodology stays standalone
+     per Brandt/Lena hard-gate; the Character-page methodology duplicate is
+     removed in this same commit.
+     ────────────────────────────────────────────────────────────────────── -->
+
+<!-- ── The AI (was /intelligence/) ─────────────────────────────────────── -->
+<section class="reveal" id="the-ai" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">The AI</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">14 intelligence systems running every day</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);max-width:680px;margin-bottom:var(--space-8)">
+    Correlation engine. Hypothesis generator. Adaptive mode. Metabolic-adaptation detector. Anomaly scanner. Each one runs on a schedule, writes structured findings to a single record, and surfaces in the morning brief. The architecture is documented above; this is what those Lambdas actually <em>do</em>.
+  </p>
+
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border);border:1px solid var(--border);">
+    <div style="background:var(--surface);padding:var(--space-6)">
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2)">Correlation Engine</div>
+      <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.6;margin:0">Weekly Pearson r across all measured variables, Benjamini–Hochberg-corrected at p&lt;0.05. Flags the top 3 non-trivial relationships and the 3 it specifically rules out.</p>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6)">
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2)">Hypothesis Generator</div>
+      <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.6;margin:0">Reads the unified record, drafts testable hypotheses with priors, tracks each one to confirmation/refutation/abandonment. Visible on the Intelligence page.</p>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6)">
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2)">Adaptive Mode</div>
+      <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.6;margin:0">Senses whether today is a flourishing / standard / struggling day from sleep, HRV, mood, and adherence — and shifts the brief's tone + asks accordingly.</p>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6)">
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2)">Metabolic Adaptation Detector</div>
+      <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.6;margin:0">Watches for the divergence between expected and actual weight loss given the deficit. Surfaces a flag, not a verdict; pairs it with what to ask next.</p>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6)">
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2)">Anomaly Scanner</div>
+      <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.6;margin:0">Per-metric residuals against the 30-day baseline. Anything &gt;2σ ends up in the brief with the contextual signal that should have predicted it (or didn't).</p>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6)">
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2)">+ 9 more</div>
+      <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.6;margin:0">Character engine, journal enrichment, freshness checker, cost governor, budget guard, predictions ledger, cycle-pause sentinel, daily-brief composer, board orchestrator.</p>
+    </div>
+  </div>
+
+  <p style="font-size:var(--text-sm);color:var(--text-muted);margin-top:var(--space-6)">
+    <a href="/legacy/archive/v1/intelligence/" style="color:var(--accent);font-family:var(--font-mono);font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase">Read the full Intelligence essay →</a>
+  </p>
+</section>
+
+<!-- ── AI Board (was /board/) ──────────────────────────────────────────── -->
+<section class="reveal" id="ai-board" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">The Board</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Six advisors. One question.</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);max-width:680px;margin-bottom:var(--space-8)">
+    The AI Board is the cross-disciplinary panel the platform consults when a question is too complex for a single coach. Each advisor reads the same unified record but answers from their own domain. Disagreements are surfaced, not hidden — that's the point.
+  </p>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border)">
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Dr. Henning Brandt</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Biostatistics · N=1 research</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Dr. Amara Patel</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Metabolic health · CGM</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Dr. Lisa Park</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Sleep · circadian rhythm</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Dr. Marcus Webb</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Evidence-based nutrition</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Dr. Sarah Chen</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Exercise physiology · strength</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Dr. Nathan Reeves</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Psychiatry · behavioral patterns</div>
+    </div>
+  </div>
+
+  <p style="font-size:var(--text-sm);color:var(--text-muted);margin-top:var(--space-6)">
+    Each advisor's perspective is rendered by Bedrock Claude (Sonnet for narrative, Haiku for structured) with the same prompt template, the same data context, and explicit instructions never to defer to consensus. The point is to <em>see</em> them disagree.
+    &nbsp;
+    <a href="/legacy/archive/v1/board/" style="color:var(--accent);font-family:var(--font-mono);font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase">Ask the Board →</a>
+  </p>
+</section>
+
+<!-- ── Coaching Team (was /coaches/) ───────────────────────────────────── -->
+<section class="reveal" id="coaching-team" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">The Coaches</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Eight specialists, one body</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);max-width:680px;margin-bottom:var(--space-8)">
+    The coaching team is the daily layer — eight domain specialists who each track their slice of the unified record and write a paragraph in the morning brief. Unlike the Board (consulted), the Coaches are <em>always on</em>.
+  </p>
+
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border)">
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Sleep</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Dr. Lisa Park</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Nutrition</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Dr. Marcus Webb</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Training</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Dr. Sarah Chen</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Mind</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Dr. Nathan Reeves</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Physical</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Dr. Victor Reyes</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Glucose</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Dr. Amara Patel</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Labs</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Dr. James Okafor</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5)">
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Explorer</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase">Dr. Henning Brandt</div>
+    </div>
+  </div>
+
+  <p style="font-size:var(--text-sm);color:var(--text-muted);margin-top:var(--space-6)">
+    Each coach runs as a separate Lambda. Shared context (yesterday's brief, the 7-day window, current goal) is cached for prompt-caching efficiency. Outputs go through a quality gate before the orchestrator stitches them into the brief.
+    &nbsp;
+    <a href="/legacy/archive/v1/coaches/" style="color:var(--accent);font-family:var(--font-mono);font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase">Open the live coaching dashboard →</a>
+  </p>
+</section>
+
+<!-- Explore deeper CTA (replaces hub grid) -->
+<section class="reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);text-align:center;">
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">Go deeper</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-6)">Explore the Build</h2>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);max-width:800px;margin:0 auto;">
+    <a href="/legacy/platform/#the-ai" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="font-size:24px;margin-bottom:var(--space-2)">🤖</div>
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">The AI</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint)">14 systems running daily</div>
+    </a>
+    <a href="/legacy/cost/" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="font-family:var(--font-display);font-size:36px;color:var(--accent);line-height:1;margin-bottom:var(--space-2)" data-const="platform.monthly_cost">$19</div>
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">The Cost</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint)">Every line item, explained</div>
+    </a>
+    <a href="/legacy/platform/#ai-board" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="font-size:24px;margin-bottom:var(--space-2)">🎯</div>
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Ask the Board</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint)">6 AI advisors, one question</div>
+    </a>
+    <a href="/legacy/methodology/" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="font-size:24px;margin-bottom:var(--space-2)">📏</div>
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Methodology</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint)">N=1 science, FDR correction</div>
+    </a>
+    <a href="/legacy/tools/" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="font-size:24px;margin-bottom:var(--space-2)">🔧</div>
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Free Tools</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint)">Zone 2, HRV, protein calculators</div>
+    </a>
+    <a href="/legacy/ask/" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="font-size:24px;margin-bottom:var(--space-2)">💬</div>
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Ask the Data</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint)">Natural language queries</div>
+    </a>
+  </div>
+</section>
+
+<!-- Throughline: Chronicle link -->
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-6) var(--page-padding);">
+  <div style="border-left:2px solid var(--accent-dim);padding:var(--space-4) var(--space-5);background:var(--surface);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-4);">
+    <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);">This platform generates a weekly chronicle. An AI journalist reads the data and writes about what she finds.</span>
+    <a href="/legacy/chronicle/" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent-dim);text-decoration:none;letter-spacing:var(--ls-tag);">Read the latest →</a>
+  </div>
+</div>
+
+<nav class="reading-path-v2">
+  <a href="/legacy/discoveries/" class="reading-path-v2__link">
+    <span class="reading-path-v2__dir">← Previous</span>
+    <span class="reading-path-v2__title">Discoveries</span>
+  </a>
+  <a href="/legacy/platform/#the-ai" class="reading-path-v2__link reading-path-v2__link--next">
+    <span class="reading-path-v2__dir">Next →</span>
+    <span class="reading-path-v2__title">The AI</span>
+  </a>
+</nav>
+
+<div id="amj-subscribe"></div>
+
+<!-- Mobile bottom nav -->
+<div id="amj-bottom-nav"></div>
+
+<div id="amj-reading-path"></div>
+<div id="amj-footer"></div>
+
+<!-- WEB-WCT: Weekly Challenge Ticker -->
+<div class="challenge-bar" id="challenge-bar" style="display:none">
+  <span class="challenge-bar__pip"></span>
+  <span class="challenge-bar__label" id="cb-week">Week —</span>
+  <span class="challenge-bar__divider"></span>
+  <span class="challenge-bar__text" id="cb-challenge">Loading challenge…</span>
+  <span class="challenge-bar__divider"></span>
+  <span class="challenge-bar__progress" id="cb-progress"></span>
+</div>
+<script>
+(function(){
+  const API = '/api/current_challenge';
+  fetch(API).then(r=>r.ok?r.json():null).then(data=>{
+    if(!data||!data.current_challenge) return;
+    const c = data.current_challenge;
+    const bar = document.getElementById('challenge-bar');
+    if(c.week_num) document.getElementById('cb-week').textContent = 'Week '+c.week_num+' Challenge';
+    if(c.challenge) document.getElementById('cb-challenge').innerHTML = '<strong>'+c.challenge+'</strong>'+(c.detail?' — '+c.detail:'');
+    if(c.days_total) document.getElementById('cb-progress').textContent = (c.days_complete||0)+'/'+c.days_total+' days';
+    bar.style.display = 'flex';
+  }).catch(()=>{});
+})();
+</script>
+
+<script src="/legacy/assets/js/reveal.js"></script>
+<script src="/legacy/assets/js/site_constants.js"></script>
+<script src="/legacy/assets/js/components.js"></script>
+<script src="/legacy/assets/js/nav.js"></script>
+<script src="/legacy/assets/js/animations.js" defer></script>
+</body>
+</html>

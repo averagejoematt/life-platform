@@ -1,0 +1,101 @@
+/*
+  evidence.css — Door 3: The Evidence (/evidence/**)
+  ----------------------------------------------------------------------------
+  Job: "What's the protocol, what's it built on, does the data hold up?"
+  Treatment: an archival index — structured, labelled, library-meets-gallery,
+  with a touch of instrument precision (the "Readout") for dense data. Calm,
+  credible, browsable. Rigor performed visually. Correlative framing in all copy.
+  All tokens from tokens.css.
+*/
+
+body { min-height: 100svh; display: flex; flex-direction: column; }
+
+.skip { position: absolute; left: 0; top: -3rem; z-index: var(--z-overlay); background: var(--surface);
+  color: var(--ink); padding: var(--sp-2) var(--sp-4); border: var(--border-hair); border-radius: var(--radius-sm); }
+.skip:focus { top: var(--sp-2); left: var(--sp-2); }
+
+.ev-top { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4);
+  padding: var(--sp-3) var(--gutter); border-bottom: var(--border-hair); max-width: var(--container); width: 100%; margin-inline: auto; }
+.brand { display: inline-flex; align-items: center; gap: var(--sp-2); text-decoration: none; }
+.brand-mark { width: 11px; height: 11px; border-radius: 2px; background: var(--ember); box-shadow: 0 0 0 3px var(--ember-wash); }
+.brand-name { font-family: var(--font-mono); font-size: var(--fs-small); }
+.brand-door { color: var(--ember); }
+.doors { display: flex; align-items: center; gap: var(--sp-4); }
+.doors a { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); text-decoration: none; }
+.doors a:hover { color: var(--ember); }
+.theme-toggle { appearance: none; cursor: pointer; background: transparent; border: var(--border-hair); border-radius: 50%; width: 28px; height: 28px; display: grid; place-items: center; }
+.theme-dot { width: 12px; height: 12px; border-radius: 50%; background: linear-gradient(135deg, var(--ink) 0 50%, transparent 50% 100%); border: 1px solid var(--ink-muted); }
+
+.ev { flex: 1; max-width: var(--container); width: 100%; margin-inline: auto; padding: var(--sp-6) var(--gutter) var(--sp-9); }
+
+/* ── Index ───────────────────────────────────────────────────────────────── */
+.ev-head { max-width: var(--measure); }
+.ev-h1 { font-family: var(--font-serif); font-weight: var(--weight-med); font-size: var(--fs-h1); line-height: 1.08; }
+.ev-lede { margin-top: var(--sp-3); color: var(--ink-muted); }
+
+.ev-group { margin-top: var(--sp-7); }
+.ev-group > .label { color: var(--ink-faint); display: block; padding-bottom: var(--sp-3); border-bottom: var(--border-hair); }
+.ev-list { margin-top: var(--sp-4); display: grid; gap: var(--bento-gap); grid-template-columns: 1fr; }
+@media (min-width: 560px) { .ev-list { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 920px) { .ev-list { grid-template-columns: 1fr 1fr 1fr; } }
+
+/* The archival index card, indexed by a measuring-rule tick */
+.ev-card { position: relative; display: block; text-decoration: none; color: inherit;
+  border: var(--border-hair); border-radius: var(--radius); background: var(--surface);
+  padding: var(--sp-4) var(--sp-4) var(--sp-4) calc(var(--sp-4) + 14px); overflow: hidden;
+  transition: border-color var(--dur-fast), transform var(--dur-fast); }
+.ev-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 8px; background: var(--spine-ticks); opacity: 0.6; }
+.ev-card:hover { border-color: var(--ember-line); transform: translateY(-2px); }
+.ev-card .idx { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.1em; color: var(--ink-faint); }
+.ev-card .ev-title { font-family: var(--font-serif); font-size: var(--fs-h3); line-height: 1.15; margin-top: var(--sp-1); }
+.ev-card .ev-blurb { margin-top: var(--sp-2); font-size: var(--fs-small); color: var(--ink-muted); }
+.ev-card .ev-tag { margin-top: var(--sp-3); display: inline-block; font-family: var(--font-mono); font-size: var(--fs-label);
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
+.ev-card[data-mode="data"] .ev-tag { color: var(--ember); }
+
+/* ── Topic (readout) page ────────────────────────────────────────────────── */
+.ev-crumbs { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
+.ev-crumbs a { color: var(--ink-faint); text-decoration: none; }
+.ev-crumbs a:hover { color: var(--ember); }
+.topic-h1 { font-family: var(--font-serif); font-weight: var(--weight-med); font-size: var(--fs-h1); line-height: 1.08; margin-top: var(--sp-2); }
+.topic-lede { margin-top: var(--sp-3); color: var(--ink-muted); max-width: var(--measure); }
+
+.readout { margin-top: var(--sp-6); border-top: var(--border-hair); }
+.figs { display: flex; flex-wrap: wrap; gap: clamp(1.25rem, 0.8rem + 3vw, 3rem); padding: var(--sp-5) 0; }
+.fig { display: grid; gap: var(--sp-1); }
+.fig .fig-v { font-family: var(--font-mono); font-weight: var(--weight-med); font-size: var(--fs-data-lg); line-height: 1; }
+.fig .fig-k { color: var(--ink-faint); }
+
+.dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--sp-2) var(--sp-5); padding: var(--sp-4) 0; border-top: var(--border-hair); }
+.dl dt { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-faint); }
+.dl dd { font-family: var(--font-mono); font-size: var(--fs-small); font-variant-numeric: tabular-nums; }
+
+table.readout-tbl { width: 100%; border-collapse: collapse; margin-top: var(--sp-4); font-family: var(--font-mono); font-size: var(--fs-small); }
+table.readout-tbl th, table.readout-tbl td { text-align: left; padding: var(--sp-2) var(--sp-3); border-bottom: var(--border-hair); font-variant-numeric: tabular-nums; }
+table.readout-tbl th { color: var(--ink-faint); font-weight: var(--weight-reg); letter-spacing: 0.04em; text-transform: capitalize; }
+table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, transparent); }
+
+/* Supplements what/why/backed */
+.supp { margin-top: var(--sp-4); display: grid; gap: var(--bento-gap); }
+.supp-item { border: var(--border-hair); border-radius: var(--radius); padding: var(--sp-4); background: var(--surface); }
+.supp-name { font-family: var(--font-serif); font-size: var(--fs-h3); }
+.supp-row { margin-top: var(--sp-2); display: grid; grid-template-columns: 84px 1fr; gap: var(--sp-3); }
+.supp-row .label { color: var(--ink-faint); }
+.supp-backed { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.08em; text-transform: uppercase; }
+.backed-strong { color: var(--ember); } .backed-some { color: var(--ink-muted); } .backed-thin { color: var(--ink-faint); }
+
+/* Correlative-framing note — first-class, calm */
+.correlative { margin-top: var(--sp-5); padding: var(--sp-3) var(--sp-4); border: var(--honest-border);
+  border-radius: var(--radius-xs); color: var(--ink-muted); font-family: var(--font-mono); font-size: var(--fs-small); max-width: var(--measure); }
+.confidence { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.08em; text-transform: uppercase; }
+.conf-prelim { color: var(--ink-faint); } .conf-low { color: var(--ink-muted); } .conf-ok { color: var(--ember); }
+
+.deeper { margin-top: var(--sp-6); padding-top: var(--sp-4); border-top: var(--border-hair); }
+.deeper a { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ember); text-decoration: none; border-bottom: 1px solid var(--ember-line); }
+.ev-note { margin-top: var(--sp-4); color: var(--ink-muted); font-family: var(--font-mono); font-size: var(--fs-small); }
+
+.ev-foot { max-width: var(--container); margin-inline: auto; padding: var(--sp-6) var(--gutter) var(--sp-8); display: flex; gap: var(--sp-4); justify-content: space-between; flex-wrap: wrap; color: var(--ink-faint); border-top: var(--border-hair); }
+.ev-foot a { color: var(--ink-faint); text-decoration: none; } .ev-foot a:hover { color: var(--ember); }
+
+.shimmer { color: var(--ink-faint); }
+@media (prefers-reduced-motion: no-preference) { .shimmer { animation: pulse 1.6s var(--ease-inout) infinite; } @keyframes pulse { 0%,100% { opacity: 0.45; } 50% { opacity: 0.9; } } }

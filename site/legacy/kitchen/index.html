@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="robots" content="noindex">
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="The Kitchen — personalized meal recommendations built from CGM data, macro targets, and food preferences. Coming soon.">
+  <meta property="og:title" content="The Kitchen — Matthew">
+  <meta property="og:description" content="Meals scored by glucose response, protein density, and real eating patterns. CGM meets the dinner table.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/kitchen/">
+  <title>The Kitchen — Matthew</title>
+  <link rel="icon" type="image/svg+xml" href="/legacy/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/legacy/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/legacy/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/legacy/assets/css/tokens.css">
+  <link rel="stylesheet" href="/legacy/assets/css/base.css">
+  <style>
+    :root {
+      --k-amber: #f59e0b;
+      --k-amber-dim: rgba(245,158,11,0.15);
+      --k-amber-glow: rgba(245,158,11,0.06);
+      --k-green: #3ecf8e;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       HERO
+       ═══════════════════════════════════════════════════════ */
+    .k-hero {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-24) var(--page-padding) var(--space-16);
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .k-hero__badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--k-amber);
+      background: var(--k-amber-dim);
+      padding: 5px 16px;
+      display: inline-block;
+      margin-bottom: var(--space-6);
+      opacity: 0;
+      animation: fadeUp 0.6s 0.1s forwards;
+    }
+    .k-hero__title {
+      font-family: var(--font-display);
+      font-size: clamp(40px, 6vw, 64px);
+      color: var(--text);
+      line-height: 1.05;
+      margin-bottom: var(--space-6);
+      opacity: 0;
+      animation: fadeUp 0.6s 0.2s forwards;
+    }
+    .k-hero__title em {
+      font-style: normal;
+      color: var(--k-amber);
+    }
+    .k-hero__sub {
+      font-size: var(--text-lg);
+      color: var(--text-muted);
+      max-width: 600px;
+      margin: 0 auto var(--space-10);
+      line-height: 1.7;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.3s forwards;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       CONCEPT
+       ═══════════════════════════════════════════════════════ */
+    .k-concept {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-16) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .k-concept__header {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-8);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .k-concept__header::after {
+      content: '\2014\2014';
+      color: var(--text-faint);
+      opacity: 0.4;
+      flex-shrink: 0;
+    }
+    .k-concept-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-6);
+    }
+    .k-concept-card {
+      border-left: 3px solid var(--k-amber);
+      background: var(--surface);
+      padding: var(--space-6);
+      border-top: 1px solid rgba(255,255,255,0.04);
+      border-right: 1px solid rgba(255,255,255,0.04);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .k-concept-card__icon {
+      font-size: 28px;
+      margin-bottom: var(--space-4);
+    }
+    .k-concept-card__title {
+      font-family: var(--font-display);
+      font-size: var(--text-base);
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .k-concept-card__text {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+    .k-concept-card__text em {
+      font-style: normal;
+      color: var(--k-amber);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       HOW IT WORKS
+       ═══════════════════════════════════════════════════════ */
+    .k-how {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-16) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .k-how__header {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-8);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .k-how__header::after {
+      content: '\2014\2014';
+      color: var(--text-faint);
+      opacity: 0.4;
+      flex-shrink: 0;
+    }
+    .k-how-steps {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+    }
+    .k-how-step {
+      display: flex;
+      gap: var(--space-5);
+      padding: var(--space-5) var(--space-6);
+      background: var(--surface);
+      border-left: 2px solid var(--k-amber);
+    }
+    .k-how-step__num {
+      font-family: var(--font-display);
+      font-size: 24px;
+      color: var(--k-amber);
+      line-height: 1;
+      flex-shrink: 0;
+      width: 32px;
+    }
+    .k-how-step__text {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+    .k-how-step__text strong {
+      color: var(--text);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       PULLQUOTE
+       ═══════════════════════════════════════════════════════ */
+    .k-pullquote {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      padding-left: calc(var(--page-padding) + 8%);
+      border-bottom: 1px solid var(--border);
+    }
+    .k-pullquote__text {
+      font-family: var(--font-display);
+      font-size: clamp(22px, 3vw, 28px);
+      line-height: 1.35;
+      color: var(--text);
+      max-width: 600px;
+      border-left: 3px solid var(--k-amber);
+      padding-left: var(--space-6);
+    }
+    .k-pullquote__text em {
+      font-style: normal;
+      color: var(--k-amber);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       SUBSCRIBE FORM
+       ═══════════════════════════════════════════════════════ */
+    .k-subscribe {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-16) var(--page-padding);
+      text-align: center;
+    }
+    .k-subscribe__title {
+      font-family: var(--font-display);
+      font-size: clamp(24px, 3.5vw, 32px);
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .k-subscribe__sub {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      margin-bottom: var(--space-8);
+      max-width: 480px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.7;
+    }
+    .k-subscribe__form {
+      display: flex;
+      gap: var(--space-3);
+      max-width: 440px;
+      margin: 0 auto;
+    }
+    .k-subscribe__input {
+      flex: 1;
+      padding: var(--space-3) var(--space-5);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .k-subscribe__input::placeholder {
+      color: var(--text-faint);
+    }
+    .k-subscribe__input:focus {
+      border-color: var(--k-amber);
+    }
+    .k-subscribe__btn {
+      padding: var(--space-3) var(--space-6);
+      background: var(--k-amber);
+      color: #000;
+      border: none;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing:var(--ls-wide);
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      white-space: nowrap;
+    }
+    .k-subscribe__btn:hover {
+      opacity: 0.85;
+    }
+    .k-subscribe__note {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      margin-top: var(--space-4);
+    }
+    .k-subscribe__success {
+      display: none;
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--k-green);
+      margin-top: var(--space-4);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       BACK LINK
+       ═══════════════════════════════════════════════════════ */
+    .k-back {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+      border-top: 1px solid var(--border);
+    }
+    .k-back a {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--k-amber);
+      text-decoration: none;
+      letter-spacing: 0.08em;
+    }
+    .k-back a:hover {
+      text-decoration: underline;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       RESPONSIVE
+       ═══════════════════════════════════════════════════════ */
+    @media (max-width: 768px) {
+      .k-concept-grid { grid-template-columns: 1fr; }
+      .k-subscribe__form { flex-direction: column; }
+      .k-pullquote { padding-left: var(--page-padding); }
+    }
+  </style>
+
+  <style>
+    /* DB-03: Observatory pillar accent */
+    :root {
+      --obs-accent: var(--pillar-nutrition);
+      --obs-accent-dim: #f59e0b66;
+      --obs-accent-bg: #f59e0b18;
+    }
+  </style>
+  <link rel="canonical" href="https://averagejoematt.com/kitchen/">
+</head>
+<body>
+
+<div id="amj-nav"></div>
+<div id="amj-hierarchy-nav"></div>
+
+<!-- ════════════════════════════════════════════════════════════
+     HERO
+     ════════════════════════════════════════════════════════════ -->
+<div class="k-hero">
+  <div class="k-hero__badge">Coming Soon</div>
+  <h1 class="k-hero__title">The <em>Kitchen</em></h1>
+  <p class="k-hero__sub">
+    Personalized meal intelligence built from CGM data, macro tracking, and real eating patterns.
+    This page will go live once enough meal + glucose data has accumulated to generate meaningful recommendations.
+  </p>
+</div>
+
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-16) var(--page-padding);text-align:center">
+  <div style="font-family:var(--font-serif);font-size:18px;color:var(--text-muted);line-height:1.7;max-width:520px;margin:0 auto">
+    The Kitchen needs real data to work. Once daily nutrition logging and CGM readings accumulate
+    over the first few weeks of the experiment, this page will surface meal-level glucose responses,
+    protein-efficient favorites, and pattern-based suggestions.
+  </div>
+  <div style="margin-top:var(--space-8)">
+    <a href="/legacy/nutrition/" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--k-amber);text-decoration:none;letter-spacing:var(--ls-tag)">&larr; Back to Nutrition Observatory</a>
+  </div>
+</div>
+
+<div id="amj-bottom-nav"></div>
+<div id="amj-footer"></div>
+
+<script src="/legacy/assets/js/site_constants.js"></script>
+<script src="/legacy/assets/js/components.js"></script>
+<script src="/legacy/assets/js/nav.js"></script>
+<script src="/legacy/assets/js/reveal.js"></script>
+<script>
+(function() {
+  var form = document.getElementById('k-form');
+  var btn = document.getElementById('k-btn');
+  var emailInput = document.getElementById('k-email');
+  var success = document.getElementById('k-success');
+
+  if (form) {
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var email = emailInput.value.trim();
+      if (!email) return;
+
+      /* Store interest locally — replace with real endpoint when available */
+      btn.textContent = 'SUBMITTING...';
+      btn.disabled = true;
+
+      setTimeout(function() {
+        btn.style.display = 'none';
+        emailInput.style.display = 'none';
+        success.style.display = 'block';
+
+        /* Attempt to POST to subscribe endpoint if available */
+        try {
+          fetch('/api/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, source: 'kitchen-teaser' })
+          }).catch(function() { /* silent fail — teaser only */ });
+        } catch (err) { /* silent */ }
+      }, 800);
+    });
+  }
+})();
+</script>
+</body>
+</html>

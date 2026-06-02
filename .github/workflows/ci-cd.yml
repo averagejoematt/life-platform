@@ -121,6 +121,19 @@ jobs:
           fi
           echo "✅ All files pass syntax check"
 
+      - name: v4 migration coverage gate
+        # Every preserved legacy page must map to a v4 door before the cutover.
+        # Read-only, no AWS. Self-skips on branches that don't have the /legacy
+        # relocation yet, so it never blocks unrelated work.
+        run: |
+          if [ -d site/legacy ]; then
+            echo "::group::v4 migration inventory"
+            python3 scripts/v4_migration_inventory.py
+            echo "::endgroup::"
+          else
+            echo "site/legacy/ not present — v4 migration gate skipped (pre-cutover branch)."
+          fi
+
       - name: Dependency Security Scan (advisory)
         # R19 Phase 6: pip-audit for known vulnerabilities in dependencies
         run: |

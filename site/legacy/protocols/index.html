@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="robots" content="noindex">
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Current Protocols — what Matthew is doing, what the data shows, and what's working.">
+  <meta property="og:title" content="Current Protocols — Matthew">
+  <meta property="og:description" content="The specific health protocols behind the transformation — and whether the data says they're working.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta property="og:type" content="website">
+  <title>Current Protocols — Matthew</title>
+    <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/legacy/assets/icons/favicon.svg">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/legacy/assets/css/tokens.css">
+  <link rel="stylesheet" href="/legacy/assets/css/base.css">
+  <style>
+    /* ── Page header ─────────────────────────────────────────── */
+    .proto-header {
+      padding: var(--space-16) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+    }
+    .proto-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+    }
+    .proto-header__title span { color: var(--accent); }
+
+    /* ── Through-line thread ────────────────────────────────── */
+    .proto-thread {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-6) var(--page-padding) 0;
+    }
+    .proto-thread__bar {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-5);
+      border: 1px solid var(--border-subtle);
+      background: var(--surface);
+      border-left: 3px solid var(--accent);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+    .proto-thread__bar a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .proto-thread__bar a:hover { text-decoration: underline; }
+
+    /* ── Protocol cards ──────────────────────────────────────── */
+    .proto-body {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 var(--page-padding);
+    }
+    .proto-card {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      margin: var(--space-8) 0;
+    }
+    .proto-card__header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-4) var(--space-6);
+      border-bottom: 1px solid var(--border-subtle);
+      flex-wrap: wrap;
+    }
+    .proto-card__category {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+    }
+    .proto-card__pillar-link {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      text-decoration: none;
+      border-bottom: 1px dotted var(--accent-dim);
+    }
+    .proto-card__pillar-link:hover { color: var(--accent); border-bottom-color: var(--accent); }
+    .proto-card__sep {
+      color: var(--border);
+      font-size: var(--text-2xs);
+    }
+    .proto-card__status {
+      margin-left: auto;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border: 1px solid;
+    }
+    .proto-card__status.active   { color: var(--accent); border-color: var(--accent-dim); }
+    .proto-card__status.testing  { color: var(--c-amber-500); border-color: var(--c-amber-300); }
+    .proto-card__status.paused   { color: var(--text-faint); border-color: var(--border); }
+
+    .proto-card__body { padding: var(--space-5) var(--space-6); }
+    .proto-card__name {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .proto-card__why {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      margin-bottom: var(--space-5);
+      padding-left: var(--space-3);
+      border-left: 2px solid var(--border-subtle);
+      font-style: italic;
+    }
+
+    /* ── Detail rows ─────────────────────────────────────────── */
+    .proto-detail {
+      display: grid;
+      grid-template-columns: 130px 1fr;
+      gap: var(--space-2) var(--space-4);
+      font-size: var(--text-xs);
+      margin-bottom: var(--space-2);
+    }
+    .proto-detail__label {
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      letter-spacing: var(--ls-label);
+    }
+    .proto-detail__value { color: var(--text-muted); }
+    .proto-detail__value strong { color: var(--text); }
+
+    /* ── Stats strip (adherence + signal) ───────────────────── */
+    .proto-stats {
+      display: flex;
+      gap: var(--space-4);
+      margin-top: var(--space-5);
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--border-subtle);
+      flex-wrap: wrap;
+    }
+    .proto-stat {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+      min-width: 110px;
+    }
+    .proto-stat__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .proto-stat__value {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--text);
+      font-weight: 600;
+    }
+    .proto-stat__value.loading { color: var(--text-faint); font-weight: 400; }
+    .proto-stat__value.signal-positive { color: var(--accent); }
+    .proto-stat__value.signal-pending  { color: var(--c-amber-500); }
+    .proto-stat__value.signal-none     { color: var(--text-faint); }
+
+    .proto-data-note {
+      margin-top: var(--space-4);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+    }
+    .proto-data-note span { color: var(--accent-dim); }
+
+    /* ── Vice tracking section ───────────────────────────────── */
+    .vice-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+    }
+    .vice-section__heading {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: var(--space-5);
+    }
+    .vice-section__heading span { color: var(--accent-dim); }
+    .vice-chips {
+      display: flex;
+      gap: var(--space-4);
+      flex-wrap: wrap;
+      margin-bottom: var(--space-5);
+    }
+    .vice-chip {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+      padding: var(--space-4) var(--space-5);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      min-width: 160px;
+    }
+    .vice-chip__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .vice-chip__value {
+      font-family: var(--font-display);
+      font-size: 28px;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .vice-chip__unit {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+    }
+    .vice-note {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+      line-height: var(--lh-body);
+    }
+    .vice-note span { color: var(--accent-dim); }
+
+    /* ── Outcome summary box (kept from v1) ──────────────────── */
+    .proto-outcomes {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-6) var(--page-padding) 0;
+    }
+    .proto-outcomes__box {
+      border: 1px solid var(--border-subtle);
+      border-left: 3px solid var(--accent);
+      background: var(--surface);
+      padding: var(--space-5) var(--space-6);
+    }
+    .proto-outcomes__heading {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-4);
+    }
+    .proto-outcomes__grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: var(--space-3) var(--space-6);
+    }
+    .proto-outcomes__row {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      line-height: var(--lh-mono);
+    }
+    .proto-outcomes__protocol { color: var(--text-faint); }
+    .proto-outcomes__value { color: var(--text); }
+    .proto-outcomes__value.on-target { color: var(--accent); }
+    .proto-outcomes__value.below-target { color: var(--c-amber-500); }
+    .proto-outcomes__footer {
+      margin-top: var(--space-4);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+    }
+
+    /* pipeline-nav styles injected by components.js */
+
+    /* ── PROTO-2: Experiment badge ───────────────────────────── */
+    .exp-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-1);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      color: var(--c-amber-500);
+      border: 1px solid var(--c-amber-300, #fbbf24);
+      padding: 2px var(--space-2);
+      text-decoration: none;
+    }
+    .exp-badge:hover { background: rgba(245,158,11,0.08); }
+    .exp-badge__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--c-amber-500); animation: pulse 2s infinite; }
+
+    /* ── PROTO-3: Habit/supplement links ────────────────────── */
+    .proto-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-6);
+      border-top: 1px solid var(--border-subtle);
+      background: var(--bg);
+    }
+    .proto-links__group {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .proto-links__label { color: var(--text-faint); text-transform: uppercase; letter-spacing: var(--ls-tag); }
+    .proto-links__link { color: var(--accent-dim); text-decoration: none; border-bottom: 1px dotted var(--accent-dim); }
+    .proto-links__link:hover { color: var(--accent); }
+
+    /* ── Tier badges ─────────────────────────────────────────── */
+    .proto-tier-badge {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border: 1px solid;
+      font-weight: 600;
+    }
+    .proto-tier-badge.tier-foundation  { color: var(--accent); border-color: var(--accent-dim); background: rgba(0,200,100,0.06); }
+    .proto-tier-badge.tier-measurement { color: var(--c-cyan-400, #22d3ee); border-color: var(--c-cyan-300, #67e8f9); background: rgba(34,211,238,0.06); }
+    .proto-tier-badge.tier-intervention { color: var(--c-amber-500); border-color: var(--c-amber-300, #fbbf24); background: rgba(245,158,11,0.06); }
+    .proto-tier-badge.tier-supporting  { color: var(--text-muted); border-color: var(--border); background: rgba(200,200,200,0.04); }
+
+    /* ── Mobile adjustments ──────────────────────────────────── */
+    @media (max-width: 768px) {
+      .proto-detail { grid-template-columns: 1fr; }
+      .proto-card__header { gap: var(--space-2); }
+      .proto-stats { gap: var(--space-3); }
+      .vice-chip { min-width: 130px; }
+    }
+  </style>
+  <link rel="canonical" href="https://averagejoematt.com/protocols/">
+</head>
+<body class="body-signal">
+<div id="amj-nav"></div>
+
+
+<div id="amj-hierarchy-nav"></div>
+
+<header class="proto-header reveal">
+  <h1 class="proto-header__title">What I&rsquo;m <span>actually doing</span></h1>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:560px;line-height:var(--lh-body)">
+    A protocol is the distilled version of what I've learned. Not a habit I'm trying to build — something that's already become part of how I operate. A morning routine that survived long enough to stop being an experiment. A pre-bed sequence that the data confirmed actually moves my sleep. The stuff that's earned a permanent place.
+  </p>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:560px;line-height:var(--lh-body);margin-top:var(--space-4)">
+    Protocols emerge from everything else on this platform — experiments, challenges, discoveries, coaching. They evolve slowly. They don't change on a whim. But they're not sacred either — if the data says something isn't working, it gets revisited.
+  </p>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:560px;line-height:var(--lh-body);margin-top:var(--space-4)">
+    Right now, at the start of this, the protocol list is short. That's honest. Ask me again in six months.
+  </p>
+</header>
+
+<!-- Signal state legend (17e) -->
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-4) var(--page-padding) 0;">
+  <div style="display:flex;gap:var(--space-6);flex-wrap:wrap;font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;">
+    <span><span style="color:var(--accent);">&#9679;</span> Positive &mdash; data confirms working</span>
+    <span><span style="color:var(--c-amber-500);">&#9679;</span> Pending &mdash; insufficient data</span>
+    <span><span style="color:var(--text-faint);">&#9679;</span> No signal &mdash; not enough time</span>
+  </div>
+</div>
+
+<!-- Through-line thread -->
+<div class="proto-thread reveal">
+  <div class="proto-thread__bar">
+    <span style="color:var(--text-faint);font-family:var(--font-mono)">//</span>
+    Protocols are the inputs &rarr; <a href="/legacy/live/">Today&rsquo;s results &rarr;</a> &middot; <a href="/legacy/experiments/">Where they come from &rarr;</a> &middot; <a href="/legacy/supplements/">The pharmacy &rarr;</a>
+  </div>
+</div>
+
+<!-- Quick-glance outcome snapshot (17c: dynamic from API) -->
+<div class="proto-outcomes reveal">
+  <div class="proto-outcomes__box">
+    <div class="proto-outcomes__heading">Is this working? — snapshot</div>
+    <div class="proto-outcomes__grid" id="outcomes-grid">
+      <div style="grid-column:1/-1;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);">Loading outcomes&hellip;</div>
+    </div>
+    <div class="proto-outcomes__footer" id="outcomes-footer">Loading from API&hellip;</div>
+  </div>
+</div>
+
+
+<div class="proto-body" id="proto-body">
+  <!-- Data-driven: rendered from /api/protocols -->
+  <div style="padding:var(--space-12) 0;text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">Loading protocols from API&hellip;</div>
+</div><!-- /proto-body -->
+
+<!-- Discipline streaks cross-link (moved to Accountability) -->
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-8) var(--page-padding);" class="reveal">
+  <a href="/legacy/accountability/" style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-4) var(--space-6);border:1px solid var(--border);background:var(--surface);text-decoration:none;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);letter-spacing:var(--ls-label);">
+    <span style="color:var(--accent-dim);">//</span>
+    <span>See discipline streaks &rarr; <strong style="color:var(--accent);">Accountability</strong></span>
+  </a>
+</div>
+
+<!-- N=1 disclaimer -->
+<aside style="max-width:var(--prose-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border-subtle);">
+  <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label)">
+    <span style="color:var(--accent-dim)">// N=1 DISCLAIMER</span><br>
+    These are protocols for one person, informed by one person&rsquo;s data. Nothing here is medical advice.
+    The value is the methodology &mdash; tracking everything, letting data drive decisions, and being honest about what&rsquo;s working and what isn&rsquo;t.
+  </p>
+</aside>
+
+<!-- Email CTA -->
+<nav class="reading-path-v2">
+  <a href="/legacy/explorer/" class="reading-path-v2__link">
+    <span class="reading-path-v2__dir">← Previous</span>
+    <span class="reading-path-v2__title">Data Explorer</span>
+  </a>
+  <a href="/legacy/supplements/" class="reading-path-v2__link reading-path-v2__link--next">
+    <span class="reading-path-v2__dir">Next →</span>
+    <span class="reading-path-v2__title">The Pharmacy</span>
+  </a>
+</nav>
+
+<div id="amj-subscribe"></div>
+
+<!-- Data-driven protocol renderer + adherence + experiment badges -->
+<script>
+(function(){
+  'use strict';
+
+  // ── Static metadata mappings (17b: origin, 17f: rationale, 17g: tier) ──
+  var ORIGIN_MAP = {
+    'sleep':       'Published literature (Walker, 2017; Huberman, 2021)',
+    'zone2':       'Published literature (Seiler 80/20 polarized model)',
+    'deficit':     'Published literature (MacroFactor adaptive TDEE)',
+    'cgm':         'Personal conviction \u2014 glucose anxiety \u2192 data as resolution',
+    'if':          'N=1 experiment (Week 3 \u2014 proved out)',
+    'supplements': 'Composite \u2014 individual supplements evidence-rated'
+  };
+  var RATIONALE_MAP = {
+    'sleep':       'Optimizes slow-wave sleep for HGH release, memory consolidation, and metabolic recovery',
+    'zone2':       'Builds mitochondrial density and fat oxidation capacity below VT1',
+    'deficit':     'Sustained moderate deficit (~500 kcal) preserves lean mass during weight loss',
+    'cgm':         'Continuous glucose data reveals individual meal responses invisible to standard blood panels',
+    'if':          '16:8 window aligns eating with circadian rhythm and extends overnight fat oxidation',
+    'supplements': 'Evidence-rated inputs supporting sleep, recovery, deficit protection, and longevity'
+  };
+  var EVIDENCE_MAP = {
+    'sleep': [
+      { title: 'Walker (2017) — Why We Sleep: sleep architecture & metabolic regulation', url: 'https://pubmed.ncbi.nlm.nih.gov/28589901/' },
+      { title: 'Huberman (2021) — Temperature & light timing for circadian entrainment', url: 'https://pubmed.ncbi.nlm.nih.gov/34613461/' }
+    ],
+    'zone2': [
+      { title: 'Seiler & Kjerland (2006) — Polarized training intensity distribution', url: 'https://pubmed.ncbi.nlm.nih.gov/16558681/' },
+      { title: 'Valenzuela et al. (2023) — Zone 2 and mitochondrial function in longevity', url: 'https://pubmed.ncbi.nlm.nih.gov/36413997/' }
+    ],
+    'deficit': [
+      { title: 'Helms et al. (2014) — Evidence-based recommendations for contest prep', url: 'https://pubmed.ncbi.nlm.nih.gov/24864135/' },
+      { title: 'Mero et al. (2010) — Moderate energy restriction vs aggressive deficit', url: 'https://pubmed.ncbi.nlm.nih.gov/21558571/' }
+    ],
+    'cgm': [
+      { title: 'Zeevi et al. (2015) — Personalized glycemic responses in 800 participants', url: 'https://pubmed.ncbi.nlm.nih.gov/26590418/' }
+    ],
+    'if': [
+      { title: 'de Cabo & Mattson (2019) — Effects of intermittent fasting on health', url: 'https://pubmed.ncbi.nlm.nih.gov/31881139/' }
+    ],
+    'supplements': [
+      { title: 'Examine.com — Independent supplement research database', url: 'https://examine.com/' }
+    ]
+  };
+  var TIER_MAP = {
+    'sleep':       { label: 'FOUNDATION',   cls: 'tier-foundation' },
+    'zone2':       { label: 'FOUNDATION',   cls: 'tier-foundation' },
+    'deficit':     { label: 'INTERVENTION',  cls: 'tier-intervention' },
+    'cgm':         { label: 'MEASUREMENT',   cls: 'tier-measurement' },
+    'if':          { label: 'INTERVENTION',  cls: 'tier-intervention' },
+    'supplements': { label: 'SUPPORTING',    cls: 'tier-supporting' }
+  };
+
+  // ── Render protocol cards from API ──
+  function renderCard(p) {
+    var statusCls = p.status === 'active' ? 'active' : p.status === 'testing' ? 'testing' : 'paused';
+    var signalCls = p.signal_status === 'positive' ? 'signal-positive' : p.signal_status === 'pending' ? 'signal-pending' : 'signal-none';
+    var signalLabel = p.signal_status === 'positive' ? 'Positive' : p.signal_status === 'pending' ? 'Pending' : 'No signal';
+    var signalText = signalLabel + (p.signal_note ? ' \u2014 ' + p.signal_note : '');
+
+    var html = '<div class="proto-card reveal is-visible" id="card-' + p.slug + '" data-tags="' + (p.experiment_tags || []).join(',') + '">';
+    // Header — prefer API fields, fall back to static maps
+    var tierLabel = null, tierCls = null;
+    if (p.tier) {
+      tierLabel = p.tier.toUpperCase();
+      tierCls = 'tier-' + p.tier;
+    } else if (TIER_MAP[p.slug]) {
+      tierLabel = TIER_MAP[p.slug].label;
+      tierCls = TIER_MAP[p.slug].cls;
+    }
+    html += '<div class="proto-card__header">';
+    if (tierLabel) {
+      html += '<span class="proto-tier-badge ' + tierCls + '">' + tierLabel + '</span>';
+      html += '<span class="proto-card__sep">&middot;</span>';
+    }
+    html += '<span class="proto-card__category">' + p.category + '</span>';
+    html += '<span class="proto-card__sep">&middot;</span>';
+    html += '<a href="/legacy/character/" class="proto-card__pillar-link">' + p.pillar_link + ' &rarr;</a>';
+    html += '<div class="proto-card__status ' + statusCls + '">' + p.status.charAt(0).toUpperCase() + p.status.slice(1) + '</div>';
+    html += '</div>';
+    // Body
+    html += '<div class="proto-card__body">';
+    html += '<div class="proto-card__name">' + p.name + '</div>';
+    html += '<div class="proto-card__why">' + p.why + '</div>';
+    html += '<div class="proto-detail"><span class="proto-detail__label">Protocol</span><span class="proto-detail__value"><strong>' + p.description + '</strong></span></div>';
+    html += '<div class="proto-detail"><span class="proto-detail__label">Key metrics</span><span class="proto-detail__value">' + (p.key_metrics || []).join(', ') + '</span></div>';
+    if (p.key_finding) {
+      html += '<div class="proto-detail"><span class="proto-detail__label">Key finding</span><span class="proto-detail__value">' + p.key_finding + '</span></div>';
+    }
+    var origin = p.origin || ORIGIN_MAP[p.slug];
+    var mechanism = p.mechanism || RATIONALE_MAP[p.slug];
+    if (origin) {
+      html += '<div class="proto-detail"><span class="proto-detail__label">Origin</span><span class="proto-detail__value">' + origin + '</span></div>';
+    }
+    if (mechanism) {
+      html += '<div class="proto-detail"><span class="proto-detail__label">Mechanism</span><span class="proto-detail__value">' + mechanism + '</span></div>';
+    }
+    // Stats
+    html += '<div class="proto-stats">';
+    html += '<div class="proto-stat"><div class="proto-stat__label">30-day adherence</div>';
+    html += '<div class="proto-stat__value loading" id="adh-' + p.slug + '">Loading&hellip;</div></div>';
+    html += '<div class="proto-stat"><div class="proto-stat__label">Signal</div>';
+    html += '<div class="proto-stat__value ' + signalCls + '">' + signalText + '</div></div>';
+    html += '</div>';
+    html += '<div class="proto-data-note"><span>// Tracked by:</span> ' + (p.tracked_by || []).join(' + ') + '</div>';
+    // Evidence references
+    var refs = p.references || EVIDENCE_MAP[p.slug];
+    if (refs && refs.length) {
+      html += '<div class="proto-detail" style="margin-top:var(--space-3);"><span class="proto-detail__label">Evidence</span><span class="proto-detail__value">';
+      refs.forEach(function(r) {
+        html += '<a href="' + r.url + '" target="_blank" rel="noopener" style="display:block;color:var(--accent);text-decoration:none;font-size:var(--text-xs);line-height:1.6;">' + r.title + ' \u2192</a>';
+      });
+      html += '</span></div>';
+    }
+    html += '</div>';
+    // Links
+    var links = '';
+    if (p.related_habits && p.related_habits.length) {
+      links += '<div class="proto-links__group"><span class="proto-links__label">Habits</span> <a href="/legacy/habits/" class="proto-links__link">' + p.related_habits.join(', ') + ' \u2192</a></div>';
+    }
+    if (p.related_supplements && p.related_supplements.length) {
+      links += '<div class="proto-links__group"><span class="proto-links__label">Supplements</span> <a href="/legacy/supplements/" class="proto-links__link">' + p.related_supplements.join(', ') + ' \u2192</a></div>';
+    }
+    if (links) html += '<div class="proto-links">' + links + '</div>';
+    html += '</div>';
+    return html;
+  }
+
+  // ── Render outcome snapshot from protocols + habits (17c) ──
+  function renderOutcomes(protocols, habitsData) {
+    var grid = document.getElementById('outcomes-grid');
+    var footer = document.getElementById('outcomes-footer');
+    if (!grid) return;
+
+    var ADH_KEYS = {
+      'sleep': 'sleep_adherence_pct',
+      'zone2': 'zone2_adherence_pct',
+      'if': 'if_adherence_pct',
+      'strength': 'strength_adherence_pct',
+      'cgm': 'cgm_adherence_pct',
+      'supplements': null
+    };
+
+    var html = '';
+    protocols.forEach(function(p) {
+      var signalCls = p.signal_status === 'positive' ? 'on-target' : p.signal_status === 'pending' ? 'below-target' : '';
+      var signalLabel = p.signal_status === 'positive' ? 'Positive' : p.signal_status === 'pending' ? 'Pending' : 'No signal';
+      var valueText = signalLabel;
+
+      // Append adherence if available
+      var adhKey = ADH_KEYS[p.slug];
+      if (adhKey && habitsData && habitsData[adhKey] !== undefined && habitsData[adhKey] !== null) {
+        var pct = Math.round(habitsData[adhKey]);
+        valueText = pct + '% adherence \u2014 ' + signalLabel;
+        signalCls = pct >= 80 ? 'on-target' : 'below-target';
+      } else if (p.signal_note) {
+        valueText += ' \u2014 ' + p.signal_note;
+      }
+
+      html += '<div class="proto-outcomes__row">';
+      html += '<div class="proto-outcomes__protocol">' + p.name + '</div>';
+      html += '<div class="proto-outcomes__value ' + signalCls + '">' + valueText + '</div>';
+      html += '</div>';
+    });
+
+    grid.innerHTML = html || '<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);">No protocols loaded</div>';
+    if (footer) footer.textContent = 'Updated from API \u2014 live adherence loads within each card below';
+  }
+
+  // ── Load protocols from API ──
+  var _cachedProtocols = [];
+  fetch('/api/protocols')
+    .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
+    .then(function(data) {
+      var protocols = data.protocols || [];
+      _cachedProtocols = protocols;
+      var body = document.getElementById('proto-body');
+      if (!protocols.length) {
+        body.innerHTML = '<div style="padding:var(--space-12) 0;text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">No protocols found</div>';
+        renderOutcomes([], null);
+        return;
+      }
+      // Render outcome snapshot with signal data (adherence added later)
+      renderOutcomes(protocols, null);
+
+      var pullQuote = '<div style="max-width:var(--max-width);margin:var(--space-6) auto;padding:var(--space-6) var(--page-padding);border-left:3px solid var(--accent);font-family:var(--font-display);font-size:var(--text-lg);color:var(--text-muted);line-height:var(--lh-body);font-style:italic;">&ldquo;The protocols aren&rsquo;t the interesting part. The interesting part is whether they survive contact with real data.&rdquo;</div>';
+      var cards = protocols.map(renderCard);
+      if (cards.length > 3) {
+        cards.splice(3, 0, pullQuote);
+      } else {
+        cards.push(pullQuote);
+      }
+      body.innerHTML = cards.join('');
+      // After cards rendered, load adherence + experiment badges
+      loadAdherence(protocols);
+      loadExperimentBadges(protocols);
+    })
+    .catch(function() {
+      document.getElementById('proto-body').innerHTML = '<div style="padding:var(--space-12) 0;text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">Could not load protocols — try refreshing</div>';
+      var grid = document.getElementById('outcomes-grid');
+      if (grid) grid.innerHTML = '<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);">Could not load protocol data</div>';
+    });
+
+  // ── Load adherence data ──
+  function loadAdherence(protocols) {
+    // Map slug → adherence key from /api/habits
+    var ADH_MAP = {
+      'zone2':    'zone2_adherence_pct',
+      'sleep':    'sleep_adherence_pct',
+      'if':       'if_adherence_pct',
+      'strength': 'strength_adherence_pct',
+      'cgm':      'cgm_adherence_pct',
+      'sunlight': 'sunlight_adherence_pct'
+    };
+    fetch('/api/habits', {signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined})
+      .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
+      .then(function(hData) {
+        protocols.forEach(function(p) {
+          var key = ADH_MAP[p.slug];
+          var el = document.getElementById('adh-' + p.slug);
+          if (el && key && hData[key] !== undefined && hData[key] !== null) {
+            el.textContent = Math.round(hData[key]) + '%';
+            el.classList.remove('loading');
+          } else if (el) {
+            el.textContent = '\u2014';
+            el.classList.remove('loading');
+          }
+        });
+        // Re-render outcome snapshot with adherence data (17c)
+        renderOutcomes(_cachedProtocols, hData);
+        // Vice streaks
+        if (hData.caloric_target_streak !== undefined) {
+          var sc = document.getElementById('streak-calories');
+          if (sc) { sc.textContent = hData.caloric_target_streak; sc.classList.remove('loading'); }
+        }
+        var alc = hData.alcohol_streak !== undefined ? hData.alcohol_streak : hData.vice_alcohol_streak;
+        if (alc !== undefined && alc !== null) {
+          var sa = document.getElementById('streak-alcohol');
+          if (sa) { sa.textContent = alc; sa.classList.remove('loading'); }
+        }
+      })
+      .catch(function() {
+        // Fallback: set all to em dash
+        protocols.forEach(function(p) {
+          var el = document.getElementById('adh-' + p.slug);
+          if (el) { el.textContent = '\u2014'; el.classList.remove('loading'); }
+        });
+      });
+  }
+
+  // ── Experiment badges on protocol cards ──
+  function loadExperimentBadges(protocols) {
+    fetch('/api/experiments')
+      .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
+      .then(function(d) {
+        var active = (d.experiments || []).filter(function(e) { return e.status === 'active'; });
+        protocols.forEach(function(p) {
+          var tags = p.experiment_tags || [];
+          var matching = active.filter(function(exp) {
+            return (exp.tags || []).some(function(t) { return tags.indexOf(t) !== -1; });
+          });
+          if (!matching.length) return;
+          var card = document.getElementById('card-' + p.slug);
+          if (!card) return;
+          var header = card.querySelector('.proto-card__header');
+          if (!header) return;
+          matching.forEach(function(exp) {
+            var badge = document.createElement('a');
+            badge.href = '/legacy/experiments/';
+            badge.className = 'exp-badge';
+            badge.title = exp.name;
+            badge.innerHTML = '<span class="exp-badge__dot"></span> Experiment running';
+            header.appendChild(badge);
+          });
+        });
+      })
+      .catch(function() {});
+  }
+
+})();
+</script>
+
+<!-- Mobile bottom nav -->
+<div id="amj-bottom-nav"></div>
+
+<div id="amj-reading-path"></div>
+<div id="amj-footer"></div>
+<script src="/legacy/assets/js/reveal.js"></script>
+<script src="/legacy/assets/js/site_constants.js"></script>
+<script src="/legacy/assets/js/components.js"></script>
+<script src="/legacy/assets/js/nav.js"></script>
+<script src="/legacy/assets/js/animations.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="robots" content="noindex">
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="The Sleep Dispatch — nightly sleep architecture, recovery, and circadian signals from Eight Sleep and Whoop. Updated daily.">
+  <meta property="og:title" content="The Sleep Dispatch — Matthew">
+  <meta property="og:description" content="Eight Sleep × Whoop, nightly. Sleep score, deep/REM, HRV, efficiency, bed temperature, and circadian consistency.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/sleep/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-sleep.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>The Sleep Dispatch — Matthew</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/legacy/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/legacy/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/legacy/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/legacy/assets/css/tokens.css">
+  <link rel="stylesheet" href="/legacy/assets/css/base.css">
+  <style>
+    /* /sleep/ — uses Front Page pattern (.fp-*); see assets/css/frontpage.css.
+       Page-scope additions only — namespace .s- (sleep). */
+    .s-page { padding-top: var(--nav-height); }
+
+    /* Skeleton placeholder before /api/sleep_detail resolves */
+    .s-skeleton {
+      background: linear-gradient(90deg, var(--surface) 25%, var(--surface-raised) 50%, var(--surface) 75%);
+      background-size: 200% 100%;
+      animation: s-shimmer 1.5s infinite;
+      border-radius: 2px;
+      display: inline-block;
+    }
+    @keyframes s-shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    .s-row-empty {
+      padding: 28px 22px;
+      border-top: 1px solid var(--border-subtle);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      color: var(--text-faint);
+      text-transform: uppercase;
+    }
+
+    /* Strip nav buttons (prev/next dispatch) */
+    .s-strip-btn {
+      cursor: not-allowed;
+      opacity: 0.5;
+      color: inherit;
+      text-decoration: none;
+    }
+    .s-strip-btn.is-active { opacity: 1; cursor: pointer; color: var(--accent-dim); }
+    .s-strip-btn.is-active:hover { color: var(--accent); }
+
+    /* ── Extra sections (last night, architecture trend, consistency, temperature)
+       sit AFTER long-arc, BEFORE cross-link footer.
+       They use editorial framing matching the .fp-* primitives. */
+    .s-extras {
+      border-top: 1px solid var(--border);
+    }
+    .s-extras__section {
+      padding: 28px 56px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .s-extras__head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 18px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .s-extras__title {
+      font-family: var(--font-display);
+      font-size: 20px;
+      letter-spacing: 0.04em;
+      color: var(--text);
+    }
+    .s-extras__meta {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .s-extras__caption {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-top: 10px;
+    }
+
+    /* Last-night stage bar */
+    .s-lastnight-bar {
+      display: flex;
+      height: 28px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .s-lastnight-legend {
+      display: flex;
+      gap: 22px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+    }
+    .s-lastnight-legend span span.dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    /* Architecture stacked-area trend */
+    .s-arch-chart {
+      position: relative;
+      height: 200px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .s-arch-chart svg { width: 100%; height: 100%; display: block; }
+
+    /* Consistency / temperature mini-cards */
+    .s-mini-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+    .s-mini-card {
+      padding: 18px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+    }
+    .s-mini-card--alert { border-left-color: var(--c-yellow-status); }
+    .s-mini-card__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: 8px;
+    }
+    .s-mini-card__value {
+      font-family: var(--font-display);
+      font-size: 32px;
+      line-height: 1;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+    .s-mini-card__detail {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.55;
+    }
+
+    /* Temperature highlight (single wide card) */
+    .s-temp-card {
+      padding: 20px 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 28px;
+      align-items: center;
+    }
+    .s-temp-card__title {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .s-temp-card__title em { font-style: normal; color: var(--accent); }
+    .s-temp-card__sub {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.55;
+    }
+    .s-temp-big { text-align: center; }
+    .s-temp-big__num {
+      font-family: var(--font-display);
+      font-size: 56px;
+      line-height: 1;
+      color: var(--accent);
+    }
+    .s-temp-big__unit {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    @media (max-width: 720px) {
+      .s-extras__section { padding: 20px 20px; }
+      .s-mini-grid { grid-template-columns: 1fr; }
+      .s-temp-card { grid-template-columns: 1fr; text-align: center; }
+    }
+  </style>
+  <link rel="canonical" href="https://averagejoematt.com/sleep/">
+</head>
+<body class="body-signal">
+  <div id="amj-nav"></div>
+  <div id="amj-hierarchy-nav"></div>
+
+  <div class="fp-page s-page" style="--accent: #c8843a; --accent-dim: #a06820;">
+
+    <!-- ═══ 1. MASTHEAD ═════════════════════════════════════ -->
+    <header class="fp-masthead">
+      <div class="fp-masthead__top">
+        <div>
+          <div class="fp-masthead__brow" id="fp-eyebrow">
+            The Sleep Dispatch · Vol I · Dispatch №<span id="fp-dispatch">—</span>
+          </div>
+          <div class="fp-masthead__title">SLEEP</div>
+        </div>
+        <div class="fp-masthead__meta">
+          <div id="fp-date"><span class="s-skeleton" style="width:160px;height:10px"></span></div>
+          <div id="fp-meta-status">Eight Sleep × Whoop · cross-referenced nightly</div>
+        </div>
+      </div>
+      <div class="fp-masthead__strip">
+        <div>
+          <span class="s-strip-btn" id="fp-prev" title="Previous nights archive coming soon">← Last night</span>
+          <span class="fp-masthead__strip-sep">·</span>
+          Night <span id="fp-night-strip">—</span> tracked
+          <span class="fp-masthead__strip-sep">·</span>
+          <span class="s-strip-btn" id="fp-next" title="Tonight's data isn't here yet">Tonight →</span>
+        </div>
+        <div id="fp-filed">Filed —</div>
+      </div>
+    </header>
+
+    <!-- ═══ 2. LEDE ═════════════════════════════════════════ -->
+    <section class="fp-lede">
+      <div>
+        <div class="fp-lede__num-brow">Night</div>
+        <div class="fp-lede__num" id="fp-night">—</div>
+        <div class="fp-lede__num-cap">tracked</div>
+      </div>
+      <div>
+        <div class="fp-lede__status" id="fp-status">▸ Last Night's Dispatch · State: Loading</div>
+        <div class="fp-lede__narrative" id="fp-narrative">
+          "<span class="s-skeleton" style="width:80%;height:18px"></span>"
+        </div>
+        <div class="fp-lede__delta" id="fp-delta" style="display:none">
+          <span class="fp-lede__delta-label">Since last night:</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 3. WATCH BANNER (optional) ══════════════════════ -->
+    <div class="fp-watch" id="fp-watch" style="display:none">
+      <span class="fp-watch__label" id="fp-watch-label">Watch</span>
+      <span id="fp-watch-text"></span>
+    </div>
+
+    <!-- ═══ 4. STANDINGS (sleep signals) ════════════════════ -->
+    <section class="fp-standings">
+      <div class="fp-standings__head">
+        <div class="fp-standings__title">SIGNALS</div>
+        <div class="fp-standings__meta">7-day trend · last reading</div>
+      </div>
+      <div id="fp-standings-rows">
+        <div class="s-row-empty">Loading signals…</div>
+      </div>
+    </section>
+
+    <!-- ═══ 5. LONG STORY (7-day duration arc) ══════════════ -->
+    <section class="fp-arc" id="fp-arc-section">
+      <div class="fp-arc__head">
+        <div>
+          <div class="fp-arc__brow">The Long Story · 30-Day Sleep Score</div>
+          <div class="fp-arc__num" id="fp-arc-num">
+            <span id="fp-arc-first">—</span> →
+            <span class="fp-arc__num-current" id="fp-arc-current">—</span> →
+            <span id="fp-arc-target">85</span>
+          </div>
+        </div>
+        <div class="fp-arc__stats" id="fp-arc-stats">
+          <div>
+            <div class="fp-arc__stat-label">7-day avg duration</div>
+            <div class="fp-arc__stat-val fp-arc__stat-val--accent" id="fp-arc-avg-hours">—</div>
+          </div>
+          <div>
+            <div class="fp-arc__stat-label">30-day avg score</div>
+            <div class="fp-arc__stat-val" id="fp-arc-avg-score">—</div>
+          </div>
+          <div>
+            <div class="fp-arc__stat-label">Best night</div>
+            <div class="fp-arc__stat-val" id="fp-arc-best">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="fp-arc__chart" id="fp-arc-chart"></div>
+      <div class="fp-arc__caption" id="fp-arc-caption">
+        <span id="fp-arc-cap-left">Earliest · —</span>
+        <span id="fp-arc-cap-right">Last night · —</span>
+      </div>
+    </section>
+
+    <!-- ═══ 6. EXTRA SECTIONS — sleep-specific features
+         (placed AFTER long story, BEFORE cross-link footer per spec) ═ -->
+    <div class="s-extras">
+
+      <!-- Last night's stage breakdown -->
+      <section class="s-extras__section" id="s-lastnight-section" style="display:none">
+        <div class="s-extras__head">
+          <div class="s-extras__title">LAST NIGHT'S ARCHITECTURE</div>
+          <div class="s-extras__meta" id="s-lastnight-meta">Single-night stages</div>
+        </div>
+        <div class="s-lastnight-bar" id="s-lastnight-bar"></div>
+        <div class="s-lastnight-legend" id="s-lastnight-legend"></div>
+        <div class="s-extras__caption">Deep + REM &gt; 40% indicates a restorative night.</div>
+      </section>
+
+      <!-- 30-day architecture trend (stacked area) -->
+      <section class="s-extras__section" id="s-arch-section" style="display:none">
+        <div class="s-extras__head">
+          <div class="s-extras__title">ARCHITECTURE — 30 NIGHTS</div>
+          <div class="s-extras__meta">Deep / REM / Light, stacked</div>
+        </div>
+        <div class="s-arch-chart">
+          <svg id="s-arch-svg" viewBox="0 0 800 200" preserveAspectRatio="none">
+            <path id="s-arch-deep"  fill="rgba(200,132,58,0.55)" stroke="none" d=""/>
+            <path id="s-arch-rem"   fill="rgba(200,132,58,0.30)" stroke="none" d=""/>
+            <path id="s-arch-light" fill="rgba(200,132,58,0.12)" stroke="none" d=""/>
+          </svg>
+        </div>
+        <div class="s-extras__caption" id="s-arch-caption">Stacked stages over the trailing 30 nights.</div>
+      </section>
+
+      <!-- Circadian consistency / social jetlag -->
+      <section class="s-extras__section" id="s-consistency-section" style="display:none">
+        <div class="s-extras__head">
+          <div class="s-extras__title">CIRCADIAN CONSISTENCY</div>
+          <div class="s-extras__meta">Bedtime · variance · jetlag</div>
+        </div>
+        <div class="s-mini-grid">
+          <div class="s-mini-card">
+            <div class="s-mini-card__label">Weekday bedtime</div>
+            <div class="s-mini-card__value" id="s-weekday-bed">—</div>
+            <div class="s-mini-card__detail" id="s-weekday-detail">Average Mon–Fri lights-out</div>
+          </div>
+          <div class="s-mini-card">
+            <div class="s-mini-card__label">Weekend bedtime</div>
+            <div class="s-mini-card__value" id="s-weekend-bed">—</div>
+            <div class="s-mini-card__detail" id="s-weekend-detail">Average Sat–Sun lights-out</div>
+          </div>
+          <div class="s-mini-card s-mini-card--alert" id="s-jetlag-card">
+            <div class="s-mini-card__label">Social jetlag</div>
+            <div class="s-mini-card__value" id="s-jetlag-val">—</div>
+            <div class="s-mini-card__detail" id="s-jetlag-desc">Weekend drift from weekday schedule.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bed temperature discovery -->
+      <section class="s-extras__section" id="s-temp-section" style="display:none">
+        <div class="s-extras__head">
+          <div class="s-extras__title">BED TEMPERATURE</div>
+          <div class="s-extras__meta">Empirical optimal · Eight Sleep pod</div>
+        </div>
+        <div class="s-temp-card">
+          <div>
+            <div class="s-temp-card__title">Optimal bed temperature: <em id="s-temp-val">—</em></div>
+            <div class="s-temp-card__sub" id="s-temp-desc">Core body temperature must drop 1–3°F to initiate deep sleep. The temperature below produced the highest average sleep scores in this dataset.</div>
+          </div>
+          <div class="s-temp-big">
+            <div class="s-temp-big__num" id="s-temp-big-num">—</div>
+            <div class="s-temp-big__unit" id="s-temp-days">— nights tracked</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Protocol adherence -->
+      <section class="s-extras__section" id="s-adherence-section">
+        <div class="s-extras__head">
+          <div class="s-extras__title">PROTOCOL ADHERENCE</div>
+          <div class="s-extras__meta">Intention vs outcome</div>
+        </div>
+        <div class="s-mini-grid" id="s-adherence-grid">
+          <div class="s-mini-card">
+            <div class="s-mini-card__label">Sleep onset &lt; 11 PM PT</div>
+            <div class="s-mini-card__value" id="s-adh-onset-pct">—</div>
+            <div class="s-mini-card__detail" id="s-adh-onset-outcome">Calculating from sleep data…</div>
+          </div>
+          <div class="s-mini-card">
+            <div class="s-mini-card__label">Bed temp at 68°F</div>
+            <div class="s-mini-card__value" id="s-adh-temp-pct">—</div>
+            <div class="s-mini-card__detail">Measuring effect on deep sleep %.</div>
+          </div>
+          <div class="s-mini-card">
+            <div class="s-mini-card__label">No alcohol</div>
+            <div class="s-mini-card__value" id="s-adh-alcohol-pct">—</div>
+            <div class="s-mini-card__detail">Tracking sleep score on alcohol vs sober nights.</div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /.s-extras -->
+
+    <!-- ═══ 7. CROSS-LINK FOOTER ════════════════════════════ -->
+    <nav class="fp-cross-footer">
+      <div class="fp-cross-footer__prev"><a href="/legacy/live/">← The Pulse</a></div>
+      <div class="fp-cross-footer__mid">
+        How a body recovers shows up in tomorrow's pulse →
+        <a href="/legacy/live/">The Pulse</a>
+      </div>
+      <div class="fp-cross-footer__next"><a href="/legacy/glucose/">Glucose →</a></div>
+    </nav>
+
+  </div>
+
+  <div id="amj-subscribe"></div>
+  <div id="amj-bottom-nav"></div>
+  <div id="amj-footer"></div>
+
+  <script src="/legacy/assets/js/site_constants.js"></script>
+  <script src="/legacy/assets/js/components.js"></script>
+  <script src="/legacy/assets/js/nav.js"></script>
+  <script>
+  (function() {
+    'use strict';
+
+    // ── Sleep "signals" rendered as standings rows ─────────
+    var SIGNAL_ORDER = ['score', 'duration', 'efficiency', 'deep', 'rem', 'hrv', 'recovery'];
+    var SIGNAL_LABELS = {
+      score: 'Sleep Score',
+      duration: 'Duration',
+      efficiency: 'Efficiency',
+      deep: 'Deep',
+      rem: 'REM',
+      hrv: 'HRV',
+      recovery: 'Recovery'
+    };
+    var SIGNAL_HREF = {
+      score: '#s-arch-section', duration: '#s-arch-section',
+      efficiency: '#s-arch-section', deep: '#s-arch-section',
+      rem: '#s-arch-section', hrv: '#s-arch-section',
+      recovery: '/recovery/'
+    };
+    var ICON_FILE = {
+      score: 'icon-sleep', duration: 'icon-sleep', efficiency: 'icon-sleep',
+      deep: 'icon-sleep', rem: 'icon-sleep', hrv: 'icon-recovery',
+      recovery: 'icon-recovery'
+    };
+
+    function iconHTML(key) {
+      var url = '/assets/icons/custom/' + (ICON_FILE[key] || 'icon-sleep') + '.svg';
+      return '<div style="width:24px;height:24px;background-color:currentColor;-webkit-mask:url(' + url + ') center/contain no-repeat;mask:url(' + url + ') center/contain no-repeat"></div>';
+    }
+
+    // Build a numeric series from trend data for sparklines
+    function trendSeries(trend, key) {
+      if (!trend || !trend.length) return [];
+      return trend.slice(-7).map(function(d) { return d[key] != null ? d[key] : null; });
+    }
+
+    function classifyState(key, v) {
+      if (v == null) return 'amber';
+      switch (key) {
+        case 'score':       return v >= 85 ? 'green' : v >= 70 ? 'amber' : 'red';
+        case 'duration':    return v >= 7.5 ? 'green' : v >= 6.5 ? 'amber' : 'red';
+        case 'efficiency':  return v >= 85 ? 'green' : v >= 75 ? 'amber' : 'red';
+        case 'deep':        return v >= 20 ? 'green' : v >= 15 ? 'amber' : 'red';
+        case 'rem':         return v >= 20 ? 'green' : v >= 15 ? 'amber' : 'red';
+        case 'hrv':         return v >= 60 ? 'green' : v >= 40 ? 'amber' : 'red';
+        case 'recovery':    return v >= 67 ? 'green' : v >= 34 ? 'amber' : 'red';
+        default:            return 'amber';
+      }
+    }
+
+    function renderSpark(values, state) {
+      if (!values || values.length === 0) return '';
+      var clean = values.filter(function(v) { return v != null; });
+      if (clean.length === 0) return '';
+      var max = Math.max.apply(null, clean);
+      var min = Math.min.apply(null, clean);
+      var range = max - min || 1;
+      var cls = 'fp-spark fp-spark--' + (state || 'amber');
+      var html = '<div class="' + cls + '">';
+      clean.forEach(function(v) {
+        var pct = Math.max(10, ((v - min) / range) * 100);
+        html += '<div class="fp-spark__bar" style="height:' + pct + '%"></div>';
+      });
+      html += '</div>';
+      return html;
+    }
+
+    function fmtNight(n) { return n != null ? Math.round(n).toString() : '—'; }
+    function fmt1(n) { return n != null ? n.toFixed(1) : '—'; }
+
+    function buildSignals(s, trend) {
+      var hours = s.whoop_hours || s.total_sleep_hours;
+      var score = s.sleep_score != null ? s.sleep_score : (trend.length ? trend[trend.length-1].sleep_score : null);
+      var efficiency = s.sleep_efficiency || (s.total_sleep_hours && s.time_in_bed_hours
+        ? Math.round((s.total_sleep_hours / s.time_in_bed_hours) * 100) : null);
+
+      return {
+        score: {
+          value: score, unit: '/ 100',
+          context: s['30d_avg_score'] ? '30-day avg: ' + Math.round(s['30d_avg_score']) : 'Eight Sleep score',
+          spark: trendSeries(trend, 'sleep_score')
+        },
+        duration: {
+          value: hours, unit: 'hrs', formatter: fmt1,
+          context: hours ? 'Time asleep last night' : 'Awaiting reading',
+          spark: trendSeries(trend, 'hours')
+        },
+        efficiency: {
+          value: efficiency, unit: '%',
+          context: s['30d_avg_efficiency'] ? '30-day avg: ' + s['30d_avg_efficiency'] + '%' : 'Sleep / time in bed',
+          spark: trendSeries(trend, 'efficiency')
+        },
+        deep: {
+          value: s.deep_pct, unit: '%', formatter: fmt1,
+          context: 'Slow-wave · target > 20%',
+          spark: trendSeries(trend, 'deep_pct')
+        },
+        rem: {
+          value: s.rem_pct, unit: '%', formatter: fmt1,
+          context: 'Memory consolidation · target > 20%',
+          spark: trendSeries(trend, 'rem_pct')
+        },
+        hrv: {
+          value: s.hrv_ms || s.hrv, unit: 'ms',
+          context: 'Parasympathetic recovery signal',
+          spark: trendSeries(trend, 'hrv_ms')
+        },
+        recovery: {
+          value: s.recovery_score, unit: '%',
+          context: s['30d_avg_recovery'] ? '30-day avg: ' + Math.round(s['30d_avg_recovery']) + '%' : 'Whoop recovery',
+          spark: trendSeries(trend, 'recovery_score')
+        }
+      };
+    }
+
+    function renderStandings(signals) {
+      var rows = document.getElementById('fp-standings-rows');
+      rows.innerHTML = '';
+      var any = false;
+      SIGNAL_ORDER.forEach(function(key) {
+        var sig = signals[key];
+        if (!sig || sig.value == null) return;
+        any = true;
+        var fmt = sig.formatter || function(v) { return Math.round(v).toString(); };
+        var state = classifyState(key, sig.value);
+        var href = SIGNAL_HREF[key] || '#';
+        var spark = renderSpark(sig.spark, state);
+        var html =
+          '<a class="fp-row" href="' + href + '">' +
+            '<div class="fp-row__icon">' + iconHTML(key) + '</div>' +
+            '<div class="fp-row__name">' + SIGNAL_LABELS[key] + '</div>' +
+            '<div class="fp-row__context">' + (sig.context || '') + '</div>' +
+            '<div class="fp-row__value">' +
+              '<span class="fp-row__num">' + fmt(sig.value) + '</span>' +
+              '<span class="fp-row__unit">' + sig.unit + '</span>' +
+            '</div>' +
+            '<div class="fp-row__spark">' + spark + '</div>' +
+          '</a>';
+        rows.insertAdjacentHTML('beforeend', html);
+      });
+      if (!any) rows.innerHTML = '<div class="s-row-empty">No sleep signals reporting yet.</div>';
+    }
+
+    function fmtDate(s) {
+      try {
+        var d = new Date(s + 'T12:00:00');
+        return d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' }).toUpperCase();
+      } catch(e) { return s; }
+    }
+
+    function renderMasthead(s, trend, lastUpdated) {
+      var nightCount = s.days_tracked || (trend ? trend.length : 0) || 0;
+      document.getElementById('fp-dispatch').textContent = nightCount || '—';
+      document.getElementById('fp-night-strip').textContent = nightCount || '—';
+      document.getElementById('fp-night').textContent = nightCount || '—';
+
+      // Date — prefer last_updated, fall back to last trend entry, then today
+      var dateStr = lastUpdated || (trend && trend.length ? trend[trend.length - 1].date : null);
+      if (dateStr) {
+        // strip time component if ISO
+        var bare = String(dateStr).slice(0, 10);
+        document.getElementById('fp-date').textContent = fmtDate(bare);
+      } else {
+        document.getElementById('fp-date').textContent = '';
+      }
+
+      var now = new Date();
+      var hh = String(now.getHours()).padStart(2, '0');
+      var mm = String(now.getMinutes()).padStart(2, '0');
+      document.getElementById('fp-filed').textContent = 'Filed ' + hh + ':' + mm + ' · Auto-synthesis';
+    }
+
+    function statusWord(score, hours) {
+      if (score == null && hours == null) return 'PENDING';
+      if (score != null) {
+        if (score >= 85) return 'RECOVERED';
+        if (score >= 70) return 'STEADY';
+        if (score >= 55) return 'SHORT';
+        return 'DISRUPTED';
+      }
+      if (hours >= 7.5) return 'STEADY';
+      if (hours >= 6) return 'SHORT';
+      return 'DISRUPTED';
+    }
+
+    function statusClass(word) {
+      if (word === 'RECOVERED' || word === 'STEADY') return 'fp-lede__status--strong';
+      if (word === 'SHORT') return 'fp-lede__status--watch';
+      if (word === 'DISRUPTED') return 'fp-lede__status--attention';
+      return 'fp-lede__status--watch';
+    }
+
+    function buildNarrative(s, signals, word) {
+      var hours = signals.duration.value;
+      var score = signals.score.value;
+      var deep = signals.deep.value;
+      var hrv = signals.hrv.value;
+      var parts = [];
+      if (hours != null) parts.push(hours.toFixed(1) + ' hours');
+      if (score != null) parts.push('a sleep score of ' + Math.round(score));
+      if (deep != null) parts.push(deep.toFixed(0) + '% deep');
+      if (hrv != null) parts.push('HRV at ' + Math.round(hrv) + 'ms');
+
+      if (!parts.length) return 'Awaiting tonight’s reading from the pod and the wrist.';
+
+      var lead;
+      switch (word) {
+        case 'RECOVERED': lead = 'A clean night.'; break;
+        case 'STEADY':    lead = 'A workable night.'; break;
+        case 'SHORT':     lead = 'A short night.'; break;
+        case 'DISRUPTED': lead = 'A rough night.'; break;
+        default:          lead = 'Last night’s reading:';
+      }
+      return lead + ' ' + parts.join(', ') + '.';
+    }
+
+    function renderLede(s, signals) {
+      var word = statusWord(signals.score.value, signals.duration.value);
+      var statusEl = document.getElementById('fp-status');
+      statusEl.textContent = "▸ LAST NIGHT'S DISPATCH · STATE: " + word;
+      statusEl.className = 'fp-lede__status ' + statusClass(word);
+      document.getElementById('fp-narrative').textContent = '"' + buildNarrative(s, signals, word) + '"';
+    }
+
+    function renderDelta(s, trend) {
+      var el = document.getElementById('fp-delta');
+      if (!trend || trend.length < 2) { el.style.display = 'none'; return; }
+      var last = trend[trend.length - 1];
+      var prev = trend[trend.length - 2];
+      var items = [];
+      function push(signal, label, currv, prevv, fmt, goodHigh) {
+        if (currv == null || prevv == null) return;
+        var d = currv - prevv;
+        if (Math.abs(d) < 0.05) {
+          items.push({ cls: 'fp-delta--flat', text: label + ' · flat' });
+          return;
+        }
+        var sign = d > 0 ? '+' : '';
+        var good = goodHigh ? d > 0 : d < 0;
+        items.push({
+          cls: good ? 'fp-delta--good' : 'fp-delta--bad',
+          text: label + ' ' + sign + fmt(d)
+        });
+      }
+      push('score', 'Score', last.sleep_score, prev.sleep_score, function(d) { return Math.round(d); }, true);
+      push('hours', 'Duration', last.hours, prev.hours, function(d) { return d.toFixed(1) + 'h'; }, true);
+      push('deep_pct', 'Deep', last.deep_pct, prev.deep_pct, function(d) { return d.toFixed(1) + '%'; }, true);
+      push('hrv_ms', 'HRV', last.hrv_ms, prev.hrv_ms, function(d) { return Math.round(d) + 'ms'; }, true);
+
+      if (!items.length) { el.style.display = 'none'; return; }
+      el.style.display = '';
+      el.innerHTML = '<span class="fp-lede__delta-label">Since last night:</span>' +
+        items.map(function(d) { return '<span class="' + d.cls + '">' + d.text + '</span>'; }).join('');
+    }
+
+    function renderWatch(signals, trend) {
+      var w = document.getElementById('fp-watch');
+      // Surface the most concerning signal as a watch banner.
+      var msg = null, severity = null;
+      var score = signals.score.value;
+      var deep = signals.deep.value;
+      var rem = signals.rem.value;
+      var hours = signals.duration.value;
+
+      if (trend && trend.length >= 2) {
+        var lastTwo = trend.slice(-2);
+        var bothLowScore = lastTwo.every(function(d) { return (d.sleep_score || 100) < 70; });
+        if (bothLowScore) {
+          msg = 'Two consecutive nights below score 70 — elevated stress signal expected today.';
+          severity = 'attention';
+        }
+      }
+      if (!msg && score != null && score < 60) {
+        msg = 'Sleep score below 60 — prioritize an early bedtime tonight.';
+        severity = 'attention';
+      }
+      if (!msg && deep != null && deep < 12) {
+        msg = 'Deep sleep at ' + deep.toFixed(1) + '% — well below the 20% target. Check bed temperature.';
+        severity = 'watch';
+      }
+      if (!msg && rem != null && rem < 12) {
+        msg = 'REM at ' + rem.toFixed(1) + '% — alcohol or late caffeine commonly the cause.';
+        severity = 'watch';
+      }
+      if (!msg && hours != null && hours < 6) {
+        msg = 'Only ' + hours.toFixed(1) + 'h of sleep — a short night by any measure.';
+        severity = 'watch';
+      }
+
+      if (!msg) { w.style.display = 'none'; return; }
+      w.classList.toggle('fp-watch--attention', severity === 'attention');
+      document.getElementById('fp-watch-label').textContent = severity === 'attention' ? 'Attention' : 'Watch';
+      document.getElementById('fp-watch-text').textContent = msg;
+      w.style.display = '';
+    }
+
+    function renderArc(s, trend) {
+      var section = document.getElementById('fp-arc-section');
+      var scores = trend.map(function(d) { return d.sleep_score; }).filter(function(v) { return v != null; });
+      if (!scores.length) { section.style.display = 'none'; return; }
+
+      var first = scores[0], current = scores[scores.length - 1];
+      var max = Math.max.apply(null, scores);
+
+      document.getElementById('fp-arc-first').textContent = Math.round(first);
+      document.getElementById('fp-arc-current').textContent = Math.round(current);
+      document.getElementById('fp-arc-target').textContent = Math.max(85, Math.round(max));
+
+      // 7-day average duration
+      var last7 = trend.slice(-7);
+      var hoursArr = last7.map(function(d) { return d.hours; }).filter(function(v) { return v != null; });
+      var avgHours = hoursArr.length ? (hoursArr.reduce(function(a,b){return a+b;}, 0) / hoursArr.length) : null;
+      document.getElementById('fp-arc-avg-hours').textContent = avgHours != null ? avgHours.toFixed(1) + 'h' : '—';
+
+      var avgScore = s['30d_avg_score'] || (scores.reduce(function(a,b){return a+b;}, 0) / scores.length);
+      document.getElementById('fp-arc-avg-score').textContent = Math.round(avgScore);
+      document.getElementById('fp-arc-best').textContent = Math.round(max);
+
+      // Chart — line+area like /live/
+      var w = 1100, h = 80, pad = 4;
+      var minS = Math.min.apply(null, scores), maxS = Math.max.apply(null, scores);
+      var range = maxS - minS || 1;
+      var pts = scores.map(function(v, i) {
+        var x = pad + (i / (scores.length - 1)) * (w - 2 * pad);
+        var y = pad + (1 - (v - minS) / range) * (h - 2 * pad);
+        return x.toFixed(1) + ',' + y.toFixed(1);
+      });
+      var area = pts.join(' ') + ' ' + (w - pad) + ',' + (h - pad) + ' ' + pad + ',' + (h - pad);
+      document.getElementById('fp-arc-chart').innerHTML =
+        '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
+          '<polygon class="fp-arc__chart-area" points="' + area + '"/>' +
+          '<polyline class="fp-arc__chart-line" points="' + pts.join(' ') + '"/>' +
+        '</svg>';
+
+      var firstDate = trend.find(function(d) { return d.sleep_score != null; });
+      var lastDate = trend.slice().reverse().find(function(d) { return d.sleep_score != null; });
+      document.getElementById('fp-arc-cap-left').textContent =
+        (firstDate && firstDate.date ? firstDate.date : 'Earliest') + ' · ' + Math.round(first);
+      document.getElementById('fp-arc-cap-right').textContent =
+        'Last night · ' + Math.round(current);
+    }
+
+    function renderLastNight(trend) {
+      if (!trend || !trend.length) return;
+      var last = trend[trend.length - 1];
+      var dp = last.deep_pct || 0, rp = last.rem_pct || 0, lp = last.light_pct || 0;
+      var ap = Math.max(0, 100 - dp - rp - lp);
+      if (dp <= 0 && rp <= 0 && lp <= 0) return;
+
+      var section = document.getElementById('s-lastnight-section');
+      var bar = document.getElementById('s-lastnight-bar');
+      var legend = document.getElementById('s-lastnight-legend');
+      var meta = document.getElementById('s-lastnight-meta');
+
+      meta.textContent = (last.date || '') + ' · single-night stages';
+      bar.innerHTML =
+        '<div style="width:' + dp + '%;background:#c8843a" title="Deep ' + dp.toFixed(1) + '%"></div>' +
+        '<div style="width:' + rp + '%;background:#a06820" title="REM ' + rp.toFixed(1) + '%"></div>' +
+        '<div style="width:' + lp + '%;background:rgba(200,132,58,0.25)" title="Light ' + lp.toFixed(1) + '%"></div>' +
+        '<div style="width:' + ap + '%;background:rgba(255,82,82,0.35)" title="Awake ' + ap.toFixed(1) + '%"></div>';
+      legend.innerHTML =
+        '<span><span class="dot" style="background:#c8843a"></span>Deep ' + dp.toFixed(1) + '%</span>' +
+        '<span><span class="dot" style="background:#a06820"></span>REM ' + rp.toFixed(1) + '%</span>' +
+        '<span><span class="dot" style="background:rgba(200,132,58,0.25)"></span>Light ' + lp.toFixed(1) + '%</span>' +
+        '<span><span class="dot" style="background:rgba(255,82,82,0.35)"></span>Awake ' + ap.toFixed(1) + '%</span>';
+      section.style.display = '';
+    }
+
+    function renderArchTrend(trend) {
+      if (!trend || trend.length < 2) return;
+      var slice = trend.slice(-30);
+      var W = 800, H = 200, n = slice.length;
+
+      var deepPath = 'M 0 ' + H;
+      var remPath = 'M 0 ' + H;
+      var lightPath = 'M 0 ' + H;
+
+      for (var i = 0; i < n; i++) {
+        var x = (i / (n - 1)) * W;
+        var dp = slice[i].deep_pct || 18;
+        var rp = slice[i].rem_pct || 22;
+        var lp = 100 - dp - rp;
+        var deepY = H - (dp / 100) * H;
+        var remY = H - ((dp + rp) / 100) * H;
+        var lightY = H - ((dp + rp + lp) / 100) * H;
+        deepPath += ' L ' + x.toFixed(1) + ' ' + deepY.toFixed(1);
+        remPath += ' L ' + x.toFixed(1) + ' ' + remY.toFixed(1);
+        lightPath += ' L ' + x.toFixed(1) + ' ' + lightY.toFixed(1);
+      }
+      deepPath += ' L ' + W + ' ' + H + ' Z';
+
+      var remBottom = '';
+      for (var j = n - 1; j >= 0; j--) {
+        var xr = (j / (n - 1)) * W;
+        var dpr = slice[j].deep_pct || 18;
+        remBottom += ' L ' + xr.toFixed(1) + ' ' + (H - (dpr / 100) * H).toFixed(1);
+      }
+      remPath += remBottom + ' Z';
+
+      var lightBottom = '';
+      for (var k = n - 1; k >= 0; k--) {
+        var xl = (k / (n - 1)) * W;
+        var dpk = slice[k].deep_pct || 18;
+        var rpk = slice[k].rem_pct || 22;
+        lightBottom += ' L ' + xl.toFixed(1) + ' ' + (H - ((dpk + rpk) / 100) * H).toFixed(1);
+      }
+      lightPath += lightBottom + ' Z';
+
+      document.getElementById('s-arch-deep').setAttribute('d', deepPath);
+      document.getElementById('s-arch-rem').setAttribute('d', remPath);
+      document.getElementById('s-arch-light').setAttribute('d', lightPath);
+      document.getElementById('s-arch-section').style.display = '';
+      document.getElementById('s-arch-caption').textContent =
+        'Stacked stages over the trailing ' + n + ' nights. Darker band = deep · mid = REM · faint = light.';
+    }
+
+    function renderConsistency(s) {
+      var section = document.getElementById('s-consistency-section');
+      var any = false;
+      if (s.weekday_bedtime) {
+        document.getElementById('s-weekday-bed').textContent = s.weekday_bedtime;
+        document.getElementById('s-weekday-detail').textContent =
+          'Mon–Fri average · ' + (s.weekday_variance_min ? '±' + s.weekday_variance_min + 'm variance' : 'low variance');
+        any = true;
+      }
+      if (s.weekend_bedtime) {
+        document.getElementById('s-weekend-bed').textContent = s.weekend_bedtime;
+        document.getElementById('s-weekend-detail').textContent =
+          'Sat–Sun average · ' + (s.weekend_variance_min ? '±' + s.weekend_variance_min + 'm variance' : 'higher variance typical');
+        any = true;
+      }
+      if (s.social_jetlag_hours != null) {
+        document.getElementById('s-jetlag-val').textContent = '~' + s.social_jetlag_hours.toFixed(2) + ' hrs';
+        document.getElementById('s-jetlag-desc').textContent =
+          'Weekend drift of ' + s.social_jetlag_hours.toFixed(2) + ' hours — equivalent to flying one timezone east every Monday.';
+        any = true;
+      }
+      if (any) section.style.display = '';
+    }
+
+    function renderTemperature(s) {
+      if (!s.optimal_temp_f) return;
+      document.getElementById('s-temp-section').style.display = '';
+      document.getElementById('s-temp-val').textContent = s.optimal_temp_f + '°F';
+      document.getElementById('s-temp-big-num').textContent = s.optimal_temp_f;
+      document.getElementById('s-temp-days').textContent = (s.days_tracked || '—') + ' nights tracked';
+      if (s.days_tracked) {
+        document.getElementById('s-temp-desc').textContent =
+          'Over ' + s.days_tracked + ' nights, ' + s.optimal_temp_f + '°F produced the highest average sleep scores. ' +
+          'Eight Sleep pod cooling allows precise temperature programming. Personal optimum will vary.';
+      }
+    }
+
+    function renderAdherence(s, trend) {
+      // Bed temp / alcohol from server-side adherence (if present)
+      if (s.adherence) {
+        var adh = s.adherence;
+        if (adh.temp_pct != null) document.getElementById('s-adh-temp-pct').textContent = adh.temp_pct + '%';
+        if (adh.alcohol_pct != null) document.getElementById('s-adh-alcohol-pct').textContent = adh.alcohol_pct + '%';
+        if (adh.bedtime_pct != null) {
+          document.getElementById('s-adh-onset-pct').textContent = adh.bedtime_pct + '%';
+          return;
+        }
+      }
+      // Fall back to client-side onset calculation (PB-07 logic)
+      if (!trend || !trend.length) return;
+      var TARGET_HOUR = 23, PT_OFFSET = -7;
+      var met = 0, missed = 0, recMet = [], recMissed = [];
+      trend.forEach(function(day) {
+        if (!day.sleep_start) return;
+        var d = new Date(day.sleep_start);
+        var ptHour = d.getUTCHours() + PT_OFFSET;
+        if (ptHour < 0) ptHour += 24;
+        var onsetHour = ptHour < 12 ? ptHour + 24 : ptHour;
+        if (onsetHour < TARGET_HOUR) {
+          met++;
+          if (day.recovery_score != null) recMet.push(day.recovery_score);
+        } else {
+          missed++;
+          if (day.recovery_score != null) recMissed.push(day.recovery_score);
+        }
+      });
+      var total = met + missed;
+      if (!total) return;
+      var pct = Math.round((met / total) * 100);
+      document.getElementById('s-adh-onset-pct').textContent = pct + '%';
+
+      var avgMet = recMet.length ? Math.round(recMet.reduce(function(a,b){return a+b;}, 0) / recMet.length) : null;
+      var avgMissed = recMissed.length ? Math.round(recMissed.reduce(function(a,b){return a+b;}, 0) / recMissed.length) : null;
+      var outcome = met + '/' + total + ' nights met.';
+      if (avgMet != null && avgMissed != null && recMet.length >= 3 && recMissed.length >= 3) {
+        var delta = avgMet - avgMissed;
+        outcome += ' Recovery delta ' + (delta >= 0 ? '+' : '') + delta + '%.';
+      }
+      document.getElementById('s-adh-onset-outcome').textContent = outcome;
+    }
+
+    // ─── Fetch /api/sleep_detail and render ─────────────────
+    var API_BASE = (typeof AMJ !== 'undefined' && AMJ.API_BASE) ? AMJ.API_BASE : '';
+    fetch(API_BASE + '/api/sleep_detail')
+      .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function(data) {
+        var s = data.sleep_detail || {};
+        var trend = data.sleep_trend || [];
+        var lastUpdated = data.last_updated || null;
+
+        var signals = buildSignals(s, trend);
+        renderMasthead(s, trend, lastUpdated);
+        renderLede(s, signals);
+        renderDelta(s, trend);
+        renderWatch(signals, trend);
+        renderStandings(signals);
+        renderArc(s, trend);
+        renderLastNight(trend);
+        renderArchTrend(trend);
+        renderConsistency(s);
+        renderTemperature(s);
+        renderAdherence(s, trend);
+      })
+      .catch(function(err) {
+        console.error('[sleep] fetch failed:', err);
+        document.getElementById('fp-narrative').textContent = "Could not load last night's sleep dispatch. Refresh to try again.";
+      });
+  })();
+  </script>
+
+  <script src="/legacy/assets/js/animations.js" defer></script>
+</body>
+</html>
