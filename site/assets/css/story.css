@@ -106,6 +106,7 @@ body { overflow-x: hidden; }
 .figure { display: grid; gap: var(--sp-1); }
 .figure .num { font-family: var(--font-mono); font-weight: var(--weight-med); font-size: var(--fs-data-lg); line-height: 1; }
 .figure .num.big { font-size: var(--fs-data-xl); color: var(--ember); }
+.figure.is-up .num.big { color: var(--ink-muted); }   /* weight gained — honest, not celebrated */
 .figure-cap { color: var(--ink-faint); }
 .beat-note { margin-top: var(--sp-4); color: var(--ink-muted); font-family: var(--font-mono); font-size: var(--fs-small); }
 
@@ -156,6 +157,10 @@ body { overflow-x: hidden; }
 .dx-stats { color: var(--ink-faint); margin-top: var(--sp-2); }
 .dx-prose { margin-top: var(--sp-4); color: var(--ink); font-size: var(--fs-body-lg); line-height: var(--lh-relaxed); max-width: var(--measure); }
 .dx-foot { color: var(--ink-faint); margin-top: var(--sp-4); }
+.dx-readmore { margin-top: var(--sp-5); }
+.dx-readmore a { font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.04em; color: var(--ember); text-decoration: none; }
+.dx-readmore a:hover { text-decoration: underline; }
+.dx-readmore a:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
 /* lab-note two-voice inside the reader (reuses the Third Wall device) */
 .dx-read .voice { display: grid; gap: var(--sp-1); padding: var(--sp-3) 0; border-top: var(--border-hair); }
 .dx-read .voice:first-of-type { border-top: 0; }

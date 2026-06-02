@@ -34,7 +34,7 @@ const ABOUT = `
 function entriesFor(s, data) {
   if (!data) return [];
   if (s.kind === "fieldnotes") return (data.entries || []).map((e) => ({ id: e.week, title: `Week ${e.week} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "" }));
-  if (s.kind === "posts") { const ps = data.posts || data.entries || (Array.isArray(data) ? data : []); return ps.map((p) => ({ id: p.week, title: p.title || `Week ${p.week}`, date: p.date, excerpt: p.excerpt, meta: p.stats_line, word_count: p.word_count })); }
+  if (s.kind === "posts") { const ps = data.posts || data.entries || (Array.isArray(data) ? data : []); return ps.map((p) => ({ id: p.week, title: p.title || `Week ${p.week}`, date: p.date, excerpt: p.excerpt, meta: p.stats_line, word_count: p.word_count, url: p.url })); }
   return [];
 }
 
@@ -62,9 +62,12 @@ async function renderRead(s, id) {
   // posts (chronicle / journal)
   const ent = entriesFor(s, await secFetch(s)).find((x) => String(x.id) === String(id));
   if (!ent) { read.innerHTML = `<p class="dx-prose">Pick an entry to read it here.</p>`; return; }
+  const readmore = ent.url
+    ? `<p class="dx-readmore"><a href="${esc(ent.url)}">Read the full piece${ent.word_count ? ` (${esc(ent.word_count)} words)` : ""} →</a></p>`
+    : (ent.word_count ? `<p class="dx-foot label">${esc(ent.word_count)} words</p>` : "");
   read.innerHTML = `<p class="dx-kicker label">${s.key === "chronicle" ? "chronicle · Elena Voss" : "journal"} · week ${esc(ent.id)}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
     `<h3 class="dx-title">${esc(ent.title)}</h3>` + (ent.meta ? `<p class="dx-stats label">${esc(ent.meta)}</p>` : "") +
-    `<p class="dx-prose">${esc(ent.excerpt || "")}</p>` + (ent.word_count ? `<p class="dx-foot label">${esc(ent.word_count)} words</p>` : "");
+    `<p class="dx-prose">${esc(ent.excerpt || "")}</p>` + readmore;
 }
 
 function selectEntry(s, id, silent) {

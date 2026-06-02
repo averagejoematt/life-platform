@@ -103,7 +103,20 @@ function drawConstellation(pillars) {
 /* ── the numbers beat ────────────────────────────────────────────────────── */
 function renderNumbers(journey) {
   if (!journey) return;
-  if (journey.lost_lbs != null) bind("lost").textContent = journey.lost_lbs;
+  if (journey.lost_lbs != null) {
+    // lost_lbs > 0 = actually lost; < 0 = gained. Show it honestly (the site's whole point),
+    // not a gain dressed up as a loss.
+    const lost = Number(journey.lost_lbs);
+    const up = lost < -0.05, even = Math.abs(lost) <= 0.05;
+    const el = bind("lost");
+    el.textContent = even ? "0" : String(Math.round(Math.abs(lost) * 10) / 10);
+    const figEl = el.closest(".figure");
+    if (figEl) {
+      figEl.classList.toggle("is-up", up);
+      const cap = figEl.querySelector(".figure-cap");
+      if (cap) cap.textContent = even ? "lbs · even" : (up ? "lbs up" : "lbs down");
+    }
+  }
   if (journey.current_weight_lbs != null) bind("current").textContent = journey.current_weight_lbs;
   if (journey.progress_pct != null) bind("progress").textContent = `${journey.progress_pct}%`;
   if (journey.projected_goal_date) {
