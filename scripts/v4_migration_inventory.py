@@ -114,7 +114,10 @@ def main() -> int:
         buckets[dest].append(url)
         # The new "the story" hub owns the /story/* namespace — never 301 it away
         # (the old top-level /story/ page is preserved at /legacy/story/ for rollback).
-        if url == "/story/" or url.startswith("/story/"):
+        # Full chronicle/journal POST pages must stay reachable too — the Story reader
+        # links to them as "Read the full piece" (they only carry excerpts otherwise).
+        if (url == "/story/" or url.startswith("/story/")
+                or url.startswith("/chronicle/posts/") or url.startswith("/journal/posts/")):
             continue
         new = new_url(url, dest)
         if new != url:           # legacy pages already live at /legacy/* — still record the 301

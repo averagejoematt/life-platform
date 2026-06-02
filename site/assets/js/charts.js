@@ -24,7 +24,15 @@ function _points(data, valueKey, dateKey) {
 // A trend line with optional goal line + filled area. data: [{<dateKey>,<valueKey>}] or [numbers].
 export function lineChart(data, { valueKey = "value", dateKey = "date", goal = null, height = 130, unit = "", label = "", emptyMsg = "" } = {}) {
   const pts = _points(data || [], valueKey, dateKey);
-  if (pts.length < 2) return `<figure class="chart chart--empty"><figcaption class="chart-cap label">${escAttr(emptyMsg || "Not enough data yet to chart — fills as readings accrue.")}</figcaption></figure>`;
+  // Fewer than 4 points can't show a real trend — two points draw a straight diagonal that
+  // reads as broken/misleading. Show an honest count + latest value instead of a fake line.
+  if (pts.length < 4) {
+    const n = pts.length;
+    const latest = n ? `Latest ${Math.round(pts[n - 1].v * 10) / 10}${unit}` : "";
+    const msg = n < 1 ? (emptyMsg || "Fills as readings accrue.")
+      : `${latest} · ${n} reading${n === 1 ? "" : "s"} so far — the trend line draws in at 4+.`;
+    return `<figure class="chart chart--empty"><figcaption class="chart-cap label">${escAttr(msg)}</figcaption></figure>`;
+  }
   const W = 600, H = height, P = 8;
   const vals = pts.map((p) => p.v).concat(goal != null ? [Number(goal)] : []);
   let min = Math.min(...vals), max = Math.max(...vals);
