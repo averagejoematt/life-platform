@@ -88,6 +88,9 @@ def test_commit_handles_orphan_created():
          patch("routine_repo.put_versioned", side_effect=fake_put), \
          patch("routine_repo.upsert_id_map") as upsert_mock, \
          patch("hevy_template_cache.resolve_movement", return_value="55E6546B"), \
+         patch("routine_title.build_title_context", return_value={
+             "phase": "Foundation", "type_count_in_phase": 1,
+             "all_time_count": 1, "experiment_started": "2026-06-01"}), \
          patch("hevy_write_client.create_routine", side_effect=orphan_exc):
         result = t.tool_manage_hevy_routine({"action": "commit", "routine_id": "r-orphan"})
     assert "HEVY_ORPHAN_CREATED" in str(result)
