@@ -1594,3 +1594,53 @@ def handle_meal_responses() -> dict:
         }
 
 
+def handle_workouts() -> dict:
+    """
+    GET /api/workouts
+    Recent Hevy strength sessions with their per-exercise sets (reps × weight).
+    Read-only — queries SOURCE#hevy WORKOUT# records for the last 30 days.
+    Cache: 900s.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}hevy") & Key("sk").between(
+                f"DATE#{d30}#WORKOUT#", f"DATE#{today}#WORKOUT#~"
+            ),
+            ScanIndexForward=False,
+        )
+        items = _decimal_to_float(resp.get("Items", []))
+    except Exception as exc:  # noqa: BLE001
+        return _ok({"workouts": [], "error": str(exc)[:120]}, cache_seconds=300)
+
+    def _num(v):
+        try:
+            return round(float(v), 1)
+        except (TypeError, ValueError):
+            return None
+
+    workouts = []
+    for w in items[:30]:
+        exercises = []
+        for ex in (w.get("exercises") or []):
+            sets = []
+            for s in (ex.get("sets") or []):
+                sets.append({
+                    "type": s.get("type") or "normal",
+                    "reps": _num(s.get("reps")),
+                    "weight_kg": _num(s.get("weight_kg")),
+                    "rpe": _num(s.get("rpe")),
+                    "distance_m": _num(s.get("distance_m")),
+                })
+            exercises.append({"name": ex.get("name"), "notes": ex.get("notes") or "", "sets": sets})
+        workouts.append({
+            "date": w.get("date"),
+            "title": w.get("title"),
+            "duration_min": round((_num(w.get("duration_sec")) or 0) / 60),
+            "total_volume_kg": _num(w.get("total_volume_kg")),
+            "exercise_count": w.get("exercise_count"),
+            "set_count": w.get("set_count"),
+            "exercises": exercises,
+        })
+    return _ok({"workouts": workouts, "count": len(workouts)}, cache_seconds=900)
