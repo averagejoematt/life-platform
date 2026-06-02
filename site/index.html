@@ -108,11 +108,15 @@
       <p class="wall-foot label" data-bind="wall-week"></p>
     </section>
 
-    <!-- Elena's chronicle: the narrative spine -->
-    <section class="beat beat-chronicle">
-      <p class="beat-kicker label">the chronicle · written weekly by Elena Voss</p>
-      <h2 class="beat-h" data-bind="chronicle-headline">The weekly story, in her words.</h2>
-      <div class="chronicle-cards" data-bind="chronicle"></div>
+    <!-- Dispatches: the native archive — Elena's chronicle, the AI lab notes, the journal -->
+    <section class="beat beat-dispatches" id="dispatches">
+      <p class="beat-kicker label">dispatches · the writing</p>
+      <h2 class="beat-h">The chronicle, the lab notes, and the journal — in their own words.</h2>
+      <nav class="dx-tabs" data-dx-tabs aria-label="Dispatches sections"></nav>
+      <div class="dx-layout">
+        <ol class="dx-list" data-dx-list aria-label="Entries"></ol>
+        <article class="dx-read" data-dx-read aria-live="polite"></article>
+      </div>
     </section>
 
     <!-- Reachable close -->
