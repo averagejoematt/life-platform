@@ -7,7 +7,10 @@ name: Remediation Agent
 
 on:
   schedule:
-    - cron: "45 14 * * *"          # ~07:45 PT daily — just before the 8 AM digest
+    # ~07:45 PT, Mon/Wed/Fri (was daily). Cost-OPT 2026-06-03: the routine sweep was
+    # an agentic Sonnet run that found nothing most days. Urgent alarms still trigger
+    # it on-demand via repository_dispatch below, so responsiveness is preserved.
+    - cron: "45 14 * * 1,3,5"
   repository_dispatch:
     types: [urgent_alarm]           # from the remediation-dispatcher Lambda (Phase 2)
   workflow_dispatch: {}             # manual test
@@ -66,7 +69,10 @@ jobs:
         env:
           CLAUDE_CODE_USE_BEDROCK: "1"
           AWS_REGION: us-west-2
-          ANTHROPIC_MODEL: us.anthropic.claude-sonnet-4-6
+          # Cost-OPT 2026-06-03: triage runs on Haiku-primary (5× cheaper, plenty for
+          # alarm/CI/DLQ classification; the auto-merge gate is deterministic so safety
+          # doesn't depend on the model). Sonnet stays available for escalation on hard tasks.
+          ANTHROPIC_MODEL: us.anthropic.claude-haiku-4-5-20251001-v1:0
           ANTHROPIC_DEFAULT_SONNET_MODEL: us.anthropic.claude-sonnet-4-6
           ANTHROPIC_SMALL_FAST_MODEL: us.anthropic.claude-haiku-4-5-20251001-v1:0
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
