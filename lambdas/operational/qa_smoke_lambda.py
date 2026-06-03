@@ -98,12 +98,15 @@ def check_ddb_freshness():
     REQUIRED = [
         ("whoop",        "Sleep/Recovery"),
         ("habitify",     "Habits"),
-        ("garmin",       "Steps/Activity"),
-        ("apple_health", "Apple Health"),
+        ("apple_health", "Apple Health (daily steps/activity)"),
     ]
     OPTIONAL = [
         ("withings",    "Weight (weigh-ins are sporadic)"),
-        ("strava",      "Strava workout (sporadic; Garmin is primary)"),
+        # 2026-06-03: garmin demoted REQUIRED→OPTIONAL — paused (Garmin's 2026
+        # anti-automation crackdown 429-blocks server-side auth; unwinnable headless).
+        # apple_health now covers daily steps/activity, so this is no longer a hard fault.
+        ("garmin",      "Garmin (paused — server-side auth 429-blocked)"),
+        ("strava",      "Strava workout (paused — API 402)"),
         ("eightsleep",  "Eight Sleep"),
         ("supplements", "Supplements"),
         ("journal",     "Notion Journal"),
