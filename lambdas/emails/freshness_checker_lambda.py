@@ -43,7 +43,10 @@ SOURCES = {
     "apple_health":    "Apple Health",
     "eightsleep":      "Eight Sleep",
     # "macrofactor":   "MacroFactor nutrition",  # dead since 2026-04-11 (Tier 1 torn down)
-    "garmin":          "Garmin biometrics",
+    # "garmin":        "Garmin biometrics",  # PAUSED 2026-06-03 — Garmin's 2026 anti-automation
+    #   crackdown 429-blocks server-side OAuth2 refresh from datacenter IPs (374 throttles vs 2
+    #   successes / 14d). Unwinnable headless; re-auth only buys ~1 run. Revive = uncomment +
+    #   re-auth from a residential IP (or if Garmin's official Health API is ever approved).
     "habitify":        "Habitify habits",
     "food_delivery":   "Food delivery behavioral signal",
     "measurements":    "Tape measure check-ins",
@@ -287,7 +290,7 @@ def lambda_handler(event, context):
         "life-platform/whoop",
         "life-platform/withings",
         # "life-platform/strava",  # PAUSED 2026-05-28 (Strava API 402; Garmin covers activity)
-        "life-platform/garmin",
+        # "life-platform/garmin",  # PAUSED 2026-06-03 — see SOURCES note (server-side refresh 429-blocked)
     ]
     MANUAL_ROTATION_SECRETS = [
         "life-platform/ai-keys",          # Anthropic — no rotation API; manual every 90d
