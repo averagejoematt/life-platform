@@ -712,8 +712,8 @@ def extract_sleep(api, date_str: str) -> dict:
             if "awake_sleep_seconds" in result:
                 stages.append(f"awake={result['awake_sleep_seconds']//60}m")
             stage_str = " ".join(stages)
-            print(f"Sleep: {result.get('sleep_duration_seconds')}s score={result.get('sleep_score')} "
-                  f"{stage_str} spo2={result.get('sleep_spo2_avg')} restless={result.get('restless_moments_count')}")
+            logger.info(f"Sleep: {result.get('sleep_duration_seconds')}s score={result.get('sleep_score')} "
+                        f"{stage_str} spo2={result.get('sleep_spo2_avg')} restless={result.get('restless_moments_count')}")
 
     except Exception as e:
         logger.info(f"Warning: sleep extraction failed: {e}")

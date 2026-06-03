@@ -46,17 +46,13 @@ from mcp.tools_health import (
     tool_get_readiness_score,
     tool_get_weight_loss_progress,
 )
-from mcp.tools_health import tool_get_autonomic_balance  # BS-MP1
 from mcp.tools_sleep import tool_get_sleep_analysis, tool_get_sleep_environment_analysis
-from mcp.tools_sleep import tool_get_sleep_environment_analysis  # BS-SL1
 from mcp.tools_nutrition import (
     tool_get_deficit_sustainability,
     tool_get_food_log,
     tool_get_metabolic_adaptation,
     tool_get_nutrition,
 )
-# BS-12 + IC-29 explicit imports
-from mcp.tools_nutrition import tool_get_deficit_sustainability, tool_get_metabolic_adaptation
 from mcp.tools_correlation import tool_get_zone2_breakdown
 from mcp.tools_habits import (
     tool_get_habits, tool_compare_habit_periods, tool_get_habit_registry,
@@ -82,7 +78,6 @@ from mcp.tools_journal import (
     tool_get_mood,
     tool_search_journal,
 )
-from mcp.tools_journal import tool_get_journal_sentiment_trajectory  # BS-MP2
 from mcp.tools_lifestyle import (
     tool_create_experiment,
     tool_end_experiment,

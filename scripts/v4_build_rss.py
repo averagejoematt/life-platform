@@ -24,6 +24,8 @@ from urllib.request import urlopen
 SRC = "https://averagejoematt.com/chronicle/posts.json"
 BASE = "https://averagejoematt.com"
 OUT = Path("site/rss.xml")
+# L-06: some readers probe /feed.xml instead of /rss.xml — emit an identical alias.
+OUT_ALIAS = Path("site/feed.xml")
 TITLE = "The Measured Life — averagejoematt"
 DESC = ("The weekly chronicle of an ordinary life, measured in full — every number, "
         "every week, including the weeks it dips. Written by Elena Voss.")
@@ -82,7 +84,8 @@ def main() -> int:
         "</rss>\n"
     )
     OUT.write_text(xml, encoding="utf-8")
-    print(f"✅ wrote {OUT} — {len(items)} items, newest {posts[0]['date'] if posts else 'n/a'}")
+    OUT_ALIAS.write_text(xml, encoding="utf-8")
+    print(f"✅ wrote {OUT} + {OUT_ALIAS} — {len(items)} items, newest {posts[0]['date'] if posts else 'n/a'}")
     return 0
 
 
