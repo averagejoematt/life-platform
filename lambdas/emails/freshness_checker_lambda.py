@@ -189,10 +189,24 @@ def lambda_handler(event, context):
                 len(stale_sources), yesterday_str,
             )
         else:
+            # Actionable remediation hint, keyed off which stale sources are present.
+            _stale_keys = {n for n, _ in stale_sources}
+            _oauth_stale = {lbl for lbl in _stale_keys
+                            if lbl in (SOURCES.get("garmin"), SOURCES.get("whoop"), SOURCES.get("withings"), SOURCES.get("eightsleep"))}
+            _input_stale = {lbl for lbl in _stale_keys
+                            if lbl in (SOURCES.get("measurements"), SOURCES.get("food_delivery"))}
+            hints = []
+            if _oauth_stale:
+                hints.append(f"• OAuth source(s) stale ({', '.join(sorted(_oauth_stale))}) → the token likely "
+                             f"expired; re-auth (Garmin: `python3 setup_garmin_browser_auth.py`).")
+            if _input_stale:
+                hints.append(f"• Input source(s) stale ({', '.join(sorted(_input_stale))}) → no new entry logged; "
+                             f"expected if you've paused that tracking.")
+            remediation = ("\n\nWhat to do:\n" + "\n".join(hints)) if hints else ""
             message = (
                 f"⚠️ Life Platform: Stale Data Detected\n\n"
                 f"The following sources have not updated in over {STALE_HOURS} hours:\n\n"
-                f"{stale_list}\n\n"
+                f"{stale_list}{remediation}\n\n"
                 f"Full source status:\n{status_list}\n\n"
                 f"Checked at: {now.strftime('%Y-%m-%d %H:%M UTC')}"
             )
