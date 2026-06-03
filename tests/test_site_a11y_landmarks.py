@@ -46,10 +46,10 @@ def test_legacy_homepage_gauges_marked_aria_hidden():
 
 
 def test_subscribe_has_skip_link_and_main():
-    """subscribe is a System page — ported as-is, stays at root."""
+    """subscribe was re-skinned to the v4 design (ADR-071): v4 skip class + <main> landmark."""
     html = _read("subscribe/index.html")
-    assert 'class="skip-link"' in html
-    assert '<main id="main">' in html
+    assert 'class="skip"' in html
+    assert '<main id="main"' in html
 
 
 def test_legacy_text_muted_token_passes_contrast():
