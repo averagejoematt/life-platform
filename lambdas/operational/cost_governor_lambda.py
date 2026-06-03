@@ -65,6 +65,11 @@ _AI_SAFETY_BUFFER = 1.15  # bias the AI estimate high so we degrade early, never
 # Tier thresholds on PROJECTED month-end total (USD).
 _TIER_THRESHOLDS = [(73, 3), (65, 2), (55, 1)]  # checked high→low; else tier 0
 
+# Days at the start of the month during which the month-end projection is too
+# noisy to trust (fixed monthly charges are front-loaded onto day 1). Inside this
+# window we escalate on ACTUAL mtd vs ceiling instead of the projection.
+EARLY_MONTH_DAYS = 5.0
+
 _cw = boto3.client("cloudwatch", region_name=REGION)
 _ssm = boto3.client("ssm", region_name=REGION)
 _sns = boto3.client("sns", region_name=REGION)
@@ -261,15 +266,20 @@ def lambda_handler(event, context):
 
         computed_tier = _tier_for(projected)
 
-        # Early-month guard: the daily-rate × days-remaining projection is
-        # unreliable on a tiny sample (a partial first day inflates the rate), so
-        # don't let it escalate the tier in the first ~2 days — wait for enough
-        # data. Prevents a false AI pause on the 1st/2nd. mtd is still tiny then,
-        # so a genuine runaway can't reach the ceiling in 2 days anyway.
-        if elapsed_days < 2.0 and computed_tier > 0:
-            print(f"[info] only {elapsed_days:.1f}d elapsed — projection not yet "
-                  f"reliable; holding tier 0 (computed {computed_tier})")
-            computed_tier = 0
+        # Early-month guard: fixed monthly charges (Route53 zones, Secrets Manager,
+        # etc.) all land on day 1, so `mtd / elapsed_days` overstates the true daily
+        # run-rate for the first several days, and projecting it over the month wildly
+        # over-estimates (e.g. $15.56 mtd on day 2 → $233 projected → false tier-3 AI
+        # cutoff). For the first ~5 days, gate on ACTUAL mtd vs the ceiling — the real
+        # guardrail — instead of the noisy projection. A genuine runaway still trips,
+        # because it shows up in actual spend; front-loaded fixed costs do not.
+        if elapsed_days < EARLY_MONTH_DAYS and computed_tier > 0:
+            actual_tier = _tier_for(mtd)
+            if actual_tier < computed_tier:
+                print(f"[info] {elapsed_days:.1f}d elapsed — projection unreliable this "
+                      f"early; gating on actual mtd=${mtd:.2f} (tier {actual_tier}) not "
+                      f"projection ${projected:.2f} (tier {computed_tier})")
+                computed_tier = actual_tier
         prev = _read_tier()
 
         logger.info(
