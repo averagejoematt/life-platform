@@ -1,7 +1,7 @@
 # Life Platform — Open Backlog
 
-**Last updated:** 2026-05-29 (v8.2.0)
-**Source:** Synthesis of V1 audit (2026-05-17, ADR-057), V2 audit (2026-05-17, `docs/V2_AUDIT_PLAN.md`), V2 follow-up sessions (2026-05-18/19), and the 2026-05-29 marathon (Bedrock cutover, budget guard, remediation agent, May-30 restart).
+**Last updated:** 2026-06-03 (v8.3.0)
+**Source:** Synthesis of V1 audit (2026-05-17, ADR-057), V2 audit (2026-05-17, `docs/V2_AUDIT_PLAN.md`), V2 follow-up sessions (2026-05-18/19), the 2026-05-29 marathon (Bedrock cutover, budget guard, remediation agent, May-30 restart), the 2026-06-01/02 v4 website launch + QA sweep, and the 2026-06-03 operations/cost session (ADR-074/075). Data-blocked items D-01/D-03/D-04 + N-01/L-11 re-checked against live AWS on 2026-06-03.
 
 > Single source of truth for everything **not done**. Items closed-with-rationale (ADR-057) and items shipped are not listed — see `docs/CHANGELOG.md` for what landed and `docs/DECISIONS.md` for what was formally closed.
 
@@ -23,11 +23,12 @@
 | Bucket | Count | Action mode |
 |---|---|---|
 | **🔴 User-action blocked** | 3 | Waiting on you / AWS Support |
-| **⏰ Data-blocked / time-windowed** | 5 | Re-evaluate at specific dates |
-| **🟡 Long-tail low-value** | 11 | Optional cleanup — chip away when bored |
+| **⏰ Data-blocked / time-windowed** | 5 | D-03 ✅ closed, D-01/D-04 findings open, D-02/D-05 still windowed (checked 2026-06-03) |
+| **🟡 Long-tail low-value** | 10 | Optional cleanup — chip away when bored (L-11 ✅ closed) |
 | **🛑 Defer-with-rationale (won't do)** | 9 | Documented `won't-do` unless trigger fires |
-| **📦 New work surfaced (post-V2)** | 7 | Discovered during V2 follow-ups |
-| **TOTAL OPEN** | **35** | |
+| **📦 New work surfaced (post-V2)** | 7 | N-01 ✅ 4/5 cleared (1 structural → S-06) |
+| **🌐 v4 website + ops follow-ups** | 7 | S-01…S-07 from the 2026-06 sessions |
+| **TOTAL OPEN** | **~38** | (L-11 + D-03 closed this pass; N-01 mostly closed) |
 
 ---
 
@@ -58,27 +59,33 @@
 
 ## ⏰ Data-blocked / time-windowed
 
-### D-01 — Cache hit-rate quantification (V2 P1.5)
-- **Wait until:** ~2026-05-26 (7+ days post-emitter fix)
-- **What changed:** V2 P0.6 fixed the `_emit_token_metrics` 2-arg bug; coach Lambdas now emit cache_creation/cache_read. Telemetry needs time to accumulate.
-- **Query:** `aws cloudwatch get-metric-statistics --namespace LifePlatform/AI --metric-name AnthropicCacheReadTokens ...`
-- **Action when data exists:** Compute cache hit ratio per Lambda; verify daily-brief's shared preamble cache is actually firing (was 0 datapoints pre-fix); quantify $/mo savings
+### D-01 — Cache hit-rate quantification (V2 P1.5) — ⚠️ checked 2026-06-03, finding open
+- **Data now exists.** Only 2 Lambdas emit cache metrics: `coach-narrative-orchestrator` and `daily-brief`.
+- **coach-narrative-orchestrator (14d):** CacheRead 382K vs CacheWrite 67K → caching is firing healthily (high-frequency invocations keep the cache warm).
+- **daily-brief (14d):** CacheRead **0** vs CacheWrite 10K → **cache delivers no savings and the writes are pure cost.** Root cause: daily-brief runs once/day, but the Anthropic prompt-cache TTL is 5 min, so the cache always expires between runs; intra-invocation reuse isn't happening either (0 reads).
+- **Open action:** Either (a) remove `cache_control` from daily-brief's system block (saves the 25%-premium cache-writes), or (b) restructure so the shared preamble is reused across the multiple Claude calls within a single daily-brief invocation. Verify which calls share a preamble before deciding.
 
 ### D-02 — Coach hit_rate threshold tuning (V2 P3.6)
 - **Wait until:** ~2026-07-17 (60 days for confirmed/refuted verdicts to accumulate)
 - **What changed:** V2 P1.1 (already-shipped) enforces `_normalize_metric_hint` whitelist; predictions with invalid hints become qualitative-only (correctly skipped by evaluator). New predictions from 2026-05-17+ should have measurable verdicts.
 - **Action when data exists:** Read `coach_quality_gate.PASS_SCORE_THRESHOLD = 60`; tune based on actual hit_rate_pct distribution; promote advisory → blocking on score < 40
 
-### D-03 — Per-Lambda AI spend ranking (V2 P1.4 followup)
-- **Wait until:** ~2026-05-26 (7+ days post-rollout)
-- **What changed:** V2 follow-up wired retry_utils/inline-telemetry on site_api + site_api_ai + brittany + 5 coach Lambdas. ~9 of 22 AI-calling Lambdas now emit. Was 2.
-- **Action when data exists:** Query `LifePlatform/AI AnthropicInputTokens` + `AnthropicOutputTokens` per `LambdaFunction` dimension; multiply by current Anthropic pricing; identify top 3 spenders + reduction levers
+### D-03 — Per-Lambda AI spend ranking (V2 P1.4 followup) — ✅ checked 2026-06-03
+- **Data now exists.** 7 Lambdas emit input/output tokens via `LifePlatform/AI` (`LambdaFunction` dim): coach-narrative-orchestrator, daily-brief, coach-history-summarizer, coach-ensemble-digest, coach-state-updater, coach-quality-gate, api_ask. (Fewer than the "9 of 22" BACKLOG estimated — site_api/site_api_ai/brittany dimensions not observed in the 14d window.)
+- **Ranking (input tokens, 14d ending 2026-06-03):**
+  1. **coach-narrative-orchestrator — 8.03M in / 539K out** ← dominant spender, ~8× the next. Sonnet narrative path. Caching already engaged (D-01).
+  2. daily-brief — 1.02M in / 163K out (cache wasted — see D-01)
+  3. coach-history-summarizer — 557K in / 27K out
+  4. coach-ensemble-digest — 434K in / 83K out
+  5. coach-state-updater — 416K in / 257K out
+  6. coach-quality-gate — 275K in / 74K out
+  7. api_ask — 0 in window (website AI quiet or budget-gated)
+- **Reduction levers:** coach-narrative-orchestrator is the only real target — everything else is rounding error. Levers: tighten its system prompt / context window, confirm Haiku isn't viable for sub-sections, verify cache hit-rate stays high. Re-run this query monthly.
 
-### D-04 — SES open-rate baseline (V2 P1.6 followup)
-- **Wait until:** ~2026-05-26
-- **What changed:** V2 P1.6 wired `life-platform-emails` configuration set to 4 email Lambdas. SES auto-injects open-tracking pixel.
-- **Current state:** Send=8, Delivery=8, Open=0 over 24h (likely no recipient opens yet OR Apple Mail Privacy masking; SES tracking options may need `CustomRedirectDomain` for full visibility)
-- **Action when data exists:** Compare Open / Delivery ratio across daily_brief vs weekly_digest vs brittany; if Open=0 persistently, investigate `aws sesv2 put-configuration-set-tracking-options` with CNAME-validated redirect domain
+### D-04 — SES open-rate baseline (V2 P1.6 followup) — ⚠️ root cause found 2026-06-03
+- **Checked:** Send=175, Delivery=110 over 14d, but **no `Open`/`Click` metric is published at all** (not zero — absent).
+- **Root cause (not Apple-Mail masking):** `aws sesv2 get-configuration-set --configuration-set-name life-platform-emails` returns `TrackingOptions: null` and `VdmOptions: null`. Open-tracking is **not enabled**, so SES never injects the tracking pixel and never emits the Open metric. The V2 assumption that the config set auto-tracks opens was wrong.
+- **Decision needed (not just "wait for data"):** To get open-rate you must `aws sesv2 put-configuration-set-tracking-options` with a CNAME-validated `CustomRedirectDomain` (open pixel + click redirect rewrite). That's a privacy tradeoff for a personal/low-volume list — may be a deliberate "won't do." Until configured, open-rate is permanently unobservable.
 
 ### D-05 — Coach prediction loop validation (V2 ADR-055)
 - **Wait until:** ~2026-06-17 (30 days post-loop closure)
@@ -135,12 +142,8 @@
 - Surfaced by V2 operations doc agent
 - Effort: 5 min cleanup
 
-### L-11 — DLQ depth: 66 messages remain in `life-platform-ingestion-dlq`
-- These were stuck pre-Garmin-OAuth-refresh
-- Will age out at 14d retention (post 2026-05-29 mostly)
-- OR drain via `dlq_consumer` manual invoke
-- Effort: 10 min triage + 5 min drain command
-- Risk: ensure no real ingestion data was lost; if scheduled-event payloads, replay is no-op (gap detection handles)
+### L-11 — DLQ depth — ✅ DONE (verified 2026-06-03)
+- `life-platform-ingestion-dlq` now holds **0 messages** (ApproximateNumberOfMessages=0, NotVisible=0). The 66 stuck pre-Garmin messages aged out at 14d retention. No action needed; ingestion gaps self-heal via gap-detection backfill regardless.
 
 ---
 
@@ -190,12 +193,10 @@ These items are documented in ADR-057 or surfaced in V2 plan as won't-do. Do not
 
 Items that came up during V2 follow-up sessions and aren't yet scheduled.
 
-### N-01 — 5 long-standing alarms in ALARM state since May 3-4
-- Surfaced by V2 doc-audit operations agent
-- Alarms: `ingestion-error-whoop`, `life-platform-dlq-depth-warning`, `life-platform-garmin-data-ingestion-errors`, `life-platform-ingestion-dlq-messages`, `slo-source-freshness`
-- Most will auto-clear after Garmin OAuth fix (today) + DLQ age-out (L-11)
-- Verify clearance by 2026-05-26
-- If stuck: re-tune threshold OR investigate root cause
+### N-01 — long-standing alarms — ✅ 4 of 5 cleared (checked 2026-06-03), 1 structural remains
+- **Cleared:** `life-platform-dlq-depth-warning` (OK since 2026-05-28), `life-platform-garmin-data-ingestion-errors` (OK since 2026-05-29), `life-platform-ingestion-dlq-messages` (OK since 2026-05-28). `ingestion-error-whoop` no longer exists (the `ingestion-error-*` alarm family is now per-compute/email-Lambda and all 34 are OK).
+- **Still ALARM — `slo-source-freshness` (since 2026-05-04):** metric `LifePlatform/Freshness StaleSourceCount`, threshold ≥1, currently 3. This is now a **structural false-positive** — Garmin/Strava/MacroFactor are intentionally paused (ADR-074), so StaleSourceCount will never drop below the paused-source count and the alarm fires forever.
+- **Open action:** make the freshness checker exclude paused sources from `StaleSourceCount` (it already pauses them in `SOURCES`/`OAUTH_SECRETS`), OR raise the alarm threshold to the count of paused sources. Until then this alarm is permanent noise — it's routed to the digest topic so it isn't paging.
 
 ### N-02 — Subscriber `confirm-token` lookup uses DDB scan
 - Per V2 audit web/DX agent
@@ -229,6 +230,36 @@ Items that came up during V2 follow-up sessions and aren't yet scheduled.
 - V2 P2.6 expanded to 5 more compute Lambdas; `acwr_compute` skipped (uses update_item)
 - Future: if `acwr_compute` ever switches to put_item, add tag_record there
 - No ETA — only if pattern changes
+
+---
+
+## 🌐 v4 website + ops follow-ups (2026-06-01/02/03 sessions)
+
+Surfaced during the v4 "The Measured Life" launch, QA sweep, and operations/cost session. Documented in `handovers/HANDOVER_LATEST.md`; folded here for single-source-of-truth.
+
+### S-01 — Tier 3 graceful-empty site-api deploy (committed, NOT deployed)
+- **Status:** Code committed (`ee88b6b`); awaiting CI/CD production approval or manual `/deploy site-api`.
+- **What it does:** Converts 503s on `/api/nutrition_overview` + `/api/correlations` to shaped-empty 200s (restart-safe); 4 more endpoints audited to match. Files: `lambdas/web/site_api_observatory.py` (+ siblings).
+- **Action:** Deploy full `web/` package (never single-file — ADR-046/deploy.md), then verify the two endpoints return shaped-empty 200 not 503.
+
+### S-02 — Evidence depth: 14 archive topics still link to /legacy
+- 12 live-readout Evidence topics bind their `/api/*`; 14 archive topics show a v4 intro + "deeper →" link back to preserved `/legacy`. Rebuild into bespoke v4 readouts as time allows.
+- Builder: `scripts/v4_build_evidence.py`. Effort: ongoing, ~1-2h per topic.
+
+### S-03 — Cockpit week/month/journey deeper time-series
+- Scope buttons show basic metrics; add deeper time-series per scope. Time-permitting enhancement.
+
+### S-04 — RSS real-time refresh (optional)
+- Today `rss.xml` regenerates on site deploy (`scripts/v4_build_rss.py`). Optional: also write it from `lambdas/emails/chronicle_approve_lambda.py::_publish_to_s3` so the feed refreshes the instant a chronicle issue is approved. Effort: 30 min. Nice-to-have.
+
+### S-05 — visual_qa legacy repointing
+- `tests/visual_qa.py` has deep legacy-page entries on old URLs; repoint to `/legacy/<path>` or drop as each is rebuilt bespoke. Low-priority test maintenance.
+
+### S-06 — slo-source-freshness alarm: exclude paused sources
+- See N-01. Make `StaleSourceCount` ignore intentionally-paused sources so the SLO alarm stops firing permanently. Effort: ~30 min in `freshness_checker_lambda.py` + re-tune alarm.
+
+### S-07 — daily-brief cache-write waste
+- See D-01. daily-brief writes prompt-cache blocks it never reads (once/day vs 5-min TTL). Remove `cache_control` from its system block, or restructure for intra-invocation reuse. Net cost, not savings, today.
 
 ---
 
@@ -282,7 +313,7 @@ If you do an item, move it to `docs/CHANGELOG.md` and remove from here. If you d
 - [x] `pipeline-health-check` Lambda had no `SNS_ARN` env var, falling back to hardcoded `life-platform-alerts` topic. Set env var to digest topic via CLI.
 
 **Open follow-ups:**
-- [ ] **Garmin OAuth rate-limited (HTTP 429)** — Garmin's exchange endpoint is throttling our refresh requests. Every scheduled invocation aborts and adds a DLQ message. **Needs manual re-auth**: log into Garmin Connect, generate fresh OAuth tokens, update `life-platform/garmin` secret. Until then, no Garmin data flows.
+- [x] ~~**Garmin OAuth rate-limited (HTTP 429)** — needs manual re-auth.~~ — **Superseded by ADR-074 (2026-06-03): Garmin direct-API ingestion RETIRED/paused.** Garmin's 2026 anti-automation crackdown 429-blocks server-side OAuth2 refresh from datacenter IPs (374 throttles vs 2 successes / 14 days — unwinnable headless). Garmin is commented out of `freshness_checker_lambda.py` SOURCES + OAUTH_SECRETS. **Revive options (open decision):** Terra wearable aggregator (free, official, webhook — 3rd-party privacy tradeoff) · official Garmin Health API (B2B, approval-gated) · residential proxy (paid, fragile). See ADR-074.
 - [ ] **The 5 duplicate Morning Brief emails** were caused by `aws lambda invoke daily-brief` during my P3.4 / phase-filter test cycles. Lesson: never invoke an email-shipping Lambda unless explicitly intended. Future-Claude: if testing daily-brief logic, set `DRY_RUN=1` env var (add this gate to the Lambda) or invoke a dedicated test endpoint that returns the HTML without SES'ing.
 - [ ] **`compute-pipeline-stale` alarm** will fire tomorrow (genesis = first day) because compute hasn't run yet. Now routes to digest, so it'll batch into one email. Once compute runs at 11 AM PT Monday, alarm self-clears.
 - [ ] **JOURNAL_COACH validator BLOCKED empty output** in daily-brief logs (currently every run). Cause: pre-genesis there are no journal entries, so the coach returns empty, the validator blocks it as low-quality. **Expected pre-launch behavior** — once you start journaling (via Notion), the coach will produce output and the validator will accept it. Self-resolves; no code change needed.
