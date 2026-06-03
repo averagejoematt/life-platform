@@ -2,8 +2,8 @@
 
 > Permanent log of significant architectural, design, and operational decisions.
 > Each ADR captures the decision, context, alternatives considered, and outcome.
-> Last updated: 2026-06-02 (v8.3.0 — v4 front-end + restart ledger reset + graceful empty-states)
-> 73 ADRs total (ADR-001 → ADR-073).
+> Last updated: 2026-06-03 (v8.3.0 — + Garmin retired & budget-guard/AI-cost trim; ADR-074/075)
+> 75 ADRs total (ADR-001 → ADR-075).
 
 ---
 
@@ -2210,3 +2210,48 @@ Confirmed live 503s (nutrition_overview, correlations) fixed in code; the rest a
 ---
 
 **Verified:** 2026-06-02 (ADR-071/072/073 — v4 front-end + restart ledger reset + graceful empty-states)
+
+---
+
+## ADR-074: Garmin direct-API ingestion retired (paused) — vendor anti-automation
+
+**Date:** 2026-06-03
+**Status:** Paused — commented out of `freshness_checker_lambda.py` SOURCES + OAUTH_SECRETS + `qa_smoke_lambda.py` (shown ⏸).
+**Related:** `lambdas/ingestion/garmin_lambda.py` (garth + 429 circuit-breaker), `setup/setup_garmin_browser_auth.py`.
+
+### Context
+
+Garmin ingestion broke on a recurring cycle (re-auth → works briefly → 429 → re-auth). Root cause, finally measured: Garmin's **2026 anti-automation crackdown 429-rate-limits the OAuth2 refresh-exchange endpoint for non-browser/datacenter clients** — **374 throttles vs 2 successes over 14 days**, last data 2026-05-29. The OAuth1 token stays valid, but Garmin won't let a Lambda exchange it for a fresh OAuth2 from an AWS IP, so each browser re-auth only buys ~1 run. The `garmin_lambda.py` code is correct (persists tokens, lazy refresh, 3h 429 breaker) — it simply can't win an IP-reputation block.
+
+### Decision
+
+**Leave Garmin paused.** No clean, zero-touch, low-cost, fully-background fix exists: (a) a library swap can't help — all hit the same endpoint from the same IP (`python-garminconnect` is built on `garth`); (b) the official Garmin Health API is B2B/approval-gated (low odds for a personal/N=1 platform); (c) a wearable aggregator (**Terra** — free tier, official Garmin partnership, webhook push) works and is hands-off but routes health data through a third party (privacy trade-off); (d) a residential proxy is paid + fragile (continued cat-and-mouse); (e) a residential host (laptop/Pi) means more tech to babysit. Owner opted to pause, not pursue any of these now. Strava (API 402) and MacroFactor (torn down) were already paused the same way; `apple_health` covers daily steps/activity.
+
+### Consequences
+
+Garmin metrics unique to it (body battery, stress, SpO2, respiration, floors, RHR, calorie split) stop updating; Whoop + Eight Sleep + Apple Health cover the rest. The freshness/QA noise stops (shown ⏸ paused, never failing). Revive = uncomment + re-auth from a residential IP, or onboard Terra/official API.
+
+---
+
+## ADR-075: Budget guard early-month guard + AI cost trim (remediation agent)
+
+**Date:** 2026-06-03
+**Status:** Implemented — `cost_governor_lambda.py` deployed; `.github/workflows/remediation-agent.yml` live from `main`.
+**Related:** ADR-063 ($75 ceiling / budget guard).
+
+### Context
+
+Two budget alerts. (1) A **day-2 false tier-3 AI cutoff**: `cost_governor` projected month-end as `mtd / elapsed_days × days` (`$15.56/2 → $233`), but fixed monthly charges front-load onto day 1, so the run-rate is wildly overstated early; the existing `elapsed_days < 2.0` guard had just expired in UTC. (2) AWS's native forecast crossed $75 — driven by ~$3/day of **Sonnet**, almost all of it the **remediation agent** (a *daily agentic* Claude Code run finding nothing most days).
+
+### Decision
+
+1. **Early-month guard:** for the first `EARLY_MONTH_DAYS=5`, escalate the AI tier on **actual mtd vs ceiling** (the true guardrail), not the noisy projection. A genuine runaway still trips (it shows in actual spend); front-loaded fixed costs no longer cause a false AI cutoff.
+2. **Remediation agent cost:** cadence daily → **Mon/Wed/Fri**, model Sonnet → **Haiku-primary** (urgent alarms still trigger on-demand via `repository_dispatch`; the auto-merge gate is deterministic so safety is model-independent; Sonnet stays available for escalation). ~$45–70/mo saved. Compute jobs already run Haiku; the daily brief stays Sonnet (flagship, single small call — caching's 5-min TTL doesn't help once-daily jobs).
+
+### Consequences
+
+No more false early-month AI pauses; month-end forecast drops back under $75 without degrading the daily brief. The budget guard still backstops a real overage.
+
+---
+
+**Verified:** 2026-06-03 (ADR-074/075 — Garmin retired + budget guard early-month/AI cost trim)
