@@ -61,7 +61,20 @@ SOURCE_STALE_HOURS = {
     # 2026-05-29: weigh-ins are sporadic (often ~weekly), so the 48h default
     # false-fired "stale" constantly. A missed week before alerting.
     "withings": 7 * 24,         # 7 days
+    # todoist records are dated by completed DAY and the freshest record is always
+    # "yesterday" (today's completions aren't known until the day ends), so a 24h
+    # default false-fires every afternoon. 48h still catches a genuine 2-day outage.
+    "todoist": 48,
 }
+
+# S-06: Sources whose staleness means "no manual entry logged yet" rather than a
+# broken pipeline. They still appear in the freshness report/email, but do NOT
+# count toward StaleSourceCount — the metric the slo-source-freshness alarm
+# watches — so only infra/OAuth/API breakage (actionable) pages. Device-synced
+# (whoop/withings/eightsleep) and API/webhook (todoist/apple_health/habitify)
+# sources stay infra. Zero new metrics/alarms: this only redefines what the
+# existing StaleSourceCount counts.
+BEHAVIORAL_SOURCES = {"measurements", "food_delivery"}
 
 # Field-level completeness checks — key fields that should be non-null in a healthy record.
 # A source can be "fresh" (recent date) but have partial data (missing key metrics).
@@ -249,12 +262,17 @@ def lambda_handler(event, context):
     # OBS-3: Emit SLO metrics to CloudWatch
     try:
         fresh_count = len(SOURCES) - len(stale_sources)
+        # S-06: StaleSourceCount counts only infra/pipeline staleness (actionable —
+        # OAuth/API/webhook breakage), not behavioral input lapses. Behavioral
+        # sources remain in stale_sources for the email report but don't trip the SLO.
+        _behavioral_labels = {SOURCES[k] for k in BEHAVIORAL_SOURCES if k in SOURCES}
+        infra_stale_count = sum(1 for name, _ in stale_sources if name not in _behavioral_labels)
         cw.put_metric_data(
             Namespace="LifePlatform/Freshness",
             MetricData=[
                 {
                     "MetricName": "StaleSourceCount",
-                    "Value": len(stale_sources),
+                    "Value": infra_stale_count,
                     "Unit": "Count",
                 },
                 {
