@@ -68,6 +68,7 @@ class Check:
         self.name = name
         self.category = category
         self.passed = None   # True=green, False=red, None=yellow
+        self.paused = False  # intentionally-paused surface: shown ⏸, not a fault
         self.message = ""
 
     def ok(self, msg=""):
@@ -78,6 +79,11 @@ class Check:
 
     def warn(self, msg=""):
         self.passed = None; self.message = msg; return self
+
+    def pause(self, msg=""):
+        # Surface is intentionally paused (will return later). Renders ⏸ and is
+        # NOT counted as a failure or a warning — visible, but never a fault.
+        self.passed = True; self.paused = True; self.message = msg; return self
 
 
 # ---------------------------------------------------------------------------
@@ -100,14 +106,18 @@ def check_ddb_freshness():
         ("habitify",     "Habits"),
         ("apple_health", "Apple Health (daily steps/activity)"),
     ]
-    # 2026-06-03: garmin + strava removed entirely (not just demoted) — both paused
-    # (Garmin: 2026 anti-automation crackdown 429-blocks server-side auth; Strava:
-    # API 402). apple_health covers daily steps/activity. Don't check dead sources.
     OPTIONAL = [
         ("withings",    "Weight (weigh-ins are sporadic)"),
         ("eightsleep",  "Eight Sleep"),
         ("supplements", "Supplements"),
         ("journal",     "Notion Journal"),
+    ]
+    # PAUSED = intentionally off, but kept visible so they're not forgotten and can
+    # be returned to. Shown ⏸, never a fault. Garmin: 2026 anti-automation crackdown
+    # 429-blocks server-side auth. Strava: API 402. (apple_health covers daily steps.)
+    PAUSED = [
+        ("garmin", "Garmin — paused (server-side auth 429-blocked); will return"),
+        ("strava", "Strava — paused (API 402); will return"),
     ]
 
     for source, label in REQUIRED:
@@ -130,6 +140,9 @@ def check_ddb_freshness():
             c.warn(f"{label} — error: {e}")
         checks.append(c)
 
+    for source, note in PAUSED:
+        checks.append(Check(f"DDB:{source}", "Data Freshness").pause(note))
+
     return checks
 
 
@@ -145,8 +158,9 @@ def check_s3_freshness():
     # The canonical writer (output_writers.py) uses dashboard/{user_id}/data.json
     # for multi-user prep. qa-smoke had been checking the OLD pre-refactor path
     # since 2026-03-08, generating false S3-stale failures continuously.
-    # 2026-06-03: buddy/data.json removed — the buddy surface is retired (data.json
-    # last written 2026-03-09; buddy.averagejoematt.com 403s). No longer checked.
+    # 2026-06-03: buddy/data.json moved to a PAUSED check below (not freshness-checked
+    # while the buddy surface is dormant; last written 2026-03-09). Kept visible so it
+    # can be returned to.
     FILES = [
         ("dashboard/matthew/data.json",     "Dashboard JSON",  4,  False),
         ("dashboard/matthew/clinical.json", "Clinical JSON",  26,  True),
@@ -170,6 +184,8 @@ def check_s3_freshness():
                 c.fail(f"{label} — error: {e}")
         checks.append(c)
 
+    checks.append(Check("S3:buddy/data.json", "Output Files").pause(
+        "Buddy JSON — paused (buddy surface dormant); will return"))
     return checks
 
 
@@ -482,7 +498,8 @@ def check_mcp_tool_calls():
 def build_report_html(all_checks, run_time_str):
     fails = [c for c in all_checks if c.passed is False]
     warns = [c for c in all_checks if c.passed is None]
-    passes = [c for c in all_checks if c.passed is True]
+    paused = [c for c in all_checks if c.paused]
+    passes = [c for c in all_checks if c.passed is True and not c.paused]
 
     overall = "ALL CLEAR" if not fails else f"{len(fails)} FAILURE(S)"
     banner_emoji = "✅" if not fails else "🔴"
@@ -499,18 +516,33 @@ def build_report_html(all_checks, run_time_str):
   <div style="background:{hdr_bg};padding:20px 24px;border-bottom:3px solid #2d2d5e;">
     <p style="color:#94a3b8;font-size:10px;margin:0 0 4px;font-weight:700;">LIFE PLATFORM · QA SMOKE TEST</p>
     <h1 style="color:{hdr_fg};font-size:24px;font-weight:700;margin:0 0 4px;">{banner_emoji} {overall}</h1>
-    <p style="color:#94a3b8;font-size:11px;margin:0;">{run_time_str} &middot; {len(passes)} passed &middot; {len(warns)} warnings &middot; {len(fails)} failed</p>
+    <p style="color:#94a3b8;font-size:11px;margin:0;">{run_time_str} &middot; {len(passes)} passed &middot; {len(paused)} paused &middot; {len(warns)} warnings &middot; {len(fails)} failed</p>
   </div>"""
 
     for cat, checks in cats.items():
         cat_fails = sum(1 for c in checks if c.passed is False)
         cat_warns = sum(1 for c in checks if c.passed is None)
-        icon = "🔴" if cat_fails else ("🟡" if cat_warns else "🟢")
+        cat_paused = sum(1 for c in checks if c.paused)
+        if cat_fails:
+            icon = "🔴"
+        elif cat_warns:
+            icon = "🟡"
+        elif cat_paused and cat_paused == len(checks):
+            icon = "⏸️"
+        else:
+            icon = "🟢"
         html += f"""
   <div style="padding:14px 24px;border-bottom:1px solid #2d2d5e;">
     <p style="color:#64748b;font-size:10px;margin:0 0 8px;font-weight:700;">{icon} {cat.upper()}</p>"""
         for c in checks:
-            ci, cc = (("✅", "#22c55e") if c.passed else ("❌", "#f87171")) if c.passed is not None else ("⚠️", "#fbbf24")
+            if c.paused:
+                ci, cc = ("⏸️", "#94a3b8")
+            elif c.passed is True:
+                ci, cc = ("✅", "#22c55e")
+            elif c.passed is False:
+                ci, cc = ("❌", "#f87171")
+            else:
+                ci, cc = ("⚠️", "#fbbf24")
             html += f"""    <p style="margin:2px 0;font-size:11px;">
       <span style="color:{cc}">{ci} <strong>{c.name}</strong></span>
       <span style="color:#9ca3af;"> — {c.message}</span></p>"""
@@ -540,11 +572,11 @@ def lambda_handler(event, context):
         all_checks += check_s3_freshness()
         all_checks += check_score_sanity()
         all_checks += check_lambda_secrets()
+        all_checks += check_avatar_assets()    # character avatar visuals — kept (real check)
         all_checks += check_mcp_tool_calls()
-        # 2026-06-03: check_blog_links() + check_avatar_assets() retired. The blog
-        # surface moved to /story/ in v4 (own gate; blog/ no longer emits week-*.html),
-        # and the avatar sprites are static legacy dashboard assets (unchanged since
-        # March) the least-privilege QA role can't list. Both were warn-only noise.
+        # blog moved to /story/ in v4 — shown paused (not failed) so it's not forgotten.
+        all_checks.append(Check("blog:links", "Blog Links").pause(
+            "Blog — paused (chronicle now lives at /story/ in v4); will return if revived"))
 
         html = build_report_html(all_checks, run_time_str)
 

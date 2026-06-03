@@ -1239,10 +1239,12 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
             resources=_s3("dashboard/*", "config/*", "blog/*"),
         ),
         iam.PolicyStatement(
-            sid="S3ListBlog",
+            sid="S3List",
             actions=["s3:ListBucket"],
             resources=[BUCKET_ARN],
-            conditions={"StringLike": {"s3:prefix": "blog/*"}},
+            # check_avatar_assets lists the character avatar sprites (was AccessDenied —
+            # 2026-06-03). blog/* kept scoped for if/when that surface is revived.
+            conditions={"StringLike": {"s3:prefix": ["dashboard/avatar/*", "blog/*"]}},
         ),
         iam.PolicyStatement(
             sid="SecretsGetMCP",
