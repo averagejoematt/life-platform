@@ -760,9 +760,9 @@ def write_anomaly_record(date_str, flagged, alert_sent, hypothesis, severity,
         item["sustained_alert_sent"] = True
     item = json.loads(json.dumps(item), parse_float=Decimal)
     table.put_item(Item=item)
-    print(f"[INFO] Anomaly record written: date={date_str} severity={severity} "
-          f"metrics={len(flagged)} sources={item['source_count']} "
-          f"sustained={len(sustained_metrics or [])} sustained_alerted={sustained_alert_sent}")
+    logger.info(f"Anomaly record written: date={date_str} severity={severity} "
+                f"metrics={len(flagged)} sources={item['source_count']} "
+                f"sustained={len(sustained_metrics or [])} sustained_alerted={sustained_alert_sent}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -916,9 +916,9 @@ def lambda_handler(event, context):
     flagged = check_anomalies(yesterday, today)
     logger.info(f"Flagged metrics: {len(flagged)}")
     for m in flagged:
-        print(f"  [{m['source']}] {m['label']}: {m['yesterday_val']} "
-              f"(Z={m['z_score']}, threshold={m.get('z_threshold')}, "
-              f"CV={m.get('cv')}, baseline={m.get('baseline_type')}, {m['direction']})")
+        logger.info(f"  [{m['source']}] {m['label']}: {m['yesterday_val']} "
+                    f"(Z={m['z_score']}, threshold={m.get('z_threshold')}, "
+                    f"CV={m.get('cv')}, baseline={m.get('baseline_type')}, {m['direction']})")
 
     # ── Sustained streak detection (IC-19 Deliverable 2 — non-fatal) ──
     sustained_metrics = []
@@ -927,8 +927,8 @@ def lambda_handler(event, context):
         try:
             sustained_metrics = _check_sustained_streaks(yesterday, flagged)
             if sustained_metrics:
-                print(f"[INFO] Sustained streaks: {len(sustained_metrics)} metric(s): "
-                      f"{[s['label'] for s in sustained_metrics]}")
+                logger.info(f"Sustained streaks: {len(sustained_metrics)} metric(s): "
+                            f"{[s['label'] for s in sustained_metrics]}")
         except Exception as e:
             logger.warning(f"_check_sustained_streaks failed (non-fatal): {e}")
 
@@ -971,8 +971,8 @@ def lambda_handler(event, context):
         hypothesis = (f"[TRAVEL] Currently in {travel_dest}. "
                       "Anomalies expected due to timezone shift, routine disruption, "
                       "and environmental change. Alert suppressed.")
-        print(f"[INFO] Travel mode -- {len(flagged)} metrics flagged across "
-              f"{source_count} sources, alert SUPPRESSED")
+        logger.info(f"Travel mode -- {len(flagged)} metrics flagged across "
+                    f"{source_count} sources, alert SUPPRESSED")
 
     elif multi and sick_mode:
         source_count = len(set(f["source"] for f in flagged))
@@ -982,8 +982,8 @@ def lambda_handler(event, context):
             "during illness — recovery score, HRV, habits, and nutrition will all look "
             "off. Anomaly alerts suppressed. Rest and recover."
         )
-        print(f"[INFO] Sick mode -- {len(flagged)} metrics flagged across "
-              f"{source_count} sources, alert SUPPRESSED")
+        logger.info(f"Sick mode -- {len(flagged)} metrics flagged across "
+                    f"{source_count} sources, alert SUPPRESSED")
 
     else:
         logger.info("No multi-source anomaly -- no alert sent.")
