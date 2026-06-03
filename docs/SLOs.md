@@ -1,7 +1,7 @@
 # Life Platform — Service Level Objectives (SLOs)
 
 > OBS-3: Formal SLO definitions for critical platform paths.
-> Last updated: 2026-06-02 (v8.3.0)
+> Last updated: 2026-06-03 (v8.3.0)
 
 ---
 
