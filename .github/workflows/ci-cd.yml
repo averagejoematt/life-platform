@@ -33,6 +33,7 @@ on:
       - 'lambdas/**'
       - 'mcp/**'
       - 'mcp_server.py'
+      - 'tests/**'          # test-only changes must re-validate the suite (else CI red lingers)
   workflow_dispatch:
     inputs:
       deploy_all:
