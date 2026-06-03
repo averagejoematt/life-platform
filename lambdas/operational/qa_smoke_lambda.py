@@ -100,13 +100,11 @@ def check_ddb_freshness():
         ("habitify",     "Habits"),
         ("apple_health", "Apple Health (daily steps/activity)"),
     ]
+    # 2026-06-03: garmin + strava removed entirely (not just demoted) — both paused
+    # (Garmin: 2026 anti-automation crackdown 429-blocks server-side auth; Strava:
+    # API 402). apple_health covers daily steps/activity. Don't check dead sources.
     OPTIONAL = [
         ("withings",    "Weight (weigh-ins are sporadic)"),
-        # 2026-06-03: garmin demoted REQUIRED→OPTIONAL — paused (Garmin's 2026
-        # anti-automation crackdown 429-blocks server-side auth; unwinnable headless).
-        # apple_health now covers daily steps/activity, so this is no longer a hard fault.
-        ("garmin",      "Garmin (paused — server-side auth 429-blocked)"),
-        ("strava",      "Strava workout (paused — API 402)"),
         ("eightsleep",  "Eight Sleep"),
         ("supplements", "Supplements"),
         ("journal",     "Notion Journal"),
@@ -147,11 +145,11 @@ def check_s3_freshness():
     # The canonical writer (output_writers.py) uses dashboard/{user_id}/data.json
     # for multi-user prep. qa-smoke had been checking the OLD pre-refactor path
     # since 2026-03-08, generating false S3-stale failures continuously.
-    # buddy/data.json is still the canonical buddy path (no user prefix there).
+    # 2026-06-03: buddy/data.json removed — the buddy surface is retired (data.json
+    # last written 2026-03-09; buddy.averagejoematt.com 403s). No longer checked.
     FILES = [
         ("dashboard/matthew/data.json",     "Dashboard JSON",  4,  False),
         ("dashboard/matthew/clinical.json", "Clinical JSON",  26,  True),
-        ("buddy/data.json",                 "Buddy JSON",     26,  True),
     ]
 
     for key, label, max_hours, non_critical in FILES:
@@ -541,10 +539,12 @@ def lambda_handler(event, context):
         all_checks += check_ddb_freshness()
         all_checks += check_s3_freshness()
         all_checks += check_score_sanity()
-        all_checks += check_blog_links()
         all_checks += check_lambda_secrets()
-        all_checks += check_avatar_assets()
         all_checks += check_mcp_tool_calls()
+        # 2026-06-03: check_blog_links() + check_avatar_assets() retired. The blog
+        # surface moved to /story/ in v4 (own gate; blog/ no longer emits week-*.html),
+        # and the avatar sprites are static legacy dashboard assets (unchanged since
+        # March) the least-privilege QA role can't list. Both were warn-only noise.
 
         html = build_report_html(all_checks, run_time_str)
 
