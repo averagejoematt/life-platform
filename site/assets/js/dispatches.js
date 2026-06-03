@@ -63,11 +63,35 @@ async function renderRead(s, id) {
   const ent = entriesFor(s, await secFetch(s)).find((x) => String(x.id) === String(id));
   if (!ent) { read.innerHTML = `<p class="dx-prose">Pick an entry to read it here.</p>`; return; }
   const readmore = ent.url
-    ? `<p class="dx-readmore"><a href="${esc(ent.url)}">Read the full piece${ent.word_count ? ` (${esc(ent.word_count)} words)` : ""} →</a></p>`
+    ? `<p class="dx-readmore"><button type="button" class="dx-readfull" data-url="${esc(ent.url)}">Read the full piece${ent.word_count ? ` (${esc(ent.word_count)} words)` : ""} →</button></p><div class="dx-fulltext" data-fulltext hidden></div>`
     : (ent.word_count ? `<p class="dx-foot label">${esc(ent.word_count)} words</p>` : "");
   read.innerHTML = `<p class="dx-kicker label">${s.key === "chronicle" ? "chronicle · Elena Voss" : "journal"} · week ${esc(ent.id)}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
     `<h3 class="dx-title">${esc(ent.title)}</h3>` + (ent.meta ? `<p class="dx-stats label">${esc(ent.meta)}</p>` : "") +
-    `<p class="dx-prose">${esc(ent.excerpt || "")}</p>` + readmore;
+    `<p class="dx-prose dx-excerpt">${esc(ent.excerpt || "")}</p>` + readmore;
+  const rf = read.querySelector(".dx-readfull");
+  if (rf) rf.addEventListener("click", () => loadFull(rf, read.querySelector("[data-fulltext]"), read.querySelector(".dx-excerpt")));
+}
+
+// Expand the full chronicle/journal piece inline (same-origin, platform-authored content):
+// fetch the post page, lift its <div class="prose">, strip old promo/footer blocks, render in v4.
+async function loadFull(btn, target, excerptEl) {
+  const url = btn.dataset.url;
+  btn.textContent = "Loading the full piece…"; btn.disabled = true;
+  try {
+    const r = await fetch(url); if (!r.ok) throw new Error("HTTP " + r.status);
+    const doc = new DOMParser().parseFromString(await r.text(), "text/html");
+    const prose = doc.querySelector(".prose") || doc.querySelector(".post-body");
+    if (!prose) throw new Error("no prose");
+    prose.querySelectorAll("script,style,iframe,link,noscript,.discord-community-card,.community-card-header,.community-card-body,.community-card-cta,.fp-cross-footer,.signature").forEach((e) => e.remove());
+    target.innerHTML = prose.innerHTML;
+    target.hidden = false;
+    if (excerptEl) excerptEl.remove();          // the excerpt is now redundant
+    btn.closest(".dx-readmore").remove();
+    target.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch (e) {
+    btn.textContent = "Open the full piece →"; btn.disabled = false;
+    btn.onclick = () => { location.href = url; };   // graceful fallback to the page
+  }
 }
 
 function selectEntry(s, id, silent) {

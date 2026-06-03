@@ -158,9 +158,19 @@ body { overflow-x: hidden; }
 .dx-prose { margin-top: var(--sp-4); color: var(--ink); font-size: var(--fs-body-lg); line-height: var(--lh-relaxed); max-width: var(--measure); }
 .dx-foot { color: var(--ink-faint); margin-top: var(--sp-4); }
 .dx-readmore { margin-top: var(--sp-5); }
-.dx-readmore a { font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.04em; color: var(--ember); text-decoration: none; }
-.dx-readmore a:hover { text-decoration: underline; }
-.dx-readmore a:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
+.dx-readmore a, .dx-readfull { font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.04em; color: var(--ember); text-decoration: none; }
+.dx-readfull { appearance: none; background: transparent; border: 0; cursor: pointer; padding: 0; }
+.dx-readmore a:hover, .dx-readfull:hover { text-decoration: underline; }
+.dx-readmore a:focus-visible, .dx-readfull:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
+/* full article, rendered inline in the v4 reader */
+.dx-fulltext { margin-top: var(--sp-4); max-width: var(--measure); }
+.dx-fulltext p { font-family: var(--font-serif); font-size: var(--fs-body-lg); line-height: var(--lh-relaxed); color: var(--ink); margin-top: var(--sp-4); }
+.dx-fulltext p:first-of-type::first-letter { font-family: var(--font-serif); font-size: 3.4em; line-height: 0.82; float: left; margin: 0.05em var(--sp-2) 0 0; color: var(--ember); }
+.dx-fulltext h2, .dx-fulltext h3 { font-family: var(--font-serif); font-weight: var(--weight-med); margin-top: var(--sp-6); line-height: 1.15; }
+.dx-fulltext blockquote { border-left: 2px solid var(--ember); padding-left: var(--sp-4); margin-top: var(--sp-4); color: var(--ink-muted); font-style: italic; }
+.dx-fulltext a { color: var(--ember); }
+.dx-fulltext em { font-style: italic; }
+.dx-fulltext strong { font-weight: var(--weight-med); }
 /* lab-note two-voice inside the reader (reuses the Third Wall device) */
 .dx-read .voice { display: grid; gap: var(--sp-1); padding: var(--sp-3) 0; border-top: var(--border-hair); }
 .dx-read .voice:first-of-type { border-top: 0; }
