@@ -49,7 +49,7 @@
   --surface:     #16130E;   /* oklch(.19 .010 75)  — paper / panels   */
   --ink:         #ECE3D2;   /* oklch(.91 .022 88)  — primary text      */
   --ink-muted:   #A99F8C;   /* oklch(.69 .020 84)  — secondary         */
-  --ink-faint:   #6B6253;   /* oklch(.46 .018 82)  — labels, ticks     */
+  --ink-faint:   #857B68;   /* oklch(.55 .018 82)  — labels, ticks · 4.7:1 on --page (WCAG AA) */
   --ember:       #DD7A37;   /* oklch(.69 .145 52)  — the one live accent */
 
   /* Derived tints (OKLCH mixing keeps the ramp even). */
@@ -220,7 +220,7 @@
     --surface:   #FBF8F1;   /* oklch(.98 .008 88) */
     --ink:       #221E17;   /* oklch(.26 .012 78) */
     --ink-muted: #6E665A;   /* oklch(.49 .015 82) */
-    --ink-faint: #A39A8A;   /* oklch(.67 .015 84) */
+    --ink-faint: #6F6757;   /* oklch(.48 .015 84) · 4.9:1 on --page (WCAG AA) */
     --ember:     #C2611F;   /* oklch(.58 .145 50) — deepened for AA on paper */
     --rule:        rgba(34, 30, 23, 0.13);
     --rule-strong: rgba(34, 30, 23, 0.22);
@@ -237,7 +237,7 @@
   --surface:   #FBF8F1;
   --ink:       #221E17;
   --ink-muted: #6E665A;
-  --ink-faint: #A39A8A;
+  --ink-faint: #6F6757;   /* 4.9:1 on --page (WCAG AA) */
   --ember:     #C2611F;
   --rule:        rgba(34, 30, 23, 0.13);
   --rule-strong: rgba(34, 30, 23, 0.22);
