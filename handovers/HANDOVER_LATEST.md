@@ -1,113 +1,129 @@
-# HANDOVER — 2026-06-03 (v4 live + reader-sweep #2 + operations/cost pass)
+# HANDOVER — 2026-06-05 (backlog burndown + features + a visual/AI test harness)
 
-> **Latest (2026-06-03) — operations & cost; read the "Operations & cost" section below.** After the v4 build + two reader sweeps, this leg was inbox-triage + reliability + cost: fixed a **cost-governor false AI cutoff**, **paused Garmin** (vendor anti-automation — unwinnable headless), reworked **QA smoke** (new ⏸ paused status + avatar restore), added **freshness remediation hints**, fixed a **CI test**, and **cut the remediation agent's Sonnet cost** (Haiku-primary + 3×/week). New decisions: **ADR-074/075**.
->
-> **Earlier (2026-06-02):** full multi-lens QA sweep + 5-tier remediation, reader-experience sweep #2 (honest weight direction, full chronicle readable **inline in v4**, no fake charts), `/subscribe` re-skinned to v4, RSS generator. Decisions **ADR-071/072/073**.
->
-> ⚠️ **Pending deploys (all committed, gated behind the CI/CD production approval):** Tier 3 graceful-empty site-api, the freshness-checker (Garmin pause + hints), `qa-smoke` (paused status), and `cd cdk && npx cdk deploy` for the avatar IAM grant. The cost-governor + budget reset were already deployed by the owner; the remediation-agent change is a GH-Actions workflow (live from `main`, no deploy).
+> **A long multi-thread session:** reconciled the backlog against live AWS, shipped several
+> verified fixes/features to production, **caught + averted a KMS landmine**, fixed a **flagship
+> Cockpit bug that 503'd ~16h/day**, and built a **Playwright + Claude-vision UI test harness**
+> — which immediately found a real bug that's now fixed. 17 commits.
 
-**Previous handover:** `handovers/HANDOVER_2026-06-01_VacationFund.md` (vacation fund + site-api deploy lesson).
-**This session covers:** the front-end rebuild of averagejoematt.com into the locked **Direction 05 "The Measured Life"** design system — Cockpit / Story / Evidence over the unchanged engine, with the old site preserved verbatim under `/legacy`. Built per `docs/CLAUDE_CODE_PROMPT_V4_PASTE_READY.md` + the four source-of-truth docs (Constitution, Design Brief, Design System, Migration Map).
+> 🔴 **READ FIRST — two things the next session MUST know:**
+> 1. **Nothing is pushed.** `main` (local) is **17 commits ahead of `origin/main`**. CI has NOT
+>    run on any of this. **First action: review + `git push`** (it'll re-deploy via CI, matching
+>    what's already live — see below).
+> 2. **Several Lambdas were deployed DIRECTLY** (`update-function-code`) from these *local* commits,
+>    so **deployed code is ahead of `origin`** until you push. Deployed this session: **site-api**
+>    (4× — Tier-3 empty states, `/api/source_freshness`, the Cockpit `/api/character` fix, the
+>    coach-analysis fix; live sha `F2TBZgcS…`), **freshness-checker** (S-06), **anomaly-detector**
+>    (L-01), **life-platform-mcp** (L-02), plus **site syncs** (pipeline page, Day-Grade Replay,
+>    a11y, feed.xml). Rollback artifacts for the direct deploys are in `/tmp/*_ROLLBACK_*.zip`
+>    (ephemeral — gone on reboot; the durable rollback is git).
 
-**SESSION-FINAL STATE (read this first):** v4 is **live**; the rolled-back content is **fully re-homed**; CI is **fixed**. Beyond the initial cutover this session also: restored full Evidence depth, added the **Dispatches reader** (chronicle · AI lab notes · journal), **trend charts** (`assets/js/charts.js`), the **AI experts reader** (board → per-coach read + timeline), a **Vitals & pulse** page, and the **per-exercise Hevy strength log** via a NEW read-only `GET /api/workouts` (`handle_workouts` in `lambdas/web/site_api_observatory.py` — the one deliberate engine change, deployed full-`web/`-package, import-verified). Also **fixed the CI red on main**: `tests/test_tools_hevy_routine.py::test_commit_handles_orphan_created` was hitting live DynamoDB (`build_title_context`) → `NoCredentialsError` in CI, halting the deploy pipeline; now mocked/hermetic. Latest commits on `main` (`0374e4b` + `ed5fba3`); site-api deployed surgically via `update-function-code` (full package). Everything browser-verified, 0 CSP/JS errors.
-**State:** ✅ **DEPLOYED LIVE 2026-06-01 (after a same-day rollback + fix cycle).** Sequence: cut over → presented badly → rolled back to old site → fixed the 4 root causes → re-deployed → **browser-verified, now live and correct.** `main` carries everything (PR #10 + fix commits). Redirect Function `v4-redirects` associated on `E3S424OXQZ8NBE`. **Browser-verified (headless Chromium):** Story renders full with real data (−1.9 lbs, 42-day waveform, Third Wall field note) in Fraunces; Cockpit shows a clean honest empty-state (data not computed — see below); Evidence index + readouts render; **zero CSP errors, fonts load from 'self', no `[AI_UNAVAILABLE]`/`··`.** Smoke: doors 200, old URLs 301, `/legacy/*` 200. No engine/pipeline/schema/Lambda/MCP changes — ever.
-
-### Operations & cost pass (2026-06-03) — inbox triage + reliability + cost
-Triggered by noisy alerts. All grounded in live evidence (Cost Explorer, CloudWatch, logs).
-
-- **Cost-governor false AI cutoff (ADR-075).** A day-2 budget alert hard-cut all AI (tier 3): the governor projected month-end from `mtd / elapsed_days` (`$15.56/2 × 30 = $233`), but fixed monthly charges front-load onto day 1 — its `elapsed_days < 2.0` guard had just expired in UTC. Fix (`lambdas/operational/cost_governor_lambda.py`): for the first `EARLY_MONTH_DAYS=5`, gate on **actual mtd vs ceiling** (the real guardrail), not the noisy projection — a genuine runaway still trips. Owner reset the tier to 0 + deployed it.
-- **AI cost trim (ADR-075).** AWS forecast crossed $75; ~$3/day of Sonnet was almost entirely the **remediation agent** — a *daily agentic* Claude Code run on Sonnet finding nothing most days. `.github/workflows/remediation-agent.yml`: cadence daily→**Mon/Wed/Fri**, model **Haiku-primary** (urgent alarms still trigger on-demand via `repository_dispatch`; auto-merge gate is deterministic so safety is model-independent; Sonnet kept for escalation). ~$45–70/mo saved. Compute already Haiku; daily brief kept Sonnet (flagship, single small call). Live from `main` (GH-Actions, no deploy).
-- **Garmin retired/paused (ADR-074).** Root cause finally pinned: Garmin's 2026 anti-automation crackdown 429-blocks server-side OAuth2 refresh from datacenter IPs — **374 throttles vs 2 successes / 14 days**; each browser re-auth buys ~1 run. **Unwinnable headless** (no library swap helps — same IP block; `python-garminconnect` is built on `garth`). Clean options: official Garmin Health API (B2B, approval-gated, ~low odds), a wearable aggregator like **Terra** (free tier, official partnership, webhook push — but data flows through a 3rd party), or a residential proxy ($/fragile). Owner chose **leave it paused**. Commented out of the freshness checker `SOURCES` + `OAUTH_SECRETS` (`lambdas/emails/freshness_checker_lambda.py`) — like Strava/MacroFactor already are. Revive = uncomment + re-auth from a residential IP.
-- **Freshness alert — actionable hints.** The checker already named stale sources but didn't say what to do; now appends a "What to do" footer (OAuth → re-auth; input source → no new entry). (`freshness_checker_lambda.py`)
-- **QA smoke — ⏸ paused status + cleanup (owner-directed).** New `Check.pause()` / ⏸ state: shown + counted ("N paused") but **never a failure or warning** (so it never emails/reads as broken). garmin/strava/buddy/blog now show **⏸ paused** (visible so they're not forgotten — owner wants to return to them), not removed. **avatar:sprites kept** (character tier visuals) and **fixed for real** — granted the qa-smoke role `s3:ListBucket` on `dashboard/avatar/*` (`cdk/stacks/role_policies.py`) so it verifies instead of `AccessDenied`. (`lambdas/operational/qa_smoke_lambda.py`)
-- **CI red fixed.** `test_subscribe_has_skip_link_and_main` asserted the old `class="skip-link"`; the v4 subscribe re-skin uses `class="skip"`. Updated the test + **added `tests/**` to the CI/CD trigger paths** (`.github/workflows/ci-cd.yml`) so test-only fixes re-validate. Verified the Unit Tests job green.
-
-### World-class QA sweep + remediation (2026-06-02)
-Multi-lens sweep (reader/UX/content + engineering/architecture + simulated fresh-visitor), grounded in an empirical 36-route browser sweep (`/tmp/sweep.py`), code reviews, and live API/RSS checks. Headline: **desktop was already 100% clean** (0 HTTP/JS/CSP errors, 0 bad tokens on all 36 routes) — the front-end degrades gracefully on genesis-week sparse data. Remediated, by tier:
-- **Tier 1 — mobile (P0, shipped `0fdf14e`):** every page except the Cockpit scrolled sideways. Fixed `.doors` topbar (shrink ≤480, hide wordmark ≤360), Evidence `.ev-side` grid blowout (`min-width:0` + `ev-layout minmax(0,1fr)` ≤819), wide `.rd-tbl` tables (`.rd-sec overflow-x:auto` ≤819), and `kvtable`'s raw `JSON.stringify` (the 984px biology blowout). **0 page-overflow at 320/360/375/414px.**
-- **Tier 2 — routing (P1, shipped `639dd87`):** `dispatches.js` popstate regex `/dispatches/`→`/story/`; back/forward on `/story/` sections verified.
-- **Tier 3 — backend graceful empty-states (P1, code in `ee88b6b`, ⚠️ DEPLOY PENDING):** confirmed live 503s on `/api/nutrition_overview` + `/api/correlations` → shaped-empty 200; audited `protein_sources`, `habit_streaks`, `supplements`, `genome_risks` to match (restart-safe). **NOT deployed** — direct `update-function-code` was blocked by the prod safety gate; needs the CI/CD production-approval deploy (full `web/` package) or the documented `/deploy site-api` command.
-- **Tier 4 — content/return (shipped `ff468b6`):** evergreen subscribe copy (killed stale "Week 1 ships after April 1"), Cockpit "follow the experiment →" CTA, corrected `rss.xml` dates.
-- **Tier 5 — a11y (shipped `ff468b6`):** Cockpit row/`:focus-visible` parity, theme-toggle 30→28px, `lineChart` aria-label trend summaries.
-
-**`/subscribe` re-skinned to v4 (2026-06-02):** was on the dead old design (loaded a non-existent `base.css` → effectively unstyled). Rebuilt as a proper v4 page — NEW `site/assets/css/subscribe.css` + rewritten `site/subscribe/index.html` (Fraunces/ember, `.story-top` topbar + doors nav + theme toggle, `.dx-foot-bar` footer, reuses story.css chrome). **All form IDs + the subscribe `<script>` preserved** (POST `/api/subscribe`, confirm/unsubscribe token flows, `/api/sub_count`) — only the status/colour token refs were updated to v4. Dropped the old nav/footer component mounts + `base.css`/`nav.js`/`components.js`. Verified: Fraunces renders, form works (POST→400 on empty = validation intact), sub-count live, 0 CSP/JS errors, 0 overflow at 320/375/414. Also hid the `.brand-door` section tag ≤480px (story.css + evidence.css) so the subscribe topbar's 3 doors fit.
-
-**RSS generator built (2026-06-02):** `rss.xml` had no generator (hand-maintained, stale). NEW `scripts/v4_build_rss.py` (stdlib/urllib) pulls the live chronicle `posts.json`, sorts newest-first, and emits a valid RSS 2.0 feed with correct per-post `pubDate`s + a stamped `lastBuildDate`; items deep-link into the v4 hub (`/story/chronicle/#<week>`, verified to resolve). **Wired into `deploy/sync_site_to_s3.sh`** (best-effort, skipped offline) so the feed refreshes on every site deploy. Verified live: 5 items, distinct correct dates, well-formed XML.
-
-**Known follow-ups (not yet done):** (a) deploy Tier 3 (above) via the CI/CD production gate; (b) optional: also write `rss.xml` from `lambdas/emails/chronicle_approve_lambda.py::_publish_to_s3` so the feed refreshes the instant an issue is approved (today it refreshes on the next site deploy).
-
-### Reader-experience sweep #2 (2026-06-02, screenshot-based)
-Reviewed every page as a human reader (full-page screenshots) + verified against live APIs. Shipped (`d5d47f8` + subscribe):
-- **Honest weight direction (integrity).** `/api/journey lost_lbs=-1.9` with `start 304.3 → current 306` = genuinely **up ~1.9 lb**; the home hero dumped raw "−1.9" in ember (read as a loss/win) and Results labeled it "down". Now `story.js` (+ `.figure.is-up` muted style) and `evidence.js renderResults` interpret the sign → "1.9 lbs up" in muted ink, consistent with Vitals.
-- **Full chronicle/journal readable, natively in v4.** Reader showed only excerpt + "1403 words". "Read the full piece" now **expands the article inline in the v4 reader** (`dispatches.js loadFull`): fetches the post page same-origin, lifts its `<div class="prose">`, strips the old promo/footer blocks, and renders it in v4 styling (`.dx-fulltext` — Fraunces, ember drop-cap, `--measure`). No old-design jump, no backend, no per-post regeneration — works for any post via the `.prose` container. Also stopped redirecting `/chronicle/posts/*` + `/journal/posts/*` (guard in `v4_migration_inventory.py`; redirects.map 73 301s + CF function) so the fetch resolves 200 and the pages remain a graceful fallback. Verified: click → 17 paragraphs render in Fraunces, button removed, URL unchanged, 0 CSP/JS errors.
-- **No more 2-point straight-line charts.** `charts.js lineChart` now needs ≥4 points; for <4 shows "Latest <v> · N readings so far — the trend line draws in at 4+".
-- **Subscribe social proof.** "Join 1 person" → "Be one of the first to follow the experiment" under ~10 subscribers (`subscribe/index.html`).
-- Left as optional polish: figure dual-unit density (now labelled), cockpit genesis-phase framing, home Third-Wall contrast.
-
-### First-cutover failures + fixes (ALL RESOLVED — keep as lessons)
-1. **CSP blocked Google Fonts.** CSP is `style-src 'self' 'unsafe-inline'; font-src 'self' data:` → the Google CDN type triad was blocked, whole site fell back to default fonts. **FIXED:** `scripts/v4_vendor_fonts.py` self-hosts Fraunces/Instrument Sans/IBM Plex Mono → `site/assets/fonts/v4/*.woff2` (18 files, 418KB) + `site/assets/css/fonts.css`; doors link the local sheet. ⚠️ `sync_site_to_s3.sh` does NOT upload `assets/**` woff2 (its catch-all excludes `assets/*`) → fonts need an explicit `aws s3 sync site/assets/fonts/ …` step (done at deploy).
-2. **Scroll-reveal hid all below-hero content** (`.beat` started at `opacity:0`, revealed only on scroll → blank first glance). **FIXED:** reveal is now TRANSFORM-ONLY (opacity stays 1) in `story.css` — content is never invisible.
-3. **Degraded live data surfaced raw** (`/api/weekly_priority` = `[AI_UNAVAILABLE]`, `/api/character` 503). **FIXED:** `cockpit.js` `isBad()` hides sentinel/empty values; missing character sheet → a calm "score hasn't computed yet — refreshes each morning" empty-state (force `display:none` on empty domains/band, not `[hidden]` which the author display rules override).
-4. **PROCESS: cut over with NO real browser render.** **FIXED going forward:** headless Playwright visual QA is now part of verification (load each door, assert fonts load + no CSP errors + content visible + no raw tokens). Do this BEFORE re-cutover next time.
-
-**DEPTH RESTORATION (2026-06-01, later same day):** A data-coverage audit found 45 of 60 legacy API endpoints had no v4 consumer. Rebuilt the Evidence door bound to the REAL nested shapes + regrouped into 4 browsable sections (The body · Mind & accountability · Protocol & experiments · Credibility & the machine): DEXA body-comp (`physical_overview`), workouts+strength (`training_overview`+`strength_benchmarks`+`weekly_physical_summary`), CGM×meals (`glucose`+`meal_glucose`+`meal_responses`), sleep_detail, mind/inner-life, vice streaks, ledger, discoveries, genome risk, challenges (26), and **The Board** (8 named AI experts via `coaching-dashboard`). Cockpit **Journey scope** now renders `journey_timeline` (level-ups/milestones) + `achievements` (34, earned/locked) — gamified layer, empty-but-ready. Old URLs rehomed: `board`/`coaches`→`/evidence/board`, `accountability`→`/evidence/vices`, `ledger`/`discoveries`→their pages. Renderers in `assets/js/evidence.js` (slug→renderer map, multi-endpoint, honest empty states). Whole-site headless QA: all clean (0 CSP/JS errors, no raw tokens). Empty domains (CGM, nutrition macros today) render "ready, no data yet" and auto-fill from the pipeline.
-
-**BOARD SWEEP (2026-06-01, later same day) — 3 phases, all deployed + browser-verified:**
-- **Phase 1 · native narrative home:** a **Dispatches reader** in the Story door (`story.js`) — Chronicle · **AI lab notes** · Journal. Lab notes fully native (`/api/field_notes` list → `?week=` two-voice); chronicle/journal native index from `/chronicle|journal/posts.json` with real excerpts. Deep-linkable `/#dispatches/<src>/<week>`; old chronicle/journal/field-notes/first-person URLs 301 into it (inventory RULES + CF fn updated).
-- **Phase 2 · trend charts:** new `site/assets/js/charts.js` (zero-dep inline SVG: lineChart/sparkline/barChart, token-driven, non-scaling stroke). Wired: weight trajectory (Story + Evidence physical/results), sleep-score trend, glucose curve, daily-steps bars. Empty series show honest "fills as data accrues". Chart CSS in `tokens.css`.
-- **Phase 3 · UX polish:** consistent cross-door top-bar nav (Cockpit got door links); Cockpit Week/Month now honest (no false re-run); explicit `:focus-visible` on all tab/tile/row nav; locked achievements use honesty vocabulary (dashed); mobile Cockpit spine shrunk; Evidence "deeper" links reworded to "(archive)"; Third Wall human voice tinted.
-- Commits `9250942` (Phase 1), `98506d3` (Phase 2), + Phase 3. Plan: `~/.claude/plans/generic-swimming-dragon.md`.
-
-**LATER ADDITIONS (2026-06-02):**
-- **No more `/legacy` links in the live UI** — removed the Evidence "deeper → archive" link from every topic; `/legacy` is now reachable only by direct URL (private rollback). Everything renders inline.
-- **Full habits registry inline** — `renderHabits` fetches `/api/habit_registry` (63 habits) + streak/dow.
-- **Dual units (kg · lb)** everywhere weight shows — `charts.js dualWeight()`; Hevy strength-log sets, 1RM + targets, session volume, DEXA lean/visceral mass, weight-loss results.
-- **Protocols/experiments** sort active/running first (inactive/completed below).
-- **Ledger reset to $0** — NEW `deploy/restart_ledger_reset.py` (deletes `LEDGER#` txns + zeros `TOTALS#current`; the site reads `TOTALS#current` directly and doesn't honour tombstones, so the old "pregenesis tombstone" never zeroed it). Ran `--apply` (5 pre-genesis txns cleared, verified `/api/ledger` $0) and **wired into `deploy/restart_pipeline.py`** after `restart_intelligence_wipe` so every future restart zeros it.
-- **Story now navigates into the site** — constellation pillars are clickable links to their Evidence pages; each scroll beat has a "go deeper →" link.
-- **"THE STORY" = the writing hub at `/story/`** (the slower "overlay of what's going on"). IA is now three doors — **the cockpit (`/now/`) · the story (`/story/`) · the evidence (`/evidence/`)** — with the **cinematic landing at `/` kept SEPARATE (home, reached via the brand/logo only — not called "the story")**. Per Matthew: "rename dispatches to Story… what is currently under dispatches is the story. The home page is separate." Real sub-page URLs `/story/{chronicle,lab-notes,journal,timeline,about}/`; master-detail (tabs → list → reader) reusing story.css `dx-*`. Built by `scripts/v4_build_dispatches.py` (→ `site/story/`, despite the script's legacy name) + `site/assets/js/dispatches.js` (routes `/story/*`; chronicle/journal from posts.json, lab-notes two-voice from `/api/field_notes`, timeline from `/api/journey_timeline`, about authored). Nav "the story" → `/story/` on all doors (Evidence via `v4_build_evidence.py` TOPBAR — regenerate after edits; brand/footer → `/` = home). Redirects (`v4_migration_inventory.py`): `chronicle/elena→chronicle`, `journal→journal`, `field-notes/first-person→lab-notes`, `recap/progress→timeline`, `about/mission→about`, plus `/dispatches/*→/story/*`. **The new `/story/*` namespace is guarded from the legacy `/story/→/` redirect** (legacy story page preserved at `/legacy/story/`). Regenerated `redirects.map` (88 301s, 0 unmapped) + CF `v4-redirects` (update+publish) + `sitemap.xml` (43 URLs). Verified live: `/story/` + 5 sub-pages serve 200, old URLs 301, 0 CSP/JS errors, 0 leftover `/dispatches/` links.
-
-**⚠️ Remaining (ENGINE/data, off-limits to the front-end):** the Cockpit is intentionally empty because `character-sheet-compute` hasn't produced today's record (`/api/character` 503 — `test_i17`) and the AI budget tier has paused Bedrock (`/api/weekly_priority` = `[AI_UNAVAILABLE]`). The Story/Evidence use other live endpoints and are full. The Cockpit fills automatically once the compute runs / budget resets — investigate `/aws/lambda/character-sheet-compute` + the budget tier if they stay stale.
-
-**ROLLBACK reference:** disassociate `v4-redirects` (FunctionAssociations Quantity=0, `update-distribution`); restore overwritten shared files (`index.html`, `assets/css/tokens.css`, `sitemap.xml`) from the pre-v4 commit `84e98e4` to S3; invalidate. Old per-page files were never deleted (additive sync) so they serve immediately once redirects are removed.
+**Previous handover:** `handovers/HANDOVER_2026-06-03_OperationsCost.md` (v4 live + ops/cost; ADR-074/075).
+**No engine/schema/pipeline changes that alter data.** All work is read-side (site-api, site, QA, docs) plus two layer-module edits that ride the next layer rebuild.
 
 ---
 
-## What shipped (front-end only)
+## What shipped (by thread)
 
-| Piece | Where |
-|---|---|
-| **Foundation** | `site/assets/css/tokens.css` — v4 token system. Locked hexes as primitives + OKLCH `color-mix()` tints; dark-first + real Daybook light mode (OS-aware, explicit choice wins); the type triad (Fraunces=human / Instrument Sans=interface / IBM Plex Mono=machine); both signatures tokenized (`--spine-*`, `--voice-*`); honesty vocabulary (muted ink, dashed marker, never red); motion + reduced-motion. |
-| **Cockpit `/now`** | `site/now/index.html` + `assets/css/cockpit.css` + `assets/js/cockpit.js`. Focus/logbook (LOCKED). Rule-spine, big tabular-mono Level+tier+movement, honesty chip, two-voice dialogue (machine=Chair verdict, human reply optional/hidden — not faked), Body/Mind bento, Consistency band, global Today/Week/Month/Journey scope, theme toggle, in-place pillar disclosure via View Transitions. Binds `/api/snapshot` + `/api/weekly_priority`; lazy `/api/coach_analysis` per pillar. `noindex` (daily tool). |
-| **Story `/`** | `site/index.html` + `assets/css/story.css` + `assets/js/story.js`. Scrollytelling default door. Relational **constellation** hero (SVG, 7 pillar nodes sized by score, relationship edges, ember=climbing). Numbers beat (`/api/journey`), honest 42-day waveform with green/amber/red/gray down-beats in muted ink (`/api/journey_waveform`), the **Third Wall** two-voice (`/api/field_notes` ai_present↔matthew_agreement, honest "hasn't replied" fallback), Elena chronicle spine (`/public_stats.json` → links to preserved `/legacy/chronicle`), reachable close + quiet subscribe. `animation-timeline` scroll reveal with `@supports`/reduced-motion fallback. |
-| **Evidence `/evidence/**`** | `site/evidence/index.html` + 26 topic pages, generated by `scripts/v4_build_evidence.py` from a topic REGISTRY. Shared `assets/css/evidence.css` + `assets/js/evidence.js` (generic honest "readout" — renders ACTUAL published data, correlative framing, confidence labels n<12 preliminary / n<30 low). 12 live-readout topics (bind their `/api/*`), 14 archive topics (v4 intro + "deeper →" link to preserved `/legacy`). Archival-index treatment, rule-tick indexed cards. |
+### 1. Backlog burndown (reconciled against live AWS)
+Re-checked the data-blocked items against real CloudWatch/SES/SQS and closed the stale ones:
+- **L-11** DLQ → 0 (drained). **D-03** AI-spend ranking captured (`coach-narrative-orchestrator`
+  dominates at ~8M input tok/14d, ~8× the next). **N-01** alarms 4/5 cleared. **B-03** done.
+- **D-01** finding: `daily-brief` writes prompt-cache it never reads (once/day vs 5-min TTL) — see S-07.
+- **D-04** root cause: SES open-tracking simply **not enabled** (`TrackingOptions: null`), not Apple-Mail masking.
+- Closed **L-01/L-02/L-05/L-06** (commits `0e41f11`); **L-10** verified a non-issue (historical comment).
+- **Tier-0** (`d28423f`): corrected **CLAUDE.md tool count 140→133** — the docs were right; the
+  `grep -c '"name":'` guidance over-counts (nested schema names). True source of truth is the AST
+  count (`deploy/sync_doc_metadata.py`). Also dropped deprecated `utcnow()` in `html_builder.py` +
+  `vacation_fund.py` (both **layer modules** — ships on next layer rebuild, not deployed for a P3).
 
-**Design fidelity:** the §10 open Cockpit decision (Mara focus vs Tyrell relational canvas) was already resolved by the later board-unanimous Design System — Cockpit = focus/logbook, Tyrell's canvas repurposed as the Story's constellation hero. Built to that; no prototyping needed. Anti-template guardrails honoured (no Inter/Roboto/system fonts, no purple gradients, no shadcn cards, no emoji headers). Editorial guardrails apply to public copy.
+### 2. S-06 — freshness SLO alarm de-noised (deployed) — `3bde46d`
+`slo-source-freshness` was permanently ALARM. Fixed `freshness_checker_lambda.py` so
+`StaleSourceCount` counts only **infra/pipeline** staleness (OAuth/API breakage = actionable);
+**behavioral** sources (`measurements`, `food_delivery`) still show in the report but don't trip the
+SLO. Also `todoist` 24h→48h (it reports the *prior* completed day, so 24h false-fired daily).
+Zero new metrics/alarms (reuses the existing one). Verified live: StaleSourceCount 3→0.
+
+### 3. "Pipeline status" Evidence dashboard (deployed) — `e039be9`
+New read-only **`GET /api/source_freshness`** (`lambdas/web/site_api_data.py`) → per-source
+fresh/stale/behavioral-stale/paused, querying each source's latest `DATE#` via
+`begins_with("DATE#")` (sidesteps the `YEAR#` rollup) and phase-filtered like the rest of the site.
+New Evidence topic **`/evidence/pipeline/`** (`scripts/v4_build_evidence.py` + `renderPipeline` in
+`evidence.js`). Turns the freshness signal + the paused sources (ADR-074) into an honest reader
+feature. Live, verified.
+
+### 4. Cockpit `/api/character` 503'd ~16h/day + Day-Grade Replay (deployed) — `1de678b`
+**Real flagship bug:** character-sheet compute writes the **prior day's** sheet daily at **16:30
+UTC**, so the freshest record is routinely 1–2 days old — but `handle_character` only accepted
+today/yesterday, so from 00:00 UTC until the 16:30 run it returned **503**, degrading the Cockpit's
+level/pillars. Fixed to take the **latest available** `DATE#` record (+ its prior, for deltas).
+**Day-Grade Replay:** each pillar now carries `score_delta`/`xp_earned` (record-over-record),
+surfaced as a compact "score N ▲+X" chip in the existing cockpit pillar disclosure (stays within
+the locked glanceable design). Also widened `test_i17` 2→3 days to match the compute cadence.
+
+### 5. a11y (deployed) — `486d6ce`
+Two **verified** WCAG-AA fails fixed (most audit a11y claims were false positives — skip-links
+already work, constellation links already keyboard-accessible): `--ink-faint` contrast (dark
+3.25→4.68, light 2.43→4.88) in `tokens.css`; constellation `<svg>` `role="img"`→`role="group"` so
+its interactive pillar links are exposed to screen readers. (The waveform's `role="img"` is correct
+— left alone.)
+
+### 6. QA tooling
+- **`deploy/smoke_test_site.sh` rewritten for v4** (`db079e4`) — it was pre-v4 and emitted **58
+  false failures** (old v3 URLs that now 301, v3 chrome that's gone). Now 65/0; checks the real
+  three-door structure + today's new endpoints, with a stale-copy guard. (Complements the qa-smoke
+  *Lambda*, which covers data/output health.)
+- **NEW: visual + AI-vision test harness** — see §7.
+
+### 7. Visual + AI-vision UI test harness (NEW capability)
+**The answer to "QA the rendered graphs" on a data-driven site where pixel-diff breaks daily.**
+- **`tests/visual_qa.py`** — modernized the stale v3 Playwright harness for v4: real routes,
+  inline-**SVG** checks (not Chart.js canvas), the **cockpit pillar interaction**, responsive
+  overflow @390px, per-chart element crops; dropped the vestigial `cf-auth` (site is public).
+- **`tests/visual_ai_qa.py`** — feeds each screenshot to **Claude via `bedrock_client.invoke()`**
+  (Haiku, vision, ~$0.001/img) for a structured verdict. Validated both ways: a sparse-data state →
+  correctly "ok"; a deliberately-broken render → "high" with specifics. Degrades cleanly (Bedrock
+  error / budget tier-3 → AI-QA skipped, deterministic checks stand).
+- **CI** — new **`visual-qa`** job in `.github/workflows/ci-cd.yml` (post-deploy, **ADVISORY**:
+  `continue-on-error` + `|| true`). `playwright==1.58.0` pinned in `requirements-dev.txt`;
+  `/qa full` updated. ADR-076.
+- **It immediately found a real bug** → §8.
+
+### 8. coach-analysis 400 (found by the harness, fixed, deployed) — `f823779`
+The harness's **interaction layer** caught it: clicking 4 of 7 cockpit pillars
+(`movement`/`metabolic`/`relationships`/`consistency`) → `/api/coach_analysis` **400 "Invalid
+domain"** (the cockpit sends *character-pillar* names; the endpoint keyed on *coach-domain* names).
+Fixed in `site_api_coach.py`: alias `movement→training`, `metabolic→glucose`; for the two pillars
+with **no dedicated board coach** (`relationships`, `consistency`) return a graceful 200/`null` so
+the cockpit fallback shows cleanly; genuinely-invalid domains still 400. Verified live: all 7 → 200;
+harness re-run → Cockpit **PASS**.
+
+### 9. KMS landmine — AVERTED (no change made) — `02d9cda`
+The roadmap/audit said "remove orphan KMS grants from `role_policies.py`." **Verified against live
+AWS first:** the ~32 remaining `KMS_KEY_ARN` grants reference **`444438d1` — the ENABLED DynamoDB
+SSE-KMS key** (`life-platform-dynamodb`), NOT the deleted orphan S3 CMK (`5c50ca02`, already removed
+2026-05-24). **Removing them would have locked every Lambda out of DynamoDB.** Recorded in BACKLOG
+so it's never re-attempted. **Do not touch those grants.**
 
 ---
 
-## /legacy relocation (reversible, no edge config)
+## ⚠️ Operator follow-ups (deliberately NOT auto-done)
+1. **`git push`** the 17 commits (review first). CI will re-deploy, matching what's already live.
+2. **Enable AI-QA in CI** — a scoped `bedrock:InvokeModel` grant is staged in
+   `deploy/setup_github_oidc.sh` (`BedrockVisionQA` statement); it's a high-severity IAM change, so
+   **operator-run** (`bash deploy/setup_github_oidc.sh`). Until applied, the `visual-qa` job runs
+   the deterministic layer and AI-QA self-skips.
+3. **Flip `visual-qa` advisory→gate** after ~1 week of tuning: remove `continue-on-error` + the
+   `|| true` in the job (a FAIL — deterministic or AI-high — then blocks; rollback's `needs`
+   excludes `visual-qa`, so advisory failures never trigger a rollback).
+4. **`utcnow()` fix** (Tier-0) ships on the **next layer rebuild** (`html_builder`/`vacation_fund`
+   are layer modules) — no urgency (P3).
 
-`scripts/v4_relocate_legacy.py --apply` (idempotent; refuses if `site/legacy/` exists). Moved 54 page-trees + `assets/` into `site/legacy/` — **84 pages, all noindex**. Rewrote **552** `/assets/` refs → `/legacy/assets/` and internal nav → `/legacy/...`; **left untouched** all 11 `/api/*` (CloudFront→Lambda), `/config/`, `/data/*.json`, root statics. **System pages** (`privacy`, `subscribe`/`confirm`, `404`) stayed at root, ported as-is. Fully `git`-reversible.
+## Known / deferred
+- **S-07** (daily-brief cache waste, ~$0.02/mo) — diagnosed, deferred; touches the shared layer,
+  root cause unconfirmed, not worth a layer redeploy. Do NOT blindly disable caching. (BACKLOG S-07.)
+- **D-04** SES open-rate — needs a privacy decision (enable CNAME tracking) or accept unobservable.
+- `relationships`/`consistency` pillars have **no board coach** by design (graceful null) — if you
+  add coaches, extend `_coach_map` in `site_api_coach.py`.
 
----
-
-## Validation + cutover
-
-- **Migration gate:** `scripts/v4_migration_inventory.py` now scans the preserved `site/legacy/` tree → **cockpit 8 · story 37 · evidence 30 · legacy 9 · 0 unmapped** (matches the map exactly). Writes `redirects.map` (**83** 301s; all evidence targets verified to exist). Enforced by a dedicated, deploy-free workflow `.github/workflows/v4-gate.yml` (PRs to main + pushes to main; self-skips pre-relocation) — kept OUT of the Lambda deploy pipeline (`ci-cd.yml`) on purpose.
-- **a11y tests:** `tests/test_site_a11y_landmarks.py` updated — original guarantees repointed to the preserved legacy pages; new tests pin skip-link + `<main>` + tokens (reduced-motion, light mode, ember) across the three doors. All site tests green.
-- **visual_qa:** `tests/visual_qa.py` PAGES updated with the three doors (+ supplements readout). It runs against the **live authenticated site post-deploy** (Playwright + cf-auth) — so it's a post-cutover check, not local. ⚠️ its deep legacy-page entries still use old URLs; repoint them to `/legacy/<path>` (or drop as each is rebuilt).
-- **Cutover:** `deploy/v4_cutover.sh` (Matthew runs; Claude does not). Pre-flight gates (inventory 0-unmapped, doors+tokens present, legacy ≥80 pages, HTML well-formed) → generates a CloudFront redirect Function from `redirects.map` → safe `site/` sync → invalidation → prints verify commands. **Rollback** documented in the header (git revert + re-deploy, or disassociate the CF function; S3 versioning retains prior objects).
-
-### ⚠️ 6 judgement calls to CONFIRM before cutover (in `redirects.map`; flip in inventory RULES if wrong)
-`status`→Cockpit · `achievements`→Cockpit · `field-notes`→Story · `community`→Story · `results`→Evidence · `ask`→Evidence · `archive/v1/**`→/legacy. Current defaults match the migration map.
-
----
-
-## Remaining / follow-ups
-- **Deploy:** run `deploy/v4_cutover.sh`, apply the generated CloudFront redirect Function, then `tests/visual_qa.py` (green across doors) + a crawl for stray 404s. Live render-verify the three doors (no browser in this build env).
-- **Evidence depth:** 14 archive topics + interactive ones (ask/explorer/tools) link to preserved legacy until rebuilt bespoke; deepen as time allows.
-- **Cockpit:** week/month/journey deeper series; human-voice daily reply source if/when published.
-- **visual_qa:** repoint legacy-page entries to `/legacy/`.
-- **Docs/CI:** migration gate runs via `.github/workflows/v4-gate.yml` (done); `python3 deploy/sync_doc_metadata.py --apply` run (pre-commit hook also does this).
-- Source-of-truth docs: `docs/{V4_DESIGN_CONSTITUTION,CLAUDE_DESIGN_BRIEF_V4,DESIGN_SYSTEM_V4_THE_MEASURED_LIFE,MIGRATION_MAP_V4}_2026_06_01.md`.
+**Verify quickly:** `bash deploy/smoke_test_site.sh` (65/0) · `python3 tests/visual_qa.py` (cockpit
+now PASS) · `/api/source_freshness`, `/api/character`, `/api/coach_analysis?domain=movement` all 200.

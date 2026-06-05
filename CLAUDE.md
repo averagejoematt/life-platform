@@ -102,6 +102,8 @@ The tool registry in `mcp/registry.py` wires all tools. `tests/test_wiring_cover
 
 GitHub Actions (`.github/workflows/ci-cd.yml`): Lint → Test → Plan → Deploy (requires manual approval via GitHub Environment: `production`) → Smoke Test → Auto-rollback if smoke fails. Auth via OIDC federation (no long-lived AWS keys).
 
+**Site QA (3 complementary layers, ADR-076):** (1) `deploy/smoke_test_site.sh` — HTTP/content smoke (v4 pages 200, legacy URLs 301, API freshness); (2) `lambdas/operational/qa_smoke_lambda.py` — data/output health (DDB freshness, score sanity), nightly; (3) **`tests/visual_qa.py`** — Playwright browser sweep (inline-SVG renders, the cockpit pillar interaction, responsive overflow) **+ `tests/visual_ai_qa.py`** — Claude/Bedrock semantic vision QA of each screenshot (`--ai-qa`; Haiku, robust to daily data changes where pixel-diff false-positives). The harness runs post-deploy as the `visual-qa` CI job (currently **advisory** — `continue-on-error`; flip to a gate after tuning). Run locally: `python3 tests/visual_qa.py --screenshot --ai-qa` (needs `playwright install chromium`). The `/qa` skill wraps these.
+
 ## AI Inference (Bedrock + Budget Guard)
 
 **Single chokepoint:** all Claude calls route through `lambdas/bedrock_client.invoke()` (ADR-062). Auth is IAM (`bedrock:InvokeModel` + `InvokeModelWithResponseStream`), no API key. Cross-region inference profiles required: `us.anthropic.claude-sonnet-4-6` (narrative) and `us.anthropic.claude-haiku-4-5-20251001-v1:0` (structured). Prompt caching uses `cache_control` blocks on the system message (~2048+ tokens to engage).
@@ -144,4 +146,4 @@ Regenerates constants, bumps the layer, deploys Core/Compute/Email, phase-tags D
 
 ---
 
-**Verified:** 2026-06-02 (v8.3.0 — v4 front-end live + QA sweep + restart ledger reset + graceful empty-states)
+**Verified:** 2026-06-05 (v8.3.0 — v4 live; Pipeline-status dashboard + `/api/source_freshness`; Cockpit 503 fix + Day-Grade Replay; a11y; v4 smoke test; visual + AI-vision test harness (ADR-076))
