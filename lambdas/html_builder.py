@@ -1519,9 +1519,9 @@ def build_html(data, profile, day_grade_score, grade, component_scores, componen
             # BS-05: confidence badge — daily brief BoD insight confidence from data volume
             # Henning: n = days since journey start (observation count proxy)
             try:
-                from datetime import datetime as _dt
+                from datetime import datetime as _dt, timezone as _tz
                 _start = data.get("profile", profile).get("journey_start_date", EXPERIMENT_START_DATE) if isinstance(data.get("profile", profile), dict) else profile.get("journey_start_date", EXPERIMENT_START_DATE)
-                _days = (_dt.utcnow().date() - _dt.strptime(_start, "%Y-%m-%d").date()).days
+                _days = (_dt.now(_tz.utc).date() - _dt.strptime(_start, "%Y-%m-%d").date()).days
                 _sources_active = sum(1 for s in ["whoop", "macrofactor", "habitify", "strava", "apple"] if data.get(s))
                 _conf = compute_confidence(days_of_data=_days, sources=list(range(_sources_active)))
                 _badge = _conf["badge_html"]

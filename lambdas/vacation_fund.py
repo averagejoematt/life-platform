@@ -29,7 +29,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -95,7 +95,7 @@ def _today_pt() -> str:
         from zoneinfo import ZoneInfo
         return datetime.now(ZoneInfo("America/Los_Angeles")).date().isoformat()
     except Exception:
-        return datetime.utcnow().date().isoformat()
+        return datetime.now(timezone.utc).date().isoformat()
 
 
 def load_config() -> dict[str, Any]:
