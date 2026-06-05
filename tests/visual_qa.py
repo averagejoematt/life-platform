@@ -210,6 +210,27 @@ def _mobile_overflow(page):
     )
 
 
+def _write_step_summary(path, passed, failed, warns, results):
+    """Append a Markdown summary to $GITHUB_STEP_SUMMARY (CI job summary)."""
+    lines = [f"## Visual + AI-vision QA — {passed} passed, {failed} failed, {warns} warnings\n"]
+    for r in results:
+        v = r.get("ai_verdict") or {}
+        if r["status"] == "FAIL" or r.get("warnings") or v.get("severity") in ("med", "high"):
+            icon = "❌" if r["status"] == "FAIL" else "⚠️"
+            lines.append(f"- {icon} **{r['page']}** (`{r['path']}`)")
+            for i in r.get("issues", []):
+                lines.append(f"  - 🔴 {i}")
+            for w in r.get("warnings", []):
+                lines.append(f"  - ⚠️ {w}")
+            if v:
+                lines.append(f"  - 🤖 AI[{v.get('severity')}]: {v.get('summary', '')}")
+    try:
+        with open(path, "a") as f:
+            f.write("\n".join(lines) + "\n")
+    except Exception:
+        pass
+
+
 def _navigate_with_fallback(page, url, primary_timeout=15000, fallback_timeout=20000):
     """Navigate; try networkidle, fall back to domcontentloaded (pages poll/async-load)."""
     try:
@@ -401,6 +422,10 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "passed": passed, "failed": failed, "warnings": warns, "results": results,
         }, f, indent=2)
+
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary_path:
+        _write_step_summary(summary_path, passed, failed, warns, results)
 
     return failed == 0
 
