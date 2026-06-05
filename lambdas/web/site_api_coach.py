@@ -144,15 +144,24 @@ def handle_ai_analysis(event):
 def handle_coach_analysis(event):
     """GET /api/coach_analysis"""
     qs = event.get("queryStringParameters") or {}
-    domain = qs.get("domain", "sleep")
+    raw_domain = qs.get("domain", "sleep")
     _coach_map = {
         "sleep": "sleep_coach", "nutrition": "nutrition_coach", "training": "training_coach",
         "mind": "mind_coach", "physical": "physical_coach", "glucose": "glucose_coach",
         "labs": "labs_coach", "explorer": "explorer_coach",
     }
+    # The Cockpit (/now/) discloses the 7 CHARACTER PILLARS, whose names differ from the
+    # coach-domain names above — alias them so a pillar click resolves to the right coach.
+    _pillar_alias = {"movement": "training", "metabolic": "glucose"}
+    # Pillars with no dedicated board coach: return a graceful empty read (200), not a 400,
+    # so the Cockpit shows its deterministic fallback without a console error.
+    _no_coach_pillars = {"relationships", "consistency"}
+    domain = _pillar_alias.get(raw_domain, raw_domain)
     coach_id = _coach_map.get(domain)
     if not coach_id:
-        return _error(400, "Invalid domain")
+        if raw_domain in _no_coach_pillars:
+            return _ok({"coach_id": None, "domain": raw_domain, "analysis": None}, cache_seconds=600)
+        return _error(400, f"Invalid domain. Use one of: {', '.join(sorted(_coach_map))}")
 
     _coach_display = {
         "sleep_coach": {"name": "Dr. Lisa Park", "initials": "LP", "title": "Sleep & Circadian Rhythm Specialist", "color": "#818cf8"},
