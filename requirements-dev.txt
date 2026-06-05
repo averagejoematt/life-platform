@@ -6,6 +6,10 @@
 pytest==9.0.2
 pytest-cov==6.1.0
 
+# Visual QA — Playwright browser automation (tests/visual_qa.py).
+# After install: `playwright install --with-deps chromium`
+playwright==1.58.0
+
 # Linting
 flake8==7.3.0
 
