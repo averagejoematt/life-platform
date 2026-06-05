@@ -169,6 +169,7 @@ from web.site_api_data import (
     handle_protocols,
     handle_tools_baseline,
     handle_platform_stats,
+    handle_source_freshness,
     handle_domains,
 )
 
@@ -404,6 +405,8 @@ ROUTES = {
     "/api/tools_baseline":      handle_tools_baseline,
     # Platform stats: single source of truth for all site pages
     "/api/platform_stats":      handle_platform_stats,
+    # Live pipeline status: per-source freshness (fresh/stale/paused)
+    "/api/source_freshness":    handle_source_freshness,
     # Discoveries page: active hypotheses + inner life + AI findings
     "/api/discoveries":         handle_discoveries,
     # Experiment suggestion (POST)

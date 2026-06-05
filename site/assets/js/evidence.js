@@ -86,8 +86,25 @@ async function renderPulse(d) {
   return head + trends + note("Your live vitals — today's pulse and the daily trend.");
 }
 
+function renderPipeline(d) {
+  const src = d.sources || [];
+  if (!src.length) return empty("Pipeline status unavailable — check back shortly.");
+  const sm = d.summary || {};
+  const rank = { fresh: 0, "behavioral-stale": 1, stale: 2, unknown: 3, paused: 4 };
+  const badge = { fresh: "● flowing", "behavioral-stale": "○ awaiting log", stale: "▲ stale", paused: "⏸ paused", unknown: "– unknown" };
+  const flagCls = (s) => (s === "stale" || s === "unknown") ? "rd-flag" : "";
+  const by = {};
+  for (const s of src) (by[s.category || "Other"] ||= []).push(s);
+  const secs = Object.entries(by).map(([cat, rows]) => sec(cat,
+    `<table class="rd-tbl"><thead><tr><th>source</th><th>what it feeds</th><th>last update</th><th>status</th></tr></thead><tbody>${rows
+      .slice().sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9))
+      .map((s) => `<tr class="${flagCls(s.status)}"><td class="rd-name">${esc(s.label)}</td><td>${esc(s.desc || "")}</td><td class="num rd-range">${esc(s.last_update || "—")}${s.age_hours != null ? ` <span class="rd-unit">${Math.round(s.age_hours)}h</span>` : ""}</td><td>${esc(badge[s.status] || s.status)}</td></tr>`).join("")}</tbody></table>`)).join("");
+  return figs([fig(sm.fresh ?? "—", "flowing"), fig(sm.paused ?? "—", "paused"), fig(sm.total ?? src.length, "sources")]) + secs +
+    `<p class="correlative">Live pipeline status — fresh = flowing on schedule, paused = intentionally off, awaiting-log = a manual entry not yet made.</p>`;
+}
+
 const RENDERERS = {
-  vitals: renderPulse, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, results: renderResults, tools: renderTools, ask: renderAsk, explorer: renderExplorer };
+  vitals: renderPulse, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, explorer: renderExplorer };
 const WIRE = {
   ask: () => { const f = document.querySelector("[data-ask]"); if (!f) return; f.addEventListener("submit", async (e) => { e.preventDefault(); const q = f.querySelector(".ask-in").value.trim(); const out = document.querySelector("[data-ask-out]"); if (!q) return; out.innerHTML = `<p class="rd-archive"><span class="shimmer">Asking…</span></p>`; try { const r = await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ question: q }) }); const d = await r.json(); const ans = d.answer || d.response || d.text || (d.error ? "" : ""); out.innerHTML = ans && !isBad(ans) ? `<p class="ask-answer">${esc(ans)}</p>` : `<p class="rd-archive">The data Q&A is paused right now (budget guard) — try again later, or browse the Evidence directly.</p>`; } catch (x) { out.innerHTML = `<p class="rd-archive">Couldn't reach the Q&A service just now.</p>`; } }); },
   board: () => {

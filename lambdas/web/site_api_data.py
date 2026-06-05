@@ -116,6 +116,103 @@ def handle_platform_stats() -> dict:
     return _ok(PLATFORM_STATS, cache_seconds=3600)
 
 
+# ── Source freshness (public pipeline-status feed) ──────────────────────────
+# Mirrors lambdas/emails/freshness_checker_lambda.py (SOURCES / SOURCE_STALE_HOURS /
+# BEHAVIORAL_SOURCES / paused list). KEEP IN SYNC if sources are added/paused there.
+# Active = ingested into DATE# records; paused = intentionally off (shown, never "stale").
+_FRESHNESS_SOURCES = {
+    "whoop":         {"label": "Whoop",        "desc": "Recovery, sleep, HRV",            "category": "Wearables"},
+    "withings":      {"label": "Withings",     "desc": "Weight & body composition",       "category": "Wearables"},
+    "eightsleep":    {"label": "Eight Sleep",  "desc": "Sleep stages, HR, HRV",           "category": "Wearables"},
+    "apple_health":  {"label": "Apple Health", "desc": "Steps & active energy",           "category": "Wearables"},
+    "habitify":      {"label": "Habitify",     "desc": "Daily habit completions",         "category": "Inputs"},
+    "todoist":       {"label": "Todoist",      "desc": "Tasks completed",                 "category": "Inputs"},
+    "measurements":  {"label": "Tape measure", "desc": "Body measurements",               "category": "Manual logs", "behavioral": True},
+    "food_delivery": {"label": "Food delivery", "desc": "Delivery behavioral signal",     "category": "Manual logs", "behavioral": True},
+}
+# Per-source stale thresholds in hours (default 48). Mirrors SOURCE_STALE_HOURS.
+_FRESHNESS_STALE_HOURS = {"withings": 7 * 24, "todoist": 48, "measurements": 60 * 24, "food_delivery": 90 * 24}
+_FRESHNESS_DEFAULT_STALE_HOURS = 48
+# Intentionally paused — reported as status "paused", never counted stale (ADR-074 etc.).
+_FRESHNESS_PAUSED = {
+    "garmin":      {"label": "Garmin",      "desc": "Biometrics — paused (vendor anti-automation, ADR-074)", "category": "Wearables"},
+    "strava":      {"label": "Strava",      "desc": "Activities — paused (API 402)",                          "category": "Wearables"},
+    "macrofactor": {"label": "MacroFactor", "desc": "Nutrition — retired (Firebase App Check)",               "category": "Manual logs"},
+}
+
+
+def _latest_date_str(source: str) -> str | None:
+    """Latest YYYY-MM-DD among a source's DATE# records, or None.
+
+    Uses begins_with('DATE#') so non-DATE sort keys (e.g. measurements' YEAR# rollup)
+    don't shadow the real latest day. Projects sk only — cheap.
+    """
+    kwargs = with_phase_filter({
+        "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}{source}") & Key("sk").begins_with("DATE#"),
+        "ScanIndexForward": False,
+        "Limit": 1,
+        "ProjectionExpression": "sk",
+    })
+    items = table.query(**kwargs).get("Items", [])
+    if not items:
+        return None
+    return str(items[0]["sk"]).replace("DATE#", "")[:10]
+
+
+def handle_source_freshness() -> dict:
+    """GET /api/source_freshness — live pipeline status per data source.
+
+    status ∈ {fresh, stale, behavioral-stale, paused}. Behavioral sources (manual
+    logs) report "behavioral-stale" rather than "stale" so a lapse in logging never
+    reads as a broken pipeline. Always a shaped 200 — sparse/empty data still renders.
+    """
+    now = datetime.now(timezone.utc)
+    sources = []
+    summary = {"fresh": 0, "stale": 0, "paused": 0, "total": 0}
+
+    for sid, meta in _FRESHNESS_SOURCES.items():
+        last_update = None
+        age_hours = None
+        status = "stale"
+        try:
+            date_str = _latest_date_str(sid)
+            if date_str:
+                last_update = date_str
+                last_dt = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                age_hours = round((now - last_dt).total_seconds() / 3600, 1)
+                threshold = _FRESHNESS_STALE_HOURS.get(sid, _FRESHNESS_DEFAULT_STALE_HOURS)
+                if age_hours <= threshold:
+                    status = "fresh"
+                elif meta.get("behavioral"):
+                    status = "behavioral-stale"
+                else:
+                    status = "stale"
+            elif meta.get("behavioral"):
+                status = "behavioral-stale"
+        except Exception as e:  # never let one source break the feed
+            logger.warning("source_freshness: %s failed: %s", sid, e)
+            status = "unknown"
+        sources.append({
+            "id": sid, "label": meta["label"], "desc": meta["desc"], "category": meta["category"],
+            "last_update": last_update, "age_hours": age_hours, "status": status,
+            "is_behavioral": bool(meta.get("behavioral")),
+        })
+        summary["total"] += 1
+        if status == "fresh":
+            summary["fresh"] += 1
+        elif status in ("stale", "behavioral-stale", "unknown"):
+            summary["stale"] += 1
+
+    for sid, meta in _FRESHNESS_PAUSED.items():
+        sources.append({
+            "id": sid, "label": meta["label"], "desc": meta["desc"], "category": meta["category"],
+            "last_update": None, "age_hours": None, "status": "paused", "is_behavioral": False,
+        })
+        summary["paused"] += 1
+        summary["total"] += 1
+
+    return _ok({"sources": sources, "summary": summary}, cache_seconds=300)
+
 
 def handle_ledger() -> dict:
     """
