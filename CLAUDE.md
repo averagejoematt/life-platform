@@ -54,7 +54,7 @@ python3 mcp_bridge.py
 2. **Store**: Raw JSON in S3 (`raw/{source}/{datatype}/{YYYY}/{MM}/{DD}.json`), normalized metrics in DynamoDB single-table (`life-platform`, PK `USER#matthew#SOURCE#{source}`, SK `DATE#{YYYY-MM-DD}`).
 
 3. **Serve/Compute**:
-   - **MCP Lambda** — 140 tools across 29 domain modules (`mcp/tools_*.py`, including `tools_hevy.py` per ADR-060 and `tools_vacation.py` (vacation-fund tracker, 2026-06-01)), accessed via Claude Desktop and claude.ai. `grep -c '"name":' mcp/registry.py` is source of truth. **Note (V2 P4.1):** only ~11 tools used in last 30 days per EMF telemetry; bulk pruning planned.
+   - **MCP Lambda** — 133 tools across 29 domain modules (`mcp/tools_*.py`, including `tools_hevy.py` per ADR-060 and `tools_vacation.py` (vacation-fund tracker, 2026-06-01)), accessed via Claude Desktop and claude.ai. Source of truth is the count of top-level keys in the `TOOLS` dict in `mcp/registry.py` (133) — use `deploy/sync_doc_metadata.py::_auto_discover_tool_count` (AST parse). NB: `grep -c '"name":' mcp/registry.py` **over-counts (140)** because it also matches nested `"name"` fields inside tool input schemas — do not use it as the count. **Note (V2 P4.1):** only ~11 tools used in last 30 days per EMF telemetry; bulk pruning planned.
    - **Compute Lambdas** (5) — run before 11 AM daily: `character-sheet`, `adaptive-mode`, `daily-metrics-compute`, `daily-insight-compute`, `hypothesis-engine`; store pre-computed results to DynamoDB
    - **Email Lambdas** (7) — daily brief at 11 AM reads pre-computed results
    - **OG Image Lambda** — generates 6 data-driven PNG share cards daily at 11:30 AM PT using Pillow

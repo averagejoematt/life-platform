@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-06-04 (v8.3.0 — 133 tools, 38-module MCP package, 20 data sources, 73 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed).
+Last updated: 2026-06-05 (v8.3.0 — 133 tools, 38-module MCP package, 20 data sources, 73 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed).
 
 > **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **three doors:** Cockpit (`/now/`, live data), Story (`/story/`, the writing hub), Evidence (`/evidence/`, the data archive); the pre-v4 site is preserved verbatim at `/legacy`. Shared layer **v71**. **75 ADRs** (ADR-001 → ADR-075; newest: ADR-073 graceful shaped-empty 200s, ADR-074 Garmin retired (vendor anti-automation), ADR-075 budget-guard early-month + AI cost trim). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
