@@ -53,6 +53,7 @@ REGISTRY = [
     ("biology",     "Biology & genome", "Genome risk by category — the baseline biology behind the numbers.", "Credibility & the machine", "data", "/api/genome_risks", None, "/legacy/biology/"),
     ("platform",    "The platform", "The architecture by the numbers — sources, tools, lambdas, tests.",  "Credibility & the machine", "data", "/api/platform_stats", None, "/legacy/platform/"),
     ("data",        "Data sources", "Every source feeding the platform, what it measures, how often.",    "Credibility & the machine", "data", "/data/data_sources.json", None, "/legacy/data/"),
+    ("pipeline",    "Pipeline status", "Which sources are flowing, which are paused, and when each last updated — live.", "Credibility & the machine", "data", "/api/source_freshness", None, "/legacy/data/"),
     ("tools",       "Tools",       "The MCP tools Claude uses to read the data back.",                    "Credibility & the machine", "data", "/api/platform_stats", None, "/legacy/tools/"),
     ("cost",        "Cost",        "What running this costs — the radical-accessibility receipt.",        "Credibility & the machine", "data", "/api/platform_stats", None, "/legacy/cost/"),
     ("results",     "Results",     "Outcomes to date — what moved, and where the mechanisms live.",       "Credibility & the machine", "data", "/api/journey", None, "/legacy/results/"),
