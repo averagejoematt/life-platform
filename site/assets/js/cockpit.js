@@ -169,12 +169,15 @@ async function togglePillar(btn, key) {
   const read = await loadPillarRead(key);
   const p = state.pillars[key] || {};
   const dir = trendOf(p.xp_delta);
+  const sd = p.score_delta;
+  const sdTxt = (typeof sd === "number" && sd !== 0) ? ` ${sd > 0 ? "▲ +" : "▼ −"}${Math.abs(sd)}` : "";
   detail.innerHTML =
     `<p class="pd-read">${read.text}</p>` +
     (read.action ? `<p class="pd-action">→ ${escapeHTML(read.action)}</p>` : "") +
     `<p class="pd-meta">` +
-      `<span class="pd-conf">${read.confidence}</span>` +
+      `<span class="pd-conf">score ${Math.round(p.raw_score ?? 0)}${sdTxt}</span>` +
       `<span class="pd-conf">trend ${MARK[dir]} ${p.tier || ""}</span>` +
+      `<span class="pd-conf">${read.confidence}</span>` +
     `</p>`;
 }
 

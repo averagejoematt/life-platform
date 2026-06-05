@@ -1085,7 +1085,12 @@ def test_i16_recent_ingest_records_exist():
 
 @pytest.mark.integration
 def test_i17_character_sheet_recent_record():
-    """I17: a CHARACTER_SHEET# record exists for today or yesterday with level ≥ 1."""
+    """I17: a character_sheet record exists in the last 3 days with level ≥ 1.
+
+    Compute writes the PRIOR day's sheet daily at ~16:30 UTC, so the freshest record is
+    routinely 1-2 days old (offset 2 before the run lands, offset 1 after). Window is 3
+    days to match that cadence rather than flaking every morning before 16:30 UTC.
+    """
     from datetime import datetime, timedelta, timezone
     boto3 = _get_boto3()
 
@@ -1100,7 +1105,7 @@ def test_i17_character_sheet_recent_record():
     ddb = boto3.client("dynamodb", region_name=REGION)
     pk = "USER#matthew#SOURCE#character_sheet"
 
-    for offset in (0, 1):
+    for offset in (0, 1, 2):
         date = (today - timedelta(days=offset)).isoformat()
         resp = ddb.get_item(
             TableName=TABLE_NAME,
