@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# smoke_test_site.sh — Comprehensive post-deploy verification for averagejoematt.com
+# smoke_test_site.sh — Post-deploy verification for averagejoematt.com (v4 "The Measured Life")
 #
-# Checks every page, API endpoint, CSS/JS assets, and content signals.
-# Run after deploy_site_all.sh.
+# Verifies the three-door v4 site (ADR-071): Cockpit (/now/), Story (/story/),
+# Evidence (/evidence/), over the unchanged read-only engine. Checks live pages (200),
+# legacy v3 URLs (301 → v4), assets, API endpoints + freshness, content markers,
+# cache headers, and stale-copy. Run after `bash deploy/sync_site_to_s3.sh`.
 #
 # Usage:
 #   bash deploy/smoke_test_site.sh           # full check
@@ -31,38 +33,6 @@ check_status() {
   fi
 }
 
-check_contains() {
-  local label="$1"
-  local url="$2"
-  local needle="$3"
-  local body
-  body=$(curl -s --max-time 10 "$url")
-  if echo "$body" | grep -q "$needle"; then
-    echo "  ✅ $label"
-    PASS=$((PASS + 1))
-  else
-    echo "  ❌ $label — expected to find: $needle"
-    echo "       URL: $url"
-    FAIL=$((FAIL + 1))
-  fi
-}
-
-check_not_contains() {
-  local label="$1"
-  local url="$2"
-  local needle="$3"
-  local body
-  body=$(curl -s --max-time 10 "$url")
-  if echo "$body" | grep -q "$needle"; then
-    echo "  ❌ $label — unexpectedly found: $needle"
-    echo "       URL: $url"
-    FAIL=$((FAIL + 1))
-  else
-    echo "  ✅ $label"
-    PASS=$((PASS + 1))
-  fi
-}
-
 check_header() {
   local label="$1"
   local url="$2"
@@ -79,196 +49,138 @@ check_header() {
 }
 
 echo "============================================================"
-echo "averagejoematt.com — Post-deploy smoke tests"
+echo "averagejoematt.com — v4 post-deploy smoke tests"
 echo "$(date)"
 echo "============================================================"
 echo ""
 
-# ── HTTP 200 on every page ────────────────────────────────────────────────────
-echo "── Static pages (HTTP 200) ──────────────────────────────"
-check_status "Homepage"             "$BASE/"
-check_status "Story"                "$BASE/story/"
-check_status "Live"                 "$BASE/live/"
-check_status "Chronicle"            "$BASE/chronicle/"
-check_status "Chronicle archive"    "$BASE/chronicle/archive/"
-check_status "Chronicle sample"     "$BASE/chronicle/sample/"
-check_status "Journal (redirect)"  "$BASE/journal/"
-check_status "Journal archive (redirect)" "$BASE/journal/archive/"
-check_status "Week"                 "$BASE/week/"
-check_status "About"                "$BASE/about/"
-check_status "Platform"             "$BASE/platform/"
-check_status "Character"            "$BASE/character/"
-check_status "Habits"               "$BASE/habits/"
-check_status "Achievements (redirect)" "$BASE/achievements/"
-check_status "Discoveries"          "$BASE/discoveries/"
-check_status "Results (redirect)"   "$BASE/results/"
-check_status "Explorer"             "$BASE/explorer/"
-check_status "Experiments"          "$BASE/experiments/"
-check_status "Protocols"            "$BASE/protocols/"
-check_status "Intelligence"         "$BASE/intelligence/"
-check_status "Accountability"       "$BASE/accountability/"
-check_status "Methodology"          "$BASE/methodology/"
-check_status "Progress (redirect)"  "$BASE/progress/"
-check_status "Benchmarks"           "$BASE/benchmarks/"
-check_status "Supplements"          "$BASE/supplements/"
-check_status "Cost"                 "$BASE/cost/"
-check_status "Tools"                "$BASE/tools/"
-check_status "Ask"                  "$BASE/ask/"
-check_status "Board"                "$BASE/board/"
-check_status "Data"                 "$BASE/data/"
-check_status "Start (redirect)"     "$BASE/start/"
+# ── v4 pages (HTTP 200) ───────────────────────────────────────────────────────
+echo "── v4 pages (HTTP 200) ───────────────────────────────────"
+check_status "Home"                 "$BASE/"
+check_status "Cockpit (/now/)"      "$BASE/now/"
+check_status "Story hub"            "$BASE/story/"
+check_status "Evidence hub"         "$BASE/evidence/"
 check_status "Subscribe"            "$BASE/subscribe/"
-check_status "Privacy"              "$BASE/privacy/"
-check_status "Glucose"              "$BASE/glucose/"
-check_status "Sleep"                "$BASE/sleep/"
-check_status "Biology (noindex)"    "$BASE/biology/"
+# Story sub-pages
+check_status "Story · chronicle"    "$BASE/story/chronicle/"
+check_status "Story · journal"      "$BASE/story/journal/"
+check_status "Story · lab-notes"    "$BASE/story/lab-notes/"
+check_status "Story · timeline"     "$BASE/story/timeline/"
+check_status "Story · about"        "$BASE/story/about/"
+# Evidence topics (sample across groups)
+check_status "Evidence · vitals"    "$BASE/evidence/vitals/"
+check_status "Evidence · glucose"   "$BASE/evidence/glucose/"
+check_status "Evidence · sleep"     "$BASE/evidence/sleep/"
+check_status "Evidence · labs"      "$BASE/evidence/labs/"
+check_status "Evidence · board"     "$BASE/evidence/board/"
+check_status "Evidence · platform"  "$BASE/evidence/platform/"
+check_status "Evidence · data"      "$BASE/evidence/data/"
+check_status "Evidence · pipeline"  "$BASE/evidence/pipeline/"
 check_status "404 page"             "$BASE/nonexistent-page-xyz" "404"
 check_status "www redirect"         "https://www.averagejoematt.com/" "200"
 echo ""
 
-# ── Static assets ─────────────────────────────────────────────────────────────
+# ── Legacy v3 URLs → 301 (the v4-redirects CloudFront fn) ──────────────────────
+echo "── Legacy v3 URLs (expect 301 → v4) ─────────────────────"
+check_status "/live/ → 301"         "$BASE/live/"        "301"
+check_status "/chronicle/ → 301"    "$BASE/chronicle/"   "301"
+check_status "/journal/ → 301"      "$BASE/journal/"     "301"
+check_status "/character/ → 301"    "$BASE/character/"   "301"
+check_status "/glucose/ → 301"      "$BASE/glucose/"     "301"
+check_status "/sleep/ → 301"        "$BASE/sleep/"       "301"
+check_status "/habits/ → 301"       "$BASE/habits/"      "301"
+check_status "/data/ → 301"         "$BASE/data/"        "301"
+check_status "/board/ → 301"        "$BASE/board/"       "301"
+check_status "/platform/ → 301"     "$BASE/platform/"    "301"
+echo ""
+
+# ── Static assets (non-hashed fallbacks + feeds) ───────────────────────────────
 echo "── Static assets ─────────────────────────────────────────"
 check_status "tokens.css"           "$BASE/assets/css/tokens.css"
-check_status "base.css"             "$BASE/assets/css/base.css"
-check_status "nav.js"               "$BASE/assets/js/nav.js"
-check_status "reveal.js"            "$BASE/assets/js/reveal.js"
-check_status "og-image.png"         "$BASE/assets/images/og-image.png"
-check_status "favicon.svg"          "$BASE/assets/icons/favicon.svg"
+check_status "cockpit.js"           "$BASE/assets/js/cockpit.js"
+check_status "story.js"             "$BASE/assets/js/story.js"
+check_status "evidence.js"          "$BASE/assets/js/evidence.js"
 check_status "RSS feed"             "$BASE/rss.xml"
+check_status "feed.xml alias"       "$BASE/feed.xml"
 check_status "Sitemap"              "$BASE/sitemap.xml"
 echo ""
 
-# ── API endpoints ─────────────────────────────────────────────────────────────
+# ── API endpoints (HTTP 200) ───────────────────────────────────────────────────
 echo "── API endpoints ─────────────────────────────────────────"
 check_status "/api/vitals"          "$BASE/api/vitals"
 check_status "/api/journey"         "$BASE/api/journey"
 check_status "/api/character"       "$BASE/api/character"
-check_status "/api/habits"          "$BASE/api/habits"
-check_status "/api/supplements"     "$BASE/api/supplements"
+check_status "/api/pulse"           "$BASE/api/pulse"
+check_status "/api/snapshot"        "$BASE/api/snapshot"
+check_status "/api/source_freshness" "$BASE/api/source_freshness"
+check_status "/api/platform_stats"  "$BASE/api/platform_stats"
 echo ""
 
 if [[ "$QUICK" != "--quick" ]]; then
-  # ── Content checks ──────────────────────────────────────────────────────────
-  echo "── Content checks (HTML structure) ──────────────────────"
-
-
-  _tmpfile=$(mktemp)
-  trap 'rm -f "$_tmpfile"' EXIT
-  check_body_contains()  {
-    local label="$1" url_key="$2" needle="$3"
-    if grep -q "$needle" "$url_key"; then echo "  ✅ $label"; PASS=$((PASS+1)); else echo "  ❌ $label — expected to find: $needle"; FAIL=$((FAIL+1)); fi
+  echo "── Content markers (v4 structure) ───────────────────────"
+  check_body_contains() {
+    local label="$1" file="$2" needle="$3"
+    if grep -q "$needle" "$file"; then echo "  ✅ $label"; PASS=$((PASS+1)); else echo "  ❌ $label — expected to find: $needle"; FAIL=$((FAIL+1)); fi
   }
   check_body_not_contains() {
-    local label="$1" url_key="$2" needle="$3"
-    if grep -q "$needle" "$url_key"; then echo "  ❌ $label — unexpectedly found: $needle"; FAIL=$((FAIL+1)); else echo "  ✅ $label"; PASS=$((PASS+1)); fi
+    local label="$1" file="$2" needle="$3"
+    if grep -qi "$needle" "$file"; then echo "  ❌ $label — unexpectedly found: $needle"; FAIL=$((FAIL+1)); else echo "  ✅ $label"; PASS=$((PASS+1)); fi
   }
-  # Write each page body to a temp file for grep (avoids large-variable piping issues)
-  HOMEPAGE_FILE=$(mktemp); curl -s --max-time 15 "$BASE/" > "$HOMEPAGE_FILE"
-  STORY_FILE=$(mktemp);    curl -s --max-time 15 "$BASE/story/" > "$STORY_FILE"
-  PLATFORM_FILE=$(mktemp); curl -s --max-time 15 "$BASE/platform/" > "$PLATFORM_FILE"
-  SUBSCRIBE_FILE=$(mktemp); curl -s --max-time 15 "$BASE/subscribe/" > "$SUBSCRIBE_FILE"
-  SITEMAP_FILE=$(mktemp);  curl -s --max-time 15 "$BASE/sitemap.xml" > "$SITEMAP_FILE"
-  CSS_FILE=$(mktemp);      curl -s --max-time 15 "$BASE/assets/css/base.css" > "$CSS_FILE"
-  trap 'rm -f "$HOMEPAGE_FILE" "$STORY_FILE" "$PLATFORM_FILE" "$SUBSCRIBE_FILE" "$SITEMAP_FILE" "$CSS_FILE"' EXIT
 
-  # ── FOUC guard: overlay must be hidden before external CSS loads ─────────────
-  check_body_contains     "Story: FOUC guard in <head>"      "$STORY_FILE"    'nav-overlay{display:none}'
-  check_body_contains     "Homepage: FOUC guard in <head>"   "$HOMEPAGE_FILE" 'nav-overlay{display:none}'
-  check_body_contains     "Platform: FOUC guard in <head>"   "$PLATFORM_FILE" 'nav-overlay{display:none}'
+  HOME_FILE=$(mktemp);   curl -s --max-time 15 "$BASE/" > "$HOME_FILE"
+  NOW_FILE=$(mktemp);    curl -s --max-time 15 "$BASE/now/" > "$NOW_FILE"
+  STORY_FILE=$(mktemp);  curl -s --max-time 15 "$BASE/story/" > "$STORY_FILE"
+  EVID_FILE=$(mktemp);   curl -s --max-time 15 "$BASE/evidence/" > "$EVID_FILE"
+  PIPE_FILE=$(mktemp);   curl -s --max-time 15 "$BASE/evidence/pipeline/" > "$PIPE_FILE"
+  SUB_FILE=$(mktemp);    curl -s --max-time 15 "$BASE/subscribe/" > "$SUB_FILE"
+  trap 'rm -f "$HOME_FILE" "$NOW_FILE" "$STORY_FILE" "$EVID_FILE" "$PIPE_FILE" "$SUB_FILE"' EXIT
 
-  # ── Nav overlay: present but not open on load ─────────────────────────────
-  check_body_contains     "Story: nav-overlay present"       "$STORY_FILE"    'class="nav-overlay"'
-  check_body_not_contains "Story: overlay NOT open on load"  "$STORY_FILE"    'class="nav-overlay is-open"'
-  check_body_contains     "Story: base.css linked"           "$STORY_FILE"    '/assets/css/base.css'
-  check_body_contains     "Story: nav.js linked"             "$STORY_FILE"    '/assets/js/nav.js'
-
-  # ── Nav version: Phase 1 IA (5-section dropdown nav) ─────────────────────
-  check_body_contains     "Story: nav has dropdown"          "$STORY_FILE"    'nav__dropdown'
-  check_body_contains     "Story: nav has The Story section" "$STORY_FILE"    'The Story'
-  check_body_contains     "Story: nav has Chronicle link"    "$STORY_FILE"    'href="/chronicle/"'
-  check_body_not_contains "Story: /start/ removed from nav" "$STORY_FILE"    'nav__link.*Explore'
-
-  # ── Homepage links ────────────────────────────────────────────────────────
-  check_body_contains     "Homepage: /chronicle/ linked"     "$HOMEPAGE_FILE" 'href="/chronicle/"'
-  check_body_contains     "Homepage: /glucose/ linked"       "$HOMEPAGE_FILE" 'href="/glucose/"'
-  check_body_contains     "Homepage: /sleep/ linked"         "$HOMEPAGE_FILE" 'href="/sleep/"'
-  check_body_contains     "Homepage: accountability quote"   "$HOMEPAGE_FILE" 'accountability without witnesses'
-  check_body_not_contains "Homepage: no /start/ in content" "$HOMEPAGE_FILE" 'href="/start/"'
-  check_body_not_contains "Homepage: no /achievements/ in content" "$HOMEPAGE_FILE" 'href="/achievements/"'
-  check_body_contains     "Subscribe page: form or link"     "$SUBSCRIBE_FILE" 'subscribe'
-
-  # ── /live/ page: snapshot panel ──────────────────────────────────────────
-  LIVE_FILE=$(mktemp); curl -s --max-time 15 "$BASE/live/" > "$LIVE_FILE"
-  trap 'rm -f "$LIVE_FILE"' EXIT
-  check_body_contains     "Live: snap-grid panel present"   "$LIVE_FILE"     'snap-grid'
-  check_body_contains     "Live: fetches /api/vitals"       "$LIVE_FILE"     '/api/vitals'
-  check_body_contains     "Live: fetches /api/habit_streaks" "$LIVE_FILE"    '/api/habit_streaks'
-
-  # ── /character/ page: intro narrative ────────────────────────────────────
-  CHAR_FILE=$(mktemp); curl -s --max-time 15 "$BASE/character/" > "$CHAR_FILE"
-  trap 'rm -f "$CHAR_FILE"' EXIT
-  check_body_contains     "Character: intro narrative present" "$CHAR_FILE"  'The Character Sheet'
-  check_body_contains     "Character: sample link to /chronicle/" "$CHAR_FILE" 'href="/chronicle/sample/"'
-
-  # ── Footer completeness (Phase 1 IA — 5 sections) ────────────────────────
-  check_body_contains     "Story footer: The Story heading"  "$STORY_FILE"    'The Story'
-  check_body_contains     "Story footer: The Data heading"   "$STORY_FILE"    'The Data'
-  check_body_contains     "Story footer: The Science heading" "$STORY_FILE"   'The Science'
-  check_body_contains     "Story footer: The Build heading"  "$STORY_FILE"    'The Build'
-  check_body_contains     "Story footer: Follow heading"     "$STORY_FILE"    '>Follow<'
-  check_body_contains     "Story footer: /habits/ link"      "$STORY_FILE"    'href="/habits/"'
-  check_body_contains     "Story footer: /chronicle/"        "$STORY_FILE"    'href="/chronicle/"'
-  check_body_contains     "Story footer: /glucose/"          "$STORY_FILE"    'href="/glucose/"'
-  check_body_contains     "Story footer: /sleep/"            "$STORY_FILE"    'href="/sleep/"'
-  check_body_not_contains "Story footer: no /biology/"       "$STORY_FILE"    'footer.*biology'
-
-  # ── Sitemap ───────────────────────────────────────────────────────────────
-  check_body_contains "Sitemap: /habits/"       "$SITEMAP_FILE" '/habits/'
-  check_body_contains "Sitemap: /chronicle/"    "$SITEMAP_FILE" '/chronicle/'
-  check_body_contains "Sitemap: /glucose/"      "$SITEMAP_FILE" '/glucose/'
-  check_body_contains "Sitemap: /sleep/"        "$SITEMAP_FILE" '/sleep/'
-  check_body_contains "Sitemap: /live/"         "$SITEMAP_FILE" '/live/'
-
-  # ── CSS critical rules ────────────────────────────────────────────────────
-  check_body_contains "base.css: nav-overlay fixed"    "$CSS_FILE" 'position: fixed'
-  check_body_contains "base.css: overlay display none" "$CSS_FILE" 'display: none'
-  check_body_contains "base.css: overlay opacity 0"    "$CSS_FILE" 'opacity: 0'
-  check_body_contains "base.css: is-open display flex" "$CSS_FILE" 'display: flex'
-  check_body_contains "base.css: pulse uses green-500" "$CSS_FILE" 'c-green-500'
-  check_body_contains "base.css: reading-path defined" "$CSS_FILE" '.reading-path'
-  check_body_contains "base.css: has-badge defined"    "$CSS_FILE" 'has-badge'
-  check_body_contains "base.css: footer-v2__grid"      "$CSS_FILE" '\.footer-v2__grid'
-  check_body_contains "base.css: footer-v2__col"       "$CSS_FILE" '\.footer-v2__col'
-  check_body_contains "base.css: challenge-bar"        "$CSS_FILE" '\.challenge-bar'
-  check_body_contains "base.css: back-to-top"          "$CSS_FILE" '\.back-to-top'
-
+  # Home: cinematic landing + the three doors + interactive constellation
+  check_body_contains "Home: constellation hero"      "$HOME_FILE"  'class="constellation"'
+  check_body_contains "Home: door · the cockpit"      "$HOME_FILE"  'the cockpit'
+  check_body_contains "Home: door · the story"        "$HOME_FILE"  'the story'
+  check_body_contains "Home: door · the evidence"     "$HOME_FILE"  'the evidence'
+  # Cockpit: live data wiring
+  check_body_contains "Cockpit: data-bind targets"    "$NOW_FILE"   'data-bind'
+  check_body_contains "Cockpit: loads cockpit.js module" "$NOW_FILE" 'assets/js/cockpit'
+  # Story hub: the writing surfaces
+  check_body_contains "Story: chronicle linked"       "$STORY_FILE" 'chronicle'
+  check_body_contains "Story: journal linked"         "$STORY_FILE" 'journal'
+  # Evidence: registry + readout shell + the new live Pipeline-status topic
+  check_body_contains "Evidence: registry embedded"   "$EVID_FILE"  '__EVIDENCE_REGISTRY__'
+  check_body_contains "Evidence: readout mount"       "$EVID_FILE"  'data-readout'
+  check_body_contains "Evidence: Pipeline-status topic" "$EVID_FILE" 'Pipeline status'
+  check_body_contains "Pipeline page: fetches /api/source_freshness" "$PIPE_FILE" 'source_freshness'
+  # Subscribe form present
+  check_body_contains "Subscribe: form present"       "$SUB_FILE"   'subscribe'
+  # Stale-copy guard (would have caught the v3 'Week 1 ships after April 1' regression)
+  check_body_not_contains "Home: no stale copy"       "$HOME_FILE"  'coming soon\|launching april\|lorem ipsum\|TODO'
+  check_body_not_contains "Cockpit: no stale copy"    "$NOW_FILE"   'coming soon\|launching april\|lorem ipsum\|TODO'
   echo ""
 
   # ── Cache headers ────────────────────────────────────────────────────────────
   echo "── Cache headers ─────────────────────────────────────────"
-  check_header "HTML page: short TTL (max-age=300)"     "$BASE/story/"                "cache-control:.*max-age=300"
-  check_header "CSS: long TTL (max-age=86400)"           "$BASE/assets/css/base.css"   "cache-control:.*max-age=86400"
-  check_header "CloudFront serving"                     "$BASE/"                       "x-cache"
+  check_header "HTML page: short TTL (max-age=300)"  "$BASE/story/"               "cache-control:.*max-age=300"
+  check_header "CSS: long TTL"                        "$BASE/assets/css/tokens.css" "cache-control:.*max-age="
+  check_header "CloudFront serving"                  "$BASE/"                      "x-cache"
   echo ""
 
   # ── API data quality ─────────────────────────────────────────────────────────
   echo "── API data quality ──────────────────────────────────────"
-  VITALS=$(curl -s --max-time 10 "$BASE/api/vitals")
-  if echo "$VITALS" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('vitals',{}).get('weight_lbs') is not None" 2>/dev/null; then
-    echo "  ✅ /api/vitals: weight_lbs present"
-    PASS=$((PASS + 1))
+  if curl -s --max-time 10 "$BASE/api/vitals" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('vitals',{}).get('weight_lbs') is not None" 2>/dev/null; then
+    echo "  ✅ /api/vitals: weight_lbs present"; PASS=$((PASS + 1))
   else
-    echo "  ❌ /api/vitals: missing weight_lbs"
-    FAIL=$((FAIL + 1))
+    echo "  ❌ /api/vitals: missing weight_lbs"; FAIL=$((FAIL + 1))
   fi
-
-  JOURNEY=$(curl -s --max-time 10 "$BASE/api/journey")
-  if echo "$JOURNEY" | python3 -c "import sys,json; d=json.load(sys.stdin); assert 'start_weight' in str(d)" 2>/dev/null; then
-    echo "  ✅ /api/journey: data present"
-    PASS=$((PASS + 1))
+  if curl -s --max-time 10 "$BASE/api/source_freshness" | python3 -c "import sys,json; d=json.load(sys.stdin); assert isinstance(d.get('sources'),list) and len(d['sources'])>0" 2>/dev/null; then
+    echo "  ✅ /api/source_freshness: sources present"; PASS=$((PASS + 1))
   else
-    echo "  ❌ /api/journey: unexpected response"
-    FAIL=$((FAIL + 1))
+    echo "  ❌ /api/source_freshness: no sources array"; FAIL=$((FAIL + 1))
+  fi
+  if curl -s --max-time 10 "$BASE/api/character" | python3 -c "import sys,json; d=json.load(sys.stdin); assert isinstance(d.get('pillars'),list) and len(d['pillars'])==7" 2>/dev/null; then
+    echo "  ✅ /api/character: 7 pillars present"; PASS=$((PASS + 1))
+  else
+    echo "  ❌ /api/character: pillars missing/incomplete"; FAIL=$((FAIL + 1))
   fi
   echo ""
 fi
