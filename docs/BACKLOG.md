@@ -1,6 +1,6 @@
 # Life Platform — Open Backlog
 
-**Last updated:** 2026-06-03 (v8.3.0)
+**Last updated:** 2026-06-05 (v8.3.0)
 **Source:** Synthesis of V1 audit (2026-05-17, ADR-057), V2 audit (2026-05-17, `docs/V2_AUDIT_PLAN.md`), V2 follow-up sessions (2026-05-18/19), the 2026-05-29 marathon (Bedrock cutover, budget guard, remediation agent, May-30 restart), the 2026-06-01/02 v4 website launch + QA sweep, and the 2026-06-03 operations/cost session (ADR-074/075). Data-blocked items D-01/D-03/D-04 + N-01/L-11 re-checked against live AWS on 2026-06-03.
 
 > Single source of truth for everything **not done**. Items closed-with-rationale (ADR-057) and items shipped are not listed — see `docs/CHANGELOG.md` for what landed and `docs/DECISIONS.md` for what was formally closed.
@@ -16,6 +16,19 @@
 - ✅ **Strava paused, freshness IAM fixed, coach seasonality crash fixed, CI verification holes closed, coach truncation fixed across siblings, secret pruning audit (none safely removable).**
 - ✅ **PAT rotation** — `gho_` refreshed; classic `life-platform-development` PAT (god-mode, never-used) deleted.
 
+### Recently shipped (2026-06-05 session — moved out of backlog)
+
+- ✅ **L-01/L-02/L-05/L-06/L-10/L-11, D-03, B-03** closed (a few long-tail remain — see below).
+- ✅ **S-01** Tier-3 graceful-empty site-api — deployed. **S-06** freshness infra-vs-behavioral split (zero new metrics/alarms) — deployed.
+- ✅ **Pipeline status** Evidence dashboard — `GET /api/source_freshness` + `/evidence/pipeline/`.
+- ✅ **Cockpit `/api/character` 503 fix** (it 503'd ~16h/day — now reads the latest available record) + **Day-Grade Replay** (per-pillar `score_delta` chip).
+- ✅ **a11y:** `--ink-faint` contrast fixed in both themes; constellation `<svg>` `role="img"`→`role="group"`.
+- ✅ **`deploy/smoke_test_site.sh` rewritten for v4** (was 58 false failures → 65/0).
+- ✅ **Visual + AI-vision UI test harness** (`tests/visual_qa.py` + `tests/visual_ai_qa.py` + CI `visual-qa` job, **ADR-076**) — Playwright deterministic + Claude/Bedrock semantic. Found & fixed the **`/api/coach_analysis` 400** for 4 of 7 cockpit pillars.
+- ⚠️ **KMS "cleanup" was a false premise** — the remaining `KMS_KEY_ARN` grants are the LIVE DynamoDB key; do NOT remove (see the restart-followups note further down).
+
+**Operator follow-ups from this session (not auto-done):** `git push` the 17 commits; apply the staged `bedrock:InvokeModel` grant in `deploy/setup_github_oidc.sh` to enable AI-QA in CI; flip the `visual-qa` job advisory→gate after a tuning week. See `handovers/HANDOVER_LATEST.md`.
+
 ---
 
 ## 📋 By status
@@ -27,8 +40,8 @@
 | **🟡 Long-tail low-value** | 5 | L-01/L-02/L-05/L-06/L-10/L-11 ✅ closed 2026-06-03; remaining: L-03/L-04/L-07/L-08/L-09 |
 | **🛑 Defer-with-rationale (won't do)** | 9 | Documented `won't-do` unless trigger fires |
 | **📦 New work surfaced (post-V2)** | 7 | N-01 ✅ 4/5 cleared (1 structural → S-06) |
-| **🌐 v4 website + ops follow-ups** | 7 | S-01 ✅ deployed; B-03 ✅; S-06/S-07 reframed as decisions |
-| **TOTAL OPEN** | **~30** | (this session: S-01 deployed; L-01/02/05/06/10/11, D-03, B-03 closed; N-01 mostly) |
+| **🌐 v4 website + ops follow-ups** | 5 | S-01 ✅ + S-06 ✅ deployed · B-03 ✅ · S-02/S-03/S-04/S-05 open · S-07 deferred |
+| **TOTAL OPEN** | **~28** | 2026-06-05 also shipped: Pipeline dashboard, Cockpit 503 fix + Day-Grade Replay, a11y, smoke_test v4, **visual+AI harness (ADR-076)**, coach-analysis 400 fix |
 
 ---
 

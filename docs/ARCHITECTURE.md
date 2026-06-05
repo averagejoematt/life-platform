@@ -249,7 +249,8 @@ All 7 modules ship together via the standard `Code.from_asset("../lambdas")` zip
 **Routes served via CloudFront → site-api:**
 - `GET /api/vitals` — weight, HRV, recovery (TTL 300s)
 - `GET /api/journey` — weight trajectory, goal date (TTL 3600s)
-- `GET /api/character` — pillar scores, level (TTL 900s)
+- `GET /api/character` — pillar scores, level, per-pillar `score_delta`/`xp_earned` (Day-Grade Replay). Reads the **latest available** `character_sheet` `DATE#` record + its prior (compute writes the prior day at ~16:30 UTC, so the freshest record is routinely 1-2 days old; a today/yesterday-only window 503'd ~16h/day — fixed 2026-06-05). TTL 900s.
+- `GET /api/source_freshness` — per-source pipeline status (fresh/stale/behavioral-stale/paused), feeds the `/evidence/pipeline/` topic (TTL 300s)
 - `GET /api/timeline` — weight history + events
 - `GET /api/correlations` — pre-computed correlation pairs
 - `GET /api/weight_progress` — 180-day weight series

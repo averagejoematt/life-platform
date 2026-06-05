@@ -2254,4 +2254,27 @@ No more false early-month AI pauses; month-end forecast drops back under $75 wit
 
 ---
 
-**Verified:** 2026-06-03 (ADR-074/075 — Garmin retired + budget guard early-month/AI cost trim)
+## ADR-076: Visual + AI-vision UI test harness
+
+**Date:** 2026-06-05
+**Status:** Implemented — `tests/visual_qa.py` + `tests/visual_ai_qa.py`; CI `visual-qa` job ADVISORY (not yet gating).
+**Related:** ADR-062 (Bedrock chokepoint), ADR-071 (v4 front-end), ADR-064/065 (shadow→auto ramp pattern).
+
+### Context
+
+The v4 site is **data-driven** — its inline-SVG charts/values legitimately change every day — so naive pixel-diff visual regression is the wrong tool (it false-positives daily). The existing `tests/visual_qa.py` was a real Playwright harness but **v4-stale** (old v3 routes, Chart.js-canvas checks, a vestigial `cf-auth` gate). HTTP smoke tests and DOM checks can't answer "does the page actually *look* right" — and can't catch interaction-only failures.
+
+### Decision
+
+A two-layer, self-hosted harness (no paid SaaS, no "hyperframes" — that's an HTML→video tool, not testing):
+1. **Deterministic (Playwright):** v4 routes, inline-SVG geometry checks, the cockpit pillar-disclosure **interaction**, responsive overflow, per-chart element crops; actionable failed-request capture (broken `/api/` calls fail with URL; resource hiccups warn).
+2. **Semantic (Claude vision):** each screenshot → `bedrock_client.invoke()` (Haiku, ~$0.001/img) → a structured verdict (`renders_ok`/`severity`/`issues`). Judges *render correctness*, not pixel identity — so it passes honest sparse-data states and flags real breakage (blank/garbled charts, raw `undefined`/`NaN`, clipped/overlapping text). Degrades cleanly (Bedrock error / budget tier-3 → AI-QA skipped; deterministic checks stand).
+3. **CI:** a post-deploy `visual-qa` job, introduced **advisory** (`continue-on-error`) per the ADR-064/065 shadow→auto ramp — tune for ~1 week, then gate on high-severity (deterministic OR AI). AI-QA needs `bedrock:InvokeModel` on `github-actions-deploy-role` (staged in `setup_github_oidc.sh`, operator-applied). Rollback's `needs` excludes `visual-qa` so advisory failures never roll back.
+
+### Consequences
+
+The two layers are complementary and earned their keep immediately — the interaction layer caught a real `/api/coach_analysis` 400 (4 of 7 cockpit pillars) that no HTTP smoke test or screenshot could see (the page still *looked* fine via its fallback). Cost is pennies per run. Pixel-diff is intentionally NOT used (data-driven). Trade-off: AI verdicts can hallucinate, so the gate fires only on high-severity + the deterministic signal, never on AI med/low.
+
+---
+
+**Verified:** 2026-06-05 (ADR-076 — visual + AI-vision test harness; advisory in CI)
