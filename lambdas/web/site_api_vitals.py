@@ -225,19 +225,24 @@ def handle_character() -> dict:
     Returns: character level, pillar scores, recent events.
     Cache: 900s (15 min) — computed nightly but visitors expect freshness.
     """
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
-
-    # Try today first, then yesterday
+    # Character-sheet compute writes YESTERDAY's sheet daily ~16:30 UTC, so the freshest
+    # record is routinely 1-2 days old. Take the latest available DATE# record (plus the
+    # one before it, for day-over-day deltas) rather than a fixed today/yesterday window —
+    # that window returned 503 for ~16h every day (00:00 UTC until the daily run landed),
+    # degrading the Cockpit. `as_of_date` tells the reader how fresh it is.
     pk = f"{USER_PREFIX}character_sheet"
-    for date_str in [today, yesterday]:
-        resp = table.get_item(Key={"pk": pk, "sk": f"DATE#{date_str}"})
-        record = _decimal_to_float(resp.get("Item"))
-        if record:
-            break
+    _resp = table.query(
+        KeyConditionExpression=Key("pk").eq(pk) & Key("sk").begins_with("DATE#"),
+        ScanIndexForward=False,
+        Limit=2,
+    )
+    _recs = _decimal_to_float(_resp.get("Items", []))
+    record = _recs[0] if _recs else None
+    prior_record = _recs[1] if len(_recs) > 1 else None
 
     if not record:
-        return _error(503, "Character sheet not yet computed today")
+        return _error(503, "Character sheet not yet computed")
+    date_str = str(record["sk"]).replace("DATE#", "")[:10]
 
     PILLAR_ORDER = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
     PILLAR_EMOJI = {"sleep": "😴", "movement": "🏋️", "nutrition": "🥗", "metabolic": "📊",
@@ -253,6 +258,8 @@ def handle_character() -> dict:
             "raw_score": float(pd.get("raw_score", 0)),
             "tier":      pd.get("tier", "Foundation"),
             "xp_delta":  float(pd.get("xp_delta", 0)),
+            "xp_earned": float(pd.get("xp_earned", 0)),
+            "score_delta": None,  # day-over-day move; filled below when a prior day exists
         })
 
     # Pre-experiment: show zeroed character (experiment hasn't started)
@@ -268,21 +275,17 @@ def handle_character() -> dict:
                          "xp_delta": 0} for p in PILLAR_ORDER],
         }, cache_seconds=900)
 
-    # DPR-1.16: Compute composite delta from yesterday
+    # DPR-1.16 + Day-Grade Replay: deltas vs the PRIOR computed day (record-over-record,
+    # robust to compute lag/gaps), not calendar yesterday.
     composite = sum(p["raw_score"] for p in pillars) / max(len(pillars), 1)
     composite_delta_1d = None
-    _yd = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
-    _d2 = (datetime.now(timezone.utc) - timedelta(days=2)).strftime("%Y-%m-%d")
-    for _check_d in [_yd, _d2]:
-        if _check_d == date_str:
-            continue
-        _yd_resp = table.get_item(Key={"pk": pk, "sk": f"DATE#{_check_d}"})
-        _yd_rec = _decimal_to_float(_yd_resp.get("Item"))
-        if _yd_rec:
-            _yd_scores = [float(_yd_rec.get(f"pillar_{p}", {}).get("raw_score", 0)) for p in PILLAR_ORDER]
-            _yd_composite = sum(_yd_scores) / max(len(_yd_scores), 1)
-            composite_delta_1d = round(composite - _yd_composite, 1)
-            break
+    if prior_record:
+        _yd_scores = [float(prior_record.get(f"pillar_{p}", {}).get("raw_score", 0)) for p in PILLAR_ORDER]
+        _yd_composite = sum(_yd_scores) / max(len(_yd_scores), 1)
+        composite_delta_1d = round(composite - _yd_composite, 1)
+        # per-pillar day-over-day score move (aligned by PILLAR_ORDER)
+        for _pp, _yd_s in zip(pillars, _yd_scores):
+            _pp["score_delta"] = round(_pp["raw_score"] - _yd_s, 1)
 
     return _ok({
         "character": {
