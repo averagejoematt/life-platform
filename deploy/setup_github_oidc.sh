@@ -174,6 +174,17 @@ PERMISSION_POLICY=$(cat <<EOF
       "Resource": "arn:aws:sqs:us-west-2:${ACCOUNT}:life-platform-ingestion-dlq"
     },
     {
+      "Sid": "BedrockVisionQA",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:InvokeModel"
+      ],
+      "Resource": [
+        "arn:aws:bedrock:*:${ACCOUNT}:inference-profile/us.anthropic.claude-*",
+        "arn:aws:bedrock:*::foundation-model/anthropic.claude-*"
+      ]
+    },
+    {
       "Sid": "KMS",
       "Effect": "Allow",
       "Action": [

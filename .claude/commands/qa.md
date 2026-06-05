@@ -16,12 +16,16 @@ Parse `$ARGUMENTS` to determine the scope. Default to "quick" if no arguments.
 
 ### Mode: `full`
 1. Run everything from "quick" mode above.
-2. Run: `python3 tests/visual_qa.py --screenshot`
-3. Read the JSON report output and summarize:
-   - Total pages checked
-   - Pages with failures (list each with the failure reason)
-   - Any stale text detected ("Launching April", "Coming Soon", "TODO")
-   - Any blank canvas elements (charts not rendering)
+2. Run: `python3 tests/visual_qa.py --screenshot --ai-qa`
+   (Playwright sweep of the v4 surfaces — renders, the cockpit pillar interaction,
+   responsive overflow — then Claude/Bedrock semantic vision QA of each screenshot.
+   Drop `--ai-qa` to skip the AI layer / Bedrock calls. Needs `playwright install chromium`.)
+3. Read `qa-screenshots/report.json` and summarize:
+   - Total pages checked; pages with failures (each with the reason)
+   - Broken API calls (e.g. a 4xx the page requested) and any JS errors
+   - Stale text ("ships after April", "Coming Soon", "TODO") or blank sections
+   - The per-page AI verdict (`ai_verdict`: severity + summary) — high = a real render
+     problem; warnings on med/low; sparse-data states are correctly judged "ok"
 4. If failures are found, offer to fix them.
 
 ### Mode: `api`
