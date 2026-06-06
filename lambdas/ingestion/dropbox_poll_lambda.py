@@ -90,8 +90,10 @@ def refresh_access_token(app_key, app_secret, refresh_token):
         "Content-Type": "application/x-www-form-urlencoded",
     })
 
+    # L-04 (2026-06-06): retry on transient 429/5xx via shared layer module.
+    from http_retry import urlopen_with_retry
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urlopen_with_retry(req, timeout=15) as resp:
             tokens = json.loads(resp.read())
     except urllib.error.HTTPError as e:
         error_body = e.read().decode()
@@ -113,8 +115,10 @@ def list_folder(access_token, folder_path="/life-platform"):
         "Content-Type": "application/json",
     })
 
+    # L-04 (2026-06-06): retry on transient 429/5xx via shared layer module.
+    from http_retry import urlopen_with_retry
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urlopen_with_retry(req, timeout=30) as resp:
             result = json.loads(resp.read())
     except urllib.error.HTTPError as e:
         error_body = e.read().decode()
@@ -127,7 +131,7 @@ def list_folder(access_token, folder_path="/life-platform"):
                     "Authorization": req.get_header("Authorization"),
                     "Content-Type": "application/json",
                 })
-                with urllib.request.urlopen(root_req, timeout=30) as root_resp:
+                with urlopen_with_retry(root_req, timeout=30) as root_resp:
                     root_result = json.loads(root_resp.read())
                     entries = root_result.get("entries", [])
                     logger.info(f"Root folder contents: {[e.get('path_lower') for e in entries]}")
@@ -151,7 +155,9 @@ def download_file(access_token, path):
     })
     req.data = b""  # Force POST without urllib adding form content-type
 
-    with urllib.request.urlopen(req, timeout=60) as resp:
+    # L-04 (2026-06-06): retry on transient 429/5xx via shared layer module.
+    from http_retry import urlopen_with_retry
+    with urlopen_with_retry(req, timeout=60) as resp:
         return resp.read()
 
 
@@ -169,8 +175,10 @@ def move_file(access_token, from_path, to_path):
             "Content-Type": "application/json",
         },
     )
+    # L-04 (2026-06-06): retry on transient 429/5xx via shared layer module.
+    from http_retry import urlopen_with_retry
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urlopen_with_retry(req, timeout=15):
             logger.info(f"  Moved: {from_path} → {to_path}")
             return True
     except urllib.error.HTTPError as e:
@@ -185,8 +193,10 @@ def delete_file(access_token, path):
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
     })
+    # L-04 (2026-06-06): retry on transient 429/5xx via shared layer module.
+    from http_retry import urlopen_with_retry
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urlopen_with_retry(req, timeout=15):
             logger.info(f"  Deleted from Dropbox: {path}")
             return True
     except urllib.error.HTTPError as e:
