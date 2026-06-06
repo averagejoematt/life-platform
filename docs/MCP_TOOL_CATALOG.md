@@ -2,9 +2,9 @@
 
 **Version:** v8.3.1 | **Last updated:** 2026-06-06 | **Total tools:** 133
 
-> Source of truth: `grep -E '^\s*"name":\s*"[a-z_]+"' mcp/registry.py | wc -l` → **127**.
+> Source of truth: the count of top-level `TOOLS` dict keys in `mcp/registry.py` → **133**, via AST parse (`deploy/sync_doc_metadata.py::_auto_discover_tool_count`). Do NOT count with `grep '"name":'` — it over-counts nested schema `"name"` fields (CLAUDE.md).
 >
-> SIMP-1 Phase 1 (v3.7.17–19) collapsed 116 → 86 tools via 13 view-dispatchers; subsequent feature work has restored counts to 127. ADR-030 (v3.7.46): `get_calendar_events` + `get_schedule_load` retired (Google Calendar). **V2 cleanup (2026-05-17):** `mcp/tools_calendar.py` DELETED.
+> SIMP-1 Phase 1 (v3.7.17–19) collapsed 116 → 86 tools via 13 view-dispatchers; subsequent feature work has grown the count to 133. ADR-030 (v3.7.46): `get_calendar_events` + `get_schedule_load` retired (Google Calendar). **V2 cleanup (2026-05-17):** `mcp/tools_calendar.py` DELETED.
 > Many previously standalone tools are now `view=` parameters of a parent dispatcher.
 > For architecture and schema details, see ARCHITECTURE.md and SCHEMA.md.
 
@@ -31,7 +31,7 @@
 
 ---
 
-## Quick Reference — All 127 Tools
+## Quick Reference — All 133 Tools
 
 ### Core Data Access
 | Tool | Key Params | Description |
@@ -82,6 +82,13 @@
 | `get_muscle_volume` | start_date=, end_date=, period= | Weekly sets per muscle group vs MEV/MAV/MRV |
 | `get_workout_frequency` | start_date=, end_date= | Adherence, streaks, top exercises |
 | `manage_hevy_routine` | action= (draft\|dry_run\|commit\|list\|get\|archive\|floor\|re_entry\|adherence), routine_id=, target_date=, start_date=, end_date=, recovery_tier=, acwr_flag=, volume_7d=, z2_minutes_7d=, days_since_last_workout= | **WRITE TOOL** (ADR-066, title ADR-067, per-exercise notes ADR-068). Author / preview / push / archive Hevy routines, score programmed-vs-performed adherence. `commit` titles routines as `<Phase> - <Type> - <N> - <Y>` (re-entry → `Welcome back · <Type>`), projects a one-line WHY-note into Hevy's notes field, and attaches one factual line per exercise (`Last: 60kg 8/8/7 (24 May)` by default) rendered in pure Python from real workout records — LLM never does math. `commit` and `archive` require explicit `routine_id` — no inferred intent. Subtract-only autoregulation. Honest framing: "deterministic volume-landmark programming with red-day deload guard" — never call this "autoregulated" publicly. |
+
+### Workouts (Unified — Hevy + MacroFactor, ADR-060)
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `get_workouts` | start_date=, end_date=, source=, limit= | Normalized workouts across Hevy + MacroFactor export (legacy aggregates bridged via `source="macrofactor_export"`) |
+| `get_workout_detail` | workout_uid | Full per-set detail by `<source>:<source_workout_id>` |
+| `get_workout_source_status` | — | Per-source workout-ingestion health + Hevy backfill status |
 
 ### Character Sheet
 | Tool | Key Params | Description |
@@ -151,6 +158,40 @@
 | `save_insight` | text, tags=[], source= | Save new insight or hypothesis |
 | `get_insights` | status_filter=, limit= | List open/acted/resolved insights |
 | `update_insight_outcome` | insight_id, outcome_notes=, status= | Record outcome when acting on insight |
+
+### Coach Intelligence (`tools_coach_intelligence.py`)
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `get_coach_thread` | coach_id, limit= | A coach's persistent thread: positions, predictions, surprises |
+| `get_predictions` | status=, coach_id=, limit= | Cross-coach prediction ledger (pending/confirmed/refuted) |
+| `get_coach_track_record` | coach_id, days=, subdomain= | Hit-rate record per coach from the `LEARNING#` audit trail |
+| `get_coach_disagreements` | — | Inter-coach disagreements from the ensemble synthesis |
+| `evaluate_prediction` | prediction_id, status, outcome_note= | **WRITE TOOL** — manually resolve a prediction (confirmed/refuted) |
+| `get_coaching_summary` | — | High-level coaching dashboard |
+
+### Coach Actions & Intelligence Quality
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `get_intelligence_quality` | days=, severity=, coach= | Post-generation validator results (coach claims vs data) |
+| `list_actions` | domain=, status=, days= | Coach-issued actions with status tracking |
+| `complete_action` | action_id, note= | **WRITE TOOL** — mark a coach action completed |
+
+### Field Notes & Ledger
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `get_field_notes` | week= | Weekly Field Notes entry (AI Lab Notes + Matthew response) |
+| `log_field_note_response` | week, notes, agreement=, disputed=, added= | **WRITE TOOL** — record Matthew's response to a Field Notes entry |
+| `log_ledger_entry` | source_type, source_id, outcome, date=, notes= | **WRITE TOOL** — record a charitable donation from an achievement/challenge/experiment outcome |
+
+### Vacation Fund (`tools_vacation.py`, 2026-06-01)
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `get_vacation_fund` | start_date=, end_date= | Workout miles since 2026-06-01 → USD ($1/workout-mile) |
+
+### Meta
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `list_available_tools` | domain=, keyword=, limit= | Tool discovery by domain/keyword (registry-inline) |
 
 ### Travel & Jet Lag
 | Tool | Key Params | Description |
@@ -273,27 +314,28 @@
 
 ## Warmer Coverage (⚡ = nightly pre-compute)
 
-14 warm steps run nightly (see `mcp/warmer.py`). All dispatch via the relevant tool function and cache to `CACHE#matthew` (26h TTL):
+14 warm steps run nightly (see `mcp/warmer.py` — verified against `results[...]` keys 2026-06-06). All dispatch via the relevant tool function and cache to `CACHE#matthew` (26h TTL):
 
 | Step | Cache Key | Warm Call |
 |------|-----------|-----------|
-| 1-2 | aggregated_summary_year_* | get_longitudinal_summary(view=aggregate, period=year) |
-| 3-4 | aggregated_summary_month_* | get_longitudinal_summary(view=aggregate, period=month) |
-| 5 | personal_records_all | get_longitudinal_summary(view=records) |
-| 6 | seasonal_patterns_all | get_longitudinal_summary(view=seasonal) |
-| 7 | health_dashboard_today | get_health(view=dashboard) |
-| 8 | habit_dashboard_today | get_habits(view=dashboard) |
-| 9 | health_risk_profile_today | get_health(view=risk_profile) |
-| 10 | health_trajectory_today | get_health(view=trajectory) |
-| 11 | training_load_today | get_training(view=load) |
-| 12 | training_periodization_today | get_training(view=periodization) |
-| 13 | training_recommendation_today | get_training(view=recommendation) |
-| 14 | character_sheet_today | get_character(view=sheet) |
-| 15 | cgm_dashboard_today | get_cgm(view=dashboard) |
+| 1 | aggregated_summary_year_* | get_longitudinal_summary(view=aggregate, period=year) |
+| 2 | aggregated_summary_month_* | get_longitudinal_summary(view=aggregate, period=month) |
+| 3 | personal_records_all | get_longitudinal_summary(view=records) |
+| 4 | seasonal_patterns_all | get_longitudinal_summary(view=seasonal) |
+| 5 | health_dashboard_today | get_health(view=dashboard) |
+| 6 | habit_dashboard_today | get_habits(view=dashboard) |
+| 7 | health_risk_profile_today | get_health(view=risk_profile) |
+| 8 | health_trajectory_today | get_health(view=trajectory) |
+| 9 | training_load_today | get_training(view=load) |
+| 10 | training_periodization_today | get_training(view=periodization) |
+| 11 | training_recommendation_today | get_training(view=recommendation) |
+| 12 | character_sheet_today | get_character(view=sheet) |
+| 13 | centenarian_benchmarks_* | get_centenarian_benchmarks() |
+| 14 | cgm_dashboard_today | get_cgm(view=dashboard) |
 
 ---
 
-**Verified:** 2026-05-19 — full audit (V2 audit + follow-up). Tool count recounted via `grep -E '^\s*"name":\s*"[a-z_]+"' mcp/registry.py | wc -l` → 127. `tools_calendar.py` confirmed absent from `mcp/`. Module count 26 confirmed via `ls mcp/tools_*.py | wc -l`. [NEEDS VERIFICATION: individual tool inventories below may have drifted; the 127 figure is authoritative for total count, but the per-section tables in this catalog were not exhaustively cross-checked against `registry.py` line-by-line in this audit. A 2026-05-19 follow-up to regenerate the catalog from `registry.py` directly is recommended.]
+**Verified:** 2026-06-06 — L-09 full line-by-line cross-check of every per-section table against `mcp/registry.py` (AST parse → 133 tools). Result: zero stale entries, zero misplacements; 17 registry tools were missing from the catalog and have been added (Coach Intelligence ×6, Coach Actions/Quality ×3, Unified Workouts ×3, Field Notes/Ledger ×3, Vacation Fund ×1, Meta ×1) with param signatures extracted from the registry's inputSchema. Module count: 29 (`ls mcp/tools_*.py | wc -l`). Count method: AST top-level `TOOLS` keys only — never `grep '"name":'` (over-counts nested schema fields).
 
 
 ### Phase-filter behavior (ADR-058)
@@ -301,11 +343,12 @@
 The following tools default to `phase=experiment`-only results and hide
 phase=pilot records:
 
-- `get_date_range`, `find_days`, `get_aggregated_summary`, `search_activities`,
-  `get_field_stats`, `compare_periods`, `get_weekly_summary` — route through
+- `get_date_range`, `find_days`, `search_activities`, `get_field_stats`,
+  `compare_periods`, `get_weekly_summary` — route through
   `mcp.core.query_source` which applies the filter.
-- `get_latest`, `get_daily_summary` — apply the filter directly.
-- `get_daily_snapshot`, `get_longitudinal_summary` — dispatch to the above.
+- `get_daily_snapshot`, `get_longitudinal_summary` — dispatchers whose views
+  (the retired standalone tools `get_aggregated_summary`/`get_latest`/
+  `get_daily_summary` now live here, SIMP-1) apply the filter via the same path.
 
 To access pre-genesis data, pass `include_pilot=True`. Most tools accept this
 keyword via the args dict. See `lambdas/phase_filter.py::with_phase_filter()`
