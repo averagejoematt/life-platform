@@ -184,6 +184,40 @@ def _tier_for(projected: float) -> int:
     return 0
 
 
+def _decide_tier(projected: float, mtd: float, elapsed_days: float) -> int:
+    """Tier from the projection, bounded by ACTUAL month-to-date spend.
+
+    The projection is an early-warning signal, but it has two failure modes that
+    made it untrustworthy as the SOLE tier input (N-08, 2026-06-06):
+      1. Early month: fixed monthly charges (Route53, Secrets Manager, ...) all
+         land on day 1, so mtd/elapsed overstates the run-rate (e.g. $15 mtd on
+         day 2 → $233 projected → false tier-3 cutoff).
+      2. After a pause: ai_daily is a month-average over ACTIVE days, so pausing
+         AI freezes the numerator AND the denominator — the projection stays
+         inflated for weeks and the tier can never de-escalate (observed: tier 3
+         set Jun 5 at $28 mtd would have held until ~Jun 22 with AI fully off).
+    Rule: the projection may escalate at most ONE tier above what actual mtd
+    justifies. So the harsh tiers (2: website AI off, 3: hard stop) require real
+    dollars, not extrapolation — a genuine runaway shows up in actual spend
+    within a day and unlocks them — while the projection still buys one tier of
+    preemptive degradation (tier 1 pauses the heaviest spender). Inside the
+    first EARLY_MONTH_DAYS the projection gets no benefit of the doubt at all.
+    """
+    projected_tier = _tier_for(projected)
+    actual_tier = _tier_for(mtd)
+    if elapsed_days < EARLY_MONTH_DAYS:
+        tier = min(projected_tier, actual_tier)
+    else:
+        tier = min(projected_tier, actual_tier + 1)
+    if tier != projected_tier:
+        logger.info(
+            f"Projection tier {projected_tier} (${projected:.2f}) capped to {tier} "
+            f"by actual mtd ${mtd:.2f} (actual tier {actual_tier}, "
+            f"{elapsed_days:.1f}d elapsed)"
+        )
+    return tier
+
+
 def _read_tier() -> int:
     try:
         return int(_ssm.get_parameter(Name=SSM_TIER_PARAM)["Parameter"]["Value"])
@@ -264,22 +298,10 @@ def lambda_handler(event, context):
         ai_daily = (ai / ai_active) if ai_active > 0 else 0.0
         projected = mtd + (non_ai_daily + ai_daily) * days_remaining
 
-        computed_tier = _tier_for(projected)
-
-        # Early-month guard: fixed monthly charges (Route53 zones, Secrets Manager,
-        # etc.) all land on day 1, so `mtd / elapsed_days` overstates the true daily
-        # run-rate for the first several days, and projecting it over the month wildly
-        # over-estimates (e.g. $15.56 mtd on day 2 → $233 projected → false tier-3 AI
-        # cutoff). For the first ~5 days, gate on ACTUAL mtd vs the ceiling — the real
-        # guardrail — instead of the noisy projection. A genuine runaway still trips,
-        # because it shows up in actual spend; front-loaded fixed costs do not.
-        if elapsed_days < EARLY_MONTH_DAYS and computed_tier > 0:
-            actual_tier = _tier_for(mtd)
-            if actual_tier < computed_tier:
-                print(f"[info] {elapsed_days:.1f}d elapsed — projection unreliable this "
-                      f"early; gating on actual mtd=${mtd:.2f} (tier {actual_tier}) not "
-                      f"projection ${projected:.2f} (tier {computed_tier})")
-                computed_tier = actual_tier
+        # Projection escalates at most ONE tier above actual mtd spend (and not at
+        # all in the early-month window) — see _decide_tier for the two failure
+        # modes (front-loaded day-1 charges; post-pause projection that can't decay).
+        computed_tier = _decide_tier(projected, mtd, elapsed_days)
         prev = _read_tier()
 
         logger.info(
