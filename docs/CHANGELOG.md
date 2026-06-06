@@ -1,3 +1,16 @@
+## v8.3.1 — 2026-06-06 (N-08 budget-tier fix; D-01/S-02 deployed)
+
+### Fixed
+- **N-08 — cost-governor false tier-3** (`lambdas/operational/cost_governor_lambda.py`, PR #12): the hourly governor had put June at tier 3 (ALL AI off) with only ~$29 actual MTD, off a $157 linear projection. Two failure modes: early-month front-loaded fixed charges (the existing day-0–5 guard expired at day 5.8), and a structural one — after a pause `ai_daily = ai/active_days` freezes, so the projection can't decay and the tier could never de-escalate (would have held tier 3 until ~Jun 22). New `_decide_tier()`: projection may escalate at most **one tier above actual MTD spend** (zero inside the early-month window). Deployed + re-invoked: tier 3→**1** (brief + website AI resumed; coach-narrative-orchestrator — the dominant spender per D-03 — stays paused). 15 unit tests (`tests/test_cost_governor.py`).
+- **DLQ drained 16→2** — all were `[AI_UNAVAILABLE]` coach outputs from the tier-3 outage (not an ingestion bug); remainder clears via consumer schedule/age-out.
+
+### Deployed (code previously committed)
+- **D-01** — shared layer **v72** published (manual `publish-layer-version`; `SHARED_LAYER_VERSION=72`, PR #13) with `cache_system=False` on the 4 daily-brief calls + `utcnow()` fixes; **daily-brief repointed to v72** (its code shipped via PR #11 CI). Other Lambdas catch up on next cdk deploy. Verify: next 11 AM brief CacheWrite=0.
+- **S-02** — site synced: bespoke Evidence renderers (intelligence/predictions/benchmarks) live + `/feed.xml` alias (closes L-06 deploy).
+- **visual-qa CI gate** — first gated run green (PR #11). `BedrockVisionQA` IAM grant verified already applied; AI-vision layer activates now that tier <3.
+
+---
+
 ## v8.3.0 — 2026-06-02 (v4 polish: world-class QA sweep, /subscribe re-skin, RSS generator)
 
 Front-end hardening pass over the live v4 site (engine untouched except read-only/graceful edits):
