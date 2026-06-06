@@ -133,9 +133,13 @@ def lambda_handler(event, context):
         pk = f"USER#{USER_ID}#SOURCE#{source_key}"
 
         try:
+            # Filter SK to DATE# prefix so non-date sentinel records (e.g.
+            # REFRESH_RATELIMIT for garmin, YEAR#2026 for food_delivery) —
+            # which sort lexicographically after DATE#YYYY-MM-DD — are never
+            # returned as the "latest" record, causing a false-stale alarm.
             response = table.query(
-                KeyConditionExpression="pk = :pk",
-                ExpressionAttributeValues={":pk": pk},
+                KeyConditionExpression="pk = :pk AND begins_with(sk, :pfx)",
+                ExpressionAttributeValues={":pk": pk, ":pfx": "DATE#"},
                 ScanIndexForward=False,
                 Limit=1,
                 ProjectionExpression="sk",
