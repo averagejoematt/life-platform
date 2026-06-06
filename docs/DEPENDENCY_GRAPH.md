@@ -138,10 +138,10 @@ Read-only query layer (with limited writes for memory, insights, decisions, hypo
 | **`daily_brief_lambda`** | Writes all 4 S3 files powering the website + dashboard + buddy page + sends daily email | Entire website shows stale data; no daily email; no fallback writer |
 | **`daily_metrics_compute`** | Writes `computed_metrics`, `day_grade`, `habit_scores` read by 6+ downstream Lambdas | All downstream compute + all emails show stale/missing grades |
 | **`public_stats.json`** | Homepage, story, mission, all observatory pages, OG images | All ~72 site pages show stale data |
-| **Whoop partition** | Read by 8 Lambdas + 6 MCP modules | Sleep, HRV, recovery, readiness all missing; day grade drops |
-| **MacroFactor partition** | Read by 7 Lambdas + 4 MCP modules | Nutrition scoring absent across platform |
-| **Anthropic API** | 24+ Lambdas + 2 site-api endpoints | All AI coaching returns `[AI_UNAVAILABLE]`; website Q&A returns 503 |
-| **Account Lambda concurrency quota (10)** | All sync invokes share this pool | Quota raise filed 2026-05-19 (case 177921309700709). Until granted, parallel cold starts can throttle. |
+| **Whoop partition** | Referenced by ~18 Lambdas + ~15 MCP modules (string-level estimate, re-derived 2026-06-06) | Sleep, HRV, recovery, readiness all missing; day grade drops |
+| **MacroFactor partition** | Referenced by ~12 MCP modules + many Lambdas (string-level estimate, 2026-06-06). Direct-API ingestion PAUSED (ADR-061/074) — partition fed only by manual Dropbox Tier-2 export | Nutrition scoring absent across platform |
+| **AWS Bedrock (ADR-062)** | All Claude inference via the `bedrock_client.invoke()` chokepoint (~24 Lambdas + 2 site-api AI endpoints) | AI coaching returns `[AI_UNAVAILABLE]` fallbacks; website Q&A degrades per budget tier (ADR-063) — same failure surface as a tier-3 budget cutoff |
+| **Account Lambda concurrency quota (10)** | All sync invokes share this pool | Quota raise filed 2026-05-19 (case 177921309700709) — still pending as of 2026-06-06 (verified: quota still 10). Until granted, parallel cold starts can throttle. |
 | **DynamoDB table** | Everything | Complete platform outage |
 | **Secrets Manager** | All OAuth Lambdas + all AI Lambdas + MCP + site-api | All ingestion stops; all AI stops |
 
@@ -219,7 +219,7 @@ Partitions ranked by number of Lambda + MCP readers:
 | `character_sheet` | 1 (character_sheet) | 4 | 1 module | **5** |
 | `habit_scores` | 1 (daily_metrics) | 4 | 1 module | **5** |
 
-> Reader counts above are best-effort static estimates from v4.5.0 and may drift as Lambdas are added/removed. Re-derive via `grep -rln '"SOURCE#whoop"\|source.*=.*whoop' lambdas/ mcp/` when audit precision is required.
+> Reader counts above are best-effort static estimates (originally v4.5.0; SPOF table re-derived 2026-06-06 — L-07) and may drift as Lambdas are added/removed. Re-derive via `grep -rl whoop lambdas/ mcp/ --include='*.py'` (upper bound — counts comments too; pks are mostly built dynamically so exact-string greps under-count) when audit precision is required.
 
 ---
 

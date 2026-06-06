@@ -1,3 +1,26 @@
+## v8.3.2 — 2026-06-06 (backlog batch: cockpit Week scope, orchestrator perf, CDK convergence, doc verification)
+
+### Added
+- **Cockpit Week scope (S-03)** — real `/api/observatory_week` reads for 6 domains: per-domain sparkline, week primary value, delta vs prior week; sparse domains omitted with an honest count. Month stays honestly gated until the record deepens. Fixes a latent scope→Today restore bug. (PR #20, browser-verified live, visual_qa 20/0.)
+- **visual-qa gate coverage** — the 3 bespoke Evidence pages added (20 pages total). (S-05, PR #17)
+- SCHEMA.md: **hevy per-workout field table + SK patterns** (was undocumented despite being the primary strength source).
+
+### Changed
+- **coach-narrative-orchestrator token reduction (D-03)** — all 8 compressed states moved into the shared prompt-cache block (byte-identical across the 8 daily calls → ~50% less billed input; invariant unit-verified); `THREAD#`/`PREDICTION#` reads bounded to most-recent 50 (input-creep guard); brief output contract tightened (≤2 sentences/field, ≤5 items/list — output tokens were the largest cost line). Effect measurable when the budget tier returns to 0. (PR #18, deployed)
+- **Batched CDK deploy landed** (staged since 5/24): shared layer attached to site-api/site-api-ai/site-stats-refresh; all Lambdas converged on layer **v73**; orphan S3-CMK grant removal confirmed converged. Lesson recorded in `constants.py`: never `publish-layer-version` manually — CFN republishes and churns the version. All checks green post-deploy (27/27 rendered, 65/0 smoke, 21/21 integration, CI rerun success).
+- `dropbox_poll`: all 6 raw urlopen sites → `http_retry.urlopen_with_retry` (L-04, PR #19); HAE `floats_to_decimal` documented as deliberately divergent.
+- **Remediation-agent freshness fix merged + deployed** (PR #16): `begins_with(sk, "DATE#")` stops sentinel records (`YEAR#…`, `REFRESH_RATELIMIT`) masquerading as the latest record.
+
+### Fixed (docs — full verification passes)
+- **SCHEMA.md (L-08)**: line-by-line cross-check of every per-source table; 3 query-breaking Withings field names, apple_health XML table 6-of-7 wrong, strava `total_kilojoules` legacy-only (⚠️ still read by hypothesis_engine/tools_nutrition — code follow-up), state_of_mind partition clarified, MacroFactor `daily_summary` v2 documented, Garmin v1.5.0 fields, ~10 smaller groups.
+- **MCP_TOOL_CATALOG.md (L-09)**: 17 of 133 tools were missing — added with AST-extracted param signatures; stale "127" counts fixed; warmer table corrected (14 steps).
+- **DEPENDENCY_GRAPH.md (L-07)**: SPOF table re-derived; "Anthropic API" row → AWS Bedrock (ADR-062/063); quota row verified still-pending.
+
+### Closed without code
+- **L-03** (site_api AI-handler extraction) — already done; the monolith no longer exists. **S-04** (instant RSS) — won't-do-as-specified: the chronicle index is deploy-bound; instant-RSS-only would desync feed vs page. **DRY_RUN gate** — existed since 5/26. **SiteAPI EMF dashboard** — existed in monitoring stack, verified live.
+
+---
+
 ## v8.3.1 — 2026-06-06 (N-08 budget-tier fix; D-01/S-02 deployed)
 
 ### Fixed
