@@ -1437,7 +1437,7 @@ Respond in EXACTLY this JSON format, no other text:
 
     try:
         raw = call_anthropic(prompt, api_key, max_tokens=500,
-                             system=shared_system, cache_system=True)
+                             system=shared_system, cache_system=False)
         cleaned = raw.strip()
         if cleaned.startswith("```"):
             cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
@@ -1504,7 +1504,7 @@ No labels, no formatting. Natural voice. Max 80 words total."""
 
     try:
         return call_anthropic(prompt, api_key, max_tokens=250,
-                              system=shared_system, cache_system=True,
+                              system=shared_system, cache_system=False,
                               output_type=AIOutputType.JOURNAL_COACH if _AI_VALIDATOR_AVAILABLE else None)
     except Exception as e:
         print("[WARN] Journal coach failed: " + str(e))
@@ -1718,7 +1718,7 @@ DO NOT start with "Matthew". Max 60 words."""
         "sleep_score": _safe_float((data.get("sleep") or {}), "sleep_score") if data else None,
     }
     return call_anthropic(prompt, api_key, max_tokens=200,
-                          system=shared_system, cache_system=True,
+                          system=shared_system, cache_system=False,
                           output_type=AIOutputType.BOD_COACHING if _AI_VALIDATOR_AVAILABLE else None,
                           health_context=_hctx)
 
@@ -1926,7 +1926,7 @@ Respond in EXACTLY this JSON format, no other text:
     }
     try:
         raw = call_anthropic(prompt, api_key, max_tokens=450,
-                             system=shared_system, cache_system=True,
+                             system=shared_system, cache_system=False,
                              output_type=AIOutputType.GUIDANCE if _AI_VALIDATOR_AVAILABLE else None,
                              health_context=_hctx)
         cleaned = raw.strip()

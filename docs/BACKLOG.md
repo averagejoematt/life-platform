@@ -29,6 +29,16 @@
 
 **Operator follow-ups from this session (not auto-done):** `git push` the 17 commits; apply the staged `bedrock:InvokeModel` grant in `deploy/setup_github_oidc.sh` to enable AI-QA in CI; flip the `visual-qa` job advisory→gate after a tuning week. See `handovers/HANDOVER_LATEST.md`.
 
+### Recently shipped (2026-06-05 continued session — moved out of backlog)
+
+- ✅ **D-01** daily-brief prompt-cache waste fixed — `cache_system=False` on the 4 daily-brief calls (root cause: Bedrock cross-region inference defeats region-local cache at once/day volume). Needs layer rebuild + daily-brief deploy.
+- ✅ **N-01** `slo-source-freshness` structural false-positive **resolved/closed** — verified live: paused sources already excluded, S-06 deployed; alarm now tracks real infra freshness (flagging a genuine eightsleep/todoist ~2-day gap).
+- ✅ **S-02** Evidence depth **done** (premise was stale — no /legacy links remain): bespoke renderers added for intelligence/predictions/benchmarks. Needs site deploy.
+- ✅ **visual-qa CI job flipped advisory→gate** (deterministic layer verified green on live prod, 17 pages/0 fails). AI-vision layer self-skips under tier-3 budget so it can't false-block; tune after a budget reset.
+- 🔴 **Surfaced N-08** — June budget at **tier 3** (all AI paused) on a projection overshoot ($15 MTD actual). Needs a decision (see N-08).
+
+**Still operator-only:** apply the `bedrock:InvokeModel` OIDC grant (`bash deploy/setup_github_oidc.sh`, live IAM) to enable AI-QA in CI; the D-01 layer rebuild + the deploys above.
+
 ---
 
 ## 📋 By status
@@ -69,11 +79,11 @@
 
 ## ⏰ Data-blocked / time-windowed
 
-### D-01 — Cache hit-rate quantification (V2 P1.5) — ⚠️ checked 2026-06-03, finding open
-- **Data now exists.** Only 2 Lambdas emit cache metrics: `coach-narrative-orchestrator` and `daily-brief`.
-- **coach-narrative-orchestrator (14d):** CacheRead 382K vs CacheWrite 67K → caching is firing healthily (high-frequency invocations keep the cache warm).
-- **daily-brief (14d):** CacheRead **0** vs CacheWrite 10K → **cache delivers no savings and the writes are pure cost.** Root cause: daily-brief runs once/day, but the Anthropic prompt-cache TTL is 5 min, so the cache always expires between runs; intra-invocation reuse isn't happening either (0 reads).
-- **Open action:** Either (a) remove `cache_control` from daily-brief's system block (saves the 25%-premium cache-writes), or (b) restructure so the shared preamble is reused across the multiple Claude calls within a single daily-brief invocation. Verify which calls share a preamble before deciding.
+### D-01 — Cache hit-rate quantification (V2 P1.5) — ✅ DONE 2026-06-05
+- **daily-brief (14d):** CacheRead **0** vs CacheWrite 10K → cache delivered no savings and the writes were pure 25%-premium cost.
+- **Deeper root cause (2026-06-05):** all 4 daily-brief Claude calls use the *same* model (`AI_MODEL`=sonnet-4-6) and the *same* `shared_system` preamble, so intra-invocation reuse *should* have hit — yet 0 reads. The cause is **Bedrock cross-region inference**: `us.anthropic.claude-sonnet-4-6` routes each call to whichever region has capacity, and prompt cache is region-local. A once/day, 4-call brief writes a fresh cache each call and never reads one back. Not fixable at the app layer for low-volume callers.
+- **Fix shipped:** `cache_system=False` on all 4 daily-brief call sites in `lambdas/ai_calls.py` (`call_training_nutrition_coach`/`call_journal_coach`/`call_board_of_directors`/`call_tldr_and_guidance`) + corrected the stale "Phase 3.8" comment in `daily_brief_lambda.py`. `coach-narrative-orchestrator` caching left untouched — it's high-frequency, keeps a region warm, and hits (382K reads/14d).
+- **Deploy + verify:** needs a layer rebuild (`bash deploy/build_layer.sh`, bump `SHARED_LAYER_VERSION`) + daily-brief redeploy. After the next 11 AM brief, `daily-brief` CacheWrite should drop to 0 with unchanged output.
 
 ### D-02 — Coach hit_rate threshold tuning (V2 P3.6)
 - **Wait until:** ~2026-07-17 (60 days for confirmed/refuted verdicts to accumulate)
@@ -198,8 +208,9 @@ Items that came up during V2 follow-up sessions and aren't yet scheduled.
 
 ### N-01 — long-standing alarms — ✅ 4 of 5 cleared (checked 2026-06-03), 1 structural remains
 - **Cleared:** `life-platform-dlq-depth-warning` (OK since 2026-05-28), `life-platform-garmin-data-ingestion-errors` (OK since 2026-05-29), `life-platform-ingestion-dlq-messages` (OK since 2026-05-28). `ingestion-error-whoop` no longer exists (the `ingestion-error-*` alarm family is now per-compute/email-Lambda and all 34 are OK).
-- **Still ALARM — `slo-source-freshness` (since 2026-05-04):** metric `LifePlatform/Freshness StaleSourceCount`, threshold ≥1, currently 3. This is now a **structural false-positive** — Garmin/Strava/MacroFactor are intentionally paused (ADR-074), so StaleSourceCount will never drop below the paused-source count and the alarm fires forever.
-- **Open action:** make the freshness checker exclude paused sources from `StaleSourceCount` (it already pauses them in `SOURCES`/`OAUTH_SECRETS`), OR raise the alarm threshold to the count of paused sources. Until then this alarm is permanent noise — it's routed to the digest topic so it isn't paging.
+- **`slo-source-freshness` structural false-positive — ✅ RESOLVED (verified live 2026-06-05).** The "count=3 forever from paused sources" premise was already false: paused sources (Garmin/Strava/MacroFactor) are **commented out of `SOURCES` entirely** in `freshness_checker_lambda.py`, so they're never counted, and S-06 (`3bde46d`, deployed 2026-06-03 21:27 UTC) excludes behavioral sources (measurements/food_delivery) from `StaleSourceCount`. Live count has dropped from a permanent 3 to a fluctuating 1–2.
+- **The alarm now behaves as designed** — it fires only when a genuine infra source exceeds its per-source threshold. At verification time it flagged `eightsleep` (51h) and `todoist` (51h), i.e. a real ~2-day gap — exactly the signal it's meant to surface (digest-routed, non-paging). No code change: lowering those thresholds would blunt a working signal.
+- **Operational note (not a code item):** eightsleep + todoist showed a live ~2-day data gap on 2026-06-05/06 — worth a glance to confirm it's behavioral (didn't use device / no tasks closed) vs an ingestion issue.
 
 ### N-02 — Subscriber `confirm-token` lookup uses DDB scan
 - Per V2 audit web/DX agent
@@ -234,6 +245,12 @@ Items that came up during V2 follow-up sessions and aren't yet scheduled.
 - Future: if `acwr_compute` ever switches to put_item, add tag_record there
 - No ETA — only if pattern changes
 
+### N-08 — 🔴 June budget at tier 3 — all AI paused (surfaced 2026-06-05) — NEEDS DECISION
+- **Observed:** SSM `/life-platform/budget-tier` = **3** (set 2026-06-05 17:00 PT). At tier 3 the budget guard hard-cuts ALL AI: daily brief skips AI, website `/api/ask`+`/api/board_ask` return "paused", and `bedrock_client.invoke()` raises `BudgetExceeded` (confirmed live — the AI-vision QA layer self-skipped with "monthly $75 ceiling reached").
+- **But actual MTD spend is only $15.38** (Cost Explorer, Jun 1–5). The tier is **projection-driven**: ~$3/day run-rate × 30 ≈ ~$90/mo projected → ≥95% of $75 → tier 3. So it's an early-month linear-extrapolation overshoot, not a real $75 breach — yet it's currently degrading the product (no AI brief, no website AI).
+- **Decisions needed:** (a) is the ~$3/day June run-rate real and worth reducing (prime suspect: `coach-narrative-orchestrator`, the dominant AI spender per D-03 — 8M in-tokens/14d), or a transient (restart aftermath)? (b) Is the cost_governor's linear projection too trigger-happy this early in the month — should it weight actual-vs-projected or add an absolute-spend floor before tiering to 3? (c) Short-term: manually reset to tier 0 for testing (`aws ssm put-parameter --name /life-platform/budget-tier --value 0 --type String --overwrite`) if the projection is judged a false alarm.
+- **Relation to D-01:** the daily-brief cache fix trims waste but is rounding error vs this; the real lever is the projection logic + coach-narrative-orchestrator token budget.
+
 ---
 
 ## 🌐 v4 website + ops follow-ups (2026-06-01/02/03 sessions)
@@ -245,9 +262,10 @@ Surfaced during the v4 "The Measured Life" launch, QA sweep, and operations/cost
 - **What it does:** Converts 503s on `/api/nutrition_overview` + `/api/correlations` to shaped-empty 200s (restart-safe); 4 more endpoints audited to match. Files: `lambdas/web/site_api_observatory.py` (+ siblings).
 - **Action:** Deploy full `web/` package (never single-file — ADR-046/deploy.md), then verify the two endpoints return shaped-empty 200 not 503.
 
-### S-02 — Evidence depth: 14 archive topics still link to /legacy
-- 12 live-readout Evidence topics bind their `/api/*`; 14 archive topics show a v4 intro + "deeper →" link back to preserved `/legacy`. Rebuild into bespoke v4 readouts as time allows.
-- Builder: `scripts/v4_build_evidence.py`. Effort: ongoing, ~1-2h per topic.
+### S-02 — Evidence depth — ✅ DONE 2026-06-05 (premise was stale)
+- The "14 archive topics link to /legacy" framing was **obsolete**: v4 `site/assets/js/evidence.js:153` already zeroes all `/legacy` link-outs ("everything lives inline in v4 now"), and the registry has no `archive`-mode topics. The real remaining gap was *depth*: 3 data-mode topics still rendered via the generic auto-table fallback (`renderGeneric`).
+- **Fixed:** added bespoke renderers `renderCorrelations` (intelligence), `renderPredictions` (predictions), `renderBenchmarks` (benchmarks) in `evidence.js` + registered them in `RENDERERS`; rebuilt via `scripts/v4_build_evidence.py`. All 3 endpoints are empty this genesis week (restart wiped intelligence) so they show honest bespoke empty-states now and rich readouts as data accrues.
+- **Deploy:** `bash deploy/sync_site_to_s3.sh` (JS-only; normal sync covers it).
 
 ### S-03 — Cockpit week/month/journey deeper time-series
 - Scope buttons show basic metrics; add deeper time-series per scope. Time-permitting enhancement.
@@ -257,6 +275,7 @@ Surfaced during the v4 "The Measured Life" launch, QA sweep, and operations/cost
 
 ### S-05 — visual_qa legacy repointing
 - `tests/visual_qa.py` has deep legacy-page entries on old URLs; repoint to `/legacy/<path>` or drop as each is rebuilt bespoke. Low-priority test maintenance.
+- **Note (2026-06-05):** no Evidence topic links to `/legacy` anymore (S-02), so legacy repointing is now purely test-harness hygiene. Separately, the `visual_qa.py` page list does **not** include the 3 newly-bespoke pages (`/evidence/intelligence|predictions|benchmarks/`) — adding them would extend gate coverage. Both are optional follow-ups.
 
 ### S-06 — slo-source-freshness alarm still firing — ⚠️ needs a decision (re-diagnosed 2026-06-03)
 - **Correction:** paused sources are ALREADY excluded — Garmin/Strava/MacroFactor are commented out of `SOURCES` in `freshness_checker_lambda.py`. So the alarm (StaleSourceCount=2-3) is firing on **genuinely stale ACTIVE behavioral sources** (e.g. `measurements` now >60d, others lapsing), not paused ones. The alarm is arguably working as designed.
