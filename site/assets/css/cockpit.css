@@ -271,3 +271,21 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
   .row .lab, .voice .who { width: 84px; }
   .hub { gap: var(--sp-3); }
 }
+
+/* Week scope (S-03): six instruments, seven days — glanceable spark rows */
+.weekview { margin-top: var(--sp-5); }
+.wk-rows { list-style: none; margin: 0; padding: 0; }
+.wk-row { display: grid; grid-template-columns: 88px 120px auto auto 1fr; align-items: center;
+          gap: var(--sp-3); padding: var(--sp-2) 0; border-bottom: 1px solid var(--rule); }
+.wk-row .label { text-transform: capitalize; }
+.wk-val { font-size: var(--fs-body); }
+.wk-val small { color: var(--ink-muted); font-size: var(--fs-label); }
+.wk-delta { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-muted); }
+.wk-delta.is-up { color: var(--ember); }
+.wk-delta.is-down { color: var(--ink-faint); }
+.wk-note { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-faint);
+           text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 480px) {
+  .wk-row { grid-template-columns: 72px 96px auto auto; }
+  .wk-note { display: none; }
+}
