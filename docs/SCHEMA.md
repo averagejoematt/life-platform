@@ -56,9 +56,9 @@ Where multiple sources measure the same thing:
 
 | Tier | Behavior | Metrics |
 |------|----------|---------|
-| **Tier 1** (Apple-exclusive) | All readings ingested | Steps, active/basal calories, gait, flights, water, caffeine |
+| **Tier 1** (Apple-exclusive) | All readings ingested | Steps, active/basal calories, gait, flights, water, caffeine, body mass (`weight_lbs` fallback, v1.4.2 — Withings API has sync delays) |
 | **Tier 2** (Cross-device) | Filtered to Apple Watch only, `_apple` suffix | HR, RHR, HRV, respiratory rate, SpO2 |
-| **Tier 3** (Skip) | Blocked at ingestion | Nutrition (MacroFactor SOT), sleep environment (Eight Sleep SOT), body comp (Withings SOT) |
+| **Tier 3** (Skip) | Blocked at ingestion | Nutrition (MacroFactor SOT), sleep analysis (Eight Sleep SOT), body fat % (`body_fat_percentage` — Withings SOT) |
 
 ---
 
@@ -96,6 +96,8 @@ Where multiple sources measure the same thing:
 |--------|-----------|---------|
 | Daily record | `DATE#YYYY-MM-DD` | `DATE#2026-02-22` |
 | Whoop workout | `DATE#YYYY-MM-DD#WORKOUT#<id>` | `DATE#2026-03-29#WORKOUT#12345` |
+| Hevy workout | `DATE#YYYY-MM-DD#WORKOUT#<id>` | `DATE#2026-05-25#WORKOUT#a1b2c3d4-…` |
+| Hevy delete tombstone | `DELETE#WORKOUT#<id>` | `DELETE#WORKOUT#a1b2c3d4-…` |
 | Lab provider metadata | `PROVIDER#<provider>#<period>` | `PROVIDER#function_health#2025-spring` |
 | User profile | `PROFILE#v1` | `PROFILE#v1` |
 
@@ -112,6 +114,8 @@ Ingestion methods: API polling (scheduled Lambda), S3 file triggers (manual expo
 ---
 
 ## Field Reference by Source
+
+> **Framework-stamped fields (all SIMP-2 framework sources):** `ingestion_framework.py` stamps `pk`, `sk`, `source`, `schema_version`, `ingested_at`, and `phase` (ADR-058: `pilot`/`experiment`) on every item it writes. These fields are not repeated in the per-source tables below.
 
 ### whoop
 
@@ -144,11 +148,13 @@ Daily records (`sk = DATE#YYYY-MM-DD`) + workout sub-items (`sk = DATE#YYYY-MM-D
 | `sleep_end` | string | ISO timestamp |
 | `sleep_onset_minutes` | number | Minutes from midnight to sleep onset |
 | `sleep_onset_consistency_7d` | number | 7-day onset consistency (std dev) |
+| `nap_count` | number | Number of nap sessions (only present when ≥1 nap) |
+| `nap_duration_hours` | number | Total nap sleep (hours, in-bed minus awake) |
 
 **Workout sub-items** (`sk = DATE#YYYY-MM-DD#WORKOUT#<id>`):
 | Field | Type | Description |
 |-------|------|-------------|
-| `workout_id` | number | Whoop workout ID |
+| `workout_id` | string | Whoop workout ID (v2 API UUID) |
 | `sport_id` | number | Whoop sport type ID |
 | `sport_name` | string | Human-readable sport name |
 | `start_time` | string | ISO timestamp |
@@ -167,15 +173,18 @@ Daily records (`sk = DATE#YYYY-MM-DD`) + workout sub-items (`sk = DATE#YYYY-MM-D
 | `weight_lbs` | number | Body weight (lbs, derived) |
 | `fat_mass_lbs` | number | Fat mass (lbs) |
 | `fat_free_mass_lbs` | number | Fat-free/lean mass (lbs) |
-| `fat_ratio_percent` | number | Body fat percentage |
+| `fat_ratio_pct` | number | Body fat percentage |
 | `muscle_mass_lbs` | number | Muscle mass (lbs) |
 | `bone_mass_lbs` | number | Bone mass (lbs) |
-| `hydration_percent` | number | Body hydration % |
-| `heart_pulse_bpm` | number | Heart rate at weigh-in |
+| `hydration_kg` | number | Body water mass (kg) |
+| `heart_pulse` | number | Heart rate at weigh-in (bpm) |
 | `measurement_timestamp` | number | Unix epoch of measurement |
 | `measurement_time_utc` | string | ISO timestamp of measurement |
+| `captured_at` | string | ISO timestamp of ingestion |
 | `lean_mass_delta_14d` | number | 14-day lean mass change (lbs) |
 | `fat_mass_delta_14d` | number | 14-day fat mass change (lbs) |
+
+Note: every mass metric is written in kg with a derived lbs twin — `fat_mass_kg`, `fat_free_mass_kg`, `muscle_mass_kg`, `bone_mass_kg` accompany the `*_lbs` fields above. Additional conditional fields are written whenever the device reports them (all in `MEAS_TYPES` in `withings_lambda.py`): `height_m`, `systolic_blood_pressure`, `diastolic_blood_pressure`, `temperature_c`, `body_temperature_c`, `skin_temperature_c`, `spo2_pct`, `pulse_wave_velocity_mps`, `vo2_max`, ECG intervals (`qrs_interval_ms`, `pr_interval_ms`, `qt_interval_ms`), and `vascular_age`.
 
 ### strava
 Day-level aggregates (rolled up from individual activities):
@@ -186,7 +195,9 @@ Day-level aggregates (rolled up from individual activities):
 | `total_elevation_gain_feet` | number | Sum of elevation gain |
 | `total_moving_time_seconds` | number | Sum of moving time |
 | `activity_count` | number | Number of activities |
-| `total_kilojoules` | number | Energy output |
+| `sport_types` | list | Sorted distinct sport types for the day |
+| `total_zone2_seconds` | number | Sum of per-activity Zone 2 seconds |
+| `total_kilojoules` | number | Energy output — **legacy-only** (pre-migration records; not written by current code, but still read by hypothesis engine and nutrition tools) |
 
 Field aliases supported in queries:
 - `distance_miles` → `total_distance_miles`
@@ -244,12 +255,12 @@ Both paths merge into the same `apple_health` DynamoDB records via `update_item`
 | Field | Type | Description |
 |-------|------|-------------|
 | `steps` | number | Step count |
-| `active_energy_kcal` | number | Active calories burned (XML legacy field) |
-| `resting_energy_kcal` | number | Resting calories (XML legacy field) |
-| `exercise_minutes` | number | Exercise minutes |
-| `stand_hours` | number | Stand hours |
-| `vo2_max` | number | Estimated VO2 max |
-| `heart_rate_avg` | number | Average heart rate (XML legacy field) |
+| `active_calories` | number | Active calories burned (daily sum) |
+| `basal_calories` | number | Basal/resting calories (daily sum) |
+| `vo2max` | number | Estimated VO2 max |
+| `heart_rate` | number | Average heart rate (daily avg) |
+
+Note: the XML import path (`apple_health_lambda.py` `QUANTITY_RECORDS`) writes many more fields than the rows above: `hrv_sdnn`, `weight_lbs`, `bmi`, `body_fat_pct`, `lean_mass_lbs`, `waist_inches`, `spo2_pct`, `respiratory_rate`, `resting_heart_rate`, `walking_heart_rate_avg`, `bp_systolic`/`bp_diastolic`, `blood_glucose_mgdl`, `walking_steadiness_pct`, `distance_cycling_miles`, ~36 `nutrition_*` fields, plus workout aggregates (`workouts`, `workout_count`, `workout_total_minutes`, `workout_types`), sleep aggregates, and CGM daily aggregates. **Caveat:** the XML path writes UNSUFFIXED HR/HRV/SpO2/respiratory fields with no Apple-device tier filtering — the Tier-2 `_apple` suffix system exists only in the HAE webhook Lambda.
 
 **Activity / energy fields (webhook — Tier 1, all readings):**
 
@@ -261,6 +272,7 @@ Both paths merge into the same `apple_health` DynamoDB records via `update_item`
 | `steps` | number | Step count (daily sum) |
 | `flights_climbed` | number | Floors climbed (daily sum) |
 | `distance_walk_run_miles` | number | Walking + running distance (daily sum, miles) |
+| `weight_lbs` | number | Body mass from HAE (Tier 1 fallback since v1.4.2 — Withings remains SOT but its API has sync delays) |
 
 **Gait / mobility fields (webhook — Tier 1, Apple Watch exclusive):**
 
@@ -278,6 +290,7 @@ Note: Gait metrics are Apple Watch exclusive. Walking speed <1.0 m/s (2.24 mph) 
 | Field | Type | Description |
 |-------|------|-------------|
 | `caffeine_mg` | number | Daily caffeine intake (mg, summed from water/caffeine tracking app) |
+| `_rd_caffeine_mg` | map | Reading-level dedup map {timestamp: quantity} — incremental sync deduplication |
 
 Note: Caffeine SOT moved from MacroFactor to Apple Health as of v2.28.0. Logged via dedicated water/caffeine app → Apple Health → webhook. MacroFactor `total_caffeine_mg` retained as secondary reference but is no longer authoritative.
 
@@ -315,7 +328,7 @@ Note: Tier 2 fields are suffixed with `_apple` to avoid colliding with SOT field
 | `cgm_source` | string | `dexcom_stelo` (≥20 readings/day) or `manual` (<20) |
 | `webhook_ingested_at` | string | ISO timestamp of last webhook write |
 
-Note: Individual 5-minute CGM readings are stored in S3 at `raw/cgm_readings/YYYY/MM/DD.json` for detailed analysis. DynamoDB holds daily aggregates only.
+Note: Individual 5-minute CGM readings are stored in S3 at `raw/matthew/cgm_readings/YYYY/MM/DD.json` for detailed analysis. DynamoDB holds daily aggregates only.
 
 Note: `cgm_source` auto-detects based on reading frequency. ≥20 readings/day indicates continuous monitor (Dexcom Stelo); fewer indicates manual finger-stick entries.
 
@@ -325,10 +338,12 @@ Note: `cgm_source` auto-detects based on reading frequency. ≥20 readings/day i
 |-------|------|-------------|
 | `blood_pressure_systolic` | number | Daily average systolic (mmHg) |
 | `blood_pressure_diastolic` | number | Daily average diastolic (mmHg) |
+| `bp_systolic` | number | Duplicate of `blood_pressure_systolic` (written alongside it) |
+| `bp_diastolic` | number | Duplicate of `blood_pressure_diastolic` (written alongside it) |
 | `blood_pressure_pulse` | number | Daily average pulse from BP cuff (bpm) |
 | `blood_pressure_readings_count` | number | Number of BP readings that day |
 
-Note: Individual BP readings stored in S3 at `raw/blood_pressure/YYYY/MM/DD.json` for morning vs evening analysis. DynamoDB holds daily averages only. Data path: BP cuff → Apple Health → Health Auto Export webhook → DynamoDB + S3.
+Note: Individual BP readings stored in S3 at `raw/matthew/blood_pressure/YYYY/MM/DD.json` for morning vs evening analysis. DynamoDB holds daily averages only. Data path: BP cuff → Apple Health → Health Auto Export webhook → DynamoDB + S3.
 
 **Breathwork / mindfulness fields (webhook — via Breathwrk app → HealthKit → HAE):**
 
@@ -341,14 +356,26 @@ Note: Individual BP readings stored in S3 at `raw/blood_pressure/YYYY/MM/DD.json
 | Field | Type | Description |
 |-------|------|-------------|
 | `water_intake_ml` | number | Daily water intake in milliliters (deduped from reading-level data) |
+| `water_intake_oz` | number | Derived: water_intake_ml / 29.5735 (oz not tracked independently) |
 | `_rd_water_intake_ml` | map | Reading-level dedup map {timestamp: quantity} — used for incremental sync deduplication |
 
-**Recovery / flexibility fields (webhook — via Apple Watch → HealthKit → HAE):**
+**Recovery / flexibility fields (webhook — from HAE workouts payloads, e.g. Pliability/Breathwrk → HealthKit → HAE; not Apple Watch-specific):**
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `recovery_workout_minutes` | number | Recovery workout minutes |
+| `recovery_workout_minutes` | number | Total recovery-workout minutes (all categories) |
+| `recovery_workout_sessions` | number | Total recovery-workout session count |
+| `recovery_workout_types` | string | Comma-joined sorted set of categories present |
 | `flexibility_minutes` | number | Stretching/flexibility minutes |
+| `flexibility_sessions` | number | Stretching/flexibility session count |
+| `breathwork_minutes` | number | Breathwork minutes |
+| `breathwork_sessions` | number | Breathwork session count |
+| `yoga_minutes` | number | Yoga minutes |
+| `yoga_sessions` | number | Yoga session count |
+| `pilates_minutes` | number | Pilates minutes |
+| `pilates_sessions` | number | Pilates session count |
+| `cooldown_minutes` | number | Cooldown minutes |
+| `tai_chi_minutes` | number | Tai chi minutes |
 
 ### eightsleep
 | Field | Type | Description |
@@ -370,8 +397,12 @@ Note: Individual BP readings stored in S3 at `raw/blood_pressure/YYYY/MM/DD.json
 | `deep_pct` | number | Deep % of total sleep (derived) |
 | `light_pct` | number | Light % of total sleep (derived) |
 | `time_to_sleep_min` | number | Sleep onset latency (minutes) |
+| `sleep_start` | string | ISO timestamp of sleep onset (UTC) |
+| `sleep_end` | string | ISO timestamp of wake (UTC) |
 | `bed_temp_c` | number | Pod temperature (°C) |
 | `bed_temp_f` | number | Pod temperature (°F) |
+| `bed_temp_min_c` | number | Minimum pod temperature overnight (°C) |
+| `bed_temp_max_c` | number | Maximum pod temperature overnight (°C) |
 | `room_temp_c` | number | Room temperature (°C) |
 | `room_temp_f` | number | Room temperature (°F) |
 | `temp_level_avg` | number | Temp level setting avg (-10 to +10) |
@@ -384,6 +415,30 @@ Note: Individual BP readings stored in S3 at `raw/blood_pressure/YYYY/MM/DD.json
 
 ### hevy (strength training)
 Hevy data is stored at the workout and set level, not day-level aggregates. Access via strength-specific MCP tools (`get_exercise_history`, `get_strength_prs`, etc.) rather than `get_date_range`.
+
+**Per-workout items** (`sk = DATE#YYYY-MM-DD#WORKOUT#<id>`, from `lambdas/hevy_common.py::normalize_workout`):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `source_workout_id` | string | Hevy workout ID |
+| `workout_uid` | string | Stable cross-source dedupe key (`hevy:<workout_id>`) |
+| `date` | string | YYYY-MM-DD |
+| `title` | string | Workout title |
+| `description` | string | Workout description (truncated to 1000 chars) |
+| `start_time` | string | ISO timestamp |
+| `end_time` | string | ISO timestamp |
+| `duration_sec` | number | Workout duration (seconds) |
+| `total_volume_kg` | number | Sum of weight × reps across all sets (kg) |
+| `exercises` | list | Per-exercise objects with sets (reps × weight) |
+| `exercise_count` | number | Number of exercises |
+| `set_count` | number | Total sets across exercises |
+| `original_unit` | string | Unit hint from the raw payload |
+| `raw_ref` | string | `s3://` path of the archived raw payload |
+| `schema_version` | number | Item schema version |
+| `ingested_at` | string | ISO timestamp |
+| `phase` | string | ADR-058 phase tag (`pilot`/`experiment`) |
+
+**Delete tombstones** (`sk = DELETE#WORKOUT#<id>`, written by `hevy_backfill_lambda.py` on Hevy deleted-events): `tombstone: true`, `tombstoned_at`, `tombstoned_reason: "hevy_event_delete"`. Reconciled by the next audit pass (the date isn't known at delete time).
 
 ### macrofactor
 | Field | Type | Description |
@@ -400,6 +455,7 @@ Hevy data is stored at the workout and set level, not day-level aggregates. Acce
 | `total_magnesium_mg` | number | Magnesium (mg) |
 | `total_vitamin_d_mcg` | number | Vitamin D (mcg) |
 | `food_log` | list | Nested list of individual food entries with per-item macros and timestamps (HH:MM format) |
+| `entries_count` | number | Number of food-log entries that day |
 | `protein_distribution_score` | number | % of meals (≥400 kcal) hitting ≥30g protein (Norton/Galpin MPS threshold) |
 | `meals_above_30g_protein` | number | Count of meals meeting ≥30g protein target |
 | `total_meals` | number | Distinct meals detected (eating occasions ≥400 kcal) |
@@ -409,6 +465,20 @@ Hevy data is stored at the workout and set level, not day-level aggregates. Acce
 
 Note: `food_log` is a nested list within each day record. Access via `get_food_log` tool rather than `get_date_range`.
 
+Note: the `total_*` nutrient rows above are a representative subset — the diary parser maps ~55 nutrient columns (`NUTRIENT_COLUMNS` in `macrofactor_lambda.py`), each written as a `total_*` field when present.
+
+**Daily-summary CSV format (current MacroFactor default export, `_format: "daily_summary"`):** one row per day with daily totals and no per-meal food log. Detected by `detect_csv_type` (Expenditure + Date + Calories columns). Writes the same `DATE#` partition with `schema_version: 2`, `_format: "daily_summary"`, empty `food_log`, `entries_count: 0`, plus:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `weight_lbs_macrofactor` | number | Scale weight from MacroFactor (lbs) |
+| `trend_weight_lbs` | number | MacroFactor trend weight (lbs) |
+| `expenditure_kcal` | number | MacroFactor estimated TDEE |
+| `target_calories_kcal` | number | Calorie target |
+| `target_protein_g` | number | Protein target |
+
+Note: `macrofactor_export` is a **read-side alias only** — no Lambda writes `source=macrofactor_export`; the MCP read layer maps `macrofactor_workouts` → `macrofactor_export` (`mcp/tools_hevy.py`).
+
 ### food_delivery (behavioral signal)
 
 Quarterly CSV import with multiple item types per session. Source: `USER#matthew#SOURCE#food_delivery`.
@@ -416,26 +486,48 @@ Quarterly CSV import with multiple item types per session. Source: `USER#matthew
 **Transaction items** (`sk = DATE#YYYY-MM-DD#TXN#NNN`):
 | Field | Type | Description |
 |-------|------|-------------|
+| `date` | string | YYYY-MM-DD order date |
 | `merchant` | string | Restaurant/service name |
 | `platform` | string | Delivery platform (DoorDash, UberEats, etc.) |
 | `amount` | number | Order amount ($) |
 | `orders_that_day` | number | Total orders that calendar day |
 | `is_binge_day` | boolean | True if 3+ orders in one day |
+| `day_of_week` | string | Day name (e.g. "Friday") |
+| `month` | string | YYYY-MM |
+| `year` | number | YYYY |
+| `import_date` | string | YYYY-MM-DD of the CSV import |
 
 **Monthly aggregates** (`sk = MONTH#YYYY-MM`):
 | Field | Type | Description |
 |-------|------|-------------|
+| `month` | string | YYYY-MM |
+| `year` | number | YYYY |
 | `order_count` | number | Total orders that month |
 | `total_spend` | number | Total spend ($) |
+| `avg_order_size` | number | Average order amount ($) |
 | `delivery_index` | number | 0-10 normalized index (10 = worst month) |
 | `binge_days` | number | Days with 3+ orders |
+| `delivery_days` | number | Distinct days with ≥1 order |
+| `orders_per_week` | number | Orders normalized per week |
+| `platform_breakdown` | map | Spend per platform |
+| `computed_at` | string | ISO timestamp |
+
+**Annual summaries** (`sk = YEAR#YYYY`): per-year rollup with `order_count`, `total_spend`, `avg_order_size`, `binge_days`, `delivery_days`, `orders_per_week`, `computed_at`.
 
 **Streak record** (`sk = STREAK#current`):
 | Field | Type | Description |
 |-------|------|-------------|
 | `streak_days` | number | Current delivery-free streak |
+| `streak_start` | string | YYYY-MM-DD streak began (day after last order) |
 | `last_order_date` | string | Date of most recent order |
+| `last_order_amount` | number | Total $ of the last order day |
+| `last_order_merchant` | string | Merchant of the last order |
 | `longest_ever_streak` | number | All-time longest clean streak |
+| `longest_ever_start` | string | YYYY-MM-DD longest streak began |
+| `longest_ever_end` | string | YYYY-MM-DD longest streak ended |
+| `updated_at` | string | ISO timestamp |
+
+**Freshness marker** (`sk = DATE#<import_date>`): written on every import with `import_date` and `records_imported` so the freshness checker sees the partition as fresh.
 
 ### measurements (body tape measurements)
 
@@ -444,8 +536,10 @@ Periodic (every 4-8 weeks) body tape measurements. Source: `USER#matthew#SOURCE#
 | Field | Type | Description |
 |-------|------|-------------|
 | `session_number` | number | Sequential session count |
-| `measured_by` | string | Person taking measurements |
+| `measured_by` | string | Person taking measurements (hardcoded `"partner"` in the ingestion Lambda) |
 | `unit` | string | Always "in" (inches) |
+| `source_file` | string | `s3://` path of the source CSV |
+| `notes` | string | Optional free-text notes from the CSV |
 | `neck_in` | number | Neck circumference |
 | `chest_in` | number | Chest circumference |
 | `waist_narrowest_in` | number | Waist at narrowest point (Attia priority) |
@@ -518,6 +612,8 @@ Note: Items can be large due to nested workout/exercise/set structure. Monitor a
 
 ### garmin
 
+**Status: paused (ADR-074)** — direct-API ingestion retired due to vendor anti-automation. Historical records remain queryable; fields below describe what the Lambda wrote.
+
 **Cross-device biometrics (validate against Whoop / Eight Sleep / Apple Health):**
 
 | Field | Type | Description |
@@ -545,8 +641,8 @@ Note: Items can be large due to nested workout/exercise/set structure. Monitor a
 | `vo2_max` | number | Garmin estimated VO2 max |
 | `fitness_age` | number | Garmin fitness age estimate |
 | `training_status` | string | Garmin training status label (e.g. PRODUCTIVE, MAINTAINING) |
-| `training_load` | number | Garmin daily training load score |
 | `training_readiness` | number | Garmin readiness 0–100 |
+| `training_readiness_level` | string | Garmin readiness level label |
 | `sleep_duration_seconds` | number | Garmin sleep duration (supplementary to Eight Sleep) |
 | `sleep_score` | number | Garmin sleep score |
 | `hr_zone_0_seconds` | number | Daily seconds in HR Zone 0 (very light) |
@@ -562,8 +658,16 @@ Note: Items can be large due to nested workout/exercise/set structure. Monitor a
 | `active_calories` | number | Active kcal burned |
 | `bmr_calories` | number | Basal metabolic rate kcal |
 | `total_calories_burned` | number | Total kcal (active + BMR) |
-| `garmin_acute_load` | number | Garmin 7-day acute training load |
+| `garmin_acute_load` | number | Garmin 7-day acute training load (replaces removed `training_load` — `extract_training_load` deleted) |
 | `garmin_chronic_load` | number | Garmin 28-day chronic training load |
+| `garmin_acwr` | number | Acute:chronic workload ratio (acute / chronic) |
+| `hrv_weekly_average` | number | 7-day HRV average (ms) |
+| `recovery_time_hours` | number | Garmin recommended recovery time (hours) |
+| `garmin_activity_count` | number | Number of activities in `garmin_activities` |
+
+Note: `hr_zone_{i}_seconds` covers **every** zone Garmin returns (0–5), not just 0–4 — the extractor enumerates the full `heartRateZones` array.
+
+Note (v1.5.0 sleep expansion): also written when present — `deep_sleep_seconds`, `light_sleep_seconds`, `rem_sleep_seconds`, `awake_sleep_seconds`, `unmeasurable_sleep_seconds`, `sleep_start_local`/`sleep_end_local`, `sleep_spo2_avg`/`sleep_spo2_low`, `sleep_avg_respiration`/`sleep_lowest_respiration`, `restless_moments_count`, and sleep sub-scores `sleep_score_quality`, `sleep_score_duration`, `sleep_score_deep`, `sleep_score_rem`, `sleep_score_light`, `sleep_score_awakenings`.
 
 **Garmin activities (Garmin-proprietary fields; Strava is SOT for GPS/distance/elevation):**
 
@@ -577,6 +681,11 @@ Note: Items can be large due to nested workout/exercise/set structure. Monitor a
 | `start_time` | string | Local start time |
 | `duration_secs` | number | Duration (seconds) |
 | `distance_meters` | number | Distance (metres) |
+| `avg_hr` | number | Average heart rate (bpm) |
+| `max_hr` | number | Max heart rate (bpm) |
+| `calories` | number | Calories burned |
+| `avg_speed_mps` | number | Average speed (m/s) |
+| `max_speed_mps` | number | Max speed (m/s) |
 | `aerobic_training_effect` | number | Aerobic TE score 0–5 (Garmin proprietary) |
 | `anaerobic_training_effect` | number | Anaerobic TE score 0–5 |
 | `training_effect_label` | string | e.g. "Base Building", "Tempo" |
@@ -606,13 +715,17 @@ Note: Garmin auto-syncs activities to Strava. `garmin_activities` captures Garmi
 | Field | Type | Description |
 |-------|------|-------------|
 | `habits` | object | Map of habit name → count (Decimal: `1` = completed, `0` = not completed) |
+| `habit_statuses` | object | Per-habit structured status map (TD-11): status, completed_at, etc. |
 | `by_group` | object | Map of P40 group name → group stats object (see below) |
 | `total_completed` | number | Total habits completed that day |
 | `total_possible` | number | Total habits tracked that day |
-| `completion_pct` | number | Overall completion 0.0–1.0 |
+| `pending_count` | number | Habits still pending (deadline not yet passed) — excluded from `completion_pct` denominator (TD-11 phantom-fail fix) |
+| `completion_pct` | number | Pending-aware completion 0.0–1.0 |
+| `completion_pct_strict` | number | Legacy strict completion (pending counts as miss), for comparison |
 | `mood` | number | Habitify mood rating 1–5 (null if not logged) |
 | `mood_label` | string | Terrible / Bad / Okay / Good / Excellent (null if not logged) |
 | `skipped_count` | number | Habits explicitly skipped |
+| `updated_at` | string | ISO timestamp of last write |
 
 Each `by_group` entry:
 ```json
@@ -643,6 +756,7 @@ Notion journal uses multiple SK patterns per day (one per template type):
 | `DATE#YYYY-MM-DD#journal#weekly` | Weekly Reflection |
 | `DATE#YYYY-MM-DD#journal#stressor#N` | Stressor Deep-Dive (numbered) |
 | `DATE#YYYY-MM-DD#journal#health#N` | Health Event (numbered) |
+| `DATE#YYYY-MM-DD#journal#journal#N` | Fallback for unstructured entries without a Template property (numbered) |
 
 **Common fields (all templates):**
 
@@ -652,6 +766,11 @@ Notion journal uses multiple SK patterns per day (one per template type):
 | `raw_text` | string | Concatenated text of all fields (for Haiku enrichment) |
 | `notion_page_id` | string | Notion page UUID |
 | `notion_last_edited` | string | Notion last_edited_time ISO |
+| `created_at` | string | Notion page created_time ISO |
+| `updated_at` | string | ISO timestamp of ingestion write |
+| `body_text` | string | Page body content (fetched blocks), when present |
+
+Note: since notion Lambda v1.2.0, property extraction is **dynamic** — `extract_all_properties()` reads ALL properties from each Notion page. The per-template field tables below reflect the current Notion template configuration and can drift if templates change in Notion (no code change required).
 
 **Morning Check-In fields:**
 
@@ -730,6 +849,10 @@ Notion journal uses multiple SK patterns per day (one per template type):
 | `enriched_flow` | boolean | Evidence of deep engagement |
 | `enriched_values_lived` | list | Core values evidenced in actions |
 | `enriched_gratitude` | list | Specific gratitude items |
+| `enriched_alcohol` | boolean | Alcohol mention detected |
+| `enriched_sleep_context` | string | Sleep-disruption context |
+| `enriched_pain` | list | Pain mentions |
+| `enriched_exercise_context` | string | Exercise context |
 | `enriched_notable_quote` | string | Most revealing sentence |
 | `enriched_at` | string | ISO timestamp of enrichment |
 
@@ -930,6 +1053,8 @@ Access via `log_supplement`, `get_supplement_log`, `get_supplement_correlation` 
 
 Note: Daily Brief reads this partition to show today's logged supplements and 7-day adherence chips per supplement.
 
+**Habitify supplement bridge:** the habitify ingestion Lambda's post-store hook (`supplement_bridge` in `habitify_lambda.py`) side-writes checked supplement habits into this partition. The day's record carries `bridge_source: "habitify"` and each bridged entry has `source: "habitify_bridge"` with dose/unit/timing from a hardcoded `SUPPLEMENT_MAP`. The bridge **overwrites the day's record** (`put_item`) — manual `log_supplement` entries for the same day can be replaced on the next habitify sync.
+
 ### weather (Seattle daily weather)
 
 **SOT for:** weather/environment domain (added v2.36.0)
@@ -967,9 +1092,11 @@ Note: S3 raw backup at `raw/weather/YYYY/MM/DD.json` (Lambda path only).
 
 **Data source:** How We Feel app → Apple HealthKit State of Mind → Health Auto Export webhook (separate Data Type automation from health metrics). Webhook Lambda v1.5.0 detects State of Mind payloads and processes them separately.
 
-**S3 raw:** Individual check-ins stored at `raw/state_of_mind/YYYY/MM/DD.json` with full detail (timestamp, kind, valence, labels, associations, source).
+**Storage location:** there is **no** `SOURCE#state_of_mind` DynamoDB partition — the `som_*` daily aggregates below are merged into the **apple_health** partition (`pk = USER#matthew#SOURCE#apple_health`, `sk = DATE#YYYY-MM-DD`) via the HAE webhook Lambda's merge path. `state_of_mind` in the SOT table is a domain label, not a partition.
 
-**DynamoDB daily aggregates:**
+**S3 raw:** Individual check-ins stored at `raw/matthew/state_of_mind/YYYY/MM/DD.json` with full detail (timestamp, kind, valence, labels, associations, source).
+
+**DynamoDB daily aggregates (in the apple_health partition):**
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -979,8 +1106,8 @@ Note: S3 raw backup at `raw/weather/YYYY/MM/DD.json` (Lambda path only).
 | `som_check_in_count` | number | Total State of Mind check-ins |
 | `som_mood_count` | number | Count of dailyMood entries |
 | `som_emotion_count` | number | Count of momentaryEmotion entries |
-| `som_top_labels` | list | Most frequent emotion labels (e.g. "content", "anxious") |
-| `som_top_associations` | list | Most frequent life area associations (e.g. "work", "health") |
+| `som_top_labels` | string | Comma-joined most frequent emotion labels (e.g. `"content, anxious"`) — a string, not a list |
+| `som_top_associations` | string | Comma-joined most frequent life area associations (e.g. `"work, health"`) — a string, not a list |
 
 **Check-in kinds:** `dailyMood` (overall day rating) and `momentaryEmotion` (in-the-moment capture).
 
@@ -1981,7 +2108,7 @@ The MCP server automatically switches from raw daily records to monthly aggregat
 
 ---
 
-**Verified:** 2026-05-19 — full audit (V2 audit + follow-up). Header counts updated; sources, partitions, and TTL policy reviewed. Note: per-source field tables (whoop, withings, strava, etc.) describe the canonical contract written by the ingestion Lambdas and were not exhaustively re-cross-referenced against current Lambda source in this pass — last full re-derivation 2026-05-19 baseline. [NEEDS VERIFICATION: when SCHEMA.md is next refreshed, regenerate each per-source field table from the Lambda's actual DDB write payload (e.g. `grep -A 30 'ddb_item = {' lambdas/whoop_lambda.py`).]
+**Verified:** 2026-06-06 — L-08 line-by-line cross-check of all per-source tables against lambdas/ingestion/* (see CHANGELOG v8.3.1).
 
 
 ### ADR-058: Phase attribute
