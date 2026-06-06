@@ -1770,10 +1770,16 @@ def lambda_handler(event, context):
         except Exception as e:
             logger.warning(f"Ensemble digest invoke failed (non-blocking): {e}")
 
-        # Phase 3.8 (2026-05-16): build the shared system block ONCE; pass to
-        # all 4 AI calls. Anthropic prompt caching reuses the cached system
-        # across calls within ~5 min — first call pays full cost, next 3 pay
-        # 10%. Estimated savings: ~$1.50-2/month.
+        # Build the shared system block ONCE; pass to all 4 AI calls so they
+        # share one preamble object (smaller request build, single construction).
+        # NB (D-01, 2026-06-05): the original Phase-3.8 intent was Anthropic
+        # prompt-cache reuse across the 4 calls (first pays full, next 3 pay 10%).
+        # That never materialized — CloudWatch showed 0 cache-reads / ~10K writes
+        # per 14d. Root cause: Bedrock cross-region inference profiles route each
+        # call to a region-local cache, so a once/day, 4-call brief never hits;
+        # we were only paying the 25% cache-write premium. cache_system is now
+        # False on all 4 daily-brief calls in ai_calls.py. (coach-narrative-
+        # orchestrator is high-frequency and keeps a region warm, so it still caches.)
         try:
             shared_system = ai_calls.daily_brief_shared_system(
                 data, profile, day_grade=day_grade_score, grade=grade)

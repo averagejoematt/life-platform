@@ -103,8 +103,46 @@ function renderPipeline(d) {
     `<p class="correlative">Live pipeline status — fresh = flowing on schedule, paused = intentionally off, awaiting-log = a manual entry not yet made.</p>`;
 }
 
+// Intelligence — the weekly correlation matrix (Pearson r + BH-FDR), strongest first.
+function renderCorrelations(d) {
+  const c = d && d.correlations;
+  const obj = (c && !Array.isArray(c)) ? c : {};
+  const pairs = obj.pairs || [];
+  if (!pairs.length) return empty("No correlations surfaced yet — the engine needs ~2+ weeks of overlapping daily data before it computes the weekly matrix.");
+  const sig = pairs.filter((p) => p.fdr_significant).length;
+  const head = figs([fig(obj.count ?? pairs.length, "pairs"), sig ? fig(sig, "FDR-significant") : "", obj.week && fig(obj.week, "week")]);
+  const rows = pairs.slice(0, 30).map((p) => `<tr class="${p.fdr_significant ? "rd-flag" : ""}"><td class="rd-name">${esc(p.label_a || p.metric_a)} <span class="rd-unit">↔</span> ${esc(p.label_b || p.metric_b)}</td><td class="num">${fmt(p.r, 2)}</td><td class="num rd-range">${fmt(p.p, 3)}</td><td class="num">${fmt(p.n)}</td><td>${p.fdr_significant ? `<span class="rd-flagmark">FDR ✓</span>` : esc(p.strength || "")}</td></tr>`).join("");
+  const tbl = sec("Correlation matrix — strongest first", `<table class="rd-tbl"><thead><tr><th>pair</th><th>r</th><th>p</th><th>n</th><th>significance</th></tr></thead><tbody>${rows}</tbody></table>`);
+  return head + tbl + (obj.methodology ? `<p class="rd-desc">${esc(obj.methodology)}</p>` : "") + note("Correlative only — Pearson r with Benjamini-Hochberg FDR control across all pairs. Never causal.");
+}
+// Predictions — the coaches' forward calls, scored against measured outcomes.
+function renderPredictions(d) {
+  const o = (d && d.overall) || {};
+  const list = (d && d.predictions) || [];
+  const resolved = (o.confirmed || 0) + (o.refuted || 0);
+  if (!(o.total > 0) && !list.length) return empty("No scored predictions yet — coaches log forward calls that get auto-graded against measured outcomes as target dates pass.");
+  const head = figs([fig(o.total ?? 0, "predictions"), o.confirmed != null && fig(o.confirmed, "confirmed"), o.refuted != null && fig(o.refuted, "refuted"), o.pending != null && fig(o.pending, "pending"), resolved > 0 && fig(fmt(o.accuracy_pct) + "%", "accuracy")]);
+  const badge = (s) => s === "confirmed" ? "rd-badge-live" : "";
+  const rows = list.slice(0, 40).map((p) => `<tr><td class="rd-name">${esc(p.coach_name || p.coach_id)}</td><td>${esc(p.text)}</td><td><span class="rd-badge ${badge(p.status)}">${esc(p.status)}</span></td><td class="num rd-range">${esc(p.date || "")}</td></tr>`).join("");
+  const tbl = list.length ? sec("The prediction ledger", `<table class="rd-tbl"><thead><tr><th>coach</th><th>call</th><th>verdict</th><th>made</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
+  return head + tbl + note("Forward calls logged, then scored against reality — the coaches' track record, kept honest.");
+}
+// Benchmarks — where the numbers sit vs age-band + centenarian-decathlon targets.
+function renderBenchmarks(d) {
+  const trends = (d && d.trends) || (Array.isArray(d) ? d : []);
+  if (!trends.length) return empty("No benchmark readouts yet — where the numbers sit vs age-band and centenarian-decathlon targets fills in as the metrics accrue.");
+  const rows = trends.slice(0, 40).map((t) => {
+    const name = t.metric || t.name || t.label || t.sk || "—";
+    const cur = t.current ?? t.value ?? t.current_value;
+    const tgt = t.target ?? t.target_value ?? t.centenarian_target;
+    const band = t.age_band ?? t.band ?? t.percentile;
+    return `<tr><td class="rd-name">${esc(ttl(String(name).replace(/^.*#/, "")))}</td><td class="num">${fmt(cur)}</td><td class="num rd-range">${fmt(tgt)}</td><td class="num">${band != null ? esc(band) : "—"}</td></tr>`;
+  }).join("");
+  return figs([fig(trends.length, "benchmarks")]) + sec("Where the numbers stand", `<table class="rd-tbl"><thead><tr><th>metric</th><th>current</th><th>target</th><th>age-band</th></tr></thead><tbody>${rows}</tbody></table>`) + note("Targets are age-band and centenarian-decathlon references — direction, not destiny.");
+}
+
 const RENDERERS = {
-  vitals: renderPulse, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, explorer: renderExplorer };
+  vitals: renderPulse, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, explorer: renderExplorer, intelligence: renderCorrelations, predictions: renderPredictions, benchmarks: renderBenchmarks };
 const WIRE = {
   ask: () => { const f = document.querySelector("[data-ask]"); if (!f) return; f.addEventListener("submit", async (e) => { e.preventDefault(); const q = f.querySelector(".ask-in").value.trim(); const out = document.querySelector("[data-ask-out]"); if (!q) return; out.innerHTML = `<p class="rd-archive"><span class="shimmer">Asking…</span></p>`; try { const r = await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ question: q }) }); const d = await r.json(); const ans = d.answer || d.response || d.text || (d.error ? "" : ""); out.innerHTML = ans && !isBad(ans) ? `<p class="ask-answer">${esc(ans)}</p>` : `<p class="rd-archive">The data Q&A is paused right now (budget guard) — try again later, or browse the Evidence directly.</p>`; } catch (x) { out.innerHTML = `<p class="rd-archive">Couldn't reach the Q&A service just now.</p>`; } }); },
   board: () => {
