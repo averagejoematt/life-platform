@@ -34,7 +34,7 @@ AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 
 # Shared utils layer — update on every layer rebuild (bash deploy/build_layer.sh)
-SHARED_LAYER_VERSION = 71  # v71: vacation fund tracker (lambdas/vacation_fund.py) + daily-brief banner (html_builder). Published 2026-06-01.
+SHARED_LAYER_VERSION = 72  # v72: D-01 cache_system=False on daily-brief calls (ai_calls) + utcnow() fixes (html_builder, vacation_fund). Published 2026-06-06 via manual publish-layer-version; only daily-brief repointed — others catch up on next cdk deploy.
 
 SHARED_LAYER_ARN = (
     f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
