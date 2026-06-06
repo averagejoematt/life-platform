@@ -112,6 +112,12 @@
         <!-- A named persona's read, made glanceable -->
         <p class="boardline" data-bind="boardline" hidden></p>
 
+        <!-- Week scope: six instruments, seven days (S-03) — real /api/observatory_week reads -->
+        <section class="weekview" data-weekview hidden aria-label="The week's instruments">
+          <p class="cap label">seven days, by instrument</p>
+          <ul class="wk-rows" data-bind="weekrows"></ul>
+        </section>
+
         <!-- Journey scope: the level-up timeline + achievements (empty-but-ready) -->
         <section class="journey" data-journey hidden aria-label="The journey so far">
           <div class="jr-block">
