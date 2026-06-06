@@ -851,21 +851,24 @@ jobs:
           fi
 
   # ════════════════════════════════════════════════════════════════
-  # Job 5c: Visual + AI-vision QA (Playwright → Claude). ADVISORY.
+  # Job 5c: Visual + AI-vision QA (Playwright → Claude). GATING.
   # Post-deploy browser sweep of the live v4 site (renders, the cockpit
   # pillar interaction, responsive overflow) + Claude/Bedrock semantic
-  # judgement of each screenshot. continue-on-error + `|| true` keep it
-  # NON-BLOCKING for now (ADR-064/065 shadow→auto ramp): tune for ~1 week,
-  # then flip to a gate by removing both so a FAIL blocks the deploy.
-  # AI-vision needs bedrock:InvokeModel on github-actions-deploy-role
-  # (added in deploy/setup_github_oidc.sh — re-run it to apply); until then
-  # the deterministic layer runs and AI-QA self-skips with a warning.
+  # judgement of each screenshot. A FAIL (deterministic, or an AI "high"
+  # verdict) now BLOCKS the pipeline. The rollback job's `needs` excludes
+  # visual-qa, so a gate failure blocks but never triggers an auto-rollback.
+  # The deterministic layer was verified green against live prod on
+  # 2026-06-05 (17 pages, 0 failures) before gating. NB: the AI-vision layer
+  # self-skips (warning, not failure) when bedrock:InvokeModel is absent on
+  # github-actions-deploy-role (re-run deploy/setup_github_oidc.sh to grant)
+  # or when the budget guard is at tier 3 — so it cannot false-block. It was
+  # not yet tuned under load; watch the first AI-active runs after a budget
+  # reset and relax thresholds in tests/visual_ai_qa.py if it over-fires.
   # ════════════════════════════════════════════════════════════════
   visual-qa:
     name: Visual + AI-vision QA
     runs-on: ubuntu-latest
     needs: deploy
-    continue-on-error: true   # ADVISORY — remove (with `|| true` below) to gate
     steps:
       - uses: actions/checkout@v4
 
@@ -888,7 +891,7 @@ jobs:
 
       - name: Run visual + AI-vision QA sweep
         run: |
-          python3 tests/visual_qa.py --screenshot --ai-qa || true
+          python3 tests/visual_qa.py --screenshot --ai-qa
 
       - name: Upload screenshots + report
         if: always()
