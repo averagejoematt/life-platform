@@ -147,6 +147,11 @@ def get_api_key():
 
 
 def floats_to_decimal(obj):
+    # L-04 note (2026-06-06): DELIBERATELY divergent from the canonical
+    # lambdas/numeric.py impl — HAE payloads carry NaN/Inf (must map to None,
+    # DynamoDB rejects Decimal('NaN')) and high-precision sensor floats
+    # (rounded to 4dp to bound item size). Do not "clean up" to the shared
+    # module without porting both behaviors.
     if isinstance(obj, float):
         if math.isnan(obj) or math.isinf(obj):
             return None
