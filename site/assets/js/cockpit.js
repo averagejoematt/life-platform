@@ -14,6 +14,8 @@
   place (View Transitions) — never a navigation away.
 */
 
+import { sparkline } from "/assets/js/charts.js";
+
 const API = "/api";
 
 // Pillar → domain grouping (LOCKED, Constitution §6). Consistency is the band.
@@ -251,12 +253,51 @@ async function renderJourney() {
     : `<p class="tl-empty">Achievements are defined and ready — they unlock as you go.</p>`;
 }
 
-// Week/Month: honest "not yet" view, never a re-run of Today (no false affordance).
-function showScopeSoon(scope) {
+/* ── Week scope: six instruments, seven days (S-03) ─────────────────────────
+   Real data only: each row is /api/observatory_week?domain=<d> — sparkline of
+   the actual daily values, this week's primary number, delta vs the week
+   before. A domain that errors or has no points is omitted (shown honestly
+   in the verdict count), never faked. */
+const WEEK_DOMAINS = ["sleep", "training", "nutrition", "glucose", "physical", "mind"];
+
+function hideDaily() {
   document.querySelector("[data-journey]").hidden = true;
   [".domains", ".band"].forEach((s) => { const el = $(s); if (el) el.style.display = "none"; });
   const hr = $(".voice.human"); if (hr) hr.style.display = "none";
   bind("boardline").hidden = true; bind("honest").hidden = true; bind("movement").hidden = true;
+}
+
+async function renderWeek() {
+  hideDaily();
+  const wv = document.querySelector("[data-weekview]"); if (wv) wv.hidden = false;
+  const wm = $(".voice.machine .who"); if (wm) wm.textContent = "Week";
+  bind("verdict").textContent = "Reading the week…";
+
+  const reads = await Promise.all(WEEK_DOMAINS.map((d) =>
+    getJSON(`${API}/observatory_week?domain=${d}`).then((r) => ({ d, r })).catch(() => ({ d, r: null }))));
+
+  const rows = reads
+    .filter(({ r }) => r && r.summary && r.summary.primary && (r.summary.primary.sparkline || []).length >= 2)
+    .map(({ d, r }) => {
+      const p = r.summary.primary;
+      const delta = typeof p.delta === "number" && p.delta !== 0
+        ? `<span class="wk-delta ${p.trend === "up" ? "is-up" : "is-down"}">${p.trend === "up" ? "▲" : "▼"} ${escapeHTML(String(Math.abs(p.delta)))}</span>`
+        : `<span class="wk-delta">—</span>`;
+      return `<li class="wk-row"><span class="label">${escapeHTML(d)}</span>${sparkline(p.sparkline)}<span class="wk-val num">${escapeHTML(String(p.value))}<small> ${escapeHTML(p.unit || "")}</small></span>${delta}<span class="wk-note">${escapeHTML(p.delta_label || "")}</span></li>`;
+    });
+
+  bind("weekrows").innerHTML = rows.length
+    ? rows.join("")
+    : `<li class="tl-empty">No week data yet — instruments fill in as the record deepens.</li>`;
+  bind("verdict").textContent = rows.length
+    ? `Seven days, ${rows.length} of ${WEEK_DOMAINS.length} instruments reporting — deltas read against the week before.`
+    : "The week view fills in as the record deepens.";
+}
+
+// Month: honest "not yet" — the record is days old; a month view would just
+// re-run the week (false affordance). Unlocks as the record deepens.
+function showScopeSoon(scope) {
+  hideDaily();
   const wm = $(".voice.machine .who"); if (wm) wm.textContent = "Scope";
   bind("verdict").innerHTML = `The ${scope} view fills in as the record deepens — for now, the 42-day arc lives in <a href="/">the Story</a> and longer trends in <a href="/evidence/">the Evidence</a>.`;
 }
@@ -273,9 +314,17 @@ function wireScope() {
       });
       state.scope = b.dataset.scope;
       bind("scopeLabel").textContent = b.textContent.toLowerCase();
+      const wv = document.querySelector("[data-weekview]"); if (wv) wv.hidden = true;
       if (state.scope === "journey") renderJourney();
-      else if (state.scope === "week" || state.scope === "month") showScopeSoon(state.scope);
-      else { showJourney(false); load(); }
+      else if (state.scope === "week") renderWeek();
+      else if (state.scope === "month") showScopeSoon(state.scope);
+      else {
+        // Today: restore what hideDaily() inline-hid (children of .dialogue —
+        // restoring the parent alone leaves them display:none), then reload.
+        const hr = $(".voice.human"); if (hr) hr.style.display = "";
+        const wm = $(".voice.machine .who"); if (wm) wm.textContent = "The board";
+        showJourney(false); load();
+      }
     });
   });
 }
