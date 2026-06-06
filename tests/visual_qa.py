@@ -43,6 +43,10 @@ CHART_TOPICS = {"vitals", "physical", "glucose", "sleep", "training"}
 EVIDENCE_TOPICS = [
     "vitals", "physical", "labs", "glucose", "sleep", "training",
     "nutrition", "habits", "board", "pipeline",
+    # S-05 (2026-06-06): the 3 bespoke renderers added by S-02. Empty this
+    # genesis week (honest empty-states), rich readouts as data accrues —
+    # the [data-readout] not_empty check covers both states.
+    "intelligence", "predictions", "benchmarks",
 ]
 
 # ── Page definitions (v4 surfaces) ────────────────────────────────────────────
