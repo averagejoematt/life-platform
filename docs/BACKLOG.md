@@ -37,7 +37,14 @@
 - ✅ **visual-qa CI job flipped advisory→gate** (deterministic layer verified green on live prod, 17 pages/0 fails). AI-vision layer self-skips under tier-3 budget so it can't false-block; tune after a budget reset.
 - 🔴 **Surfaced N-08** — June budget at **tier 3** (all AI paused) on a projection overshoot ($15 MTD actual). Needs a decision (see N-08).
 
-**Still operator-only:** apply the `bedrock:InvokeModel` OIDC grant (`bash deploy/setup_github_oidc.sh`, live IAM) to enable AI-QA in CI; the D-01 layer rebuild + the deploys above.
+### Recently shipped (2026-06-06 session — moved out of backlog)
+
+- ✅ **N-08 RESOLVED** — root cause was deeper than "early-month overshoot": after a pause the projection structurally can't decay (`ai_daily = ai/active_days` freezes), so tier 3 would have held until ~Jun 22. Fix (PR #12, deployed): `_decide_tier()` caps projection-driven escalation at **actual-MTD tier + 1**. Tier went 3→**1** (brief + website AI back; orchestrator stays paused — correct, its ~$2.4/day run-rate is real per D-03). 15 unit tests. **Follow-up lever (open):** reduce coach-narrative-orchestrator tokens (D-03) — at current run-rate June will duty-cycle tier 0/1.
+- ✅ **D-01 deployed** — layer **v72** published (`SHARED_LAYER_VERSION=72`, PR #13), daily-brief repointed; brief code shipped via PR #11 CI. Other Lambdas catch up on next cdk deploy. Verify next 11 AM brief: CacheWrite=0.
+- ✅ **S-02 deployed** — Evidence bespoke renderers + `/feed.xml` alias (L-06) live, verified 200.
+- ✅ **Bedrock OIDC grant** — verified ALREADY applied on `github-actions-deploy-role` (matches staged scope); AI-vision QA active in CI now that tier <3. First gated `visual-qa` run green (PR #11).
+- ✅ **DLQ 16→2** — all `[AI_UNAVAILABLE]` coach outputs from the tier-3 outage; cause fixed, remainder ages out. (CI `test_i9_dlq_empty` red until then.)
+- ℹ️ **Remediation branch open:** `remediation/freshness-date-sk-filter` (no PR) — legit `begins_with(sk, "DATE#")` fix for sentinel-record false-stales in `freshness_checker_lambda.py`. Review + merge.
 
 ---
 
@@ -49,9 +56,9 @@
 | **⏰ Data-blocked / time-windowed** | 5 | D-03 ✅ closed, D-01/D-04 findings open, D-02/D-05 still windowed (checked 2026-06-03) |
 | **🟡 Long-tail low-value** | 5 | L-01/L-02/L-05/L-06/L-10/L-11 ✅ closed 2026-06-03; remaining: L-03/L-04/L-07/L-08/L-09 |
 | **🛑 Defer-with-rationale (won't do)** | 9 | Documented `won't-do` unless trigger fires |
-| **📦 New work surfaced (post-V2)** | 7 | N-01 ✅ 4/5 cleared (1 structural → S-06) |
-| **🌐 v4 website + ops follow-ups** | 5 | S-01 ✅ + S-06 ✅ deployed · B-03 ✅ · S-02/S-03/S-04/S-05 open · S-07 deferred |
-| **TOTAL OPEN** | **~28** | 2026-06-05 also shipped: Pipeline dashboard, Cockpit 503 fix + Day-Grade Replay, a11y, smoke_test v4, **visual+AI harness (ADR-076)**, coach-analysis 400 fix |
+| **📦 New work surfaced (post-V2)** | 7 | N-01 ✅ closed · N-08 ✅ resolved 2026-06-06 (tier 3→1) |
+| **🌐 v4 website + ops follow-ups** | 5 | S-01 ✅ + S-02 ✅ + S-06 ✅ deployed · B-03 ✅ · S-03/S-04/S-05 open · S-07 deferred |
+| **TOTAL OPEN** | **~25** | 2026-06-06 shipped: N-08 fix, D-01 deploy (layer v72), S-02 deploy, OIDC grant verified, DLQ drained |
 
 ---
 
@@ -83,7 +90,7 @@
 - **daily-brief (14d):** CacheRead **0** vs CacheWrite 10K → cache delivered no savings and the writes were pure 25%-premium cost.
 - **Deeper root cause (2026-06-05):** all 4 daily-brief Claude calls use the *same* model (`AI_MODEL`=sonnet-4-6) and the *same* `shared_system` preamble, so intra-invocation reuse *should* have hit — yet 0 reads. The cause is **Bedrock cross-region inference**: `us.anthropic.claude-sonnet-4-6` routes each call to whichever region has capacity, and prompt cache is region-local. A once/day, 4-call brief writes a fresh cache each call and never reads one back. Not fixable at the app layer for low-volume callers.
 - **Fix shipped:** `cache_system=False` on all 4 daily-brief call sites in `lambdas/ai_calls.py` (`call_training_nutrition_coach`/`call_journal_coach`/`call_board_of_directors`/`call_tldr_and_guidance`) + corrected the stale "Phase 3.8" comment in `daily_brief_lambda.py`. `coach-narrative-orchestrator` caching left untouched — it's high-frequency, keeps a region warm, and hits (382K reads/14d).
-- **Deploy + verify:** needs a layer rebuild (`bash deploy/build_layer.sh`, bump `SHARED_LAYER_VERSION`) + daily-brief redeploy. After the next 11 AM brief, `daily-brief` CacheWrite should drop to 0 with unchanged output.
+- **Deploy + verify:** ✅ deployed 2026-06-06 — layer v72 published, daily-brief repointed. After the next 11 AM brief, `daily-brief` CacheWrite should drop to 0 with unchanged output.
 
 ### D-02 — Coach hit_rate threshold tuning (V2 P3.6)
 - **Wait until:** ~2026-07-17 (60 days for confirmed/refuted verdicts to accumulate)
@@ -245,7 +252,12 @@ Items that came up during V2 follow-up sessions and aren't yet scheduled.
 - Future: if `acwr_compute` ever switches to put_item, add tag_record there
 - No ETA — only if pattern changes
 
-### N-08 — 🔴 June budget at tier 3 — all AI paused (surfaced 2026-06-05) — NEEDS DECISION
+### N-08 — June budget tier 3 — ✅ RESOLVED 2026-06-06 (PR #12, deployed; tier now 1)
+
+- **Resolution:** `_decide_tier()` in `cost_governor_lambda.py` caps projection-driven escalation at actual-MTD tier +1 (and ignores the projection entirely inside the early-month window). Found a second, worse failure mode while fixing: post-pause the projection structurally can't decay (`ai_daily = ai/active_days` freezes), so the old code would have held tier 3 until ~Jun 22 with AI off the whole time.
+- **Decisions (a)/(b)/(c) answered:** (a) the ~$2.4/day AI run-rate is REAL (orchestrator-dominated, matches D-03) — not transient; (b) yes, projection was too trigger-happy — fixed via the actual-spend cap rather than a one-off floor; (c) no manual reset needed — redeployed governor re-computed tier 1 on invoke.
+- **Open follow-up:** the real spend lever remains coach-narrative-orchestrator token reduction (see D-03). At current run-rate June will duty-cycle between tiers 0/1 — acceptable, but trimming the orchestrator unlocks full tier-0 months.
+- Original report follows for context:
 - **Observed:** SSM `/life-platform/budget-tier` = **3** (set 2026-06-05 17:00 PT). At tier 3 the budget guard hard-cuts ALL AI: daily brief skips AI, website `/api/ask`+`/api/board_ask` return "paused", and `bedrock_client.invoke()` raises `BudgetExceeded` (confirmed live — the AI-vision QA layer self-skipped with "monthly $75 ceiling reached").
 - **But actual MTD spend is only $15.38** (Cost Explorer, Jun 1–5). The tier is **projection-driven**: ~$3/day run-rate × 30 ≈ ~$90/mo projected → ≥95% of $75 → tier 3. So it's an early-month linear-extrapolation overshoot, not a real $75 breach — yet it's currently degrading the product (no AI brief, no website AI).
 - **Decisions needed:** (a) is the ~$3/day June run-rate real and worth reducing (prime suspect: `coach-narrative-orchestrator`, the dominant AI spender per D-03 — 8M in-tokens/14d), or a transient (restart aftermath)? (b) Is the cost_governor's linear projection too trigger-happy this early in the month — should it weight actual-vs-projected or add an absolute-spend floor before tiering to 3? (c) Short-term: manually reset to tier 0 for testing (`aws ssm put-parameter --name /life-platform/budget-tier --value 0 --type String --overwrite`) if the projection is judged a false alarm.
@@ -265,7 +277,7 @@ Surfaced during the v4 "The Measured Life" launch, QA sweep, and operations/cost
 ### S-02 — Evidence depth — ✅ DONE 2026-06-05 (premise was stale)
 - The "14 archive topics link to /legacy" framing was **obsolete**: v4 `site/assets/js/evidence.js:153` already zeroes all `/legacy` link-outs ("everything lives inline in v4 now"), and the registry has no `archive`-mode topics. The real remaining gap was *depth*: 3 data-mode topics still rendered via the generic auto-table fallback (`renderGeneric`).
 - **Fixed:** added bespoke renderers `renderCorrelations` (intelligence), `renderPredictions` (predictions), `renderBenchmarks` (benchmarks) in `evidence.js` + registered them in `RENDERERS`; rebuilt via `scripts/v4_build_evidence.py`. All 3 endpoints are empty this genesis week (restart wiped intelligence) so they show honest bespoke empty-states now and rich readouts as data accrues.
-- **Deploy:** `bash deploy/sync_site_to_s3.sh` (JS-only; normal sync covers it).
+- **Deploy:** ✅ synced 2026-06-06 — all 3 topics + `/feed.xml` verified 200 live.
 
 ### S-03 — Cockpit week/month/journey deeper time-series
 - Scope buttons show basic metrics; add deeper time-series per scope. Time-permitting enhancement.
