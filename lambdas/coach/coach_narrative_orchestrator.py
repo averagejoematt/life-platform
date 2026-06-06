@@ -29,7 +29,6 @@ v1.0.0 — 2026-04-06 (Coach Intelligence Phase 2)
 import json
 import logging
 import os
-import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -249,14 +248,23 @@ def _get_item(pk, sk):
         return None
 
 
-def _query_begins_with(pk, sk_prefix, scan_forward=True):
-    """Query DynamoDB for items with SK beginning with a prefix. ADR-058: phase-filtered."""
+def _query_begins_with(pk, sk_prefix, scan_forward=True, limit=None):
+    """Query DynamoDB for items with SK beginning with a prefix. ADR-058: phase-filtered.
+
+    D-03 follow-up (2026-06-06): callers pass `limit` to bound prompt growth —
+    THREAD#/PREDICTION# accumulate daily forever, and unbounded reads fed an
+    ever-growing orchestrator prompt (input creep). Pair with
+    scan_forward=False to keep the most RECENT N.
+    """
     from boto3.dynamodb.conditions import Key
     try:
-        resp = table.query(**with_phase_filter({
+        params = {
             "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
             "ScanIndexForward": scan_forward,
-        }))
+        }
+        if limit:
+            params["Limit"] = limit
+        resp = table.query(**with_phase_filter(params))
         return _decimal_to_float(resp.get("Items", []))
     except Exception as e:
         logger.warning("query_begins_with(%s, %s) failed: %s", pk, sk_prefix, e)
@@ -374,14 +382,14 @@ def _gather_all_state(coach_id):
             "note": "No voice history yet — first generation.",
         }
 
-    # 8. Open threads (filter status=open)
-    all_threads = _query_begins_with(coach_pk, "THREAD#")
+    # 8. Open threads (filter status=open; most recent 50 — D-03 input-creep bound)
+    all_threads = _query_begins_with(coach_pk, "THREAD#", scan_forward=False, limit=50)
     open_threads = [t for t in all_threads if t.get("status") == "open"]
     if not open_threads:
         logger.info("No open threads for %s", coach_id)
 
-    # 9. Active predictions (filter status in pending/confirming)
-    all_predictions = _query_begins_with(coach_pk, "PREDICTION#")
+    # 9. Active predictions (filter status in pending/confirming; most recent 50)
+    all_predictions = _query_begins_with(coach_pk, "PREDICTION#", scan_forward=False, limit=50)
     active_predictions = [
         p for p in all_predictions
         if p.get("status") in ("pending", "confirming")
@@ -449,16 +457,22 @@ def _build_user_message(state, coach_id, today):
     """Build the orchestrator user message as two content blocks for prompt caching.
 
     ADR-062 follow-up (2026-05-28): the orchestrator runs once per coach (8/day),
-    and four context blocks come from GLOBAL keys — `ensemble_digest`,
-    `influence_graph`, `computation_results`, `narrative_arc` — so they are
-    byte-identical across all 8 invocations in a run. We emit them first as a
-    single `cache_control: ephemeral` block (serialized deterministically with
-    sort_keys so the cached prefix matches exactly), and put the per-coach,
-    varying context (target/other compressed, voice, threads, predictions) +
-    instructions in a second, uncached block. Net: call 1 writes the cache,
-    calls 2-8 read it at ~0.1x. The shared block is also what pushes the cached
-    prefix over Haiku's minimum cacheable length (the old system-only block was
-    too small to cache at all — hence zero cache hits pre-fix).
+    and the GLOBAL context blocks — `ensemble_digest`, `influence_graph`,
+    `computation_results`, `narrative_arc` — are byte-identical across all 8
+    invocations in a run, so they go in a `cache_control: ephemeral` block
+    (serialized deterministically with sort_keys so the cached prefix matches
+    exactly). Call 1 writes the cache, calls 2-8 read it at ~0.1x. The shared
+    block is also what pushes the cached prefix over Haiku's minimum cacheable
+    length (the old system-only block was too small to cache at all).
+
+    D-03 follow-up (2026-06-06): ALL 8 coaches' compressed states now live in
+    the shared block too. Previously the target's state + the 7 others were in
+    the per-coach (uncached) suffix; because the 7-of-8 subset differs per
+    target, those bytes never matched the cache and were billed full price on
+    every call (~31K uncached in/call measured June 1-6, the platform's largest
+    AI input line). The full 8-state set IS byte-identical across calls, so it
+    caches; the suffix just names the target. Same information, ~50% less
+    billed input.
 
     Returns a list of Anthropic content blocks (not a string).
     """
@@ -475,27 +489,26 @@ def _build_user_message(state, coach_id, today):
         "",
         "## Narrative Arc State",
         json.dumps(state["narrative_arc"], indent=2, sort_keys=True, default=str),
+        "",
+        "## All Coach Compressed States",
+        "(One entry per coach. The per-call instructions below name the target "
+        "coach — read its state here; the rest provide cross-coach context.)",
     ]
+    all_compressed = dict(state["other_compressed"])
+    all_compressed[coach_id] = state["target_compressed"]
+    for cid in sorted(all_compressed):  # sorted → byte-identical across all 8 calls
+        shared_parts.append(f"### {cid}")
+        shared_parts.append(json.dumps(all_compressed[cid], indent=2, sort_keys=True, default=str))
 
     # ── Per-coach suffix (varies per invocation → not cached) ──
     parts = [
         f"## Target Coach: {coach_id}",
         f"## Date: {today}",
         "",
-        "## Target Coach Compressed State",
-        json.dumps(state["target_compressed"], indent=2, default=str),
+        f"(The target coach's compressed state is the `{coach_id}` entry in "
+        "'All Coach Compressed States' above.)",
         "",
     ]
-
-    if state["other_compressed"]:
-        parts.append("## Other Coaches' Compressed States")
-        for cid, cstate in state["other_compressed"].items():
-            parts.append(f"### {cid}")
-            parts.append(json.dumps(cstate, indent=2, default=str))
-        parts.append("")
-    else:
-        parts.append("## Other Coaches: No compressed states available yet (first cycle).")
-        parts.append("")
 
     parts.append("## Coach Voice State")
     parts.append(json.dumps(state["voice_state"], indent=2, default=str))
@@ -521,7 +534,14 @@ def _build_user_message(state, coach_id, today):
         "with the schema: {coach_id, generation_brief: {open_threads, cross_coach_context, "
         "predictions_to_address, narrative_beat, journey_phase, periodization_note, "
         "voice_guidance: {avoid_openings, suggested_opening, structural_note}, "
-        "decision_class_ceiling, evidence_note, seasonal_flags, computation_outputs}}."
+        "decision_class_ceiling, evidence_note, seasonal_flags, computation_outputs}}.\n"
+        # D-03 (2026-06-06): output tokens are the orchestrator's largest cost
+        # line; un-tightened briefs ran 1800-3000 tokens of repeated prose.
+        "Be CONCISE — this brief is machine-consumed planning, not coaching "
+        "prose: every free-text field at most 2 sentences; do not restate data "
+        "already in the context (reference it); include only the most relevant "
+        "items — at most 5 open_threads, 5 cross_coach_context entries, and 5 "
+        "predictions_to_address (drop the rest, lowest-priority first)."
     )
 
     return [
