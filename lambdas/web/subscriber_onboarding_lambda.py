@@ -34,17 +34,26 @@ ses = boto3.client("sesv2", region_name=REGION)
 s3 = boto3.client("s3", region_name=REGION)
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 
-# Fallback pages when no Chronicle posts exist yet
+# Fallback pages when no Chronicle posts exist yet. v4 "three doors" routing —
+# the legacy /live//chronicle/ paths now 301, which adds a redirect hop to every
+# email link, so point straight at the v4 destinations.
 FALLBACK_PAGES = [
     {"label": "The Story", "title": "Why I'm doing this — and what I'm tracking", "path": "/story/"},
-    {"label": "The Pulse", "title": "Live daily dashboard — weight, sleep, recovery, habits", "path": "/live/"},
-    {"label": "The Chronicle", "title": "Weekly dispatches from inside the experiment", "path": "/chronicle/"},
+    {"label": "The Cockpit", "title": "Live daily dashboard — weight, sleep, recovery, habits", "path": "/now/"},
+    {"label": "The Chronicle", "title": "Weekly dispatches from inside the experiment", "path": "/story/chronicle/"},
 ]
 
 
 def _get_published_posts(max_posts=3):
     """Read posts.json from S3 to get actually-published Chronicle posts.
-    Returns list of dicts with label, title, path — or FALLBACK_PAGES if none exist."""
+    Returns list of dicts with label, title, path — or FALLBACK_PAGES if none exist.
+
+    NOTE (PG-04): the subscriber-onboarding role has no s3:GetObject grant
+    (`role_policies.subscriber_onboarding`), so in prod this read AccessDenies and
+    the bridge email always uses the (now v4-correct) FALLBACK_PAGES. To surface
+    real dispatch cards, add an S3 grant for `site/chronicle/posts.json` + point the
+    key there + deep-link `/story/chronicle/#<week>`. Deferred to post-reset so the
+    IAM/CDK change doesn't ride along with the Monday reset (BACKLOG PG-04 follow-up)."""
     try:
         resp = s3.get_object(Bucket=S3_BUCKET, Key="generated/journal/posts.json")
         data = json.loads(resp["Body"].read())
