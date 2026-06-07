@@ -42,36 +42,53 @@ from botocore.exceptions import ClientError
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(REPO_ROOT / "lambdas"))
 
 from lambdas.constants import EXPERIMENT_START_DATE
+import phase_taxonomy as taxonomy  # ADR-077: single source of truth
 
 TABLE_NAME = "life-platform"
 USER_ID = os.environ.get("LIFE_PLATFORM_USER", "matthew")
 USER_PK_PREFIX = f"USER#{USER_ID}#SOURCE#"
 REGION = "us-west-2"
+SSM_CYCLE_PARAM = "/life-platform/experiment-cycle"
+DEFAULT_CYCLE = 2  # seed matches the CYCLE#2#reentry marker
+
+
+def current_cycle() -> int:
+    """Read the closing run's cycle number from SSM (ADR-077). Default 2."""
+    try:
+        ssm = boto3.client("ssm", region_name=REGION)
+        return int(ssm.get_parameter(Name=SSM_CYCLE_PARAM)["Parameter"]["Value"])
+    except Exception:
+        return DEFAULT_CYCLE
+
 
 DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
 WEEK_RE = re.compile(r"(\d{4})-W(\d{2})")
 
 # Partition rules. Order is deterministic (matches spec §5 reading order).
-# Each entry: (source, mode, extra_attrs)
+# Each entry: (source, mode, extra_attrs). The registry-coverage assertion in
+# main() guarantees every EXPERIMENT_SCOPED source from phase_taxonomy appears
+# here — a new scoped source can't silently escape the wipe (ADR-077).
 PARTITIONS = [
     # All entries tombstoned regardless of date (intelligence-layer state):
     ("chronicle",        "all",        {"hidden": True}),
-    ("coach_threads",    "all",        {}),
     ("predictions",      "all",        {}),
     ("hypotheses",       "all",        {}),
     ("decisions",        "all",        {}),
     ("insights",         "all",        {}),
     ("challenges",       "all",        {}),
     ("experiments",      "all",        {}),
+    ("coach_actions",    "all",        {}),
 
     # character_sheet + habit_scores: tombstone everything — §6 rebuilds from scratch
     # so that level/streak cascades start at zero on Day 1 (no leak from old state).
     ("character_sheet",  "all",        {}),
     ("habit_scores",     "all",        {}),
     # computed_metrics + ledger: only pre-genesis history is tombstoned; post-genesis
-    # records continue accumulating from Day 1 forward.
+    # records continue accumulating from Day 1 forward. (ledger TOTALS#current is
+    # reset to $0 by restart_ledger_reset.py, which also preserves a LIFETIME# aggregate.)
     ("computed_metrics", "pregenesis", {}),
     ("ledger",           "pregenesis", {}),
 
@@ -90,6 +107,15 @@ PARTITIONS = [
     ("weekly_correlations",   "pregenesis", {}),  # WEEK# keyed correlations
     ("computed_insights",     "pregenesis", {}),  # DATE# keyed daily insight blobs
 
+    # ADR-077: derived compute outputs the original wipe MISSED (they leaked stale
+    # pilot intelligence onto the site / into coach context). pregenesis keeps
+    # post-genesis records accumulating from Day 1.
+    ("adaptive_mode",         "pregenesis", {}),
+    ("circadian",             "pregenesis", {}),
+    ("centenarian_progress",  "pregenesis", {}),
+    ("nutrition_review",      "pregenesis", {}),
+    ("protocols",             "all",        {}),
+
     # Stage0 Fix 3 (2026-05-30): the per-expert AI analyses (Brandt et al.) were
     # missed by the wipe. They're singleton EXPERT#<key> records keyed only by
     # expert, not by date — "all" mode is correct since every active record
@@ -97,6 +123,27 @@ PARTITIONS = [
     # /explorer/ page. The site-api now also guards against this at render time
     # (handle_ai_analysis returns null when days_in_experiment > current day_n).
     ("ai_analysis",           "all",        {}),
+]
+
+# Full-pk entries OUTSIDE the USER#matthew#SOURCE# namespace. The original tagger
+# never scanned these and the original wipe either missed them (ENSEMBLE#, NARRATIVE#)
+# or aimed at a phantom partition name (the old USER#SOURCE#coach_threads entry —
+# the real conversation threads live under a bare USER#matthew pk, ADR-077 finding 1).
+# Each: (pk_full, label, mode, extra_attrs, sk_prefix). sk_prefix="" scans the whole pk.
+FULL_PK_PARTITIONS = [
+    # The coach-conversation-thread LEAK (279 pre-genesis threads were feeding live
+    # coach prompts). Bare USER#matthew pk; restrict to the SOURCE#coach_thread sk so
+    # we never touch PROFILE#v1 on the same pk.
+    (f"USER#{USER_ID}", "coach_thread", "pregenesis", {}, "SOURCE#coach_thread"),
+    # Cross-coach synthesis intelligence — pre-genesis April cycles leaked through.
+    ("ENSEMBLE#digest",        "ensemble_digest",   "pregenesis", {}, ""),
+    ("ENSEMBLE#disagreements", "ensemble_disagree", "all",        {}, ""),
+    # Narrative arc: tombstone pre-genesis HISTORY# snapshots. STATE#current has no
+    # date in its sk so pregenesis-mode skips it — it is left for the first
+    # post-genesis coach-state run to recompute (avoids the phase="plateau" /
+    # experiment-phase attribute collision; the arc reader uses get_item, not the
+    # phase filter). ADR-077 finding 2.
+    ("NARRATIVE#arc",          "narrative_arc",     "pregenesis", {}, ""),
 ]
 
 # Coach state lives under pk=COACH#<coach_id>, NOT under USER#matthew#SOURCE#*.
@@ -118,12 +165,12 @@ COACH_PARTITIONS = [
     ("COACH#computation",     "coach_compute",   "pregenesis", {}),
 ]
 
-# Per the §14 E decision: coach-running-state categories.
-COACH_RUNNING_STATE_CATEGORIES = {
-    "failure_pattern", "what_worked", "coaching_calibration", "personal_curves",
-    "weekly_plate", "journey_milestone", "insight", "experiment_result",
-    "intention_tracking", "hypothesis_monitoring",
-}
+# Per the §14 E decision: coach-running-state categories. ADR-077 finding 4:
+# failure_pattern_compute writes `failure_patterns` (plural) via `memory_type`,
+# not `category` — the original wipe missed all 6 records. Both spellings listed,
+# and should_tombstone now reads memory_type as a fallback. Source of truth for
+# this set is phase_taxonomy.MEMORY_SCOPED_CATEGORIES.
+COACH_RUNNING_STATE_CATEGORIES = set(taxonomy.MEMORY_SCOPED_CATEGORIES)
 
 # Idempotency: reason string includes the genesis date so re-runs after a
 # date change correctly recognise their own tombstones.
@@ -153,9 +200,9 @@ def extract_date(item: dict) -> str | None:
             pass
     for attr in ("created_at", "stored_at", "computed_at", "generated_at",
                  "captured_at", "ingested_at", "date_saved", "ended_at"):
-            v = item.get(attr)
-            if isinstance(v, str) and len(v) >= 10 and DATE_RE.match(v[:10]):
-                return v[:10]
+        v = item.get(attr)
+        if isinstance(v, str) and len(v) >= 10 and DATE_RE.match(v[:10]):
+            return v[:10]
     return None
 
 
@@ -166,7 +213,8 @@ def should_tombstone(item: dict, mode: str) -> bool:
         d = extract_date(item)
         return d is not None and d < EXPERIMENT_START_DATE
     if mode == "by_category":
-        return item.get("category") in COACH_RUNNING_STATE_CATEGORIES
+        cat = item.get("category") or item.get("memory_type")  # ADR-077 finding 4
+        return cat in COACH_RUNNING_STATE_CATEGORIES
     return False
 
 
@@ -175,21 +223,28 @@ def is_already_tombstoned(item: dict) -> bool:
     return bool(item.get("tombstone")) and item.get("tombstoned_reason") == TOMBSTONE_REASON
 
 
-def build_update(extra_attrs: dict, now_iso: str):
-    """Construct UpdateItem args for a tombstone write."""
+def build_update(extra_attrs: dict, now_iso: str, cycle: int):
+    """Construct UpdateItem args for a tombstone write.
+
+    ADR-077: stamps `cycle=<closing run>` so the archive is navigable by reset
+    generation — `phase=pilot` says "hidden from the current run", `cycle` says
+    "belonged to run N".
+    """
     sets = [
         "tombstone = :tomb",
         "tombstoned_at = :ts",
         "tombstoned_reason = :reason",
         "#p = :phase",
+        "#cyc = :cycle",
     ]
     values = {
         ":tomb":   True,
         ":ts":     now_iso,
         ":reason": TOMBSTONE_REASON,
         ":phase":  "pilot",
+        ":cycle":  cycle,
     }
-    names = {"#p": "phase"}
+    names = {"#p": "phase", "#cyc": "cycle"}
     for k, v in extra_attrs.items():
         placeholder_name = f"#{k}"
         placeholder_val = f":val_{k}"
@@ -199,13 +254,39 @@ def build_update(extra_attrs: dict, now_iso: str):
     return ("SET " + ", ".join(sets), names, values)
 
 
+def assert_registry_coverage():
+    """ADR-077: every EXPERIMENT_SCOPED source in the registry must be wiped here,
+    and the known non-SOURCE scoped pks must be covered. Fail loudly on a gap so a
+    new scoped partition can never silently survive a restart (the root-cause bug)."""
+    covered_sources = {src for src, _m, _e in PARTITIONS}
+    missing = [s for s in taxonomy.SCOPED_SOURCES if s not in covered_sources]
+    if missing:
+        raise SystemExit(
+            "restart_intelligence_wipe: EXPERIMENT_SCOPED sources missing from the "
+            f"wipe (ADR-077 coverage gap): {sorted(missing)}. Add them to PARTITIONS."
+        )
+    covered_pks = {pk for pk, *_ in FULL_PK_PARTITIONS} | {pk for pk, *_ in COACH_PARTITIONS}
+    required_pks = {f"USER#{USER_ID}", "ENSEMBLE#digest", "ENSEMBLE#disagreements",
+                    "NARRATIVE#arc"} | {f"COACH#{c}" for c in (
+                        "sleep_coach", "nutrition_coach", "training_coach", "mind_coach",
+                        "physical_coach", "glucose_coach", "labs_coach", "explorer_coach")}
+    gap = [pk for pk in required_pks if pk not in covered_pks]
+    if gap:
+        raise SystemExit(
+            f"restart_intelligence_wipe: scoped non-SOURCE pks not covered: {sorted(gap)}"
+        )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--apply", action="store_true", help="Commit writes (default: dry-run).")
     args = parser.parse_args()
 
+    assert_registry_coverage()
+    cycle = current_cycle()
     mode_str = "APPLY" if args.apply else "DRY-RUN"
-    print(f"[{mode_str}] intelligence wipe starting. genesis={EXPERIMENT_START_DATE} reason={TOMBSTONE_REASON}")
+    print(f"[{mode_str}] intelligence wipe starting. genesis={EXPERIMENT_START_DATE} "
+          f"cycle={cycle} reason={TOMBSTONE_REASON}")
 
     ddb = boto3.resource("dynamodb", region_name=REGION)
     table = ddb.Table(TABLE_NAME)
@@ -218,14 +299,21 @@ def main():
     samples = defaultdict(list)
     errors = []
 
-    # Build unified work list: SOURCE-style entries + full-pk COACH entries.
-    work = [(f"{USER_PK_PREFIX}{src}", src, mode, extra) for src, mode, extra in PARTITIONS]
-    work += [(pk_full, label, mode, extra) for pk_full, label, mode, extra in COACH_PARTITIONS]
+    # Build unified work list: SOURCE entries + full-pk COACH entries + the
+    # non-SOURCE scoped pks (ENSEMBLE/NARRATIVE/coach_thread). 5-tuple carries an
+    # optional sk_prefix that scopes a bare-pk scan (e.g. coach_thread under USER#matthew).
+    work = [(f"{USER_PK_PREFIX}{src}", src, mode, extra, "") for src, mode, extra in PARTITIONS]
+    work += [(pk_full, label, mode, extra, "") for pk_full, label, mode, extra in COACH_PARTITIONS]
+    work += [(pk_full, label, mode, extra, skp) for pk_full, label, mode, extra, skp in FULL_PK_PARTITIONS]
 
-    for pk, source, mode, extra in work:
+    for pk, source, mode, extra, sk_prefix in work:
         c = counts[source]
-        kwargs = {"KeyConditionExpression": "pk = :pk",
-                  "ExpressionAttributeValues": {":pk": pk}}
+        if sk_prefix:
+            kwargs = {"KeyConditionExpression": "pk = :pk AND begins_with(sk, :skp)",
+                      "ExpressionAttributeValues": {":pk": pk, ":skp": sk_prefix}}
+        else:
+            kwargs = {"KeyConditionExpression": "pk = :pk",
+                      "ExpressionAttributeValues": {":pk": pk}}
         while True:
             resp = table.query(**kwargs)
             for item in resp.get("Items", []):
@@ -240,7 +328,7 @@ def main():
                 if len(samples[source]) < 3:
                     samples[source].append(item.get("sk", ""))
                 if args.apply:
-                    update_expr, names, values = build_update(extra, now_iso)
+                    update_expr, names, values = build_update(extra, now_iso, cycle)
                     try:
                         table.update_item(
                             Key={"pk": item["pk"], "sk": item["sk"]},
@@ -270,7 +358,8 @@ def main():
     grand = {"total": 0, "to_tombstone": 0, "skipped_already": 0,
              "skipped_mode": 0, "applied": 0, "errors": 0}
     report_rows = ([(src, mode) for src, mode, _ in PARTITIONS] +
-                   [(label, mode) for _pk, label, mode, _ in COACH_PARTITIONS])
+                   [(label, mode) for _pk, label, mode, _ in COACH_PARTITIONS] +
+                   [(label, mode) for _pk, label, mode, _e, _skp in FULL_PK_PARTITIONS])
     for source, mode in report_rows:
         c = counts[source]
         for k in grand:
