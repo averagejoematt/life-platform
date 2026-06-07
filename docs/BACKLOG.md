@@ -1,6 +1,6 @@
 # Life Platform — Open Backlog
 
-**Last updated:** 2026-06-07 (v8.3.4 — ADR-077 phase taxonomy + restart tooling; Monday reset staged)
+**Last updated:** 2026-06-07 (v8.4.0 — PG product/growth summit added; prior: ADR-077 phase taxonomy + restart tooling, Monday reset staged)
 **Source:** Synthesis of V1 audit (2026-05-17, ADR-057), V2 audit (2026-05-17, `docs/V2_AUDIT_PLAN.md`), V2 follow-up sessions (2026-05-18/19), the 2026-05-29 marathon (Bedrock cutover, budget guard, remediation agent, May-30 restart), the 2026-06-01/02 v4 website launch + QA sweep, and the 2026-06-03 operations/cost session (ADR-074/075). Data-blocked items D-01/D-03/D-04 + N-01/L-11 re-checked against live AWS on 2026-06-03.
 
 > Single source of truth for everything **not done**. Items closed-with-rationale (ADR-057) and items shipped are not listed — see `docs/CHANGELOG.md` for what landed and `docs/DECISIONS.md` for what was formally closed.
@@ -58,7 +58,133 @@
 | **🛑 Defer-with-rationale (won't do)** | 9 | Documented `won't-do` unless trigger fires |
 | **📦 New work surfaced (post-V2)** | 7 | N-01 ✅ closed · N-08 ✅ resolved 2026-06-06 (tier 3→1) |
 | **🌐 v4 website + ops follow-ups** | 5 | S-01 ✅ + S-02 ✅ + S-06 ✅ deployed · B-03 ✅ · S-03/S-04/S-05 open · S-07 deferred |
-| **TOTAL OPEN** | **~25** | 2026-06-06 shipped: N-08 fix, D-01 deploy (layer v72), S-02 deploy, OIDC grant verified, DLQ drained |
+| **🚀 Product & Growth (PG)** | 14 | NEW 2026-06-07 summit — see PG section. PG-01–05 ready now; PG-13/14 exploratory (Wedge B) |
+| **TOTAL OPEN** | **~39** | 2026-06-07: +14 PG items from product/growth summit (`docs/reviews/SUMMIT_2026-06-07_PRODUCT_GROWTH_REVIEW.md`) |
+
+---
+
+## 🚀 Product & Growth (PG-series) — 2026-06-07 Summit
+
+**Source:** Product + Personal Board joint summit, 2026-06-07 (full record: `docs/reviews/SUMMIT_2026-06-07_PRODUCT_GROWTH_REVIEW.md`).
+**Governing test for every PG item:** *does this make Matthew more likely, or less likely, to reach 185?* Growth as a byproduct of real progress = yes. Growth that requires more building or more performance = no.
+**Build cap (Reeves/Viktor dissent, accepted):** the platform is already ~2 years more mature than the transformation it documents (genesis re-anchored 2026-05-30, baseline 304.62 lb). PG work is weighted toward **front-door + audience (cheap, non-building)** and **Wedge B showcase (documents what exists)**. Net-new analytic engines are OUT — they violate the 30-day post-genesis data-maturity gate.
+
+### How Claude Code should work a PG item (each session)
+1. **Open:** read `handovers/HANDOVER_LATEST.md` then `CLAUDE.md`; confirm `main` is pushed/clean before starting (the 2026-06-05 17-commit backlog must be resolved first).
+2. **Scope:** do ONE PG item per session unless they're trivially coupled. Confirm the item's *gate* is met before touching code.
+3. **Deploy discipline (unchanged):** Matthew runs all deploys in terminal — never via MCP. Site: per-file `aws s3 cp` (NEVER `--delete` at bucket root) + CloudFront invalidation (`E3S424OXQZ8NBE`) always follows. Lambda: full `web/` package, never single-file (ADR-046); 10s between sequential Lambda deploys. MCP: run `test_mcp_registry.py` before deploy; tool functions go BEFORE the `TOOLS={}` dict. Layer modules (`ai_calls.py`, `html_builder.py`, etc.): require layer rebuild + `SHARED_LAYER_VERSION` bump.
+4. **Public AI rule (Anika/Dana):** any reader-facing AI endpoint must (a) keep the LLM strictly interpretive — math in Python, LLM narrates only, correlative + confidence-labelled (Henning standard); (b) ship behind per-IP rate limits + the existing budget-tier degrade (**PG-10 is a hard prerequisite**). One traffic spike must not empty the $75 ceiling and dark-fire the site.
+5. **Editorial guardrails (all public surfaces):** no employer/role/industry; partner never named; only alcohol + food-delivery vice categories named publicly; bereavement opt-in only; correlative framing; down-weeks always visible.
+6. **Close:** update `CHANGELOG.md` + `PROJECT_PLAN.md` always (other docs per their triggers); `python3 deploy/sync_doc_metadata.py --apply` if counts changed; write handover + update `HANDOVER_LATEST.md`; `git add -A && git commit && git push`. Move the finished PG item out of this file into `CHANGELOG.md`.
+
+---
+
+### PG-00 — Wedge decision (DECISION, do before PG-06+)
+- **Decision required from Matthew:** confirm the summit recommendation — **Wedge B now** (build-in-public; the only wedge true today; feeds the enterprise-AI mandate; *capped* to documenting what exists), **Wedge A accruing** (transformation story via chronicle + email list; monetise at ~30 lb + sustained list), **Wedge C shelved** (multi-tenant = existing W-02 trigger).
+- **Claude Code action:** none until decided. Once decided, record as an ADR (`docs/DECISIONS.md`) and unblock PG-06.
+- **Effort:** decision only. **Gate:** Matthew.
+
+### PG-01 — Story-page honesty hook + 10-sec "what/who" (READY)
+- **Why:** the front door assumes you already know what the site is; the Midlife-Wake-up & Casual-Reader segments bounce. The shareable asset (honest *before*, biostatistician-checked) isn't stated anywhere.
+- **Files:** `site/index.html` (hero copy / `.h-hero__title` area), relevant copy in `scripts/v4_build_*` if hero is templated; check `site/assets/js/components.js` for hero hydration.
+- **Action:** add a one-line hook (honesty framing, no employer/partner per guardrails) + a 10-second "what this is / who it's for" line above the fold. Copy only — do not touch Direction-05 visual identity (Tyrell: it's already world-class).
+- **Acceptance:** a first-time visitor can answer "what is this and who's it for" in <10s; `bash deploy/smoke_test_site.sh` stays 65/0; CLS budget (<0.1) unaffected.
+- **Effort:** S (copy). **Gate:** none.
+
+### PG-02 — Cockpit first-run reading layer (READY)
+- **Why:** `/now` is glanceable for the pilot, unreadable for a new visitor (Mara: "can't use it without instructions"). Two-mode: pilot (dense default) vs visitor (narrated first-visit overlay).
+- **Files:** `site/assets/js/` (cockpit hydration — locate the `/now` renderer), `site/assets/css/` for the overlay; client-side only, NO api change (James: cheap).
+- **Action:** dismissible first-run "what am I looking at" overlay; default stays dense; preserve confidence labels (Henning: "preliminary pattern, n=9" is the credibility moment). Use a lightweight cookie/localStorage flag for "seen".
+- **Acceptance:** overlay shows once, dismissible, never blocks the dense view; `tests/visual_qa.py` cockpit still PASS.
+- **Effort:** S (client). **Gate:** none.
+
+### PG-03 — Subscribe CTA on every chronicle dispatch + "read from #1" (READY)
+- **Why:** the chronicle is the only organic-share engine; today it has no consistent capture or back-catalogue path.
+- **Files:** chronicle templates (`site/chronicle/` + `scripts/v4_build_*` for chronicle render), `posts.json` ordering for the "#1" path.
+- **Action:** subscribe CTA at the foot of every dispatch; a "start from the first dispatch" link; verify `/feed.xml` (L-06, live) is linked.
+- **Acceptance:** CTA present on all dispatches post-rebuild; back-catalogue navigable; smoke test green.
+- **Effort:** S (template). **Gate:** none.
+
+### PG-04 — Start the email list + welcome sequence (READY, needs an ESP decision)
+- **Why:** the list is the durable owned channel and the slow-accrual asset for Wedge A; Sofia: start now even with no product.
+- **Files:** `lambdas/web/email_subscriber_lambda.py`, `/api/subscribe` flow (already exists incl. canary handling). A welcome sequence may be a new lightweight scheduled send or ESP-side.
+- **Action:** confirm subscribe→confirm→welcome path end-to-end; add a short welcome sequence (what the site is, the honesty pitch, link to dispatch #1). Decide ESP/native-SES.
+- **Acceptance:** real subscribe produces a confirmed subscriber + welcome email; no canary/MAILER-DAEMON regressions.
+- **Effort:** S + decision. **Gate:** Matthew picks ESP vs native SES.
+
+### PG-05 — Evidence empty-states say *why* (READY)
+- **Why:** genesis-week Evidence pages (correlations/predictions/benchmarks) are honestly empty; a visitor must read *integrity*, not breakage.
+- **Files:** `site/assets/js/evidence.js` (the bespoke `renderCorrelations`/`renderPredictions`/`renderBenchmarks` empty-states), rebuild via `scripts/v4_build_evidence.py`.
+- **Action:** empty-state copy explains genesis reset + "fills in as data accrues" with confidence framing.
+- **Acceptance:** all 3 topics show explanatory empty-states; `tests/visual_qa.py` 20/0.
+- **Effort:** XS (copy). **Gate:** none.
+
+### PG-06 — Wedge B build-log surface (NEXT, capped)
+- **Why:** the platform/architecture is the only wedge true today (Builder/Engineer segment + enterprise-AI proof). Surfaces the build honestly.
+- **Files:** new Evidence topic or dedicated page (`scripts/v4_build_evidence.py` topic registry + an `evidence.js` renderer), sourcing from existing ADRs/`docs/`.
+- **Action:** a FINITE set of build-in-public writeups (board framework, AI-vision QA harness, budget governor, "keeping an AI honest about my own data"). **CAP: documents what exists; shipping a writeup must NOT spawn new platform features.**
+- **Acceptance:** pages render + indexable; each writeup links to the real ADR/code; no new Lambdas created to support it.
+- **Effort:** M. **Gate:** PG-00 = Wedge B confirmed.
+
+### PG-07 — Reader "predict the week" loop (NEXT)
+- **Why:** reader-side engagement that does NOT make Matthew perform (Maya's guardrail). Reuses the prediction-ledger machinery you're already validating (D-05).
+- **Files:** `PREDICTION#`/`LEARNING#` partitions; a read-mostly public endpoint (hardened per PG-10); a small front-end widget.
+- **Action:** "predict whether this week's intervention moves the needle"; aggregate reader predictions; reveal next dispatch. LLM (if any) interprets only.
+- **Acceptance:** reader can submit a prediction; aggregate stored + revealed; endpoint passes PG-10 hardening.
+- **Effort:** M. **Gate:** PG-10 done; D-05 prediction loop producing real verdicts (~2026-06-17).
+
+### PG-08 — One sustainable social channel + repurposing rhythm (NEXT, ongoing)
+- **Why:** organic distribution; Ava: pick ONE channel sustainable for a year, not three abandoned in a month.
+- **Action:** each dispatch → one "transparency moment" repost (down-weeks/honesty, not highlights). Process, not code; Claude Code can scaffold a repurposing template/checklist in `docs/content/`.
+- **Acceptance:** a repeatable per-dispatch checklist exists; first 4 weeks executed.
+- **Effort:** ongoing. **Gate:** PG-03.
+
+### PG-09 — Methodology / SEO / credibility pages (NEXT)
+- **Why:** the Skeptic-Clinician segment cites methodology; these are unique, linkable, indexable assets ("the Henning standard", "how I keep an AI honest about my own data").
+- **Files:** Evidence/Story page additions + build scripts; ensure indexable (robots/sitemap).
+- **Acceptance:** pages live, indexable, internally linked; smoke test green.
+- **Effort:** M. **Gate:** NEXT.
+
+### PG-10 — Public AI endpoint hardening (PREREQUISITE for any reader-facing AI)
+- **Why:** Dana/Anika — a public AI endpoint has an unbounded request denominator; one spike empties the $75 ceiling and dark-fires the whole site (the budget guard already proved it can tier-3 the platform).
+- **Files:** `lambdas/web/site_api_ai_lambda.py` (`/api/ask`, `/api/board_ask`), `cost_governor_lambda.py` / `budget_guard.py`, `bedrock_client.invoke()`.
+- **Action:** per-IP rate limit + abuse guard; confirm tier-3 graceful-degrade returns a clean "paused" not a 5xx; cap tokens/request; correlative + confidence-labelled output only.
+- **Acceptance:** load/abuse test can't breach budget; tier-3 degrades cleanly; outputs carry confidence labels.
+- **Effort:** M. **Gate:** before PG-07 and any public AI feature.
+
+### PG-11 — Wedge A monetisation (LATER, gated)
+- **Why:** the transformation story is the biggest-TAM wedge but needs a real result.
+- **Action:** guide / cohort / paid narrative tier — design when triggered.
+- **Effort:** L. **Gate (hard):** ~30 lb visible honest progress AND a sustained email list. NOT before.
+
+### PG-12 — Light community (LATER, gated)
+- **Why:** belonging loop; but an empty forum is worse than none.
+- **Effort:** L. **Gate:** critical-mass list (community specialist's trigger).
+
+---
+
+### PG-13 — In-platform "agents" showcase (EXPLORATORY → Wedge B)
+*Matthew's idea: "AI agents that do X/Y/Z for the platform — a way to show off my AI use and be creative."*
+
+- **Key insight (cheapest, highest-integrity win):** you ALREADY run a rich agent roster — **surface it before spawning new ones.** Existing agents to name + expose: the 8-agent Coach Intelligence ensemble (`lambdas/coach_computation_engine.py:COACH_IDS`; ADR-047/055), the self-healing **Remediation Agent** (`remediation/` + daily GitHub Actions, Sonnet 4.6 via OIDC, ADR-064/065), the **Visual+AI QA Agent** (`tests/visual_ai_qa.py`, ADR-076), the **Budget Governor** (`cost_governor_lambda.py`, ADR-063), the **Anomaly Detector** (`lambdas/emails/anomaly_detector_lambda.py`), the **Freshness Sentinel** (`freshness_checker_lambda.py`), and **Elena Voss** (the chronicle journalist agent).
+- **Phase 1 — Agent roster + activity feed (cheap, no new inference; do this first):**
+  - **Files:** new Evidence topic / page via `scripts/v4_build_evidence.py` + `evidence.js` renderer; data sourced from existing agent outputs (remediation PR/commit logs, QA verdicts, anomaly flags, budget-tier transitions, coach ensemble summaries under `ENSEMBLE#`).
+  - **Action:** a public "Meet the agents that run The Measured Life" page + a weekly **"Agent Activity"** readout ("the remediation agent fixed X, the QA agent caught Y, the sentinel flagged a 2-day eightsleep gap"). Genuinely novel build-in-public content and a Wedge-B engagement loop. Read-only — no new agent, no new cost.
+  - **Acceptance:** page renders from real agent data; no new Lambda/inference; smoke + visual_qa green.
+- **Phase 2 — 1–2 net-new creative agents (OPTIONAL, cost-gated, build-cap applies):** e.g. a **Scout** (surfaces studies relevant to the current protocol), an **Adversary** (argues against Matthew's choices — he values being challenged), a **Curator** (gym-playlist maintenance). Each new public agent MUST pass **PG-10** hardening and the interpret-only rule, and counts against the build cap — prefer Phase 1's showcase value first.
+- **Gate:** PG-00 (Wedge B) for the public surface; Phase 2 additionally gated on PG-10 + a cost check (Dana). **Effort:** Phase 1 M; Phase 2 M–L each.
+- **Adversarial note:** Reeves/Viktor flag new agents as build-itch. Phase 1 is sanctioned (surfacing, ~zero build). Phase 2 is the itch — keep it contained and Wedge-B-justified, not core-platform expansion.
+
+### PG-14 — "AI me" weight-loss visualization (EXPLORATORY — SPIKE FIRST)
+*Matthew's idea: "an AI version of myself that drops weight, like those creative AI videos — how hard would it be?"*
+
+- **Honest feasibility read (three tiers, cheapest/most-defensible first):**
+  - **Tier A — Data-driven parametric figure (RECOMMENDED, buildable, on-brand):** a morphable body figure driven by your REAL data (Withings body-comp, tape `measurements`, weight 304→current→projected 185). Tech: a parametric **SMPL/SMPL-X** mesh rendered headless (pyrender/Blender) → milestone time-lapse via `ffmpeg`; or a lighter **Three.js** figure in-browser. Honest (no hallucination), privacy-safe (generic body, not your face), ties to evidence/measurements you already hold. A "304 → 185" honest time-lapse is a strong Wedge-B/chronicle artifact.
+  - **Tier B — Photoreal identity-preserving generation (R&D, privacy- and honesty-gated):** identity-preserving image edit / personalized model on your photos to render "you" at milestones. **Problems to flag, not hide:** (1) a generated "you at 185" is a *guess*, not a projection — presenting it as fact violates the Henning/Lena correlative-honesty standard; must be labelled motivational fiction. (2) Feeding your face/body to third-party generative APIs is a real privacy decision and cuts against the site's pseudonymous-ish posture (no employer, partner unnamed). (3) Identity consistency is still unreliable.
+  - **Tier C — Generative AI *video* (DEFER):** image-to-video (Runway/Kling/Veo/Sora-class). Consistent identity + accurate body-change over a journey is beyond reliable quality today; expect artifacts. Revisit as models improve.
+- **Spike first (Claude Code, time-boxed ~1 session):** prototype **Tier A** with current data — map weight/measurements → body params, render 3–5 milestone frames, assess fidelity vs. your real measurements. Output a short writeup (`docs/specs/`) + sample frames; decide go/no-go before any Tier B/C work.
+- **Gate:** PG-00 (Wedge B framing). Tier B blocked on an explicit Matthew privacy decision + a label-as-fiction commitment. Tier C deferred. **Effort:** Tier A spike S–M; Tier A full M; Tier B L + privacy review; Tier C deferred.
+- **Adversarial note:** a creative artifact, not an analytic engine — fine *as* a contained Wedge-B showcase, not a reason to expand the core platform. The most motivating *and* honest version is Tier A driven by real numbers (it moves with actual progress — reinforcing the §1 "185" test).
 
 ---
 
