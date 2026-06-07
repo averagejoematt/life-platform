@@ -30,6 +30,7 @@ import re
 import boto3
 
 from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -136,7 +137,7 @@ def query_range(source, start_date, end_date):
         },
     }
     while True:
-        resp = table.query(**kwargs)
+        resp = table.query(**with_phase_filter(kwargs))
         for item in resp.get("Items", []):
             date_str = item.get("date") or item["sk"].replace("DATE#", "")
             records[date_str] = d2f(item)
@@ -156,7 +157,7 @@ def query_range_list(source, start_date, end_date):
         },
     }
     while True:
-        resp = table.query(**kwargs)
+        resp = table.query(**with_phase_filter(kwargs))
         items.extend(d2f(resp.get("Items", [])))
         if "LastEvaluatedKey" not in resp:
             break

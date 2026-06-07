@@ -749,9 +749,11 @@ def tool_get_fasting_glucose_validation(args):
 
     # ── Load lab fasting glucose ─────────────────────────────────────────
     from boto3.dynamodb.conditions import Key
-    lab_resp = table.query(
-        KeyConditionExpression=Key("pk").eq(USER_PREFIX + "labs") & Key("sk").begins_with("DATE#")
-    )
+    from mcp.core import _apply_phase_filter  # ADR-058
+    # ADR-058: longitudinal/clinical archive — cross-phase by design (owner decision 2026-06-06)
+    lab_resp = table.query(**_apply_phase_filter({
+        "KeyConditionExpression": Key("pk").eq(USER_PREFIX + "labs") & Key("sk").begins_with("DATE#")
+    }, include_pilot=True))
     lab_draws = []
     for item in lab_resp.get("Items", []):
         glucose_bm = item.get("biomarkers", {}).get("glucose", {})

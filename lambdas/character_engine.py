@@ -1120,25 +1120,26 @@ def fetch_character_sheet(table_resource: Any, user_prefix: str, date_str: str) 
         return None
 
 
-def fetch_character_sheet_range(table_resource: Any, user_prefix: str, start_date: str, end_date: str) -> list[dict[str, Any]]:
+def fetch_character_sheet_range(table_resource: Any, user_prefix: str, start_date: str, end_date: str,
+                                include_pilot: bool = False) -> list[dict[str, Any]]:
+    """ADR-058: phase='pilot' records are excluded by default; restart tooling
+    can pass include_pilot=True to opt out of the filter."""
     try:
-        resp = table_resource.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :start AND :end",
-            ExpressionAttributeValues={
+        from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+        base_kwargs = {
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :start AND :end",
+            "ExpressionAttributeValues": {
                 ":pk": user_prefix + "character_sheet",
                 ":start": "DATE#" + start_date, ":end": "DATE#" + end_date,
             },
-        )
+        }
+        resp = table_resource.query(**with_phase_filter(base_kwargs, include_pilot=include_pilot))
         items = resp.get("Items", [])
         while resp.get("LastEvaluatedKey"):
-            resp = table_resource.query(
-                KeyConditionExpression="pk = :pk AND sk BETWEEN :start AND :end",
-                ExpressionAttributeValues={
-                    ":pk": user_prefix + "character_sheet",
-                    ":start": "DATE#" + start_date, ":end": "DATE#" + end_date,
-                },
-                ExclusiveStartKey=resp["LastEvaluatedKey"],
-            )
+            resp = table_resource.query(**with_phase_filter(
+                dict(base_kwargs, ExclusiveStartKey=resp["LastEvaluatedKey"]),
+                include_pilot=include_pilot,
+            ))
             items.extend(resp.get("Items", []))
         return [_from_decimal(i) for i in items]
     except Exception as e:

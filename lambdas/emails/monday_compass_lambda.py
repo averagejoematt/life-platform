@@ -40,6 +40,7 @@ from decimal import Decimal
 import boto3
 
 from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
@@ -171,7 +172,7 @@ def query_source(source, start_date, end_date):
         },
     }
     while True:
-        resp = table.query(**kwargs)
+        resp = table.query(**with_phase_filter(kwargs))
         items.extend([d2f(i) for i in resp.get("Items", [])])
         if "LastEvaluatedKey" not in resp:
             break
@@ -181,12 +182,12 @@ def query_source(source, start_date, end_date):
 def query_source_latest(source):
     """Get the most recent record for a source."""
     pk = f"USER#{USER_ID}#SOURCE#{source}"
-    resp = table.query(
-        KeyConditionExpression="pk = :pk",
-        ExpressionAttributeValues={":pk": pk},
-        ScanIndexForward=False,
-        Limit=1,
-    )
+    resp = table.query(**with_phase_filter({
+        "KeyConditionExpression": "pk = :pk",
+        "ExpressionAttributeValues": {":pk": pk},
+        "ScanIndexForward": False,
+        "Limit": 1,
+    }))
     items = resp.get("Items", [])
     return d2f(items[0]) if items else {}
 

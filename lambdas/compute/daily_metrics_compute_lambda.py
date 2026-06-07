@@ -41,6 +41,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import scoring_engine
+from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -117,7 +118,7 @@ def fetch_range(source, start, end):
             },
         }
         while True:
-            r = table.query(**kwargs)
+            r = table.query(**with_phase_filter(kwargs))
             records.extend(d2f(i) for i in r.get("Items", []))
             if "LastEvaluatedKey" not in r:
                 break

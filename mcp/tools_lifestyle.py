@@ -284,11 +284,12 @@ def tool_get_insights(args):
     limit = int(args.get("limit") or 50)
     today = datetime.now(timezone.utc).date()
 
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(INSIGHTS_PK) & Key("sk").begins_with("INSIGHT#"),
-        ScanIndexForward=False,  # newest first
-        Limit=200,
-    )
+    from mcp.core import _apply_phase_filter  # ADR-058
+    resp = table.query(**_apply_phase_filter({
+        "KeyConditionExpression": Key("pk").eq(INSIGHTS_PK) & Key("sk").begins_with("INSIGHT#"),
+        "ScanIndexForward": False,  # newest first
+        "Limit": 200,
+    }))
     items = resp.get("Items", [])
 
     results = []
@@ -2484,10 +2485,11 @@ def tool_list_experiments(args):
     status_filter = args.get("status")  # None = all
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(EXPERIMENTS_PK) & Key("sk").begins_with("EXP#"),
-        ScanIndexForward=False,
-    )
+    from mcp.core import _apply_phase_filter  # ADR-058
+    resp = table.query(**_apply_phase_filter({
+        "KeyConditionExpression": Key("pk").eq(EXPERIMENTS_PK) & Key("sk").begins_with("EXP#"),
+        "ScanIndexForward": False,
+    }))
     items = resp.get("Items", [])
 
     results = []
@@ -3013,14 +3015,15 @@ def tool_get_ruck_log(args):
     end = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
-    resp = table.query(
-        KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-        ExpressionAttributeValues={
+    from mcp.core import _apply_phase_filter  # ADR-058
+    resp = table.query(**_apply_phase_filter({
+        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+        "ExpressionAttributeValues": {
             ":pk": RUCK_PK,
             ":s": f"DATE#{start}",
             ":e": f"DATE#{end}\xff",
         },
-    )
+    }))
     items = resp.get("Items", [])
     if not items:
         return {"message": f"No rucks logged between {start} and {end}.", "total_sessions": 0}

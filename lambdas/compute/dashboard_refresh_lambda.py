@@ -18,6 +18,7 @@ from decimal import Decimal
 import logging
 
 from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -71,13 +72,13 @@ def fetch_date(source, date_str):
 
 def fetch_range(source, start, end):
     try:
-        r = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={
+        r = table.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {
                 ":pk": USER_PREFIX + source,
                 ":s": "DATE#" + start,
                 ":e": "DATE#" + end,
-            })
+            }}))
         return [d2f(i) for i in r.get("Items", [])]
     except Exception:
         return []

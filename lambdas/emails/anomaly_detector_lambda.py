@@ -501,14 +501,15 @@ def _check_sustained_streaks(yesterday_str, today_flagged):
         start_6d = (yest_dt - timedelta(days=6)).isoformat()
 
         pk = f"USER#{USER_ID}#SOURCE#anomalies"
-        resp = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={
+        from phase_filter import with_phase_filter
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {
                 ":pk": pk,
                 ":s":  f"DATE#{start_6d}",
                 ":e":  f"DATE#{yesterday_str}",
             },
-        )
+        }))
         history = {item["date"]: item for item in resp.get("Items", [])}
     except Exception as e:
         logger.warning(f"_check_sustained_streaks: DDB read failed (non-fatal, falling back to single-day): {e}")

@@ -40,22 +40,18 @@ def _fetch_one(date_str):
 
 
 def _fetch_range(start, end):
+    from mcp.core import _apply_phase_filter  # ADR-058
     try:
-        resp = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={
+        kwargs = _apply_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {
                 ":pk": CS_PK, ":s": "DATE#" + start, ":e": "DATE#" + end,
             },
-        )
+        })
+        resp = table.query(**kwargs)
         items = resp.get("Items", [])
         while resp.get("LastEvaluatedKey"):
-            resp = table.query(
-                KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-                ExpressionAttributeValues={
-                    ":pk": CS_PK, ":s": "DATE#" + start, ":e": "DATE#" + end,
-                },
-                ExclusiveStartKey=resp["LastEvaluatedKey"],
-            )
+            resp = table.query(**kwargs, ExclusiveStartKey=resp["LastEvaluatedKey"])
             items.extend(resp.get("Items", []))
         return [_d2f(i) for i in items]
     except Exception as e:
@@ -446,24 +442,19 @@ def tool_get_rewards(args):
     status_filter = args.get("status", "").lower() or None
     valid_statuses = ["active", "triggered", "claimed"]
 
+    from mcp.core import _apply_phase_filter  # ADR-058
     try:
-        resp = table.query(
-            KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
-            ExpressionAttributeValues={
+        kwargs = _apply_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+            "ExpressionAttributeValues": {
                 ":pk": REWARDS_PK,
                 ":prefix": "REWARD#",
             },
-        )
+        })
+        resp = table.query(**kwargs)
         items = resp.get("Items", [])
         while resp.get("LastEvaluatedKey"):
-            resp = table.query(
-                KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
-                ExpressionAttributeValues={
-                    ":pk": REWARDS_PK,
-                    ":prefix": "REWARD#",
-                },
-                ExclusiveStartKey=resp["LastEvaluatedKey"],
-            )
+            resp = table.query(**kwargs, ExclusiveStartKey=resp["LastEvaluatedKey"])
             items.extend(resp.get("Items", []))
     except Exception as e:
         logger.error(f"[rewards] get_rewards query failed: {e}")
@@ -615,11 +606,12 @@ def tool_update_character_config(args):
 def evaluate_rewards(character_sheet, table_resource=None):
     """Check all active rewards against current character sheet. Returns newly triggered rewards."""
     tbl = table_resource or table
+    from mcp.core import _apply_phase_filter  # ADR-058
     try:
-        resp = tbl.query(
-            KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
-            ExpressionAttributeValues={":pk": REWARDS_PK, ":prefix": "REWARD#"},
-        )
+        resp = tbl.query(**_apply_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+            "ExpressionAttributeValues": {":pk": REWARDS_PK, ":prefix": "REWARD#"},
+        }))
         items = resp.get("Items", [])
     except Exception as e:
         logger.error(f"[rewards] evaluate_rewards query failed: {e}")

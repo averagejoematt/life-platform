@@ -30,13 +30,15 @@ def _get_item(sk):
         return {}
 
 def _query_prefix(prefix, limit=24, asc=False):
+    from mcp.core import _apply_phase_filter  # ADR-058
     try:
-        resp = _get_table().query(
-            KeyConditionExpression=Key('pk').eq('USER#matthew#SOURCE#food_delivery')
+        # ADR-058: longitudinal/clinical archive — cross-phase by design (owner decision 2026-06-06)
+        resp = _get_table().query(**_apply_phase_filter({
+            'KeyConditionExpression': Key('pk').eq('USER#matthew#SOURCE#food_delivery')
                 & Key('sk').begins_with(prefix),
-            ScanIndexForward=asc,
-            Limit=limit
-        )
+            'ScanIndexForward': asc,
+            'Limit': limit
+        }, include_pilot=True))
         return resp.get('Items', [])
     except Exception:
         return []

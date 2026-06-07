@@ -31,6 +31,7 @@ from decimal import Decimal
 from collections import Counter, defaultdict
 
 from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 import re
 
 _logger_std = logging.getLogger()
@@ -93,16 +94,16 @@ def load_plate_history(today_str):
     """Load last MAX_PLATE_HISTORY weekly plate summaries from DynamoDB platform_memory."""
     try:
         start_date = (datetime.strptime(today_str, "%Y-%m-%d") - timedelta(days=70)).strftime("%Y-%m-%d")
-        resp = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {
                 ":pk": USER_PREFIX_MEMORY,
                 ":s": f"MEMORY#weekly_plate#{start_date}",
                 ":e": f"MEMORY#weekly_plate#{today_str}",
             },
-            ScanIndexForward=False,
-            Limit=MAX_PLATE_HISTORY,
-        )
+            "ScanIndexForward": False,
+            "Limit": MAX_PLATE_HISTORY,
+        }))
         items = [d2f(i) for i in resp.get("Items", [])]
         logger.info(f"Plate history: {len(items)} past plates loaded")
         return items
@@ -220,7 +221,7 @@ def query_range(source, start_date, end_date):
         },
     }
     while True:
-        resp = table.query(**kwargs)
+        resp = table.query(**with_phase_filter(kwargs))
         for item in resp.get("Items", []):
             date_str = item["sk"].replace("DATE#", "")
             records[date_str] = d2f(item)
