@@ -58,8 +58,8 @@
 | **🛑 Defer-with-rationale (won't do)** | 9 | Documented `won't-do` unless trigger fires |
 | **📦 New work surfaced (post-V2)** | 7 | N-01 ✅ closed · N-08 ✅ resolved 2026-06-06 (tier 3→1) |
 | **🌐 v4 website + ops follow-ups** | 5 | S-01 ✅ + S-02 ✅ + S-06 ✅ deployed · B-03 ✅ · S-03/S-04/S-05 open · S-07 deferred |
-| **🚀 Product & Growth (PG)** | 11 | NEW 2026-06-07 summit. PG-00 ✅ (ADR-078) · **PG-01 ✅ + PG-02 ✅ + PG-05 ✅ deployed** · PG-03/04 ready; PG-13/14 exploratory |
-| **TOTAL OPEN** | **~36** | 2026-06-07: +14 PG items from summit; PG-00/01/02/05 closed same day |
+| **🚀 Product & Growth (PG)** | 10 | NEW 2026-06-07 summit. PG-00 ✅ · **PG-01 ✅ + PG-02 ✅ + PG-05 ✅ deployed · PG-03 ✅ landed** · PG-04 (ESP decision); PG-13/14 exploratory |
+| **TOTAL OPEN** | **~35** | 2026-06-07: +14 PG items from summit; PG-00/01/02/03/05 closed same day |
 
 ---
 
@@ -98,7 +98,7 @@
 - **Acceptance:** overlay shows once, dismissible, never blocks the dense view; `tests/visual_qa.py` cockpit still PASS.
 - **Effort:** S (client). **Gate:** none.
 
-### PG-03 — Subscribe CTA on every chronicle dispatch + "read from #1" (READY)
+### PG-03 — Subscribe CTA on every chronicle dispatch + "read from #1" ✅ DONE 2026-06-07 (foot CTA → /subscribe/ + RSS + earliest-by-date back-catalogue link; `dispatches.js`)
 - **Why:** the chronicle is the only organic-share engine; today it has no consistent capture or back-catalogue path.
 - **Files:** chronicle templates (`site/chronicle/` + `scripts/v4_build_*` for chronicle render), `posts.json` ordering for the "#1" path.
 - **Action:** subscribe CTA at the foot of every dispatch; a "start from the first dispatch" link; verify `/feed.xml` (L-06, live) is linked.
