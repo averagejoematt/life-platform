@@ -185,10 +185,11 @@ def tool_list_protocols(args):
     status_filter = (args.get("status") or "").strip()
     domain_filter = (args.get("domain") or "").strip()
 
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(PROTOCOLS_PK) & Key("sk").begins_with("PROTOCOL#"),
-        ScanIndexForward=True,
-    )
+    from mcp.core import _apply_phase_filter  # ADR-058
+    resp = table.query(**_apply_phase_filter({
+        "KeyConditionExpression": Key("pk").eq(PROTOCOLS_PK) & Key("sk").begins_with("PROTOCOL#"),
+        "ScanIndexForward": True,
+    }))
     items = decimal_to_float(resp.get("Items", []))
 
     protocols = []

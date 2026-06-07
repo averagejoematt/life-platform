@@ -30,6 +30,8 @@ from decimal import Decimal
 import boto3
 from boto3.dynamodb.conditions import Key
 
+from phase_filter import with_phase_filter  # ADR-058
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -138,11 +140,11 @@ def _decimal_to_float(obj):
 def _latest_item(source: str) -> dict | None:
     """Get the most recent item for a source."""
     pk = f"{USER_PREFIX}{source}"
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(pk),
-        ScanIndexForward=False,
-        Limit=1,
-    )
+    resp = table.query(**with_phase_filter({  # ADR-058: hide pilot records
+        "KeyConditionExpression": Key("pk").eq(pk),
+        "ScanIndexForward": False,
+        "Limit": 1,
+    }))
     items = _decimal_to_float(resp.get("Items", []))
     return items[0] if items else None
 
@@ -371,7 +373,8 @@ def _ask_fetch_context() -> dict:
             ctx["pillars"] = pillars
             break
     hs_pk = f"{USER_PREFIX}habit_scores"
-    hs_resp = table.query(KeyConditionExpression=Key("pk").eq(hs_pk), ScanIndexForward=False, Limit=1)
+    hs_resp = table.query(**with_phase_filter(  # ADR-058: hide pilot habit scores
+        {"KeyConditionExpression": Key("pk").eq(hs_pk), "ScanIndexForward": False, "Limit": 1}))
     hs_items = _decimal_to_float(hs_resp.get("Items", []))
     if hs_items:
         ctx["tier0_streak"] = int(hs_items[0].get("t0_perfect_streak", 0) or 0)

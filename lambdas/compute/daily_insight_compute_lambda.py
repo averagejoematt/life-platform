@@ -54,6 +54,8 @@ import urllib.error
 
 import boto3
 
+from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
@@ -120,7 +122,7 @@ def fetch_range(source, start, end):
                                           ":s": "DATE#" + start, ":e": "DATE#" + end},
         }
         while True:
-            r = table.query(**kwargs)
+            r = table.query(**with_phase_filter(kwargs))
             records.extend(d2f(i) for i in r.get("Items", []))
             if "LastEvaluatedKey" not in r:
                 break
@@ -148,12 +150,12 @@ def fetch_memory_records(category, days=30):
     start_sk = f"MEMORY#{category}#{start}"
     end_sk = f"MEMORY#{category}#~"
     try:
-        resp = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={":pk": pk, ":s": start_sk, ":e": end_sk},
-            ScanIndexForward=False,
-            Limit=5,
-        )
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {":pk": pk, ":s": start_sk, ":e": end_sk},
+            "ScanIndexForward": False,
+            "Limit": 5,
+        }))
         return [d2f(i) for i in resp.get("Items", [])]
     except Exception as e:
         logger.warning(f"fetch_memory({category}): {e}")
@@ -552,16 +554,16 @@ def _load_intention_history(yesterday_str):
     ).strftime("%Y-%m-%d")
     pk = USER_PREFIX + "platform_memory"
     try:
-        resp = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {
                 ":pk": pk,
                 ":s": f"MEMORY#intention_tracking#{start}",
                 ":e": f"MEMORY#intention_tracking#{yesterday_str}",
             },
-            ScanIndexForward=False,
-            Limit=14,
-        )
+            "ScanIndexForward": False,
+            "Limit": 14,
+        }))
         records = []
         for item in resp.get("Items", []):
             rec = d2f(item)
@@ -1136,16 +1138,16 @@ def _build_experiment_context(yesterday_str, profile):
     """
     try:
         exp_pk = USER_PREFIX + "experiments"
-        resp = table.query(
-            KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
-            FilterExpression="#st = :active",
-            ExpressionAttributeNames={"#st": "status"},
-            ExpressionAttributeValues={
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+            "FilterExpression": "#st = :active",
+            "ExpressionAttributeNames": {"#st": "status"},
+            "ExpressionAttributeValues": {
                 ":pk":     exp_pk,
                 ":prefix": "EXP#",
                 ":active": "active",
             },
-        )
+        }))
         active_exps = [d2f(i) for i in resp.get("Items", [])]
     except Exception as e:
         logger.warning(f"_build_experiment_context: query failed (non-fatal): {e}")
@@ -2003,11 +2005,11 @@ def lambda_handler(event, context):
     try:
         from boto3.dynamodb.conditions import Key as _CKey
         _corr_pk = USER_PREFIX + "weekly_correlations"
-        _corr_resp = table.query(
-            KeyConditionExpression=_CKey("pk").eq(_corr_pk),
-            ScanIndexForward=False,
-            Limit=1,
-        )
+        _corr_resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": _CKey("pk").eq(_corr_pk),
+            "ScanIndexForward": False,
+            "Limit": 1,
+        }))
         _corr_items = _corr_resp.get("Items", [])
         if _corr_items:
             _corr_rec = _corr_items[0]

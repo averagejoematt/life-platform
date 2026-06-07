@@ -29,6 +29,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from collections import defaultdict
 from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
@@ -115,7 +116,7 @@ def query_range(source, start_date, end_date):
         },
     }
     while True:
-        resp = table.query(**kwargs)
+        resp = table.query(**with_phase_filter(kwargs))
         for item in resp.get("Items", []):
             date_str = item.get("date") or item["sk"].replace("DATE#", "")
             records[date_str] = d2f(item)
@@ -132,7 +133,7 @@ def query_all(source):
         "ExpressionAttributeValues": {":pk": pk},
     }
     while True:
-        resp = table.query(**kwargs)
+        resp = table.query(**with_phase_filter(kwargs))
         items.extend(resp.get("Items", []))
         if "LastEvaluatedKey" not in resp:
             break
@@ -195,11 +196,11 @@ def gather_nutrition_data():
     prev_review = None
     try:
         pk = f"USER#{USER_ID}#SOURCE#nutrition_review"
-        resp = table.query(
-            KeyConditionExpression="pk = :pk",
-            ExpressionAttributeValues={":pk": pk},
-            ScanIndexForward=False, Limit=1,
-        )
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk",
+            "ExpressionAttributeValues": {":pk": pk},
+            "ScanIndexForward": False, "Limit": 1,
+        }))
         items = resp.get("Items", [])
         if items:
             prev_review = d2f(items[0])

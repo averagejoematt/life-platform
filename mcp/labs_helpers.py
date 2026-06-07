@@ -6,7 +6,7 @@ import logging
 
 from boto3.dynamodb.conditions import Key
 from mcp.config import table, s3_client, S3_BUCKET, USER_PREFIX, logger
-from mcp.core import decimal_to_float, query_source
+from mcp.core import decimal_to_float, query_source, _apply_phase_filter
 
 _GENOME_CACHE_V2 = None
 
@@ -32,7 +32,11 @@ def _get_genome_cached():
 def _query_all_lab_draws():
     """Query all blood draw items from labs source, sorted chronologically."""
     pk = f"{USER_PREFIX}labs"
-    kwargs = {"KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with("DATE#")}
+    # ADR-058: longitudinal/clinical archive — cross-phase by design (owner decision 2026-06-06)
+    kwargs = _apply_phase_filter(
+        {"KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with("DATE#")},
+        include_pilot=True,
+    )
     items = []
     while True:
         resp = table.query(**kwargs)
@@ -46,7 +50,11 @@ def _query_all_lab_draws():
 def _query_dexa_scans():
     """Query all DEXA scan items, sorted chronologically."""
     pk = f"{USER_PREFIX}dexa"
-    kwargs = {"KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with("DATE#")}
+    # ADR-058: longitudinal/clinical archive — cross-phase by design (owner decision 2026-06-06)
+    kwargs = _apply_phase_filter(
+        {"KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with("DATE#")},
+        include_pilot=True,
+    )
     items = []
     while True:
         resp = table.query(**kwargs)
@@ -60,7 +68,11 @@ def _query_dexa_scans():
 def _query_lab_meta():
     """Query labs provider metadata items (non-DATE# SKs)."""
     pk = f"{USER_PREFIX}labs"
-    kwargs = {"KeyConditionExpression": Key("pk").eq(pk)}
+    # ADR-058: longitudinal/clinical archive — cross-phase by design (owner decision 2026-06-06)
+    kwargs = _apply_phase_filter(
+        {"KeyConditionExpression": Key("pk").eq(pk)},
+        include_pilot=True,
+    )
     items = []
     while True:
         resp = table.query(**kwargs)

@@ -41,6 +41,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -130,11 +131,11 @@ def query_range(source, start_date, end_date):
     from boto3.dynamodb.conditions import Key
     pk = f"USER#{USER_ID}#SOURCE#{source}"
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(
                 f"DATE#{start_date}", f"DATE#{end_date}"
-            )
-        )
+            ),
+        }))
         return d2f(resp.get("Items", []))
     except Exception as e:
         logger.warning(f"query_range({source}) failed: {e}")
@@ -175,10 +176,10 @@ def load_existing_hypotheses(status_filter=None):
     """Load existing hypotheses from DynamoDB."""
     from boto3.dynamodb.conditions import Key
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(HYPOTHESES_PK) & Key("sk").begins_with("HYPOTHESIS#"),
-            ScanIndexForward=False,
-        )
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": Key("pk").eq(HYPOTHESES_PK) & Key("sk").begins_with("HYPOTHESIS#"),
+            "ScanIndexForward": False,
+        }))
         items = d2f(resp.get("Items", []))
         if status_filter:
             items = [h for h in items if h.get("status") == status_filter]
@@ -439,9 +440,9 @@ def load_active_experiments():
     EXPERIMENTS_PK = f"USER#{USER_ID}#SOURCE#experiments"
     try:
         from boto3.dynamodb.conditions import Key
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(EXPERIMENTS_PK) & Key("sk").begins_with("EXP#"),
-        )
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": Key("pk").eq(EXPERIMENTS_PK) & Key("sk").begins_with("EXP#"),
+        }))
         items = []
         for item in resp.get("Items", []):
             status = item.get("status", "")

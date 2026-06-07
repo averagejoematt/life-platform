@@ -32,6 +32,8 @@ import boto3
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+
 # OBS-1: Structured logger
 try:
     from platform_logger import get_logger
@@ -94,7 +96,7 @@ def fetch_range(source, start_date, end_date):
             },
         }
         while True:
-            r = table.query(**kwargs)
+            r = table.query(**with_phase_filter(kwargs))
             records.extend(d2f(item) for item in r.get("Items", []))
             if "LastEvaluatedKey" not in r:
                 break

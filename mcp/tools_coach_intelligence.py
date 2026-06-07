@@ -149,11 +149,12 @@ def tool_get_coach_track_record(args):
     try:
         # LEARNING# is the authoritative per-evaluation audit. Query the date
         # range as a between() against the SK pattern LEARNING#{date}#{slug}.
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(coach_pk)
+        from mcp.core import _apply_phase_filter  # ADR-058
+        resp = table.query(**_apply_phase_filter({
+            "KeyConditionExpression": Key("pk").eq(coach_pk)
                 & Key("sk").between(f"LEARNING#{cutoff}", "LEARNING#z"),
-            ScanIndexForward=False,
-        )
+            "ScanIndexForward": False,
+        }))
     except Exception as ex:
         return {"error": str(ex)}
 

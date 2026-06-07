@@ -96,15 +96,19 @@ def fetch_source_date(source, date_str):
 
 
 def fetch_range(source, start, end):
+    # ADR-058: physiological continuity — the circadian baseline needs the
+    # actual sleep rhythm history, not just the post-restart week (owner
+    # decision 2026-06-06). include_pilot=True is a deliberate no-op annotation.
+    from phase_filter import with_phase_filter
     try:
-        records, kwargs = [], {
+        records, kwargs = [], with_phase_filter({
             "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
             "ExpressionAttributeValues": {
                 ":pk": USER_PREFIX + source,
                 ":s":  "DATE#" + start,
                 ":e":  "DATE#" + end,
             },
-        }
+        }, include_pilot=True)
         while True:
             r = table.query(**kwargs)
             records.extend(d2f(i) for i in r.get("Items", []))

@@ -25,6 +25,8 @@ from decimal import Decimal  # noqa: F401
 import boto3  # noqa: F401 — handlers may instantiate clients
 from boto3.dynamodb.conditions import Key
 
+from phase_filter import with_phase_filter  # ADR-058
+
 from web.site_api_common import (
     logger,
     table,
@@ -1071,12 +1073,12 @@ def handle_hypotheses() -> dict:
     Cache: 3600s (hypothesis engine runs daily; data shifts slowly).
     """
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(_HYPOTHESES_PK)
-                                   & Key("sk").begins_with("HYPOTHESIS#"),
-            ScanIndexForward=False,  # newest first
-            Limit=50,
-        )
+        resp = table.query(**with_phase_filter({  # ADR-058: hide pilot hypotheses
+            "KeyConditionExpression": Key("pk").eq(_HYPOTHESES_PK)
+                                      & Key("sk").begins_with("HYPOTHESIS#"),
+            "ScanIndexForward": False,  # newest first
+            "Limit": 50,
+        }))
     except Exception as e:
         logger.warning(f"hypotheses query failed: {e}")
         return _error(503, "Hypotheses unavailable.")
@@ -1124,11 +1126,11 @@ def handle_intelligence_summary() -> dict:
     }
     # Hypotheses count + by-status
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(_HYPOTHESES_PK)
-                                   & Key("sk").begins_with("HYPOTHESIS#"),
-            Limit=200,
-        )
+        resp = table.query(**with_phase_filter({  # ADR-058: hide pilot hypotheses
+            "KeyConditionExpression": Key("pk").eq(_HYPOTHESES_PK)
+                                      & Key("sk").begins_with("HYPOTHESIS#"),
+            "Limit": 200,
+        }))
         items = _decimal_to_float(resp.get("Items", []))
         public_items = [it for it in items if it.get("public") is not False]
         summary["hypotheses"]["count"] = len(public_items)
@@ -1142,11 +1144,11 @@ def handle_intelligence_summary() -> dict:
 
     # Latest weekly correlation matrix
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}weekly_correlations"),
-            ScanIndexForward=False,
-            Limit=1,
-        )
+        resp = table.query(**with_phase_filter({  # ADR-058: hide pilot correlations
+            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}weekly_correlations"),
+            "ScanIndexForward": False,
+            "Limit": 1,
+        }))
         items = _decimal_to_float(resp.get("Items", []))
         if items:
             record = items[0]
@@ -1160,10 +1162,10 @@ def handle_intelligence_summary() -> dict:
 
     # Active experiments — query the experiments partition (best-effort)
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}experiments"),
-            Limit=100,
-        )
+        resp = table.query(**with_phase_filter({  # ADR-058: hide pilot experiments
+            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}experiments"),
+            "Limit": 100,
+        }))
         items = _decimal_to_float(resp.get("Items", []))
         summary["experiments"]["active"] = sum(
             1 for it in items if it.get("status") == "active"

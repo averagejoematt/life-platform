@@ -123,16 +123,17 @@ def _get_latest_chronicle_headline(table_client, user_id: str) -> dict | None:
         from datetime import timedelta
         today = datetime.now(timezone.utc).date()
         week_ago = (today - timedelta(days=7)).isoformat()
-        resp = table_client.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={
+        from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+        resp = table_client.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {
                 ":pk": f"USER#{user_id}#SOURCE#chronicle",
                 ":s":  f"DATE#{week_ago}",
                 ":e":  f"DATE#{today.isoformat()}",
             },
-            ScanIndexForward=False,
-            Limit=1,
-        )
+            "ScanIndexForward": False,
+            "Limit": 1,
+        }))
         items = resp.get("Items", [])
         if items:
             item = items[0]
@@ -159,16 +160,17 @@ def _get_recent_chronicles(table_client, user_id: str, count: int = 3) -> list:
         from datetime import timedelta
         today = datetime.now(timezone.utc).date()
         d90 = (today - timedelta(days=90)).isoformat()
-        resp = table_client.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={
+        from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+        resp = table_client.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {
                 ":pk": f"USER#{user_id}#SOURCE#chronicle",
                 ":s":  f"DATE#{d90}",
                 ":e":  f"DATE#{today.isoformat()}",
             },
-            ScanIndexForward=False,
-            Limit=count,
-        )
+            "ScanIndexForward": False,
+            "Limit": count,
+        }))
         items = resp.get("Items", [])
         entries = []
         for item in items:

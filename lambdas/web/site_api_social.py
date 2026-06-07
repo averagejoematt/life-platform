@@ -33,6 +33,8 @@ from datetime import datetime, timezone, timedelta
 import boto3
 from boto3.dynamodb.conditions import Key
 
+from phase_filter import with_phase_filter  # ADR-058
+
 from web.site_api_common import (
     logger,
     table,
@@ -490,11 +492,11 @@ def handle_experiment_library() -> dict:
     exp_status_map = {}
     try:
         exp_pk = f"{USER_PREFIX}experiments"
-        exp_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(exp_pk),
-            ScanIndexForward=False,
-            Limit=100,
-        )
+        exp_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot experiments
+            "KeyConditionExpression": Key("pk").eq(exp_pk),
+            "ScanIndexForward": False,
+            "Limit": 100,
+        }))
         for item in _decimal_to_float(exp_resp.get("Items", [])):
             if not item.get("sk", "").startswith("EXP#"):
                 continue
@@ -798,11 +800,11 @@ def _handle_experiment_detail(event: dict) -> dict:
     runs = []
     try:
         exp_pk = f"{USER_PREFIX}experiments"
-        exp_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(exp_pk),
-            ScanIndexForward=False,
-            Limit=100,
-        )
+        exp_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot experiments
+            "KeyConditionExpression": Key("pk").eq(exp_pk),
+            "ScanIndexForward": False,
+            "Limit": 100,
+        }))
         for item in _decimal_to_float(exp_resp.get("Items", [])):
             if not item.get("sk", "").startswith("EXP#"):
                 continue
@@ -1050,10 +1052,10 @@ def handle_challenges() -> dict:
     """
     challenges_pk = f"USER#{USER_ID}#SOURCE#challenges"
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(challenges_pk) & Key("sk").begins_with("CHALLENGE#"),
-            ScanIndexForward=False,
-        )
+        resp = table.query(**with_phase_filter({  # ADR-058: hide pilot challenges
+            "KeyConditionExpression": Key("pk").eq(challenges_pk) & Key("sk").begins_with("CHALLENGE#"),
+            "ScanIndexForward": False,
+        }))
         items = resp.get("Items", [])
 
         # Build response — website mainly needs active + candidate

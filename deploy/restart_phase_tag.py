@@ -67,7 +67,14 @@ TIMESTAMP_FALLBACKS = (
 NEVER_TAG_PARTITIONS = {"subscribers", "genome"}
 
 # SK prefixes that indicate identity / non-data records — never tag.
-NEVER_TAG_SK_PREFIXES = ("EMAIL#", "PROFILE#", "CONFIG#")
+# Durable platform memories (2026-06-06, phase-filter sweep): the intelligence
+# wipe deliberately KEEPS baseline_snapshot / re_entry / cycle-marker memories,
+# but this tagger used to stamp them phase=pilot anyway — so the read-path
+# filter would hide exactly what the wipe chose to preserve. Never tag them.
+NEVER_TAG_SK_PREFIXES = (
+    "EMAIL#", "PROFILE#", "CONFIG#",
+    "MEMORY#baseline_snapshot#", "MEMORY#re_entry#", "MEMORY#cycle_",
+)
 
 
 def extract_date(item: dict) -> str | None:
