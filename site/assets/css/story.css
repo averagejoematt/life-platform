@@ -167,6 +167,33 @@ body { overflow-x: hidden; }
 .dx-readfull { appearance: none; background: transparent; border: 0; cursor: pointer; padding: 0; }
 .dx-readmore a:hover, .dx-readfull:hover { text-decoration: underline; }
 .dx-readmore a:focus-visible, .dx-readfull:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
+
+/* ── PG-03 — per-dispatch subscribe foot + "start from the beginning" ──────── */
+.dx-subscribe {
+  margin-top: var(--sp-7); padding: var(--sp-5);
+  border: var(--border-hair); border-top: 2px solid var(--ember);
+  border-radius: var(--radius); background: var(--ember-wash);
+  max-width: var(--measure);
+}
+.dx-sub-h { font-family: var(--font-serif); font-size: var(--fs-body-lg); margin: 0; color: var(--ink); }
+.dx-sub-p { margin: var(--sp-2) 0 var(--sp-4); color: var(--ink-muted); }
+.dx-sub-cta { display: flex; align-items: baseline; gap: var(--sp-4); flex-wrap: wrap; margin: 0; }
+.dx-sub-btn {
+  font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.04em;
+  color: var(--ember); text-decoration: none;
+  border: 1px solid var(--ember-line); border-radius: var(--radius-xs);
+  padding: var(--sp-2) var(--sp-4); transition: background var(--dur-fast);
+}
+.dx-sub-btn:hover { background: color-mix(in oklch, var(--ember) 14%, transparent); }
+.dx-sub-rss { font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.04em; color: var(--ink-muted); text-decoration: none; }
+.dx-sub-rss:hover { color: var(--ember); text-decoration: underline; }
+.dx-startfirst {
+  display: inline-block; margin-top: var(--sp-4);
+  appearance: none; background: transparent; border: 0; cursor: pointer; padding: 0;
+  font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.04em; color: var(--ink-muted);
+}
+.dx-startfirst:hover { color: var(--ember); text-decoration: underline; }
+.dx-sub-btn:focus-visible, .dx-sub-rss:focus-visible, .dx-startfirst:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
 /* full article, rendered inline in the v4 reader */
 .dx-fulltext { margin-top: var(--sp-4); max-width: var(--measure); }
 .dx-fulltext p { font-family: var(--font-serif); font-size: var(--fs-body-lg); line-height: var(--lh-relaxed); color: var(--ink); margin-top: var(--sp-4); }

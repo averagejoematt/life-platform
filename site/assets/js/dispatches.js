@@ -60,16 +60,38 @@ async function renderRead(s, id) {
     return;
   }
   // posts (chronicle / journal)
-  const ent = entriesFor(s, await secFetch(s)).find((x) => String(x.id) === String(id));
+  const all = entriesFor(s, await secFetch(s));
+  const ent = all.find((x) => String(x.id) === String(id));
   if (!ent) { read.innerHTML = `<p class="dx-prose">Pick an entry to read it here.</p>`; return; }
   const readmore = ent.url
     ? `<p class="dx-readmore"><button type="button" class="dx-readfull" data-url="${esc(ent.url)}">Read the full piece${ent.word_count ? ` (${esc(ent.word_count)} words)` : ""} →</button></p><div class="dx-fulltext" data-fulltext hidden></div>`
     : (ent.word_count ? `<p class="dx-foot label">${esc(ent.word_count)} words</p>` : "");
   read.innerHTML = `<p class="dx-kicker label">${s.key === "chronicle" ? "chronicle · Elena Voss" : "journal"} · week ${esc(ent.id)}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
     `<h3 class="dx-title">${esc(ent.title)}</h3>` + (ent.meta ? `<p class="dx-stats label">${esc(ent.meta)}</p>` : "") +
-    `<p class="dx-prose dx-excerpt">${esc(ent.excerpt || "")}</p>` + readmore;
+    `<p class="dx-prose dx-excerpt">${esc(ent.excerpt || "")}</p>` + readmore + dispatchFoot(s, ent, all);
   const rf = read.querySelector(".dx-readfull");
   if (rf) rf.addEventListener("click", () => loadFull(rf, read.querySelector("[data-fulltext]"), read.querySelector(".dx-excerpt")));
+  const sf = read.querySelector(".dx-startfirst");
+  if (sf) sf.addEventListener("click", () => selectEntry(s, sf.dataset.startid));
+}
+
+// PG-03 — the per-dispatch foot: a subscribe CTA (the chronicle is the only
+// organic-share engine) + a "start from the beginning" link. The first dispatch
+// is the chronologically-earliest by date (week labels run -4…N, non-linear).
+function dispatchFoot(s, ent, all) {
+  const sorted = (all || []).slice().sort((a, b) =>
+    String(a.date || "").localeCompare(String(b.date || "")) || (Number(a.id) - Number(b.id)));
+  const first = sorted[0];
+  const startLink = (first && String(first.id) !== String(ent.id))
+    ? `<button type="button" class="dx-startfirst" data-startid="${esc(first.id)}">↩ Start from the beginning — &ldquo;${esc(first.title)}&rdquo;</button>`
+    : "";
+  return `
+    <aside class="dx-subscribe" aria-label="Follow the experiment">
+      <p class="dx-sub-h">Follow the experiment as it's written.</p>
+      <p class="dx-sub-p">New dispatches land here first — the down weeks included. No selling, unsubscribe anytime.</p>
+      <p class="dx-sub-cta"><a class="dx-sub-btn" href="/subscribe/">Subscribe by email</a><a class="dx-sub-rss" href="/rss.xml">or follow via RSS</a></p>
+      ${startLink}
+    </aside>`;
 }
 
 // Expand the full chronicle/journal piece inline (same-origin, platform-authored content):
