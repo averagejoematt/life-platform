@@ -1,3 +1,18 @@
+## v8.4.0 — 2026-06-07 (product/growth summit + first PG front-door work)
+
+### Added
+- **2026-06-07 Product + Personal summit** (`docs/reviews/SUMMIT_2026-06-07_PRODUCT_GROWTH_REVIEW.md`) + **ADR-078** (commercial wedge — Wedge B build-in-public *now*, Wedge A transformation-story *accruing*, Wedge C SaaS *shelved*) + **14 PG-series backlog items** with the governing test (*more likely, or less likely, to reach 185?*) and the build cap.
+- **PG-02 — Cockpit first-run orientation** (`cockpit.js` + `cockpit.css`): a dismissible "what am I looking at" card for first-time visitors, shown once (`localStorage` `ajm-cockpit-intro-v1`), non-modal and above the panel so it never blocks the dense view the pilot uses daily. Confidence framing preserved (the `preliminary · n=9` labels are part of the explanation, not simplified away).
+
+### Changed
+- **PG-01 — Hero "who it's for" line** (`index.html` + `story.css`, deployed): adds the 10-second audience line the summit's audience panel found missing — everyman / Wedge-A framing ("…tired of transformation theater and wants to watch a real one happen — slowly, honestly, in public"), set apart with an ember left-rule.
+- **PG-05 — Genesis-aware Evidence empty-states** (`evidence.js`, deployed): the three reset-emptied surfaces (correlations / predictions / benchmarks) now read as integrity — the experiment deliberately restarted; data accrues from the current genesis — rather than a broken pipeline.
+
+### Operational
+- PG-01 + PG-05 deployed to averagejoematt.com (content-hashed sync + CloudFront invalidation); smoke 65/0, both verified live.
+
+---
+
 ## v8.3.4 — 2026-06-07 (ADR-077 phase taxonomy + coherent restart tooling)
 
 ### Added

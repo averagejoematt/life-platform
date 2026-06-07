@@ -58,8 +58,8 @@
 | **🛑 Defer-with-rationale (won't do)** | 9 | Documented `won't-do` unless trigger fires |
 | **📦 New work surfaced (post-V2)** | 7 | N-01 ✅ closed · N-08 ✅ resolved 2026-06-06 (tier 3→1) |
 | **🌐 v4 website + ops follow-ups** | 5 | S-01 ✅ + S-02 ✅ + S-06 ✅ deployed · B-03 ✅ · S-03/S-04/S-05 open · S-07 deferred |
-| **🚀 Product & Growth (PG)** | 14 | NEW 2026-06-07 summit — see PG section. PG-01–05 ready now; PG-13/14 exploratory (Wedge B) |
-| **TOTAL OPEN** | **~39** | 2026-06-07: +14 PG items from product/growth summit (`docs/reviews/SUMMIT_2026-06-07_PRODUCT_GROWTH_REVIEW.md`) |
+| **🚀 Product & Growth (PG)** | 11 | NEW 2026-06-07 summit. PG-00 ✅ (ADR-078) · **PG-01 ✅ + PG-05 ✅ deployed** · **PG-02 ✅ landed (pending deploy)** · PG-03/04 ready; PG-13/14 exploratory |
+| **TOTAL OPEN** | **~36** | 2026-06-07: +14 PG items from summit; PG-00/01/02/05 closed same day |
 
 ---
 
@@ -84,14 +84,14 @@
 - **Claude Code action:** none until decided. Once decided, record as an ADR (`docs/DECISIONS.md`) and unblock PG-06.
 - **Effort:** decision only. **Gate:** Matthew.
 
-### PG-01 — Story-page honesty hook + 10-sec "what/who" (READY)
+### PG-01 — Story-page honesty hook + 10-sec "what/who" ✅ DONE 2026-06-07 (deployed; everyman/Wedge-A line, PR #31)
 - **Why:** the front door assumes you already know what the site is; the Midlife-Wake-up & Casual-Reader segments bounce. The shareable asset (honest *before*, biostatistician-checked) isn't stated anywhere.
 - **Files:** `site/index.html` (hero copy / `.h-hero__title` area), relevant copy in `scripts/v4_build_*` if hero is templated; check `site/assets/js/components.js` for hero hydration.
 - **Action:** add a one-line hook (honesty framing, no employer/partner per guardrails) + a 10-second "what this is / who it's for" line above the fold. Copy only — do not touch Direction-05 visual identity (Tyrell: it's already world-class).
 - **Acceptance:** a first-time visitor can answer "what is this and who's it for" in <10s; `bash deploy/smoke_test_site.sh` stays 65/0; CLS budget (<0.1) unaffected.
 - **Effort:** S (copy). **Gate:** none.
 
-### PG-02 — Cockpit first-run reading layer (READY)
+### PG-02 — Cockpit first-run reading layer ✅ DONE 2026-06-07 (dismissible first-run card, localStorage `ajm-cockpit-intro-v1`; pending deploy)
 - **Why:** `/now` is glanceable for the pilot, unreadable for a new visitor (Mara: "can't use it without instructions"). Two-mode: pilot (dense default) vs visitor (narrated first-visit overlay).
 - **Files:** `site/assets/js/` (cockpit hydration — locate the `/now` renderer), `site/assets/css/` for the overlay; client-side only, NO api change (James: cheap).
 - **Action:** dismissible first-run "what am I looking at" overlay; default stays dense; preserve confidence labels (Henning: "preliminary pattern, n=9" is the credibility moment). Use a lightweight cookie/localStorage flag for "seen".
@@ -112,7 +112,7 @@
 - **Acceptance:** real subscribe produces a confirmed subscriber + welcome email; no canary/MAILER-DAEMON regressions.
 - **Effort:** S + decision. **Gate:** Matthew picks ESP vs native SES.
 
-### PG-05 — Evidence empty-states say *why* (READY)
+### PG-05 — Evidence empty-states say *why* ✅ DONE 2026-06-07 (deployed; genesis-aware copy on correlations/predictions/benchmarks, PR #31)
 - **Why:** genesis-week Evidence pages (correlations/predictions/benchmarks) are honestly empty; a visitor must read *integrity*, not breakage.
 - **Files:** `site/assets/js/evidence.js` (the bespoke `renderCorrelations`/`renderPredictions`/`renderBenchmarks` empty-states), rebuild via `scripts/v4_build_evidence.py`.
 - **Action:** empty-state copy explains genesis reset + "fills in as data accrues" with confidence framing.
