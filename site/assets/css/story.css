@@ -51,6 +51,11 @@ body { overflow-x: hidden; }
   line-height: 1.45; color: var(--ink-muted); margin-top: var(--sp-5); max-width: 40ch;
 }
 .hero-sub { margin-top: var(--sp-4); color: var(--ink-muted); max-width: 46ch; }
+.hero-for {
+  margin-top: var(--sp-4); max-width: 46ch; color: var(--ink-muted);
+  padding-left: var(--sp-3); border-left: 2px solid var(--ember-line);
+}
+.hero-for em { font-style: normal; color: var(--ember); }
 .hero-cta { margin-top: var(--sp-5); }
 .cta {
   display: inline-block; font-family: var(--font-mono); font-size: var(--fs-small);
