@@ -34,7 +34,7 @@ AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 
 # Shared utils layer — update on every layer rebuild (bash deploy/build_layer.sh)
-SHARED_LAYER_VERSION = 73  # v73: same content as v72 (D-01 cache_system=False on daily-brief ai_calls + utcnow() fixes), republished by the CFN-managed LayerVersion during the 2026-06-06 cdk deploy --all. Lesson: never `aws lambda publish-layer-version` manually — CFN can't adopt it and republishes, churning the version; let cdk deploy LifePlatformCore publish.
+SHARED_LAYER_VERSION = 74  # v74: ADR-058 phase-filter sweep layer modules (character_engine include_pilot passthrough, insight_writer/site_writer/output_writers filters, exercise_history/labs_coaching cross-phase annotations). Published 2026-06-07 via cdk deploy LifePlatformCore (never publish-layer-version manually — CFN republishes and churns the version).
 
 SHARED_LAYER_ARN = (
     f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
