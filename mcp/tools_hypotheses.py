@@ -35,16 +35,17 @@ def tool_get_hypotheses(args: dict):
     include_archived = args.get("include_archived", False)
 
     table = get_table()
+    from mcp.core import _apply_phase_filter  # ADR-058
     try:
-        resp = table.query(
-            KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
-            ExpressionAttributeValues={
+        resp = table.query(**_apply_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+            "ExpressionAttributeValues": {
                 ":pk": HYPOTHESES_PK,
                 ":prefix": "HYPOTHESIS#",
             },
-            ScanIndexForward=False,
-            Limit=100,
-        )
+            "ScanIndexForward": False,
+            "Limit": 100,
+        }))
     except Exception as e:
         return {"error": f"DDB query failed: {e}"}
 

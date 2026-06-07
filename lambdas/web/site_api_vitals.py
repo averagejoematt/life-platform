@@ -231,11 +231,11 @@ def handle_character() -> dict:
     # that window returned 503 for ~16h every day (00:00 UTC until the daily run landed),
     # degrading the Cockpit. `as_of_date` tells the reader how fresh it is.
     pk = f"{USER_PREFIX}character_sheet"
-    _resp = table.query(
-        KeyConditionExpression=Key("pk").eq(pk) & Key("sk").begins_with("DATE#"),
-        ScanIndexForward=False,
-        Limit=2,
-    )
+    _resp = table.query(**with_phase_filter({  # ADR-058: hide pilot character sheets
+        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with("DATE#"),
+        "ScanIndexForward": False,
+        "Limit": 2,
+    }))
     _recs = _decimal_to_float(_resp.get("Items", []))
     record = _recs[0] if _recs else None
     prior_record = _recs[1] if len(_recs) > 1 else None
@@ -596,10 +596,10 @@ def handle_journey_timeline() -> dict:
     # ── 5. FDR-significant correlation findings ────────────────────────
     corr_pk = f"{USER_PREFIX}weekly_correlations"
     try:
-        corr_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(corr_pk),
-            ScanIndexForward=True,
-        )
+        corr_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot correlations
+            "KeyConditionExpression": Key("pk").eq(corr_pk),
+            "ScanIndexForward": True,
+        }))
         _METRIC_LABELS = {
             "hrv": "Heart Rate Variability", "recovery_score": "Recovery Score",
             "sleep_duration": "Sleep Duration", "sleep_score": "Sleep Score",
@@ -777,30 +777,30 @@ def handle_achievements() -> dict:
 
     # ── Streak data
     habit_pk = f"{USER_PREFIX}habit_scores"
-    habit_resp = table.query(
-        KeyConditionExpression=Key("pk").eq(habit_pk),
-        ScanIndexForward=False,
-        Limit=1,
-    )
+    habit_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot habit scores
+        "KeyConditionExpression": Key("pk").eq(habit_pk),
+        "ScanIndexForward": False,
+        "Limit": 1,
+    }))
     habit_items = _decimal_to_float(habit_resp.get("Items", []))
     latest_habit = habit_items[0] if habit_items else {}
     current_streak = int(latest_habit.get("t0_perfect_streak") or latest_habit.get("t0_aggregate_streak") or 0)
 
     # Days tracked = count of habit_score records in last 365 days
-    all_habits_resp = table.query(
-        KeyConditionExpression=Key("pk").eq(habit_pk) & Key("sk").between(
+    all_habits_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot habit scores
+        "KeyConditionExpression": Key("pk").eq(habit_pk) & Key("sk").between(
             f"DATE#{d365}", f"DATE#{today}"
         ),
-    )
+    }))
     days_tracked = len(all_habits_resp.get("Items", []))
 
     # ── Character level
     char_pk = f"{USER_PREFIX}character_sheet"
-    char_resp = table.query(
-        KeyConditionExpression=Key("pk").eq(char_pk),
-        ScanIndexForward=False,
-        Limit=1,
-    )
+    char_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot character sheets
+        "KeyConditionExpression": Key("pk").eq(char_pk),
+        "ScanIndexForward": False,
+        "Limit": 1,
+    }))
     char_items = _decimal_to_float(char_resp.get("Items", []))
     current_level = int(float((char_items[0] if char_items else {}).get("character_level", 1)))
 
@@ -812,11 +812,11 @@ def handle_achievements() -> dict:
 
     # ── First experiment
     exp_pk = f"{USER_PREFIX}experiments"
-    exp_resp = table.query(
-        KeyConditionExpression=Key("pk").eq(exp_pk),
-        ScanIndexForward=False,
-        Limit=50,
-    )
+    exp_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot experiments
+        "KeyConditionExpression": Key("pk").eq(exp_pk),
+        "ScanIndexForward": False,
+        "Limit": 50,
+    }))
     all_exps = [
         i for i in _decimal_to_float(exp_resp.get("Items", []))
         if i.get("sk", "").startswith("EXP#")
@@ -848,9 +848,9 @@ def handle_achievements() -> dict:
     completed_challenges = 0
     perfect_challenges = 0
     try:
-        ch_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(challenges_pk) & Key("sk").begins_with("CHALLENGE#"),
-        )
+        ch_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot challenges
+            "KeyConditionExpression": Key("pk").eq(challenges_pk) & Key("sk").begins_with("CHALLENGE#"),
+        }))
         ch_items = _decimal_to_float(ch_resp.get("Items", []))
         for ch in ch_items:
             if ch.get("status") == "completed":

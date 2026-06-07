@@ -439,12 +439,13 @@ def tool_list_challenges(args):
     domain_filter = (args.get("domain") or "").strip()
     limit = min(int(args.get("limit", 50)), 100)
 
-    resp = table.query(
-        KeyConditionExpression=(
+    from mcp.core import _apply_phase_filter  # ADR-058
+    resp = table.query(**_apply_phase_filter({
+        "KeyConditionExpression": (
             Key("pk").eq(CHALLENGES_PK) & Key("sk").begins_with("CHALLENGE#")
         ),
-        ScanIndexForward=False,
-    )
+        "ScanIndexForward": False,
+    }))
     items = resp.get("Items", [])
 
     # Apply filters
@@ -579,11 +580,12 @@ def tool_complete_challenge(args):
     badge = ""
     if final_status == "completed":
         # Count total completed challenges (including this one)
-        all_resp = table.query(
-            KeyConditionExpression=(
+        from mcp.core import _apply_phase_filter  # ADR-058
+        all_resp = table.query(**_apply_phase_filter({
+            "KeyConditionExpression": (
                 Key("pk").eq(CHALLENGES_PK) & Key("sk").begins_with("CHALLENGE#")
             ),
-        )
+        }))
         completed_count = sum(
             1 for i in all_resp.get("Items", [])
             if i.get("status") == "completed"

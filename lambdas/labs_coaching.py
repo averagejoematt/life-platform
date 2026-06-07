@@ -53,13 +53,17 @@ def build_labs_coaching_context(table, user_prefix):
     """
     try:
         from boto3.dynamodb.conditions import Key
+        # ADR-058: clinical archive — lab draws are date-independent; filtering
+        # pilot draws would blind the coach to the entire lab history (owner
+        # decision 2026-06-06). include_pilot=True is a deliberate no-op annotation.
+        from phase_filter import with_phase_filter
         # Read latest labs — try the clinical.json S3 approach used by handle_labs
         labs_pk = f"{user_prefix}labs"
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(labs_pk),
-            ScanIndexForward=False,
-            Limit=20,
-        )
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": Key("pk").eq(labs_pk),
+            "ScanIndexForward": False,
+            "Limit": 20,
+        }, include_pilot=True))
         items = resp.get("Items", [])
         if not items:
             return ""

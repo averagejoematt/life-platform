@@ -24,6 +24,8 @@ import boto3
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
+from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+
 try:
     from platform_logger import get_logger
     logger = get_logger("weekly-signal")
@@ -110,16 +112,16 @@ def _get_weekly_insight():
     today = datetime.now(timezone.utc).date()
     week_ago = (today - timedelta(days=7)).isoformat()
     try:
-        resp = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {
                 ":pk": f"{USER_PREFIX}computed_insights",
                 ":s":  f"DATE#{week_ago}",
                 ":e":  f"DATE#{today.isoformat()}",
             },
-            ScanIndexForward=False,
-            Limit=5,
-        )
+            "ScanIndexForward": False,
+            "Limit": 5,
+        }))
         items = [_d2f(i) for i in resp.get("Items", [])]
         for item in items:
             guidance = item.get("guidance_given") or item.get("top_insight") or item.get("summary")

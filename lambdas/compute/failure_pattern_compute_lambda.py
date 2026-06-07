@@ -30,6 +30,8 @@ import logging
 import boto3
 from datetime import datetime, timedelta, timezone
 
+from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+
 try:
     from platform_logger import get_logger
     logger = get_logger("failure-pattern-compute")
@@ -62,15 +64,15 @@ def _check_data_gate():
     try:
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         gate_start = (datetime.now(timezone.utc) - timedelta(days=MIN_DAYS_REQUIRED)).strftime("%Y-%m-%d")
-        resp = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :start AND :end",
-            ExpressionAttributeValues={
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :start AND :end",
+            "ExpressionAttributeValues": {
                 ":pk":    f"{USER_PREFIX}habit_scores",
                 ":start": f"DATE#{gate_start}",
                 ":end":   f"DATE#{today}",
             },
-            Select="COUNT",
-        )
+            "Select": "COUNT",
+        }))
         days = resp.get("Count", 0)
         return days >= MIN_DAYS_REQUIRED, days
     except Exception as e:
@@ -403,34 +405,34 @@ def lambda_handler(event, context):
     lookback_start = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
 
     try:
-        habit_resp = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :start AND :end",
-            ExpressionAttributeValues={
+        habit_resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :start AND :end",
+            "ExpressionAttributeValues": {
                 ":pk":    f"{USER_PREFIX}habit_scores",
                 ":start": f"DATE#{lookback_start}",
                 ":end":   f"DATE#{today}",
             },
-        )
+        }))
         habit_records = habit_resp.get("Items", [])
 
-        outcome_resp = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :start AND :end",
-            ExpressionAttributeValues={
+        outcome_resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :start AND :end",
+            "ExpressionAttributeValues": {
                 ":pk":    f"{USER_PREFIX}day_grade",
                 ":start": f"DATE#{lookback_start}",
                 ":end":   f"DATE#{today}",
             },
-        )
+        }))
         outcome_records = outcome_resp.get("Items", [])
 
-        sleep_resp = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :start AND :end",
-            ExpressionAttributeValues={
+        sleep_resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :start AND :end",
+            "ExpressionAttributeValues": {
                 ":pk":    f"{USER_PREFIX}whoop",
                 ":start": f"DATE#{lookback_start}",
                 ":end":   f"DATE#{today}",
             },
-        )
+        }))
         sleep_records = sleep_resp.get("Items", [])
 
     except Exception as e:

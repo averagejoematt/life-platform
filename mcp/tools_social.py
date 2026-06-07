@@ -212,14 +212,15 @@ def tool_get_social_dashboard(args):
     end = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
-    resp = table.query(
-        KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-        ExpressionAttributeValues={
+    from mcp.core import _apply_phase_filter  # ADR-058
+    resp = table.query(**_apply_phase_filter({
+        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+        "ExpressionAttributeValues": {
             ":pk": INTERACTIONS_PK,
             ":s": f"DATE#{start}",
             ":e": f"DATE#{end}\xff",
         },
-    )
+    }))
     items = [decimal_to_float(i) for i in resp.get("Items", [])]
     items.sort(key=lambda x: x.get("date", ""))
 
@@ -393,14 +394,15 @@ def tool_get_temptation_trend(args):
     end = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
-    resp = table.query(
-        KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-        ExpressionAttributeValues={
+    from mcp.core import _apply_phase_filter  # ADR-058
+    resp = table.query(**_apply_phase_filter({
+        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+        "ExpressionAttributeValues": {
             ":pk": TEMPTATIONS_PK,
             ":s": f"DATE#{start}",
             ":e": f"DATE#{end}\xff",
         },
-    )
+    }))
     items = [decimal_to_float(i) for i in resp.get("Items", [])]
     items.sort(key=lambda x: x.get("date", ""))
 
@@ -567,14 +569,15 @@ def tool_get_exposure_log(args):
     end = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
-    resp = table.query(
-        KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-        ExpressionAttributeValues={
+    from mcp.core import _apply_phase_filter  # ADR-058
+    resp = table.query(**_apply_phase_filter({
+        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+        "ExpressionAttributeValues": {
             ":pk": EXPOSURES_PK,
             ":s": f"DATE#{start}",
             ":e": f"DATE#{end}\xff",
         },
-    )
+    }))
     items = [decimal_to_float(i) for i in resp.get("Items", [])]
     items.sort(key=lambda x: x.get("date", ""))
 
@@ -634,14 +637,15 @@ def tool_get_exposure_correlation(args):
     start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     # Get exposures
-    resp = table.query(
-        KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-        ExpressionAttributeValues={
+    from mcp.core import _apply_phase_filter  # ADR-058
+    resp = table.query(**_apply_phase_filter({
+        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+        "ExpressionAttributeValues": {
             ":pk": EXPOSURES_PK,
             ":s": f"DATE#{start}",
             ":e": f"DATE#{end}\xff",
         },
-    )
+    }))
     exposures = [decimal_to_float(i) for i in resp.get("Items", [])]
 
     if len(exposures) < 3:
@@ -830,11 +834,12 @@ def tool_annotate_discovery(args):
 def tool_get_discovery_annotations(args):
     """List all discovery annotations."""
     from boto3.dynamodb.conditions import Key as _Key
+    from mcp.core import _apply_phase_filter  # ADR-058
     try:
-        resp = table.query(
-            KeyConditionExpression=_Key("pk").eq(ANNOTATIONS_PK),
-            ScanIndexForward=True,
-        )
+        resp = table.query(**_apply_phase_filter({
+            "KeyConditionExpression": _Key("pk").eq(ANNOTATIONS_PK),
+            "ScanIndexForward": True,
+        }))
         items = decimal_to_float(resp.get("Items", []))
     except Exception as e:
         return {"error": f"Failed to query annotations: {e}"}

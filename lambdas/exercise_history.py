@@ -97,10 +97,15 @@ def load_recent_history(
     index: dict[str, list[dict[str, Any]]] = {}
 
     last_key = None
+    # ADR-058: training continuity — weight selection needs the most recent
+    # performances regardless of experiment phase; filtering pilot workouts
+    # would make the routine generator think every lift is brand-new (owner
+    # decision 2026-06-06). include_pilot=True is a deliberate no-op annotation.
+    from phase_filter import with_phase_filter
     while True:
-        kwargs: dict[str, Any] = {
+        kwargs: dict[str, Any] = with_phase_filter({
             "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").gte(f"DATE#{start}"),
-        }
+        }, include_pilot=True)
         if last_key:
             kwargs["ExclusiveStartKey"] = last_key
         resp = _table().query(**kwargs)

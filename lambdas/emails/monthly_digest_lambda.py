@@ -558,10 +558,11 @@ def gather_all():
     try:
         cs_pk = f"USER#{USER_ID}#SOURCE#character_sheet"
         def _cs_fetch(s, e):
-            resp = table.query(
-                KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-                ExpressionAttributeValues={":pk": cs_pk, ":s": f"DATE#{s}", ":e": f"DATE#{e}"}
-            )
+            from phase_filter import with_phase_filter
+            resp = table.query(**with_phase_filter({
+                "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                "ExpressionAttributeValues": {":pk": cs_pk, ":s": f"DATE#{s}", ":e": f"DATE#{e}"},
+            }))
             return [d2f(i) for i in resp.get("Items", [])]
         cs_recs_cur = _cs_fetch(wins["cur_start"],   wins["cur_end"])
         cs_recs_prior = _cs_fetch(wins["prior_start"], wins["prior_end"])

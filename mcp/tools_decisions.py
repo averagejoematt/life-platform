@@ -99,12 +99,13 @@ def tool_get_decisions(args):
     outcome_only = args.get("outcome_only", False)
 
     from boto3.dynamodb.conditions import Key
+    from mcp.core import _apply_phase_filter  # ADR-058
 
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(_decisions_pk()) & Key("sk").begins_with("DECISION#"),
-        ScanIndexForward=False,
-        Limit=100,
-    )
+    resp = table.query(**_apply_phase_filter({
+        "KeyConditionExpression": Key("pk").eq(_decisions_pk()) & Key("sk").begins_with("DECISION#"),
+        "ScanIndexForward": False,
+        "Limit": 100,
+    }))
     items = resp.get("Items", [])
 
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")

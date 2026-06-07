@@ -32,6 +32,8 @@ import boto3
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+
 try:
     from platform_logger import get_logger
     logger = get_logger("chronicle-email-sender")
@@ -77,16 +79,16 @@ def _get_this_weeks_installment() -> dict | None:
     today_str = today.isoformat()
 
     try:
-        resp = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={
+        resp = table.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {
                 ":pk": CHRONICLE_PK,
                 ":s":  f"DATE#{week_ago}",
                 ":e":  f"DATE#{today_str}",
             },
-            ScanIndexForward=False,
-            Limit=1,
-        )
+            "ScanIndexForward": False,
+            "Limit": 1,
+        }))
         items = resp.get("Items", [])
         if not items:
             logger.info("No Chronicle installment found within last 7 days — no-op")

@@ -96,14 +96,16 @@ def tool_get_sick_days(args):
     ).strftime("%Y-%m-%d")
 
     try:
-        resp = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={
+        from mcp.core import _apply_phase_filter  # ADR-058
+        # ADR-058: longitudinal/clinical archive — cross-phase by design (owner decision 2026-06-06)
+        resp = table.query(**_apply_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {
                 ":pk": SICK_DAYS_PK,
                 ":s":  f"DATE#{start_date}",
                 ":e":  f"DATE#{end_date}",
             },
-        )
+        }, include_pilot=True))
         items = [_d2f(i) for i in resp.get("Items", [])]
     except Exception as e:
         logger.error(f"[sick_days] get_sick_days query failed: {e}")

@@ -23,6 +23,8 @@ from decimal import Decimal  # noqa: F401
 
 from boto3.dynamodb.conditions import Key
 
+from phase_filter import with_phase_filter  # ADR-058
+
 from web.site_api_common import (
     logger,
     table,
@@ -69,11 +71,11 @@ def handle_field_notes(event):
         }}, cache_seconds=300)
     else:
         # List mode — return all weeks (most recent first)
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(fn_pk),
-            ScanIndexForward=False,
-            Limit=52,
-        )
+        resp = table.query(**with_phase_filter({  # ADR-058: hide pilot field notes
+            "KeyConditionExpression": Key("pk").eq(fn_pk),
+            "ScanIndexForward": False,
+            "Limit": 52,
+        }))
         items = _decimal_to_float(resp.get("Items", []))
         entries = [{
             "week": i.get("week", i.get("sk", "").replace("WEEK#", "")),
@@ -178,10 +180,10 @@ def handle_coach_analysis(event):
         coach_pk = f"COACH#{coach_id}"
 
         # 1. Most recent OUTPUT# record
-        out_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(coach_pk) & Key("sk").begins_with("OUTPUT#"),
-            ScanIndexForward=False, Limit=1,
-        )
+        out_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot coach outputs
+            "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("OUTPUT#"),
+            "ScanIndexForward": False, "Limit": 1,
+        }))
         out_items = out_resp.get("Items", [])
         if not out_items:
             return _ok({"coach_id": coach_id, "domain": domain, "analysis": None}, cache_seconds=300)
@@ -195,9 +197,9 @@ def handle_coach_analysis(event):
         # 2. Open threads
         thread_reference = None
         try:
-            thread_resp = table.query(
-                KeyConditionExpression=Key("pk").eq(coach_pk) & Key("sk").begins_with("THREAD#"),
-            )
+            thread_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot coach threads
+                "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("THREAD#"),
+            }))
             threads = [_decimal_to_float(t) for t in thread_resp.get("Items", []) if t.get("status") == "open"]
             if threads:
                 # Pick most recently referenced thread
@@ -228,10 +230,10 @@ def handle_coach_analysis(event):
         # 4. Computation guardrails — data availability
         data_availability = "preliminary"
         try:
-            comp_resp = table.query(
-                KeyConditionExpression=Key("pk").eq("COACH#computation") & Key("sk").begins_with("RESULTS#"),
-                ScanIndexForward=False, Limit=1,
-            )
+            comp_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot computation results
+                "KeyConditionExpression": Key("pk").eq("COACH#computation") & Key("sk").begins_with("RESULTS#"),
+                "ScanIndexForward": False, "Limit": 1,
+            }))
             comp_items = comp_resp.get("Items", [])
             if comp_items:
                 guardrails = _decimal_to_float(comp_items[0]).get("statistical_guardrails", {})
@@ -249,10 +251,10 @@ def handle_coach_analysis(event):
         # 5. Revision signal — recent learning records
         revision_signal = None
         try:
-            learn_resp = table.query(
-                KeyConditionExpression=Key("pk").eq(coach_pk) & Key("sk").begins_with("LEARNING#"),
-                ScanIndexForward=False, Limit=3,
-            )
+            learn_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot coach learnings
+                "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("LEARNING#"),
+                "ScanIndexForward": False, "Limit": 3,
+            }))
             for item in learn_resp.get("Items", []):
                 item = _decimal_to_float(item)
                 if item.get("type") == "position_revision":
@@ -362,11 +364,11 @@ def handle_predictions(event):
             by_coach[cid] = {"total": 0, "confirmed": 0, "refuted": 0, "pending": 0}
 
             try:
-                out_resp = table.query(
-                    KeyConditionExpression=Key("pk").eq(coach_pk) & Key("sk").begins_with("OUTPUT#"),
-                    ScanIndexForward=False,
-                    Limit=12,
-                )
+                out_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot predictions
+                    "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("OUTPUT#"),
+                    "ScanIndexForward": False,
+                    "Limit": 12,
+                }))
                 for out_item in out_resp.get("Items", []):
                     out_item = _decimal_to_float(out_item)
                     preds = out_item.get("predictions", [])
@@ -453,11 +455,11 @@ def handle_coach_timeline(event):
 
         # Query OUTPUT# records for stance_changes, predictions, surprises, emotional_investment
         try:
-            out_resp = table.query(
-                KeyConditionExpression=Key("pk").eq(coach_pk) & Key("sk").begins_with("OUTPUT#"),
-                ScanIndexForward=False,
-                Limit=20,
-            )
+            out_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot timeline outputs
+                "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("OUTPUT#"),
+                "ScanIndexForward": False,
+                "Limit": 20,
+            }))
             prev_investment = None
             for out_item in out_resp.get("Items", []):
                 out_item = _decimal_to_float(out_item)
@@ -540,11 +542,11 @@ def handle_coach_timeline(event):
 
         # Also check LEARNING# records
         try:
-            learn_resp = table.query(
-                KeyConditionExpression=Key("pk").eq(coach_pk) & Key("sk").begins_with("LEARNING#"),
-                ScanIndexForward=False,
-                Limit=20,
-            )
+            learn_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot timeline learnings
+                "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("LEARNING#"),
+                "ScanIndexForward": False,
+                "Limit": 20,
+            }))
             for l_item in learn_resp.get("Items", []):
                 l_item = _decimal_to_float(l_item)
                 l_date = l_item.get("sk", "").replace("LEARNING#", "")

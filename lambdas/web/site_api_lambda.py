@@ -638,10 +638,10 @@ def lambda_handler(event, context):
             # 2. Open actions from coach_actions source
             _cd_actions = []
             try:
-                _cd_act_resp = table.query(
-                    KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}coach_actions"),
-                    Limit=50,
-                )
+                _cd_act_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot coach actions
+                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}coach_actions"),
+                    "Limit": 50,
+                }))
                 for _act in _cd_act_resp.get("Items", []):
                     _act = _decimal_to_float(_act)
                     if _act.get("status") == "open":
@@ -668,10 +668,10 @@ def lambda_handler(event, context):
 
                 # Latest output for position_summary
                 try:
-                    _cd_out = table.query(
-                        KeyConditionExpression=Key("pk").eq(_cd_coach_pk) & Key("sk").begins_with("OUTPUT#"),
-                        ScanIndexForward=False, Limit=1,
-                    )
+                    _cd_out = table.query(**with_phase_filter({  # ADR-058: hide pilot coach outputs
+                        "KeyConditionExpression": Key("pk").eq(_cd_coach_pk) & Key("sk").begins_with("OUTPUT#"),
+                        "ScanIndexForward": False, "Limit": 1,
+                    }))
                     _cd_out_items = _cd_out.get("Items", [])
                     if _cd_out_items:
                         _cd_out_item = _decimal_to_float(_cd_out_items[0])
