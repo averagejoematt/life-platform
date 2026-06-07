@@ -47,6 +47,7 @@ REGISTRY = [
     # ── Credibility & the machine ──────────────────────────────────────────
     ("board",       "The board",   "The named AI experts who argue about the data — reads & roster.",     "Credibility & the machine", "data", "/api/coaching-dashboard", None, "/legacy/coaches/"),
     ("methodology", "Methodology", "How inputs become scores — N=1, the correlation engine, confidence.", "Credibility & the machine", "editorial", None, None, "/legacy/methodology/"),
+    ("build",       "How it's built", "Build-in-public — the AI agents, the budget governor, and keeping a model honest about my own data.", "Credibility & the machine", "editorial", None, None, None),
     ("intelligence", "Intelligence", "Cross-source correlations the engine surfaces (correlative only).", "Credibility & the machine", "data", "/api/correlations", None, "/legacy/intelligence/"),
     ("predictions", "Predictions", "The model's forward calls — logged, then scored against reality.",    "Credibility & the machine", "data", "/api/predictions", None, "/legacy/predictions/"),
     ("benchmarks",  "Benchmarks",  "Where the numbers sit vs age-band and centenarian targets.",          "Credibility & the machine", "data", "/api/benchmark_trends", None, "/legacy/benchmarks/"),
@@ -79,6 +80,20 @@ EDITORIAL = {
     ),
     "kitchen": (
         '<p class="rd-archive">The Kitchen is personalised meal intelligence — built from CGM response, macro tracking, and your real eating patterns. It needs data to work, and fills in automatically once daily nutrition logging and CGM readings accumulate over the first weeks. Until then, see Nutrition and Glucose &amp; meals for what\'s already flowing.</p>'
+    ),
+    "build": (
+        '<p class="rd-lede">Most of these pages show the data. This one shows the machine that gathers it — built in public, by one person and a model, on a hard $75-a-month ceiling.</p>'
+        '<section class="rd-sec"><h2 class="rd-h">A board of AI experts that argues</h2>'
+        '<p class="rd-prose">The coaching layer isn\'t one assistant — it\'s an ensemble of eight named personas (a sports scientist, a metabolic doctor, a behavioural coach, an N=1 statistician, and others) that each read the week from their own discipline. They disagree, and the disagreements are surfaced rather than averaged away — a single confident voice is exactly what an experiment of one should distrust. <em>(ADR-047 / ADR-055; <strong>coach_computation_engine.py</strong>.)</em></p></section>'
+        '<section class="rd-sec"><h2 class="rd-h">Keeping a model honest about my own data</h2>'
+        '<p class="rd-prose">The rule the whole system is built around: the model never does the math. Every number — correlations, scores, deltas — is computed in Python; the model only narrates pre-computed values, always correlatively, always with the confidence label attached. It cannot invent a statistic in prose because it is never handed the raw freedom to. All inference routes through one Bedrock chokepoint so there is a single place to audit what was asked and what came back. <em>(ADR-062; <strong>bedrock_client.py</strong>.)</em> <span class="confidence conf-low">interpretive only</span></p></section>'
+        '<section class="rd-sec"><h2 class="rd-h">A governor that won\'t let the bill run away</h2>'
+        '<p class="rd-prose">Putting an AI behind a public website is a way to get a surprise invoice. So a cost governor projects month-end spend every hour and writes a budget tier (0–3). As the projection climbs, AI features degrade on purpose — first the heavy ensemble narratives pause, then the public ask-the-data endpoint returns a friendly "paused" instead of a charge, and at the ceiling even the daily brief skips inference. One traffic spike cannot empty the budget and dark-fire the site. <em>(ADR-063; <strong>cost_governor_lambda.py</strong> + <strong>budget_guard.py</strong>.)</em></p></section>'
+        '<section class="rd-sec"><h2 class="rd-h">An agent that fixes the platform while I sleep</h2>'
+        '<p class="rd-prose">A self-healing agent runs each morning, triaging alarms, failed CI, and queue backlogs. The narrow, provably-safe fixes it merges itself — behind a deterministic gate that checks an allowlist, a diff-size cap, and the test subset before anything lands. Everything riskier becomes a pull request for a human, and the production deploy approval is never bypassed. The agent has read-only credentials; the gate, not the model, holds the keys. <em>(ADR-064 / ADR-065.)</em></p></section>'
+        '<section class="rd-sec"><h2 class="rd-h">QA that looks at the screen, with a model\'s eyes</h2>'
+        '<p class="rd-prose">After every deploy a headless browser walks the live site, opens the cockpit, exercises the interactions, and screenshots each page. Then a vision model reads each screenshot for things a pixel-diff would miss or false-alarm on — broken charts, overflow, a panel that rendered empty — robust to the fact that the underlying numbers change every day. The site you\'re reading was checked this way. <em>(ADR-076; <strong>tests/visual_qa.py</strong> + <strong>tests/visual_ai_qa.py</strong>.)</em></p></section>'
+        '<p class="correlative">A note kept honest: the platform is deliberately further along than the result it documents. That\'s the joke, and the point — the engineering is the easy part; the weight is the hard part. This page is the receipt, not the trophy.</p>'
     ),
 }
 
