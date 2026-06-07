@@ -1,3 +1,13 @@
+## v8.3.3 — 2026-06-07 (ADR-058 phase-filter sweep — full read-side coverage)
+
+### Changed
+- **Phase-filter sweep landed** (PR #23, 49 files, layer v74): all 268 query callsites inventoried via AST; **112 wrapped** (47 web incl. the public discoveries/experiments/hypotheses/correlations endpoints that were serving 100% pilot-era data; structural wraps in compute/email range-helpers; 23 MCP sites), **22 explicit `include_pilot=True` cross-phase annotations** (clinical labs/DEXA, ACWR/circadian/training continuity, longitudinal MCP research tools), **68 verified exempt** (ingestion/backfill, ops telemetry, subscribers/system). AI-context leaks closed: hypothesis-engine + daily-insight no longer ingest pilot hypotheses/experiments.
+- **Owner retention rule codified:** clinical truths are date-independent; progress-tracking (weight/habits/experiments/challenges/insights/coach state/tape measurements) resets on the website at restart; nothing is ever deleted.
+- `restart_phase_tag.py`: durable platform memories (baseline_snapshot/re_entry/cycle markers) added to NEVER_TAG — the wipe keeps them, so tagging them pilot hid exactly what was preserved. (One-time live untag of `MEMORY#baseline_snapshot#2026-05-03` is an operator step.)
+- **In progress:** schema-wide phase-taxonomy registry (expert-panel review; will derive the restart scripts from one machine-readable classification — closes the `ENSEMBLE#digest` coverage gap).
+
+---
+
 ## v8.3.2 — 2026-06-06 (backlog batch: cockpit Week scope, orchestrator perf, CDK convergence, doc verification)
 
 ### Added
