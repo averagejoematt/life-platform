@@ -218,15 +218,26 @@ def rewrite_index(s3, index_key: str, apply: bool):
 
 
 def untombstone_and_redate(ddb_table, sk: str, new_date: str, apply: bool):
-    """Untombstone a chronicle DDB record and re-date it to new_date.
-    The DDB record's content stays — only flags update.
+    """Untombstone a chronicle DDB record, re-date it, and force it VISIBLE.
+
+    The record's content stays — only flags update. ADR-077 fix: the wipe stamped
+    phase=pilot on every chronicle (mode "all"); removing the tombstone alone left
+    phase=pilot, so the read filter (phase=pilot OR tombstone → hidden) still hid
+    the "resurrected" article. We now also SET phase=experiment so a kept issue is
+    genuinely visible as a pinned pre-genesis lead-in.
     """
     if apply:
         ddb_table.update_item(
             Key={"pk": "USER#matthew#SOURCE#chronicle", "sk": sk},
-            UpdateExpression="REMOVE tombstone, tombstoned_at, tombstoned_reason, hidden SET #d = :d, redated_at = :ts, redated_from_sk = :osk",
-            ExpressionAttributeNames={"#d": "date"},
-            ExpressionAttributeValues={":d": new_date, ":ts": datetime.now(timezone.utc).isoformat(), ":osk": sk},
+            UpdateExpression=(
+                "REMOVE tombstone, tombstoned_at, tombstoned_reason, hidden "
+                "SET #d = :d, #p = :exp, redated_at = :ts, redated_from_sk = :osk"
+            ),
+            ExpressionAttributeNames={"#d": "date", "#p": "phase"},
+            ExpressionAttributeValues={
+                ":d": new_date, ":exp": "experiment",
+                ":ts": datetime.now(timezone.utc).isoformat(), ":osk": sk,
+            },
         )
 
 
@@ -234,7 +245,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--apply", action="store_true", help="Commit writes (default: dry-run)")
     parser.add_argument("--resurrect-sk", action="append", default=[],
-                        help="Chronicle DDB sk to resurrect + re-date (repeatable, max 2)")
+                        help="Chronicle DDB sk to keep + re-date as a pre-genesis lead-in (repeatable, max 2)")
+    parser.add_argument("--keep-days", type=int, default=5,
+                        help="Days before genesis to date the first kept chronicle (default 5)")
     args = parser.parse_args()
 
     if len(args.resurrect_sk) > 2:
@@ -276,14 +289,15 @@ def main():
 
     # ── 3. Resurrect entries ──
     if args.resurrect_sk:
-        # Wednesday of the experiment week
+        # ADR-077 dec D: kept issues become pinned pre-genesis lead-ins, re-dated to
+        # genesis − N days (default 5), staggered one day earlier per additional
+        # keeper so multiple keepers preserve their original chronological order.
         genesis = date.fromisoformat(EXPERIMENT_START_DATE)
-        first_wednesday = genesis + timedelta(days=(2 - genesis.weekday()) % 7)
-        wednesdays = [first_wednesday + timedelta(weeks=i) for i in range(len(args.resurrect_sk))]
-        print(f"\n[3/3] Resurrecting {len(args.resurrect_sk)} chronicle(s):")
-        for sk, new_wed in zip(args.resurrect_sk, wednesdays):
-            new_date = new_wed.isoformat()
-            print(f"  {sk} → re-dated to {new_date}")
+        new_dates = [(genesis - timedelta(days=args.keep_days + i)).isoformat()
+                     for i in range(len(args.resurrect_sk))]
+        print(f"\n[3/3] Keeping {len(args.resurrect_sk)} chronicle(s) as pre-genesis lead-ins:")
+        for sk, new_date in zip(args.resurrect_sk, new_dates):
+            print(f"  {sk} → re-dated to {new_date} (phase=experiment, visible)")
             if args.apply:
                 untombstone_and_redate(ddb, sk, new_date, args.apply)
     else:
