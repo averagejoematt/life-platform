@@ -58,7 +58,7 @@
 | **🛑 Defer-with-rationale (won't do)** | 9 | Documented `won't-do` unless trigger fires |
 | **📦 New work surfaced (post-V2)** | 7 | N-01 ✅ closed · N-08 ✅ resolved 2026-06-06 (tier 3→1) |
 | **🌐 v4 website + ops follow-ups** | 5 | S-01 ✅ + S-02 ✅ + S-06 ✅ deployed · B-03 ✅ · S-03/S-04/S-05 open · S-07 deferred |
-| **🚀 Product & Growth (PG)** | 10 | NEW 2026-06-07 summit. PG-00 ✅ · **PG-01 ✅ + PG-02 ✅ + PG-05 ✅ deployed · PG-03 ✅ landed** · PG-04 (ESP decision); PG-13/14 exploratory |
+| **🚀 Product & Growth (PG)** | 10 | NEW 2026-06-07 summit. PG-00 ✅ · **PG-01/02/03/05 ✅ deployed + verified (smoke 65/0, visual_qa 20/0)** · PG-04 (ESP decision); PG-06/PG-13 Wedge-B builds; PG-14 spike |
 | **TOTAL OPEN** | **~35** | 2026-06-07: +14 PG items from summit; PG-00/01/02/03/05 closed same day |
 
 ---
