@@ -58,8 +58,8 @@
 | **🛑 Defer-with-rationale (won't do)** | 9 | Documented `won't-do` unless trigger fires |
 | **📦 New work surfaced (post-V2)** | 7 | N-01 ✅ closed · N-08 ✅ resolved 2026-06-06 (tier 3→1) |
 | **🌐 v4 website + ops follow-ups** | 5 | S-01 ✅ + S-02 ✅ + S-06 ✅ deployed · B-03 ✅ · S-03/S-04/S-05 open · S-07 deferred |
-| **🚀 Product & Growth (PG)** | 10 | NEW 2026-06-07 summit. PG-00 ✅ · **PG-01/02/03/05 ✅ deployed + verified (smoke 65/0, visual_qa 20/0)** · PG-04 (ESP decision); PG-06/PG-13 Wedge-B builds; PG-14 spike |
-| **TOTAL OPEN** | **~35** | 2026-06-07: +14 PG items from summit; PG-00/01/02/03/05 closed same day |
+| **🚀 Product & Growth (PG)** | 8 | NEW 2026-06-07 summit. PG-00 ✅ · **PG-01/02/03/05/06 ✅ deployed** · PG-04 ✅ native-SES (PR #36, CI-deploy pending) · PG-04b/PG-13 builds; PG-14 spike |
+| **TOTAL OPEN** | **~33** | 2026-06-07: +14 PG from summit; PG-00/01/02/03/05/06 closed same day; PG-04 in PR #36; PG-04b logged |
 
 ---
 
@@ -119,7 +119,7 @@
 - **Acceptance:** all 3 topics show explanatory empty-states; `tests/visual_qa.py` 20/0.
 - **Effort:** XS (copy). **Gate:** none.
 
-### PG-06 — Wedge B build-log surface (NEXT, capped)
+### PG-06 — Wedge B build-log surface ✅ DONE 2026-06-07 (editorial topic `/evidence/build/`, 6 writeups citing real ADRs/modules; no new feature)
 - **Why:** the platform/architecture is the only wedge true today (Builder/Engineer segment + enterprise-AI proof). Surfaces the build honestly.
 - **Files:** new Evidence topic or dedicated page (`scripts/v4_build_evidence.py` topic registry + an `evidence.js` renderer), sourcing from existing ADRs/`docs/`.
 - **Action:** a FINITE set of build-in-public writeups (board framework, AI-vision QA harness, budget governor, "keeping an AI honest about my own data"). **CAP: documents what exists; shipping a writeup must NOT spawn new platform features.**
