@@ -340,6 +340,45 @@ function wireTheme() {
   });
 }
 
+/* ── First-run orientation (PG-02) ───────────────────────────────────────────
+   A dismissible "what am I looking at" card for first-time visitors. Shown once
+   (localStorage), non-modal, sits above the panel — never blocks the dense view
+   the pilot uses daily. Confidence framing is preserved, not simplified away. */
+const INTRO_KEY = "ajm-cockpit-intro-v1";
+function wireFirstRun() {
+  let seen;
+  try { seen = localStorage.getItem(INTRO_KEY); } catch (e) { seen = "1"; } // private mode → don't nag
+  if (seen) return;
+  const main = $("#cockpit");
+  if (!main) return;
+
+  const intro = document.createElement("aside");
+  intro.className = "cockpit-intro";
+  intro.setAttribute("aria-label", "What you're looking at");
+  intro.innerHTML = `
+    <button class="cockpit-intro__x" type="button" aria-label="Dismiss orientation">&times;</button>
+    <p class="cockpit-intro__k label">new here?</p>
+    <h2 class="cockpit-intro__h">This is one life, measured — live.</h2>
+    <ul class="cockpit-intro__list">
+      <li><strong>The big number</strong> is today's whole-life score: seven pillars rolled into one, recomputed every morning.</li>
+      <li><strong>&ldquo;The board&rdquo;</strong> is an AI panel reading the week. Labels like <em>preliminary &middot; n=9</em> mean early signal, not proof.</li>
+      <li><strong>Today &middot; Week &middot; Month &middot; Journey</strong> (top right) change the time scope; tap any pillar to open its detail.</li>
+    </ul>
+    <button class="cockpit-intro__go" type="button">Got it &mdash; show me the cockpit</button>
+    <p class="cockpit-intro__note label">Shown once. It won't interrupt again.</p>`;
+
+  const onKey = (e) => { if (e.key === "Escape") dismiss(); };
+  function dismiss() {
+    try { localStorage.setItem(INTRO_KEY, "1"); } catch (e) {}
+    document.removeEventListener("keydown", onKey);
+    intro.remove();
+  }
+  intro.querySelector(".cockpit-intro__x").addEventListener("click", dismiss);
+  intro.querySelector(".cockpit-intro__go").addEventListener("click", dismiss);
+  document.addEventListener("keydown", onKey);
+  main.insertBefore(intro, main.firstChild);
+}
+
 /* ── load + orchestrate ──────────────────────────────────────────────────── */
 async function load() {
   const main = $("#cockpit");
@@ -393,5 +432,6 @@ function escapeHTML(s) {
 
 wireScope();
 wireTheme();
+wireFirstRun();
 bind("scopeLabel").textContent = "today";
 load();
