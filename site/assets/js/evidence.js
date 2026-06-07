@@ -108,7 +108,7 @@ function renderCorrelations(d) {
   const c = d && d.correlations;
   const obj = (c && !Array.isArray(c)) ? c : {};
   const pairs = obj.pairs || [];
-  if (!pairs.length) return empty("No correlations surfaced yet — the engine needs ~2+ weeks of overlapping daily data before it computes the weekly matrix.");
+  if (!pairs.length) return empty("No correlations yet — and that's the honest state, not a broken pipeline. The experiment is freshly anchored to its current genesis, and the weekly matrix only computes once there are ~2+ weeks of overlapping daily data. An empty matrix means the sample is still too small to claim a pattern; it fills in as the days accrue.");
   const sig = pairs.filter((p) => p.fdr_significant).length;
   const head = figs([fig(obj.count ?? pairs.length, "pairs"), sig ? fig(sig, "FDR-significant") : "", obj.week && fig(obj.week, "week")]);
   const rows = pairs.slice(0, 30).map((p) => `<tr class="${p.fdr_significant ? "rd-flag" : ""}"><td class="rd-name">${esc(p.label_a || p.metric_a)} <span class="rd-unit">↔</span> ${esc(p.label_b || p.metric_b)}</td><td class="num">${fmt(p.r, 2)}</td><td class="num rd-range">${fmt(p.p, 3)}</td><td class="num">${fmt(p.n)}</td><td>${p.fdr_significant ? `<span class="rd-flagmark">FDR ✓</span>` : esc(p.strength || "")}</td></tr>`).join("");
@@ -120,7 +120,7 @@ function renderPredictions(d) {
   const o = (d && d.overall) || {};
   const list = (d && d.predictions) || [];
   const resolved = (o.confirmed || 0) + (o.refuted || 0);
-  if (!(o.total > 0) && !list.length) return empty("No scored predictions yet — coaches log forward calls that get auto-graded against measured outcomes as target dates pass.");
+  if (!(o.total > 0) && !list.length) return empty("No scored predictions yet — the prediction ledger restarts with each genesis rather than carrying old scores forward. Coaches log forward calls that get auto-graded against measured outcomes as target dates pass, so the track record rebuilds honestly from day one. It fills in as the first calls come due.");
   const head = figs([fig(o.total ?? 0, "predictions"), o.confirmed != null && fig(o.confirmed, "confirmed"), o.refuted != null && fig(o.refuted, "refuted"), o.pending != null && fig(o.pending, "pending"), resolved > 0 && fig(fmt(o.accuracy_pct) + "%", "accuracy")]);
   const badge = (s) => s === "confirmed" ? "rd-badge-live" : "";
   const rows = list.slice(0, 40).map((p) => `<tr><td class="rd-name">${esc(p.coach_name || p.coach_id)}</td><td>${esc(p.text)}</td><td><span class="rd-badge ${badge(p.status)}">${esc(p.status)}</span></td><td class="num rd-range">${esc(p.date || "")}</td></tr>`).join("");
@@ -130,7 +130,7 @@ function renderPredictions(d) {
 // Benchmarks — where the numbers sit vs age-band + centenarian-decathlon targets.
 function renderBenchmarks(d) {
   const trends = (d && d.trends) || (Array.isArray(d) ? d : []);
-  if (!trends.length) return empty("No benchmark readouts yet — where the numbers sit vs age-band and centenarian-decathlon targets fills in as the metrics accrue.");
+  if (!trends.length) return empty("No benchmark readouts yet — these place your current numbers against age-band and centenarian-decathlon targets, and they re-populate from the current genesis as each metric accrues enough post-reset readings to be worth showing. An empty board is the experiment starting fresh, not a gap in the data. Direction, not destiny.");
   const rows = trends.slice(0, 40).map((t) => {
     const name = t.metric || t.name || t.label || t.sk || "—";
     const cur = t.current ?? t.value ?? t.current_value;
