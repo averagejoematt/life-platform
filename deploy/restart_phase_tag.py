@@ -39,12 +39,14 @@ from botocore.exceptions import ClientError
 # Add repo root to sys.path so we can import from lambdas/
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(REPO_ROOT / "lambdas"))
 
 from lambdas.constants import (
     EXPERIMENT_START_DATE,
     EXPERIMENT_PHASE_CURRENT,
     EXPERIMENT_PHASE_PRIOR,
 )
+import phase_taxonomy as taxonomy  # ADR-077: registry decides what's taggable
 
 TABLE_NAME = "life-platform"
 USER_ID = os.environ.get("LIFE_PLATFORM_USER", "matthew")
@@ -60,21 +62,21 @@ TIMESTAMP_FALLBACKS = (
     "captured_at", "ingested_at", "date_saved",
 )
 
-# Partitions whose contents are inherently cross-phase — never tag.
-# Subscribers must stay untagged so phase-filtered email sends still see them.
-# Genome data doesn't change phase. (field_notes WAS here but was wrong — items
-# use WEEK#YYYY-WNN sks and ARE date-dimensional. Removed 2026-05-24.)
-NEVER_TAG_PARTITIONS = {"subscribers", "genome"}
+# ADR-077: "never tag" is now decided by the phase_taxonomy registry, not these
+# hand-rolled lists. cross_phase (labs, dexa, genome, supplements, chronicling,
+# durable memories, subscribers) and system_state (caches, ops, dead partitions)
+# are skipped AND actively untagged if a prior run stamped them — that's what
+# un-hides supplements/chronicling/baseline_snapshot. Only experiment_scoped and
+# raw_timeseries records get a phase tag (raw_timeseries is harmless/optional but
+# kept for behavioral parity: the site genesis-anchors raw series regardless).
 
-# SK prefixes that indicate identity / non-data records — never tag.
-# Durable platform memories (2026-06-06, phase-filter sweep): the intelligence
-# wipe deliberately KEEPS baseline_snapshot / re_entry / cycle-marker memories,
-# but this tagger used to stamp them phase=pilot anyway — so the read-path
-# filter would hide exactly what the wipe chose to preserve. Never tag them.
-NEVER_TAG_SK_PREFIXES = (
-    "EMAIL#", "PROFILE#", "CONFIG#",
-    "MEMORY#baseline_snapshot#", "MEMORY#re_entry#", "MEMORY#cycle_",
-)
+
+def taxonomy_class(item: dict) -> str:
+    """Classify an item via the registry, passing memory category when present."""
+    return taxonomy.classify(
+        item.get("pk", ""), item.get("sk", ""),
+        category=item.get("category"), memory_type=item.get("memory_type"),
+    )
 
 
 def extract_date(item: dict) -> str | None:
@@ -141,21 +143,34 @@ def main():
             c = counts[source]
             c["total"] += 1
 
-            # ADR-058: never tag inherently cross-phase partitions or identity records.
-            if source in NEVER_TAG_PARTITIONS or any(sk.startswith(p) for p in NEVER_TAG_SK_PREFIXES):
+            # ADR-077: cross_phase + system_state are never tagged. If a prior run
+            # stamped them pilot (the bug that hid supplements/chronicling/baseline),
+            # actively REMOVE the phase attribute so they become visible again.
+            try:
+                cls = taxonomy_class(item)
+            except KeyError:
+                # Unknown source — leave untouched and surface it in the report.
+                cls = "unknown"
+            if cls in (taxonomy.CROSS_PHASE, taxonomy.SYSTEM_STATE, "unknown"):
                 c["untagged_no_date"] += 1
-                # If a previous run incorrectly tagged this item, remove the phase attribute.
-                if item.get("phase") and args.apply:
-                    try:
-                        table.update_item(
-                            Key={"pk": pk, "sk": sk},
-                            UpdateExpression="REMOVE #p",
-                            ExpressionAttributeNames={"#p": "phase"},
-                        )
-                        c["updated"] += 1
-                    except ClientError as e:
-                        c["errors"] += 1
-                        errors.append(f"untag {pk} / {sk} :: {e}")
+                # Un-hide: a prior run may have stamped these pilot (the bug that
+                # hid supplements/chronicling/labs). Count the would-be untag in the
+                # report (dry-run included) so the un-hiding is visible.
+                if item.get("phase") and cls != "unknown":
+                    c["would_update"] += 1
+                    if len(samples[source]) < 5:
+                        samples[source].append((sk, item.get("phase"), "(untag)"))
+                    if args.apply:
+                        try:
+                            table.update_item(
+                                Key={"pk": pk, "sk": sk},
+                                UpdateExpression="REMOVE #p",
+                                ExpressionAttributeNames={"#p": "phase"},
+                            )
+                            c["updated"] += 1
+                        except ClientError as e:
+                            c["errors"] += 1
+                            errors.append(f"untag {pk} / {sk} :: {e}")
                 continue
 
             item_date = extract_date(item)
