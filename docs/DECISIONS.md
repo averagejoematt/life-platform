@@ -2302,3 +2302,31 @@ The taxonomy is mechanically enforced and test-covered against every live family
 ---
 
 **Verified:** 2026-06-07 (ADR-077 — phase taxonomy registry + tests + doc; wiring in progress)
+
+---
+
+## ADR-078: Commercial wedge — sequence, don't choose (PG-00)
+
+**Date:** 2026-06-07
+**Status:** Decided — adopts the 2026-06-07 Product + Personal summit recommendation; resolves PG-00 and unblocks PG-06+ in `docs/BACKLOG.md`. (Reversible: a different wedge call is a one-line edit here + re-gating the PG items.)
+**Related:** `docs/reviews/SUMMIT_2026-06-07_PRODUCT_GROWTH_REVIEW.md` (full summit record), BACKLOG PG-series, W-02 (multi-tenant — won't-do).
+
+### Context
+
+The summit asked "what's the commercial opportunity?" and found three companies hiding in the question, mostly mutually exclusive for the next ~6 months: **Wedge A** (the transformation story), **Wedge B** (build-in-public — the architecture/AI-use itself), **Wedge C** (multi-tenant SaaS). The governing tension: the platform is ~2 years more mature than the transformation it documents (genesis re-anchored 2026-05-30, baseline 304.62 lb, goal 185), and commercialising is the highest-fidelity version of the platform's recurring adversarial verdict ("more pounds lost than Lambdas deployed"). Dissents on record: Reeves/Maya (an audience swaps an adherence system for a performance one), Viktor (do no wedge for 90 days and just lose weight), Sofia (start audience-building immediately).
+
+### Decision
+
+**Sequence, don't choose forever.**
+- **Wedge B (build-in-public) — NOW.** The only wedge true today; it monetises the building that's already happening and doubles as proof for the enterprise-AI-adoption mandate. **CAP:** it documents what exists and must NOT be used to justify net-new platform construction (this is the Reeves/Viktor guardrail).
+- **Wedge A (transformation story) — ACCRUING.** Start the email list + chronicle cadence now (adopts Sofia's "list now"), but **monetise only at the hard gate of ~30 lb visible honest progress AND a sustained list** (PG-11).
+- **Wedge C (multi-tenant SaaS) — SHELVED.** Stays behind the existing **W-02** trigger (a real second user begins onboarding). Not pulled forward.
+- **Governing test on every PG item:** *more likely, or less likely, to reach 185?* Growth as a byproduct of real progress = yes; growth that requires more building or more performance = no.
+
+### Consequences
+
+Unblocks **PG-06** (Wedge-B build-log surface) and **PG-13 Phase 1** (surface the existing agent roster) as the sanctioned Wedge-B work under the cap. **PG-07** (reader predict-the-week) and **PG-10** (public-AI hardening) proceed as engagement infrastructure — any reader-facing AI must clear PG-10 first. **PG-11/PG-12** stay gated on the result + list milestones. The wedge is revisited at the ~30-lb / sustained-list milestone, or sooner if the build cap is being used to rationalise construction (the failure mode this ADR exists to prevent).
+
+---
+
+**Verified:** 2026-06-07 (ADR-078 — commercial wedge: B now / A accruing / C shelved; PG-00 resolved)
