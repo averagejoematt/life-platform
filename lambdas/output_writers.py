@@ -165,10 +165,11 @@ def evaluate_rewards(character_sheet):
         return []
     tier_order = ["Foundation", "Momentum", "Discipline", "Mastery", "Elite"]
     try:
-        resp = _table.query(
-            KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
-            ExpressionAttributeValues={":pk": _REWARDS_PK, ":prefix": "REWARD#"},
-        )
+        from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+        resp = _table.query(**with_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+            "ExpressionAttributeValues": {":pk": _REWARDS_PK, ":prefix": "REWARD#"},
+        }))
         items = resp.get("Items", [])
     except Exception as e:
         print("[WARN] evaluate_rewards query failed: " + str(e))
@@ -649,11 +650,14 @@ def write_clinical_json(data, profile, yesterday):
         # Body Composition (DEXA)
         body_comp = {}
         try:
-            resp = _table.query(
-                KeyConditionExpression="pk = :pk AND begins_with(sk, :sk)",
-                ExpressionAttributeValues={":pk": _USER_PREFIX + "dexa", ":sk": "DATE#"},
-                ScanIndexForward=False, Limit=1
-            )
+            from phase_filter import with_phase_filter
+            # ADR-058 include_pilot=True: clinical archive — labs/DEXA are date-independent
+            # (owner decision 2026-06-06; filtering would empty the public labs page)
+            resp = _table.query(**with_phase_filter({
+                "KeyConditionExpression": "pk = :pk AND begins_with(sk, :sk)",
+                "ExpressionAttributeValues": {":pk": _USER_PREFIX + "dexa", ":sk": "DATE#"},
+                "ScanIndexForward": False, "Limit": 1,
+            }, include_pilot=True))
             if resp.get("Items"):
                 dexa = resp["Items"][0]
                 bc = dexa.get("body_composition", {})
@@ -673,16 +677,19 @@ def write_clinical_json(data, profile, yesterday):
         # Lab Results
         labs = {}
         try:
-            resp = _table.query(
-                KeyConditionExpression="pk = :pk AND begins_with(sk, :sk)",
-                ExpressionAttributeValues={":pk": _USER_PREFIX + "labs", ":sk": "DATE#"},
-                ScanIndexForward=False, Limit=1
-            )
-            all_draws = _table.query(
-                KeyConditionExpression="pk = :pk AND begins_with(sk, :sk)",
-                ExpressionAttributeValues={":pk": _USER_PREFIX + "labs", ":sk": "DATE#"},
-                Select="COUNT"
-            )
+            from phase_filter import with_phase_filter
+            # ADR-058 include_pilot=True: clinical archive — labs/DEXA are date-independent
+            # (owner decision 2026-06-06; filtering would empty the public labs page)
+            resp = _table.query(**with_phase_filter({
+                "KeyConditionExpression": "pk = :pk AND begins_with(sk, :sk)",
+                "ExpressionAttributeValues": {":pk": _USER_PREFIX + "labs", ":sk": "DATE#"},
+                "ScanIndexForward": False, "Limit": 1,
+            }, include_pilot=True))
+            all_draws = _table.query(**with_phase_filter({
+                "KeyConditionExpression": "pk = :pk AND begins_with(sk, :sk)",
+                "ExpressionAttributeValues": {":pk": _USER_PREFIX + "labs", ":sk": "DATE#"},
+                "Select": "COUNT",
+            }, include_pilot=True))
             total_draws = all_draws.get("Count", 0)
 
             if resp.get("Items"):

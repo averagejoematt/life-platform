@@ -152,16 +152,17 @@ def tool_read_platform_memory(args: dict) -> dict:
     end_sk = _sk(category, end) + "~"  # ~ sorts after all dates
 
     try:
-        resp = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={
+        from mcp.core import _apply_phase_filter  # ADR-058
+        resp = table.query(**_apply_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {
                 ":pk": pk,
                 ":s": start_sk,
                 ":e": end_sk,
             },
-            ScanIndexForward=False,
-            Limit=limit,
-        )
+            "ScanIndexForward": False,
+            "Limit": limit,
+        }))
         records = [_d2f(i) for i in resp.get("Items", [])]
         # Remove internal DDB keys from response for readability
         clean = []
@@ -197,16 +198,17 @@ def tool_list_memory_categories(args: dict) -> dict:
     end_sk = f"MEMORY#~"
 
     try:
-        resp = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={
+        from mcp.core import _apply_phase_filter  # ADR-058
+        resp = table.query(**_apply_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {
                 ":pk": pk,
                 ":s": start_sk,
                 ":e": end_sk,
             },
-            ProjectionExpression="sk, category, #d",
-            ExpressionAttributeNames={"#d": "date"},
-        )
+            "ProjectionExpression": "sk, category, #d",
+            "ExpressionAttributeNames": {"#d": "date"},
+        }))
         items = resp.get("Items", [])
 
         # Group by category

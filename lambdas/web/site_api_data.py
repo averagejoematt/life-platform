@@ -341,11 +341,11 @@ def handle_discoveries() -> dict:
     # ── 2. Inner life observations from insights partition ──
     inner_life = []
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}insights"),
-            ScanIndexForward=False,
-            Limit=50,
-        )
+        resp = table.query(**with_phase_filter({  # ADR-058: hide pilot insights
+            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}insights"),
+            "ScanIndexForward": False,
+            "Limit": 50,
+        }))
         for item in _decimal_to_float(resp.get("Items", [])):
             digest_type = item.get("digest_type", "")
             insight_type = item.get("insight_type", "")
@@ -411,12 +411,12 @@ def handle_discoveries() -> dict:
     # ── 3. AI findings from weekly correlations ──
     ai_findings = []
     try:
-        corr_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(
+        corr_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot correlations
+            "KeyConditionExpression": Key("pk").eq(
                 f"{USER_PREFIX}weekly_correlations"),
-            ScanIndexForward=False,
-            Limit=4,
-        )
+            "ScanIndexForward": False,
+            "Limit": 4,
+        }))
         _LABELS = {
             "hrv": "HRV", "recovery_score": "Recovery",
             "sleep_duration": "Sleep Duration", "sleep_score": "Sleep Score",
@@ -474,12 +474,12 @@ def handle_habit_streaks() -> dict:
 
     # Read latest habit_scores record
     pk = f"{USER_PREFIX}habit_scores"
-    resp = table.query(
-        KeyConditionExpression="pk = :pk",
-        ExpressionAttributeValues={":pk": pk},
-        ScanIndexForward=False,
-        Limit=3,
-    )
+    resp = table.query(**with_phase_filter({  # ADR-058: hide pilot habit scores
+        "KeyConditionExpression": "pk = :pk",
+        "ExpressionAttributeValues": {":pk": pk},
+        "ScanIndexForward": False,
+        "Limit": 3,
+    }))
     items = _decimal_to_float(resp.get("Items", []))
     record = items[0] if items else None
 
@@ -514,12 +514,12 @@ def handle_experiments() -> dict:
     Cache: 3600s (1 hr).
     """
     pk = f"{USER_PREFIX}experiments"
-    resp = table.query(
-        KeyConditionExpression="pk = :pk",
-        ExpressionAttributeValues={":pk": pk},
-        ScanIndexForward=False,
-        Limit=50,
-    )
+    resp = table.query(**with_phase_filter({  # ADR-058: hide pilot experiments
+        "KeyConditionExpression": "pk = :pk",
+        "ExpressionAttributeValues": {":pk": pk},
+        "ScanIndexForward": False,
+        "Limit": 50,
+    }))
     items = _decimal_to_float(resp.get("Items", []))
 
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -671,12 +671,12 @@ def handle_vice_streaks() -> dict:
     # only the former was filtered here, while the client shipped the keyword
     # list to do the substring check itself — leaking the keywords in JS.
     pk = f"{USER_PREFIX}habit_scores"
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(
+    resp = table.query(**with_phase_filter({  # ADR-058: hide pilot habit scores
+        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(
             f"DATE#{ninety_days_ago}", f"DATE#{today}"
         ),
-        ScanIndexForward=True,
-    )
+        "ScanIndexForward": True,
+    }))
     items = _decimal_to_float(resp.get("Items", []))
 
     if not items:
@@ -745,22 +745,22 @@ def handle_habits() -> dict:
     ninety_days_ago = _experiment_date(90)
 
     pk = f"{USER_PREFIX}habit_scores"
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(
+    resp = table.query(**with_phase_filter({  # ADR-058: hide pilot habit scores
+        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(
             f"DATE#{ninety_days_ago}", f"DATE#{today}"
         ),
-        ScanIndexForward=True,
-    )
+        "ScanIndexForward": True,
+    }))
     items = _decimal_to_float(resp.get("Items", []))
 
     # ── Also pull by_group from habitify partition (group data lives there, not in habit_scores)
     hab_pk = f"{USER_PREFIX}habitify"
-    hab_resp = table.query(
-        KeyConditionExpression=Key("pk").eq(hab_pk) & Key("sk").between(
+    hab_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot habitify records
+        "KeyConditionExpression": Key("pk").eq(hab_pk) & Key("sk").between(
             f"DATE#{ninety_days_ago}", f"DATE#{today}"
         ),
-        ScanIndexForward=True,
-    )
+        "ScanIndexForward": True,
+    }))
     habitify_by_date = {}
     for hi in _decimal_to_float(hab_resp.get("Items", [])):
         date_key = hi.get("date") or hi.get("sk", "").replace("DATE#", "")
@@ -855,12 +855,12 @@ def handle_habits() -> dict:
 
         # Fetch character_sheet records for same window
         cs_pk = f"{USER_PREFIX}character_sheet"
-        cs_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(cs_pk) & Key("sk").between(
+        cs_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot character sheets
+            "KeyConditionExpression": Key("pk").eq(cs_pk) & Key("sk").between(
                 f"DATE#{ninety_days_ago}", f"DATE#{today}"
             ),
-            ScanIndexForward=True,
-        )
+            "ScanIndexForward": True,
+        }))
         cs_items = _decimal_to_float(cs_resp.get("Items", []))
 
         # Build date → pillar sum (character health proxy)
@@ -1405,10 +1405,10 @@ def handle_protocols() -> dict:
     """GET /api/protocols — Return protocol definitions from DynamoDB."""
     protocols_pk = f"{USER_PREFIX}protocols"
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(protocols_pk) & Key("sk").begins_with("PROTOCOL#"),
-            ScanIndexForward=True,
-        )
+        resp = table.query(**with_phase_filter({  # ADR-058: hide pilot protocols
+            "KeyConditionExpression": Key("pk").eq(protocols_pk) & Key("sk").begins_with("PROTOCOL#"),
+            "ScanIndexForward": True,
+        }))
         protocols = []
         for item in _decimal_to_float(resp.get("Items", [])):
             item.pop("pk", None)

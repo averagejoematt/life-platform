@@ -31,14 +31,16 @@ from mcp.helpers import (
 
 def _query_journal(start_date, end_date, template=None):
     """Query journal entries from DynamoDB. Returns list of items."""
+    from mcp.core import _apply_phase_filter  # ADR-058
     pk = f"{USER_PREFIX}notion"
-    kwargs = {
+    # ADR-058: longitudinal/clinical archive — cross-phase by design (owner decision 2026-06-06)
+    kwargs = _apply_phase_filter({
         "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(
             f"DATE#{start_date}#journal",
             f"DATE#{end_date}#journal#~"
         ),
         "ScanIndexForward": True,
-    }
+    }, include_pilot=True)
     items = []
     while True:
         resp = table.query(**kwargs)

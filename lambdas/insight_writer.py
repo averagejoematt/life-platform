@@ -194,13 +194,15 @@ def get_recent_insights(digest_type=None, days=14, pillars=None, max_results=20)
         # SK prefix INSIGHT# sorts chronologically
         from boto3.dynamodb.conditions import Key, Attr
 
+        from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+
         kwargs = {
             "KeyConditionExpression": Key("pk").eq(_PK) & Key("sk").begins_with("INSIGHT#"),
             "ScanIndexForward": False,  # Newest first
             "Limit": max_results * 3,  # Over-fetch to allow filtering
         }
 
-        resp = _table.query(**kwargs)
+        resp = _table.query(**with_phase_filter(kwargs))
         items = resp.get("Items", [])
 
         # Filter by date cutoff

@@ -17,6 +17,8 @@ from decimal import Decimal  # noqa: F401 — kept for handlers that convert typ
 
 from boto3.dynamodb.conditions import Key
 
+from phase_filter import with_phase_filter  # ADR-058
+
 from web.site_api_common import (
     logger,
     table,
@@ -537,11 +539,11 @@ def handle_training_overview() -> dict:
     # Whoop workouts — per-workout HR zone data (enriches Strava)
     whoop_workouts = []
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}whoop") & Key("sk").between(
+        resp = table.query(**with_phase_filter({  # ADR-058: hide pilot workouts
+            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}whoop") & Key("sk").between(
                 f"DATE#{d30}#WORKOUT#", f"DATE#{today}#WORKOUT#~"
             ),
-        )
+        }))
         whoop_workouts = _decimal_to_float(resp.get("Items", []))
         # Add Whoop Z2 minutes from actual HR zones to the Z2 calculation
         for ww in whoop_workouts:
@@ -748,10 +750,11 @@ def handle_physical_overview() -> dict:
 
     # ── 1. DEXA scans (all, sorted ascending) ──
     dexa_pk = f"{USER_PREFIX}dexa"
-    dexa_resp = table.query(
-        KeyConditionExpression=Key("pk").eq(dexa_pk),
-        ScanIndexForward=True,
-    )
+    # clinical archive — DEXA is date-independent (owner decision 2026-06-06)
+    dexa_resp = table.query(**with_phase_filter({
+        "KeyConditionExpression": Key("pk").eq(dexa_pk),
+        "ScanIndexForward": True,
+    }, include_pilot=True))
     dexa_items = _decimal_to_float(dexa_resp.get("Items", []))
 
     # Baseline = most recent scan on or before EXPERIMENT_START (the starting point)
@@ -847,21 +850,23 @@ def handle_physical_overview() -> dict:
 
     # ── 2. Tape measurements (latest session) ──
     meas_pk = f"{USER_PREFIX}measurements"
-    meas_resp = table.query(
-        KeyConditionExpression=Key("pk").eq(meas_pk),
-        ScanIndexForward=False,
-        Limit=1,
-    )
+    # ADR-058: tape measurements are progress-tracking — hide pilot records
+    # (page shows an honest empty state until post-restart measurements exist)
+    meas_resp = table.query(**with_phase_filter({
+        "KeyConditionExpression": Key("pk").eq(meas_pk),
+        "ScanIndexForward": False,
+        "Limit": 1,
+    }))
     meas_items = _decimal_to_float(meas_resp.get("Items", []))
     tape = None
     tape_session_count = 0
     if meas_items:
         m = meas_items[0]
         # Count total sessions
-        count_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(meas_pk),
-            Select="COUNT",
-        )
+        count_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot measurements
+            "KeyConditionExpression": Key("pk").eq(meas_pk),
+            "Select": "COUNT",
+        }))
         tape_session_count = count_resp.get("Count", 1)
 
         # Build tape data from raw measurement fields
@@ -890,13 +895,14 @@ def handle_physical_overview() -> dict:
     bp_data = None
     try:
         ah_pk = f"{USER_PREFIX}apple_health"
-        ah_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(ah_pk) & Key("sk").begins_with("DATE#"),
-            FilterExpression="attribute_exists(bp_systolic) OR attribute_exists(blood_pressure_systolic)",
-            ScanIndexForward=False,
-            Limit=30,
-            ProjectionExpression="sk, bp_systolic, bp_diastolic, blood_pressure_systolic, blood_pressure_diastolic, blood_pressure_readings_count",
-        )
+        ah_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot BP records
+            "KeyConditionExpression": Key("pk").eq(ah_pk) & Key("sk").begins_with("DATE#"),
+            "FilterExpression": "attribute_exists(bp_systolic) OR attribute_exists(blood_pressure_systolic)",
+            "ScanIndexForward": False,
+            "Limit": 30,
+            "ProjectionExpression": ("sk, bp_systolic, bp_diastolic, blood_pressure_systolic, "
+                                     "blood_pressure_diastolic, blood_pressure_readings_count"),
+        }))
         bp_items = _decimal_to_float(ah_resp.get("Items", []))
         if bp_items:
             latest_bp = bp_items[0]
@@ -954,10 +960,10 @@ def handle_journal_analysis() -> dict:
     d90 = _experiment_date(90)
 
     ja_pk = f"{USER_PREFIX}journal_analysis"
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(ja_pk) & Key("sk").between(f"DATE#{d90}", f"DATE#{today}"),
-        ScanIndexForward=True,
-    )
+    resp = table.query(**with_phase_filter({  # ADR-058: hide pilot journal analysis
+        "KeyConditionExpression": Key("pk").eq(ja_pk) & Key("sk").between(f"DATE#{d90}", f"DATE#{today}"),
+        "ScanIndexForward": True,
+    }))
     items = _decimal_to_float(resp.get("Items", []))
 
     # Build theme frequency counts
@@ -1065,11 +1071,11 @@ def handle_mind_overview() -> dict:
     # blocked_vices full names AND blocked_vice_keywords substrings) so the
     # client doesn't have to ship a keyword list to filter what we missed.
     hs_pk = f"{USER_PREFIX}habit_scores"
-    hs_resp = table.query(
-        KeyConditionExpression=Key("pk").eq(hs_pk),
-        ScanIndexForward=False,
-        Limit=1,
-    )
+    hs_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot habit scores
+        "KeyConditionExpression": Key("pk").eq(hs_pk),
+        "ScanIndexForward": False,
+        "Limit": 1,
+    }))
     hs_items = _decimal_to_float(hs_resp.get("Items", []))
     vice_data = []
     if hs_items:
@@ -1089,12 +1095,12 @@ def handle_mind_overview() -> dict:
     # ── 4. Social connection quality (interactions) ──
     int_pk = f"{USER_PREFIX}interactions"
     try:
-        int_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(int_pk) & Key("sk").between(
+        int_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot interactions
+            "KeyConditionExpression": Key("pk").eq(int_pk) & Key("sk").between(
                 f"DATE#{d30}", f"DATE#{today}~"
             ),
-            ScanIndexForward=True,
-        )
+            "ScanIndexForward": True,
+        }))
         interactions = _decimal_to_float(int_resp.get("Items", []))
     except Exception:
         interactions = []
@@ -1110,11 +1116,11 @@ def handle_mind_overview() -> dict:
     # ── 5. Temptation resist rate (90d) ──
     temp_pk = f"{USER_PREFIX}temptations"
     try:
-        temp_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(temp_pk) & Key("sk").between(
+        temp_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot temptations
+            "KeyConditionExpression": Key("pk").eq(temp_pk) & Key("sk").between(
                 f"DATE#{d90}", f"DATE#{today}~"
             ),
-        )
+        }))
         temptations = _decimal_to_float(temp_resp.get("Items", []))
     except Exception:
         temptations = []
@@ -1126,12 +1132,12 @@ def handle_mind_overview() -> dict:
     # ── 6. Journal entry count (as journaling progress signal) ──
     journal_pk = f"{USER_PREFIX}notion"
     try:
-        j_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(journal_pk) & Key("sk").between(
+        j_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot journal records
+            "KeyConditionExpression": Key("pk").eq(journal_pk) & Key("sk").between(
                 f"DATE#{d30}", f"DATE#{today}"
             ),
-            Select="COUNT",
-        )
+            "Select": "COUNT",
+        }))
         journal_count = j_resp.get("Count", 0)
     except Exception:
         journal_count = 0
@@ -1167,10 +1173,10 @@ def handle_mind_overview() -> dict:
     }
 
     # ── 8. Vice streak timeline (30-day daily history) ──
-    hs_30d_resp = table.query(
-        KeyConditionExpression=Key("pk").eq(hs_pk) & Key("sk").between(f"DATE#{d30}", f"DATE#{today}"),
-        ScanIndexForward=True,
-    )
+    hs_30d_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot habit scores
+        "KeyConditionExpression": Key("pk").eq(hs_pk) & Key("sk").between(f"DATE#{d30}", f"DATE#{today}"),
+        "ScanIndexForward": True,
+    }))
     hs_30d_items = _decimal_to_float(hs_30d_resp.get("Items", []))
     vice_timeline = []
     for hs_day in hs_30d_items:
@@ -1190,10 +1196,10 @@ def handle_mind_overview() -> dict:
     # ── 9. Energy level from journal analysis (latest entry) ──
     energy_level = None
     try:
-        ja_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}journal_analysis") & Key("sk").between(f"DATE#{d30}", f"DATE#{today}"),
-            ScanIndexForward=False, Limit=5,
-        )
+        ja_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot journal analysis
+            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}journal_analysis") & Key("sk").between(f"DATE#{d30}", f"DATE#{today}"),
+            "ScanIndexForward": False, "Limit": 5,
+        }))
         ja_items = _decimal_to_float(ja_resp.get("Items", []))
         energy_vals = [i.get("energy_level") for i in ja_items if i.get("energy_level")]
         if energy_vals:
@@ -1618,12 +1624,12 @@ def handle_workouts() -> dict:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}hevy") & Key("sk").between(
+        resp = table.query(**with_phase_filter({  # ADR-058: hide pilot workouts
+            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}hevy") & Key("sk").between(
                 f"DATE#{d30}#WORKOUT#", f"DATE#{today}#WORKOUT#~"
             ),
-            ScanIndexForward=False,
-        )
+            "ScanIndexForward": False,
+        }))
         items = _decimal_to_float(resp.get("Items", []))
     except Exception as exc:  # noqa: BLE001
         return _ok({"workouts": [], "error": str(exc)[:120]}, cache_seconds=300)

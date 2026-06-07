@@ -44,15 +44,16 @@ def get_adaptive_mode(days: int = 14) -> dict:
     end = (today - timedelta(days=1)).isoformat()
 
     try:
-        resp = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={
+        from mcp.core import _apply_phase_filter  # ADR-058
+        resp = table.query(**_apply_phase_filter({
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {
                 ":pk": USER_PREFIX + "adaptive_mode",
                 ":s":  "DATE#" + start,
                 ":e":  "DATE#" + end,
             },
-            ScanIndexForward=False,
-        )
+            "ScanIndexForward": False,
+        }))
         records = [d2f(item) for item in resp.get("Items", [])]
     except Exception as e:
         return {"error": str(e)}
