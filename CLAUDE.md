@@ -10,7 +10,8 @@ Deep documentation lives in `docs/`. Start here when context is needed:
 - `docs/ARCHITECTURE.md` — full system design, 80 Lambdas (us-west-2) + 5 (us-east-1), 8 CDK stacks, data flows (updated v8.1.0)
 - `docs/SCHEMA.md` — DynamoDB field reference (authoritative)
 - `docs/RUNBOOK.md` — daily operations, troubleshooting
-- `docs/DECISIONS.md` — ADRs (ADR-001 through ADR-070), why things are the way they are
+- `docs/DECISIONS.md` — ADRs (ADR-001 through ADR-077), why things are the way they are
+- `docs/PHASE_TAXONOMY.md` — experiment-restart data semantics (ADR-077): the 4-class registry for what resets vs. what's kept
 - `docs/REMEDIATION_TAXONOMY.md` — classifier rubric for the self-healing agent (auto-fix-safe / fix-via-pr / needs-human / stale)
 - `docs/DATA_GOVERNANCE.md` — PII classification + retention policy (added v7.2.0)
 - `docs/BOARDS.md` — the three AI persona boards (Personal, Technical, Product)
@@ -80,7 +81,7 @@ python3 mcp_bridge.py
 
 **EventBridge crons use fixed UTC** — no DST drift. All schedules in `cdk/stacks/` must be UTC-fixed.
 
-**Lambda Layer** — shared modules (`ai_calls.py`, `retry_utils.py`, `bedrock_client.py`, `budget_guard.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `site_writer.py`, `character_engine.py`, `intelligence_common.py`, `auth_breaker.py`, `compute_metadata.py`, `http_retry.py`, `numeric.py`, `platform_logger.py`, `rate_limiter.py`, `request_validator.py`, + others) are deployed as a layer (currently **v71**, mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`). Note: `email_framework.py` was deleted in V2 (replaced inline). Changes here require a layer rebuild (`bash deploy/build_layer.sh`) before deploying dependent functions. Source of truth: `aws lambda list-layer-versions --layer-name life-platform-shared-utils --query 'LayerVersions[0].Version'`.
+**Lambda Layer** — shared modules (`ai_calls.py`, `retry_utils.py`, `bedrock_client.py`, `budget_guard.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `site_writer.py`, `character_engine.py`, `intelligence_common.py`, `auth_breaker.py`, `compute_metadata.py`, `http_retry.py`, `numeric.py`, `platform_logger.py`, `rate_limiter.py`, `request_validator.py`, + others) are deployed as a layer (currently **v74**, mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`). Note: `email_framework.py` was deleted in V2 (replaced inline). Changes here require a layer rebuild (`bash deploy/build_layer.sh`) before deploying dependent functions. Source of truth: `aws lambda list-layer-versions --layer-name life-platform-shared-utils --query 'LayerVersions[0].Version'`.
 
 **Prompt caching (COST-OPT-2)** — `ai_calls.py` and `retry_utils.py` auto-wrap system messages as Anthropic cached content blocks (90% discount). Model tiering: structured tasks use Haiku, narrative content uses Sonnet. All model assignments configurable via `AI_MODEL` env var. See ADR-049.
 
@@ -128,17 +129,21 @@ Scheduled GitHub Actions workflow (`.github/workflows/remediation-agent.yml`, ~0
 
 **Audit log:** every gate decision → `s3://matthew-life-platform/remediation-log/automerge/`. Classifier rubric: `docs/REMEDIATION_TAXONOMY.md`.
 
-## Experiment Restart Pipeline (ADR-058/059)
+## Experiment Restart Pipeline (ADR-058/059/077)
 
-Experiment is anchored by `EXPERIMENT_START_DATE` in `lambdas/constants.py` (currently **2026-05-30**, baseline 304.62 lbs). Re-anchoring is one idempotent command:
+Experiment is anchored by `EXPERIMENT_START_DATE` in `lambdas/constants.py` (currently **2026-06-01**; a reset to **2026-06-08** is staged — see `handovers/HANDOVER_LATEST.md`). Re-anchoring is one idempotent command:
 
 ```bash
 python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --apply
 # Override Withings baseline when the genesis date has no weigh-in yet:
 python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --override-weight-lbs <weight> --apply
+# Carry forward selected chronicle issues as pre-genesis lead-ins (ADR-077):
+python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --keep-chronicle DATE#... --apply
 ```
 
-Regenerates constants, bumps the layer, deploys Core/Compute/Email, phase-tags DDB, wipes intelligence, **zeroes the accountability ledger** (`deploy/restart_ledger_reset.py` — ADR-072; the site reads `TOTALS#current` directly and ignores phase tombstones), rebuilds character, syncs site + docs, verifies 27 rendered pages. Rollback: `deploy/restart_rollback.py`.
+Regenerates constants, bumps the layer, deploys Core/Compute/Email, phase-tags DDB, wipes intelligence, rolls the accountability ledger into a durable `LIFETIME#` aggregate + zeroes `TOTALS#current` (`deploy/restart_ledger_reset.py` — ADR-072/077), rebuilds character, curates the chronicle, syncs site + docs, verifies 27 rendered pages. Rollback: `deploy/restart_rollback.py`.
+
+**Phase taxonomy (ADR-077):** what resets vs. what's kept is decided by `lambdas/phase_taxonomy.py` — the single registry (`cross_phase` / `raw_timeseries` / `experiment_scoped` / `system_state`) that both the tagger and wipe derive from, with a coverage assertion so no scoped partition can silently survive a reset. Archived records are stamped `cycle=N` (SSM `/life-platform/experiment-cycle`) so the archive is navigable by reset generation. See `docs/PHASE_TAXONOMY.md`. Run the tagger/wipe in dry-run (no `--apply`) to preview the surface.
 
 ## Public Website (v4 "The Measured Life" — ADR-071)
 
