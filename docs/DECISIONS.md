@@ -2278,3 +2278,27 @@ The two layers are complementary and earned their keep immediately — the inter
 ---
 
 **Verified:** 2026-06-05 (ADR-076 — visual + AI-vision test harness; advisory in CI)
+
+---
+
+## ADR-077: Phase taxonomy — one classification for experiment-restart semantics
+
+**Date:** 2026-06-07
+**Status:** In progress — `lambdas/phase_taxonomy.py` registry + `tests/test_phase_taxonomy.py` (180 live families) + `docs/PHASE_TAXONOMY.md` landed; restart-script rewiring, write-time stamping, cycle stamping, and the 7 mechanism fixes follow under the same ADR.
+**Related:** ADR-058 (experiment restart + phase filter), ADR-072 (ledger reset), the 2026-06-07 read-side phase-filter sweep (PR #23).
+
+### Context
+
+Restart semantics were enforced by **three mechanisms with no shared definition**: the tagger (`restart_phase_tag.py`, scans only `USER#…SOURCE#`), the wipe (`restart_intelligence_wipe.py`, its own hand-rolled partition lists), and ~250 read paths. A full-table census (27,083 items, 180 record families) plus a three-lens expert review (physiologist, behavioral scientist, data/product) found the divergence was causing real harm: **279 pre-genesis coach-conversation threads leaking into live prompts** (writer on a bare `USER#matthew` pk the tagger can't see; the wipe aimed at a phantom partition name); public endpoints serving 100% pilot data; the clinical labs page one careless wrap from emptying; durable memories tagged for hiding; `ENSEMBLE#digest` missed by both tools; a `phase="plateau"` attribute collision on `NARRATIVE#arc`.
+
+### Decision
+
+A single registry (`phase_taxonomy.py`) classifies every record type into four classes — **cross_phase** (clinical/identity/durable: never touch), **raw_timeseries** (facts kept; current views genesis-anchored), **experiment_scoped** (tagged + wiped + cycle-stamped at restart; phase-filtered on read), **system_state** (phase machinery ignores). Both restart tools and the read paths derive from it. Owner invariants: nothing is ever deleted; restart re-anchors progress to genesis; clinical truths are date-independent. Panel-corrected reclassifications (supplements→cross_phase for med safety; measurements/day_grade→raw_timeseries; `chronicling`→cross_phase; email_log→system_state; ledger keeps a durable LIFETIME aggregate; vice-streak longest-ever promoted out of the wiped partition). New **cycle / reset-generation stamping** (`cycle=N` at archive + write time) makes the archive a navigable sequence of past runs. Curated **chronicle carry-forward** keeps selected Wednesday issues across a restart, re-dated to genesis−N. Full rationale + per-record table: `docs/PHASE_TAXONOMY.md`.
+
+### Consequences
+
+The taxonomy is mechanically enforced and test-covered against every live family, so a new source can't silently default to the wrong behavior. The seven divergence bugs are fixed at the root (shared registry) rather than patched per-symptom. Restart becomes auditable: a dry-run reports exactly what each run will tag/wipe/cycle-stamp. Trade-off: experiment_scoped writers must now stamp `phase`/`cycle` at write time (small additive change across ~6 writers) so the wipe can reach tagger-blind partitions.
+
+---
+
+**Verified:** 2026-06-07 (ADR-077 — phase taxonomy registry + tests + doc; wiring in progress)
