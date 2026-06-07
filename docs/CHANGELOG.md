@@ -1,3 +1,19 @@
+## v8.3.4 — 2026-06-07 (ADR-077 phase taxonomy + coherent restart tooling)
+
+### Added
+- **Phase taxonomy registry** (`lambdas/phase_taxonomy.py`, PR #27): single source of truth classifying every DynamoDB record family into `cross_phase` / `raw_timeseries` / `experiment_scoped` / `system_state`. Built from a full census (27,083 items, 180 families) + a 3-lens expert panel (physiologist/behavioral/data). `tests/test_phase_taxonomy.py` (127 tests, all live families). `docs/PHASE_TAXONOMY.md` + **ADR-077**.
+
+### Changed
+- **Restart tooling rewired to the registry** (PR #28 + 046c36a): the tagger + wipe derive from `phase_taxonomy` with a **coverage assertion** (a new experiment_scoped partition can't silently survive a reset). Closes every census gap — the **279-thread coach_thread leak** (was a phantom partition target), ENSEMBLE#digest/disagreements, NARRATIVE#arc, adaptive_mode/circadian/centenarian_progress/nutrition_review/protocols, and the `failure_pattern(s)` category drift. **Cycle / reset-generation stamping** (`cycle=N` from SSM) makes the archive navigable per run. The tagger now untags `cross_phase` (un-hides supplements/chronicling/labs/dexa + durable memories — decisions A/D).
+- **Ledger reset keeps history** (`restart_ledger_reset.py`): rolls a durable `LIFETIME#aggregate` + per-cycle row and tombstones txns instead of hard-deleting (decision F).
+- **Chronicle carry-forward** (`restart_chronicle_handler.py` + `--keep-chronicle` pipeline passthrough): kept issues re-dated to genesis−N as visible pre-genesis lead-ins (fixed a latent bug where "resurrected" articles stayed `phase=pilot`/hidden).
+- **Owner reclassifications (ADR-077 A–G):** supplements→cross_phase, measurements/day_grade→raw_timeseries, chronicling→cross_phase, email_log→system_state, ledger LIFETIME, vice_streaks split.
+
+### Operational
+- **Monday 2026-06-08 experiment reset staged** — all tooling dry-run-validated for the new genesis (7,525 records archived, coach_thread covered, supplements/chronicling un-hidden, "Before the Numbers" kept as a lead-in). Runbook in the plan file + `project_monday_reset.md` memory. Production behavior unchanged until `--apply` (operator-run).
+
+---
+
 ## v8.3.3 — 2026-06-07 (ADR-058 phase-filter sweep — full read-side coverage)
 
 ### Changed
