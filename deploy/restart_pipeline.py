@@ -186,6 +186,9 @@ def main():
     parser.add_argument("--override-weight-kg", type=float, help="Override kg too (computed from lbs if absent)")
     parser.add_argument("--skip-deploy", action="store_true", help="Skip CDK deploy step (use if you just deployed)")
     parser.add_argument("--skip-chronicle", action="store_true", help="Skip chronicle handler (rerunning is generally fine)")
+    parser.add_argument("--keep-chronicle", action="append", default=[],
+                        help="Chronicle DDB sk to keep across the restart, re-dated as a pre-genesis "
+                             "lead-in (repeatable, max 2). e.g. --keep-chronicle DATE#2026-02-28")
     args = parser.parse_args()
 
     # Resolve target genesis
@@ -263,7 +266,10 @@ def main():
         ("restart_docs_update",       ["python3", "deploy/restart_docs_update.py", "--apply"]),
     ]
     if not args.skip_chronicle:
-        sub_scripts.insert(3, ("restart_chronicle_handler", ["python3", "deploy/restart_chronicle_handler.py", "--apply"]))
+        chron_cmd = ["python3", "deploy/restart_chronicle_handler.py", "--apply"]
+        for sk in args.keep_chronicle:  # ADR-077: curated carry-forward
+            chron_cmd += ["--resurrect-sk", sk]
+        sub_scripts.insert(3, ("restart_chronicle_handler", chron_cmd))
 
     for name, cmd in sub_scripts:
         run_step(name, cmd, args.apply, log)
