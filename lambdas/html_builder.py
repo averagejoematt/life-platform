@@ -630,7 +630,7 @@ def build_html(
                 html += '<div style="padding:8px 24px;background:rgba(0,0,0,0.2);">'
                 for ev in cs_events:
                     ev_type = ev.get("type", "")
-                    pillar = ev.get("pillar", "").capitalize()
+                    pillar = (ev.get("pillar") or "").capitalize()
                     old = ev.get("old_level") or ev.get("old_tier", "")
                     new = ev.get("new_level") or ev.get("new_tier", "")
                     if "character" in ev_type:
@@ -708,7 +708,7 @@ def build_html(
                 html += '<div style="padding:8px 24px 12px;background:rgba(0,0,0,0.15);border-top:1px solid #2d2d5e;">'
                 html += '<p style="color:#94a3b8;font-size:10px;margin:0 0 4px;font-weight:700;">PROTOCOL RECOMMENDATIONS</p>'
                 for rec in protocol_recs:
-                    pillar_name = rec.get("pillar", "").capitalize()
+                    pillar_name = (rec.get("pillar") or "").capitalize()
                     dropped = rec.get("dropped", False)
                     arrow = "↓" if dropped else "⚠"
                     protos = rec.get("protocols", [])

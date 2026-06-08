@@ -881,18 +881,18 @@ def _compute_diminishing_returns(character_sheet, data, profile):
     lines = []
 
     if saturated and lowest["score"] < highest["score"] - 20:
-        sat_names = ", ".join(p["pillar"].capitalize() for p in saturated)
+        sat_names = ", ".join((p.get("pillar") or "").capitalize() for p in saturated)
         lines.append("LEVERAGE ANALYSIS:")
         lines.append(f"  \u26a0\ufe0f Diminishing returns on: {sat_names} (high effort, score already {saturated[0]['score']:.0f}+)")
         lines.append(
-            f"  \u2b06\ufe0f Highest leverage: {lowest['pillar'].capitalize()} (score {lowest['score']:.0f}, most room for improvement)"
+            f"  \u2b06\ufe0f Highest leverage: {(lowest.get('pillar') or '').capitalize()} (score {lowest['score']:.0f}, most room for improvement)"
         )
         if underinvested:
-            ui_names = ", ".join(p["pillar"].capitalize() for p in underinvested)
+            ui_names = ", ".join((p.get("pillar") or "").capitalize() for p in underinvested)
             lines.append(f"  \ud83c\udfaf Underinvested: {ui_names} (low score + low effort = high ROI)")
         lines.append("INSTRUCTION: Redirect coaching effort toward highest-leverage pillars. Don't over-optimize what's already strong.")
     elif underinvested:
-        ui_names = ", ".join(p["pillar"].capitalize() for p in underinvested)
+        ui_names = ", ".join((p.get("pillar") or "").capitalize() for p in underinvested)
         lines.append("LEVERAGE ANALYSIS:")
         lines.append(
             f"  \ud83c\udfaf Underinvested pillars: {ui_names} (low score + low effort \u2014 small changes here have outsized impact)"
@@ -1675,7 +1675,7 @@ def call_board_of_directors(
             pd = character_sheet.get("pillar_" + pn, {})
             character_ctx += (
                 "\n  "
-                + pn.capitalize()
+                + (pn or "").capitalize()
                 + ": Level "
                 + str(pd.get("level", "?"))
                 + " ("
@@ -1690,7 +1690,7 @@ def call_board_of_directors(
                 if "tier" in ev_type:
                     character_ctx += (
                         "\n  "
-                        + ev.get("pillar", "").capitalize()
+                        + (ev.get("pillar") or "").capitalize()
                         + ": "
                         + str(ev.get("old_tier", ""))
                         + " → "
@@ -1704,7 +1704,7 @@ def call_board_of_directors(
                         "\n  "
                         + arrow
                         + " "
-                        + ev.get("pillar", "").capitalize()
+                        + (ev.get("pillar") or "").capitalize()
                         + " Level "
                         + str(ev.get("old_level", ""))
                         + " → "
