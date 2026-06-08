@@ -38,6 +38,7 @@ A personal **health-intelligence platform** — it ingests data from ~20 wearabl
 | Operate / troubleshoot | [`docs/RUNBOOK.md`](docs/RUNBOOK.md) |
 | Know *why* (ADRs) | [`docs/DECISIONS.md`](docs/DECISIONS.md) · [`docs/TAG_CODES.md`](docs/TAG_CODES.md) |
 | The data model | [`docs/SCHEMA.md`](docs/SCHEMA.md) |
+| See what shipped | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) |
 | How the AI agent builds this | [`CLAUDE.md`](CLAUDE.md) |
 
 ## Tech stack
