@@ -331,6 +331,9 @@ class WebStack(Stack):
         # OG Image Lambda — life-platform-og-image (WR-17)
         # Dynamic SVG social preview image with live stats.
         # CDK-managed Lambda with proper Function URL permissions.
+        # Handler is `og_image_lambda.handler` (the .mjs sits at lambdas/ root,
+        # i.e. the zip root — NOT web/). Was web.og_image_lambda.handler, which
+        # MODULE_NOT_FOUND'd on every invoke from 2026-03-20 until 2026-06-08.
         # ══════════════════════════════════════════════════════════════
         og_image_role = iam.Role(
             self,
@@ -348,7 +351,7 @@ class WebStack(Stack):
             "OgImageLambda",
             function_name="life-platform-og-image",
             runtime=_lambda.Runtime.NODEJS_20_X,
-            handler="web.og_image_lambda.handler",
+            handler="og_image_lambda.handler",  # see block comment above (fixed 2026-06-08)
             code=_lambda.Code.from_asset(
                 "../lambdas",
                 exclude=[

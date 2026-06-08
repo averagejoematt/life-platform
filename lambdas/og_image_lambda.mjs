@@ -2,7 +2,7 @@
  * og-image Lambda (us-east-1)
  * 
  * GET /og — Returns a dynamically-generated SVG social preview image
- * with live stats baked in from public_stats.json on S3.
+ * with live stats baked in from generated/public_stats.json on S3.
  * 
  * CloudFront behavior: /og → this Lambda, Cache TTL 3600s (1hr)
  * OG image tag on site: <meta property="og:image" content="https://averagejoematt.com/og">
@@ -10,7 +10,7 @@
  * DEPLOY:
  *   1. Create Lambda: life-platform-og-image (us-east-1, Node 20, 256MB, 10s timeout)
  *   2. Add Function URL (AuthType NONE)
- *   3. Add S3:GetObject permission on matthew-life-platform/site/data/public_stats.json
+ *   3. Add S3:GetObject permission on matthew-life-platform/generated/public_stats.json
  *   4. Add CloudFront behavior: /og → this Lambda's Function URL
  *   5. Update OG meta tags on all pages to use /og instead of /assets/images/og-image.png
  * 
@@ -21,7 +21,9 @@ import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 
 const s3 = new S3Client({ region: 'us-west-2' });
 const BUCKET = 'matthew-life-platform';
-const KEY = 'site/data/public_stats.json';
+// ADR-046: public_stats.json lives under generated/, not site/data/ (the old
+// path returned NoSuchKey, so live stats were silently absent). Fixed 2026-06-08.
+const KEY = 'generated/public_stats.json';
 
 // Cache stats in warm container (5 min)
 let _statsCache = null;
