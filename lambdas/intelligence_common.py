@@ -34,6 +34,7 @@ s3 = boto3.client("s3", region_name="us-west-2")
 
 
 def _decimal_to_float(obj):
+    """Recursively convert DynamoDB Decimal values to floats in dicts/lists/scalars."""
     if isinstance(obj, Decimal):
         return float(obj)
     if isinstance(obj, dict):
