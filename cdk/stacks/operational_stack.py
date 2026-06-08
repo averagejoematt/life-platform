@@ -640,18 +640,12 @@ class OperationalStack(Stack):
         )
         _site_api_spike_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
-        cloudwatch.Dashboard(
-            self,
-            "SiteApiDashboard",
-            dashboard_name="life-platform-site-api",
-            widgets=[
-                [
-                    cloudwatch.GraphWidget(title="Invocations", left=[site_api_invocations], width=8),
-                    cloudwatch.GraphWidget(title="Errors", left=[site_api_errors], width=8),
-                    cloudwatch.GraphWidget(title="Duration (p50 / p95)", left=[site_api_duration_p50, site_api_duration_p95], width=8),
-                ]
-            ],
-        )
+        # NOTE (2026-06-08): the "life-platform-site-api" CloudWatch Dashboard was
+        # removed from CDK after it was deleted out-of-band — CFN tried to UPDATE a
+        # non-existent dashboard and stuck LifePlatformOperational in
+        # UPDATE_ROLLBACK_FAILED. Site-api monitoring is covered by the
+        # life-platform-site-api-dashboard / -latency dashboards + the alarms above.
+        # Re-add a Dashboard construct here (fresh name) if a curated board is wanted.
 
         # ── 11. Site Stats Refresh — 4x/day: 8am, 12pm, 4pm, 8pm PT (15:00, 19:00, 23:00, 03:00 UTC)
         # Invokes ingestion Lambdas synchronously, reads fresh DynamoDB, updates vitals in
