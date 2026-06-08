@@ -1,3 +1,3 @@
-verify_rendered report — genesis=2026-06-01
+verify_rendered report — genesis=2026-06-08
 
 checked 27 URLs, 0 with forbidden tokens
