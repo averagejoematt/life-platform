@@ -658,7 +658,7 @@ def build_user_message(week_state, todoist_data, health_data, profile, pillar_ma
     pillar_block = []
     for p, score in sorted(week_state.get("pillar_scores", {}).items(), key=lambda x: x[1]):
         emoji = _PILLAR_EMOJIS.get(p, "📌")
-        pillar_block.append(f"  {emoji} {p.capitalize()}: {score:.0f}/100")
+        pillar_block.append(f"  {emoji} {(p or "").capitalize()}: {score:.0f}/100")
 
     weakest = week_state.get("weakest_pillar", "consistency")
 
@@ -741,7 +741,7 @@ CHARACTER SHEET:
   Level {char_level} ({char_tier})
   Pillar scores (weakest to strongest):
 {chr(10).join(pillar_block) if pillar_block else '  No pillar data yet'}
-  Weakest pillar this week: {weakest.capitalize()}
+  Weakest pillar this week: {(weakest or "").capitalize()}
 
 LAST WEEK:
   {grade_line or 'No grade data'}

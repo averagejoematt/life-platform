@@ -956,7 +956,7 @@ def build_html(data, goals, commentary, windows):
             prev = (cs_p.get("pillars") or {}).get(pname, {}).get("level") if cs_p else None
             dlt = delta(plvl, prev) if prev else ""
             emoji = _PILLAR_EMOJI.get(pname, "")
-            cs_rows += row(f"{emoji} {pname.capitalize()}", f"Level {int(plvl)} — {ptier}", dlt)
+            cs_rows += row(f"{emoji} {(pname or "").capitalize()}", f"Level {int(plvl)} — {ptier}", dlt)
         cs_html = section("Character Sheet — 30 Days", "🎮", tbl(cs_rows))
 
     return f"""<!DOCTYPE html>

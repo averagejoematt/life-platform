@@ -35,7 +35,6 @@ from web.site_api_common import (
     USER_ID,
     USER_PREFIX,
     _decimal_to_float,
-    _error,
     _get_profile,
     _latest_item,
     _ok,
@@ -230,6 +229,41 @@ def handle_character() -> dict:
     # one before it, for day-over-day deltas) rather than a fixed today/yesterday window —
     # that window returned 503 for ~16h every day (00:00 UTC until the daily run landed),
     # degrading the Cockpit. `as_of_date` tells the reader how fresh it is.
+    PILLAR_ORDER = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
+    PILLAR_EMOJI = {
+        "sleep": "😴",
+        "movement": "🏋️",
+        "nutrition": "🥗",
+        "metabolic": "📊",
+        "mind": "🧠",
+        "relationships": "💬",
+        "consistency": "🎯",
+    }
+
+    def _zeroed_pre_experiment(as_of: str) -> dict:
+        # The zeroed "experiment hasn't started" state. Used both when the experiment
+        # hasn't begun AND — critically — when the phase filter (ADR-058) hides every
+        # pilot/pre-genesis sheet right after a reset: the first experiment-phase sheet
+        # isn't computed until the morning after genesis, and a 503 in that window
+        # degraded the Cockpit. Show zeroed, never a 503.
+        return _ok(
+            {
+                "character": {
+                    "level": 1,
+                    "tier": "Foundation",
+                    "tier_emoji": "🔨",
+                    "xp_total": 0,
+                    "as_of_date": as_of,
+                    "pre_experiment": True,
+                },
+                "pillars": [
+                    {"name": p, "emoji": PILLAR_EMOJI.get(p, ""), "level": 1, "raw_score": 0, "tier": "Foundation", "xp_delta": 0}
+                    for p in PILLAR_ORDER
+                ],
+            },
+            cache_seconds=900,
+        )
+
     pk = f"{USER_PREFIX}character_sheet"
     _resp = table.query(
         **with_phase_filter(
@@ -244,20 +278,11 @@ def handle_character() -> dict:
     record = _recs[0] if _recs else None
     prior_record = _recs[1] if len(_recs) > 1 else None
 
+    # No experiment-phase sheet yet (incl. the post-reset window where all sheets are
+    # pilot and filtered out) → zeroed state, not a 503.
     if not record:
-        return _error(503, "Character sheet not yet computed")
+        return _zeroed_pre_experiment(EXPERIMENT_START)
     date_str = str(record["sk"]).replace("DATE#", "")[:10]
-
-    PILLAR_ORDER = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
-    PILLAR_EMOJI = {
-        "sleep": "😴",
-        "movement": "🏋️",
-        "nutrition": "🥗",
-        "metabolic": "📊",
-        "mind": "🧠",
-        "relationships": "💬",
-        "consistency": "🎯",
-    }
 
     pillars = []
     for p in PILLAR_ORDER:
@@ -277,23 +302,7 @@ def handle_character() -> dict:
 
     # Pre-experiment: show zeroed character (experiment hasn't started)
     if date_str < EXPERIMENT_START:
-        return _ok(
-            {
-                "character": {
-                    "level": 1,
-                    "tier": "Foundation",
-                    "tier_emoji": "\ud83d\udd28",
-                    "xp_total": 0,
-                    "as_of_date": date_str,
-                    "pre_experiment": True,
-                },
-                "pillars": [
-                    {"name": p, "emoji": PILLAR_EMOJI.get(p, ""), "level": 1, "raw_score": 0, "tier": "Foundation", "xp_delta": 0}
-                    for p in PILLAR_ORDER
-                ],
-            },
-            cache_seconds=900,
-        )
+        return _zeroed_pre_experiment(date_str)
 
     # DPR-1.16 + Day-Grade Replay: deltas vs the PRIOR computed day (record-over-record,
     # robust to compute lag/gaps), not calendar yesterday.
@@ -586,7 +595,7 @@ def handle_journey_timeline() -> dict:
                     for p in _PILLAR_NAMES:
                         pd = item.get(f"pillar_{p}", {})
                         if isinstance(pd, dict) and pd.get("raw_score"):
-                            top_pillars.append((p.capitalize(), float(pd["raw_score"])))
+                            top_pillars.append(((p or "").capitalize(), float(pd["raw_score"])))
                     top_pillars.sort(key=lambda x: -x[1])
                     drivers = ", ".join(f"{n} ({s:.0f})" for n, s in top_pillars[:3])
                     events.append(
