@@ -1,3 +1,3 @@
-character rebuild report — mode=APPLY — genesis=2026-06-01
-end_date=2026-05-30  days_recomputed=0
+character rebuild report — mode=APPLY — genesis=2026-06-08
+end_date=2026-06-06  days_recomputed=0
 stale_state_files_tombstoned=0

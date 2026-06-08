@@ -1,103 +1,79 @@
-restart_pipeline report — target=2026-06-01 — mode=APPLY
-generated=2026-06-01T03:40:28.253564+00:00
+restart_pipeline report — target=2026-06-08 — mode=APPLY
+generated=2026-06-08T04:01:25.686084+00:00
 
-baseline_weight_lbs = 304.3
-baseline_weight_kg  = 138.028
+baseline_weight_lbs = 306.25
+baseline_weight_kg  = 138.913
 
 === sync_constants_from_config === (exit 0)
 [SYNC] Wrote lambdas/constants.py from config/user_goals.json
 
 === build_layer === (exit 0)
-✅ Layer built: 37 modules in cdk/layer-build/python/
+✅ Layer built: 38 modules in cdk/layer-build/python/
 
-=== cdk_deploy === (exit 1)
+=== cdk_deploy === (exit 0)
 arn:aws:cloudformation:us-west-2:205930651321:stack/LifePlatformMonitoring/518a97c0-1bf9-11f1-9902-0266f90be1b5
-
-STDERR: : InvalidRequest)
-     ├─ WhoopIngestion
-     │   └─ Resource  (AWS::Lambda::Function WhoopIngestionD6FDC5D6)
-     │      🛑 Resource handler returned message: "Layer version
-     │         arn:aws:lambda:us-west-2:205930651321:layer:life-platform-shared-utils:71 does not exist. (Service: Lambda, Status Code:
-     │         400, Request ID: 32de2e66-0129-429b-ae72-23c925ba18a8) (SDK Attempt Count: 1)" (RequestToken:
-     │         30a35aa1-ccb9-daf3-7507-ede8f5ad495f, HandlerErrorCode: InvalidRequest)
-     └─ WithingsIngestion
-         └─ Resource  (AWS::Lambda::Function WithingsIngestion67318586)
-            🛑 Resource handler returned message: "Layer version
-               arn:aws:lambda:us-west-2:205930651321:layer:life-platform-shared-utils:71 does not exist. (Service: Lambda, Status Code:
-               400, Request ID: 7b6b8a2e-9acf-4d21-89ce-0dedf3a8abcb) (SDK Attempt Count: 1)" (RequestToken:
-               998d6fa2-6ca8-c10b-9df8-af0c59d02024, HandlerErrorCode: InvalidRequest)
+arn:aws:cloudformation:us-west-2:205930651321:stack/LifePlatformCore/3461b5b0-1c31-11f1-bf26-0a83b3ae395d
+arn:aws:cloudformation:us-west-2:205930651321:stack/LifePlatformIngestion/68dccb20-1b75-11f1-a0e2-02461cd92c05
+arn:aws:cloudformation:us-west-2:205930651321:stack/LifePlatformCompute/d5601fd0-1b7b-11f1-9b6d-06ac7aace231
+arn:aws:cloudformation:us-west-2:205930651321:stack/LifePlatformEmail/e5201b50-1b7b-11f1-b06b-02be2d5340f9
+arn:aws:cloudformation:us-east-1:205930651321:stack/LifePlatformWeb/89569f20-1bfc-11f1-be8f-0e018eea3d8b
+arn:aws:cloudformation:us-west-2:205930651321:stack/LifePlatformOperational/66101950-1bf3-11f1-817e-0a70ff347503
+arn:aws:cloudformation:us-west-2:205930651321:stack/LifePlatformMcp/5284cbb1-1bf8-11f1-9a8e-0208388a0bd3
 
 === restart_phase_tag === (exit 0)
- before=None  after='pilot'
-  sk=DATE#2026-01-19#journal#journal#1  before=None  after='pilot'
-  sk=DATE#2026-01-21#journal#journal#1  before=None  after='pilot'
+  before='experiment'  after='pilot'
 
-[platform_memory]
-  sk=MEMORY#failure_patterns#2026-05-31  before='experiment'  after='pilot'
-  sk=MEMORY#hypothesis_monitoring#2026-05-31  before='experiment'  after='pilot'
-
-[routine_index]
-  sk=DATE#2026-06-01#ROUTINE#fd188365baac469babdb3e38513e98bd  before=None  after='experiment'
-  sk=DATE#2026-06-02#ROUTINE#2af150189cdb413e97b3de585385abde  before=None  after='experiment'
-
-[sleep_unified]
-  sk=DATE#2026-05-30  before='experiment'  after='pilot'
+[supplements]
+  sk=DATE#2026-02-24  before='pilot'  after='(untag)'
+  sk=DATE#2026-02-25  before='pilot'  after='(untag)'
+  sk=DATE#2026-02-26  before='pilot'  after='(untag)'
+  sk=DATE#2026-02-27  before='pilot'  after='(untag)'
+  sk=DATE#2026-02-28  before='pilot'  after='(untag)'
 
 [todoist]
-  sk=DATE#2026-05-30  before='experiment'  after='pilot'
+  sk=DATE#2026-06-01  before='experiment'  after='pilot'
+  sk=DATE#2026-06-02  before='experiment'  after='pilot'
+  sk=DATE#2026-06-03  before='experiment'  after='pilot'
+  sk=DATE#2026-06-04  before='experiment'  after='pilot'
+  sk=DATE#2026-06-05  before='experiment'  after='pilot'
 
 [weather]
-  sk=DATE#2026-05-30  before='experiment'  after='pilot'
-  sk=DATE#2026-05-31  before='experiment'  after='pilot'
+  sk=DATE#2026-06-01  before='experiment'  after='pilot'
+  sk=DATE#2026-06-02  before='experiment'  after='pilot'
+  sk=DATE#2026-06-03  before='experiment'  after='pilot'
+  sk=DATE#2026-06-04  before='experiment'  after='pilot'
+  sk=DATE#2026-06-05  before='experiment'  after='pilot'
 
 [weekly_correlations]
-  sk=WEEK#2026-W22  before='experiment'  after='pilot'
+  sk=WEEK#2026-W23  before='experiment'  after='pilot'
 
 [whoop]
-  sk=DATE#2026-05-30  before='experiment'  after='pilot'
-  sk=DATE#2026-05-30#WORKOUT#869b33c6-cb9a-4c72-8091-9945d8310103  before='experiment'  after='pilot'
-  sk=DATE#2026-05-30#WORKOUT#b4c79e6e-0fa2-4811-ab45-685df4e68263  before='experiment'  after='pilot'
-  sk=DATE#2026-05-31  before='experiment'  after='pilot'
-  sk=DATE#2026-05-31#WORKOUT#e1fd1991-a776-4efd-b4ea-81963ec8eeb0  before='experiment'  after='pilot'
+  sk=DATE#2026-06-01  before='experiment'  after='pilot'
+  sk=DATE#2026-06-01#WORKOUT#613a1810-d955-4eca-b681-712026454b75  before='experiment'  after='pilot'
+  sk=DATE#2026-06-02  before='experiment'  after='pilot'
+  sk=DATE#2026-06-03  before='experiment'  after='pilot'
+  sk=DATE#2026-06-03#WORKOUT#12ae232f-106e-4623-b711-3ed9bb7040d9  before='experiment'  after='pilot'
 
 [withings]
-  sk=DATE#2026-05-30  before='experiment'  after='pilot'
-  sk=DATE#2026-05-31  before='experiment'  after='pilot'
+  sk=DATE#2026-06-01  before='experiment'  after='pilot'
 
 Report written to: docs/restart/_phase_tag_report.txt
 
 === restart_intelligence_wipe === (exit 0)
--09
-
-[coach_physical]
-  sk=BRIEF#2026-04-07
-  sk=BRIEF#2026-04-08
-  sk=BRIEF#2026-04-09
-
-[coach_sleep]
-  sk=BRIEF#2026-04-07
-  sk=BRIEF#2026-04-08
-  sk=BRIEF#2026-04-09
-
-[coach_training]
-  sk=BRIEF#2026-04-07
-  sk=BRIEF#2026-04-08
-  sk=BRIEF#2026-04-09
-
-[computed_insights]
-  sk=DATE#2026-03-06
-  sk=DATE#2026-03-07
-  sk=DATE#2026-03-09
-
-[computed_metrics]
-  sk=DATE#2026-03-05
-  sk=DATE#2026-03-06
-  sk=DATE#2026-03-07
-
-[discovery_annotations]
+s]
   sk=EVENT#14c27dfa1d6dc049
   sk=EVENT#433f6d4121ed3719
   sk=EVENT#5cbff38789c9a7d0
+
+[ensemble_digest]
+  sk=CYCLE#2026-04-08
+  sk=CYCLE#2026-04-09
+  sk=CYCLE#2026-04-10
+
+[ensemble_disagree]
+  sk=ACTIVE#caloric_deficit_sustainability_and_muscle_preservation
+  sk=ACTIVE#caloric_intake_adequacy_for_current_activity_and_upcoming_training
+  sk=ACTIVE#device_synchronization_and_measurement_infrastructure
 
 [experiments]
   sk=EXP#breathwork-before-sleep
@@ -124,15 +100,24 @@ Report written to: docs/restart/_phase_tag_report.txt
   sk=INSIGHT#2026-02-27T16:49:18.448301+00:00
   sk=INSIGHT#2026-03-08T06:55:08.874Z#monday_compass
 
-[ledger]
-  sk=LEDGER#2026-05-04T00:03:00.086Z
-  sk=LEDGER#2026-05-04T00:03:00.148Z
-  sk=LEDGER#2026-05-04T00:03:00.204Z
+[narrative_arc]
+  sk=HISTORY#2026-05-18
+  sk=HISTORY#2026-05-26
+
+[nutrition_review]
+  sk=DATE#2026-02-28
+  sk=DATE#2026-03-13
+  sk=DATE#2026-04-03
 
 [platform_memory]
   sk=MEMORY#failure_pattern#2026-03-09#0
   sk=MEMORY#failure_pattern#2026-03-09#1
   sk=MEMORY#failure_pattern#2026-03-09#2
+
+[protocols]
+  sk=PROTOCOL#cgm
+  sk=PROTOCOL#intermittent_fasting
+  sk=PROTOCOL#morning_sunlight
 
 [weekly_correlations]
   sk=WEEK#2026-W11
@@ -141,23 +126,15 @@ Report written to: docs/restart/_phase_tag_report.txt
 
 Report written to: docs/restart/_intelligence_wipe_report.txt
 
-=== restart_character_rebuild === (exit 0)
-[APPLY] character rebuild starting. genesis=2026-06-01
+=== restart_ledger_reset === (exit 0)
+ledger reset — cycle=2 — 0 transaction(s); TOTALS#current present; LIFETIME#aggregate absent
+  closing-run totals: total_donated_usd=0, total_bounties_usd=0, total_punishments_usd=0
+  lifetime after roll-forward: total_donated_usd=0, total_bounties_usd=0, total_punishments_usd=0
+  mode: APPLY
+  ✓ rolled LIFETIME (donated=$0); tombstoned 0 txn(s) as cycle 2; TOTALS#current zeroed → run starts at $0.
 
-[1/3] Stale S3 compute_state files: 0
-
-[2/3] Days to recompute: 0 (2026-06-01 → 2026-05-30)
-
-[3/3] Verification hints (run via MCP after apply):
-  - get_habits()              → expect streak=0 for all habits
-  - get_vice_streaks()        → expect streak_days=0 for every vice
-  - get_rewards()             → expect every milestone in active state, 0% progress
-  - get_character(view=sheet) → expect days_active matches day_n(2026-05-30)
-
-Report written to: docs/restart/_character_rebuild_report.txt
-
-=== restart_chronicle_handler === (exit 0)
-[APPLY] chronicle handler. genesis=2026-06-01
+=== restart_chronicle_handler === (exit 1)
+[APPLY] chronicle handler. genesis=2026-06-08
 
 [1/3] Archiving chronicle HTML across 3 prefix(es):
   [blog/] 1 file(s):
@@ -169,37 +146,49 @@ Report written to: docs/restart/_character_rebuild_report.txt
   (wrote) dashboard/chronicle/index.html  (3751 bytes, Day-1 placeholder)
   (wrote) site/chronicle/index.html  (3751 bytes, Day-1 placeholder)
 
-[3/3] No --resurrect-sk passed: blank chronicle, fresh start on next Wed cycle.
+[3/3] Keeping 1 chronicle(s) as pre-genesis lead-ins:
+  DATE#2026-02-28 → re-dated to 2026-06-03 (phase=experiment, visible)
 
-Report written to: docs/restart/_chronicle_report.txt
+STDERR: .client, operation_name)(*args, **params)
+  File "/Users/matthewwalker/Library/Python/3.14/lib/python/site-packages/botocore/client.py", line 602, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/matthewwalker/Library/Python/3.14/lib/python/site-packages/botocore/context.py", line 123, in wrapper
+    return func(*args, **kwargs)
+  File "/Users/matthewwalker/Library/Python/3.14/lib/python/site-packages/botocore/client.py", line 1078, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.exceptions.ClientError: An error occurred (ValidationException) when calling the UpdateItem operation: Invalid UpdateExpression: Attribute name is a reserved keyword; reserved keyword: hidden
 
-=== restart_site_copy_sync === (exit 0)
-[APPLY] site copy sync. genesis=2026-06-01 baseline=304.3
+=== restart_character_rebuild === (exit 0)
+[APPLY] character rebuild starting. genesis=2026-06-08
 
-[1/5] site_constants.js: CHANGED
-[2/5] content_manifest.json: unchanged
-[3/8] HTML files updated: 0
-[4/8] JS files updated: 0
-[5/8] builders/index.html Feb-22 strip: unchanged
-[6/8] Orphan S3 files tombstoned: 6
-    - s3://matthew-life-platform/dashboard/data.json
-    - s3://matthew-life-platform/dashboard/clinical.json
-    - s3://matthew-life-platform/dashboard/data/character_stats.json
-    - s3://matthew-life-platform/dashboard/journal/posts.json
-    - s3://matthew-life-platform/dashboard/chronicle/posts.json
-    - s3://matthew-life-platform/site/data/data_sources.json
-[7/8] S3 sync: 3 key(s)
-       CloudFront invalidation: 10 path(s)
-[8/8] Regen Lambda invocations: 4
-    - life-platform-daily-brief: err(254)
-    - character-sheet-compute: err(254)
-    - site-stats-refresh: err(254)
-    - og-image-generator: err(254)
+[1/3] Stale S3 compute_state files: 0
 
-Report written to: docs/restart/_site_copy_report.txt
+[2/3] Days to recompute: 0 (2026-06-08 → 2026-06-06)
+
+[3/3] Verification hints (run via MCP after apply):
+  - get_habits()              → expect streak=0 for all habits
+  - get_vice_streaks()        → expect streak_days=0 for every vice
+  - get_rewards()             → expect every milestone in active state, 0% progress
+  - get_character(view=sheet) → expect days_active matches day_n(2026-06-06)
+
+Report written to: docs/restart/_character_rebuild_report.txt
+
+=== restart_site_copy_sync === (exit 1)
+[APPLY] site copy sync. genesis=2026-06-08 baseline=306.25
+
+STDERR: te_constants
+    text = SITE_CONSTANTS_JS.read_text()
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/matthewwalker/Documents/Claude/life-platform/site/assets/js/site_constants.js'
 
 === restart_docs_update === (exit 0)
-[APPLY] docs update. genesis=2026-06-01 baseline=304.3
+[APPLY] docs update. genesis=2026-06-08 baseline=306.25
 
   unchanged  docs/DECISIONS.md
   updated    docs/CHANGELOG.md
@@ -213,7 +202,7 @@ Report written to: docs/restart/_docs_update_report.txt
 
 === restart_verify_rendered === (exit 0)
 
-restart_verify_rendered — checking public surfaces against genesis=2026-06-01
+restart_verify_rendered — checking public surfaces against genesis=2026-06-08
 
   ✓ /
   ✓ /mission/
