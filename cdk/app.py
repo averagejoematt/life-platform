@@ -46,6 +46,14 @@ region = app.node.try_get_context("region") or "us-west-2"
 
 env = cdk.Environment(account=account, region=region)
 
+# ── Cost-allocation / governance tags (applied to every taggable resource in
+# every stack). Activate as cost-allocation tags in Billing console once to slice
+# spend by Project/Env/Owner. (A-grade review: closes the "no resource tags" gap.)
+cdk.Tags.of(app).add("Project", "life-platform")
+cdk.Tags.of(app).add("Env", "prod")
+cdk.Tags.of(app).add("Owner", "matthew")
+cdk.Tags.of(app).add("ManagedBy", "cdk")
+
 # ── Core infrastructure (DynamoDB, S3, SQS, SNS) ──
 core = CoreStack(app, "LifePlatformCore", env=env)
 
