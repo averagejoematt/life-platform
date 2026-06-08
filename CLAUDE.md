@@ -5,6 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Documentation Index
 
 Deep documentation lives in `docs/`. Start here when context is needed:
+- `docs/README.md` — **the full doc index** (everything in `docs/`, categorized)
 - `docs/ONBOARDING.md` — first-day mental model, key concepts
 - `docs/QUICKSTART.md` — first-day commands (AWS auth, deploy, rollback)
 - `docs/ARCHITECTURE.md` — full system design, ~73 Lambdas (CDK-defined; canonical count via `sync_doc_metadata.py` — ~55 currently deployed across us-west-2 + us-east-1), 8 CDK stacks, data flows (updated v8.4.0)
