@@ -58,8 +58,8 @@
 | **🛑 Defer-with-rationale (won't do)** | 9 | Documented `won't-do` unless trigger fires |
 | **📦 New work surfaced (post-V2)** | 7 | N-01 ✅ closed · N-08 ✅ resolved 2026-06-06 (tier 3→1) |
 | **🌐 v4 website + ops follow-ups** | 5 | S-01 ✅ + S-02 ✅ + S-06 ✅ deployed · B-03 ✅ · S-03/S-04/S-05 open · S-07 deferred |
-| **🚀 Product & Growth (PG)** | 8 | NEW 2026-06-07 summit. PG-00 ✅ · **PG-01/02/03/05/06 ✅ deployed** · PG-04 ✅ native-SES (PR #36, CI-deploy pending) · PG-04b/PG-13 builds; PG-14 spike |
-| **TOTAL OPEN** | **~33** | 2026-06-07: +14 PG from summit; PG-00/01/02/03/05/06 closed same day; PG-04 in PR #36; PG-04b logged |
+| **🚀 Product & Growth (PG)** | 8 | NEW 2026-06-07 summit. PG-00 ✅ · **PG-01/02/03/05/06 ✅ deployed; PG-14 ✅ spike (Tier-A go)** · PG-04 ✅ native-SES (PR #36) · PG-04b/PG-13 + PG-14 productionization post-reset |
+| **TOTAL OPEN** | **~33** | 2026-06-07: +14 PG from summit; PG-00/01/02/03/05/06 + PG-14-spike closed same day; PG-04 in PR #36; PG-04b + PG-14-prod logged |
 
 ---
 
@@ -175,8 +175,10 @@
 - **Gate:** PG-00 (Wedge B) for the public surface; Phase 2 additionally gated on PG-10 + a cost check (Dana). **Effort:** Phase 1 M; Phase 2 M–L each.
 - **Adversarial note:** Reeves/Viktor flag new agents as build-itch. Phase 1 is sanctioned (surfacing, ~zero build). Phase 2 is the itch — keep it contained and Wedge-B-justified, not core-platform expansion.
 
-### PG-14 — "AI me" weight-loss visualization (EXPLORATORY — SPIKE FIRST)
+### PG-14 — "AI me" weight-loss visualization — ✅ SPIKE DONE 2026-06-07 (Tier-A go; B/C defer) · productionization decision pending owner
 *Matthew's idea: "an AI version of myself that drops weight, like those creative AI videos — how hard would it be?"*
+
+- **✅ Spike complete:** `spikes/pg14_ai_me/` (self-contained prototype + 3 frames) + `docs/specs/PG-14_ai_me_spike.md` (go/no-go). **Finding:** the *honest* version is the *buildable* one — a faceless, monochrome SVG silhouette whose girth is a direct function of the real weight (304→185), morphs convincingly, hallucinates nothing, privacy-safe, on-brand. Torso morph strong; limbs stylised (2D-procedural ceiling). **Rec: GO Tier A** as ONE contained data-driven artifact (e.g. `/evidence/results/` hero or chronicle milestone); **NO-GO/defer Tier B** (photoreal = honesty+privacy bar) **& Tier C** (video = quality). Not deployed (lives in `spikes/`). **Productionization (≈S–M, no new backend) is the owner's call — hold until post-reset to anchor the new genesis weight.**
 
 - **Honest feasibility read (three tiers, cheapest/most-defensible first):**
   - **Tier A — Data-driven parametric figure (RECOMMENDED, buildable, on-brand):** a morphable body figure driven by your REAL data (Withings body-comp, tape `measurements`, weight 304→current→projected 185). Tech: a parametric **SMPL/SMPL-X** mesh rendered headless (pyrender/Blender) → milestone time-lapse via `ffmpeg`; or a lighter **Three.js** figure in-browser. Honest (no hallucination), privacy-safe (generic body, not your face), ties to evidence/measurements you already hold. A "304 → 185" honest time-lapse is a strong Wedge-B/chronicle artifact.
