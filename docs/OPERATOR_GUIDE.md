@@ -10,14 +10,14 @@
 
 ## System in 60 Seconds
 
-The Life Platform is a personal health intelligence system. It pulls data from ~19 sources (wearables, apps, food logs, labs), stores everything in DynamoDB single-table (`life-platform`, us-west-2), and makes it queryable by Claude through 127 MCP tools. **73 Lambdas** (5 power-tuning Lambdas deleted in V2 P4) run the ingest → compute → email pipeline daily.
+The Life Platform is a personal health intelligence system. It pulls data from ~19 sources (wearables, apps, food logs, labs), stores everything in DynamoDB single-table (`life-platform`, us-west-2), and makes it queryable by Claude through 133 MCP tools. **73 Lambdas** (5 power-tuning Lambdas deleted in V2 P4) run the ingest → compute → email pipeline daily.
 
 **Pipeline (UTC, ADR-052):**
 - Ingestion: 06:45-09:00 PT
 - 16:30 UTC `character-sheet-compute` → 16:35 `adaptive-mode-compute` → 16:40 `daily-metrics-compute` → 16:45 `daily-insight-compute` → 17:00 `daily-brief`
 - 11:30 PT OG images
 
-May 2026 MTD AWS spend (through 2026-05-19): **~$18.58**. Budget target: **$25/mo**. Anthropic API ~$8-12/mo on top.
+AWS run-rate (real CE, 2026-06-08 sweep): steady-state **~$25-40/mo** against a **$75/mo enforced ceiling** (ADR-063; cost-governor degrades AI by tier). Bedrock AI is the swing factor and is in-budget. See `docs/COST_TRACKER.md`.
 
 All infrastructure is CDK-managed across 8 stacks (`cdk/stacks/`).
 
@@ -154,7 +154,7 @@ aws cloudwatch list-metrics --namespace LifePlatform/MCP --metric-name ToolInvoc
   --query 'Metrics[*].Dimensions[?Name==`ToolName`].Value' --output text
 ```
 
-V2 P4.1 finding: only ~11 of 127 tools used in the last 30 days. Most cold tools are pre-V2 specialty queries scheduled for pruning.
+V2 P4.1 finding: only ~11 of 133 tools used in the last 30 days. Most cold tools are pre-V2 specialty queries scheduled for pruning.
 
 ---
 
