@@ -19,7 +19,6 @@ v1.0.0 — 2026-04-06 (Coach Intelligence Phase 2)
 import json
 import logging
 import os
-import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone

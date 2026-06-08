@@ -32,8 +32,6 @@ What it does:
 Run this BEFORE re-running restart_pipeline.py with a corrected genesis.
 """
 import argparse
-import json
-import os
 import subprocess
 import sys
 from datetime import datetime, timezone

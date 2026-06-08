@@ -15,7 +15,6 @@ No email on days when all three are complete — don't nag unnecessarily.
 v1.0.0 — 2026-03-15 (R54)
 """
 
-import json
 import logging
 import os
 from datetime import datetime, timezone

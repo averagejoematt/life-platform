@@ -17,8 +17,6 @@ Endpoints in this module:
 
 import json
 import os
-import re
-import time
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401
 
@@ -39,7 +37,6 @@ from web.site_api_common import (
     _get_profile,
     _is_blocked_vice,
     _latest_item,
-    _load_content_filter,
     _load_s3_json,
     _load_supp_metadata,
     _ok,

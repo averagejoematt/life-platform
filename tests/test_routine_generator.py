@@ -115,7 +115,6 @@ def test_rest_day_returns_placeholder_only():
 
 def test_exercise_notes_populated_from_history_index(monkeypatch):
     """ADR-068 end-to-end: generator pulls history, renders notes into the IR."""
-    import re
 
     fake_index = {
         "7EB3F7C3": [  # machine_chest_press

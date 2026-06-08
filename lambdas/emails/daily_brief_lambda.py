@@ -47,8 +47,6 @@ import json
 import math
 import os
 import time
-import urllib.error
-import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -2087,7 +2085,6 @@ def lambda_handler(event, context):
     # ── S2-T1-10: Weekly Habit Review (Sunday only) ──────────────────────────────
     _weekly_habit_review = None
     try:
-        import calendar
 
         _is_sunday = datetime.now(timezone.utc).weekday() == 6  # 6 = Sunday
         if _is_sunday:

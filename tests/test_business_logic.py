@@ -15,7 +15,6 @@ Run: python3 -m pytest tests/test_business_logic.py -v
 v1.0.0 — 2026-03-14 (R8-LT3)
 """
 
-import math
 import os
 import sys
 from datetime import date, timedelta
@@ -669,7 +668,7 @@ class TestDispatcherRouting:
         Dispatchers may mutate the return value (e.g. add _disclaimer per R13-F09);
         that mutation is intentional product behaviour, not a routing regression.
         """
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import patch
 
         sentinel = {"routed": True, "view": view}
         with patch.object(module, underlying_name, return_value=dict(sentinel)) as mock_fn:

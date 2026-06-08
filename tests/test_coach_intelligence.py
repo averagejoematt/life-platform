@@ -7,13 +7,10 @@ action lifecycle, and credibility scoring using mocks (no DynamoDB/API calls).
 V2.2 — 2026-04-07
 """
 
-import json
 import os
 import sys
-from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 
 # Set required env vars before importing
 os.environ.setdefault("TABLE_NAME", "life-platform")

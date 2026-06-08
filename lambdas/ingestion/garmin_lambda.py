@@ -66,7 +66,7 @@ import json
 import logging
 import os
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from decimal import Decimal
 
 import boto3

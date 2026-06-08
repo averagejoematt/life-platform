@@ -23,7 +23,6 @@ Usage:
 """
 import argparse
 import json
-import os
 import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path

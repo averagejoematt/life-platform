@@ -32,7 +32,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from urllib.error import HTTPError
-from urllib.request import Request, urlopen
+from urllib.request import Request
 from zoneinfo import ZoneInfo
 
 import boto3

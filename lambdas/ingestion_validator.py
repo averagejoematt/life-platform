@@ -48,7 +48,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal as _Decimal
-from typing import Any
 
 logger = logging.getLogger(__name__)
 REGION = os.environ.get("AWS_REGION", "us-west-2")

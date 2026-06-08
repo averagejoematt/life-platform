@@ -22,7 +22,6 @@ from aws_cdk import aws_lambda as _lambda
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_sns as sns
 from aws_cdk import aws_sqs as sqs
-from constructs import Construct
 from stacks import role_policies as rp
 from stacks.constants import ACCT, GARTH_LAYER_ARN, REGION, S3_BUCKET, SHARED_LAYER_ARN, TABLE_NAME  # CONF-01
 from stacks.lambda_helpers import create_platform_lambda
