@@ -571,6 +571,42 @@ def compute_daily_insight() -> list[iam.PolicyStatement]:
     )
 
 
+# ── Intelligence Lambdas (ADR-081) ──────────────────────────────────────
+# ai-expert-analyzer / field-notes-generate / journal-analyzer were CLI-created
+# orphans adopted into CDK on 2026-06-08. They previously shared the
+# daily-insight role, so these grants are deliberately identical to
+# compute_daily_insight() — a provably-safe role swap (the workload runs on
+# this exact grant-set today) while giving each function its own dedicated,
+# least-privilege role per the one-role-per-Lambda convention.
+
+
+def intelligence_ai_expert() -> list[iam.PolicyStatement]:
+    """Observatory AI expert analyzer (weekly): reads DDB, uses ai-keys for Bedrock narrative, writes analysis to DDB."""
+    return _compute_base(
+        needs_kms=True,  # writes observatory/insight records to DDB
+        needs_ai_keys=True,
+        needs_s3_config=True,
+    )
+
+
+def intelligence_field_notes() -> list[iam.PolicyStatement]:
+    """Field-notes generator (weekly): reads DDB, uses ai-keys for Bedrock, writes field-note records to DDB."""
+    return _compute_base(
+        needs_kms=True,
+        needs_ai_keys=True,
+        needs_s3_config=True,
+    )
+
+
+def intelligence_journal_analyzer() -> list[iam.PolicyStatement]:
+    """Journal analyzer (nightly): reads journal entries from DDB, uses ai-keys for Bedrock, writes sentiment/insights to DDB."""
+    return _compute_base(
+        needs_kms=True,
+        needs_ai_keys=True,
+        needs_s3_config=True,
+    )
+
+
 def compute_adaptive_mode() -> list[iam.PolicyStatement]:
     """Adaptive mode compute: reads DDB + S3 config, uses ai-keys for mode inference."""
     return _compute_base(
