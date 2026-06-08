@@ -33,6 +33,14 @@ except ImportError:
     logger = logging.getLogger("qa-smoke")
     logger.setLevel(logging.INFO)
 
+# Genesis-aware checks (2026-06-08): on the day after an experiment reset, the
+# dashboard validates *yesterday*, which is pre-genesis and legitimately has no
+# day-grade. A missing grade for a pre-experiment date is expected, not a fault.
+try:
+    from constants import EXPERIMENT_START_DATE
+except ImportError:
+    EXPERIMENT_START_DATE = None
+
 
 # ---------------------------------------------------------------------------
 # Config
@@ -256,6 +264,8 @@ def check_score_sanity():
     c = Check("score:day_grade", "Score Sanity")
     if grade_l and grade_s is not None:
         c.ok(f"Day grade = {grade_l} ({grade_s}/100)")
+    elif EXPERIMENT_START_DATE and actual_date and actual_date < EXPERIMENT_START_DATE:
+        c.ok(f"Day grade absent for pre-genesis day {actual_date} (experiment starts {EXPERIMENT_START_DATE}) — expected")
     else:
         c.fail(f"Day grade missing — grade={grade_l}, score={grade_s}")
     checks.append(c)
