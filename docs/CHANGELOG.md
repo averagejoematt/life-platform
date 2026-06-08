@@ -14,6 +14,9 @@
 ### Operational
 - PG-01 + PG-05 deployed to averagejoematt.com (content-hashed sync + CloudFront invalidation); smoke 65/0, both verified live.
 
+### Fixed
+- **Persistent door nav** — the three-door menu (Cockpit · Story · Evidence) used a "you-are-here by omission" rule (each page hid its own door from the menu), so menu items appeared/vanished page-to-page and read as inconsistent. Now every page shows all three doors with the current one marked `aria-current="page"` (ember + underline). Touches `now/index.html`, the story shell (`v4_build_dispatches.py`), the evidence shell (`v4_build_evidence.py`), and the three `.doors` CSS blocks.
+
 ---
 
 ## v8.3.4 — 2026-06-07 (ADR-077 phase taxonomy + coherent restart tooling)
