@@ -571,7 +571,7 @@ def tool_get_intelligence_quality(args):
         resp = table.query(
             **_apply_phase_filter(
                 {
-                    "KeyConditionExpression": Key("pk").eq(f"USER#matthew")
+                    "KeyConditionExpression": Key("pk").eq("USER#matthew")
                     & Key("sk").between(
                         f"SOURCE#intelligence_quality#{start_date}",
                         f"SOURCE#intelligence_quality#{end_date}~",

@@ -409,8 +409,7 @@ def tool_get_genome_insights(args):
                 result["lab_cross_reference"] = lab_links
 
     if cross_ref == "nutrition" and snps_out:
-        from datetime import datetime as _dt
-        from datetime import timedelta as _td
+        from datetime import datetime as _dt, timedelta as _td
 
         today = _dt.now().strftime("%Y-%m-%d")
         week_ago = (_dt.now() - _td(days=7)).strftime("%Y-%m-%d")

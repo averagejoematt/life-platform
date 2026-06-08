@@ -79,7 +79,7 @@ def main():
             weight_lbs = float(item.get("weight_lbs"))
             weight_kg = float(item.get("weight_kg"))
             log(f"  FOUND reading for {genesis}: weight_lbs={weight_lbs} weight_kg={weight_kg}")
-            log(f"  Running pipeline...")
+            log("  Running pipeline...")
             proc = subprocess.run(
                 ["python3", "deploy/restart_pipeline.py", "--genesis", genesis, "--apply"],
                 cwd=REPO_ROOT,

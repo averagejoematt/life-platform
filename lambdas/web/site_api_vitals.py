@@ -27,6 +27,7 @@ from decimal import Decimal  # noqa: F401
 
 from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # ADR-058 — used by handle_timeline
+
 from web.site_api_common import (
     CORS_HEADERS,
     EXPERIMENT_BASELINE_WEIGHT_LBS,

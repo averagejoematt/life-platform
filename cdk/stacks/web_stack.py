@@ -29,19 +29,25 @@ import aws_cdk as cdk
 from aws_cdk import (
     Duration,
     Stack,
+    aws_cloudfront as cloudfront,
+    aws_cloudwatch as cloudwatch,
+    aws_dynamodb as dynamodb,
+    aws_iam as iam,
+    aws_lambda as _lambda,
+    aws_s3 as s3,
+    aws_sns as sns,
+    aws_sqs as sqs,
 )
-from aws_cdk import aws_cloudfront as cloudfront
-from aws_cdk import aws_cloudwatch as cloudwatch
-from aws_cdk import aws_dynamodb as dynamodb
-from aws_cdk import aws_iam as iam
-from aws_cdk import aws_lambda as _lambda
-from aws_cdk import aws_s3 as s3
-from aws_cdk import aws_sns as sns
-from aws_cdk import aws_sqs as sqs
 from constructs import Construct
+
 from stacks import role_policies as rp
-from stacks.constants import ACCT, CF_AUTH_VERSION_ARN, PRIVACY_MODE, REGION
-from stacks.constants import S3_BUCKET as _CONSTANTS_BUCKET  # CONF-01
+from stacks.constants import (
+    ACCT,
+    CF_AUTH_VERSION_ARN,
+    PRIVACY_MODE,
+    REGION,
+    S3_BUCKET as _CONSTANTS_BUCKET,  # CONF-01
+)
 from stacks.lambda_helpers import create_platform_lambda
 
 BUCKET = _CONSTANTS_BUCKET

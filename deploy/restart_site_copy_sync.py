@@ -410,7 +410,7 @@ def main():
         paths = invalidate_cloudfront(args.apply, keys + orphans)
         print(f"       CloudFront invalidation: {len(paths)} path(s){' (would invalidate)' if not args.apply else ''}")
     else:
-        print(f"       CloudFront invalidation: SKIPPED")
+        print("       CloudFront invalidation: SKIPPED")
 
     # 8. Regenerate generated/ JSON by invoking the writer Lambdas
     regen_results = invoke_regen_lambdas(args.apply)
@@ -435,7 +435,7 @@ def main():
     )
     print(f"\nReport written to: {report_path.relative_to(REPO_ROOT)}")
     if not args.apply:
-        print(f"\n(dry-run) — pass --apply to commit.")
+        print("\n(dry-run) — pass --apply to commit.")
 
 
 if __name__ == "__main__":

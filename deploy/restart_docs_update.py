@@ -116,7 +116,7 @@ CHANGELOG_ENTRY = f"""{CHANGELOG_MARKER} — {TODAY}
 """
 
 
-SCHEMA_MARKER = f"### ADR-058: Phase attribute"
+SCHEMA_MARKER = "### ADR-058: Phase attribute"
 
 SCHEMA_APPEND = f"""
 {SCHEMA_MARKER}
@@ -275,7 +275,7 @@ def main():
     )
     print(f"\nReport written to: {report.relative_to(REPO_ROOT)}")
     if not args.apply:
-        print(f"\n(dry-run) — pass --apply to commit.")
+        print("\n(dry-run) — pass --apply to commit.")
 
 
 if __name__ == "__main__":

@@ -25,8 +25,7 @@ Categories seeded now:
 import json
 from datetime import datetime, timedelta, timezone
 
-from mcp.config import USER_ID as _user_id_ref
-from mcp.config import table as _table_ref
+from mcp.config import USER_ID as _user_id_ref, table as _table_ref
 from mcp.core import decimal_to_float as _d2f
 
 
@@ -207,7 +206,7 @@ def tool_list_memory_categories(args: dict) -> dict:
 
     pk = _memory_pk()
     start_sk = f"MEMORY#{start}"
-    end_sk = f"MEMORY#~"
+    end_sk = "MEMORY#~"
 
     try:
         from mcp.core import _apply_phase_filter  # ADR-058

@@ -200,7 +200,7 @@ def lambda_handler(event, context):
         1. S3 Event Notification (has 'Records' with s3 info)
         2. SES direct invocation (has 'Records' with ses info)
         """
-        print(f"[INFO] Insight Email Parser v1.1.0 triggered")
+        print("[INFO] Insight Email Parser v1.1.0 triggered")
 
         for record in event.get("Records", []):
             # Handle S3 trigger

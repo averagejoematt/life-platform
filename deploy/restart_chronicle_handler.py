@@ -112,11 +112,11 @@ def _build_chronicle_placeholder() -> str:
     ADR-058 launch-eve fix (2026-05-24): replaces the previous standalone
     527-byte HTML that lacked site styling.
     """
-    return f"""<!DOCTYPE html>
+    return """<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <style>.nav-overlay{{display:none}}</style>
+  <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="The Measured Life — a weekly chronicle by Elena Voss documenting Matthew's 12-month health experiment.">
   <meta property="og:title" content="The Measured Life — Chronicle">
@@ -139,46 +139,46 @@ def _build_chronicle_placeholder() -> str:
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
-    .chronicle-header {{
+    .chronicle-header {
       padding: var(--space-20) var(--page-padding) var(--space-16);
       border-bottom: 1px solid var(--border);
       max-width: var(--content-width);
       margin: 0 auto;
-    }}
-    .chronicle-header__kicker {{
+    }
+    .chronicle-header__kicker {
       font-size: var(--text-xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
       color: var(--accent-dim);
       margin-bottom: var(--space-6);
-    }}
-    .chronicle-header__title {{
+    }
+    .chronicle-header__title {
       font-family: var(--font-display);
       font-size: var(--text-h1);
       line-height: var(--lh-display);
       color: var(--text);
       letter-spacing: var(--ls-display);
       margin-bottom: var(--space-8);
-    }}
-    .chronicle-header__sub {{
+    }
+    .chronicle-header__sub {
       font-size: var(--text-lg);
       color: var(--text-muted);
       line-height: var(--lh-body);
       max-width: var(--prose-width);
-    }}
-    .chronicle-empty {{
+    }
+    .chronicle-empty {
       padding: var(--space-20) var(--page-padding);
       max-width: var(--prose-width);
       margin: 0 auto;
       text-align: center;
-    }}
-    .chronicle-empty__note {{
+    }
+    .chronicle-empty__note {
       font-family: var(--font-serif);
       font-size: var(--text-lg);
       color: var(--text-muted);
       line-height: var(--lh-body);
       font-style: italic;
-    }}
+    }
   </style>
   <link rel="canonical" href="https://averagejoematt.com/chronicle/">
 </head>
@@ -291,7 +291,7 @@ def main():
                 skipped_count += 1
 
     # ── 2. Rewrite each index ──
-    print(f"\n[2/3] Rewriting chronicle index pages:")
+    print("\n[2/3] Rewriting chronicle index pages:")
     for _, _, index_key in CHRONICLE_PREFIXES:
         placeholder = rewrite_index(s3, index_key, args.apply)
         print(f"  ({'would write' if not args.apply else 'wrote'}) {index_key}  ({len(placeholder)} bytes, Day-1 placeholder)")
@@ -309,7 +309,7 @@ def main():
             if args.apply:
                 untombstone_and_redate(ddb, sk, new_date, args.apply)
     else:
-        print(f"\n[3/3] No --resurrect-sk passed: blank chronicle, fresh start on next Wed cycle.")
+        print("\n[3/3] No --resurrect-sk passed: blank chronicle, fresh start on next Wed cycle.")
 
     # Report
     report_path = REPO_ROOT / "docs" / "restart" / "_chronicle_report.txt"
@@ -325,7 +325,7 @@ def main():
     )
     print(f"\nReport written to: {report_path.relative_to(REPO_ROOT)}")
     if not args.apply:
-        print(f"\n(dry-run) — pass --apply to commit.")
+        print("\n(dry-run) — pass --apply to commit.")
 
 
 if __name__ == "__main__":

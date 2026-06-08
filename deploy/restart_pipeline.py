@@ -201,10 +201,10 @@ def main():
         from lambdas.constants import EXPERIMENT_START_DATE
 
         target = EXPERIMENT_START_DATE
-    print(f"\n╔══ restart_pipeline ══╗")
+    print("\n╔══ restart_pipeline ══╗")
     print(f"║ target genesis: {target}")
     print(f"║ mode: {'APPLY' if args.apply else 'DRY-RUN'}")
-    print(f"╚══════════════════════╝")
+    print("╚══════════════════════╝")
 
     # Step 1: fetch Withings reading
     if args.override_weight_lbs:
@@ -224,7 +224,7 @@ def main():
             sys.exit(2)
 
     # Step 2: update configs + DDB profile
-    print(f"\n[2] Updating config/user_goals.json + config/character_sheet.json + DDB PROFILE#v1")
+    print("\n[2] Updating config/user_goals.json + config/character_sheet.json + DDB PROFILE#v1")
     update_configs(target, wt["weight_lbs"], wt["weight_kg"], wt.get("measurement_utc"), args.apply)
     update_ddb_profile(target, wt["weight_lbs"], args.apply)
     print(f"    ({'wrote' if args.apply else 'would write'} configs + DDB profile)")
@@ -237,11 +237,11 @@ def main():
 
     # Step 4 + 5: bump layer + build + deploy
     if not args.skip_deploy:
-        print(f"\n[4] Bumping SHARED_LAYER_VERSION")
+        print("\n[4] Bumping SHARED_LAYER_VERSION")
         new_v = bump_layer_version(args.apply)
         print(f"    → v{new_v}")
         if args.apply:
-            print(f"\n[5] Building layer + CDK deploy")
+            print("\n[5] Building layer + CDK deploy")
             run_step("build_layer", ["bash", "deploy/build_layer.sh"], True, log)
             # Deploy ALL stacks from cdk/ working dir so CDK re-synths against
             # the freshly built layer-build/. Every stack imports the shared
@@ -258,9 +258,9 @@ def main():
                 log.append(f"STDERR: {cdk_proc.stderr[-1000:]}")
             print(cdk_proc.stdout[-500:] if cdk_proc.stdout else "(no stdout)")
         else:
-            print(f"\n[5] (dry-run) skipping CDK deploy")
+            print("\n[5] (dry-run) skipping CDK deploy")
     else:
-        print(f"\n[4-5] CDK deploy skipped (--skip-deploy)")
+        print("\n[4-5] CDK deploy skipped (--skip-deploy)")
 
     # Step 6-11: all the restart sub-scripts
     sub_scripts = [
@@ -281,7 +281,7 @@ def main():
         run_step(name, cmd, args.apply, log)
 
     # Final: bust warm-container caches on read-path Lambdas
-    print(f"\n[final] Busting warm-container caches on public-facing Lambdas")
+    print("\n[final] Busting warm-container caches on public-facing Lambdas")
     bust_lambda_warm_cache(args.apply)
     print(f"    ({'forced cold start' if args.apply else 'would force cold start'} on site-api / site-api-ai / site-stats-refresh)")
 
@@ -291,16 +291,16 @@ def main():
     # DDB partitions, etc.). Pass the verify only if apply is true — in
     # dry-run we don't expect the live site to reflect the pivot yet.
     if args.apply:
-        print(f"\n[verify] restart_verify_rendered.py (hard gate)")
+        print("\n[verify] restart_verify_rendered.py (hard gate)")
         import time
 
         time.sleep(30)  # let CloudFront invalidation propagate before we curl
         verify_rc = run_step("restart_verify_rendered", ["python3", "deploy/restart_verify_rendered.py"], True, log)
         if verify_rc != 0:
-            print(f"\n⚠ VERIFY GATE FAILED — public surfaces still show stale tokens.")
-            print(f"   Check docs/restart/_verify_rendered_report.txt for the failing URLs.")
-            print(f"   Common causes: CloudFront cache not yet purged, Lambda warm-cache,")
-            print(f"   newly-missed JS/HTML/JSON surface. Re-run after fixing.")
+            print("\n⚠ VERIFY GATE FAILED — public surfaces still show stale tokens.")
+            print("   Check docs/restart/_verify_rendered_report.txt for the failing URLs.")
+            print("   Common causes: CloudFront cache not yet purged, Lambda warm-cache,")
+            print("   newly-missed JS/HTML/JSON surface. Re-run after fixing.")
 
     # Final report
     report = REPO_ROOT / "docs" / "restart" / "_pipeline_report.txt"
@@ -312,9 +312,9 @@ def main():
         f"baseline_weight_kg  = {wt['weight_kg']}\n\n" + "\n".join(log)
     )
     print(f"\n══ pipeline {'COMPLETE' if args.apply else 'DRY-RUN COMPLETE'} ══")
-    print(f"Report: docs/restart/_pipeline_report.txt")
+    print("Report: docs/restart/_pipeline_report.txt")
     if not args.apply:
-        print(f"\nRe-run with --apply to commit.")
+        print("\nRe-run with --apply to commit.")
 
 
 if __name__ == "__main__":

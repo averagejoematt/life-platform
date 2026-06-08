@@ -17,8 +17,7 @@ v1.0.0 — 2026-03-07
 import json
 from datetime import datetime, timedelta, timezone
 
-from mcp.config import USER_ID as _user_id_ref
-from mcp.config import table as _table_ref
+from mcp.config import USER_ID as _user_id_ref, table as _table_ref
 from mcp.core import decimal_to_float as _d2f
 
 

@@ -45,9 +45,11 @@ PULSE_KEY = "generated/pulse.json"
 # Journey start date — used for "X days on journey" counter (ADR-058)
 # IMPORTANT: this import must come BEFORE HERO_WHY_PARAGRAPH below, which
 # embeds JOURNEY_START_WEIGHT in an f-string at module-load time.
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS as JOURNEY_START_WEIGHT
-from constants import EXPERIMENT_GOAL_WEIGHT_LBS as GOAL_WEIGHT
-from constants import EXPERIMENT_START_DATE as JOURNEY_START_DATE
+from constants import (
+    EXPERIMENT_BASELINE_WEIGHT_LBS as JOURNEY_START_WEIGHT,
+    EXPERIMENT_GOAL_WEIGHT_LBS as GOAL_WEIGHT,
+    EXPERIMENT_START_DATE as JOURNEY_START_DATE,
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # BS-02: Hero narrative copy (finalised v3.7.67)

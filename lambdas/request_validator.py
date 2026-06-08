@@ -146,11 +146,11 @@ def validate_envelope(event: dict, path: str = None, method: str = None) -> None
             _check_suspicious(v, f"query parameter '{k}'")
             # Specific format checks for well-known param names
             if k == "user_id" and not _USER_ID_RE.match(v):
-                raise ValidationError(f"Invalid user_id format", status=400)
+                raise ValidationError("Invalid user_id format", status=400)
             if k == "date" and not _DATE_RE.match(v):
-                raise ValidationError(f"Invalid date format (expected YYYY-MM-DD)", status=400)
+                raise ValidationError("Invalid date format (expected YYYY-MM-DD)", status=400)
             if k == "source" and not _SOURCE_RE.match(v):
-                raise ValidationError(f"Invalid source format", status=400)
+                raise ValidationError("Invalid source format", status=400)
 
 
 def validate_user_id(user_id: str) -> str:

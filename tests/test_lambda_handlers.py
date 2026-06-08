@@ -227,8 +227,8 @@ def test_i5_no_orphaned_lambda_files():
     assert not orphans, (
         f"I5 FAIL: {len(orphans)} Lambda file(s) found in lambdas/ but not registered "
         f"in ci/lambda_map.json:\n" + "\n".join(f"  - {p}" for p in orphans) + "\n\n"
-        f'  Either add them to lambda_map.json["lambdas"] or list them in '
-        f'lambda_map.json["skip_deploy"]["files"].'
+        '  Either add them to lambda_map.json["lambdas"] or list them in '
+        'lambda_map.json["skip_deploy"]["files"].'
     )
 
 

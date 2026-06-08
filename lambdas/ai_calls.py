@@ -28,8 +28,7 @@ from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # A
 
 # AI-3 middleware: lazy import of output validator (transparent fail-safe)
 try:
-    from ai_output_validator import AIOutputType
-    from ai_output_validator import validate_ai_output as _validate_ai_output
+    from ai_output_validator import AIOutputType, validate_ai_output as _validate_ai_output
 
     _AI_VALIDATOR_AVAILABLE = True
 except ImportError:
@@ -883,7 +882,7 @@ def _compute_diminishing_returns(character_sheet, data, profile):
 
     if saturated and lowest["score"] < highest["score"] - 20:
         sat_names = ", ".join(p["pillar"].capitalize() for p in saturated)
-        lines.append(f"LEVERAGE ANALYSIS:")
+        lines.append("LEVERAGE ANALYSIS:")
         lines.append(f"  \u26a0\ufe0f Diminishing returns on: {sat_names} (high effort, score already {saturated[0]['score']:.0f}+)")
         lines.append(
             f"  \u2b06\ufe0f Highest leverage: {lowest['pillar'].capitalize()} (score {lowest['score']:.0f}, most room for improvement)"
@@ -894,7 +893,7 @@ def _compute_diminishing_returns(character_sheet, data, profile):
         lines.append("INSTRUCTION: Redirect coaching effort toward highest-leverage pillars. Don't over-optimize what's already strong.")
     elif underinvested:
         ui_names = ", ".join(p["pillar"].capitalize() for p in underinvested)
-        lines.append(f"LEVERAGE ANALYSIS:")
+        lines.append("LEVERAGE ANALYSIS:")
         lines.append(
             f"  \ud83c\udfaf Underinvested pillars: {ui_names} (low score + low effort \u2014 small changes here have outsized impact)"
         )
@@ -1165,9 +1164,9 @@ def daily_brief_shared_system(
     jctx = _build_journey_context(profile, (data or {}).get("date") if data else None)
     journey_block = _format_journey_context(jctx)
     parts = [
-        f"You are coaching Matthew, a real person on a multi-year health transformation journey.",
+        "You are coaching Matthew, a real person on a multi-year health transformation journey.",
         "",
-        f"## Profile snapshot (stable across this brief)",
+        "## Profile snapshot (stable across this brief)",
         f"- Journey: {journey_block}",
         f"- Calorie target: {profile.get('calorie_target', '?')} kcal",
         f"- Protein target: {profile.get('protein_target_g', '?')} g",

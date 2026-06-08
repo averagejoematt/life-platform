@@ -21,10 +21,22 @@ target-version = "py312"
 extend-exclude = [".venv", "cdk.out", "layer-build", "site", "node_modules", "archive", "datadrops"]
 
 [tool.ruff.lint]
-# pycodestyle (E/W) + pyflakes (F) + isort (I). Mirror the .flake8 ignores so
-# the baseline is a pure-format diff, not a rules fight.
+# pycodestyle (E/W) + pyflakes (F) + isort (I).
 select = ["E", "W", "F", "I"]
-ignore = ["E501", "E402", "E741"]
+# E501 line-length (formatter) · E402 import-order (Lambda handlers) · E741
+# ambiguous names · E701/E702 compound statements (intentional compact style;
+# black keeps them) · E731 lambda-assign · F841 unused-vars (DEFERRED — assignment
+# removal can drop side-effecting calls; a separate reviewed pass).
+ignore = ["E501", "E402", "E741", "E701", "E702", "E731", "F841"]
+# `# noqa: CDK_HANDLER_ORPHAN` belongs to the custom CDK handler-consistency
+# linter (tests/test_cdk_handler_consistency.py), not ruff — don't warn on it.
+external = ["CDK_HANDLER_ORPHAN"]
+
+[tool.ruff.lint.per-file-ignores]
+# mcp/ uses an import-driven tool-registration pattern — a blanket F401 removal
+# orphans tools (proven by a reverted attempt). Its unused-imports are cleaned in
+# a careful per-module follow-up; F401 deferred here only.
+"mcp/*.py" = ["F401", "F811"]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
