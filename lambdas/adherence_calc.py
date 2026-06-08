@@ -18,6 +18,7 @@ Output:
 Movement matching: by Hevy exercise_template_id when present; falls back to
 title prefix on the catalog title.
 """
+
 from __future__ import annotations
 
 import json
@@ -44,6 +45,7 @@ def _load_catalog() -> dict[str, Any]:
     global _s3_loader_client
     if _s3_loader_client is None:
         import boto3
+
         _s3_loader_client = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2"))
     obj = _s3_loader_client.get_object(Bucket=S3_BUCKET, Key=f"{S3_CONFIG_PREFIX}movement_catalog.json")
     return json.loads(obj["Body"].read())
@@ -78,12 +80,14 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
     for p in programmed:
         performed_sets = performed_by_tid.get(p["template_id"], 0)
         pct = round(min(1.0, performed_sets / p["sets"]) * 100, 1) if p["sets"] else 0.0
-        movements.append({
-            "movement_key": p["movement_key"],
-            "programmed_sets": p["sets"],
-            "performed_sets": performed_sets,
-            "pct": pct,
-        })
+        movements.append(
+            {
+                "movement_key": p["movement_key"],
+                "programmed_sets": p["sets"],
+                "performed_sets": performed_sets,
+                "pct": pct,
+            }
+        )
         muscle = catalog["movements"].get(p["movement_key"], {}).get("primary_muscle", "unknown")
         per_muscle_programmed[muscle] = per_muscle_programmed.get(muscle, 0) + p["sets"]
         per_muscle_performed[muscle] = per_muscle_performed.get(muscle, 0) + performed_sets
@@ -97,8 +101,7 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
         for muscle, sets in per_muscle_programmed.items()
     }
     total_programmed = sum(per_muscle_programmed.values())
-    total_performed = sum(min(per_muscle_programmed[m], per_muscle_performed.get(m, 0))
-                          for m in per_muscle_programmed)
+    total_performed = sum(min(per_muscle_programmed[m], per_muscle_performed.get(m, 0)) for m in per_muscle_programmed)
     overall_pct = round((total_performed / total_programmed) * 100, 1) if total_programmed else 0.0
 
     return {

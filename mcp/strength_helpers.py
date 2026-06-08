@@ -4,44 +4,37 @@ Strength training helpers: exercise classification, 1RM estimation, volume track
 
 from mcp.config import logger
 
-
 _EXERCISE_MUSCLE_MAP = [
     # (keywords, muscle_groups, movement_pattern)
-    (["bench press", "chest press", "pec deck", "fly", "flye", "push up", "pushup"],
-     ["Chest", "Triceps", "Shoulders"], "Push"),
-    (["overhead press", "ohp", "shoulder press", "military press", "dumbbell press", "arnold"],
-     ["Shoulders", "Triceps"], "Push"),
-    (["tricep", "triceps", "skull crusher", "pushdown", "push down", "close grip", "dip"],
-     ["Triceps", "Chest"], "Push"),
-    (["pull up", "pullup", "chin up", "chinup", "lat pulldown", "pull-up", "pull-down"],
-     ["Back", "Biceps"], "Pull"),
-    (["row", "rowing", "cable row", "t-bar", "seated row"],
-     ["Back", "Biceps"], "Pull"),
-    (["deadlift"],
-     ["Back", "Hamstrings", "Glutes", "Quads"], "Pull"),
-    (["back extension", "hyperextension", "good morning"],
-     ["Back", "Hamstrings", "Glutes"], "Pull"),
-    (["bicep", "biceps", "curl", "hammer curl"],
-     ["Biceps"], "Pull"),
-    (["squat", "goblet"],
-     ["Quads", "Glutes", "Hamstrings"], "Legs"),
-    (["leg press"],
-     ["Quads", "Glutes", "Hamstrings"], "Legs"),
-    (["lunge", "step up", "bulgarian"],
-     ["Quads", "Glutes", "Hamstrings"], "Legs"),
-    (["leg extension", "leg curl", "hamstring curl", "nordic"],
-     ["Quads", "Hamstrings"], "Legs"),
-    (["hip thrust", "glute bridge", "hip abduct", "hip adduct"],
-     ["Glutes", "Hamstrings"], "Legs"),
-    (["calf", "calves", "standing calf", "seated calf"],
-     ["Calves"], "Legs"),
-    (["plank", "crunch", "ab ", "abs ", "core", "oblique", "sit up", "situp", "hanging leg", "windshield"],
-     ["Core"], "Core"),
+    (["bench press", "chest press", "pec deck", "fly", "flye", "push up", "pushup"], ["Chest", "Triceps", "Shoulders"], "Push"),
+    (["overhead press", "ohp", "shoulder press", "military press", "dumbbell press", "arnold"], ["Shoulders", "Triceps"], "Push"),
+    (["tricep", "triceps", "skull crusher", "pushdown", "push down", "close grip", "dip"], ["Triceps", "Chest"], "Push"),
+    (["pull up", "pullup", "chin up", "chinup", "lat pulldown", "pull-up", "pull-down"], ["Back", "Biceps"], "Pull"),
+    (["row", "rowing", "cable row", "t-bar", "seated row"], ["Back", "Biceps"], "Pull"),
+    (["deadlift"], ["Back", "Hamstrings", "Glutes", "Quads"], "Pull"),
+    (["back extension", "hyperextension", "good morning"], ["Back", "Hamstrings", "Glutes"], "Pull"),
+    (["bicep", "biceps", "curl", "hammer curl"], ["Biceps"], "Pull"),
+    (["squat", "goblet"], ["Quads", "Glutes", "Hamstrings"], "Legs"),
+    (["leg press"], ["Quads", "Glutes", "Hamstrings"], "Legs"),
+    (["lunge", "step up", "bulgarian"], ["Quads", "Glutes", "Hamstrings"], "Legs"),
+    (["leg extension", "leg curl", "hamstring curl", "nordic"], ["Quads", "Hamstrings"], "Legs"),
+    (["hip thrust", "glute bridge", "hip abduct", "hip adduct"], ["Glutes", "Hamstrings"], "Legs"),
+    (["calf", "calves", "standing calf", "seated calf"], ["Calves"], "Legs"),
+    (["plank", "crunch", "ab ", "abs ", "core", "oblique", "sit up", "situp", "hanging leg", "windshield"], ["Core"], "Core"),
 ]
 
 _BODYWEIGHT_EXERCISES = [
-    "pull up", "pullup", "pull-up", "chin up", "chinup", "chin-up",
-    "dip", "push up", "pushup", "push-up", "bodyweight squat",
+    "pull up",
+    "pullup",
+    "pull-up",
+    "chin up",
+    "chinup",
+    "chin-up",
+    "dip",
+    "push up",
+    "pushup",
+    "push-up",
+    "bodyweight squat",
 ]
 
 
@@ -89,6 +82,7 @@ def normalize_hevy_items(hevy_items: list) -> list[dict]:
     item['data']['workouts'], which never matched the new shape — every
     new-shape workout was invisible to the read tools.
     """
+
     def _set(s: dict) -> dict:
         w_kg = s.get("weight_kg")
         w_lbs = s.get("weight_lbs")
@@ -99,8 +93,8 @@ def normalize_hevy_items(hevy_items: list) -> list[dict]:
         return {
             "set_type": s.get("set_type", "normal"),
             "weight_lbs": float(w_lbs or 0),
-            "weight_kg":  float(w_kg or 0),
-            "reps":       int(s.get("reps") or 0),
+            "weight_kg": float(w_kg or 0),
+            "reps": int(s.get("reps") or 0),
         }
 
     def _exercise(ex: dict) -> dict:
@@ -114,24 +108,26 @@ def normalize_hevy_items(hevy_items: list) -> list[dict]:
         sk = item.get("sk", "")
         # New per-workout shape: sk contains #WORKOUT#, exercises at top.
         if "#WORKOUT#" in sk and item.get("exercises") is not None:
-            date_str = item.get("date") or (
-                sk.split("DATE#", 1)[1].split("#", 1)[0] if "DATE#" in sk else ""
+            date_str = item.get("date") or (sk.split("DATE#", 1)[1].split("#", 1)[0] if "DATE#" in sk else "")
+            out.append(
+                {
+                    "date": date_str,
+                    "workout_name": item.get("workout_name") or item.get("title") or "",
+                    "exercises": [_exercise(ex) for ex in item.get("exercises", [])],
+                }
             )
-            out.append({
-                "date": date_str,
-                "workout_name": item.get("workout_name") or item.get("title") or "",
-                "exercises": [_exercise(ex) for ex in item.get("exercises", [])],
-            })
             continue
         # Legacy per-day shape: workouts nested under data.workouts (or top-level workouts).
         date_str = item.get("date") or sk[5:15]
         workouts = item.get("data", {}).get("workouts") or item.get("workouts") or []
         for w in workouts:
-            out.append({
-                "date": date_str,
-                "workout_name": w.get("name") or w.get("workout_name") or "",
-                "exercises": [_exercise(ex) for ex in (w.get("exercises") or [])],
-            })
+            out.append(
+                {
+                    "date": date_str,
+                    "workout_name": w.get("name") or w.get("workout_name") or "",
+                    "exercises": [_exercise(ex) for ex in (w.get("exercises") or [])],
+                }
+            )
     return out
 
 
@@ -163,32 +159,33 @@ def extract_hevy_sessions(hevy_items: list, exercise_name: str, include_warmups:
             best_1rm = max((s["estimated_1rm"] for s in sets_out if s["estimated_1rm"]), default=None)
             best_weight = max((s["weight_lbs"] for s in sets_out), default=0)
             volume = sum(s["weight_lbs"] * s["reps"] for s in sets_out)
-            sessions.append({
-                "date": date_str,
-                "exercise_name": ex_name,
-                "sets": sets_out,
-                "best_1rm": best_1rm,
-                "best_weight": best_weight,
-                "volume_lbs": round(volume, 1),
-                "set_count": len(sets_out),
-            })
+            sessions.append(
+                {
+                    "date": date_str,
+                    "exercise_name": ex_name,
+                    "sets": sets_out,
+                    "best_1rm": best_1rm,
+                    "best_weight": best_weight,
+                    "volume_lbs": round(volume, 1),
+                    "set_count": len(sets_out),
+                }
+            )
     sessions.sort(key=lambda x: x["date"])
     return sessions
 
 
-
 _VOLUME_LANDMARKS = {
-    "Chest":       {"MV": 4,  "MEV": 8,  "MAV_lo": 12, "MAV_hi": 16, "MRV": 20},
-    "Back":        {"MV": 6,  "MEV": 10, "MAV_lo": 14, "MAV_hi": 20, "MRV": 25},
-    "Shoulders":   {"MV": 4,  "MEV": 8,  "MAV_lo": 12, "MAV_hi": 20, "MRV": 25},
-    "Quads":       {"MV": 4,  "MEV": 8,  "MAV_lo": 12, "MAV_hi": 16, "MRV": 20},
-    "Hamstrings":  {"MV": 2,  "MEV": 6,  "MAV_lo": 10, "MAV_hi": 14, "MRV": 18},
-    "Glutes":      {"MV": 2,  "MEV": 6,  "MAV_lo": 10, "MAV_hi": 14, "MRV": 18},
-    "Biceps":      {"MV": 2,  "MEV": 6,  "MAV_lo": 10, "MAV_hi": 14, "MRV": 20},
-    "Triceps":     {"MV": 2,  "MEV": 6,  "MAV_lo": 10, "MAV_hi": 14, "MRV": 20},
-    "Calves":      {"MV": 4,  "MEV": 8,  "MAV_lo": 12, "MAV_hi": 16, "MRV": 20},
-    "Core":        {"MV": 0,  "MEV": 4,  "MAV_lo": 6,  "MAV_hi": 16, "MRV": 25},
-    "Other":       {"MV": 0,  "MEV": 0,  "MAV_lo": 0,  "MAV_hi": 0,  "MRV": 99},
+    "Chest": {"MV": 4, "MEV": 8, "MAV_lo": 12, "MAV_hi": 16, "MRV": 20},
+    "Back": {"MV": 6, "MEV": 10, "MAV_lo": 14, "MAV_hi": 20, "MRV": 25},
+    "Shoulders": {"MV": 4, "MEV": 8, "MAV_lo": 12, "MAV_hi": 20, "MRV": 25},
+    "Quads": {"MV": 4, "MEV": 8, "MAV_lo": 12, "MAV_hi": 16, "MRV": 20},
+    "Hamstrings": {"MV": 2, "MEV": 6, "MAV_lo": 10, "MAV_hi": 14, "MRV": 18},
+    "Glutes": {"MV": 2, "MEV": 6, "MAV_lo": 10, "MAV_hi": 14, "MRV": 18},
+    "Biceps": {"MV": 2, "MEV": 6, "MAV_lo": 10, "MAV_hi": 14, "MRV": 20},
+    "Triceps": {"MV": 2, "MEV": 6, "MAV_lo": 10, "MAV_hi": 14, "MRV": 20},
+    "Calves": {"MV": 4, "MEV": 8, "MAV_lo": 12, "MAV_hi": 16, "MRV": 20},
+    "Core": {"MV": 0, "MEV": 4, "MAV_lo": 6, "MAV_hi": 16, "MRV": 25},
+    "Other": {"MV": 0, "MEV": 0, "MAV_lo": 0, "MAV_hi": 0, "MRV": 99},
 }
 
 
@@ -208,10 +205,10 @@ def volume_status(muscle: str, sets_per_week: float) -> str:
 
 
 _STRENGTH_STANDARDS = {
-    "bench press":     {"Untrained": 0.50, "Novice": 0.75, "Intermediate": 1.00, "Advanced": 1.50, "Elite": 2.00},
-    "squat":           {"Untrained": 0.75, "Novice": 1.00, "Intermediate": 1.50, "Advanced": 2.00, "Elite": 2.75},
-    "deadlift":        {"Untrained": 1.00, "Novice": 1.25, "Intermediate": 1.75, "Advanced": 2.50, "Elite": 3.25},
-    "overhead press":  {"Untrained": 0.35, "Novice": 0.50, "Intermediate": 0.75, "Advanced": 1.00, "Elite": 1.50},
+    "bench press": {"Untrained": 0.50, "Novice": 0.75, "Intermediate": 1.00, "Advanced": 1.50, "Elite": 2.00},
+    "squat": {"Untrained": 0.75, "Novice": 1.00, "Intermediate": 1.50, "Advanced": 2.00, "Elite": 2.75},
+    "deadlift": {"Untrained": 1.00, "Novice": 1.25, "Intermediate": 1.75, "Advanced": 2.50, "Elite": 3.25},
+    "overhead press": {"Untrained": 0.35, "Novice": 0.50, "Intermediate": 0.75, "Advanced": 1.00, "Elite": 1.50},
 }
 _STANDARD_LEVELS = ["Untrained", "Novice", "Intermediate", "Advanced", "Elite"]
 
@@ -226,8 +223,8 @@ _STANDARD_LEVELS = ["Untrained", "Novice", "Intermediate", "Advanced", "Elite"]
 _ATTIA_TARGETS = {
     "deadlift": {
         "description": "Full-body posterior chain. Foundation of functional independence.",
-        "target_ratio": 2.0,      # goal: 2× BW 1RM now to have 1× BW at ~85
-        "minimum_ratio": 1.5,    # minimum acceptable for longevity protection
+        "target_ratio": 2.0,  # goal: 2× BW 1RM now to have 1× BW at ~85
+        "minimum_ratio": 1.5,  # minimum acceptable for longevity protection
         "elite_ratio": 2.5,
         "centenarian_projection": 1.0,  # target at age ~85
     },
@@ -256,11 +253,11 @@ _ATTIA_TARGETS = {
 
 # Status tiers relative to target_ratio
 _ATTIA_STATUS_TIERS = [
-    (1.10, "exceeds_target",  "Exceeds Attia target"),
-    (1.00, "at_target",       "At Attia target"),
-    (0.85, "approaching",     "Approaching target (within 15%)"),
-    (0.65, "progressing",     "Progressing — solid base"),
-    (0.00, "below_minimum",   "Below minimum threshold"),
+    (1.10, "exceeds_target", "Exceeds Attia target"),
+    (1.00, "at_target", "At Attia target"),
+    (0.85, "approaching", "Approaching target (within 15%)"),
+    (0.65, "progressing", "Progressing — solid base"),
+    (0.00, "below_minimum", "Below minimum threshold"),
 ]
 
 

@@ -33,12 +33,14 @@ def env(monkeypatch):
 
 
 def _alarm(name, reason="threshold breached", state="ALARM", t="2026-05-16T15:00:00Z"):
-    return json.dumps({
-        "AlarmName": name,
-        "NewStateValue": state,
-        "NewStateReason": reason,
-        "StateChangeTime": t,
-    })
+    return json.dumps(
+        {
+            "AlarmName": name,
+            "NewStateValue": state,
+            "NewStateReason": reason,
+            "StateChangeTime": t,
+        }
+    )
 
 
 def _import_module():
@@ -50,8 +52,10 @@ def _import_module():
 
         def _factory(svc, **kw):
             return sqs_mock if svc == "sqs" else ses_mock
+
         mock_client.side_effect = _factory
         import alert_digest_lambda
+
         alert_digest_lambda._sqs_mock = sqs_mock
         alert_digest_lambda._ses_mock = ses_mock
     return alert_digest_lambda
@@ -67,11 +71,13 @@ def test_parse_raw_delivery_body(env):
 
 def test_parse_envelope_fallback(env):
     mod = _import_module()
-    envelope = json.dumps({
-        "Type": "Notification",
-        "MessageId": "abc",
-        "Message": _alarm("ingestion-error-garmin"),
-    })
+    envelope = json.dumps(
+        {
+            "Type": "Notification",
+            "MessageId": "abc",
+            "Message": _alarm("ingestion-error-garmin"),
+        }
+    )
     parsed = mod._parse_alarm_payload(envelope)
     assert parsed["AlarmName"] == "ingestion-error-garmin"
 
@@ -126,10 +132,12 @@ def test_handler_non_empty_sends_one_email(env):
     mod = _import_module()
     # Two messages for same alarm, then empty on second poll.
     mod._sqs_mock.receive_message.side_effect = [
-        {"Messages": [
-            {"MessageId": "1", "ReceiptHandle": "h1", "Body": _alarm("ingestion-error-whoop")},
-            {"MessageId": "2", "ReceiptHandle": "h2", "Body": _alarm("ingestion-error-whoop")},
-        ]},
+        {
+            "Messages": [
+                {"MessageId": "1", "ReceiptHandle": "h1", "Body": _alarm("ingestion-error-whoop")},
+                {"MessageId": "2", "ReceiptHandle": "h2", "Body": _alarm("ingestion-error-whoop")},
+            ]
+        },
         {"Messages": []},
     ]
     result = mod.lambda_handler({}, None)

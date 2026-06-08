@@ -1,10 +1,10 @@
 """tests/test_routine_repo.py — versioned write + id-map atomic + lookups."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 import routine_repo as repo
 from routine_ir import ExerciseBlock, RoutineSpec, Set
 
@@ -22,8 +22,10 @@ def _ir(version: int = 1) -> RoutineSpec:
 def _mock_table(items_by_key: dict | None = None):
     items_by_key = items_by_key or {}
     table = MagicMock()
+
     def get_item(Key):
         return {"Item": items_by_key.get((Key["pk"], Key["sk"]))} if items_by_key.get((Key["pk"], Key["sk"])) else {}
+
     table.get_item.side_effect = get_item
     return table
 
@@ -41,6 +43,7 @@ def test_put_versioned_refuses_overwrite_on_conditional_failure():
     table = _mock_table()
     # Hook the conditional-check exception
     from botocore.exceptions import ClientError
+
     err = ClientError({"Error": {"Code": "ConditionalCheckFailedException"}}, "PutItem")
     table.put_item.side_effect = err
     ddb_meta = MagicMock()

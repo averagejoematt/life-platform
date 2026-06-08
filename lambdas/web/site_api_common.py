@@ -14,6 +14,7 @@ This module owns:
 
 site_api_lambda.py + sibling handler modules import from here.
 """
+
 import copy  # noqa: F401 — kept for downstream import compatibility
 import hashlib  # noqa: F401
 import json
@@ -21,14 +22,14 @@ import logging
 import os
 import re
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import boto3
 from boto3.dynamodb.conditions import Key  # noqa: F401 — re-exported for downstream use
-
-from constants import EXPERIMENT_START_DATE as EXPERIMENT_START, EXPERIMENT_BASELINE_WEIGHT_LBS
+from constants import EXPERIMENT_BASELINE_WEIGHT_LBS
+from constants import EXPERIMENT_START_DATE as EXPERIMENT_START
 from phase_filter import with_phase_filter
 
 # ── Config ─────────────────────────────────────────────────
@@ -84,14 +85,14 @@ CORS_ORIGIN = os.environ.get("CORS_ORIGIN", "https://averagejoematt.com")
 # When SITE_API_ORIGIN_SECRET is set, missing/wrong values 403.
 SITE_API_ORIGIN_SECRET = os.environ.get("SITE_API_ORIGIN_SECRET", "")
 CORS_HEADERS = {
-    "Access-Control-Allow-Origin":  CORS_ORIGIN,
+    "Access-Control-Allow-Origin": CORS_ORIGIN,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, X-Subscriber-Token",
-    "Access-Control-Max-Age":       "3600",
-    "Content-Type":                 "application/json",
-    "X-Content-Type-Options":       "nosniff",
-    "X-Frame-Options":              "DENY",
-    "Strict-Transport-Security":    "max-age=31536000; includeSubDomains",
+    "Access-Control-Max-Age": "3600",
+    "Content-Type": "application/json",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
 }
 
 
@@ -101,11 +102,11 @@ CORS_HEADERS = {
 PLATFORM_STATS = {
     "data_sources": 26,
     "mcp_tools": 138,
-    "lambdas": 87,            # us-west-2: 82 + us-east-1: 5
+    "lambdas": 87,  # us-west-2: 82 + us-east-1: 5
     "cdk_stacks": 8,
     "alarms": 94,
     "adrs": 65,
-    "monthly_cost": "$19",    # editorial: the "single-person platform" narrative anchor
+    "monthly_cost": "$19",  # editorial: the "single-person platform" narrative anchor
     "review_count": 19,
     "review_grade": "A",
     "active_secrets": 15,
@@ -120,6 +121,7 @@ PLATFORM_STATS = {
 
 
 # ── Helpers ───────────────────────────────────────────────
+
 
 def _cached_secret(client, secret_id):
     entry = _secret_cache.get(secret_id)
@@ -152,11 +154,12 @@ def _query_source(source: str, start_date: str, end_date: str, include_pilot: bo
     if start_date > end_date:
         return []  # EXPERIMENT_START is in the future — no data yet
     pk = f"{USER_PREFIX}{source}"
-    kwargs = with_phase_filter({
-        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(
-            f"DATE#{start_date}", f"DATE#{end_date}"
-        ),
-    }, include_pilot=include_pilot)
+    kwargs = with_phase_filter(
+        {
+            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}"),
+        },
+        include_pilot=include_pilot,
+    )
     resp = table.query(**kwargs)
     return _decimal_to_float(resp.get("Items", []))
 
@@ -164,11 +167,14 @@ def _query_source(source: str, start_date: str, end_date: str, include_pilot: bo
 def _latest_item(source: str, include_pilot: bool = False) -> dict | None:
     """Get the most recent item for a source. ADR-058: phase=pilot hidden by default."""
     pk = f"{USER_PREFIX}{source}"
-    kwargs = with_phase_filter({
-        "KeyConditionExpression": Key("pk").eq(pk),
-        "ScanIndexForward": False,
-        "Limit": 1,
-    }, include_pilot=include_pilot)
+    kwargs = with_phase_filter(
+        {
+            "KeyConditionExpression": Key("pk").eq(pk),
+            "ScanIndexForward": False,
+            "Limit": 1,
+        },
+        include_pilot=include_pilot,
+    )
     resp = table.query(**kwargs)
     items = _decimal_to_float(resp.get("Items", []))
     return items[0] if items else None
@@ -230,10 +236,25 @@ def _load_content_filter():
         # so logger.info() isn't an option here.
         try:
             import sys
-            sys.stdout.write(json.dumps({"_aws": {"Timestamp": int(time.time() * 1000),
-                "CloudWatchMetrics": [{"Namespace": "LifePlatform/SiteApi",
-                    "Dimensions": [[]], "Metrics": [{"Name": "ContentFilterFallback", "Unit": "Count"}]}]},
-                "ContentFilterFallback": 1}) + "\n")
+
+            sys.stdout.write(
+                json.dumps(
+                    {
+                        "_aws": {
+                            "Timestamp": int(time.time() * 1000),
+                            "CloudWatchMetrics": [
+                                {
+                                    "Namespace": "LifePlatform/SiteApi",
+                                    "Dimensions": [[]],
+                                    "Metrics": [{"Name": "ContentFilterFallback", "Unit": "Count"}],
+                                }
+                            ],
+                        },
+                        "ContentFilterFallback": 1,
+                    }
+                )
+                + "\n"
+            )
         except Exception:
             pass
     return _content_filter_cache
@@ -249,8 +270,8 @@ def _scrub_blocked_terms(text: str) -> str:
     for vice in cf.get("blocked_vices", []):
         pattern = re.compile(re.escape(vice), re.IGNORECASE)
         result = pattern.sub("[filtered]", result)
-    result = re.sub(r'\[filtered\]', '', result)
-    result = re.sub(r'\s{2,}', ' ', result)
+    result = re.sub(r"\[filtered\]", "", result)
+    result = re.sub(r"\s{2,}", " ", result)
     return result.strip()
 
 
@@ -285,14 +306,16 @@ def _ok(data: dict, cache_seconds: int = 300) -> dict:
             **_request_id_headers(),
             "Cache-Control": f"public, max-age={cache_seconds}, s-maxage={cache_seconds}",
         },
-        "body": json.dumps({
-            "_meta": {
-                "generated_at": datetime.now(timezone.utc).isoformat(),
-                "cache_seconds": cache_seconds,
-                **({"request_id": rid} if rid else {}),
-            },
-            **data,
-        }),
+        "body": json.dumps(
+            {
+                "_meta": {
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
+                    "cache_seconds": cache_seconds,
+                    **({"request_id": rid} if rid else {}),
+                },
+                **data,
+            }
+        ),
     }
 
 
@@ -301,10 +324,12 @@ def _error(status: int, message: str) -> dict:
     return {
         "statusCode": status,
         "headers": {**CORS_HEADERS, **_request_id_headers(), "Cache-Control": "no-cache, no-store"},
-        "body": json.dumps({
-            "error": message,
-            **({"request_id": rid} if rid else {}),
-        }),
+        "body": json.dumps(
+            {
+                "error": message,
+                **({"request_id": rid} if rid else {}),
+            }
+        ),
     }
 
 

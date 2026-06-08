@@ -19,10 +19,11 @@ Run:  python3 -m pytest tests/test_iam_secrets_consistency.py -v
 v1.0.0 — 2026-03-13 (Architecture Review #8)
 """
 
-import os
-import sys
-import re
 import json
+import os
+import re
+import sys
+
 import pytest
 
 # ── Add cdk/ and cdk/stacks/ to path ─────────────────────────────────────────
@@ -35,11 +36,14 @@ sys.path.insert(0, os.path.abspath(CDK_STACKS))
 
 # ── Stub aws_cdk so role_policies.py imports without CDK installed ────────────
 import types
+
+
 class _PolicyStatement:
     def __init__(self, sid="", actions=None, resources=None, **kwargs):
         self.sid = sid
         self.actions = list(actions or [])
         self.resources = list(resources or [])
+
 
 _iam_stub = types.ModuleType("aws_cdk.aws_iam")
 _iam_stub.PolicyStatement = _PolicyStatement
@@ -48,8 +52,9 @@ _cdk_stub.aws_iam = _iam_stub
 sys.modules.setdefault("aws_cdk", _cdk_stub)
 sys.modules["aws_cdk.aws_iam"] = _iam_stub
 
-import role_policies as rp
 import inspect
+
+import role_policies as rp
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Known secrets — the single source of truth for what exists in AWS.
@@ -67,25 +72,25 @@ KNOWN_SECRETS = [
     "life-platform/ai-keys",
     "life-platform/habitify",
     "life-platform/ingestion-keys",  # COST-B bundle: Notion + Habitify + Todoist + Dropbox + HAE webhook keys
-    "life-platform/mcp-api-key",     # MCP server auth (90-day auto-rotation via key-rotator Lambda)
-    "life-platform/site-api-ai-key", # R17-04: isolated Anthropic key for site-api (separate from main ai-keys)
-    "life-platform/notion",          # Notion API key (also in ingestion-keys bundle)
-    "life-platform/dropbox",         # Dropbox API key (also in ingestion-keys bundle)
-    "life-platform/todoist",         # Todoist API token — read by MCP write tools (mcp/tools_todoist.py:22). Created 2026-02-21. TD-23 added to mcp_server() IAM.
-    "life-platform/hevy",            # ADR-060 / SPEC_HEVY §2.4: api_key + webhook_secret for hevy-webhook + hevy-backfill. Created 2026-05-25.
-    "life-platform/hevy-write",      # ADR-066 (2026-05-31): write-capable Hevy key for hevy-routine-cron + MCP manage_hevy_routine. Separate from read per Yael bundling rule.
+    "life-platform/mcp-api-key",  # MCP server auth (90-day auto-rotation via key-rotator Lambda)
+    "life-platform/site-api-ai-key",  # R17-04: isolated Anthropic key for site-api (separate from main ai-keys)
+    "life-platform/notion",  # Notion API key (also in ingestion-keys bundle)
+    "life-platform/dropbox",  # Dropbox API key (also in ingestion-keys bundle)
+    "life-platform/todoist",  # Todoist API token — read by MCP write tools (mcp/tools_todoist.py:22). Created 2026-02-21. TD-23 added to mcp_server() IAM.
+    "life-platform/hevy",  # ADR-060 / SPEC_HEVY §2.4: api_key + webhook_secret for hevy-webhook + hevy-backfill. Created 2026-05-25.
+    "life-platform/hevy-write",  # ADR-066 (2026-05-31): write-capable Hevy key for hevy-routine-cron + MCP manage_hevy_routine. Separate from read per Yael bundling rule.
     "life-platform/github-dispatch-token",  # ADR-064 (2026-05-29): fine-grained PAT for remediation-dispatcher Lambda → GitHub repository_dispatch. Rotates ~2026-08-27.
-    "life-platform/subscriber-token-secret", # #106 (2026-05-30): HMAC signing key for subscriber tokens, dedicated (was sha256(anthropic-api-key)).
-    "life-platform",                 # Wildcard prefix — pipeline_health_check reads all secrets to verify they exist
+    "life-platform/subscriber-token-secret",  # #106 (2026-05-30): HMAC signing key for subscriber tokens, dedicated (was sha256(anthropic-api-key)).
+    "life-platform",  # Wildcard prefix — pipeline_health_check reads all secrets to verify they exist
 ]
 
 # Secrets that have been permanently deleted — must not appear in IAM policies.
 DELETED_SECRETS = [
-    "life-platform/api-keys",          # Permanently deleted 2026-03-14
-    "life-platform/webhook-key",       # PR 3 (2026-05-03): deleted 2026-03-14 per HANDOVER_v3.7.84. cdk/stacks/role_policies.py:326 still has a stale comment referencing it; removed in PR 3.
-    "life-platform/google-calendar",   # Permanently deleted 2026-03-15 (ADR-030)
-    "life-platform/anthropic-api-key", # Phase 1.4 (2026-05-16): orphan in AWS — soft-deleted with 7d recovery window. Permanent deletion 2026-05-23.
-    "life-platform/macrofactor",       # 2026-05-25: created earlier today for MF Tier 1 (unofficial Firebase API), blocked by App Check, torn down same day. ADR-061 documents the attempt + removal.
+    "life-platform/api-keys",  # Permanently deleted 2026-03-14
+    "life-platform/webhook-key",  # PR 3 (2026-05-03): deleted 2026-03-14 per HANDOVER_v3.7.84. cdk/stacks/role_policies.py:326 still has a stale comment referencing it; removed in PR 3.
+    "life-platform/google-calendar",  # Permanently deleted 2026-03-15 (ADR-030)
+    "life-platform/anthropic-api-key",  # Phase 1.4 (2026-05-16): orphan in AWS — soft-deleted with 7d recovery window. Permanent deletion 2026-05-23.
+    "life-platform/macrofactor",  # 2026-05-25: created earlier today for MF Tier 1 (unofficial Firebase API), blocked by App Check, torn down same day. ADR-061 documents the attempt + removal.
 ]
 
 # Secrets that are referenced in IAM but are known to be transitional.
@@ -98,26 +103,25 @@ TRANSITIONAL_ALLOWLIST = {
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _all_policy_functions():
-    return {
-        name: obj
-        for name, obj in inspect.getmembers(rp, inspect.isfunction)
-        if not name.startswith("_")
-    }
+    return {name: obj for name, obj in inspect.getmembers(rp, inspect.isfunction) if not name.startswith("_")}
 
 
 def _extract_secret_names_from_policies():
     """Extract all secret names referenced in IAM policy ARN patterns."""
     secret_refs = {}  # secret_name → [function_names]
-    pattern = re.compile(
-        r"arn:aws:secretsmanager:[^:]+:[^:]+:secret:([^\*\"]+)"
-    )
+    pattern = re.compile(r"arn:aws:secretsmanager:[^:]+:[^:]+:secret:([^\*\"]+)")
 
     for fn_name, fn in _all_policy_functions().items():
         stmts = fn()
         for stmt in stmts:
-            secrets_actions = {"secretsmanager:getsecretvalue", "secretsmanager:putsecretvalue",
-                               "secretsmanager:updatesecret", "secretsmanager:describesecret"}
+            secrets_actions = {
+                "secretsmanager:getsecretvalue",
+                "secretsmanager:putsecretvalue",
+                "secretsmanager:updatesecret",
+                "secretsmanager:describesecret",
+            }
             if not ({a.lower() for a in stmt.actions} & secrets_actions):
                 continue
             for resource in stmt.resources:
@@ -139,6 +143,7 @@ SECRET_REFS = _extract_secret_names_from_policies()
 # Tests
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def test_s1_all_iam_secrets_are_known():
     """S1: Every secret referenced in IAM policies must be in the known-secrets list
     or the transitional allowlist."""
@@ -148,9 +153,7 @@ def test_s1_all_iam_secrets_are_known():
             unknown.append(f"  '{secret_name}' (referenced by: {', '.join(fn_names)})")
 
     assert not unknown, (
-        f"S1 FAIL: {len(unknown)} secret(s) referenced in IAM but not in KNOWN_SECRETS:\n"
-        + "\n".join(unknown)
-        + "\n\nEither:\n"
+        f"S1 FAIL: {len(unknown)} secret(s) referenced in IAM but not in KNOWN_SECRETS:\n" + "\n".join(unknown) + "\n\nEither:\n"
         "  (a) Add the secret to KNOWN_SECRETS if it exists in AWS\n"
         "  (b) Add to TRANSITIONAL_ALLOWLIST with a reason if migration is in progress\n"
         "  (c) Fix the IAM policy in role_policies.py to reference the correct secret\n"
@@ -187,6 +190,7 @@ def test_s3_all_known_secrets_referenced():
         # Soft check — some secrets are accessed via env var overrides or
         # non-standard patterns. Print warning but don't fail.
         import warnings
+
         warnings.warn(
             f"S3 INFO: {len(unreferenced)} known secret(s) not directly referenced "
             f"in any role_policies.py function: {unreferenced}. "
@@ -225,6 +229,7 @@ def test_s4_known_secrets_count_matches_architecture():
 
 if __name__ == "__main__":
     import subprocess
+
     result = subprocess.run(
         ["python3", "-m", "pytest", __file__, "-v", "--tb=short"],
         cwd=ROOT,

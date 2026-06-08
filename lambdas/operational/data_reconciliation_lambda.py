@@ -43,6 +43,7 @@ import boto3
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("data-reconciliation")
 except ImportError:
     logger = logging.getLogger("data-reconciliation")
@@ -66,27 +67,27 @@ USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 # Gaps are only flagged if days_missing > (7 - expected_days)
 SOURCES = [
     # Daily sources (expected every day)
-    ("whoop",            7, "Sleep + recovery — wrist sensor"),
-    ("apple_health",     7, "Steps, CGM, gait — iPhone webhook"),
-    ("weather",          7, "Open-Meteo daily fetch"),
-    ("day_grade",        7, "Computed by daily-metrics-compute"),
-    ("habit_scores",     7, "Computed by daily-metrics-compute"),
+    ("whoop", 7, "Sleep + recovery — wrist sensor"),
+    ("apple_health", 7, "Steps, CGM, gait — iPhone webhook"),
+    ("weather", 7, "Open-Meteo daily fetch"),
+    ("day_grade", 7, "Computed by daily-metrics-compute"),
+    ("habit_scores", 7, "Computed by daily-metrics-compute"),
     ("computed_metrics", 7, "Computed by daily-metrics-compute"),
-    ("character_sheet",  7, "Computed by character-sheet-compute"),
-    ("adaptive_mode",    7, "Computed by adaptive-mode-compute"),
+    ("character_sheet", 7, "Computed by character-sheet-compute"),
+    ("adaptive_mode", 7, "Computed by adaptive-mode-compute"),
     ("computed_insights", 7, "Computed by daily-insight-compute"),
     # Highly active but may miss days
-    ("strava",           5, "Exercise days only — OK to miss 2+"),
-    ("garmin",           5, "Exercise days only — OK to miss 2+"),
-    ("eightsleep",       7, "Bed environment — every night"),
-    ("withings",         5, "Weight — may skip weekends"),
-    ("habitify",         7, "Habits — daily logging expected"),
-    ("todoist",          7, "Tasks — daily expected"),
-    ("macrofactor",      6, "Nutrition CSV — may miss 1 day/week"),
+    ("strava", 5, "Exercise days only — OK to miss 2+"),
+    ("garmin", 5, "Exercise days only — OK to miss 2+"),
+    ("eightsleep", 7, "Bed environment — every night"),
+    ("withings", 5, "Weight — may skip weekends"),
+    ("habitify", 7, "Habits — daily logging expected"),
+    ("todoist", 7, "Tasks — daily expected"),
+    ("macrofactor", 6, "Nutrition CSV — may miss 1 day/week"),
     # Journal — variable
-    ("notion",           5, "Journal entries — weekdays typical"),
+    ("notion", 5, "Journal entries — weekdays typical"),
     # Supplements — every day logged
-    ("supplements",      7, "Supplement bridge — every day"),
+    ("supplements", 7, "Supplement bridge — every day"),
 ]
 
 # Sources that DON'T use DATE# sk prefix (skip or handle differently)
@@ -101,9 +102,12 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 
 
 def d2f(obj):
-    if isinstance(obj, Decimal): return float(obj)
-    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, list): return [d2f(i) for i in obj]
+    if isinstance(obj, Decimal):
+        return float(obj)
+    if isinstance(obj, dict):
+        return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [d2f(i) for i in obj]
     return obj
 
 
@@ -118,7 +122,7 @@ def check_source_coverage(source: str, dates: list[str]) -> dict[str, bool]:
         try:
             resp = table.get_item(
                 Key={"pk": pk, "sk": f"DATE#{date_str}"},
-                ProjectionExpression="pk",   # minimal read — just need existence
+                ProjectionExpression="pk",  # minimal read — just need existence
             )
             item = resp.get("Item")
             coverage[date_str] = item is not None
@@ -129,8 +133,10 @@ def check_source_coverage(source: str, dates: list[str]) -> dict[str, bool]:
 
 
 def coverage_emoji(present: bool | None) -> str:
-    if present is True: return "✅"
-    if present is False: return "❌"
+    if present is True:
+        return "✅"
+    if present is False:
+        return "❌"
     return "❓"  # unknown (error)
 
 
@@ -238,15 +244,17 @@ def lambda_handler(event, context):
         expected_present = min(expected_days, len(dates))
         gaps = max(0, expected_present - days_present)
 
-        source_results.append({
-            "source": source,
-            "coverage": coverage,
-            "days_present": days_present,
-            "days_checked": len(dates),
-            "gaps": gaps,
-            "expected_days": expected_days,
-            "notes": notes,
-        })
+        source_results.append(
+            {
+                "source": source,
+                "coverage": coverage,
+                "days_present": days_present,
+                "days_checked": len(dates),
+                "gaps": gaps,
+                "expected_days": expected_days,
+                "notes": notes,
+            }
+        )
         if gaps > 0:
             logger.warning(f"[reconciliation] Gap detected: {source} — {gaps} missing (expected {expected_days}/7)")
 
@@ -265,10 +273,12 @@ def lambda_handler(event, context):
         ses.send_email(
             FromEmailAddress=SENDER,
             Destination={"ToAddresses": [RECIPIENT]},
-            Content={"Simple": {
-                "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
-            }},
+            Content={
+                "Simple": {
+                    "Subject": {"Data": subject, "Charset": "UTF-8"},
+                    "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
+                }
+            },
         )
         logger.info(f"[reconciliation] Report sent: {subject}")
     except Exception as e:
@@ -284,8 +294,12 @@ def lambda_handler(event, context):
             "total_gaps": total_gaps,
             "sources_with_gaps": sources_with_gaps,
             "results": [
-                {"source": r["source"], "gaps": r["gaps"], "days_present": r["days_present"],
-                 "missing_dates": [d for d in dates if r["coverage"].get(d) is False]}
+                {
+                    "source": r["source"],
+                    "gaps": r["gaps"],
+                    "days_present": r["days_present"],
+                    "missing_dates": [d for d in dates if r["coverage"].get(d) is False],
+                }
                 for r in source_results
             ],
         }
@@ -302,10 +316,12 @@ def lambda_handler(event, context):
 
     return {
         "statusCode": 200,
-        "body": json.dumps({
-            "severity": severity,
-            "total_gaps": total_gaps,
-            "sources_with_gaps": sources_with_gaps,
-            "week": week_label,
-        }),
+        "body": json.dumps(
+            {
+                "severity": severity,
+                "total_gaps": total_gaps,
+                "sources_with_gaps": sources_with_gaps,
+                "week": week_label,
+            }
+        ),
     }

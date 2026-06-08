@@ -43,6 +43,7 @@ import boto3
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("pip-audit")
 except ImportError:
     logger = logging.getLogger("pip-audit")
@@ -56,7 +57,7 @@ RECIPIENT = os.environ["EMAIL_RECIPIENT"]
 SENDER = os.environ["EMAIL_SENDER"]
 REQ_S3_PREFIX = os.environ.get("REQ_S3_PREFIX", "config/requirements/")
 
-s3 = boto3.client("s3",    region_name=REGION)
+s3 = boto3.client("s3", region_name=REGION)
 ses = boto3.client("sesv2", region_name=REGION)
 
 
@@ -64,11 +65,7 @@ def list_requirements_files() -> list[str]:
     """List all requirements.txt files in S3 under REQ_S3_PREFIX."""
     try:
         resp = s3.list_objects_v2(Bucket=BUCKET, Prefix=REQ_S3_PREFIX)
-        return [
-            obj["Key"]
-            for obj in resp.get("Contents", [])
-            if obj["Key"].endswith(".txt")
-        ]
+        return [obj["Key"] for obj in resp.get("Contents", []) if obj["Key"].endswith(".txt")]
     except Exception as e:
         logger.error(f"[pip_audit] Failed to list S3 requirements: {e}")
         return []
@@ -87,10 +84,7 @@ def download_requirements(s3_key: str, local_path: str) -> bool:
 def ensure_pip_audit() -> bool:
     """Install pip-audit if not present (Lambda cold start)."""
     try:
-        result = subprocess.run(
-            [sys.executable, "-m", "pip_audit", "--version"],
-            capture_output=True, timeout=10
-        )
+        result = subprocess.run([sys.executable, "-m", "pip_audit", "--version"], capture_output=True, timeout=10)
         if result.returncode == 0:
             return True
     except Exception:
@@ -99,9 +93,9 @@ def ensure_pip_audit() -> bool:
     logger.info("[pip_audit] Installing pip-audit...")
     try:
         result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "pip-audit==2.7.3", "--quiet",
-             "--target", "/tmp/pip_audit_pkg"],
-            capture_output=True, timeout=120
+            [sys.executable, "-m", "pip", "install", "pip-audit==2.7.3", "--quiet", "--target", "/tmp/pip_audit_pkg"],
+            capture_output=True,
+            timeout=120,
         )
         if result.returncode == 0:
             if "/tmp/pip_audit_pkg" not in sys.path:
@@ -132,24 +126,33 @@ def audit_requirements_file(req_path: str, lambda_name: str) -> dict:
     try:
         with open(req_path) as f:
             content = f.read()
-        real_lines = [l.strip() for l in content.splitlines()
-                      if l.strip() and not l.strip().startswith("#")]
+        real_lines = [l.strip() for l in content.splitlines() if l.strip() and not l.strip().startswith("#")]
         if not real_lines:
-            return {"lambda": lambda_name, "vulnerabilities": [], "packages_checked": 0,
-                    "status": "empty", "notes": "No packages in requirements"}
+            return {
+                "lambda": lambda_name,
+                "vulnerabilities": [],
+                "packages_checked": 0,
+                "status": "empty",
+                "notes": "No packages in requirements",
+            }
     except Exception as e:
-        return {"lambda": lambda_name, "vulnerabilities": [], "packages_checked": 0,
-                "status": "error", "error_msg": str(e)}
+        return {"lambda": lambda_name, "vulnerabilities": [], "packages_checked": 0, "status": "error", "error_msg": str(e)}
 
     try:
         result = subprocess.run(
-            [sys.executable, "-m", "pip_audit",
-             "--requirement", req_path,
-             "--format", "json",
-             "--disable-pip",   # don't audit pip itself
-             "--no-deps",       # check only what's listed, not transitive
+            [
+                sys.executable,
+                "-m",
+                "pip_audit",
+                "--requirement",
+                req_path,
+                "--format",
+                "json",
+                "--disable-pip",  # don't audit pip itself
+                "--no-deps",  # check only what's listed, not transitive
             ],
-            capture_output=True, timeout=120,
+            capture_output=True,
+            timeout=120,
         )
 
         output = result.stdout.decode("utf-8", errors="replace")
@@ -160,22 +163,28 @@ def audit_requirements_file(req_path: str, lambda_name: str) -> dict:
             audit_data = json.loads(output)
         except json.JSONDecodeError:
             if "No known vulnerabilities found" in output or "No known vulnerabilities found" in stderr:
-                return {"lambda": lambda_name, "vulnerabilities": [], "packages_checked": len(real_lines),
-                        "status": "clean"}
-            return {"lambda": lambda_name, "vulnerabilities": [], "packages_checked": len(real_lines),
-                    "status": "error", "error_msg": f"JSON parse failed. stdout={output[:200]}, stderr={stderr[:200]}"}
+                return {"lambda": lambda_name, "vulnerabilities": [], "packages_checked": len(real_lines), "status": "clean"}
+            return {
+                "lambda": lambda_name,
+                "vulnerabilities": [],
+                "packages_checked": len(real_lines),
+                "status": "error",
+                "error_msg": f"JSON parse failed. stdout={output[:200]}, stderr={stderr[:200]}",
+            }
 
         vulnerabilities = []
         for dep in audit_data.get("dependencies", []):
             for vuln in dep.get("vulns", []):
-                vulnerabilities.append({
-                    "package": dep.get("name", "?"),
-                    "version": dep.get("version", "?"),
-                    "vuln_id": vuln.get("id", "?"),
-                    "description": vuln.get("description", "")[:300],
-                    "fix_versions": vuln.get("fix_versions", []),
-                    "aliases": vuln.get("aliases", []),
-                })
+                vulnerabilities.append(
+                    {
+                        "package": dep.get("name", "?"),
+                        "version": dep.get("version", "?"),
+                        "vuln_id": vuln.get("id", "?"),
+                        "description": vuln.get("description", "")[:300],
+                        "fix_versions": vuln.get("fix_versions", []),
+                        "aliases": vuln.get("aliases", []),
+                    }
+                )
 
         packages_checked = len(audit_data.get("dependencies", []))
         status = "vulnerable" if vulnerabilities else "clean"
@@ -188,11 +197,15 @@ def audit_requirements_file(req_path: str, lambda_name: str) -> dict:
         }
 
     except subprocess.TimeoutExpired:
-        return {"lambda": lambda_name, "vulnerabilities": [], "packages_checked": 0,
-                "status": "error", "error_msg": "pip-audit timed out after 120s"}
+        return {
+            "lambda": lambda_name,
+            "vulnerabilities": [],
+            "packages_checked": 0,
+            "status": "error",
+            "error_msg": "pip-audit timed out after 120s",
+        }
     except Exception as e:
-        return {"lambda": lambda_name, "vulnerabilities": [], "packages_checked": 0,
-                "status": "error", "error_msg": str(e)}
+        return {"lambda": lambda_name, "vulnerabilities": [], "packages_checked": 0, "status": "error", "error_msg": str(e)}
 
 
 def build_report_html(results: list[dict], scan_date: str) -> tuple[str, bool]:
@@ -270,7 +283,8 @@ def build_report_html(results: list[dict], scan_date: str) -> tuple[str, bool]:
           <td style="padding:6px 12px;font-size:11px;color:#9ca3af;">{notes}</td>
         </tr>"""
 
-    return f"""<!DOCTYPE html>
+    return (
+        f"""<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"></head>
 <body style="font-family:system-ui,sans-serif;margin:0;padding:16px;background:#f9fafb;">
@@ -303,7 +317,9 @@ def build_report_html(results: list[dict], scan_date: str) -> tuple[str, bool]:
     AI-generated analysis, not medical advice. Life Platform | pip-audit Lambda (SEC-5)
   </div>
 </div>
-</body></html>""", has_vulns
+</body></html>""",
+        has_vulns,
+    )
 
 
 def _is_first_monday_of_month() -> bool:
@@ -351,13 +367,15 @@ def lambda_handler(event, context):
             local_path = os.path.join(tmpdir, f"{lambda_name}.txt")
 
             if not download_requirements(s3_key, local_path):
-                results.append({
-                    "lambda": lambda_name,
-                    "vulnerabilities": [],
-                    "packages_checked": 0,
-                    "status": "error",
-                    "error_msg": "S3 download failed",
-                })
+                results.append(
+                    {
+                        "lambda": lambda_name,
+                        "vulnerabilities": [],
+                        "packages_checked": 0,
+                        "status": "error",
+                        "error_msg": "S3 download failed",
+                    }
+                )
                 continue
 
             logger.info(f"[pip_audit] Auditing {lambda_name}...")
@@ -365,9 +383,7 @@ def lambda_handler(event, context):
             results.append(result)
 
             if result["vulnerabilities"]:
-                logger.warning(
-                    f"[pip_audit] {lambda_name}: {len(result['vulnerabilities'])} vulnerabilities found"
-                )
+                logger.warning(f"[pip_audit] {lambda_name}: {len(result['vulnerabilities'])} vulnerabilities found")
 
     html, has_vulns = build_report_html(results, scan_date)
     total_vulns = sum(len(r["vulnerabilities"]) for r in results)
@@ -378,10 +394,12 @@ def lambda_handler(event, context):
         ses.send_email(
             FromEmailAddress=SENDER,
             Destination={"ToAddresses": [RECIPIENT]},
-            Content={"Simple": {
-                "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
-            }},
+            Content={
+                "Simple": {
+                    "Subject": {"Data": subject, "Charset": "UTF-8"},
+                    "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
+                }
+            },
         )
         logger.info(f"[pip_audit] Report sent: {subject}")
     except Exception as e:
@@ -390,9 +408,11 @@ def lambda_handler(event, context):
 
     return {
         "statusCode": 200,
-        "body": json.dumps({
-            "files_audited": len(results),
-            "total_vulnerabilities": total_vulns,
-            "has_vulnerabilities": has_vulns,
-        }),
+        "body": json.dumps(
+            {
+                "files_audited": len(results),
+                "total_vulnerabilities": total_vulns,
+                "has_vulnerabilities": has_vulns,
+            }
+        ),
     }

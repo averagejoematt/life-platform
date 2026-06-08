@@ -21,7 +21,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 
 # ==============================================================================
 # MODULE STATE (set by init())
@@ -43,8 +43,7 @@ _CS_CONFIG_KEY = None  # set in init() as config/{user_id}/character_sheet.json
 _PILLAR_ORDER = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
 
 
-def init(s3_client, table_client, bucket, user_id, user_prefix,
-         fetch_range_fn, fetch_date_fn, normalize_whoop_fn):
+def init(s3_client, table_client, bucket, user_id, user_prefix, fetch_range_fn, fetch_date_fn, normalize_whoop_fn):
     """Inject shared dependencies. Call once at Lambda startup."""
     global _s3, _table, _S3_BUCKET, _USER_ID, _USER_PREFIX
     global _fetch_range, _fetch_date, _normalize_whoop_sleep, _REWARDS_PK
@@ -66,17 +65,25 @@ def init(s3_client, table_client, bucket, user_id, user_prefix,
 # INLINE UTILITIES
 # ==============================================================================
 
+
 def _safe_float(rec, field, default=None):
     if rec and field in rec:
-        try: return float(rec[field])
-        except Exception: return default
+        try:
+            return float(rec[field])
+        except Exception:
+            return default
     return default
 
+
 def _d2f(obj):
-    if isinstance(obj, list): return [_d2f(i) for i in obj]
-    if isinstance(obj, dict): return {k: _d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [_d2f(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: _d2f(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
+
 
 def _get_current_phase(profile, current_weight_lbs):
     phases = profile.get("weight_loss_phases", [])
@@ -89,6 +96,7 @@ def _get_current_phase(profile, current_weight_lbs):
 # ==============================================================================
 # AVATAR DATA BUILDER
 # ==============================================================================
+
 
 def _build_avatar_data(character_sheet, profile, current_weight=None):
     """Build avatar display state from character sheet + weight data."""
@@ -159,6 +167,7 @@ def _build_avatar_data(character_sheet, profile, current_weight=None):
 # (pre-computed in lambda_handler and passed to html_builder as params)
 # ==============================================================================
 
+
 def evaluate_rewards(character_sheet):
     """Check all active rewards against current character sheet. Returns newly triggered rewards."""
     if not character_sheet:
@@ -166,10 +175,15 @@ def evaluate_rewards(character_sheet):
     tier_order = ["Foundation", "Momentum", "Discipline", "Mastery", "Elite"]
     try:
         from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
-        resp = _table.query(**with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
-            "ExpressionAttributeValues": {":pk": _REWARDS_PK, ":prefix": "REWARD#"},
-        }))
+
+        resp = _table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+                    "ExpressionAttributeValues": {":pk": _REWARDS_PK, ":prefix": "REWARD#"},
+                }
+            )
+        )
         items = resp.get("Items", [])
     except Exception as e:
         print("[WARN] evaluate_rewards query failed: " + str(e))
@@ -193,8 +207,7 @@ def evaluate_rewards(character_sheet):
         elif ctype == "character_tier":
             cur = character_sheet.get("character_tier", "Foundation")
             tgt = condition.get("tier", "Elite")
-            met = (tier_order.index(cur) >= tier_order.index(tgt)
-                   if cur in tier_order and tgt in tier_order else False)
+            met = tier_order.index(cur) >= tier_order.index(tgt) if cur in tier_order and tgt in tier_order else False
         elif ctype == "pillar_level":
             p = condition.get("pillar", "")
             met = character_sheet.get("pillar_" + p, {}).get("level", 0) >= condition.get("level", 999)
@@ -202,8 +215,7 @@ def evaluate_rewards(character_sheet):
             p = condition.get("pillar", "")
             cur = character_sheet.get("pillar_" + p, {}).get("tier", "Foundation")
             tgt = condition.get("tier", "Elite")
-            met = (tier_order.index(cur) >= tier_order.index(tgt)
-                   if cur in tier_order and tgt in tier_order else False)
+            met = tier_order.index(cur) >= tier_order.index(tgt) if cur in tier_order and tgt in tier_order else False
         if met:
             try:
                 _table.update_item(
@@ -212,12 +224,14 @@ def evaluate_rewards(character_sheet):
                     ExpressionAttributeNames={"#s": "status"},
                     ExpressionAttributeValues={":s": "triggered", ":t": now},
                 )
-                triggered.append({
-                    "reward_id": str(item.get("reward_id", "")),
-                    "title": str(_d2f(item.get("title", ""))),
-                    "description": str(_d2f(item.get("description", ""))),
-                    "condition": condition,
-                })
+                triggered.append(
+                    {
+                        "reward_id": str(item.get("reward_id", "")),
+                        "title": str(_d2f(item.get("title", ""))),
+                        "description": str(_d2f(item.get("description", ""))),
+                        "condition": condition,
+                    }
+                )
             except Exception as e:
                 print("[ERROR] Failed to update reward " + str(item.get("reward_id")) + ": " + str(e))
                 # Don't re-raise — other rewards may still succeed, but log as ERROR for monitoring
@@ -252,19 +266,22 @@ def get_protocol_recs(character_sheet):
             if isinstance(pillar_protos, dict) and tier in pillar_protos:
                 tier_recs = pillar_protos[tier]
                 if tier_recs:
-                    recs.append({
-                        "pillar": pillar,
-                        "tier": tier,
-                        "level": level,
-                        "dropped": pillar in dropped,
-                        "protocols": tier_recs[:2],
-                    })
+                    recs.append(
+                        {
+                            "pillar": pillar,
+                            "tier": tier,
+                            "level": level,
+                            "dropped": pillar in dropped,
+                            "protocols": tier_recs[:2],
+                        }
+                    )
     return recs
 
 
 # ==============================================================================
 # DEMO MODE SANITIZER
 # ==============================================================================
+
 
 def sanitize_for_demo(html, data, profile):
     """Apply demo mode sanitization using profile-driven rules."""
@@ -274,8 +291,8 @@ def sanitize_for_demo(html, data, profile):
 
     # 1. Hide entire sections via comment markers
     for section in rules.get("hide_sections", []):
-        pattern = r'<!-- S:' + re.escape(section) + r' -->.*?<!-- /S:' + re.escape(section) + r' -->'
-        html = re.sub(pattern, '', html, flags=re.DOTALL)
+        pattern = r"<!-- S:" + re.escape(section) + r" -->.*?<!-- /S:" + re.escape(section) + r" -->"
+        html = re.sub(pattern, "", html, flags=re.DOTALL)
 
     # 2. Replace specific data values with masked text
     rv = rules.get("replace_values", {})
@@ -317,14 +334,16 @@ def sanitize_for_demo(html, data, profile):
 
     # 3. Redact text patterns (case-insensitive)
     for pat in rules.get("redact_patterns", []):
-        html = re.sub(r'(?i)\b' + re.escape(pat) + r'(?:s|ed|ing)?\b', '[redacted]', html)
+        html = re.sub(r"(?i)\b" + re.escape(pat) + r"(?:s|ed|ing)?\b", "[redacted]", html)
 
     # 4. Add demo banner
-    demo_banner = ('<div style="background:#fef3c7;border:2px solid #f59e0b;border-radius:8px;'
-                   'padding:8px 16px;margin:0 16px 8px;text-align:center;">'
-                   '<p style="font-size:11px;color:#92400e;margin:0;font-weight:700;">'
-                   '&#128274; DEMO VERSION — Some data redacted for privacy</p></div>')
-    header_end = '</div></div>'
+    demo_banner = (
+        '<div style="background:#fef3c7;border:2px solid #f59e0b;border-radius:8px;'
+        'padding:8px 16px;margin:0 16px 8px;text-align:center;">'
+        '<p style="font-size:11px;color:#92400e;margin:0;font-weight:700;">'
+        "&#128274; DEMO VERSION — Some data redacted for privacy</p></div>"
+    )
+    header_end = "</div></div>"
     idx = html.find(header_end)
     if idx > 0:
         insert_at = idx + len(header_end)
@@ -343,6 +362,7 @@ def sanitize_for_demo(html, data, profile):
 # Jordan Kim directive: expose delta (lbs_lost), not absolute weight.
 # Ava Moreau directive: the delta IS the story.
 # ==============================================================================
+
 
 def write_public_stats_json(data, profile, streak_data=None):
     """Write site/public_stats.json for the averagejoematt.com homepage hero.
@@ -388,7 +408,7 @@ def write_public_stats_json(data, profile, streak_data=None):
         stats = {
             "updated_at": datetime.now(timezone.utc).isoformat(),
             "days_in": days_in,
-            "lbs_lost": lbs_lost,                    # Jordan: delta, not absolute
+            "lbs_lost": lbs_lost,  # Jordan: delta, not absolute
             "journey_pct": journey_pct,
             "tier0_streak": tier0_streak,
             "goal_lbs": int(goal_weight),
@@ -408,9 +428,19 @@ def write_public_stats_json(data, profile, streak_data=None):
         raise  # Re-raise — stale public stats breaks homepage and OG images
 
 
-def write_dashboard_json(data, profile, day_grade_score, grade, component_scores,
-                          readiness_score, readiness_colour, tldr_guidance, yesterday,
-                          component_details=None, character_sheet=None):
+def write_dashboard_json(
+    data,
+    profile,
+    day_grade_score,
+    grade,
+    component_scores,
+    readiness_score,
+    readiness_colour,
+    tldr_guidance,
+    yesterday,
+    component_details=None,
+    character_sheet=None,
+):
     """Write dashboard/data.json to S3 for the static web dashboard."""
     if component_details is None:
         component_details = {}
@@ -418,8 +448,7 @@ def write_dashboard_json(data, profile, day_grade_score, grade, component_scores
         today = datetime.now(timezone.utc).date()
 
         # Sparklines
-        sleep_7d = [_normalize_whoop_sleep(i) for i in _fetch_range("whoop",
-                               (today - timedelta(days=7)).isoformat(), yesterday)]
+        sleep_7d = [_normalize_whoop_sleep(i) for i in _fetch_range("whoop", (today - timedelta(days=7)).isoformat(), yesterday)]
         sleep_sparkline = [_safe_float(d, "sleep_score") for d in sleep_7d]
 
         hrv_7d_recs = _fetch_range("whoop", (today - timedelta(days=7)).isoformat(), yesterday)
@@ -502,7 +531,7 @@ def write_dashboard_json(data, profile, day_grade_score, grade, component_scores
             z2_hi = max_hr * 0.70
             z2_total = 0.0
             for day_rec in strava_week:
-                for act in (day_rec.get("activities") or []):
+                for act in day_rec.get("activities") or []:
                     avg_hr = _safe_float(act, "average_heartrate")
                     dur_s = _safe_float(act, "moving_time_seconds") or 0
                     if avg_hr and z2_lo <= avg_hr <= z2_hi:
@@ -512,8 +541,7 @@ def write_dashboard_json(data, profile, day_grade_score, grade, component_scores
             pass
 
         # Active sources count
-        source_names = ["whoop", "sleep", "macrofactor", "habitify",
-                        "apple", "strava", "garmin", "supplements_today", "weather_yesterday"]
+        source_names = ["whoop", "sleep", "macrofactor", "habitify", "apple", "strava", "garmin", "supplements_today", "weather_yesterday"]
         sources_active = sum(1 for s_name in source_names if data.get(s_name))
         if data.get("journal"):
             sources_active += 1
@@ -524,8 +552,7 @@ def write_dashboard_json(data, profile, day_grade_score, grade, component_scores
             "readiness": {
                 "score": readiness_score,
                 "color": readiness_colour,
-                "label": {"green": "Go", "yellow": "Moderate",
-                          "red": "Easy", "gray": "No Data"}.get(readiness_colour, "—"),
+                "label": {"green": "Go", "yellow": "Moderate", "red": "Easy", "gray": "No Data"}.get(readiness_colour, "—"),
                 "training_rec": training_rec,
             },
             "sleep": {
@@ -576,23 +603,35 @@ def write_dashboard_json(data, profile, day_grade_score, grade, component_scores
                 "tldr": (tldr_guidance or {}).get("tldr", ""),
             },
             "sources_active": sources_active,
-            "character_sheet": {
-                "level": character_sheet.get("character_level", 1) if character_sheet else None,
-                "tier": character_sheet.get("character_tier") if character_sheet else None,
-                "tier_emoji": character_sheet.get("character_tier_emoji") if character_sheet else None,
-                "xp": character_sheet.get("character_xp", 0) if character_sheet else None,
-                "pillars": {pn: {
-                    "level": (character_sheet.get("pillar_" + pn) or {}).get("level"),
-                    "tier": (character_sheet.get("pillar_" + pn) or {}).get("tier"),
-                    "raw_score": (character_sheet.get("pillar_" + pn) or {}).get("raw_score")}
-                    for pn in _PILLAR_ORDER}
-                if character_sheet else {},
-                "events": character_sheet.get("level_events", []) if character_sheet else [],
-                "effects": [{"name": e.get("name"), "emoji": e.get("emoji")}
-                            for e in character_sheet.get("active_effects", [])] if character_sheet else [],
-            } if character_sheet else None,
-            "avatar": _build_avatar_data(character_sheet, profile,
-                                         data.get("avatar_weight") or data.get("latest_weight")),
+            "character_sheet": (
+                {
+                    "level": character_sheet.get("character_level", 1) if character_sheet else None,
+                    "tier": character_sheet.get("character_tier") if character_sheet else None,
+                    "tier_emoji": character_sheet.get("character_tier_emoji") if character_sheet else None,
+                    "xp": character_sheet.get("character_xp", 0) if character_sheet else None,
+                    "pillars": (
+                        {
+                            pn: {
+                                "level": (character_sheet.get("pillar_" + pn) or {}).get("level"),
+                                "tier": (character_sheet.get("pillar_" + pn) or {}).get("tier"),
+                                "raw_score": (character_sheet.get("pillar_" + pn) or {}).get("raw_score"),
+                            }
+                            for pn in _PILLAR_ORDER
+                        }
+                        if character_sheet
+                        else {}
+                    ),
+                    "events": character_sheet.get("level_events", []) if character_sheet else [],
+                    "effects": (
+                        [{"name": e.get("name"), "emoji": e.get("emoji")} for e in character_sheet.get("active_effects", [])]
+                        if character_sheet
+                        else []
+                    ),
+                }
+                if character_sheet
+                else None
+            ),
+            "avatar": _build_avatar_data(character_sheet, profile, data.get("avatar_weight") or data.get("latest_weight")),
         }
 
         _s3.put_object(
@@ -611,6 +650,7 @@ def write_dashboard_json(data, profile, day_grade_score, grade, component_scores
 # ==============================================================================
 # CLINICAL JSON WRITER
 # ==============================================================================
+
 
 def write_clinical_json(data, profile, yesterday):
     """Write dashboard/clinical.json to S3 for the clinical summary view."""
@@ -651,13 +691,20 @@ def write_clinical_json(data, profile, yesterday):
         body_comp = {}
         try:
             from phase_filter import with_phase_filter
+
             # ADR-058 include_pilot=True: clinical archive — labs/DEXA are date-independent
             # (owner decision 2026-06-06; filtering would empty the public labs page)
-            resp = _table.query(**with_phase_filter({
-                "KeyConditionExpression": "pk = :pk AND begins_with(sk, :sk)",
-                "ExpressionAttributeValues": {":pk": _USER_PREFIX + "dexa", ":sk": "DATE#"},
-                "ScanIndexForward": False, "Limit": 1,
-            }, include_pilot=True))
+            resp = _table.query(
+                **with_phase_filter(
+                    {
+                        "KeyConditionExpression": "pk = :pk AND begins_with(sk, :sk)",
+                        "ExpressionAttributeValues": {":pk": _USER_PREFIX + "dexa", ":sk": "DATE#"},
+                        "ScanIndexForward": False,
+                        "Limit": 1,
+                    },
+                    include_pilot=True,
+                )
+            )
             if resp.get("Items"):
                 dexa = resp["Items"][0]
                 bc = dexa.get("body_composition", {})
@@ -678,18 +725,30 @@ def write_clinical_json(data, profile, yesterday):
         labs = {}
         try:
             from phase_filter import with_phase_filter
+
             # ADR-058 include_pilot=True: clinical archive — labs/DEXA are date-independent
             # (owner decision 2026-06-06; filtering would empty the public labs page)
-            resp = _table.query(**with_phase_filter({
-                "KeyConditionExpression": "pk = :pk AND begins_with(sk, :sk)",
-                "ExpressionAttributeValues": {":pk": _USER_PREFIX + "labs", ":sk": "DATE#"},
-                "ScanIndexForward": False, "Limit": 1,
-            }, include_pilot=True))
-            all_draws = _table.query(**with_phase_filter({
-                "KeyConditionExpression": "pk = :pk AND begins_with(sk, :sk)",
-                "ExpressionAttributeValues": {":pk": _USER_PREFIX + "labs", ":sk": "DATE#"},
-                "Select": "COUNT",
-            }, include_pilot=True))
+            resp = _table.query(
+                **with_phase_filter(
+                    {
+                        "KeyConditionExpression": "pk = :pk AND begins_with(sk, :sk)",
+                        "ExpressionAttributeValues": {":pk": _USER_PREFIX + "labs", ":sk": "DATE#"},
+                        "ScanIndexForward": False,
+                        "Limit": 1,
+                    },
+                    include_pilot=True,
+                )
+            )
+            all_draws = _table.query(
+                **with_phase_filter(
+                    {
+                        "KeyConditionExpression": "pk = :pk AND begins_with(sk, :sk)",
+                        "ExpressionAttributeValues": {":pk": _USER_PREFIX + "labs", ":sk": "DATE#"},
+                        "Select": "COUNT",
+                    },
+                    include_pilot=True,
+                )
+            )
             total_draws = all_draws.get("Count", 0)
 
             if resp.get("Items"):
@@ -698,23 +757,52 @@ def write_clinical_json(data, profile, yesterday):
                 out_of_range = lab_rec.get("out_of_range", [])
 
                 cat_order = [
-                    "lipids", "lipids_advanced", "cardiovascular", "metabolic",
-                    "cbc", "cbc_differential", "liver", "kidney", "thyroid",
-                    "hormones", "inflammation", "iron", "vitamins", "minerals",
-                    "electrolytes", "immune", "omega_fatty_acids", "prostate",
-                    "toxicology", "genetics", "blood_type", "digestive"
+                    "lipids",
+                    "lipids_advanced",
+                    "cardiovascular",
+                    "metabolic",
+                    "cbc",
+                    "cbc_differential",
+                    "liver",
+                    "kidney",
+                    "thyroid",
+                    "hormones",
+                    "inflammation",
+                    "iron",
+                    "vitamins",
+                    "minerals",
+                    "electrolytes",
+                    "immune",
+                    "omega_fatty_acids",
+                    "prostate",
+                    "toxicology",
+                    "genetics",
+                    "blood_type",
+                    "digestive",
                 ]
                 cat_names = {
-                    "lipids": "Lipids", "lipids_advanced": "Advanced Lipids",
-                    "cardiovascular": "Cardiovascular", "metabolic": "Metabolic",
-                    "cbc": "Complete Blood Count", "cbc_differential": "CBC Differential",
-                    "liver": "Liver", "kidney": "Kidney", "thyroid": "Thyroid",
-                    "hormones": "Hormones", "inflammation": "Inflammation",
-                    "iron": "Iron Studies", "vitamins": "Vitamins", "minerals": "Minerals",
-                    "electrolytes": "Electrolytes", "immune": "Immune",
-                    "omega_fatty_acids": "Omega Fatty Acids", "prostate": "Prostate",
-                    "toxicology": "Toxicology", "genetics": "Genetics",
-                    "blood_type": "Blood Type", "digestive": "Digestive"
+                    "lipids": "Lipids",
+                    "lipids_advanced": "Advanced Lipids",
+                    "cardiovascular": "Cardiovascular",
+                    "metabolic": "Metabolic",
+                    "cbc": "Complete Blood Count",
+                    "cbc_differential": "CBC Differential",
+                    "liver": "Liver",
+                    "kidney": "Kidney",
+                    "thyroid": "Thyroid",
+                    "hormones": "Hormones",
+                    "inflammation": "Inflammation",
+                    "iron": "Iron Studies",
+                    "vitamins": "Vitamins",
+                    "minerals": "Minerals",
+                    "electrolytes": "Electrolytes",
+                    "immune": "Immune",
+                    "omega_fatty_acids": "Omega Fatty Acids",
+                    "prostate": "Prostate",
+                    "toxicology": "Toxicology",
+                    "genetics": "Genetics",
+                    "blood_type": "Blood Type",
+                    "digestive": "Digestive",
                 }
 
                 by_cat = {}
@@ -739,15 +827,17 @@ def write_clinical_json(data, profile, yesterday):
                         elif abs(val) < 10:
                             decimals = 1
 
-                    by_cat[cat].append({
-                        "name": key.replace("_", " ").title(),
-                        "value": _d2f(val) if isinstance(val, (int, float)) else val,
-                        "unit": bm.get("unit", ""),
-                        "range": bm.get("ref_text", ""),
-                        "flag": flag_code,
-                        "decimals": decimals,
-                        "category": cat_names.get(cat, cat.replace("_", " ").title()),
-                    })
+                    by_cat[cat].append(
+                        {
+                            "name": key.replace("_", " ").title(),
+                            "value": _d2f(val) if isinstance(val, (int, float)) else val,
+                            "unit": bm.get("unit", ""),
+                            "range": bm.get("ref_text", ""),
+                            "flag": flag_code,
+                            "decimals": decimals,
+                            "category": cat_names.get(cat, cat.replace("_", " ").title()),
+                        }
+                    )
 
                 biomarker_list = []
                 for cat in cat_order:
@@ -773,7 +863,7 @@ def write_clinical_json(data, profile, yesterday):
             supp_7d = _fetch_range("supplements", (today - timedelta(days=7)).isoformat(), yesterday)
             seen = {}
             for day_rec in supp_7d:
-                for s_item in (day_rec.get("supplements") or []):
+                for s_item in day_rec.get("supplements") or []:
                     name = s_item.get("name", "").strip()
                     if name and name.lower() not in seen:
                         dose_str = ""
@@ -791,8 +881,7 @@ def write_clinical_json(data, profile, yesterday):
             print("[WARN] Clinical: supplements query failed: " + str(e))
 
         # Sleep 30-day averages
-        sleep_30d = [_normalize_whoop_sleep(i) for i in _fetch_range(
-            "whoop", (today - timedelta(days=30)).isoformat(), yesterday)]
+        sleep_30d = [_normalize_whoop_sleep(i) for i in _fetch_range("whoop", (today - timedelta(days=30)).isoformat(), yesterday)]
         s_scores = [v for v in (_safe_float(r, "sleep_score") for r in sleep_30d) if v is not None]
         s_dur = [v for v in (_safe_float(r, "sleep_duration_hours") for r in sleep_30d) if v is not None]
         s_eff = [v for v in (_safe_float(r, "sleep_efficiency_pct") for r in sleep_30d) if v is not None]
@@ -820,7 +909,7 @@ def write_clinical_json(data, profile, yesterday):
         total_z2_min = 0.0
         sport_counts = {}
         for day_rec in strava_28d:
-            for act in (day_rec.get("activities") or []):
+            for act in day_rec.get("activities") or []:
                 total_sessions += 1
                 sport = act.get("sport_type", "Unknown")
                 sport_counts[sport] = sport_counts.get(sport, 0) + 1
@@ -862,25 +951,26 @@ def write_clinical_json(data, profile, yesterday):
         try:
             resp = _table.query(
                 KeyConditionExpression="pk = :pk AND begins_with(sk, :sk)",
-                ExpressionAttributeValues={":pk": _USER_PREFIX + "genome", ":sk": "GENE#"}
+                ExpressionAttributeValues={":pk": _USER_PREFIX + "genome", ":sk": "GENE#"},
             )
-            for item in (resp.get("Items") or []):
+            for item in resp.get("Items") or []:
                 risk = item.get("risk_level", "")
                 if risk in ("unfavorable", "mixed"):
-                    genome_flags.append({
-                        "gene": item.get("gene", ""),
-                        "variant": item.get("genotype", ""),
-                        "risk": risk,
-                        "note": item.get("summary", ""),
-                    })
+                    genome_flags.append(
+                        {
+                            "gene": item.get("gene", ""),
+                            "variant": item.get("genotype", ""),
+                            "risk": risk,
+                            "note": item.get("summary", ""),
+                        }
+                    )
             genome_flags.sort(key=lambda x: (0 if x["risk"] == "unfavorable" else 1, x["gene"]))
         except Exception as e:
             print("[WARN] Clinical: genome query failed: " + str(e))
 
         # Active sources count
         sources_active = 0
-        for s_name in ["whoop", "sleep", "macrofactor", "habitify", "apple", "strava",
-                        "garmin", "supplements_today", "weather_yesterday"]:
+        for s_name in ["whoop", "sleep", "macrofactor", "habitify", "apple", "strava", "garmin", "supplements_today", "weather_yesterday"]:
             if data.get(s_name):
                 sources_active += 1
         if data.get("journal"):
@@ -945,9 +1035,14 @@ def _buddy_friendly_date(date_str):
 def _buddy_friendly_name(name, sport_type):
     """Make activity names more readable."""
     friendly = {
-        "Walk": "Walk", "Run": "Run", "Ride": "Bike Ride",
-        "VirtualRide": "Indoor Ride", "WeightTraining": "Weight Training",
-        "Hike": "Hike", "Yoga": "Yoga", "Swim": "Swim",
+        "Walk": "Walk",
+        "Run": "Run",
+        "Ride": "Bike Ride",
+        "VirtualRide": "Indoor Ride",
+        "WeightTraining": "Weight Training",
+        "Hike": "Hike",
+        "Yoga": "Yoga",
+        "Swim": "Swim",
     }
     if name == sport_type or not name:
         return friendly.get(sport_type, sport_type)
@@ -967,9 +1062,12 @@ def _dedup_activities(activities):
 
     def device_priority(a):
         dev = (a.get("device_name") or "").lower()
-        if "garmin" in dev: return 3
-        if "apple" in dev: return 2
-        if "whoop" in dev: return 1
+        if "garmin" in dev:
+            return 3
+        if "apple" in dev:
+            return 2
+        if "whoop" in dev:
+            return 1
         return 0
 
     sorted_acts = sorted(activities, key=lambda a: a.get("start_date", ""))
@@ -1119,10 +1217,7 @@ def write_buddy_json(data, profile, yesterday, character_sheet=None):
             exercise_text = f"No exercise this week — last session {days_since_exercise} days ago"
 
         activities.sort(key=lambda x: x.get("sort_date", ""), reverse=True)
-        activity_highlights = [
-            {"name": a["name"], "detail": a["detail"], "date": a["date"]}
-            for a in activities[:4]
-        ]
+        activity_highlights = [{"name": a["name"], "detail": a["detail"], "date": a["date"]} for a in activities[:4]]
 
         # Routine Signal
         latest_habit_date = None
@@ -1244,20 +1339,24 @@ def write_buddy_json(data, profile, yesterday, character_sheet=None):
                 "goal_lbs": int(goal_weight),
             },
             "last_updated_friendly": friendly_time,
-            "character_sheet": {
-                "level": character_sheet.get("character_level", 1),
-                "tier": character_sheet.get("character_tier"),
-                "tier_emoji": character_sheet.get("character_tier_emoji"),
-                "xp": character_sheet.get("character_xp", 0),
-                "events": character_sheet.get("level_events", []),
-                "pillars": {
-                    pn: {
-                        "level": (character_sheet.get("pillar_" + pn) or {}).get("level"),
-                        "tier": (character_sheet.get("pillar_" + pn) or {}).get("tier"),
-                    }
-                    for pn in _PILLAR_ORDER
-                },
-            } if character_sheet else None,
+            "character_sheet": (
+                {
+                    "level": character_sheet.get("character_level", 1),
+                    "tier": character_sheet.get("character_tier"),
+                    "tier_emoji": character_sheet.get("character_tier_emoji"),
+                    "xp": character_sheet.get("character_xp", 0),
+                    "events": character_sheet.get("level_events", []),
+                    "pillars": {
+                        pn: {
+                            "level": (character_sheet.get("pillar_" + pn) or {}).get("level"),
+                            "tier": (character_sheet.get("pillar_" + pn) or {}).get("tier"),
+                        }
+                        for pn in _PILLAR_ORDER
+                    },
+                }
+                if character_sheet
+                else None
+            ),
             "avatar": _build_avatar_data(character_sheet, profile, current_weight),
         }
 

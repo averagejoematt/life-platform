@@ -24,6 +24,7 @@ v1.0.0 — 2026-03-11
 import os
 import re
 import sys
+
 import pytest
 
 # ── Project root ─────────────────────────────────────────────────────────────
@@ -41,6 +42,7 @@ def _build_lambda_index():
             if fname.endswith(".py"):
                 idx[fname] = os.path.join(root, fname)
     return idx
+
 
 _LAMBDA_INDEX = _build_lambda_index()
 
@@ -63,60 +65,105 @@ def _exists(filename: str) -> bool:
 # Every deployable Lambda (filename only, relative to lambdas/)
 ALL_LAMBDAS = [
     # Ingestion
-    "strava_lambda.py", "whoop_lambda.py", "garmin_lambda.py",
-    "eightsleep_lambda.py", "habitify_lambda.py", "withings_lambda.py",
-    "todoist_lambda.py", "notion_lambda.py", "macrofactor_lambda.py",
-    "apple_health_lambda.py", "health_auto_export_lambda.py",
-    "dropbox_poll_lambda.py", "weather_handler.py",
-    "enrichment_lambda.py", "journal_enrichment_lambda.py",
+    "strava_lambda.py",
+    "whoop_lambda.py",
+    "garmin_lambda.py",
+    "eightsleep_lambda.py",
+    "habitify_lambda.py",
+    "withings_lambda.py",
+    "todoist_lambda.py",
+    "notion_lambda.py",
+    "macrofactor_lambda.py",
+    "apple_health_lambda.py",
+    "health_auto_export_lambda.py",
+    "dropbox_poll_lambda.py",
+    "weather_handler.py",
+    "enrichment_lambda.py",
+    "journal_enrichment_lambda.py",
     # Email
-    "daily_brief_lambda.py", "weekly_digest_lambda.py", "monthly_digest_lambda.py",
-    "nutrition_review_lambda.py", "wednesday_chronicle_lambda.py",
-    "weekly_plate_lambda.py", "monday_compass_lambda.py", "partner_email_lambda.py",
+    "daily_brief_lambda.py",
+    "weekly_digest_lambda.py",
+    "monthly_digest_lambda.py",
+    "nutrition_review_lambda.py",
+    "wednesday_chronicle_lambda.py",
+    "weekly_plate_lambda.py",
+    "monday_compass_lambda.py",
+    "partner_email_lambda.py",
     # AI-compute
-    "anomaly_detector_lambda.py", "daily_insight_compute_lambda.py",
-    "hypothesis_engine_lambda.py", "adaptive_mode_lambda.py",
+    "anomaly_detector_lambda.py",
+    "daily_insight_compute_lambda.py",
+    "hypothesis_engine_lambda.py",
+    "adaptive_mode_lambda.py",
     # Non-AI compute / operational
-    "character_sheet_lambda.py", "daily_metrics_compute_lambda.py",
-    "dashboard_refresh_lambda.py", "failure_pattern_compute_lambda.py",
-    "freshness_checker_lambda.py", "insight_email_parser_lambda.py",
-    "canary_lambda.py", "qa_smoke_lambda.py", "dlq_consumer_lambda.py",
-    "key_rotator_lambda.py", "pip_audit_lambda.py",
-    "data_export_lambda.py", "data_reconciliation_lambda.py",
+    "character_sheet_lambda.py",
+    "daily_metrics_compute_lambda.py",
+    "dashboard_refresh_lambda.py",
+    "failure_pattern_compute_lambda.py",
+    "freshness_checker_lambda.py",
+    "insight_email_parser_lambda.py",
+    "canary_lambda.py",
+    "qa_smoke_lambda.py",
+    "dlq_consumer_lambda.py",
+    "key_rotator_lambda.py",
+    "pip_audit_lambda.py",
+    "data_export_lambda.py",
+    "data_reconciliation_lambda.py",
     # ADR-066 (2026-05-31): Hevy routine write-loop cron
     "hevy_routine_cron_lambda.py",
 ]
 
 # Ingestion Lambdas — must wire ingestion_validator (DATA-2)
 INGESTION_LAMBDAS = [
-    "strava_lambda.py", "whoop_lambda.py", "garmin_lambda.py",
-    "eightsleep_lambda.py", "habitify_lambda.py", "withings_lambda.py",
-    "todoist_lambda.py", "notion_lambda.py", "macrofactor_lambda.py",
-    "apple_health_lambda.py", "health_auto_export_lambda.py",
-    "dropbox_poll_lambda.py", "weather_handler.py",
-    "enrichment_lambda.py", "journal_enrichment_lambda.py",
+    "strava_lambda.py",
+    "whoop_lambda.py",
+    "garmin_lambda.py",
+    "eightsleep_lambda.py",
+    "habitify_lambda.py",
+    "withings_lambda.py",
+    "todoist_lambda.py",
+    "notion_lambda.py",
+    "macrofactor_lambda.py",
+    "apple_health_lambda.py",
+    "health_auto_export_lambda.py",
+    "dropbox_poll_lambda.py",
+    "weather_handler.py",
+    "enrichment_lambda.py",
+    "journal_enrichment_lambda.py",
 ]
 
 # Email + AI-compute Lambdas — must wire ai_output_validator (AI-3)
 AI_OUTPUT_LAMBDAS = [
     # Email
-    "daily_brief_lambda.py", "weekly_digest_lambda.py", "monthly_digest_lambda.py",
-    "nutrition_review_lambda.py", "wednesday_chronicle_lambda.py",
-    "weekly_plate_lambda.py", "monday_compass_lambda.py", "partner_email_lambda.py",
+    "daily_brief_lambda.py",
+    "weekly_digest_lambda.py",
+    "monthly_digest_lambda.py",
+    "nutrition_review_lambda.py",
+    "wednesday_chronicle_lambda.py",
+    "weekly_plate_lambda.py",
+    "monday_compass_lambda.py",
+    "partner_email_lambda.py",
     # AI-compute
-    "anomaly_detector_lambda.py", "daily_insight_compute_lambda.py",
-    "hypothesis_engine_lambda.py", "adaptive_mode_lambda.py",
+    "anomaly_detector_lambda.py",
+    "daily_insight_compute_lambda.py",
+    "hypothesis_engine_lambda.py",
+    "adaptive_mode_lambda.py",
 ]
 
 # Lambdas with inline prompt strings (not sourced from ai_calls.py)
 # These are scanned for causal language.  Add any new Lambda that builds
 # its own prompt strings here.
 PROMPT_LAMBDAS = [
-    "weekly_digest_lambda.py", "monthly_digest_lambda.py",
-    "nutrition_review_lambda.py", "wednesday_chronicle_lambda.py",
-    "weekly_plate_lambda.py", "monday_compass_lambda.py", "partner_email_lambda.py",
-    "anomaly_detector_lambda.py", "daily_insight_compute_lambda.py",
-    "hypothesis_engine_lambda.py", "adaptive_mode_lambda.py",
+    "weekly_digest_lambda.py",
+    "monthly_digest_lambda.py",
+    "nutrition_review_lambda.py",
+    "wednesday_chronicle_lambda.py",
+    "weekly_plate_lambda.py",
+    "monday_compass_lambda.py",
+    "partner_email_lambda.py",
+    "anomaly_detector_lambda.py",
+    "daily_insight_compute_lambda.py",
+    "hypothesis_engine_lambda.py",
+    "adaptive_mode_lambda.py",
     "ai_calls.py",  # The main prompt module — always checked
 ]
 
@@ -153,6 +200,7 @@ W3_KNOWN_GAPS: set[str] = {
 # W1 — platform_logger wired in every Lambda
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.parametrize("filename", sorted(ALL_LAMBDAS))
 def test_w1_platform_logger_imported(filename):
     """W1: Every Lambda must import get_logger from platform_logger (OBS-1)."""
@@ -161,11 +209,7 @@ def test_w1_platform_logger_imported(filename):
     if filename in W1_KNOWN_GAPS:
         pytest.xfail(f"Known W1 gap: {filename} — see W1_KNOWN_GAPS")
     src = _src(filename)
-    has_logger = (
-        "from platform_logger import" in src
-        or "platform_logger" in src
-        or "get_logger(" in src
-    )
+    has_logger = "from platform_logger import" in src or "platform_logger" in src or "get_logger(" in src
     assert has_logger, (
         f"{filename}: platform_logger not imported. OBS-1 requires all Lambdas to use "
         f"structured logging via get_logger(). Add:\n"
@@ -180,6 +224,7 @@ def test_w1_platform_logger_imported(filename):
 # ══════════════════════════════════════════════════════════════════════════════
 # W2 — ingestion_validator wired in ingestion Lambdas
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.parametrize("filename", sorted(INGESTION_LAMBDAS))
 def test_w2_ingestion_validator_wired(filename):
@@ -211,6 +256,7 @@ def test_w2_ingestion_validator_wired(filename):
 # W3 — ai_output_validator wired in AI-calling Lambdas
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.parametrize("filename", sorted(AI_OUTPUT_LAMBDAS))
 def test_w3_ai_output_validator_wired(filename):
     """W3: Email and AI-compute Lambdas must wire ai_output_validator (AI-3)."""
@@ -223,9 +269,9 @@ def test_w3_ai_output_validator_wired(filename):
     # (a) imports from ai_calls which has the middleware built in
     # (b) imports validate_ai_output directly
     # (c) standalone _HAS_AI_VALIDATOR pattern
-    has_via_ai_calls   = "from ai_calls import" in src or "import ai_calls" in src
-    has_direct         = "from ai_output_validator import" in src or "validate_ai_output" in src
-    has_standalone     = "_HAS_AI_VALIDATOR" in src and "validate_ai_output" in src
+    has_via_ai_calls = "from ai_calls import" in src or "import ai_calls" in src
+    has_direct = "from ai_output_validator import" in src or "validate_ai_output" in src
+    has_standalone = "_HAS_AI_VALIDATOR" in src and "validate_ai_output" in src
     assert has_via_ai_calls or has_direct or has_standalone, (
         f"{filename}: ai_output_validator not wired. AI-3 requires all email and "
         f"AI-compute Lambdas to validate AI outputs. Either:\n"
@@ -243,28 +289,28 @@ def test_w3_ai_output_validator_wired(filename):
 # Patterns that indicate causal framing in prompts (case-insensitive)
 # Allowlist patterns that are legitimate uses (e.g. discussing the principle)
 _CAUSAL_PATTERNS = [
-    r'\bcauses\s+your\b',           # "causes your sleep to"
-    r'\bproves\s+that\b',           # "proves that the pattern"
-    r'\bbecause\s+your\b',          # "because your recovery"
-    r'\bis\s+why\s+your\b',         # "is why your HRV"
-    r'\bdirectly\s+causing\b',      # "directly causing fatigue"
-    r'\bproven\s+to\s+cause\b',     # "proven to cause"
-    r'\bcausally\s+linked\b',       # "causally linked to"
-    r'\bthis\s+data\s+clearly\s+caus',  # "this data clearly causes"
+    r"\bcauses\s+your\b",  # "causes your sleep to"
+    r"\bproves\s+that\b",  # "proves that the pattern"
+    r"\bbecause\s+your\b",  # "because your recovery"
+    r"\bis\s+why\s+your\b",  # "is why your HRV"
+    r"\bdirectly\s+causing\b",  # "directly causing fatigue"
+    r"\bproven\s+to\s+cause\b",  # "proven to cause"
+    r"\bcausally\s+linked\b",  # "causally linked to"
+    r"\bthis\s+data\s+clearly\s+caus",  # "this data clearly causes"
 ]
 
 # Lines containing these strings are allowlisted (meta-commentary about causal language)
 _CAUSAL_ALLOWLIST = [
-    "causal language",   # comments about the principle
-    "correlative",       # already framing as correlation
-    "not proven causal", # explicit caveat
-    "correlation",       # already using correct framing
-    "causal_chain",      # variable name (legacy, renamed)
-    "causal →",          # ADR/doc reference
-    "causal framing",    # meta-commentary
+    "causal language",  # comments about the principle
+    "correlative",  # already framing as correlation
+    "not proven causal",  # explicit caveat
+    "correlation",  # already using correct framing
+    "causal_chain",  # variable name (legacy, renamed)
+    "causal →",  # ADR/doc reference
+    "causal framing",  # meta-commentary
     "non-causal",
     "likely_connection",
-    "# ",                # comment lines
+    "# ",  # comment lines
 ]
 
 
@@ -310,6 +356,7 @@ def test_w4_no_causal_language_in_prompts(filename):
 
 if __name__ == "__main__":
     import subprocess
+
     result = subprocess.run(
         ["python3", "-m", "pytest", __file__, "-v", "--tb=short"],
         cwd=ROOT,

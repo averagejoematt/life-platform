@@ -13,9 +13,9 @@ Covers:
 Run:  python3 -m pytest tests/test_auth_breaker.py -v
 """
 
+import logging
 import os
 import sys
-import logging
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
@@ -48,6 +48,7 @@ def test_looks_like_auth_failure_recognizes_keywords():
 def test_looks_like_auth_failure_recognizes_httperror_code():
     class FakeHTTPError(Exception):
         code = 401
+
     assert ig._looks_like_auth_failure(FakeHTTPError("oops"))
 
 
@@ -64,12 +65,14 @@ def test_check_auth_breaker_absent_returns_none(logger):
 
 def test_check_auth_breaker_fresh_returns_item(logger):
     table = MagicMock()
-    table.get_item.return_value = {"Item": {
-        "pk": "USER#matthew#SOURCE#whoop",
-        "sk": "AUTH_FAILURE",
-        "marked_at": datetime.now(timezone.utc).isoformat(),
-        "error": "401 Unauthorized",
-    }}
+    table.get_item.return_value = {
+        "Item": {
+            "pk": "USER#matthew#SOURCE#whoop",
+            "sk": "AUTH_FAILURE",
+            "marked_at": datetime.now(timezone.utc).isoformat(),
+            "error": "401 Unauthorized",
+        }
+    }
     result = ig._check_auth_breaker(table, "whoop", "matthew", logger)
     assert result is not None
     assert result["error"] == "401 Unauthorized"
@@ -78,11 +81,13 @@ def test_check_auth_breaker_fresh_returns_item(logger):
 def test_check_auth_breaker_expired_returns_none(logger):
     table = MagicMock()
     old = (datetime.now(timezone.utc) - timedelta(hours=25)).isoformat()
-    table.get_item.return_value = {"Item": {
-        "pk": "USER#matthew#SOURCE#whoop",
-        "sk": "AUTH_FAILURE",
-        "marked_at": old,
-    }}
+    table.get_item.return_value = {
+        "Item": {
+            "pk": "USER#matthew#SOURCE#whoop",
+            "sk": "AUTH_FAILURE",
+            "marked_at": old,
+        }
+    }
     assert ig._check_auth_breaker(table, "whoop", "matthew", logger) is None
 
 
@@ -102,6 +107,4 @@ def test_mark_auth_failure_writes_item_with_ttl(logger):
 def test_clear_auth_failure_deletes_item(logger):
     table = MagicMock()
     ig._clear_auth_failure(table, "garmin", "matthew", logger)
-    table.delete_item.assert_called_once_with(
-        Key={"pk": "USER#matthew#SOURCE#garmin", "sk": "AUTH_FAILURE"}
-    )
+    table.delete_item.assert_called_once_with(Key={"pk": "USER#matthew#SOURCE#garmin", "sk": "AUTH_FAILURE"})

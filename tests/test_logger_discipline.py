@@ -20,7 +20,6 @@ import os
 import re
 import subprocess
 
-
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 LAMBDAS_DIR = os.path.join(ROOT, "lambdas")
 
@@ -54,9 +53,9 @@ def test_print_count_baseline():
         f"logger instead:\n\n"
         f"    try:\n"
         f"        from platform_logger import get_logger\n"
-        f"        logger = get_logger(\"my-lambda\")\n"
+        f'        logger = get_logger("my-lambda")\n'
         f"    except ImportError:\n"
-        f"        import logging; logger = logging.getLogger(\"my-lambda\")\n\n"
+        f'        import logging; logger = logging.getLogger("my-lambda")\n\n'
         f"Then use logger.info(...), logger.warning(...), logger.error(...). "
         f"If the increase is intentional (e.g. CloudWatch Logs Insights "
         f"requires a specific string format), update BASELINE_PRINT_COUNT."
@@ -71,12 +70,14 @@ def test_no_print_in_new_lambdas():
     try:
         result = subprocess.run(
             ["git", "diff", "--name-only", "--diff-filter=A", "HEAD~1", "HEAD", "--", "lambdas/"],
-            cwd=ROOT, capture_output=True, text=True, timeout=10,
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if result.returncode != 0:
             return  # not in a git repo or no prior commit; skip
-        new_files = [f.strip() for f in result.stdout.splitlines()
-                     if f.strip().endswith(".py")]
+        new_files = [f.strip() for f in result.stdout.splitlines() if f.strip().endswith(".py")]
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return  # git unavailable; skip
 
@@ -90,7 +91,4 @@ def test_no_print_in_new_lambdas():
                 if re.match(r"^\s*print\s*\(", line):
                     violators.append(f"  {rel_path}:{i}")
 
-    assert not violators, (
-        "New Lambda file(s) use print(); should use platform_logger:\n"
-        + "\n".join(violators)
-    )
+    assert not violators, "New Lambda file(s) use print(); should use platform_logger:\n" + "\n".join(violators)

@@ -5,13 +5,15 @@ Protocols are the strategy layer: each one defines a health intervention,
 its rationale, key metrics, related habits/supplements, and adherence target.
 Stored in DynamoDB under USER#<id>#SOURCE#protocols.
 """
-import re
+
 import logging
+import re
 from datetime import datetime, timezone
 from decimal import Decimal
+
 from boto3.dynamodb.conditions import Key
 
-from mcp.config import table, PROTOCOLS_PK, logger
+from mcp.config import PROTOCOLS_PK, logger, table
 from mcp.core import decimal_to_float
 
 
@@ -30,8 +32,15 @@ def _now_iso():
 
 VALID_STATUSES = ["active", "paused", "retired"]
 VALID_DOMAINS = [
-    "sleep", "movement", "nutrition", "supplements", "mental",
-    "social", "discipline", "metabolic", "general",
+    "sleep",
+    "movement",
+    "nutrition",
+    "supplements",
+    "mental",
+    "social",
+    "discipline",
+    "metabolic",
+    "general",
 ]
 VALID_SIGNALS = ["positive", "neutral", "negative", "pending"]
 
@@ -63,30 +72,30 @@ def tool_create_protocol(args):
         raise ValueError(f"Protocol '{protocol_id}' already exists. Use update_protocol to modify.")
 
     item = {
-        "pk":                  PROTOCOLS_PK,
-        "sk":                  sk,
-        "protocol_id":         protocol_id,
-        "name":                name,
-        "slug":                slug,
-        "domain":              domain,
-        "category":            (args.get("category") or domain.capitalize()).strip(),
-        "pillar":              (args.get("pillar") or domain).strip(),
-        "pillar_link":         (args.get("pillar_link") or "").strip(),
-        "status":              status,
-        "start_date":          (args.get("start_date") or _today()).strip(),
-        "description":         (args.get("description") or "").strip(),
-        "why":                 (args.get("why") or "").strip(),
-        "key_metrics":         args.get("key_metrics") or [],
-        "key_finding":         (args.get("key_finding") or "").strip(),
-        "tracked_by":          args.get("tracked_by") or [],
-        "related_habits":      args.get("related_habits") or [],
+        "pk": PROTOCOLS_PK,
+        "sk": sk,
+        "protocol_id": protocol_id,
+        "name": name,
+        "slug": slug,
+        "domain": domain,
+        "category": (args.get("category") or domain.capitalize()).strip(),
+        "pillar": (args.get("pillar") or domain).strip(),
+        "pillar_link": (args.get("pillar_link") or "").strip(),
+        "status": status,
+        "start_date": (args.get("start_date") or _today()).strip(),
+        "description": (args.get("description") or "").strip(),
+        "why": (args.get("why") or "").strip(),
+        "key_metrics": args.get("key_metrics") or [],
+        "key_finding": (args.get("key_finding") or "").strip(),
+        "tracked_by": args.get("tracked_by") or [],
+        "related_habits": args.get("related_habits") or [],
         "related_supplements": args.get("related_supplements") or [],
-        "experiment_tags":     args.get("experiment_tags") or [],
-        "adherence_target":    int(args.get("adherence_target", 90)),
-        "signal_status":       (args.get("signal_status") or "pending").strip(),
-        "signal_note":         (args.get("signal_note") or "").strip(),
-        "created_at":          _now_iso(),
-        "updated_at":          _now_iso(),
+        "experiment_tags": args.get("experiment_tags") or [],
+        "adherence_target": int(args.get("adherence_target", 90)),
+        "signal_status": (args.get("signal_status") or "pending").strip(),
+        "signal_note": (args.get("signal_note") or "").strip(),
+        "created_at": _now_iso(),
+        "updated_at": _now_iso(),
     }
 
     if item["signal_status"] not in VALID_SIGNALS:
@@ -96,11 +105,11 @@ def tool_create_protocol(args):
     logger.info(f"create_protocol: created {protocol_id}")
 
     return {
-        "created":      True,
-        "protocol_id":  protocol_id,
-        "name":         name,
-        "domain":       domain,
-        "status":       status,
+        "created": True,
+        "protocol_id": protocol_id,
+        "name": name,
+        "domain": domain,
+        "status": status,
     }
 
 
@@ -120,12 +129,24 @@ def tool_update_protocol(args):
 
     # Fields that can be updated
     updatable = [
-        "name", "description", "why", "status", "domain", "category",
-        "pillar", "pillar_link", "key_finding", "signal_status", "signal_note",
+        "name",
+        "description",
+        "why",
+        "status",
+        "domain",
+        "category",
+        "pillar",
+        "pillar_link",
+        "key_finding",
+        "signal_status",
+        "signal_note",
     ]
     list_fields = [
-        "key_metrics", "tracked_by", "related_habits",
-        "related_supplements", "experiment_tags",
+        "key_metrics",
+        "tracked_by",
+        "related_habits",
+        "related_supplements",
+        "experiment_tags",
     ]
     int_fields = ["adherence_target"]
 
@@ -171,9 +192,9 @@ def tool_update_protocol(args):
 
     logger.info(f"update_protocol: updated {protocol_id} fields={list(updates.keys())}")
     return {
-        "updated":     True,
+        "updated": True,
         "protocol_id": protocol_id,
-        "fields":      list(updates.keys()),
+        "fields": list(updates.keys()),
     }
 
 
@@ -186,10 +207,15 @@ def tool_list_protocols(args):
     domain_filter = (args.get("domain") or "").strip()
 
     from mcp.core import _apply_phase_filter  # ADR-058
-    resp = table.query(**_apply_phase_filter({
-        "KeyConditionExpression": Key("pk").eq(PROTOCOLS_PK) & Key("sk").begins_with("PROTOCOL#"),
-        "ScanIndexForward": True,
-    }))
+
+    resp = table.query(
+        **_apply_phase_filter(
+            {
+                "KeyConditionExpression": Key("pk").eq(PROTOCOLS_PK) & Key("sk").begins_with("PROTOCOL#"),
+                "ScanIndexForward": True,
+            }
+        )
+    )
     items = decimal_to_float(resp.get("Items", []))
 
     protocols = []
@@ -203,9 +229,9 @@ def tool_list_protocols(args):
         protocols.append(item)
 
     return {
-        "protocols":  protocols,
-        "count":      len(protocols),
-        "total":      len(items),
+        "protocols": protocols,
+        "count": len(protocols),
+        "total": len(items),
     }
 
 
@@ -232,7 +258,7 @@ def tool_retire_protocol(args):
         UpdateExpression="SET #s = :s, end_date = :ed, retire_reason = :rr, updated_at = :ua",
         ExpressionAttributeNames={"#s": "status"},
         ExpressionAttributeValues={
-            ":s":  "retired",
+            ":s": "retired",
             ":ed": _today(),
             ":rr": reason,
             ":ua": _now_iso(),
@@ -241,7 +267,7 @@ def tool_retire_protocol(args):
 
     logger.info(f"retire_protocol: retired {protocol_id}")
     return {
-        "retired":     True,
+        "retired": True,
         "protocol_id": protocol_id,
-        "end_date":    _today(),
+        "end_date": _today(),
     }

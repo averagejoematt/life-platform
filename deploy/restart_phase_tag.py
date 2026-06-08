@@ -41,12 +41,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "lambdas"))
 
+import phase_taxonomy as taxonomy  # ADR-077: registry decides what's taggable
+
 from lambdas.constants import (
-    EXPERIMENT_START_DATE,
     EXPERIMENT_PHASE_CURRENT,
     EXPERIMENT_PHASE_PRIOR,
+    EXPERIMENT_START_DATE,
 )
-import phase_taxonomy as taxonomy  # ADR-077: registry decides what's taggable
 
 TABLE_NAME = "life-platform"
 USER_ID = os.environ.get("LIFE_PLATFORM_USER", "matthew")
@@ -58,8 +59,13 @@ ISO_DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
 
 # Timestamp attributes checked in order if neither item['date'] nor sk has a date.
 TIMESTAMP_FALLBACKS = (
-    "created_at", "stored_at", "computed_at", "generated_at",
-    "captured_at", "ingested_at", "date_saved",
+    "created_at",
+    "stored_at",
+    "computed_at",
+    "generated_at",
+    "captured_at",
+    "ingested_at",
+    "date_saved",
 )
 
 # ADR-077: "never tag" is now decided by the phase_taxonomy registry, not these
@@ -74,8 +80,10 @@ TIMESTAMP_FALLBACKS = (
 def taxonomy_class(item: dict) -> str:
     """Classify an item via the registry, passing memory category when present."""
     return taxonomy.classify(
-        item.get("pk", ""), item.get("sk", ""),
-        category=item.get("category"), memory_type=item.get("memory_type"),
+        item.get("pk", ""),
+        item.get("sk", ""),
+        category=item.get("category"),
+        memory_type=item.get("memory_type"),
     )
 
 
@@ -105,7 +113,7 @@ def desired_phase(item_date: str) -> str:
 
 
 def source_from_pk(pk: str) -> str:
-    return pk[len(USER_PK_PREFIX):] if pk.startswith(USER_PK_PREFIX) else pk
+    return pk[len(USER_PK_PREFIX) :] if pk.startswith(USER_PK_PREFIX) else pk
 
 
 def main():
@@ -121,15 +129,22 @@ def main():
     table = ddb.Table(TABLE_NAME)
 
     # Per-partition counters
-    counts = defaultdict(lambda: {
-        "total": 0, "pilot": 0, "experiment": 0, "untagged_no_date": 0,
-        "already_correct": 0, "would_update": 0, "updated": 0, "errors": 0,
-    })
+    counts = defaultdict(
+        lambda: {
+            "total": 0,
+            "pilot": 0,
+            "experiment": 0,
+            "untagged_no_date": 0,
+            "already_correct": 0,
+            "would_update": 0,
+            "updated": 0,
+            "errors": 0,
+        }
+    )
     samples = defaultdict(list)  # source -> list of (sk, before_phase, new_phase)
     errors = []
 
-    scan_kwargs = {"FilterExpression": "begins_with(pk, :pfx)",
-                   "ExpressionAttributeValues": {":pfx": USER_PK_PREFIX}}
+    scan_kwargs = {"FilterExpression": "begins_with(pk, :pfx)", "ExpressionAttributeValues": {":pfx": USER_PK_PREFIX}}
     scanned = 0
     while True:
         resp = table.scan(**scan_kwargs)
@@ -221,8 +236,16 @@ def main():
     lines.append(f"generated {datetime.now(timezone.utc).isoformat()}")
     lines.append(f"scanned {scanned} items across {len(counts)} partitions\n")
 
-    grand = {"total": 0, "pilot": 0, "experiment": 0, "untagged_no_date": 0,
-             "already_correct": 0, "would_update": 0, "updated": 0, "errors": 0}
+    grand = {
+        "total": 0,
+        "pilot": 0,
+        "experiment": 0,
+        "untagged_no_date": 0,
+        "already_correct": 0,
+        "would_update": 0,
+        "updated": 0,
+        "errors": 0,
+    }
 
     fmt = "{:36s} {:>8s} {:>8s} {:>8s} {:>10s} {:>10s} {:>10s} {:>8s} {:>7s}"
     header = fmt.format("partition (source)", "total", "pilot", "exper", "no-date", "ok-correct", "to-update", "applied", "errors")
@@ -233,17 +256,33 @@ def main():
         c = counts[source]
         for k in grand:
             grand[k] += c[k]
-        lines.append(fmt.format(
-            source[:36], str(c["total"]), str(c["pilot"]), str(c["experiment"]),
-            str(c["untagged_no_date"]), str(c["already_correct"]),
-            str(c["would_update"]), str(c["updated"]), str(c["errors"]),
-        ))
+        lines.append(
+            fmt.format(
+                source[:36],
+                str(c["total"]),
+                str(c["pilot"]),
+                str(c["experiment"]),
+                str(c["untagged_no_date"]),
+                str(c["already_correct"]),
+                str(c["would_update"]),
+                str(c["updated"]),
+                str(c["errors"]),
+            )
+        )
     lines.append("-" * len(header))
-    lines.append(fmt.format(
-        "TOTAL", str(grand["total"]), str(grand["pilot"]), str(grand["experiment"]),
-        str(grand["untagged_no_date"]), str(grand["already_correct"]),
-        str(grand["would_update"]), str(grand["updated"]), str(grand["errors"]),
-    ))
+    lines.append(
+        fmt.format(
+            "TOTAL",
+            str(grand["total"]),
+            str(grand["pilot"]),
+            str(grand["experiment"]),
+            str(grand["untagged_no_date"]),
+            str(grand["already_correct"]),
+            str(grand["would_update"]),
+            str(grand["updated"]),
+            str(grand["errors"]),
+        )
+    )
 
     if samples:
         lines.append("\n=== samples of items that would be updated (up to 5 per partition) ===")

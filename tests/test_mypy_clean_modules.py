@@ -9,6 +9,7 @@ Mypy is an *advisory* gate (per the investment plan): if mypy isn't installed
 locally the test is skipped, not failed. CI installs mypy and runs it
 non-blocking.
 """
+
 import subprocess
 import sys
 from pathlib import Path
@@ -32,7 +33,9 @@ def _mypy_available() -> bool:
     try:
         subprocess.run(
             [sys.executable, "-m", "mypy", "--version"],
-            check=True, capture_output=True, timeout=10,
+            check=True,
+            capture_output=True,
+            timeout=10,
         )
         return True
     except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
@@ -49,8 +52,4 @@ def test_mypy_clean_on_shared_modules() -> None:
         text=True,
         timeout=120,
     )
-    assert result.returncode == 0, (
-        f"mypy regression on shared modules:\n"
-        f"stdout:\n{result.stdout}\n"
-        f"stderr:\n{result.stderr}"
-    )
+    assert result.returncode == 0, f"mypy regression on shared modules:\n" f"stdout:\n{result.stdout}\n" f"stderr:\n{result.stderr}"

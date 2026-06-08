@@ -16,11 +16,12 @@ v1.0.0 — 2026-03-15 (R54)
 """
 
 import json
-import os
 import logging
-import boto3
+import os
 from datetime import datetime, timezone
 from decimal import Decimal
+
+import boto3
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -39,9 +40,12 @@ ses = boto3.client("sesv2", region_name=_REGION)
 
 
 def _d2f(obj):
-    if isinstance(obj, list): return [_d2f(i) for i in obj]
-    if isinstance(obj, dict): return {k: _d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [_d2f(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: _d2f(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
 
 
@@ -136,11 +140,7 @@ def _build_html(today_str: str, missing: list[dict], complete: list[dict]) -> st
         today_fmt = today_str
 
     missing_count = len(missing)
-    headline = (
-        "One thing left to log"
-        if missing_count == 1
-        else f"{missing_count} things left to log"
-    )
+    headline = "One thing left to log" if missing_count == 1 else f"{missing_count} things left to log"
 
     return f"""<!DOCTYPE html>
 <html>
@@ -233,10 +233,12 @@ def lambda_handler(event, context):
         ses.send_email(
             FromEmailAddress=SENDER,
             Destination={"ToAddresses": [RECIPIENT]},
-            Content={"Simple": {
-                "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
-            }},
+            Content={
+                "Simple": {
+                    "Subject": {"Data": subject, "Charset": "UTF-8"},
+                    "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
+                }
+            },
         )
         logger.info(f"[nudge] Sent: {subject}")
         return {"statusCode": 200, "body": f"Nudge sent: {subject}"}

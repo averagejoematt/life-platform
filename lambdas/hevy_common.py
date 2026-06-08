@@ -24,6 +24,7 @@ Schema version: bump SCHEMA_VERSION on any breaking change to the normalized sha
 
 Authored 2026-05-25 per ADR-058 (phase-tag-on-write via ingestion_framework helper).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -41,6 +42,7 @@ import boto3
 
 try:
     from platform_logger import get_logger
+
     logger = get_logger("hevy")
 except ImportError:
     logger = logging.getLogger("hevy")
@@ -77,18 +79,18 @@ def load_secret() -> dict[str, str]:
         return _secret_cache
     try:
         from secret_cache import get_secret_json
+
         _secret_cache = get_secret_json(SECRET_NAME, _secrets)
     except ImportError:
         resp = _secrets.get_secret_value(SecretId=SECRET_NAME)
         _secret_cache = json.loads(resp["SecretString"])
     if "api_key" not in _secret_cache or "webhook_secret" not in _secret_cache:
-        raise RuntimeError(
-            f"{SECRET_NAME} missing required keys (need: api_key, webhook_secret)"
-        )
+        raise RuntimeError(f"{SECRET_NAME} missing required keys (need: api_key, webhook_secret)")
     return _secret_cache
 
 
 # ── Webhook signature verification ───────────────────────────────────────────
+
 
 def verify_webhook_signature(body_bytes: bytes, provided_secret_or_sig: str) -> bool:
     """Validate webhook authenticity.
@@ -118,6 +120,7 @@ def verify_webhook_signature(body_bytes: bytes, provided_secret_or_sig: str) -> 
 
 
 # ── HTTP helpers (stdlib only — no requests dependency per CLAUDE.md) ────────
+
 
 class HevyAPIError(Exception):
     pass
@@ -178,6 +181,7 @@ def fetch_events_page(since_iso: str, page: int = 1, page_size: int = 10) -> dic
 
 
 # ── Normalization ────────────────────────────────────────────────────────────
+
 
 def _to_decimal(v: Any) -> Any:
     """Recursively convert floats to Decimal for DDB."""
@@ -303,6 +307,7 @@ def normalize_workout(raw: dict) -> dict:
 
 # ── Persistence ──────────────────────────────────────────────────────────────
 
+
 def archive_raw(workout_id: str, raw: dict) -> str:
     """Write the raw payload to S3 for re-derivation. Returns the s3:// URL."""
     key = f"raw/{SOURCE}/{workout_id}.json"
@@ -324,6 +329,7 @@ def write_normalized(record: dict) -> None:
     """
     try:
         from ingestion_framework import _phase_for_date
+
         record["phase"] = _phase_for_date(record["date"])
     except ImportError:
         # Fallback: tag as experiment (untagged passes the filter too, but
@@ -344,7 +350,10 @@ def ingest_workout_by_id(workout_id: str) -> dict:
     write_normalized(rec)
     logger.info(
         "hevy ingest %s date=%s sets=%d volume=%.2fkg",
-        workout_id, rec["date"], rec["set_count"], rec["total_volume_kg"],
+        workout_id,
+        rec["date"],
+        rec["set_count"],
+        rec["total_volume_kg"],
     )
     return rec
 
@@ -381,15 +390,18 @@ def load_since() -> str:
 
 def save_since(since_iso: str) -> None:
     """Persist the high-water mark for the next poll."""
-    _table.put_item(Item={
-        "pk": _STATE_PK,
-        "sk": _STATE_SK,
-        "since_iso": since_iso,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    })
+    _table.put_item(
+        Item={
+            "pk": _STATE_PK,
+            "sk": _STATE_SK,
+            "since_iso": since_iso,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
 
 
 # ── Backward-compat shims (will be removed once nothing imports them) ────────
+
 
 def load_cursor() -> Optional[str]:  # noqa: D401 - kept for transitional callers
     """DEPRECATED: use load_since(). Will be removed."""

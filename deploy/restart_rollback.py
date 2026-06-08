@@ -115,8 +115,9 @@ def remove_all_phase_tags(table, apply: bool) -> int:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--to-genesis", help="Roll back to this date (re-runs the pipeline against it after un-tombstoning)")
-    parser.add_argument("--full-unwind", action="store_true",
-                        help="Remove ALL phase tags + tombstones (whether from this restart or not). Total reset.")
+    parser.add_argument(
+        "--full-unwind", action="store_true", help="Remove ALL phase tags + tombstones (whether from this restart or not). Total reset."
+    )
     parser.add_argument("--apply", action="store_true", help="Commit writes (default: dry-run)")
     args = parser.parse_args()
 
@@ -151,9 +152,15 @@ def main():
     if args.to_genesis and args.apply:
         print(f"\n[3] Re-running pipeline against new genesis {args.to_genesis}")
         proc = subprocess.run(
-            ["python3", "deploy/restart_pipeline.py",
-             "--genesis", args.to_genesis, "--apply",
-             "--override-weight-lbs", "297.24"],  # caller can re-run pipeline manually for the correct weight
+            [
+                "python3",
+                "deploy/restart_pipeline.py",
+                "--genesis",
+                args.to_genesis,
+                "--apply",
+                "--override-weight-lbs",
+                "297.24",
+            ],  # caller can re-run pipeline manually for the correct weight
             cwd=REPO_ROOT,
         )
         print(f"  pipeline exit={proc.returncode}")

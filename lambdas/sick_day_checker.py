@@ -27,9 +27,12 @@ SICK_DAYS_SOURCE = "sick_days"
 
 def _d2f(obj):
     """Convert Decimal → float recursively."""
-    if isinstance(obj, list): return [_d2f(i) for i in obj]
-    if isinstance(obj, dict): return {k: _d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [_d2f(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: _d2f(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
 
 
@@ -60,8 +63,8 @@ def get_sick_days_range(table, user_id, start_date, end_date):
             KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
             ExpressionAttributeValues={
                 ":pk": pk,
-                ":s":  f"DATE#{start_date}",
-                ":e":  f"DATE#{end_date}",
+                ":s": f"DATE#{start_date}",
+                ":e": f"DATE#{end_date}",
             },
         )
         return [_d2f(i) for i in resp.get("Items", [])]
@@ -75,10 +78,10 @@ def write_sick_day(table, user_id, date_str, reason=None):
     pk = f"USER#{user_id}#SOURCE#{SICK_DAYS_SOURCE}"
     sk = f"DATE#{date_str}"
     item = {
-        "pk":             pk,
-        "sk":             sk,
-        "date":           date_str,
-        "logged_at":      datetime.now(timezone.utc).isoformat(),
+        "pk": pk,
+        "sk": sk,
+        "date": date_str,
+        "logged_at": datetime.now(timezone.utc).isoformat(),
         "schema_version": 1,
     }
     if reason:

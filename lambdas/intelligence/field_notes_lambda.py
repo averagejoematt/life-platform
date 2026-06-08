@@ -17,8 +17,8 @@ v1.0.0 — 2026-03-31
 import json
 import logging
 import os
-import urllib.request
 import urllib.error
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -82,11 +82,7 @@ def week_bounds(iso_week):
 
 def _query_source(source, start_date, end_date):
     pk = f"{USER_PREFIX}{source}"
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(
-            f"DATE#{start_date}", f"DATE#{end_date}"
-        )
-    )
+    resp = table.query(KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}"))
     return _decimal_to_float(resp.get("Items", []))
 
 
@@ -160,9 +156,7 @@ def gather_week_data(start_date, end_date):
     # Journal (Notion)
     journal_pk = f"{USER_PREFIX}notion"
     j_resp = table.query(
-        KeyConditionExpression=Key("pk").eq(journal_pk) & Key("sk").between(
-            f"DATE#{start_date}#journal", f"DATE#{end_date}#journal#~"
-        ),
+        KeyConditionExpression=Key("pk").eq(journal_pk) & Key("sk").between(f"DATE#{start_date}#journal", f"DATE#{end_date}#journal#~"),
     )
     journal_items = _decimal_to_float(j_resp.get("Items", []))
     journal_items = [j for j in journal_items if "#journal#" in j.get("sk", "")]
@@ -203,11 +197,13 @@ def get_prior_notes(current_week, count=4):
         resp = table.get_item(Key={"pk": FN_PK, "sk": f"WEEK#{pw}"})
         item = _decimal_to_float(resp.get("Item"))
         if item and item.get("ai_present"):
-            notes.append({
-                "week": pw,
-                "present": item.get("ai_present", ""),
-                "tone": item.get("ai_tone", ""),
-            })
+            notes.append(
+                {
+                    "week": pw,
+                    "present": item.get("ai_present", ""),
+                    "tone": item.get("ai_tone", ""),
+                }
+            )
     return notes
 
 
@@ -264,11 +260,13 @@ def generate_field_notes(iso_week):
     prompt = build_prompt(iso_week, data, prior_notes)
 
     api_key = _get_api_key()
-    req_body = json.dumps({
-        "model": AI_MODEL,
-        "max_tokens": 2000,
-        "messages": [{"role": "user", "content": prompt}],
-    })
+    req_body = json.dumps(
+        {
+            "model": AI_MODEL,
+            "max_tokens": 2000,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+    )
 
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages",
@@ -282,6 +280,7 @@ def generate_field_notes(iso_week):
 
     # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
     from retry_utils import call_anthropic_raw
+
     result = call_anthropic_raw(req, timeout=60)
 
     text = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")

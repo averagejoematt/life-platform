@@ -5,18 +5,21 @@ Trigger: S3 ObjectCreated on matthew-life-platform, prefix imports/measurements/
 Cadence: every 4-8 weeks (manual upload by Partner)
 Schema: USER#matthew#SOURCE#measurements / DATE#YYYY-MM-DD
 """
+
 import csv
 import io
 import json
+import logging
 import os
 import re
-import logging
-import boto3
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 
+import boto3
+
 try:
     from platform_logger import get_logger
+
     logger = get_logger("measurements-ingestion")
 except ImportError:
     logger = logging.getLogger("measurements-ingestion")
@@ -35,10 +38,19 @@ PK = f"USER#{USER_ID}#SOURCE#measurements"
 
 REQUIRED_FIELDS = ["waist_narrowest_in", "waist_navel_in"]
 MEASUREMENT_FIELDS = [
-    "neck_in", "chest_in", "waist_narrowest_in", "waist_navel_in", "hips_in",
-    "bicep_relaxed_left_in", "bicep_relaxed_right_in",
-    "bicep_flexed_left_in", "bicep_flexed_right_in",
-    "calf_left_in", "calf_right_in", "thigh_left_in", "thigh_right_in",
+    "neck_in",
+    "chest_in",
+    "waist_narrowest_in",
+    "waist_navel_in",
+    "hips_in",
+    "bicep_relaxed_left_in",
+    "bicep_relaxed_right_in",
+    "bicep_flexed_left_in",
+    "bicep_flexed_right_in",
+    "calf_left_in",
+    "calf_right_in",
+    "thigh_left_in",
+    "thigh_right_in",
 ]
 
 
@@ -131,7 +143,7 @@ def _compute_derived(measurements: dict, height_in: int) -> dict:
 
 
 def lambda_handler(event, context):
-    if hasattr(logger, 'set_date'):
+    if hasattr(logger, "set_date"):
         logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))
 
     # Parse S3 event
@@ -217,10 +229,12 @@ def lambda_handler(event, context):
 
     return {
         "statusCode": 200,
-        "body": json.dumps({
-            "session_date": session_date,
-            "session_number": session_number,
-            "waist_height_ratio": str(derived.get("waist_height_ratio", "")),
-            "fields_captured": len(measurements),
-        }),
+        "body": json.dumps(
+            {
+                "session_date": session_date,
+                "session_number": session_number,
+                "waist_height_ratio": str(derived.get("waist_height_ratio", "")),
+                "fields_captured": len(measurements),
+            }
+        ),
     }

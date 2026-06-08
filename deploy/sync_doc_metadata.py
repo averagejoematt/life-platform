@@ -32,9 +32,9 @@ WHAT IT DOES NOT UPDATE (requires human judgment):
 v1.0.0 — 2026-03-14 (post doc-audit that found 19 stale facts)
 """
 
+import os
 import re
 import sys
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -46,6 +46,7 @@ DOCS = ROOT / "docs"
 # AUTO-DISCOVERY — derive counts from source files (no AWS calls needed)
 # Always runs before PLATFORM_FACTS is used. Overrides any stale manual values.
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _auto_discover_tool_count() -> int | None:
     """Count top-level keys in TOOLS dict in mcp/registry.py via AST."""
@@ -117,7 +118,7 @@ def _auto_discover_version() -> str | None:
         return None
     try:
         src = changelog.read_text(encoding="utf-8")
-        m = re.search(r'^## (v[\d.]+)', src, re.MULTILINE)
+        m = re.search(r"^## (v[\d.]+)", src, re.MULTILINE)
         return m.group(1) if m else None
     except Exception:
         return None
@@ -159,6 +160,7 @@ def _apply_auto_discovered(facts: dict) -> dict:
     )
     return facts
 
+
 # ══════════════════════════════════════════════════════════════════════════════
 # PLATFORM FACTS — update this dict when platform state changes
 # This is the ONLY place these numbers should live.
@@ -166,22 +168,20 @@ def _apply_auto_discovered(facts: dict) -> dict:
 
 PLATFORM_FACTS = {
     # Core counts (tool_count + lambda_count auto-discovered from source when available)
-    "version":          "v3.9.38",
-    "date":             "2026-03-26",
-    "lambda_count":     45,       # fallback: auto-discovery may under-count Lambda@Edge
-    "tool_count":       88,       # fallback: auto-discovery requires registry.py parseable
-    "module_count":     31,       # fallback: all mcp/*.py except __init__.py
-    "secret_count":     9,        # active secrets (webhook-key deleted 2026-03-14, google-calendar deleted 2026-03-15)
-    "alarm_count":      49,
-    "data_sources":     20,       # google_calendar retired (ADR-030); hevy active (ADR-060)
-    "cdk_stacks":       8,
-    "iam_roles":        43,
-
+    "version": "v3.9.38",
+    "date": "2026-03-26",
+    "lambda_count": 45,  # fallback: auto-discovery may under-count Lambda@Edge
+    "tool_count": 88,  # fallback: auto-discovery requires registry.py parseable
+    "module_count": 31,  # fallback: all mcp/*.py except __init__.py
+    "secret_count": 9,  # active secrets (webhook-key deleted 2026-03-14, google-calendar deleted 2026-03-15)
+    "alarm_count": 49,
+    "data_sources": 20,  # google_calendar retired (ADR-030); hevy active (ADR-060)
+    "cdk_stacks": 8,
+    "iam_roles": 43,
     # Secret state
-    "api_keys_status":  "PERMANENTLY DELETED 2026-03-14",
-
+    "api_keys_status": "PERMANENTLY DELETED 2026-03-14",
     # Cost
-    "secrets_cost":     "$3.60",  # secret_count × $0.40
+    "secrets_cost": "$3.60",  # secret_count × $0.40
     "secrets_cost_note": "9 active secrets × $0.40/secret/month. `api-keys` deleted 2026-03-14. `webhook-key` deleted 2026-03-14. `google-calendar` deleted 2026-03-15 (ADR-030).",
 }
 
@@ -193,7 +193,6 @@ PLATFORM_FACTS = {
 # ══════════════════════════════════════════════════════════════════════════════
 
 RULES = [
-
     # ── ARCHITECTURE.md ──────────────────────────────────────────────────────
     (
         "docs/ARCHITECTURE.md",
@@ -247,7 +246,6 @@ RULES = [
         r"Secrets Manager \([^)]+\) \| ~\$[\d.]+",
         "Secrets Manager ({secret_count} active secrets) | ~{secrets_cost}",
     ),
-
     # ── INFRASTRUCTURE.md ────────────────────────────────────────────────────
     (
         "docs/INFRASTRUCTURE.md",
@@ -270,7 +268,6 @@ RULES = [
         r"CloudWatch alarms \| ~\d+ metric alarms",
         "CloudWatch alarms | ~{alarm_count} metric alarms",
     ),
-
     # ── RUNBOOK.md ────────────────────────────────────────────────────────────
     (
         "docs/RUNBOOK.md",
@@ -278,7 +275,6 @@ RULES = [
         "Last updated: {date} ({version} — {tool_count} MCP tools, {module_count}-module package, "
         "{lambda_count} Lambdas, {data_sources} data sources)",
     ),
-
     # ── COST_TRACKER.md ──────────────────────────────────────────────────────
     (
         "docs/COST_TRACKER.md",
@@ -290,30 +286,25 @@ RULES = [
         r"\| \*\*Secrets Manager\*\* \| \$[\d.]+ \|[^\n]+",
         "| **Secrets Manager** | {secrets_cost} | {secrets_cost_note} |",
     ),
-
     # ── MCP_TOOL_CATALOG.md ──────────────────────────────────────────────────
     (
         "docs/MCP_TOOL_CATALOG.md",
         r"\*\*Version:\*\* [^\|]+ \| \*\*Last updated:\*\* [^\|]+ \| \*\*Total tools:\*\* \d+",
         "**Version:** {version} | **Last updated:** {date} | **Total tools:** {tool_count}",
     ),
-
     # DATA_DICTIONARY.md archived v3.7.32 — merged into SCHEMA.md
-
     # ── SLOs.md ──────────────────────────────────────────────────────────────
     (
         "docs/SLOs.md",
         r"Last updated: \d{4}-\d{2}-\d{2} \([^\)]+\)",
         "Last updated: {date} ({version})",
     ),
-
     # ── DECISIONS.md ─────────────────────────────────────────────────────────
     (
         "docs/DECISIONS.md",
         r"\*Last updated: \d{4}-\d{2}-\d{2} \([^\)]+\)\*",
         "*Last updated: {date} ({version})*",
     ),
-
     # ── SCHEMA.md ────────────────────────────────────────────────────────────
     (
         "docs/SCHEMA.md",
@@ -375,8 +366,10 @@ def main():
     print(f"\n{'='*60}")
     print(f"  sync_doc_metadata.py — {mode}")
     print(f"  Platform version: {PLATFORM_FACTS['version']} ({PLATFORM_FACTS['date']})")
-    print(f"  Lambdas: {PLATFORM_FACTS['lambda_count']}  Tools: {PLATFORM_FACTS['tool_count']}  "
-          f"Secrets: {PLATFORM_FACTS['secret_count']}  Alarms: {PLATFORM_FACTS['alarm_count']}")
+    print(
+        f"  Lambdas: {PLATFORM_FACTS['lambda_count']}  Tools: {PLATFORM_FACTS['tool_count']}  "
+        f"Secrets: {PLATFORM_FACTS['secret_count']}  Alarms: {PLATFORM_FACTS['alarm_count']}"
+    )
     print(f"{'='*60}\n")
 
     # Get unique docs to process

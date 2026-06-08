@@ -4,6 +4,7 @@ Regression guard for the per-container lifetime-counter bug: the limit must
 trip on a runaway loop but self-heal as the window slides (no cold start /
 new conversation), and must never penalize a human-paced multi-step flow.
 """
+
 from __future__ import annotations
 
 import os
@@ -34,7 +35,7 @@ def test_over_limit_blocks_then_window_slides():
     with patch("mcp.handler.time.time", return_value=t0):
         for _ in range(h._WRITE_TOOL_RATE_LIMIT):
             assert h._check_write_rate_limit(name) is None
-        err = h._check_write_rate_limit(name)          # one over → blocked
+        err = h._check_write_rate_limit(name)  # one over → blocked
         assert err and "exceeded" in err
     # advance past the window → allowed again WITHOUT a cold start (the fix)
     with patch("mcp.handler.time.time", return_value=t0 + h._WRITE_TOOL_RATE_WINDOW_SECS + 1):

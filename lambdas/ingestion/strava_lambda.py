@@ -22,12 +22,13 @@ import os
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 import boto3
 
 try:
     from platform_logger import get_logger
+
     logger = get_logger("strava")
 except ImportError:
     logger = logging.getLogger("strava")
@@ -45,17 +46,21 @@ _cw = boto3.client("cloudwatch", region_name=REGION)
 
 # ── Strava API helpers ────────────────────────────────────────────────────────
 
+
 def _refresh_oauth(secret: dict) -> dict:
     """Refresh the access token using the refresh_token grant. Mutates+returns secret."""
     logger.info("Refreshing Strava access token...")
-    data = urllib.parse.urlencode({
-        "client_id":     secret["client_id"],
-        "client_secret": secret["client_secret"],
-        "refresh_token": secret["refresh_token"],
-        "grant_type":    "refresh_token",
-    }).encode()
+    data = urllib.parse.urlencode(
+        {
+            "client_id": secret["client_id"],
+            "client_secret": secret["client_secret"],
+            "refresh_token": secret["refresh_token"],
+            "grant_type": "refresh_token",
+        }
+    ).encode()
     req = urllib.request.Request("https://www.strava.com/oauth/token", data=data, method="POST")
     from http_retry import urlopen_with_retry
+
     with urlopen_with_retry(req, timeout=30) as resp:
         result = json.loads(resp.read())
     secret["access_token"] = result["access_token"]
@@ -70,6 +75,7 @@ def _strava_get(url: str, secret: dict) -> tuple:
         secret = _refresh_oauth(secret)
     req = urllib.request.Request(url, headers={"Authorization": f"Bearer {secret['access_token']}"})
     from http_retry import urlopen_with_retry
+
     with urlopen_with_retry(req, timeout=30) as resp:
         return json.loads(resp.read()), secret
 
@@ -78,8 +84,7 @@ def _fetch_activities_in_range(secret: dict, after_ts: float, before_ts: float):
     """Page through all activities in a time window."""
     activities, page = [], 1
     while True:
-        url = (f"https://www.strava.com/api/v3/athlete/activities"
-               f"?after={int(after_ts)}&before={int(before_ts)}&per_page=100&page={page}")
+        url = f"https://www.strava.com/api/v3/athlete/activities" f"?after={int(after_ts)}&before={int(before_ts)}&per_page=100&page={page}"
         batch, secret = _strava_get(url, secret)
         if not batch:
             break
@@ -110,8 +115,7 @@ def _fetch_activity_zones(strava_id: str, secret: dict) -> tuple:
 
 def _fetch_activity_streams(strava_id: str, secret: dict) -> tuple:
     """HR streams for recovery metric (60s drop after exercise)."""
-    url = (f"https://www.strava.com/api/v3/activities/{strava_id}/streams"
-           f"?keys=heartrate,time&key_by_type=true")
+    url = f"https://www.strava.com/api/v3/activities/{strava_id}/streams" f"?keys=heartrate,time&key_by_type=true"
     try:
         result, secret = _strava_get(url, secret)
     except urllib.error.HTTPError as e:
@@ -123,53 +127,57 @@ def _fetch_activity_streams(strava_id: str, secret: dict) -> tuple:
         return {}, secret
     peak = max(hr)
     peak_idx = hr.index(peak)
-    after = hr[peak_idx:peak_idx + 60]
+    after = hr[peak_idx : peak_idx + 60]
     if len(after) < 30:
         return {}, secret
-    return {"hr_peak": peak, "hr_30s_recovery": peak - hr[peak_idx + 29], "hr_60s_recovery": peak - hr[peak_idx + 59] if len(after) >= 60 else None}, secret
+    return {
+        "hr_peak": peak,
+        "hr_30s_recovery": peak - hr[peak_idx + 29],
+        "hr_60s_recovery": peak - hr[peak_idx + 59] if len(after) >= 60 else None,
+    }, secret
 
 
 def _normalize(activity: dict, zone_data: dict = None, hr_recovery: dict = None) -> dict:
     result = {
-        "strava_id":                  str(activity.get("id", "")),
-        "name":                       activity.get("name", ""),
-        "type":                       activity.get("type", ""),
-        "sport_type":                 activity.get("sport_type", ""),
-        "start_date":                 activity.get("start_date", ""),
-        "start_date_local":           activity.get("start_date_local", ""),
-        "timezone":                   activity.get("timezone", ""),
-        "moving_time_seconds":        activity.get("moving_time"),
-        "elapsed_time_seconds":       activity.get("elapsed_time"),
-        "distance_meters":            activity.get("distance"),
-        "distance_miles":             round(activity["distance"] * 0.000621371, 2) if activity.get("distance") else None,
+        "strava_id": str(activity.get("id", "")),
+        "name": activity.get("name", ""),
+        "type": activity.get("type", ""),
+        "sport_type": activity.get("sport_type", ""),
+        "start_date": activity.get("start_date", ""),
+        "start_date_local": activity.get("start_date_local", ""),
+        "timezone": activity.get("timezone", ""),
+        "moving_time_seconds": activity.get("moving_time"),
+        "elapsed_time_seconds": activity.get("elapsed_time"),
+        "distance_meters": activity.get("distance"),
+        "distance_miles": round(activity["distance"] * 0.000621371, 2) if activity.get("distance") else None,
         "total_elevation_gain_meters": activity.get("total_elevation_gain"),
-        "total_elevation_gain_feet":  round(activity["total_elevation_gain"] * 3.28084, 1) if activity.get("total_elevation_gain") else None,
-        "elev_high_meters":           activity.get("elev_high"),
-        "elev_low_meters":            activity.get("elev_low"),
-        "average_speed_ms":           activity.get("average_speed"),
-        "max_speed_ms":               activity.get("max_speed"),
-        "average_heartrate":          activity.get("average_heartrate"),
-        "max_heartrate":              activity.get("max_heartrate"),
-        "has_heartrate":              activity.get("has_heartrate", False),
-        "average_watts":              activity.get("average_watts"),
-        "max_watts":                  activity.get("max_watts"),
-        "weighted_average_watts":     activity.get("weighted_average_watts"),
-        "kilojoules":                 activity.get("kilojoules"),
-        "device_watts":               activity.get("device_watts", False),
-        "average_cadence":            activity.get("average_cadence"),
-        "pr_count":                   activity.get("pr_count", 0),
-        "achievement_count":          activity.get("achievement_count", 0),
-        "kudos_count":                activity.get("kudos_count", 0),
-        "trainer":                    activity.get("trainer", False),
-        "commute":                    activity.get("commute", False),
-        "manual":                     activity.get("manual", False),
-        "private":                    activity.get("private", False),
-        "gear_id":                    activity.get("gear_id"),
-        "device_name":                activity.get("device_name"),
-        "summary_polyline":           activity.get("map", {}).get("summary_polyline", ""),
-        "location_city":              activity.get("location_city"),
-        "location_state":             activity.get("location_state"),
-        "location_country":           activity.get("location_country"),
+        "total_elevation_gain_feet": round(activity["total_elevation_gain"] * 3.28084, 1) if activity.get("total_elevation_gain") else None,
+        "elev_high_meters": activity.get("elev_high"),
+        "elev_low_meters": activity.get("elev_low"),
+        "average_speed_ms": activity.get("average_speed"),
+        "max_speed_ms": activity.get("max_speed"),
+        "average_heartrate": activity.get("average_heartrate"),
+        "max_heartrate": activity.get("max_heartrate"),
+        "has_heartrate": activity.get("has_heartrate", False),
+        "average_watts": activity.get("average_watts"),
+        "max_watts": activity.get("max_watts"),
+        "weighted_average_watts": activity.get("weighted_average_watts"),
+        "kilojoules": activity.get("kilojoules"),
+        "device_watts": activity.get("device_watts", False),
+        "average_cadence": activity.get("average_cadence"),
+        "pr_count": activity.get("pr_count", 0),
+        "achievement_count": activity.get("achievement_count", 0),
+        "kudos_count": activity.get("kudos_count", 0),
+        "trainer": activity.get("trainer", False),
+        "commute": activity.get("commute", False),
+        "manual": activity.get("manual", False),
+        "private": activity.get("private", False),
+        "gear_id": activity.get("gear_id"),
+        "device_name": activity.get("device_name"),
+        "summary_polyline": activity.get("map", {}).get("summary_polyline", ""),
+        "location_city": activity.get("location_city"),
+        "location_state": activity.get("location_state"),
+        "location_country": activity.get("location_country"),
     }
     if zone_data:
         result.update(zone_data)
@@ -192,13 +200,18 @@ def _dedup(activities: list) -> list:
                 t_new = datetime.strptime(act.get("start_date", "")[:19], "%Y-%m-%dT%H:%M:%S")
                 if abs((t_new - t_existing).total_seconds()) > 120:
                     continue
+
                 # Within 2-min window — overlap. Keep richer (has HR, watts, polyline)
                 def richness(a):
-                    return sum([
-                        bool(a.get("has_heartrate")), bool(a.get("device_watts")),
-                        bool(a.get("map", {}).get("summary_polyline")),
-                        bool(a.get("kilojoules")),
-                    ])
+                    return sum(
+                        [
+                            bool(a.get("has_heartrate")),
+                            bool(a.get("device_watts")),
+                            bool(a.get("map", {}).get("summary_polyline")),
+                            bool(a.get("kilojoules")),
+                        ]
+                    )
+
                 if richness(act) > richness(existing):
                     kept[i] = act
                 replaced = True
@@ -230,7 +243,9 @@ def fetch_day(credentials: dict, date_str: str) -> dict | None:
     start_dt = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     end_dt = start_dt + timedelta(days=1)
     activities, secret = _fetch_activities_in_range(
-        secret, start_dt.timestamp(), end_dt.timestamp(),
+        secret,
+        start_dt.timestamp(),
+        end_dt.timestamp(),
     )
     _secret_cache["secret"] = secret
     if not activities:
@@ -255,17 +270,19 @@ def transform(raw: dict, date_str: str) -> list[dict]:
     if not raw or not raw.get("activities"):
         return []
     activities = raw["activities"]
-    return [{
-        "source":                    "strava",
-        "date":                      date_str,
-        "activity_count":            len(activities),
-        "activities":                activities,
-        "total_distance_miles":      round(sum(a.get("distance_miles") or 0 for a in activities), 2),
-        "total_moving_time_seconds": sum(a.get("moving_time_seconds") or 0 for a in activities),
-        "total_elevation_gain_feet": round(sum(a.get("total_elevation_gain_feet") or 0 for a in activities), 1),
-        "sport_types":               sorted(set(a.get("sport_type", "") for a in activities)),
-        "total_zone2_seconds":       sum(a.get("zone2_seconds") or 0 for a in activities),
-    }]
+    return [
+        {
+            "source": "strava",
+            "date": date_str,
+            "activity_count": len(activities),
+            "activities": activities,
+            "total_distance_miles": round(sum(a.get("distance_miles") or 0 for a in activities), 2),
+            "total_moving_time_seconds": sum(a.get("moving_time_seconds") or 0 for a in activities),
+            "total_elevation_gain_feet": round(sum(a.get("total_elevation_gain_feet") or 0 for a in activities), 1),
+            "sport_types": sorted(set(a.get("sport_type", "") for a in activities)),
+            "total_zone2_seconds": sum(a.get("zone2_seconds") or 0 for a in activities),
+        }
+    ]
 
 
 # ── Framework config ──────────────────────────────────────────────────────────

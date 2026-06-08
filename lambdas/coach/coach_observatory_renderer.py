@@ -29,13 +29,13 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-
-from phase_filter import with_phase_filter  # ADR-058
 from boto3.dynamodb.conditions import Key
+from phase_filter import with_phase_filter  # ADR-058
 
 # ── Structured logger ────────────────────────────────────────────────────────
 try:
     from platform_logger import get_logger
+
     logger = get_logger("coach-observatory-renderer")
 except ImportError:
     logger = logging.getLogger("coach-observatory-renderer")
@@ -138,6 +138,7 @@ DOMAIN_SOURCE_MAP = {
 # HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _decimal_to_float(obj):
     """Recursively convert DynamoDB Decimal values to Python float."""
     if isinstance(obj, Decimal):
@@ -219,6 +220,7 @@ def _compute_experiment_timing():
 # CARD ASSEMBLY — SINGLE COACH
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _render_coach_card(domain, include_threads=True):
     """Assemble the observatory card payload for a single domain/coach.
 
@@ -235,7 +237,8 @@ def _render_coach_card(domain, include_threads=True):
 
     # ── 1. Latest OUTPUT# record ────────────────────────────────────────────
     outputs = _query_begins_with(
-        coach_pk, "OUTPUT#",
+        coach_pk,
+        "OUTPUT#",
         scan_forward=False,
         limit=1,
     )
@@ -288,7 +291,8 @@ def _render_coach_card(domain, include_threads=True):
     # ── 4. Ensemble digest — cross-coach references ─────────────────────────
     cross_coach_reference = None
     digest_records = _query_begins_with(
-        "ENSEMBLE#digest", "CYCLE#",
+        "ENSEMBLE#digest",
+        "CYCLE#",
         scan_forward=False,
         limit=1,
     )
@@ -316,12 +320,8 @@ def _render_coach_card(domain, include_threads=True):
                     other_names = []
                     for oc in other_coaches:
                         oc_display = COACH_DISPLAY.get(oc, {})
-                        other_names.append(
-                            oc_display.get("name", oc.replace("_", " ").title())
-                        )
-                    cross_coach_reference = (
-                        f"{', '.join(other_names)}'s notes on {topic}"
-                    )
+                        other_names.append(oc_display.get("name", oc.replace("_", " ").title()))
+                    cross_coach_reference = f"{', '.join(other_names)}'s notes on {topic}"
                     break
 
         # Also check coach_summaries for wants_team_input_on
@@ -337,9 +337,7 @@ def _render_coach_card(domain, include_threads=True):
                 if summary.get("coach_id") == coach_id:
                     team_input = summary.get("wants_team_input_on", [])
                     if team_input:
-                        cross_coach_reference = (
-                            f"Requesting team input on: {team_input[0]}"
-                        )
+                        cross_coach_reference = f"Requesting team input on: {team_input[0]}"
                     break
 
     # ── 5. Computation results — data availability / guardrails ──────────────
@@ -347,7 +345,8 @@ def _render_coach_card(domain, include_threads=True):
     confidence_language = "preliminary"
 
     comp_results = _query_begins_with(
-        "COACH#computation", "RESULTS#",
+        "COACH#computation",
+        "RESULTS#",
         scan_forward=False,
         limit=1,
     )
@@ -408,7 +407,8 @@ def _render_coach_card(domain, include_threads=True):
     # ── 6. Revision signals ──────────────────────────────────────────────────
     revision_signal = None
     learning_records = _query_begins_with(
-        coach_pk, "LEARNING#",
+        coach_pk,
+        "LEARNING#",
         scan_forward=False,
         limit=3,
     )
@@ -440,12 +440,15 @@ def _render_coach_card(domain, include_threads=True):
     track_record = None
     try:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
-        tr_resp = table.query(**with_phase_filter({  # ADR-058
-            "KeyConditionExpression": Key("pk").eq(coach_pk)
-                & Key("sk").between(f"LEARNING#{cutoff}", "LEARNING#z"),
-            "ProjectionExpression": "#s, #p",  # phase_filter needs #p in projection too
-            "ExpressionAttributeNames": {"#s": "status"},
-        }))
+        tr_resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058
+                    "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").between(f"LEARNING#{cutoff}", "LEARNING#z"),
+                    "ProjectionExpression": "#s, #p",  # phase_filter needs #p in projection too
+                    "ExpressionAttributeNames": {"#s": "status"},
+                }
+            )
+        )
         counts = {"confirmed": 0, "refuted": 0, "inconclusive": 0, "expired": 0}
         for it in tr_resp.get("Items", []):
             s = it.get("status", "")
@@ -501,7 +504,9 @@ def _render_coach_card(domain, include_threads=True):
 
     logger.info(
         "Rendered card for %s (%s) — %d fields, analysis=%d chars",
-        coach_id, domain, len(card),
+        coach_id,
+        domain,
+        len(card),
         len(analysis) if analysis else 0,
     )
 
@@ -525,6 +530,7 @@ def _extract_cross_coach_ref(digest, coach_id, domain):
 # ══════════════════════════════════════════════════════════════════════════════
 # HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def lambda_handler(event, context):
     """Lambda handler — renders observatory coaching cards.
@@ -551,10 +557,7 @@ def lambda_handler(event, context):
         # Also check queryStringParameters for API Gateway GET requests
         query_params = event.get("queryStringParameters") or {}
 
-        all_mode = (
-            body.get("all", False)
-            or str(query_params.get("all", "")).lower() in ("true", "1", "yes")
-        )
+        all_mode = body.get("all", False) or str(query_params.get("all", "")).lower() in ("true", "1", "yes")
         include_threads = body.get("include_threads", True)
         if "include_threads" in query_params:
             include_threads = str(query_params["include_threads"]).lower() not in ("false", "0", "no")
@@ -569,11 +572,13 @@ def lambda_handler(event, context):
                 except Exception as e:
                     logger.error("Failed to render card for %s: %s", domain, e)
                     coach_id = DOMAIN_COACH_MAP.get(domain, domain)
-                    coaches.append({
-                        "coach_id": coach_id,
-                        "domain": domain,
-                        "analysis": None,
-                    })
+                    coaches.append(
+                        {
+                            "coach_id": coach_id,
+                            "domain": domain,
+                            "analysis": None,
+                        }
+                    )
 
             result = {"coaches": coaches}
             logger.info("Rendered %d coach cards (all mode)", len(coaches))
@@ -598,10 +603,12 @@ def lambda_handler(event, context):
                     "Content-Type": "application/json",
                     "Access-Control-Allow-Origin": "*",
                 },
-                "body": json.dumps({
-                    "error": "domain parameter required",
-                    "valid_domains": list(DOMAIN_COACH_MAP.keys()),
-                }),
+                "body": json.dumps(
+                    {
+                        "error": "domain parameter required",
+                        "valid_domains": list(DOMAIN_COACH_MAP.keys()),
+                    }
+                ),
             }
 
         domain = domain.lower().strip()
@@ -613,10 +620,12 @@ def lambda_handler(event, context):
                     "Content-Type": "application/json",
                     "Access-Control-Allow-Origin": "*",
                 },
-                "body": json.dumps({
-                    "error": f"unknown domain: {domain}",
-                    "valid_domains": list(DOMAIN_COACH_MAP.keys()),
-                }),
+                "body": json.dumps(
+                    {
+                        "error": f"unknown domain: {domain}",
+                        "valid_domains": list(DOMAIN_COACH_MAP.keys()),
+                    }
+                ),
             }
 
         card = _render_coach_card(domain, include_threads=include_threads)
@@ -638,8 +647,10 @@ def lambda_handler(event, context):
                 "Content-Type": "application/json",
                 "Access-Control-Allow-Origin": "*",
             },
-            "body": json.dumps({
-                "error": "internal_error",
-                "message": str(e),
-            }),
+            "body": json.dumps(
+                {
+                    "error": "internal_error",
+                    "message": str(e),
+                }
+            ),
         }

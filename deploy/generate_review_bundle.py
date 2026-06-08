@@ -23,10 +23,10 @@ v1.0.0 — 2026-03-10
 v1.1.0 — 2026-03-14 — Updated grade table with R13 results
 """
 
-import os
-import sys
 import json
+import os
 import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -117,13 +117,15 @@ def build_bundle():
     # ══════════════════════════════════════════════════════════════
     # HEADER
     # ══════════════════════════════════════════════════════════════
-    sections.append(f"""# Life Platform — Pre-Compiled Review Bundle
+    sections.append(
+        f"""# Life Platform — Pre-Compiled Review Bundle
 **Generated:** {TODAY}
 **Purpose:** Single-file input for architecture reviews. Contains all platform state needed for a Technical Board assessment.
 **Usage:** Start a new session and say: "Read this review bundle file, then conduct Architecture Review #N using the Technical Board of Directors."
 
 ---
-""")
+"""
+    )
 
     # ══════════════════════════════════════════════════════════════
     # SECTION 1: PLATFORM STATE SNAPSHOT
@@ -236,6 +238,7 @@ def build_bundle():
             try:
                 content = tf.read_text(encoding="utf-8")
                 import re
+
                 fns = re.findall(r"^def (test_\w+)", content, re.MULTILINE)
             except Exception:
                 pass
@@ -315,7 +318,8 @@ def build_bundle():
     # This section is the single most important section for preventing stale re-flags.
     # ══════════════════════════════════════════════════════════════
     sections.append("## 13. PREVIOUS REVIEW GRADES\n")
-    sections.append("""
+    sections.append(
+        """
 | Dimension | #1 (v2.91) | #2 (v3.1.3) | #3 (v3.3.10) | #4 (v3.4.1) | #13 (v3.7.29) |
 |-----------|-----------|-----------|-------------|-------------|---------------|
 | Architecture | B+ | B+ | A- | A | A |
@@ -327,7 +331,8 @@ def build_bundle():
 | AI/Analytics | C+ | B- | B | B | B+ |
 | Maintainability | C | B- | B | B+ | B+ |
 | Production Readiness | D+ | C | B- | B | B+ |
-""")
+"""
+    )
 
     # Dynamic: read the last review's findings from the actual file
     last_review_files = sorted((DOCS_DIR / "reviews").glob("REVIEW_*.md"), reverse=True)
@@ -344,7 +349,8 @@ def build_bundle():
     # The reviewer MUST check this before issuing any finding.
     # ══════════════════════════════════════════════════════════════
     sections.append("## 13b. RESOLVED FINDINGS INVENTORY\n")
-    sections.append("""
+    sections.append(
+        """
 > **REVIEWER INSTRUCTION:** Before issuing ANY finding in this review, check this table.
 > If the finding appears here as RESOLVED, do NOT re-issue it. Instead, verify the
 > resolution is adequate and note it as confirmed-resolved in your output.
@@ -370,9 +376,11 @@ def build_bundle():
 | R13-F14 | No MCP endpoint canary | ✅ RESOLVED | v3.7.40 | EventBridge rule `rate(15 minutes)` → canary. Alarms: `life-platform-mcp-canary-failure-15min`, `life-platform-mcp-canary-latency-15min`. |
 | R13-F15 | Weekly correlation lacks FDR correction | ✅ RESOLVED | v3.7.37 | `weekly_correlation_compute_lambda.py` Benjamini-Hochberg FDR correction, `pearson_p_value()`, per-pair `p_value`/`p_value_fdr`/`fdr_significant`. |
 | R13-XR | No X-Ray tracing on MCP | ✅ RESOLVED | v3.7.40 | `cdk/stacks/mcp_stack.py` `tracing=_lambda.Tracing.ACTIVE`. IAM: `xray:PutTraceSegments` etc. in `mcp_server()` policy. |
-""")
+"""
+    )
 
-    sections.append("""
+    sections.append(
+        """
 ### R17 Findings (2026-03-20, v3.7.82)
 
 | ID | Finding | Status | Version | Proof |
@@ -404,9 +412,11 @@ def build_bundle():
 | R18-F07 | SIMP-1 regression (95→110) | ✅ RESOLVED | v4.5.1 | ADR-045 formally accepts 118 as operating state |
 | R18-F08 | INTELLIGENCE_LAYER.md stale | ✅ RESOLVED | v4.5.2 | Full refresh — freeze label removed, all IC statuses updated |
 | R18-F09 | Cross-region split on 13+ routes | ✅ RESOLVED | v4.3.0 | Site-api confirmed us-west-2 (AWS CLI 2026-03-30). No cross-region reads. |
-""")
+"""
+    )
 
-    sections.append("""
+    sections.append(
+        """
 ### R19 Findings (2026-03-30, v4.5.0)
 
 | ID | Finding | Status | Version | Proof |
@@ -418,7 +428,8 @@ def build_bundle():
 | R19-F05 | 118 MCP tools (4th consecutive review) | ✅ RESOLVED | v4.5.1 | ADR-045 formally accepts tool count as operating state. Current count: 115 (reduced from 118). |
 | R19-F06 | Site-API region contradicts Function URL | ✅ RESOLVED | v4.3.0 | AWS CLI verification confirmed us-west-2. Docs updated. |
 | R19-F07 | Section 13b not updated for R17/R18 | ✅ RESOLVED | v4.5.2 + v4.9.0 | R17, R18, R19 findings all added to generate_review_bundle.py Section 13b. |
-""")
+"""
+    )
 
     sections.append("\n---\n")
 

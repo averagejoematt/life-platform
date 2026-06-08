@@ -1,16 +1,18 @@
 """
 Shared configuration: environment variables, AWS clients, constants.
 """
+
 __version__ = "2.74.0"
-import os
 import logging
+import os
+
 import boto3
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 # ── AI model constants (env-overridable to avoid silent deprecation failures) ──
-AI_MODEL = os.environ.get("AI_MODEL",       "claude-sonnet-4-6")
+AI_MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 # ── Environment variables (with backwards-compatible defaults) ──
@@ -38,30 +40,51 @@ MEM_CACHE_TTL = 600  # 10 minutes
 # Fields stripped in lean queries
 _LEAN_STRIP = {"activities", "sport_types", "pk", "sk", "ingested_at", "source"}
 
-SOURCES = ["whoop", "withings", "strava", "todoist", "apple_health", "eightsleep", "chronicling", "macrofactor", "garmin", "habitify", "notion", "labs", "dexa", "genome", "weather", "supplements", "state_of_mind", "habit_scores", "health_auto_export", "dropbox_poll"]
+SOURCES = [
+    "whoop",
+    "withings",
+    "strava",
+    "todoist",
+    "apple_health",
+    "eightsleep",
+    "chronicling",
+    "macrofactor",
+    "garmin",
+    "habitify",
+    "notion",
+    "labs",
+    "dexa",
+    "genome",
+    "weather",
+    "supplements",
+    "state_of_mind",
+    "habit_scores",
+    "health_auto_export",
+    "dropbox_poll",
+]
 
 # ── Source-of-truth domain ownership ──
 _DEFAULT_SOURCE_OF_TRUTH = {
-    "cardio":      "strava",
-    "strength":    "hevy",
-    "physiology":  "whoop",
-    "nutrition":   "macrofactor",
-    "sleep":       "whoop",
+    "cardio": "strava",
+    "strength": "hevy",
+    "physiology": "whoop",
+    "nutrition": "macrofactor",
+    "sleep": "whoop",
     "sleep_environment": "eightsleep",
-    "journal":     "notion",
-    "body":        "withings",
-    "steps":       "apple_health",
-    "tasks":       "todoist",
-    "habits":      "habitify",
-    "stress":      "garmin",
+    "journal": "notion",
+    "body": "withings",
+    "steps": "apple_health",
+    "tasks": "todoist",
+    "habits": "habitify",
+    "stress": "garmin",
     "body_battery": "garmin",
-    "gait":        "apple_health",
+    "gait": "apple_health",
     "energy_expenditure": "apple_health",
-    "cgm":         "apple_health",
-    "water":        "apple_health",
-    "caffeine":     "apple_health",
-    "supplements":  "supplements",
-    "weather":      "weather",
+    "cgm": "apple_health",
+    "water": "apple_health",
+    "caffeine": "apple_health",
+    "supplements": "supplements",
+    "weather": "weather",
     "state_of_mind": "state_of_mind",
 }
 
@@ -69,10 +92,10 @@ P40_GROUPS = ["Data", "Discipline", "Growth", "Hygiene", "Nutrition", "Performan
 
 FIELD_ALIASES = {
     "strava": {
-        "distance_miles":        "total_distance_miles",
-        "elevation_gain_feet":   "total_elevation_gain_feet",
-        "elevation_gain":        "total_elevation_gain_feet",
-        "distance":              "total_distance_miles",
+        "distance_miles": "total_distance_miles",
+        "elevation_gain_feet": "total_elevation_gain_feet",
+        "elevation_gain": "total_elevation_gain_feet",
+        "distance": "total_distance_miles",
     }
 }
 

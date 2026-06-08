@@ -89,6 +89,7 @@ def main():
         print(f"[SYNC] Wrote {CONSTANTS_PATH.relative_to(REPO_ROOT)} from {CONFIG_PATH.relative_to(REPO_ROOT)}")
     else:
         import difflib
+
         diff = difflib.unified_diff(
             current.splitlines(keepends=True),
             new_content.splitlines(keepends=True),

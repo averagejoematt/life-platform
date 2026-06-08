@@ -42,14 +42,18 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-
 _AUTH_FAIL_SK = "AUTH_FAILURE"
 _AUTH_FAIL_TTL_SECONDS = 24 * 3600  # 24 hours
 
 _AUTH_FAIL_HTTP_CODES = ("401", "403")
 _AUTH_FAIL_KEYWORDS = (
-    "unauthorized", "forbidden", "invalid token", "expired token",
-    "token expired", "auth failed", "authentication failed",
+    "unauthorized",
+    "forbidden",
+    "invalid token",
+    "expired token",
+    "token expired",
+    "auth failed",
+    "authentication failed",
 )
 
 

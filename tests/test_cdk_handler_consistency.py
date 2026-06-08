@@ -30,6 +30,7 @@ import ast
 import os
 import re
 import sys
+
 import pytest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -38,17 +39,14 @@ LAMBDAS_DIR = os.path.join(ROOT, "lambdas")
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _read(path):
     with open(path, encoding="utf-8") as f:
         return f.read()
 
 
 def _stack_files():
-    return [
-        os.path.join(CDK_STACKS_DIR, f)
-        for f in os.listdir(CDK_STACKS_DIR)
-        if f.endswith(".py") and not f.startswith("__")
-    ]
+    return [os.path.join(CDK_STACKS_DIR, f) for f in os.listdir(CDK_STACKS_DIR) if f.endswith(".py") and not f.startswith("__")]
 
 
 def _extract_create_lambda_calls(src):
@@ -67,29 +65,28 @@ def _extract_create_lambda_calls(src):
     for hm in handler_matches:
         handler_val = hm.group(1)
         handler_pos = hm.start()
-        handler_line = src[:handler_pos].count('\n') + 1
+        handler_line = src[:handler_pos].count("\n") + 1
 
         # Check surrounding context (±400 chars back) for noqa annotation
-        context = src[max(0, handler_pos - 400):handler_pos + 200]
-        if 'noqa: CDK_HANDLER_ORPHAN' in context:
+        context = src[max(0, handler_pos - 400) : handler_pos + 200]
+        if "noqa: CDK_HANDLER_ORPHAN" in context:
             continue
 
         # Find the nearest source_file= within ±30 lines (≈±1500 chars)
-        nearby_sources = [
-            sm for sm in source_matches
-            if abs(sm.start() - handler_pos) < 1500
-        ]
+        nearby_sources = [sm for sm in source_matches if abs(sm.start() - handler_pos) < 1500]
         if not nearby_sources:
             # No source_file nearby — skip (inline _lambda.Function without source_file=)
             continue
         # Pick the closest one
         closest_src = min(nearby_sources, key=lambda sm: abs(sm.start() - handler_pos))
         source_val = closest_src.group(1)
-        results.append({
-            "handler": handler_val,
-            "source_file": source_val,
-            "line": handler_line,
-        })
+        results.append(
+            {
+                "handler": handler_val,
+                "source_file": source_val,
+                "line": handler_line,
+            }
+        )
 
     return results
 
@@ -108,6 +105,7 @@ def _all_cdk_pairs():
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
+
 def test_h1_handler_and_source_always_paired():
     """H1: Every handler= in CDK stacks has a nearby source_file=."""
     failures = []
@@ -120,11 +118,11 @@ def test_h1_handler_and_source_always_paired():
         for hm in handler_matches:
             handler_val = hm.group(1)
             handler_pos = hm.start()
-            handler_line = src[:handler_pos].count('\n') + 1
+            handler_line = src[:handler_pos].count("\n") + 1
 
             # Skip noqa-annotated orphans
-            context = src[max(0, handler_pos - 400):handler_pos + 200]
-            if 'noqa: CDK_HANDLER_ORPHAN' in context:
+            context = src[max(0, handler_pos - 400) : handler_pos + 200]
+            if "noqa: CDK_HANDLER_ORPHAN" in context:
                 continue
 
             nearby = [sm for sm in source_matches if abs(sm.start() - handler_pos) < 1500]
@@ -134,10 +132,7 @@ def test_h1_handler_and_source_always_paired():
                     f"(within 30 lines). If this is an inline _lambda.Function, add a comment # noqa: CDK_HANDLER_ORPHAN"
                 )
 
-    assert not failures, (
-        f"H1 FAIL: {len(failures)} handler(s) without source_file:\n"
-        + "\n".join(f"  - {f}" for f in failures)
-    )
+    assert not failures, f"H1 FAIL: {len(failures)} handler(s) without source_file:\n" + "\n".join(f"  - {f}" for f in failures)
 
 
 def test_h2_all_source_files_exist():
@@ -148,15 +143,12 @@ def test_h2_all_source_files_exist():
         stack_name = os.path.basename(stack_path)
         for m in re.finditer(r'source_file\s*=\s*["\']([^"\']+)["\']', src):
             source_val = m.group(1)
-            line = src[:m.start()].count('\n') + 1
+            line = src[: m.start()].count("\n") + 1
             full_path = os.path.join(ROOT, source_val)
             if not os.path.exists(full_path):
                 failures.append(f"{stack_name}:{line} — source_file='{source_val}' does not exist")
 
-    assert not failures, (
-        f"H2 FAIL: {len(failures)} source_file(s) don't exist on disk:\n"
-        + "\n".join(f"  - {f}" for f in failures)
-    )
+    assert not failures, f"H2 FAIL: {len(failures)} source_file(s) don't exist on disk:\n" + "\n".join(f"  - {f}" for f in failures)
 
 
 def test_h3_handler_module_matches_source_file():
@@ -176,7 +168,7 @@ def test_h3_handler_module_matches_source_file():
         # source_file is "lambdas/ingestion/whoop_lambda.py" — convert to "ingestion.whoop_lambda"
         rel = source_file
         if rel.startswith("lambdas/"):
-            rel = rel[len("lambdas/"):]
+            rel = rel[len("lambdas/") :]
         expected_module_path = rel.replace(".py", "").replace("/", ".")
         if handler_module_path != expected_module_path:
             failures.append(
@@ -189,8 +181,7 @@ def test_h3_handler_module_matches_source_file():
 
     assert not failures, (
         f"H3 FAIL: {len(failures)} handler/source_file mismatch(es) — "
-        f"this is exactly the bug that caused the 2026-03-12 P0:\n"
-        + "\n".join(f"  - {f}" for f in failures)
+        f"this is exactly the bug that caused the 2026-03-12 P0:\n" + "\n".join(f"  - {f}" for f in failures)
     )
 
 
@@ -206,14 +197,11 @@ def test_h4_all_source_files_define_lambda_handler():
         checked.add(full_path)
 
         src = _read(full_path)
-        if not re.search(r'^def lambda_handler', src, re.MULTILINE):
-            failures.append(
-                f"{pair['stack']}:{pair['line']} — {source_file} has no 'def lambda_handler' function"
-            )
+        if not re.search(r"^def lambda_handler", src, re.MULTILINE):
+            failures.append(f"{pair['stack']}:{pair['line']} — {source_file} has no 'def lambda_handler' function")
 
-    assert not failures, (
-        f"H4 FAIL: {len(failures)} Lambda source file(s) missing def lambda_handler:\n"
-        + "\n".join(f"  - {f}" for f in failures)
+    assert not failures, f"H4 FAIL: {len(failures)} Lambda source file(s) missing def lambda_handler:\n" + "\n".join(
+        f"  - {f}" for f in failures
     )
 
 
@@ -229,7 +217,7 @@ def test_h5_no_generic_lambda_function_handler():
         src = _read(stack_path)
         stack_name = os.path.basename(stack_path)
         for m in re.finditer(r'handler\s*=\s*["\']lambda_function\.lambda_handler["\']', src):
-            line = src[:m.start()].count('\n') + 1
+            line = src[: m.start()].count("\n") + 1
             failures.append(
                 f"{stack_name}:{line} — handler='lambda_function.lambda_handler' is a generic "
                 f"placeholder. Replace with the actual module name.\n"
@@ -238,8 +226,7 @@ def test_h5_no_generic_lambda_function_handler():
 
     assert not failures, (
         f"H5 FAIL: {len(failures)} 'lambda_function.lambda_handler' reference(s) found — "
-        f"this is the root cause of the 2026-03-12 P0 alarm flood:\n"
-        + "\n".join(f"  - {f}" for f in failures)
+        f"this is the root cause of the 2026-03-12 P0 alarm flood:\n" + "\n".join(f"  - {f}" for f in failures)
     )
 
 
@@ -247,6 +234,7 @@ def test_h5_no_generic_lambda_function_handler():
 
 if __name__ == "__main__":
     import subprocess
+
     result = subprocess.run(
         ["python3", "-m", "pytest", __file__, "-v", "--tb=short"],
         cwd=ROOT,

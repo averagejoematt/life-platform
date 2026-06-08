@@ -15,6 +15,7 @@ Usage:
 v1.0.0 — 2026-03-02
 v1.1.0 — 2026-03-30  (Statistical review: F-01 through F-15)
 """
+
 import json
 import logging
 import math
@@ -23,7 +24,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Optional
 
-from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 
 logger = logging.getLogger(__name__)
 
@@ -40,17 +41,18 @@ DEFAULT_XP_BUFFER_THRESHOLD = 20
 
 # ── Tier definitions (also in config, but hardcoded as fallback) ──
 _DEFAULT_TIERS = [
-    {"name": "Foundation", "emoji": "🔨", "min_level": 1,  "max_level": 20},
-    {"name": "Momentum",   "emoji": "🔥", "min_level": 21, "max_level": 40},
+    {"name": "Foundation", "emoji": "🔨", "min_level": 1, "max_level": 20},
+    {"name": "Momentum", "emoji": "🔥", "min_level": 21, "max_level": 40},
     {"name": "Discipline", "emoji": "⚔️", "min_level": 41, "max_level": 60},
-    {"name": "Mastery",    "emoji": "🏆", "min_level": 61, "max_level": 80},
-    {"name": "Elite",      "emoji": "👑", "min_level": 81, "max_level": 100},
+    {"name": "Mastery", "emoji": "🏆", "min_level": 61, "max_level": 80},
+    {"name": "Elite", "emoji": "👑", "min_level": 81, "max_level": 100},
 ]
 
 
 # ==============================================================================
 # CONFIG LOADER
 # ==============================================================================
+
 
 def load_character_config(
     s3_client: Any,
@@ -60,16 +62,14 @@ def load_character_config(
 ) -> dict[str, Any]:
     """Load character_sheet.json from S3 with warm-container caching."""
     now = time.time()
-    if (not force_refresh and _config_cache["data"]
-            and (now - _config_cache["ts"]) < _CONFIG_TTL_S):
+    if not force_refresh and _config_cache["data"] and (now - _config_cache["ts"]) < _CONFIG_TTL_S:
         return _config_cache["data"]
     try:
         resp = s3_client.get_object(Bucket=bucket, Key=f"config/{user_id}/character_sheet.json")
         config = json.loads(resp["Body"].read().decode("utf-8"))
         _config_cache["data"] = config
         _config_cache["ts"] = now
-        logger.info("[character_engine] Loaded config from S3 — %d pillars",
-                    len(config.get("pillars", {})))
+        logger.info("[character_engine] Loaded config from S3 — %d pillars", len(config.get("pillars", {})))
         return config
     except Exception as e:
         logger.warning("[character_engine] Failed to load config from S3: %s", e)
@@ -81,6 +81,7 @@ def load_character_config(
 # ==============================================================================
 # UTILITY FUNCTIONS
 # ==============================================================================
+
 
 def _clamp(val, lo=0, hi=100):
     if val is None:
@@ -170,13 +171,16 @@ def _compute_xp(raw_score, previous_xp, config, day_number=None):
     """Compute XP delta with daily decay. Returns (xp_earned, xp_delta, new_xp_total). [F-02]
     C2: Grace period — decay scales linearly over first 14 days to avoid
     punishing new users before data stabilizes."""
-    bands = config.get("xp_bands", [
-        {"min_raw_score": 80, "xp": 3},
-        {"min_raw_score": 60, "xp": 2},
-        {"min_raw_score": 40, "xp": 1},
-        {"min_raw_score": 20, "xp": 0},
-        {"min_raw_score": 0,  "xp": -1},
-    ])
+    bands = config.get(
+        "xp_bands",
+        [
+            {"min_raw_score": 80, "xp": 3},
+            {"min_raw_score": 60, "xp": 2},
+            {"min_raw_score": 40, "xp": 1},
+            {"min_raw_score": 20, "xp": 0},
+            {"min_raw_score": 0, "xp": -1},
+        ],
+    )
     leveling = config.get("leveling", {})
     daily_decay = leveling.get("daily_xp_decay", DEFAULT_DAILY_XP_DECAY)
 
@@ -200,6 +204,7 @@ def _compute_xp(raw_score, previous_xp, config, day_number=None):
 # ==============================================================================
 # PILLAR RAW SCORE COMPUTATIONS
 # ==============================================================================
+
 
 def compute_sleep_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[float, dict[str, Any]]:
     """Compute Sleep pillar raw_score (0-100)."""
@@ -273,6 +278,7 @@ def compute_sleep_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[flo
 
     if len(onset_minutes) >= 3:
         import statistics
+
         std = statistics.stdev(onset_minutes)
         scores["onset_consistency"] = _deviation_score(std, ideal=0, worst=120)
     else:
@@ -306,7 +312,7 @@ def compute_movement_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[
         z2 = _safe_float(day, "zone2_minutes") or _safe_float(day, "time_in_zone_2_minutes")
         if z2:
             z2_minutes += z2
-        for act in (day.get("activities") or []):
+        for act in day.get("activities") or []:
             z2a = _safe_float(act, "zone2_minutes")
             if z2a:
                 z2_minutes += z2a
@@ -340,7 +346,7 @@ def compute_movement_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[
     # Movement diversity
     activity_types = set()
     for day in strava_7d:
-        for act in (day.get("activities") or []):
+        for act in day.get("activities") or []:
             sport = act.get("sport_type") or act.get("type", "")
             if sport:
                 activity_types.add(sport.lower())
@@ -454,8 +460,7 @@ def compute_metabolic_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
 
     # Body fat trajectory
     withings_30d = data.get("withings_30d", [])
-    bf_vals = [_safe_float(w, "body_fat_pct") or _safe_float(w, "fat_mass_pct")
-               for w in withings_30d]
+    bf_vals = [_safe_float(w, "body_fat_pct") or _safe_float(w, "fat_mass_pct") for w in withings_30d]
     bf_vals = [v for v in bf_vals if v is not None]
     scores["body_fat_trajectory"] = _trend_score(bf_vals, higher_is_better=False) if len(bf_vals) >= 3 else None
 
@@ -596,9 +601,7 @@ def compute_mind_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[floa
         if streaks:
             avg_streak = sum(streaks) / len(streaks)
             # Log curve: day 7 ≈ 58, day 14 ≈ 77, day 30 = 100
-            scores["vice_control"] = _clamp(round(
-                100 * math.log(1 + avg_streak) / math.log(31), 1
-            ))
+            scores["vice_control"] = _clamp(round(100 * math.log(1 + avg_streak) / math.log(31), 1))
         else:
             scores["vice_control"] = None
     else:
@@ -655,17 +658,19 @@ def compute_relationships_raw(data: dict[str, Any], config: dict[str, Any]) -> t
     return _weighted_pillar_score(scores, components)
 
 
-def compute_consistency_raw(data: dict[str, Any], config: dict[str, Any], other_pillar_raw_scores: dict[str, float]) -> tuple[float, dict[str, Any]]:
+def compute_consistency_raw(
+    data: dict[str, Any], config: dict[str, Any], other_pillar_raw_scores: dict[str, float]
+) -> tuple[float, dict[str, Any]]:
     """Compute Consistency meta-pillar raw_score (0-100)."""
     pillar_cfg = config.get("pillars", {}).get("consistency", {})
     components = pillar_cfg.get("components", {})
     scores = {}
 
     # Cross-pillar variance
-    other_scores = [v for k, v in other_pillar_raw_scores.items()
-                    if k != "consistency" and v is not None]
+    other_scores = [v for k, v in other_pillar_raw_scores.items() if k != "consistency" and v is not None]
     if len(other_scores) >= 3:
         import statistics
+
         std = statistics.stdev(other_scores)
         scores["cross_pillar_variance"] = _deviation_score(std, ideal=0, worst=30)
     else:
@@ -736,6 +741,7 @@ def _weighted_pillar_score(component_scores, components_config):
 # EMA + LEVEL COMPUTATION
 # ==============================================================================
 
+
 def compute_ema_level_score(raw_scores_history: list[float], config: dict[str, Any], pillar_name: Optional[str] = None) -> float:
     """Compute EMA of raw scores. Uses per-pillar lambda if available. [F-03]"""
     leveling = config.get("leveling", {})
@@ -752,7 +758,7 @@ def compute_ema_level_score(raw_scores_history: list[float], config: dict[str, A
     if not recent:
         return 50.0  # [F-09]
 
-    weights = [lam ** i for i in range(len(recent))]
+    weights = [lam**i for i in range(len(recent))]
     weights.reverse()
 
     total = sum(r * w for r, w in zip(recent, weights))
@@ -760,17 +766,16 @@ def compute_ema_level_score(raw_scores_history: list[float], config: dict[str, A
     return round(total / total_w, 1) if total_w > 0 else 50.0
 
 
-def evaluate_level_changes(pillar_name: str, current_level_score: float, previous_state: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
+def evaluate_level_changes(
+    pillar_name: str, current_level_score: float, previous_state: dict[str, Any], config: dict[str, Any]
+) -> dict[str, Any]:
     """Level changes with progressive difficulty by tier. [F-15, F-10, F-11, F-02]"""
     leveling = config.get("leveling", {})
 
     # Progressive streak overrides by tier [F-15]
     tier_overrides = leveling.get("tier_streak_overrides", {})
 
-    prev = previous_state or {
-        "level": 1, "tier": "Foundation", "streak_above": 0,
-        "streak_below": 0, "xp_total": 0
-    }
+    prev = previous_state or {"level": 1, "tier": "Foundation", "streak_above": 0, "streak_below": 0, "xp_total": 0}
     current_level = prev.get("level", 1)
     current_tier_info = get_tier(current_level, config)
     current_tier_name = current_tier_info["name"]
@@ -812,10 +817,14 @@ def evaluate_level_changes(pillar_name: str, current_level_score: float, previou
                 step = 2 if delta > level_step_threshold else 1
                 current_level = min(current_level + step, 100)
                 streak_above = 0
-                events.append({
-                    "type": "level_up", "pillar": pillar_name,
-                    "old_level": old_level, "new_level": current_level,
-                })
+                events.append(
+                    {
+                        "type": "level_up",
+                        "pillar": pillar_name,
+                        "old_level": old_level,
+                        "new_level": current_level,
+                    }
+                )
     elif target_level < current_level:
         streak_below += 1
         streak_above = 0
@@ -834,10 +843,14 @@ def evaluate_level_changes(pillar_name: str, current_level_score: float, previou
                     old_level = current_level
                     current_level = max(current_level - 1, 1)
                     streak_below = 0
-                    events.append({
-                        "type": "level_down", "pillar": pillar_name,
-                        "old_level": old_level, "new_level": current_level,
-                    })
+                    events.append(
+                        {
+                            "type": "level_down",
+                            "pillar": pillar_name,
+                            "old_level": old_level,
+                            "new_level": current_level,
+                        }
+                    )
     else:
         # Equal day: hold streaks constant [F-11]
         pass
@@ -848,24 +861,34 @@ def evaluate_level_changes(pillar_name: str, current_level_score: float, previou
     current_tier = prev.get("tier", "Foundation")
     if new_tier != current_tier:
         etype = "tier_up" if current_level > prev.get("level", 1) else "tier_down"
-        events.append({
-            "type": etype, "pillar": pillar_name,
-            "old_tier": current_tier, "new_tier": new_tier,
-            "old_level": prev.get("level", 1), "new_level": current_level,
-        })
+        events.append(
+            {
+                "type": etype,
+                "pillar": pillar_name,
+                "old_tier": current_tier,
+                "new_tier": new_tier,
+                "old_level": prev.get("level", 1),
+                "new_level": current_level,
+            }
+        )
         current_tier = new_tier
 
     return {
-        "level": current_level, "tier": current_tier,
+        "level": current_level,
+        "tier": current_tier,
         "tier_emoji": new_tier_info.get("emoji", "🔨"),
-        "streak_above": streak_above, "streak_below": streak_below,
-        "xp_total": xp_total, "xp_buffer": xp_buffer, "events": events,
+        "streak_above": streak_above,
+        "streak_below": streak_below,
+        "xp_total": xp_total,
+        "xp_buffer": xp_buffer,
+        "events": events,
     }
 
 
 # ==============================================================================
 # CROSS-PILLAR EFFECTS
 # ==============================================================================
+
 
 def compute_cross_pillar_effects(pillar_levels: dict[str, float], config: dict[str, Any]) -> dict[str, Any]:
     """Evaluate cross-pillar effects. Returns (active_effects, modifier_dict). [F-05]"""
@@ -878,10 +901,14 @@ def compute_cross_pillar_effects(pillar_levels: dict[str, float], config: dict[s
         targets = effect.get("targets", {})
 
         if _evaluate_condition(condition, pillar_levels):
-            active.append({
-                "name": effect["name"], "emoji": effect.get("emoji", ""),
-                "condition": condition, "targets": targets,
-            })
+            active.append(
+                {
+                    "name": effect["name"],
+                    "emoji": effect.get("emoji", ""),
+                    "condition": condition,
+                    "targets": targets,
+                }
+            )
             for target_pillar, mod_spec in targets.items():
                 # Support both old format (raw number) and new format (dict with type+value)
                 if isinstance(mod_spec, dict):
@@ -925,12 +952,18 @@ def _evaluate_condition(condition_str, pillar_levels):
 
 
 def _compare(a, op, b):
-    if op == "<": return a < b
-    if op == "<=": return a <= b
-    if op == ">": return a > b
-    if op == ">=": return a >= b
-    if op == "==": return a == b
-    if op == "!=": return a != b
+    if op == "<":
+        return a < b
+    if op == "<=":
+        return a <= b
+    if op == ">":
+        return a > b
+    if op == ">=":
+        return a >= b
+    if op == "==":
+        return a == b
+    if op == "!=":
+        return a != b
     return False
 
 
@@ -939,16 +972,18 @@ def _compare(a, op, b):
 # ==============================================================================
 
 PILLAR_COMPUTERS = {
-    "sleep":         compute_sleep_raw,
-    "movement":      compute_movement_raw,
-    "nutrition":     compute_nutrition_raw,
-    "metabolic":     compute_metabolic_raw,
-    "mind":          compute_mind_raw,
+    "sleep": compute_sleep_raw,
+    "movement": compute_movement_raw,
+    "nutrition": compute_nutrition_raw,
+    "metabolic": compute_metabolic_raw,
+    "mind": compute_mind_raw,
     "relationships": compute_relationships_raw,
 }
 
 
-def compute_character_sheet(data: dict[str, Any], previous_day_state: Optional[dict[str, Any]], raw_score_histories: dict[str, list[float]], config: dict[str, Any]) -> dict[str, Any]:
+def compute_character_sheet(
+    data: dict[str, Any], previous_day_state: Optional[dict[str, Any]], raw_score_histories: dict[str, list[float]], config: dict[str, Any]
+) -> dict[str, Any]:
     """Compute the full character sheet for a single day."""
     compute_date = data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     experiment_start = config.get("experiment_start", EXPERIMENT_START_DATE)
@@ -995,7 +1030,8 @@ def compute_character_sheet(data: dict[str, Any], previous_day_state: Optional[d
         for pn in pillar_raw_scores:
             pp = previous_day_state.get(f"pillar_{pn}") or {}
             prev_pillars[pn] = {
-                "level": pp.get("level", 1), "tier": pp.get("tier", "Foundation"),
+                "level": pp.get("level", 1),
+                "tier": pp.get("tier", "Foundation"),
                 "streak_above": pp.get("streak_above", 0),
                 "streak_below": pp.get("streak_below", 0),
                 "xp_total": pp.get("xp_total", 0),
@@ -1005,8 +1041,7 @@ def compute_character_sheet(data: dict[str, Any], previous_day_state: Optional[d
     pillar_results = {}
     for pillar_name in pillar_raw_scores:
         prev_state = prev_pillars.get(pillar_name)
-        level_state = evaluate_level_changes(
-            pillar_name, adjusted_level_scores[pillar_name], prev_state, config)
+        level_state = evaluate_level_changes(pillar_name, adjusted_level_scores[pillar_name], prev_state, config)
 
         prev_xp = prev_state.get("xp_total", 0) if prev_state else 0
         xp_earned, xp_delta, new_xp = _compute_xp(pillar_raw_scores[pillar_name], prev_xp, config, day_number=_day_number)
@@ -1015,9 +1050,11 @@ def compute_character_sheet(data: dict[str, Any], previous_day_state: Optional[d
         pillar_results[pillar_name] = {
             "raw_score": pillar_raw_scores[pillar_name],
             "level_score": adjusted_level_scores[pillar_name],
-            "level": level_state["level"], "tier": level_state["tier"],
+            "level": level_state["level"],
+            "tier": level_state["tier"],
             "tier_emoji": level_state.get("tier_emoji", "🔨"),
-            "xp_total": level_state["xp_total"], "xp_delta": xp_delta,
+            "xp_total": level_state["xp_total"],
+            "xp_delta": xp_delta,
             "xp_earned": xp_earned,
             "confidence": pillar_details[pillar_name].get("_confidence"),
             "data_coverage": pillar_details[pillar_name].get("_data_coverage"),
@@ -1033,8 +1070,9 @@ def compute_character_sheet(data: dict[str, Any], previous_day_state: Optional[d
             ev["xp_earned"] = xp_earned
             ev["streak_days"] = level_state.get("streak_above", 0) or level_state.get("streak_below", 0)
             # Extract top contributing component (skip private keys)
-            components = {k: v for k, v in pillar_details[pillar_name].items()
-                         if not k.startswith("_") and isinstance(v, (int, float)) and v > 0}
+            components = {
+                k: v for k, v in pillar_details[pillar_name].items() if not k.startswith("_") and isinstance(v, (int, float)) and v > 0
+            }
             if components:
                 top = max(components, key=components.get)
                 ev["top_driver"] = top.replace("_", " ").title()
@@ -1061,8 +1099,7 @@ def compute_character_sheet(data: dict[str, Any], previous_day_state: Optional[d
     total_xp = sum(pr["xp_total"] for pr in pillar_results.values())
 
     # Confidence stats [F-01]
-    confidences: list[float] = [pr["confidence"] for pr in pillar_results.values()
-                                if pr.get("confidence") is not None]
+    confidences: list[float] = [pr["confidence"] for pr in pillar_results.values() if pr.get("confidence") is not None]
     min_confidence = round(min(confidences), 3) if confidences else 0.0
     avg_confidence = round(sum(confidences) / len(confidences), 3) if confidences else 0.0
 
@@ -1089,6 +1126,7 @@ def compute_character_sheet(data: dict[str, Any], previous_day_state: Optional[d
 # DDB HELPERS
 # ==============================================================================
 
+
 def store_character_sheet(table_resource: Any, user_prefix: str, record: dict[str, Any]) -> None:
     """Write a character_sheet record to DynamoDB.
     Phase 3.3 (2026-05-16): tags with run_id + computed_at via compute_metadata.
@@ -1103,6 +1141,7 @@ def store_character_sheet(table_resource: Any, user_prefix: str, record: dict[st
         item["phase"] = "pilot"
     try:
         from compute_metadata import tag_record
+
         item = tag_record(item, source_id="character_sheet")
     except ImportError:
         pass  # Helper not in deploy bundle; fall through to untagged write
@@ -1112,34 +1151,38 @@ def store_character_sheet(table_resource: Any, user_prefix: str, record: dict[st
 
 def fetch_character_sheet(table_resource: Any, user_prefix: str, date_str: str) -> Optional[dict[str, Any]]:
     try:
-        resp = table_resource.get_item(
-            Key={"pk": user_prefix + "character_sheet", "sk": "DATE#" + date_str})
+        resp = table_resource.get_item(Key={"pk": user_prefix + "character_sheet", "sk": "DATE#" + date_str})
         item = resp.get("Item")
         return _from_decimal(item) if item else None
     except Exception:
         return None
 
 
-def fetch_character_sheet_range(table_resource: Any, user_prefix: str, start_date: str, end_date: str,
-                                include_pilot: bool = False) -> list[dict[str, Any]]:
+def fetch_character_sheet_range(
+    table_resource: Any, user_prefix: str, start_date: str, end_date: str, include_pilot: bool = False
+) -> list[dict[str, Any]]:
     """ADR-058: phase='pilot' records are excluded by default; restart tooling
     can pass include_pilot=True to opt out of the filter."""
     try:
         from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+
         base_kwargs = {
             "KeyConditionExpression": "pk = :pk AND sk BETWEEN :start AND :end",
             "ExpressionAttributeValues": {
                 ":pk": user_prefix + "character_sheet",
-                ":start": "DATE#" + start_date, ":end": "DATE#" + end_date,
+                ":start": "DATE#" + start_date,
+                ":end": "DATE#" + end_date,
             },
         }
         resp = table_resource.query(**with_phase_filter(base_kwargs, include_pilot=include_pilot))
         items = resp.get("Items", [])
         while resp.get("LastEvaluatedKey"):
-            resp = table_resource.query(**with_phase_filter(
-                dict(base_kwargs, ExclusiveStartKey=resp["LastEvaluatedKey"]),
-                include_pilot=include_pilot,
-            ))
+            resp = table_resource.query(
+                **with_phase_filter(
+                    dict(base_kwargs, ExclusiveStartKey=resp["LastEvaluatedKey"]),
+                    include_pilot=include_pilot,
+                )
+            )
             items.extend(resp.get("Items", []))
         return [_from_decimal(i) for i in items]
     except Exception as e:
@@ -1161,6 +1204,7 @@ def _to_decimal(obj):
 
 def _from_decimal(obj):
     from decimal import Decimal
+
     if isinstance(obj, Decimal):
         return float(obj)
     if isinstance(obj, dict):

@@ -17,29 +17,34 @@ by this module (not site_api_common) because the cache lifecycle is
 local to handle_status — the `global` declarations write back to this
 module's namespace.
 """
+
 import json
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401
 
 import boto3  # noqa: F401 — handlers may instantiate clients
 from boto3.dynamodb.conditions import Key
-
 from phase_filter import with_phase_filter  # ADR-058
-
 from web.site_api_common import (
-    logger,
-    table,
-    dynamodb,
-    USER_ID, USER_PREFIX,
-    EXPERIMENT_START, EXPERIMENT_BASELINE_WEIGHT_LBS,
-    PT, DDB_REGION,
-    STATUS_CACHE_TTL,
+    DDB_REGION,
+    EXPERIMENT_BASELINE_WEIGHT_LBS,
+    EXPERIMENT_START,
     PLATFORM_STATS,
-    _ok, _error,
-    _query_source, _latest_item, _decimal_to_float,
+    PT,
+    STATUS_CACHE_TTL,
+    USER_ID,
+    USER_PREFIX,
+    _decimal_to_float,
+    _error,
     _experiment_date,
     _get_profile,
+    _latest_item,
+    _ok,
+    _query_source,
+    dynamodb,
+    logger,
+    table,
 )
 
 # ── Module-owned cache state for /api/status ─────────────
@@ -71,7 +76,8 @@ def handle_status() -> dict:
     try:
         hc_resp = table.query(
             KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}health_check"),
-            ScanIndexForward=False, Limit=1,
+            ScanIndexForward=False,
+            Limit=1,
         )
         hc_items = hc_resp.get("Items", [])
         if hc_items:
@@ -103,17 +109,28 @@ def handle_status() -> dict:
 
     # Map Lambda function names to source IDs for alarm lookup
     _LAMBDA_TO_SOURCE = {
-        "whoop-data-ingestion": "whoop", "withings-data-ingestion": "withings",
-        "garmin-data-ingestion": "garmin", "strava-data-ingestion": "strava",
-        "habitify-data-ingestion": "habitify", "eightsleep-data-ingestion": "eightsleep",
-        "macrofactor-data-ingestion": "macrofactor", "notion-journal-ingestion": "notion",
-        "todoist-data-ingestion": "todoist", "weather-data-ingestion": "weather",
-        "health-auto-export-webhook": "apple_health", "food-delivery-ingestion": "food_delivery",
-        "character-sheet-compute": "character_sheet", "daily-metrics-compute": "computed_metrics",
-        "daily-insight-compute": "insights", "adaptive-mode-compute": "adaptive_mode",
-        "daily-brief": "daily_brief", "weekly-digest": "weekly_digest",
-        "monday-compass": "monday_compass", "wednesday-chronicle": "wednesday_chronicle",
-        "weekly-plate": "weekly_plate", "nutrition-review": "nutrition_review",
+        "whoop-data-ingestion": "whoop",
+        "withings-data-ingestion": "withings",
+        "garmin-data-ingestion": "garmin",
+        "strava-data-ingestion": "strava",
+        "habitify-data-ingestion": "habitify",
+        "eightsleep-data-ingestion": "eightsleep",
+        "macrofactor-data-ingestion": "macrofactor",
+        "notion-journal-ingestion": "notion",
+        "todoist-data-ingestion": "todoist",
+        "weather-data-ingestion": "weather",
+        "health-auto-export-webhook": "apple_health",
+        "food-delivery-ingestion": "food_delivery",
+        "character-sheet-compute": "character_sheet",
+        "daily-metrics-compute": "computed_metrics",
+        "daily-insight-compute": "insights",
+        "adaptive-mode-compute": "adaptive_mode",
+        "daily-brief": "daily_brief",
+        "weekly-digest": "weekly_digest",
+        "monday-compass": "monday_compass",
+        "wednesday-chronicle": "wednesday_chronicle",
+        "weekly-plate": "weekly_plate",
+        "nutrition-review": "nutrition_review",
         "anomaly-detector": "anomaly_detector",
     }
     alarming_sources = set()
@@ -129,51 +146,288 @@ def handle_status() -> dict:
     # field_check: if set, _last_sync filters by this field existing (for shared partitions like apple_health)
     _DATA_SOURCES = [
         # ── API-Based (fully automated) ──
-        ("whoop",              "Recovery & Sleep Data",              "HRV \u00B7 recovery score \u00B7 sleep staging",      25,  49, "auto",    "API-Based", False, "Whoop", None),
-        ("withings",           "Weight Data",                        "Weight \u00B7 body composition \u00B7 blood pressure", 25,  49, "auto",   "API-Based", True,  "Withings", None),
-        ("eightsleep",         "Sleep Environment Data",             "Sleep staging \u00B7 bed temperature \u00B7 HRV",      25,  49, "auto",    "API-Based", False, "Eight Sleep", None),
-        ("todoist",            "To Do Task Data",                    "Tasks \u00B7 projects \u00B7 completion rate",          25,  49, "auto",   "API-Based", True,  "Todoist", None),
-        ("weather",            "Weather Data",                       "Daily temperature \u00B7 conditions \u00B7 humidity",   25,  49, "auto",   "API-Based", False, "OpenWeather", None),
-        ("garmin",             "Activity Tracking (1 of 2)",         "Steps \u00B7 GPS routes \u00B7 stress \u00B7 body battery", 25,  49, "auto",   "API-Based", True,  "Garmin", None),
-        ("strava",             "Activity Tracking (2 of 2)",         "Activities \u00B7 segments \u00B7 training load",      25,  49, "auto",    "API-Based", True,  "Strava", None),
-        ("notion",             "Journal Data",                       "Journal entries \u00B7 mood \u00B7 reflections",       25,  49, "auto",    "API-Based", True,  "Notion", None),
+        (
+            "whoop",
+            "Recovery & Sleep Data",
+            "HRV \u00b7 recovery score \u00b7 sleep staging",
+            25,
+            49,
+            "auto",
+            "API-Based",
+            False,
+            "Whoop",
+            None,
+        ),
+        (
+            "withings",
+            "Weight Data",
+            "Weight \u00b7 body composition \u00b7 blood pressure",
+            25,
+            49,
+            "auto",
+            "API-Based",
+            True,
+            "Withings",
+            None,
+        ),
+        (
+            "eightsleep",
+            "Sleep Environment Data",
+            "Sleep staging \u00b7 bed temperature \u00b7 HRV",
+            25,
+            49,
+            "auto",
+            "API-Based",
+            False,
+            "Eight Sleep",
+            None,
+        ),
+        ("todoist", "To Do Task Data", "Tasks \u00b7 projects \u00b7 completion rate", 25, 49, "auto", "API-Based", True, "Todoist", None),
+        (
+            "weather",
+            "Weather Data",
+            "Daily temperature \u00b7 conditions \u00b7 humidity",
+            25,
+            49,
+            "auto",
+            "API-Based",
+            False,
+            "OpenWeather",
+            None,
+        ),
+        (
+            "garmin",
+            "Activity Tracking (1 of 2)",
+            "Steps \u00b7 GPS routes \u00b7 stress \u00b7 body battery",
+            25,
+            49,
+            "auto",
+            "API-Based",
+            True,
+            "Garmin",
+            None,
+        ),
+        (
+            "strava",
+            "Activity Tracking (2 of 2)",
+            "Activities \u00b7 segments \u00b7 training load",
+            25,
+            49,
+            "auto",
+            "API-Based",
+            True,
+            "Strava",
+            None,
+        ),
+        ("notion", "Journal Data", "Journal entries \u00b7 mood \u00b7 reflections", 25, 49, "auto", "API-Based", True, "Notion", None),
         # ── User-Driven (requires user to log/sync) ──
-        ("habitify",           "Habit Tracking Data",                "Daily habits \u00B7 day grades",                       25,  49, "auto",    "User-Driven", True,  "Habitify", None),
-        ("macrofactor",        "Nutrition Data",                     "Calories \u00B7 macros \u00B7 meal timing",            25,  49, "auto",    "User-Driven", True,  "MacroFactor via Dropbox", None),
-        ("supplements",        "Supplement Adherence",               "Daily supplement tracking & compliance",                25,  49, "auto",   "User-Driven", True,  "Habitify", None),
+        ("habitify", "Habit Tracking Data", "Daily habits \u00b7 day grades", 25, 49, "auto", "User-Driven", True, "Habitify", None),
+        (
+            "macrofactor",
+            "Nutrition Data",
+            "Calories \u00b7 macros \u00b7 meal timing",
+            25,
+            49,
+            "auto",
+            "User-Driven",
+            True,
+            "MacroFactor via Dropbox",
+            None,
+        ),
+        (
+            "supplements",
+            "Supplement Adherence",
+            "Daily supplement tracking & compliance",
+            25,
+            49,
+            "auto",
+            "User-Driven",
+            True,
+            "Habitify",
+            None,
+        ),
         # State of Mind tracked via apple_health partition field check (som_avg_valence) in Periodic Uploads section
         # ── Periodic Uploads (file drops, webhooks, device sync) ──
-        ("macrofactor_workouts", "Exercise Log Data",                 "Workout CSV via file drop",                             48, 168, "auto",   "Periodic Uploads", True,  "MacroFactor via Dropbox", None),
-        ("apple_health",       "CGM Glucose Data",                   "Continuous glucose monitor readings",                   25,  49, "auto",  "Periodic Uploads", True,  "Dexcom Stelo via Health Exporter", "blood_glucose_avg"),
-        ("apple_health",       "Water Intake Data",                  "Daily water consumption tracking",                      25,  49, "auto",   "Periodic Uploads", True,  "Apple Health via Health Exporter", "water_intake_ml"),
-        ("apple_health",       "Blood Pressure Data",                "Systolic \u00B7 diastolic \u00B7 pulse",               168, 336, "manual",  "Periodic Uploads", True,  "Apple Health via Health Exporter", "blood_pressure_systolic"),
-        ("apple_health",       "Breathwork Data",                    "Breathwork mindful minutes \u00B7 sessions",                   48, 168, "auto",   "Periodic Uploads", True,  "Breathwrk via Apple Health", "mindful_minutes"),
-        ("apple_health",       "Stretching Data",                    "Flexibility sessions \u00B7 recovery",                  48, 168, "auto",   "Periodic Uploads", True,  "Pliability via Health Exporter", "flexibility_minutes"),
-        ("apple_health",       "Mindful Minutes Data",               "Meditation & mindfulness sessions",                     48, 168, "auto",   "Periodic Uploads", True,  "Apple Health via Health Exporter", "mindful_minutes"),
-        ("apple_health",       "State of Mind Data (Health Export)",  "How We Feel mood check-ins via Health Exporter",       48, 168, "auto",   "Periodic Uploads", True,  "Apple Health via Health Exporter", "som_avg_valence"),
-        ("apple_health",       "Apple Health Import",                 "Steps \u00B7 activity \u00B7 walking metrics",        25,  49, "auto",  "Periodic Uploads", True,  "Health Auto Export", "steps"),
-        ("food_delivery",      "Food Delivery Index",                "Quarterly CSV import \u00B7 delivery index 0-10",     2160, 2880, "manual", "Periodic Uploads", True, "CSV upload"),
-        ("measurements",       "Body Tape Measurements",             "Periodic body measurements \u00B7 waist-to-height ratio", 1440, 2880, "manual", "Periodic Uploads", True, "CSV upload (Partner)"),
+        (
+            "macrofactor_workouts",
+            "Exercise Log Data",
+            "Workout CSV via file drop",
+            48,
+            168,
+            "auto",
+            "Periodic Uploads",
+            True,
+            "MacroFactor via Dropbox",
+            None,
+        ),
+        (
+            "apple_health",
+            "CGM Glucose Data",
+            "Continuous glucose monitor readings",
+            25,
+            49,
+            "auto",
+            "Periodic Uploads",
+            True,
+            "Dexcom Stelo via Health Exporter",
+            "blood_glucose_avg",
+        ),
+        (
+            "apple_health",
+            "Water Intake Data",
+            "Daily water consumption tracking",
+            25,
+            49,
+            "auto",
+            "Periodic Uploads",
+            True,
+            "Apple Health via Health Exporter",
+            "water_intake_ml",
+        ),
+        (
+            "apple_health",
+            "Blood Pressure Data",
+            "Systolic \u00b7 diastolic \u00b7 pulse",
+            168,
+            336,
+            "manual",
+            "Periodic Uploads",
+            True,
+            "Apple Health via Health Exporter",
+            "blood_pressure_systolic",
+        ),
+        (
+            "apple_health",
+            "Breathwork Data",
+            "Breathwork mindful minutes \u00b7 sessions",
+            48,
+            168,
+            "auto",
+            "Periodic Uploads",
+            True,
+            "Breathwrk via Apple Health",
+            "mindful_minutes",
+        ),
+        (
+            "apple_health",
+            "Stretching Data",
+            "Flexibility sessions \u00b7 recovery",
+            48,
+            168,
+            "auto",
+            "Periodic Uploads",
+            True,
+            "Pliability via Health Exporter",
+            "flexibility_minutes",
+        ),
+        (
+            "apple_health",
+            "Mindful Minutes Data",
+            "Meditation & mindfulness sessions",
+            48,
+            168,
+            "auto",
+            "Periodic Uploads",
+            True,
+            "Apple Health via Health Exporter",
+            "mindful_minutes",
+        ),
+        (
+            "apple_health",
+            "State of Mind Data (Health Export)",
+            "How We Feel mood check-ins via Health Exporter",
+            48,
+            168,
+            "auto",
+            "Periodic Uploads",
+            True,
+            "Apple Health via Health Exporter",
+            "som_avg_valence",
+        ),
+        (
+            "apple_health",
+            "Apple Health Import",
+            "Steps \u00b7 activity \u00b7 walking metrics",
+            25,
+            49,
+            "auto",
+            "Periodic Uploads",
+            True,
+            "Health Auto Export",
+            "steps",
+        ),
+        (
+            "food_delivery",
+            "Food Delivery Index",
+            "Quarterly CSV import \u00b7 delivery index 0-10",
+            2160,
+            2880,
+            "manual",
+            "Periodic Uploads",
+            True,
+            "CSV upload",
+        ),
+        (
+            "measurements",
+            "Body Tape Measurements",
+            "Periodic body measurements \u00b7 waist-to-height ratio",
+            1440,
+            2880,
+            "manual",
+            "Periodic Uploads",
+            True,
+            "CSV upload (Partner)",
+        ),
         # ── Lab & Clinical (infrequent) ──
-        ("labs",               "Blood Test Results",                  "Lab work \u00B7 biomarkers \u00B7 lipid panel",       4320, 8760, "manual", "Lab & Clinical", True,  "Function Health"),
-        ("dexa",               "Bone Density & Body Comp",           "DEXA scan \u00B7 bone density \u00B7 lean mass",      4320, 8760, "manual", "Lab & Clinical", True,  "Clinical (manual)"),
-        ("genome",             "Genome Data",                         "Genetic variants \u00B7 risk scores \u00B7 SNPs",    999999, 999999, "onetime", "Lab & Clinical", False, "23andMe (one-time)"),
+        (
+            "labs",
+            "Blood Test Results",
+            "Lab work \u00b7 biomarkers \u00b7 lipid panel",
+            4320,
+            8760,
+            "manual",
+            "Lab & Clinical",
+            True,
+            "Function Health",
+        ),
+        (
+            "dexa",
+            "Bone Density & Body Comp",
+            "DEXA scan \u00b7 bone density \u00b7 lean mass",
+            4320,
+            8760,
+            "manual",
+            "Lab & Clinical",
+            True,
+            "Clinical (manual)",
+        ),
+        (
+            "genome",
+            "Genome Data",
+            "Genetic variants \u00b7 risk scores \u00b7 SNPs",
+            999999,
+            999999,
+            "onetime",
+            "Lab & Clinical",
+            False,
+            "23andMe (one-time)",
+        ),
     ]
     _COMPUTE_SOURCES = [
-        ("character_sheet",  "Character Sheet",        "Pillar scores \u00B7 level \u00B7 XP",         25, 49),
-        ("computed_metrics", "Daily Metrics",          "Cross-domain computed signals",                 25, 49),
-        ("habit_scores",     "Habit Score Aggregation", "Tier scores \u00B7 streaks \u00B7 grades",    25, 49),
-        ("insights",         "Daily Insights",         "IC-8 intent vs execution",                     25, 49),
-        ("adaptive_mode",    "Adaptive Mode",          "Engagement scoring \u00B7 brief mode",         25, 49),
+        ("character_sheet", "Character Sheet", "Pillar scores \u00b7 level \u00b7 XP", 25, 49),
+        ("computed_metrics", "Daily Metrics", "Cross-domain computed signals", 25, 49),
+        ("habit_scores", "Habit Score Aggregation", "Tier scores \u00b7 streaks \u00b7 grades", 25, 49),
+        ("insights", "Daily Insights", "IC-8 intent vs execution", 25, 49),
+        ("adaptive_mode", "Adaptive Mode", "Engagement scoring \u00b7 brief mode", 25, 49),
     ]
     _EMAIL_LAMBDAS = [
-        ("daily_brief",         "Daily brief",         "11:00 AM daily · 18 sections",     -1, 25,  49),
-        ("weekly_digest",       "Weekly digest",       "Sunday 9:00 AM",                    6, 200, 400),
-        ("monday_compass",      "Monday compass",      "Monday 8:00 AM · forward planning", 0, 200, 400),
-        ("wednesday_chronicle", "Wednesday chronicle", "Wednesday 8:00 AM · Elena Voss",    2, 200, 400),
-        ("weekly_plate",        "Weekly plate",        "Friday 7:00 PM · nutrition",        4, 200, 400),
-        ("nutrition_review",    "Nutrition review",    "Saturday 10:00 AM",                 5, 200, 400),
-        ("anomaly_detector",    "Anomaly detector",    "9:05 AM daily · 15 metrics",       -1, 25,  49),
+        ("daily_brief", "Daily brief", "11:00 AM daily · 18 sections", -1, 25, 49),
+        ("weekly_digest", "Weekly digest", "Sunday 9:00 AM", 6, 200, 400),
+        ("monday_compass", "Monday compass", "Monday 8:00 AM · forward planning", 0, 200, 400),
+        ("wednesday_chronicle", "Wednesday chronicle", "Wednesday 8:00 AM · Elena Voss", 2, 200, 400),
+        ("weekly_plate", "Weekly plate", "Friday 7:00 PM · nutrition", 4, 200, 400),
+        ("nutrition_review", "Nutrition review", "Saturday 10:00 AM", 5, 200, 400),
+        ("anomaly_detector", "Anomaly detector", "9:05 AM daily · 15 metrics", -1, 25, 49),
     ]
 
     def _last_sync(source_id, field_check=None):
@@ -183,6 +437,7 @@ def handle_status() -> dict:
             if field_check:
                 # Must scan with filter — more expensive but necessary for sub-source tracking
                 from boto3.dynamodb.conditions import Attr
+
                 resp = table.query(
                     KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{source_id}") & Key("sk").begins_with("DATE#"),
                     FilterExpression=Attr(field_check).exists(),
@@ -195,7 +450,9 @@ def handle_status() -> dict:
             else:
                 resp = table.query(
                     KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{source_id}") & Key("sk").begins_with("DATE#"),
-                    ScanIndexForward=False, Limit=1, ProjectionExpression="sk",
+                    ScanIndexForward=False,
+                    Limit=1,
+                    ProjectionExpression="sk",
                 )
                 items = resp.get("Items", [])
                 return items[0]["sk"].replace("DATE#", "")[:10] if items else None
@@ -249,9 +506,8 @@ def handle_status() -> dict:
                 return [2]  # pre-epoch: neutral
 
             resp = table.query(
-                KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{source_id}") & Key("sk").between(
-                    f"DATE#{epoch_start.isoformat()}", f"DATE#{today.isoformat()}"
-                ),
+                KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{source_id}")
+                & Key("sk").between(f"DATE#{epoch_start.isoformat()}", f"DATE#{today.isoformat()}"),
                 ProjectionExpression="sk",
             )
             present = {item["sk"].replace("DATE#", "")[:10] for item in resp.get("Items", [])}
@@ -295,7 +551,8 @@ def handle_status() -> dict:
             try:
                 _gene_resp = table.query(
                     KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{sid}"),
-                    Limit=1, ProjectionExpression="sk",
+                    Limit=1,
+                    ProjectionExpression="sk",
                 )
                 has_data = len(_gene_resp.get("Items", [])) > 0
             except Exception:
@@ -352,7 +609,9 @@ def handle_status() -> dict:
                     try:
                         _hist_resp = table.query(
                             KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{sid}") & Key("sk").begins_with("DATE#"),
-                            ScanIndexForward=False, Limit=14, ProjectionExpression="sk",
+                            ScanIndexForward=False,
+                            Limit=14,
+                            ProjectionExpression="sk",
                         )
                         _hist_dates = [i["sk"].replace("DATE#", "")[:10] for i in _hist_resp.get("Items", [])]
                         if len(_hist_dates) >= 7:
@@ -402,10 +661,19 @@ def handle_status() -> dict:
             status = "red"
             comment = f"Daily health check failed \u2014 pipeline error detected"
 
-        ds_components.append({"id": sid, "name": name, "description": desc,
-                              "status": status, "last_sync_relative": rel,
-                              "uptime_90d": uptime, "comment": comment,
-                              "group": group, "source_app": source_app})
+        ds_components.append(
+            {
+                "id": sid,
+                "name": name,
+                "description": desc,
+                "status": status,
+                "last_sync_relative": rel,
+                "uptime_90d": uptime,
+                "comment": comment,
+                "group": group,
+                "source_app": source_app,
+            }
+        )
 
     # Compute components
     compute_components = []
@@ -425,9 +693,17 @@ def handle_status() -> dict:
         if sid in alarming_sources:
             status = "red"
             comment = "CloudWatch alarm firing \u2014 Lambda errors detected"
-        compute_components.append({"id": sid, "name": name, "description": desc,
-                                   "status": status, "last_sync_relative": rel,
-                                   "uptime_90d": uptime, "comment": comment})
+        compute_components.append(
+            {
+                "id": sid,
+                "name": name,
+                "description": desc,
+                "status": status,
+                "last_sync_relative": rel,
+                "uptime_90d": uptime,
+                "comment": comment,
+            }
+        )
 
     # Email components
     email_components = []
@@ -453,9 +729,17 @@ def handle_status() -> dict:
         # only genuinely stale emails get grayed out on off-days
         if status not in ("green", "red"):
             status, rel = _sched_aware(status, rel, exp_dow)
-        email_components.append({"id": lid, "name": name, "description": desc,
-                                 "status": status, "last_sync_relative": rel,
-                                 "uptime_90d": uptime, "comment": comment})
+        email_components.append(
+            {
+                "id": lid,
+                "name": name,
+                "description": desc,
+                "status": status,
+                "last_sync_relative": rel,
+                "uptime_90d": uptime,
+                "comment": comment,
+            }
+        )
 
     # Infrastructure
     # DLQ depth check
@@ -476,21 +760,31 @@ def handle_status() -> dict:
         pass
 
     infra = [
-        {"id": "cloudfront_main", "name": "averagejoematt.com",     "description": "CloudFront \u00B7 66 pages",         "status": "green", "comment": None},
-        {"id": "site_api",        "name": "Site API Lambda",         "description": "us-west-2 \u00B7 60+ endpoints",    "status": "green", "comment": None},
-        {"id": "mcp_server",      "name": "MCP server",              "description": "us-west-2 \u00B7 116 tools",        "status": "green", "comment": None},
-        {"id": "dynamodb",        "name": "DynamoDB",                "description": "on-demand \u00B7 PITR enabled",      "status": "green", "comment": None},
-        {"id": "ses",             "name": "SES email delivery",      "description": "Production mode \u00B7 receipt rule", "status": "green", "comment": None},
-        {"id": "dlq",             "name": "Dead-letter queue",       "description": f"{dlq_depth} messages",               "status": dlq_status, "comment": dlq_comment},
+        {
+            "id": "cloudfront_main",
+            "name": "averagejoematt.com",
+            "description": "CloudFront \u00b7 66 pages",
+            "status": "green",
+            "comment": None,
+        },
+        {"id": "site_api", "name": "Site API Lambda", "description": "us-west-2 \u00b7 60+ endpoints", "status": "green", "comment": None},
+        {"id": "mcp_server", "name": "MCP server", "description": "us-west-2 \u00b7 116 tools", "status": "green", "comment": None},
+        {"id": "dynamodb", "name": "DynamoDB", "description": "on-demand \u00b7 PITR enabled", "status": "green", "comment": None},
+        {
+            "id": "ses",
+            "name": "SES email delivery",
+            "description": "Production mode \u00b7 receipt rule",
+            "status": "green",
+            "comment": None,
+        },
+        {"id": "dlq", "name": "Dead-letter queue", "description": f"{dlq_depth} messages", "status": dlq_status, "comment": dlq_comment},
     ]
 
     # Overall status: proportional to severity.
     # Exclude: blue (manual/infrequent), gray (idle), yellow (overdue labs etc.)
-    red_components = [c for c in ds_components + compute_components + email_components
-                      if c["status"] == "red"]
+    red_components = [c for c in ds_components + compute_components + email_components if c["status"] == "red"]
     red_count = len(red_components)
-    total_active = len([c for c in ds_components + compute_components + email_components
-                        if c["status"] not in ("blue", "gray")])
+    total_active = len([c for c in ds_components + compute_components + email_components if c["status"] not in ("blue", "gray")])
 
     if red_count == 0:
         overall = "green"
@@ -541,11 +835,26 @@ def handle_status() -> dict:
         "cost": cost_info,
         "health_check": health_check_info,
         "groups": [
-            {"id": "data_sources",  "label": "Data sources",   "subtitle": f"{len(ds_components)} feeds \u2014 wearables \u00B7 nutrition \u00B7 labs \u00B7 genome", "components": ds_components},
-            {"id": "compute",       "label": "Compute layer",  "subtitle": "character sheet \u00B7 metrics \u00B7 insights \u00B7 adaptive mode", "components": compute_components},
-            {"id": "email",         "label": "Email & digests", "subtitle": "7 scheduled senders", "components": email_components},
-            {"id": "infrastructure", "label": "Infrastructure",  "subtitle": "CloudFront \u00B7 DynamoDB \u00B7 SES \u00B7 DLQ", "components": infra},
-        ]
+            {
+                "id": "data_sources",
+                "label": "Data sources",
+                "subtitle": f"{len(ds_components)} feeds \u2014 wearables \u00b7 nutrition \u00b7 labs \u00b7 genome",
+                "components": ds_components,
+            },
+            {
+                "id": "compute",
+                "label": "Compute layer",
+                "subtitle": "character sheet \u00b7 metrics \u00b7 insights \u00b7 adaptive mode",
+                "components": compute_components,
+            },
+            {"id": "email", "label": "Email & digests", "subtitle": "7 scheduled senders", "components": email_components},
+            {
+                "id": "infrastructure",
+                "label": "Infrastructure",
+                "subtitle": "CloudFront \u00b7 DynamoDB \u00b7 SES \u00b7 DLQ",
+                "components": infra,
+            },
+        ],
     }
 
     _status_cache = result
@@ -553,17 +862,18 @@ def handle_status() -> dict:
     return _ok(result, cache_seconds=60)
 
 
-
 def handle_status_summary() -> dict:
     """GET /api/status/summary — lightweight overall status for footer dot."""
     # Ensure the cache is populated
     if not _status_cache or (time.time() - _status_cache_ts >= STATUS_CACHE_TTL):
         handle_status()
-    return _ok({
-        "overall": _status_cache.get("overall", "green"),
-        "generated_at": _status_cache.get("generated_at", ""),
-    }, cache_seconds=60)
-
+    return _ok(
+        {
+            "overall": _status_cache.get("overall", "green"),
+            "generated_at": _status_cache.get("generated_at", ""),
+        },
+        cache_seconds=60,
+    )
 
 
 def handle_pulse() -> dict:
@@ -577,7 +887,11 @@ def handle_pulse() -> dict:
     today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     yesterday_pt = (datetime.now(PT) - timedelta(days=1)).strftime("%Y-%m-%d")
     # Display day number in PT; query DynamoDB covering both PT and UTC dates
-    _pulse_day = max(1, (datetime.now(PT).date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1) if today_pt >= EXPERIMENT_START else 0
+    _pulse_day = (
+        max(1, (datetime.now(PT).date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
+        if today_pt >= EXPERIMENT_START
+        else 0
+    )
     # Query range covers yesterday(PT) through today(UTC) to catch timezone boundary records
     q_start = min(yesterday_pt, today_pt)
     q_end = max(today_pt, today_utc)
@@ -588,7 +902,8 @@ def handle_pulse() -> dict:
     try:
         _w_resp = table.query(
             KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}whoop") & Key("sk").begins_with("DATE#"),
-            ScanIndexForward=False, Limit=20,  # Increased from 5 — workout sub-records can push daily records out of window
+            ScanIndexForward=False,
+            Limit=20,  # Increased from 5 — workout sub-records can push daily records out of window
         )
         for _w_item in _decimal_to_float(_w_resp.get("Items", [])):
             _w_sk = _w_item.get("sk", "")
@@ -610,7 +925,8 @@ def handle_pulse() -> dict:
     try:
         ah_resp = table.query(
             KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}apple_health") & Key("sk").between(f"DATE#{q_start}", f"DATE#{q_end}"),
-            ScanIndexForward=False, Limit=1,
+            ScanIndexForward=False,
+            Limit=1,
         )
         ah = _decimal_to_float(ah_resp.get("Items", [{}])[0]) if ah_resp.get("Items") else {}
     except Exception:
@@ -660,7 +976,8 @@ def handle_pulse() -> dict:
     try:
         _g_resp = table.query(
             KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}garmin") & Key("sk").between(f"DATE#{yesterday_pt}", f"DATE#{q_end}"),
-            ScanIndexForward=False, Limit=1,
+            ScanIndexForward=False,
+            Limit=1,
         )
         for _g in _g_resp.get("Items", []):
             _gs = _g.get("steps")
@@ -702,12 +1019,16 @@ def handle_pulse() -> dict:
                 _LIFT_TYPES = {"WeightTraining", "Crossfit", "Workout", "HIIT", "Yoga", "RockClimbing"}
                 for _act in _strava_items[0].get("activities", []):
                     _act_m = _act.get("M", _act) if isinstance(_act, dict) else _act
-                    _atype = (_act_m.get("sport_type", {}).get("S", "") if isinstance(_act_m.get("sport_type"), dict)
-                              else str(_act_m.get("sport_type", "")))
+                    _atype = (
+                        _act_m.get("sport_type", {}).get("S", "")
+                        if isinstance(_act_m.get("sport_type"), dict)
+                        else str(_act_m.get("sport_type", ""))
+                    )
                     if _atype in _LIFT_TYPES:
                         trained_today = True
-                        _aname = (_act_m.get("name", {}).get("S", "") if isinstance(_act_m.get("name"), dict)
-                                  else str(_act_m.get("name", "")))
+                        _aname = (
+                            _act_m.get("name", {}).get("S", "") if isinstance(_act_m.get("name"), dict) else str(_act_m.get("name", ""))
+                        )
                         workout_type = _aname or _atype or "Strength"
                         break
         except Exception:
@@ -718,7 +1039,8 @@ def handle_pulse() -> dict:
     try:
         _som_resp = table.query(
             KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}state_of_mind") & Key("sk").between(f"DATE#{today_pt}", f"DATE#{today_pt}~"),
-            ScanIndexForward=False, Limit=1,
+            ScanIndexForward=False,
+            Limit=1,
         )
         _som_items = _som_resp.get("Items", [])
         if _som_items:
@@ -726,8 +1048,10 @@ def handle_pulse() -> dict:
         if not mind_score:
             # Fallback: apple_health partition
             _ah_som = table.query(
-                KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}apple_health") & Key("sk").between(f"DATE#{today_pt}", f"DATE#{today_pt}~"),
-                ScanIndexForward=False, Limit=1,
+                KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}apple_health")
+                & Key("sk").between(f"DATE#{today_pt}", f"DATE#{today_pt}~"),
+                ScanIndexForward=False,
+                Limit=1,
             )
             for _a in _ah_som.get("Items", []):
                 _sv = _a.get("som_avg_valence")
@@ -744,7 +1068,9 @@ def handle_pulse() -> dict:
         _mf_resp = table.query(
             KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}macrofactor") & Key("sk").between(f"DATE#{_d7}", f"DATE#{today_pt}~"),
         )
-        nutrition_logged_7d = sum(1 for i in _mf_resp.get("Items", []) if i.get("total_calories_kcal") and float(str(i["total_calories_kcal"])) > 0)
+        nutrition_logged_7d = sum(
+            1 for i in _mf_resp.get("Items", []) if i.get("total_calories_kcal") and float(str(i["total_calories_kcal"])) > 0
+        )
     except Exception:
         pass
 
@@ -854,7 +1180,9 @@ def handle_pulse() -> dict:
     amber_or_red = sum(1 for g in glyphs.values() if g.get("state") in ("amber", "red"))
     if signals_reporting == 0:
         status = "quiet"
-    elif amber_or_red >= 2 or any(g.get("state") == "red" and g.get("recovery_pct") is not None and g["recovery_pct"] < 40 for g in glyphs.values()):
+    elif amber_or_red >= 2 or any(
+        g.get("state") == "red" and g.get("recovery_pct") is not None and g["recovery_pct"] < 40 for g in glyphs.values()
+    ):
         status = "mixed"
     elif t0_pct and t0_pct >= 80 and recovery and recovery > 50:
         status = "strong"
@@ -902,23 +1230,28 @@ def handle_pulse() -> dict:
     since_yesterday = []
     try:
         _yd_whoop = None
-        for _w_item in _decimal_to_float(table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}whoop") & Key("sk").between(f"DATE#{yesterday_pt}", f"DATE#{yesterday_pt}~"),
-            Limit=5,
-        ).get("Items", [])):
+        for _w_item in _decimal_to_float(
+            table.query(
+                KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}whoop")
+                & Key("sk").between(f"DATE#{yesterday_pt}", f"DATE#{yesterday_pt}~"),
+                Limit=5,
+            ).get("Items", [])
+        ):
             if "#WORKOUT#" not in _w_item.get("sk", "") and _w_item.get("recovery_score") is not None:
                 _yd_whoop = _w_item
                 break
         _yd_wt = None
         _yd_wi = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}withings") & Key("sk").between(f"DATE#{yesterday_pt}", f"DATE#{yesterday_pt}~"),
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}withings")
+            & Key("sk").between(f"DATE#{yesterday_pt}", f"DATE#{yesterday_pt}~"),
             Limit=1,
         ).get("Items", [])
         if _yd_wi and _yd_wi[0].get("weight_lbs"):
             _yd_wt = float(_yd_wi[0]["weight_lbs"])
         if not _yd_wt:
             _yd_ah = table.query(
-                KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}apple_health") & Key("sk").between(f"DATE#{yesterday_pt}", f"DATE#{yesterday_pt}~"),
+                KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}apple_health")
+                & Key("sk").between(f"DATE#{yesterday_pt}", f"DATE#{yesterday_pt}~"),
                 Limit=1,
             ).get("Items", [])
             if _yd_ah and _yd_ah[0].get("weight_lbs"):
@@ -944,42 +1277,50 @@ def handle_pulse() -> dict:
     # --- DPR-1.15: Notable signals ---
     notable_signals = []
     if recovery is not None and recovery < 40:
-        notable_signals.append({
-            "signal": "recovery",
-            "message": f"Recovery is low at {round(recovery)}%. Consider a rest day or light movement only.",
-            "severity": "warning",
-        })
+        notable_signals.append(
+            {
+                "signal": "recovery",
+                "message": f"Recovery is low at {round(recovery)}%. Consider a rest day or light movement only.",
+                "severity": "warning",
+            }
+        )
     if sleep_hrs is not None and sleep_hrs < 6:
-        notable_signals.append({
-            "signal": "sleep",
-            "message": f"Sleep was {round(sleep_hrs, 1)}h \u2014 below the 7h minimum. Prioritize an early bedtime tonight.",
-            "severity": "warning",
-        })
+        notable_signals.append(
+            {
+                "signal": "sleep",
+                "message": f"Sleep was {round(sleep_hrs, 1)}h \u2014 below the 7h minimum. Prioritize an early bedtime tonight.",
+                "severity": "warning",
+            }
+        )
     if w_val and since_yesterday:
         _wt_d = next((s["delta"] for s in since_yesterday if s["signal"] == "weight"), None)
         if _wt_d and _wt_d > 3:
-            notable_signals.append({
-                "signal": "weight",
-                "message": f"Weight up {_wt_d:.1f} lbs from yesterday. Likely water retention \u2014 check sodium and hydration.",
-                "severity": "info",
-            })
+            notable_signals.append(
+                {
+                    "signal": "weight",
+                    "message": f"Weight up {_wt_d:.1f} lbs from yesterday. Likely water retention \u2014 check sodium and hydration.",
+                    "severity": "info",
+                }
+            )
 
-    return _ok({
-        "pulse": {
-            "day_number": _pulse_day,
-            "date": today_pt,
-            "status": status,
-            "status_color": {"strong": "#22c55e", "green": "#22c55e", "mixed": "#f5a623", "quiet": "#3a5a48"}.get(status, "#3a5a48"),
-            "signals_reporting": signals_reporting,
-            "signals_total": 8,
-            "narrative": narrative,
-            "since_yesterday": since_yesterday,
-            "notable_signals": notable_signals,
-            "glyphs": glyphs,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-        }
-    }, cache_seconds=300)
-
+    return _ok(
+        {
+            "pulse": {
+                "day_number": _pulse_day,
+                "date": today_pt,
+                "status": status,
+                "status_color": {"strong": "#22c55e", "green": "#22c55e", "mixed": "#f5a623", "quiet": "#3a5a48"}.get(status, "#3a5a48"),
+                "signals_reporting": signals_reporting,
+                "signals_total": 8,
+                "narrative": narrative,
+                "since_yesterday": since_yesterday,
+                "notable_signals": notable_signals,
+                "glyphs": glyphs,
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        },
+        cache_seconds=300,
+    )
 
 
 def handle_pulse_history() -> dict:
@@ -1040,17 +1381,19 @@ def handle_pulse_history() -> dict:
         if sleep_hrs:
             headline_parts.append(f"Sleep {round(sleep_hrs, 1)}h")
 
-        days.append({
-            "date": d,
-            "day_number": day_num,
-            "weight_lbs": round(weight, 1) if weight else None,
-            "weight_delta": round(weight - start_weight, 1) if weight else None,
-            "recovery_pct": round(recovery) if recovery is not None else None,
-            "sleep_hours": round(sleep_hrs, 1) if sleep_hrs else None,
-            "hrv_ms": round(hrv, 1) if hrv else None,
-            "steps": steps,
-            "headline": " · ".join(headline_parts) if headline_parts else "No data recorded",
-        })
+        days.append(
+            {
+                "date": d,
+                "day_number": day_num,
+                "weight_lbs": round(weight, 1) if weight else None,
+                "weight_delta": round(weight - start_weight, 1) if weight else None,
+                "recovery_pct": round(recovery) if recovery is not None else None,
+                "sleep_hours": round(sleep_hrs, 1) if sleep_hrs else None,
+                "hrv_ms": round(hrv, 1) if hrv else None,
+                "steps": steps,
+                "headline": " · ".join(headline_parts) if headline_parts else "No data recorded",
+            }
+        )
         current += timedelta(days=1)
         day_num += 1
 
@@ -1073,12 +1416,15 @@ def handle_hypotheses() -> dict:
     Cache: 3600s (hypothesis engine runs daily; data shifts slowly).
     """
     try:
-        resp = table.query(**with_phase_filter({  # ADR-058: hide pilot hypotheses
-            "KeyConditionExpression": Key("pk").eq(_HYPOTHESES_PK)
-                                      & Key("sk").begins_with("HYPOTHESIS#"),
-            "ScanIndexForward": False,  # newest first
-            "Limit": 50,
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot hypotheses
+                    "KeyConditionExpression": Key("pk").eq(_HYPOTHESES_PK) & Key("sk").begins_with("HYPOTHESIS#"),
+                    "ScanIndexForward": False,  # newest first
+                    "Limit": 50,
+                }
+            )
+        )
     except Exception as e:
         logger.warning(f"hypotheses query failed: {e}")
         return _error(503, "Hypotheses unavailable.")
@@ -1090,22 +1436,27 @@ def handle_hypotheses() -> dict:
         # written by the IC-18 engine, which produces user-visible findings.
         if it.get("public") is False:
             continue
-        hypotheses.append({
-            "hypothesis_id": it.get("hypothesis_id") or it.get("sk", "").replace("HYPOTHESIS#", ""),
-            "hypothesis":    it.get("hypothesis", ""),
-            "domains":       it.get("domains", []),
-            "status":        it.get("status", "pending"),
-            "confidence":    it.get("confidence"),
-            "created_at":    it.get("created_at"),
-            "check_count":   it.get("check_count", 0),
-            "evidence":      it.get("evidence", {}),
-        })
+        hypotheses.append(
+            {
+                "hypothesis_id": it.get("hypothesis_id") or it.get("sk", "").replace("HYPOTHESIS#", ""),
+                "hypothesis": it.get("hypothesis", ""),
+                "domains": it.get("domains", []),
+                "status": it.get("status", "pending"),
+                "confidence": it.get("confidence"),
+                "created_at": it.get("created_at"),
+                "check_count": it.get("check_count", 0),
+                "evidence": it.get("evidence", {}),
+            }
+        )
 
-    return _ok({
-        "hypotheses": hypotheses,
-        "count": len(hypotheses),
-        "_notice": "N=1 personal-platform observations — not population claims.",
-    }, cache_seconds=3600)
+    return _ok(
+        {
+            "hypotheses": hypotheses,
+            "count": len(hypotheses),
+            "_notice": "N=1 personal-platform observations — not population claims.",
+        },
+        cache_seconds=3600,
+    )
 
 
 def handle_intelligence_summary() -> dict:
@@ -1126,11 +1477,14 @@ def handle_intelligence_summary() -> dict:
     }
     # Hypotheses count + by-status
     try:
-        resp = table.query(**with_phase_filter({  # ADR-058: hide pilot hypotheses
-            "KeyConditionExpression": Key("pk").eq(_HYPOTHESES_PK)
-                                      & Key("sk").begins_with("HYPOTHESIS#"),
-            "Limit": 200,
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot hypotheses
+                    "KeyConditionExpression": Key("pk").eq(_HYPOTHESES_PK) & Key("sk").begins_with("HYPOTHESIS#"),
+                    "Limit": 200,
+                }
+            )
+        )
         items = _decimal_to_float(resp.get("Items", []))
         public_items = [it for it in items if it.get("public") is not False]
         summary["hypotheses"]["count"] = len(public_items)
@@ -1144,32 +1498,36 @@ def handle_intelligence_summary() -> dict:
 
     # Latest weekly correlation matrix
     try:
-        resp = table.query(**with_phase_filter({  # ADR-058: hide pilot correlations
-            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}weekly_correlations"),
-            "ScanIndexForward": False,
-            "Limit": 1,
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot correlations
+                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}weekly_correlations"),
+                    "ScanIndexForward": False,
+                    "Limit": 1,
+                }
+            )
+        )
         items = _decimal_to_float(resp.get("Items", []))
         if items:
             record = items[0]
             corrs = record.get("correlations", {})
-            summary["correlations"]["count"] = (
-                len(corrs) if isinstance(corrs, (dict, list)) else 0
-            )
+            summary["correlations"]["count"] = len(corrs) if isinstance(corrs, (dict, list)) else 0
             summary["correlations"]["last_week"] = record.get("sk", "").replace("WEEK#", "")
     except Exception as e:
         logger.warning(f"intel summary: correlations failed: {e}")
 
     # Active experiments — query the experiments partition (best-effort)
     try:
-        resp = table.query(**with_phase_filter({  # ADR-058: hide pilot experiments
-            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}experiments"),
-            "Limit": 100,
-        }))
-        items = _decimal_to_float(resp.get("Items", []))
-        summary["experiments"]["active"] = sum(
-            1 for it in items if it.get("status") == "active"
+        resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot experiments
+                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}experiments"),
+                    "Limit": 100,
+                }
+            )
         )
+        items = _decimal_to_float(resp.get("Items", []))
+        summary["experiments"]["active"] = sum(1 for it in items if it.get("status") == "active")
     except Exception as e:
         logger.warning(f"intel summary: experiments failed: {e}")
 

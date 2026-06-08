@@ -6,26 +6,33 @@ tools_hypotheses.py — IC-18: Cross-Domain Hypothesis Engine MCP Tools
   update_hypothesis_outcome — record a confirming or refuting observation
 """
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from mcp.config import table, USER_ID
+
+from mcp.config import USER_ID, table
+
 
 def get_table():
     return table
+
 
 HYPOTHESES_PK = f"USER#{USER_ID}#SOURCE#hypotheses"
 
 
 def _d2f(obj):
-    if isinstance(obj, list): return [_d2f(i) for i in obj]
-    if isinstance(obj, dict): return {k: _d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [_d2f(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: _d2f(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # get_hypotheses
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def tool_get_hypotheses(args: dict):
     """IC-18: List cross-domain hypotheses. Optionally filter by status or domain."""
@@ -36,16 +43,21 @@ def tool_get_hypotheses(args: dict):
 
     table = get_table()
     from mcp.core import _apply_phase_filter  # ADR-058
+
     try:
-        resp = table.query(**_apply_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
-            "ExpressionAttributeValues": {
-                ":pk": HYPOTHESES_PK,
-                ":prefix": "HYPOTHESIS#",
-            },
-            "ScanIndexForward": False,
-            "Limit": 100,
-        }))
+        resp = table.query(
+            **_apply_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+                    "ExpressionAttributeValues": {
+                        ":pk": HYPOTHESES_PK,
+                        ":prefix": "HYPOTHESIS#",
+                    },
+                    "ScanIndexForward": False,
+                    "Limit": 100,
+                }
+            )
+        )
     except Exception as e:
         return {"error": f"DDB query failed: {e}"}
 
@@ -76,22 +88,24 @@ def tool_get_hypotheses(args: dict):
 
     formatted = []
     for h in items:
-        formatted.append({
-            "sk": h.get("sk", ""),
-            "hypothesis_id": h.get("hypothesis_id", ""),
-            "hypothesis": h.get("hypothesis", ""),
-            "status": h.get("status", "pending"),
-            "domains": h.get("domains", []),
-            "confidence": h.get("confidence", "low"),
-            "evidence": h.get("evidence", ""),
-            "confirmation_criteria": h.get("confirmation_criteria", ""),
-            "actionable_if_confirmed": h.get("actionable_if_confirmed", ""),
-            "monitoring_window_days": h.get("monitoring_window_days", 21),
-            "check_count": h.get("check_count", 0),
-            "created_at": h.get("created_at", "")[:10],
-            "last_checked": h.get("last_checked", "")[:10],
-            "evidence_log": h.get("evidence_log", []),
-        })
+        formatted.append(
+            {
+                "sk": h.get("sk", ""),
+                "hypothesis_id": h.get("hypothesis_id", ""),
+                "hypothesis": h.get("hypothesis", ""),
+                "status": h.get("status", "pending"),
+                "domains": h.get("domains", []),
+                "confidence": h.get("confidence", "low"),
+                "evidence": h.get("evidence", ""),
+                "confirmation_criteria": h.get("confirmation_criteria", ""),
+                "actionable_if_confirmed": h.get("actionable_if_confirmed", ""),
+                "monitoring_window_days": h.get("monitoring_window_days", 21),
+                "check_count": h.get("check_count", 0),
+                "created_at": h.get("created_at", "")[:10],
+                "last_checked": h.get("last_checked", "")[:10],
+                "evidence_log": h.get("evidence_log", []),
+            }
+        )
 
     return {
         "total": len(formatted),
@@ -109,6 +123,7 @@ def tool_get_hypotheses(args: dict):
 # ─────────────────────────────────────────────────────────────────────────────
 # update_hypothesis_outcome
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def tool_update_hypothesis_outcome(args: dict):
     """IC-18: Record a confirming or refuting observation for a hypothesis.
@@ -144,11 +159,11 @@ def tool_update_hypothesis_outcome(args: dict):
         log_entry["effectiveness"] = effectiveness
 
     status_map = {
-        "confirming":   "confirming",
-        "confirmed":    "confirmed",
-        "refuted":      "refuted",
+        "confirming": "confirming",
+        "confirmed": "confirmed",
+        "refuted": "refuted",
         "insufficient": None,
-        "archived":     "archived",
+        "archived": "archived",
     }
     new_status = status_map.get(verdict)
 

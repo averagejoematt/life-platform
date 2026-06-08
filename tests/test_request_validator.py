@@ -21,8 +21,8 @@ sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
 import request_validator as rv  # noqa: E402
 
-
 # ── Legit traffic should not raise ──
+
 
 def test_legit_get_passes():
     event = {
@@ -43,6 +43,7 @@ def test_legit_post_passes():
 
 
 # ── Abuse should raise ──
+
 
 def test_oversized_body_rejected():
     big = "x" * (rv.MAX_BODY_BYTES + 1)
@@ -109,6 +110,7 @@ def test_bad_source_format_rejected():
 
 
 # ── Per-param helpers ──
+
 
 def test_validate_user_id_passes():
     assert rv.validate_user_id("matthew") == "matthew"

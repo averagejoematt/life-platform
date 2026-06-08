@@ -35,13 +35,13 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import boto3
-
-from phase_filter import with_phase_filter  # ADR-058
 from constants import EXPERIMENT_START_DATE  # ADR-058
+from phase_filter import with_phase_filter  # ADR-058
 
 # Structured logger
 try:
     from platform_logger import get_logger
+
     logger = get_logger("coach-narrative-orchestrator")
 except ImportError:
     logger = logging.getLogger("coach-narrative-orchestrator")
@@ -63,8 +63,14 @@ TARGET_COACH = os.environ.get("TARGET_COACH", "sleep_coach")
 
 # All coach IDs in the system
 ALL_COACH_IDS = [
-    "sleep_coach", "training_coach", "nutrition_coach", "mind_coach",
-    "physical_coach", "glucose_coach", "labs_coach", "explorer_coach",
+    "sleep_coach",
+    "training_coach",
+    "nutrition_coach",
+    "mind_coach",
+    "physical_coach",
+    "glucose_coach",
+    "labs_coach",
+    "explorer_coach",
 ]
 
 # CloudWatch metrics
@@ -100,6 +106,7 @@ def _get_api_key():
 # HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _decimal_to_float(obj):
     """Recursively convert DynamoDB Decimals to float for JSON serialization."""
     if isinstance(obj, Decimal):
@@ -122,8 +129,7 @@ def _float_to_decimal(obj):
     return obj
 
 
-def _emit_token_metrics(input_tokens, output_tokens,
-                        cache_creation_tokens=0, cache_read_tokens=0):
+def _emit_token_metrics(input_tokens, output_tokens, cache_creation_tokens=0, cache_read_tokens=0):
     """Emit per-Lambda token usage to CloudWatch (non-fatal).
 
     V2 P0.6 (2026-05-17): added cache fields. Prior 2-arg signature dropped them,
@@ -134,25 +140,33 @@ def _emit_token_metrics(input_tokens, output_tokens,
             {
                 "MetricName": "AnthropicInputTokens",
                 "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": input_tokens, "Unit": "Count",
+                "Value": input_tokens,
+                "Unit": "Count",
             },
             {
                 "MetricName": "AnthropicOutputTokens",
                 "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": output_tokens, "Unit": "Count",
+                "Value": output_tokens,
+                "Unit": "Count",
             },
         ]
         if cache_creation_tokens or cache_read_tokens:
-            metric_data.append({
-                "MetricName": "AnthropicCacheWriteTokens",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": cache_creation_tokens, "Unit": "Count",
-            })
-            metric_data.append({
-                "MetricName": "AnthropicCacheReadTokens",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": cache_read_tokens, "Unit": "Count",
-            })
+            metric_data.append(
+                {
+                    "MetricName": "AnthropicCacheWriteTokens",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": cache_creation_tokens,
+                    "Unit": "Count",
+                }
+            )
+            metric_data.append(
+                {
+                    "MetricName": "AnthropicCacheReadTokens",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": cache_read_tokens,
+                    "Unit": "Count",
+                }
+            )
         _cw.put_metric_data(Namespace=_CW_NAMESPACE, MetricData=metric_data)
     except Exception as e:
         logger.warning("CloudWatch token metric emit failed (non-fatal): %s", e)
@@ -163,11 +177,14 @@ def _emit_failure_metric():
     try:
         _cw.put_metric_data(
             Namespace=_CW_NAMESPACE,
-            MetricData=[{
-                "MetricName": "AnthropicAPIFailure",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": 1, "Unit": "Count",
-            }],
+            MetricData=[
+                {
+                    "MetricName": "AnthropicAPIFailure",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": 1,
+                    "Unit": "Count",
+                }
+            ],
         )
     except Exception as e:
         logger.warning("CloudWatch failure metric emit failed (non-fatal): %s", e)
@@ -176,6 +193,7 @@ def _emit_failure_metric():
 # ══════════════════════════════════════════════════════════════════════════════
 # ANTHROPIC API CALL
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _call_haiku(system, user_message, max_tokens=6000, temperature=0.3):
     """Call Anthropic Haiku with exponential backoff + CloudWatch metrics.
@@ -209,6 +227,7 @@ def _call_haiku(system, user_message, max_tokens=6000, temperature=0.3):
 
     # ADR-062 (2026-05-27): route through retry_utils.call_anthropic_raw (Bedrock).
     from retry_utils import call_anthropic_raw
+
     resp = call_anthropic_raw(req)
     text = resp["content"][0]["text"].strip()
     try:
@@ -237,6 +256,7 @@ def _call_haiku(system, user_message, max_tokens=6000, temperature=0.3):
 # DYNAMODB READS
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _get_item(pk, sk):
     """Get a single DynamoDB item. Returns None if not found or on error."""
     try:
@@ -257,6 +277,7 @@ def _query_begins_with(pk, sk_prefix, scan_forward=True, limit=None):
     scan_forward=False to keep the most RECENT N.
     """
     from boto3.dynamodb.conditions import Key
+
     try:
         params = {
             "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
@@ -274,12 +295,17 @@ def _query_begins_with(pk, sk_prefix, scan_forward=True, limit=None):
 def _query_latest(pk, sk_prefix):
     """Query for the most recent item matching a SK prefix. ADR-058: phase-filtered."""
     from boto3.dynamodb.conditions import Key
+
     try:
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
-            "ScanIndexForward": False,
-            "Limit": 1,
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
+                    "ScanIndexForward": False,
+                    "Limit": 1,
+                }
+            )
+        )
         items = resp.get("Items", [])
         return _decimal_to_float(items[0]) if items else None
     except Exception as e:
@@ -290,6 +316,7 @@ def _query_latest(pk, sk_prefix):
 # ══════════════════════════════════════════════════════════════════════════════
 # STATE GATHERING
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _gather_all_state(coach_id):
     """Gather all state needed for the orchestrator's generation brief.
@@ -390,10 +417,7 @@ def _gather_all_state(coach_id):
 
     # 9. Active predictions (filter status in pending/confirming; most recent 50)
     all_predictions = _query_begins_with(coach_pk, "PREDICTION#", scan_forward=False, limit=50)
-    active_predictions = [
-        p for p in all_predictions
-        if p.get("status") in ("pending", "confirming")
-    ]
+    active_predictions = [p for p in all_predictions if p.get("status") in ("pending", "confirming")]
     if not active_predictions:
         logger.info("No active predictions for %s", coach_id)
 
@@ -505,8 +529,7 @@ def _build_user_message(state, coach_id, today):
         f"## Target Coach: {coach_id}",
         f"## Date: {today}",
         "",
-        f"(The target coach's compressed state is the `{coach_id}` entry in "
-        "'All Coach Compressed States' above.)",
+        f"(The target coach's compressed state is the `{coach_id}` entry in " "'All Coach Compressed States' above.)",
         "",
     ]
 
@@ -554,15 +577,18 @@ def _build_user_message(state, coach_id, today):
 # BRIEF CACHING
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _cache_brief(coach_id, brief, today):
     """Cache the generation brief to DynamoDB for fallback use."""
     try:
-        item = _float_to_decimal({
-            "pk": f"COACH#{coach_id}",
-            "sk": f"BRIEF#{today}",
-            "brief": brief,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        })
+        item = _float_to_decimal(
+            {
+                "pk": f"COACH#{coach_id}",
+                "sk": f"BRIEF#{today}",
+                "brief": brief,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         table.put_item(Item=item)
         logger.info("Cached generation brief for %s at BRIEF#%s", coach_id, today)
     except Exception as e:
@@ -581,6 +607,7 @@ def _load_fallback_brief(coach_id):
 # ══════════════════════════════════════════════════════════════════════════════
 # DEFAULT BRIEF
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _build_default_brief(coach_id, today):
     """Build a safe default brief when LLM and fallback both fail.
@@ -602,15 +629,11 @@ def _build_default_brief(coach_id, today):
             "voice_guidance": {
                 "avoid_openings": [],
                 "suggested_opening": "lead_with_data",
-                "structural_note": (
-                    "First generation — establish voice and begin observing. "
-                    "No prior outputs to callback to."
-                ),
+                "structural_note": ("First generation — establish voice and begin observing. " "No prior outputs to callback to."),
             },
             "decision_class_ceiling": "observational",
             "evidence_note": (
-                "Very early in data collection (<14 days). "
-                "All observations are preliminary. No directional claims warranted."
+                "Very early in data collection (<14 days). " "All observations are preliminary. No directional claims warranted."
             ),
             "seasonal_flags": [],
             "computation_outputs": {
@@ -626,6 +649,7 @@ def _build_default_brief(coach_id, today):
 # ══════════════════════════════════════════════════════════════════════════════
 # HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def lambda_handler(event, context):
     """Produce a generation brief for the target coach.
@@ -652,6 +676,7 @@ def lambda_handler(event, context):
         # Budget guardrail: at Tier ≥ 1 skip the LLM and fall back to the cached/
         # default brief, so the coach pipeline keeps running with zero Bedrock spend.
         from budget_guard import allow as _budget_allow
+
         if not _budget_allow("coach_narrative"):
             raise RuntimeError("coach narrative AI paused by budget tier — using fallback")
         result = _call_haiku(
@@ -684,9 +709,7 @@ def lambda_handler(event, context):
                 brief.get("generation_brief", {}).get("decision_class_ceiling", "unknown"),
             )
         else:
-            logger.warning(
-                "LLM returned non-dict response for %s — attempting fallback", coach_id
-            )
+            logger.warning("LLM returned non-dict response for %s — attempting fallback", coach_id)
             brief = _load_fallback_brief(coach_id)
             if not brief:
                 brief = _build_default_brief(coach_id, today)

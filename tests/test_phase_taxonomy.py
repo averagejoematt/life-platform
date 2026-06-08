@@ -6,6 +6,7 @@ asserts every one classifies to a valid class without raising — so a new sourc
 or pk pattern cannot silently appear unclassified. The spot checks pin the
 decided/contentious rows to their agreed class.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -133,38 +134,47 @@ def test_unknown_pk_raises():
 
 # ── Decision spot-checks (ADR-077) ────────────────────────────────────────────
 
-@pytest.mark.parametrize("source,expected", [
-    ("labs", pt.CROSS_PHASE),
-    ("dexa", pt.CROSS_PHASE),
-    ("genome", pt.CROSS_PHASE),
-    ("supplements", pt.CROSS_PHASE),       # dec A — med safety
-    ("chronicling", pt.CROSS_PHASE),       # dec D — frozen "before" archive
-    ("subscribers", pt.CROSS_PHASE),
-    ("measurements", pt.RAW_TIMESERIES),   # dec B — body fact, GA not hide
-    ("day_grade", pt.RAW_TIMESERIES),      # dec C — keep series for Replay
-    ("whoop", pt.RAW_TIMESERIES),
-    ("hevy", pt.RAW_TIMESERIES),
-    ("food_delivery", pt.RAW_TIMESERIES),
-    ("email_log", pt.SYSTEM_STATE),        # dec E
-    ("journal_analysis", pt.SYSTEM_STATE),
-    ("google_calendar", pt.SYSTEM_STATE),  # dead
-    ("composite_scores", pt.SYSTEM_STATE),  # dead
-    ("insights", pt.EXPERIMENT_SCOPED),
-    ("hypotheses", pt.EXPERIMENT_SCOPED),
-    ("experiments", pt.EXPERIMENT_SCOPED),
-    ("challenges", pt.EXPERIMENT_SCOPED),
-    ("chronicle", pt.EXPERIMENT_SCOPED),
-    ("habit_scores", pt.EXPERIMENT_SCOPED),
-    ("character_sheet", pt.EXPERIMENT_SCOPED),
-    ("ledger", pt.EXPERIMENT_SCOPED),
-])
+
+@pytest.mark.parametrize(
+    "source,expected",
+    [
+        ("labs", pt.CROSS_PHASE),
+        ("dexa", pt.CROSS_PHASE),
+        ("genome", pt.CROSS_PHASE),
+        ("supplements", pt.CROSS_PHASE),  # dec A — med safety
+        ("chronicling", pt.CROSS_PHASE),  # dec D — frozen "before" archive
+        ("subscribers", pt.CROSS_PHASE),
+        ("measurements", pt.RAW_TIMESERIES),  # dec B — body fact, GA not hide
+        ("day_grade", pt.RAW_TIMESERIES),  # dec C — keep series for Replay
+        ("whoop", pt.RAW_TIMESERIES),
+        ("hevy", pt.RAW_TIMESERIES),
+        ("food_delivery", pt.RAW_TIMESERIES),
+        ("email_log", pt.SYSTEM_STATE),  # dec E
+        ("journal_analysis", pt.SYSTEM_STATE),
+        ("google_calendar", pt.SYSTEM_STATE),  # dead
+        ("composite_scores", pt.SYSTEM_STATE),  # dead
+        ("insights", pt.EXPERIMENT_SCOPED),
+        ("hypotheses", pt.EXPERIMENT_SCOPED),
+        ("experiments", pt.EXPERIMENT_SCOPED),
+        ("challenges", pt.EXPERIMENT_SCOPED),
+        ("chronicle", pt.EXPERIMENT_SCOPED),
+        ("habit_scores", pt.EXPERIMENT_SCOPED),
+        ("character_sheet", pt.EXPERIMENT_SCOPED),
+        ("ledger", pt.EXPERIMENT_SCOPED),
+    ],
+)
 def test_source_decisions(source, expected):
     assert pt.classify(f"USER#matthew#SOURCE#{source}", "DATE#2026-01-01") == expected
 
 
-@pytest.mark.parametrize("source", [
-    "email_log#daily_brief", "email_log#anomaly_detector", "email_log#weekly_plate",
-])
+@pytest.mark.parametrize(
+    "source",
+    [
+        "email_log#daily_brief",
+        "email_log#anomaly_detector",
+        "email_log#weekly_plate",
+    ],
+)
 def test_email_log_family_is_system_state(source):
     assert pt.classify(f"USER#matthew#SOURCE#{source}", "DATE#2026-03-29") == pt.SYSTEM_STATE
 

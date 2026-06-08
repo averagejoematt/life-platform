@@ -19,6 +19,7 @@ the Anthropic API key as the signing secret), per-IP rate-limit stores
 for nudge/submit_finding, and the rate-limit EMF metric emitter — since
 nothing outside this cluster uses them.
 """
+
 import base64 as _b64
 import copy
 import hashlib
@@ -28,36 +29,39 @@ import os
 import re
 import time
 import urllib.request
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 import boto3
 from boto3.dynamodb.conditions import Key
-
 from phase_filter import with_phase_filter  # ADR-058
-
 from web.site_api_common import (
-    logger,
-    table,
-    USER_ID, USER_PREFIX,
-    EXPERIMENT_START,
     CORS_HEADERS,
-    S3_REGION,
+    EXPERIMENT_START,
     PT,
-    _ok, _error,
-    _query_source, _latest_item, _decimal_to_float,
+    S3_REGION,
+    USER_ID,
+    USER_PREFIX,
     _cached_secret,
+    _decimal_to_float,
+    _error,
     _get_profile,
-    _scrub_blocked_terms,
     _is_blocked_vice,
+    _latest_item,
     _load_s3_json,
-    set_request_id, get_request_id,
+    _ok,
+    _query_source,
+    _scrub_blocked_terms,
+    get_request_id,
+    logger,
+    set_request_id,
+    table,
 )
 
 # ── Module-owned globals ──────────────────────────────────
 # These were originally module-level in site_api_lambda; they're only
 # touched by the handlers in this file, so they move with the cluster.
 _token_secret_cache = None
-_nudge_rate_store: dict = {}   # ACCT-2: ip_hash+category -> list of timestamps
+_nudge_rate_store: dict = {}  # ACCT-2: ip_hash+category -> list of timestamps
 
 
 def _extract_client_ip(event: dict) -> str:
@@ -79,7 +83,9 @@ def _extract_client_ip(event: dict) -> str:
         or event.get("requestContext", {}).get("identity", {}).get("sourceIp")
         or "unknown"
     )
-_nudge_counts: dict = {}        # ACCT-2: category -> approximate count
+
+
+_nudge_counts: dict = {}  # ACCT-2: category -> approximate count
 _finding_rate_store: dict = {}  # NEW-1: ip_hash -> list of timestamps for submit_finding
 # S3 config caches for experiment + challenge endpoints
 _challenges_cache = None
@@ -93,10 +99,10 @@ AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/site-api-ai-key
 # in site_api_lambda.py — only _handle_nudge + _handle_submit_finding use them).
 NUDGE_CATEGORIES = {"back_on_it", "watching", "take_your_time", "you_got_this"}
 NUDGE_LABELS = {
-    "back_on_it":    "Get back on it 🔥",
-    "watching":      "We're watching 👀",
+    "back_on_it": "Get back on it 🔥",
+    "watching": "We're watching 👀",
     "take_your_time": "Take your time ⏰",
-    "you_got_this":  "You've got this 💪",
+    "you_got_this": "You've got this 💪",
 }
 FINDING_RATE_LIMIT = 3  # per IP per hour
 
@@ -119,21 +125,21 @@ def handle_current_challenge() -> dict:
     except Exception as e:
         logger.warning(f"[site_api] current_challenge S3 fetch failed: {e}")
         # Fallback: static placeholder so ticker degrades gracefully
-        return _ok({
-            "current_challenge": {
-                "week_num": None,
-                "challenge": "Check back soon",
-                "detail": "",
-                "days_complete": 0,
-                "days_total": 7,
-            }
-        }, cache_seconds=60)
+        return _ok(
+            {
+                "current_challenge": {
+                    "week_num": None,
+                    "challenge": "Check back soon",
+                    "detail": "",
+                    "days_complete": 0,
+                    "days_total": 7,
+                }
+            },
+            cache_seconds=60,
+        )
 
 
-
-_SUBSCRIBER_TOKEN_SECRET_NAME = os.environ.get(
-    "SUBSCRIBER_TOKEN_SECRET_NAME", "life-platform/subscriber-token-secret"
-)
+_SUBSCRIBER_TOKEN_SECRET_NAME = os.environ.get("SUBSCRIBER_TOKEN_SECRET_NAME", "life-platform/subscriber-token-secret")
 _legacy_token_secret_cache = None
 
 
@@ -157,15 +163,10 @@ def _get_token_secret() -> str:
         return _token_secret_cache
     try:
         sm = boto3.client("secretsmanager", region_name="us-west-2")
-        _token_secret_cache = sm.get_secret_value(
-            SecretId=_SUBSCRIBER_TOKEN_SECRET_NAME
-        )["SecretString"]
+        _token_secret_cache = sm.get_secret_value(SecretId=_SUBSCRIBER_TOKEN_SECRET_NAME)["SecretString"]
         return _token_secret_cache
     except Exception as e:
-        logger.warning(
-            f"[token_secret] Falling back to legacy derivation; new secret "
-            f"unavailable: {e}"
-        )
+        logger.warning(f"[token_secret] Falling back to legacy derivation; new secret " f"unavailable: {e}")
         legacy = _get_legacy_token_secret()
         if not legacy:
             raise RuntimeError("Token signing secret unavailable") from e
@@ -180,6 +181,7 @@ def _get_legacy_token_secret() -> str:
     if _legacy_token_secret_cache:
         return _legacy_token_secret_cache
     import hashlib as _h
+
     api_key = _get_anthropic_key()
     if not api_key:
         return ""  # legacy path is best-effort; missing key just means no fallback
@@ -187,14 +189,14 @@ def _get_legacy_token_secret() -> str:
     return _legacy_token_secret_cache
 
 
-
 def _generate_subscriber_token(email: str) -> str:
     """Generate a 24hr HMAC token for a confirmed subscriber."""
     import time as _time
+
     expires = int(_time.time()) + 86400
     payload = f"{email.lower()}:{expires}"
     secret = _get_token_secret().encode()
-    sig = _hmac.new(secret, payload.encode(), digestmod='sha256').hexdigest()[:32]
+    sig = _hmac.new(secret, payload.encode(), digestmod="sha256").hexdigest()[:32]
     return _b64.urlsafe_b64encode(f"{payload}:{sig}".encode()).decode()
 
 
@@ -204,22 +206,23 @@ def _generate_subscriber_token(email: str) -> str:
 # which CloudFront routes to the AI Lambda instead.
 
 
-
 def _is_confirmed_subscriber(email: str) -> bool:
     """Check DDB: USER#matthew#SOURCE#subscribers / EMAIL#{sha256} / status=confirmed"""
     import hashlib as _h
+
     email_hash = _h.sha256(email.strip().lower().encode()).hexdigest()
     try:
-        resp = table.get_item(Key={
-            "pk": f"USER#{USER_ID}#SOURCE#subscribers",
-            "sk": f"EMAIL#{email_hash}",
-        })
+        resp = table.get_item(
+            Key={
+                "pk": f"USER#{USER_ID}#SOURCE#subscribers",
+                "sk": f"EMAIL#{email_hash}",
+            }
+        )
         item = _decimal_to_float(resp.get("Item") or {})
         return item.get("status") == "confirmed"
     except Exception as e:
         logger.warning(f"[verify_subscriber] DDB lookup failed: {e}")
         return False
-
 
 
 def _handle_verify_subscriber(event: dict) -> dict:
@@ -243,22 +246,21 @@ def _handle_verify_subscriber(event: dict) -> dict:
         return {
             "statusCode": 404,
             "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-            "body": json.dumps({
-                "error": "Email not found. Subscribe at /subscribe/ to unlock more questions!"
-            }),
+            "body": json.dumps({"error": "Email not found. Subscribe at /subscribe/ to unlock more questions!"}),
         }
 
     token = _generate_subscriber_token(email)
     return {
         "statusCode": 200,
         "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-        "body": json.dumps({
-            "token": token,
-            "message": "Verified! You now have 20 questions per hour.",
-            "limit": 20,
-        }),
+        "body": json.dumps(
+            {
+                "token": token,
+                "message": "Verified! You now have 20 questions per hour.",
+                "limit": 20,
+            }
+        ),
     }
-
 
 
 def handle_subscriber_count() -> dict:
@@ -282,7 +284,6 @@ def handle_subscriber_count() -> dict:
     return _ok({"count": count}, cache_seconds=600)
 
 
-
 def _get_anthropic_key():
     """Fetch Anthropic API key from Secrets Manager (cached with 15-min TTL)."""
     try:
@@ -293,20 +294,22 @@ def _get_anthropic_key():
         return None
 
 
-
 def _emit_rate_limit_metric(endpoint: str) -> None:
     """OBS-03: EMF metric emitted when a rate limit is hit. Zero-config via stdout."""
-    import time as _t
     import json as _json
+    import time as _t
+
     try:
         emf = {
             "_aws": {
                 "Timestamp": int(_t.time() * 1000),
-                "CloudWatchMetrics": [{
-                    "Namespace": "LifePlatform/SiteApi",
-                    "Dimensions": [["Endpoint"]],
-                    "Metrics": [{"Name": "RateLimitHit", "Unit": "Count"}],
-                }],
+                "CloudWatchMetrics": [
+                    {
+                        "Namespace": "LifePlatform/SiteApi",
+                        "Dimensions": [["Endpoint"]],
+                        "Metrics": [{"Name": "RateLimitHit", "Unit": "Count"}],
+                    }
+                ],
             },
             "Endpoint": endpoint,
             "RateLimitHit": 1,
@@ -314,9 +317,11 @@ def _emit_rate_limit_metric(endpoint: str) -> None:
         # sys.stdout.write so CloudWatch EMF parser sees pure JSON without
         # the logger formatter prefix; same reason as site_api_common.py.
         import sys
+
         sys.stdout.write(_json.dumps(emf) + "\n")
     except Exception:
         pass
+
 
 def _handle_nudge(event: dict) -> dict:
     """
@@ -327,6 +332,7 @@ def _handle_nudge(event: dict) -> dict:
     NOTE: Persisting counts to DynamoDB requires a CDK write-permission change (future work).
     """
     import time as _time
+
     source_ip = _extract_client_ip(event)
     try:
         body = json.loads(event.get("body") or "{}")
@@ -360,14 +366,15 @@ def _handle_nudge(event: dict) -> dict:
     return {
         "statusCode": 200,
         "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-        "body": json.dumps({
-            "success": True,
-            "category": category,
-            "label": NUDGE_LABELS[category],
-            "message": "Reaction sent. Matthew will see this in his daily brief.",
-        }),
+        "body": json.dumps(
+            {
+                "success": True,
+                "category": category,
+                "label": NUDGE_LABELS[category],
+                "message": "Reaction sent. Matthew will see this in his daily brief.",
+            }
+        ),
     }
-
 
 
 def _handle_submit_finding(event: dict) -> dict:
@@ -378,6 +385,7 @@ def _handle_submit_finding(event: dict) -> dict:
     Rate limit: 3 per IP per hour.
     """
     import time as _time
+
     source_ip = _extract_client_ip(event)
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
     now = int(_time.time())
@@ -417,14 +425,14 @@ def _handle_submit_finding(event: dict) -> dict:
     timestamp = datetime.now(timezone.utc).isoformat()
     finding_id = hashlib.sha256(f"{ip_hash}:{timestamp}:{metric_a}:{metric_b}".encode()).hexdigest()[:12]
     record = {
-        "id":        finding_id,
-        "metric_a":  metric_a,
-        "metric_b":  metric_b,
-        "finding":   finding,
-        "email":     email if email else None,
+        "id": finding_id,
+        "metric_a": metric_a,
+        "metric_b": metric_b,
+        "finding": finding,
+        "email": email if email else None,
         "submitted_at": timestamp,
-        "ip_hash":   ip_hash,
-        "status":    "pending",
+        "ip_hash": ip_hash,
+        "status": "pending",
     }
 
     # Write to S3
@@ -447,14 +455,15 @@ def _handle_submit_finding(event: dict) -> dict:
     return {
         "statusCode": 200,
         "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-        "body": json.dumps({
-            "success": True,
-            "finding_id": finding_id,
-            "message": "Finding submitted! Matthew will review it and may promote it to a Discovery or seed an Experiment.",
-            "remaining": remaining,
-        }),
+        "body": json.dumps(
+            {
+                "success": True,
+                "finding_id": finding_id,
+                "message": "Finding submitted! Matthew will review it and may promote it to a Discovery or seed an Experiment.",
+                "remaining": remaining,
+            }
+        ),
     }
-
 
 
 def handle_experiment_library() -> dict:
@@ -492,11 +501,15 @@ def handle_experiment_library() -> dict:
     exp_status_map = {}
     try:
         exp_pk = f"{USER_PREFIX}experiments"
-        exp_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot experiments
-            "KeyConditionExpression": Key("pk").eq(exp_pk),
-            "ScanIndexForward": False,
-            "Limit": 100,
-        }))
+        exp_resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot experiments
+                    "KeyConditionExpression": Key("pk").eq(exp_pk),
+                    "ScanIndexForward": False,
+                    "Limit": 100,
+                }
+            )
+        )
         for item in _decimal_to_float(exp_resp.get("Items", [])):
             if not item.get("sk", "").startswith("EXP#"):
                 continue
@@ -572,21 +585,21 @@ def handle_experiment_library() -> dict:
     for pid in pillar_order:
         if pid in pillar_map:
             group = pillar_map[pid]
-            group["experiments"].sort(
-                key=lambda e: (0 if e.get("status") == "active" else 1, -(e.get("votes") or 0))
-            )
+            group["experiments"].sort(key=lambda e: (0 if e.get("status") == "active" else 1, -(e.get("votes") or 0)))
             pillars.append(group)
     for pid, group in pillar_map.items():
         if pid not in pillar_order:
             pillars.append(group)
 
-    return _ok({
-        "pillars": pillars,
-        "total_experiments": len(experiments),
-        "total_votes": total_votes,
-        "version": library.get("version", "1.0.0"),
-    }, cache_seconds=900)
-
+    return _ok(
+        {
+            "pillars": pillars,
+            "total_experiments": len(experiments),
+            "total_votes": total_votes,
+            "version": library.get("version", "1.0.0"),
+        },
+        cache_seconds=900,
+    )
 
 
 def _handle_experiment_vote(event: dict) -> dict:
@@ -652,12 +665,13 @@ def _handle_experiment_vote(event: dict) -> dict:
     return {
         "statusCode": 200,
         "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-        "body": json.dumps({
-            "library_id": library_id,
-            "new_count": new_count,
-        }),
+        "body": json.dumps(
+            {
+                "library_id": library_id,
+                "new_count": new_count,
+            }
+        ),
     }
-
 
 
 def _handle_experiment_follow(event: dict) -> dict:
@@ -742,7 +756,6 @@ def _handle_experiment_follow(event: dict) -> dict:
     }
 
 
-
 def _handle_experiment_detail(event: dict) -> dict:
     """
     GET /api/experiment_detail?id=post-dinner-walk
@@ -800,11 +813,15 @@ def _handle_experiment_detail(event: dict) -> dict:
     runs = []
     try:
         exp_pk = f"{USER_PREFIX}experiments"
-        exp_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot experiments
-            "KeyConditionExpression": Key("pk").eq(exp_pk),
-            "ScanIndexForward": False,
-            "Limit": 100,
-        }))
+        exp_resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot experiments
+                    "KeyConditionExpression": Key("pk").eq(exp_pk),
+                    "ScanIndexForward": False,
+                    "Limit": 100,
+                }
+            )
+        )
         for item in _decimal_to_float(exp_resp.get("Items", [])):
             if not item.get("sk", "").startswith("EXP#"):
                 continue
@@ -820,25 +837,27 @@ def _handle_experiment_detail(event: dict) -> dict:
                     days = max(0, (end_d - datetime.strptime(start, "%Y-%m-%d")).days)
                 except Exception:
                     pass
-                runs.append({
-                    "experiment_id": item.get("sk", "").replace("EXP#", ""),
-                    "status": status,
-                    "start_date": start,
-                    "end_date": end,
-                    "days": days,
-                    "hypothesis": item.get("hypothesis"),
-                    "outcome": item.get("outcome") or item.get("result_summary"),
-                    "primary_metric": item.get("primary_metric"),
-                    "baseline_value": item.get("baseline_value"),
-                    "result_value": item.get("result_value"),
-                    "grade": item.get("grade"),
-                    "compliance_pct": item.get("compliance_pct"),
-                    "reflection": item.get("reflection"),
-                    "mechanism": item.get("mechanism"),
-                    "key_finding": item.get("key_finding"),
-                    "hypothesis_confirmed": item.get("hypothesis_confirmed"),
-                    "iteration": item.get("iteration", 1),
-                })
+                runs.append(
+                    {
+                        "experiment_id": item.get("sk", "").replace("EXP#", ""),
+                        "status": status,
+                        "start_date": start,
+                        "end_date": end,
+                        "days": days,
+                        "hypothesis": item.get("hypothesis"),
+                        "outcome": item.get("outcome") or item.get("result_summary"),
+                        "primary_metric": item.get("primary_metric"),
+                        "baseline_value": item.get("baseline_value"),
+                        "result_value": item.get("result_value"),
+                        "grade": item.get("grade"),
+                        "compliance_pct": item.get("compliance_pct"),
+                        "reflection": item.get("reflection"),
+                        "mechanism": item.get("mechanism"),
+                        "key_finding": item.get("key_finding"),
+                        "hypothesis_confirmed": item.get("hypothesis_confirmed"),
+                        "iteration": item.get("iteration", 1),
+                    }
+                )
     except Exception as e:
         logger.warning(f"[experiment_detail] Experiment query failed: {e}")
 
@@ -848,7 +867,6 @@ def _handle_experiment_detail(event: dict) -> dict:
     lib_exp["completed_runs_count"] = sum(1 for r in runs if r["status"] == "completed")
 
     return _ok(lib_exp, cache_seconds=900)
-
 
 
 def _handle_challenge_vote(event: dict) -> dict:
@@ -913,12 +931,13 @@ def _handle_challenge_vote(event: dict) -> dict:
     return {
         "statusCode": 200,
         "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-        "body": json.dumps({
-            "catalog_id": catalog_id,
-            "new_count": new_count,
-        }),
+        "body": json.dumps(
+            {
+                "catalog_id": catalog_id,
+                "new_count": new_count,
+            }
+        ),
     }
-
 
 
 def _handle_challenge_follow(event: dict) -> dict:
@@ -1001,7 +1020,6 @@ def _handle_challenge_follow(event: dict) -> dict:
     }
 
 
-
 def handle_challenge_catalog() -> dict:
     """GET /api/challenge_catalog — Challenge catalog from S3 with vote counts.
 
@@ -1011,9 +1029,7 @@ def handle_challenge_catalog() -> dict:
     """
     global _challenge_catalog_cache
     if _challenge_catalog_cache is None:
-        _challenge_catalog_cache = _load_s3_json(
-            "site/config/challenges_catalog.json", "challenge_catalog"
-        )
+        _challenge_catalog_cache = _load_s3_json("site/config/challenges_catalog.json", "challenge_catalog")
 
     # Merge vote counts from DynamoDB
     vote_counts = {}
@@ -1043,7 +1059,6 @@ def handle_challenge_catalog() -> dict:
     return _ok(result, cache_seconds=900)
 
 
-
 def handle_challenges() -> dict:
     """GET /api/challenges — Return challenges from DynamoDB (primary) with S3 fallback.
 
@@ -1052,10 +1067,14 @@ def handle_challenges() -> dict:
     """
     challenges_pk = f"USER#{USER_ID}#SOURCE#challenges"
     try:
-        resp = table.query(**with_phase_filter({  # ADR-058: hide pilot challenges
-            "KeyConditionExpression": Key("pk").eq(challenges_pk) & Key("sk").begins_with("CHALLENGE#"),
-            "ScanIndexForward": False,
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot challenges
+                    "KeyConditionExpression": Key("pk").eq(challenges_pk) & Key("sk").begins_with("CHALLENGE#"),
+                    "ScanIndexForward": False,
+                }
+            )
+        )
         items = resp.get("Items", [])
 
         # Build response — website mainly needs active + candidate
@@ -1073,7 +1092,8 @@ def handle_challenges() -> dict:
                 ch["challenge_id"] = raw_id
                 # Strip date suffix (_YYYY-MM-DD) for catalog matching
                 import re as _re
-                ch["id"] = _re.sub(r'_\d{4}-\d{2}-\d{2}$', '', raw_id)
+
+                ch["id"] = _re.sub(r"_\d{4}-\d{2}-\d{2}$", "", raw_id)
 
                 # Compute progress for active challenges
                 if status == "active":
@@ -1081,19 +1101,19 @@ def handle_challenges() -> dict:
                     duration = int(ch.get("duration_days", 7))
                     completed_days = sum(1 for c in checkins if c.get("completed"))
                     ch["progress"] = {
-                        "checkin_days":   len(checkins),
+                        "checkin_days": len(checkins),
                         "completed_days": completed_days,
-                        "duration_days":  duration,
+                        "duration_days": duration,
                         "completion_pct": round(len(checkins) / duration * 100) if duration else 0,
-                        "success_rate":   round(completed_days / len(checkins) * 100) if checkins else 0,
+                        "success_rate": round(completed_days / len(checkins) * 100) if checkins else 0,
                     }
 
                 result.append(ch)
 
         # Summary
         summary = {
-            "total":     len(items),
-            "active":    sum(1 for i in items if i.get("status") == "active"),
+            "total": len(items),
+            "active": sum(1 for i in items if i.get("status") == "active"),
             "candidate": sum(1 for i in items if i.get("status") == "candidate"),
             "completed": sum(1 for i in items if i.get("status") == "completed"),
         }
@@ -1110,7 +1130,6 @@ def handle_challenges() -> dict:
         _challenges_cache = _load_s3_json("site/config/challenges.json", "challenges")
     challenges = _challenges_cache.get("challenges", [])
     return _ok({"challenges": challenges, "count": len(challenges), "source": "s3_fallback"}, cache_seconds=3600)
-
 
 
 def _handle_challenge_checkin(event: dict) -> dict:
@@ -1156,10 +1175,10 @@ def _handle_challenge_checkin(event: dict) -> dict:
     # Build checkin
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
     checkin = {
-        "date":      date_str,
+        "date": date_str,
         "completed": bool(completed),
         "logged_at": now_iso,
-        "source":    "website",
+        "source": "website",
     }
     if note:
         checkin["note"] = note
@@ -1170,7 +1189,7 @@ def _handle_challenge_checkin(event: dict) -> dict:
             Key={"pk": challenges_pk, "sk": sk},
             UpdateExpression="SET daily_checkins = list_append(if_not_exists(daily_checkins, :empty), :ci)",
             ExpressionAttributeValues={
-                ":ci":    [checkin],
+                ":ci": [checkin],
                 ":empty": [],
             },
         )
@@ -1182,40 +1201,39 @@ def _handle_challenge_checkin(event: dict) -> dict:
     total = len(existing) + 1
     duration = int(item.get("duration_days", 7) if item.get("duration_days") else 7)
 
-    return _ok({
-        "checked_in":     True,
-        "challenge_id":   challenge_id,
-        "date":           date_str,
-        "completed":      bool(completed),
-        "total_checkins": total,
-        "duration_days":  duration,
-        "completion_pct":  round(total / duration * 100) if duration else 0,
-    }, cache_seconds=0)
+    return _ok(
+        {
+            "checked_in": True,
+            "challenge_id": challenge_id,
+            "date": date_str,
+            "completed": bool(completed),
+            "total_checkins": total,
+            "duration_days": duration,
+            "completion_pct": round(total / duration * 100) if duration else 0,
+        },
+        cache_seconds=0,
+    )
 
 
 def _handle_experiment_suggest(event: dict) -> dict:
     """POST /api/experiment_suggest — Store reader experiment suggestion."""
     try:
-        body = json.loads(event.get('body', '{}'))
-        idea = body.get('idea', '').strip()
-        source = body.get('source', '').strip()
+        body = json.loads(event.get("body", "{}"))
+        idea = body.get("idea", "").strip()
+        source = body.get("source", "").strip()
         if not idea or len(idea) < 10:
-            return _error(400, 'Idea must be at least 10 characters')
-        table.put_item(Item={
-            'pk': 'USER#matthew#SOURCE#experiment_suggestions',
-            'sk': f'SUGGEST#{datetime.now(timezone.utc).isoformat()}',
-            'idea': idea,
-            'source': source,
-            'status': 'pending',
-            'created_at': datetime.now(timezone.utc).isoformat(),
-        })
-        return {
-            'statusCode': 200,
-            'headers': CORS_HEADERS,
-            'body': json.dumps({'status': 'received'})
-        }
+            return _error(400, "Idea must be at least 10 characters")
+        table.put_item(
+            Item={
+                "pk": "USER#matthew#SOURCE#experiment_suggestions",
+                "sk": f"SUGGEST#{datetime.now(timezone.utc).isoformat()}",
+                "idea": idea,
+                "source": source,
+                "status": "pending",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        return {"statusCode": 200, "headers": CORS_HEADERS, "body": json.dumps({"status": "received"})}
     except Exception as e:
         logger.error(f"[site_api] experiment_suggest failed: {e}")
-        return _error(500, 'Failed to submit suggestion')
-
-
+        return _error(500, "Failed to submit suggestion")

@@ -1,7 +1,9 @@
 """Tests for build_weekly_signal_data() in wednesday_chronicle_lambda.py"""
-import sys
+
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lambdas'))
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
 # Set required env vars before import
 os.environ.setdefault("USER_ID", "matthew")

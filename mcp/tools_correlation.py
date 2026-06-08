@@ -1,30 +1,55 @@
 """
 Correlation tools: caffeine, exercise, zone2, alcohol vs sleep.
 """
+
 import json
+import logging
 import math
 import re
-import logging
-from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 
 from mcp.config import (
-    table, s3_client, S3_BUCKET, USER_PREFIX, USER_ID, SOURCES,
-    P40_GROUPS, FIELD_ALIASES, logger,
-    INSIGHTS_PK, EXPERIMENTS_PK, TRAVEL_PK,
+    EXPERIMENTS_PK,
+    FIELD_ALIASES,
+    INSIGHTS_PK,
+    P40_GROUPS,
+    S3_BUCKET,
+    SOURCES,
+    TRAVEL_PK,
+    USER_ID,
+    USER_PREFIX,
+    logger,
+    s3_client,
+    table,
 )
 from mcp.core import (
-    query_source, parallel_query_sources, query_source_range,
-    get_profile, get_sot, decimal_to_float,
-    ddb_cache_get, ddb_cache_set, mem_cache_get, mem_cache_set,
-    date_diff_days, resolve_field,
+    date_diff_days,
+    ddb_cache_get,
+    ddb_cache_set,
+    decimal_to_float,
+    get_profile,
+    get_sot,
+    mem_cache_get,
+    mem_cache_set,
+    parallel_query_sources,
+    query_source,
+    query_source_range,
+    resolve_field,
 )
 from mcp.helpers import (
-    aggregate_items, flatten_strava_activity,
-    compute_daily_load_score, compute_ewa, pearson_r, _linear_regression,
-    classify_day_type, query_chronicling, _habit_series,
+    _habit_series,
+    _linear_regression,
+    aggregate_items,
+    classify_day_type,
+    compute_daily_load_score,
+    compute_ewa,
+    flatten_strava_activity,
     normalize_whoop_sleep,
+    pearson_r,
+    query_chronicling,
 )
+
 
 def tool_get_caffeine_sleep_correlation(args):
     """
@@ -33,11 +58,11 @@ def tool_get_caffeine_sleep_correlation(args):
     Whoop sleep metrics (SOT v2.55.0). Splits days into time buckets to show where sleep degrades.
     Based on Huberman & Attia: caffeine timing is one of the highest-leverage sleep interventions.
     """
-    end_date = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=89)).strftime("%Y-%m-%d"))
 
     mf_items = query_source("macrofactor", start_date, end_date)
-    wh_raw = query_source("whoop",       start_date, end_date)
+    wh_raw = query_source("whoop", start_date, end_date)
 
     if not mf_items:
         return {"error": "No MacroFactor data for range.", "start_date": start_date, "end_date": end_date}
@@ -66,7 +91,8 @@ def tool_get_caffeine_sleep_correlation(args):
         h = int(d) % 24
         m = int(round((d % 1) * 60))
         if m == 60:
-            h += 1; m = 0
+            h += 1
+            m = 0
         return f"{h:02d}:{m:02d}"
 
     def _sf(v):
@@ -131,46 +157,49 @@ def tool_get_caffeine_sleep_correlation(args):
         else:
             bucket = "after_4pm"
 
-        daily_rows.append({
-            "date": date,
-            "total_caffeine_mg": round(total_caffeine, 1),
-            "last_caffeine_time": last_caffeine_time,
-            "last_caffeine_time_hm": d2hm(last_caffeine_time),
-            "last_caffeine_food": last_caffeine_food,
-            "caffeine_entries": caffeine_entry_count,
-            "bucket": bucket,
-            "sleep_efficiency_pct": eff,
-            "deep_pct": deep,
-            "rem_pct": rem,
-            "sleep_score": score,
-            "sleep_duration_hrs": dur,
-            "time_to_sleep_min": latency,
-        })
+        daily_rows.append(
+            {
+                "date": date,
+                "total_caffeine_mg": round(total_caffeine, 1),
+                "last_caffeine_time": last_caffeine_time,
+                "last_caffeine_time_hm": d2hm(last_caffeine_time),
+                "last_caffeine_food": last_caffeine_food,
+                "caffeine_entries": caffeine_entry_count,
+                "bucket": bucket,
+                "sleep_efficiency_pct": eff,
+                "deep_pct": deep,
+                "rem_pct": rem,
+                "sleep_score": score,
+                "sleep_duration_hrs": dur,
+                "time_to_sleep_min": latency,
+            }
+        )
 
     if len(daily_rows) < 5:
         return {
             "error": f"Only {len(daily_rows)} days with both caffeine and sleep data. Need at least 5.",
             "hint": "Ensure MacroFactor food logging and Whoop data overlap for the requested period.",
-            "start_date": start_date, "end_date": end_date,
+            "start_date": start_date,
+            "end_date": end_date,
         }
 
     # ── Bucket analysis ──────────────────────────────────────────────────────
     SLEEP_METRICS = [
         ("sleep_efficiency_pct", "Sleep Efficiency %", "higher_is_better"),
-        ("deep_pct",             "Deep Sleep %",       "higher_is_better"),
-        ("rem_pct",              "REM %",              "higher_is_better"),
-        ("sleep_score",          "Sleep Score",        "higher_is_better"),
-        ("sleep_duration_hrs",   "Sleep Duration",     "higher_is_better"),
-        ("time_to_sleep_min",    "Sleep Onset Latency", "lower_is_better"),
+        ("deep_pct", "Deep Sleep %", "higher_is_better"),
+        ("rem_pct", "REM %", "higher_is_better"),
+        ("sleep_score", "Sleep Score", "higher_is_better"),
+        ("sleep_duration_hrs", "Sleep Duration", "higher_is_better"),
+        ("time_to_sleep_min", "Sleep Onset Latency", "lower_is_better"),
     ]
 
     BUCKET_ORDER = ["no_caffeine", "before_noon", "noon_to_2pm", "2pm_to_4pm", "after_4pm"]
     BUCKET_LABELS = {
-        "no_caffeine":  "No Caffeine",
-        "before_noon":  "Last Caffeine Before Noon",
-        "noon_to_2pm":  "Last Caffeine 12-2 PM",
-        "2pm_to_4pm":   "Last Caffeine 2-4 PM",
-        "after_4pm":    "Last Caffeine After 4 PM",
+        "no_caffeine": "No Caffeine",
+        "before_noon": "Last Caffeine Before Noon",
+        "noon_to_2pm": "Last Caffeine 12-2 PM",
+        "2pm_to_4pm": "Last Caffeine 2-4 PM",
+        "after_4pm": "Last Caffeine After 4 PM",
         "unknown_time": "Caffeine (time unknown)",
     }
 
@@ -212,7 +241,10 @@ def tool_get_caffeine_sleep_correlation(args):
             else:
                 impact = "HARMFUL" if r_val > 0.15 else "NEUTRAL" if abs(r_val) < 0.15 else "BENEFICIAL"
             timing_correlations[field] = {
-                "label": label, "pearson_r": r_val, "n": len(xs), "impact": impact,
+                "label": label,
+                "pearson_r": r_val,
+                "n": len(xs),
+                "impact": impact,
                 "interpretation": (
                     f"Later caffeine {'strongly ' if abs(r_val) > 0.4 else ''}correlates with "
                     f"{'worse' if impact == 'HARMFUL' else 'better' if impact == 'BENEFICIAL' else 'no significant change in'} "
@@ -291,9 +323,7 @@ def tool_get_caffeine_sleep_correlation(args):
 
     alerts = []
     if summary["avg_daily_caffeine_mg"] and summary["avg_daily_caffeine_mg"] > 400:
-        alerts.append(
-            f"Average daily caffeine is {summary['avg_daily_caffeine_mg']}mg -- exceeds the 400mg/day FDA safety threshold."
-        )
+        alerts.append(f"Average daily caffeine is {summary['avg_daily_caffeine_mg']}mg -- exceeds the 400mg/day FDA safety threshold.")
     after_4_count = sum(1 for r in daily_rows if r["bucket"] == "after_4pm")
     if after_4_count > 0:
         pct = round(100 * after_4_count / len(daily_rows), 0)
@@ -313,7 +343,11 @@ def tool_get_caffeine_sleep_correlation(args):
         "recommendation": {
             "cutoff_time": cutoff_time,
             "text": recommendation,
-            "evidence_basis": "bucket_comparison" if cutoff_time and "drops by" in (recommendation or "") else "correlation" if cutoff_time else "insufficient_data",
+            "evidence_basis": (
+                "bucket_comparison"
+                if cutoff_time and "drops by" in (recommendation or "")
+                else "correlation" if cutoff_time else "insufficient_data"
+            ),
         },
         "bucket_comparison": bucket_data,
         "timing_correlations": timing_correlations,
@@ -345,13 +379,13 @@ def tool_get_exercise_sleep_correlation(args):
     Based on Huberman, Galpin, and Attia: exercise timing is a modifiable lever
     for sleep quality, but the effect is highly individual.
     """
-    end_date = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=179)).strftime("%Y-%m-%d"))
     min_duration_min = int(args.get("min_duration_minutes", 15))
     exclude_types = [t.strip().lower() for t in (args.get("exclude_sport_types") or "").split(",") if t.strip()]
 
     strava_items = query_source("strava", start_date, end_date)
-    wh_raw = query_source("whoop",  start_date, end_date)
+    wh_raw = query_source("whoop", start_date, end_date)
 
     if not strava_items:
         return {"error": "No Strava data for range.", "start_date": start_date, "end_date": end_date}
@@ -398,7 +432,8 @@ def tool_get_exercise_sleep_correlation(args):
         h = int(d) % 24
         m = int(round((d % 1) * 60))
         if m == 60:
-            h += 1; m = 0
+            h += 1
+            m = 0
         return f"{h:02d}:{m:02d}"
 
     def _classify_intensity(avg_hr):
@@ -514,30 +549,33 @@ def tool_get_exercise_sleep_correlation(args):
 
         intensity = _classify_intensity(avg_hr_weighted)
 
-        daily_rows.append({
-            "date": date,
-            "activity_count": activity_count,
-            "total_exercise_min": round(total_exercise_min, 1),
-            "last_end_time": last_end_time,
-            "last_end_time_hm": last_end_hm,
-            "last_sport": last_sport,
-            "sport_types": sport_types,
-            "avg_hr": avg_hr_weighted,
-            "intensity": intensity,
-            "bucket": bucket,
-            "sleep_efficiency_pct": eff,
-            "deep_pct": deep,
-            "rem_pct": rem,
-            "sleep_score": score,
-            "sleep_duration_hrs": dur,
-            "time_to_sleep_min": latency,
-            "hrv_avg": hrv,
-        })
+        daily_rows.append(
+            {
+                "date": date,
+                "activity_count": activity_count,
+                "total_exercise_min": round(total_exercise_min, 1),
+                "last_end_time": last_end_time,
+                "last_end_time_hm": last_end_hm,
+                "last_sport": last_sport,
+                "sport_types": sport_types,
+                "avg_hr": avg_hr_weighted,
+                "intensity": intensity,
+                "bucket": bucket,
+                "sleep_efficiency_pct": eff,
+                "deep_pct": deep,
+                "rem_pct": rem,
+                "sleep_score": score,
+                "sleep_duration_hrs": dur,
+                "time_to_sleep_min": latency,
+                "hrv_avg": hrv,
+            }
+        )
 
     if len(daily_rows) < 10:
         return {
             "error": f"Only {len(daily_rows)} days with sleep data. Need at least 10.",
-            "start_date": start_date, "end_date": end_date,
+            "start_date": start_date,
+            "end_date": end_date,
         }
 
     exercise_days = [r for r in daily_rows if r["bucket"] != "rest_day"]
@@ -546,22 +584,22 @@ def tool_get_exercise_sleep_correlation(args):
     # ── Bucket analysis ──────────────────────────────────────────────────────
     SLEEP_METRICS = [
         ("sleep_efficiency_pct", "Sleep Efficiency %", "higher_is_better"),
-        ("deep_pct",             "Deep Sleep %",       "higher_is_better"),
-        ("rem_pct",              "REM %",              "higher_is_better"),
-        ("sleep_score",          "Sleep Score",        "higher_is_better"),
-        ("sleep_duration_hrs",   "Sleep Duration",     "higher_is_better"),
-        ("time_to_sleep_min",    "Sleep Onset Latency", "lower_is_better"),
-        ("hrv_avg",              "HRV",                "higher_is_better"),
+        ("deep_pct", "Deep Sleep %", "higher_is_better"),
+        ("rem_pct", "REM %", "higher_is_better"),
+        ("sleep_score", "Sleep Score", "higher_is_better"),
+        ("sleep_duration_hrs", "Sleep Duration", "higher_is_better"),
+        ("time_to_sleep_min", "Sleep Onset Latency", "lower_is_better"),
+        ("hrv_avg", "HRV", "higher_is_better"),
     ]
 
     BUCKET_ORDER = ["rest_day", "before_noon", "noon_to_3pm", "3pm_to_6pm", "6pm_to_8pm", "after_8pm"]
     BUCKET_LABELS = {
-        "rest_day":     "Rest Day (No Exercise)",
-        "before_noon":  "Exercise Ends Before Noon",
-        "noon_to_3pm":  "Exercise Ends 12–3 PM",
-        "3pm_to_6pm":   "Exercise Ends 3–6 PM",
-        "6pm_to_8pm":   "Exercise Ends 6–8 PM",
-        "after_8pm":    "Exercise Ends After 8 PM",
+        "rest_day": "Rest Day (No Exercise)",
+        "before_noon": "Exercise Ends Before Noon",
+        "noon_to_3pm": "Exercise Ends 12–3 PM",
+        "3pm_to_6pm": "Exercise Ends 3–6 PM",
+        "6pm_to_8pm": "Exercise Ends 6–8 PM",
+        "after_8pm": "Exercise Ends After 8 PM",
         "unknown_time": "Exercise (time unknown)",
     }
 
@@ -600,7 +638,10 @@ def tool_get_exercise_sleep_correlation(args):
             else:
                 impact = "HARMFUL" if r_val > 0.15 else "NEUTRAL" if abs(r_val) < 0.15 else "BENEFICIAL"
             timing_correlations[field] = {
-                "label": label, "pearson_r": r_val, "n": len(xs), "impact": impact,
+                "label": label,
+                "pearson_r": r_val,
+                "n": len(xs),
+                "impact": impact,
                 "interpretation": (
                     f"Later exercise {'strongly ' if abs(r_val) > 0.4 else ''}correlates with "
                     f"{'worse' if impact == 'HARMFUL' else 'better' if impact == 'BENEFICIAL' else 'no significant change in'} "
@@ -740,8 +781,7 @@ def tool_get_exercise_sleep_correlation(args):
         "avg_exercise_min_on_active_days": _avg([r["total_exercise_min"] for r in exercise_days if r["total_exercise_min"] > 0]),
         "avg_hr_on_active_days": _avg([r["avg_hr"] for r in exercise_days]),
         "intensity_distribution": {
-            level: sum(1 for r in exercise_days if r["intensity"] == level)
-            for level in ["low", "moderate", "high", "unknown"]
+            level: sum(1 for r in exercise_days if r["intensity"] == level) for level in ["low", "moderate", "high", "unknown"]
         },
     }
 
@@ -780,10 +820,11 @@ def tool_get_exercise_sleep_correlation(args):
         "recommendation": {
             "cutoff_time": cutoff_time,
             "text": recommendation,
-            "evidence_basis": ("bucket_comparison" if cutoff_time and "drops by" in (recommendation or "")
-                              else "correlation" if cutoff_time
-                              else "beneficial" if "BETTER" in (recommendation or "")
-                              else "insufficient_data"),
+            "evidence_basis": (
+                "bucket_comparison"
+                if cutoff_time and "drops by" in (recommendation or "")
+                else "correlation" if cutoff_time else "beneficial" if "BETTER" in (recommendation or "") else "insufficient_data"
+            ),
         },
         "bucket_comparison": bucket_data,
         "exercise_vs_rest": exercise_vs_rest,
@@ -821,7 +862,7 @@ def tool_get_zone2_breakdown(args):
     density, fat oxidation capacity, and cardiovascular base. Most people drastically
     undertrain Zone 2 relative to higher intensities.
     """
-    end_date = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=89)).strftime("%Y-%m-%d"))
     weekly_target_min = int(args.get("weekly_target_minutes", 150))
     min_duration_min = int(args.get("min_duration_minutes", 10))
@@ -838,11 +879,11 @@ def tool_get_zone2_breakdown(args):
     # Zone 4: 80-90%  (threshold / lactate)
     # Zone 5: 90-100% (VO2 max / anaerobic)
     ZONE_BOUNDS = [
-        ("zone_1", "Zone 1 (Recovery)",   0.50, 0.60),
-        ("zone_2", "Zone 2 (Aerobic)",    0.60, 0.70),
-        ("zone_3", "Zone 3 (Tempo)",      0.70, 0.80),
-        ("zone_4", "Zone 4 (Threshold)",  0.80, 0.90),
-        ("zone_5", "Zone 5 (VO2 Max)",    0.90, 1.00),
+        ("zone_1", "Zone 1 (Recovery)", 0.50, 0.60),
+        ("zone_2", "Zone 2 (Aerobic)", 0.60, 0.70),
+        ("zone_3", "Zone 3 (Tempo)", 0.70, 0.80),
+        ("zone_4", "Zone 4 (Threshold)", 0.80, 0.90),
+        ("zone_5", "Zone 5 (VO2 Max)", 0.90, 1.00),
     ]
 
     zone_hr_ranges = {}
@@ -895,16 +936,18 @@ def tool_get_zone2_breakdown(args):
             avg_hr = _sf(act.get("average_heartrate"))
             zone = classify_zone(avg_hr)
             sport = act.get("sport_type") or act.get("type") or "Unknown"
-            all_activities.append({
-                "date": date,
-                "name": act.get("enriched_name") or act.get("name") or "Unnamed",
-                "sport_type": sport,
-                "moving_time_min": round(moving / 60, 1),
-                "avg_hr": avg_hr,
-                "max_hr": _sf(act.get("max_heartrate")),
-                "zone": zone,
-                "distance_miles": _sf(act.get("distance_miles")),
-            })
+            all_activities.append(
+                {
+                    "date": date,
+                    "name": act.get("enriched_name") or act.get("name") or "Unnamed",
+                    "sport_type": sport,
+                    "moving_time_min": round(moving / 60, 1),
+                    "avg_hr": avg_hr,
+                    "max_hr": _sf(act.get("max_heartrate")),
+                    "zone": zone,
+                    "distance_miles": _sf(act.get("distance_miles")),
+                }
+            )
 
     if not all_activities:
         return {"error": "No qualifying activities found.", "start_date": start_date, "end_date": end_date}
@@ -914,24 +957,36 @@ def tool_get_zone2_breakdown(args):
 
     def iso_week(date_str):
         """Return ISO year-week string like '2025-W48'."""
-        from datetime import datetime as dt, timezone
+        from datetime import datetime as dt
+        from datetime import timezone
+
         d = dt.strptime(date_str, "%Y-%m-%d")
         iso = d.isocalendar()
         return f"{iso[0]}-W{iso[1]:02d}"
 
     def week_start(date_str):
         """Return Monday of the week for a given date."""
-        from datetime import datetime as dt, timezone
+        from datetime import datetime as dt
+        from datetime import timezone
+
         d = dt.strptime(date_str, "%Y-%m-%d")
         monday = d - timedelta(days=d.weekday())
         return monday.strftime("%Y-%m-%d")
 
-    weekly = defaultdict(lambda: {
-        "zone_1_min": 0, "zone_2_min": 0, "zone_3_min": 0,
-        "zone_4_min": 0, "zone_5_min": 0, "below_zone_1_min": 0,
-        "no_hr_min": 0, "total_exercise_min": 0, "activity_count": 0,
-        "zone_2_activities": [],
-    })
+    weekly = defaultdict(
+        lambda: {
+            "zone_1_min": 0,
+            "zone_2_min": 0,
+            "zone_3_min": 0,
+            "zone_4_min": 0,
+            "zone_5_min": 0,
+            "below_zone_1_min": 0,
+            "no_hr_min": 0,
+            "total_exercise_min": 0,
+            "activity_count": 0,
+            "zone_2_activities": [],
+        }
+    )
 
     for act in all_activities:
         wk = week_start(act["date"])
@@ -946,32 +1001,36 @@ def tool_get_zone2_breakdown(args):
         else:
             weekly[wk]["no_hr_min"] += mins
         if z == "zone_2":
-            weekly[wk]["zone_2_activities"].append({
-                "date": act["date"],
-                "name": act["name"],
-                "sport": act["sport_type"],
-                "minutes": mins,
-                "avg_hr": act["avg_hr"],
-            })
+            weekly[wk]["zone_2_activities"].append(
+                {
+                    "date": act["date"],
+                    "name": act["name"],
+                    "sport": act["sport_type"],
+                    "minutes": mins,
+                    "avg_hr": act["avg_hr"],
+                }
+            )
 
     weekly_sorted = []
     for wk in sorted(weekly.keys()):
         w = weekly[wk]
         z2 = w["zone_2_min"]
         pct_target = round(100 * z2 / weekly_target_min, 0) if weekly_target_min > 0 else None
-        weekly_sorted.append({
-            "week_start": wk,
-            "zone_2_minutes": round(z2, 1),
-            "target_pct": pct_target,
-            "target_met": z2 >= weekly_target_min,
-            "zone_1_min": round(w["zone_1_min"], 1),
-            "zone_3_min": round(w["zone_3_min"], 1),
-            "zone_4_min": round(w["zone_4_min"], 1),
-            "zone_5_min": round(w["zone_5_min"], 1),
-            "total_exercise_min": round(w["total_exercise_min"], 1),
-            "activity_count": w["activity_count"],
-            "zone_2_activities": w["zone_2_activities"],
-        })
+        weekly_sorted.append(
+            {
+                "week_start": wk,
+                "zone_2_minutes": round(z2, 1),
+                "target_pct": pct_target,
+                "target_met": z2 >= weekly_target_min,
+                "zone_1_min": round(w["zone_1_min"], 1),
+                "zone_3_min": round(w["zone_3_min"], 1),
+                "zone_4_min": round(w["zone_4_min"], 1),
+                "zone_5_min": round(w["zone_5_min"], 1),
+                "total_exercise_min": round(w["total_exercise_min"], 1),
+                "activity_count": w["activity_count"],
+                "zone_2_activities": w["zone_2_activities"],
+            }
+        )
 
     # ── Zone distribution (full period) ──────────────────────────────────────
     zone_totals = {"zone_1": 0, "zone_2": 0, "zone_3": 0, "zone_4": 0, "zone_5": 0, "below_zone_1": 0, "no_hr": 0}
@@ -1002,11 +1061,13 @@ def tool_get_zone2_breakdown(args):
 
     sport_breakdown = []
     for sport, data in sorted(z2_by_sport.items(), key=lambda x: -x[1]["minutes"]):
-        sport_breakdown.append({
-            "sport_type": sport,
-            "zone_2_minutes": round(data["minutes"], 1),
-            "activity_count": data["count"],
-        })
+        sport_breakdown.append(
+            {
+                "sport_type": sport,
+                "zone_2_minutes": round(data["minutes"], 1),
+                "activity_count": data["count"],
+            }
+        )
 
     # ── Trend analysis ───────────────────────────────────────────────────────
     z2_weekly_vals = [w["zone_2_minutes"] for w in weekly_sorted]
@@ -1014,10 +1075,12 @@ def tool_get_zone2_breakdown(args):
     if len(z2_weekly_vals) >= 3:
         xs = list(range(len(z2_weekly_vals)))
         slope_r = pearson_r(xs, z2_weekly_vals) if len(xs) >= 3 else None
-        avg_first_half = sum(z2_weekly_vals[:len(z2_weekly_vals)//2]) / max(len(z2_weekly_vals)//2, 1)
-        avg_second_half = sum(z2_weekly_vals[len(z2_weekly_vals)//2:]) / max(len(z2_weekly_vals) - len(z2_weekly_vals)//2, 1)
+        avg_first_half = sum(z2_weekly_vals[: len(z2_weekly_vals) // 2]) / max(len(z2_weekly_vals) // 2, 1)
+        avg_second_half = sum(z2_weekly_vals[len(z2_weekly_vals) // 2 :]) / max(len(z2_weekly_vals) - len(z2_weekly_vals) // 2, 1)
         trend = {
-            "direction": "INCREASING" if avg_second_half > avg_first_half + 5 else "DECREASING" if avg_second_half < avg_first_half - 5 else "STABLE",
+            "direction": (
+                "INCREASING" if avg_second_half > avg_first_half + 5 else "DECREASING" if avg_second_half < avg_first_half - 5 else "STABLE"
+            ),
             "first_half_avg_min": round(avg_first_half, 1),
             "second_half_avg_min": round(avg_second_half, 1),
             "correlation_r": slope_r,
@@ -1116,11 +1179,11 @@ def tool_get_alcohol_sleep_correlation(args):
     Based on Huberman, Attia, and Walker: even moderate alcohol suppresses REM and
     deep sleep, raises resting HR, and impairs next-day HRV recovery.
     """
-    end_date = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=89)).strftime("%Y-%m-%d"))
 
     mf_items = query_source("macrofactor", start_date, end_date)
-    wh_raw = query_source("whoop",       start_date, end_date)
+    wh_raw = query_source("whoop", start_date, end_date)
 
     if not mf_items:
         return {"error": "No MacroFactor data for range.", "start_date": start_date, "end_date": end_date}
@@ -1161,7 +1224,8 @@ def tool_get_alcohol_sleep_correlation(args):
         h = int(d) % 24
         m = int(round((d % 1) * 60))
         if m == 60:
-            h += 1; m = 0
+            h += 1
+            m = 0
         return f"{h:02d}:{m:02d}"
 
     def _avg(vals):
@@ -1181,11 +1245,11 @@ def tool_get_alcohol_sleep_correlation(args):
             return "none"
         drinks = alcohol_g / GRAMS_PER_DRINK
         if drinks <= 1.0:
-            return "light"       # ≤1 drink
+            return "light"  # ≤1 drink
         elif drinks <= 2.5:
-            return "moderate"    # 1-2.5 drinks
+            return "moderate"  # 1-2.5 drinks
         else:
-            return "heavy"       # 3+ drinks
+            return "heavy"  # 3+ drinks
 
     # ── Extract per-day alcohol + sleep + next-day recovery ──────────────────
     daily_rows = []
@@ -1240,51 +1304,54 @@ def tool_get_alcohol_sleep_correlation(args):
         drinks = round(total_alcohol_g / GRAMS_PER_DRINK, 1) if total_alcohol_g > 0 else 0
         bucket = _classify_dose(total_alcohol_g)
 
-        daily_rows.append({
-            "date": date,
-            "total_alcohol_g": round(total_alcohol_g, 1),
-            "standard_drinks": drinks,
-            "last_drink_time": last_drink_time,
-            "last_drink_time_hm": _d2hm(last_drink_time),
-            "last_drink_food": last_drink_food,
-            "drink_entries": drink_entries,
-            "bucket": bucket,
-            # Same-night sleep
-            "sleep_efficiency_pct": eff,
-            "deep_pct": deep,
-            "rem_pct": rem,
-            "sleep_score": score,
-            "sleep_duration_hrs": dur,
-            "time_to_sleep_min": latency,
-            "es_hrv": es_hrv,
-            # Next-day recovery
-            "next_recovery_score": next_recovery,
-            "next_hrv": next_hrv,
-            "next_rhr": next_rhr,
-        })
+        daily_rows.append(
+            {
+                "date": date,
+                "total_alcohol_g": round(total_alcohol_g, 1),
+                "standard_drinks": drinks,
+                "last_drink_time": last_drink_time,
+                "last_drink_time_hm": _d2hm(last_drink_time),
+                "last_drink_food": last_drink_food,
+                "drink_entries": drink_entries,
+                "bucket": bucket,
+                # Same-night sleep
+                "sleep_efficiency_pct": eff,
+                "deep_pct": deep,
+                "rem_pct": rem,
+                "sleep_score": score,
+                "sleep_duration_hrs": dur,
+                "time_to_sleep_min": latency,
+                "es_hrv": es_hrv,
+                # Next-day recovery
+                "next_recovery_score": next_recovery,
+                "next_hrv": next_hrv,
+                "next_rhr": next_rhr,
+            }
+        )
 
     if len(daily_rows) < 5:
         return {
             "error": f"Only {len(daily_rows)} days with both nutrition and sleep data. Need at least 5.",
             "hint": "Ensure MacroFactor food logging and Whoop data overlap. Re-check after 2+ weeks of consistent logging.",
-            "start_date": start_date, "end_date": end_date,
+            "start_date": start_date,
+            "end_date": end_date,
         }
 
     # ── Metric definitions ───────────────────────────────────────────────────
     SLEEP_METRICS = [
-        ("sleep_efficiency_pct", "Sleep Efficiency %",  "higher_is_better"),
-        ("deep_pct",             "Deep Sleep %",        "higher_is_better"),
-        ("rem_pct",              "REM %",               "higher_is_better"),
-        ("sleep_score",          "Sleep Score",         "higher_is_better"),
-        ("sleep_duration_hrs",   "Sleep Duration",      "higher_is_better"),
-        ("time_to_sleep_min",    "Sleep Onset Latency", "lower_is_better"),
-        ("es_hrv",               "Sleep HRV",           "higher_is_better"),
+        ("sleep_efficiency_pct", "Sleep Efficiency %", "higher_is_better"),
+        ("deep_pct", "Deep Sleep %", "higher_is_better"),
+        ("rem_pct", "REM %", "higher_is_better"),
+        ("sleep_score", "Sleep Score", "higher_is_better"),
+        ("sleep_duration_hrs", "Sleep Duration", "higher_is_better"),
+        ("time_to_sleep_min", "Sleep Onset Latency", "lower_is_better"),
+        ("es_hrv", "Sleep HRV", "higher_is_better"),
     ]
 
     RECOVERY_METRICS = [
-        ("next_recovery_score",  "Next-Day Recovery",   "higher_is_better"),
-        ("next_hrv",             "Next-Day HRV",        "higher_is_better"),
-        ("next_rhr",             "Next-Day RHR",        "lower_is_better"),
+        ("next_recovery_score", "Next-Day Recovery", "higher_is_better"),
+        ("next_hrv", "Next-Day HRV", "higher_is_better"),
+        ("next_rhr", "Next-Day RHR", "lower_is_better"),
     ]
 
     ALL_METRICS = SLEEP_METRICS + RECOVERY_METRICS
@@ -1292,10 +1359,10 @@ def tool_get_alcohol_sleep_correlation(args):
     # ── Bucket analysis ──────────────────────────────────────────────────────
     BUCKET_ORDER = ["none", "light", "moderate", "heavy"]
     BUCKET_LABELS = {
-        "none":     "No Alcohol",
-        "light":    "Light (≤1 drink / ≤14g)",
+        "none": "No Alcohol",
+        "light": "Light (≤1 drink / ≤14g)",
         "moderate": "Moderate (1-2.5 drinks / 14-35g)",
-        "heavy":    "Heavy (3+ drinks / 35g+)",
+        "heavy": "Heavy (3+ drinks / 35g+)",
     }
 
     bucket_data = {}
@@ -1331,7 +1398,10 @@ def tool_get_alcohol_sleep_correlation(args):
             else:
                 impact = "HARMFUL" if r_val > 0.15 else "NEUTRAL" if abs(r_val) < 0.15 else "BENEFICIAL"
             dose_correlations[field] = {
-                "label": label, "pearson_r": r_val, "n": len(xs), "impact": impact,
+                "label": label,
+                "pearson_r": r_val,
+                "n": len(xs),
+                "impact": impact,
             }
 
     # ── Timing correlations (last drink time vs sleep, drinking days only) ───
@@ -1347,7 +1417,10 @@ def tool_get_alcohol_sleep_correlation(args):
             else:
                 impact = "HARMFUL" if r_val > 0.15 else "NEUTRAL" if abs(r_val) < 0.15 else "BENEFICIAL"
             timing_correlations[field] = {
-                "label": label, "pearson_r": r_val, "n": len(xs), "impact": impact,
+                "label": label,
+                "pearson_r": r_val,
+                "n": len(xs),
+                "impact": impact,
                 "interpretation": (
                     f"Later drinking {'strongly ' if abs(r_val) > 0.4 else ''}correlates with "
                     f"{'worse' if impact == 'HARMFUL' else 'better' if impact == 'BENEFICIAL' else 'no significant change in'} "
@@ -1453,8 +1526,7 @@ def tool_get_alcohol_sleep_correlation(args):
             severity = "LOW"
     else:
         assessment = (
-            "Not enough data to compare drinking vs sober nights. "
-            "Continue logging food intake in MacroFactor for at least 2-3 weeks."
+            "Not enough data to compare drinking vs sober nights. " "Continue logging food intake in MacroFactor for at least 2-3 weeks."
         )
         severity = "INSUFFICIENT_DATA"
 
@@ -1471,9 +1543,7 @@ def tool_get_alcohol_sleep_correlation(args):
         "drinking_frequency_pct": round(100 * drinking_count / len(daily_rows), 0) if daily_rows else 0,
         "avg_alcohol_g_on_drinking_days": _avg(all_drink_amounts),
         "avg_drinks_on_drinking_days": _avg([g / GRAMS_PER_DRINK for g in all_drink_amounts]) if all_drink_amounts else None,
-        "avg_last_drink_time": _d2hm(
-            sum(r["last_drink_time"] for r in timed_rows) / len(timed_rows)
-        ) if timed_rows else None,
+        "avg_last_drink_time": _d2hm(sum(r["last_drink_time"] for r in timed_rows) / len(timed_rows)) if timed_rows else None,
     }
 
     alerts = []

@@ -22,7 +22,7 @@ import json
 import os
 import sys
 import time
-from datetime import date, datetime, timezone, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import boto3
@@ -91,10 +91,18 @@ def main():
         print("  (would tombstone-overwrite these files via S3 PutObject)")
     elif stale and args.apply:
         for key in stale:
-            s3.put_object(Bucket=S3_BUCKET, Key=key,
-                          Body=json.dumps({"tombstone": True, "tombstoned_at": datetime.now(timezone.utc).isoformat(),
-                                           "tombstoned_reason": f"experiment_restart_{EXPERIMENT_START_DATE}"}).encode(),
-                          ContentType="application/json")
+            s3.put_object(
+                Bucket=S3_BUCKET,
+                Key=key,
+                Body=json.dumps(
+                    {
+                        "tombstone": True,
+                        "tombstoned_at": datetime.now(timezone.utc).isoformat(),
+                        "tombstoned_reason": f"experiment_restart_{EXPERIMENT_START_DATE}",
+                    }
+                ).encode(),
+                ContentType="application/json",
+            )
         print(f"  [APPLIED] tombstoned {len(stale)} stale state file(s)")
 
     # ── Step 2: invoke character-sheet-compute for each day ──

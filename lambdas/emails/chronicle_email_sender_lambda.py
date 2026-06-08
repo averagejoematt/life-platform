@@ -24,18 +24,19 @@ v1.0.0 — 2026-03-17 (BS-03)
 """
 
 import json
+import logging
 import os
 import time
-import logging
 import urllib.parse
-import boto3
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+import boto3
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 try:
     from platform_logger import get_logger
+
     logger = get_logger("chronicle-email-sender")
 except ImportError:
     logger = logging.getLogger("chronicle-email-sender")
@@ -62,10 +63,14 @@ ses = boto3.client("sesv2", region_name=REGION)
 # HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _d2f(obj):
-    if isinstance(obj, list): return [_d2f(i) for i in obj]
-    if isinstance(obj, dict): return {k: _d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [_d2f(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: _d2f(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
 
 
@@ -79,16 +84,20 @@ def _get_this_weeks_installment() -> dict | None:
     today_str = today.isoformat()
 
     try:
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": CHRONICLE_PK,
-                ":s":  f"DATE#{week_ago}",
-                ":e":  f"DATE#{today_str}",
-            },
-            "ScanIndexForward": False,
-            "Limit": 1,
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                    "ExpressionAttributeValues": {
+                        ":pk": CHRONICLE_PK,
+                        ":s": f"DATE#{week_ago}",
+                        ":e": f"DATE#{today_str}",
+                    },
+                    "ScanIndexForward": False,
+                    "Limit": 1,
+                }
+            )
+        )
         items = resp.get("Items", [])
         if not items:
             logger.info("No Chronicle installment found within last 7 days — no-op")
@@ -117,7 +126,7 @@ def _get_confirmed_subscribers() -> list[dict]:
             "FilterExpression": "#s = :confirmed",
             "ExpressionAttributeNames": {"#s": "status"},
             "ExpressionAttributeValues": {
-                ":pk":        SUBSCRIBERS_PK,
+                ":pk": SUBSCRIBERS_PK,
                 ":confirmed": "confirmed",
             },
         }
@@ -137,27 +146,33 @@ def _get_confirmed_subscribers() -> list[dict]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 BOARD_MEMBERS = {
-    "sarah_chen":       {"name": "Dr. Sarah Chen",       "title": "Sports Scientist",                 "color": "#0ea5e9", "emoji": "\U0001F3CB\uFE0F"},
-    "marcus_webb":      {"name": "Dr. Marcus Webb",      "title": "Nutritionist",                     "color": "#22c55e", "emoji": "\U0001F957"},
-    "lisa_park":        {"name": "Dr. Lisa Park",        "title": "Sleep & Circadian Specialist",      "color": "#8b5cf6", "emoji": "\U0001F634"},
-    "james_okafor":     {"name": "Dr. James Okafor",     "title": "Longevity & Preventive Medicine",   "color": "#f59e0b", "emoji": "\U0001FA7A"},
-    "maya_rodriguez":   {"name": "Coach Maya Rodriguez",  "title": "Behavioural Performance Coach",    "color": "#ec4899", "emoji": "\U0001F9E0"},
-    "the_chair":        {"name": "The Chair",             "title": "Board Chair \u2014 Verdict & Priority", "color": "#6366f1", "emoji": "\U0001F3AF"},
-    "layne_norton":     {"name": "Dr. Marcus Webb",       "title": "Macros, Protein & Adherence",      "color": "#10b981", "emoji": "\U0001F4AA"},
-    "rhonda_patrick":   {"name": "Dr. Amara Patel",      "title": "Micronutrients & Longevity",       "color": "#8b5cf6", "emoji": "\U0001F9EC"},
-    "peter_attia":      {"name": "Dr. James Okafor",     "title": "Metabolic Health & Longevity",     "color": "#f59e0b", "emoji": "\U0001F4CA"},
-    "andrew_huberman":  {"name": "Dr. Kai Nakamura",     "title": "Neuroscience & Protocols",         "color": "#06b6d4", "emoji": "\U0001F52C"},
-    "elena_voss":       {"name": "Elena Voss",            "title": "Embedded Journalist",              "color": "#94a3b8", "emoji": "\u270D\uFE0F"},
-    "paul_conti":       {"name": "Dr. Nathan Reeves",     "title": "Psychiatrist \u2014 Self-Structure",    "color": "#7c3aed", "emoji": "\U0001F9E0"},
-    "margaret_calloway": {"name": "Margaret Calloway",     "title": "Senior Editor \u2014 Longform",         "color": "#b45309", "emoji": "\u270F\uFE0F"},
-    "vivek_murthy":     {"name": "Dr. Daniel Murthy",     "title": "Social Connection & Loneliness",   "color": "#0891b2", "emoji": "\U0001F91D"},
+    "sarah_chen": {"name": "Dr. Sarah Chen", "title": "Sports Scientist", "color": "#0ea5e9", "emoji": "\U0001f3cb\ufe0f"},
+    "marcus_webb": {"name": "Dr. Marcus Webb", "title": "Nutritionist", "color": "#22c55e", "emoji": "\U0001f957"},
+    "lisa_park": {"name": "Dr. Lisa Park", "title": "Sleep & Circadian Specialist", "color": "#8b5cf6", "emoji": "\U0001f634"},
+    "james_okafor": {"name": "Dr. James Okafor", "title": "Longevity & Preventive Medicine", "color": "#f59e0b", "emoji": "\U0001fa7a"},
+    "maya_rodriguez": {"name": "Coach Maya Rodriguez", "title": "Behavioural Performance Coach", "color": "#ec4899", "emoji": "\U0001f9e0"},
+    "the_chair": {"name": "The Chair", "title": "Board Chair \u2014 Verdict & Priority", "color": "#6366f1", "emoji": "\U0001f3af"},
+    "layne_norton": {"name": "Dr. Marcus Webb", "title": "Macros, Protein & Adherence", "color": "#10b981", "emoji": "\U0001f4aa"},
+    "rhonda_patrick": {"name": "Dr. Amara Patel", "title": "Micronutrients & Longevity", "color": "#8b5cf6", "emoji": "\U0001f9ec"},
+    "peter_attia": {"name": "Dr. James Okafor", "title": "Metabolic Health & Longevity", "color": "#f59e0b", "emoji": "\U0001f4ca"},
+    "andrew_huberman": {"name": "Dr. Kai Nakamura", "title": "Neuroscience & Protocols", "color": "#06b6d4", "emoji": "\U0001f52c"},
+    "elena_voss": {"name": "Elena Voss", "title": "Embedded Journalist", "color": "#94a3b8", "emoji": "\u270d\ufe0f"},
+    "paul_conti": {"name": "Dr. Nathan Reeves", "title": "Psychiatrist \u2014 Self-Structure", "color": "#7c3aed", "emoji": "\U0001f9e0"},
+    "margaret_calloway": {
+        "name": "Margaret Calloway",
+        "title": "Senior Editor \u2014 Longform",
+        "color": "#b45309",
+        "emoji": "\u270f\ufe0f",
+    },
+    "vivek_murthy": {"name": "Dr. Daniel Murthy", "title": "Social Connection & Loneliness", "color": "#0891b2", "emoji": "\U0001f91d"},
 }
 
 
 def _extract_chronicle_preview(content_html: str, max_paragraphs: int = 3) -> str:
     """Extract first N paragraphs from Chronicle HTML for email preview."""
     import re
-    paragraphs = re.findall(r'<p>(.*?)</p>', content_html, re.DOTALL)
+
+    paragraphs = re.findall(r"<p>(.*?)</p>", content_html, re.DOTALL)
     preview_paras = paragraphs[:max_paragraphs]
     return "\n".join(f"<p>{p}</p>" for p in preview_paras) if preview_paras else "<p>This week's chronicle is available on the site.</p>"
 
@@ -331,7 +346,7 @@ def _build_subscriber_email(installment: dict, subscriber: dict) -> tuple[str, s
     </p>
     <p style="font-size:11px;text-align:center;margin:0;">
       <a href="{unsub_url}" style="color:#484f58;text-decoration:underline;">Unsubscribe</a>
-      &nbsp;\u00B7&nbsp;
+      &nbsp;\u00b7&nbsp;
       <a href="{SITE_URL}" style="color:#484f58;text-decoration:underline;">averagejoematt.com</a>
     </p>
   </div>
@@ -347,6 +362,7 @@ def _build_subscriber_email(installment: dict, subscriber: dict) -> tuple[str, s
 # HANDLER
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def lambda_handler(event, context):
     try:
         if os.environ.get("EXTERNAL_EMAILS_ENABLED", "true").lower() != "true":
@@ -361,14 +377,14 @@ def lambda_handler(event, context):
             logger.info("No installment found this week — clean no-op")
             return {
                 "statusCode": 200,
-                "body":    "No Chronicle installment found this week — no-op",
-                "sent":    0,
+                "body": "No Chronicle installment found this week — no-op",
+                "sent": 0,
                 "skipped": True,
             }
 
         title = installment.get("title", "")
         week_num = installment.get("week_number", "?")
-        logger.info("Installment found — Week %s: \"%s\"", week_num, title)
+        logger.info('Installment found — Week %s: "%s"', week_num, title)
 
         # Load confirmed subscribers
         subscribers = _get_confirmed_subscribers()
@@ -394,10 +410,12 @@ def lambda_handler(event, context):
                 ses.send_email(
                     FromEmailAddress=SENDER,
                     Destination={"ToAddresses": [email]},
-                    Content={"Simple": {
-                        "Subject": {"Data": subject, "Charset": "UTF-8"},
-                        "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
-                    }},
+                    Content={
+                        "Simple": {
+                            "Subject": {"Data": subject, "Charset": "UTF-8"},
+                            "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
+                        }
+                    },
                 )
                 sent += 1
                 logger.info("Sent %d/%d (%s...)", i + 1, len(subscribers), email[:6])
@@ -413,12 +431,12 @@ def lambda_handler(event, context):
 
         return {
             "statusCode": 200,
-            "body":     f"Chronicle Week {week_num} sent to {sent}/{len(subscribers)} subscribers",
-            "sent":     sent,
-            "failed":   failed,
-            "total":    len(subscribers),
+            "body": f"Chronicle Week {week_num} sent to {sent}/{len(subscribers)} subscribers",
+            "sent": sent,
+            "failed": failed,
+            "total": len(subscribers),
             "week_num": week_num,
-            "title":    title,
+            "title": title,
         }
     except Exception as e:
         logger.error("lambda_handler failed: %s", e, exc_info=True)

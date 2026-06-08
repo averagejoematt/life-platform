@@ -38,8 +38,7 @@ TOMBSTONE_REASON = "legacy_daily_aggregate_superseded_by_per_workout"
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--apply", action="store_true",
-                    help="Commit the tombstones. Default = dry-run.")
+    ap.add_argument("--apply", action="store_true", help="Commit the tombstones. Default = dry-run.")
     args = ap.parse_args()
     dry = not args.apply
 
@@ -54,8 +53,7 @@ def main() -> int:
             "KeyConditionExpression": Key("pk").eq(PK) & Key("sk").begins_with("DATE#"),
             # Match aggregates: SK is exactly "DATE#yyyy-mm-dd" with no further suffix.
             # The per-workout records have "DATE#yyyy-mm-dd#WORKOUT#..." which contains "#WORKOUT#".
-            "FilterExpression": "attribute_not_exists(source_workout_id) "
-                                "AND attribute_not_exists(tombstone)",
+            "FilterExpression": "attribute_not_exists(source_workout_id) " "AND attribute_not_exists(tombstone)",
             "ProjectionExpression": "pk, sk, #d, workouts_count, total_sets",
             "ExpressionAttributeNames": {"#d": "date"},
         }
@@ -68,11 +66,15 @@ def main() -> int:
             # Sanity guard: be paranoid — only match legacy aggregate sks.
             if "#WORKOUT#" in sk:
                 continue
-            legacy_keys.append({
-                "pk": it["pk"], "sk": sk,
-                "date": it.get("date"), "workouts_count": it.get("workouts_count"),
-                "total_sets": it.get("total_sets"),
-            })
+            legacy_keys.append(
+                {
+                    "pk": it["pk"],
+                    "sk": sk,
+                    "date": it.get("date"),
+                    "workouts_count": it.get("workouts_count"),
+                    "total_sets": it.get("total_sets"),
+                }
+            )
         scanned += len(items)
         last_eval = resp.get("LastEvaluatedKey")
         if not last_eval:
@@ -85,8 +87,10 @@ def main() -> int:
 
     if dry:
         for k in legacy_keys[:10]:
-            print(f"  [DRY] would tombstone sk={k['sk']} date={k['date']} "
-                  f"workouts_count={k['workouts_count']} total_sets={k['total_sets']}")
+            print(
+                f"  [DRY] would tombstone sk={k['sk']} date={k['date']} "
+                f"workouts_count={k['workouts_count']} total_sets={k['total_sets']}"
+            )
         if len(legacy_keys) > 10:
             print(f"  ... + {len(legacy_keys) - 10} more")
         print(f"(dry-run) would update {len(legacy_keys)} items. Pass --apply to commit.")
@@ -97,14 +101,11 @@ def main() -> int:
     for k in legacy_keys:
         table.update_item(
             Key={"pk": k["pk"], "sk": k["sk"]},
-            UpdateExpression=(
-                "SET tombstone = :t, tombstoned_at = :now, "
-                "tombstoned_reason = :r"
-            ),
+            UpdateExpression=("SET tombstone = :t, tombstoned_at = :now, " "tombstoned_reason = :r"),
             ExpressionAttributeValues={
-                ":t":   True,
+                ":t": True,
                 ":now": now_iso,
-                ":r":   TOMBSTONE_REASON,
+                ":r": TOMBSTONE_REASON,
             },
         )
         updated += 1

@@ -18,44 +18,54 @@ import json
 import os
 import re
 import sys
-import boto3
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+import boto3
+
 # ── ANSI colors ──────────────────────────────────────────────────────────────
-GREEN  = "\033[92m"
+GREEN = "\033[92m"
 YELLOW = "\033[93m"
-RED    = "\033[91m"
-RESET  = "\033[0m"
-BOLD   = "\033[1m"
-DIM    = "\033[2m"
+RED = "\033[91m"
+RESET = "\033[0m"
+BOLD = "\033[1m"
+DIM = "\033[2m"
 
 # ── Config ────────────────────────────────────────────────────────────────────
-REGION      = "us-west-2"
-TABLE_NAME  = "life-platform"
-S3_BUCKET   = "matthew-life-platform"
+REGION = "us-west-2"
+TABLE_NAME = "life-platform"
+S3_BUCKET = "matthew-life-platform"
 USER_PREFIX = "USER#matthew#SOURCE#"
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
-table    = dynamodb.Table(TABLE_NAME)
-s3       = boto3.client("s3", region_name=REGION)
+table = dynamodb.Table(TABLE_NAME)
+s3 = boto3.client("s3", region_name=REGION)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 class Check:
     def __init__(self, name, category):
-        self.name = name; self.category = category
-        self.passed = None; self.message = ""
+        self.name = name
+        self.category = category
+        self.passed = None
+        self.message = ""
 
     def ok(self, msg=""):
-        self.passed = True; self.message = msg; return self
+        self.passed = True
+        self.message = msg
+        return self
 
     def fail(self, msg=""):
-        self.passed = False; self.message = msg; return self
+        self.passed = False
+        self.message = msg
+        return self
 
     def warn(self, msg=""):
-        self.passed = None; self.message = msg; return self
+        self.passed = None
+        self.message = msg
+        return self
 
     def render(self):
         if self.passed is True:
@@ -72,13 +82,19 @@ def pt_now():
 
 # ── Check functions (reuse same logic as lambda) ──────────────────────────────
 
+
 def check_ddb_freshness(yesterday):
     checks = []
     REQUIRED = [
-        ("whoop","Sleep/Recovery"),("macrofactor","Nutrition"),("habitify","Habits"),
-        ("withings","Weight"),("strava","Training"),("garmin","Steps"),("apple_health","Apple Health"),
+        ("whoop", "Sleep/Recovery"),
+        ("macrofactor", "Nutrition"),
+        ("habitify", "Habits"),
+        ("withings", "Weight"),
+        ("strava", "Training"),
+        ("garmin", "Steps"),
+        ("apple_health", "Apple Health"),
     ]
-    OPTIONAL = [("eightsleep","Eight Sleep"),("supplements","Supplements"),("journal","Journal")]
+    OPTIONAL = [("eightsleep", "Eight Sleep"), ("supplements", "Supplements"), ("journal", "Journal")]
 
     for source, label in REQUIRED:
         c = Check(f"DDB:{source}", "Data Freshness")
@@ -104,9 +120,9 @@ def check_ddb_freshness(yesterday):
 def check_s3_freshness():
     checks = []
     FILES = [
-        ("dashboard/data.json","Dashboard JSON",4),
-        ("dashboard/clinical.json","Clinical JSON",26),
-        ("buddy/data.json","Buddy JSON",26),
+        ("dashboard/data.json", "Dashboard JSON", 4),
+        ("dashboard/clinical.json", "Clinical JSON", 26),
+        ("buddy/data.json", "Buddy JSON", 26),
     ]
     for key, label, max_h in FILES:
         c = Check(f"S3:{key}", "Output Files")
@@ -142,18 +158,21 @@ def check_score_sanity(yesterday):
             return c.ok(f"{val}{unit}")
         return c.fail(f"{val}{unit} out of range [{lo}–{hi}]")
 
-    r = data.get("readiness") or {}; s = data.get("sleep") or {}
-    w = data.get("weight") or {};   h = data.get("hrv") or {}
-    g = data.get("glucose") or {};  dg = data.get("day_grade") or {}
+    r = data.get("readiness") or {}
+    s = data.get("sleep") or {}
+    w = data.get("weight") or {}
+    h = data.get("hrv") or {}
+    g = data.get("glucose") or {}
+    dg = data.get("day_grade") or {}
     comps = dg.get("components") or {}
 
     checks += [
-        rng("readiness",  r.get("score"),   0,100,"%",  opt=True),
-        rng("sleep",      s.get("score"),   0,100,     opt=True),
-        rng("weight",     w.get("current"), 150,450," lbs"),
-        rng("hrv",        h.get("value"),   5,250," ms",opt=True),
-        rng("glucose",    g.get("avg"),     50,300," mg/dL",opt=True),
-        rng("hydration",  comps.get("hydration"), 0,100,  opt=True),
+        rng("readiness", r.get("score"), 0, 100, "%", opt=True),
+        rng("sleep", s.get("score"), 0, 100, opt=True),
+        rng("weight", w.get("current"), 150, 450, " lbs"),
+        rng("hrv", h.get("value"), 5, 250, " ms", opt=True),
+        rng("glucose", g.get("avg"), 50, 300, " mg/dL", opt=True),
+        rng("hydration", comps.get("hydration"), 0, 100, opt=True),
     ]
 
     c = Check("score:day_grade", "Score Sanity")
@@ -220,7 +239,7 @@ def check_blog_links():
 
 
 def check_avatar_assets():
-    TIERS = ["foundation","momentum","discipline","mastery","elite"]
+    TIERS = ["foundation", "momentum", "discipline", "mastery", "elite"]
     try:
         paginator = s3.get_paginator("list_objects_v2")
         existing = set()
@@ -230,10 +249,7 @@ def check_avatar_assets():
     except Exception as e:
         return [Check("avatar:sprites", "Avatar Assets").fail(str(e))]
 
-    missing = [
-        f"{t}-frame{f}.png" for t in TIERS for f in [1,2,3]
-        if f"dashboard/avatar/base/{t}-frame{f}.png" not in existing
-    ]
+    missing = [f"{t}-frame{f}.png" for t in TIERS for f in [1, 2, 3] if f"dashboard/avatar/base/{t}-frame{f}.png" not in existing]
     c = Check("avatar:sprites", "Avatar Assets")
     total = len(TIERS) * 3
     c.fail(f"Missing {len(missing)}/{total}: {', '.join(missing)}") if missing else c.ok(f"All {total} sprites present")
@@ -242,10 +258,11 @@ def check_avatar_assets():
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+
 def main():
     parser = argparse.ArgumentParser(description="Life Platform smoke test")
-    parser.add_argument("--quick",  action="store_true", help="Skip blog + avatar checks")
-    parser.add_argument("--date",   default=None,        help="Override yesterday date (YYYY-MM-DD)")
+    parser.add_argument("--quick", action="store_true", help="Skip blog + avatar checks")
+    parser.add_argument("--date", default=None, help="Override yesterday date (YYYY-MM-DD)")
     args = parser.parse_args()
 
     yesterday = args.date or (pt_now() - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -253,14 +270,14 @@ def main():
 
     all_checks = []
     sections = [
-        ("Data Freshness",  lambda: check_ddb_freshness(yesterday)),
-        ("Output Files",    check_s3_freshness),
-        ("Score Sanity",    lambda: check_score_sanity(yesterday)),
+        ("Data Freshness", lambda: check_ddb_freshness(yesterday)),
+        ("Output Files", check_s3_freshness),
+        ("Score Sanity", lambda: check_score_sanity(yesterday)),
     ]
     if not args.quick:
         sections += [
-            ("Blog Links",     check_blog_links),
-            ("Avatar Assets",  check_avatar_assets),
+            ("Blog Links", check_blog_links),
+            ("Avatar Assets", check_avatar_assets),
         ]
 
     for section_name, fn in sections:
@@ -271,8 +288,8 @@ def main():
         all_checks += checks
         print()
 
-    fails  = [c for c in all_checks if c.passed is False]
-    warns  = [c for c in all_checks if c.passed is None]
+    fails = [c for c in all_checks if c.passed is False]
+    warns = [c for c in all_checks if c.passed is None]
     passes = [c for c in all_checks if c.passed is True]
 
     if fails:

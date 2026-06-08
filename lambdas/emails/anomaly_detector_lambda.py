@@ -59,23 +59,25 @@ Logic:
 """
 
 import json
-import os
 import logging
 import math
+import os
 import statistics
 import time
-import boto3
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+
+import boto3
 
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
 
 # AI-3: Output validation
 try:
-    from ai_output_validator import validate_ai_output, AIOutputType
+    from ai_output_validator import AIOutputType, validate_ai_output
+
     _HAS_AI_VALIDATOR = True
 except ImportError:
     _HAS_AI_VALIDATOR = False
@@ -83,9 +85,11 @@ except ImportError:
 # OBS-1: Structured logger
 try:
     from platform_logger import get_logger
+
     logger = get_logger("anomaly-detector")
 except ImportError:
     import logging as _log
+
     logger = _log.getLogger("anomaly-detector")
     logger.setLevel(_log.INFO)
 
@@ -113,16 +117,16 @@ MIN_BASELINE_DAYS = 7
 # At 13 metrics, Z=1.5 floor yields ~42% daily FP rate. Z=2.0 floor drops it to ~2.3% per metric.
 # Sustained streak tracker (DDB history) is unaffected by this change.
 CV_THRESHOLDS = [
-    (0.30, 2.5),   # high variability → Z=2.5
-    (0.15, 2.0),   # medium variability → Z=2.0
-    (0.0,  2.0),   # low variability → Z=2.0
+    (0.30, 2.5),  # high variability → Z=2.5
+    (0.15, 2.0),  # medium variability → Z=2.0
+    (0.0, 2.0),  # low variability → Z=2.0
 ]
 
 MIN_ABSOLUTE_CHANGE = {
-    "weight_lbs":       1.5,
-    "steps":            2000,
+    "weight_lbs": 1.5,
+    "steps": 2000,
     "resting_heart_rate": 3,
-    "blood_pressure_systolic":  8,
+    "blood_pressure_systolic": 8,
     "blood_pressure_diastolic": 5,
 }
 
@@ -136,27 +140,28 @@ LOG_TRANSFORM_METRICS = {"hrv"}
 
 # 4th element (low_is_bad): True=flag LOW values, False=flag HIGH, None=flag either direction
 METRICS = [
-    ("whoop",       "recovery_score",       "Recovery Score",      True),
-    ("whoop",       "hrv",                  "HRV",                 True),
-    ("whoop",       "resting_heart_rate",   "Resting Heart Rate",  False),
-    ("whoop",       "sleep_quality_score",  "Sleep Score",         True),
-    ("whoop",       "sleep_efficiency_percentage", "Sleep Efficiency", True),
-    ("withings",    "weight_lbs",           "Weight",              None),
-    ("apple_health", "steps",                "Steps",               True),
-    ("apple_health", "walking_speed_mph",    "Walking Speed",       True),
-    ("apple_health", "walking_asymmetry_pct", "Walking Asymmetry",   False),
-    ("todoist",     "tasks_completed",      "Tasks Completed",     True),
-    ("habitify",    "completion_pct",       "P40 Habits",          True),
-    ("garmin",      "body_battery_high",    "Body Battery",        True),
-    ("garmin",      "avg_stress",           "Garmin Stress",       False),
-    ("apple_health", "blood_pressure_systolic", "BP Systolic",        False),
-    ("apple_health", "blood_pressure_diastolic", "BP Diastolic",     False),
+    ("whoop", "recovery_score", "Recovery Score", True),
+    ("whoop", "hrv", "HRV", True),
+    ("whoop", "resting_heart_rate", "Resting Heart Rate", False),
+    ("whoop", "sleep_quality_score", "Sleep Score", True),
+    ("whoop", "sleep_efficiency_percentage", "Sleep Efficiency", True),
+    ("withings", "weight_lbs", "Weight", None),
+    ("apple_health", "steps", "Steps", True),
+    ("apple_health", "walking_speed_mph", "Walking Speed", True),
+    ("apple_health", "walking_asymmetry_pct", "Walking Asymmetry", False),
+    ("todoist", "tasks_completed", "Tasks Completed", True),
+    ("habitify", "completion_pct", "P40 Habits", True),
+    ("garmin", "body_battery_high", "Body Battery", True),
+    ("garmin", "avg_stress", "Garmin Stress", False),
+    ("apple_health", "blood_pressure_systolic", "BP Systolic", False),
+    ("apple_health", "blood_pressure_diastolic", "BP Diastolic", False),
 ]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def get_anthropic_key():
     """ADR-062: Bedrock uses IAM auth — this fetch is dead. Returns a truthy
@@ -166,15 +171,20 @@ def get_anthropic_key():
     Full plumbing removal tracked as task #90."""
     return "_BEDROCK_IAM_"
 
+
 def d2f(obj):
-    if isinstance(obj, list): return [d2f(i) for i in obj]
-    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [d2f(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
 
 
 # ── Travel awareness (v2.1.0) ─────────────────────────────────────────────────
 TRAVEL_PK = f"USER#{USER_ID}#SOURCE#travel"
+
 
 def _check_travel(date_str):
     """Check if date falls within an active trip. Returns trip dict or None."""
@@ -202,26 +212,33 @@ def fetch_date(source, date_str):
     except Exception:
         return {}
 
+
 def fetch_range(source, start, end):
     try:
         # ADR-058: phase=pilot hidden by default.
         from phase_filter import with_phase_filter
-        r = table.query(**with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": f"USER#{USER_ID}#SOURCE#{source}",
-                ":s":  f"DATE#{start}",
-                ":e":  f"DATE#{end}"
-            }}))
+
+        r = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                    "ExpressionAttributeValues": {":pk": f"USER#{USER_ID}#SOURCE#{source}", ":s": f"DATE#{start}", ":e": f"DATE#{end}"},
+                }
+            )
+        )
         return [d2f(item) for item in r.get("Items", [])]
     except Exception:
         return []
 
+
 def safe_float(rec, field):
     if rec and field in rec:
-        try: return float(rec[field])
-        except Exception: return None
+        try:
+            return float(rec[field])
+        except Exception:
+            return None
     return None
+
 
 def is_weekend(date_str):
     try:
@@ -235,14 +252,15 @@ def is_weekend(date_str):
 # ADAPTIVE THRESHOLD LEARNING
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def compute_adaptive_threshold(cv):
     for cv_floor, z_threshold in CV_THRESHOLDS:
         if cv >= cv_floor:
             return z_threshold
     return 1.5
 
-def compute_baseline(source, field, end_date, lookback_days=30, dow_normalize=False,
-                     target_is_weekend=False, log_transform=False):
+
+def compute_baseline(source, field, end_date, lookback_days=30, dow_normalize=False, target_is_weekend=False, log_transform=False):
     """Compute rolling baseline mean, SD, CV, and adaptive Z-threshold.
 
     Args:
@@ -286,7 +304,7 @@ def compute_baseline(source, field, end_date, lookback_days=30, dow_normalize=Fa
         if len(safe_vals) < MIN_BASELINE_DAYS:
             return None, None, None, None, len(safe_vals), baseline_type
         log_vals = [math.log(v) for v in safe_vals]
-        mean = statistics.mean(log_vals)       # log-domain mean
+        mean = statistics.mean(log_vals)  # log-domain mean
         sd = statistics.stdev(log_vals) if len(log_vals) > 1 else 0
         # CV still computed in original domain for consistent adaptive-threshold logic
         orig_mean = statistics.mean(safe_vals)
@@ -320,7 +338,9 @@ def check_anomalies(yesterday_str, today):
         log_transform = field in LOG_TRANSFORM_METRICS
 
         mean, sd, cv, z_threshold, sample_size, baseline_type = compute_baseline(
-            source, field, yesterday_date,
+            source,
+            field,
+            yesterday_date,
             dow_normalize=dow_normalize,
             target_is_weekend=yesterday_is_weekend,
             log_transform=log_transform,
@@ -366,26 +386,28 @@ def check_anomalies(yesterday_str, today):
             display_mean = round(math.exp(mean) if log_transform else mean, 1)
             display_sd = round(
                 # Approximate original-unit SD from log-domain SD via delta method: σ_orig ≈ μ_orig * σ_log
-                math.exp(mean) * sd if log_transform else sd, 1
+                math.exp(mean) * sd if log_transform else sd,
+                1,
             )
-            flagged.append({
-                "source":              source,
-                "field":               field,
-                "label":               label,
-                "yesterday_val":       round(yesterday_val, 1),
-                "baseline_mean":       display_mean,
-                "baseline_sd":         display_sd,
-                "z_score":             round(z, 2),
-                "direction":           direction,
-                "pct_from_mean":       round(((yesterday_val - display_mean) / display_mean) * 100, 1)
-                                       if display_mean != 0 else 0,
-                "cv":                  round(cv, 3) if cv is not None else None,
-                "z_threshold":         z_threshold,
-                "baseline_type":       baseline_type,
-                "sample_size":         sample_size,
-                "log_transform":       log_transform,
-                "distribution_note":   "lognormal_z" if log_transform else "gaussian_approx",
-            })
+            flagged.append(
+                {
+                    "source": source,
+                    "field": field,
+                    "label": label,
+                    "yesterday_val": round(yesterday_val, 1),
+                    "baseline_mean": display_mean,
+                    "baseline_sd": display_sd,
+                    "z_score": round(z, 2),
+                    "direction": direction,
+                    "pct_from_mean": round(((yesterday_val - display_mean) / display_mean) * 100, 1) if display_mean != 0 else 0,
+                    "cv": round(cv, 3) if cv is not None else None,
+                    "z_threshold": z_threshold,
+                    "baseline_type": baseline_type,
+                    "sample_size": sample_size,
+                    "log_transform": log_transform,
+                    "distribution_note": "lognormal_z" if log_transform else "gaussian_approx",
+                }
+            )
 
     return flagged
 
@@ -426,9 +448,11 @@ def build_context(yesterday_str):
     for source in sources:
         rec = fetch_date(source, yesterday_str)
         if rec:
-            clean = {k: v for k, v in rec.items()
-                     if k not in ("pk", "sk", "activities", "food_log", "habits", "workouts")
-                     and not isinstance(v, list)}
+            clean = {
+                k: v
+                for k, v in rec.items()
+                if k not in ("pk", "sk", "activities", "food_log", "habits", "workouts") and not isinstance(v, list)
+            }
             context[source] = clean
     return context
 
@@ -440,30 +464,30 @@ def call_anthropic_with_retry(req, timeout=30, max_attempts=None, backoff_s=None
     Signature kept for callers; max_attempts/backoff_s args ignored.
     """
     from retry_utils import call_anthropic_raw
+
     return call_anthropic_raw(req, timeout=timeout)
 
 
 def call_haiku_hypothesis(flagged, context, api_key):
-    payload = json.dumps({
-        "model": AI_MODEL_HAIKU,
-        "max_tokens": 250,
-        "messages": [{
-            "role": "user",
-            "content": HYPOTHESIS_PROMPT.format(
-                anomalies_json=json.dumps(flagged, indent=2),
-                context_json=json.dumps(context, indent=2)
-            )
-        }]
-    }).encode()
+    payload = json.dumps(
+        {
+            "model": AI_MODEL_HAIKU,
+            "max_tokens": 250,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": HYPOTHESIS_PROMPT.format(
+                        anomalies_json=json.dumps(flagged, indent=2), context_json=json.dumps(context, indent=2)
+                    ),
+                }
+            ],
+        }
+    ).encode()
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages",
         data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01"
-        },
-        method="POST"
+        headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
+        method="POST",
     )
     resp = call_anthropic_with_retry(req, timeout=25)
     return resp["content"][0]["text"].strip()
@@ -472,6 +496,7 @@ def call_haiku_hypothesis(flagged, context, api_key):
 # ══════════════════════════════════════════════════════════════════════════════
 # SUSTAINED ANOMALY TRACKING  (IC-19 Deliverable 2 — Board v2 spec)
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _check_sustained_streaks(yesterday_str, today_flagged):
     """Detect metrics that have been flagged in the same direction for 3+ consecutive days.
@@ -502,14 +527,19 @@ def _check_sustained_streaks(yesterday_str, today_flagged):
 
         pk = f"USER#{USER_ID}#SOURCE#anomalies"
         from phase_filter import with_phase_filter
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": pk,
-                ":s":  f"DATE#{start_6d}",
-                ":e":  f"DATE#{yesterday_str}",
-            },
-        }))
+
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                    "ExpressionAttributeValues": {
+                        ":pk": pk,
+                        ":s": f"DATE#{start_6d}",
+                        ":e": f"DATE#{yesterday_str}",
+                    },
+                }
+            )
+        )
         history = {item["date"]: item for item in resp.get("Items", [])}
     except Exception as e:
         logger.warning(f"_check_sustained_streaks: DDB read failed (non-fatal, falling back to single-day): {e}")
@@ -525,12 +555,12 @@ def _check_sustained_streaks(yesterday_str, today_flagged):
     # Collect all unique (field, direction) combos seen across history + today
     all_metric_keys = set(today_by_key.keys())
     for day_rec in history.values():
-        for m in (day_rec.get("anomalous_metrics") or []):
+        for m in day_rec.get("anomalous_metrics") or []:
             all_metric_keys.add((m.get("field", ""), m.get("direction", "")))
 
     sustained = []
 
-    for (field, direction) in all_metric_keys:
+    for field, direction in all_metric_keys:
         if not field or not direction:
             continue
 
@@ -561,8 +591,7 @@ def _check_sustained_streaks(yesterday_str, today_flagged):
                 break
 
             day_flags = day_rec.get("anomalous_metrics") or []
-            match = next((f for f in day_flags
-                          if f.get("field") == field and f.get("direction") == direction), None)
+            match = next((f for f in day_flags if f.get("field") == field and f.get("direction") == direction), None)
             if match:
                 streak += 1
                 if not candidate_label:
@@ -607,15 +636,17 @@ def _check_sustained_streaks(yesterday_str, today_flagged):
             except Exception as e:
                 logger.warning(f"Training covariate check failed (non-fatal): {e}")
 
-        sustained.append({
-            "metric":           field,
-            "label":            candidate_label or field,
-            "source":           candidate_source or "",
-            "direction":        direction,
-            "streak_days":      streak,
-            "severity":         "sustained_single_source",
-            "training_context": training_context,
-        })
+        sustained.append(
+            {
+                "metric": field,
+                "label": candidate_label or field,
+                "source": candidate_source or "",
+                "direction": direction,
+                "streak_days": streak,
+                "severity": "sustained_single_source",
+                "training_context": training_context,
+            }
+        )
 
     # ── 4. Park: deduplicate sleep metrics — keep most clinically meaningful ──
     sleep_fields = {"sleep_efficiency_percentage", "sleep_score", "sleep_performance"}
@@ -646,9 +677,9 @@ def build_sustained_alert_html(sustained_list, date_str):
         direction_word = "below" if s["direction"] == "low" else "above"
         tc_html = ""
         if s.get("training_context"):
-            tc_html = (f'<p style="color:#92400e;font-size:13px;margin:6px 0 0 0;">'
-                       f'<em>{s["training_context"]}</em></p>')
-        rows.append(f"""
+            tc_html = f'<p style="color:#92400e;font-size:13px;margin:6px 0 0 0;">' f'<em>{s["training_context"]}</em></p>'
+        rows.append(
+            f"""
         <tr>
           <td style="padding:12px 16px;border-bottom:1px solid #fef3c7;">
             <strong style="color:#1f2937;">{s["label"]}</strong><br>
@@ -658,7 +689,8 @@ def build_sustained_alert_html(sustained_list, date_str):
             </span>
             {tc_html}
           </td>
-        </tr>""")
+        </tr>"""
+        )
 
     return f"""<!DOCTYPE html>
 <html>
@@ -718,7 +750,7 @@ def send_sustained_alert_email(sustained_list, date_str):
         Content={
             "Simple": {
                 "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
+                "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
             }
         },
     )
@@ -729,30 +761,40 @@ def send_sustained_alert_email(sustained_list, date_str):
 # DYNAMODB WRITE
 # ══════════════════════════════════════════════════════════════════════════════
 
-def write_anomaly_record(date_str, flagged, alert_sent, hypothesis, severity,
-                         travel_mode=False, travel_dest=None,
-                         sick_mode=False, sick_reason=None,
-                         sustained_metrics=None, sustained_alert_sent=False):
+
+def write_anomaly_record(
+    date_str,
+    flagged,
+    alert_sent,
+    hypothesis,
+    severity,
+    travel_mode=False,
+    travel_dest=None,
+    sick_mode=False,
+    sick_reason=None,
+    sustained_metrics=None,
+    sustained_alert_sent=False,
+):
     """Write anomaly record. Additive sustained_metrics field — no schema breakage. (Jin/Omar)"""
     # R17-17: 90-day TTL — anomaly records are investigative, not long-term data
     record_dt = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     ttl_epoch = int((record_dt + timedelta(days=90)).timestamp())
     item = {
-        "pk":                    f"USER#{USER_ID}#SOURCE#anomalies",
-        "sk":                    f"DATE#{date_str}",
-        "date":                  date_str,
-        "anomalous_metrics":     flagged,
-        "source_count":          len(set(f["source"] for f in flagged)),
-        "alert_sent":            alert_sent,
-        "hypothesis":            hypothesis,
-        "severity":              severity,
-        "travel_mode":           travel_mode,
-        "travel_destination":    travel_dest,
-        "sick_mode":             sick_mode,
-        "sick_reason":           sick_reason,
-        "detector_version":      "2.5.0",
-        "updated_at":            datetime.now(timezone.utc).isoformat(),
-        "ttl":                   ttl_epoch,
+        "pk": f"USER#{USER_ID}#SOURCE#anomalies",
+        "sk": f"DATE#{date_str}",
+        "date": date_str,
+        "anomalous_metrics": flagged,
+        "source_count": len(set(f["source"] for f in flagged)),
+        "alert_sent": alert_sent,
+        "hypothesis": hypothesis,
+        "severity": severity,
+        "travel_mode": travel_mode,
+        "travel_destination": travel_dest,
+        "sick_mode": sick_mode,
+        "sick_reason": sick_reason,
+        "detector_version": "2.5.0",
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "ttl": ttl_epoch,
     }
     # Sustained streak fields — additive, harmless if absent (IC-19 Deliverable 2)
     if sustained_metrics:
@@ -761,14 +803,17 @@ def write_anomaly_record(date_str, flagged, alert_sent, hypothesis, severity,
         item["sustained_alert_sent"] = True
     item = json.loads(json.dumps(item), parse_float=Decimal)
     table.put_item(Item=item)
-    logger.info(f"Anomaly record written: date={date_str} severity={severity} "
-                f"metrics={len(flagged)} sources={item['source_count']} "
-                f"sustained={len(sustained_metrics or [])} sustained_alerted={sustained_alert_sent}")
+    logger.info(
+        f"Anomaly record written: date={date_str} severity={severity} "
+        f"metrics={len(flagged)} sources={item['source_count']} "
+        f"sustained={len(sustained_metrics or [])} sustained_alerted={sustained_alert_sent}"
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ALERT EMAIL
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def build_alert_html(flagged, hypothesis, date_str):
     try:
@@ -789,7 +834,7 @@ def build_alert_html(flagged, hypothesis, date_str):
         z_str = f'Z = {m["z_score"]} (threshold: {m.get("z_threshold", 1.5)})'
         baseline_note = m.get("baseline_type", "rolling_30d")
         if baseline_note != "rolling_30d":
-            baseline_note = f'{baseline_note} baseline'
+            baseline_note = f"{baseline_note} baseline"
         else:
             baseline_note = ""
         metric_rows += f"""
@@ -858,10 +903,12 @@ def send_alert_email(flagged, hypothesis, date_str):
     ses.send_email(
         FromEmailAddress=SENDER,
         Destination={"ToAddresses": [RECIPIENT]},
-        Content={"Simple": {
-            "Subject": {"Data": subject, "Charset": "UTF-8"},
-            "Body":    {"Html":  {"Data": html,    "Charset": "UTF-8"}},
-        }},
+        Content={
+            "Simple": {
+                "Subject": {"Data": subject, "Charset": "UTF-8"},
+                "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
+            }
+        },
     )
     logger.info(f"Alert email sent: {subject}")
 
@@ -874,15 +921,18 @@ def send_alert_email(flagged, hypothesis, date_str):
 def record_email_send(table, lambda_name):
     """Write a completion record so the status page can track last send."""
     import time as _time
+
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     try:
-        table.put_item(Item={
-            "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
-            "sk": f"DATE#{today}",
-            "sent_at": datetime.now(timezone.utc).isoformat(),
-            "status": "success",
-            "ttl": int(_time.time()) + 86400 * 90
-        })
+        table.put_item(
+            Item={
+                "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
+                "sk": f"DATE#{today}",
+                "sent_at": datetime.now(timezone.utc).isoformat(),
+                "status": "success",
+                "ttl": int(_time.time()) + 86400 * 90,
+            }
+        )
     except Exception as e:
         logger.info(f"[status-tracking] Non-fatal write failure: {e}")
 
@@ -906,6 +956,7 @@ def lambda_handler(event, context):
     # ── Sick day check (v2.2.0) ──
     try:
         from sick_day_checker import check_sick_day as _check_sick_anomaly
+
         _sick_rec_anomaly = _check_sick_anomaly(table, USER_ID, yesterday)
     except ImportError:
         _sick_rec_anomaly = None
@@ -917,9 +968,11 @@ def lambda_handler(event, context):
     flagged = check_anomalies(yesterday, today)
     logger.info(f"Flagged metrics: {len(flagged)}")
     for m in flagged:
-        logger.info(f"  [{m['source']}] {m['label']}: {m['yesterday_val']} "
-                    f"(Z={m['z_score']}, threshold={m.get('z_threshold')}, "
-                    f"CV={m.get('cv')}, baseline={m.get('baseline_type')}, {m['direction']})")
+        logger.info(
+            f"  [{m['source']}] {m['label']}: {m['yesterday_val']} "
+            f"(Z={m['z_score']}, threshold={m.get('z_threshold')}, "
+            f"CV={m.get('cv')}, baseline={m.get('baseline_type')}, {m['direction']})"
+        )
 
     # ── Sustained streak detection (IC-19 Deliverable 2 — non-fatal) ──
     sustained_metrics = []
@@ -928,8 +981,7 @@ def lambda_handler(event, context):
         try:
             sustained_metrics = _check_sustained_streaks(yesterday, flagged)
             if sustained_metrics:
-                logger.info(f"Sustained streaks: {len(sustained_metrics)} metric(s): "
-                            f"{[s['label'] for s in sustained_metrics]}")
+                logger.info(f"Sustained streaks: {len(sustained_metrics)} metric(s): " f"{[s['label'] for s in sustained_metrics]}")
         except Exception as e:
             logger.warning(f"_check_sustained_streaks failed (non-fatal): {e}")
 
@@ -969,11 +1021,12 @@ def lambda_handler(event, context):
     elif multi and travel_mode:
         source_count = len(set(f["source"] for f in flagged))
         severity = "travel_suppressed"
-        hypothesis = (f"[TRAVEL] Currently in {travel_dest}. "
-                      "Anomalies expected due to timezone shift, routine disruption, "
-                      "and environmental change. Alert suppressed.")
-        logger.info(f"Travel mode -- {len(flagged)} metrics flagged across "
-                    f"{source_count} sources, alert SUPPRESSED")
+        hypothesis = (
+            f"[TRAVEL] Currently in {travel_dest}. "
+            "Anomalies expected due to timezone shift, routine disruption, "
+            "and environmental change. Alert suppressed."
+        )
+        logger.info(f"Travel mode -- {len(flagged)} metrics flagged across " f"{source_count} sources, alert SUPPRESSED")
 
     elif multi and sick_mode:
         source_count = len(set(f["source"] for f in flagged))
@@ -983,8 +1036,7 @@ def lambda_handler(event, context):
             "during illness — recovery score, HRV, habits, and nutrition will all look "
             "off. Anomaly alerts suppressed. Rest and recover."
         )
-        logger.info(f"Sick mode -- {len(flagged)} metrics flagged across "
-                    f"{source_count} sources, alert SUPPRESSED")
+        logger.info(f"Sick mode -- {len(flagged)} metrics flagged across " f"{source_count} sources, alert SUPPRESSED")
 
     else:
         logger.info("No multi-source anomaly -- no alert sent.")
@@ -997,25 +1049,35 @@ def lambda_handler(event, context):
         except Exception as e:
             logger.error(f"Sustained alert email failed (non-fatal): {e}")
 
-    write_anomaly_record(yesterday, flagged, alert_sent, hypothesis, severity,
-                         travel_mode=travel_mode, travel_dest=travel_dest,
-                         sick_mode=sick_mode, sick_reason=sick_reason if sick_mode else None,
-                         sustained_metrics=sustained_metrics,
-                         sustained_alert_sent=sustained_alert_sent)
+    write_anomaly_record(
+        yesterday,
+        flagged,
+        alert_sent,
+        hypothesis,
+        severity,
+        travel_mode=travel_mode,
+        travel_dest=travel_dest,
+        sick_mode=sick_mode,
+        sick_reason=sick_reason if sick_mode else None,
+        sustained_metrics=sustained_metrics,
+        sustained_alert_sent=sustained_alert_sent,
+    )
 
     record_email_send(table, "anomaly_detector")
     return {
         "statusCode": 200,
-        "body": json.dumps({
-            "date":                yesterday,
-            "flagged_count":       len(flagged),
-            "multi_source":        multi,
-            "severity":            severity,
-            "alert_sent":          alert_sent,
-            "travel_mode":         travel_mode,
-            "travel_destination":  travel_dest,
-            "sustained_count":     len(sustained_metrics),
-            "sustained_alert_sent": sustained_alert_sent,
-            "detector_version":    "2.3.0",
-        })
+        "body": json.dumps(
+            {
+                "date": yesterday,
+                "flagged_count": len(flagged),
+                "multi_source": multi,
+                "severity": severity,
+                "alert_sent": alert_sent,
+                "travel_mode": travel_mode,
+                "travel_destination": travel_dest,
+                "sustained_count": len(sustained_metrics),
+                "sustained_alert_sent": sustained_alert_sent,
+                "detector_version": "2.3.0",
+            }
+        ),
     }

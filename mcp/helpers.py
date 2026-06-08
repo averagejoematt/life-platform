@@ -1,15 +1,17 @@
 """
 Shared computation helpers: aggregation, training load, statistics, classification.
 """
-import math
+
 import logging
+import math
 from collections import defaultdict
 from datetime import datetime, timedelta
 
 from mcp.config import FIELD_ALIASES, P40_GROUPS, logger
-from mcp.core import get_profile, query_source, decimal_to_float, get_sot
+from mcp.core import decimal_to_float, get_profile, get_sot, query_source
 
 # ── Aggregation ──
+
 
 # ── Aggregation helpers ───────────────────────────────────────────────────────
 def aggregate_items(items, period):
@@ -50,20 +52,20 @@ def flatten_strava_activity(day_record):
     for act in activities:
         sport_type = act.get("sport_type") or act.get("type") or ""
         flat = {
-            "date":                      day_record.get("date"),
-            "name":                      act.get("name"),
-            "enriched_name":             act.get("enriched_name"),
-            "sport_type":                sport_type,
-            "distance_miles":            act.get("distance_miles"),
+            "date": day_record.get("date"),
+            "name": act.get("name"),
+            "enriched_name": act.get("enriched_name"),
+            "sport_type": sport_type,
+            "distance_miles": act.get("distance_miles"),
             "total_elevation_gain_feet": act.get("total_elevation_gain_feet"),
-            "moving_time_seconds":       act.get("moving_time_seconds"),
-            "average_heartrate":         act.get("average_heartrate"),
-            "max_heartrate":             act.get("max_heartrate"),
-            "average_watts":             act.get("average_watts"),
-            "kilojoules":                act.get("kilojoules"),
-            "pr_count":                  act.get("pr_count"),
-            "achievement_count":         act.get("achievement_count"),
-            "strava_id":                 act.get("strava_id"),
+            "moving_time_seconds": act.get("moving_time_seconds"),
+            "average_heartrate": act.get("average_heartrate"),
+            "max_heartrate": act.get("max_heartrate"),
+            "average_watts": act.get("average_watts"),
+            "kilojoules": act.get("kilojoules"),
+            "pr_count": act.get("pr_count"),
+            "achievement_count": act.get("achievement_count"),
+            "strava_id": act.get("strava_id"),
         }
         result.append({k: v for k, v in flat.items() if v is not None})
     return result
@@ -108,7 +110,7 @@ def pearson_r(xs, ys):
     mx = sum(xs) / n
     my = sum(ys) / n
     num = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
-    denom = math.sqrt(sum((x - mx)**2 for x in xs) * sum((y - my)**2 for y in ys))
+    denom = math.sqrt(sum((x - mx) ** 2 for x in xs) * sum((y - my) ** 2 for y in ys))
     if denom == 0:
         return None
     return round(num / denom, 3)
@@ -121,14 +123,14 @@ def _linear_regression(points):
         return None, None, None
     xs = [p[0] for p in points]
     ys = [p[1] for p in points]
-    mx, my = sum(xs)/n, sum(ys)/n
-    ss_xx = sum((x - mx)**2 for x in xs)
+    mx, my = sum(xs) / n, sum(ys) / n
+    ss_xx = sum((x - mx) ** 2 for x in xs)
     if ss_xx == 0:
         return 0, my, 0
-    ss_xy = sum((x - mx)*(y - my) for x, y in zip(xs, ys))
+    ss_xy = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
     slope = ss_xy / ss_xx
     intercept = my - slope * mx
-    ss_yy = sum((y - my)**2 for y in ys)
+    ss_yy = sum((y - my) ** 2 for y in ys)
     r_sq = (ss_xy**2 / (ss_xx * ss_yy)) if ss_yy > 0 else 0
     return round(slope, 4), round(intercept, 2), round(r_sq, 3)
 
@@ -193,12 +195,12 @@ def classify_day_type(whoop_strain=None, strava_activities=None, daily_load=None
 
 DAY_TYPE_THRESHOLDS = {
     "whoop_strain": {"rest": 4, "light": 8, "moderate": 14, "hard": 21},
-    "load_score":   {"rest": 50, "light": 200, "moderate": 500, "hard": float("inf")},
+    "load_score": {"rest": 50, "light": 200, "moderate": 500, "hard": float("inf")},
 }
 
 
-
 # ── Chronicling / Habits helpers ──
+
 
 def query_chronicling(start_date, end_date):
     """Query habit items (habitify or chronicling) based on source-of-truth.
@@ -217,14 +219,16 @@ def _habit_series(items):
     for item in sorted(items, key=lambda x: x.get("date", "")):
         if not item.get("habits"):
             continue
-        rows.append({
-            "date":            item.get("date"),
-            "habits":          {k: int(v) for k, v in item.get("habits", {}).items()},
-            "by_group":        item.get("by_group", {}),
-            "total_completed": item.get("total_completed", 0),
-            "total_possible":  item.get("total_possible", 0),
-            "completion_pct":  item.get("completion_pct", 0),
-        })
+        rows.append(
+            {
+                "date": item.get("date"),
+                "habits": {k: int(v) for k, v in item.get("habits", {}).items()},
+                "by_group": item.get("by_group", {}),
+                "total_completed": item.get("total_completed", 0),
+                "total_possible": item.get("total_possible", 0),
+                "completion_pct": item.get("completion_pct", 0),
+            }
+        )
     return rows
 
 
@@ -234,6 +238,7 @@ def _habit_series(items):
 # This normaliser maps Whoop DynamoDB fields to a common schema so all sleep
 # consumers (tools_sleep, tools_correlation, tools_health, daily brief) use
 # a consistent field vocabulary.
+
 
 def normalize_whoop_sleep(item):
     """Map Whoop DynamoDB fields to normalised sleep analysis fields.
@@ -262,8 +267,8 @@ def normalize_whoop_sleep(item):
     if dur and dur > 0:
         for src_field, pct_field in [
             ("slow_wave_sleep_hours", "deep_pct"),
-            ("rem_sleep_hours",      "rem_pct"),
-            ("light_sleep_hours",    "light_pct"),
+            ("rem_sleep_hours", "rem_pct"),
+            ("light_sleep_hours", "light_pct"),
         ]:
             val = item.get(src_field)
             if val is not None and pct_field not in item:

@@ -15,6 +15,7 @@ Writes are versioned; bump version + write a new VERSION#<n> item, then
 update VERSION#current. The id-map write is conditional (no overwrite) so
 two concurrent first-push attempts can't collide.
 """
+
 from __future__ import annotations
 
 import logging
@@ -23,7 +24,6 @@ from typing import Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
-
 from routine_ir import RoutineSpec, deserialize, serialize
 
 logger = logging.getLogger("routine_repo")
@@ -86,23 +86,23 @@ def put_versioned(ir: RoutineSpec) -> RoutineSpec:
             ConditionExpression="attribute_not_exists(pk) AND attribute_not_exists(sk)",
         )
     except _ddb.meta.client.exceptions.ConditionalCheckFailedException as e:
-        raise RoutineConflict(
-            f"VERSION#{ir.version:06d} for routine {ir.routine_id} already exists"
-        ) from e
+        raise RoutineConflict(f"VERSION#{ir.version:06d} for routine {ir.routine_id} already exists") from e
 
     pointer_item = {**body, "pk": pk, "sk": "VERSION#current"}
     _table.put_item(Item=pointer_item)
     # Date-sorted index for list_by_date_range; idempotent put (same routine
     # writes the same index sk every time).
-    _table.put_item(Item={
-        "pk": INDEX_PK,
-        "sk": f"DATE#{ir.target_date}#ROUTINE#{ir.routine_id}",
-        "routine_id": ir.routine_id,
-        "target_date": ir.target_date,
-        "archetype": ir.archetype,
-        "variant": ir.variant,
-        "status": ir.status,
-    })
+    _table.put_item(
+        Item={
+            "pk": INDEX_PK,
+            "sk": f"DATE#{ir.target_date}#ROUTINE#{ir.routine_id}",
+            "routine_id": ir.routine_id,
+            "target_date": ir.target_date,
+            "archetype": ir.archetype,
+            "variant": ir.variant,
+            "status": ir.status,
+        }
+    )
     return ir
 
 
@@ -112,9 +112,9 @@ def list_by_date_range(start_date: str, end_date: str, limit: int = 100) -> list
     table and missed records when Limit cut off the page before the matches.
     """
     from boto3.dynamodb.conditions import Key
+
     resp = _table.query(
-        KeyConditionExpression=Key("pk").eq(INDEX_PK)
-            & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}#￿"),
+        KeyConditionExpression=Key("pk").eq(INDEX_PK) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}#￿"),
         Limit=limit,
     )
     routines: list[RoutineSpec] = []
@@ -152,9 +152,7 @@ def upsert_id_map(routine_id: str, hevy_routine_id: str) -> None:
             ConditionExpression="attribute_not_exists(pk) AND attribute_not_exists(sk)",
         )
     except _ddb.meta.client.exceptions.ConditionalCheckFailedException as e:
-        raise RoutineConflict(
-            f"id-map already present for routine_id={routine_id} / hevy={hevy_routine_id}"
-        ) from e
+        raise RoutineConflict(f"id-map already present for routine_id={routine_id} / hevy={hevy_routine_id}") from e
 
 
 def lookup_hevy_id(routine_id: str) -> str | None:

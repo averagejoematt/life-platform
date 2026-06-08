@@ -19,7 +19,6 @@ Run:  python3 -m pytest tests/test_handler_type_hints.py -v
 import os
 import re
 
-
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 LAMBDAS_DIR = os.path.join(ROOT, "lambdas")
 

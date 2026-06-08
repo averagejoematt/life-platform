@@ -61,6 +61,7 @@ def _import_bedrock():
         if lam not in sys.path:
             sys.path.insert(0, lam)
         import bedrock_client  # noqa: E402
+
         return bedrock_client
     except Exception as e:  # pragma: no cover
         print(f"  ⚠ AI-QA unavailable — could not import bedrock_client: {e}")
@@ -139,8 +140,7 @@ def assess_results(results):
 
 if __name__ == "__main__":
     # Standalone: re-assess an existing qa-screenshots/report.json (paths must still exist).
-    report = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
-        os.path.dirname(__file__), "..", "qa-screenshots", "report.json")
+    report = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), "..", "qa-screenshots", "report.json")
     with open(report) as f:
         data = json.load(f)
     print(f"AI-vision QA over {report}\n{'=' * 56}")

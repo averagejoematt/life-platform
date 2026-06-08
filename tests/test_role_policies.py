@@ -20,9 +20,9 @@ Or directly: python3 tests/test_role_policies.py
 v1.0.0 — 2026-03-11
 """
 
-import sys
-import os
 import inspect
+import os
+import sys
 import types
 
 # ── Add cdk/ and cdk/stacks/ to path ─────────────────────────────────────────
@@ -33,13 +33,16 @@ CDK_STACKS = os.path.join(CDK_DIR, "stacks")
 sys.path.insert(0, os.path.abspath(CDK_DIR))
 sys.path.insert(0, os.path.abspath(CDK_STACKS))
 
+
 # ── Stub aws_cdk so role_policies.py imports without CDK installed ────────────
 class _PolicyStatement:
     """Minimal stub that captures the fields role_policies.py uses."""
+
     def __init__(self, sid="", actions=None, resources=None, **kwargs):
         self.sid = sid
         self.actions = list(actions or [])
         self.resources = list(resources or [])
+
 
 _iam_stub = types.ModuleType("aws_cdk.aws_iam")
 _iam_stub.PolicyStatement = _PolicyStatement
@@ -57,43 +60,46 @@ KMS_KEY_ARN = rp.KMS_KEY_ARN
 # S3 KMS CMK removed 2026-05-24 — bucket uses AES256 default encryption; key
 # scheduled for deletion 2026-06-16.
 ALLOWED_KMS_ARNS = {KMS_KEY_ARN}
-TABLE_ARN   = rp.TABLE_ARN
+TABLE_ARN = rp.TABLE_ARN
 
-DDB_READ_ACTIONS  = {
-    "dynamodb:getitem", "dynamodb:query", "dynamodb:scan", "dynamodb:batchgetitem",
+DDB_READ_ACTIONS = {
+    "dynamodb:getitem",
+    "dynamodb:query",
+    "dynamodb:scan",
+    "dynamodb:batchgetitem",
 }
 DDB_WRITE_ACTIONS = {
-    "dynamodb:putitem", "dynamodb:updateitem", "dynamodb:deleteitem", "dynamodb:batchwriteitem",
+    "dynamodb:putitem",
+    "dynamodb:updateitem",
+    "dynamodb:deleteitem",
+    "dynamodb:batchwriteitem",
 }
 
 # Actions for which a wildcard (*) resource is genuinely required by AWS
 WILDCARD_RESOURCE_ALLOWLIST = {
-    "cloudwatch:putmetricdata",        # CloudWatch requires * — no resource-level support
-    "ses:sendemail",                   # Canary SESAlert stmt uses * intentionally
-    "xray:puttracesegments",           # X-Ray does not support resource-level restrictions
-    "xray:puttelemetryrecords",        # X-Ray does not support resource-level restrictions
-    "xray:getsamplingrules",           # X-Ray does not support resource-level restrictions
-    "xray:getsamplingtargets",         # X-Ray does not support resource-level restrictions
-    "secretsmanager:listsecrets",      # List operation — no resource-level support
-    "lambda:listfunctions",            # List operation — no resource-level support
-    "cloudfront:createinvalidation",   # CloudFront invalidation requires * — no resource-level support
-    "ses:sendrawemail",                # SES SendRawEmail requires * — same as SendEmail
-    "ce:getcostandusage",              # Cost Explorer has no resource-level scoping (cost-governor)
-    "cloudwatch:getmetricdata",        # CloudWatch read APIs have no resource-level scoping
+    "cloudwatch:putmetricdata",  # CloudWatch requires * — no resource-level support
+    "ses:sendemail",  # Canary SESAlert stmt uses * intentionally
+    "xray:puttracesegments",  # X-Ray does not support resource-level restrictions
+    "xray:puttelemetryrecords",  # X-Ray does not support resource-level restrictions
+    "xray:getsamplingrules",  # X-Ray does not support resource-level restrictions
+    "xray:getsamplingtargets",  # X-Ray does not support resource-level restrictions
+    "secretsmanager:listsecrets",  # List operation — no resource-level support
+    "lambda:listfunctions",  # List operation — no resource-level support
+    "cloudfront:createinvalidation",  # CloudFront invalidation requires * — no resource-level support
+    "ses:sendrawemail",  # SES SendRawEmail requires * — same as SendEmail
+    "ce:getcostandusage",  # Cost Explorer has no resource-level scoping (cost-governor)
+    "cloudwatch:getmetricdata",  # CloudWatch read APIs have no resource-level scoping
     "cloudwatch:getmetricstatistics",  # CloudWatch read APIs have no resource-level scoping
-    "cloudwatch:listmetrics",          # List operation — no resource-level support
+    "cloudwatch:listmetrics",  # List operation — no resource-level support
 }
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _all_policy_functions():
     """Return {name: fn} for every public function in role_policies."""
-    return {
-        name: obj
-        for name, obj in inspect.getmembers(rp, inspect.isfunction)
-        if not name.startswith("_")
-    }
+    return {name: obj for name, obj in inspect.getmembers(rp, inspect.isfunction) if not name.startswith("_")}
 
 
 ALL_FUNCTIONS = _all_policy_functions()
@@ -154,12 +160,10 @@ def test_r3_kms_resource_is_scoped(fn_name):
             continue
         for resource in s.resources:
             assert resource != "*", (
-                f"{fn_name}(): KMS statement (sid={s.sid!r}) uses wildcard resource '*'. "
-                f"Scope to one of: {ALLOWED_KMS_ARNS}"
+                f"{fn_name}(): KMS statement (sid={s.sid!r}) uses wildcard resource '*'. " f"Scope to one of: {ALLOWED_KMS_ARNS}"
             )
             assert resource in ALLOWED_KMS_ARNS, (
-                f"{fn_name}(): KMS statement (sid={s.sid!r}) targets unexpected ARN "
-                f"{resource!r}. Expected one of {ALLOWED_KMS_ARNS}"
+                f"{fn_name}(): KMS statement (sid={s.sid!r}) targets unexpected ARN " f"{resource!r}. Expected one of {ALLOWED_KMS_ARNS}"
             )
 
 
@@ -171,15 +175,11 @@ def test_r4_no_unexpected_wildcard_resources(fn_name):
     for s in stmts:
         if "*" not in s.resources:
             continue
-        non_allowlisted = [
-            a for a in s.actions
-            if a.lower() not in WILDCARD_RESOURCE_ALLOWLIST
-        ]
+        non_allowlisted = [a for a in s.actions if a.lower() not in WILDCARD_RESOURCE_ALLOWLIST]
         if non_allowlisted:
             violations.append(f"sid={s.sid!r}, actions={non_allowlisted}")
     assert not violations, (
-        f"{fn_name}(): wildcard resource '*' on non-allowlisted actions:\n  " +
-        "\n  ".join(violations) + "\n"
+        f"{fn_name}(): wildcard resource '*' on non-allowlisted actions:\n  " + "\n  ".join(violations) + "\n"
         f"Allowlisted wildcard actions: {sorted(WILDCARD_RESOURCE_ALLOWLIST)}\n"
         f"Scope these to specific ARNs."
     )
@@ -190,8 +190,10 @@ def test_r5_secrets_resources_are_scoped(fn_name):
     """R5: Secrets Manager statements must use scoped ARNs, not '*'."""
     stmts = ALL_FUNCTIONS[fn_name]()
     secrets_actions = {
-        "secretsmanager:getsecretvalue", "secretsmanager:putsecretvalue",
-        "secretsmanager:updatesecret", "secretsmanager:describesecret",
+        "secretsmanager:getsecretvalue",
+        "secretsmanager:putsecretvalue",
+        "secretsmanager:updatesecret",
+        "secretsmanager:describesecret",
         "secretsmanager:rotatescret",
     }
     for s in stmts:
@@ -222,10 +224,7 @@ def test_r7_no_duplicate_sids(fn_name):
         if sid in seen:
             dupes.append(sid)
         seen.add(sid)
-    assert not dupes, (
-        f"{fn_name}(): duplicate SIDs: {dupes}. "
-        f"Each statement in a policy must have a unique SID."
-    )
+    assert not dupes, f"{fn_name}(): duplicate SIDs: {dupes}. " f"Each statement in a policy must have a unique SID."
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -234,6 +233,7 @@ def test_r7_no_duplicate_sids(fn_name):
 
 if __name__ == "__main__":
     import subprocess
+
     result = subprocess.run(
         ["python3", "-m", "pytest", __file__, "-v", "--tb=short"],
         cwd=os.path.join(os.path.dirname(__file__), ".."),

@@ -19,30 +19,34 @@ Endpoints:
   /api/snapshot         — single-call vitals+journey+character combo
   /api/timeline         — life events timeline
 """
+
 import hashlib  # used by handle_achievements stable-event-key hash
 import json
 import re
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401
 
 import boto3
 from boto3.dynamodb.conditions import Key
-
 from phase_filter import with_phase_filter  # ADR-058 — used by handle_timeline
-
 from web.site_api_common import (
-    logger,
-    table,
-    USER_ID, USER_PREFIX,
-    EXPERIMENT_START, EXPERIMENT_BASELINE_WEIGHT_LBS,
-    S3_REGION,
     CORS_HEADERS,
-    _ok, _error,
-    _query_source, _latest_item, _decimal_to_float,
+    EXPERIMENT_BASELINE_WEIGHT_LBS,
+    EXPERIMENT_START,
+    S3_REGION,
+    USER_ID,
+    USER_PREFIX,
+    _decimal_to_float,
+    _error,
     _experiment_date,
     _get_profile,
+    _latest_item,
     _load_s3_json,
+    _ok,
+    _query_source,
+    logger,
+    table,
 )
 
 
@@ -61,10 +65,7 @@ def handle_vitals() -> dict:
     whoop_30d = _query_source("whoop", d30, today)
 
     # Latest reading
-    latest = sorted(
-        [w for w in whoop_7d if w.get("recovery_score") is not None],
-        key=lambda x: x.get("sk", ""), reverse=True
-    )
+    latest = sorted([w for w in whoop_7d if w.get("recovery_score") is not None], key=lambda x: x.get("sk", ""), reverse=True)
     latest = latest[0] if latest else {}
 
     # 30d averages + trends
@@ -73,12 +74,15 @@ def handle_vitals() -> dict:
     rec_vals = [float(w["recovery_score"]) for w in whoop_30d if w.get("recovery_score")]
 
     def trend(vals):
-        if len(vals) < 6: return "insufficient_data"
+        if len(vals) < 6:
+            return "insufficient_data"
         mid = len(vals) // 2
         first_avg = sum(vals[:mid]) / len(vals[:mid])
         second_avg = sum(vals[mid:]) / len(vals[mid:])
-        if second_avg > first_avg * 1.03: return "improving"
-        if second_avg < first_avg * 0.97: return "declining"
+        if second_avg > first_avg * 1.03:
+            return "improving"
+        if second_avg < first_avg * 0.97:
+            return "declining"
         return "stable"
 
     # G-3: Latest weight — check Withings first, fall back to Apple Health (HAE)
@@ -89,8 +93,7 @@ def handle_vitals() -> dict:
         wv = withings_latest.get("weight_lbs")
         if wv is not None:
             current_weight = float(wv)
-            weight_as_of = (withings_latest.get("sk", "").replace("DATE#", "")
-                            or withings_latest.get("date"))
+            weight_as_of = withings_latest.get("sk", "").replace("DATE#", "") or withings_latest.get("date")
     # v1.4.2: Check apple_health for more recent weight (HAE fallback)
     try:
         ah_latest = _latest_item("apple_health")
@@ -124,24 +127,26 @@ def handle_vitals() -> dict:
         "/explorer": _today_iso,
     }
 
-    return _ok({
-        "vitals": {
-            "weight_lbs":       round(current_weight) if current_weight is not None else None,
-            "weight_as_of":     weight_as_of,
-            "weight_delta_30d": weight_delta_30d,
-            "hrv_ms":           round(float(latest.get("hrv", 0)), 1) if latest.get("hrv") else None,
-            "hrv_30d_avg":      round(sum(hrv_vals) / len(hrv_vals), 1) if hrv_vals else None,
-            "hrv_trend":        trend(hrv_vals),
-            "rhr_bpm":          round(float(latest.get("resting_heart_rate", 0)), 0) if latest.get("resting_heart_rate") else None,
-            "rhr_trend":        trend(list(reversed(rhr_vals))),  # lower is better
-            "recovery_pct":     round(recovery_pct, 0),
-            "recovery_status":  recovery_status,
-            "sleep_hours":      round(float(latest.get("sleep_duration_hours", 0)), 1) if latest.get("sleep_duration_hours") else None,
-            "as_of_date":       _as_of,
+    return _ok(
+        {
+            "vitals": {
+                "weight_lbs": round(current_weight) if current_weight is not None else None,
+                "weight_as_of": weight_as_of,
+                "weight_delta_30d": weight_delta_30d,
+                "hrv_ms": round(float(latest.get("hrv", 0)), 1) if latest.get("hrv") else None,
+                "hrv_30d_avg": round(sum(hrv_vals) / len(hrv_vals), 1) if hrv_vals else None,
+                "hrv_trend": trend(hrv_vals),
+                "rhr_bpm": round(float(latest.get("resting_heart_rate", 0)), 0) if latest.get("resting_heart_rate") else None,
+                "rhr_trend": trend(list(reversed(rhr_vals))),  # lower is better
+                "recovery_pct": round(recovery_pct, 0),
+                "recovery_status": recovery_status,
+                "sleep_hours": round(float(latest.get("sleep_duration_hours", 0)), 1) if latest.get("sleep_duration_hours") else None,
+                "as_of_date": _as_of,
+            },
+            "page_freshness": page_freshness,
         },
-        "page_freshness": page_freshness,
-    }, cache_seconds=300)
-
+        cache_seconds=300,
+    )
 
 
 def handle_journey() -> dict:
@@ -155,20 +160,19 @@ def handle_journey() -> dict:
 
     withings_all = _query_source("withings", d120, today)
     weight_series = sorted(
-        [(w["sk"].replace("DATE#", ""), float(w["weight_lbs"]))
-         for w in withings_all if w.get("weight_lbs")],
-        key=lambda x: x[0]
+        [(w["sk"].replace("DATE#", ""), float(w["weight_lbs"])) for w in withings_all if w.get("weight_lbs")], key=lambda x: x[0]
     )
 
     if not weight_series:
         # G-4: Fall back to last known weight — never return 503 for missing recent data.
         withings_latest = _latest_item("withings")
         if withings_latest and withings_latest.get("weight_lbs") is not None:
-            last_date = (withings_latest.get("sk", "").replace("DATE#", "")
-                         or withings_latest.get("date", today))
+            last_date = withings_latest.get("sk", "").replace("DATE#", "") or withings_latest.get("date", today)
             weight_series = [(last_date, float(withings_latest["weight_lbs"]))]
         else:
-            weight_series = [(EXPERIMENT_START, EXPERIMENT_BASELINE_WEIGHT_LBS)]  # ADR-058: genesis baseline; only used when no Withings data exists
+            weight_series = [
+                (EXPERIMENT_START, EXPERIMENT_BASELINE_WEIGHT_LBS)
+            ]  # ADR-058: genesis baseline; only used when no Withings data exists
 
     _p = _get_profile()
     start_weight = float(_p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
@@ -179,8 +183,7 @@ def handle_journey() -> dict:
     progress_pct = round(lost_lbs / (start_weight - goal_weight) * 100, 1) if start_weight != goal_weight else 0
 
     # Recent rate (last 28 days regression)
-    recent = [(d, w) for d, w in weight_series
-              if d >= (datetime.now(timezone.utc) - timedelta(days=28)).strftime("%Y-%m-%d")]
+    recent = [(d, w) for d, w in weight_series if d >= (datetime.now(timezone.utc) - timedelta(days=28)).strftime("%Y-%m-%d")]
     weekly_rate = 0.0
     slope_per_day = 0.0
     if len(recent) >= 4:
@@ -202,21 +205,23 @@ def handle_journey() -> dict:
         projected_goal_date = (datetime.now(timezone.utc) + timedelta(days=days)).strftime("%Y-%m-%d")
         days_to_goal = int(days)
 
-    return _ok({
-        "journey": {
-            "start_weight_lbs":   start_weight,
-            "goal_weight_lbs":    goal_weight,
-            "current_weight_lbs": round(current_weight),
-            "lost_lbs":           lost_lbs,
-            "remaining_lbs":      remaining,
-            "progress_pct":       progress_pct,
-            "weekly_rate_lbs":    weekly_rate,
-            "projected_goal_date": projected_goal_date,
-            "days_to_goal":       days_to_goal,
-            "started_date":       EXPERIMENT_START,
-        }
-    }, cache_seconds=3600)
-
+    return _ok(
+        {
+            "journey": {
+                "start_weight_lbs": start_weight,
+                "goal_weight_lbs": goal_weight,
+                "current_weight_lbs": round(current_weight),
+                "lost_lbs": lost_lbs,
+                "remaining_lbs": remaining,
+                "progress_pct": progress_pct,
+                "weekly_rate_lbs": weekly_rate,
+                "projected_goal_date": projected_goal_date,
+                "days_to_goal": days_to_goal,
+                "started_date": EXPERIMENT_START,
+            }
+        },
+        cache_seconds=3600,
+    )
 
 
 def handle_character() -> dict:
@@ -231,11 +236,15 @@ def handle_character() -> dict:
     # that window returned 503 for ~16h every day (00:00 UTC until the daily run landed),
     # degrading the Cockpit. `as_of_date` tells the reader how fresh it is.
     pk = f"{USER_PREFIX}character_sheet"
-    _resp = table.query(**with_phase_filter({  # ADR-058: hide pilot character sheets
-        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with("DATE#"),
-        "ScanIndexForward": False,
-        "Limit": 2,
-    }))
+    _resp = table.query(
+        **with_phase_filter(
+            {  # ADR-058: hide pilot character sheets
+                "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with("DATE#"),
+                "ScanIndexForward": False,
+                "Limit": 2,
+            }
+        )
+    )
     _recs = _decimal_to_float(_resp.get("Items", []))
     record = _recs[0] if _recs else None
     prior_record = _recs[1] if len(_recs) > 1 else None
@@ -245,35 +254,51 @@ def handle_character() -> dict:
     date_str = str(record["sk"]).replace("DATE#", "")[:10]
 
     PILLAR_ORDER = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
-    PILLAR_EMOJI = {"sleep": "😴", "movement": "🏋️", "nutrition": "🥗", "metabolic": "📊",
-                    "mind": "🧠", "relationships": "💬", "consistency": "🎯"}
+    PILLAR_EMOJI = {
+        "sleep": "😴",
+        "movement": "🏋️",
+        "nutrition": "🥗",
+        "metabolic": "📊",
+        "mind": "🧠",
+        "relationships": "💬",
+        "consistency": "🎯",
+    }
 
     pillars = []
     for p in PILLAR_ORDER:
         pd = record.get(f"pillar_{p}", {})
-        pillars.append({
-            "name":      p,
-            "emoji":     PILLAR_EMOJI.get(p, ""),
-            "level":     float(pd.get("level", 1)),
-            "raw_score": float(pd.get("raw_score", 0)),
-            "tier":      pd.get("tier", "Foundation"),
-            "xp_delta":  float(pd.get("xp_delta", 0)),
-            "xp_earned": float(pd.get("xp_earned", 0)),
-            "score_delta": None,  # day-over-day move; filled below when a prior day exists
-        })
+        pillars.append(
+            {
+                "name": p,
+                "emoji": PILLAR_EMOJI.get(p, ""),
+                "level": float(pd.get("level", 1)),
+                "raw_score": float(pd.get("raw_score", 0)),
+                "tier": pd.get("tier", "Foundation"),
+                "xp_delta": float(pd.get("xp_delta", 0)),
+                "xp_earned": float(pd.get("xp_earned", 0)),
+                "score_delta": None,  # day-over-day move; filled below when a prior day exists
+            }
+        )
 
     # Pre-experiment: show zeroed character (experiment hasn't started)
     if date_str < EXPERIMENT_START:
-        return _ok({
-            "character": {
-                "level": 1, "tier": "Foundation", "tier_emoji": "\ud83d\udd28",
-                "xp_total": 0, "as_of_date": date_str,
-                "pre_experiment": True,
+        return _ok(
+            {
+                "character": {
+                    "level": 1,
+                    "tier": "Foundation",
+                    "tier_emoji": "\ud83d\udd28",
+                    "xp_total": 0,
+                    "as_of_date": date_str,
+                    "pre_experiment": True,
+                },
+                "pillars": [
+                    {"name": p, "emoji": PILLAR_EMOJI.get(p, ""), "level": 1, "raw_score": 0, "tier": "Foundation", "xp_delta": 0}
+                    for p in PILLAR_ORDER
+                ],
             },
-            "pillars": [{"name": p, "emoji": PILLAR_EMOJI.get(p, ""),
-                         "level": 1, "raw_score": 0, "tier": "Foundation",
-                         "xp_delta": 0} for p in PILLAR_ORDER],
-        }, cache_seconds=900)
+            cache_seconds=900,
+        )
 
     # DPR-1.16 + Day-Grade Replay: deltas vs the PRIOR computed day (record-over-record,
     # robust to compute lag/gaps), not calendar yesterday.
@@ -287,19 +312,21 @@ def handle_character() -> dict:
         for _pp, _yd_s in zip(pillars, _yd_scores):
             _pp["score_delta"] = round(_pp["raw_score"] - _yd_s, 1)
 
-    return _ok({
-        "character": {
-            "level":      float(record.get("character_level", 1)),
-            "tier":       record.get("character_tier", "Foundation"),
-            "tier_emoji": record.get("character_tier_emoji", "🔨"),
-            "xp_total":   float(record.get("character_xp", 0)),
-            "as_of_date": date_str,
-            "composite_score": round(composite, 1),
-            "composite_delta_1d": composite_delta_1d,
+    return _ok(
+        {
+            "character": {
+                "level": float(record.get("character_level", 1)),
+                "tier": record.get("character_tier", "Foundation"),
+                "tier_emoji": record.get("character_tier_emoji", "🔨"),
+                "xp_total": float(record.get("character_xp", 0)),
+                "as_of_date": date_str,
+                "composite_score": round(composite, 1),
+                "composite_delta_1d": composite_delta_1d,
+            },
+            "pillars": pillars,
         },
-        "pillars": pillars,
-    }, cache_seconds=900)
-
+        cache_seconds=900,
+    )
 
 
 def handle_weight_progress() -> dict:
@@ -315,7 +342,7 @@ def handle_weight_progress() -> dict:
     readings = sorted(
         [
             {
-                "date":       item["sk"].replace("DATE#", ""),
+                "date": item["sk"].replace("DATE#", ""),
                 "weight_lbs": round(float(item["weight_lbs"]), 1),
             }
             for item in items
@@ -325,7 +352,6 @@ def handle_weight_progress() -> dict:
     )
 
     return _ok({"weight_progress": readings}, cache_seconds=3600)
-
 
 
 def handle_character_stats() -> dict:
@@ -351,46 +377,57 @@ def handle_character_stats() -> dict:
         #   - Clients can branch on the flag without parsing magic strings
         # 5-min cache: short enough that the first compute lands quickly,
         # long enough that 50k visitors don't hammer DDB.
-        return _ok({
-            "character_stats": None,
-            "pillars": None,
-            "computed": False,
-            "reason": "Character sheet not yet computed for today or yesterday",
-        }, cache_seconds=300)
+        return _ok(
+            {
+                "character_stats": None,
+                "pillars": None,
+                "computed": False,
+                "reason": "Character sheet not yet computed for today or yesterday",
+            },
+            cache_seconds=300,
+        )
 
     PILLARS = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
     pillars = {}
     for p in PILLARS:
         pd = record.get(f"pillar_{p}", {})
         pillars[p] = {
-            "level":     float(pd.get("level", 1)),
+            "level": float(pd.get("level", 1)),
             "raw_score": float(pd.get("raw_score", 0)),
-            "tier":      pd.get("tier", "Foundation"),
+            "tier": pd.get("tier", "Foundation"),
         }
 
     # Pre-experiment: zeroed character
     if date_str < EXPERIMENT_START:
-        PILLARS_ZERO = {p: {"level": 1, "raw_score": 0, "tier": "Foundation"}
-                        for p in PILLARS}
-        return _ok({
-            "character_stats": {
-                "level": 1, "tier": "Foundation", "tier_emoji": "\ud83d\udd28",
-                "xp_total": 0, "as_of_date": date_str, "pre_experiment": True,
+        PILLARS_ZERO = {p: {"level": 1, "raw_score": 0, "tier": "Foundation"} for p in PILLARS}
+        return _ok(
+            {
+                "character_stats": {
+                    "level": 1,
+                    "tier": "Foundation",
+                    "tier_emoji": "\ud83d\udd28",
+                    "xp_total": 0,
+                    "as_of_date": date_str,
+                    "pre_experiment": True,
+                },
+                "pillars": PILLARS_ZERO,
             },
-            "pillars": PILLARS_ZERO,
-        }, cache_seconds=3600)
+            cache_seconds=3600,
+        )
 
-    return _ok({
-        "character_stats": {
-            "level":       float(record.get("character_level", 1)),
-            "tier":        record.get("character_tier", "Foundation"),
-            "tier_emoji":  record.get("character_tier_emoji", "🔨"),
-            "xp_total":    float(record.get("character_xp", 0)),
-            "as_of_date":  date_str,
+    return _ok(
+        {
+            "character_stats": {
+                "level": float(record.get("character_level", 1)),
+                "tier": record.get("character_tier", "Foundation"),
+                "tier_emoji": record.get("character_tier_emoji", "🔨"),
+                "xp_total": float(record.get("character_xp", 0)),
+                "as_of_date": date_str,
+            },
+            "pillars": pillars,
         },
-        "pillars": pillars,
-    }, cache_seconds=3600)
-
+        cache_seconds=3600,
+    )
 
 
 def handle_timeline() -> dict:
@@ -406,17 +443,20 @@ def handle_timeline() -> dict:
     # Weight series (full journey)
     wt_items = _query_source("withings", start, today)
     weights = sorted(
-        [{"date": i["sk"].replace("DATE#", ""), "lbs": round(float(i["weight_lbs"]), 1)}
-         for i in wt_items if i.get("weight_lbs")],
-        key=lambda x: x["date"]
+        [{"date": i["sk"].replace("DATE#", ""), "lbs": round(float(i["weight_lbs"]), 1)} for i in wt_items if i.get("weight_lbs")],
+        key=lambda x: x["date"],
     )
 
     # Life events (ADR-058: phase=pilot filtered)
     life_pk = f"USER#{USER_ID}#SOURCE#life_events"
     le_resp = table.query(**with_phase_filter({"KeyConditionExpression": Key("pk").eq(life_pk)}))
     life_events = [
-        {"date": i.get("date", ""), "title": i.get("title", ""),
-         "type": i.get("type", "other"), "weight": int(i.get("emotional_weight", 3))}
+        {
+            "date": i.get("date", ""),
+            "title": i.get("title", ""),
+            "type": i.get("type", "other"),
+            "weight": int(i.get("emotional_weight", 3)),
+        }
         for i in _decimal_to_float(le_resp.get("Items", []))
     ]
 
@@ -424,42 +464,49 @@ def handle_timeline() -> dict:
     exp_pk = f"USER#{USER_ID}#SOURCE#experiments"
     exp_resp = table.query(**with_phase_filter({"KeyConditionExpression": Key("pk").eq(exp_pk)}))
     experiments = [
-        {"name": i.get("name", ""), "start": i.get("start_date", ""),
-         "end": i.get("end_date"), "status": i.get("status", "active")}
+        {"name": i.get("name", ""), "start": i.get("start_date", ""), "end": i.get("end_date"), "status": i.get("status", "active")}
         for i in _decimal_to_float(exp_resp.get("Items", []))
         if i.get("sk", "").startswith("EXP#")
     ]
 
     # Character level history (ADR-058: phase=pilot filtered)
     cs_pk = f"{USER_PREFIX}character_sheet"
-    cs_resp = table.query(**with_phase_filter({
-        "KeyConditionExpression": Key("pk").eq(cs_pk) & Key("sk").begins_with("DATE#"),
-        "ScanIndexForward": True,
-    }))
+    cs_resp = table.query(
+        **with_phase_filter(
+            {
+                "KeyConditionExpression": Key("pk").eq(cs_pk) & Key("sk").begins_with("DATE#"),
+                "ScanIndexForward": True,
+            }
+        )
+    )
     level_events = []
     prev_level = 0
     for item in _decimal_to_float(cs_resp.get("Items", [])):
         lvl = int(float(item.get("character_level", 0)))
         if lvl > prev_level and prev_level > 0:
-            level_events.append({
-                "date": item.get("sk", "").replace("DATE#", ""),
-                "level": lvl,
-                "tier": item.get("character_tier", ""),
-            })
+            level_events.append(
+                {
+                    "date": item.get("sk", "").replace("DATE#", ""),
+                    "level": lvl,
+                    "tier": item.get("character_tier", ""),
+                }
+            )
         prev_level = lvl
 
-    return _ok({
-        "timeline": {
-            "weights":      weights,
-            "life_events":  sorted(life_events, key=lambda x: x["date"]),
-            "experiments":  sorted(experiments, key=lambda x: x["start"]),
-            "level_ups":    level_events,
-            "journey_start": EXPERIMENT_START,
-            "start_weight":  float(_get_profile().get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)),
-            "goal_weight":   float(_get_profile().get("goal_weight_lbs", 185.0)),
-        }
-    }, cache_seconds=3600)
-
+    return _ok(
+        {
+            "timeline": {
+                "weights": weights,
+                "life_events": sorted(life_events, key=lambda x: x["date"]),
+                "experiments": sorted(experiments, key=lambda x: x["start"]),
+                "level_ups": level_events,
+                "journey_start": EXPERIMENT_START,
+                "start_weight": float(_get_profile().get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)),
+                "goal_weight": float(_get_profile().get("goal_weight_lbs", 185.0)),
+            }
+        },
+        cache_seconds=3600,
+    )
 
 
 def handle_journey_timeline() -> dict:
@@ -480,13 +527,15 @@ def handle_journey_timeline() -> dict:
     events: list = []
 
     # ── 1. Day 1 anchor (ADR-058: copy rewritten in §8 with Elena voice) ─────
-    events.append({
-        "date":  start_date,
-        "type":  "milestone",
-        "title": "Day 1",
-        "body":  f"Starting weight: {int(round(EXPERIMENT_BASELINE_WEIGHT_LBS))} lbs. Goal: 185.",
-        "link":  "/story/",
-    })
+    events.append(
+        {
+            "date": start_date,
+            "type": "milestone",
+            "title": "Day 1",
+            "body": f"Starting weight: {int(round(EXPERIMENT_BASELINE_WEIGHT_LBS))} lbs. Goal: 185.",
+            "link": "/story/",
+        }
+    )
 
     # ── 2. Weight milestones (5-lb thresholds) ───────────────────────────────
     thresholds = list(range(295, int(goal_weight) - 1, -5))  # 295, 290, 285, …, 190, 185
@@ -495,9 +544,7 @@ def handle_journey_timeline() -> dict:
     wk_pk = f"{USER_PREFIX}withings"
     try:
         wk_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(wk_pk) & Key("sk").between(
-                f"DATE#{start_date}", f"DATE#{today}"
-            ),
+            KeyConditionExpression=Key("pk").eq(wk_pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{today}"),
             ScanIndexForward=True,
         )
         for item in _decimal_to_float(wk_resp.get("Items", [])):
@@ -514,21 +561,21 @@ def handle_journey_timeline() -> dict:
 
     for thr in sorted(crossed.keys(), reverse=True):  # highest first = earliest
         lbs_lost = start_weight - thr
-        events.append({
-            "date":  crossed[thr],
-            "type":  "weight",
-            "title": f"Crossed {thr} lbs — {int(lbs_lost)} lbs lost",
-            "body":  f"Down {int(lbs_lost)} lbs from {int(round(start_weight))}. {round((lbs_lost / (start_weight - goal_weight)) * 100)}% of the way to goal.",
-            "link":  "/live/",
-        })
+        events.append(
+            {
+                "date": crossed[thr],
+                "type": "weight",
+                "title": f"Crossed {thr} lbs — {int(lbs_lost)} lbs lost",
+                "body": f"Down {int(lbs_lost)} lbs from {int(round(start_weight))}. {round((lbs_lost / (start_weight - goal_weight)) * 100)}% of the way to goal.",
+                "link": "/live/",
+            }
+        )
 
     # ── 3. Level-up events from character_sheet ──────────────────────────────
     cs_pk = f"{USER_PREFIX}character_sheet"
     try:
         cs_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(cs_pk) & Key("sk").between(
-                f"DATE#{start_date}", f"DATE#{today}"
-            ),
+            KeyConditionExpression=Key("pk").eq(cs_pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{today}"),
             ScanIndexForward=True,
         )
         seen_levels: set = set()
@@ -547,13 +594,15 @@ def handle_journey_timeline() -> dict:
                             top_pillars.append((p.capitalize(), float(pd["raw_score"])))
                     top_pillars.sort(key=lambda x: -x[1])
                     drivers = ", ".join(f"{n} ({s:.0f})" for n, s in top_pillars[:3])
-                    events.append({
-                        "date":  date_str,
-                        "type":  "level_up",
-                        "title": f"Reached Character Level {int(level)}",
-                        "body":  f"Driven by: {drivers}" if drivers else f"Level {int(level)} — {item.get('character_tier', '')}",
-                        "link":  "/character/",
-                    })
+                    events.append(
+                        {
+                            "date": date_str,
+                            "type": "level_up",
+                            "title": f"Reached Character Level {int(level)}",
+                            "body": f"Driven by: {drivers}" if drivers else f"Level {int(level)} — {item.get('character_tier', '')}",
+                            "link": "/character/",
+                        }
+                    )
     except Exception:
         pass
 
@@ -573,42 +622,59 @@ def handle_journey_timeline() -> dict:
                 continue
             status = item.get("status", "")
             if status == "active":
-                events.append({
-                    "date":  start,
-                    "type":  "experiment",
-                    "title": f"Experiment: {item.get('name', 'Unnamed')}",
-                    "body":  item.get("hypothesis", "")[:120] + ("…" if len(item.get("hypothesis", "")) > 120 else ""),
-                    "link":  "/experiments/",
-                })
+                events.append(
+                    {
+                        "date": start,
+                        "type": "experiment",
+                        "title": f"Experiment: {item.get('name', 'Unnamed')}",
+                        "body": item.get("hypothesis", "")[:120] + ("…" if len(item.get("hypothesis", "")) > 120 else ""),
+                        "link": "/experiments/",
+                    }
+                )
             elif status == "completed":
                 end = item.get("end_date", start)
                 outcome = (item.get("outcome") or item.get("result_summary") or "")[:80]
-                events.append({
-                    "date":  end,
-                    "type":  "discovery",
-                    "title": f"Experiment Complete: {item.get('name', 'Unnamed')}",
-                    "body":  outcome + ("…" if len(outcome) == 80 else ""),
-                    "link":  "/discoveries/",
-                })
+                events.append(
+                    {
+                        "date": end,
+                        "type": "discovery",
+                        "title": f"Experiment Complete: {item.get('name', 'Unnamed')}",
+                        "body": outcome + ("…" if len(outcome) == 80 else ""),
+                        "link": "/discoveries/",
+                    }
+                )
     except Exception:
         pass
 
     # ── 5. FDR-significant correlation findings ────────────────────────
     corr_pk = f"{USER_PREFIX}weekly_correlations"
     try:
-        corr_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot correlations
-            "KeyConditionExpression": Key("pk").eq(corr_pk),
-            "ScanIndexForward": True,
-        }))
+        corr_resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot correlations
+                    "KeyConditionExpression": Key("pk").eq(corr_pk),
+                    "ScanIndexForward": True,
+                }
+            )
+        )
         _METRIC_LABELS = {
-            "hrv": "Heart Rate Variability", "recovery_score": "Recovery Score",
-            "sleep_duration": "Sleep Duration", "sleep_score": "Sleep Score",
-            "resting_hr": "Resting Heart Rate", "strain": "Strain",
-            "tsb": "Training Stress Balance", "training_kj": "Training Load",
-            "training_mins": "Training Minutes", "protein_g": "Protein",
-            "calories": "Calories", "carbs_g": "Carbs", "steps": "Steps",
-            "habit_pct": "Habit Completion", "day_grade": "Day Grade",
-            "readiness": "Readiness", "tier0_streak": "Tier 0 Streak",
+            "hrv": "Heart Rate Variability",
+            "recovery_score": "Recovery Score",
+            "sleep_duration": "Sleep Duration",
+            "sleep_score": "Sleep Score",
+            "resting_hr": "Resting Heart Rate",
+            "strain": "Strain",
+            "tsb": "Training Stress Balance",
+            "training_kj": "Training Load",
+            "training_mins": "Training Minutes",
+            "protein_g": "Protein",
+            "calories": "Calories",
+            "carbs_g": "Carbs",
+            "steps": "Steps",
+            "habit_pct": "Habit Completion",
+            "day_grade": "Day Grade",
+            "readiness": "Readiness",
+            "tier0_streak": "Tier 0 Streak",
         }
         seen_findings: set = set()
         for item in _decimal_to_float(corr_resp.get("Items", [])):
@@ -633,14 +699,16 @@ def handle_journey_timeline() -> dict:
                 is_ci = data.get("counterintuitive", False)
                 evt_type = "counterintuitive" if is_ci else "finding"
                 title_prefix = "⚠️ Surprise: " if is_ci else "AI Finding: "
-                events.append({
-                    "date":  end_d or week,
-                    "type":  evt_type,
-                    "title": f"{title_prefix}{la} → {direction} {lb}",
-                    "body":  f"r={r_val:+.2f} over {n_val} days. Passed FDR significance testing (week {week}).",
-                    "link":  "/explorer/",
-                    "meta":  {"r": r_val, "n": n_val, "pair": label, "week": week},
-                })
+                events.append(
+                    {
+                        "date": end_d or week,
+                        "type": evt_type,
+                        "title": f"{title_prefix}{la} → {direction} {lb}",
+                        "body": f"r={r_val:+.2f} over {n_val} days. Passed FDR significance testing (week {week}).",
+                        "link": "/explorer/",
+                        "meta": {"r": r_val, "n": n_val, "pair": label, "week": week},
+                    }
+                )
     except Exception as e:
         logger.warning("journey_timeline: correlation events failed (non-fatal): %s", e)
 
@@ -675,20 +743,20 @@ def handle_journey_timeline() -> dict:
         # Attach annotations to matching events
         if ann_lookup:
             for e in deduped:
-                ek = hashlib.sha256(
-                    f"{e['date']}|{e['type']}|{e['title']}".encode()
-                ).hexdigest()[:16]
+                ek = hashlib.sha256(f"{e['date']}|{e['type']}|{e['title']}".encode()).hexdigest()[:16]
                 if ek in ann_lookup:
                     e["annotation"] = ann_lookup[ek]
     except Exception as _ann_e:
         logger.warning("journey_timeline: annotation merge failed (non-fatal): %s", _ann_e)
 
-    return _ok({
-        "as_of_date": today,
-        "events":     deduped,
-        "total":      len(deduped),
-    }, cache_seconds=3600)
-
+    return _ok(
+        {
+            "as_of_date": today,
+            "events": deduped,
+            "total": len(deduped),
+        },
+        cache_seconds=3600,
+    )
 
 
 def handle_journey_waveform() -> dict:
@@ -704,16 +772,19 @@ def handle_journey_waveform() -> dict:
     end_date = today.isoformat()
 
     PILLARS = [
-        "pillar_sleep", "pillar_nutrition", "pillar_movement",
-        "pillar_metabolic", "pillar_mind", "pillar_consistency", "pillar_relationships",
+        "pillar_sleep",
+        "pillar_nutrition",
+        "pillar_movement",
+        "pillar_metabolic",
+        "pillar_mind",
+        "pillar_consistency",
+        "pillar_relationships",
     ]
 
     cs_pk = f"{USER_PREFIX}character_sheet"
     try:
         resp = table.query(
-            KeyConditionExpression=Key("pk").eq(cs_pk) & Key("sk").between(
-                f"DATE#{start_date}", f"DATE#{end_date}"
-            ),
+            KeyConditionExpression=Key("pk").eq(cs_pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}"),
             ScanIndexForward=True,
         )
         items = resp.get("Items", [])
@@ -756,12 +827,14 @@ def handle_journey_waveform() -> dict:
 
     max_score = max((d["score"] for d in days if d["score"] is not None), default=1)
 
-    return _ok({
-        "days":      days,
-        "max_score": max_score,
-        "window":    42,
-    }, cache_seconds=3600)
-
+    return _ok(
+        {
+            "days": days,
+            "max_score": max_score,
+            "window": 42,
+        },
+        cache_seconds=3600,
+    )
 
 
 def handle_achievements() -> dict:
@@ -777,30 +850,40 @@ def handle_achievements() -> dict:
 
     # ── Streak data
     habit_pk = f"{USER_PREFIX}habit_scores"
-    habit_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot habit scores
-        "KeyConditionExpression": Key("pk").eq(habit_pk),
-        "ScanIndexForward": False,
-        "Limit": 1,
-    }))
+    habit_resp = table.query(
+        **with_phase_filter(
+            {  # ADR-058: hide pilot habit scores
+                "KeyConditionExpression": Key("pk").eq(habit_pk),
+                "ScanIndexForward": False,
+                "Limit": 1,
+            }
+        )
+    )
     habit_items = _decimal_to_float(habit_resp.get("Items", []))
     latest_habit = habit_items[0] if habit_items else {}
     current_streak = int(latest_habit.get("t0_perfect_streak") or latest_habit.get("t0_aggregate_streak") or 0)
 
     # Days tracked = count of habit_score records in last 365 days
-    all_habits_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot habit scores
-        "KeyConditionExpression": Key("pk").eq(habit_pk) & Key("sk").between(
-            f"DATE#{d365}", f"DATE#{today}"
-        ),
-    }))
+    all_habits_resp = table.query(
+        **with_phase_filter(
+            {  # ADR-058: hide pilot habit scores
+                "KeyConditionExpression": Key("pk").eq(habit_pk) & Key("sk").between(f"DATE#{d365}", f"DATE#{today}"),
+            }
+        )
+    )
     days_tracked = len(all_habits_resp.get("Items", []))
 
     # ── Character level
     char_pk = f"{USER_PREFIX}character_sheet"
-    char_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot character sheets
-        "KeyConditionExpression": Key("pk").eq(char_pk),
-        "ScanIndexForward": False,
-        "Limit": 1,
-    }))
+    char_resp = table.query(
+        **with_phase_filter(
+            {  # ADR-058: hide pilot character sheets
+                "KeyConditionExpression": Key("pk").eq(char_pk),
+                "ScanIndexForward": False,
+                "Limit": 1,
+            }
+        )
+    )
     char_items = _decimal_to_float(char_resp.get("Items", []))
     current_level = int(float((char_items[0] if char_items else {}).get("character_level", 1)))
 
@@ -812,22 +895,24 @@ def handle_achievements() -> dict:
 
     # ── First experiment
     exp_pk = f"{USER_PREFIX}experiments"
-    exp_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot experiments
-        "KeyConditionExpression": Key("pk").eq(exp_pk),
-        "ScanIndexForward": False,
-        "Limit": 50,
-    }))
-    all_exps = [
-        i for i in _decimal_to_float(exp_resp.get("Items", []))
-        if i.get("sk", "").startswith("EXP#")
-    ]
+    exp_resp = table.query(
+        **with_phase_filter(
+            {  # ADR-058: hide pilot experiments
+                "KeyConditionExpression": Key("pk").eq(exp_pk),
+                "ScanIndexForward": False,
+                "Limit": 50,
+            }
+        )
+    )
+    all_exps = [i for i in _decimal_to_float(exp_resp.get("Items", [])) if i.get("sk", "").startswith("EXP#")]
     completed_exps = [i for i in all_exps if i.get("status") in ("completed", "confirmed")]
 
     # EL-21: Streak detection — last 3 finished experiments all completed (no abandoned/failed)
     _exp_has_3_streak = False
     finished = sorted(
         [i for i in all_exps if i.get("status") in ("completed", "confirmed", "abandoned")],
-        key=lambda x: x.get("end_date") or x.get("start_date", ""), reverse=True,
+        key=lambda x: x.get("end_date") or x.get("start_date", ""),
+        reverse=True,
     )
     if len(finished) >= 3:
         _exp_has_3_streak = all(e.get("status") in ("completed", "confirmed") for e in finished[:3])
@@ -836,7 +921,7 @@ def handle_achievements() -> dict:
     _ALL_PILLARS = {"sleep", "movement", "nutrition", "supplements", "mental", "social", "discipline"}
     _covered_pillars = set()
     for e in completed_exps:
-        for tag in (e.get("tags") or []):
+        for tag in e.get("tags") or []:
             tag_lower = tag.lower()
             for p in _ALL_PILLARS:
                 if p in tag_lower:
@@ -848,9 +933,13 @@ def handle_achievements() -> dict:
     completed_challenges = 0
     perfect_challenges = 0
     try:
-        ch_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot challenges
-            "KeyConditionExpression": Key("pk").eq(challenges_pk) & Key("sk").begins_with("CHALLENGE#"),
-        }))
+        ch_resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot challenges
+                    "KeyConditionExpression": Key("pk").eq(challenges_pk) & Key("sk").begins_with("CHALLENGE#"),
+                }
+            )
+        )
         ch_items = _decimal_to_float(ch_resp.get("Items", []))
         for ch in ch_items:
             if ch.get("status") == "completed":
@@ -865,185 +954,336 @@ def handle_achievements() -> dict:
 
     def badge(id_, label, category, desc, earned, earned_date=None, unlock_hint=None, icon=None):
         return {
-            "id": id_, "label": label, "category": category, "description": desc,
-            "earned": earned, "earned_date": earned_date, "icon": icon, "unlock_hint": unlock_hint,
+            "id": id_,
+            "label": label,
+            "category": category,
+            "description": desc,
+            "earned": earned,
+            "earned_date": earned_date,
+            "icon": icon,
+            "unlock_hint": unlock_hint,
         }
 
     achievements = [
         # ── Streak
-        badge("week_warrior", "Week Warrior", "streak",
-              "7-day Tier 0 habit streak",
-              earned=current_streak >= 7,
-              earned_date=today if current_streak >= 7 else None,
-              unlock_hint=f"{max(0, 7 - current_streak)} days to unlock" if current_streak < 7 else None),
-        badge("monthly_grind", "Monthly Grind", "streak",
-              "30-day Tier 0 habit streak",
-              earned=current_streak >= 30,
-              earned_date=today if current_streak >= 30 else None,
-              unlock_hint=f"{max(0, 30 - current_streak)} days to unlock" if current_streak < 30 else None),
-        badge("quarterly", "Quarterly", "streak",
-              "90-day Tier 0 habit streak",
-              earned=current_streak >= 90,
-              unlock_hint=f"{max(0, 90 - current_streak)} days to unlock" if current_streak < 90 else None),
-
+        badge(
+            "week_warrior",
+            "Week Warrior",
+            "streak",
+            "7-day Tier 0 habit streak",
+            earned=current_streak >= 7,
+            earned_date=today if current_streak >= 7 else None,
+            unlock_hint=f"{max(0, 7 - current_streak)} days to unlock" if current_streak < 7 else None,
+        ),
+        badge(
+            "monthly_grind",
+            "Monthly Grind",
+            "streak",
+            "30-day Tier 0 habit streak",
+            earned=current_streak >= 30,
+            earned_date=today if current_streak >= 30 else None,
+            unlock_hint=f"{max(0, 30 - current_streak)} days to unlock" if current_streak < 30 else None,
+        ),
+        badge(
+            "quarterly",
+            "Quarterly",
+            "streak",
+            "90-day Tier 0 habit streak",
+            earned=current_streak >= 90,
+            unlock_hint=f"{max(0, 90 - current_streak)} days to unlock" if current_streak < 90 else None,
+        ),
         # ── Level
-        badge("first_level_up", "First Level Up", "level",
-              "Reached Character Level 2",
-              earned=current_level >= 2,
-              earned_date=today if current_level >= 2 else None),
-        badge("apprentice", "Apprentice", "level",
-              "Reached Character Level 5",
-              earned=current_level >= 5,
-              unlock_hint=f"Level {current_level} → Level 5 needed" if current_level < 5 else None),
-        badge("journeyman", "Journeyman", "level",
-              "Reached Character Level 10",
-              earned=current_level >= 10,
-              unlock_hint=f"Level {current_level} → Level 10 needed" if current_level < 10 else None),
-
+        badge(
+            "first_level_up",
+            "First Level Up",
+            "level",
+            "Reached Character Level 2",
+            earned=current_level >= 2,
+            earned_date=today if current_level >= 2 else None,
+        ),
+        badge(
+            "apprentice",
+            "Apprentice",
+            "level",
+            "Reached Character Level 5",
+            earned=current_level >= 5,
+            unlock_hint=f"Level {current_level} → Level 5 needed" if current_level < 5 else None,
+        ),
+        badge(
+            "journeyman",
+            "Journeyman",
+            "level",
+            "Reached Character Level 10",
+            earned=current_level >= 10,
+            unlock_hint=f"Level {current_level} → Level 10 needed" if current_level < 10 else None,
+        ),
         # ── Weight LOSS milestones (every 10 lbs)
-        badge("lost_10", "Lost 10 lbs", "milestone",
-              "Lost 10 lbs from starting weight",
-              earned=lost_lbs >= 10, icon="\u2696\ufe0f",
-              unlock_hint=f"{10 - lost_lbs:.0f} lbs to go" if lost_lbs < 10 else None),
-        badge("lost_20", "Lost 20 lbs", "milestone",
-              "Lost 20 lbs from starting weight",
-              earned=lost_lbs >= 20, icon="\u2696\ufe0f",
-              unlock_hint=f"{20 - lost_lbs:.0f} lbs to go" if lost_lbs < 20 else None),
-        badge("lost_30", "Lost 30 lbs", "milestone",
-              "Lost 30 lbs from starting weight",
-              earned=lost_lbs >= 30, icon="\u2696\ufe0f",
-              unlock_hint=f"{30 - lost_lbs:.0f} lbs to go" if lost_lbs < 30 else None),
-        badge("lost_40", "Lost 40 lbs", "milestone",
-              "Lost 40 lbs from starting weight",
-              earned=lost_lbs >= 40, icon="\u2696\ufe0f",
-              unlock_hint=f"{40 - lost_lbs:.0f} lbs to go" if lost_lbs < 40 else None),
-        badge("lost_50", "Lost 50 lbs", "milestone",
-              "Lost 50 lbs from starting weight",
-              earned=lost_lbs >= 50, icon="\u2696\ufe0f",
-              unlock_hint=f"{50 - lost_lbs:.0f} lbs to go" if lost_lbs < 50 else None),
-        badge("lost_60", "Lost 60 lbs", "milestone",
-              "Lost 60 lbs from starting weight",
-              earned=lost_lbs >= 60, icon="\u2696\ufe0f",
-              unlock_hint=f"{60 - lost_lbs:.0f} lbs to go" if lost_lbs < 60 else None),
-        badge("lost_70", "Lost 70 lbs", "milestone",
-              "Lost 70 lbs from starting weight",
-              earned=lost_lbs >= 70, icon="\u2696\ufe0f",
-              unlock_hint=f"{70 - lost_lbs:.0f} lbs to go" if lost_lbs < 70 else None),
-        badge("lost_80", "Lost 80 lbs", "milestone",
-              "Lost 80 lbs from starting weight",
-              earned=lost_lbs >= 80, icon="\u2696\ufe0f",
-              unlock_hint=f"{80 - lost_lbs:.0f} lbs to go" if lost_lbs < 80 else None),
-        badge("lost_90", "Lost 90 lbs", "milestone",
-              "Lost 90 lbs from starting weight",
-              earned=lost_lbs >= 90, icon="\u2696\ufe0f",
-              unlock_hint=f"{90 - lost_lbs:.0f} lbs to go" if lost_lbs < 90 else None),
-        badge("lost_100", "Lost 100 lbs", "milestone",
-              "Lost 100 lbs from starting weight",
-              earned=lost_lbs >= 100, icon="\u2696\ufe0f",
-              unlock_hint=f"{100 - lost_lbs:.0f} lbs to go" if lost_lbs < 100 else None),
-
+        badge(
+            "lost_10",
+            "Lost 10 lbs",
+            "milestone",
+            "Lost 10 lbs from starting weight",
+            earned=lost_lbs >= 10,
+            icon="\u2696\ufe0f",
+            unlock_hint=f"{10 - lost_lbs:.0f} lbs to go" if lost_lbs < 10 else None,
+        ),
+        badge(
+            "lost_20",
+            "Lost 20 lbs",
+            "milestone",
+            "Lost 20 lbs from starting weight",
+            earned=lost_lbs >= 20,
+            icon="\u2696\ufe0f",
+            unlock_hint=f"{20 - lost_lbs:.0f} lbs to go" if lost_lbs < 20 else None,
+        ),
+        badge(
+            "lost_30",
+            "Lost 30 lbs",
+            "milestone",
+            "Lost 30 lbs from starting weight",
+            earned=lost_lbs >= 30,
+            icon="\u2696\ufe0f",
+            unlock_hint=f"{30 - lost_lbs:.0f} lbs to go" if lost_lbs < 30 else None,
+        ),
+        badge(
+            "lost_40",
+            "Lost 40 lbs",
+            "milestone",
+            "Lost 40 lbs from starting weight",
+            earned=lost_lbs >= 40,
+            icon="\u2696\ufe0f",
+            unlock_hint=f"{40 - lost_lbs:.0f} lbs to go" if lost_lbs < 40 else None,
+        ),
+        badge(
+            "lost_50",
+            "Lost 50 lbs",
+            "milestone",
+            "Lost 50 lbs from starting weight",
+            earned=lost_lbs >= 50,
+            icon="\u2696\ufe0f",
+            unlock_hint=f"{50 - lost_lbs:.0f} lbs to go" if lost_lbs < 50 else None,
+        ),
+        badge(
+            "lost_60",
+            "Lost 60 lbs",
+            "milestone",
+            "Lost 60 lbs from starting weight",
+            earned=lost_lbs >= 60,
+            icon="\u2696\ufe0f",
+            unlock_hint=f"{60 - lost_lbs:.0f} lbs to go" if lost_lbs < 60 else None,
+        ),
+        badge(
+            "lost_70",
+            "Lost 70 lbs",
+            "milestone",
+            "Lost 70 lbs from starting weight",
+            earned=lost_lbs >= 70,
+            icon="\u2696\ufe0f",
+            unlock_hint=f"{70 - lost_lbs:.0f} lbs to go" if lost_lbs < 70 else None,
+        ),
+        badge(
+            "lost_80",
+            "Lost 80 lbs",
+            "milestone",
+            "Lost 80 lbs from starting weight",
+            earned=lost_lbs >= 80,
+            icon="\u2696\ufe0f",
+            unlock_hint=f"{80 - lost_lbs:.0f} lbs to go" if lost_lbs < 80 else None,
+        ),
+        badge(
+            "lost_90",
+            "Lost 90 lbs",
+            "milestone",
+            "Lost 90 lbs from starting weight",
+            earned=lost_lbs >= 90,
+            icon="\u2696\ufe0f",
+            unlock_hint=f"{90 - lost_lbs:.0f} lbs to go" if lost_lbs < 90 else None,
+        ),
+        badge(
+            "lost_100",
+            "Lost 100 lbs",
+            "milestone",
+            "Lost 100 lbs from starting weight",
+            earned=lost_lbs >= 100,
+            icon="\u2696\ufe0f",
+            unlock_hint=f"{100 - lost_lbs:.0f} lbs to go" if lost_lbs < 100 else None,
+        ),
         # ── Weight TARGET milestones
-        badge("sub_280", "Sub-280", "milestone",
-              "Weight under 280 lbs",
-              earned=current_weight < 280, icon="\ud83c\udfaf",
-              unlock_hint=f"{current_weight - 280:.0f} lbs to go" if current_weight >= 280 else None),
-        badge("sub_250", "Sub-250", "milestone",
-              "Weight under 250 lbs",
-              earned=current_weight < 250, icon="\ud83c\udfaf",
-              unlock_hint=f"{current_weight - 250:.0f} lbs to go" if current_weight >= 250 else None),
-        badge("sub_220", "Sub-220", "milestone",
-              "Weight under 220 lbs",
-              earned=current_weight < 220, icon="\ud83c\udfaf",
-              unlock_hint=f"{current_weight - 220:.0f} lbs to go" if current_weight >= 220 else None),
-        badge("sub_200", "Sub-200", "milestone",
-              "Weight under 200 lbs",
-              earned=current_weight < 200, icon="\ud83c\udfaf",
-              unlock_hint=f"{current_weight - 200:.0f} lbs to go" if current_weight >= 200 else None),
-
+        badge(
+            "sub_280",
+            "Sub-280",
+            "milestone",
+            "Weight under 280 lbs",
+            earned=current_weight < 280,
+            icon="\ud83c\udfaf",
+            unlock_hint=f"{current_weight - 280:.0f} lbs to go" if current_weight >= 280 else None,
+        ),
+        badge(
+            "sub_250",
+            "Sub-250",
+            "milestone",
+            "Weight under 250 lbs",
+            earned=current_weight < 250,
+            icon="\ud83c\udfaf",
+            unlock_hint=f"{current_weight - 250:.0f} lbs to go" if current_weight >= 250 else None,
+        ),
+        badge(
+            "sub_220",
+            "Sub-220",
+            "milestone",
+            "Weight under 220 lbs",
+            earned=current_weight < 220,
+            icon="\ud83c\udfaf",
+            unlock_hint=f"{current_weight - 220:.0f} lbs to go" if current_weight >= 220 else None,
+        ),
+        badge(
+            "sub_200",
+            "Sub-200",
+            "milestone",
+            "Weight under 200 lbs",
+            earned=current_weight < 200,
+            icon="\ud83c\udfaf",
+            unlock_hint=f"{current_weight - 200:.0f} lbs to go" if current_weight >= 200 else None,
+        ),
         # ── Data
-        badge("100_days", "100 Days Tracked", "data",
-              "100+ days of habit logging",
-              earned=days_tracked >= 100,
-              earned_date=today if days_tracked >= 100 else None,
-              unlock_hint=f"{max(0, 100 - days_tracked)} days to unlock" if days_tracked < 100 else None),
-        badge("365_days", "Year of Data", "data",
-              "365 days of habit logging",
-              earned=days_tracked >= 365,
-              unlock_hint=f"{max(0, 365 - days_tracked)} days to unlock" if days_tracked < 365 else None),
-
+        badge(
+            "100_days",
+            "100 Days Tracked",
+            "data",
+            "100+ days of habit logging",
+            earned=days_tracked >= 100,
+            earned_date=today if days_tracked >= 100 else None,
+            unlock_hint=f"{max(0, 100 - days_tracked)} days to unlock" if days_tracked < 100 else None,
+        ),
+        badge(
+            "365_days",
+            "Year of Data",
+            "data",
+            "365 days of habit logging",
+            earned=days_tracked >= 365,
+            unlock_hint=f"{max(0, 365 - days_tracked)} days to unlock" if days_tracked < 365 else None,
+        ),
         # ── Experiment
-        badge("first_experiment", "First Experiment", "science",
-              "Completed first N=1 experiment",
-              earned=len(completed_exps) >= 1,
-              earned_date=today if completed_exps else None),
-        badge("hypothesis_confirmed", "Hypothesis Confirmed", "science",
-              "N=1 result statistically validated",
-              earned=False,  # requires manual confirmation
-              unlock_hint="Complete a tracked experiment to unlock"),
-
+        badge(
+            "first_experiment",
+            "First Experiment",
+            "science",
+            "Completed first N=1 experiment",
+            earned=len(completed_exps) >= 1,
+            earned_date=today if completed_exps else None,
+        ),
+        badge(
+            "hypothesis_confirmed",
+            "Hypothesis Confirmed",
+            "science",
+            "N=1 result statistically validated",
+            earned=False,  # requires manual confirmation
+            unlock_hint="Complete a tracked experiment to unlock",
+        ),
         # EL-21: Experiment evolution badges
-        badge("exp_3_completed", "Lab Rat", "science",
-              "Completed 3 experiments",
-              earned=len(completed_exps) >= 3,
-              earned_date=today if len(completed_exps) >= 3 else None,
-              unlock_hint=f"{max(0, 3 - len(completed_exps))} experiments to unlock" if len(completed_exps) < 3 else None),
-        badge("exp_5_completed", "Research Fellow", "science",
-              "Completed 5 experiments",
-              earned=len(completed_exps) >= 5,
-              earned_date=today if len(completed_exps) >= 5 else None,
-              unlock_hint=f"{max(0, 5 - len(completed_exps))} experiments to unlock" if len(completed_exps) < 5 else None),
-        badge("exp_10_completed", "Principal Investigator", "science",
-              "Completed 10 experiments",
-              earned=len(completed_exps) >= 10,
-              unlock_hint=f"{max(0, 10 - len(completed_exps))} experiments to unlock" if len(completed_exps) < 10 else None),
-        badge("exp_streak_3", "Hot Streak", "science",
-              "3 consecutive completed experiments (no fails)",
-              earned=_exp_has_3_streak,
-              unlock_hint="Complete 3 experiments in a row without abandoning"),
-        badge("exp_all_pillars", "Renaissance Man", "science",
-              "Completed experiment in every pillar",
-              earned=_exp_all_pillars_covered,
-              unlock_hint="Complete at least one experiment in each of the 7 pillars"),
-
+        badge(
+            "exp_3_completed",
+            "Lab Rat",
+            "science",
+            "Completed 3 experiments",
+            earned=len(completed_exps) >= 3,
+            earned_date=today if len(completed_exps) >= 3 else None,
+            unlock_hint=f"{max(0, 3 - len(completed_exps))} experiments to unlock" if len(completed_exps) < 3 else None,
+        ),
+        badge(
+            "exp_5_completed",
+            "Research Fellow",
+            "science",
+            "Completed 5 experiments",
+            earned=len(completed_exps) >= 5,
+            earned_date=today if len(completed_exps) >= 5 else None,
+            unlock_hint=f"{max(0, 5 - len(completed_exps))} experiments to unlock" if len(completed_exps) < 5 else None,
+        ),
+        badge(
+            "exp_10_completed",
+            "Principal Investigator",
+            "science",
+            "Completed 10 experiments",
+            earned=len(completed_exps) >= 10,
+            unlock_hint=f"{max(0, 10 - len(completed_exps))} experiments to unlock" if len(completed_exps) < 10 else None,
+        ),
+        badge(
+            "exp_streak_3",
+            "Hot Streak",
+            "science",
+            "3 consecutive completed experiments (no fails)",
+            earned=_exp_has_3_streak,
+            unlock_hint="Complete 3 experiments in a row without abandoning",
+        ),
+        badge(
+            "exp_all_pillars",
+            "Renaissance Man",
+            "science",
+            "Completed experiment in every pillar",
+            earned=_exp_all_pillars_covered,
+            unlock_hint="Complete at least one experiment in each of the 7 pillars",
+        ),
         # ── Challenges
-        badge("first_challenge", "First Challenge", "challenge",
-              "Completed first challenge",
-              earned=completed_challenges >= 1,
-              earned_date=today if completed_challenges >= 1 else None),
-        badge("five_challenges", "Challenge Regular", "challenge",
-              "Completed 5 challenges",
-              earned=completed_challenges >= 5,
-              unlock_hint=f"{max(0, 5 - completed_challenges)} challenges to unlock" if completed_challenges < 5 else None),
-        badge("ten_challenges", "Challenge Veteran", "challenge",
-              "Completed 10 challenges",
-              earned=completed_challenges >= 10,
-              unlock_hint=f"{max(0, 10 - completed_challenges)} challenges to unlock" if completed_challenges < 10 else None),
-        badge("twenty_five_challenges", "Challenge Legend", "challenge",
-              "Completed 25 challenges",
-              earned=completed_challenges >= 25,
-              unlock_hint=f"{max(0, 25 - completed_challenges)} challenges to unlock" if completed_challenges < 25 else None),
-        badge("perfect_challenge", "Flawless", "challenge",
-              "Completed a challenge with 100% success rate (7+ days)",
-              earned=perfect_challenges >= 1,
-              unlock_hint="Complete a 7+ day challenge without missing a single day"),
+        badge(
+            "first_challenge",
+            "First Challenge",
+            "challenge",
+            "Completed first challenge",
+            earned=completed_challenges >= 1,
+            earned_date=today if completed_challenges >= 1 else None,
+        ),
+        badge(
+            "five_challenges",
+            "Challenge Regular",
+            "challenge",
+            "Completed 5 challenges",
+            earned=completed_challenges >= 5,
+            unlock_hint=f"{max(0, 5 - completed_challenges)} challenges to unlock" if completed_challenges < 5 else None,
+        ),
+        badge(
+            "ten_challenges",
+            "Challenge Veteran",
+            "challenge",
+            "Completed 10 challenges",
+            earned=completed_challenges >= 10,
+            unlock_hint=f"{max(0, 10 - completed_challenges)} challenges to unlock" if completed_challenges < 10 else None,
+        ),
+        badge(
+            "twenty_five_challenges",
+            "Challenge Legend",
+            "challenge",
+            "Completed 25 challenges",
+            earned=completed_challenges >= 25,
+            unlock_hint=f"{max(0, 25 - completed_challenges)} challenges to unlock" if completed_challenges < 25 else None,
+        ),
+        badge(
+            "perfect_challenge",
+            "Flawless",
+            "challenge",
+            "Completed a challenge with 100% success rate (7+ days)",
+            earned=perfect_challenges >= 1,
+            unlock_hint="Complete a 7+ day challenge without missing a single day",
+        ),
     ]
 
     earned_count = sum(1 for a in achievements if a["earned"])
 
-    return _ok({
-        "achievements": achievements,
-        "summary": {
-            "earned": earned_count,
-            "total":  len(achievements),
-            "current_streak": current_streak,
-            "days_tracked":   days_tracked,
-            "current_level":  current_level,
-            "current_weight": round(current_weight),
-            "completed_challenges": completed_challenges,
-            "perfect_challenges": perfect_challenges,
+    return _ok(
+        {
+            "achievements": achievements,
+            "summary": {
+                "earned": earned_count,
+                "total": len(achievements),
+                "current_streak": current_streak,
+                "days_tracked": days_tracked,
+                "current_level": current_level,
+                "current_weight": round(current_weight),
+                "completed_challenges": completed_challenges,
+                "perfect_challenges": perfect_challenges,
+            },
         },
-    }, cache_seconds=3600)
-
+        cache_seconds=3600,
+    )
 
 
 def handle_snapshot() -> dict:
@@ -1076,15 +1316,13 @@ def handle_snapshot() -> dict:
         character_body = None
 
     payload = {
-        "vitals":    vitals_body,
-        "journey":   journey_body,
+        "vitals": vitals_body,
+        "journey": journey_body,
         "character": character_body,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
     return {
         "statusCode": 200,
-        "headers":    {**CORS_HEADERS, "Cache-Control": "public, max-age=60"},
-        "body":       json.dumps(payload, default=str),
+        "headers": {**CORS_HEADERS, "Cache-Control": "public, max-age=60"},
+        "body": json.dumps(payload, default=str),
     }
-
-

@@ -20,6 +20,7 @@ Read-only except for redirects.map. Run from repo root:
     python3 scripts/v4_migration_inventory.py
 """
 from __future__ import annotations
+
 import sys
 from pathlib import Path
 
@@ -28,28 +29,60 @@ LEGACY_DIR = Path("site/legacy")
 # Top-level segment (of the ORIGINAL url) -> v4 destination.
 RULES: dict[str, str] = {
     # Cockpit — daily state, score, time-views
-    "character": "cockpit", "observatory": "cockpit",
-    "week": "cockpit", "weekly": "cockpit", "recap": "story",
-    "status": "cockpit", "achievements": "cockpit",
+    "character": "cockpit",
+    "observatory": "cockpit",
+    "week": "cockpit",
+    "weekly": "cockpit",
+    "recap": "story",
+    "status": "cockpit",
+    "achievements": "cockpit",
     # Story — narrative, journey, the cast, public face
     "": "story",  # the old root index.html
-    "chronicle": "story", "journal": "story", "elena": "story", "story": "story",
-    "mission": "story", "about": "story", "first-person": "story",
-    "field-notes": "story", "progress": "story",
-    "builders": "story", "community": "story",
+    "chronicle": "story",
+    "journal": "story",
+    "elena": "story",
+    "story": "story",
+    "mission": "story",
+    "about": "story",
+    "first-person": "story",
+    "field-notes": "story",
+    "progress": "story",
+    "builders": "story",
+    "community": "story",
     "start": "story",
     # Evidence — depth, protocols, data, credibility
-    "nutrition": "evidence", "sleep": "evidence", "training": "evidence",
-    "physical": "evidence", "mind": "evidence", "supplements": "evidence",
-    "labs": "evidence", "biology": "evidence", "glucose": "evidence",
-    "protocols": "evidence", "habits": "evidence", "experiments": "evidence",
-    "challenges": "evidence", "benchmarks": "evidence", "methodology": "evidence",
-    "intelligence": "evidence", "predictions": "evidence", "stack": "evidence",
-    "board": "evidence", "coaches": "evidence", "ledger": "evidence",
-    "discoveries": "evidence", "accountability": "evidence", "live": "evidence",
-    "kitchen": "evidence", "results": "evidence", "cost": "evidence",
-    "explorer": "evidence", "data": "evidence", "tools": "evidence",
-    "platform": "evidence", "ask": "evidence",
+    "nutrition": "evidence",
+    "sleep": "evidence",
+    "training": "evidence",
+    "physical": "evidence",
+    "mind": "evidence",
+    "supplements": "evidence",
+    "labs": "evidence",
+    "biology": "evidence",
+    "glucose": "evidence",
+    "protocols": "evidence",
+    "habits": "evidence",
+    "experiments": "evidence",
+    "challenges": "evidence",
+    "benchmarks": "evidence",
+    "methodology": "evidence",
+    "intelligence": "evidence",
+    "predictions": "evidence",
+    "stack": "evidence",
+    "board": "evidence",
+    "coaches": "evidence",
+    "ledger": "evidence",
+    "discoveries": "evidence",
+    "accountability": "evidence",
+    "live": "evidence",
+    "kitchen": "evidence",
+    "results": "evidence",
+    "cost": "evidence",
+    "explorer": "evidence",
+    "data": "evidence",
+    "tools": "evidence",
+    "platform": "evidence",
+    "ask": "evidence",
     # Legacy — already-archived v1, preserved not rehomed
     "archive": "legacy",
 }
@@ -77,27 +110,34 @@ def classify(url: str) -> str | None:
 
 def new_url(url: str, dest: str) -> str:
     if dest == "cockpit":
-        return "/now/"   # trailing slash: bare /now 302s to /site/now/ via the S3 origin
+        return "/now/"  # trailing slash: bare /now 302s to /site/now/ via the S3 origin
     if dest == "story":
-        deep = {"chronicle": "/story/chronicle/", "elena": "/story/chronicle/",
-                "journal": "/story/journal/",
-                "field-notes": "/story/lab-notes/", "first-person": "/story/lab-notes/",
-                "recap": "/story/timeline/", "progress": "/story/timeline/",
-                "about": "/story/about/", "mission": "/story/about/"}
-        return deep.get(seg_of(url), "/")   # narrative URLs land on their native Story sub-page
+        deep = {
+            "chronicle": "/story/chronicle/",
+            "elena": "/story/chronicle/",
+            "journal": "/story/journal/",
+            "field-notes": "/story/lab-notes/",
+            "first-person": "/story/lab-notes/",
+            "recap": "/story/timeline/",
+            "progress": "/story/timeline/",
+            "about": "/story/about/",
+            "mission": "/story/about/",
+        }
+        return deep.get(seg_of(url), "/")  # narrative URLs land on their native Story sub-page
     if dest == "evidence":
         remap = {"coaches": "board", "accountability": "vices", "live": "vitals"}
         seg = seg_of(url)
-        return f"/evidence/{remap.get(seg, seg)}/"   # collapse subpaths; remap rehomed slugs
+        return f"/evidence/{remap.get(seg, seg)}/"  # collapse subpaths; remap rehomed slugs
     if dest == "legacy":
-        return f"/legacy{url}"               # served verbatim from its preserved location
+        return f"/legacy{url}"  # served verbatim from its preserved location
     return url
 
 
 def main() -> int:
     if not LEGACY_DIR.is_dir():
-        print(f"error: '{LEGACY_DIR}/' not found. Run scripts/v4_relocate_legacy.py "
-              f"--apply first (from the repo root).", file=sys.stderr)
+        print(
+            f"error: '{LEGACY_DIR}/' not found. Run scripts/v4_relocate_legacy.py " f"--apply first (from the repo root).", file=sys.stderr
+        )
         return 2
 
     pages = sorted(LEGACY_DIR.rglob("*.html"))
@@ -116,11 +156,10 @@ def main() -> int:
         # (the old top-level /story/ page is preserved at /legacy/story/ for rollback).
         # Full chronicle/journal POST pages must stay reachable too — the Story reader
         # links to them as "Read the full piece" (they only carry excerpts otherwise).
-        if (url == "/story/" or url.startswith("/story/")
-                or url.startswith("/chronicle/posts/") or url.startswith("/journal/posts/")):
+        if url == "/story/" or url.startswith("/story/") or url.startswith("/chronicle/posts/") or url.startswith("/journal/posts/"):
             continue
         new = new_url(url, dest)
-        if new != url:           # legacy pages already live at /legacy/* — still record the 301
+        if new != url:  # legacy pages already live at /legacy/* — still record the 301
             redirects.append((url, new))
 
     # Non-legacy 301s: /dispatches/* briefly shipped before "the story" rename — keep them alive.
@@ -138,8 +177,7 @@ def main() -> int:
         for u in unmapped:
             print(f"  ! {u}")
 
-    Path("redirects.map").write_text(
-        "\n".join(f"{o}\t{n}" for o, n in sorted(redirects)) + "\n", encoding="utf-8")
+    Path("redirects.map").write_text("\n".join(f"{o}\t{n}" for o, n in sorted(redirects)) + "\n", encoding="utf-8")
     print(f"\nwrote redirects.map ({len(redirects)} 301s; review before wiring to the edge).")
 
     if unmapped:

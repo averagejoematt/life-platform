@@ -82,9 +82,7 @@ class StructuredFormatter(logging.Formatter):
     """
 
     def format(self, record: logging.LogRecord) -> str:
-        ts = datetime.fromtimestamp(record.created, tz=timezone.utc).strftime(
-            "%Y-%m-%dT%H:%M:%S.%f"
-        )[:-3] + "Z"
+        ts = datetime.fromtimestamp(record.created, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
         doc = {
             "timestamp": ts,
@@ -110,13 +108,15 @@ class StructuredFormatter(logging.Formatter):
             return json.dumps(doc, default=str, separators=(",", ":"))
         except Exception:
             # Last resort — never swallow a log line entirely
-            return json.dumps({
-                "timestamp": ts,
-                "level": record.levelname,
-                "source": getattr(record, "platform_source", _LAMBDA_NAME),
-                "message": str(record.getMessage()),
-                "serialization_error": True,
-            })
+            return json.dumps(
+                {
+                    "timestamp": ts,
+                    "level": record.levelname,
+                    "source": getattr(record, "platform_source", _LAMBDA_NAME),
+                    "message": str(record.getMessage()),
+                    "serialization_error": True,
+                }
+            )
 
 
 def _safe_json_value(v):
@@ -367,35 +367,13 @@ def get_logger(source: str = None) -> PlatformLogger:
 # ── CloudWatch Logs Insights query helpers (reference strings) ─────────────────
 
 CWL_QUERIES = {
-    "errors_today": (
-        "filter level = 'ERROR' "
-        "| sort @timestamp desc "
-        "| limit 50"
-    ),
-    "validation_errors": (
-        "filter message = 'Validation errors' "
-        "| stats count(*) by source "
-        "| sort count desc"
-    ),
-    "ai_failures": (
-        "filter message = 'AI call failed' "
-        "| stats count(*) by call_name "
-        "| sort count desc"
-    ),
-    "ingestion_by_date": (
-        "filter message = 'Ingestion complete' "
-        "| stats sum(records_written) by date "
-        "| sort date desc"
-    ),
-    "source_gaps": (
-        "filter message = 'Source data missing' "
-        "| stats count(*) by source, date "
-        "| sort date desc, source"
-    ),
+    "errors_today": ("filter level = 'ERROR' " "| sort @timestamp desc " "| limit 50"),
+    "validation_errors": ("filter message = 'Validation errors' " "| stats count(*) by source " "| sort count desc"),
+    "ai_failures": ("filter message = 'AI call failed' " "| stats count(*) by call_name " "| sort count desc"),
+    "ingestion_by_date": ("filter message = 'Ingestion complete' " "| stats sum(records_written) by date " "| sort date desc"),
+    "source_gaps": ("filter message = 'Source data missing' " "| stats count(*) by source, date " "| sort date desc, source"),
     "slow_ai_calls": (
-        "filter message = 'AI call complete' and latency_ms > 30000 "
-        "| fields call_name, latency_ms, tokens_out "
-        "| sort latency_ms desc"
+        "filter message = 'AI call complete' and latency_ms > 30000 " "| fields call_name, latency_ms, tokens_out " "| sort latency_ms desc"
     ),
     "cross_lambda_by_date": (
         # Replace DATE with target date

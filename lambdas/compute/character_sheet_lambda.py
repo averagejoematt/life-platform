@@ -27,13 +27,13 @@ v1.2.0 — 2026-03-26: Phase D — Challenge bonus XP wired into pillar xp_total
 """
 
 import json
+import logging
 import os
 import time
-import logging
-import boto3
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+import boto3
 import character_engine
 from constants import EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
@@ -41,6 +41,7 @@ from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("character-sheet-compute")
 except ImportError:
     logger = logging.getLogger("character-sheet-compute")
@@ -65,11 +66,15 @@ s3 = boto3.client("s3", region_name=_REGION)
 # DDB QUERY HELPERS
 # ==============================================================================
 
+
 def d2f(obj):
     """Convert DynamoDB Decimal to float recursively."""
-    if isinstance(obj, list): return [d2f(i) for i in obj]
-    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [d2f(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
 
 
@@ -80,10 +85,12 @@ def fetch_date(source, date_str):
     semantics during/after the experiment restart wipe).
     """
     try:
-        resp = table.get_item(Key={
-            "pk": USER_PREFIX + source,
-            "sk": "DATE#" + date_str,
-        })
+        resp = table.get_item(
+            Key={
+                "pk": USER_PREFIX + source,
+                "sk": "DATE#" + date_str,
+            }
+        )
         item = resp.get("Item")
         if item and item.get("tombstone"):
             return None
@@ -97,14 +104,16 @@ def fetch_range(source, start_date, end_date):
     """Fetch all records for a source within a date range."""
     try:
         records = []
-        kwargs = with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": USER_PREFIX + source,
-                ":s": "DATE#" + start_date,
-                ":e": "DATE#" + end_date,
-            },
-        })
+        kwargs = with_phase_filter(
+            {
+                "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                "ExpressionAttributeValues": {
+                    ":pk": USER_PREFIX + source,
+                    ":s": "DATE#" + start_date,
+                    ":e": "DATE#" + end_date,
+                },
+            }
+        )
         while True:
             resp = table.query(**kwargs)
             for item in resp.get("Items", []):
@@ -123,14 +132,16 @@ def fetch_journal_entries(date_str):
     try:
         pk = f"USER#{USER_ID}#SOURCE#notion"
         entries = []
-        kwargs = with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": pk,
-                ":s": f"DATE#{date_str}#journal#",
-                ":e": f"DATE#{date_str}#journal#zzz",
-            },
-        })
+        kwargs = with_phase_filter(
+            {
+                "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                "ExpressionAttributeValues": {
+                    ":pk": pk,
+                    ":s": f"DATE#{date_str}#journal#",
+                    ":e": f"DATE#{date_str}#journal#zzz",
+                },
+            }
+        )
         while True:
             resp = table.query(**kwargs)
             for item in resp.get("Items", []):
@@ -157,6 +168,7 @@ def _safe_float(rec, field):
 # ==============================================================================
 # DATA ASSEMBLY — mirrors retrocompute_character_sheet.assemble_data_for_date
 # ==============================================================================
+
 
 def assemble_data(yesterday_str):
     """Build the data dict that character_engine.compute_character_sheet() expects.
@@ -229,15 +241,17 @@ def assemble_data(yesterday_str):
         d = (dt - timedelta(days=i)).strftime("%Y-%m-%d")
         try:
             pk = f"USER#{USER_ID}#SOURCE#notion"
-            _j14_kwargs = with_phase_filter({
-                "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-                "ExpressionAttributeValues": {
-                    ":pk": pk,
-                    ":s": f"DATE#{d}#journal#",
-                    ":e": f"DATE#{d}#journal#zzz",
-                },
-                "Select": "COUNT",
-            })
+            _j14_kwargs = with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                    "ExpressionAttributeValues": {
+                        ":pk": pk,
+                        ":s": f"DATE#{d}#journal#",
+                        ":e": f"DATE#{d}#journal#zzz",
+                    },
+                    "Select": "COUNT",
+                }
+            )
             resp = table.query(**_j14_kwargs)
             if resp.get("Count", 0) > 0:
                 j14d_count += 1
@@ -264,13 +278,17 @@ def assemble_data(yesterday_str):
     data["data_completeness_pct"] = round((present / expected_count) * 100, 1)
 
     elapsed = time.time() - t0
-    logger.info(f"[character] Data assembled for {yesterday_str} in {elapsed:.1f}s — sources: " + ", ".join(k for k in ["whoop", "macrofactor", "apple", "habit_scores", "state_of_mind", "journal_entries"] if data.get(k)))
+    logger.info(
+        f"[character] Data assembled for {yesterday_str} in {elapsed:.1f}s — sources: "
+        + ", ".join(k for k in ["whoop", "macrofactor", "apple", "habit_scores", "state_of_mind", "journal_entries"] if data.get(k))
+    )
     return data
 
 
 # ==============================================================================
 # HISTORY LOADING — fetch prior character sheet records for continuity
 # ==============================================================================
+
 
 def load_previous_state(yesterday_str):
     """Load the most recent character sheet record, scanning back up to 7 days.
@@ -317,25 +335,27 @@ def load_raw_score_histories(yesterday_str, window=21):
 # FOOD DELIVERY MODIFIER — adjusts Nutrition pillar based on delivery streak
 # ==============================================================================
 
+
 def get_food_delivery_modifier():
     """Returns a multiplier (0.85-1.10) for the Nutrition pillar based on delivery streak."""
     try:
-        resp = table.get_item(Key={
-            'pk': 'USER#matthew#SOURCE#food_delivery',
-            'sk': 'STREAK#current'
-        })
-        streak = resp.get('Item', {})
+        resp = table.get_item(Key={"pk": "USER#matthew#SOURCE#food_delivery", "sk": "STREAK#current"})
+        streak = resp.get("Item", {})
         if not streak:
             return 1.0
-        streak_days = int(streak.get('streak_days', 0))
-        last_order = streak.get('last_order_date', '')
+        streak_days = int(streak.get("streak_days", 0))
+        last_order = streak.get("last_order_date", "")
         from datetime import datetime
+
         # 15% penalty for ordering delivery; graduated bonus at 7/14/30 clean days
-        if last_order == datetime.now(timezone.utc).strftime('%Y-%m-%d'):
+        if last_order == datetime.now(timezone.utc).strftime("%Y-%m-%d"):
             return 0.85
-        if streak_days >= 30: return 1.10
-        if streak_days >= 14: return 1.05
-        if streak_days >= 7: return 1.02
+        if streak_days >= 30:
+            return 1.10
+        if streak_days >= 14:
+            return 1.05
+        if streak_days >= 7:
+            return 1.02
         return 1.0
     except Exception:
         return 1.0
@@ -344,6 +364,7 @@ def get_food_delivery_modifier():
 # ==============================================================================
 # LAMBDA HANDLER
 # ==============================================================================
+
 
 def lambda_handler(event, context):
     if event.get("healthcheck"):
@@ -378,6 +399,7 @@ def lambda_handler(event, context):
     # penalty), mark it sick_day=True, and return early.
     try:
         from sick_day_checker import check_sick_day as _check_sick
+
         _sick_rec = _check_sick(table, USER_ID, yesterday_str)
     except ImportError:
         _sick_rec = None
@@ -396,33 +418,41 @@ def lambda_handler(event, context):
             _frozen["sick_day_reason"] = _sick_reason
             _frozen["frozen_from"] = _prev.get("date", "")
             _frozen["computed_at"] = datetime.now(timezone.utc).isoformat()
+
             # Convert floats → Decimal for DynamoDB
             def _dec(obj):
-                if isinstance(obj, list): return [_dec(i) for i in obj]
-                if isinstance(obj, dict): return {k: _dec(v) for k, v in obj.items()}
-                if isinstance(obj, bool): return obj
-                if isinstance(obj, float): return Decimal(str(obj))
-                if isinstance(obj, int): return Decimal(str(obj))
+                if isinstance(obj, list):
+                    return [_dec(i) for i in obj]
+                if isinstance(obj, dict):
+                    return {k: _dec(v) for k, v in obj.items()}
+                if isinstance(obj, bool):
+                    return obj
+                if isinstance(obj, float):
+                    return Decimal(str(obj))
+                if isinstance(obj, int):
+                    return Decimal(str(obj))
                 return obj
+
             # Phase 3.3 (2026-05-16): tag with run_id + computed_at for double-run observability.
             from compute_metadata import tag_record
+
             _tagged = tag_record({k: _dec(v) for k, v in _frozen.items() if v is not None}, source_id="character_sheet")
             table.put_item(Item=_tagged)
             logger.info(f"[character] Frozen record stored for {yesterday_str} (from {_frozen.get('frozen_from', '?')})")
             return {
-                "statusCode":   200,
-                "body":         f"Sick day {yesterday_str}: character sheet EMA frozen (no change)",
-                "sick_day":     True,
-                "frozen_from":  _frozen.get("frozen_from", ""),
+                "statusCode": 200,
+                "body": f"Sick day {yesterday_str}: character sheet EMA frozen (no change)",
+                "sick_day": True,
+                "frozen_from": _frozen.get("frozen_from", ""),
                 "character_level": _prev.get("character_level"),
-                "character_tier":  _prev.get("character_tier"),
+                "character_tier": _prev.get("character_tier"),
             }
         else:
             logger.info("[character] Sick day but no previous state — skipping compute entirely")
             return {
                 "statusCode": 200,
-                "body":       f"Sick day {yesterday_str}: no previous state to freeze from, skipped",
-                "sick_day":   True,
+                "body": f"Sick day {yesterday_str}: no previous state to freeze from, skipped",
+                "sick_day": True,
             }
 
     # ── Load config from S3 ──
@@ -439,7 +469,9 @@ def lambda_handler(event, context):
     # ── Load continuity state ──
     previous_state = load_previous_state(yesterday_str)
     if previous_state:
-        logger.info(f"[character] Previous state loaded — Level {previous_state.get('character_level', '?')} ({previous_state.get('character_tier_emoji', '')} {previous_state.get('character_tier', '?')})")
+        logger.info(
+            f"[character] Previous state loaded — Level {previous_state.get('character_level', '?')} ({previous_state.get('character_tier_emoji', '')} {previous_state.get('character_tier', '?')})"
+        )
     else:
         logger.info("[character] No previous state — starting from baseline")
 
@@ -449,9 +481,7 @@ def lambda_handler(event, context):
 
     # ── Compute ──
     try:
-        record = character_engine.compute_character_sheet(
-            data, previous_state, raw_score_histories, config
-        )
+        record = character_engine.compute_character_sheet(data, previous_state, raw_score_histories, config)
     except Exception as e:
         logger.error(f"[character] compute_character_sheet failed: {e}")
         return {"statusCode": 500, "body": f"Computation failed: {e}"}
@@ -473,7 +503,9 @@ def lambda_handler(event, context):
     # Log pillar summary
     for p in PILLAR_ORDER:
         pd = record.get(f"pillar_{p}", {})
-        logger.info(f"[character]   {p}: raw={pd.get('raw_score', '?')} level={pd.get('level', '?')} tier={pd.get('tier', '?')} ({pd.get('tier_emoji', '?')})")
+        logger.info(
+            f"[character]   {p}: raw={pd.get('raw_score', '?')} level={pd.get('level', '?')} tier={pd.get('tier', '?')} ({pd.get('tier_emoji', '?')})"
+        )
 
     # Log events
     if events:
@@ -490,20 +522,30 @@ def lambda_handler(event, context):
     # Query challenges completed on the target date that haven't been
     # XP-consumed yet. Add bonus XP to the relevant pillar.
     CHALLENGE_DOMAIN_TO_PILLAR = {
-        "sleep": "sleep", "movement": "movement", "nutrition": "nutrition",
-        "supplements": "nutrition", "mental": "mind", "social": "relationships",
-        "discipline": "consistency", "metabolic": "metabolic", "general": "consistency",
+        "sleep": "sleep",
+        "movement": "movement",
+        "nutrition": "nutrition",
+        "supplements": "nutrition",
+        "mental": "mind",
+        "social": "relationships",
+        "discipline": "consistency",
+        "metabolic": "metabolic",
+        "general": "consistency",
     }
     challenge_bonus_xp = {}  # pillar → total bonus XP
     try:
         from boto3.dynamodb.conditions import Key as _Key
+
         _ch_pk = USER_PREFIX + "challenges"
-        _ch_kwargs = with_phase_filter({
-            "KeyConditionExpression": _Key("pk").eq(_ch_pk) & _Key("sk").begins_with("CHALLENGE#"),
-        })
+        _ch_kwargs = with_phase_filter(
+            {
+                "KeyConditionExpression": _Key("pk").eq(_ch_pk) & _Key("sk").begins_with("CHALLENGE#"),
+            }
+        )
         _ch_resp = table.query(**_ch_kwargs)
         _completed_today = [
-            c for c in _ch_resp.get("Items", [])
+            c
+            for c in _ch_resp.get("Items", [])
             if c.get("status") in ("completed", "failed")
             and (c.get("completed_at", "") or "").startswith(yesterday_str)
             and not c.get("xp_consumed_at")
@@ -531,9 +573,7 @@ def lambda_handler(event, context):
 
         if challenge_bonus_xp:
             # Recalculate total character XP with bonuses
-            record["character_xp"] = sum(
-                record.get(f"pillar_{p}", {}).get("xp_total", 0) for p in PILLAR_ORDER
-            )
+            record["character_xp"] = sum(record.get(f"pillar_{p}", {}).get("xp_total", 0) for p in PILLAR_ORDER)
             record["challenge_bonus_xp"] = challenge_bonus_xp
             logger.info(f"[character] Challenge bonus XP applied: {challenge_bonus_xp}")
     except Exception as _ch_err:
@@ -544,13 +584,14 @@ def lambda_handler(event, context):
     # We validate a lightweight proxy item — only the fields the schema checks.
     try:
         from ingestion_validator import validate_item as _vi
+
         _val_proxy = {
-            "pk":              USER_PREFIX + "character_sheet",
-            "sk":              "DATE#" + yesterday_str,
-            "date":            yesterday_str,
+            "pk": USER_PREFIX + "character_sheet",
+            "sk": "DATE#" + yesterday_str,
+            "date": yesterday_str,
             "character_level": record.get("character_level"),
-            "character_tier":  record.get("character_tier"),
-            "computed_at":     record.get("computed_at", ""),
+            "character_tier": record.get("character_tier"),
+            "computed_at": record.get("computed_at", ""),
         }
         _vr = _vi("character_sheet", _val_proxy, yesterday_str)
         if _vr.should_skip_ddb:
@@ -579,19 +620,24 @@ def lambda_handler(event, context):
         from site_writer import write_character_stats
 
         PILLAR_EMOJI_MAP = {
-            "sleep": "😴", "movement": "🏋️", "nutrition": "🥗",
-            "metabolic": "📊", "mind": "🧠", "relationships": "💬", "consistency": "🎯"
+            "sleep": "😴",
+            "movement": "🏋️",
+            "nutrition": "🥗",
+            "metabolic": "📊",
+            "mind": "🧠",
+            "relationships": "💬",
+            "consistency": "🎯",
         }
         pillars_for_site = [
             {
-                "name":      p,
-                "emoji":     PILLAR_EMOJI_MAP.get(p, ""),
-                "level":     float(record.get(f"pillar_{p}", {}).get("level", 1)),
+                "name": p,
+                "emoji": PILLAR_EMOJI_MAP.get(p, ""),
+                "level": float(record.get(f"pillar_{p}", {}).get("level", 1)),
                 "raw_score": float(record.get(f"pillar_{p}", {}).get("raw_score", 0)),
-                "tier":      record.get(f"pillar_{p}", {}).get("tier", "Foundation"),
-                "xp_delta":  float(record.get(f"pillar_{p}", {}).get("xp_delta", 0)),
+                "tier": record.get(f"pillar_{p}", {}).get("tier", "Foundation"),
+                "xp_delta": float(record.get(f"pillar_{p}", {}).get("xp_delta", 0)),
                 "challenge_bonus_xp": float(record.get(f"pillar_{p}", {}).get("challenge_bonus_xp", 0)),
-                "trend":     "up" if float(record.get(f"pillar_{p}", {}).get("xp_delta", 0)) > 0 else "neutral",
+                "trend": "up" if float(record.get(f"pillar_{p}", {}).get("xp_delta", 0)) > 0 else "neutral",
             }
             for p in PILLAR_ORDER
         ]
@@ -620,9 +666,9 @@ def lambda_handler(event, context):
 
         timeline_events = [
             {
-                "date":            ev.get("date", yesterday_str),
+                "date": ev.get("date", yesterday_str),
                 "character_level": float(ev.get("new_level", char_level)),
-                "event":           _build_event_description(ev),
+                "event": _build_event_description(ev),
             }
             for ev in (events or [])
         ]
@@ -631,6 +677,7 @@ def lambda_handler(event, context):
         _pillar_history = []
         try:
             from collections import defaultdict as _dd
+
             _hist_start = (datetime.strptime(yesterday_str, "%Y-%m-%d") - timedelta(days=49)).strftime("%Y-%m-%d")
             _hist_recs = fetch_range("character_sheet", _hist_start, yesterday_str)
             _weeks = _dd(list)
@@ -639,7 +686,7 @@ def lambda_handler(event, context):
                 if not _d:
                     continue
                 _dt = datetime.strptime(_d, "%Y-%m-%d")
-                _wk = _dt.strftime("%G-W%V")   # ISO year-week
+                _wk = _dt.strftime("%G-W%V")  # ISO year-week
                 _weeks[_wk].append((_d, _rec))
             for _wk in sorted(_weeks.keys()):
                 _last_date, _last_rec = _weeks[_wk][-1]
@@ -649,27 +696,29 @@ def lambda_handler(event, context):
                     _scores[_p] = round(float(_pdata.get("level_score") or _pdata.get("raw_score") or 0), 1)
                 _wk_dt = datetime.strptime(_last_date, "%Y-%m-%d")
                 _mon_dt = _wk_dt - timedelta(days=_wk_dt.weekday())
-                _pillar_history.append({
-                    "week_label": f"Wk {_wk.split('-W')[1]}",
-                    "week_end":   _last_date,
-                    "week_start": _mon_dt.strftime("%Y-%m-%d"),
-                    "pillars":    _scores,
-                })
+                _pillar_history.append(
+                    {
+                        "week_label": f"Wk {_wk.split('-W')[1]}",
+                        "week_end": _last_date,
+                        "week_start": _mon_dt.strftime("%Y-%m-%d"),
+                        "pillars": _scores,
+                    }
+                )
         except Exception as _phe:
             logger.warning(f"[character] pillar_history build failed (non-fatal): {_phe}")
 
         write_character_stats(
             s3_client=boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2")),
             character={
-                "level":              float(char_level),
-                "tier":               char_tier,
-                "tier_emoji":         char_emoji,
-                "xp_total":           float(record.get("character_xp", 0)),
-                "days_active":        int(history_depth),
+                "level": float(char_level),
+                "tier": char_tier,
+                "tier_emoji": char_emoji,
+                "xp_total": float(record.get("character_xp", 0)),
+                "days_active": int(history_depth),
                 "level_events_count": len(events),
-                "next_tier":          "Momentum",
-                "next_tier_level":    21,
-                "started_date":       EXPERIMENT_START_DATE,
+                "next_tier": "Momentum",
+                "next_tier_level": 21,
+                "started_date": EXPERIMENT_START_DATE,
                 "challenge_bonus_xp": {k: v for k, v in (record.get("challenge_bonus_xp") or {}).items()},
             },
             pillars=pillars_for_site,

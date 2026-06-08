@@ -35,6 +35,7 @@ from datetime import datetime, timezone
 # OBS-1 logger
 try:
     from platform_logger import get_logger
+
     logger = get_logger("todoist")
 except ImportError:
     logger = logging.getLogger("todoist")
@@ -49,6 +50,7 @@ BASE_URL = "https://api.todoist.com/api/v1"
 
 
 # ── Todoist API helpers (unchanged from pre-migration) ─────────────────────────
+
 
 def api_get(path, api_token, params=None):
     """GET with retry on transient Todoist outages (429/500/502/503/504).
@@ -65,8 +67,7 @@ def api_get(path, api_token, params=None):
                 return json.loads(response.read())
         except urllib.error.HTTPError as e:
             if e.code in (429, 500, 502, 503, 504) and attempt < 2:
-                logger.warning("Todoist HTTP %d on %s — retry %d/2 in %ds",
-                               e.code, path, attempt + 1, backoff[attempt])
+                logger.warning("Todoist HTTP %d on %s — retry %d/2 in %ds", e.code, path, attempt + 1, backoff[attempt])
                 time.sleep(backoff[attempt])
                 continue
             raise
@@ -128,17 +129,18 @@ def get_filtered_tasks(api_token, filter_str):
 def normalize_completed_task(task, project_map):
     """Normalize a completed task from the v1 API."""
     return {
-        "task_id":      str(task.get("id", "")),
-        "task_name":    task.get("content", ""),
-        "project_id":   str(task.get("project_id", "")),
+        "task_id": str(task.get("id", "")),
+        "task_name": task.get("content", ""),
+        "project_id": str(task.get("project_id", "")),
         "project_name": project_map.get(str(task.get("project_id", "")), "Unknown"),
         "completed_at": task.get("completed_at", ""),
-        "labels":       task.get("labels", []),
-        "priority":     task.get("priority", 1),
+        "labels": task.get("labels", []),
+        "priority": task.get("priority", 1),
     }
 
 
 # ── SIMP-2 framework callbacks ─────────────────────────────────────────────────
+
 
 def authenticate(secret_data: dict) -> dict:
     """Extract the API token from the secret bundle. SIMP-2 will pass this back
@@ -168,17 +170,22 @@ def fetch_day(credentials: dict, date_str: str) -> dict | None:
     active_tasks = get_active_tasks(api_token)
     overdue_tasks = get_filtered_tasks(api_token, "overdue")
     due_today_tasks = get_filtered_tasks(api_token, "today")
-    logger.info("Day %s: completed=%d active=%d overdue=%d due_today=%d",
-                date_str, len(completed_raw), len(active_tasks),
-                len(overdue_tasks), len(due_today_tasks))
+    logger.info(
+        "Day %s: completed=%d active=%d overdue=%d due_today=%d",
+        date_str,
+        len(completed_raw),
+        len(active_tasks),
+        len(overdue_tasks),
+        len(due_today_tasks),
+    )
 
     return {
-        "date":              date_str,
-        "project_map":       project_map,
-        "completed_raw":     completed_raw,
-        "active_tasks":      active_tasks,
-        "overdue_tasks":     overdue_tasks,
-        "due_today_tasks":   due_today_tasks,
+        "date": date_str,
+        "project_map": project_map,
+        "completed_raw": completed_raw,
+        "active_tasks": active_tasks,
+        "overdue_tasks": overdue_tasks,
+        "due_today_tasks": due_today_tasks,
     }
 
 
@@ -213,27 +220,29 @@ def transform(raw: dict, date_str: str) -> list[dict]:
 
     tasks_due_today = [
         {
-            "task_id":     str(t.get("id", "")),
-            "task_name":   t.get("content", ""),
-            "project_id":  str(t.get("project_id", "")),
+            "task_id": str(t.get("id", "")),
+            "task_name": t.get("content", ""),
+            "project_id": str(t.get("project_id", "")),
             "project_name": project_map.get(str(t.get("project_id", "")), "Unknown"),
-            "priority":    t.get("priority", 4),
+            "priority": t.get("priority", 4),
         }
         for t in due_today_tasks[:50]
     ]
 
-    return [{
-        "source":                "todoist",
-        "date":                  date_str,
-        "completed_count":       len(normalized),
-        "active_count":          len(active_tasks),
-        "overdue_count":         len(overdue_tasks),
-        "due_today_count":       len(due_today_tasks),
-        "priority_breakdown":    priority_breakdown,
-        "completed_tasks":       normalized,
-        "completions_by_project": by_project,
-        "tasks_due_today":       tasks_due_today,
-    }]
+    return [
+        {
+            "source": "todoist",
+            "date": date_str,
+            "completed_count": len(normalized),
+            "active_count": len(active_tasks),
+            "overdue_count": len(overdue_tasks),
+            "due_today_count": len(due_today_tasks),
+            "priority_breakdown": priority_breakdown,
+            "completed_tasks": normalized,
+            "completions_by_project": by_project,
+            "tasks_due_today": tasks_due_today,
+        }
+    ]
 
 
 # ── Framework config (one place, declarative) ──────────────────────────────────
@@ -251,10 +260,10 @@ _config = IngestionConfig(
 
 def lambda_handler(event: dict, context) -> dict:
     """SIMP-2 entry point. Accepts:
-      {}                                 — gap-aware backfill (default cron behavior)
-      {"date_override": "today"}         — force today's data only
-      {"date_override": "2026-05-15"}    — single explicit date
-      {"healthcheck": true}              — boot check, returns 200/"ok"
+    {}                                 — gap-aware backfill (default cron behavior)
+    {"date_override": "today"}         — force today's data only
+    {"date_override": "2026-05-15"}    — single explicit date
+    {"healthcheck": true}              — boot check, returns 200/"ok"
     """
     try:
         if event.get("healthcheck"):

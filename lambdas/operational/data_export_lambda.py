@@ -31,6 +31,7 @@ from boto3.dynamodb.conditions import Key
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("data-export")
 except ImportError:
     logger = logging.getLogger("data-export")
@@ -52,20 +53,56 @@ s3 = boto3.client("s3", region_name=REGION)
 # `USER#matthew#SOURCE#*` partitions, minus operational/internal ones.
 ALL_SOURCES = [
     # ── Raw ingestion sources ──
-    "whoop", "withings", "strava", "garmin", "eightsleep", "apple_health",
-    "macrofactor", "macrofactor_workouts", "habitify", "notion", "todoist",
-    "weather", "food_delivery", "measurements", "dexa", "genome", "labs",
-    "supplements", "google_calendar", "hevy",
+    "whoop",
+    "withings",
+    "strava",
+    "garmin",
+    "eightsleep",
+    "apple_health",
+    "macrofactor",
+    "macrofactor_workouts",
+    "habitify",
+    "notion",
+    "todoist",
+    "weather",
+    "food_delivery",
+    "measurements",
+    "dexa",
+    "genome",
+    "labs",
+    "supplements",
+    "google_calendar",
+    "hevy",
     # ── User-curated / manual ──
-    "chronicle", "chronicling", "journal_analysis", "sick_days",
-    "discovery_annotations", "field_notes", "subscribers",
+    "chronicle",
+    "chronicling",
+    "journal_analysis",
+    "sick_days",
+    "discovery_annotations",
+    "field_notes",
+    "subscribers",
     # ── Computed / derived ──
-    "character_sheet", "computed_metrics", "computed_insights",
-    "composite_scores", "day_grade", "habit_scores", "sleep_unified",
-    "centenarian_progress", "circadian", "adaptive_mode", "ai_analysis",
+    "character_sheet",
+    "computed_metrics",
+    "computed_insights",
+    "composite_scores",
+    "day_grade",
+    "habit_scores",
+    "sleep_unified",
+    "centenarian_progress",
+    "circadian",
+    "adaptive_mode",
+    "ai_analysis",
     # ── Coaching state + analytics ──
-    "anomalies", "insights", "experiments", "challenges", "protocols",
-    "hypotheses", "weekly_correlations", "platform_memory", "nutrition_review",
+    "anomalies",
+    "insights",
+    "experiments",
+    "challenges",
+    "protocols",
+    "hypotheses",
+    "weekly_correlations",
+    "platform_memory",
+    "nutrition_review",
     "ledger",
 ]
 
@@ -78,6 +115,7 @@ ALL_SOURCES = [
 
 class DecimalEncoder(json.JSONEncoder):
     """Handle Decimal types from DynamoDB."""
+
     def default(self, obj):
         if isinstance(obj, Decimal):
             if obj % 1 == 0:
@@ -132,7 +170,8 @@ def export_profile(export_date):
             key = f"exports/{export_date}/profile.json"
             body = json.dumps(item, cls=DecimalEncoder, indent=2, default=str)
             s3.put_object(
-                Bucket=S3_BUCKET, Key=key,
+                Bucket=S3_BUCKET,
+                Key=key,
                 Body=body.encode("utf-8"),
                 ContentType="application/json",
                 StorageClass="STANDARD_IA",
