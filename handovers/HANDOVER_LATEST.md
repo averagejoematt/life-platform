@@ -1,24 +1,25 @@
-# HANDOVER — 2026-06-06/07 (phase taxonomy + coherent restart tooling; Monday reset staged)
+# HANDOVER — 2026-06-07/08 (Product/Growth summit → PG front-door + Wedge-B build; reset still pending)
 
-> A long two-day marathon. Closed the entire backlog burndown, then ran a full
-> **schema-wide phase-taxonomy review** (census + 3-lens expert panel) and built
-> **coherent experiment-restart tooling** from it — all dry-run-validated for a
-> **Monday 2026-06-08 reset** the owner intends to execute. ~10 PRs.
+> A full-day PG burndown off the 2026-06-07 **Product + Personal summit** (ADR-078).
+> Shipped six PG items live, merged a creative spike, and left two backend PRs
+> queued for the operator. **The Monday 2026-06-08 experiment reset is still
+> un-run** — it remains the headline pending action.
 
-> 🔴 **READ FIRST:**
-> 1. **A platform RESET is scheduled for Monday 2026-06-08** (genesis re-anchor). All
->    tooling is landed + dry-run-validated. The runbook is in
->    `.claude/plans/quizzical-rolling-leaf.md` and memory `project_monday_reset.md`.
->    **The owner runs the `--apply`** (most destructive op in the system).
-> 2. Everything is **committed + pushed**; `main` == `origin/main`; no open PRs; CI green.
-> 3. Production behavior is **unchanged until Monday** — `phase_taxonomy.py` is imported
->    only by the local restart scripts, not by any Lambda.
+> 🔴 **READ FIRST — two operator actions, in this order:**
+> 1. **Run the Monday 2026-06-08 reset** (still not executed — see "The reset" below). All
+>    tooling is landed + dry-run-validated; the operator runs the `--apply`.
+> 2. **After the reset**, merge + approve the two held backend PRs:
+>    **#36 (PG-04 native-SES welcome)** and **#39 (PG-10 public-AI hardening)**. Both are
+>    pure Lambda code, CI-deploy through the GitHub **production** gate; held off
+>    deliberately so they don't ride the reset's Core/Compute/Email deploy.
+> 3. Everything else is **committed + pushed**; `main == origin/main`; the only open PRs
+>    are the two above. Production behavior is unchanged until the reset + those merges.
 
-**Previous handover:** `handovers/HANDOVER_2026-06-05_BacklogBurndownVisualQA.md`.
+**Previous handover:** `handovers/HANDOVER_2026-06-07_PhaseTaxonomyResetStaged.md` (the reset's full design + ADR-077 taxonomy).
 
 ---
 
-## The Monday 2026-06-08 reset (the headline)
+## The reset (still the headline — NOT yet run)
 
 **One command** (after the morning Withings weigh-in syncs — auto-anchors the genesis weight):
 ```
@@ -27,42 +28,40 @@ python3 deploy/restart_pipeline.py --genesis 2026-06-08 --keep-chronicle DATE#20
 # then apply (operator runs this):
 python3 deploy/restart_pipeline.py --genesis 2026-06-08 --keep-chronicle DATE#2026-02-28 --apply
 ```
-Pre-flight: confirm `DATE#2026-06-08` exists in the withings partition before running (else `--override-weight-lbs`). Post-reset: `aws ssm put-parameter --name /life-platform/experiment-cycle --value 3 --overwrite`.
-
-**June-8 dry-run validated:** 7,525 records archived; coach_thread leak (279 threads) covered; ENSEMBLE/NARRATIVE/adaptive_mode/circadian/protocols covered; supplements/chronicling/labs/dexa un-hidden; ledger LIFETIME roll; "Before the Numbers" → visible pre-genesis lead-in; cycle=2 stamped. Coverage assertion green. Constants reverted cleanly after the preview.
+Pre-flight: confirm `DATE#2026-06-08` exists in the withings partition (else `--override-weight-lbs`). Post-reset: `aws ssm put-parameter --name /life-platform/experiment-cycle --value 3 --overwrite`. Full design + June-8 dry-run validation (7,525 records archived, coach_thread leak covered, "Before the Numbers" kept) is in the previous handover. **PG-05 was built specifically for this** — the genesis-emptied Evidence pages now read as integrity, not breakage.
 
 ---
 
-## What shipped (by thread)
+## PG session — what shipped (ADR-078 / summit `docs/reviews/SUMMIT_2026-06-07_PRODUCT_GROWTH_REVIEW.md`)
 
-### 1. Phase taxonomy (ADR-077) — the big one
-- **Full census** of the live table (27,083 items, 180 record families) + **3-lens expert panel** (physiologist / behavioral / data-product) classified every record type.
-- **`lambdas/phase_taxonomy.py`** (PR #27): single registry → `cross_phase` / `raw_timeseries` / `experiment_scoped` / `system_state`. `classify(pk, sk)` raises on unknown sources (no silent default). `tests/test_phase_taxonomy.py` — 127 tests over all 180 families. `docs/PHASE_TAXONOMY.md` + ADR-077.
-- **Caught a live bug:** 279 pre-genesis coach threads were leaking into live coach prompts (writer on a bare `USER#matthew` pk the tagger couldn't see; wipe aimed at a phantom partition name).
-- **Owner decisions (A–G):** supplements → cross_phase (med safety); measurements/day_grade → raw_timeseries (genesis-anchor, not hide); chronicling → cross_phase (the "before" archive); email_log → system_state; ledger → keep LIFETIME aggregate (no hard-delete); vice_streaks → split current/longest-ever. **New: cycle/reset-generation stamping** (`cycle=N`) so the archive is navigable per run.
+**Foundation:** committed the summit record + **ADR-078** (commercial wedge — Wedge **B build-in-public now** / A transformation-story accruing / C SaaS shelved) + 14 **PG-series** backlog items with the governing test (*more likely, or less likely, to reach 185?*) and the Reeves/Viktor **build cap** (document what exists; no new platform features).
 
-### 2. Coherent restart tooling (ADR-077, PR #28 + 046c36a)
-- `restart_intelligence_wipe.py` + `restart_phase_tag.py` now **derive from the registry** with a **coverage assertion** (a new scoped partition can't silently survive a reset). Closes every census gap. cycle stamping. failure_pattern(s) drift fixed.
-- `restart_ledger_reset.py` rolls a durable `LIFETIME#aggregate` + per-cycle row, tombstones (not deletes) txns.
-- `restart_chronicle_handler.py` — kept issues re-dated to genesis−N as visible pre-genesis lead-ins (fixed a latent bug where "resurrected" articles stayed `phase=pilot`/hidden). `restart_pipeline.py --keep-chronicle` passthrough.
+### Live on averagejoematt.com (deployed + verified, smoke 65/0 · visual_qa 20/0)
+- **PG-01** — hero "who it's for" line (everyman/Wedge-A framing). `index.html` + `story.css`.
+- **PG-02** — cockpit first-run orientation card (dismissible, `localStorage ajm-cockpit-intro-v1`, non-modal). `cockpit.js` + `cockpit.css`.
+- **PG-03** — per-dispatch subscribe foot (→ `/subscribe/`) + RSS (→ `/rss.xml`) + "start from the beginning" (earliest-by-date). `dispatches.js` + `story.css`.
+- **PG-05** — genesis-aware Evidence empty-states (correlations/predictions/benchmarks). `evidence.js`.
+- **PG-06** — Wedge-B **`/evidence/build/`** ("How it's built"): 6 build-in-public writeups (the board, interpret-only rule, budget governor, remediation agent, vision-QA), each citing the real ADR/module. New editorial topic in `v4_build_evidence.py`. **First sanctioned Wedge-B work; no new Lambda/inference.**
 
-### 3. ADR-058 read-side phase-filter sweep (PR #23, layer v74)
-All 268 query sites inventoried: 112 filtered, 22 cross-phase `include_pilot` annotations, 68 exempt. Public endpoints stopped serving 100% pilot-era data; labs preserved. Verified live (smoke 65/0, visual 20/0).
+### Merged but NOT deployed
+- **PG-14 spike** — `spikes/pg14_ai_me/` (a faceless, data-driven SVG body figure that morphs with the real weight 304→185) + `docs/specs/PG-14_ai_me_spike.md` (go/no-go). Lives outside `site/`, so it never deploys. **Rec: GO Tier A** as one contained artifact (productionize post-reset, anchored to new genesis); defer photoreal/video tiers (honesty/privacy/quality). Owner's call.
 
-### 4. Backlog burndown (2026-06-06) — see CHANGELOG v8.3.1/8.3.2
-- **N-08** cost-governor false tier-3 fixed (actual-spend cap; tier 3→1, AI restored). **D-01** daily-brief cache fix deployed (layer v72→73→74). **S-02** Evidence depth. **S-03** cockpit Week scope (real observatory_week sparklines). **S-05** visual-qa coverage. **D-03** orchestrator token reduction (~50% billed input). **L-04** http_retry in dropbox_poll. **L-07/L-08/L-09** doc verification passes (SCHEMA.md ~20 sections, MCP catalog +17 tools, DEPENDENCY_GRAPH SPOF). Several stale items closed (L-03, DRY_RUN gate, SiteAPI dashboard, S-04).
-- Remediation-agent freshness fix merged (PR #16).
+### Held for operator (post-reset) — both pure Lambda code, no IAM/CDK
+- **PR #36 — PG-04** (native SES): the subscribe→confirm→welcome sequence already existed; fixed v4-migration staleness (welcome email linked legacy `/character//mind/` → v4 doors, dispatch-#1 first). **PG-04b follow-up logged:** the `subscriber-onboarding` role has no `s3:GetObject` grant, so the day-2 bridge's dynamic cards always fall back — needs an IAM/CDK change, deliberately deferred.
+- **PR #39 — PG-10** (public-AI hardening): endpoints were already ~95% hardened (DDB rate limits, HTTP-200 paused-degrade before inference on both handlers, `max_tokens`+500-char caps, reserved concurrency=2); **verified + pinned with 7 guard tests** (`tests/test_ai_endpoint_hardening.py`) and added the last gap — `/api/ask` now enforces **correlative-only + confidence-labelled** output (Henning standard).
 
 ---
 
 ## ⚠️ Operator follow-ups
-1. **Monday: run the reset** (above). Confirm weigh-in first; you run `--apply`.
-2. **Post-reset:** bump SSM `/life-platform/experiment-cycle` to 3.
+1. **Run the reset** (above); bump SSM `/life-platform/experiment-cycle` to 3 after.
+2. **Post-reset: merge + approve #36 and #39** (production gate). A trivial one-line BACKLOG/CHANGELOG conflict between them is possible — keep both bullets.
 
-## Known / deferred (non-blocking, post-reset)
-- Write-time `phase`/`cycle` stamping in the coach writers (so the NEXT reset's tagger-blind partitions self-describe).
-- `NARRATIVE#arc` `phase → arc_phase` rename (latent attribute collision; harmless today).
-- Read-side measurements genesis-anchor (currently phase-filtered; 1 record).
-- The `baseline_snapshot` untag is **no longer a manual step** — the rewired tagger handles it automatically during the reset.
+## Deferred / not built (all genuinely gated)
+- **PG-04b** — IAM grant + CDK for the bridge's real dispatch cards (post-reset).
+- **PG-07** (reader predict-the-week) — needs PG-10 (done, in #39) **and** the D-05 prediction ledger producing verdicts (~Jun 17).
+- **PG-13** (agent activity feed) — sources `ENSEMBLE#`/remediation data the reset re-curates; roster half is already covered by PG-06.
+- **PG-14 productionization** — owner decision; post-reset.
+- **PG-09** (methodology/SEO pages) — buildable but overlaps `/evidence/methodology/` + the new `/evidence/build/`; low marginal value.
+- **PG-08** (one social channel) — content/process, not code. **PG-11/12** — hard-gated on ~30 lb progress + a sustained list.
 
-**Verify quickly:** `python3 -m pytest tests/test_phase_taxonomy.py -q` (127/0) · `python3 deploy/restart_intelligence_wipe.py` (dry-run, coverage assertion green) · `bash deploy/smoke_test_site.sh` (65/0).
+**Verify quickly:** `bash deploy/smoke_test_site.sh` (65/0) · `python3 tests/visual_qa.py` (20/0) · `python3 -m pytest tests/test_ai_endpoint_hardening.py -q` (7/0, on #39's branch).
