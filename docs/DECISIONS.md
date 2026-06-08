@@ -2384,4 +2384,22 @@ The AWS "account-controls" sub-grade stays below a literal-checklist A on those 
 
 ---
 
-**Verified:** 2026-06-08 (ADR-080 — mypy tier-1 + coverage floor + size gate all enforced in CI)
+## ADR-081: Adopt the orphaned intelligence Lambdas into CDK (drift elimination)
+
+**Status:** Accepted (2026-06-08)
+
+**Context:** Three intelligence Lambdas — `ai-expert-analyzer` (Observatory analysis), `field-notes-generate`, `journal-analyzer` — were created by CLI early in the project and never lived in IaC. The drift was real and visible: no shared layer, no DLQ, no error alarm, `Tracing=PASS_THROUGH`, and all three shared the CDK-owned `daily-insight` role rather than having their own. A `# Cannot import to CDK (already exists)` comment in `compute_stack.py` even shipped a manual `aws lambda update-function-configuration` recipe for keeping their layer current — exactly the hand-maintenance IaC exists to remove. A CTO inspecting `aws lambda list-functions ∖ (CDK-managed)` would find a non-empty set; the goal is ∅.
+
+**Decision:** Define all three in `LifePlatformCompute` via `create_platform_lambda(...)`, identical in shape to their compute siblings:
+- **Dedicated least-privilege role each** (`role_policies.intelligence_{ai_expert,field_notes,journal_analyzer}`). The grant-set is intentionally identical to `compute_daily_insight()` — DDB R/W, KMS, S3-config read, ai-keys secret, Bedrock inference-profile, DLQ, budget-tier SSM — because the workload **already runs on that exact grant-set** (the shared daily-insight role), so the role swap is provably non-breaking while still giving each function its own role (one-role-per-Lambda).
+- Standard convergence: shared layer, DLQ, X-Ray `ACTIVE`, 30-day log retention, a digest-routed error alarm, and a CDK-owned EventBridge schedule preserving each live cadence (`cron(0 14 * * ? *)` / `cron(0 18 ? * SUN *)` / `cron(0 10 * * ? *)`). Handlers move to the package path (`intelligence.<module>.lambda_handler`) so they deploy from the standard monorepo asset; absolute imports (`from constants import …`) resolve unchanged from the asset root.
+
+**Adoption mechanics:** Because the physical functions already exist, CloudFormation sees the synthesized resources as additions — a plain `cdk deploy` would fail "function already exists." Adoption is therefore an **owner-run, in-the-loop step**: either (a) delete the three stateless functions + their CLI-created EventBridge rules, then `cdk deploy LifePlatformCompute` recreates them under IaC with the same names/ARNs (chosen — these are stateless, idempotent, gap-aware jobs with no Function URLs or event-source mappings, so a sub-minute window away from cron times has no effect), or (b) two-phase `cdk import` (import matching live, then converge) for strict zero-downtime. The old CLI rules are deleted so each function fires once, from its CDK rule.
+
+**Deferred — `og-image-generator` (us-west-2):** the daily Pillow PNG share-card generator is also a CLI orphan, but its source is **not** in the `lambdas/` tree (only the unrelated us-east-1 dynamic-SVG `web/og_image_lambda.py` is). It also depends on a standalone `pillow-layer`. Adoption requires relocating its source into the monorepo asset first, so it stays deferred (tracked, runs fine outside CDK). The us-east-1 `life-platform-og-image` is a **different** function — an on-demand SVG behind a CloudFront Function URL, already CDK-managed in `web_stack` (WR-17) — not a duplicate.
+
+**Consequences:** `aws lambda list-functions ∖ CDK` shrinks by three; the adopted functions gain the platform's monitoring, layering, and least-priv posture automatically going forward; the manual layer-update recipe is deleted. One known orphan (`og-image-generator`) remains, now documented with its blocker rather than buried in a code comment.
+
+---
+
+**Verified:** 2026-06-08 (ADR-081 — 3 intelligence Lambdas adopted into CDK; og-image-generator deferred with documented blocker)
