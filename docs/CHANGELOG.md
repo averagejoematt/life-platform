@@ -1,3 +1,22 @@
+## v8.5.0 — 2026-06-08 (reset run · A-grade hardening · CDK orphan adoption → ∅ · inbox triage)
+
+### Added
+- **ADR-080 — enforced CI quality gates:** mypy tier-1 (budget/auth/inference core + broader clean set), coverage regression floor (`--cov-fail-under=8`), Lambda size gate (`tests/test_lambda_size_gate.py`, no new `*_lambda.py` > 2000 lines). Plus `.gitattributes`, `CONTRIBUTING.md`, root `SECURITY.md`.
+- **ADR-081 — CDK orphan adoption:** the 4 remaining CLI-created Lambdas (`ai-expert-analyzer`, `field-notes-generate`, `journal-analyzer`, `og-image-generator`) adopted into CDK via `create_platform_lambda`, each with a dedicated least-priv role + DLQ + X-Ray + error alarm + CDK-owned schedule. `aws lambda list-functions ∖ CDK = ∅`.
+- `role_policies.intelligence_{ai_expert,field_notes,journal_analyzer}` + `operational_og_image_generator` wired to the adopted functions.
+- CI **undeployed-config-drift annotation** (PR #69): `cdk diff` now emits a loud `::warning title=Run: cdk deploy <stack>` for any merged Lambda config change (handler/runtime/memory/timeout/env/layers) that CI's code-only deploy can't ship.
+
+### Changed
+- **god-module split:** `ai_calls.py` 2412 → 1277; extracted `ai_context.py` + `ai_summaries.py` (`ai_calls` re-exports for back-compat). ~1000 F401 + 53 F841 removed; both rules now enforced.
+- Genesis baseline re-pointed **306.25 → 311.62 lbs** (real Monday Withings weigh-in, PR #55).
+- Shared layer → **v76**.
+
+### Fixed
+- **`/og` dynamic-SVG endpoint** — broken since 2026-03-20 (`MODULE_NOT_FOUND`): `web_stack` handler `web.og_image_lambda.handler` → `og_image_lambda.handler` (the `.mjs` sits at `lambdas/` root), and the stale S3 key `site/data/public_stats.json` → `generated/public_stats.json` (ADR-046). Now returns live-stat SVG (HTTP 200).
+- **Whoop refresh-token race** — EventBridge at-least-once double-delivery reused the single-use refresh token → HTTP 400 → DLQ. `whoop_lambda.authenticate()` now re-reads the secret fresh on a 400 and adopts a concurrently-rotated token; only raises on a genuine failure.
+- **qa-smoke "Day grade missing"** false positive on reset day — skips the day-grade check when the dashboard date precedes `EXPERIMENT_START_DATE` (genesis-aware).
+
+
 ## [Restart 2026-06-08] — 2026-06-07
 
 ### Added
