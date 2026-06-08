@@ -66,3 +66,9 @@ archive/051726_downloadsfolder_backup/
 CLAUDE_CODE_BRIEF*.md
 docs/CLAUDE_CODE_BRIEF*.md
 cdk/_mcp_staging/
+
+# pytest-cov local artifacts
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
