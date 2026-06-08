@@ -406,14 +406,15 @@ class WebStack(Stack):
         )
 
         # ══════════════════════════════════════════════════════════════
-        # SEC-02: WAF WebACL ARN — defined here (before amj_dist) so CDK
-        # tracks the association and a cdk deploy cannot accidentally
-        # disassociate the WAF from the CloudFront distribution.
-        # WebACL pre-existed in us-east-1 (id: 3d75472e-e18b-4d1c-b76b-8bbe63cb05e8).
-        # Rules: SubscribeRateLimit (60/5min), GlobalRateLimit (1000/5min),
-        #        RateLimitAsk (100/5min), RateLimitBoardAsk (100/5min).
+        # WAF REMOVED (2026-06). `life-platform-amj-waf` was deleted (~−$8/mo;
+        # the WebACL no longer exists in us-east-1). Rate limiting is now done
+        # in-Lambda (DDB-backed, PG-10) on /api/ask, /api/board_ask, /api/subscribe,
+        # plus the cost-governor tier-2 pause — so the CloudFront WAF association
+        # is intentionally gone. Do NOT re-add a `web_acl_id` pointing at a
+        # non-existent WebACL: cdk deploy would fail associating a dead ARN.
+        # (Original SEC-02 WAF: SubscribeRateLimit/GlobalRateLimit/RateLimitAsk/
+        # RateLimitBoardAsk — superseded by the in-Lambda limiters.)
         # ══════════════════════════════════════════════════════════════
-        WAF_WEB_ACL_ARN = f"arn:aws:wafv2:us-east-1:{ACCT}:global/webacl/life-platform-amj-waf/3d75472e-e18b-4d1c-b76b-8bbe63cb05e8"
 
         # ══════════════════════════════════════════════════════════════
         # averagejoematt.com — main website
@@ -430,7 +431,7 @@ class WebStack(Stack):
                 aliases=["averagejoematt.com", "www.averagejoematt.com"],
                 price_class="PriceClass_100",
                 default_root_object="index.html",
-                web_acl_id=WAF_WEB_ACL_ARN,  # SEC-02: CDK now owns WAF association — prevents accidental disassociation on cdk deploy
+                # web_acl_id intentionally omitted — WAF removed (2026-06); see note above.
                 viewer_certificate=cloudfront.CfnDistribution.ViewerCertificateProperty(
                     acm_certificate_arn=CERT_ARN_AMJ,
                     ssl_support_method="sni-only",
@@ -705,11 +706,6 @@ class WebStack(Stack):
             ),
         )
 
-        # WAF WebACL ARN output (WAF_WEB_ACL_ARN defined above, before amj_dist — SEC-02)
-        cdk.CfnOutput(self, "AmjWafWebAclArn",
-            value=WAF_WEB_ACL_ARN,
-            description="WAF WebACL ARN for averagejoematt.com CloudFront distribution (R17-01/SEC-02)",
-        )
 
         # ── Outputs
         cdk.CfnOutput(self, "DashboardDistributionId",
