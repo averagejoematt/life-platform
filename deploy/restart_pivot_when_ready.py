@@ -52,16 +52,17 @@ def fetch_reading(genesis: str):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--genesis", default=None,
-                        help="Target genesis date YYYY-MM-DD. Default: read from constants.py")
-    parser.add_argument("--max-minutes", type=int, default=DEFAULT_MAX_MINUTES,
-                        help=f"Max polling duration in minutes. Default: {DEFAULT_MAX_MINUTES}")
+    parser.add_argument("--genesis", default=None, help="Target genesis date YYYY-MM-DD. Default: read from constants.py")
+    parser.add_argument(
+        "--max-minutes", type=int, default=DEFAULT_MAX_MINUTES, help=f"Max polling duration in minutes. Default: {DEFAULT_MAX_MINUTES}"
+    )
     args = parser.parse_args()
 
     if args.genesis:
         genesis = args.genesis
     else:
         from lambdas.constants import EXPERIMENT_START_DATE
+
         genesis = EXPERIMENT_START_DATE
 
     log(f"watchdog starting. genesis={genesis} max_minutes={args.max_minutes} poll={POLL_INTERVAL_SECONDS}s")
@@ -80,9 +81,10 @@ def main():
             log(f"  FOUND reading for {genesis}: weight_lbs={weight_lbs} weight_kg={weight_kg}")
             log(f"  Running pipeline...")
             proc = subprocess.run(
-                ["python3", "deploy/restart_pipeline.py",
-                 "--genesis", genesis, "--apply"],
-                cwd=REPO_ROOT, capture_output=True, text=True,
+                ["python3", "deploy/restart_pipeline.py", "--genesis", genesis, "--apply"],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
             )
             log(f"  pipeline exit={proc.returncode}")
             log(f"  stdout-tail: {proc.stdout[-2000:]}")

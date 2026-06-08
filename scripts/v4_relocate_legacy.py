@@ -36,22 +36,28 @@ SITE = Path("site")
 LEGACY = SITE / "legacy"
 
 # Top-level dirs that STAY at root (system pages + live/shared behaviours).
-KEEP_DIRS = {"api", "config", "generated", ".well-known",
-             "privacy", "subscribe", "404", "legacy"}
+KEEP_DIRS = {"api", "config", "generated", ".well-known", "privacy", "subscribe", "404", "legacy"}
 # Root-level files that STAY at root.
-KEEP_FILES = {"404.html", "subscribe.html", "favicon.ico", "robots.txt",
-              "sitemap.xml", "rss.xml", "site.webmanifest", "DEPLOY.md",
-              "apple-touch-icon.png", "apple-touch-icon-precomposed.png"}
+KEEP_FILES = {
+    "404.html",
+    "subscribe.html",
+    "favicon.ico",
+    "robots.txt",
+    "sitemap.xml",
+    "rss.xml",
+    "site.webmanifest",
+    "DEPLOY.md",
+    "apple-touch-icon.png",
+    "apple-touch-icon-precomposed.png",
+}
 # In the /data dir: move pages (*.html), keep everything else (the json blobs).
 SPLIT_DIRS = {"data"}
 
 # URL-rewrite rules (applied only to files now under site/legacy/).
 # First path segment that must NOT be prefixed with /legacy:
-NO_PREFIX_SEG = {"api", "config", "generated", ".well-known",
-                 "privacy", "subscribe", "404"}
+NO_PREFIX_SEG = {"api", "config", "generated", ".well-known", "privacy", "subscribe", "404"}
 # Root-level static-file extensions that must NOT be prefixed.
-NO_PREFIX_ROOT_EXT = {".ico", ".png", ".svg", ".xml", ".txt", ".json",
-                      ".webmanifest", ".jpg", ".jpeg", ".gif", ".webp", ".pdf"}
+NO_PREFIX_ROOT_EXT = {".ico", ".png", ".svg", ".xml", ".txt", ".json", ".webmanifest", ".jpg", ".jpeg", ".gif", ".webp", ".pdf"}
 
 
 def _should_prefix(path: str) -> bool:
@@ -159,8 +165,9 @@ def main() -> int:
         print("error: run from repo root (site/index.html not found).", file=sys.stderr)
         return 2
     if LEGACY.exists():
-        print(f"error: {LEGACY}/ already exists. Delete it to re-run "
-              f"(`rm -rf {LEGACY}` — it's git-tracked/reversible).", file=sys.stderr)
+        print(
+            f"error: {LEGACY}/ already exists. Delete it to re-run " f"(`rm -rf {LEGACY}` — it's git-tracked/reversible).", file=sys.stderr
+        )
         return 2
 
     moves = _plan()
@@ -192,8 +199,10 @@ def main() -> int:
             if p.suffix.lower() in {".html", ".htm"}:
                 page_count += 1
 
-    print(f"\napplied: moved {len(moves)} entries; rewrote {rewritten} text file(s); "
-          f"{page_count} legacy HTML page(s) now under {LEGACY}/.")
+    print(
+        f"\napplied: moved {len(moves)} entries; rewrote {rewritten} text file(s); "
+        f"{page_count} legacy HTML page(s) now under {LEGACY}/."
+    )
     print("verify:  grep -rE '(href|src)=\"/assets/' site/legacy --include='*.html' | wc -l   # expect 0")
     return 0
 

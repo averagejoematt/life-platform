@@ -4,6 +4,7 @@ Pure unit tests of the projection→tier policy: the projection may escalate at
 most ONE tier above what ACTUAL month-to-date spend justifies (none at all in
 the early-month window). No AWS calls.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -18,17 +19,26 @@ def gov():
 
 # ── _tier_for: threshold mapping ─────────────────────────────────────────────
 
-@pytest.mark.parametrize("projected,expected", [
-    (0, 0), (54.99, 0),
-    (55, 1), (64.99, 1),
-    (65, 2), (72.99, 2),
-    (73, 3), (500, 3),
-])
+
+@pytest.mark.parametrize(
+    "projected,expected",
+    [
+        (0, 0),
+        (54.99, 0),
+        (55, 1),
+        (64.99, 1),
+        (65, 2),
+        (72.99, 2),
+        (73, 3),
+        (500, 3),
+    ],
+)
 def test_tier_thresholds(gov, projected, expected):
     assert gov._tier_for(projected) == expected
 
 
 # ── _decide_tier: actual-spend cap ───────────────────────────────────────────
+
 
 def test_n08_regression_projection_overshoot_capped_to_tier1(gov):
     """The 2026-06-05/06 incident: $28.86 actual, $157 projected, day 6.

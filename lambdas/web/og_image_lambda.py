@@ -8,10 +8,12 @@ Images:  og-home.png, og-sleep.png, og-glucose.png,
          og-training.png, og-character.png, og-nutrition.png
 Output:  s3://matthew-life-platform/site/assets/images/
 """
-import json
+
 import io
+import json
 import os
 import time
+
 import boto3
 from PIL import Image, ImageDraw, ImageFont
 
@@ -38,12 +40,12 @@ def _font(name, size):
 
 
 # Design tokens
-BG = (8, 12, 10)          # #080c0a
-TEXT = (232, 240, 232)     # #e8f0e8
-MUTED = (138, 170, 144)   # #8aaa90
-FAINT = (90, 117, 101)    # #5a7565
-GREEN = (34, 197, 94)     # #22c55e
-BORDER = (14, 26, 18)     # subtle line
+BG = (8, 12, 10)  # #080c0a
+TEXT = (232, 240, 232)  # #e8f0e8
+MUTED = (138, 170, 144)  # #8aaa90
+FAINT = (90, 117, 101)  # #5a7565
+GREEN = (34, 197, 94)  # #22c55e
+BORDER = (14, 26, 18)  # subtle line
 
 FONT_DISPLAY = "bebas-neue-400.ttf"
 FONT_MONO = "space-mono-400.ttf"
@@ -75,8 +77,7 @@ def _draw_metric(draw, x, y, value, label, color=TEXT):
 def _draw_footer(draw, stats):
     days_in = stats.get("platform", {}).get("days_in", 0)
     draw.text((48, H - 30), f"Day {days_in}", fill=FAINT, font=_font(FONT_MONO, 11))
-    draw.text((W - 48, H - 30), "updated daily by life-platform",
-              fill=FAINT, font=_font(FONT_MONO, 11), anchor="ra")
+    draw.text((W - 48, H - 30), "updated daily by life-platform", fill=FAINT, font=_font(FONT_MONO, 11), anchor="ra")
 
 
 def _fmt(val, decimals=0, suffix=""):
@@ -99,8 +100,7 @@ def build_home(stats):
     draw.text((48, 100), "AVERAGEJOEMATT", fill=TEXT, font=_font(FONT_DISPLAY, 72))
 
     # Subtitle
-    draw.text((48, 180), "One man. 25 data sources. Total transparency.",
-              fill=MUTED, font=_font(FONT_MONO, 14))
+    draw.text((48, 180), "One man. 25 data sources. Total transparency.", fill=MUTED, font=_font(FONT_MONO, 14))
 
     # Metrics row
     lost = journey.get("lost_lbs")
@@ -120,8 +120,7 @@ def build_sleep(stats):
     vitals = stats.get("vitals", {})
 
     draw.text((48, 100), "SLEEP", fill=TEXT, font=_font(FONT_DISPLAY, 72))
-    draw.text((48, 180), "Eight Sleep x Whoop cross-referenced.",
-              fill=MUTED, font=_font(FONT_MONO, 14))
+    draw.text((48, 180), "Eight Sleep x Whoop cross-referenced.", fill=MUTED, font=_font(FONT_MONO, 14))
 
     _draw_metric(draw, 48, 260, _fmt(vitals.get("sleep_hours"), 1, "h"), "AVG DURATION")
     _draw_metric(draw, 320, 260, _fmt(vitals.get("hrv_ms"), 0, " ms"), "HRV")
@@ -137,14 +136,11 @@ def build_glucose(stats):
     _draw_header(draw, "Glucose Observatory")
 
     draw.text((48, 100), "GLUCOSE", fill=TEXT, font=_font(FONT_DISPLAY, 72))
-    draw.text((48, 180), "Continuous glucose monitoring. Dexcom Stelo.",
-              fill=MUTED, font=_font(FONT_MONO, 14))
+    draw.text((48, 180), "Continuous glucose monitoring. Dexcom Stelo.", fill=MUTED, font=_font(FONT_MONO, 14))
 
     # Glucose-specific data may not be in public_stats — use placeholders
-    draw.text((48, 280), "Time-in-range, variability, meal responses.",
-              fill=FAINT, font=_font(FONT_MONO, 13))
-    draw.text((48, 310), "Real CGM data. Updated daily.",
-              fill=FAINT, font=_font(FONT_MONO, 13))
+    draw.text((48, 280), "Time-in-range, variability, meal responses.", fill=FAINT, font=_font(FONT_MONO, 13))
+    draw.text((48, 310), "Real CGM data. Updated daily.", fill=FAINT, font=_font(FONT_MONO, 13))
 
     _draw_footer(draw, stats)
     return img
@@ -157,8 +153,7 @@ def build_training(stats):
     training = stats.get("training", {})
 
     draw.text((48, 100), "TRAINING", fill=TEXT, font=_font(FONT_DISPLAY, 72))
-    draw.text((48, 180), "Whoop strain x Strava volume x recovery.",
-              fill=MUTED, font=_font(FONT_MONO, 14))
+    draw.text((48, 180), "Whoop strain x Strava volume x recovery.", fill=MUTED, font=_font(FONT_MONO, 14))
 
     z2 = training.get("zone2_this_week_min")
     _draw_metric(draw, 48, 260, _fmt(z2, 0, " min"), "ZONE 2 THIS WEEK")
@@ -174,8 +169,7 @@ def build_character(stats):
     _draw_header(draw, "Character Sheet")
 
     draw.text((48, 100), "THE SCORE", fill=TEXT, font=_font(FONT_DISPLAY, 72))
-    draw.text((48, 180), "Gamified health tracking. 7 pillars. Real XP.",
-              fill=MUTED, font=_font(FONT_MONO, 14))
+    draw.text((48, 180), "Gamified health tracking. 7 pillars. Real XP.", fill=MUTED, font=_font(FONT_MONO, 14))
 
     platform = stats.get("platform", {})
     _draw_metric(draw, 48, 260, _fmt(platform.get("tier0_streak"), 0), "TIER-0 STREAK", GREEN)
@@ -190,8 +184,7 @@ def build_nutrition(stats):
     _draw_header(draw, "Nutrition Observatory")
 
     draw.text((48, 100), "NUTRITION", fill=TEXT, font=_font(FONT_DISPLAY, 72))
-    draw.text((48, 180), "MacroFactor data. Calories, protein, deficit status.",
-              fill=MUTED, font=_font(FONT_MONO, 14))
+    draw.text((48, 180), "MacroFactor data. Calories, protein, deficit status.", fill=MUTED, font=_font(FONT_MONO, 14))
 
     vitals = stats.get("vitals", {})
     _draw_metric(draw, 48, 260, _fmt(vitals.get("weight_lbs"), 1, " lbs"), "CURRENT WEIGHT")
@@ -204,8 +197,7 @@ def build_mind(stats):
     img, draw = _base_image()
     _draw_header(draw, "Inner Life Observatory")
     draw.text((48, 100), "INNER LIFE", fill=TEXT, font=_font(FONT_DISPLAY, 72))
-    draw.text((48, 180), "Mood, willpower, connection, vice streaks.",
-              fill=MUTED, font=_font(FONT_MONO, 14))
+    draw.text((48, 180), "Mood, willpower, connection, vice streaks.", fill=MUTED, font=_font(FONT_MONO, 14))
     platform = stats.get("platform", {})
     _draw_metric(draw, 48, 260, _fmt(platform.get("days_in"), 0), "DAYS TRACKED")
     _draw_footer(draw, stats)
@@ -216,8 +208,7 @@ def build_labs(stats):
     img, draw = _base_image()
     _draw_header(draw, "Bloodwork Intelligence")
     draw.text((48, 100), "THE LABS", fill=TEXT, font=_font(FONT_DISPLAY, 72))
-    draw.text((48, 180), "74 biomarkers. 7 draws. The ground truth.",
-              fill=MUTED, font=_font(FONT_MONO, 14))
+    draw.text((48, 180), "74 biomarkers. 7 draws. The ground truth.", fill=MUTED, font=_font(FONT_MONO, 14))
     _draw_metric(draw, 48, 260, "74", "BIOMARKERS")
     _draw_metric(draw, 320, 260, "7", "DRAWS")
     _draw_footer(draw, stats)
@@ -228,10 +219,8 @@ def build_chronicle(stats):
     img, draw = _base_image()
     _draw_header(draw, "The Measured Life")
     draw.text((48, 100), "CHRONICLE", fill=TEXT, font=_font(FONT_DISPLAY, 72))
-    draw.text((48, 180), "Weekly dispatches from a health transformation.",
-              fill=MUTED, font=_font(FONT_MONO, 14))
-    draw.text((48, 260), "Every Wednesday. Real data. Every failure included.",
-              fill=FAINT, font=_font(FONT_MONO, 13))
+    draw.text((48, 180), "Weekly dispatches from a health transformation.", fill=MUTED, font=_font(FONT_MONO, 14))
+    draw.text((48, 260), "Every Wednesday. Real data. Every failure included.", fill=FAINT, font=_font(FONT_MONO, 13))
     _draw_footer(draw, stats)
     return img
 
@@ -240,8 +229,7 @@ def build_weekly(stats):
     img, draw = _base_image()
     _draw_header(draw, "Weekly Snapshots")
     draw.text((48, 100), "THE WEEK", fill=TEXT, font=_font(FONT_DISPLAY, 72))
-    draw.text((48, 180), "Walk the journey one week at a time.",
-              fill=MUTED, font=_font(FONT_MONO, 14))
+    draw.text((48, 180), "Walk the journey one week at a time.", fill=MUTED, font=_font(FONT_MONO, 14))
     platform = stats.get("platform", {})
     _draw_metric(draw, 48, 260, _fmt(platform.get("days_in"), 0), "DAYS IN")
     _draw_footer(draw, stats)
@@ -252,8 +240,7 @@ def build_experiments(stats):
     img, draw = _base_image()
     _draw_header(draw, "N=1 Experiments")
     draw.text((48, 100), "EXPERIMENTS", fill=TEXT, font=_font(FONT_DISPLAY, 72))
-    draw.text((48, 180), "Testing protocols against my own data.",
-              fill=MUTED, font=_font(FONT_MONO, 14))
+    draw.text((48, 180), "Testing protocols against my own data.", fill=MUTED, font=_font(FONT_MONO, 14))
     _draw_footer(draw, stats)
     return img
 
@@ -262,8 +249,7 @@ def build_builders(stats):
     img, draw = _base_image()
     _draw_header(draw, "For Builders")
     draw.text((48, 100), "THE BUILD", fill=TEXT, font=_font(FONT_DISPLAY, 72))
-    draw.text((48, 180), "How to build an AI health platform for $13/month.",
-              fill=MUTED, font=_font(FONT_MONO, 14))
+    draw.text((48, 180), "How to build an AI health platform for $13/month.", fill=MUTED, font=_font(FONT_MONO, 14))
     platform = stats.get("platform", {})
     _draw_metric(draw, 48, 260, "116", "MCP TOOLS")
     _draw_metric(draw, 320, 260, "59", "LAMBDAS")

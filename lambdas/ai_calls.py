@@ -26,12 +26,13 @@ from datetime import date as _date_cls
 from typing import Any, Optional, Union
 
 import boto3
-
-from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 
 # AI-3 middleware: lazy import of output validator (transparent fail-safe)
 try:
-    from ai_output_validator import validate_ai_output as _validate_ai_output, AIOutputType
+    from ai_output_validator import AIOutputType
+    from ai_output_validator import validate_ai_output as _validate_ai_output
+
     _AI_VALIDATOR_AVAILABLE = True
 except ImportError:
     _validate_ai_output = None
@@ -39,7 +40,7 @@ except ImportError:
     _AI_VALIDATOR_AVAILABLE = False
 
 # AI model constants — read from env so model can be updated without redeployment
-AI_MODEL = os.environ.get("AI_MODEL",       "claude-sonnet-4-6")
+AI_MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 # CloudWatch client for token usage + failure metrics (P1.8/P1.9)
@@ -51,8 +52,7 @@ _CW_NAMESPACE = "LifePlatform/AI"
 _BACKOFF_DELAYS = [5, 15, 45]  # attempts 1→2, 2→3, 3→4
 
 
-def _emit_token_metrics(input_tokens, output_tokens,
-                        cache_creation_tokens=0, cache_read_tokens=0):
+def _emit_token_metrics(input_tokens, output_tokens, cache_creation_tokens=0, cache_read_tokens=0):
     """Emit per-Lambda Anthropic token usage to CloudWatch (P1.9)."""
     try:
         metric_data = [
@@ -70,18 +70,22 @@ def _emit_token_metrics(input_tokens, output_tokens,
             },
         ]
         if cache_creation_tokens or cache_read_tokens:
-            metric_data.append({
-                "MetricName": "AnthropicCacheWriteTokens",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": cache_creation_tokens,
-                "Unit": "Count",
-            })
-            metric_data.append({
-                "MetricName": "AnthropicCacheReadTokens",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": cache_read_tokens,
-                "Unit": "Count",
-            })
+            metric_data.append(
+                {
+                    "MetricName": "AnthropicCacheWriteTokens",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": cache_creation_tokens,
+                    "Unit": "Count",
+                }
+            )
+            metric_data.append(
+                {
+                    "MetricName": "AnthropicCacheReadTokens",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": cache_read_tokens,
+                    "Unit": "Count",
+                }
+            )
         _cw.put_metric_data(Namespace=_CW_NAMESPACE, MetricData=metric_data)
     except Exception as e:
         print(f"[WARN] CloudWatch token metric emit failed (non-fatal): {e}")
@@ -92,15 +96,18 @@ def _emit_failure_metric():
     try:
         _cw.put_metric_data(
             Namespace=_CW_NAMESPACE,
-            MetricData=[{
-                "MetricName": "AnthropicAPIFailure",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": 1,
-                "Unit": "Count",
-            }],
+            MetricData=[
+                {
+                    "MetricName": "AnthropicAPIFailure",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": 1,
+                    "Unit": "Count",
+                }
+            ],
         )
     except Exception as e:
         print(f"[WARN] CloudWatch failure metric emit failed (non-fatal): {e}")
+
 
 # ==============================================================================
 # MODULE STATE (set by init())
@@ -125,15 +132,19 @@ def init(s3_client: Any, bucket: str, has_board_loader: bool, board_loader_modul
 # INLINE UTILITIES
 # ==============================================================================
 
+
 def _safe_float(rec, field, default=None):
     if rec and field in rec:
-        try: return float(rec[field])
-        except Exception: return default
+        try:
+            return float(rec[field])
+        except Exception:
+            return default
     return default
+
 
 def _avg(vals):
     v = [x for x in vals if x is not None]
-    return round(sum(v)/len(v), 1) if v else None
+    return round(sum(v) / len(v), 1) if v else None
 
 
 # ==============================================================================
@@ -244,7 +255,9 @@ def _build_milestone_context(profile, current_weight):
         recent_m = min(achieved, key=lambda x: x["weight_lbs"])
         lbs_past = round(recent_m["weight_lbs"] - current_weight, 1)
         if lbs_past <= 5:
-            lines.append(f"🏆 MILESTONE JUST ACHIEVED: '{recent_m['name']}' at {recent_m['weight_lbs']} lbs ({lbs_past} lbs below threshold)")
+            lines.append(
+                f"🏆 MILESTONE JUST ACHIEVED: '{recent_m['name']}' at {recent_m['weight_lbs']} lbs ({lbs_past} lbs below threshold)"
+            )
             lines.append(f"   Significance: {recent_m['significance']}")
             lines.append("   → Acknowledge this in your coaching. This is a real biological event, not just a number.")
 
@@ -258,15 +271,14 @@ def _build_milestone_context(profile, current_weight):
 # Applied to BoD and TL;DR+Guidance calls.
 # ==============================================================================
 
+
 def _run_analysis_pass(component_scores, habit_miss_context, insights_ctx, api_key):
     """IC-3 Pass 1: Identify patterns and causal chains BEFORE writing coaching.
 
     Forces the model to reason about what's happening before it writes.
     Returns analysis dict, or None if the call fails (graceful degradation).
     """
-    comp_str = ", ".join(
-        f"{k.replace('_', ' ')}: {v}" for k, v in component_scores.items() if v is not None
-    )
+    comp_str = ", ".join(f"{k.replace('_', ' ')}: {v}" for k, v in component_scores.items() if v is not None)
 
     prompt = f"""You are analyzing Matthew's health data. Output ONLY a JSON object, no preamble.
 
@@ -324,6 +336,7 @@ def _format_analysis(analysis):
 # P2: JOURNEY CONTEXT BLOCK
 # Injected into every AI call — week number, stage, stage-appropriate coaching.
 # ==============================================================================
+
 
 def _build_journey_context(profile, current_date_str=None):
     """
@@ -404,6 +417,7 @@ def _format_journey_context(jctx):
 # P5: TDEE / DEFICIT CONTEXT
 # ==============================================================================
 
+
 def _build_tdee_context(data, profile):
     """
     Build TDEE + deficit context for nutrition AI calls.
@@ -440,7 +454,9 @@ def _build_tdee_context(data, profile):
     lines.append(f"Actual intake: {int(actual_cal)} kcal → actual deficit: ~{int(actual_deficit)} kcal ({deficit_pct}% of TDEE)")
 
     if actual_cal < cal_target * 0.75:
-        lines.append("⚠ VERY LOW INTAKE: >25% below target — may be a logging gap or aggressive restriction. Check for logging completeness before coaching deficit.")
+        lines.append(
+            "⚠ VERY LOW INTAKE: >25% below target — may be a logging gap or aggressive restriction. Check for logging completeness before coaching deficit."
+        )
     elif actual_cal > cal_target * 1.10:
         lines.append("⚠ ABOVE TARGET: more than 10% over calorie goal.")
 
@@ -451,6 +467,7 @@ def _build_tdee_context(data, profile):
 # P4: HABIT → OUTCOME PATTERNS (simplified)
 # Traces causal links between habit completion and downstream metrics.
 # ==============================================================================
+
 
 def _build_habit_outcome_context(data, profile):
     """
@@ -484,20 +501,16 @@ def _build_habit_outcome_context(data, profile):
         "exercise": "movement",
     }
 
-    tier0_names = [n for n, m in registry.items()
-                   if m.get("tier") == 0 and m.get("status") == "active"]
-    tier1_names = [n for n, m in registry.items()
-                   if m.get("tier") == 1 and m.get("status") == "active"]
+    tier0_names = [n for n, m in registry.items() if m.get("tier") == 0 and m.get("status") == "active"]
+    tier1_names = [n for n, m in registry.items() if m.get("tier") == 1 and m.get("status") == "active"]
 
     # 7-day completion trend
     trend_lines = []
     for day_rec in habitify_7d[-7:]:
         date_str = day_rec.get("sk", "").replace("DATE#", "")
         habits_map = day_rec.get("habits", {}) if isinstance(day_rec, dict) else {}
-        t0_done = sum(1 for h in tier0_names
-                      if habits_map.get(h) is not None and float(habits_map.get(h, 0)) >= 1)
-        t1_done = sum(1 for h in tier1_names
-                      if habits_map.get(h) is not None and float(habits_map.get(h, 0)) >= 1)
+        t0_done = sum(1 for h in tier0_names if habits_map.get(h) is not None and float(habits_map.get(h, 0)) >= 1)
+        t1_done = sum(1 for h in tier1_names if habits_map.get(h) is not None and float(habits_map.get(h, 0)) >= 1)
         trend_lines.append(f"  {date_str}: T0 {t0_done}/{len(tier0_names)}, T1 {t1_done}/{len(tier1_names)}")
 
     # Known habit-outcome relationships to surface to the AI
@@ -517,9 +530,11 @@ def _build_habit_outcome_context(data, profile):
     if causal_pairs:
         lines.append("Known habit→metric correlations (name the likely connection if habit was missed):")
         lines.extend(causal_pairs[:8])  # cap at 8 to avoid prompt bloat
-    lines.append("INSTRUCTION: When a T0/T1 habit was missed, NAME THE LIKELY CORRELATIVE PATTERN. "
-                 "Don't just list 'missed X' — connect it to the metric it's designed to support. "
-                 "Frame as correlation, not proven causation: e.g. 'Wind-down missed → sleep efficiency 71% (vs your ~82% baseline — consistent pattern but not proven causal).'")
+    lines.append(
+        "INSTRUCTION: When a T0/T1 habit was missed, NAME THE LIKELY CORRELATIVE PATTERN. "
+        "Don't just list 'missed X' — connect it to the metric it's designed to support. "
+        "Frame as correlation, not proven causation: e.g. 'Wind-down missed → sleep efficiency 71% (vs your ~82% baseline — consistent pattern but not proven causal).'"
+    )
 
     return "\n".join(lines)
 
@@ -529,6 +544,7 @@ def _build_habit_outcome_context(data, profile):
 # Per-source confidence scores injected into AI prompts so the model knows
 # when data is incomplete or suspicious. Eliminates coaching on logging gaps.
 # ==============================================================================
+
 
 def _compute_data_quality(data, profile):
     """Compute per-source data quality / confidence for yesterday's data.
@@ -554,10 +570,14 @@ def _compute_data_quality(data, profile):
         apple_7d = data.get("apple_7d") or []
         # Use simple heuristic: if calories < 50% of target, likely incomplete
         if cal < cal_target * 0.50:
-            signals.append(f"\u26a0\ufe0f Nutrition: {int(cal)} cal logged \u2014 likely INCOMPLETE (target {cal_target}). Treat with skepticism.")
+            signals.append(
+                f"\u26a0\ufe0f Nutrition: {int(cal)} cal logged \u2014 likely INCOMPLETE (target {cal_target}). Treat with skepticism."
+            )
             scores["nutrition"] = 0.3
         elif cal < cal_target * 0.75:
-            signals.append(f"\u26a0\ufe0f Nutrition: {int(cal)} cal \u2014 possibly incomplete or aggressive restriction. Verify before coaching.")
+            signals.append(
+                f"\u26a0\ufe0f Nutrition: {int(cal)} cal \u2014 possibly incomplete or aggressive restriction. Verify before coaching."
+            )
             scores["nutrition"] = 0.6
         else:
             meal_count = len(food_log) if food_log else 0
@@ -627,8 +647,12 @@ def _compute_data_quality(data, profile):
 
     # Build overall score
     weighted_sources = {
-        "nutrition": 0.25, "sleep": 0.25, "apple_health": 0.20,
-        "habits": 0.15, "activity": 0.10, "journal": 0.05,
+        "nutrition": 0.25,
+        "sleep": 0.25,
+        "apple_health": 0.20,
+        "habits": 0.15,
+        "activity": 0.10,
+        "journal": 0.05,
     }
     overall = sum(scores.get(s, 0) * w for s, w in weighted_sources.items())
 
@@ -651,6 +675,7 @@ def _compute_data_quality(data, profile):
 # rolling baseline. High-surprise gets expanded context; low-surprise compresses.
 # Information theory applied to prompt engineering.
 # ==============================================================================
+
 
 def _compute_surprise_scores(data):
     """Compute per-metric surprise scores (0-1) based on deviation from 7-day baselines.
@@ -779,6 +804,7 @@ def _build_surprise_context(surprises, threshold=0.4):
 # Redirects coaching to highest-leverage opportunities.
 # ==============================================================================
 
+
 def _compute_diminishing_returns(character_sheet, data, profile):
     """Detect pillars with high effort + flat/declining trajectory.
 
@@ -794,8 +820,14 @@ def _compute_diminishing_returns(character_sheet, data, profile):
 
     # Map habits to pillars
     HABIT_PILLAR_MAP = {
-        "sleep": ["wind_down_routine", "no_screens_before_bed", "no_screens_1hr_before_bed",
-                  "consistent_bedtime", "caffeine_cutoff", "caffeine_cutoff_2pm"],
+        "sleep": [
+            "wind_down_routine",
+            "no_screens_before_bed",
+            "no_screens_1hr_before_bed",
+            "consistent_bedtime",
+            "caffeine_cutoff",
+            "caffeine_cutoff_2pm",
+        ],
         "movement": ["morning_walk", "steps_goal", "exercise"],
         "nutrition": ["track_macros", "log_food", "protein_first", "meal_prep"],
         "mind": ["journal", "meditation", "gratitude"],
@@ -816,18 +848,19 @@ def _compute_diminishing_returns(character_sheet, data, profile):
         pillar_habits = HABIT_PILLAR_MAP.get(pillar_name, [])
         active_habits = [h for h in pillar_habits if registry.get(h, {}).get("status") == "active"]
         if active_habits:
-            completed = sum(1 for h in active_habits
-                          if habits_map.get(h) is not None and float(habits_map.get(h, 0)) >= 1)
+            completed = sum(1 for h in active_habits if habits_map.get(h) is not None and float(habits_map.get(h, 0)) >= 1)
             effort_pct = round(completed / len(active_habits) * 100) if active_habits else 0
         else:
             effort_pct = None  # No habits mapped to this pillar
 
-        pillar_analysis.append({
-            "pillar": pillar_name,
-            "score": raw_score,
-            "level": level,
-            "effort_pct": effort_pct,
-        })
+        pillar_analysis.append(
+            {
+                "pillar": pillar_name,
+                "score": raw_score,
+                "level": level,
+                "effort_pct": effort_pct,
+            }
+        )
 
     if not pillar_analysis:
         return ""
@@ -843,12 +876,10 @@ def _compute_diminishing_returns(character_sheet, data, profile):
     highest = scored[-1]
 
     # Detect diminishing returns: high effort + high score (above 75)
-    saturated = [p for p in scored if p["effort_pct"] is not None
-                 and p["effort_pct"] >= 80 and p["score"] >= 70]
+    saturated = [p for p in scored if p["effort_pct"] is not None and p["effort_pct"] >= 80 and p["score"] >= 70]
 
     # Detect underinvested: low score + low effort (or no habits)
-    underinvested = [p for p in scored if p["score"] < 50
-                     and (p["effort_pct"] is None or p["effort_pct"] < 50)]
+    underinvested = [p for p in scored if p["score"] < 50 and (p["effort_pct"] is None or p["effort_pct"] < 50)]
 
     lines = []
 
@@ -856,7 +887,9 @@ def _compute_diminishing_returns(character_sheet, data, profile):
         sat_names = ", ".join(p["pillar"].capitalize() for p in saturated)
         lines.append(f"LEVERAGE ANALYSIS:")
         lines.append(f"  \u26a0\ufe0f Diminishing returns on: {sat_names} (high effort, score already {saturated[0]['score']:.0f}+)")
-        lines.append(f"  \u2b06\ufe0f Highest leverage: {lowest['pillar'].capitalize()} (score {lowest['score']:.0f}, most room for improvement)")
+        lines.append(
+            f"  \u2b06\ufe0f Highest leverage: {lowest['pillar'].capitalize()} (score {lowest['score']:.0f}, most room for improvement)"
+        )
         if underinvested:
             ui_names = ", ".join(p["pillar"].capitalize() for p in underinvested)
             lines.append(f"  \ud83c\udfaf Underinvested: {ui_names} (low score + low effort = high ROI)")
@@ -864,7 +897,9 @@ def _compute_diminishing_returns(character_sheet, data, profile):
     elif underinvested:
         ui_names = ", ".join(p["pillar"].capitalize() for p in underinvested)
         lines.append(f"LEVERAGE ANALYSIS:")
-        lines.append(f"  \ud83c\udfaf Underinvested pillars: {ui_names} (low score + low effort \u2014 small changes here have outsized impact)")
+        lines.append(
+            f"  \ud83c\udfaf Underinvested pillars: {ui_names} (low score + low effort \u2014 small changes here have outsized impact)"
+        )
         lines.append("INSTRUCTION: Nudge coaching toward underinvested pillars where effort-to-outcome ratio is highest.")
 
     return "\n".join(lines)
@@ -876,6 +911,7 @@ def _compute_diminishing_returns(character_sheet, data, profile):
 # Instead of coaching each pillar in isolation, finds where pillars are in tension
 # and identifies the limiting factor + optimization call.
 # ==============================================================================
+
 
 def _build_cross_pillar_tradeoffs(component_scores, data, profile):
     """IC-7: Cross-pillar trade-off analysis.
@@ -959,8 +995,7 @@ def _build_cross_pillar_tradeoffs(component_scores, data, profile):
 
     # 5. Consistency lagging behind pillar strength
     if consistency_score is not None and consistency_score < 45:
-        strong_pillars = [k for k, v in component_scores.items()
-                          if v is not None and v > 65 and k not in ("consistency", "relationships")]
+        strong_pillars = [k for k, v in component_scores.items() if v is not None and v > 65 and k not in ("consistency", "relationships")]
         if strong_pillars:
             strong_str = ", ".join(k.replace("_", " ").title() for k in strong_pillars[:3])
             tradeoffs.append(
@@ -984,6 +1019,7 @@ def _build_cross_pillar_tradeoffs(component_scores, data, profile):
 # ==============================================================================
 # DATA SUMMARY BUILDERS (used by AI prompt construction)
 # ==============================================================================
+
 
 def build_data_summary(data: dict[str, Any], profile: dict[str, Any]) -> dict[str, Any]:
     journal = data.get("journal") or {}
@@ -1111,9 +1147,12 @@ def build_workout_summary(data: dict[str, Any]) -> dict[str, Any]:
 # ANTHROPIC API
 # ==============================================================================
 
+
 def daily_brief_shared_system(
-    data: dict[str, Any], profile: dict[str, Any],
-    day_grade: Optional[int] = None, grade: Optional[str] = None,
+    data: dict[str, Any],
+    profile: dict[str, Any],
+    day_grade: Optional[int] = None,
+    grade: Optional[str] = None,
 ) -> str:
     """Phase 3.8 (2026-05-16): build a stable system block reused across the 4
     daily-brief AI calls (BoD, training+nutrition, journal, TL;DR).
@@ -1138,26 +1177,28 @@ def daily_brief_shared_system(
     ]
     if day_grade is not None and grade is not None:
         parts.append(f"- Today's day-grade: {grade} (score {day_grade:.0f}/100)")
-    parts.extend([
-        "",
-        "## Voice + rules common to all coaching",
-        "- Reference real data shown in user message. Don't invent numbers.",
-        "- Concrete > abstract. Action > theory.",
-        "- If a metric is missing from the user message, say so — don't extrapolate.",
-        "- Coaching is direct and warm; never preachy.",
-        "- Stage-appropriate: Matthew is mid-journey, not a beginner.",
-        "- **Opening-line rule (do not violate)**: Never begin your response"
-        " with the name 'Matthew' or any greeting/salutation. Open with the"
-        " *substance* — a number, an observation, a verdict."
-        " The ai_output_validator flags 'Output starts with Matthew' as a"
-        " quality warning; the training coach has been violating this"
-        " consistently. Correct openings start with data: 'HRV at 47ms tells"
-        " me…', 'Sleep dropped to 5.8 hours…', 'Two missed sessions this"
-        " week…'. Incorrect: 'Matthew, your HRV…', 'Matthew — sleep dropped…'."
-        " Treat this as a hard constraint, not a stylistic preference.",
-        "",
-        "Coach-specific instructions follow in each user message.",
-    ])
+    parts.extend(
+        [
+            "",
+            "## Voice + rules common to all coaching",
+            "- Reference real data shown in user message. Don't invent numbers.",
+            "- Concrete > abstract. Action > theory.",
+            "- If a metric is missing from the user message, say so — don't extrapolate.",
+            "- Coaching is direct and warm; never preachy.",
+            "- Stage-appropriate: Matthew is mid-journey, not a beginner.",
+            "- **Opening-line rule (do not violate)**: Never begin your response"
+            " with the name 'Matthew' or any greeting/salutation. Open with the"
+            " *substance* — a number, an observation, a verdict."
+            " The ai_output_validator flags 'Output starts with Matthew' as a"
+            " quality warning; the training coach has been violating this"
+            " consistently. Correct openings start with data: 'HRV at 47ms tells"
+            " me…', 'Sleep dropped to 5.8 hours…', 'Two missed sessions this"
+            " week…'. Incorrect: 'Matthew, your HRV…', 'Matthew — sleep dropped…'."
+            " Treat this as a hard constraint, not a stylistic preference.",
+            "",
+            "Coach-specific instructions follow in each user message.",
+        ]
+    )
     return "\n".join(parts)
 
 
@@ -1214,8 +1255,8 @@ def call_anthropic(
     # param now ignored — kept for signature compatibility). Prompt caching
     # preserved via cache_control blocks in sys_block. Response shape is
     # identical to the direct API, so parsing/validation below is unchanged.
-    from bedrock_client import invoke as _bedrock_invoke
     import botocore.exceptions as _bce
+    from bedrock_client import invoke as _bedrock_invoke
 
     max_attempts = len(_BACKOFF_DELAYS) + 1  # 4
     for attempt in range(1, max_attempts + 1):
@@ -1247,8 +1288,10 @@ def call_anthropic(
             code = e.response.get("Error", {}).get("Code", "Unknown")
             # Retryable Bedrock errors: throttling + transient service issues.
             retryable = code in (
-                "ThrottlingException", "ModelTimeoutException",
-                "ServiceUnavailableException", "InternalServerException",
+                "ThrottlingException",
+                "ModelTimeoutException",
+                "ServiceUnavailableException",
+                "InternalServerException",
                 "ModelNotReadyException",
             )
             print(f"[WARN] Bedrock {code} attempt {attempt}/{max_attempts}")
@@ -1278,6 +1321,7 @@ def call_anthropic(
 # AI PROMPT HELPERS
 # ==============================================================================
 
+
 def _build_weight_context(data, profile):
     """Dynamic weight context for AI prompts."""
     start_w = profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
@@ -1286,8 +1330,9 @@ def _build_weight_context(data, profile):
     if current_w:
         lost = round(start_w - current_w, 1)
         remaining = round(current_w - goal_w, 1)
-        return (f"Started at {start_w} lbs, currently {round(current_w, 1)} lbs, "
-                f"goal {goal_w} lbs ({lost} lost so far, {remaining} to go)")
+        return (
+            f"Started at {start_w} lbs, currently {round(current_w, 1)} lbs, " f"goal {goal_w} lbs ({lost} lost so far, {remaining} to go)"
+        )
     return f"{start_w}->{goal_w} lbs"
 
 
@@ -1313,6 +1358,7 @@ def _build_recent_training_summary(data):
 # Reads ACWR fields from computed_metrics (already written by acwr-compute before
 # the Daily Brief runs). Provides prescriptive training guidance to the coach prompt.
 # ==============================================================================
+
 
 def _build_acwr_coaching_context(data):
     """IC-28: Extract ACWR training load status for the training coach prompt.
@@ -1368,7 +1414,10 @@ def _build_acwr_coaching_context(data):
 # AI CALLS
 # ==============================================================================
 
-def call_training_nutrition_coach(data: dict[str, Any], profile: dict[str, Any], api_key: str = "", shared_system: Optional[str] = None) -> str:
+
+def call_training_nutrition_coach(
+    data: dict[str, Any], profile: dict[str, Any], api_key: str = "", shared_system: Optional[str] = None
+) -> str:
     """AI call: Training coach + Nutritionist combined. (P2+P3+P5 aware)
     Phase 3.8: optional shared_system reused across 4 daily-brief calls (cached)."""
     data_summary = build_data_summary(data, profile)
@@ -1436,8 +1485,7 @@ Respond in EXACTLY this JSON format, no other text:
 {{"training": "2-4 sentences from sports scientist. Per-activity analysis. Walks evaluated as primary sessions at Week {jctx['week_num']}. Reference specific metrics.", "nutrition": "2-3 sentences from nutritionist about macro adherence + meal timing + deficit context. Reference specific foods and timestamps. What to adjust today."}}"""
 
     try:
-        raw = call_anthropic(prompt, api_key, max_tokens=500,
-                             system=shared_system, cache_system=False)
+        raw = call_anthropic(prompt, api_key, max_tokens=500, system=shared_system, cache_system=False)
         cleaned = raw.strip()
         if cleaned.startswith("```"):
             cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
@@ -1503,15 +1551,21 @@ Format: [reflection] || [tactical thing]
 No labels, no formatting. Natural voice. Max 80 words total."""
 
     try:
-        return call_anthropic(prompt, api_key, max_tokens=250,
-                              system=shared_system, cache_system=False,
-                              output_type=AIOutputType.JOURNAL_COACH if _AI_VALIDATOR_AVAILABLE else None)
+        return call_anthropic(
+            prompt,
+            api_key,
+            max_tokens=250,
+            system=shared_system,
+            cache_system=False,
+            output_type=AIOutputType.JOURNAL_COACH if _AI_VALIDATOR_AVAILABLE else None,
+        )
     except Exception as e:
         print("[WARN] Journal coach failed: " + str(e))
         return ""
 
 
 # -- Board of Directors prompt builder -----------------------------------------
+
 
 def _build_daily_bod_intro_from_config(data=None, profile=None):
     """Build the Board of Directors role intro from S3 config."""
@@ -1550,8 +1604,9 @@ Tone: direct, empathetic, no-BS.{protocol_note}"""
     return intro
 
 
-def call_board_of_directors(data, profile, day_grade, grade, component_scores, api_key="",
-                             character_sheet=None, brief_mode="standard", shared_system=None):
+def call_board_of_directors(
+    data, profile, day_grade, grade, component_scores, api_key="", character_sheet=None, brief_mode="standard", shared_system=None
+):
     data_summary = build_data_summary(data, profile)
     comp_lines = []
     for comp, score in component_scores.items():
@@ -1621,18 +1676,43 @@ def call_board_of_directors(data, profile, day_grade, grade, component_scores, a
         character_ctx = "\nCHARACTER SHEET: Level " + str(cs_level) + " (" + cs_tier + ")"
         for pn in ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]:
             pd = character_sheet.get("pillar_" + pn, {})
-            character_ctx += "\n  " + pn.capitalize() + ": Level " + str(pd.get("level", "?")) + " (" + str(pd.get("tier", "?")) + ") raw=" + str(pd.get("raw_score", "?"))
+            character_ctx += (
+                "\n  "
+                + pn.capitalize()
+                + ": Level "
+                + str(pd.get("level", "?"))
+                + " ("
+                + str(pd.get("tier", "?"))
+                + ") raw="
+                + str(pd.get("raw_score", "?"))
+            )
         if cs_events:
             character_ctx += "\nLEVEL EVENTS TODAY:"
             for ev in cs_events:
                 ev_type = ev.get("type", "")
                 if "tier" in ev_type:
-                    character_ctx += "\n  " + ev.get("pillar", "").capitalize() + ": " + str(ev.get("old_tier", "")) + " → " + str(ev.get("new_tier", ""))
+                    character_ctx += (
+                        "\n  "
+                        + ev.get("pillar", "").capitalize()
+                        + ": "
+                        + str(ev.get("old_tier", ""))
+                        + " → "
+                        + str(ev.get("new_tier", ""))
+                    )
                 elif "character" in ev_type:
                     character_ctx += "\n  Character Level " + str(ev.get("old_level", "")) + " → " + str(ev.get("new_level", ""))
                 else:
                     arrow = "↑" if "up" in ev_type else "↓"
-                    character_ctx += "\n  " + arrow + " " + ev.get("pillar", "").capitalize() + " Level " + str(ev.get("old_level", "")) + " → " + str(ev.get("new_level", ""))
+                    character_ctx += (
+                        "\n  "
+                        + arrow
+                        + " "
+                        + ev.get("pillar", "").capitalize()
+                        + " Level "
+                        + str(ev.get("old_level", ""))
+                        + " → "
+                        + str(ev.get("new_level", ""))
+                    )
         if cs_effects:
             character_ctx += "\nACTIVE EFFECTS: " + ", ".join(e.get("name", "") for e in cs_effects)
 
@@ -1671,11 +1751,15 @@ def call_board_of_directors(data, profile, day_grade, grade, component_scores, a
     if not bod_intro:
         print("[INFO] Using fallback dynamic daily BoD prompt")
         weight_ctx = _build_weight_context(data, profile)
-        bod_intro = ("You are the Board of Directors for Project40 — sports scientist + nutritionist + sleep specialist + behavioral coach unified.\n"
-                     f"Speaking to Matthew, 36yo, weight loss journey ({weight_ctx}). Phase 1 Ignition: 3 lbs/week, 1500 kcal deficit, 1800 cal daily.\n"
-                     "Tone: direct, empathetic, no-BS.")
+        bod_intro = (
+            "You are the Board of Directors for Project40 — sports scientist + nutritionist + sleep specialist + behavioral coach unified.\n"
+            f"Speaking to Matthew, 36yo, weight loss journey ({weight_ctx}). Phase 1 Ignition: 3 lbs/week, 1500 kcal deficit, 1800 cal daily.\n"
+            "Tone: direct, empathetic, no-BS."
+        )
 
-    prompt = bod_intro + f"""
+    prompt = (
+        bod_intro
+        + f"""
 
 {journey_block}
 {health_ctx}
@@ -1706,6 +1790,7 @@ CROSS-PILLAR: If the trade-off analysis above identifies a limiting factor or op
 RED TEAM CHECK: If the analysis pass flagged a challenge (⚠️ above), consider it. If the correlation might be misleading or there's a confounding factor, adjust your coaching accordingly — don't give confident advice based on shaky signal. Intellectual honesty > false certainty.
 OPENING RULE: DO NOT open with a metric readout. The form 'Recovery was X%, HRV was Y, today do Z' is explicitly banned as an opener — it's a data dump, not coaching. Open instead with a pattern ("Three nights of short sleep are compounding..."), a direct challenge ("The T0 miss yesterday is the third this week..."), or a concrete observation that requires inference, not just reading. The metric data exists in the scorecard above — the BoD's job is to interpret it, not repeat it.
 DO NOT start with "Matthew". Max 60 words."""
+    )
 
     if brief_mode == "flourishing":
         prompt += "\n\nTONE: He is FLOURISHING — engagement is high, habits strong, trajectory improving. Lead with reinforcement. Be energising. Name what's working specifically. One brief forward-looking note."
@@ -1717,14 +1802,20 @@ DO NOT start with "Matthew". Max 60 words."""
         "tsb": data.get("tsb") if data else None,
         "sleep_score": _safe_float((data.get("sleep") or {}), "sleep_score") if data else None,
     }
-    return call_anthropic(prompt, api_key, max_tokens=200,
-                          system=shared_system, cache_system=False,
-                          output_type=AIOutputType.BOD_COACHING if _AI_VALIDATOR_AVAILABLE else None,
-                          health_context=_hctx)
+    return call_anthropic(
+        prompt,
+        api_key,
+        max_tokens=200,
+        system=shared_system,
+        cache_system=False,
+        output_type=AIOutputType.BOD_COACHING if _AI_VALIDATOR_AVAILABLE else None,
+        health_context=_hctx,
+    )
 
 
-def call_tldr_and_guidance(data, profile, day_grade, grade, component_scores, component_details,
-                            readiness_score, readiness_colour, api_key, shared_system=None):
+def call_tldr_and_guidance(
+    data, profile, day_grade, grade, component_scores, component_details, readiness_score, readiness_colour, api_key, shared_system=None
+):
     """v2.3: Combined TL;DR + Smart Guidance — one AI call that returns both. (P2+P4+P5 aware)
     Phase 3.8: shared_system passed for cross-call prompt caching."""
     data_summary = build_data_summary(data, profile)
@@ -1783,9 +1874,8 @@ def call_tldr_and_guidance(data, profile, day_grade, grade, component_scores, co
 
     # IC-3: Analysis pass (Pass 1)
     analysis = _run_analysis_pass(
-        component_scores,
-        ("MISSED HABITS: " + ", ".join(missed_mvp)) if missed_mvp else "",
-        insights_ctx, api_key)
+        component_scores, ("MISSED HABITS: " + ", ".join(missed_mvp)) if missed_mvp else "", insights_ctx, api_key
+    )
     analysis_block = _format_analysis(analysis)
 
     # IC-6: Milestone
@@ -1921,14 +2011,19 @@ Respond in EXACTLY this JSON format, no other text:
     # on the guidance items (checks claimed metric values against actual data).
     _hctx = {
         "recovery_score": data_summary.get("recovery_score"),
-        "tsb":            data_summary.get("tsb"),
-        "sleep_score":    data_summary.get("sleep_score"),
+        "tsb": data_summary.get("tsb"),
+        "sleep_score": data_summary.get("sleep_score"),
     }
     try:
-        raw = call_anthropic(prompt, api_key, max_tokens=450,
-                             system=shared_system, cache_system=False,
-                             output_type=AIOutputType.GUIDANCE if _AI_VALIDATOR_AVAILABLE else None,
-                             health_context=_hctx)
+        raw = call_anthropic(
+            prompt,
+            api_key,
+            max_tokens=450,
+            system=shared_system,
+            cache_system=False,
+            output_type=AIOutputType.GUIDANCE if _AI_VALIDATOR_AVAILABLE else None,
+            health_context=_hctx,
+        )
         cleaned = raw.strip()
         if cleaned.startswith("```"):
             cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
@@ -1988,10 +2083,12 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
             orch_resp = lambda_client.invoke(
                 FunctionName="coach-narrative-orchestrator",
                 InvocationType="RequestResponse",
-                Payload=json.dumps({
-                    "coach_id": coach_id,
-                    "computation_results": comp_results,
-                }).encode(),
+                Payload=json.dumps(
+                    {
+                        "coach_id": coach_id,
+                        "computation_results": comp_results,
+                    }
+                ).encode(),
             )
             orch_payload = json.loads(orch_resp["Payload"].read())
             orch_body = orch_payload.get("body")
@@ -2101,8 +2198,7 @@ Write your {domain_label} coaching section now."""
 
         # Step 5: Generate with Sonnet
         print(f"[COACH-V2:{coach_id}] Generating output...")
-        output = call_anthropic(system_prompt + "\n\n" + user_message,
-                                api_key, max_tokens=600)
+        output = call_anthropic(system_prompt + "\n\n" + user_message, api_key, max_tokens=600)
         print(f"[COACH-V2:{coach_id}] Output: {len(output)} chars")
 
         # Step 6: Invoke state updater (async)
@@ -2110,12 +2206,14 @@ Write your {domain_label} coaching section now."""
             lambda_client.invoke(
                 FunctionName="coach-state-updater",
                 InvocationType="Event",
-                Payload=json.dumps({
-                    "coach_id": coach_id,
-                    "output_text": output,
-                    "output_type": f"daily_brief_{domain_label.lower().replace(' ', '_')}",
-                    "generation_date": _date_cls.today().isoformat(),
-                }).encode(),
+                Payload=json.dumps(
+                    {
+                        "coach_id": coach_id,
+                        "output_text": output,
+                        "output_type": f"daily_brief_{domain_label.lower().replace(' ', '_')}",
+                        "generation_date": _date_cls.today().isoformat(),
+                    }
+                ).encode(),
             )
         except Exception as e:
             print(f"[COACH-V2:{coach_id}] State updater invoke failed (non-blocking): {e}")
@@ -2129,12 +2227,14 @@ Write your {domain_label} coaching section now."""
             lambda_client.invoke(
                 FunctionName="coach-quality-gate",
                 InvocationType="Event",
-                Payload=json.dumps({
-                    "coach_id": coach_id,
-                    "output_text": output,
-                    "generation_brief": generation_brief if isinstance(generation_brief, dict) else None,
-                    "generation_date": _date_cls.today().isoformat(),
-                }).encode(),
+                Payload=json.dumps(
+                    {
+                        "coach_id": coach_id,
+                        "output_text": output,
+                        "generation_brief": generation_brief if isinstance(generation_brief, dict) else None,
+                        "generation_date": _date_cls.today().isoformat(),
+                    }
+                ).encode(),
             )
         except Exception as e:
             print(f"[COACH-V2:{coach_id}] Quality gate invoke failed (non-blocking): {e}")

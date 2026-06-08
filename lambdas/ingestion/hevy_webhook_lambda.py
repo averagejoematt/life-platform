@@ -17,6 +17,7 @@ Region: us-west-2
 FunctionURL: created by CDK in operational_stack (see add_hevy_function_url).
 Auth: NONE (open URL). Protection = mandatory webhook_secret header match.
 """
+
 from __future__ import annotations
 
 import base64
@@ -27,15 +28,16 @@ from typing import Any
 import hevy_common
 from hevy_common import (
     HevyAPIError,
-    fetch_workout,
     archive_raw,
+    fetch_workout,
     normalize_workout,
-    write_normalized,
     verify_webhook_signature,
+    write_normalized,
 )
 
 try:
     from platform_logger import get_logger
+
     logger = get_logger("hevy-webhook")
 except ImportError:
     logger = logging.getLogger("hevy-webhook")
@@ -155,10 +157,13 @@ def lambda_handler(event: dict, context: Any) -> dict:
         logger.exception("hevy webhook unhandled error for %s: %s", workout_id, e)
         return _response(500, {"error": "internal", "workout_id": workout_id})
 
-    return _response(200, {
-        "status": "ingested",
-        "workout_id": workout_id,
-        "date": record["date"],
-        "set_count": record["set_count"],
-        "total_volume_kg": record["total_volume_kg"],
-    })
+    return _response(
+        200,
+        {
+            "status": "ingested",
+            "workout_id": workout_id,
+            "date": record["date"],
+            "set_count": record["set_count"],
+            "total_volume_kg": record["total_volume_kg"],
+        },
+    )

@@ -10,19 +10,21 @@ Also re-computes buddy/data.json with fresh signals.
 
 v1.0.0 — 2026-03-03
 """
+
 import json
+import logging
 import os
-import boto3
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-import logging
 
-from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+import boto3
+from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("dashboard-refresh")
 except ImportError:
     logger = logging.getLogger("dashboard-refresh")
@@ -47,18 +49,24 @@ s3 = boto3.client("s3", region_name=_REGION)
 # HELPERS (shared with daily_brief_lambda.py)
 # ==============================================================================
 
+
 def d2f(obj):
     """Convert DynamoDB Decimals to floats."""
-    if isinstance(obj, list): return [d2f(i) for i in obj]
-    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [d2f(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
 
 
 def safe_float(rec, field, default=None):
     if rec and field in rec:
-        try: return float(rec[field])
-        except Exception: return default
+        try:
+            return float(rec[field])
+        except Exception:
+            return default
     return default
 
 
@@ -72,13 +80,18 @@ def fetch_date(source, date_str):
 
 def fetch_range(source, start, end):
     try:
-        r = table.query(**with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": USER_PREFIX + source,
-                ":s": "DATE#" + start,
-                ":e": "DATE#" + end,
-            }}))
+        r = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                    "ExpressionAttributeValues": {
+                        ":pk": USER_PREFIX + source,
+                        ":s": "DATE#" + start,
+                        ":e": "DATE#" + end,
+                    },
+                }
+            )
+        )
         return [d2f(i) for i in r.get("Items", [])]
     except Exception:
         return []
@@ -95,8 +108,12 @@ def _normalize_whoop_sleep(item):
         out["sleep_efficiency_pct"] = out["sleep_efficiency_percentage"]
     total = safe_float(out, "sleep_duration_hours") or 0
     if total > 0:
-        for stage, field in [("deep_hours", "deep_pct"), ("rem_hours", "rem_pct"),
-                             ("light_hours", "light_pct"), ("awake_hours", "awake_pct")]:
+        for stage, field in [
+            ("deep_hours", "deep_pct"),
+            ("rem_hours", "rem_pct"),
+            ("light_hours", "light_pct"),
+            ("awake_hours", "awake_pct"),
+        ]:
             if stage in out and field not in out:
                 out[field] = round(float(out[stage]) / total * 100, 1)
     return out
@@ -127,12 +144,18 @@ def _dedup_activities(activities):
 
     def richness(a):
         score = 0
-        if a.get("average_heartrate"): score += 1
-        if a.get("max_heartrate"): score += 1
-        if a.get("calories"): score += 1
-        if a.get("average_speed"): score += 1
-        if a.get("total_elevation_gain"): score += 1
-        if a.get("average_cadence"): score += 1
+        if a.get("average_heartrate"):
+            score += 1
+        if a.get("max_heartrate"):
+            score += 1
+        if a.get("calories"):
+            score += 1
+        if a.get("average_speed"):
+            score += 1
+        if a.get("total_elevation_gain"):
+            score += 1
+        if a.get("average_cadence"):
+            score += 1
         return score
 
     kept = []
@@ -177,9 +200,14 @@ def _buddy_friendly_date(date_str):
 
 def _buddy_friendly_name(name, sport_type):
     friendly = {
-        "Walk": "Walk", "Run": "Run", "Ride": "Bike Ride",
-        "VirtualRide": "Indoor Ride", "WeightTraining": "Weight Training",
-        "Hike": "Hike", "Yoga": "Yoga", "Swim": "Swim",
+        "Walk": "Walk",
+        "Run": "Run",
+        "Ride": "Bike Ride",
+        "VirtualRide": "Indoor Ride",
+        "WeightTraining": "Weight Training",
+        "Hike": "Hike",
+        "Yoga": "Yoga",
+        "Swim": "Swim",
     }
     if name == sport_type or not name:
         return friendly.get(sport_type, sport_type)
@@ -239,11 +267,14 @@ def _build_avatar_data(character_sheet, profile, current_weight=None):
     alignment_ring = all_discipline and all(badges[p] == "bright" for p in pillar_names)
 
     return {
-        "tier": tier, "body_frame": body_frame,
+        "tier": tier,
+        "body_frame": body_frame,
         "composition_score": round(composition_score, 1),
-        "badges": badges, "effects": effect_names,
+        "badges": badges,
+        "effects": effect_names,
         "expressions": expressions,
-        "elite_crown": elite_crown, "alignment_ring": alignment_ring,
+        "elite_crown": elite_crown,
+        "alignment_ring": alignment_ring,
     }
 
 
@@ -273,6 +304,7 @@ def read_existing_json(key):
 # ==============================================================================
 # DASHBOARD REFRESH
 # ==============================================================================
+
 
 def refresh_dashboard(profile, yesterday, today):
     """Re-query intraday sources and merge into existing dashboard JSON."""
@@ -362,7 +394,7 @@ def refresh_dashboard(profile, yesterday, today):
         z2_hi = max_hr * 0.70
         z2_total = 0.0
         for day_rec in strava_week:
-            for act in (day_rec.get("activities") or []):
+            for act in day_rec.get("activities") or []:
                 avg_hr = safe_float(act, "average_heartrate")
                 dur_s = safe_float(act, "moving_time_seconds") or 0
                 if avg_hr and z2_lo <= avg_hr <= z2_hi:
@@ -379,7 +411,7 @@ def refresh_dashboard(profile, yesterday, today):
             for day_rec in strava_60d:
                 date_str = day_rec.get("sk", "").replace("DATE#", "")
                 daily_load = 0
-                for act in (day_rec.get("activities") or []):
+                for act in day_rec.get("activities") or []:
                     dur_min = (safe_float(act, "moving_time_seconds") or 0) / 60
                     avg_hr = safe_float(act, "average_heartrate") or 0
                     if dur_min > 0 and avg_hr > 0:
@@ -431,6 +463,7 @@ def refresh_dashboard(profile, yesterday, today):
 # ==============================================================================
 # BUDDY REFRESH (full recompute — no AI, cheap)
 # ==============================================================================
+
 
 def refresh_buddy(profile, yesterday, today):
     """Re-compute buddy/data.json with fresh signal data."""
@@ -541,10 +574,7 @@ def refresh_buddy(profile, yesterday, today):
             exercise_text = f"No exercise this week — last session {days_since_exercise} days ago"
 
         activities.sort(key=lambda x: x.get("sort_date", ""), reverse=True)
-        activity_highlights = [
-            {"name": a["name"], "detail": a["detail"], "date": a["date"]}
-            for a in activities[:4]
-        ]
+        activity_highlights = [{"name": a["name"], "detail": a["detail"], "date": a["date"]} for a in activities[:4]]
 
         # --- Routine Signal ---
         latest_habit_date = None
@@ -608,7 +638,9 @@ def refresh_buddy(profile, yesterday, today):
             beacon = "red"
             beacon_label = "Check in on him"
             beacon_summary = "Multiple signals have gone quiet. He might be in a rough stretch."
-            prompt = "Time to reach out. Don\u2019t make it about health data \u2014 just ask how he\u2019s really doing. Be direct but kind."
+            prompt = (
+                "Time to reach out. Don\u2019t make it about health data \u2014 just ask how he\u2019s really doing. Be direct but kind."
+            )
         elif red_count >= 1 or yellow_count >= 2:
             beacon = "yellow"
             beacon_label = "Might be a quiet stretch"
@@ -670,12 +702,16 @@ def refresh_buddy(profile, yesterday, today):
                 "goal_lbs": int(goal_weight),
             },
             "last_updated_friendly": friendly_time,
-            "character_sheet": {
-                "level": character_sheet.get("character_level", 1),
-                "tier": character_sheet.get("character_tier"),
-                "tier_emoji": character_sheet.get("character_tier_emoji"),
-                "events": character_sheet.get("level_events", []),
-            } if character_sheet else None,
+            "character_sheet": (
+                {
+                    "level": character_sheet.get("character_level", 1),
+                    "tier": character_sheet.get("character_tier"),
+                    "tier_emoji": character_sheet.get("character_tier_emoji"),
+                    "events": character_sheet.get("level_events", []),
+                }
+                if character_sheet
+                else None
+            ),
             "avatar": _build_avatar_data(character_sheet, profile, current_weight),
         }
 
@@ -695,6 +731,7 @@ def refresh_buddy(profile, yesterday, today):
 # ==============================================================================
 # HANDLER
 # ==============================================================================
+
 
 def lambda_handler(event, context):
     try:

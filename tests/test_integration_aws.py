@@ -44,6 +44,7 @@ import json
 import os
 import sys
 import time
+
 import pytest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -60,11 +61,13 @@ SHARED_LAYER_MIN_VERSION = 4
 # BOTO3 AVAILABILITY + CREDENTIAL CHECK
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _get_boto3():
     """Return boto3 or skip if not available / no credentials."""
     try:
         import boto3
-        from botocore.exceptions import NoCredentialsError, ClientError
+        from botocore.exceptions import ClientError, NoCredentialsError
+
         # Quick credential check
         sts = boto3.client("sts", region_name=REGION)
         sts.get_caller_identity()
@@ -86,26 +89,26 @@ pytestmark = pytest.mark.integration
 
 # Expected handler mapping: function_name → expected_module_prefix
 EXPECTED_HANDLERS = {
-    "whoop-data-ingestion":         "whoop_lambda",
-    "garmin-data-ingestion":        "garmin_lambda",
-    "strava-data-ingestion":        "strava_lambda",
-    "withings-data-ingestion":      "withings_lambda",
-    "habitify-data-ingestion":      "habitify_lambda",
-    "eightsleep-data-ingestion":    "eightsleep_lambda",
-    "macrofactor-data-ingestion":   "macrofactor_lambda",
-    "todoist-data-ingestion":       "todoist_lambda",
-    "notion-journal-ingestion":     "notion_lambda",
-    "health-auto-export-webhook":   "health_auto_export_lambda",
-    "daily-brief":                  "daily_brief_lambda",
-    "weekly-digest":                "weekly_digest_lambda",
-    "life-platform-mcp":            "mcp_server",
+    "whoop-data-ingestion": "whoop_lambda",
+    "garmin-data-ingestion": "garmin_lambda",
+    "strava-data-ingestion": "strava_lambda",
+    "withings-data-ingestion": "withings_lambda",
+    "habitify-data-ingestion": "habitify_lambda",
+    "eightsleep-data-ingestion": "eightsleep_lambda",
+    "macrofactor-data-ingestion": "macrofactor_lambda",
+    "todoist-data-ingestion": "todoist_lambda",
+    "notion-journal-ingestion": "notion_lambda",
+    "health-auto-export-webhook": "health_auto_export_lambda",
+    "daily-brief": "daily_brief_lambda",
+    "weekly-digest": "weekly_digest_lambda",
+    "life-platform-mcp": "mcp_server",
     "life-platform-freshness-checker": "freshness_checker_lambda",
-    "character-sheet-compute":      "character_sheet_lambda",
-    "daily-metrics-compute":        "daily_metrics_compute_lambda",
-    "daily-insight-compute":        "daily_insight_compute_lambda",
-    "anomaly-detector":             "anomaly_detector_lambda",
-    "life-platform-canary":         "canary_lambda",
-    "life-platform-dlq-consumer":   "dlq_consumer_lambda",
+    "character-sheet-compute": "character_sheet_lambda",
+    "daily-metrics-compute": "daily_metrics_compute_lambda",
+    "daily-insight-compute": "daily_insight_compute_lambda",
+    "anomaly-detector": "anomaly_detector_lambda",
+    "life-platform-canary": "canary_lambda",
+    "life-platform-dlq-consumer": "dlq_consumer_lambda",
 }
 
 
@@ -115,11 +118,7 @@ def _load_not_deployed_functions():
     try:
         with open(map_path) as f:
             lmap = json.load(f)
-        return {
-            v["function"]
-            for v in lmap.get("lambdas", {}).values()
-            if isinstance(v, dict) and v.get("not_deployed")
-        }
+        return {v["function"] for v in lmap.get("lambdas", {}).values() if isinstance(v, dict) and v.get("not_deployed")}
     except Exception:
         return set()
 
@@ -155,17 +154,14 @@ def test_i1_lambda_handlers_match_expected():
             #   "ingestion.whoop_lambda.lambda_handler" → "whoop_lambda"
             #   "site_api_lambda.lambda_handler" (flat) → "site_api_lambda"
             handler_module_path = actual_handler.rsplit(".", 1)[0]  # strip entry point
-            actual_module = handler_module_path.rsplit(".", 1)[-1]   # basename
+            actual_module = handler_module_path.rsplit(".", 1)[-1]  # basename
 
             if actual_module == "lambda_function":
                 failures.append(
-                    f"{fn_name}: handler is 'lambda_function.lambda_handler' "
-                    f"(CDK reconcile regression — expected '{expected_module}')"
+                    f"{fn_name}: handler is 'lambda_function.lambda_handler' " f"(CDK reconcile regression — expected '{expected_module}')"
                 )
             elif actual_module != expected_module:
-                failures.append(
-                    f"{fn_name}: module '{actual_module}' != expected '{expected_module}'"
-                )
+                failures.append(f"{fn_name}: module '{actual_module}' != expected '{expected_module}'")
         except Exception as e:
             if "ResourceNotFoundException" in str(e):
                 failures.append(f"{fn_name}: Lambda does not exist in AWS")
@@ -221,10 +217,7 @@ def test_i2_lambda_layer_version_current():
             config = lc.get_function_configuration(FunctionName=fn_name)
             layers = config.get("Layers", [])
             layer_arns = [l["Arn"] for l in layers]
-            has_current = any(
-                f":{SHARED_LAYER_NAME}:{current_version}" in arn
-                for arn in layer_arns
-            )
+            has_current = any(f":{SHARED_LAYER_NAME}:{current_version}" in arn for arn in layer_arns)
             if not layer_arns:
                 stale.append(f"{fn_name}: NO layer attached at all")
             elif not has_current:
@@ -233,10 +226,7 @@ def test_i2_lambda_layer_version_current():
                 for arn in layer_arns:
                     if SHARED_LAYER_NAME in arn:
                         found_version = arn.split(":")[-1]
-                stale.append(
-                    f"{fn_name}: layer v{found_version} "
-                    f"(current is v{current_version})"
-                )
+                stale.append(f"{fn_name}: layer v{found_version} " f"(current is v{current_version})")
         except Exception:
             pass  # Lambda might not exist — I1 catches that
 
@@ -254,9 +244,9 @@ def test_i2_lambda_layer_version_current():
 # ══════════════════════════════════════════════════════════════════════════════
 
 SPOT_CHECK_LAMBDAS = [
-    "life-platform-canary",           # always safe to invoke
-    "life-platform-freshness-checker", # read-only, non-destructive
-    "life-platform-mcp",              # MCP health check (warmer path)
+    "life-platform-canary",  # always safe to invoke
+    "life-platform-freshness-checker",  # read-only, non-destructive
+    "life-platform-mcp",  # MCP health check (warmer path)
 ]
 
 
@@ -313,6 +303,7 @@ def test_i3_spot_check_lambda_invocability():
 # Root cause of: would be catastrophic data loss
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def test_i4_dynamodb_table_healthy():
     """I4: DynamoDB table exists, has deletion protection, and PITR enabled."""
     boto3 = _get_boto3()
@@ -336,12 +327,8 @@ def test_i4_dynamodb_table_healthy():
     # Check PITR
     try:
         pitr = ddb.describe_continuous_backups(TableName=TABLE_NAME)
-        pitr_status = (pitr["ContinuousBackupsDescription"]
-                       ["PointInTimeRecoveryDescription"]
-                       ["PointInTimeRecoveryStatus"])
-        assert pitr_status == "ENABLED", (
-            f"I4 FAIL: PITR is '{pitr_status}' (expected ENABLED) — no 35-day backup!"
-        )
+        pitr_status = pitr["ContinuousBackupsDescription"]["PointInTimeRecoveryDescription"]["PointInTimeRecoveryStatus"]
+        assert pitr_status == "ENABLED", f"I4 FAIL: PITR is '{pitr_status}' (expected ENABLED) — no 35-day backup!"
     except Exception as e:
         pytest.fail(f"I4 FAIL: Could not check PITR status: {e}")
 
@@ -393,14 +380,10 @@ def test_i5_required_secrets_exist():
         except Exception:
             pass  # Not found = correct
 
-    assert not missing, (
-        f"I5 FAIL: {len(missing)} required secret(s) missing or deleted:\n"
-        + "\n".join(f"  ❌ {s}" for s in missing)
-    )
+    assert not missing, f"I5 FAIL: {len(missing)} required secret(s) missing or deleted:\n" + "\n".join(f"  ❌ {s}" for s in missing)
 
-    assert not still_alive, (
-        f"I5 WARN: {len(still_alive)} secret(s) should have been deleted:\n"
-        + "\n".join(f"  ⚠️  {s}" for s in still_alive)
+    assert not still_alive, f"I5 WARN: {len(still_alive)} secret(s) should have been deleted:\n" + "\n".join(
+        f"  ⚠️  {s}" for s in still_alive
     )
 
 
@@ -519,6 +502,7 @@ def test_i8_s3_bucket_and_config_files():
 # Root cause of: 2026-03-08 P3 (DLQ messages accumulated for 2 days unnoticed)
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def test_i9_dlq_empty():
     """I9: Ingestion DLQ should have zero messages.
 
@@ -531,8 +515,7 @@ def test_i9_dlq_empty():
     try:
         attrs = sqs.get_queue_attributes(
             QueueUrl=DLQ_URL,
-            AttributeNames=["ApproximateNumberOfMessages",
-                             "ApproximateNumberOfMessagesNotVisible"],
+            AttributeNames=["ApproximateNumberOfMessages", "ApproximateNumberOfMessagesNotVisible"],
         )["Attributes"]
         visible = int(attrs.get("ApproximateNumberOfMessages", 0))
         in_flight = int(attrs.get("ApproximateNumberOfMessagesNotVisible", 0))
@@ -552,6 +535,7 @@ def test_i9_dlq_empty():
 # I10 — MCP Lambda responds to tool list (basic connectivity)
 # Root cause of: any MCP deploy issue blocks all Claude tool calls
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_i10_mcp_lambda_responds():
     """I10: MCP Lambda must respond to a basic invocation without structural errors.
@@ -627,6 +611,7 @@ def test_i11_data_reconciliation_running():
     # Step 2: CloudWatch log group has recent activity
     log_group = f"/aws/lambda/{DRECON_FUNCTION}"
     import time as _time
+
     cutoff_ms = int((_time.time() - DRECON_LOOKBACK_HOURS * 3600) * 1000)
 
     try:
@@ -647,14 +632,12 @@ def test_i11_data_reconciliation_running():
         pytest.skip(f"I11: Could not check CloudWatch logs: {e}")
 
     if not streams:
-        pytest.fail(
-            f"I11 FAIL: {DRECON_FUNCTION} log group exists but has no log streams. "
-            f"Lambda has never successfully run!"
-        )
+        pytest.fail(f"I11 FAIL: {DRECON_FUNCTION} log group exists but has no log streams. " f"Lambda has never successfully run!")
 
     last_event_ms = streams[0].get("lastEventTimestamp", 0)
     if last_event_ms < cutoff_ms:
         import datetime as _dt
+
         last_run = _dt.datetime.fromtimestamp(last_event_ms / 1000).strftime("%Y-%m-%d %H:%M UTC")
         pytest.fail(
             f"I11 FAIL: {DRECON_FUNCTION} last ran at {last_run} "
@@ -669,6 +652,7 @@ def test_i11_data_reconciliation_running():
 # Root cause it prevents: MCP server starts but tools return wrong shape
 # (IAM gap, schema mismatch, import error in tool function)
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_i12_mcp_tool_call_response_shape():
     """I12: MCP server must execute a representative tool call and return valid JSON
@@ -694,6 +678,7 @@ def test_i12_mcp_tool_call_response_shape():
 
     import hashlib
     import hmac as _hmac
+
     sig = _hmac.new(api_key.encode(), b"life-platform-bearer-v1", hashlib.sha256).hexdigest()
     bearer = f"lp_{sig}"
 
@@ -727,10 +712,7 @@ def test_i12_mcp_tool_call_response_shape():
 
     if "FunctionError" in response:
         raw = json.loads(response["Payload"].read())
-        pytest.fail(
-            f"I12 FAIL: MCP Lambda returned FunctionError: "
-            f"{raw.get('errorType')}: {raw.get('errorMessage', '')[:150]}"
-        )
+        pytest.fail(f"I12 FAIL: MCP Lambda returned FunctionError: " f"{raw.get('errorType')}: {raw.get('errorMessage', '')[:150]}")
 
     raw_body = json.loads(response["Payload"].read())
     body_str = raw_body.get("body", "")
@@ -742,28 +724,19 @@ def test_i12_mcp_tool_call_response_shape():
 
     # Validate JSON-RPC response shape
     assert "jsonrpc" in body, f"I12 FAIL: response missing 'jsonrpc' field: {body}"
-    assert "result" in body or "error" in body, (
-        f"I12 FAIL: response has neither 'result' nor 'error': {body}"
-    )
+    assert "result" in body or "error" in body, f"I12 FAIL: response has neither 'result' nor 'error': {body}"
 
     if "error" in body:
         # An RPC-level error (e.g. auth failure) is a real failure
-        pytest.fail(
-            f"I12 FAIL: MCP tool call returned RPC error: {body['error']}.\n"
-            "Check IAM permissions and Bearer token derivation."
-        )
+        pytest.fail(f"I12 FAIL: MCP tool call returned RPC error: {body['error']}.\n" "Check IAM permissions and Bearer token derivation.")
 
     result = body.get("result", {})
     content = result.get("content", [])
-    assert isinstance(content, list) and len(content) > 0, (
-        f"I12 FAIL: result.content is empty or not a list: {result}"
-    )
+    assert isinstance(content, list) and len(content) > 0, f"I12 FAIL: result.content is empty or not a list: {result}"
 
     # Content items must have type and text
     first = content[0]
-    assert first.get("type") == "text", (
-        f"I12 FAIL: content[0].type is not 'text': {first}"
-    )
+    assert first.get("type") == "text", f"I12 FAIL: content[0].type is not 'text': {first}"
     text = first.get("text", "")
     assert len(text) > 10, f"I12 FAIL: content[0].text is suspiciously short: {text!r}"
 
@@ -773,9 +746,7 @@ def test_i12_mcp_tool_call_response_shape():
     except json.JSONDecodeError as e:
         pytest.fail(f"I12 FAIL: tool result text is not valid JSON: {e}\nText: {text[:200]}")
 
-    assert isinstance(tool_result, dict), (
-        f"I12 FAIL: tool result is not a dict: {type(tool_result)}"
-    )
+    assert isinstance(tool_result, dict), f"I12 FAIL: tool result is not a dict: {type(tool_result)}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -813,8 +784,7 @@ def test_i13_freshness_checker_returns_valid_data():
     if "FunctionError" in response:
         payload = json.loads(response["Payload"].read())
         pytest.fail(
-            f"I13 FAIL: {FRESHNESS_FUNCTION} FunctionError: "
-            f"{payload.get('errorType')}: {payload.get('errorMessage', '')[:150]}"
+            f"I13 FAIL: {FRESHNESS_FUNCTION} FunctionError: " f"{payload.get('errorType')}: {payload.get('errorMessage', '')[:150]}"
         )
 
     raw = json.loads(response["Payload"].read())
@@ -830,13 +800,8 @@ def test_i13_freshness_checker_returns_valid_data():
         body = body_str
 
     # Must contain some freshness data — accept several possible shapes
-    has_sources = (
-        isinstance(body, dict)
-        and (
-            "sources" in body
-            or "freshness" in body
-            or any(src in str(body).lower() for src in _FRESHNESS_EXPECTED_SOURCES)
-        )
+    has_sources = isinstance(body, dict) and (
+        "sources" in body or "freshness" in body or any(src in str(body).lower() for src in _FRESHNESS_EXPECTED_SOURCES)
     )
 
     assert has_sources, (
@@ -910,9 +875,7 @@ def test_i14_canary_mcp_check_passes():
     try:
         body = json.loads(body_str)
     except (json.JSONDecodeError, TypeError) as e:
-        pytest.fail(
-            f"I14 FAIL: Canary response body is not valid JSON: {e}\nRaw: {str(raw_payload)[:300]}"
-        )
+        pytest.fail(f"I14 FAIL: Canary response body is not valid JSON: {e}\nRaw: {str(raw_payload)[:300]}")
 
     # Must report all_pass=True — any failure in the MCP check shows here
     all_pass = body.get("all_pass", False)
@@ -933,15 +896,12 @@ def test_i14_canary_mcp_check_passes():
     )
 
     # Verify MCP result has expected shape
-    assert mcp_result.get("ok") is True, (
-        f"I14 FAIL: MCP check did not return ok=True: {mcp_result}"
-    )
+    assert mcp_result.get("ok") is True, f"I14 FAIL: MCP check did not return ok=True: {mcp_result}"
 
     # Latency sanity check — MCP cold start should be < 10s
     latency_ms = mcp_result.get("latency_ms", 0)
     assert latency_ms < 10_000, (
-        f"I14 WARN: MCP latency {latency_ms}ms exceeds 10s — Lambda may be cold-starting "
-        f"or experiencing resource contention."
+        f"I14 WARN: MCP latency {latency_ms}ms exceeds 10s — Lambda may be cold-starting " f"or experiencing resource contention."
     )
 
 
@@ -952,6 +912,7 @@ def test_i14_canary_mcp_check_passes():
 # uncommented them and the deploy will fail).
 # Added 2026-05-24 per P1.2 of the holistic platform investment plan.
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.integration
 def test_i15_reserved_concurrency_guard():
@@ -964,6 +925,7 @@ def test_i15_reserved_concurrency_guard():
     quota (case 177921309700709).
     """
     import re
+
     boto3 = _get_boto3()
     lambda_client = boto3.client("lambda", region_name=REGION)
 
@@ -1021,6 +983,7 @@ def test_i15_reserved_concurrency_guard():
 # Added 2026-05-24 per P2.1 of the holistic platform investment plan.
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.integration
 def test_i16_recent_ingest_records_exist():
     """I16: at least 2 ingestion sources have today-or-yesterday DATE# records.
@@ -1039,6 +1002,7 @@ def test_i16_recent_ingest_records_exist():
     real user activity.
     """
     from datetime import datetime, timedelta, timezone
+
     boto3 = _get_boto3()
 
     sys.path.insert(0, os.path.join(ROOT, "lambdas"))
@@ -1083,6 +1047,7 @@ def test_i16_recent_ingest_records_exist():
 # day. Catches "compute Lambda silently failed; level stays frozen for days".
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.integration
 def test_i17_character_sheet_recent_record():
     """I17: a character_sheet record exists in the last 3 days with level ≥ 1.
@@ -1092,6 +1057,7 @@ def test_i17_character_sheet_recent_record():
     days to match that cadence rather than flaking every morning before 16:30 UTC.
     """
     from datetime import datetime, timedelta, timezone
+
     boto3 = _get_boto3()
 
     sys.path.insert(0, os.path.join(ROOT, "lambdas"))
@@ -1119,9 +1085,7 @@ def test_i17_character_sheet_recent_record():
                 f"I17 FAIL: character record exists for {date} but has no "
                 f"character_level/level attribute. Item keys: {sorted(item.keys())}"
             )
-            assert float(level_raw) >= 1, (
-                f"I17 FAIL: character level is {level_raw} on {date} — expected ≥ 1."
-            )
+            assert float(level_raw) >= 1, f"I17 FAIL: character level is {level_raw} on {date} — expected ≥ 1."
             return
 
     pytest.fail(
@@ -1137,10 +1101,12 @@ def test_i17_character_sheet_recent_record():
 # silent (no alarm if it raises in error-trapped section)".
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.integration
 def test_i18_daily_brief_recently_invoked():
     """I18: daily-brief Lambda has been invoked successfully in the past 48h."""
     from datetime import datetime, timedelta, timezone
+
     boto3 = _get_boto3()
 
     sys.path.insert(0, os.path.join(ROOT, "lambdas"))
@@ -1165,10 +1131,7 @@ def test_i18_daily_brief_recently_invoked():
         Statistics=["Sum"],
     )
     total = sum(p["Sum"] for p in resp.get("Datapoints", []))
-    assert total >= 1, (
-        f"I18 FAIL: daily-brief has 0 invocations in the last 48h. "
-        f"Check EventBridge rule + Lambda permissions."
-    )
+    assert total >= 1, f"I18 FAIL: daily-brief has 0 invocations in the last 48h. " f"Check EventBridge rule + Lambda permissions."
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1178,10 +1141,12 @@ def test_i18_daily_brief_recently_invoked():
 # silently breaks the homepage with no Lambda error.
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.integration
 def test_i19_site_api_journey_contract():
     """I19: /api/journey returns the expected fields with sensible values."""
     import urllib.request
+
     sys.path.insert(0, os.path.join(ROOT, "lambdas"))
     from constants import EXPERIMENT_START_DATE
 
@@ -1196,17 +1161,11 @@ def test_i19_site_api_journey_contract():
         pytest.skip(f"I19 SKIP: /api/journey unreachable: {e}")
 
     # Contract: top-level wrapper.
-    assert "journey" in body, (
-        f"I19 FAIL: /api/journey missing 'journey' wrapper key. "
-        f"Got keys: {sorted(body.keys())}"
-    )
+    assert "journey" in body, f"I19 FAIL: /api/journey missing 'journey' wrapper key. " f"Got keys: {sorted(body.keys())}"
     j = body["journey"]
     required = ["started_date", "start_weight_lbs", "current_weight_lbs", "goal_weight_lbs"]
     missing = [k for k in required if k not in j]
-    assert not missing, (
-        f"I19 FAIL: /api/journey.journey missing fields: {missing}\n"
-        f"Got keys: {sorted(j.keys())}"
-    )
+    assert not missing, f"I19 FAIL: /api/journey.journey missing fields: {missing}\n" f"Got keys: {sorted(j.keys())}"
 
     # Cross-check started_date matches our deployed constants.
     assert j["started_date"] == EXPERIMENT_START_DATE, (
@@ -1227,6 +1186,7 @@ def test_i19_site_api_journey_contract():
 # bug class is back. Catches "DDB read returns a 2026-04 record because someone
 # forgot to phase-tag a partition".
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.integration
 def test_i20_pre_genesis_records_are_phase_tagged():
@@ -1270,14 +1230,12 @@ def test_i20_pre_genesis_records_are_phase_tagged():
                 untagged_pre_genesis.append(f"{pk} {sk_raw} phase={phase!r}")
 
     if checked == 0:
-        pytest.skip(
-            "I20 SKIP: no pre-genesis records found in sample (table may "
-            "be empty pre-launch — that's also fine)"
-        )
+        pytest.skip("I20 SKIP: no pre-genesis records found in sample (table may " "be empty pre-launch — that's also fine)")
 
     assert not untagged_pre_genesis, (
         f"I20 FAIL: {len(untagged_pre_genesis)} pre-genesis records lack "
-        f"phase='pilot' tag:\n  " + "\n  ".join(untagged_pre_genesis[:5])
+        f"phase='pilot' tag:\n  "
+        + "\n  ".join(untagged_pre_genesis[:5])
         + (f"\n  ... ({len(untagged_pre_genesis) - 5} more)" if len(untagged_pre_genesis) > 5 else "")
         + "\n\nFix: rerun deploy/restart_phase_tag.py --apply"
     )
@@ -1291,13 +1249,14 @@ def test_i20_pre_genesis_records_are_phase_tagged():
 # Catches the "site_api warm cache held stale weight" class of bug.
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.integration
 def test_i21_ddb_profile_matches_constants():
     """I21: USER#matthew PROFILE#v1 fields must match lambdas/constants.py."""
     boto3 = _get_boto3()
 
     sys.path.insert(0, os.path.join(ROOT, "lambdas"))
-    from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS
+    from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE
 
     ddb = boto3.client("dynamodb", region_name=REGION)
     resp = ddb.get_item(
@@ -1331,6 +1290,7 @@ def test_i21_ddb_profile_matches_constants():
 
 if __name__ == "__main__":
     import subprocess
+
     result = subprocess.run(
         ["python3", "-m", "pytest", __file__, "-v", "--tb=short", "-m", "integration"],
         cwd=ROOT,

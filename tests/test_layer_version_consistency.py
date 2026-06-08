@@ -32,6 +32,7 @@ import json
 import os
 import re
 import sys
+
 import pytest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -42,6 +43,7 @@ SHARED_LAYER_NAME = "life-platform-shared-utils"
 
 
 # ── Load lambda_map.json ──────────────────────────────────────────────────────
+
 
 def _load_lambda_map():
     with open(LAMBDA_MAP_PATH) as f:
@@ -54,6 +56,7 @@ _LAYER_CONSUMERS = _MAP.get("shared_layer", {}).get("consumers", [])
 
 
 # ── CDK source files ──────────────────────────────────────────────────────────
+
 
 def _get_cdk_python_sources():
     """Return .py files in cdk/stacks/, excluding constants.py.
@@ -92,6 +95,7 @@ _CDK_SOURCE = _read_cdk_sources()
 # LV1 — CDK references layer by name, not hardcoded ARN/version
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def test_lv1_cdk_uses_layer_name_not_hardcoded_arn():
     """LV1: CDK stacks must reference the shared layer by name lookup, not a
     hardcoded ARN with a version number embedded.
@@ -109,9 +113,7 @@ def test_lv1_cdk_uses_layer_name_not_hardcoded_arn():
         pytest.skip("No CDK stack sources found in cdk/stacks/")
 
     # Pattern: hardcoded layer ARN with a specific version (ends in :N)
-    hardcoded_arn_re = re.compile(
-        r"arn:aws:lambda:[^:]+:[^:]+:layer:" + re.escape(SHARED_LAYER_NAME) + r":\d+"
-    )
+    hardcoded_arn_re = re.compile(r"arn:aws:lambda:[^:]+:[^:]+:layer:" + re.escape(SHARED_LAYER_NAME) + r":\d+")
     matches = hardcoded_arn_re.findall(_CDK_SOURCE)
 
     assert not matches, (
@@ -125,6 +127,7 @@ def test_lv1_cdk_uses_layer_name_not_hardcoded_arn():
 # ══════════════════════════════════════════════════════════════════════════════
 # LV2 — All lambda_map.json consumers appear in CDK source
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_lv2_all_consumers_referenced_in_cdk():
     """LV2: Every consumer listed in ci/lambda_map.json shared_layer.consumers
@@ -159,6 +162,7 @@ def test_lv2_all_consumers_referenced_in_cdk():
 # LV3 — All layer module source files exist on disk
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def test_lv3_all_layer_modules_exist_on_disk():
     """LV3: Every module listed in ci/lambda_map.json shared_layer.modules must
     have a corresponding source file on disk.
@@ -192,6 +196,7 @@ def test_lv3_all_layer_modules_exist_on_disk():
 # LV4 — shared_layer.modules must match build_layer.sh
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def test_lv4_layer_modules_match_build_script():
     """LV4: ci/lambda_map.json shared_layer.modules must exactly match the
     MODULES list in deploy/build_layer.sh (the source of truth for what ships
@@ -203,6 +208,7 @@ def test_lv4_layer_modules_match_build_script():
     they had drifted by 10 modules (bedrock_client, phase_filter, numeric, …).
     """
     import re
+
     build_sh = os.path.join(ROOT, "deploy", "build_layer.sh")
     inblock = False
     build_mods = set()
@@ -231,6 +237,7 @@ def test_lv4_layer_modules_match_build_script():
 # LV5 — Layer version only in constants
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def test_lv5_layer_version_only_in_constants():
     """LV5: The hardcoded layer version number must only appear in constants.py,
     not copied into individual stack files.
@@ -243,9 +250,7 @@ def test_lv5_layer_version_only_in_constants():
     if not _CDK_SOURCE:
         pytest.skip("No CDK stack sources found in cdk/stacks/")
 
-    hardcoded_re = re.compile(
-        r"arn:aws:lambda:[^:]+:[^:]+:layer:" + re.escape(SHARED_LAYER_NAME) + r":\d+"
-    )
+    hardcoded_re = re.compile(r"arn:aws:lambda:[^:]+:[^:]+:layer:" + re.escape(SHARED_LAYER_NAME) + r":\d+")
     matches = hardcoded_re.findall(_CDK_SOURCE)
 
     assert not matches, (
@@ -275,6 +280,7 @@ def test_lv4_consumer_count_sanity():
 # ══════════════════════════════════════════════════════════════════════════════
 # LV6 — CDK constant matches latest published layer (AWS-aware, V2 P0.2 follow-up)
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.integration
 def test_lv6_cdk_constant_matches_latest_published_layer():
@@ -327,6 +333,7 @@ def test_lv6_cdk_constant_matches_latest_published_layer():
 
 if __name__ == "__main__":
     import subprocess
+
     result = subprocess.run(
         ["python3", "-m", "pytest", __file__, "-v", "--tb=short"],
         cwd=ROOT,

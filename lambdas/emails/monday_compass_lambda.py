@@ -26,8 +26,9 @@ v1.0.0 — 2026-03-08
 """
 
 import json
-import os
 import logging
+import os
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 import time
@@ -38,8 +39,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-
-from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 _logger_std = logging.getLogger()
@@ -67,6 +67,7 @@ _TODOIST_BASE = "https://api.todoist.com/api/v1"
 # Optional shared modules (bundled in zip)
 try:
     import board_loader
+
     _HAS_BOARD_LOADER = True
 except ImportError:
     _HAS_BOARD_LOADER = False
@@ -74,6 +75,7 @@ except ImportError:
 
 try:
     import insight_writer
+
     insight_writer.init(table, USER_ID)
     _HAS_INSIGHT_WRITER = True
 except ImportError:
@@ -81,7 +83,8 @@ except ImportError:
 
 # AI-3: Output validation
 try:
-    from ai_output_validator import validate_ai_output, AIOutputType
+    from ai_output_validator import AIOutputType, validate_ai_output
+
     _HAS_AI_VALIDATOR = True
 except ImportError:
     _HAS_AI_VALIDATOR = False
@@ -89,47 +92,54 @@ except ImportError:
 # OBS-1: Structured logger
 try:
     from platform_logger import get_logger
+
     logger = get_logger("monday-compass")
 except ImportError:
     import logging as _log
+
     logger = _log.getLogger("monday-compass")
     logger.setLevel(_log.INFO)
 
 # ── Default project→pillar mapping (overridden by S3 config if present) ──────
 _DEFAULT_PROJECT_PILLAR_MAP = {
-    "Health & Body":    "movement",
-    "Health":           "movement",
-    "Nutrition":        "nutrition",
-    "Sleep":            "sleep",
-    "Mind":             "mind",
-    "Meditation":       "mind",
-    "Relationships":    "relationships",
-    "Social":           "relationships",
-    "Finance":          "metabolic",
-    "Work":             "consistency",
-    "Career":           "consistency",
-    "Home":             "consistency",
-    "Admin":            "consistency",
-    "Personal":         "consistency",
-    "Growth":           "mind",
-    "Learning":         "mind",
-    "Inbox":            "consistency",
+    "Health & Body": "movement",
+    "Health": "movement",
+    "Nutrition": "nutrition",
+    "Sleep": "sleep",
+    "Mind": "mind",
+    "Meditation": "mind",
+    "Relationships": "relationships",
+    "Social": "relationships",
+    "Finance": "metabolic",
+    "Work": "consistency",
+    "Career": "consistency",
+    "Home": "consistency",
+    "Admin": "consistency",
+    "Personal": "consistency",
+    "Growth": "mind",
+    "Learning": "mind",
+    "Inbox": "consistency",
 }
 
 _PILLAR_EMOJIS = {
-    "sleep":        "😴",
-    "movement":     "🏃",
-    "nutrition":    "🥗",
-    "mind":         "🧠",
-    "metabolic":    "📈",
-    "consistency":  "🔗",
+    "sleep": "😴",
+    "movement": "🏃",
+    "nutrition": "🥗",
+    "mind": "🧠",
+    "metabolic": "📈",
+    "consistency": "🔗",
     "relationships": "❤️",
-    "general":      "📌",
+    "general": "📌",
 }
 
 _PILLAR_WEIGHTS = {
-    "sleep": 20, "movement": 18, "nutrition": 18,
-    "mind": 15, "metabolic": 12, "consistency": 10, "relationships": 7,
+    "sleep": 20,
+    "movement": 18,
+    "nutrition": 18,
+    "mind": 15,
+    "metabolic": 12,
+    "consistency": 10,
+    "relationships": 7,
 }
 
 
@@ -137,22 +147,31 @@ _PILLAR_WEIGHTS = {
 # HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def d2f(obj):
-    if isinstance(obj, list): return [d2f(i) for i in obj]
-    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [d2f(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
+
 
 def safe_float(rec, field, default=None):
     if rec and field in rec:
-        try: return float(rec[field])
-        except Exception: return default
+        try:
+            return float(rec[field])
+        except Exception:
+            return default
     return default
+
 
 def get_secret():
     """ADR-062: Bedrock IAM auth — sentinel dict. Only anthropic_api_key is
     read downstream (line ~792); see task #90 for full removal."""
     return {"anthropic_api_key": "_BEDROCK_IAM_"}
+
 
 def fetch_profile():
     try:
@@ -162,14 +181,13 @@ def fetch_profile():
         logger.warning(f"Profile fetch failed: {e}")
         return {}
 
+
 def query_source(source, start_date, end_date):
     pk = f"USER#{USER_ID}#SOURCE#{source}"
     items = []
     kwargs = {
         "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-        "ExpressionAttributeValues": {
-            ":pk": pk, ":s": f"DATE#{start_date}", ":e": f"DATE#{end_date}"
-        },
+        "ExpressionAttributeValues": {":pk": pk, ":s": f"DATE#{start_date}", ":e": f"DATE#{end_date}"},
     }
     while True:
         resp = table.query(**with_phase_filter(kwargs))
@@ -179,24 +197,28 @@ def query_source(source, start_date, end_date):
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
     return sorted(items, key=lambda x: x.get("date", ""))
 
+
 def query_source_latest(source):
     """Get the most recent record for a source."""
     pk = f"USER#{USER_ID}#SOURCE#{source}"
-    resp = table.query(**with_phase_filter({
-        "KeyConditionExpression": "pk = :pk",
-        "ExpressionAttributeValues": {":pk": pk},
-        "ScanIndexForward": False,
-        "Limit": 1,
-    }))
+    resp = table.query(
+        **with_phase_filter(
+            {
+                "KeyConditionExpression": "pk = :pk",
+                "ExpressionAttributeValues": {":pk": pk},
+                "ScanIndexForward": False,
+                "Limit": 1,
+            }
+        )
+    )
     items = resp.get("Items", [])
     return d2f(items[0]) if items else {}
+
 
 def load_project_pillar_map():
     """Load project→pillar mapping from S3. Falls back to default if not found."""
     try:
-        resp = s3_client.get_object(
-            Bucket=S3_BUCKET, Key="config/project_pillar_map.json"
-        )
+        resp = s3_client.get_object(Bucket=S3_BUCKET, Key="config/project_pillar_map.json")
         return json.loads(resp["Body"].read().decode("utf-8"))
     except Exception as e:
         logger.info(f"S3 project_pillar_map not found — using defaults: {e}")
@@ -207,11 +229,13 @@ def load_project_pillar_map():
 # TODOIST API
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _todoist_request(method, path, payload=None, token=None):
     url = _TODOIST_BASE + path
     data = json.dumps(payload).encode("utf-8") if payload else None
     req = urllib.request.Request(
-        url, data=data,
+        url,
+        data=data,
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
         method=method,
     )
@@ -222,6 +246,7 @@ def _todoist_request(method, path, payload=None, token=None):
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"Todoist {method} {path} → {e.code}: {body[:200]}")
+
 
 def _fetch_tasks_with_filter(filter_str, token, limit=200):
     """Fetch tasks matching a Todoist filter string (paginated)."""
@@ -246,6 +271,7 @@ def _fetch_tasks_with_filter(filter_str, token, limit=200):
             break
     return all_tasks
 
+
 def _fetch_projects(token):
     try:
         result = _todoist_request("GET", "/projects", token=token)
@@ -254,6 +280,7 @@ def _fetch_projects(token):
     except Exception as e:
         logger.warning(f"Todoist projects fetch failed: {e}")
         return {}
+
 
 def gather_todoist_data(token):
     """Fetch due-this-week tasks, overdue tasks, and project map."""
@@ -299,6 +326,7 @@ def gather_todoist_data(token):
 # HEALTH DATA GATHERING
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def gather_health_data():
     """Pull Monday readiness, last week grades, and Character Sheet from DDB."""
     today = datetime.now(timezone.utc).date()
@@ -336,6 +364,7 @@ def gather_health_data():
 # DATA PROCESSING
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _group_tasks_by_pillar(tasks, pillar_map):
     """Group tasks by pillar using project→pillar mapping."""
     groups = {}
@@ -364,8 +393,10 @@ def _group_tasks_by_pillar(tasks, pillar_map):
         groups[pillar].append(task)
     return groups
 
+
 def _priority_label(p):
     return {1: "🔴 P1", 2: "🟠 P2", 3: "🟡 P3", 4: ""}.get(p, "")
+
 
 def _due_label(due):
     if not due:
@@ -375,12 +406,16 @@ def _due_label(due):
         due_date = datetime.strptime(date_str[:10], "%Y-%m-%d").date()
         today = datetime.now(timezone.utc).date()
         delta = (due_date - today).days
-        if delta == 0: return "· due today"
-        if delta == 1: return "· due tomorrow"
-        if delta < 0: return f"· {abs(delta)}d overdue"
+        if delta == 0:
+            return "· due today"
+        if delta == 1:
+            return "· due tomorrow"
+        if delta < 0:
+            return f"· {abs(delta)}d overdue"
         return f"· {due_date.strftime('%a')}"
     except Exception:
         return ""
+
 
 def build_week_state_summary(health_data, profile):
     """Build human-readable week state for prompt and email."""
@@ -431,6 +466,7 @@ def build_week_state_summary(health_data, profile):
         "week_num": week_num,
     }
 
+
 def _compute_week_num(profile):
     try:
         start = datetime.strptime(profile.get("journey_start_date", EXPERIMENT_START_DATE), "%Y-%m-%d").date()
@@ -443,6 +479,7 @@ def _compute_week_num(profile):
 # ══════════════════════════════════════════════════════════════════════════════
 # BOARD PRO TIPS (config-driven)
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _build_board_context_for_compass(week_state, todoist_data):
     """Build Board of Directors context for weekly planning."""
@@ -460,8 +497,12 @@ def _build_board_context_for_compass(week_state, todoist_data):
     priority_members = ["rodriguez"]
 
     pillar_to_member = {
-        "sleep": "park", "movement": "chen", "nutrition": "webb",
-        "mind": "conti", "metabolic": "attia", "relationships": "murthy",
+        "sleep": "park",
+        "movement": "chen",
+        "nutrition": "webb",
+        "mind": "conti",
+        "metabolic": "attia",
+        "relationships": "murthy",
         "consistency": "the_chair",
     }
     pillar_member = pillar_to_member.get(weakest, "the_chair")
@@ -498,6 +539,7 @@ def _build_board_context_for_compass(week_state, todoist_data):
 
     return "\n".join(lines)
 
+
 def _fallback_board_context(week_state):
     weakest = week_state.get("weakest_pillar", "consistency")
     return (
@@ -513,9 +555,11 @@ def _fallback_board_context(week_state):
 # AI CALL
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def call_anthropic(system_prompt, user_message, api_key, max_tokens=3000):
     # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
     import retry_utils
+
     return retry_utils.call_anthropic_api(
         prompt=user_message,
         api_key=api_key,
@@ -597,8 +641,7 @@ Format it as a clear call-to-action. Bold the actual action. End with why this o
 - This email is read Monday morning before the week starts. It should feel like a strategic briefing, not a review."""
 
 
-def build_user_message(week_state, todoist_data, health_data, profile,
-                       pillar_map, board_context):
+def build_user_message(week_state, todoist_data, health_data, profile, pillar_map, board_context):
     """Assemble the full data payload for the AI."""
     today = datetime.now(timezone.utc).date()
 
@@ -614,8 +657,7 @@ def build_user_message(week_state, todoist_data, health_data, profile,
     )
 
     pillar_block = []
-    for p, score in sorted(week_state.get("pillar_scores", {}).items(),
-                            key=lambda x: x[1]):
+    for p, score in sorted(week_state.get("pillar_scores", {}).items(), key=lambda x: x[1]):
         emoji = _PILLAR_EMOJIS.get(p, "📌")
         pillar_block.append(f"  {emoji} {p.capitalize()}: {score:.0f}/100")
 
@@ -632,17 +674,19 @@ def build_user_message(week_state, todoist_data, health_data, profile,
             content = t.get("content", "Untitled")
             proj = t.get("project_name", "")
             parts = [content]
-            if p_label: parts.append(p_label)
-            if due_label: parts.append(due_label)
-            if proj: parts.append(f"[{proj}]")
+            if p_label:
+                parts.append(p_label)
+            if due_label:
+                parts.append(due_label)
+            if proj:
+                parts.append(f"[{proj}]")
             lines.append("    - " + " ".join(parts))
         if len(tasks) > max_count:
             lines.append(f"    ... +{len(tasks) - max_count} more")
         return "\n".join(lines)
 
     task_block = []
-    for pillar in ["sleep", "movement", "nutrition", "mind", "metabolic",
-                   "consistency", "relationships", "general"]:
+    for pillar in ["sleep", "movement", "nutrition", "mind", "metabolic", "consistency", "relationships", "general"]:
         tasks = due_groups.get(pillar, [])
         if not tasks:
             continue
@@ -672,18 +716,15 @@ def build_user_message(week_state, todoist_data, health_data, profile,
     grades = health_data.get("day_grades", [])
     grade_line = ""
     if grades:
-        scores = [(g.get("date", ""), g.get("day_grade"), g.get("grade_label", ""))
-                  for g in grades if g.get("day_grade") is not None]
-        grade_line = "Last 7 day grades: " + ", ".join(
-            f"{d[5:]} {v:.0f} ({lbl})" for d, v, lbl in scores[-7:]
-        )
+        scores = [(g.get("date", ""), g.get("day_grade"), g.get("grade_label", "")) for g in grades if g.get("day_grade") is not None]
+        grade_line = "Last 7 day grades: " + ", ".join(f"{d[5:]} {v:.0f} ({lbl})" for d, v, lbl in scores[-7:])
 
     insights_ctx = ""
     if _HAS_INSIGHT_WRITER:
         try:
             insights_ctx = insight_writer.build_insights_context(
-                days=7, max_items=3,
-                label="RECENT PLATFORM INSIGHTS (context for planning)")
+                days=7, max_items=3, label="RECENT PLATFORM INSIGHTS (context for planning)"
+            )
         except Exception as e:
             logger.warning(f"IC-16 insights failed: {e}")
 
@@ -730,6 +771,7 @@ Write the Monday Compass email now. All 6 sections. Ground every recommendation 
 # EMAIL HTML WRAPPER
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def build_email_html(ai_content, week_state, today_str):
     try:
         dt = datetime.strptime(today_str, "%Y-%m-%d")
@@ -743,13 +785,9 @@ def build_email_html(ai_content, week_state, today_str):
     week_num = week_state.get("week_num", 1)
 
     recovery_str = f"{recovery:.0f}%" if recovery is not None else "—"
-    recovery_color = (
-        "#4ade80" if recovery and recovery >= 67 else
-        "#fb923c" if recovery and recovery >= 34 else
-        "#f87171"
-    )
+    recovery_color = "#4ade80" if recovery and recovery >= 67 else "#fb923c" if recovery and recovery >= 34 else "#f87171"
 
-    return f'''<div style="max-width:600px;margin:0 auto;background:#1a1a2e;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:20px;color:#e0e0e0;">
+    return f"""<div style="max-width:600px;margin:0 auto;background:#1a1a2e;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:20px;color:#e0e0e0;">
   <div style="text-align:center;margin-bottom:28px;">
     <div style="font-size:11px;letter-spacing:2px;color:#6366f1;font-weight:600;margin-bottom:4px;">LIFE PLATFORM · WEEK {week_num}</div>
     <div style="font-size:23px;font-weight:700;color:#ffffff;">🧭 The Monday Compass</div>
@@ -764,7 +802,7 @@ def build_email_html(ai_content, week_state, today_str):
     <div style="color:#6b7280;font-size:11px;">The Monday Compass · Life Platform · Weekly Planning Edition</div>
     <div style="color:#9ca3af;font-size:9px;margin-top:6px;">⚕️ Personal health tracking only &mdash; not medical advice. Consult a qualified healthcare professional before making changes to your diet, exercise, or supplement regimen.</div>
   </div>
-</div>'''
+</div>"""
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -775,15 +813,18 @@ def build_email_html(ai_content, week_state, today_str):
 def record_email_send(table, lambda_name):
     """Write a completion record so the status page can track last send."""
     import time as _time
+
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     try:
-        table.put_item(Item={
-            "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
-            "sk": f"DATE#{today}",
-            "sent_at": datetime.now(timezone.utc).isoformat(),
-            "status": "success",
-            "ttl": int(_time.time()) + 86400 * 90
-        })
+        table.put_item(
+            Item={
+                "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
+                "sk": f"DATE#{today}",
+                "sent_at": datetime.now(timezone.utc).isoformat(),
+                "status": "success",
+                "ttl": int(_time.time()) + 86400 * 90,
+            }
+        )
     except Exception as e:
         logger.info(f"[status-tracking] Non-fatal write failure: {e}")
 
@@ -820,9 +861,7 @@ def lambda_handler(event, context):
     week_state = build_week_state_summary(health_data, profile)
     board_context = _build_board_context_for_compass(week_state, todoist_data)
 
-    user_message, journey_context = build_user_message(
-        week_state, todoist_data, health_data, profile, pillar_map, board_context
-    )
+    user_message, journey_context = build_user_message(week_state, todoist_data, health_data, profile, pillar_map, board_context)
     system = SYSTEM_PROMPT.format(journey_context=journey_context)
 
     try:
@@ -831,7 +870,7 @@ def lambda_handler(event, context):
         logger.error(f"Anthropic failed: {e}")
         ai_content = (
             '<div style="background:#16213e;border-radius:8px;padding:20px;color:#e0e0e0;">'
-            'Monday Compass AI unavailable this week. Check CloudWatch logs.</div>'
+            "Monday Compass AI unavailable this week. Check CloudWatch logs.</div>"
         )
 
     # AI-3: Validate output before rendering
@@ -839,7 +878,10 @@ def lambda_handler(event, context):
         _val = validate_ai_output(ai_content, AIOutputType.WEEKLY_DIGEST)
         if _val.blocked:
             logger.error(f"[AI-3] Monday Compass output BLOCKED: {_val.block_reason}")
-            ai_content = _val.safe_fallback or '<div style="background:#16213e;border-radius:8px;padding:20px;color:#e0e0e0;">Monday Compass AI unavailable. Check CloudWatch logs.</div>'
+            ai_content = (
+                _val.safe_fallback
+                or '<div style="background:#16213e;border-radius:8px;padding:20px;color:#e0e0e0;">Monday Compass AI unavailable. Check CloudWatch logs.</div>'
+            )
         elif _val.warnings:
             logger.warning(f"[AI-3] Monday Compass warnings: {_val.warnings}")
 
@@ -857,10 +899,12 @@ def lambda_handler(event, context):
     ses.send_email(
         FromEmailAddress=SENDER,
         Destination={"ToAddresses": [RECIPIENT]},
-        Content={"Simple": {
-            "Subject": {"Data": subject, "Charset": "UTF-8"},
-            "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
-        }},
+        Content={
+            "Simple": {
+                "Subject": {"Data": subject, "Charset": "UTF-8"},
+                "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
+            }
+        },
     )
     logger.info(f"Sent: {subject}")
 
@@ -883,11 +927,13 @@ def lambda_handler(event, context):
     record_email_send(table, "monday_compass")
     return {
         "statusCode": 200,
-        "body": json.dumps({
-            "email": subject,
-            "tasks_due_this_week": todoist_data.get("total_due_this_week", 0),
-            "overdue": todoist_data.get("total_overdue", 0),
-            "week_num": week_state.get("week_num", 1),
-            "char_level": week_state.get("char_level", 1),
-        })
+        "body": json.dumps(
+            {
+                "email": subject,
+                "tasks_due_this_week": todoist_data.get("total_due_this_week", 0),
+                "overdue": todoist_data.get("total_overdue", 0),
+                "week_num": week_state.get("week_num", 1),
+                "char_level": week_state.get("char_level", 1),
+            }
+        ),
     }

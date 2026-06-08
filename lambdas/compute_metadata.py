@@ -85,7 +85,7 @@ def _infer_phase_from_record(record: dict) -> str:
     phase constant (typically "experiment").
     """
     try:
-        from constants import EXPERIMENT_START_DATE, EXPERIMENT_PHASE_CURRENT
+        from constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE
     except ImportError:
         return "experiment"  # Layer not loaded (local test) — safe default
     sk = record.get("sk", "")
@@ -107,15 +107,17 @@ def _emit_write_metric(source_id: str) -> None:
             _CW = boto3.client("cloudwatch", region_name=os.environ.get("AWS_REGION", "us-west-2"))
         _CW.put_metric_data(
             Namespace="LifePlatform/Compute",
-            MetricData=[{
-                "MetricName": "RecordWritten",
-                "Dimensions": [
-                    {"Name": "Source", "Value": source_id},
-                    {"Name": "LambdaFunction", "Value": _LAMBDA_NAME},
-                ],
-                "Value": 1.0,
-                "Unit": "Count",
-            }],
+            MetricData=[
+                {
+                    "MetricName": "RecordWritten",
+                    "Dimensions": [
+                        {"Name": "Source", "Value": source_id},
+                        {"Name": "LambdaFunction", "Value": _LAMBDA_NAME},
+                    ],
+                    "Value": 1.0,
+                    "Unit": "Count",
+                }
+            ],
         )
     except Exception:
         pass  # Non-fatal; metric emit failure shouldn't block writes

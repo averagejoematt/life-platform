@@ -1,30 +1,55 @@
 """
 Training tools: load, PRs, correlation, seasonal, periodization, recommendation, HR recovery.
 """
+
 import json
+import logging
 import math
 import re
-import logging
-from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 
 from mcp.config import (
-    table, s3_client, S3_BUCKET, USER_PREFIX, USER_ID, SOURCES,
-    P40_GROUPS, FIELD_ALIASES, logger,
-    INSIGHTS_PK, EXPERIMENTS_PK, TRAVEL_PK,
+    EXPERIMENTS_PK,
+    FIELD_ALIASES,
+    INSIGHTS_PK,
+    P40_GROUPS,
+    S3_BUCKET,
+    SOURCES,
+    TRAVEL_PK,
+    USER_ID,
+    USER_PREFIX,
+    logger,
+    s3_client,
+    table,
 )
 from mcp.core import (
-    query_source, parallel_query_sources, query_source_range,
-    get_profile, get_sot, decimal_to_float,
-    ddb_cache_get, ddb_cache_set, mem_cache_get, mem_cache_set,
-    date_diff_days, resolve_field,
+    date_diff_days,
+    ddb_cache_get,
+    ddb_cache_set,
+    decimal_to_float,
+    get_profile,
+    get_sot,
+    mem_cache_get,
+    mem_cache_set,
+    parallel_query_sources,
+    query_source,
+    query_source_range,
+    resolve_field,
 )
 from mcp.helpers import (
-    aggregate_items, flatten_strava_activity,
-    compute_daily_load_score, compute_ewa, pearson_r, _linear_regression,
-    classify_day_type, query_chronicling, _habit_series,
+    _habit_series,
+    _linear_regression,
+    aggregate_items,
+    classify_day_type,
+    compute_daily_load_score,
+    compute_ewa,
+    flatten_strava_activity,
+    pearson_r,
+    query_chronicling,
 )
 from mcp.tools_correlation import tool_get_zone2_breakdown
+
 
 def tool_get_training_load(args):
     end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
@@ -78,16 +103,18 @@ def tool_get_training_load(args):
         elif tsb < -25:
             form = "very fatigued — recovery priority"
 
-        result_rows.append({
-            "date":           date_str,
-            "daily_load":     round(load_by_date.get(date_str, 0.0), 1),
-            "ctl_fitness":    ctl,
-            "atl_fatigue":    atl,
-            "tsb_form":       tsb,
-            "acwr":           acwr,
-            "injury_risk":    risk,
-            "form_status":    form,
-        })
+        result_rows.append(
+            {
+                "date": date_str,
+                "daily_load": round(load_by_date.get(date_str, 0.0), 1),
+                "ctl_fitness": ctl,
+                "atl_fatigue": atl,
+                "tsb_form": tsb,
+                "acwr": acwr,
+                "injury_risk": risk,
+                "form_status": form,
+            }
+        )
 
     if not result_rows:
         return {"error": "No training data found for the requested window."}
@@ -101,7 +128,7 @@ def tool_get_training_load(args):
     if len(last_7_loads) >= 7:
         mean_7 = sum(last_7_loads) / len(last_7_loads)
         var_7 = sum((x - mean_7) ** 2 for x in last_7_loads) / len(last_7_loads)
-        sd_7 = var_7 ** 0.5 if var_7 > 0 else 0
+        sd_7 = var_7**0.5 if var_7 > 0 else 0
         monotony = round(mean_7 / sd_7, 2) if sd_7 > 0 else None
         weekly_strain = round(sum(last_7_loads) * monotony, 1) if monotony else None
         monotony_result = {
@@ -111,12 +138,12 @@ def tool_get_training_load(args):
         }
 
     return {
-        "model":          "Banister Impulse-Response (CTL=42d EWA, ATL=7d EWA)",
-        "load_proxy":     "kJ (cycling) > TRIMP (HR×time) > distance+elevation estimate",
-        "current_state":  latest,
-        "peak_fitness":   {"ctl": peak_ctl["ctl_fitness"], "date": peak_ctl["date"]},
-        "monotony":       monotony_result,
-        "series":         result_rows,
+        "model": "Banister Impulse-Response (CTL=42d EWA, ATL=7d EWA)",
+        "load_proxy": "kJ (cycling) > TRIMP (HR×time) > distance+elevation estimate",
+        "current_state": latest,
+        "peak_fitness": {"ctl": peak_ctl["ctl_fitness"], "date": peak_ctl["date"]},
+        "monotony": monotony_result,
+        "series": result_rows,
         "interpretation": {
             "CTL": "Fitness base (42-day). Higher = more aerobic capacity built.",
             "ATL": "Fatigue (7-day). Spikes after big training blocks.",
@@ -157,14 +184,14 @@ def tool_get_personal_records(args):
         all_acts.extend(flatten_strava_activity(day))
 
     act_fields = {
-        "longest_activity_miles":         ("distance_miles",            "max"),
-        "most_elevation_gain_feet":        ("total_elevation_gain_feet", "max"),
-        "longest_moving_time_seconds":     ("moving_time_seconds",       "max"),
-        "highest_avg_heartrate_bpm":       ("average_heartrate",         "max"),
-        "highest_max_heartrate_bpm":       ("max_heartrate",             "max"),
-        "highest_avg_watts":               ("average_watts",             "max"),
-        "most_kilojoules":                 ("kilojoules",                "max"),
-        "most_prs_in_one_activity":        ("pr_count",                  "max"),
+        "longest_activity_miles": ("distance_miles", "max"),
+        "most_elevation_gain_feet": ("total_elevation_gain_feet", "max"),
+        "longest_moving_time_seconds": ("moving_time_seconds", "max"),
+        "highest_avg_heartrate_bpm": ("average_heartrate", "max"),
+        "highest_max_heartrate_bpm": ("max_heartrate", "max"),
+        "highest_avg_watts": ("average_watts", "max"),
+        "most_kilojoules": ("kilojoules", "max"),
+        "most_prs_in_one_activity": ("pr_count", "max"),
     }
 
     for label, (field, mode) in act_fields.items():
@@ -173,17 +200,17 @@ def tool_get_personal_records(args):
             continue
         best_val, best_act = max(candidates, key=lambda x: x[0])
         records[label] = {
-            "value":      round(best_val, 2),
-            "date":       best_act.get("date"),
-            "activity":   best_act.get("name"),
+            "value": round(best_val, 2),
+            "date": best_act.get("date"),
+            "activity": best_act.get("name"),
             "sport_type": best_act.get("sport_type"),
             "age_at_record": age_at(best_act.get("date")),
         }
 
     day_fields = {
-        "biggest_day_miles":     ("total_distance_miles",      "max"),
+        "biggest_day_miles": ("total_distance_miles", "max"),
         "biggest_day_elevation": ("total_elevation_gain_feet", "max"),
-        "most_activities_in_day": ("activity_count",            "max"),
+        "most_activities_in_day": ("activity_count", "max"),
     }
     for label, (field, mode) in day_fields.items():
         candidates = [(float(d[field]), d) for d in strava_days if d.get(field)]
@@ -192,7 +219,7 @@ def tool_get_personal_records(args):
         best_val, best_day = max(candidates, key=lambda x: x[0])
         records[label] = {
             "value": round(best_val, 2),
-            "date":  best_day.get("date"),
+            "date": best_day.get("date"),
             "age_at_record": age_at(best_day.get("date")),
         }
 
@@ -215,25 +242,25 @@ def tool_get_personal_records(args):
         best_week_elev = max(weeks.items(), key=lambda x: x[1]["elev"])
         records["biggest_week_miles"] = {
             "value": round(best_week_miles[1]["miles"], 2),
-            "week":  best_week_miles[0],
+            "week": best_week_miles[0],
             "week_start": min(best_week_miles[1]["dates"]),
             "age_at_record": age_at(min(best_week_miles[1]["dates"])),
         }
         records["biggest_week_elevation_feet"] = {
             "value": round(best_week_elev[1]["elev"], 1),
-            "week":  best_week_elev[0],
+            "week": best_week_elev[0],
             "week_start": min(best_week_elev[1]["dates"]),
             "age_at_record": age_at(min(best_week_elev[1]["dates"])),
         }
 
     whoop_days = pr_sources.get("whoop", [])
     whoop_fields = {
-        "best_hrv_ms":              ("hrv",                 "max"),
-        "lowest_resting_hr_bpm":    ("resting_heart_rate",  "min"),
-        "best_recovery_score":      ("recovery_score",      "max"),
-        "highest_strain":           ("strain",              "max"),
-        "longest_sleep_hours":      ("sleep_duration_hours", "max"),
-        "worst_recovery_score":     ("recovery_score",      "min"),
+        "best_hrv_ms": ("hrv", "max"),
+        "lowest_resting_hr_bpm": ("resting_heart_rate", "min"),
+        "best_recovery_score": ("recovery_score", "max"),
+        "highest_strain": ("strain", "max"),
+        "longest_sleep_hours": ("sleep_duration_hours", "max"),
+        "worst_recovery_score": ("recovery_score", "min"),
     }
     for label, (field, mode) in whoop_fields.items():
         candidates = [(float(d[field]), d) for d in whoop_days if d.get(field) is not None]
@@ -242,15 +269,15 @@ def tool_get_personal_records(args):
         best_val, best_day = (max if mode == "max" else min)(candidates, key=lambda x: x[0])
         records[label] = {
             "value": round(best_val, 2),
-            "date":  best_day.get("date"),
+            "date": best_day.get("date"),
             "age_at_record": age_at(best_day.get("date")),
         }
 
     withings_days = pr_sources.get("withings", [])
     withings_fields = {
-        "heaviest_weight_lbs":   ("weight_lbs", "max"),
-        "lightest_weight_lbs":   ("weight_lbs", "min"),
-        "lowest_body_fat_pct":   ("body_fat_percentage", "min"),
+        "heaviest_weight_lbs": ("weight_lbs", "max"),
+        "lightest_weight_lbs": ("weight_lbs", "min"),
+        "lowest_body_fat_pct": ("body_fat_percentage", "min"),
         "highest_muscle_mass_lbs": ("muscle_mass_lbs", "max"),
     }
     for label, (field, mode) in withings_fields.items():
@@ -260,16 +287,16 @@ def tool_get_personal_records(args):
         best_val, best_day = (max if mode == "max" else min)(candidates, key=lambda x: x[0])
         records[label] = {
             "value": round(best_val, 2),
-            "date":  best_day.get("date"),
+            "date": best_day.get("date"),
             "age_at_record": age_at(best_day.get("date")),
         }
 
     payload = {
-        "profile_dob":    dob_str,
+        "profile_dob": dob_str,
         "records_through": end_date,
-        "total_records":  len(records),
-        "records":        records,
-        "coaching_note":  "Age at record enables tracking whether peak performances are trending younger or older over time.",
+        "total_records": len(records),
+        "records": records,
+        "coaching_note": "Age at record enables tracking whether peak performances are trending younger or older over time.",
     }
     ddb_cache_set(pr_cache_key, payload)
     mem_cache_set(pr_cache_key, payload)
@@ -368,6 +395,7 @@ def tool_get_cross_source_correlation(args):
         # For df > 5 this gives p accurate to <0.005
         try:
             import math
+
             # Use a simple but sufficiently accurate p-value from the t-distribution
             # via the beta function approximation
             a = df / 2.0
@@ -452,34 +480,38 @@ def tool_get_cross_source_correlation(args):
             significance = f"not significant (p={p_value}) — may be noise"
 
     return {
-        "source_a":        source_a,
-        "field_a":         fa,
-        "source_b":        source_b,
-        "field_b":         fb,
-        "lag_days":        lag_days,
-        "lag_note":        f"Positive lag: does {fa} today predict {fb} in {lag_days} days?" if lag_days > 0 else "No lag — same-day relationship",
-        "start_date":      start_date,
-        "end_date":        end_date,
-        "n_paired_days":   n,
-        "pearson_r":       r,
-        "r_squared":       round(r**2, 3) if r is not None else None,
-        "p_value":         p_value,
-        "significance":    significance,
-        "ci_95":           {"lower": ci_lower, "upper": ci_upper} if ci_lower is not None else None,
-        "interpretation":  interpretation,
-        "mean_a":          round(sum(xs)/len(xs), 2),
-        "mean_b":          round(sum(ys)/len(ys), 2),
-        "n_gating_note":   "strong requires n≥50, moderate requires n≥30, weak requires n≥14. Smaller samples are downgraded to prevent spurious strong-labelled correlations.",
-        "coaching_note":   "r > 0.4 is practically meaningful for coaching. r² tells you what % of variance is explained. Always check p-value before acting on a correlation.",
+        "source_a": source_a,
+        "field_a": fa,
+        "source_b": source_b,
+        "field_b": fb,
+        "lag_days": lag_days,
+        "lag_note": f"Positive lag: does {fa} today predict {fb} in {lag_days} days?" if lag_days > 0 else "No lag — same-day relationship",
+        "start_date": start_date,
+        "end_date": end_date,
+        "n_paired_days": n,
+        "pearson_r": r,
+        "r_squared": round(r**2, 3) if r is not None else None,
+        "p_value": p_value,
+        "significance": significance,
+        "ci_95": {"lower": ci_lower, "upper": ci_upper} if ci_lower is not None else None,
+        "interpretation": interpretation,
+        "mean_a": round(sum(xs) / len(xs), 2),
+        "mean_b": round(sum(ys) / len(ys), 2),
+        "n_gating_note": "strong requires n≥50, moderate requires n≥30, weak requires n≥14. Smaller samples are downgraded to prevent spurious strong-labelled correlations.",
+        "coaching_note": "r > 0.4 is practically meaningful for coaching. r² tells you what % of variance is explained. Always check p-value before acting on a correlation.",
         # R14-F08: FDR note — on-demand test is a single pair, not FDR-corrected
-        **({
-            "_note": (
-                "This is a single-pair test (no multiple-comparison correction). "
-                "The weekly report applies FDR correction (Benjamini-Hochberg) across all pairs, "
-                "so p-values there are more conservative. "
-                "For exploratory use only — do not act on a single p<0.05 without replication."
-            )
-        } if p_value is not None and p_value < 0.05 else {}),
+        **(
+            {
+                "_note": (
+                    "This is a single-pair test (no multiple-comparison correction). "
+                    "The weekly report applies FDR correction (Benjamini-Hochberg) across all pairs, "
+                    "so p-values there are more conservative. "
+                    "For exploratory use only — do not act on a single p<0.05 without replication."
+                )
+            }
+            if p_value is not None and p_value < 0.05
+            else {}
+        ),
     }
 
 
@@ -491,8 +523,20 @@ def tool_get_seasonal_patterns(args):
     sources_to_query = [source] if source and source in SOURCES else SOURCES
     skip_fields = {"pk", "sk", "source", "ingested_at", "date", "activities", "sport_types"}
 
-    month_names = {1: "January", 2: "February", 3: "March", 4: "April", 5: "May", 6: "June",
-                   7: "July", 8: "August", 9: "September", 10: "October", 11: "November", 12: "December"}
+    month_names = {
+        1: "January",
+        2: "February",
+        3: "March",
+        4: "April",
+        5: "May",
+        6: "June",
+        7: "July",
+        8: "August",
+        9: "September",
+        10: "October",
+        11: "November",
+        12: "December",
+    }
 
     cache_key = f"seasonal_patterns_{start_date}_{end_date}_{','.join(sources_to_query)}"
     cached = ddb_cache_get(cache_key) or mem_cache_get(cache_key)
@@ -536,8 +580,8 @@ def tool_get_seasonal_patterns(args):
             if m not in month_buckets:
                 continue
             row = {
-                "month":         m,
-                "month_name":    month_names[m],
+                "month": m,
+                "month_name": month_names[m],
                 "years_of_data": len(year_counts[m]),
             }
             for field, values in month_buckets[m].items():
@@ -550,9 +594,9 @@ def tool_get_seasonal_patterns(args):
 
     seasonal_payload = {
         "start_date": start_date,
-        "end_date":   end_date,
-        "note":       "Months averaged across all available years. 'years_of_data' shows how many years contribute to each month.",
-        "sources":    result,
+        "end_date": end_date,
+        "note": "Months averaged across all available years. 'years_of_data' shows how many years contribute to each month.",
+        "sources": result,
     }
     mem_cache_set(cache_key, seasonal_payload)
     ddb_cache_set(cache_key, seasonal_payload)
@@ -570,13 +614,15 @@ def tool_get_training_periodization(args):
     """
     end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     weeks_back = int(args.get("weeks", 12))
-    start_date = args.get("start_date",
-        (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(weeks=weeks_back)).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(weeks=weeks_back)).strftime("%Y-%m-%d"))
 
     def _sf(v):
-        if v is None: return None
-        try: return float(v)
-        except (ValueError, TypeError): return None
+        if v is None:
+            return None
+        try:
+            return float(v)
+        except (ValueError, TypeError):
+            return None
 
     def _avg(vals):
         v = [x for x in vals if x is not None]
@@ -600,16 +646,25 @@ def tool_get_training_periodization(args):
         # ISO week: Monday start
         return d.strftime("%G-W%V")
 
-    weeks = defaultdict(lambda: {
-        "cardio_minutes": 0, "strength_minutes": 0, "total_minutes": 0,
-        "zone2_minutes": 0, "hard_minutes": 0, "easy_minutes": 0,
-        "sessions": 0, "strength_sessions": 0, "cardio_sessions": 0,
-        "total_volume_lbs": 0, "rest_days": 0, "dates": set(),
-        "activities": [],
-    })
+    weeks = defaultdict(
+        lambda: {
+            "cardio_minutes": 0,
+            "strength_minutes": 0,
+            "total_minutes": 0,
+            "zone2_minutes": 0,
+            "hard_minutes": 0,
+            "easy_minutes": 0,
+            "sessions": 0,
+            "strength_sessions": 0,
+            "cardio_sessions": 0,
+            "total_volume_lbs": 0,
+            "rest_days": 0,
+            "dates": set(),
+            "activities": [],
+        }
+    )
 
-    cardio_types = {"run", "ride", "swim", "hike", "walk", "rowing", "elliptical",
-                    "virtualrun", "virtualride", "trailrun"}
+    cardio_types = {"run", "ride", "swim", "hike", "walk", "rowing", "elliptical", "virtualrun", "virtualride", "trailrun"}
     strength_types = {"weighttraining", "crossfit", "workout"}
 
     # Process Strava activities
@@ -619,7 +674,7 @@ def tool_get_training_periodization(args):
             continue
         wk = _week_key(date)
         weeks[wk]["dates"].add(date)
-        for act in (item.get("activities") or []):
+        for act in item.get("activities") or []:
             sport = (act.get("sport_type") or act.get("type") or "").lower().replace(" ", "")
             elapsed = _sf(act.get("elapsed_time_seconds")) or 0
             if elapsed < 600:
@@ -651,11 +706,14 @@ def tool_get_training_periodization(args):
                 weeks[wk]["strength_sessions"] += 1
                 weeks[wk]["strength_minutes"] += duration_min
 
-            weeks[wk]["activities"].append({
-                "date": date, "sport": sport,
-                "duration_min": round(duration_min, 1),
-                "avg_hr": avg_hr,
-            })
+            weeks[wk]["activities"].append(
+                {
+                    "date": date,
+                    "sport": sport,
+                    "duration_min": round(duration_min, 1),
+                    "avg_hr": avg_hr,
+                }
+            )
 
     # Process MacroFactor workouts for volume tracking
     for item in mf_workout_items:
@@ -693,22 +751,24 @@ def tool_get_training_periodization(args):
             else:
                 phase = "base"
 
-        weekly_summary.append({
-            "week": wk,
-            "phase": phase,
-            "sessions": w["sessions"],
-            "total_minutes": round(total_min, 1),
-            "cardio_minutes": round(w["cardio_minutes"], 1),
-            "strength_minutes": round(w["strength_minutes"], 1),
-            "zone2_minutes": round(w["zone2_minutes"], 1),
-            "hard_minutes": round(w["hard_minutes"], 1),
-            "easy_pct": easy_pct,
-            "hard_pct": hard_pct,
-            "volume_lbs": round(w["total_volume_lbs"], 1),
-            "rest_days": w["rest_days"],
-            "cardio_sessions": w["cardio_sessions"],
-            "strength_sessions": w["strength_sessions"],
-        })
+        weekly_summary.append(
+            {
+                "week": wk,
+                "phase": phase,
+                "sessions": w["sessions"],
+                "total_minutes": round(total_min, 1),
+                "cardio_minutes": round(w["cardio_minutes"], 1),
+                "strength_minutes": round(w["strength_minutes"], 1),
+                "zone2_minutes": round(w["zone2_minutes"], 1),
+                "hard_minutes": round(w["hard_minutes"], 1),
+                "easy_pct": easy_pct,
+                "hard_pct": hard_pct,
+                "volume_lbs": round(w["total_volume_lbs"], 1),
+                "rest_days": w["rest_days"],
+                "cardio_sessions": w["cardio_sessions"],
+                "strength_sessions": w["strength_sessions"],
+            }
+        )
 
     # ── 4. Deload detection ──────────────────────────────────────────────────
     deload_analysis = {
@@ -727,15 +787,19 @@ def tool_get_training_periodization(args):
 
     if consecutive >= 4:
         deload_analysis["deload_recommended"] = True
-        deload_analysis["reason"] = f"{consecutive} consecutive training weeks without deload. Galpin recommends 3:1 or 4:1 loading-to-deload ratio."
+        deload_analysis["reason"] = (
+            f"{consecutive} consecutive training weeks without deload. Galpin recommends 3:1 or 4:1 loading-to-deload ratio."
+        )
     elif consecutive >= 3:
         # Check if volume is trending up
         recent_3 = weekly_summary[-3:] if len(weekly_summary) >= 3 else weekly_summary
         if len(recent_3) >= 3:
             vols = [w["total_minutes"] for w in recent_3]
-            if all(vols[i] >= vols[i-1] for i in range(1, len(vols))):
+            if all(vols[i] >= vols[i - 1] for i in range(1, len(vols))):
                 deload_analysis["deload_recommended"] = True
-                deload_analysis["reason"] = "3 consecutive weeks of increasing volume. Progressive overload is good, but a deload preserves adaptation."
+                deload_analysis["reason"] = (
+                    "3 consecutive weeks of increasing volume. Progressive overload is good, but a deload preserves adaptation."
+                )
 
     # ── 5. Training polarization check (Seiler) ─────────────────────────────
     total_easy = sum(w["easy_minutes"] for wk, w in weeks.items())
@@ -777,27 +841,30 @@ def tool_get_training_periodization(args):
                 "second_half_avg_volume_lbs": second_half_vol,
                 "delta_pct": delta_pct,
                 "trend": "increasing" if delta_pct > 5 else ("decreasing" if delta_pct < -5 else "stable"),
-                "note": "Progressive overload detected." if delta_pct > 5 else (
-                    "Volume declining — ensure this is intentional (deload/cut)." if delta_pct < -5
-                    else "Volume stable — consider adding progressive overload."
+                "note": (
+                    "Progressive overload detected."
+                    if delta_pct > 5
+                    else (
+                        "Volume declining — ensure this is intentional (deload/cut)."
+                        if delta_pct < -5
+                        else "Volume stable — consider adding progressive overload."
+                    )
                 ),
             }
 
     # ── 7. Training consistency ──────────────────────────────────────────────
     sessions_per_week = [ws["sessions"] for ws in weekly_summary]
     avg_sessions = _avg(sessions_per_week)
-    consistency_pct = round(
-        sum(1 for s in sessions_per_week if s >= 3) / len(sessions_per_week) * 100, 1
-    ) if sessions_per_week else 0
+    consistency_pct = round(sum(1 for s in sessions_per_week if s >= 3) / len(sessions_per_week) * 100, 1) if sessions_per_week else 0
 
     consistency = {
         "avg_sessions_per_week": avg_sessions,
         "weeks_with_3plus_sessions_pct": consistency_pct,
         "total_weeks_analyzed": len(weekly_summary),
-        "assessment": "excellent" if consistency_pct >= 85 else (
-            "good" if consistency_pct >= 70 else (
-                "needs_improvement" if consistency_pct >= 50 else "inconsistent"
-            )
+        "assessment": (
+            "excellent"
+            if consistency_pct >= 85
+            else ("good" if consistency_pct >= 70 else ("needs_improvement" if consistency_pct >= 50 else "inconsistent"))
         ),
     }
 
@@ -817,24 +884,38 @@ def tool_get_training_periodization(args):
     bod = []
 
     if deload_analysis["deload_recommended"]:
-        bod.append(f"Galpin: {deload_analysis['reason']} Reduce volume by 40-60% this week. Maintain intensity on key lifts but cut sets in half.")
+        bod.append(
+            f"Galpin: {deload_analysis['reason']} Reduce volume by 40-60% this week. Maintain intensity on key lifts but cut sets in half."
+        )
 
     if polarization:
         if polarization["status"] == "too_much_intensity":
-            bod.append(f"Seiler: Only {polarization['easy_pct']}% of your training is easy. The 80/20 model says you need more Zone 2 and fewer moderate sessions. 'No man's land' (Zone 3) generates fatigue without proportional adaptation.")
+            bod.append(
+                f"Seiler: Only {polarization['easy_pct']}% of your training is easy. The 80/20 model says you need more Zone 2 and fewer moderate sessions. 'No man's land' (Zone 3) generates fatigue without proportional adaptation."
+            )
         elif polarization["status"] == "well_polarized":
-            bod.append("Seiler: Training well polarized — strong easy/hard split. This is the highest-evidence approach for long-term development.")
+            bod.append(
+                "Seiler: Training well polarized — strong easy/hard split. This is the highest-evidence approach for long-term development."
+            )
 
     if overload and overload["trend"] == "increasing":
-        bod.append(f"Galpin: Progressive overload confirmed (+{overload['delta_pct']}% volume). This is the fundamental driver of hypertrophy and strength adaptation.")
+        bod.append(
+            f"Galpin: Progressive overload confirmed (+{overload['delta_pct']}% volume). This is the fundamental driver of hypertrophy and strength adaptation."
+        )
     elif overload and overload["trend"] == "decreasing":
-        bod.append(f"Galpin: Volume declining by {abs(overload['delta_pct'])}%. If not intentional (cut/deload), this represents a missed adaptation opportunity.")
+        bod.append(
+            f"Galpin: Volume declining by {abs(overload['delta_pct'])}%. If not intentional (cut/deload), this represents a missed adaptation opportunity."
+        )
 
     if zone2_status["weeks_hitting_target_pct"] < 50:
-        bod.append(f"Attia: Only hitting Zone 2 target {zone2_status['weeks_hitting_target_pct']}% of weeks. Zone 2 is the highest-ROI longevity training modality — aim for 150 min/week.")
+        bod.append(
+            f"Attia: Only hitting Zone 2 target {zone2_status['weeks_hitting_target_pct']}% of weeks. Zone 2 is the highest-ROI longevity training modality — aim for 150 min/week."
+        )
 
     if consistency["assessment"] in ("needs_improvement", "inconsistent"):
-        bod.append(f"Attia: Consistency ({consistency['avg_sessions_per_week']} sessions/week avg) matters more than intensity. The best program is the one you actually do.")
+        bod.append(
+            f"Attia: Consistency ({consistency['avg_sessions_per_week']} sessions/week avg) matters more than intensity. The best program is the one you actually do."
+        )
 
     return {
         "period": {"start_date": start_date, "end_date": end_date, "weeks": len(weekly_summary)},
@@ -871,9 +952,12 @@ def tool_get_training_recommendation(args):
     d3_start = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=3)).strftime("%Y-%m-%d")
 
     def _sf(v):
-        if v is None: return None
-        try: return float(v)
-        except (ValueError, TypeError): return None
+        if v is None:
+            return None
+        try:
+            return float(v)
+        except (ValueError, TypeError):
+            return None
 
     def _avg(vals):
         v = [x for x in vals if x is not None]
@@ -950,8 +1034,7 @@ def tool_get_training_recommendation(args):
     consecutive_training_days = 0
 
     dates_7d = sorted(strava_by_date.keys())[-7:]
-    cardio_types = {"run", "ride", "swim", "hike", "walk", "rowing", "elliptical",
-                    "virtualrun", "virtualride", "trailrun"}
+    cardio_types = {"run", "ride", "swim", "hike", "walk", "rowing", "elliptical", "virtualrun", "virtualride", "trailrun"}
     strength_types = {"weighttraining", "crossfit", "workout"}
 
     for i, date in enumerate(sorted(strava_by_date.keys(), reverse=True)):
@@ -978,18 +1061,20 @@ def tool_get_training_recommendation(args):
             if is_hard and (last_hard_date is None or date > last_hard_date):
                 last_hard_date = date
 
-            recent_activities.append({
-                "date": date,
-                "sport": act.get("sport_type") or act.get("type"),
-                "duration_min": round(elapsed / 60, 1),
-                "avg_hr": avg_hr,
-                "is_hard": is_hard,
-            })
+            recent_activities.append(
+                {
+                    "date": date,
+                    "sport": act.get("sport_type") or act.get("type"),
+                    "duration_min": round(elapsed / 60, 1),
+                    "avg_hr": avg_hr,
+                    "is_hard": is_hard,
+                }
+            )
 
     # Consecutive rest/training days
     check_date = datetime.strptime(target_date, "%Y-%m-%d")
     for i in range(7):
-        d = (check_date - timedelta(days=i+1)).strftime("%Y-%m-%d")
+        d = (check_date - timedelta(days=i + 1)).strftime("%Y-%m-%d")
         day_data = strava_by_date.get(d, {})
         acts = day_data.get("activities", [])
         real_acts = [a for a in acts if (_sf(a.get("elapsed_time_seconds")) or 0) >= 600]
@@ -1010,7 +1095,8 @@ def tool_get_training_recommendation(args):
 
     # Days since last activities
     def _days_since(d):
-        if d is None: return None
+        if d is None:
+            return None
         return (datetime.strptime(target_date, "%Y-%m-%d") - datetime.strptime(d, "%Y-%m-%d")).days
 
     days_since_cardio = _days_since(last_cardio_date)
@@ -1022,8 +1108,8 @@ def tool_get_training_recommendation(args):
     mf_workout_items = query_source("macrofactor_workouts", d14_start, target_date)
     for item in mf_workout_items:
         d = item.get("date")
-        for workout in (item.get("workouts") or []):
-            for exercise in (workout.get("exercises") or []):
+        for workout in item.get("workouts") or []:
+            for exercise in workout.get("exercises") or []:
                 ename = exercise.get("exercise_name", "")
                 cls = classify_exercise(ename)  # noqa: F821
                 for mg in cls["muscle_groups"]:
@@ -1046,9 +1132,12 @@ def tool_get_training_recommendation(args):
 
     # Composite readiness (0-100)
     signals = []
-    if recovery_score is not None: signals.append(recovery_score)
-    if sleep_score is not None: signals.append(sleep_score)
-    if body_battery is not None: signals.append(body_battery)
+    if recovery_score is not None:
+        signals.append(recovery_score)
+    if sleep_score is not None:
+        signals.append(sleep_score)
+    if body_battery is not None:
+        signals.append(body_battery)
 
     composite = _avg(signals) if signals else 50
     tier = "GREEN" if composite >= 67 else ("YELLOW" if composite >= 33 else "RED")
@@ -1187,12 +1276,16 @@ def tool_get_training_recommendation(args):
     if consecutive_training_days >= 4:
         warnings.append(f"⚠️ {consecutive_training_days} consecutive training days. Consider a rest day soon.")
     if readiness.get("sleep_duration") and readiness["sleep_duration"] < 6:
-        warnings.append(f"⚠️ Only {readiness['sleep_duration']}h sleep — short sleep impairs muscle protein synthesis and injury risk. Reduce intensity.")
+        warnings.append(
+            f"⚠️ Only {readiness['sleep_duration']}h sleep — short sleep impairs muscle protein synthesis and injury risk. Reduce intensity."
+        )
     if readiness.get("whoop_hrv") and len([w for w in whoop_items if _sf(w.get("hrv"))]) >= 3:
         hrv_vals = [_sf(w.get("hrv")) for w in whoop_items if _sf(w.get("hrv"))]
         hrv_avg = _avg(hrv_vals)
         if readiness["whoop_hrv"] < hrv_avg * 0.8:
-            warnings.append(f"⚠️ HRV ({readiness['whoop_hrv']}ms) is {round((1 - readiness['whoop_hrv']/hrv_avg)*100)}% below your 7-day average. Parasympathetic suppression — reduce intensity.")
+            warnings.append(
+                f"⚠️ HRV ({readiness['whoop_hrv']}ms) is {round((1 - readiness['whoop_hrv']/hrv_avg)*100)}% below your 7-day average. Parasympathetic suppression — reduce intensity."
+            )
     if readiness.get("garmin_stress") and readiness["garmin_stress"] > 50:
         warnings.append(f"⚠️ Garmin stress score {readiness['garmin_stress']} (elevated). Consider how allostatic load affects recovery.")
 
@@ -1201,12 +1294,18 @@ def tool_get_training_recommendation(args):
     if tier == "GREEN":
         bod_notes.append("Huberman: Full parasympathetic recovery detected. Sympathetic drive available for high-output work.")
         if rec.get("type", "").startswith("Strength"):
-            bod_notes.append("Galpin: Mechanical tension (heavy loads, 1-2 RIR) drives hypertrophy most efficiently when recovery is complete.")
+            bod_notes.append(
+                "Galpin: Mechanical tension (heavy loads, 1-2 RIR) drives hypertrophy most efficiently when recovery is complete."
+            )
         elif "Interval" in rec.get("type", ""):
-            bod_notes.append("Attia: VO2max is the single strongest predictor of all-cause mortality. Hard intervals 1-2x/week are the highest-ROI investment.")
+            bod_notes.append(
+                "Attia: VO2max is the single strongest predictor of all-cause mortality. Hard intervals 1-2x/week are the highest-ROI investment."
+            )
     elif tier == "YELLOW":
         bod_notes.append("Attia: Zone 2 is the longevity foundation — 150+ min/week builds mitochondrial density without recovery cost.")
-        bod_notes.append("Huberman: Moderate training during partial recovery can still stimulate adaptation without digging a deeper hole.")
+        bod_notes.append(
+            "Huberman: Moderate training during partial recovery can still stimulate adaptation without digging a deeper hole."
+        )
     else:
         bod_notes.append("Walker: Sleep debt is cumulative and cannot be repaid by a single night. Prioritize recovery.")
         bod_notes.append("Galpin: Training in a depleted state converts productive stress into destructive stress.")
@@ -1260,9 +1359,12 @@ def tool_get_hr_recovery_trend(args):
         return {"error": "No Strava data for range.", "start_date": start_date, "end_date": end_date}
 
     def _sf(v):
-        if v is None: return None
-        try: return float(v)
-        except (ValueError, TypeError): return None
+        if v is None:
+            return None
+        try:
+            return float(v)
+        except (ValueError, TypeError):
+            return None
 
     def _avg(vals):
         v = [x for x in vals if x is not None]
@@ -1274,7 +1376,7 @@ def tool_get_hr_recovery_trend(args):
     records = []
     for item in strava_items:
         date = item.get("date")
-        for act in (item.get("activities") or []):
+        for act in item.get("activities") or []:
             hr_rec = act.get("hr_recovery")
             if not hr_rec or not isinstance(hr_rec, dict):
                 continue
@@ -1292,30 +1394,37 @@ def tool_get_hr_recovery_trend(args):
             if peak is None or best_recovery is None:
                 continue
             # Cole et al. 1999 NEJM: <=12 bpm at 60s = 2x mortality risk
-            if best_recovery >= 25: classification = "excellent"
-            elif best_recovery >= 18: classification = "good"
-            elif best_recovery >= 12: classification = "average"
-            else: classification = "below_average"
-            records.append({
-                "date": date,
-                "sport_type": act.get("sport_type") or act.get("type"),
-                "activity_name": act.get("name", ""),
-                "duration_min": round((_sf(act.get("elapsed_time_seconds")) or 0) / 60, 1),
-                "hr_peak": peak,
-                "hr_peak_pct_max": round(peak / max_hr * 100, 1) if peak else None,
-                "hr_end_60s": _sf(hr_rec.get("hr_end_60s")),
-                "hr_recovery_intra": recovery_intra,
-                "hr_recovery_60s": recovery_60s,
-                "hr_recovery_120s": recovery_120s,
-                "has_cooldown": has_cooldown,
-                "best_recovery_bpm": best_recovery,
-                "classification": classification,
-            })
+            if best_recovery >= 25:
+                classification = "excellent"
+            elif best_recovery >= 18:
+                classification = "good"
+            elif best_recovery >= 12:
+                classification = "average"
+            else:
+                classification = "below_average"
+            records.append(
+                {
+                    "date": date,
+                    "sport_type": act.get("sport_type") or act.get("type"),
+                    "activity_name": act.get("name", ""),
+                    "duration_min": round((_sf(act.get("elapsed_time_seconds")) or 0) / 60, 1),
+                    "hr_peak": peak,
+                    "hr_peak_pct_max": round(peak / max_hr * 100, 1) if peak else None,
+                    "hr_end_60s": _sf(hr_rec.get("hr_end_60s")),
+                    "hr_recovery_intra": recovery_intra,
+                    "hr_recovery_60s": recovery_60s,
+                    "hr_recovery_120s": recovery_120s,
+                    "has_cooldown": has_cooldown,
+                    "best_recovery_bpm": best_recovery,
+                    "classification": classification,
+                }
+            )
 
     if not records:
         return {
             "error": "No activities with HR recovery data found. HR recovery requires Strava ingestion v2.35.0+ with stream fetching.",
-            "start_date": start_date, "end_date": end_date,
+            "start_date": start_date,
+            "end_date": end_date,
             "tip": "Activities need HR data and >= 10 min duration. Recovery metrics computed from HR streams during ingestion.",
         }
 
@@ -1389,7 +1498,9 @@ def tool_get_hr_recovery_trend(args):
     elif trend_direction == "declining":
         bod.append(f"Huberman: HR recovery declining by {abs(trend_delta)} bpm — consider overtraining, sleep debt, or chronic stress.")
     if cooldown_records and no_cooldown:
-        bod.append(f"Galpin: {len(cooldown_records)} of {total} activities include cooldown. Adding 5-min easy cooldown improves recovery data reliability.")
+        bod.append(
+            f"Galpin: {len(cooldown_records)} of {total} activities include cooldown. Adding 5-min easy cooldown improves recovery data reliability."
+        )
     if dist["below_average"] > 0 and dist["below_average"] / total > 0.3:
         bod.append("Attia: >30% of sessions show below-average recovery. Consider reducing volume and prioritizing sleep.")
 
@@ -1399,13 +1510,19 @@ def tool_get_hr_recovery_trend(args):
         "overall_avg_recovery_bpm": overall_avg,
         "clinical_assessment": clinical,
         "trend": {
-            "direction": trend_direction, "delta_bpm": trend_delta,
-            "first_half_avg": first_avg, "second_half_avg": second_avg,
+            "direction": trend_direction,
+            "delta_bpm": trend_delta,
+            "first_half_avg": first_avg,
+            "second_half_avg": second_avg,
             "pearson_r": r_val,
             "interpretation": (
-                f"HR recovery {'improving' if trend_direction == 'improving' else 'declining' if trend_direction == 'declining' else 'stable'} "
-                f"over the period ({'+' if (trend_delta or 0) > 0 else ''}{trend_delta} bpm)."
-            ) if trend_delta is not None else None,
+                (
+                    f"HR recovery {'improving' if trend_direction == 'improving' else 'declining' if trend_direction == 'declining' else 'stable'} "
+                    f"over the period ({'+' if (trend_delta or 0) > 0 else ''}{trend_delta} bpm)."
+                )
+                if trend_delta is not None
+                else None
+            ),
         },
         "classification_distribution": dist,
         "classification_distribution_pct": dist_pct,
@@ -1435,6 +1552,7 @@ def tool_get_hr_recovery_trend(args):
 # ═══════════════════════════════════════════════════════════════════════
 # #28 — EXERCISE VARIETY SCORING (Sponsor: Dr. Sarah Chen)
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def tool_get_exercise_variety(args):
     """
@@ -1498,6 +1616,7 @@ def tool_get_exercise_variety(args):
 
     # Shannon diversity index (H)
     import math as _math
+
     h = 0
     for count in pattern_counts.values():
         if count > 0:
@@ -1535,7 +1654,9 @@ def tool_get_exercise_variety(args):
 
     staleness_flag = None
     if len(recent) >= 4 and len(recent_patterns) <= 2:
-        staleness_flag = f"Only {len(recent_patterns)} movement pattern(s) in last {window_weeks} weeks: {', '.join(sorted(recent_patterns))}."
+        staleness_flag = (
+            f"Only {len(recent_patterns)} movement pattern(s) in last {window_weeks} weeks: {', '.join(sorted(recent_patterns))}."
+        )
 
     # Missing movement categories
     ideal_patterns = {"running", "cycling", "walking_hiking", "swimming", "strength", "flexibility"}
@@ -1544,12 +1665,14 @@ def tool_get_exercise_variety(args):
     # Pattern distribution
     distribution = []
     for p, count in sorted(pattern_counts.items(), key=lambda x: -x[1]):
-        distribution.append({
-            "pattern": p,
-            "sessions": count,
-            "pct": round(100 * count / total_activities, 1),
-            "total_minutes": round(pattern_minutes[p], 0),
-        })
+        distribution.append(
+            {
+                "pattern": p,
+                "sessions": count,
+                "pct": round(100 * count / total_activities, 1),
+                "total_minutes": round(pattern_minutes[p], 0),
+            }
+        )
 
     # Recommendations
     recommendations = []
@@ -1595,6 +1718,7 @@ def tool_get_exercise_variety(args):
 # LACTATE THRESHOLD ESTIMATION  (#27)
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def tool_get_lactate_threshold_estimate(args):
     """
     Estimates aerobic threshold development using cardiac efficiency analysis.
@@ -1603,11 +1727,11 @@ def tool_get_lactate_threshold_estimate(args):
     Linear regression on cardiac_efficiency reveals direction and rate of change.
     Chen: proxy lactate curve from HR drift over repeated steady-state efforts.
     """
-    end = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
-    zone2_low = float(args.get("zone2_hr_low",      110))
-    zone2_high = float(args.get("zone2_hr_high",     139))
-    min_duration = float(args.get("min_duration_min",   20))
+    zone2_low = float(args.get("zone2_hr_low", 110))
+    zone2_high = float(args.get("zone2_hr_high", 139))
+    min_duration = float(args.get("min_duration_min", 20))
     sport_filter = (args.get("sport_type") or "").lower()
 
     strava = query_source("strava", start, end)
@@ -1634,17 +1758,19 @@ def tool_get_lactate_threshold_estimate(args):
             # Higher = faster pace for given HR = better aerobic fitness
             ce = (mi / dur_min / hr) * 1000
             pace_min_per_mi = round(dur_min / mi, 2) if mi > 0 else None
-            eligible.append({
-                "date":            date,
-                "sport":           sport,
-                "avg_hr":          round(hr, 1),
-                "duration_min":    round(dur_min, 1),
-                "distance_miles":  round(mi, 2),
-                "speed_mph":       round(mi / (dur_min / 60), 2),
-                "pace_min_per_mi": pace_min_per_mi,
-                "cardiac_efficiency": round(ce, 4),
-                "name":            a.get("enriched_name") or a.get("name", ""),
-            })
+            eligible.append(
+                {
+                    "date": date,
+                    "sport": sport,
+                    "avg_hr": round(hr, 1),
+                    "duration_min": round(dur_min, 1),
+                    "distance_miles": round(mi, 2),
+                    "speed_mph": round(mi / (dur_min / 60), 2),
+                    "pace_min_per_mi": pace_min_per_mi,
+                    "cardiac_efficiency": round(ce, 4),
+                    "name": a.get("enriched_name") or a.get("name", ""),
+                }
+            )
 
     if not eligible:
         return {
@@ -1675,10 +1801,12 @@ def tool_get_lactate_threshold_estimate(args):
         trend_dir, trend_label = "stable", "Base is holding but not yet growing"
 
     from collections import defaultdict as _dd
+
     weekly = _dd(list)
     for s in eligible:
         try:
             import datetime as _dt
+
             d = _dt.datetime.strptime(s["date"], "%Y-%m-%d")
             key = f"{d.isocalendar()[0]}-W{d.isocalendar()[1]:02d}"
         except Exception:
@@ -1686,31 +1814,30 @@ def tool_get_lactate_threshold_estimate(args):
         weekly[key].append(s["cardiac_efficiency"])
 
     weekly_summary = [
-        {"period": wk, "sessions": len(ces), "avg_cardiac_efficiency": round(sum(ces)/len(ces), 4)}
-        for wk, ces in sorted(weekly.items())
+        {"period": wk, "sessions": len(ces), "avg_cardiac_efficiency": round(sum(ces) / len(ces), 4)} for wk, ces in sorted(weekly.items())
     ]
 
     return {
-        "period":            {"start_date": start, "end_date": end},
+        "period": {"start_date": start, "end_date": end},
         "sessions_analyzed": n,
-        "zone2_band":        f"{int(zone2_low)}-{int(zone2_high)} bpm",
-        "sport_filter":      sport_filter or "all",
-        "avg_hr_in_zone2":   round(sum(s["avg_hr"] for s in eligible) / n, 1),
+        "zone2_band": f"{int(zone2_low)}-{int(zone2_high)} bpm",
+        "sport_filter": sport_filter or "all",
+        "avg_hr_in_zone2": round(sum(s["avg_hr"] for s in eligible) / n, 1),
         "cardiac_efficiency": {
-            "avg":              round(sum(ce_vals) / n, 4),
-            "earliest":         round(ce_vals[0], 4),
-            "latest":           round(ce_vals[-1], 4),
+            "avg": round(sum(ce_vals) / n, 4),
+            "earliest": round(ce_vals[0], 4),
+            "latest": round(ce_vals[-1], 4),
             "pct_change_first_vs_last_third": pct_change,
-            "unit":             "miles/(min*HR) x 1000 — higher = better fitness",
+            "unit": "miles/(min*HR) x 1000 — higher = better fitness",
         },
         "trend": {
             "direction": trend_dir,
-            "label":     trend_label,
-            "slope":     round(slope, 5) if slope is not None else None,
-            "r":         round(r, 3) if r is not None else None,
+            "label": trend_label,
+            "slope": round(slope, 5) if slope is not None else None,
+            "r": round(r, 3) if r is not None else None,
         },
         "weekly_summary": weekly_summary,
-        "sessions":       eligible[-20:],
+        "sessions": eligible[-20:],
         "interpretation": (
             "Cardiac efficiency (CE) = miles / (minutes * avg_HR) * 1000. "
             "A rising CE means you cover more distance per HR unit — your aerobic engine is improving. "
@@ -1725,6 +1852,7 @@ def tool_get_lactate_threshold_estimate(args):
 # EXERCISE EFFICIENCY TRENDING  (#39)
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def tool_get_exercise_efficiency_trend(args):
     """
     Tracks pace-at-HR over time for repeated workout types.
@@ -1733,7 +1861,7 @@ def tool_get_exercise_efficiency_trend(args):
     per sport type to detect improvement signal.
     Attia: pace-at-HR over time is the purest fitness signal available from consumer data.
     """
-    end = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
     min_hr = float(args.get("min_hr", 100))
     min_dur = float(args.get("min_duration_min", 10))
@@ -1744,6 +1872,7 @@ def tool_get_exercise_efficiency_trend(args):
         return {"error": f"No Strava data between {start} and {end}."}
 
     from collections import defaultdict as _dd
+
     by_sport = _dd(list)
     for day in strava:
         day = decimal_to_float(day)
@@ -1763,16 +1892,18 @@ def tool_get_exercise_efficiency_trend(args):
             if "run" in sport or "walk" in sport:
                 pm = dur_min / mi
                 pace_str = f"{int(pm)}:{int((pm % 1) * 60):02d}/mi"
-            by_sport[sport].append({
-                "date":               date,
-                "avg_hr":             round(hr, 1),
-                "duration_min":       round(dur_min, 1),
-                "distance_miles":     round(mi, 2),
-                "speed_mph":          round(mi / (dur_min / 60), 2),
-                "pace_per_mile":      pace_str,
-                "cardiac_efficiency": round(ce, 4),
-                "name":               a.get("enriched_name") or a.get("name", ""),
-            })
+            by_sport[sport].append(
+                {
+                    "date": date,
+                    "avg_hr": round(hr, 1),
+                    "duration_min": round(dur_min, 1),
+                    "distance_miles": round(mi, 2),
+                    "speed_mph": round(mi / (dur_min / 60), 2),
+                    "pace_per_mile": pace_str,
+                    "cardiac_efficiency": round(ce, 4),
+                    "name": a.get("enriched_name") or a.get("name", ""),
+                }
+            )
 
     if not by_sport:
         return {"error": "No activities with HR data found in range.", "start": start, "end": end}
@@ -1799,26 +1930,26 @@ def tool_get_exercise_efficiency_trend(args):
             trend = "stable"
 
         results[sport] = {
-            "sessions":                    n,
-            "avg_cardiac_efficiency":      round(sum(ce_vals) / n, 4),
-            "avg_hr":                      round(sum(s["avg_hr"] for s in sessions) / n, 1),
-            "trend":                       trend,
-            "slope":                       round(slope, 5) if slope else None,
-            "r":                           round(r, 3) if r else None,
+            "sessions": n,
+            "avg_cardiac_efficiency": round(sum(ce_vals) / n, 4),
+            "avg_hr": round(sum(s["avg_hr"] for s in sessions) / n, 1),
+            "trend": trend,
+            "slope": round(slope, 5) if slope else None,
+            "r": round(r, 3) if r else None,
             "pct_change_first_vs_last_third": pct_delta,
-            "recent_sessions":             sessions[-5:],
+            "recent_sessions": sessions[-5:],
         }
 
     improving = [s for s, d in results.items() if d["trend"] == "improving"]
     declining = [s for s, d in results.items() if d["trend"] == "declining"]
 
     return {
-        "period":       {"start_date": start, "end_date": end},
+        "period": {"start_date": start, "end_date": end},
         "sport_filter": sport_type or "all",
-        "by_sport":     results,
+        "by_sport": results,
         "summary": {
-            "sports_improving":      improving,
-            "sports_declining":      declining,
+            "sports_improving": improving,
+            "sports_declining": declining,
             "total_sports_analyzed": len(results),
         },
         "methodology": (
@@ -1838,37 +1969,44 @@ def tool_get_acwr_status(args):
     Falls back to live computation from Whoop strain if pre-computed record is missing.
     """
     end_date = args.get("date", (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"))
-    days_back = int(args.get("days_back", 14))   # how many days of history to return
+    days_back = int(args.get("days_back", 14))  # how many days of history to return
 
     def _sf(v):
-        if v is None: return None
-        try: return float(v)
-        except (TypeError, ValueError): return None
+        if v is None:
+            return None
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
 
     # ── Read from computed_metrics (prefer pre-computed) ─────────────────────
-    cm_records = query_source("computed_metrics",
-                              (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=days_back - 1)).strftime("%Y-%m-%d"),
-                              end_date)
+    cm_records = query_source(
+        "computed_metrics", (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=days_back - 1)).strftime("%Y-%m-%d"), end_date
+    )
 
     history = []
     for rec in sorted(cm_records, key=lambda r: r.get("date", ""), reverse=True):
         acwr = _sf(rec.get("acwr"))
         if acwr is None and "acute_load_7d" not in rec:
             continue  # skip records that have no ACWR data at all
-        history.append({
-            "date":             rec.get("date"),
-            "acwr":             acwr,
-            "acute_load_7d":    _sf(rec.get("acute_load_7d")),
-            "chronic_load_28d": _sf(rec.get("chronic_load_28d")),
-            "zone":             rec.get("acwr_zone", "unknown"),
-            "alert":            bool(rec.get("acwr_alert", False)),
-            "alert_reason":     rec.get("acwr_alert_reason"),
-        })
+        history.append(
+            {
+                "date": rec.get("date"),
+                "acwr": acwr,
+                "acute_load_7d": _sf(rec.get("acute_load_7d")),
+                "chronic_load_28d": _sf(rec.get("chronic_load_28d")),
+                "zone": rec.get("acwr_zone", "unknown"),
+                "alert": bool(rec.get("acwr_alert", False)),
+                "alert_reason": rec.get("acwr_alert_reason"),
+            }
+        )
 
     if not history:
         return {
             "error": "No ACWR data found in computed_metrics. acwr-compute Lambda may not have run yet for this date range.",
-            "hint": "Run the acwr-compute Lambda manually: aws lambda invoke --function-name acwr-compute --payload '{\"date\":\"" + end_date + "\"}' /tmp/out.json",
+            "hint": 'Run the acwr-compute Lambda manually: aws lambda invoke --function-name acwr-compute --payload \'{"date":"'
+            + end_date
+            + "\"}' /tmp/out.json",
         }
 
     latest = history[0]
@@ -1901,17 +2039,17 @@ def tool_get_acwr_status(args):
         coaching = "Attia: Chronic load exceeds acute — you are doing less than your body is adapted to. Increase training frequency or duration this week."
 
     return {
-        "date":          latest.get("date"),
-        "acwr":          acwr,
-        "zone":          zone,
-        "alert":         latest.get("alert"),
-        "alert_reason":  latest.get("alert_reason"),
+        "date": latest.get("date"),
+        "acwr": acwr,
+        "zone": zone,
+        "alert": latest.get("alert"),
+        "alert_reason": latest.get("alert_reason"),
         "acute_load_7d": latest.get("acute_load_7d"),
         "chronic_load_28d": latest.get("chronic_load_28d"),
-        "trend_7d":      trend,
+        "trend_7d": trend,
         "alerts_last_7d": alerts_7d,
-        "coaching":      coaching,
-        "history":       history,
+        "coaching": coaching,
+        "history": history,
         "interpretation": (
             "ACWR = 7-day avg Whoop strain / 28-day avg Whoop strain. "
             "Safe zone: 0.8-1.3. Above 1.3: elevated injury risk. Below 0.8: detraining. "
@@ -1933,12 +2071,15 @@ def tool_get_training(args):
     added to nightly warmer in same commit (all multi-source, expensive on-demand).
     """
     VALID_VIEWS = {
-        "load":            tool_get_training_load,
-        "periodization":   tool_get_training_periodization,
-        "recommendation":  tool_get_training_recommendation,
+        "load": tool_get_training_load,
+        "periodization": tool_get_training_periodization,
+        "recommendation": tool_get_training_recommendation,
     }
     view = (args.get("view") or "load").lower().strip()
     if view not in VALID_VIEWS:
-        return {"error": f"Unknown view '{view}'.", "valid_views": list(VALID_VIEWS.keys()),
-                "hint": "'load' for CTL/ATL/TSB fitness-fatigue model, 'periodization' for mesocycle analysis, 'recommendation' for today's workout suggestion."}
+        return {
+            "error": f"Unknown view '{view}'.",
+            "valid_views": list(VALID_VIEWS.keys()),
+            "hint": "'load' for CTL/ATL/TSB fitness-fatigue model, 'periodization' for mesocycle analysis, 'recommendation' for today's workout suggestion.",
+        }
     return VALID_VIEWS[view](args)

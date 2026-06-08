@@ -62,8 +62,7 @@ def test_shim_imports():
     handles Decimal conversion internally; the shim is no longer needed there.
     Removed as migrated: todoist (v7.10), habitify (v7.11), withings (v7.12),
     strava (v7.12), eightsleep (v7.13), whoop (v7.13), garmin (v7.13)."""
-    for module_name in ("macrofactor_lambda", "enrichment_lambda",
-                        "apple_health_lambda"):
+    for module_name in ("macrofactor_lambda", "enrichment_lambda", "apple_health_lambda"):
         # Reset any prior import; we only need to confirm the symbol exists.
         sys.modules.pop(module_name, None)
         # We can't actually import these (they require boto3 + env), but we
@@ -72,6 +71,6 @@ def test_shim_imports():
         path = os.path.join(ROOT, "lambdas", "ingestion", module_name + ".py")
         with open(path) as f:
             src = f.read()
-        assert "from numeric import floats_to_decimal" in src, (
-            f"{module_name} missing the Phase 4.2 shim — should re-export from numeric module"
-        )
+        assert (
+            "from numeric import floats_to_decimal" in src
+        ), f"{module_name} missing the Phase 4.2 shim — should re-export from numeric module"

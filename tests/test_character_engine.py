@@ -17,34 +17,35 @@ Covers findings F-01 through F-15 from the statistical review:
 Run with:   python3 -m pytest tests/test_character_engine.py -v
 """
 
-import sys
-import os
 import math
+import os
+import sys
 
 # ── Add lambdas/ to import path ──
 LAMBDAS_DIR = os.path.join(os.path.dirname(__file__), "..", "lambdas")
 sys.path.insert(0, os.path.abspath(LAMBDAS_DIR))
 
 from character_engine import (
-    _weighted_pillar_score,
-    _compute_xp,
+    ENGINE_VERSION,
     _body_comp_score,
     _compute_lab_score,
+    _compute_xp,
     _in_range_score,
-    evaluate_level_changes,
+    _weighted_pillar_score,
     compute_ema_level_score,
+    evaluate_level_changes,
     get_tier,
-    ENGINE_VERSION,
 )
 
-
 # ── Version ──
+
 
 def test_engine_version():
     assert ENGINE_VERSION == "1.1.0"
 
 
 # ── F-01: Confidence scoring ──
+
 
 def test_weighted_pillar_score_full_data():
     """Full data -> confidence 1.0, no blending."""
@@ -74,6 +75,7 @@ def test_weighted_pillar_score_no_data():
 
 
 # ── F-02: XP decay ──
+
 
 def test_xp_decays_on_mediocre_day():
     """Score 40 earns +1 XP but decay -2 -> net -1."""
@@ -109,6 +111,7 @@ def test_xp_grows_on_good_day():
 
 # ── F-04: Body comp sigmoid ──
 
+
 def test_body_comp_loss_sigmoid():
     """Sigmoid produces nonlinear curve."""
     config = {"baseline": {"start_weight_lbs": 302, "goal_weight_lbs": 185, "weight_phase": "loss"}}
@@ -123,8 +126,8 @@ def test_body_comp_maintenance():
     config = {"baseline": {"goal_weight_lbs": 185, "weight_phase": "maintenance", "maintenance_band_lbs": 3}}
     assert _body_comp_score(185, config) == 100.0
     assert _body_comp_score(187, config) == 100.0  # within band
-    assert _body_comp_score(190, config) < 100.0   # outside band
-    assert _body_comp_score(205, config) == 0.0     # 20 lbs out
+    assert _body_comp_score(190, config) < 100.0  # outside band
+    assert _body_comp_score(205, config) == 0.0  # 20 lbs out
 
 
 def test_body_comp_none_weight():
@@ -133,6 +136,7 @@ def test_body_comp_none_weight():
 
 
 # ── F-07: Lab decay to zero ──
+
 
 def test_lab_decay_full_value():
     """Labs within 30 days get full credit."""
@@ -161,12 +165,14 @@ def test_lab_decay_at_90_days():
 
 # ── F-09: Neutral default ──
 
+
 def test_ema_empty_returns_50():
     config = {"leveling": {"ema_lambda": 0.85, "ema_window_days": 21}}
     assert compute_ema_level_score([], config) == 50.0
 
 
 # ── F-12: Vice log curve ──
+
 
 def test_vice_log_curve():
     """Day 7 should score higher than old linear 23%."""
@@ -183,6 +189,7 @@ def test_vice_log_day_30():
 
 
 # ── F-13: _in_range_score buffer ──
+
 
 def test_in_range_score_in_range():
     assert _in_range_score(100, 90, 120) == 100.0
@@ -247,6 +254,7 @@ def test_mastery_levels_up_at_10_days():
 
 # ── F-11: Equal day streak hold ──
 
+
 def test_equal_day_holds_streak():
     """Equal day should not decay streak."""
     prev = {"level": 5, "tier": "Foundation", "streak_above": 2, "streak_below": 0, "xp_total": 50}
@@ -255,6 +263,7 @@ def test_equal_day_holds_streak():
 
 
 # ── F-10: Variable step size ──
+
 
 def test_variable_step_when_delta_large():
     """When target - current > 10, step by 2."""
@@ -274,6 +283,7 @@ def test_normal_step_when_delta_small():
 
 # ── F-03: Per-pillar EMA ──
 
+
 def test_per_pillar_ema_lambda():
     """Metabolic pillar uses higher lambda (0.95) than default (0.85)."""
     config = {
@@ -288,6 +298,7 @@ def test_per_pillar_ema_lambda():
 
 
 # ── F-02: XP buffer gate ──
+
 
 def test_xp_buffer_prevents_level_down():
     """High XP buffer should prevent level loss even after streak threshold."""

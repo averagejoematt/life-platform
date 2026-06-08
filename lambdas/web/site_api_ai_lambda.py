@@ -13,23 +13,21 @@ Endpoints:
 IAM: Read-only DynamoDB + S3 config + Secrets Manager (site-api-ai-key). No writes.
 """
 
+import base64 as _b64
 import hashlib
 import hmac as _hmac
-import base64 as _b64
 import json
 import logging
 import os
 import re
 import time
 import urllib.request
-from datetime import datetime, timezone, timedelta
-
-from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
 from boto3.dynamodb.conditions import Key
-
+from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058
 
 logger = logging.getLogger(__name__)
@@ -75,42 +73,44 @@ def _emit_token_metrics(usage: dict, endpoint: str) -> None:
         cache_w = int(usage.get("cache_creation_input_tokens", 0) or 0)
         cache_r = int(usage.get("cache_read_input_tokens", 0) or 0)
         metric_data = [
-            {"MetricName": "AnthropicInputTokens",  "Dimensions": dims_base, "Value": in_tok,  "Unit": "Count"},
+            {"MetricName": "AnthropicInputTokens", "Dimensions": dims_base, "Value": in_tok, "Unit": "Count"},
             {"MetricName": "AnthropicOutputTokens", "Dimensions": dims_base, "Value": out_tok, "Unit": "Count"},
         ]
         if cache_w or cache_r:
             metric_data.append({"MetricName": "AnthropicCacheWriteTokens", "Dimensions": dims_base, "Value": cache_w, "Unit": "Count"})
-            metric_data.append({"MetricName": "AnthropicCacheReadTokens",  "Dimensions": dims_base, "Value": cache_r, "Unit": "Count"})
+            metric_data.append({"MetricName": "AnthropicCacheReadTokens", "Dimensions": dims_base, "Value": cache_r, "Unit": "Count"})
         _cw.put_metric_data(Namespace="LifePlatform/AI", MetricData=metric_data)
     except Exception as e:
         logger.warning(f"site_api_ai token-metric emit failed (non-fatal): {e}")
 
+
 # ── CORS headers ───────────────────────────────────────────
 CORS_ORIGIN = os.environ.get("CORS_ORIGIN", "https://averagejoematt.com")
 CORS_HEADERS = {
-    "Access-Control-Allow-Origin":  CORS_ORIGIN,
+    "Access-Control-Allow-Origin": CORS_ORIGIN,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, X-Subscriber-Token",
-    "Access-Control-Max-Age":       "3600",
-    "Content-Type":                 "application/json",
-    "X-Content-Type-Options":       "nosniff",
-    "X-Frame-Options":              "DENY",
-    "Strict-Transport-Security":    "max-age=31536000; includeSubDomains",
+    "Access-Control-Max-Age": "3600",
+    "Content-Type": "application/json",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
     # Phase 2.8 (2026-05-16): AI responses are personalized — never cache.
     # Prevents proxy/browser from serving one user's reply to another.
-    "Cache-Control":                "private, no-store, must-revalidate",
-    "Pragma":                       "no-cache",
+    "Cache-Control": "private, no-store, must-revalidate",
+    "Pragma": "no-cache",
 }
 
 # ── Rate limiting (Phase 2.1, 2026-05-16): DynamoDB-backed ────
 # Replaces in-memory dict which didn't survive warm-container distribution.
 # Old stores kept as fallbacks if rate_limiter import fails.
-_ask_rate_store: dict = {}    # legacy, only used if DDB rate_limiter fails
+_ask_rate_store: dict = {}  # legacy, only used if DDB rate_limiter fails
 _board_rate_store: dict = {}  # legacy, only used if DDB rate_limiter fails
 BOARD_RATE_LIMIT = 5  # 5 req/IP/hr — matches WAF rate limit tier; each call makes up to 6 Haiku calls
 
 try:
     from rate_limiter import check_rate_limit as _ddb_rate_check
+
     _RATE_LIMITER_READY = True
 except ImportError:
     _RATE_LIMITER_READY = False
@@ -127,6 +127,7 @@ _token_secret_cache = None
 
 # ── Helper functions ───────────────────────────────────────
 
+
 def _decimal_to_float(obj):
     if isinstance(obj, Decimal):
         return float(obj)
@@ -140,11 +141,15 @@ def _decimal_to_float(obj):
 def _latest_item(source: str) -> dict | None:
     """Get the most recent item for a source."""
     pk = f"{USER_PREFIX}{source}"
-    resp = table.query(**with_phase_filter({  # ADR-058: hide pilot records
-        "KeyConditionExpression": Key("pk").eq(pk),
-        "ScanIndexForward": False,
-        "Limit": 1,
-    }))
+    resp = table.query(
+        **with_phase_filter(
+            {  # ADR-058: hide pilot records
+                "KeyConditionExpression": Key("pk").eq(pk),
+                "ScanIndexForward": False,
+                "Limit": 1,
+            }
+        )
+    )
     items = _decimal_to_float(resp.get("Items", []))
     return items[0] if items else None
 
@@ -162,16 +167,20 @@ def _ai_paused_response():
     HTTP-200 'paused' payload the frontend renders calmly; else None. Fail-open."""
     try:
         from budget_guard import allow
+
         if not allow("website_ai"):
             return {
                 "statusCode": 200,
                 "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-                "body": json.dumps({
-                    "answer": ("The AI assistant is paused for the rest of the month "
-                               "to stay within budget — it'll be back on the 1st."),
-                    "paused": True,
-                    "remaining": 0,
-                }),
+                "body": json.dumps(
+                    {
+                        "answer": (
+                            "The AI assistant is paused for the rest of the month " "to stay within budget — it'll be back on the 1st."
+                        ),
+                        "paused": True,
+                        "remaining": 0,
+                    }
+                ),
             }
     except Exception:
         pass
@@ -193,9 +202,7 @@ def _get_anthropic_key():
         return None
 
 
-_SUBSCRIBER_TOKEN_SECRET_NAME = os.environ.get(
-    "SUBSCRIBER_TOKEN_SECRET_NAME", "life-platform/subscriber-token-secret"
-)
+_SUBSCRIBER_TOKEN_SECRET_NAME = os.environ.get("SUBSCRIBER_TOKEN_SECRET_NAME", "life-platform/subscriber-token-secret")
 _legacy_token_secret_cache = None
 
 
@@ -207,17 +214,12 @@ def _get_token_secret() -> str:
         return _token_secret_cache
     try:
         sm = boto3.client("secretsmanager", region_name="us-west-2")
-        _token_secret_cache = sm.get_secret_value(
-            SecretId=_SUBSCRIBER_TOKEN_SECRET_NAME
-        )["SecretString"]
+        _token_secret_cache = sm.get_secret_value(SecretId=_SUBSCRIBER_TOKEN_SECRET_NAME)["SecretString"]
         return _token_secret_cache
     except Exception as e:
         # Rollout safety: fall back to the legacy derivation if the IAM grant
         # has not been applied yet via `cdk deploy LifePlatformOperational`.
-        logger.warning(
-            f"[token_secret] Falling back to legacy derivation; new secret "
-            f"unavailable: {e}"
-        )
+        logger.warning(f"[token_secret] Falling back to legacy derivation; new secret " f"unavailable: {e}")
         legacy = _get_legacy_token_secret()
         if not legacy:
             raise RuntimeError("Token signing secret unavailable") from e
@@ -257,14 +259,14 @@ def _validate_subscriber_token(token: str) -> bool:
         payload = f"{email}:{expires_str}"
         # Try new secret first
         new_secret = _get_token_secret().encode()
-        new_expected = _hmac.new(new_secret, payload.encode(), digestmod='sha256').hexdigest()[:32]
+        new_expected = _hmac.new(new_secret, payload.encode(), digestmod="sha256").hexdigest()[:32]
         if _hmac.compare_digest(provided_sig, new_expected):
             return True
         # 24h migration window: fall back to the legacy AI-key-derived secret.
         legacy = _get_legacy_token_secret()
         if not legacy:
             return False
-        legacy_expected = _hmac.new(legacy.encode(), payload.encode(), digestmod='sha256').hexdigest()[:32]
+        legacy_expected = _hmac.new(legacy.encode(), payload.encode(), digestmod="sha256").hexdigest()[:32]
         return _hmac.compare_digest(provided_sig, legacy_expected)
     except Exception:
         return False
@@ -297,8 +299,8 @@ def _scrub_blocked_terms(text: str) -> str:
         result = re.compile(re.escape(term), re.IGNORECASE).sub("", result)
     for vice in cf.get("blocked_vices", []):
         result = re.compile(re.escape(vice), re.IGNORECASE).sub("", result)
-    result = re.sub(r'\[filtered\]', '', result)
-    result = re.sub(r'\s{2,}', ' ', result)
+    result = re.sub(r"\[filtered\]", "", result)
+    result = re.sub(r"\s{2,}", " ", result)
     return result.strip()
 
 
@@ -308,11 +310,13 @@ def _emit_rate_limit_metric(endpoint: str) -> None:
         emf = {
             "_aws": {
                 "Timestamp": int(time.time() * 1000),
-                "CloudWatchMetrics": [{
-                    "Namespace": "LifePlatform/SiteApiAi",
-                    "Dimensions": [["Endpoint"]],
-                    "Metrics": [{"Name": "RateLimitHit", "Unit": "Count"}],
-                }],
+                "CloudWatchMetrics": [
+                    {
+                        "Namespace": "LifePlatform/SiteApiAi",
+                        "Dimensions": [["Endpoint"]],
+                        "Metrics": [{"Name": "RateLimitHit", "Unit": "Count"}],
+                    }
+                ],
             },
             "Endpoint": endpoint,
             "RateLimitHit": 1,
@@ -331,7 +335,11 @@ def _ask_rate_check(ip_hash: str, limit: int = 5) -> tuple:
     """
     if _RATE_LIMITER_READY:
         allowed, remaining, _retry = _ddb_rate_check(
-            table, endpoint="ask", ip_hash=ip_hash, limit=limit, window_seconds=3600,
+            table,
+            endpoint="ask",
+            ip_hash=ip_hash,
+            limit=limit,
+            window_seconds=3600,
         )
         return allowed, remaining
     # Legacy fallback (warm-container only)
@@ -355,10 +363,14 @@ def _ask_fetch_context() -> dict:
         ctx["weight_lbs"] = float(w["weight_lbs"])
     wh = _latest_item("whoop")
     if wh:
-        if wh.get("hrv"): ctx["hrv_ms"] = float(wh["hrv"])
-        if wh.get("resting_heart_rate"): ctx["rhr_bpm"] = float(wh["resting_heart_rate"])
-        if wh.get("recovery_score"): ctx["recovery_pct"] = float(wh["recovery_score"])
-        if wh.get("sleep_duration_hours"): ctx["sleep_hours"] = float(wh["sleep_duration_hours"])
+        if wh.get("hrv"):
+            ctx["hrv_ms"] = float(wh["hrv"])
+        if wh.get("resting_heart_rate"):
+            ctx["rhr_bpm"] = float(wh["resting_heart_rate"])
+        if wh.get("recovery_score"):
+            ctx["recovery_pct"] = float(wh["recovery_score"])
+        if wh.get("sleep_duration_hours"):
+            ctx["sleep_hours"] = float(wh["sleep_duration_hours"])
     cs_pk = f"{USER_PREFIX}character_sheet"
     for d in [today_str, yesterday_str]:
         resp = table.get_item(Key={"pk": cs_pk, "sk": f"DATE#{d}"})
@@ -369,12 +381,19 @@ def _ask_fetch_context() -> dict:
             pillars = {}
             for p in ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]:
                 pd = rec.get(f"pillar_{p}", {})
-                pillars[p] = {"level": float(pd.get("level", 1)), "raw_score": float(pd.get("raw_score", 0)), "tier": pd.get("tier", "Foundation")}
+                pillars[p] = {
+                    "level": float(pd.get("level", 1)),
+                    "raw_score": float(pd.get("raw_score", 0)),
+                    "tier": pd.get("tier", "Foundation"),
+                }
             ctx["pillars"] = pillars
             break
     hs_pk = f"{USER_PREFIX}habit_scores"
-    hs_resp = table.query(**with_phase_filter(  # ADR-058: hide pilot habit scores
-        {"KeyConditionExpression": Key("pk").eq(hs_pk), "ScanIndexForward": False, "Limit": 1}))
+    hs_resp = table.query(
+        **with_phase_filter(  # ADR-058: hide pilot habit scores
+            {"KeyConditionExpression": Key("pk").eq(hs_pk), "ScanIndexForward": False, "Limit": 1}
+        )
+    )
     hs_items = _decimal_to_float(hs_resp.get("Items", []))
     if hs_items:
         ctx["tier0_streak"] = int(hs_items[0].get("t0_perfect_streak", 0) or 0)
@@ -392,12 +411,12 @@ def _ask_fetch_context() -> dict:
 
 # WR-40: Question safety filter — block sensitive query categories
 _ASK_BLOCKED_PATTERNS = [
-    r'\b(ssn|social.?security|passport|credit.?card|bank.?account|routing.?number)\b',
-    r'\b(password|api.?key|secret|token|credential)\b',
-    r'\b(address|phone.?number|email.?address|zip.?code|employer.?name)\b',
-    r'\b(salary|income|net.?worth|financial|tax)\b',
-    r'\b(suicid|self.?harm|eating.?disorder|mental.?illness|diagnos)\b',
-    r'\b(medication.?name|prescription|dosage|drug.?interaction)\b',
+    r"\b(ssn|social.?security|passport|credit.?card|bank.?account|routing.?number)\b",
+    r"\b(password|api.?key|secret|token|credential)\b",
+    r"\b(address|phone.?number|email.?address|zip.?code|employer.?name)\b",
+    r"\b(salary|income|net.?worth|financial|tax)\b",
+    r"\b(suicid|self.?harm|eating.?disorder|mental.?illness|diagnos)\b",
+    r"\b(medication.?name|prescription|dosage|drug.?interaction)\b",
 ]
 
 
@@ -406,7 +425,10 @@ def _ask_question_safe(question: str) -> tuple:
     q_lower = question.lower()
     for pattern in _ASK_BLOCKED_PATTERNS:
         if re.search(pattern, q_lower):
-            return False, "This question touches on sensitive personal data that the platform doesn't share publicly. Try asking about weight, sleep, HRV, training, habits, or nutrition trends instead."
+            return (
+                False,
+                "This question touches on sensitive personal data that the platform doesn't share publicly. Try asking about weight, sleep, HRV, training, habits, or nutrition trends instead.",
+            )
     return True, ""
 
 
@@ -414,8 +436,7 @@ def _ask_build_prompt(ctx: dict) -> str:
     pillars_str = ""
     if "pillars" in ctx:
         pillars_str = "\n".join(
-            f"    {n}: level {p['level']:.0f}, score {p['raw_score']:.1f}, tier {p['tier']}"
-            for n, p in ctx["pillars"].items()
+            f"    {n}: level {p['level']:.0f}, score {p['raw_score']:.1f}, tier {p['tier']}" for n, p in ctx["pillars"].items()
         )
     return f"""You are the AI behind Matthew Walker's Life Platform — a personal health intelligence system tracking 19 data sources.
 
@@ -522,15 +543,16 @@ PERSONA_PROMPTS = {
 
 # ── Lambda Handler ─────────────────────────────────────────
 
+
 def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
     """Routes /api/ask (POST) and /api/board_ask (POST) only."""
     # Phase 2.2: centralized request envelope validation (Body size cap +
     # injection pattern detection + param format checks). Returns 4xx on abuse.
     try:
-        from request_validator import validate_envelope, ValidationError
+        from request_validator import ValidationError, validate_envelope
+
         path = event.get("rawPath") or event.get("path", "/")
-        method = (event.get("requestContext", {}).get("http", {}).get("method") or
-                  event.get("httpMethod", "POST")).upper()
+        method = (event.get("requestContext", {}).get("http", {}).get("method") or event.get("httpMethod", "POST")).upper()
         validate_envelope(event, path=path, method=method)
     except ImportError:
         pass
@@ -546,10 +568,7 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
         return {"statusCode": 200, "body": "ok"}
 
     path = event.get("rawPath") or event.get("path", "/")
-    method = (
-        event.get("requestContext", {}).get("http", {}).get("method")
-        or event.get("httpMethod", "GET")
-    ).upper()
+    method = (event.get("requestContext", {}).get("http", {}).get("method") or event.get("httpMethod", "GET")).upper()
 
     # CORS preflight
     if method == "OPTIONS":
@@ -582,7 +601,7 @@ def _handle_ask(event: dict) -> dict:
     )
     try:
         question = json.loads(event.get("body") or "{}").get("question", "").strip()[:500]
-        question = re.sub(r'<[^>]+>', '', question)
+        question = re.sub(r"<[^>]+>", "", question)
         if len(question) < 5:
             return _error(400, "Question too short")
 
@@ -617,15 +636,18 @@ def _handle_ask(event: dict) -> dict:
         ctx = _ask_fetch_context()
         system_prompt = _ask_build_prompt(ctx)
 
-        req_body = json.dumps({
-            "model": AI_MODEL_HAIKU,
-            "max_tokens": 600,
-            "system": system_prompt,
-            "messages": [{"role": "user", "content": question}],
-        })
+        req_body = json.dumps(
+            {
+                "model": AI_MODEL_HAIKU,
+                "max_tokens": 600,
+                "system": system_prompt,
+                "messages": [{"role": "user", "content": question}],
+            }
+        )
 
         # ADR-062 (2026-05-27): Bedrock invoke_model (was urllib → api.anthropic.com).
         from bedrock_client import invoke as _bedrock_invoke
+
         result = _bedrock_invoke(json.loads(req_body))
 
         # V2 follow-up: emit token metrics (was dark)
@@ -659,7 +681,11 @@ def _handle_board_ask(event: dict) -> dict:
     # so global enforcement is critical to bound the worst-case bill.
     if _RATE_LIMITER_READY:
         _board_allowed, _board_remaining, _board_retry = _ddb_rate_check(
-            table, endpoint="board_ask", ip_hash=ip_hash, limit=BOARD_RATE_LIMIT, window_seconds=3600,
+            table,
+            endpoint="board_ask",
+            ip_hash=ip_hash,
+            limit=BOARD_RATE_LIMIT,
+            window_seconds=3600,
         )
         if not _board_allowed:
             _emit_rate_limit_metric("board_ask")
@@ -708,16 +734,20 @@ def _handle_board_ask(event: dict) -> dict:
     for pid in personas:
         p = PERSONA_PROMPTS[pid]
         try:
-            req_body = json.dumps({
-                "model": AI_MODEL_HAIKU,
-                "max_tokens": 300,
-                "system": [{
-                    "type": "text",
-                    "text": p["system"],
-                    "cache_control": {"type": "ephemeral"},
-                }],
-                "messages": [{"role": "user", "content": question}],
-            })
+            req_body = json.dumps(
+                {
+                    "model": AI_MODEL_HAIKU,
+                    "max_tokens": 300,
+                    "system": [
+                        {
+                            "type": "text",
+                            "text": p["system"],
+                            "cache_control": {"type": "ephemeral"},
+                        }
+                    ],
+                    "messages": [{"role": "user", "content": question}],
+                }
+            )
             # ADR-062 (2026-05-27): Bedrock invoke_model (was urllib → api.anthropic.com).
             # No retry wrapper — board_ask makes 6 calls/request; a transient
             # Bedrock error on call N degrades cleanly to "[name] temporarily
@@ -725,6 +755,7 @@ def _handle_board_ask(event: dict) -> dict:
             # /var/task via Code.from_asset, so it imports even though site-api-ai
             # runs without the shared layer.
             from bedrock_client import invoke as _bedrock_invoke
+
             result = _bedrock_invoke(json.loads(req_body))
             # V2 follow-up: emit per-persona token metrics (was dark)
             _emit_token_metrics(result.get("usage", {}), endpoint="api_board_ask")

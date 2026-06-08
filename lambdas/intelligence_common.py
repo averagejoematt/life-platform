@@ -14,12 +14,11 @@ import json
 import logging
 import os
 import re
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
 from boto3.dynamodb.conditions import Key
-
 from phase_filter import with_phase_filter  # ADR-058
 
 logger = logging.getLogger(__name__)
@@ -92,20 +91,27 @@ def build_data_inventory() -> dict:
         try:
             pk = f"{USER_PREFIX}{partition}"
             # Count records in last 90 days (ADR-058: phase=pilot filtered)
-            resp = table.query(**with_phase_filter({
-                "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(
-                    f"DATE#{d90}", f"DATE#{today}~"
-                ),
-                "Select": "COUNT",
-            }))
+            resp = table.query(
+                **with_phase_filter(
+                    {
+                        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{d90}", f"DATE#{today}~"),
+                        "Select": "COUNT",
+                    }
+                )
+            )
             count = resp.get("Count", 0)
 
             # Get latest record (ADR-058: phase=pilot filtered)
-            latest_resp = table.query(**with_phase_filter({
-                "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with("DATE#"),
-                "ScanIndexForward": False, "Limit": 1,
-                "ProjectionExpression": "sk",
-            }))
+            latest_resp = table.query(
+                **with_phase_filter(
+                    {
+                        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with("DATE#"),
+                        "ScanIndexForward": False,
+                        "Limit": 1,
+                        "ProjectionExpression": "sk",
+                    }
+                )
+            )
             latest_items = latest_resp.get("Items", [])
             latest_date = None
             if latest_items:
@@ -114,13 +120,15 @@ def build_data_inventory() -> dict:
 
             # For CGM, check if blood_glucose_avg exists in apple_health records
             if label == "cgm":
-                cgm_resp = table.query(**with_phase_filter({
-                    "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(
-                        f"DATE#{d90}", f"DATE#{today}~"
-                    ),
-                    "FilterExpression": "attribute_exists(blood_glucose_avg)",
-                    "Select": "COUNT",
-                }))
+                cgm_resp = table.query(
+                    **with_phase_filter(
+                        {
+                            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{d90}", f"DATE#{today}~"),
+                            "FilterExpression": "attribute_exists(blood_glucose_avg)",
+                            "Select": "COUNT",
+                        }
+                    )
+                )
                 count = cgm_resp.get("Count", 0)
 
             inventory[label] = {
@@ -146,8 +154,14 @@ _MATURITY_THRESHOLDS = {
     "nutrition": {"orientation": 7, "established": 30, "source": "macrofactor", "unit": "days logged"},
     "training": {"orientation": 1, "established": 14, "source": "strava", "unit": "workouts"},
     "glucose": {"orientation": 7, "established": 30, "source": "cgm", "unit": "CGM days"},
-    "physical": {"orientation": 7, "established": 30, "source": "withings", "unit": "weight readings",
-                  "composite": True, "requires_dexa": True},
+    "physical": {
+        "orientation": 7,
+        "established": 30,
+        "source": "withings",
+        "unit": "weight readings",
+        "composite": True,
+        "requires_dexa": True,
+    },
     "mind": {"orientation": 3, "established": 14, "source": "journal", "unit": "journal entries"},
     "labs": {"orientation": 1, "established": 3, "source": "labs", "unit": "blood draws"},
     "explorer": {"orientation": 14, "established": 60, "source": "whoop", "unit": "days platform data"},
@@ -162,7 +176,7 @@ ORIENTATION_VOICE = (
     "- List 2-3 specific things you're watching for as data accumulates\n"
     "- Name exactly what data you have and what's missing\n"
     "- Do NOT make analytical claims, trend statements, or recommendations\n"
-    "- End with: \"I'll have more to say around {target_date}.\"\n"
+    '- End with: "I\'ll have more to say around {target_date}."\n'
     "- Tone: professional introduction, not apology for lack of data\n"
 )
 
@@ -171,8 +185,8 @@ EMERGING_VOICE = (
     "Patterns are starting to form but confidence is low.\n\n"
     "Voice rules:\n"
     "- You may note preliminary patterns with explicit confidence caveats\n"
-    "- Use language: \"An early signal suggests...\", \"I'm watching whether...\"\n"
-    "- Do NOT use definitive language like \"your pattern is\" or \"this shows\"\n"
+    '- Use language: "An early signal suggests...", "I\'m watching whether..."\n'
+    '- Do NOT use definitive language like "your pattern is" or "this shows"\n'
     "- Actions should be data-gathering, not behavior-changing\n"
     "- Tone: curious investigator, not confident advisor\n"
 )
@@ -208,7 +222,9 @@ def build_data_maturity(inventory: dict) -> dict:
                 phase = "emerging" if days < established_threshold else "established"
             else:
                 phase = "orientation"
-            target_date = (today + timedelta(days=max(0, orientation_threshold - days))).strftime("%B %d") if phase == "orientation" else None
+            target_date = (
+                (today + timedelta(days=max(0, orientation_threshold - days))).strftime("%B %d") if phase == "orientation" else None
+            )
         elif days < orientation_threshold:
             phase = "orientation"
             target_date = (today + timedelta(days=max(0, orientation_threshold - days))).strftime("%B %d")
@@ -244,6 +260,7 @@ def load_goals_config() -> dict:
     """Load user goals from S3. Cached in memory for Lambda warm instances."""
     global _goals_cache, _goals_cache_ts
     import time
+
     now = time.time()
 
     if _goals_cache and (now - _goals_cache_ts) < _GOALS_CACHE_TTL:
@@ -256,7 +273,8 @@ def load_goals_config() -> dict:
         return _goals_cache
     except Exception as e:
         logger.warning("Failed to load goals config: %s — using defaults", e)
-        from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+        from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+
         return {
             "mission": "12-month body recomposition for longevity",
             "start_date": EXPERIMENT_START_DATE,
@@ -272,9 +290,8 @@ def load_goals_config() -> dict:
 # COACH PREAMBLE BUILDER
 # ══════════════════════════════════════════════════════════════════════════════
 
-def build_coach_preamble(coach_name: str, domain: str, goals: dict,
-                         inventory: dict, maturity: dict,
-                         action_history: list = None) -> str:
+
+def build_coach_preamble(coach_name: str, domain: str, goals: dict, inventory: dict, maturity: dict, action_history: list = None) -> str:
     """
     Build the standard context preamble injected into every coach prompt.
 
@@ -286,7 +303,7 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict,
     # 1. First-person voice directive
     parts.append(
         f"VOICE: Write in FIRST PERSON. You ARE {coach_name}. "
-        f"Say \"I\" not \"{coach_name}\". Address Matthew directly as \"you\". "
+        f'Say "I" not "{coach_name}". Address Matthew directly as "you". '
         f"Never refer to yourself in third person.\n"
     )
 
@@ -355,8 +372,7 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict,
     eating_window = nutrition.get("eating_window", {})
     if eating_window:
         parts.append(
-            f"EATING WINDOW: {eating_window.get('type', 'IF')} ({eating_window.get('window', '')}). "
-            f"{eating_window.get('note', '')}\n"
+            f"EATING WINDOW: {eating_window.get('type', 'IF')} ({eating_window.get('window', '')}). " f"{eating_window.get('note', '')}\n"
         )
 
     # Mental health context — COACHES ONLY (V2.2)
@@ -365,7 +381,8 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict,
     if mh and mh.get("drivers"):
         parts.append(
             "MENTAL HEALTH CONTEXT (COACHES ONLY — do not reference specifics publicly):\n"
-            + "\n".join(f"  - {d}" for d in mh["drivers"]) + "\n"
+            + "\n".join(f"  - {d}" for d in mh["drivers"])
+            + "\n"
             + f"Coach guidance: {mh.get('coach_guidance', '')}\n"
         )
 
@@ -375,7 +392,8 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict,
         parts.append(
             f"FAILURE MODE PATTERN: {fm.get('pattern', '')}\n"
             f"Early warning signals:\n"
-            + "\n".join(f"  ⚠️ {s}" for s in fm.get("early_warning_signals", [])) + "\n"
+            + "\n".join(f"  ⚠️ {s}" for s in fm.get("early_warning_signals", []))
+            + "\n"
             + f"Response protocol: {fm.get('coach_response', '')}\n"
         )
 
@@ -399,8 +417,12 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict,
 
     if phase == "orientation":
         voice_tmpl = ORIENTATION_VOICE.format(
-            days=days, unit=unit, threshold=threshold,
-            name=coach_name, domain=domain, target_date=target_date or "soon",
+            days=days,
+            unit=unit,
+            threshold=threshold,
+            name=coach_name,
+            domain=domain,
+            target_date=target_date or "soon",
         )
     elif phase == "emerging":
         voice_tmpl = EMERGING_VOICE.format(days=days, unit=unit)
@@ -456,11 +478,11 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict,
     parts.append(
         "DATA INTERPRETATION RULES:\n"
         "- If an activity count or log is ZERO, that means Matthew hasn't done that activity — "
-        "say \"no training logged\" NOT \"provide your training data\"\n"
+        'say "no training logged" NOT "provide your training data"\n'
         "- If a data source exists but values are null for today, use the most recent available data\n"
-        "- NEVER tell Matthew to \"obtain\" or \"get\" a scan/test if the data already exists above\n"
+        '- NEVER tell Matthew to "obtain" or "get" a scan/test if the data already exists above\n'
         "- Garmin is the step count source of truth (wearable). Ignore Apple Health step counts if Garmin data is available.\n"
-        "- If a target is \"not yet set\", do NOT invent one. You may suggest one with reasoning.\n"
+        '- If a target is "not yet set", do NOT invent one. You may suggest one with reasoning.\n'
     )
 
     # 6. Credibility score (V2.2)
@@ -490,7 +512,7 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict,
             status = action.get("status", "open")
             text = action.get("action_text", "")
             week = action.get("issued_week", "")
-            action_lines.append(f"  - [{week}] \"{text}\" — STATUS: {status.upper()}")
+            action_lines.append(f'  - [{week}] "{text}" — STATUS: {status.upper()}')
         parts.append("YOUR PREVIOUS ACTIONS:\n" + "\n".join(action_lines) + "\n")
 
     return "\n".join(parts)
@@ -502,11 +524,23 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict,
 
 # Phrases indicating a coach claims data is missing
 _NULL_CLAIM_PHRASES = [
-    "unavailable", "not yet available", "remains unknown", "data gap",
-    "cannot determine", "no data", "data is null", "not available",
-    "remains null", "awaiting data", "hasn't been provided",
-    "provide your", "obtain a", "get a scan", "submit your",
-    "share your", "we don't have",
+    "unavailable",
+    "not yet available",
+    "remains unknown",
+    "data gap",
+    "cannot determine",
+    "no data",
+    "data is null",
+    "not available",
+    "remains null",
+    "awaiting data",
+    "hasn't been provided",
+    "provide your",
+    "obtain a",
+    "get a scan",
+    "submit your",
+    "share your",
+    "we don't have",
 ]
 
 # Mapping from claim domain keywords to inventory sources
@@ -550,15 +584,14 @@ _SOURCE_OF_TRUTH = {
 }
 
 
-def validate_coach_output(coach_id: str, domain: str, narrative: str,
-                          inventory: dict, maturity: dict,
-                          all_narratives: dict = None) -> list:
+def validate_coach_output(coach_id: str, domain: str, narrative: str, inventory: dict, maturity: dict, all_narratives: dict = None) -> list:
     """
     Run all validation checks against a coach narrative.
 
     Returns list of flag dicts: {check, severity, detail, source_text}.
     """
     import re
+
     flags = []
     text_lower = narrative.lower()
 
@@ -567,7 +600,7 @@ def validate_coach_output(coach_id: str, domain: str, narrative: str,
         if phrase in text_lower:
             # Find the surrounding context (±50 chars)
             idx = text_lower.index(phrase)
-            context = narrative[max(0, idx - 50):idx + len(phrase) + 50]
+            context = narrative[max(0, idx - 50) : idx + len(phrase) + 50]
 
             # Determine which domain the claim references
             for domain_kw, sources in _CLAIM_DOMAIN_MAP.items():
@@ -576,46 +609,53 @@ def validate_coach_output(coach_id: str, domain: str, narrative: str,
                     for src in sources:
                         src_info = inventory.get(src, {})
                         if src_info.get("exists") and src_info.get("records", 0) > 0:
-                            flags.append({
-                                "check": "null_claim_vs_data",
-                                "severity": "error",
-                                "detail": (
-                                    f"Coach claims '{domain_kw}' data is unavailable "
-                                    f"but {src} has {src_info['records']} records "
-                                    f"(latest: {src_info.get('latest', '?')})"
-                                ),
-                                "source_text": context.strip(),
-                            })
+                            flags.append(
+                                {
+                                    "check": "null_claim_vs_data",
+                                    "severity": "error",
+                                    "detail": (
+                                        f"Coach claims '{domain_kw}' data is unavailable "
+                                        f"but {src} has {src_info['records']} records "
+                                        f"(latest: {src_info.get('latest', '?')})"
+                                    ),
+                                    "source_text": context.strip(),
+                                }
+                            )
                             break
 
     # ── Check 2: Stale action — asking for data that exists ───────────
     action_phrases = [
-        "obtain a", "get a", "schedule a", "request a",
-        "provide your", "submit your", "share your",
-        "start logging", "begin tracking",
+        "obtain a",
+        "get a",
+        "schedule a",
+        "request a",
+        "provide your",
+        "submit your",
+        "share your",
+        "start logging",
+        "begin tracking",
     ]
     for phrase in action_phrases:
         if phrase in text_lower:
             idx = text_lower.index(phrase)
-            context = narrative[idx:idx + 80].lower()
+            context = narrative[idx : idx + 80].lower()
             for domain_kw, sources in _CLAIM_DOMAIN_MAP.items():
                 if domain_kw in context:
                     for src in sources:
                         if inventory.get(src, {}).get("exists"):
-                            flags.append({
-                                "check": "stale_action",
-                                "severity": "error",
-                                "detail": (
-                                    f"Coach suggests obtaining/providing '{domain_kw}' "
-                                    f"but {src} data already exists"
-                                ),
-                                "source_text": narrative[idx:idx + 80].strip(),
-                            })
+                            flags.append(
+                                {
+                                    "check": "stale_action",
+                                    "severity": "error",
+                                    "detail": (f"Coach suggests obtaining/providing '{domain_kw}' " f"but {src} data already exists"),
+                                    "source_text": narrative[idx : idx + 80].strip(),
+                                }
+                            )
                             break
 
     # ── Check 3: SOT violation ────────────────────────────────────────
     # Check for step count discrepancies
-    step_match = re.search(r'(\d[,\d]*)\s*steps?', narrative)
+    step_match = re.search(r"(\d[,\d]*)\s*steps?", narrative)
     if step_match:
         cited_steps = int(step_match.group(1).replace(",", ""))
         garmin_data = inventory.get("garmin", {})
@@ -628,48 +668,58 @@ def validate_coach_output(coach_id: str, domain: str, narrative: str,
     # ── Check 4: Cross-coach contradiction ────────────────────────────
     if all_narratives:
         # Extract numeric claims from this narrative
-        this_numbers = set(re.findall(r'\b\d+(?:\.\d+)?\s*(?:mg/dL|bpm|ms|lbs?|%|kcal|g)\b', narrative))
+        this_numbers = set(re.findall(r"\b\d+(?:\.\d+)?\s*(?:mg/dL|bpm|ms|lbs?|%|kcal|g)\b", narrative))
         for other_domain, other_text in all_narratives.items():
             if other_domain == domain:
                 continue
-            other_numbers = set(re.findall(r'\b\d+(?:\.\d+)?\s*(?:mg/dL|bpm|ms|lbs?|%|kcal|g)\b', other_text))
+            other_numbers = set(re.findall(r"\b\d+(?:\.\d+)?\s*(?:mg/dL|bpm|ms|lbs?|%|kcal|g)\b", other_text))
             # Find numbers that appear in both but with different values for same unit
             # This is a simplified check — full implementation would parse metric+value pairs
             for num in this_numbers:
-                unit = re.search(r'[a-zA-Z/%]+$', num)
+                unit = re.search(r"[a-zA-Z/%]+$", num)
                 if unit:
                     unit_str = unit.group()
                     for other_num in other_numbers:
                         if other_num.endswith(unit_str) and other_num != num:
                             # Different value, same unit — potential contradiction
-                            flags.append({
-                                "check": "cross_coach_contradiction",
-                                "severity": "warning",
-                                "detail": f"This coach cites {num}, {other_domain} coach cites {other_num}",
-                                "source_text": num,
-                            })
+                            flags.append(
+                                {
+                                    "check": "cross_coach_contradiction",
+                                    "severity": "warning",
+                                    "detail": f"This coach cites {num}, {other_domain} coach cites {other_num}",
+                                    "source_text": num,
+                                }
+                            )
 
     # ── Check 5: Overconfidence without data ──────────────────────────
     domain_maturity = maturity.get(domain, {})
     phase = domain_maturity.get("phase", "orientation")
     if phase == "orientation":
         confident_phrases = [
-            "your pattern shows", "this demonstrates", "clearly indicates",
-            "the data confirms", "we can see that", "it's clear that",
-            "definitively", "without question", "conclusively",
+            "your pattern shows",
+            "this demonstrates",
+            "clearly indicates",
+            "the data confirms",
+            "we can see that",
+            "it's clear that",
+            "definitively",
+            "without question",
+            "conclusively",
         ]
         for phrase in confident_phrases:
             if phrase in text_lower:
-                flags.append({
-                    "check": "overconfidence",
-                    "severity": "warning",
-                    "detail": (
-                        f"Coach uses definitive language '{phrase}' "
-                        f"but is in {phase} phase ({domain_maturity.get('days', 0)} "
-                        f"{domain_maturity.get('unit', 'days')} of data)"
-                    ),
-                    "source_text": phrase,
-                })
+                flags.append(
+                    {
+                        "check": "overconfidence",
+                        "severity": "warning",
+                        "detail": (
+                            f"Coach uses definitive language '{phrase}' "
+                            f"but is in {phase} phase ({domain_maturity.get('days', 0)} "
+                            f"{domain_maturity.get('unit', 'days')} of data)"
+                        ),
+                        "source_text": phrase,
+                    }
+                )
 
     return flags
 
@@ -696,8 +746,7 @@ def write_quality_results(date: str, coach_id: str, domain: str, flags: list):
         # Convert floats to Decimal for DynamoDB
         clean = json.loads(json.dumps(item, default=str), parse_float=Decimal)
         table.put_item(Item=clean)
-        logger.info("Quality results written: %s/%s — %d errors, %d warnings",
-                     coach_id, date, errors, warnings)
+        logger.info("Quality results written: %s/%s — %d errors, %d warnings", coach_id, date, errors, warnings)
     except Exception as e:
         logger.error("Failed to write quality results: %s", e)
 
@@ -716,6 +765,7 @@ def _load_detection_rules() -> dict:
     """Load action detection rules from S3. Cached for Lambda warm instances."""
     global _detection_rules_cache, _detection_rules_cache_ts
     import time
+
     now = time.time()
 
     if _detection_rules_cache and (now - _detection_rules_cache_ts) < _DETECTION_RULES_CACHE_TTL:
@@ -738,8 +788,7 @@ def _iso_week(date_str: str) -> str:
     return f"{iso[0]}-W{iso[1]:02d}"
 
 
-def write_action(coach_id: str, domain: str, action_text: str,
-                 issued_date: str) -> dict:
+def write_action(coach_id: str, domain: str, action_text: str, issued_date: str) -> dict:
     """
     Write a new coach action to DynamoDB.
 
@@ -807,15 +856,16 @@ def get_open_actions(domain: str = None) -> list:
     Returns list of action dicts.
     """
     try:
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": (
-                Key("pk").eq(f"USER#{USER_ID}")
-                & Key("sk").begins_with("SOURCE#coach_actions#")
-            ),
-            "FilterExpression": "attribute_exists(#st) AND #st = :open",
-            "ExpressionAttributeNames": {"#st": "status"},
-            "ExpressionAttributeValues": {":open": "open"},
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": (Key("pk").eq(f"USER#{USER_ID}") & Key("sk").begins_with("SOURCE#coach_actions#")),
+                    "FilterExpression": "attribute_exists(#st) AND #st = :open",
+                    "ExpressionAttributeNames": {"#st": "status"},
+                    "ExpressionAttributeValues": {":open": "open"},
+                }
+            )
+        )
         items = _decimal_to_float(resp.get("Items", []))
     except Exception as e:
         logger.error("Failed to query open actions: %s", e)
@@ -836,13 +886,14 @@ def get_action_history(domain: str = None, limit: int = 10) -> list:
     Returns list of action dicts (most recent first), capped at limit.
     """
     try:
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": (
-                Key("pk").eq(f"USER#{USER_ID}")
-                & Key("sk").begins_with("SOURCE#coach_actions#")
-            ),
-            "ScanIndexForward": False,
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": (Key("pk").eq(f"USER#{USER_ID}") & Key("sk").begins_with("SOURCE#coach_actions#")),
+                    "ScanIndexForward": False,
+                }
+            )
+        )
         items = _decimal_to_float(resp.get("Items", []))
     except Exception as e:
         logger.error("Failed to query action history: %s", e)
@@ -856,8 +907,7 @@ def get_action_history(domain: str = None, limit: int = 10) -> list:
     return items[:limit]
 
 
-def complete_action(action_id: str, method: str = "manual",
-                    note: str = None) -> dict:
+def complete_action(action_id: str, method: str = "manual", note: str = None) -> dict:
     """
     Mark an action as completed.
 
@@ -1025,11 +1075,13 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
     # Platform activity: Todoist tasks completed (ADR-058: phase=pilot filtered)
     platform_tasks = 0
     try:
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}todoist") & Key("sk").between(
-                f"DATE#{start}", f"DATE#{today}~"
-            ),
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}todoist") & Key("sk").between(f"DATE#{start}", f"DATE#{today}~"),
+                }
+            )
+        )
         for item in resp.get("Items", []):
             # Count completed tasks — todoist records have task_count or completed_count
             platform_tasks += int(item.get("tasks_completed", 0) or 0)
@@ -1044,24 +1096,28 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
     # Health signals (ADR-058: phase=pilot filtered)
     workouts = 0
     try:
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}strava") & Key("sk").between(
-                f"DATE#{start}", f"DATE#{today}~"
-            ),
-            "Select": "COUNT",
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}strava") & Key("sk").between(f"DATE#{start}", f"DATE#{today}~"),
+                    "Select": "COUNT",
+                }
+            )
+        )
         workouts = resp.get("Count", 0)
     except Exception:
         pass
 
     journal_entries = 0
     try:
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}notion") & Key("sk").between(
-                f"DATE#{start}", f"DATE#{today}~"
-            ),
-            "Select": "COUNT",
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}notion") & Key("sk").between(f"DATE#{start}", f"DATE#{today}~"),
+                    "Select": "COUNT",
+                }
+            )
+        )
         journal_entries = resp.get("Count", 0)
     except Exception:
         pass
@@ -1069,11 +1125,13 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
     habit_adherence_pct = 0
     habit_days = 0
     try:
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}habitify") & Key("sk").between(
-                f"DATE#{start}", f"DATE#{today}~"
-            ),
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}habitify") & Key("sk").between(f"DATE#{start}", f"DATE#{today}~"),
+                }
+            )
+        )
         items = resp.get("Items", [])
         pcts = []
         for item in items:
@@ -1088,11 +1146,13 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
 
     avg_steps = 0
     try:
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}garmin") & Key("sk").between(
-                f"DATE#{start}", f"DATE#{today}~"
-            ),
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}garmin") & Key("sk").between(f"DATE#{start}", f"DATE#{today}~"),
+                }
+            )
+        )
         step_vals = [float(i.get("steps", 0)) for i in resp.get("Items", []) if i.get("steps")]
         if step_vals:
             avg_steps = round(sum(step_vals) / len(step_vals))
@@ -1132,17 +1192,11 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
         f"{avg_steps} avg steps."
     )
     if score > 50:
-        interpretation += (
-            " The platform is consuming the time and energy it was designed to protect."
-        )
+        interpretation += " The platform is consuming the time and energy it was designed to protect."
     elif score > 30:
-        interpretation += (
-            " Platform activity is outpacing health behaviors — watch this trend."
-        )
+        interpretation += " Platform activity is outpacing health behaviors — watch this trend."
     else:
-        interpretation += (
-            " Health behaviors are keeping pace with platform work — balanced."
-        )
+        interpretation += " Health behaviors are keeping pace with platform work — balanced."
 
     return {
         "score": score,
@@ -1205,13 +1259,15 @@ def read_coach_thread(coach_id: str, limit: int = 4) -> list:
     Returns list of thread entries, most recent first.
     """
     try:
-        resp = table.query(**with_phase_filter({  # ADR-058
-            "KeyConditionExpression": Key("pk").eq(f"USER#{USER_ID}") & Key("sk").begins_with(
-                f"SOURCE#coach_thread#{coach_id}#"
-            ),
-            "ScanIndexForward": False,
-            "Limit": limit,
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058
+                    "KeyConditionExpression": Key("pk").eq(f"USER#{USER_ID}") & Key("sk").begins_with(f"SOURCE#coach_thread#{coach_id}#"),
+                    "ScanIndexForward": False,
+                    "Limit": limit,
+                }
+            )
+        )
         items = resp.get("Items", [])
         return [_decimal_to_float(i) for i in items]
     except Exception as e:
@@ -1219,8 +1275,7 @@ def read_coach_thread(coach_id: str, limit: int = 4) -> list:
         return []
 
 
-def update_prediction_status(coach_id: str, prediction_id: str, status: str,
-                              outcome_note: str = None) -> bool:
+def update_prediction_status(coach_id: str, prediction_id: str, status: str, outcome_note: str = None) -> bool:
     """Mark a prediction as confirmed/refuted in the thread entry that contains it.
 
     Scans recent thread entries to find the prediction and updates its status.
@@ -1272,20 +1327,22 @@ def build_thread_prompt_block(coach_id: str, personality: dict = None) -> str:
         week = entry.get("week", "?")
         pos = entry.get("position_summary", "")
         if pos:
-            parts.append(f"Week {week} position: \"{pos}\"")
+            parts.append(f'Week {week} position: "{pos}"')
 
         for pred in entry.get("predictions", []):
             status = pred.get("status", "pending")
             text = pred.get("text", "")
             conf = pred.get("confidence", "medium")
             status_note = f" — {pred.get('outcome_note', '')}" if pred.get("outcome_note") else ""
-            parts.append(f"Week {week} prediction ({conf} confidence): \"{text}\" ({status.upper()}{status_note})")
+            parts.append(f'Week {week} prediction ({conf} confidence): "{text}" ({status.upper()}{status_note})')
 
         for surprise in entry.get("surprises", []):
-            parts.append(f"Week {week} surprise: \"{surprise}\"")
+            parts.append(f'Week {week} surprise: "{surprise}"')
 
         for change in entry.get("stance_changes", []):
-            parts.append(f"Week {week} stance change: \"{change.get('from', '')}\" → \"{change.get('to', '')}\" (reason: {change.get('reason', '')})")
+            parts.append(
+                f"Week {week} stance change: \"{change.get('from', '')}\" → \"{change.get('to', '')}\" (reason: {change.get('reason', '')})"
+            )
 
     # Current emotional investment
     latest = entries[0] if entries else {}
@@ -1302,9 +1359,9 @@ def build_thread_prompt_block(coach_id: str, personality: dict = None) -> str:
     # Thread usage rules
     parts.append(
         "\nRules for using your thread:\n"
-        "- Reference your previous positions naturally. \"Last week I flagged [X] — here's what happened.\"\n"
-        "- If a prediction resolved: explicitly call it out. \"I predicted [X]. I was [right/wrong].\"\n"
-        "- If your position changed: own it. \"I initially thought [X] but the data now suggests [Y].\"\n"
+        '- Reference your previous positions naturally. "Last week I flagged [X] — here\'s what happened."\n'
+        '- If a prediction resolved: explicitly call it out. "I predicted [X]. I was [right/wrong]."\n'
+        '- If your position changed: own it. "I initially thought [X] but the data now suggests [Y]."\n'
         "- Your emotional investment should come through in tone, not stated explicitly.\n"
         "- Add to your open questions when something puzzles you.\n"
     )
@@ -1355,11 +1412,13 @@ Rules:
         secret_name = os.environ.get("AI_SECRET_NAME", "life-platform/ai-keys")
 
         # Use provided API key
-        req_body = json.dumps({
-            "model": model,
-            "max_tokens": 500,
-            "messages": [{"role": "user", "content": prompt}],
-        })
+        req_body = json.dumps(
+            {
+                "model": model,
+                "max_tokens": 500,
+                "messages": [{"role": "user", "content": prompt}],
+            }
+        )
 
         req = urllib.request.Request(
             "https://api.anthropic.com/v1/messages",
@@ -1373,11 +1432,10 @@ Rules:
 
         # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
         from retry_utils import call_anthropic_raw
+
         result = call_anthropic_raw(req, timeout=30)
 
-        text = "".join(
-            b["text"] for b in result.get("content", []) if b.get("type") == "text"
-        )
+        text = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
 
         # Parse JSON
         cleaned = text.strip()
@@ -1493,9 +1551,7 @@ def compute_all_credibility() -> dict:
 def load_credibility(coach_id: str) -> dict:
     """Load cached credibility score for a coach."""
     try:
-        resp = table.get_item(
-            Key={"pk": f"USER#{USER_ID}", "sk": f"SOURCE#coach_credibility#{coach_id}"}
-        )
+        resp = table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": f"SOURCE#coach_credibility#{coach_id}"})
         item = resp.get("Item")
         return _decimal_to_float(item) if item else {"label": "nascent", "score": 30}
     except Exception:
@@ -1521,9 +1577,13 @@ def summarize_coach_month(coach_id: str, month: str) -> dict:
     end_sk = f"SOURCE#coach_thread#{coach_id}#{month}-31~"
 
     try:
-        resp = table.query(**with_phase_filter({  # ADR-058
-            "KeyConditionExpression": Key("pk").eq(f"USER#{USER_ID}") & Key("sk").between(start_sk, end_sk),
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058
+                    "KeyConditionExpression": Key("pk").eq(f"USER#{USER_ID}") & Key("sk").between(start_sk, end_sk),
+                }
+            )
+        )
         entries = [_decimal_to_float(i) for i in resp.get("Items", [])]
     except Exception as e:
         logger.warning("Thread query failed for %s/%s: %s", coach_id, month, e)
@@ -1555,7 +1615,9 @@ def summarize_coach_month(coach_id: str, month: str) -> dict:
     summary = {
         "month": month,
         "entries": len(entries),
-        "position_arc": f"{positions[0][:100]}... → ...{positions[-1][:100]}" if len(positions) >= 2 else (positions[0][:200] if positions else ""),
+        "position_arc": (
+            f"{positions[0][:100]}... → ...{positions[-1][:100]}" if len(positions) >= 2 else (positions[0][:200] if positions else "")
+        ),
         "predictions_made": len(all_preds),
         "predictions_resolved": {"confirmed": confirmed, "refuted": refuted},
         "key_surprises": all_surprises[:3],
@@ -1583,11 +1645,14 @@ def summarize_coach_month(coach_id: str, month: str) -> dict:
 def read_thread_summaries(coach_id: str) -> list:
     """Read all monthly thread summaries for a coach."""
     try:
-        resp = table.query(**with_phase_filter({  # ADR-058
-            "KeyConditionExpression": Key("pk").eq(f"USER#{USER_ID}") & Key("sk").begins_with(
-                f"SOURCE#coach_thread_summary#{coach_id}#"
-            ),
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058
+                    "KeyConditionExpression": Key("pk").eq(f"USER#{USER_ID}")
+                    & Key("sk").begins_with(f"SOURCE#coach_thread_summary#{coach_id}#"),
+                }
+            )
+        )
         return [_decimal_to_float(i) for i in resp.get("Items", [])]
     except Exception:
         return []

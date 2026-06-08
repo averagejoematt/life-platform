@@ -7,7 +7,7 @@ disambiguation that's the core of the phantom-failed-habits fix.
 
 import os
 import sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 # Path setup — the Lambda imports `ingestion_framework` and `platform_logger`
@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.join(ROOT, "lambdas", "ingestion"))
 # polluting sys.modules with a partial fake breaks test_http_retry.py when
 # the full suite runs in alphabetical order.
 import types
+
 if "ingestion_framework" not in sys.modules:
     fake = types.ModuleType("ingestion_framework")
     fake.IngestionConfig = lambda **kw: kw
@@ -121,11 +122,17 @@ def test_legacy_habits_field_still_present_and_correct():
     """Backward compat is the whole point of Phase 1 — readers of `habits`
     must continue to get 0/1 binary exactly as before."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    out = transform(_raw([
-        _entry("A", "completed", current=1),
-        _entry("B", "in_progress"),
-        _entry("C", "failed"),
-    ], today), today)
+    out = transform(
+        _raw(
+            [
+                _entry("A", "completed", current=1),
+                _entry("B", "in_progress"),
+                _entry("C", "failed"),
+            ],
+            today,
+        ),
+        today,
+    )
     assert out[0]["habits"]["A"] == Decimal("1")
     assert out[0]["habits"]["B"] == Decimal("0")
     assert out[0]["habits"]["C"] == Decimal("0")
@@ -140,17 +147,24 @@ def test_scheduled_today_is_true_for_current_registry():
 
 # ── TD-11 Phase 2: pending-aware completion_pct ─────────────
 
+
 def test_completion_pct_excludes_pending_today():
     """The phantom-fail fix: mid-day, pending habits do not pull completion_pct
     down. With 1 completed + 3 pending today, the pending-aware pct is 100%
     (1/1 resolved), while the strict legacy interpretation is 25% (1/4)."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    out = transform(_raw([
-        _entry("A", "completed", current=1),
-        _entry("B", "in_progress"),
-        _entry("C", "in_progress"),
-        _entry("D", "in_progress"),
-    ], today), today)
+    out = transform(
+        _raw(
+            [
+                _entry("A", "completed", current=1),
+                _entry("B", "in_progress"),
+                _entry("C", "in_progress"),
+                _entry("D", "in_progress"),
+            ],
+            today,
+        ),
+        today,
+    )
     record = out[0]
     assert record["pending_count"] == 3
     assert record["total_possible"] == 4
@@ -165,12 +179,18 @@ def test_completion_pct_past_day_unchanged():
     so pending-aware and strict interpretations agree — past-data behavior
     is identical to pre-fix."""
     yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
-    out = transform(_raw([
-        _entry("A", "completed", current=1),
-        _entry("B", "failed"),
-        _entry("C", "failed"),
-        _entry("D", "skipped"),
-    ], yesterday), yesterday)
+    out = transform(
+        _raw(
+            [
+                _entry("A", "completed", current=1),
+                _entry("B", "failed"),
+                _entry("C", "failed"),
+                _entry("D", "skipped"),
+            ],
+            yesterday,
+        ),
+        yesterday,
+    )
     record = out[0]
     assert record["pending_count"] == 0
     # 1 / 4 = 0.25 both ways.
@@ -182,10 +202,16 @@ def test_completion_pct_all_pending_today_returns_zero_not_nan():
     """Edge case: every habit pending today → 0 resolved → completion_pct must
     NOT divide by zero. Returns 0 to keep downstream code safe."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    out = transform(_raw([
-        _entry("A", "in_progress"),
-        _entry("B", "in_progress"),
-    ], today), today)
+    out = transform(
+        _raw(
+            [
+                _entry("A", "in_progress"),
+                _entry("B", "in_progress"),
+            ],
+            today,
+        ),
+        today,
+    )
     record = out[0]
     assert record["pending_count"] == 2
     assert float(record["completion_pct"]) == 0.0  # safe fallback

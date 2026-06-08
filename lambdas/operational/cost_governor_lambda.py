@@ -35,6 +35,7 @@ import boto3
 
 try:
     from platform_logger import get_logger
+
     logger = get_logger("cost-governor")
 except ImportError:
     logger = logging.getLogger("cost-governor")
@@ -43,9 +44,7 @@ except ImportError:
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 ACCT = os.environ.get("CDK_ACCOUNT", "205930651321")
 SSM_TIER_PARAM = os.environ.get("BUDGET_TIER_PARAM", "/life-platform/budget-tier")
-ALERTS_TOPIC = os.environ.get(
-    "ALERTS_TOPIC_ARN", f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
-)
+ALERTS_TOPIC = os.environ.get("ALERTS_TOPIC_ARN", f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts")
 MONTHLY_CEILING = float(os.environ.get("MONTHLY_CEILING_USD", "75"))
 # Phase B ships observe-only (emit metrics, don't set tier/alert). Phase C flips
 # this to "false" via env to enable enforcement once the estimate is validated.
@@ -56,8 +55,8 @@ OBSERVE_MODE = os.environ.get("OBSERVE_MODE", "true").lower() in ("1", "true", "
 # (a buffer below) so the estimate never under-counts the real bill.
 _PRICES = {
     "sonnet": {"in": 3.00, "out": 15.00, "cache_read": 0.30, "cache_write": 3.75},
-    "haiku":  {"in": 1.00, "out": 5.00,  "cache_read": 0.10, "cache_write": 1.25},
-    "opus":   {"in": 5.00, "out": 25.00, "cache_read": 0.50, "cache_write": 6.25},
+    "haiku": {"in": 1.00, "out": 5.00, "cache_read": 0.10, "cache_write": 1.25},
+    "opus": {"in": 5.00, "out": 25.00, "cache_read": 0.50, "cache_write": 6.25},
 }
 _DEFAULT_PRICE = _PRICES["sonnet"]  # unknown model → price as the most expensive tier
 _AI_SAFETY_BUFFER = 1.15  # bias the AI estimate high so we degrade early, never overshoot
@@ -153,11 +152,9 @@ def _ai_cost(start: datetime, now: datetime) -> float:
         out = _bedrock_metric_sum("OutputTokenCount", model_id, start, now)
         cr = _bedrock_metric_sum("CacheReadInputTokenCount", model_id, start, now)
         cw = _bedrock_metric_sum("CacheWriteInputTokenCount", model_id, start, now)
-        cost = (inp * p["in"] + out * p["out"]
-                + cr * p["cache_read"] + cw * p["cache_write"]) / 1_000_000
+        cost = (inp * p["in"] + out * p["out"] + cr * p["cache_read"] + cw * p["cache_write"]) / 1_000_000
         if cost:
-            logger.info(f"AI model {model_id}: in={inp:.0f} out={out:.0f} "
-                        f"cache_r={cr:.0f} cache_w={cw:.0f} → ${cost:.2f}")
+            logger.info(f"AI model {model_id}: in={inp:.0f} out={out:.0f} " f"cache_r={cr:.0f} cache_w={cw:.0f} → ${cost:.2f}")
         total += cost
     return total * _AI_SAFETY_BUFFER
 
@@ -168,8 +165,12 @@ def _ai_active_days(month_start: datetime, now: datetime) -> int:
     dilute it — we project over the days AI was actually billing instead."""
     try:
         resp = _cw.get_metric_statistics(
-            Namespace="AWS/Bedrock", MetricName="InputTokenCount",
-            StartTime=month_start, EndTime=now, Period=86400, Statistics=["Sum"],
+            Namespace="AWS/Bedrock",
+            MetricName="InputTokenCount",
+            StartTime=month_start,
+            EndTime=now,
+            Period=86400,
+            Statistics=["Sum"],
         )
         return sum(1 for d in resp.get("Datapoints", []) if d["Sum"] > 0)
     except Exception as e:
@@ -229,9 +230,7 @@ def _read_tier() -> int:
 
 
 def _write_tier(tier: int) -> None:
-    _ssm.put_parameter(
-        Name=SSM_TIER_PARAM, Value=str(tier), Type="String", Overwrite=True
-    )
+    _ssm.put_parameter(Name=SSM_TIER_PARAM, Value=str(tier), Type="String", Overwrite=True)
 
 
 _TIER_LABELS = {
@@ -315,13 +314,22 @@ def lambda_handler(event, context):
         # do NOT write SSM or alert — lets us validate the estimate vs the real
         # AWS bill for a few days before enforcement (Phase C sets OBSERVE_MODE=false).
         if OBSERVE_MODE:
-            return {"statusCode": 200, "body": json.dumps({
-                "observe_mode": True, "non_ai_mtd": round(non_ai, 2),
-                "ai_mtd": round(ai, 2), "ai_per_day": round(ai_daily, 2),
-                "mtd_total": round(mtd, 2), "projected": round(projected, 2),
-                "computed_tier": computed_tier, "active_tier": prev,
-                "ceiling": MONTHLY_CEILING,
-            })}
+            return {
+                "statusCode": 200,
+                "body": json.dumps(
+                    {
+                        "observe_mode": True,
+                        "non_ai_mtd": round(non_ai, 2),
+                        "ai_mtd": round(ai, 2),
+                        "ai_per_day": round(ai_daily, 2),
+                        "mtd_total": round(mtd, 2),
+                        "projected": round(projected, 2),
+                        "computed_tier": computed_tier,
+                        "active_tier": prev,
+                        "ceiling": MONTHLY_CEILING,
+                    }
+                ),
+            }
 
         # force_tier in the event lets an AWS-Budgets action pin a floor.
         tier = computed_tier
@@ -333,12 +341,21 @@ def lambda_handler(event, context):
             _write_tier(tier)
             _alert(prev, tier, mtd, projected)
 
-        return {"statusCode": 200, "body": json.dumps({
-            "non_ai_mtd": round(non_ai, 2), "ai_mtd": round(ai, 2),
-            "ai_per_day": round(ai_daily, 2), "mtd_total": round(mtd, 2),
-            "projected": round(projected, 2), "tier": tier, "prev_tier": prev,
-            "ceiling": MONTHLY_CEILING,
-        })}
+        return {
+            "statusCode": 200,
+            "body": json.dumps(
+                {
+                    "non_ai_mtd": round(non_ai, 2),
+                    "ai_mtd": round(ai, 2),
+                    "ai_per_day": round(ai_daily, 2),
+                    "mtd_total": round(mtd, 2),
+                    "projected": round(projected, 2),
+                    "tier": tier,
+                    "prev_tier": prev,
+                    "ceiling": MONTHLY_CEILING,
+                }
+            ),
+        }
     except Exception as e:
         logger.error("cost_governor failed: %s", e, exc_info=True)
         raise

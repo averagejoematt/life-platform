@@ -1,51 +1,103 @@
 """
 Lifestyle tools: insights, supplements, weather, social, meditation, travel, BP, experiments, gait, energy, movement, state_of_mind.
 """
+
 import json
-import urllib.request
+import logging
 import math
 import re
-import logging
-from datetime import datetime, timedelta, timezone
+import urllib.request
 from collections import defaultdict
-from boto3.dynamodb.conditions import Key
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+from boto3.dynamodb.conditions import Key
+
 from mcp.config import (
-    table, s3_client, S3_BUCKET, USER_PREFIX, USER_ID, SOURCES,
-    P40_GROUPS, FIELD_ALIASES, logger,
-    INSIGHTS_PK, EXPERIMENTS_PK, TRAVEL_PK, RUCK_PK,
+    EXPERIMENTS_PK,
+    FIELD_ALIASES,
+    INSIGHTS_PK,
+    P40_GROUPS,
+    RUCK_PK,
+    S3_BUCKET,
+    SOURCES,
+    TRAVEL_PK,
+    USER_ID,
+    USER_PREFIX,
+    logger,
+    s3_client,
+    table,
 )
 from mcp.core import (
-    query_source, parallel_query_sources, query_source_range,
-    get_profile, get_sot, decimal_to_float,
-    ddb_cache_get, ddb_cache_set, mem_cache_get, mem_cache_set,
-    date_diff_days, resolve_field,
+    date_diff_days,
+    ddb_cache_get,
+    ddb_cache_set,
+    decimal_to_float,
+    get_profile,
+    get_sot,
+    mem_cache_get,
+    mem_cache_set,
+    parallel_query_sources,
+    query_source,
+    query_source_range,
+    resolve_field,
 )
 from mcp.helpers import (
-    aggregate_items, flatten_strava_activity,
-    compute_daily_load_score, compute_ewa, pearson_r, _linear_regression,
-    classify_day_type, query_chronicling, _habit_series,
+    _habit_series,
+    _linear_regression,
+    aggregate_items,
+    classify_day_type,
+    compute_daily_load_score,
+    compute_ewa,
+    flatten_strava_activity,
     normalize_whoop_sleep,
+    pearson_r,
+    query_chronicling,
 )
 from mcp.labs_helpers import (
-    _get_genome_cached, _query_all_lab_draws, _query_dexa_scans,
-    _query_lab_meta, _genome_context_for_biomarkers,
+    _genome_context_for_biomarkers,
+    _get_genome_cached,
+    _query_all_lab_draws,
+    _query_dexa_scans,
+    _query_lab_meta,
 )
 
 # ── Travel constants ──
 
 _TZ_OFFSETS = {
-    "America/Los_Angeles": -8, "America/Denver": -7, "America/Chicago": -6,
-    "America/New_York": -5, "America/Anchorage": -9, "Pacific/Honolulu": -10,
-    "Europe/London": 0, "Europe/Paris": 1, "Europe/Berlin": 1, "Europe/Rome": 1,
-    "Europe/Madrid": 1, "Europe/Amsterdam": 1, "Europe/Zurich": 1,
-    "Asia/Tokyo": 9, "Asia/Shanghai": 8, "Asia/Hong_Kong": 8, "Asia/Singapore": 8,
-    "Asia/Seoul": 9, "Asia/Bangkok": 7, "Asia/Dubai": 4, "Asia/Kolkata": 5.5,
-    "Australia/Sydney": 10, "Australia/Melbourne": 10, "Australia/Perth": 8,
-    "Pacific/Auckland": 12, "America/Sao_Paulo": -3, "America/Mexico_City": -6,
-    "America/Toronto": -5, "America/Vancouver": -8, "Africa/Cairo": 2,
-    "America/Lima": -5, "America/Bogota": -5, "America/Buenos_Aires": -3,
+    "America/Los_Angeles": -8,
+    "America/Denver": -7,
+    "America/Chicago": -6,
+    "America/New_York": -5,
+    "America/Anchorage": -9,
+    "Pacific/Honolulu": -10,
+    "Europe/London": 0,
+    "Europe/Paris": 1,
+    "Europe/Berlin": 1,
+    "Europe/Rome": 1,
+    "Europe/Madrid": 1,
+    "Europe/Amsterdam": 1,
+    "Europe/Zurich": 1,
+    "Asia/Tokyo": 9,
+    "Asia/Shanghai": 8,
+    "Asia/Hong_Kong": 8,
+    "Asia/Singapore": 8,
+    "Asia/Seoul": 9,
+    "Asia/Bangkok": 7,
+    "Asia/Dubai": 4,
+    "Asia/Kolkata": 5.5,
+    "Australia/Sydney": 10,
+    "Australia/Melbourne": 10,
+    "Australia/Perth": 8,
+    "Pacific/Auckland": 12,
+    "America/Sao_Paulo": -3,
+    "America/Mexico_City": -6,
+    "America/Toronto": -5,
+    "America/Vancouver": -8,
+    "Africa/Cairo": 2,
+    "America/Lima": -5,
+    "America/Bogota": -5,
+    "America/Buenos_Aires": -3,
 }
 HOME_TZ = "America/Los_Angeles"
 HOME_OFFSET = _TZ_OFFSETS[HOME_TZ]
@@ -79,28 +131,28 @@ def _is_traveling(date_str=None):
 
 _EXPERIMENT_METRICS = [
     # Sleep
-    ("whoop",      "sleep_score",               "Sleep Score",          True),   # normalized from sleep_quality_score
-    ("whoop",      "sleep_efficiency_pct",      "Sleep Efficiency %",   True),   # normalized from sleep_efficiency_percentage
-    ("whoop",      "deep_pct",                  "Deep Sleep %",         True),   # normalized from slow_wave_sleep_hours
-    ("whoop",      "rem_pct",                   "REM Sleep %",          True),   # normalized from rem_sleep_hours
-    ("eightsleep", "sleep_onset_latency_min",    "Sleep Onset Latency",  False),  # Eight Sleep only — Whoop doesn't track
+    ("whoop", "sleep_score", "Sleep Score", True),  # normalized from sleep_quality_score
+    ("whoop", "sleep_efficiency_pct", "Sleep Efficiency %", True),  # normalized from sleep_efficiency_percentage
+    ("whoop", "deep_pct", "Deep Sleep %", True),  # normalized from slow_wave_sleep_hours
+    ("whoop", "rem_pct", "REM Sleep %", True),  # normalized from rem_sleep_hours
+    ("eightsleep", "sleep_onset_latency_min", "Sleep Onset Latency", False),  # Eight Sleep only — Whoop doesn't track
     # Recovery
-    ("whoop",      "recovery_score",             "Whoop Recovery",       True),
-    ("whoop",      "hrv_rmssd",                  "HRV (rMSSD)",         True),
-    ("whoop",      "resting_heart_rate",         "Resting HR",          False),
+    ("whoop", "recovery_score", "Whoop Recovery", True),
+    ("whoop", "hrv_rmssd", "HRV (rMSSD)", True),
+    ("whoop", "resting_heart_rate", "Resting HR", False),
     # Stress & Energy
-    ("garmin",     "average_stress_level",       "Garmin Stress",       False),
-    ("garmin",     "body_battery_high",          "Body Battery Peak",   True),
+    ("garmin", "average_stress_level", "Garmin Stress", False),
+    ("garmin", "body_battery_high", "Body Battery Peak", True),
     # Body
-    ("withings",   "weight_lbs",                 "Weight (lbs)",        None),  # direction depends on goal
+    ("withings", "weight_lbs", "Weight (lbs)", None),  # direction depends on goal
     # Nutrition
-    ("macrofactor", "calories",                  "Calories",            None),
-    ("macrofactor", "protein_g",                 "Protein (g)",         None),
+    ("macrofactor", "calories", "Calories", None),
+    ("macrofactor", "protein_g", "Protein (g)", None),
     # Movement
-    ("apple_health", "steps",                    "Steps",               True),
+    ("apple_health", "steps", "Steps", True),
     # Glucose (if available)
-    ("apple_health", "cgm_mean_glucose",         "Mean Glucose",        False),
-    ("apple_health", "cgm_time_in_range_pct",    "CGM Time in Range %", True),
+    ("apple_health", "cgm_mean_glucose", "Mean Glucose", False),
+    ("apple_health", "cgm_time_in_range_pct", "CGM Time in Range %", True),
 ]
 
 
@@ -198,6 +250,7 @@ def _fetch_weather_range(start_date, end_date):
                 }
                 try:
                     from decimal import Decimal
+
                     def _to_decimal(obj):
                         if isinstance(obj, float):
                             return Decimal(str(round(obj, 4)))
@@ -206,6 +259,7 @@ def _fetch_weather_range(start_date, end_date):
                         if isinstance(obj, list):
                             return [_to_decimal(v) for v in obj]
                         return obj
+
                     table.put_item(Item=_to_decimal(db_item))
                 except Exception as e:
                     logger.warning(f"Weather cache write failed for {date_str}: {e}")
@@ -253,25 +307,25 @@ def tool_save_insight(args):
     sk = f"INSIGHT#{ts}"
 
     item = {
-        "pk":           INSIGHTS_PK,
-        "sk":           sk,
-        "insight_id":   insight_id,
-        "text":         text,
-        "date_saved":   now.strftime("%Y-%m-%d"),
-        "source":       source,
-        "status":       "open",
+        "pk": INSIGHTS_PK,
+        "sk": sk,
+        "insight_id": insight_id,
+        "text": text,
+        "date_saved": now.strftime("%Y-%m-%d"),
+        "source": source,
+        "status": "open",
         "outcome_notes": "",
-        "tags":         tags,
+        "tags": tags,
     }
     table.put_item(Item=item)
     logger.info(f"save_insight: saved insight_id={insight_id}")
     return {
-        "saved":        True,
-        "insight_id":   insight_id,
-        "date_saved":   item["date_saved"],
+        "saved": True,
+        "insight_id": insight_id,
+        "date_saved": item["date_saved"],
         "text_preview": text[:120] + ("…" if len(text) > 120 else ""),
-        "tags":         tags,
-        "source":       source,
+        "tags": tags,
+        "source": source,
     }
 
 
@@ -285,11 +339,16 @@ def tool_get_insights(args):
     today = datetime.now(timezone.utc).date()
 
     from mcp.core import _apply_phase_filter  # ADR-058
-    resp = table.query(**_apply_phase_filter({
-        "KeyConditionExpression": Key("pk").eq(INSIGHTS_PK) & Key("sk").begins_with("INSIGHT#"),
-        "ScanIndexForward": False,  # newest first
-        "Limit": 200,
-    }))
+
+    resp = table.query(
+        **_apply_phase_filter(
+            {
+                "KeyConditionExpression": Key("pk").eq(INSIGHTS_PK) & Key("sk").begins_with("INSIGHT#"),
+                "ScanIndexForward": False,  # newest first
+                "Limit": 200,
+            }
+        )
+    )
     items = resp.get("Items", [])
 
     results = []
@@ -304,26 +363,28 @@ def tool_get_insights(args):
         except Exception:
             days_open = None
 
-        results.append({
-            "insight_id":    item.get("insight_id", ""),
-            "text":          item.get("text", ""),
-            "date_saved":    date_saved,
-            "days_open":     days_open,
-            "source":        item.get("source", "chat"),
-            "status":        status,
-            "outcome_notes": item.get("outcome_notes", ""),
-            "tags":          item.get("tags", []),
-            "stale":         (days_open is not None and days_open > 14 and status == "open"),
-        })
+        results.append(
+            {
+                "insight_id": item.get("insight_id", ""),
+                "text": item.get("text", ""),
+                "date_saved": date_saved,
+                "days_open": days_open,
+                "source": item.get("source", "chat"),
+                "status": status,
+                "outcome_notes": item.get("outcome_notes", ""),
+                "tags": item.get("tags", []),
+                "stale": (days_open is not None and days_open > 14 and status == "open"),
+            }
+        )
         if len(results) >= limit:
             break
 
     stale_count = sum(1 for r in results if r["stale"])
     return {
-        "total":         len(results),
-        "stale_count":   stale_count,
+        "total": len(results),
+        "stale_count": stale_count,
         "status_filter": status_filter or "all",
-        "insights":      results,
+        "insights": results,
     }
 
 
@@ -360,11 +421,11 @@ def tool_update_insight_outcome(args):
     )
     logger.info(f"update_insight_outcome: insight_id={insight_id} status={new_status}")
     return {
-        "updated":       True,
-        "insight_id":    insight_id,
-        "status":        new_status,
+        "updated": True,
+        "insight_id": insight_id,
+        "status": new_status,
         "outcome_notes": outcome_notes,
-        "text_preview":  existing.get("text", "")[:120],
+        "text_preview": existing.get("text", "")[:120],
     }
 
 
@@ -436,8 +497,12 @@ def tool_get_supplement_log(args):
 
     items = query_source("supplements", start_date, end_date)
     if not items:
-        return {"error": "No supplement data for range.", "start_date": start_date, "end_date": end_date,
-                "tip": "Use log_supplement to start tracking. Example: log 500mg magnesium glycinate before bed."}
+        return {
+            "error": "No supplement data for range.",
+            "start_date": start_date,
+            "end_date": end_date,
+            "tip": "Use log_supplement to start tracking. Example: log 500mg magnesium glycinate before bed.",
+        }
 
     all_entries = []
     by_supplement = {}
@@ -470,8 +535,7 @@ def tool_get_supplement_log(args):
             by_date[date] = day_entries
 
     if not all_entries:
-        return {"error": f"No entries found{' for ' + name_filter if name_filter else ''}.",
-                "start_date": start_date, "end_date": end_date}
+        return {"error": f"No entries found{' for ' + name_filter if name_filter else ''}.", "start_date": start_date, "end_date": end_date}
 
     # Total days in range
     d_start = datetime.strptime(start_date, "%Y-%m-%d")
@@ -484,21 +548,30 @@ def tool_get_supplement_log(args):
     for key, data in sorted(by_supplement.items(), key=lambda x: x[1]["days_taken"], reverse=True):
         avg_dose = round(sum(data["doses"]) / len(data["doses"]), 1) if data["doses"] else None
         adherence_pct = round(data["days_taken"] / total_days * 100, 1)
-        supplement_summary.append({
-            "name": data["name"],
-            "days_taken": data["days_taken"],
-            "adherence_pct": adherence_pct,
-            "avg_dose": avg_dose,
-            "unit": data["entries"][0].get("unit", "") if data["entries"] else "",
-            "typical_timings": sorted(data["timings"]),
-            "category": data["entries"][0].get("category", "supplement") if data["entries"] else "",
-        })
+        supplement_summary.append(
+            {
+                "name": data["name"],
+                "days_taken": data["days_taken"],
+                "adherence_pct": adherence_pct,
+                "avg_dose": avg_dose,
+                "unit": data["entries"][0].get("unit", "") if data["entries"] else "",
+                "typical_timings": sorted(data["timings"]),
+                "category": data["entries"][0].get("category", "supplement") if data["entries"] else "",
+            }
+        )
 
     # Recent log (last 7 days)
     recent = {}
     for date in sorted(by_date.keys(), reverse=True)[:7]:
-        recent[date] = [{"name": e.get("name"), "dose": float(e["dose"]) if e.get("dose") else None,
-                         "unit": e.get("unit", ""), "timing": e.get("timing", "")} for e in by_date[date]]
+        recent[date] = [
+            {
+                "name": e.get("name"),
+                "dose": float(e["dose"]) if e.get("dose") else None,
+                "unit": e.get("unit", ""),
+                "timing": e.get("timing", ""),
+            }
+            for e in by_date[date]
+        ]
 
     return {
         "period": {"start_date": start_date, "end_date": end_date},
@@ -532,7 +605,7 @@ def tool_get_supplement_correlation(args):
     # Find days with and without this supplement
     days_with = set()
     for item in supp_items:
-        for entry in (item.get("supplements") or []):
+        for entry in item.get("supplements") or []:
             if supplement_name in (entry.get("name") or "").lower():
                 days_with.add(item.get("date"))
 
@@ -540,9 +613,12 @@ def tool_get_supplement_correlation(args):
         return {"error": f"No entries found for '{supplement_name}'.", "start_date": start_date, "end_date": end_date}
 
     def _sf(v):
-        if v is None: return None
-        try: return float(v)
-        except (ValueError, TypeError): return None
+        if v is None:
+            return None
+        try:
+            return float(v)
+        except (ValueError, TypeError):
+            return None
 
     def _avg(vals):
         v = [x for x in vals if x is not None]
@@ -615,15 +691,17 @@ def tool_get_supplement_correlation(args):
             else:
                 effect = "positive" if delta < 0 else ("negative" if delta > 0 else "neutral")
 
-            comparisons.append({
-                "metric": label,
-                "avg_with_supplement": avg_with,
-                "avg_without_supplement": avg_without,
-                "delta": delta,
-                "effect": effect,
-                "n_with": len(with_vals),
-                "n_without": len(without_vals),
-            })
+            comparisons.append(
+                {
+                    "metric": label,
+                    "avg_with_supplement": avg_with,
+                    "avg_without_supplement": avg_without,
+                    "delta": delta,
+                    "effect": effect,
+                    "n_with": len(with_vals),
+                    "n_without": len(without_vals),
+                }
+            )
 
     # Board of Directors
     bod = []
@@ -632,10 +710,14 @@ def tool_get_supplement_correlation(args):
 
     if positive_effects:
         metrics = ", ".join([c["metric"] for c in positive_effects[:3]])
-        bod.append(f"Attia: {supplement_name.title()} shows positive association with {metrics}. Correlation ≠ causation — consider running a formal N=1 experiment with create_experiment.")
+        bod.append(
+            f"Attia: {supplement_name.title()} shows positive association with {metrics}. Correlation ≠ causation — consider running a formal N=1 experiment with create_experiment."
+        )
     if negative_effects:
         metrics = ", ".join([c["metric"] for c in negative_effects[:3]])
-        bod.append(f"Huberman: Possible negative association with {metrics}. Check timing and dosage — many supplements are timing-dependent.")
+        bod.append(
+            f"Huberman: Possible negative association with {metrics}. Check timing and dosage — many supplements are timing-dependent."
+        )
     if len(days_with) < 14:
         bod.append(f"Attia: Only {len(days_with)} days of data. Minimum 14 days recommended for meaningful N=1 analysis.")
     if not comparisons:
@@ -670,9 +752,12 @@ def tool_get_weather_correlation(args):
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     def _sf(v):
-        if v is None: return None
-        try: return float(v)
-        except (ValueError, TypeError): return None
+        if v is None:
+            return None
+        try:
+            return float(v)
+        except (ValueError, TypeError):
+            return None
 
     def _avg(vals):
         v = [x for x in vals if x is not None]
@@ -748,10 +833,12 @@ def tool_get_weather_correlation(args):
             xs, ys = [], []
             for d, w in weather_by_date.items():
                 wv = _sf(w.get(wvar))
-                if wv is None: continue
+                if wv is None:
+                    continue
                 hv = _sf(health_sources.get(src, {}).get(d, {}).get(field))
                 if hv is not None:
-                    xs.append(wv); ys.append(hv)
+                    xs.append(wv)
+                    ys.append(hv)
             r = pearson_r(xs, ys) if len(xs) >= 10 else None
             if r is not None:
                 correlations[wvar]["health_correlations"][field] = {"label": hlabel, "pearson_r": r, "n": len(xs)}
@@ -760,10 +847,12 @@ def tool_get_weather_correlation(args):
             xs, ys = [], []
             for d, w in weather_by_date.items():
                 wv = _sf(w.get(wvar))
-                if wv is None: continue
+                if wv is None:
+                    continue
                 jv = journal_by_date.get(d, {}).get(jfield)
                 if jv is not None:
-                    xs.append(wv); ys.append(jv)
+                    xs.append(wv)
+                    ys.append(jv)
             r = pearson_r(xs, ys) if len(xs) >= 10 else None
             if r is not None:
                 correlations[wvar]["journal_correlations"][jfield] = {"label": jlabel, "pearson_r": r, "n": len(xs)}
@@ -793,7 +882,12 @@ def tool_get_weather_correlation(args):
         seasonal = {
             "first_half_avg_daylight": _avg([_sf(w.get("daylight_hours")) for w in first_half]),
             "second_half_avg_daylight": _avg([_sf(w.get("daylight_hours")) for w in second_half]),
-            "daylight_trend": "increasing" if (_avg([_sf(w.get("daylight_hours")) for w in second_half]) or 0) > (_avg([_sf(w.get("daylight_hours")) for w in first_half]) or 0) else "decreasing",
+            "daylight_trend": (
+                "increasing"
+                if (_avg([_sf(w.get("daylight_hours")) for w in second_half]) or 0)
+                > (_avg([_sf(w.get("daylight_hours")) for w in first_half]) or 0)
+                else "decreasing"
+            ),
         }
 
     # Find strongest correlations
@@ -809,18 +903,26 @@ def tool_get_weather_correlation(args):
     bod = []
     daylight_mood = correlations.get("daylight_hours", {}).get("journal_correlations", {}).get("morning_mood", {})
     if daylight_mood and daylight_mood.get("pearson_r", 0) > 0.15:
-        bod.append(f"Huberman: Daylight correlates with your mood (r={daylight_mood['pearson_r']}). Morning sunlight within 30 min of waking is the single highest-ROI circadian intervention.")
-    
+        bod.append(
+            f"Huberman: Daylight correlates with your mood (r={daylight_mood['pearson_r']}). Morning sunlight within 30 min of waking is the single highest-ROI circadian intervention."
+        )
+
     sunshine_sleep = correlations.get("sunshine_hours", {}).get("health_correlations", {}).get("sleep_score", {})
     if sunshine_sleep and sunshine_sleep.get("pearson_r", 0) > 0.15:
-        bod.append(f"Walker: More sunshine correlates with better sleep (r={sunshine_sleep['pearson_r']}). Light exposure during the day strengthens the circadian sleep drive.")
+        bod.append(
+            f"Walker: More sunshine correlates with better sleep (r={sunshine_sleep['pearson_r']}). Light exposure during the day strengthens the circadian sleep drive."
+        )
 
     pressure_corrs = correlations.get("pressure_hpa", {}).get("health_correlations", {})
     if any(abs(c.get("pearson_r", 0)) > 0.2 for c in pressure_corrs.values()):
-        bod.append("Attia: Barometric pressure shows correlation with your health metrics. Low-pressure systems (storms) can affect joint inflammation, headaches, and autonomic function.")
+        bod.append(
+            "Attia: Barometric pressure shows correlation with your health metrics. Low-pressure systems (storms) can affect joint inflammation, headaches, and autonomic function."
+        )
 
     if weather_summary.get("rainy_days", 0) > weather_summary.get("total_days", 1) * 0.5:
-        bod.append("Note: Seattle's rain prevalence means outdoor light exposure requires intentionality. Consider a 10,000 lux light therapy lamp for morning use during dark months.")
+        bod.append(
+            "Note: Seattle's rain prevalence means outdoor light exposure requires intentionality. Consider a 10,000 lux light therapy lamp for morning use during dark months."
+        )
 
     return {
         "period": {"start_date": start_date, "end_date": end_date},
@@ -850,9 +952,12 @@ def tool_get_social_connection_trend(args):
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     def _sf(v):
-        if v is None: return None
-        try: return float(v)
-        except (ValueError, TypeError): return None
+        if v is None:
+            return None
+        try:
+            return float(v)
+        except (ValueError, TypeError):
+            return None
 
     def _avg(vals):
         v = [x for x in vals if x is not None]
@@ -896,10 +1001,10 @@ def tool_get_social_connection_trend(args):
     rolling_7d = []
     rolling_30d = []
     for i, d in enumerate(sorted_dates):
-        w7 = scores[max(0, i-6):i+1]
-        w30 = scores[max(0, i-29):i+1]
-        rolling_7d.append({"date": d, "avg": round(sum(w7)/len(w7), 2)})
-        rolling_30d.append({"date": d, "avg": round(sum(w30)/len(w30), 2)})
+        w7 = scores[max(0, i - 6) : i + 1]
+        w30 = scores[max(0, i - 29) : i + 1]
+        rolling_7d.append({"date": d, "avg": round(sum(w7) / len(w7), 2)})
+        rolling_30d.append({"date": d, "avg": round(sum(w30) / len(w30), 2)})
 
     current_streak = 0
     longest_streak = 0
@@ -925,8 +1030,10 @@ def tool_get_social_connection_trend(args):
 
     health_correlations = []
     HEALTH_SOURCES = [
-        ("whoop", "recovery_score", "Recovery"), ("whoop", "hrv", "HRV"),
-        ("whoop", "sleep_score", "Sleep Score"), ("garmin", "avg_stress", "Stress"),
+        ("whoop", "recovery_score", "Recovery"),
+        ("whoop", "hrv", "HRV"),
+        ("whoop", "sleep_score", "Sleep Score"),
+        ("garmin", "avg_stress", "Stress"),
         ("garmin", "body_battery_high", "Body Battery"),
     ]
     health_data = {}
@@ -947,13 +1054,14 @@ def tool_get_social_connection_trend(args):
                 ys.append(hv)
         if len(xs) >= 10:
             n = len(xs)
-            mx, my = sum(xs)/n, sum(ys)/n
-            cov = sum((x-mx)*(y-my) for x, y in zip(xs, ys)) / n
-            sx = (sum((x-mx)**2 for x in xs) / n) ** 0.5
-            sy = (sum((y-my)**2 for y in ys) / n) ** 0.5
+            mx, my = sum(xs) / n, sum(ys) / n
+            cov = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / n
+            sx = (sum((x - mx) ** 2 for x in xs) / n) ** 0.5
+            sy = (sum((y - my) ** 2 for y in ys) / n) ** 0.5
             r = round(cov / (sx * sy), 3) if sx > 0 and sy > 0 else 0
-            health_correlations.append({"metric": label, "r": r, "n": n,
-                                        "interpretation": "strong" if abs(r) > 0.5 else "moderate" if abs(r) > 0.3 else "weak"})
+            health_correlations.append(
+                {"metric": label, "r": r, "n": n, "interpretation": "strong" if abs(r) > 0.5 else "moderate" if abs(r) > 0.3 else "weak"}
+            )
 
     journal_correlations = []
     for field_data, label in [(daily_mood, "Mood"), (daily_energy, "Energy"), (daily_stress, "Stress")]:
@@ -964,10 +1072,10 @@ def tool_get_social_connection_trend(args):
                 ys.append(field_data[d])
         if len(xs) >= 10:
             n = len(xs)
-            mx, my = sum(xs)/n, sum(ys)/n
-            cov = sum((x-mx)*(y-my) for x, y in zip(xs, ys)) / n
-            sx = (sum((x-mx)**2 for x in xs) / n) ** 0.5
-            sy = (sum((y-my)**2 for y in ys) / n) ** 0.5
+            mx, my = sum(xs) / n, sum(ys) / n
+            cov = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / n
+            sx = (sum((x - mx) ** 2 for x in xs) / n) ** 0.5
+            sy = (sum((y - my) ** 2 for y in ys) / n) ** 0.5
             r = round(cov / (sx * sy), 3) if sx > 0 and sy > 0 else 0
             journal_correlations.append({"metric": label, "r": r, "n": n})
 
@@ -982,15 +1090,21 @@ def tool_get_social_connection_trend(args):
             comparison[label] = {"meaningful_avg": m_avg, "low_social_avg": l_avg, "diff": round(m_avg - l_avg, 2)}
 
     return {
-        "start_date": start_date, "end_date": end_date,
-        "total_days_with_data": len(daily_social), "distribution": distribution,
+        "start_date": start_date,
+        "end_date": end_date,
+        "total_days_with_data": len(daily_social),
+        "distribution": distribution,
         "overall_avg_score": _avg(scores),
         "score_legend": {"alone": 1, "surface": 2, "meaningful": 3, "deep": 4},
         "rolling_7d_latest": rolling_7d[-1] if rolling_7d else None,
         "rolling_30d_latest": rolling_30d[-1] if rolling_30d else None,
-        "streaks": {"current_meaningful_streak": current_streak, "longest_meaningful_streak": longest_streak,
-                    "days_since_meaningful": days_since_meaningful},
-        "health_correlations": health_correlations, "journal_correlations": journal_correlations,
+        "streaks": {
+            "current_meaningful_streak": current_streak,
+            "longest_meaningful_streak": longest_streak,
+            "days_since_meaningful": days_since_meaningful,
+        },
+        "health_correlations": health_correlations,
+        "journal_correlations": journal_correlations,
         "meaningful_vs_low_comparison": comparison,
         "perma_context": "Seligman PERMA: Relationships are #1 wellbeing predictor. Holt-Lunstad: isolation increases mortality 26%. Target: meaningful+ connection 5+ days/week.",
     }
@@ -1003,9 +1117,12 @@ def tool_get_social_isolation_risk(args):
     isolation_threshold = int(args.get("consecutive_days", 3))
 
     def _sf(v):
-        if v is None: return None
-        try: return float(v)
-        except (ValueError, TypeError): return None
+        if v is None:
+            return None
+        try:
+            return float(v)
+        except (ValueError, TypeError):
+            return None
 
     def _avg(vals):
         v = [x for x in vals if x is not None]
@@ -1063,9 +1180,16 @@ def tool_get_social_isolation_risk(args):
         pre_start = (ep_start - timedelta(days=7)).strftime("%Y-%m-%d")
         pre_end = (ep_start - timedelta(days=1)).strftime("%Y-%m-%d")
         impact = {"episode": ep, "health_deltas": {}}
-        for src, field, label in [("whoop", "recovery_score", "Recovery"), ("whoop", "hrv", "HRV"), ("whoop", "sleep_score", "Sleep"), ("garmin", "avg_stress", "Stress")]:
+        for src, field, label in [
+            ("whoop", "recovery_score", "Recovery"),
+            ("whoop", "hrv", "HRV"),
+            ("whoop", "sleep_score", "Sleep"),
+            ("garmin", "avg_stress", "Stress"),
+        ]:
             pre_vals = [_sf(health_data.get(src, {}).get(d, {}).get(field)) for d in health_data.get(src, {}) if pre_start <= d <= pre_end]
-            ep_vals = [_sf(health_data.get(src, {}).get(d, {}).get(field)) for d in health_data.get(src, {}) if ep["start"] <= d <= ep["end"]]
+            ep_vals = [
+                _sf(health_data.get(src, {}).get(d, {}).get(field)) for d in health_data.get(src, {}) if ep["start"] <= d <= ep["end"]
+            ]
             pa, ea = _avg(pre_vals), _avg(ep_vals)
             if pa is not None and ea is not None:
                 impact["health_deltas"][label] = {"before": pa, "during": ea, "change": round(ea - pa, 2)}
@@ -1075,21 +1199,31 @@ def tool_get_social_isolation_risk(args):
     total_days = len(sorted_dates)
     isolated_days = sum(1 for d in sorted_dates if daily_social[d] < 3)
     isolation_pct = round(100 * isolated_days / total_days, 1) if total_days else 0
-    risk_level = "high" if (isolation_pct > 60 or currently_isolated) else "moderate" if (isolation_pct > 40 or len(episodes) >= 3) else "low"
+    risk_level = (
+        "high" if (isolation_pct > 60 or currently_isolated) else "moderate" if (isolation_pct > 40 or len(episodes) >= 3) else "low"
+    )
 
     coaching = []
     if currently_isolated:
         coaching.append(f"Low-social period: {current_isolation_days} days. Reach out to one person today.")
     if risk_level != "low":
-        coaching.append("Huberman: Social connection activates oxytocin, directly reducing cortisol. Schedule recurring social commitments.")
+        coaching.append(
+            "Huberman: Social connection activates oxytocin, directly reducing cortisol. Schedule recurring social commitments."
+        )
     if isolation_pct > 50:
         coaching.append("Attia: Loneliness is as harmful to longevity as obesity and smoking.")
 
     return {
-        "start_date": start_date, "end_date": end_date, "risk_level": risk_level,
-        "isolation_episodes": episodes, "total_episodes": len(episodes),
-        "currently_isolated": currently_isolated, "current_isolation_days": current_isolation_days if currently_isolated else 0,
-        "isolation_pct": isolation_pct, "episode_health_impact": episode_health_impact, "coaching": coaching,
+        "start_date": start_date,
+        "end_date": end_date,
+        "risk_level": risk_level,
+        "isolation_episodes": episodes,
+        "total_episodes": len(episodes),
+        "currently_isolated": currently_isolated,
+        "current_isolation_days": current_isolation_days if currently_isolated else 0,
+        "isolation_pct": isolation_pct,
+        "episode_health_impact": episode_health_impact,
+        "coaching": coaching,
     }
 
 
@@ -1099,9 +1233,12 @@ def tool_get_meditation_correlation(args):
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     def _sf(v):
-        if v is None: return None
-        try: return float(v)
-        except (ValueError, TypeError): return None
+        if v is None:
+            return None
+        try:
+            return float(v)
+        except (ValueError, TypeError):
+            return None
 
     def _avg(vals):
         v = [x for x in vals if x is not None]
@@ -1117,9 +1254,13 @@ def tool_get_meditation_correlation(args):
             daily_minutes[d] = mm
 
     if not daily_minutes:
-        return {"error": "No mindful_minutes data found.", "start_date": start_date, "end_date": end_date,
-                "tip": "Enable 'Mindful Minutes' in Health Auto Export iOS app.",
-                "apps": "Apple Mindfulness, Headspace, Calm, Insight Timer, Ten Percent Happier"}
+        return {
+            "error": "No mindful_minutes data found.",
+            "start_date": start_date,
+            "end_date": end_date,
+            "tip": "Enable 'Mindful Minutes' in Health Auto Export iOS app.",
+            "apps": "Apple Mindfulness, Headspace, Calm, Insight Timer, Ten Percent Happier",
+        }
 
     all_dates = sorted(ah_by_date.keys())
     practice_dates = sorted(daily_minutes.keys())
@@ -1151,9 +1292,12 @@ def tool_get_meditation_correlation(args):
 
     non_practice_dates = [d for d in all_dates if d not in daily_minutes]
     COMPARE_METRICS = [
-        ("whoop", "recovery_score", "Recovery", "higher_is_better"), ("whoop", "hrv", "HRV", "higher_is_better"),
-        ("whoop", "resting_heart_rate", "Resting HR", "lower_is_better"), ("whoop", "sleep_score", "Sleep Score", "higher_is_better"),
-        ("whoop", "sleep_efficiency_pct", "Sleep Efficiency", "higher_is_better"), ("garmin", "avg_stress", "Stress", "lower_is_better"),
+        ("whoop", "recovery_score", "Recovery", "higher_is_better"),
+        ("whoop", "hrv", "HRV", "higher_is_better"),
+        ("whoop", "resting_heart_rate", "Resting HR", "lower_is_better"),
+        ("whoop", "sleep_score", "Sleep Score", "higher_is_better"),
+        ("whoop", "sleep_efficiency_pct", "Sleep Efficiency", "higher_is_better"),
+        ("garmin", "avg_stress", "Stress", "lower_is_better"),
         ("garmin", "body_battery_high", "Body Battery", "higher_is_better"),
     ]
 
@@ -1165,10 +1309,17 @@ def tool_get_meditation_correlation(args):
         if p_avg is not None and n_avg is not None:
             diff = round(p_avg - n_avg, 2)
             favorable = (diff > 0 and direction == "higher_is_better") or (diff < 0 and direction == "lower_is_better")
-            comparison.append({"metric": label, "meditation_days": p_avg, "no_meditation_days": n_avg,
-                               "diff": diff, "favorable": favorable,
-                               "n_meditation": len([v for v in p_vals if v is not None]),
-                               "n_control": len([v for v in n_vals if v is not None])})
+            comparison.append(
+                {
+                    "metric": label,
+                    "meditation_days": p_avg,
+                    "no_meditation_days": n_avg,
+                    "diff": diff,
+                    "favorable": favorable,
+                    "n_meditation": len([v for v in p_vals if v is not None]),
+                    "n_control": len([v for v in n_vals if v is not None]),
+                }
+            )
 
     dose_response = {}
     for low, high, label in [(0, 5, "0-5 min"), (5, 10, "5-10 min"), (10, 20, "10-20 min"), (20, 999, "20+ min")]:
@@ -1181,7 +1332,11 @@ def tool_get_meditation_correlation(args):
             a = _avg(vals)
             if a is not None:
                 bm[ml] = a
-        dose_response[label] = {"days": len(bucket_dates), "avg_minutes": _avg([daily_minutes[d] for d in bucket_dates]), "health_metrics": bm}
+        dose_response[label] = {
+            "days": len(bucket_dates),
+            "avg_minutes": _avg([daily_minutes[d] for d in bucket_dates]),
+            "health_metrics": bm,
+        }
 
     correlations = []
     for src, field, label, _ in COMPARE_METRICS:
@@ -1193,10 +1348,10 @@ def tool_get_meditation_correlation(args):
                 ys.append(hv)
         if len(xs) >= 10:
             n = len(xs)
-            mx, my = sum(xs)/n, sum(ys)/n
-            cov = sum((x-mx)*(y-my) for x, y in zip(xs, ys)) / n
-            sx, sy = (sum((x-mx)**2 for x in xs)/n)**0.5, (sum((y-my)**2 for y in ys)/n)**0.5
-            r = round(cov/(sx*sy), 3) if sx > 0 and sy > 0 else 0
+            mx, my = sum(xs) / n, sum(ys) / n
+            cov = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / n
+            sx, sy = (sum((x - mx) ** 2 for x in xs) / n) ** 0.5, (sum((y - my) ** 2 for y in ys) / n) ** 0.5
+            r = round(cov / (sx * sy), 3) if sx > 0 and sy > 0 else 0
             correlations.append({"metric": label, "r": r, "n": n})
 
     next_day = []
@@ -1209,16 +1364,23 @@ def tool_get_meditation_correlation(args):
                 (p_next if d in daily_minutes else n_next).append(hv)
         pa, na = _avg(p_next), _avg(n_next)
         if pa is not None and na is not None:
-            next_day.append({"metric": f"Next-day {label}", "after_meditation": pa, "after_no_meditation": na, "diff": round(pa-na, 2)})
+            next_day.append({"metric": f"Next-day {label}", "after_meditation": pa, "after_no_meditation": na, "diff": round(pa - na, 2)})
 
     return {
-        "start_date": start_date, "end_date": end_date,
-        "summary": {"total_practice_days": practice_days, "total_days_in_range": total_days,
-                     "adherence_pct": adherence_pct, "avg_minutes_per_session": _avg(list(daily_minutes.values())),
-                     "total_minutes": round(sum(daily_minutes.values()), 1)},
+        "start_date": start_date,
+        "end_date": end_date,
+        "summary": {
+            "total_practice_days": practice_days,
+            "total_days_in_range": total_days,
+            "adherence_pct": adherence_pct,
+            "avg_minutes_per_session": _avg(list(daily_minutes.values())),
+            "total_minutes": round(sum(daily_minutes.values()), 1),
+        },
         "streaks": {"current_streak": current_streak, "longest_streak": longest_streak},
-        "meditation_vs_no_meditation": comparison, "dose_response": dose_response,
-        "correlations": correlations, "next_day_effects": next_day,
+        "meditation_vs_no_meditation": comparison,
+        "dose_response": dose_response,
+        "correlations": correlations,
+        "next_day_effects": next_day,
         "coaching": {
             "huberman": "NSDR and physiological sigh are highest-ROI protocols. 5 min/day improves prefrontal cortex function within 8 weeks.",
             "attia": "Dose-response is logarithmic. Consistency > duration. Diminishing returns above ~20 min/day.",
@@ -1249,7 +1411,8 @@ def tool_log_travel(args):
                     UpdateExpression="SET end_date = :ed, #st = :st, updated_at = :ua",
                     ExpressionAttributeNames={"#st": "status"},
                     ExpressionAttributeValues={
-                        ":ed": end_date, ":st": "completed",
+                        ":ed": end_date,
+                        ":st": "completed",
                         ":ua": datetime.now(timezone.utc).isoformat(),
                     },
                 )
@@ -1268,12 +1431,12 @@ def tool_log_travel(args):
                     UpdateExpression="SET end_date = :ed, #st = :st, updated_at = :ua",
                     ExpressionAttributeNames={"#st": "status"},
                     ExpressionAttributeValues={
-                        ":ed": end_date, ":st": "completed",
+                        ":ed": end_date,
+                        ":st": "completed",
                         ":ua": datetime.now(timezone.utc).isoformat(),
                     },
                 )
-                return {"status": "trip_ended", "trip_id": sk, "end_date": end_date,
-                        "destination": active.get("destination_city")}
+                return {"status": "trip_ended", "trip_id": sk, "end_date": end_date, "destination": active.get("destination_city")}
             except Exception as e:
                 return {"error": f"Failed to end trip: {e}"}
 
@@ -1327,7 +1490,9 @@ def tool_log_travel(args):
         return {"error": f"Failed to log trip: {e}"}
 
     result = {
-        "status": "trip_started", "trip_id": sk, "destination": dest_city,
+        "status": "trip_started",
+        "trip_id": sk,
+        "destination": dest_city,
         "start_date": start_date,
     }
     if tz_diff is not None:
@@ -1391,11 +1556,15 @@ def tool_get_travel_log(args):
     return {
         "total_trips": len(trips),
         "currently_traveling": bool(active),
-        "active_trip": {
-            "destination": active[0].get("destination_city"),
-            "since": active[0].get("start_date"),
-            "tz_offset": active[0].get("tz_offset_hours"),
-        } if active else None,
+        "active_trip": (
+            {
+                "destination": active[0].get("destination_city"),
+                "since": active[0].get("start_date"),
+                "tz_offset": active[0].get("tz_offset_hours"),
+            }
+            if active
+            else None
+        ),
         "trips": summary,
     }
 
@@ -1474,8 +1643,7 @@ def tool_get_jet_lag_recovery(args):
             if val is None:
                 continue
             val = float(val)
-            day_num = (datetime.strptime(item.get("date", post_start), "%Y-%m-%d") -
-                       datetime.strptime(end_date, "%Y-%m-%d")).days
+            day_num = (datetime.strptime(item.get("date", post_start), "%Y-%m-%d") - datetime.strptime(end_date, "%Y-%m-%d")).days
             daily.append({"day": day_num, "value": round(val, 1)})
 
             # Check if recovered to baseline
@@ -1524,7 +1692,7 @@ def tool_get_jet_lag_recovery(args):
         },
         "coaching": {
             "huberman": f"Jet lag recovery: ~1 day per timezone crossed ({abs(tz_diff or 0)} zones). "
-                        f"{'Eastbound travel is harder — your body prefers to delay, not advance.' if (tz_diff or 0) > 0 else 'Westbound is easier — staying up later is natural.'}",
+            f"{'Eastbound travel is harder — your body prefers to delay, not advance.' if (tz_diff or 0) > 0 else 'Westbound is easier — staying up later is natural.'}",
             "attia": "Monitor HRV as the primary recovery signal. Training intensity should match recovery — keep it Zone 2 until HRV returns to baseline.",
             "walker": "Avoid sleeping pills; they suppress REM. Melatonin (0.5-1mg) at destination bedtime for the first few nights only.",
         },
@@ -1548,17 +1716,19 @@ def tool_get_state_of_mind_trend(args):
             item = resp.get("Item", {})
             valence = item.get("som_avg_valence")
             if valence is not None:
-                days_data.append({
-                    "date": ds,
-                    "avg_valence": float(valence),
-                    "min_valence": float(item.get("som_min_valence", valence)),
-                    "max_valence": float(item.get("som_max_valence", valence)),
-                    "check_in_count": int(item.get("som_check_in_count", 0)),
-                    "mood_count": int(item.get("som_mood_count", 0)),
-                    "emotion_count": int(item.get("som_emotion_count", 0)),
-                    "top_labels": item.get("som_top_labels", ""),
-                    "top_associations": item.get("som_top_associations", ""),
-                })
+                days_data.append(
+                    {
+                        "date": ds,
+                        "avg_valence": float(valence),
+                        "min_valence": float(item.get("som_min_valence", valence)),
+                        "max_valence": float(item.get("som_max_valence", valence)),
+                        "check_in_count": int(item.get("som_check_in_count", 0)),
+                        "mood_count": int(item.get("som_mood_count", 0)),
+                        "emotion_count": int(item.get("som_emotion_count", 0)),
+                        "top_labels": item.get("som_top_labels", ""),
+                        "top_associations": item.get("som_top_associations", ""),
+                    }
+                )
         except Exception:
             pass
         current += timedelta(days=1)
@@ -1625,6 +1795,7 @@ def tool_get_state_of_mind_trend(args):
 
     # ── Label frequency analysis ──
     from collections import Counter
+
     label_freq = Counter(all_labels).most_common(10)
     assoc_freq = Counter(all_associations).most_common(10)
 
@@ -1717,9 +1888,7 @@ def tool_get_state_of_mind_trend(args):
         "valence_distribution": class_dist,
         "top_emotion_labels": [{"label": l, "count": c} for l, c in label_freq],
         "top_life_associations": [{"association": a, "count": c} for a, c in assoc_freq],
-        "valence_by_association": [
-            {"association": a, **v} for a, v in assoc_sorted
-        ],
+        "valence_by_association": [{"association": a, **v} for a, v in assoc_sorted],
         "time_of_day_pattern": time_of_day,
         "best_days": [{"date": d["date"], "valence": d["avg_valence"], "labels": d["top_labels"]} for d in best_3],
         "worst_days": [{"date": d["date"], "valence": d["avg_valence"], "labels": d["top_labels"]} for d in worst_3],
@@ -1748,7 +1917,7 @@ def tool_get_blood_pressure_dashboard(args):
       Stage 2:   >=140 / >=90
       Crisis:    >180 / >120
     """
-    end_date = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=29)).strftime("%Y-%m-%d"))
 
     items = query_source("apple_health", start_date, end_date)
@@ -1762,19 +1931,22 @@ def tool_get_blood_pressure_dashboard(args):
         dia_val = item.get("blood_pressure_diastolic")
         if sys_val is None or dia_val is None:
             continue
-        bp_days.append({
-            "date": item.get("date", ""),
-            "systolic": float(sys_val),
-            "diastolic": float(dia_val),
-            "pulse": float(item["blood_pressure_pulse"]) if item.get("blood_pressure_pulse") is not None else None,
-            "readings_count": int(item.get("blood_pressure_readings_count", 1)),
-        })
+        bp_days.append(
+            {
+                "date": item.get("date", ""),
+                "systolic": float(sys_val),
+                "diastolic": float(dia_val),
+                "pulse": float(item["blood_pressure_pulse"]) if item.get("blood_pressure_pulse") is not None else None,
+                "readings_count": int(item.get("blood_pressure_readings_count", 1)),
+            }
+        )
 
     if not bp_days:
         return {
             "status": "no_data",
             "message": "No blood pressure readings found in the date range. Ensure BP cuff syncs to Apple Health.",
-            "start_date": start_date, "end_date": end_date,
+            "start_date": start_date,
+            "end_date": end_date,
         }
 
     bp_days.sort(key=lambda x: x["date"])
@@ -1805,8 +1977,9 @@ def tool_get_blood_pressure_dashboard(args):
 
     # Variability (SD)
     import math as _math
-    sys_sd = round(_math.sqrt(sum((v - avg_sys)**2 for v in sys_vals) / len(sys_vals)), 1) if len(sys_vals) > 1 else 0
-    dia_sd = round(_math.sqrt(sum((v - avg_dia)**2 for v in dia_vals) / len(dia_vals)), 1) if len(dia_vals) > 1 else 0
+
+    sys_sd = round(_math.sqrt(sum((v - avg_sys) ** 2 for v in sys_vals) / len(sys_vals)), 1) if len(sys_vals) > 1 else 0
+    dia_sd = round(_math.sqrt(sum((v - avg_dia) ** 2 for v in dia_vals) / len(dia_vals)), 1) if len(dia_vals) > 1 else 0
 
     # Trend (first half vs second half)
     mid = len(bp_days) // 2
@@ -1845,15 +2018,22 @@ def tool_get_blood_pressure_dashboard(args):
     time_of_day = None
     if morning_sys and evening_sys:
         time_of_day = {
-            "morning_avg": {"systolic": round(sum(morning_sys)/len(morning_sys), 1),
-                           "diastolic": round(sum(morning_dia)/len(morning_dia), 1),
-                           "readings": len(morning_sys)},
-            "evening_avg": {"systolic": round(sum(evening_sys)/len(evening_sys), 1),
-                           "diastolic": round(sum(evening_dia)/len(evening_dia), 1),
-                           "readings": len(evening_sys)},
-            "note": "Morning BP is typically higher (cortisol awakening response). " +
-                    ("Your pattern matches." if sum(morning_sys)/len(morning_sys) > sum(evening_sys)/len(evening_sys)
-                     else "Your evening is higher than morning — consider stress/sodium timing."),
+            "morning_avg": {
+                "systolic": round(sum(morning_sys) / len(morning_sys), 1),
+                "diastolic": round(sum(morning_dia) / len(morning_dia), 1),
+                "readings": len(morning_sys),
+            },
+            "evening_avg": {
+                "systolic": round(sum(evening_sys) / len(evening_sys), 1),
+                "diastolic": round(sum(evening_dia) / len(evening_dia), 1),
+                "readings": len(evening_sys),
+            },
+            "note": "Morning BP is typically higher (cortisol awakening response). "
+            + (
+                "Your pattern matches."
+                if sum(morning_sys) / len(morning_sys) > sum(evening_sys) / len(evening_sys)
+                else "Your evening is higher than morning — consider stress/sodium timing."
+            ),
         }
 
     # Classification distribution
@@ -1865,36 +2045,54 @@ def tool_get_blood_pressure_dashboard(args):
     # Coaching
     coaching = {}
     if avg_sys >= 130 or avg_dia >= 85:
-        coaching["attia"] = "Sustained BP above 130/85 accelerates arterial aging. Sodium restriction (<2000mg), regular Zone 2, and sleep optimization are first-line interventions."
+        coaching["attia"] = (
+            "Sustained BP above 130/85 accelerates arterial aging. Sodium restriction (<2000mg), regular Zone 2, and sleep optimization are first-line interventions."
+        )
     # SD >12 mmHg systolic: independent CVD risk factor (Stevens et al. 2016)
     if sys_sd > 12:
-        coaching["huberman"] = f"High systolic variability (SD={sys_sd}). Consider consistent measurement timing, limiting caffeine before readings, and 5 min seated rest pre-measurement."
+        coaching["huberman"] = (
+            f"High systolic variability (SD={sys_sd}). Consider consistent measurement timing, limiting caffeine before readings, and 5 min seated rest pre-measurement."
+        )
     if avg_class == "normal":
         coaching["summary"] = "Blood pressure is well-controlled. Continue current lifestyle factors."
     else:
-        coaching["summary"] = f"Average classification: {avg_class.replace('_', ' ').title()}. Track trends and discuss with your physician if sustained."
+        coaching["summary"] = (
+            f"Average classification: {avg_class.replace('_', ' ').title()}. Track trends and discuss with your physician if sustained."
+        )
 
     return {
         "period": {"start_date": start_date, "end_date": end_date, "days_with_bp": len(bp_days), "total_readings": total_readings},
         "current": {
             "date": latest["date"],
-            "systolic": latest["systolic"], "diastolic": latest["diastolic"],
+            "systolic": latest["systolic"],
+            "diastolic": latest["diastolic"],
             "pulse": latest.get("pulse"),
             "classification": latest_class,
         },
         "averages": {
-            "systolic": avg_sys, "diastolic": avg_dia,
-            "pulse": round(sum(pulse_vals)/len(pulse_vals), 1) if pulse_vals else None,
+            "systolic": avg_sys,
+            "diastolic": avg_dia,
+            "pulse": round(sum(pulse_vals) / len(pulse_vals), 1) if pulse_vals else None,
             "classification": avg_class,
         },
-        "variability": {"systolic_sd": sys_sd, "diastolic_sd": dia_sd,
-                        "note": "SD >12 mmHg systolic suggests high visit-to-visit variability (independent CV risk factor)"},
+        "variability": {
+            "systolic_sd": sys_sd,
+            "diastolic_sd": dia_sd,
+            "note": "SD >12 mmHg systolic suggests high visit-to-visit variability (independent CV risk factor)",
+        },
         "trend": {"systolic_delta": trend_sys, "direction": trend_dir},
         "time_of_day": time_of_day,
         "classification_distribution": class_dist,
-        "daily_readings": [{"date": d["date"], "systolic": d["systolic"], "diastolic": d["diastolic"],
-                            "pulse": d.get("pulse"), "class": classify_bp(d["systolic"], d["diastolic"])}
-                           for d in bp_days],
+        "daily_readings": [
+            {
+                "date": d["date"],
+                "systolic": d["systolic"],
+                "diastolic": d["diastolic"],
+                "pulse": d.get("pulse"),
+                "class": classify_bp(d["systolic"], d["diastolic"]),
+            }
+            for d in bp_days
+        ],
         "coaching": coaching,
         # R13-F09: Medical disclaimer on all health-assessment tool responses
         "_disclaimer": "For personal health tracking only. Not medical advice. Consult a qualified healthcare provider before making health decisions based on this data.",
@@ -1906,15 +2104,15 @@ def tool_get_blood_pressure_correlation(args):
     Correlate blood pressure with lifestyle factors: sodium, training load, stress,
     sleep quality, caffeine, weight. Pearson r + bucketed comparisons.
     """
-    end_date = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=89)).strftime("%Y-%m-%d"))
 
     ah_items = query_source("apple_health", start_date, end_date)
-    mf_items = query_source("macrofactor",  start_date, end_date)
-    wh_items = query_source("whoop",        start_date, end_date)
-    wi_items = query_source("withings",     start_date, end_date)
-    ga_items = query_source("garmin",       start_date, end_date)
-    st_items = query_source("strava",       start_date, end_date)
+    mf_items = query_source("macrofactor", start_date, end_date)
+    wh_items = query_source("whoop", start_date, end_date)
+    wi_items = query_source("withings", start_date, end_date)
+    ga_items = query_source("garmin", start_date, end_date)
+    st_items = query_source("strava", start_date, end_date)
 
     # Build date-indexed lookups
     def by_date(items):
@@ -1933,8 +2131,7 @@ def tool_get_blood_pressure_correlation(args):
             bp_by_date[item.get("date", "")] = {"systolic": float(s), "diastolic": float(d)}
 
     if len(bp_by_date) < 5:
-        return {"error": f"Need at least 5 days with BP data, found {len(bp_by_date)}.",
-                "start_date": start_date, "end_date": end_date}
+        return {"error": f"Need at least 5 days with BP data, found {len(bp_by_date)}.", "start_date": start_date, "end_date": end_date}
 
     mf_map = by_date(mf_items)
     wh_map = by_date(wh_items)
@@ -1947,17 +2144,17 @@ def tool_get_blood_pressure_correlation(args):
     ah_map = by_date(ah_items)
 
     factor_pairs = [
-        ("Sodium (mg)",        mf_map, "total_sodium_mg"),
-        ("Calories",           mf_map, "total_calories_kcal"),
-        ("Caffeine (mg)",      ah_map, "caffeine_mg"),
+        ("Sodium (mg)", mf_map, "total_sodium_mg"),
+        ("Calories", mf_map, "total_calories_kcal"),
+        ("Caffeine (mg)", ah_map, "caffeine_mg"),
         ("Sleep Efficiency %", wh_map, "sleep_efficiency_pct"),
-        ("Sleep Score",        wh_map, "sleep_score"),
-        ("Recovery Score",     wh_map, "recovery_score"),
-        ("HRV",               wh_map, "hrv"),
-        ("Garmin Stress",      ga_map, "avg_stress"),
-        ("Weight (lbs)",       wi_map, "weight_lbs"),
-        ("Steps",              ah_map, "steps"),
-        ("Training Load",      st_map, "total_kilojoules"),
+        ("Sleep Score", wh_map, "sleep_score"),
+        ("Recovery Score", wh_map, "recovery_score"),
+        ("HRV", wh_map, "hrv"),
+        ("Garmin Stress", ga_map, "avg_stress"),
+        ("Weight (lbs)", wi_map, "weight_lbs"),
+        ("Steps", ah_map, "steps"),
+        ("Training Load", st_map, "total_kilojoules"),
     ]
 
     for factor_name, source_map, field in factor_pairs:
@@ -1978,14 +2175,19 @@ def tool_get_blood_pressure_correlation(args):
         if len(sys_xs) >= 5:
             r_sys = pearson_r(sys_xs, sys_ys)
             r_dia = pearson_r(dia_xs, dia_ys)
-            correlations.append({
-                "factor": factor_name,
-                "n_days": len(sys_xs),
-                "systolic_r": round(r_sys, 3) if r_sys is not None else None,
-                "diastolic_r": round(r_dia, 3) if r_dia is not None else None,
-                "strength": "strong" if r_sys is not None and abs(r_sys) >= 0.4 else
-                           ("moderate" if r_sys is not None and abs(r_sys) >= 0.2 else "weak"),
-            })
+            correlations.append(
+                {
+                    "factor": factor_name,
+                    "n_days": len(sys_xs),
+                    "systolic_r": round(r_sys, 3) if r_sys is not None else None,
+                    "diastolic_r": round(r_dia, 3) if r_dia is not None else None,
+                    "strength": (
+                        "strong"
+                        if r_sys is not None and abs(r_sys) >= 0.4
+                        else ("moderate" if r_sys is not None and abs(r_sys) >= 0.2 else "weak")
+                    ),
+                }
+            )
 
     # Sort by absolute systolic correlation strength
     correlations.sort(key=lambda c: abs(c.get("systolic_r") or 0), reverse=True)
@@ -2076,8 +2278,7 @@ def tool_get_gait_analysis(args):
         return {"error": f"No Apple Health data for {start_date} to {end_date}."}
 
     items_sorted = sorted(items, key=lambda x: x.get("date", ""))
-    GAIT_FIELDS = ["walking_speed_mph", "walking_step_length_in",
-                    "walking_asymmetry_pct", "walking_double_support_pct"]
+    GAIT_FIELDS = ["walking_speed_mph", "walking_step_length_in", "walking_asymmetry_pct", "walking_double_support_pct"]
 
     rows = []
     for item in items_sorted:
@@ -2112,28 +2313,49 @@ def tool_get_gait_analysis(args):
             first_avg = sum(vals[:mid]) / mid
             second_avg = sum(vals[mid:]) / (len(vals) - mid)
             pct_change = round((second_avg - first_avg) / first_avg * 100, 1) if first_avg else 0
-            improving = (f in ("walking_speed_mph", "walking_step_length_in") and pct_change > 1) or \
-                        (f in ("walking_asymmetry_pct", "walking_double_support_pct") and pct_change < -1)
-            declining = (f in ("walking_speed_mph", "walking_step_length_in") and pct_change < -1) or \
-                        (f in ("walking_asymmetry_pct", "walking_double_support_pct") and pct_change > 1)
-            trends[f] = {"first_half_avg": round(first_avg, 2), "second_half_avg": round(second_avg, 2),
-                         "pct_change": pct_change, "direction": "improving" if improving else "declining" if declining else "stable"}
+            improving = (f in ("walking_speed_mph", "walking_step_length_in") and pct_change > 1) or (
+                f in ("walking_asymmetry_pct", "walking_double_support_pct") and pct_change < -1
+            )
+            declining = (f in ("walking_speed_mph", "walking_step_length_in") and pct_change < -1) or (
+                f in ("walking_asymmetry_pct", "walking_double_support_pct") and pct_change > 1
+            )
+            trends[f] = {
+                "first_half_avg": round(first_avg, 2),
+                "second_half_avg": round(second_avg, 2),
+                "pct_change": pct_change,
+                "direction": "improving" if improving else "declining" if declining else "stable",
+            }
 
     # Clinical flags
     flags = []
     avg_speed = averages.get("walking_speed_mph")
     if avg_speed is not None:
         if avg_speed < 2.24:
-            flags.append({"metric": "walking_speed_mph", "severity": "critical",
-                          "message": f"Avg speed {avg_speed} mph < 1.0 m/s clinical threshold — strong adverse health predictor."})
+            flags.append(
+                {
+                    "metric": "walking_speed_mph",
+                    "severity": "critical",
+                    "message": f"Avg speed {avg_speed} mph < 1.0 m/s clinical threshold — strong adverse health predictor.",
+                }
+            )
         elif avg_speed < 3.0:
-            flags.append({"metric": "walking_speed_mph", "severity": "warning",
-                          "message": f"Avg speed {avg_speed} mph below optimal. Target >3.0 mph for age <60."})
+            flags.append(
+                {
+                    "metric": "walking_speed_mph",
+                    "severity": "warning",
+                    "message": f"Avg speed {avg_speed} mph below optimal. Target >3.0 mph for age <60.",
+                }
+            )
 
     avg_asym = averages.get("walking_asymmetry_pct")
     if avg_asym is not None and avg_asym > 4.0:
-        flags.append({"metric": "walking_asymmetry_pct", "severity": "warning",
-                      "message": f"Avg asymmetry {avg_asym}% > 4% threshold — may indicate injury/compensation."})
+        flags.append(
+            {
+                "metric": "walking_asymmetry_pct",
+                "severity": "warning",
+                "message": f"Avg asymmetry {avg_asym}% > 4% threshold — may indicate injury/compensation.",
+            }
+        )
 
     # Asymmetry spike detection
     asym_vals = [r.get("walking_asymmetry_pct") for r in rows if r.get("walking_asymmetry_pct") is not None]
@@ -2141,13 +2363,23 @@ def tool_get_gait_analysis(args):
         baseline_avg = sum(asym_vals[:-3]) / len(asym_vals[:-3])
         recent_avg = sum(asym_vals[-3:]) / 3
         if baseline_avg > 0 and (recent_avg - baseline_avg) / baseline_avg > 0.3:
-            flags.append({"metric": "walking_asymmetry_pct", "severity": "alert",
-                          "message": f"Asymmetry spike: recent {round(recent_avg, 1)}% vs baseline {round(baseline_avg, 1)}%."})
+            flags.append(
+                {
+                    "metric": "walking_asymmetry_pct",
+                    "severity": "alert",
+                    "message": f"Asymmetry spike: recent {round(recent_avg, 1)}% vs baseline {round(baseline_avg, 1)}%.",
+                }
+            )
 
     speed_trend = trends.get("walking_speed_mph", {})
     if speed_trend.get("direction") == "declining" and abs(speed_trend.get("pct_change", 0)) > 3:
-        flags.append({"metric": "walking_speed_mph", "severity": "warning",
-                      "message": f"Walking speed declining {abs(speed_trend['pct_change'])}% — early longevity risk signal."})
+        flags.append(
+            {
+                "metric": "walking_speed_mph",
+                "severity": "warning",
+                "message": f"Walking speed declining {abs(speed_trend['pct_change'])}% — early longevity risk signal.",
+            }
+        )
 
     # Composite gait score (0-100): speed 40%, step length 30%, asymmetry 20%, double support 10%
     composite = None
@@ -2224,19 +2456,24 @@ def tool_get_energy_balance(args):
         row = {"date": date}
         if tdee is not None:
             row["tdee"] = round(float(tdee), 0)
-            if active: row["active_calories"] = round(float(active), 0)
-            if basal: row["basal_calories"] = round(float(basal), 0)
+            if active:
+                row["active_calories"] = round(float(active), 0)
+            if basal:
+                row["basal_calories"] = round(float(basal), 0)
         if intake is not None:
             row["intake_kcal"] = round(float(intake), 0)
             prot = mf.get("total_protein_g")
-            if prot: row["protein_g"] = round(float(prot), 0)
+            if prot:
+                row["protein_g"] = round(float(prot), 0)
         if tdee is not None and intake is not None:
             bal = round(float(intake) - float(tdee), 0)
             row["balance_kcal"] = bal
             row["status"] = "deficit" if bal < 0 else "surplus"
             balance_vals.append(bal)
-            if bal <= -target_deficit: deficit_hit += 1
-            if bal > 0: surplus += 1
+            if bal <= -target_deficit:
+                deficit_hit += 1
+            if bal > 0:
+                surplus += 1
         daily.append(row)
 
     paired = len(balance_vals)
@@ -2431,24 +2668,24 @@ def tool_create_experiment(args):
         pass
 
     item = {
-        "pk":           EXPERIMENTS_PK,
-        "sk":           sk,
+        "pk": EXPERIMENTS_PK,
+        "sk": sk,
         "experiment_id": exp_id,
-        "name":         name,
-        "hypothesis":   hypothesis,
-        "start_date":   start_date,
-        "end_date":     None,       # null = still active
-        "status":       "active",   # active, completed, abandoned
-        "tags":         tags,
-        "notes":        notes,
-        "outcome":      "",
-        "created_at":   now.strftime("%Y-%m-%dT%H:%M:%S"),
+        "name": name,
+        "hypothesis": hypothesis,
+        "start_date": start_date,
+        "end_date": None,  # null = still active
+        "status": "active",  # active, completed, abandoned
+        "tags": tags,
+        "notes": notes,
+        "outcome": "",
+        "created_at": now.strftime("%Y-%m-%dT%H:%M:%S"),
         # EL-F5: New fields
-        "library_id":   library_id or None,
+        "library_id": library_id or None,
         "duration_tier": duration_tier or None,
         "experiment_type": experiment_type or None,
         "planned_duration_days": int(planned_duration_days) if planned_duration_days else None,
-        "iteration":    iteration,
+        "iteration": iteration,
     }
 
     # Clean None values for DynamoDB
@@ -2457,21 +2694,21 @@ def tool_create_experiment(args):
     logger.info(f"create_experiment: created {exp_id} (iteration {iteration})")
 
     return {
-        "created":       True,
+        "created": True,
         "experiment_id": exp_id,
-        "name":          name,
-        "hypothesis":    hypothesis,
-        "start_date":    start_date,
-        "status":        "active",
-        "tags":          tags,
-        "library_id":    library_id or None,
+        "name": name,
+        "hypothesis": hypothesis,
+        "start_date": start_date,
+        "status": "active",
+        "tags": tags,
+        "library_id": library_id or None,
         "duration_tier": duration_tier or None,
         "experiment_type": experiment_type or None,
-        "iteration":     iteration,
+        "iteration": iteration,
         "board_of_directors": {
             "Huberman": "One variable at a time. Track for at least 2 weeks before drawing conclusions. Control for confounders: sleep timing, stress, travel.",
-            "Attia":    "Define your primary endpoint now. What number would convince you this worked? Statistical noise requires \u226514 days of data.",
-            "Ferriss":  "What does the minimum effective dose look like? Start with the smallest intervention that could produce a measurable change.",
+            "Attia": "Define your primary endpoint now. What number would convince you this worked? Statistical noise requires \u226514 days of data.",
+            "Ferriss": "What does the minimum effective dose look like? Start with the smallest intervention that could produce a measurable change.",
         },
     }
 
@@ -2486,10 +2723,15 @@ def tool_list_experiments(args):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     from mcp.core import _apply_phase_filter  # ADR-058
-    resp = table.query(**_apply_phase_filter({
-        "KeyConditionExpression": Key("pk").eq(EXPERIMENTS_PK) & Key("sk").begins_with("EXP#"),
-        "ScanIndexForward": False,
-    }))
+
+    resp = table.query(
+        **_apply_phase_filter(
+            {
+                "KeyConditionExpression": Key("pk").eq(EXPERIMENTS_PK) & Key("sk").begins_with("EXP#"),
+                "ScanIndexForward": False,
+            }
+        )
+    )
     items = resp.get("Items", [])
 
     results = []
@@ -2505,36 +2747,38 @@ def tool_list_experiments(args):
         except Exception:
             days = None
 
-        results.append({
-            "experiment_id": item.get("experiment_id", ""),
-            "name":          item.get("name", ""),
-            "hypothesis":    item.get("hypothesis", ""),
-            "start_date":    start,
-            "end_date":      item.get("end_date"),
-            "status":        status,
-            "days_active":   days,
-            "min_duration_met": days is not None and days >= 14,
-            "tags":          item.get("tags", []),
-            "notes":         item.get("notes", ""),
-            "outcome":       item.get("outcome", ""),
-            # EL-22/23: Evolution fields
-            "library_id":      item.get("library_id"),
-            "grade":           item.get("grade"),
-            "compliance_pct":  item.get("compliance_pct"),
-            "duration_tier":   item.get("duration_tier"),
-            "experiment_type": item.get("experiment_type"),
-            "iteration":       item.get("iteration", 1),
-            "reflection":      item.get("reflection"),
-        })
+        results.append(
+            {
+                "experiment_id": item.get("experiment_id", ""),
+                "name": item.get("name", ""),
+                "hypothesis": item.get("hypothesis", ""),
+                "start_date": start,
+                "end_date": item.get("end_date"),
+                "status": status,
+                "days_active": days,
+                "min_duration_met": days is not None and days >= 14,
+                "tags": item.get("tags", []),
+                "notes": item.get("notes", ""),
+                "outcome": item.get("outcome", ""),
+                # EL-22/23: Evolution fields
+                "library_id": item.get("library_id"),
+                "grade": item.get("grade"),
+                "compliance_pct": item.get("compliance_pct"),
+                "duration_tier": item.get("duration_tier"),
+                "experiment_type": item.get("experiment_type"),
+                "iteration": item.get("iteration", 1),
+                "reflection": item.get("reflection"),
+            }
+        )
 
     active = sum(1 for r in results if r["status"] == "active")
     completed = sum(1 for r in results if r["status"] == "completed")
 
     return {
-        "total":     len(results),
-        "active":    active,
+        "total": len(results),
+        "active": active,
         "completed": completed,
-        "filter":    status_filter or "all",
+        "filter": status_filter or "all",
         "experiments": results,
     }
 
@@ -2674,24 +2918,23 @@ def tool_get_experiment_results(args):
             effect_size = None  # Yael: None \u2192 JSON null, not an error
 
         # Consistency score: % of during-period days above before-period mean (Henning: non-parametric)
-        consistency_score = (
-            round(sum(1 for v in during_vals if v > before_mean) / len(during_vals) * 100, 1)
-            if during_vals else None
-        )
+        consistency_score = round(sum(1 for v in during_vals if v > before_mean) / len(during_vals) * 100, 1) if during_vals else None
 
-        comparisons.append({
-            "metric":             display_name,
-            "source":             source,
-            "before_mean":        round(before_mean, 2),
-            "during_mean":        round(during_mean, 2),
-            "delta":              round(delta, 2),
-            "pct_change":         round(pct_change, 1) if pct_change is not None else None,
-            "direction":          direction,
-            "before_n":           len(before_vals),
-            "during_n":           len(during_vals),
-            "effect_size":        effect_size,
-            "consistency_score":  consistency_score,
-        })
+        comparisons.append(
+            {
+                "metric": display_name,
+                "source": source,
+                "before_mean": round(before_mean, 2),
+                "during_mean": round(during_mean, 2),
+                "delta": round(delta, 2),
+                "pct_change": round(pct_change, 1) if pct_change is not None else None,
+                "direction": direction,
+                "before_n": len(before_vals),
+                "during_n": len(during_vals),
+                "effect_size": effect_size,
+                "consistency_score": consistency_score,
+            }
+        )
 
     # Sort: improved first, then worsened, then unchanged
     order = {"improved": 0, "worsened": 1, "increased": 2, "decreased": 3, "unchanged": 4}
@@ -2714,28 +2957,27 @@ def tool_get_experiment_results(args):
             )
         else:
             duration_warning = (
-                f"Only {during_days} days of data. Board recommends minimum 14 days "
-                f"for reliable signal. Results may be noise."
+                f"Only {during_days} days of data. Board recommends minimum 14 days " f"for reliable signal. Results may be noise."
             )
 
     return {
         "experiment": {
-            "id":         exp_id,
-            "name":       item.get("name", ""),
+            "id": exp_id,
+            "name": item.get("name", ""),
             "hypothesis": hypothesis,
-            "status":     status,
+            "status": status,
             "start_date": start_date,
-            "end_date":   end_date if status != "active" else f"{end_date} (ongoing)",
+            "end_date": end_date if status != "active" else f"{end_date} (ongoing)",
         },
         "comparison_period": {
             "before": f"{before_start} \u2192 {before_end} ({during_days} days)",
             "during": f"{during_start} \u2192 {during_end} ({during_days} days)",
         },
-        "duration_warning":  duration_warning,
-        "metrics_compared":  len(comparisons),
-        "improved_count":    len(improved),
-        "worsened_count":    len(worsened),
-        "comparisons":       comparisons,
+        "duration_warning": duration_warning,
+        "metrics_compared": len(comparisons),
+        "improved_count": len(improved),
+        "worsened_count": len(worsened),
+        "comparisons": comparisons,
         "board_of_directors": {
             "Attia": (
                 f"{'✅ Minimum 14-day threshold met.' if min_duration_met else '⚠️ Under 14 days — treat as preliminary.'} "
@@ -2751,9 +2993,12 @@ def tool_get_experiment_results(args):
                 "Consistency score tells you how often each during-day beat your before average \u2014 "
                 "it's the non-parametric signal that Cohen's d can miss at small N. A consistency score "
                 "of 70%+ with a positive delta is more meaningful than a larger delta with 50% consistency. "
-                + ("Note: for nutrition/supplement experiments, treat week 1 as adaptation noise. "
-                   "The clean signal is in the second week and beyond. "
-                   if ("supplement" in category or "nutrition" in category) else "")
+                + (
+                    "Note: for nutrition/supplement experiments, treat week 1 as adaptation noise. "
+                    "The clean signal is in the second week and beyond. "
+                    if ("supplement" in category or "nutrition" in category)
+                    else ""
+                )
                 + "Build from what's working. Don't overhaul \u2014 optimize."
             ),
             "Chen": (
@@ -2805,11 +3050,11 @@ def tool_end_experiment(args):
 
     update_expr = "SET #s = :s, outcome = :o, end_date = :e, ended_at = :ea, grade = :g"
     expr_values = {
-        ":s":  status,
-        ":o":  outcome,
-        ":e":  end_date,
+        ":s": status,
+        ":o": outcome,
+        ":e": end_date,
         ":ea": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
-        ":g":  grade,
+        ":g": grade,
     }
     if compliance_pct is not None:
         update_expr += ", compliance_pct = :cp"
@@ -2833,23 +3078,24 @@ def tool_end_experiment(args):
         days = None
 
     return {
-        "ended":         True,
+        "ended": True,
         "experiment_id": exp_id,
-        "name":          existing.get("name", ""),
-        "status":        status,
-        "grade":         grade,
-        "start_date":    start_date,
-        "end_date":      end_date,
-        "days_run":      days,
-        "outcome":       outcome,
+        "name": existing.get("name", ""),
+        "status": status,
+        "grade": grade,
+        "start_date": start_date,
+        "end_date": end_date,
+        "days_run": days,
+        "outcome": outcome,
         "compliance_pct": int(compliance_pct) if compliance_pct is not None else None,
-        "reflection":    reflection or None,
-        "iteration":     existing.get("iteration", 1),
-        "tip":           "Run get_experiment_results to see the full before/after comparison.",
+        "reflection": reflection or None,
+        "iteration": existing.get("iteration", 1),
+        "tip": "Run get_experiment_results to see the full before/after comparison.",
     }
 
 
 # \u2500\u2500 Ruck Logging (v2.49.0) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+
 
 def tool_log_ruck(args):
     """
@@ -2858,6 +3104,7 @@ def tool_log_ruck(args):
     writes an overlay to ruck_log partition.
     """
     from decimal import Decimal
+
     import boto3
 
     date = args.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
@@ -2973,10 +3220,7 @@ def tool_log_ruck(args):
     try:
         table.update_item(
             Key={"pk": RUCK_PK, "sk": f"DATE#{date}"},
-            UpdateExpression=(
-                "SET #r = list_append(if_not_exists(#r, :empty), :entry), "
-                "#d = :date, #src = :src, #ua = :ua"
-            ),
+            UpdateExpression=("SET #r = list_append(if_not_exists(#r, :empty), :entry), " "#d = :date, #src = :src, #ua = :ua"),
             ExpressionAttributeNames={"#r": "rucks", "#d": "date", "#src": "source", "#ua": "updated_at"},
             ExpressionAttributeValues={
                 ":entry": [entry],
@@ -3016,14 +3260,19 @@ def tool_get_ruck_log(args):
     start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     from mcp.core import _apply_phase_filter  # ADR-058
-    resp = table.query(**_apply_phase_filter({
-        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-        "ExpressionAttributeValues": {
-            ":pk": RUCK_PK,
-            ":s": f"DATE#{start}",
-            ":e": f"DATE#{end}\xff",
-        },
-    }))
+
+    resp = table.query(
+        **_apply_phase_filter(
+            {
+                "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                "ExpressionAttributeValues": {
+                    ":pk": RUCK_PK,
+                    ":s": f"DATE#{start}",
+                    ":e": f"DATE#{end}\xff",
+                },
+            }
+        )
+    )
     items = resp.get("Items", [])
     if not items:
         return {"message": f"No rucks logged between {start} and {end}.", "total_sessions": 0}
@@ -3051,16 +3300,18 @@ def tool_get_ruck_log(args):
     # Per-session summary
     sessions = []
     for r in all_rucks:
-        sessions.append({
-            "date": r.get("date"),
-            "weight_lbs": r.get("weight_lbs"),
-            "distance_miles": r.get("distance_miles"),
-            "duration_min": r.get("duration_min"),
-            "elevation_ft": r.get("elevation_gain_ft"),
-            "estimated_kcal": r.get("estimated_kcal"),
-            "avg_hr": r.get("avg_heartrate"),
-            "activity": r.get("activity_name", ""),
-        })
+        sessions.append(
+            {
+                "date": r.get("date"),
+                "weight_lbs": r.get("weight_lbs"),
+                "distance_miles": r.get("distance_miles"),
+                "duration_min": r.get("duration_min"),
+                "elevation_ft": r.get("elevation_gain_ft"),
+                "estimated_kcal": r.get("estimated_kcal"),
+                "avg_hr": r.get("avg_heartrate"),
+                "activity": r.get("activity_name", ""),
+            }
+        )
 
     return {
         "period": f"{start} to {end}",
@@ -3099,8 +3350,11 @@ def tool_get_field_notes(args):
     resp = table.get_item(Key={"pk": FIELD_NOTES_PK, "sk": f"WEEK#{week}"})
     item = resp.get("Item")
     if not item:
-        return {"status": "not_yet_generated", "week": week,
-                "message": f"No field notes found for {week}. The AI notes may not have been generated yet."}
+        return {
+            "status": "not_yet_generated",
+            "week": week,
+            "message": f"No field notes found for {week}. The AI notes may not have been generated yet.",
+        }
 
     item = decimal_to_float(item)
     result = {
@@ -3199,7 +3453,7 @@ def tool_log_field_note_response(args):
             f"Field Notes response saved — {week_label}\n"
             f"   Agreement: {agreement or 'not specified'}\n"
             f"   The right page is now filled.\n\n"
-            f"   AI said: \"{ai_preview}...\"\n"
+            f'   AI said: "{ai_preview}..."\n'
             f"   You responded in {word_count} words."
         ),
     }
@@ -3270,11 +3524,17 @@ def tool_log_ledger_entry(args):
     elif source_type == "challenge":
         try:
             from mcp.core import _apply_phase_filter
+
             # ADR-058: phase=pilot hidden by default.
-            ch_resp = table.query(**_apply_phase_filter({
-                "KeyConditionExpression": Key("pk").eq(f"USER#{USER_ID}#SOURCE#challenges") & Key("sk").begins_with(f"CHALLENGE#{source_id}"),
-                "Limit": 1,
-            }))
+            ch_resp = table.query(
+                **_apply_phase_filter(
+                    {
+                        "KeyConditionExpression": Key("pk").eq(f"USER#{USER_ID}#SOURCE#challenges")
+                        & Key("sk").begins_with(f"CHALLENGE#{source_id}"),
+                        "Limit": 1,
+                    }
+                )
+            )
             ch_items = ch_resp.get("Items", [])
             if ch_items:
                 ch = ch_items[0]
@@ -3353,14 +3613,16 @@ def tool_log_ledger_entry(args):
     entry = by_cause[cause_id]
     entry["amount_usd"] = Decimal(str(entry.get("amount_usd", 0))) + Decimal(str(amount_usd))
     entry["count"] = int(entry.get("count", 0)) + 1
-    entry.setdefault("transactions", []).append({
-        "date": date,
-        "source_name": source_name,
-        "source_type": source_type,
-        "source_badge_icon": badge_icon,
-        "amount_usd": Decimal(str(amount_usd)),
-        "outcome": outcome,
-    })
+    entry.setdefault("transactions", []).append(
+        {
+            "date": date,
+            "source_name": source_name,
+            "source_type": source_type,
+            "source_badge_icon": badge_icon,
+            "amount_usd": Decimal(str(amount_usd)),
+            "outcome": outcome,
+        }
+    )
 
     prev_donated = Decimal(str(existing.get("total_donated_usd", 0)))
     prev_bounties = Decimal(str(existing.get("total_bounties_usd", 0)))
@@ -3374,18 +3636,20 @@ def tool_log_ledger_entry(args):
     new_bounty_count = prev_bounty_count + (1 if is_success else 0)
     new_punishment_count = prev_punishment_count + (1 if not is_success else 0)
 
-    table.put_item(Item={
-        "pk": LEDGER_PK,
-        "sk": totals_sk,
-        "total_donated_usd": new_total,
-        "total_bounties_usd": new_bounties,
-        "total_punishments_usd": new_punishments,
-        "bounty_count": new_bounty_count,
-        "punishment_count": new_punishment_count,
-        "cause_count": len(by_cause),
-        "by_cause": by_cause,
-        "last_updated": ts,
-    })
+    table.put_item(
+        Item={
+            "pk": LEDGER_PK,
+            "sk": totals_sk,
+            "total_donated_usd": new_total,
+            "total_bounties_usd": new_bounties,
+            "total_punishments_usd": new_punishments,
+            "bounty_count": new_bounty_count,
+            "punishment_count": new_punishment_count,
+            "cause_count": len(by_cause),
+            "by_cause": by_cause,
+            "last_updated": ts,
+        }
+    )
 
     return {
         "status": "logged",

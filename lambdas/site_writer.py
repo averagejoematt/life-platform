@@ -12,7 +12,7 @@ INTEGRATION INSTRUCTIONS:
        write_character_stats(s3_client, character_record, pillar_records, timeline)
 
 COST WARNING: This is just two extra s3.put_object calls inside Lambdas
-already running daily. Zero new infrastructure. Zero new cost. 
+already running daily. Zero new infrastructure. Zero new cost.
 Files served via existing CloudFront distribution on matthew-life-platform.
 
 S3 path: s3://matthew-life-platform/site/public_stats.json
@@ -45,11 +45,9 @@ PULSE_KEY = "generated/pulse.json"
 # Journey start date — used for "X days on journey" counter (ADR-058)
 # IMPORTANT: this import must come BEFORE HERO_WHY_PARAGRAPH below, which
 # embeds JOURNEY_START_WEIGHT in an f-string at module-load time.
-from constants import (
-    EXPERIMENT_START_DATE as JOURNEY_START_DATE,
-    EXPERIMENT_BASELINE_WEIGHT_LBS as JOURNEY_START_WEIGHT,
-    EXPERIMENT_GOAL_WEIGHT_LBS as GOAL_WEIGHT,
-)
+from constants import EXPERIMENT_BASELINE_WEIGHT_LBS as JOURNEY_START_WEIGHT
+from constants import EXPERIMENT_GOAL_WEIGHT_LBS as GOAL_WEIGHT
+from constants import EXPERIMENT_START_DATE as JOURNEY_START_DATE
 
 # ─────────────────────────────────────────────────────────────────────────────
 # BS-02: Hero narrative copy (finalised v3.7.67)
@@ -98,16 +96,16 @@ def _compute_hero(vitals: dict, journey: dict) -> dict:
     goal_date = journey.get("projected_goal_date", "")
 
     return {
-        "why_paragraph":    HERO_WHY_PARAGRAPH,
+        "why_paragraph": HERO_WHY_PARAGRAPH,
         "scroll_invitation": "See the actual numbers below →",
-        "days_on_journey":  days_on_journey,
+        "days_on_journey": days_on_journey,
         "start_weight_lbs": JOURNEY_START_WEIGHT,
-        "goal_weight_lbs":  GOAL_WEIGHT,
+        "goal_weight_lbs": GOAL_WEIGHT,
         "current_weight_lbs": current_weight,
-        "lost_lbs":         lost_lbs,
-        "progress_pct":     progress_pct,
+        "lost_lbs": lost_lbs,
+        "progress_pct": progress_pct,
         "projected_goal_date": goal_date,
-        "journey_started":  JOURNEY_START_DATE,
+        "journey_started": JOURNEY_START_DATE,
         "paragraph_is_placeholder": False,
     }
 
@@ -121,26 +119,32 @@ def _get_latest_chronicle_headline(table_client, user_id: str) -> dict | None:
         return None
     try:
         from datetime import timedelta
+
         today = datetime.now(timezone.utc).date()
         week_ago = (today - timedelta(days=7)).isoformat()
         from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
-        resp = table_client.query(**with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": f"USER#{user_id}#SOURCE#chronicle",
-                ":s":  f"DATE#{week_ago}",
-                ":e":  f"DATE#{today.isoformat()}",
-            },
-            "ScanIndexForward": False,
-            "Limit": 1,
-        }))
+
+        resp = table_client.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                    "ExpressionAttributeValues": {
+                        ":pk": f"USER#{user_id}#SOURCE#chronicle",
+                        ":s": f"DATE#{week_ago}",
+                        ":e": f"DATE#{today.isoformat()}",
+                    },
+                    "ScanIndexForward": False,
+                    "Limit": 1,
+                }
+            )
+        )
         items = resp.get("Items", [])
         if items:
             item = items[0]
             return {
-                "title":      item.get("title", ""),
-                "week_num":   int(item.get("week_number", 0)),
-                "date":       item.get("date", ""),
+                "title": item.get("title", ""),
+                "week_num": int(item.get("week_number", 0)),
+                "date": item.get("date", ""),
                 "stats_line": item.get("stats_line", ""),
             }
     except Exception as exc:
@@ -158,19 +162,25 @@ def _get_recent_chronicles(table_client, user_id: str, count: int = 3) -> list:
         return []
     try:
         from datetime import timedelta
+
         today = datetime.now(timezone.utc).date()
         d90 = (today - timedelta(days=90)).isoformat()
         from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
-        resp = table_client.query(**with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": f"USER#{user_id}#SOURCE#chronicle",
-                ":s":  f"DATE#{d90}",
-                ":e":  f"DATE#{today.isoformat()}",
-            },
-            "ScanIndexForward": False,
-            "Limit": count,
-        }))
+
+        resp = table_client.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                    "ExpressionAttributeValues": {
+                        ":pk": f"USER#{user_id}#SOURCE#chronicle",
+                        ":s": f"DATE#{d90}",
+                        ":e": f"DATE#{today.isoformat()}",
+                    },
+                    "ScanIndexForward": False,
+                    "Limit": count,
+                }
+            )
+        )
         items = resp.get("Items", [])
         entries = []
         for item in items:
@@ -187,25 +197,36 @@ def _get_recent_chronicles(table_client, user_id: str, count: int = 3) -> list:
                     excerpt = first_sentence + ("." if len(first_sentence) < 120 else "…")
             # URL: /chronicle/week-N/ pattern
             url = f"/chronicle/week-{week_num}/" if week_num else "/chronicle/"
-            entries.append({
-                "title":    title,
-                "week_num": week_num,
-                "date":     date,
-                "url":      url,
-                "excerpt":  (excerpt or "")[:150],
-            })
+            entries.append(
+                {
+                    "title": title,
+                    "week_num": week_num,
+                    "date": date,
+                    "url": url,
+                    "excerpt": (excerpt or "")[:150],
+                }
+            )
         return entries
     except Exception as exc:
         logger.warning("[site_writer] Recent chronicles fetch failed: %s", exc)
     return []
 
 
-def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
-                       platform: dict = None, table_client=None, user_id: str = "matthew",
-                       trends: dict = None, brief_excerpt: str = None,
-                       baseline: dict = None, group_narratives: dict = None,
-                       elena_hero_line: str = None,
-                       character: dict = None) -> bool:
+def write_public_stats(
+    s3_client,
+    vitals: dict,
+    journey: dict,
+    training: dict,
+    platform: dict = None,
+    table_client=None,
+    user_id: str = "matthew",
+    trends: dict = None,
+    brief_excerpt: str = None,
+    baseline: dict = None,
+    group_narratives: dict = None,
+    elena_hero_line: str = None,
+    character: dict = None,
+) -> bool:
     """
     Write public_stats.json to S3 from daily-brief-lambda data.
 
@@ -263,15 +284,18 @@ def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
             "hero": _json_safe(hero),
             # BS-02: Latest Chronicle headline for below-fold
             "chronicle_latest": _json_safe(chronicle_headline) if chronicle_headline else None,
-            "vitals":   _json_safe(vitals),
-            "journey":  _json_safe(journey),
+            "vitals": _json_safe(vitals),
+            "journey": _json_safe(journey),
             "training": _json_safe(training),
-            "platform": _json_safe(platform or {
-                "mcp_tools": 95,
-                "data_sources": 19,
-                "lambdas": 50,
-                "last_review_grade": "A-",
-            }),
+            "platform": _json_safe(
+                platform
+                or {
+                    "mcp_tools": 95,
+                    "data_sources": 19,
+                    "lambdas": 50,
+                    "last_review_grade": "A-",
+                }
+            ),
             # v1.2.0: Trend arrays for homepage sparkline charts
             "trends": _json_safe(trends or {}),
             # v1.2.0: AI brief excerpt for "What Claude Sees" homepage widget
@@ -304,8 +328,9 @@ def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
         return False
 
 
-def write_character_stats(s3_client, character: dict, pillars: list, timeline: list,
-                          tiers: list = None, pillar_history: list = None) -> bool:
+def write_character_stats(
+    s3_client, character: dict, pillars: list, timeline: list, tiers: list = None, pillar_history: list = None
+) -> bool:
     """
     Write character_stats.json to S3 from character-sheet-compute data.
 
@@ -327,11 +352,41 @@ def write_character_stats(s3_client, character: dict, pillars: list, timeline: l
     """
     try:
         default_tiers = [
-            {"name": "Foundation", "emoji": "🔨", "min_level": 1,  "max_level": 20,  "status": "current" if character.get("tier") == "Foundation" else "locked"},
-            {"name": "Momentum",   "emoji": "🔥", "min_level": 21, "max_level": 40,  "status": "current" if character.get("tier") == "Momentum" else "locked"},
-            {"name": "Discipline", "emoji": "⚔️", "min_level": 41, "max_level": 60,  "status": "current" if character.get("tier") == "Discipline" else "locked"},
-            {"name": "Mastery",    "emoji": "🏆", "min_level": 61, "max_level": 80,  "status": "current" if character.get("tier") == "Mastery" else "locked"},
-            {"name": "Elite",      "emoji": "👑", "min_level": 81, "max_level": 100, "status": "current" if character.get("tier") == "Elite" else "locked"},
+            {
+                "name": "Foundation",
+                "emoji": "🔨",
+                "min_level": 1,
+                "max_level": 20,
+                "status": "current" if character.get("tier") == "Foundation" else "locked",
+            },
+            {
+                "name": "Momentum",
+                "emoji": "🔥",
+                "min_level": 21,
+                "max_level": 40,
+                "status": "current" if character.get("tier") == "Momentum" else "locked",
+            },
+            {
+                "name": "Discipline",
+                "emoji": "⚔️",
+                "min_level": 41,
+                "max_level": 60,
+                "status": "current" if character.get("tier") == "Discipline" else "locked",
+            },
+            {
+                "name": "Mastery",
+                "emoji": "🏆",
+                "min_level": 61,
+                "max_level": 80,
+                "status": "current" if character.get("tier") == "Mastery" else "locked",
+            },
+            {
+                "name": "Elite",
+                "emoji": "👑",
+                "min_level": 81,
+                "max_level": 100,
+                "status": "current" if character.get("tier") == "Elite" else "locked",
+            },
         ]
 
         payload = {
@@ -365,6 +420,7 @@ def write_character_stats(s3_client, character: dict, pillars: list, timeline: l
 
 # ── PULSE-A1/A2/A3: Pulse computation and storage ──────────────────────────────
 
+
 def _glyph_state(green_test, amber_test, has_data):
     """Return 'green', 'amber', 'red', or 'gray' based on signal thresholds."""
     if not has_data:
@@ -376,14 +432,21 @@ def _glyph_state(green_test, amber_test, has_data):
     return "red"
 
 
-def _compute_pulse(vitals: dict, journey: dict, training: dict,
-                   journal_data: dict = None, mood_data: dict = None,
-                   trends: dict = None, brief_excerpt: str = None) -> dict:
+def _compute_pulse(
+    vitals: dict,
+    journey: dict,
+    training: dict,
+    journal_data: dict = None,
+    mood_data: dict = None,
+    trends: dict = None,
+    brief_excerpt: str = None,
+) -> dict:
     """Compute the full pulse object from daily brief data."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     try:
         from datetime import date as _date
+
         started = _date.fromisoformat(JOURNEY_START_DATE)
         day_number = max(1, (_date.today() - started).days + 1)
     except Exception:
@@ -416,48 +479,59 @@ def _compute_pulse(vitals: dict, journey: dict, training: dict,
         "journey_summary": (
             f"{round(JOURNEY_START_WEIGHT - weight, 1)} lbs lost "
             f"({round((JOURNEY_START_WEIGHT - weight) / (JOURNEY_START_WEIGHT - GOAL_WEIGHT) * 100, 1)}%)"
-            if weight and weight < JOURNEY_START_WEIGHT else None
+            if weight and weight < JOURNEY_START_WEIGHT
+            else None
         ),
         "sparkline_7d": [d.get("lbs") for d in weight_daily[-7:]] if weight_daily else [],
         "as_of": vitals.get("weight_as_of") or today,
     }
 
     # ── 2. WATER (not yet tracked) ──
-    glyphs["water"] = {"state": "gray", "liters": None, "target": 3.0, "label": None,
-                       "sparkline_7d": [], "as_of": today}
+    glyphs["water"] = {"state": "gray", "liters": None, "target": 3.0, "label": None, "sparkline_7d": [], "as_of": today}
 
     # ── 3. MOVEMENT ──
     z2_week = training.get("zone2_this_week_min", 0) or 0
     activity_type = training.get("today_activity")
     has_movement = z2_week > 0 or activity_type
     glyphs["movement"] = {
-        "state": _glyph_state(green_test=bool(activity_type or z2_week > 60),
-                              amber_test=(z2_week > 0), has_data=has_movement),
-        "steps": None, "zone2_week_min": round(z2_week), "zone2_target": 150,
-        "activity_type": activity_type, "sparkline_7d": [], "as_of": today,
+        "state": _glyph_state(green_test=bool(activity_type or z2_week > 60), amber_test=(z2_week > 0), has_data=has_movement),
+        "steps": None,
+        "zone2_week_min": round(z2_week),
+        "zone2_target": 150,
+        "activity_type": activity_type,
+        "sparkline_7d": [],
+        "as_of": today,
     }
 
     # ── 4. LIFT ──
     trained_today = bool(activity_type)
     glyphs["lift"] = {
         "state": _glyph_state(green_test=trained_today, amber_test=True, has_data=True),
-        "trained_today": trained_today, "workout_type": activity_type or "Rest",
-        "strain": training.get("today_strain"), "sessions_this_week": 0,
-        "rest_day_streak": 0, "as_of": today,
+        "trained_today": trained_today,
+        "workout_type": activity_type or "Rest",
+        "strain": training.get("today_strain"),
+        "sessions_this_week": 0,
+        "rest_day_streak": 0,
+        "as_of": today,
     }
 
     # ── 5. RECOVERY ──
     recovery_pct = vitals.get("recovery_pct")
     recovery_trend = (trends or {}).get("recovery_daily", [])
     glyphs["recovery"] = {
-        "state": _glyph_state(green_test=(recovery_pct and recovery_pct >= 67),
-                              amber_test=(recovery_pct and recovery_pct >= 33),
-                              has_data=(recovery_pct is not None)),
+        "state": _glyph_state(
+            green_test=(recovery_pct and recovery_pct >= 67),
+            amber_test=(recovery_pct and recovery_pct >= 33),
+            has_data=(recovery_pct is not None),
+        ),
         "recovery_pct": round(recovery_pct) if recovery_pct else None,
-        "status_label": ("Optimal" if (recovery_pct or 0) >= 67 else
-                         ("Moderate" if (recovery_pct or 0) >= 33 else "Needs rest"))
-                         if recovery_pct else None,
-        "hrv_ms": vitals.get("hrv_ms"), "rhr_bpm": vitals.get("rhr_bpm"),
+        "status_label": (
+            ("Optimal" if (recovery_pct or 0) >= 67 else ("Moderate" if (recovery_pct or 0) >= 33 else "Needs rest"))
+            if recovery_pct
+            else None
+        ),
+        "hrv_ms": vitals.get("hrv_ms"),
+        "rhr_bpm": vitals.get("rhr_bpm"),
         "sparkline_7d": [d.get("pct") for d in recovery_trend[-7:]] if recovery_trend else [],
         "as_of": today,
     }
@@ -466,9 +540,9 @@ def _compute_pulse(vitals: dict, journey: dict, training: dict,
     sleep_hours = vitals.get("sleep_hours")
     sleep_trend = (trends or {}).get("sleep_daily", [])
     glyphs["sleep"] = {
-        "state": _glyph_state(green_test=(sleep_hours and sleep_hours >= 7),
-                              amber_test=(sleep_hours and sleep_hours >= 6),
-                              has_data=(sleep_hours is not None)),
+        "state": _glyph_state(
+            green_test=(sleep_hours and sleep_hours >= 7), amber_test=(sleep_hours and sleep_hours >= 6), has_data=(sleep_hours is not None)
+        ),
         "hours": round(sleep_hours, 1) if sleep_hours else None,
         "score": vitals.get("sleep_score"),
         "sparkline_7d": [d.get("hrs") for d in sleep_trend[-7:]] if sleep_trend else [],
@@ -480,8 +554,11 @@ def _compute_pulse(vitals: dict, journey: dict, training: dict,
     written_today = bool(journal.get("entries") and journal["entries"] > 0)
     glyphs["journal"] = {
         "state": "green" if written_today else "gray",
-        "written_today": written_today, "streak_days": journal.get("streak_days", 0),
-        "themes": (journal.get("themes") or [])[:3], "binary_14d": [], "as_of": today,
+        "written_today": written_today,
+        "streak_days": journal.get("streak_days", 0),
+        "themes": (journal.get("themes") or [])[:3],
+        "binary_14d": [],
+        "as_of": today,
     }
 
     # ── 8. MIND ──
@@ -490,12 +567,14 @@ def _compute_pulse(vitals: dict, journey: dict, training: dict,
     has_mood = mood_score is not None
     mood_labels = {1: "Low", 2: "Below avg", 3: "Average", 4: "Good", 5: "Excellent"}
     glyphs["mind"] = {
-        "state": _glyph_state(green_test=(mood_score and float(mood_score) >= 4),
-                              amber_test=(mood_score and float(mood_score) >= 3),
-                              has_data=has_mood),
-        "score": round(float(mood_score)) if mood_score else None, "max_score": 5,
+        "state": _glyph_state(
+            green_test=(mood_score and float(mood_score) >= 4), amber_test=(mood_score and float(mood_score) >= 3), has_data=has_mood
+        ),
+        "score": round(float(mood_score)) if mood_score else None,
+        "max_score": 5,
         "label": mood_labels.get(round(float(mood_score))) if mood_score else None,
-        "sparkline_7d": [], "as_of": today,
+        "sparkline_7d": [],
+        "as_of": today,
     }
 
     # ── PULSE STATUS ──
@@ -515,8 +594,7 @@ def _compute_pulse(vitals: dict, journey: dict, training: dict,
     narrative = brief_excerpt
     if not narrative:
         if status == "quiet":
-            narrative = (f"{reporting_count} signal{'s' if reporting_count != 1 else ''}"
-                         " reporting. The rest is silence.")
+            narrative = f"{reporting_count} signal{'s' if reporting_count != 1 else ''}" " reporting. The rest is silence."
         elif status == "strong":
             parts = []
             if day_delta is not None and day_delta < 0:
@@ -532,28 +610,49 @@ def _compute_pulse(vitals: dict, journey: dict, training: dict,
 
     return {
         "pulse": {
-            "day_number": day_number, "date": today,
-            "status": status, "status_color": status_color,
+            "day_number": day_number,
+            "date": today,
+            "status": status,
+            "status_color": status_color,
             "narrative": narrative,
-            "signals_reporting": reporting_count, "signals_total": 8,
+            "signals_reporting": reporting_count,
+            "signals_total": 8,
             "glyphs": glyphs,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
     }
 
 
-def write_pulse_json(s3_client, vitals: dict, journey: dict, training: dict,
-                     journal_data: dict = None, mood_data: dict = None,
-                     trends: dict = None, brief_excerpt: str = None,
-                     table_client=None, user_id: str = "matthew") -> bool:
+def write_pulse_json(
+    s3_client,
+    vitals: dict,
+    journey: dict,
+    training: dict,
+    journal_data: dict = None,
+    mood_data: dict = None,
+    trends: dict = None,
+    brief_excerpt: str = None,
+    table_client=None,
+    user_id: str = "matthew",
+) -> bool:
     """PULSE-A2/A3: Write pulse.json to S3 + DynamoDB for /api/pulse."""
     try:
-        pulse = _compute_pulse(vitals=vitals, journey=journey, training=training,
-                               journal_data=journal_data, mood_data=mood_data,
-                               trends=trends, brief_excerpt=brief_excerpt)
-        s3_client.put_object(Bucket=S3_BUCKET, Key=PULSE_KEY,
-                             Body=json.dumps(pulse, indent=2, default=str),
-                             ContentType="application/json", CacheControl="max-age=300")
+        pulse = _compute_pulse(
+            vitals=vitals,
+            journey=journey,
+            training=training,
+            journal_data=journal_data,
+            mood_data=mood_data,
+            trends=trends,
+            brief_excerpt=brief_excerpt,
+        )
+        s3_client.put_object(
+            Bucket=S3_BUCKET,
+            Key=PULSE_KEY,
+            Body=json.dumps(pulse, indent=2, default=str),
+            ContentType="application/json",
+            CacheControl="max-age=300",
+        )
         logger.info("[site_writer] pulse.json written to S3")
 
         if table_client is not None:
@@ -561,9 +660,14 @@ def write_pulse_json(s3_client, vitals: dict, journey: dict, training: dict,
             try:
                 pulse_json = json.dumps(pulse["pulse"], default=str)
                 pulse_item = json.loads(pulse_json, parse_float=Decimal)
-                table_client.put_item(Item={"pk": "PULSE", "sk": f"DATE#{today_str}",
-                                            "date": today_str,
-                                            **{k: v for k, v in pulse_item.items() if v is not None}})
+                table_client.put_item(
+                    Item={
+                        "pk": "PULSE",
+                        "sk": f"DATE#{today_str}",
+                        "date": today_str,
+                        **{k: v for k, v in pulse_item.items() if v is not None},
+                    }
+                )
                 logger.info(f"[site_writer] Pulse DynamoDB: {today_str}")
             except Exception as ddb_e:
                 logger.warning(f"[site_writer] Pulse DDB write failed: {ddb_e}")

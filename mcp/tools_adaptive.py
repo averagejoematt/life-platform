@@ -6,10 +6,11 @@ Tools:
 """
 
 import json
-import boto3
 import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+
+import boto3
 
 _REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
@@ -22,9 +23,12 @@ USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
 
 def d2f(obj):
-    if isinstance(obj, list): return [d2f(i) for i in obj]
-    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [d2f(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
 
 
@@ -45,15 +49,20 @@ def get_adaptive_mode(days: int = 14) -> dict:
 
     try:
         from mcp.core import _apply_phase_filter  # ADR-058
-        resp = table.query(**_apply_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": USER_PREFIX + "adaptive_mode",
-                ":s":  "DATE#" + start,
-                ":e":  "DATE#" + end,
-            },
-            "ScanIndexForward": False,
-        }))
+
+        resp = table.query(
+            **_apply_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                    "ExpressionAttributeValues": {
+                        ":pk": USER_PREFIX + "adaptive_mode",
+                        ":s": "DATE#" + start,
+                        ":e": "DATE#" + end,
+                    },
+                    "ScanIndexForward": False,
+                }
+            )
+        )
         records = [d2f(item) for item in resp.get("Items", [])]
     except Exception as e:
         return {"error": str(e)}
@@ -85,34 +94,36 @@ def get_adaptive_mode(days: int = 14) -> dict:
     # Build compact history
     history = []
     for r in sorted(records, key=lambda x: x.get("date", ""), reverse=False):
-        history.append({
-            "date":  r.get("date"),
-            "mode":  r.get("brief_mode"),
-            "score": r.get("engagement_score"),
-            "factors": r.get("factors", {}),
-        })
+        history.append(
+            {
+                "date": r.get("date"),
+                "mode": r.get("brief_mode"),
+                "score": r.get("engagement_score"),
+                "factors": r.get("factors", {}),
+            }
+        )
 
     return {
         "current": {
-            "date":             latest.get("date"),
-            "brief_mode":       latest.get("brief_mode"),
-            "mode_label":       latest.get("mode_label"),
+            "date": latest.get("date"),
+            "brief_mode": latest.get("brief_mode"),
+            "mode_label": latest.get("mode_label"),
             "engagement_score": latest.get("engagement_score"),
-            "factors":          latest.get("factors", {}),
+            "factors": latest.get("factors", {}),
             "component_scores": latest.get("component_scores", {}),
-            "computed_at":      latest.get("computed_at"),
+            "computed_at": latest.get("computed_at"),
         },
         "summary": {
-            "days_analysed":   len(records),
-            "avg_score":       avg_score,
-            "current_streak":  streak,
-            "streak_mode":     current_mode,
+            "days_analysed": len(records),
+            "avg_score": avg_score,
+            "current_streak": streak,
+            "streak_mode": current_mode,
             "mode_distribution": mode_counts,
         },
         "history": history,
         "interpretation": {
             "flourishing": "Score ≥ 70 — journal complete, high habit adherence, improving trend",
-            "standard":    "Score 40-69 — on track, normal brief behaviour",
-            "struggling":  "Score < 40 — brief shifts to gentler coaching and recovery focus",
+            "standard": "Score 40-69 — on track, normal brief behaviour",
+            "struggling": "Score < 40 — brief shifts to gentler coaching and recovery focus",
         },
     }

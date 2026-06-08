@@ -27,8 +27,10 @@ OUT = Path("site/rss.xml")
 # L-06: some readers probe /feed.xml instead of /rss.xml — emit an identical alias.
 OUT_ALIAS = Path("site/feed.xml")
 TITLE = "The Measured Life — averagejoematt"
-DESC = ("The weekly chronicle of an ordinary life, measured in full — every number, "
-        "every week, including the weeks it dips. Written by Elena Voss.")
+DESC = (
+    "The weekly chronicle of an ordinary life, measured in full — every number, "
+    "every week, including the weeks it dips. Written by Elena Voss."
+)
 
 
 def rfc822(date_str: str) -> str:
@@ -78,8 +80,7 @@ def main() -> int:
         f"      <url>{BASE}/assets/images/og-image.png</url>\n"
         f"      <title>{esc(TITLE)}</title>\n"
         f"      <link>{BASE}/story/chronicle/</link>\n"
-        "    </image>\n"
-        + "\n".join(items) + "\n"
+        "    </image>\n" + "\n".join(items) + "\n"
         "  </channel>\n"
         "</rss>\n"
     )

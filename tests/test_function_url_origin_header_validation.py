@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
+
 def _make_event(path: str, method: str = "GET", headers: dict | None = None) -> dict:
     return {
         "rawPath": path,
@@ -50,17 +51,23 @@ def _load_site_api(origin_secret: str = ""):
     fake_conditions.Key = mock.MagicMock()
 
     with (
-        mock.patch.dict("sys.modules", {
-            "boto3": fake_boto3,
-            "boto3.dynamodb": types.ModuleType("boto3.dynamodb"),
-            "boto3.dynamodb.conditions": fake_conditions,
-        }),
-        mock.patch.dict(os.environ, {
-            "TABLE_NAME": "test-table",
-            "USER_ID": "matthew",
-            "S3_BUCKET": "test-bucket",
-            "SITE_API_ORIGIN_SECRET": origin_secret,
-        }),
+        mock.patch.dict(
+            "sys.modules",
+            {
+                "boto3": fake_boto3,
+                "boto3.dynamodb": types.ModuleType("boto3.dynamodb"),
+                "boto3.dynamodb.conditions": fake_conditions,
+            },
+        ),
+        mock.patch.dict(
+            os.environ,
+            {
+                "TABLE_NAME": "test-table",
+                "USER_ID": "matthew",
+                "S3_BUCKET": "test-bucket",
+                "SITE_API_ORIGIN_SECRET": origin_secret,
+            },
+        ),
     ):
         if "site_api_lambda" in sys.modules:
             del sys.modules["site_api_lambda"]
@@ -69,6 +76,7 @@ def _load_site_api(origin_secret: str = ""):
 
 
 # ── tests ─────────────────────────────────────────────────────────────────────
+
 
 class TestOriginHeaderValidationDisabled:
     """When SITE_API_ORIGIN_SECRET is empty (default), ALL requests pass through."""
@@ -79,9 +87,7 @@ class TestOriginHeaderValidationDisabled:
     def test_request_without_header_allowed_when_secret_unset(self):
         event = _make_event("/api/vitals", headers={})
         resp = self.mod.lambda_handler(event, None)
-        assert resp["statusCode"] != 403, (
-            "Should allow all requests when SITE_API_ORIGIN_SECRET is not configured"
-        )
+        assert resp["statusCode"] != 403, "Should allow all requests when SITE_API_ORIGIN_SECRET is not configured"
 
     def test_request_with_header_allowed_when_secret_unset(self):
         event = _make_event("/api/vitals", headers={"x-amj-origin": "some-value"})
@@ -100,23 +106,17 @@ class TestOriginHeaderValidationEnabled:
     def test_missing_header_rejected(self):
         event = _make_event("/api/vitals", headers={})
         resp = self.mod.lambda_handler(event, None)
-        assert resp["statusCode"] == 403, (
-            "Request without X-AMJ-Origin must be rejected 403 when secret is configured"
-        )
+        assert resp["statusCode"] == 403, "Request without X-AMJ-Origin must be rejected 403 when secret is configured"
 
     def test_wrong_header_value_rejected(self):
         event = _make_event("/api/vitals", headers={"x-amj-origin": "wrong-value"})
         resp = self.mod.lambda_handler(event, None)
-        assert resp["statusCode"] == 403, (
-            "Request with incorrect X-AMJ-Origin must be rejected 403"
-        )
+        assert resp["statusCode"] == 403, "Request with incorrect X-AMJ-Origin must be rejected 403"
 
     def test_correct_header_passes(self):
         event = _make_event("/api/vitals", headers={"x-amj-origin": self.SECRET})
         resp = self.mod.lambda_handler(event, None)
-        assert resp["statusCode"] != 403, (
-            "Request with correct X-AMJ-Origin must not be rejected"
-        )
+        assert resp["statusCode"] != 403, "Request with correct X-AMJ-Origin must not be rejected"
 
     def test_correct_header_case_insensitive(self):
         """HTTP headers are case-insensitive; both x-amj-origin and X-AMJ-Origin must work."""
@@ -135,6 +135,7 @@ class TestOriginHeaderValidationEnabled:
         resp = self.mod.lambda_handler(event, None)
         assert resp["statusCode"] == 403
         import json
+
         body = json.loads(resp["body"])
         assert "error" in body or "message" in body or body  # any non-empty JSON
 

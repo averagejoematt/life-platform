@@ -1,30 +1,53 @@
 """
 CGM / glucose tools.
 """
+
 import json
+import logging
 import math
 import re
-import logging
-from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 
 from mcp.config import (
-    table, s3_client, S3_BUCKET, USER_PREFIX, USER_ID, SOURCES,
-    P40_GROUPS, FIELD_ALIASES, logger,
-    INSIGHTS_PK, EXPERIMENTS_PK, TRAVEL_PK,
+    EXPERIMENTS_PK,
+    FIELD_ALIASES,
+    INSIGHTS_PK,
+    P40_GROUPS,
+    S3_BUCKET,
+    SOURCES,
+    TRAVEL_PK,
+    USER_ID,
+    USER_PREFIX,
+    logger,
+    s3_client,
+    table,
 )
 from mcp.core import (
-    query_source, parallel_query_sources, query_source_range,
-    get_profile, get_sot, decimal_to_float,
-    ddb_cache_get, ddb_cache_set, mem_cache_get, mem_cache_set,
-    date_diff_days, resolve_field,
+    date_diff_days,
+    ddb_cache_get,
+    ddb_cache_set,
+    decimal_to_float,
+    get_profile,
+    get_sot,
+    mem_cache_get,
+    mem_cache_set,
+    parallel_query_sources,
+    query_source,
+    query_source_range,
+    resolve_field,
 )
 from mcp.helpers import (
-    aggregate_items, flatten_strava_activity,
-    compute_daily_load_score, compute_ewa, pearson_r, _linear_regression,
-    classify_day_type, query_chronicling, _habit_series,
+    _habit_series,
+    _linear_regression,
+    aggregate_items,
+    classify_day_type,
+    compute_daily_load_score,
+    compute_ewa,
+    flatten_strava_activity,
+    pearson_r,
+    query_chronicling,
 )
-
 
 # ── CGM helpers ──
 
@@ -119,7 +142,9 @@ def tool_get_cgm_dashboard(args):
     a140 = [r["time_above_140_pct"] for r in rows]
 
     summary = {
-        "total_days": len(rows), "cgm_days": cgm_ct, "manual_days": len(rows) - cgm_ct,
+        "total_days": len(rows),
+        "cgm_days": cgm_ct,
+        "manual_days": len(rows) - cgm_ct,
         "avg_glucose": round(sum(avg_vals) / len(avg_vals), 1),
         "avg_fasting_proxy": round(sum(min_vals) / len(min_vals), 1) if min_vals else None,
         "avg_variability_sd": round(sum(sd_vals) / len(sd_vals), 1),
@@ -131,7 +156,12 @@ def tool_get_cgm_dashboard(args):
     if summary["avg_glucose"] > 100:
         flags.append({"severity": "warning", "message": f"Mean glucose {summary['avg_glucose']} > 100 mg/dL optimal threshold."})
     if summary["avg_variability_sd"] > 25:
-        flags.append({"severity": "warning", "message": f"Glucose variability SD {summary['avg_variability_sd']} > 25 target. Large postprandial spikes."})
+        flags.append(
+            {
+                "severity": "warning",
+                "message": f"Glucose variability SD {summary['avg_variability_sd']} > 25 target. Large postprandial spikes.",
+            }
+        )
     if summary["avg_time_in_range_pct"] < 90:
         flags.append({"severity": "warning", "message": f"Time in range {summary['avg_time_in_range_pct']}% < 90% target."})
     fp = summary.get("avg_fasting_proxy")
@@ -144,12 +174,19 @@ def tool_get_cgm_dashboard(args):
         f_avg = sum(avg_vals[:mid]) / mid
         s_avg = sum(avg_vals[mid:]) / (len(avg_vals) - mid)
         pct = round((s_avg - f_avg) / f_avg * 100, 1) if f_avg else 0
-        trend = {"first_half": round(f_avg, 1), "second_half": round(s_avg, 1), "pct_change": pct,
-                 "direction": "improving" if pct < -2 else "worsening" if pct > 2 else "stable"}
+        trend = {
+            "first_half": round(f_avg, 1),
+            "second_half": round(s_avg, 1),
+            "pct_change": pct,
+            "direction": "improving" if pct < -2 else "worsening" if pct > 2 else "stable",
+        }
 
     return {
         "period": {"start": start_date, "end": end_date},
-        "summary": summary, "trend": trend, "clinical_flags": flags or [], "daily": rows,
+        "summary": summary,
+        "trend": trend,
+        "clinical_flags": flags or [],
+        "daily": rows,
         "note": "Targets: mean <100, SD <20, TIR >90%, fasting <90. Time above 140 triggers insulin + inflammation.",
     }
 
@@ -162,14 +199,20 @@ def tool_get_glucose_sleep_correlation(args):
     sources = parallel_query_sources(["apple_health", "eightsleep"], start_date, end_date)
     ah_items = sources.get("apple_health", [])
     es_items = sources.get("eightsleep", [])
-    if not ah_items: return {"error": "No Apple Health data."}
-    if not es_items: return {"error": "No Eight Sleep data."}
+    if not ah_items:
+        return {"error": "No Apple Health data."}
+    if not es_items:
+        return {"error": "No Eight Sleep data."}
 
     es_by_date = {i.get("date"): i for i in es_items if i.get("date")}
+
     def _sf(v):
-        if v is None: return None
-        try: return float(v)
-        except Exception: return None
+        if v is None:
+            return None
+        try:
+            return float(v)
+        except Exception:
+            return None
 
     SLEEP_METRICS = ["sleep_efficiency_pct", "deep_pct", "rem_pct", "sleep_score", "hrv", "time_to_sleep_min"]
 
@@ -177,16 +220,27 @@ def tool_get_glucose_sleep_correlation(args):
     for item in sorted(ah_items, key=lambda x: x.get("date", "")):
         date = item.get("date")
         g_avg = _sf(item.get("blood_glucose_avg"))
-        if not date or g_avg is None: continue
+        if not date or g_avg is None:
+            continue
         sleep = es_by_date.get(date)
-        if not sleep: continue
+        if not sleep:
+            continue
         sm_vals = {sm: _sf(sleep.get(sm)) for sm in SLEEP_METRICS}
-        if sm_vals.get("sleep_efficiency_pct") is None and sm_vals.get("sleep_score") is None: continue
+        if sm_vals.get("sleep_efficiency_pct") is None and sm_vals.get("sleep_score") is None:
+            continue
 
-        bucket = "optimal_below_90" if g_avg < 90 else "normal_90_100" if g_avg < 100 else "elevated_100_110" if g_avg < 110 else "high_above_110"
-        row = {"date": date, "bucket": bucket, "glucose_avg": g_avg,
-               "glucose_sd": _sf(item.get("blood_glucose_std_dev")),
-               "time_above_140": _sf(item.get("blood_glucose_time_above_140_pct"))}
+        bucket = (
+            "optimal_below_90"
+            if g_avg < 90
+            else "normal_90_100" if g_avg < 100 else "elevated_100_110" if g_avg < 110 else "high_above_110"
+        )
+        row = {
+            "date": date,
+            "bucket": bucket,
+            "glucose_avg": g_avg,
+            "glucose_sd": _sf(item.get("blood_glucose_std_dev")),
+            "time_above_140": _sf(item.get("blood_glucose_time_above_140_pct")),
+        }
         row.update(sm_vals)
         paired.append(row)
 
@@ -202,7 +256,8 @@ def tool_get_glucose_sleep_correlation(args):
         stats = {"n": len(brows)}
         for sm in SLEEP_METRICS:
             vals = [r[sm] for r in brows if r.get(sm) is not None]
-            if vals: stats[f"avg_{sm}"] = round(sum(vals) / len(vals), 1)
+            if vals:
+                stats[f"avg_{sm}"] = round(sum(vals) / len(vals), 1)
         bucket_summary[bname] = stats
 
     correlations = {}
@@ -219,10 +274,12 @@ def tool_get_glucose_sleep_correlation(args):
 
     return {
         "period": {"start": start_date, "end": end_date, "paired_days": len(paired)},
-        "bucket_analysis": bucket_summary, "correlations": correlations,
-        "notable_correlations": strong if strong else None, "daily": paired[-14:],
+        "bucket_analysis": bucket_summary,
+        "correlations": correlations,
+        "notable_correlations": strong if strong else None,
+        "daily": paired[-14:],
         "interpretation": "Negative r between glucose and sleep quality means higher glucose = worse sleep. "
-                          "Time above 140 is most actionable -- spikes raise core temperature, opposing deep sleep.",
+        "Time above 140 is most actionable -- spikes raise core temperature, opposing deep sleep.",
     }
 
 
@@ -234,14 +291,19 @@ def tool_get_glucose_exercise_correlation(args):
     sources = parallel_query_sources(["apple_health", "strava"], start_date, end_date)
     ah_items = sources.get("apple_health", [])
     strava_items = sources.get("strava", [])
-    if not ah_items: return {"error": "No Apple Health data."}
+    if not ah_items:
+        return {"error": "No Apple Health data."}
 
     ah_by_date = {i.get("date"): i for i in ah_items if i.get("date")}
     strava_by_date = {i.get("date"): i for i in strava_items if i.get("date")}
+
     def _sf(v):
-        if v is None: return None
-        try: return float(v)
-        except Exception: return None
+        if v is None:
+            return None
+        try:
+            return float(v)
+        except Exception:
+            return None
 
     GM = ["glucose_avg", "glucose_sd", "time_in_range_pct", "time_above_140_pct", "glucose_min"]
     exercise_days = []
@@ -250,19 +312,26 @@ def tool_get_glucose_exercise_correlation(args):
     for date in sorted(ah_by_date.keys()):
         ah = ah_by_date[date]
         g_avg = _sf(ah.get("blood_glucose_avg"))
-        if g_avg is None: continue
+        if g_avg is None:
+            continue
         strava = strava_by_date.get(date, {})
         has_ex = int(float(strava.get("activity_count", 0))) > 0
 
-        row = {"date": date, "glucose_avg": g_avg, "glucose_sd": _sf(ah.get("blood_glucose_std_dev")),
-               "glucose_min": _sf(ah.get("blood_glucose_min")), "time_in_range_pct": _sf(ah.get("blood_glucose_time_in_range_pct")),
-               "time_above_140_pct": _sf(ah.get("blood_glucose_time_above_140_pct"))}
+        row = {
+            "date": date,
+            "glucose_avg": g_avg,
+            "glucose_sd": _sf(ah.get("blood_glucose_std_dev")),
+            "glucose_min": _sf(ah.get("blood_glucose_min")),
+            "time_in_range_pct": _sf(ah.get("blood_glucose_time_in_range_pct")),
+            "time_above_140_pct": _sf(ah.get("blood_glucose_time_above_140_pct")),
+        }
 
         if has_ex:
             row["moving_time_min"] = round(float(strava.get("total_moving_time_seconds", 0)) / 60, 0)
             activities = strava.get("activities", [])
             hr_vals = [float(a["average_heartrate"]) for a in activities if a.get("average_heartrate")]
-            if hr_vals: row["avg_hr"] = round(sum(hr_vals) / len(hr_vals), 0)
+            if hr_vals:
+                row["avg_hr"] = round(sum(hr_vals) / len(hr_vals), 0)
             exercise_days.append(row)
         else:
             rest_days.append(row)
@@ -275,13 +344,18 @@ def tool_get_glucose_exercise_correlation(args):
         ex_v = [r[gm] for r in exercise_days if r.get(gm) is not None]
         re_v = [r[gm] for r in rest_days if r.get(gm) is not None]
         c = {}
-        if ex_v: c["exercise_avg"] = round(sum(ex_v) / len(ex_v), 1); c["exercise_n"] = len(ex_v)
-        if re_v: c["rest_avg"] = round(sum(re_v) / len(re_v), 1); c["rest_n"] = len(re_v)
+        if ex_v:
+            c["exercise_avg"] = round(sum(ex_v) / len(ex_v), 1)
+            c["exercise_n"] = len(ex_v)
+        if re_v:
+            c["rest_avg"] = round(sum(re_v) / len(re_v), 1)
+            c["rest_n"] = len(re_v)
         if ex_v and re_v:
             d = c["exercise_avg"] - c["rest_avg"]
             c["difference"] = round(d, 1)
             c["exercise_better"] = d > 0 if gm == "time_in_range_pct" else d < 0
-        if c: comparison[gm] = c
+        if c:
+            comparison[gm] = c
 
     intensity = None
     hr_days = [r for r in exercise_days if r.get("avg_hr")]
@@ -294,7 +368,8 @@ def tool_get_glucose_exercise_correlation(args):
                 st = {"n": len(grp)}
                 for gm in GM:
                     vals = [r[gm] for r in grp if r.get(gm) is not None]
-                    if vals: st[f"avg_{gm}"] = round(sum(vals) / len(vals), 1)
+                    if vals:
+                        st[f"avg_{gm}"] = round(sum(vals) / len(vals), 1)
                 intensity[label] = st
 
     correlations = {}
@@ -303,15 +378,16 @@ def tool_get_glucose_exercise_correlation(args):
         ys = [r[gm] for r in exercise_days if r.get("moving_time_min") and r.get(gm)]
         if len(xs) >= 7:
             rv = pearson_r(xs, ys)
-            if rv is not None: correlations[f"duration_vs_{gm}"] = round(rv, 3)
+            if rv is not None:
+                correlations[f"duration_vs_{gm}"] = round(rv, 3)
 
     return {
-        "period": {"start": start_date, "end": end_date,
-                   "exercise_days": len(exercise_days), "rest_days": len(rest_days)},
-        "exercise_vs_rest": comparison, "intensity_analysis": intensity,
+        "period": {"start": start_date, "end": end_date, "exercise_days": len(exercise_days), "rest_days": len(rest_days)},
+        "exercise_vs_rest": comparison,
+        "intensity_analysis": intensity,
         "correlations": correlations if correlations else None,
         "interpretation": "Exercise lowers glucose via GLUT4 uptake for 24-48h post. Zone 2 has strongest chronic benefit. "
-                          "Look for lower avg, lower SD, higher TIR on exercise vs rest days.",
+        "Look for lower avg, lower SD, higher TIR on exercise vs rest days.",
     }
 
 
@@ -330,7 +406,7 @@ def tool_get_glucose_meal_response(args):
     resistance, inflammation, and accelerated glycation. Fiber, protein, and fat
     blunt the spike; refined carbs and sugar amplify it.
     """
-    end_date = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
     meal_gap_minutes = args.get("meal_gap_minutes", 30)
     baseline_window_min = 30  # minutes before meal for baseline
@@ -543,20 +619,25 @@ def tool_get_glucose_meal_response(args):
     for fn, spikes_list in sorted(food_scores.items()):
         if len(spikes_list) >= 2:
             avg_s = round(sum(spikes_list) / len(spikes_list), 1)
-            food_summary.append({
-                "food": fn,
-                "appearances": len(spikes_list),
-                "avg_spike": avg_s,
-                "grade": score_spike(avg_s),
-            })
+            food_summary.append(
+                {
+                    "food": fn,
+                    "appearances": len(spikes_list),
+                    "avg_spike": avg_s,
+                    "grade": score_spike(avg_s),
+                }
+            )
     food_summary.sort(key=lambda x: x["avg_spike"])
 
     # Macro correlations (carbs, fiber, protein, sugar vs spike)
     correlations = {}
     for macro_field, label in [
-        ("carbs_g", "carbs"), ("fiber_g", "fiber"),
-        ("protein_g", "protein"), ("fat_g", "fat"),
-        ("sugar_g", "sugar"), ("calories", "calories"),
+        ("carbs_g", "carbs"),
+        ("fiber_g", "fiber"),
+        ("protein_g", "protein"),
+        ("fat_g", "fat"),
+        ("sugar_g", "sugar"),
+        ("calories", "calories"),
     ]:
         xs = [m[macro_field] for m in all_meals if m.get(macro_field) is not None]
         ys = [m["spike_mg_dl"] for m in all_meals if m.get(macro_field) is not None]
@@ -618,8 +699,8 @@ def tool_get_glucose_meal_response(args):
         "recommendation": rec,
         "meals": all_meals[-30:],  # last 30 meals for detail
         "note": "Scoring: A (<15 spike), B (15-30), C (30-40), D (40-50), F (>50 mg/dL). "
-                "Based on Attia/Huberman: spikes >30 drive insulin resistance. "
-                "Fiber, protein, fat blunt spikes; refined carbs and sugar amplify them.",
+        "Based on Attia/Huberman: spikes >30 drive insulin resistance. "
+        "Fiber, protein, fat blunt spikes; refined carbs and sugar amplify them.",
     }
 
 
@@ -640,11 +721,11 @@ def tool_get_fasting_glucose_validation(args):
     import statistics
 
     # ── Parameters ────────────────────────────────────────────────────────
-    nadir_start = float(args.get("nadir_start_hour", 0))      # midnight
-    nadir_end = float(args.get("nadir_end_hour", 6))        # 6 AM
+    nadir_start = float(args.get("nadir_start_hour", 0))  # midnight
+    nadir_end = float(args.get("nadir_end_hour", 6))  # 6 AM
     # 2-5 AM avoids dawn phenomenon cortisol rise (4-7 AM per Attia/Patrick)
-    deep_start = float(args.get("deep_nadir_start_hour", 2)) # 2 AM
-    deep_end = float(args.get("deep_nadir_end_hour", 5))   # 5 AM
+    deep_start = float(args.get("deep_nadir_start_hour", 2))  # 2 AM
+    deep_end = float(args.get("deep_nadir_end_hour", 5))  # 5 AM
     min_readings = int(args.get("min_overnight_readings", 6))  # need ~30 min coverage
 
     # ── Discover all CGM days from S3 ─────────────────────────────────────
@@ -702,17 +783,19 @@ def tool_get_fasting_glucose_validation(args):
         all_vals = [v for _, v in readings]
         daily_min = min(all_vals) if all_vals else None
 
-        nadir_results.append({
-            "date": date_str,
-            "overnight_nadir": on_min,
-            "overnight_avg": round(on_avg, 1),
-            "overnight_nadir_time": on_min_time,
-            "overnight_readings": len(overnight),
-            "deep_nadir": deep_min,
-            "deep_avg": deep_avg,
-            "daily_min": daily_min,
-            "daily_min_vs_overnight": round(daily_min - on_min, 1) if daily_min is not None else None,
-        })
+        nadir_results.append(
+            {
+                "date": date_str,
+                "overnight_nadir": on_min,
+                "overnight_avg": round(on_avg, 1),
+                "overnight_nadir_time": on_min_time,
+                "overnight_readings": len(overnight),
+                "deep_nadir": deep_min,
+                "deep_avg": deep_avg,
+                "daily_min": daily_min,
+                "daily_min_vs_overnight": round(daily_min - on_min, 1) if daily_min is not None else None,
+            }
+        )
 
     if not nadir_results:
         return {"error": "Insufficient overnight CGM readings across all days."}
@@ -749,21 +832,27 @@ def tool_get_fasting_glucose_validation(args):
 
     # ── Load lab fasting glucose ─────────────────────────────────────────
     from boto3.dynamodb.conditions import Key
+
     from mcp.core import _apply_phase_filter  # ADR-058
+
     # ADR-058: longitudinal/clinical archive — cross-phase by design (owner decision 2026-06-06)
-    lab_resp = table.query(**_apply_phase_filter({
-        "KeyConditionExpression": Key("pk").eq(USER_PREFIX + "labs") & Key("sk").begins_with("DATE#")
-    }, include_pilot=True))
+    lab_resp = table.query(
+        **_apply_phase_filter(
+            {"KeyConditionExpression": Key("pk").eq(USER_PREFIX + "labs") & Key("sk").begins_with("DATE#")}, include_pilot=True
+        )
+    )
     lab_draws = []
     for item in lab_resp.get("Items", []):
         glucose_bm = item.get("biomarkers", {}).get("glucose", {})
         val = glucose_bm.get("value_numeric")
         if val is not None:
-            lab_draws.append({
-                "draw_date": item.get("draw_date"),
-                "fasting_glucose_mg_dl": float(val),
-                "provider": item.get("lab_provider", "unknown"),
-            })
+            lab_draws.append(
+                {
+                    "draw_date": item.get("draw_date"),
+                    "fasting_glucose_mg_dl": float(val),
+                    "provider": item.get("lab_provider", "unknown"),
+                }
+            )
 
     # ── Direct validation (same-day overlap) ─────────────────────────────
     nadir_by_date = {r["date"]: r for r in nadir_results}
@@ -774,16 +863,18 @@ def tool_get_fasting_glucose_validation(args):
             nr = nadir_by_date[dd]
             diff_overnight = round(draw["fasting_glucose_mg_dl"] - nr["overnight_nadir"], 1)
             diff_deep = round(draw["fasting_glucose_mg_dl"] - nr["deep_nadir"], 1) if nr["deep_nadir"] else None
-            direct_validations.append({
-                "date": dd,
-                "lab_fasting_glucose": draw["fasting_glucose_mg_dl"],
-                "cgm_overnight_nadir": nr["overnight_nadir"],
-                "cgm_deep_nadir": nr["deep_nadir"],
-                "cgm_daily_min": nr["daily_min"],
-                "lab_minus_cgm_overnight": diff_overnight,
-                "lab_minus_cgm_deep": diff_deep,
-                "provider": draw["provider"],
-            })
+            direct_validations.append(
+                {
+                    "date": dd,
+                    "lab_fasting_glucose": draw["fasting_glucose_mg_dl"],
+                    "cgm_overnight_nadir": nr["overnight_nadir"],
+                    "cgm_deep_nadir": nr["deep_nadir"],
+                    "cgm_daily_min": nr["daily_min"],
+                    "lab_minus_cgm_overnight": diff_overnight,
+                    "lab_minus_cgm_deep": diff_deep,
+                    "provider": draw["provider"],
+                }
+            )
 
     # ── Statistical validation (no overlap) ──────────────────────────────
     stat_validations = []
@@ -804,21 +895,27 @@ def tool_get_fasting_glucose_validation(args):
             below = sum(1 for v in on_nadirs if v <= lab_val)
             pct = round(below / len(on_nadirs) * 100, 1)
 
-        stat_validations.append({
-            "draw_date": draw["draw_date"],
-            "lab_fasting_glucose": lab_val,
-            "vs_overnight_nadir": {
-                "z_score": z_overnight,
-                "percentile_of_nadir_dist": pct,
-                "within_1sd": abs(z_overnight) <= 1 if z_overnight is not None else None,
-                "within_2sd": abs(z_overnight) <= 2 if z_overnight is not None else None,
-            },
-            "vs_deep_nadir": {
-                "z_score": z_deep,
-                "within_1sd": abs(z_deep) <= 1 if z_deep is not None else None,
-            } if z_deep is not None else None,
-            "provider": draw["provider"],
-        })
+        stat_validations.append(
+            {
+                "draw_date": draw["draw_date"],
+                "lab_fasting_glucose": lab_val,
+                "vs_overnight_nadir": {
+                    "z_score": z_overnight,
+                    "percentile_of_nadir_dist": pct,
+                    "within_1sd": abs(z_overnight) <= 1 if z_overnight is not None else None,
+                    "within_2sd": abs(z_overnight) <= 2 if z_overnight is not None else None,
+                },
+                "vs_deep_nadir": (
+                    {
+                        "z_score": z_deep,
+                        "within_1sd": abs(z_deep) <= 1 if z_deep is not None else None,
+                    }
+                    if z_deep is not None
+                    else None
+                ),
+                "provider": draw["provider"],
+            }
+        )
 
     # ── Bias analysis ────────────────────────────────────────────────────
     bias = {}
@@ -841,14 +938,20 @@ def tool_get_fasting_glucose_validation(args):
             bias["confidence"] = "high"
         elif abs(diff) <= 10:
             direction = "higher" if diff > 0 else "lower"
-            bias["interpretation"] = f"Good agreement -- lab reads ~{abs(diff)} mg/dL {direction} than CGM nadir. Within expected CGM accuracy range (+-10-15 mg/dL for Stelo)."
+            bias["interpretation"] = (
+                f"Good agreement -- lab reads ~{abs(diff)} mg/dL {direction} than CGM nadir. Within expected CGM accuracy range (+-10-15 mg/dL for Stelo)."
+            )
             bias["confidence"] = "moderate"
         elif abs(diff) <= 20:
             direction = "higher" if diff > 0 else "lower"
-            bias["interpretation"] = f"Moderate discrepancy -- lab reads ~{abs(diff)} mg/dL {direction}. Dexcom Stelo has MARD ~9% which can produce this gap. Consider a same-day validation."
+            bias["interpretation"] = (
+                f"Moderate discrepancy -- lab reads ~{abs(diff)} mg/dL {direction}. Dexcom Stelo has MARD ~9% which can produce this gap. Consider a same-day validation."
+            )
             bias["confidence"] = "low"
         else:
-            bias["interpretation"] = f"Significant discrepancy ({abs(diff)} mg/dL). CGM interstitial glucose lags venous by design, but this gap warrants investigation."
+            bias["interpretation"] = (
+                f"Significant discrepancy ({abs(diff)} mg/dL). CGM interstitial glucose lags venous by design, but this gap warrants investigation."
+            )
             bias["confidence"] = "very_low"
 
     # ── Insights ─────────────────────────────────────────────────────────
@@ -864,7 +967,9 @@ def tool_get_fasting_glucose_validation(args):
                 f"{'Daily min occurs outside overnight window -- current proxy slightly underestimates true fasting.' if diff < 0 else 'Daily min typically IS the overnight nadir -- current proxy is reasonable.'}"
             )
         else:
-            insights.append(f"Daily minimum ({dm}) and overnight nadir ({on}) are very close -- current fasting proxy is a good approximation.")
+            insights.append(
+                f"Daily minimum ({dm}) and overnight nadir ({on}) are very close -- current fasting proxy is a good approximation."
+            )
 
     if deep_stats and on_stats:
         diff = round(deep_stats["mean"] - on_stats["mean"], 1)
@@ -875,7 +980,9 @@ def tool_get_fasting_glucose_validation(args):
             )
 
     if on_stats and on_stats["std_dev"] > 8:
-        insights.append(f"High overnight nadir variability (SD {on_stats['std_dev']} mg/dL). Factors: meal timing, alcohol, sleep quality, stress.")
+        insights.append(
+            f"High overnight nadir variability (SD {on_stats['std_dev']} mg/dL). Factors: meal timing, alcohol, sleep quality, stress."
+        )
     elif on_stats and on_stats["std_dev"] < 4:
         insights.append(f"Very stable overnight nadirs (SD {on_stats['std_dev']} mg/dL) -- strong metabolic consistency.")
 
@@ -883,12 +990,16 @@ def tool_get_fasting_glucose_validation(args):
         recent = lab_draws[-1]["fasting_glucose_mg_dl"]
         oldest = lab_draws[0]["fasting_glucose_mg_dl"]
         if recent > oldest + 5:
-            insights.append(f"Lab fasting glucose trending up: {oldest} -> {recent} mg/dL over {len(lab_draws)} draws. Monitor with CGM confirmation.")
+            insights.append(
+                f"Lab fasting glucose trending up: {oldest} -> {recent} mg/dL over {len(lab_draws)} draws. Monitor with CGM confirmation."
+            )
         elif recent < oldest - 5:
             insights.append(f"Lab fasting glucose trending down: {oldest} -> {recent} mg/dL -- positive trajectory.")
 
     if not direct_validations:
-        insights.append("No same-day CGM + lab data available. Schedule your next blood draw while wearing the Stelo for gold-standard validation.")
+        insights.append(
+            "No same-day CGM + lab data available. Schedule your next blood draw while wearing the Stelo for gold-standard validation."
+        )
 
     return {
         "cgm_coverage": {
@@ -929,12 +1040,15 @@ def tool_get_cgm(args):
     """Unified CGM intelligence dispatcher."""
     VALID_VIEWS = {
         "dashboard": tool_get_cgm_dashboard,
-        "fasting":   tool_get_fasting_glucose_validation,
+        "fasting": tool_get_fasting_glucose_validation,
     }
     view = (args.get("view") or "dashboard").lower().strip()
     if view not in VALID_VIEWS:
-        return {"error": f"Unknown view '{view}'.", "valid_views": list(VALID_VIEWS.keys()),
-                "hint": "'dashboard' for time-in-range, variability, mean glucose, clinical flags. 'fasting' for overnight nadir-based fasting glucose validation."}
+        return {
+            "error": f"Unknown view '{view}'.",
+            "valid_views": list(VALID_VIEWS.keys()),
+            "hint": "'dashboard' for time-in-range, variability, mean glucose, clinical flags. 'fasting' for overnight nadir-based fasting glucose validation.",
+        }
     result = VALID_VIEWS[view](args)
     # R13-F09: Inject disclaimer into all CGM view responses
     if isinstance(result, dict) and "error" not in result:

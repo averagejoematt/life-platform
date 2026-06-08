@@ -32,12 +32,12 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import boto3
-
 from phase_filter import with_phase_filter  # ADR-058
 
 # Structured logger
 try:
     from platform_logger import get_logger
+
     logger = get_logger("coach-ensemble-digest")
 except ImportError:
     logger = logging.getLogger("coach-ensemble-digest")
@@ -56,8 +56,14 @@ AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 # All coach IDs in the system
 ALL_COACH_IDS = [
-    "sleep_coach", "nutrition_coach", "training_coach", "mind_coach",
-    "physical_coach", "glucose_coach", "labs_coach", "explorer_coach",
+    "sleep_coach",
+    "nutrition_coach",
+    "training_coach",
+    "mind_coach",
+    "physical_coach",
+    "glucose_coach",
+    "labs_coach",
+    "explorer_coach",
 ]
 
 # CloudWatch metrics
@@ -92,6 +98,7 @@ def _get_api_key():
 # HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _decimal_to_float(obj):
     """Recursively convert DynamoDB Decimals to float for JSON serialization."""
     if isinstance(obj, Decimal):
@@ -117,13 +124,12 @@ def _float_to_decimal(obj):
 def _slugify(text):
     """Convert a topic string to a URL-safe slug for DynamoDB sort keys."""
     slug = text.lower().strip()
-    slug = re.sub(r'[^a-z0-9]+', '_', slug)
-    slug = slug.strip('_')
+    slug = re.sub(r"[^a-z0-9]+", "_", slug)
+    slug = slug.strip("_")
     return slug[:80] if slug else "unnamed"
 
 
-def _emit_token_metrics(input_tokens, output_tokens,
-                        cache_creation_tokens=0, cache_read_tokens=0):
+def _emit_token_metrics(input_tokens, output_tokens, cache_creation_tokens=0, cache_read_tokens=0):
     """Emit per-Lambda token usage to CloudWatch (non-fatal).
 
     V2 P0.6 (2026-05-17): added cache fields. Prior 2-arg signature dropped them,
@@ -134,25 +140,33 @@ def _emit_token_metrics(input_tokens, output_tokens,
             {
                 "MetricName": "AnthropicInputTokens",
                 "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": input_tokens, "Unit": "Count",
+                "Value": input_tokens,
+                "Unit": "Count",
             },
             {
                 "MetricName": "AnthropicOutputTokens",
                 "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": output_tokens, "Unit": "Count",
+                "Value": output_tokens,
+                "Unit": "Count",
             },
         ]
         if cache_creation_tokens or cache_read_tokens:
-            metric_data.append({
-                "MetricName": "AnthropicCacheWriteTokens",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": cache_creation_tokens, "Unit": "Count",
-            })
-            metric_data.append({
-                "MetricName": "AnthropicCacheReadTokens",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": cache_read_tokens, "Unit": "Count",
-            })
+            metric_data.append(
+                {
+                    "MetricName": "AnthropicCacheWriteTokens",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": cache_creation_tokens,
+                    "Unit": "Count",
+                }
+            )
+            metric_data.append(
+                {
+                    "MetricName": "AnthropicCacheReadTokens",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": cache_read_tokens,
+                    "Unit": "Count",
+                }
+            )
         _cw.put_metric_data(Namespace=_CW_NAMESPACE, MetricData=metric_data)
     except Exception as e:
         logger.warning("CloudWatch token metric emit failed (non-fatal): %s", e)
@@ -163,11 +177,14 @@ def _emit_failure_metric():
     try:
         _cw.put_metric_data(
             Namespace=_CW_NAMESPACE,
-            MetricData=[{
-                "MetricName": "AnthropicAPIFailure",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": 1, "Unit": "Count",
-            }],
+            MetricData=[
+                {
+                    "MetricName": "AnthropicAPIFailure",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": 1,
+                    "Unit": "Count",
+                }
+            ],
         )
     except Exception as e:
         logger.warning("CloudWatch failure metric emit failed (non-fatal): %s", e)
@@ -176,6 +193,7 @@ def _emit_failure_metric():
 # ══════════════════════════════════════════════════════════════════════════════
 # ANTHROPIC API CALL
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _call_haiku(system, user_message, max_tokens=6000, temperature=0.2):
     """Call Anthropic Haiku with exponential backoff + CloudWatch metrics.
@@ -212,6 +230,7 @@ def _call_haiku(system, user_message, max_tokens=6000, temperature=0.2):
     # token metrics + failure metric. `req` is still built above; the body is
     # extracted and forwarded to bedrock_client.invoke().
     from retry_utils import call_anthropic_raw
+
     resp = call_anthropic_raw(req)
     text = resp["content"][0]["text"].strip()
     try:
@@ -240,6 +259,7 @@ def _call_haiku(system, user_message, max_tokens=6000, temperature=0.2):
 # DYNAMODB OPERATIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _get_item(pk, sk):
     """Get a single DynamoDB item. Returns None if not found or on error."""
     try:
@@ -267,12 +287,17 @@ def _query_latest(pk, sk_prefix):
     ADR-058: phase-filtered (tombstoned items hidden).
     """
     from boto3.dynamodb.conditions import Key
+
     try:
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
-            "ScanIndexForward": False,
-            "Limit": 1,
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
+                    "ScanIndexForward": False,
+                    "Limit": 1,
+                }
+            )
+        )
         items = resp.get("Items", [])
         return _decimal_to_float(items[0]) if items else None
     except Exception as e:
@@ -283,6 +308,7 @@ def _query_latest(pk, sk_prefix):
 # ══════════════════════════════════════════════════════════════════════════════
 # COACH DATA GATHERING
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _gather_coach_data(coach_ids):
     """Read the most recent OUTPUT# record and COMPRESSED#latest for each coach.
@@ -442,10 +468,7 @@ def _build_user_message(coach_data, cycle_date, expected_coach_ids=None):
         if compressed:
             parts.append("#### Compressed State")
             # Filter out pk/sk for cleaner prompt
-            filtered = {
-                k: v for k, v in compressed.items()
-                if k not in ("pk", "sk")
-            }
+            filtered = {k: v for k, v in compressed.items() if k not in ("pk", "sk")}
             parts.append(json.dumps(filtered, indent=2, default=str))
         else:
             parts.append("#### Compressed State: None available")
@@ -467,6 +490,7 @@ def _build_user_message(coach_data, cycle_date, expected_coach_ids=None):
 # ══════════════════════════════════════════════════════════════════════════════
 # DEFAULT DIGEST (FALLBACK)
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _build_default_digest(coach_data, cycle_date):
     """Build a minimal digest when the LLM call fails.
@@ -490,10 +514,7 @@ def _build_default_digest(coach_data, cycle_date):
         # Pull predictions from output if available
         preds = output.get("predictions_made", [])
         if isinstance(preds, list):
-            summary["predictions_active"] = [
-                p.get("claim_natural", str(p)) if isinstance(p, dict) else str(p)
-                for p in preds[:3]
-            ]
+            summary["predictions_active"] = [p.get("claim_natural", str(p)) if isinstance(p, dict) else str(p) for p in preds[:3]]
 
         coach_summaries.append(summary)
 
@@ -509,6 +530,7 @@ def _build_default_digest(coach_data, cycle_date):
 # ══════════════════════════════════════════════════════════════════════════════
 # WRITE OPERATIONS
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _write_digest(digest, cycle_date):
     """Write the ensemble digest to DynamoDB at ENSEMBLE#digest / CYCLE#{date}."""
@@ -582,9 +604,7 @@ def _write_disagreements(disagreements, cycle_date):
         if _put_item(item):
             written += 1
 
-    logger.info(
-        "Wrote %d disagreement records for cycle %s", written, cycle_date
-    )
+    logger.info("Wrote %d disagreement records for cycle %s", written, cycle_date)
     return written
 
 
@@ -630,11 +650,13 @@ def _update_coach_compressed_states(digest, coach_data, cycle_date):
         involved_disagreements = []
         for d in digest.get("active_disagreements", []):
             if coach_id in d.get("coaches", []):
-                involved_disagreements.append({
-                    "topic": d.get("topic", ""),
-                    "with_coaches": [c for c in d.get("coaches", []) if c != coach_id],
-                    "my_position": d.get("positions", {}).get(coach_id, ""),
-                })
+                involved_disagreements.append(
+                    {
+                        "topic": d.get("topic", ""),
+                        "with_coaches": [c for c in d.get("coaches", []) if c != coach_id],
+                        "my_position": d.get("positions", {}).get(coach_id, ""),
+                    }
+                )
         if involved_disagreements:
             contribution["active_disagreements"] = involved_disagreements
 
@@ -657,6 +679,7 @@ def _update_coach_compressed_states(digest, coach_data, cycle_date):
 # HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def lambda_handler(event, context):
     """Produce the cross-coach ensemble digest for a completed generation cycle.
 
@@ -677,7 +700,8 @@ def lambda_handler(event, context):
 
     logger.info(
         "Starting ensemble digest for cycle %s — %d coaches targeted",
-        cycle_date, len(coach_ids),
+        cycle_date,
+        len(coach_ids),
     )
 
     # Step 1: Gather data from all coaches
@@ -700,7 +724,8 @@ def lambda_handler(event, context):
 
     logger.info(
         "Gathered data from %d/%d coaches: %s",
-        len(coach_data), len(coach_ids),
+        len(coach_data),
+        len(coach_ids),
         list(coach_data.keys()),
     )
 
@@ -711,6 +736,7 @@ def lambda_handler(event, context):
     try:
         # Budget guardrail: at Tier ≥ 1 skip the LLM and use the default digest.
         from budget_guard import allow as _budget_allow
+
         if not _budget_allow("ensemble"):
             raise RuntimeError("ensemble digest AI paused by budget tier — using fallback")
         result = _call_haiku(
@@ -738,9 +764,7 @@ def lambda_handler(event, context):
                 len(digest["unanimous_flags"]),
             )
         else:
-            logger.warning(
-                "LLM returned non-dict response — using fallback digest"
-            )
+            logger.warning("LLM returned non-dict response — using fallback digest")
             digest = _build_default_digest(coach_data, cycle_date)
 
     except Exception as e:

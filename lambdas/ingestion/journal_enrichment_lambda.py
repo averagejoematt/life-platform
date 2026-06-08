@@ -32,8 +32,8 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from urllib.request import Request, urlopen
 from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -41,6 +41,7 @@ from boto3.dynamodb.conditions import Key
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("journal-enrichment")
 except ImportError:
     logger = logging.getLogger("journal-enrichment")
@@ -170,16 +171,22 @@ def call_haiku_defense(raw_text, date, template, mood, stress, themes):
         "messages": [{"role": "user", "content": user_content}],
     }
 
-    req = Request(ANTHROPIC_API, data=json.dumps(body).encode("utf-8"), method="POST", headers={
-        "x-api-key": api_key,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-        "anthropic-beta": "prompt-caching-2024-07-31",
-    })
+    req = Request(
+        ANTHROPIC_API,
+        data=json.dumps(body).encode("utf-8"),
+        method="POST",
+        headers={
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+            "anthropic-beta": "prompt-caching-2024-07-31",
+        },
+    )
 
     # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
     try:
         from retry_utils import call_anthropic_raw
+
         result = call_anthropic_raw(req, timeout=30)
     except HTTPError as e:
         error_body = e.read().decode() if e.fp else ""
@@ -258,11 +265,16 @@ def build_structured_scores(item):
     """Build a summary of structured scores already captured in the entry."""
     scores = []
     field_map = {
-        "morning_mood": "mood", "day_rating": "day_rating",
-        "morning_energy": "energy", "energy_eod": "energy_eod",
-        "stress_level": "stress", "subjective_sleep_quality": "sleep_quality",
-        "workout_rpe": "rpe", "social_connection": "social",
-        "week_rating": "week_rating", "stress_intensity": "stress_intensity",
+        "morning_mood": "mood",
+        "day_rating": "day_rating",
+        "morning_energy": "energy",
+        "energy_eod": "energy_eod",
+        "stress_level": "stress",
+        "subjective_sleep_quality": "sleep_quality",
+        "workout_rpe": "rpe",
+        "social_connection": "social",
+        "week_rating": "week_rating",
+        "stress_intensity": "stress_intensity",
     }
     for field, label in field_map.items():
         val = item.get(field)
@@ -289,16 +301,22 @@ def call_haiku(raw_text, date, template, structured_scores):
         "messages": [{"role": "user", "content": user_content}],
     }
 
-    req = Request(ANTHROPIC_API, data=json.dumps(body).encode("utf-8"), method="POST", headers={
-        "x-api-key": api_key,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-        "anthropic-beta": "prompt-caching-2024-07-31",
-    })
+    req = Request(
+        ANTHROPIC_API,
+        data=json.dumps(body).encode("utf-8"),
+        method="POST",
+        headers={
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+            "anthropic-beta": "prompt-caching-2024-07-31",
+        },
+    )
 
     # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
     try:
         from retry_utils import call_anthropic_raw
+
         result = call_anthropic_raw(req, timeout=30)
     except HTTPError as e:
         error_body = e.read().decode() if e.fp else ""
@@ -408,8 +426,7 @@ def query_journal_entries(start_date, end_date, full_sync=False):
 
     if not full_sync:
         kwargs["KeyConditionExpression"] &= Key("sk").between(
-            f"DATE#{start_date}#journal",
-            f"DATE#{end_date}#journal#~"  # ~ sorts after all suffixes
+            f"DATE#{start_date}#journal", f"DATE#{end_date}#journal#~"  # ~ sorts after all suffixes
         )
 
     items = []
@@ -436,7 +453,8 @@ def lambda_handler(event, context):
           {"full_sync": true}             → all entries
           {"force": true}                 → re-enrich already-enriched entries
         """
-        if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+        if hasattr(logger, "set_date"):
+            logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
         force = event.get("force", False)
         full_sync = event.get("full_sync", False)
 
@@ -456,8 +474,7 @@ def lambda_handler(event, context):
             end_date = now_pacific.strftime("%Y-%m-%d")
             start_date = (now_pacific - timedelta(days=1)).strftime("%Y-%m-%d")
 
-        logger.info(f"Enriching journal entries: {start_date} → {end_date} "
-                    f"(force={force}, full_sync={full_sync})")
+        logger.info(f"Enriching journal entries: {start_date} → {end_date} " f"(force={force}, full_sync={full_sync})")
 
         entries = query_journal_entries(start_date, end_date, full_sync)
         logger.info(f"Found {len(entries)} journal entries")
@@ -494,16 +511,20 @@ def lambda_handler(event, context):
                     applied = apply_enrichment(item, enrichment)
                     if applied:
                         enriched += 1
-                        logger.info(f"  ✓ Enriched {sk}: "
-                                    f"mood={enrichment.get('mood_score')}, "
-                                    f"stress={enrichment.get('stress_score')}, "
-                                    f"themes={enrichment.get('themes', [])}")
+                        logger.info(
+                            f"  ✓ Enriched {sk}: "
+                            f"mood={enrichment.get('mood_score')}, "
+                            f"stress={enrichment.get('stress_score')}, "
+                            f"themes={enrichment.get('themes', [])}"
+                        )
 
                         # Defense mechanism detection (second Haiku call) — v2.72.0 #41
                         if ENRICH_DEFENSE_PATTERNS and (force or not item.get("defense_enriched_at")):
                             try:
                                 defense = call_haiku_defense(
-                                    raw_text, date, template,
+                                    raw_text,
+                                    date,
+                                    template,
                                     enrichment.get("mood_score"),
                                     enrichment.get("stress_score"),
                                     enrichment.get("themes", []),

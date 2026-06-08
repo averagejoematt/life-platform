@@ -30,8 +30,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from lambdas.constants import (
-    EXPERIMENT_START_DATE,
     EXPERIMENT_BASELINE_WEIGHT_LBS,
+    EXPERIMENT_START_DATE,
 )
 
 DOCS = REPO_ROOT / "docs"
@@ -224,13 +224,13 @@ for the underlying mechanism.
 
 
 SECTIONS = [
-    ("docs/DECISIONS.md",        ADR_058_MARKER,   ADR_058,           "append"),
-    ("docs/CHANGELOG.md",        CHANGELOG_MARKER, CHANGELOG_ENTRY,   "prepend"),
-    ("docs/SCHEMA.md",           SCHEMA_MARKER,    SCHEMA_APPEND,     "append"),
-    ("docs/ARCHITECTURE.md",     ARCH_MARKER,      ARCH_APPEND,       "append"),
-    ("docs/RUNBOOK.md",          RUNBOOK_MARKER,   RUNBOOK_APPEND,    "append"),
-    ("docs/BACKLOG.md",          BACKLOG_MARKER,   BACKLOG_APPEND,    "append"),
-    ("docs/MCP_TOOL_CATALOG.md", MCP_MARKER,       MCP_APPEND,        "append"),
+    ("docs/DECISIONS.md", ADR_058_MARKER, ADR_058, "append"),
+    ("docs/CHANGELOG.md", CHANGELOG_MARKER, CHANGELOG_ENTRY, "prepend"),
+    ("docs/SCHEMA.md", SCHEMA_MARKER, SCHEMA_APPEND, "append"),
+    ("docs/ARCHITECTURE.md", ARCH_MARKER, ARCH_APPEND, "append"),
+    ("docs/RUNBOOK.md", RUNBOOK_MARKER, RUNBOOK_APPEND, "append"),
+    ("docs/BACKLOG.md", BACKLOG_MARKER, BACKLOG_APPEND, "append"),
+    ("docs/MCP_TOOL_CATALOG.md", MCP_MARKER, MCP_APPEND, "append"),
 ]
 
 
@@ -271,8 +271,7 @@ def main():
     report = REPO_ROOT / "docs" / "restart" / "_docs_update_report.txt"
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(
-        f"docs update report — mode={mode_str} — genesis={EXPERIMENT_START_DATE}\n\n"
-        + "\n".join(f"{s:9s}  {r}" for r, s in results) + "\n"
+        f"docs update report — mode={mode_str} — genesis={EXPERIMENT_START_DATE}\n\n" + "\n".join(f"{s:9s}  {r}" for r, s in results) + "\n"
     )
     print(f"\nReport written to: {report.relative_to(REPO_ROOT)}")
     if not args.apply:

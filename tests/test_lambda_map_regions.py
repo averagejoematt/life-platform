@@ -13,13 +13,16 @@ Rules:
 
 R2 + R3 are skipped if AWS credentials aren't available (local dev).
 """
+
 import json
 import os
+
 import pytest
 
 LAMBDA_MAP_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "ci", "lambda_map.json",
+    "ci",
+    "lambda_map.json",
 )
 DEFAULT_REGION = "us-west-2"
 
@@ -35,7 +38,7 @@ def lambdas_by_region():
     """Live-AWS Lambda inventory by region. None if AWS not available."""
     try:
         import boto3
-        from botocore.exceptions import BotoCoreError, NoCredentialsError, ClientError
+        from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError
     except ImportError:
         return None
     out = {}
@@ -61,10 +64,7 @@ def test_r1_region_field_is_known(lambda_map):
         region = entry.get("region")
         if region and region not in known:
             unknown.append(f"{path}: {region}")
-    assert not unknown, (
-        "R1 FAIL: lambda_map entries with unrecognised region:\n  "
-        + "\n  ".join(unknown)
-    )
+    assert not unknown, "R1 FAIL: lambda_map entries with unrecognised region:\n  " + "\n  ".join(unknown)
 
 
 def test_r2_declared_region_matches_live(lambda_map, lambdas_by_region):
@@ -80,10 +80,7 @@ def test_r2_declared_region_matches_live(lambda_map, lambdas_by_region):
         live = lambdas_by_region.get(region, set())
         if fn not in live:
             mismatches.append(f"{path}: declared region={region} but '{fn}' not in {region}")
-    assert not mismatches, (
-        "R2 FAIL: lambda_map declares a region where the function does not exist:\n  "
-        + "\n  ".join(mismatches)
-    )
+    assert not mismatches, "R2 FAIL: lambda_map declares a region where the function does not exist:\n  " + "\n  ".join(mismatches)
 
 
 def test_r3_no_silent_us_east_1_only(lambda_map, lambdas_by_region):
@@ -101,7 +98,4 @@ def test_r3_no_silent_us_east_1_only(lambda_map, lambdas_by_region):
         fn = entry["function"]
         if fn in e1 and fn not in w2:
             silent.append(f"{path}: '{fn}' only in us-east-1 — needs `region: us-east-1` in lambda_map")
-    assert not silent, (
-        "R3 FAIL: Lambdas only in us-east-1 without a region override:\n  "
-        + "\n  ".join(silent)
-    )
+    assert not silent, "R3 FAIL: Lambdas only in us-east-1 without a region override:\n  " + "\n  ".join(silent)

@@ -192,8 +192,7 @@ def get_recent_insights(digest_type=None, days=14, pillars=None, max_results=20)
     try:
         # Query all insights, filter by date
         # SK prefix INSIGHT# sorts chronologically
-        from boto3.dynamodb.conditions import Key, Attr
-
+        from boto3.dynamodb.conditions import Attr, Key
         from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
         kwargs = {
@@ -243,8 +242,10 @@ def build_insights_context(days=14, pillars=None, max_items=5, label="PREVIOUS I
         eff_str = f" [effectiveness: {eff}]" if eff is not None else ""
         lines.append(f"  [{date} / {dtype}] {text}{eff_str}")
 
-    lines.append("INSTRUCTION: Reference previous insights when today's data confirms or contradicts them. "
-                 "Build on patterns already identified — don't rediscover the same insight.")
+    lines.append(
+        "INSTRUCTION: Reference previous insights when today's data confirms or contradicts them. "
+        "Build on patterns already identified — don't rediscover the same insight."
+    )
     return "\n".join(lines)
 
 
@@ -267,8 +268,7 @@ def _extract_pillars_from_text(text):
     return pillars or ["general"]
 
 
-def extract_daily_brief_insights(bod_insight, tldr_guidance, training_nutrition,
-                                  journal_coach_text, date, component_scores=None):
+def extract_daily_brief_insights(bod_insight, tldr_guidance, training_nutrition, journal_coach_text, date, component_scores=None):
     """Extract structured insights from Daily Brief AI outputs.
 
     Returns a list of dicts ready for write_insights_batch().
@@ -278,89 +278,101 @@ def extract_daily_brief_insights(bod_insight, tldr_guidance, training_nutrition,
 
     # BoD coaching insight
     if bod_insight and len(bod_insight) > 15:
-        insights.append({
-            "digest_type": "daily_brief",
-            "insight_type": "coaching",
-            "text": bod_insight,
-            "pillars": _extract_pillars_from_text(bod_insight),
-            "tags": ["bod", "coaching"],
-            "confidence": "high",
-            "actionable": False,
-            "date": date,
-            "component_scores": component_scores,
-        })
+        insights.append(
+            {
+                "digest_type": "daily_brief",
+                "insight_type": "coaching",
+                "text": bod_insight,
+                "pillars": _extract_pillars_from_text(bod_insight),
+                "tags": ["bod", "coaching"],
+                "confidence": "high",
+                "actionable": False,
+                "date": date,
+                "component_scores": component_scores,
+            }
+        )
 
     # TL;DR
     tldr_text = tldr_guidance.get("tldr", "") if isinstance(tldr_guidance, dict) else ""
     if tldr_text and len(tldr_text) > 10:
-        insights.append({
-            "digest_type": "daily_brief",
-            "insight_type": "observation",
-            "text": tldr_text,
-            "pillars": _extract_pillars_from_text(tldr_text),
-            "tags": ["tldr", "summary"],
-            "confidence": "high",
-            "actionable": False,
-            "date": date,
-        })
+        insights.append(
+            {
+                "digest_type": "daily_brief",
+                "insight_type": "observation",
+                "text": tldr_text,
+                "pillars": _extract_pillars_from_text(tldr_text),
+                "tags": ["tldr", "summary"],
+                "confidence": "high",
+                "actionable": False,
+                "date": date,
+            }
+        )
 
     # Guidance items (each is actionable)
     guidance = tldr_guidance.get("guidance", []) if isinstance(tldr_guidance, dict) else []
     for g_item in guidance:
         if isinstance(g_item, str) and len(g_item) > 10:
-            insights.append({
-                "digest_type": "daily_brief",
-                "insight_type": "guidance",
-                "text": g_item,
-                "pillars": _extract_pillars_from_text(g_item),
-                "tags": ["guidance", "actionable"],
-                "confidence": "medium",
-                "actionable": True,
-                "date": date,
-            })
+            insights.append(
+                {
+                    "digest_type": "daily_brief",
+                    "insight_type": "guidance",
+                    "text": g_item,
+                    "pillars": _extract_pillars_from_text(g_item),
+                    "tags": ["guidance", "actionable"],
+                    "confidence": "medium",
+                    "actionable": True,
+                    "date": date,
+                }
+            )
 
     # Training coach
     training_text = training_nutrition.get("training", "") if isinstance(training_nutrition, dict) else ""
     if training_text and len(training_text) > 15:
-        insights.append({
-            "digest_type": "daily_brief",
-            "insight_type": "coaching",
-            "text": training_text,
-            "pillars": ["movement"],
-            "data_sources": ["strava", "garmin", "whoop"],
-            "tags": ["training", "coaching"],
-            "confidence": "medium",
-            "actionable": False,
-            "date": date,
-        })
+        insights.append(
+            {
+                "digest_type": "daily_brief",
+                "insight_type": "coaching",
+                "text": training_text,
+                "pillars": ["movement"],
+                "data_sources": ["strava", "garmin", "whoop"],
+                "tags": ["training", "coaching"],
+                "confidence": "medium",
+                "actionable": False,
+                "date": date,
+            }
+        )
 
     # Nutrition coach
     nutrition_text = training_nutrition.get("nutrition", "") if isinstance(training_nutrition, dict) else ""
     if nutrition_text and len(nutrition_text) > 15:
-        insights.append({
-            "digest_type": "daily_brief",
-            "insight_type": "coaching",
-            "text": nutrition_text,
-            "pillars": ["nutrition"],
-            "data_sources": ["macrofactor"],
-            "tags": ["nutrition", "coaching"],
-            "confidence": "medium",
-            "actionable": True,
-            "date": date,
-        })
+        insights.append(
+            {
+                "digest_type": "daily_brief",
+                "insight_type": "coaching",
+                "text": nutrition_text,
+                "pillars": ["nutrition"],
+                "data_sources": ["macrofactor"],
+                "tags": ["nutrition", "coaching"],
+                "confidence": "medium",
+                "actionable": True,
+                "date": date,
+            }
+        )
 
     # Journal coach
     if journal_coach_text and len(journal_coach_text) > 15:
-        insights.append({
-            "digest_type": "daily_brief",
-            "insight_type": "coaching",
-            "text": journal_coach_text,
-            "pillars": ["mind"],
-            "data_sources": ["journal"],
-            "tags": ["journal", "coaching", "mind"],
-            "confidence": "medium",
-            "actionable": True,
-            "date": date,
-        })
+        insights.append(
+            {
+                "digest_type": "daily_brief",
+                "insight_type": "coaching",
+                "text": journal_coach_text,
+                "pillars": ["mind"],
+                "data_sources": ["journal"],
+                "tags": ["journal", "coaching", "mind"],
+                "confidence": "medium",
+                "actionable": True,
+                "date": date,
+            }
+        )
 
     return insights

@@ -2,15 +2,18 @@
 Freshness Checker Lambda — monitors data source staleness.
 Fires via EventBridge schedule. Alerts via SNS when sources are stale.
 """
+
 import json
-import os
 import logging
+import os
+from datetime import datetime, timedelta, timezone
+
 import boto3
-from datetime import datetime, timezone, timedelta
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("freshness-checker")
 except ImportError:
     logger = logging.getLogger("freshness-checker")
@@ -36,31 +39,31 @@ sns = boto3.client("sns", region_name=REGION)
 cw = boto3.client("cloudwatch", region_name=REGION)
 
 SOURCES = {
-    "whoop":           "Whoop recovery/sleep",
-    "withings":        "Withings weight/body comp",
+    "whoop": "Whoop recovery/sleep",
+    "withings": "Withings weight/body comp",
     # "strava":        "Strava activities",  # PAUSED 2026-05-28 (API 402; Garmin covers activity)
-    "todoist":         "Todoist tasks",
-    "apple_health":    "Apple Health",
-    "eightsleep":      "Eight Sleep",
+    "todoist": "Todoist tasks",
+    "apple_health": "Apple Health",
+    "eightsleep": "Eight Sleep",
     # "macrofactor":   "MacroFactor nutrition",  # dead since 2026-04-11 (Tier 1 torn down)
     # "garmin":        "Garmin biometrics",  # PAUSED 2026-06-03 — Garmin's 2026 anti-automation
     #   crackdown 429-blocks server-side OAuth2 refresh from datacenter IPs (374 throttles vs 2
     #   successes / 14d). Unwinnable headless; re-auth only buys ~1 run. Revive = uncomment +
     #   re-auth from a residential IP (or if Garmin's official Health API is ever approved).
-    "habitify":        "Habitify habits",
-    "food_delivery":   "Food delivery behavioral signal",
-    "measurements":    "Tape measure check-ins",
+    "habitify": "Habitify habits",
+    "food_delivery": "Food delivery behavioral signal",
+    "measurements": "Tape measure check-ins",
     # google_calendar retired v3.7.46 — see ADR-030 in DECISIONS.md
 }
 
 # R18-F04: Per-source stale threshold overrides (hours). Sources not listed use STALE_HOURS default.
 # food_delivery is a quarterly CSV import — 90 days before stale alert.
 SOURCE_STALE_HOURS = {
-    "food_delivery": 90 * 24,   # 90 days
-    "measurements": 60 * 24,    # 60 days — one missed session before alert
+    "food_delivery": 90 * 24,  # 90 days
+    "measurements": 60 * 24,  # 60 days — one missed session before alert
     # 2026-05-29: weigh-ins are sporadic (often ~weekly), so the 48h default
     # false-fired "stale" constantly. A missed week before alerting.
-    "withings": 7 * 24,         # 7 days
+    "withings": 7 * 24,  # 7 days
     # todoist records are dated by completed DAY and the freshest record is always
     # "yesterday" (today's completions aren't known until the day ends), so a 24h
     # default false-fires every afternoon. 48h still catches a genuine 2-day outage.
@@ -81,18 +84,19 @@ BEHAVIORAL_SOURCES = {"measurements", "food_delivery"}
 # Missing fields here emit a PartialCompletenessCount metric and include source in alert.
 # Added v3.7.27 (item 11 — Omar / Jin board recommendation).
 FIELD_COMPLETENESS_CHECKS: dict[str, list[str]] = {
-    "whoop":           ["hrv", "recovery_score", "sleep_duration_hours"],
-    "garmin":          ["steps", "resting_heart_rate", "body_battery_highest"],
-    "apple_health":    ["steps", "active_energy_kcal"],
+    "whoop": ["hrv", "recovery_score", "sleep_duration_hours"],
+    "garmin": ["steps", "resting_heart_rate", "body_battery_highest"],
+    "apple_health": ["steps", "active_energy_kcal"],
     # "macrofactor":   [...],  # dead since 2026-04-11 (Tier 1 torn down)
     # "strava":        ["activity_count"],  # PAUSED 2026-05-28
-    "eightsleep":      ["sleep_efficiency_pct", "sleep_duration_hours"],
-    "withings":        ["weight_lbs"],
-    "habitify":        ["total_completed"],
-    "measurements":    ["waist_navel_in", "waist_narrowest_in", "thigh_left_in"],
-    "todoist":         ["tasks_completed"],
+    "eightsleep": ["sleep_efficiency_pct", "sleep_duration_hours"],
+    "withings": ["weight_lbs"],
+    "habitify": ["total_completed"],
+    "measurements": ["waist_navel_in", "waist_narrowest_in", "thigh_left_in"],
+    "todoist": ["tasks_completed"],
     # google_calendar removed — ADR-030
 }
+
 
 def lambda_handler(event, context):
     table = dynamodb.Table(TABLE_NAME)
@@ -108,25 +112,27 @@ def lambda_handler(event, context):
     _sick_suppress = False
     try:
         from sick_day_checker import get_sick_days_range
+
         sick_records = get_sick_days_range(
-            table, USER_ID,
-            window_start.isoformat(), window_end.isoformat(),
+            table,
+            USER_ID,
+            window_start.isoformat(),
+            window_end.isoformat(),
         )
         if sick_records:
             _sick_suppress = True
-            _sick_dates = ", ".join(
-                sorted(r.get("sk", "").replace("DATE#", "")[:10] for r in sick_records)
-            )
+            _sick_dates = ", ".join(sorted(r.get("sk", "").replace("DATE#", "")[:10] for r in sick_records))
             logger.info(
                 "Sick day(s) flagged in last %d days (%s) — freshness alerts suppressed",
-                SICK_SUPPRESS_DAYS, _sick_dates,
+                SICK_SUPPRESS_DAYS,
+                _sick_dates,
             )
     except ImportError:
         pass
 
     stale_sources = []
-    partial_sources = []   # fresh but missing expected fields
-    warning_sources = []   # ADR-052: age > WARNING_HOURS but < stale threshold
+    partial_sources = []  # fresh but missing expected fields
+    warning_sources = []  # ADR-052: age > WARNING_HOURS but < stale threshold
     source_status = []
 
     for source_key, source_name in SOURCES.items():
@@ -206,22 +212,29 @@ def lambda_handler(event, context):
             yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
             logger.info(
                 "Stale sources detected (%d) but suppressed — sick day (%s)",
-                len(stale_sources), yesterday_str,
+                len(stale_sources),
+                yesterday_str,
             )
         else:
             # Actionable remediation hint, keyed off which stale sources are present.
             _stale_keys = {n for n, _ in stale_sources}
-            _oauth_stale = {lbl for lbl in _stale_keys
-                            if lbl in (SOURCES.get("garmin"), SOURCES.get("whoop"), SOURCES.get("withings"), SOURCES.get("eightsleep"))}
-            _input_stale = {lbl for lbl in _stale_keys
-                            if lbl in (SOURCES.get("measurements"), SOURCES.get("food_delivery"))}
+            _oauth_stale = {
+                lbl
+                for lbl in _stale_keys
+                if lbl in (SOURCES.get("garmin"), SOURCES.get("whoop"), SOURCES.get("withings"), SOURCES.get("eightsleep"))
+            }
+            _input_stale = {lbl for lbl in _stale_keys if lbl in (SOURCES.get("measurements"), SOURCES.get("food_delivery"))}
             hints = []
             if _oauth_stale:
-                hints.append(f"• OAuth source(s) stale ({', '.join(sorted(_oauth_stale))}) → the token likely "
-                             f"expired; re-auth (Garmin: `python3 setup_garmin_browser_auth.py`).")
+                hints.append(
+                    f"• OAuth source(s) stale ({', '.join(sorted(_oauth_stale))}) → the token likely "
+                    f"expired; re-auth (Garmin: `python3 setup_garmin_browser_auth.py`)."
+                )
             if _input_stale:
-                hints.append(f"• Input source(s) stale ({', '.join(sorted(_input_stale))}) → no new entry logged; "
-                             f"expected if you've paused that tracking.")
+                hints.append(
+                    f"• Input source(s) stale ({', '.join(sorted(_input_stale))}) → no new entry logged; "
+                    f"expected if you've paused that tracking."
+                )
             remediation = ("\n\nWhat to do:\n" + "\n".join(hints)) if hints else ""
             message = (
                 f"⚠️ Life Platform: Stale Data Detected\n\n"
@@ -245,9 +258,7 @@ def lambda_handler(event, context):
 
     # Partial completeness alert (separate from staleness alert)
     if partial_sources and not _sick_suppress:
-        partial_list = "\n".join(
-            [f"  - {name}: missing {', '.join(fields)}" for name, fields in partial_sources]
-        )
+        partial_list = "\n".join([f"  - {name}: missing {', '.join(fields)}" for name, fields in partial_sources])
         try:
             sns.publish(
                 TopicArn=SNS_ARN,
@@ -298,8 +309,13 @@ def lambda_handler(event, context):
                 },
             ],
         )
-        logger.info("SLO metrics emitted: %d stale, %d fresh, %d partial, %d warning",
-                    len(stale_sources), fresh_count, len(partial_sources), len(warning_sources))
+        logger.info(
+            "SLO metrics emitted: %d stale, %d fresh, %d partial, %d warning",
+            len(stale_sources),
+            fresh_count,
+            len(partial_sources),
+            len(warning_sources),
+        )
     except Exception as e:
         logger.error("CloudWatch SLO metric emit failed (non-fatal): %s", e)
 
@@ -315,13 +331,13 @@ def lambda_handler(event, context):
         # "life-platform/garmin",  # PAUSED 2026-06-03 — see SOURCES note (server-side refresh 429-blocked)
     ]
     MANUAL_ROTATION_SECRETS = [
-        "life-platform/ai-keys",          # Anthropic — no rotation API; manual every 90d
+        "life-platform/ai-keys",  # Anthropic — no rotation API; manual every 90d
         "life-platform/site-api-ai-key",  # Anthropic — separate key for site API
         "life-platform/eightsleep-client",
         "life-platform/notion",
         # "life-platform/dropbox",  # removed 2026-05-28 — secret soft-deleted
         "life-platform/todoist",
-        "life-platform/ingestion-keys",   # COST-B bundle: Notion + Habitify + Todoist + Dropbox + HAE
+        "life-platform/ingestion-keys",  # COST-B bundle: Notion + Habitify + Todoist + Dropbox + HAE
     ]
     OAUTH_STALE_DAYS = int(os.environ.get("OAUTH_STALE_DAYS", "60"))
     MANUAL_ROTATION_STALE_DAYS = int(os.environ.get("MANUAL_ROTATION_STALE_DAYS", "120"))
@@ -339,7 +355,8 @@ def lambda_handler(event, context):
                         oauth_stale.append((secret_name, age_days))
                         logger.warning(
                             "OAuth token stale: %s last updated %d days ago",
-                            secret_name, age_days,
+                            secret_name,
+                            age_days,
                         )
             except Exception as _se:
                 logger.warning("Could not check OAuth secret %s: %s", secret_name, _se)
@@ -354,15 +371,14 @@ def lambda_handler(event, context):
                         manual_stale.append((secret_name, age_days))
                         logger.warning(
                             "Manual-rotation secret stale: %s last rotated %d days ago",
-                            secret_name, age_days,
+                            secret_name,
+                            age_days,
                         )
             except Exception as _se:
                 logger.warning("Could not check manual secret %s: %s", secret_name, _se)
 
         if oauth_stale:
-            stale_list = "\n".join(
-                [f"  - {name}: {days} days since last update" for name, days in oauth_stale]
-            )
+            stale_list = "\n".join([f"  - {name}: {days} days since last update" for name, days in oauth_stale])
             try:
                 sns.publish(
                     TopicArn=SNS_ARN,
@@ -383,9 +399,7 @@ def lambda_handler(event, context):
 
         # Phase 2.6: manual-rotation staleness alert (separate from OAuth)
         if manual_stale:
-            stale_list = "\n".join(
-                [f"  - {name}: {days} days since last rotation" for name, days in manual_stale]
-            )
+            stale_list = "\n".join([f"  - {name}: {days} days since last rotation" for name, days in manual_stale])
             try:
                 sns.publish(
                     TopicArn=SNS_ARN,

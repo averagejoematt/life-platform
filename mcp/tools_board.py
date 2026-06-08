@@ -2,11 +2,12 @@
 Board of Directors tools: view, update, and remove board members.
 Config lives in S3 at config/board_of_directors.json.
 """
+
 import json
 import logging
 from datetime import datetime, timezone
 
-from mcp.config import s3_client, S3_BUCKET, USER_ID, logger
+from mcp.config import S3_BUCKET, USER_ID, logger, s3_client
 
 # ── S3 key ──
 BOARD_S3_KEY = f"config/{USER_ID}/board_of_directors.json"
@@ -36,6 +37,7 @@ def _save_board(board):
 
 
 # ── Tool: get_board_of_directors ──
+
 
 def tool_get_board_of_directors(args):
     """View the full board or a specific member. Optional filters by type, feature, or active status."""
@@ -82,6 +84,7 @@ def tool_get_board_of_directors(args):
 
 # ── Tool: update_board_member ──
 
+
 def tool_update_board_member(args):
     """Add a new board member or update fields on an existing one. Supports partial updates."""
     member_id = args.get("member_id")
@@ -125,6 +128,7 @@ def tool_update_board_member(args):
 
 
 # ── Tool: remove_board_member ──
+
 
 def tool_remove_board_member(args):
     """Remove a board member or deactivate them (soft delete). Default is deactivate."""

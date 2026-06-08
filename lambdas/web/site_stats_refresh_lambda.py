@@ -13,11 +13,11 @@ sleep), tier0_streak, and _meta timestamp.
 
 Cost: ~$0/month (well within Lambda free tier).
 """
-import boto3
 import json
 import os
-from datetime import datetime, timezone, date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
+import boto3
 from constants import EXPERIMENT_START_DATE  # ADR-058
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -56,16 +56,21 @@ def _get_latest(table, source, days_back=2):
     try:
         # ADR-058: phase=pilot hidden by default.
         from phase_filter import with_phase_filter
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": f"USER#{USER_ID}#SOURCE#{source}",
-                ":s":  f"DATE#{start}",
-                ":e":  f"DATE#{today}",
-            },
-            "ScanIndexForward": False,
-            "Limit": 1,
-        }))
+
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                    "ExpressionAttributeValues": {
+                        ":pk": f"USER#{USER_ID}#SOURCE#{source}",
+                        ":s": f"DATE#{start}",
+                        ":e": f"DATE#{today}",
+                    },
+                    "ScanIndexForward": False,
+                    "Limit": 1,
+                }
+            )
+        )
         items = resp.get("Items", [])
         return dict(items[0]) if items else {}
     except Exception as e:
@@ -81,7 +86,7 @@ def lambda_handler(event, context):
         try:
             resp = _lambda.invoke(
                 FunctionName=fn,
-                InvocationType="RequestResponse",   # synchronous — wait for data
+                InvocationType="RequestResponse",  # synchronous — wait for data
                 Payload=json.dumps({}),
             )
             print(f"[INFO] {fn}: HTTP {resp['StatusCode']}")
@@ -98,9 +103,7 @@ def lambda_handler(event, context):
 
     # ── 3. Read existing public_stats.json to preserve non-vitals sections ───
     try:
-        existing = json.loads(
-            _s3.get_object(Bucket=S3_BUCKET, Key=STATS_KEY)["Body"].read()
-        )
+        existing = json.loads(_s3.get_object(Bucket=S3_BUCKET, Key=STATS_KEY)["Body"].read())
     except Exception as e:
         print(f"[WARN] Could not read existing public_stats.json: {e}")
         existing = {}
@@ -125,23 +128,19 @@ def lambda_handler(event, context):
         weight = ev.get("weight_lbs")
         weight_as_of = ev.get("weight_as_of")
 
-    rec_status = (
-        "green" if (recovery or 0) >= 67 else
-        "yellow" if (recovery or 0) >= 34 else
-        "red"
-    )
+    rec_status = "green" if (recovery or 0) >= 67 else "yellow" if (recovery or 0) >= 34 else "red"
 
     fresh_vitals = {
-        "weight_lbs":          round(weight) if weight else None,
-        "weight_as_of":        weight_as_of,
-        "weight_delta_30d":    ev.get("weight_delta_30d"),   # preserved from morning
-        "hrv_ms":              round(hrv, 1) if hrv else ev.get("hrv_ms"),
-        "hrv_trend":           ev.get("hrv_trend"),
-        "rhr_bpm":             round(rhr, 1) if rhr else ev.get("rhr_bpm"),
-        "rhr_trend":           ev.get("rhr_trend"),
-        "recovery_pct":        round(recovery, 0) if recovery else None,
-        "recovery_status":     rec_status if recovery else ev.get("recovery_status"),
-        "sleep_hours":         round(sleep, 1) if sleep else ev.get("sleep_hours"),
+        "weight_lbs": round(weight) if weight else None,
+        "weight_as_of": weight_as_of,
+        "weight_delta_30d": ev.get("weight_delta_30d"),  # preserved from morning
+        "hrv_ms": round(hrv, 1) if hrv else ev.get("hrv_ms"),
+        "hrv_trend": ev.get("hrv_trend"),
+        "rhr_bpm": round(rhr, 1) if rhr else ev.get("rhr_bpm"),
+        "rhr_trend": ev.get("rhr_trend"),
+        "recovery_pct": round(recovery, 0) if recovery else None,
+        "recovery_status": rec_status if recovery else ev.get("recovery_status"),
+        "sleep_hours": round(sleep, 1) if sleep else ev.get("sleep_hours"),
         "sleep_hours_30d_avg": ev.get("sleep_hours_30d_avg"),
     }
 
@@ -184,14 +183,19 @@ def lambda_handler(event, context):
     try:
         # ADR-058: phase=pilot hidden by default.
         from phase_filter import with_phase_filter
-        _tr_resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": f"USER#{USER_ID}#SOURCE#strava",
-                ":s": f"DATE#{exp_start.isoformat()}",
-                ":e": f"DATE#{date.today().isoformat()}",
-            },
-        }))
+
+        _tr_resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                    "ExpressionAttributeValues": {
+                        ":pk": f"USER#{USER_ID}#SOURCE#strava",
+                        ":s": f"DATE#{exp_start.isoformat()}",
+                        ":e": f"DATE#{date.today().isoformat()}",
+                    },
+                }
+            )
+        )
         _tr_items = _tr_resp.get("Items", [])
         total_min = 0
         for ti in _tr_items:
@@ -227,14 +231,17 @@ def lambda_handler(event, context):
         "character": existing_char or None,
         "_meta": {
             **existing.get("_meta", {}),
-            "generated_at":  existing.get("_meta", {}).get("generated_at"),  # keep morning time
-            "refreshed_at":  datetime.now(timezone.utc).isoformat(),
-            "generated_by":  "daily-brief-lambda",
+            "generated_at": existing.get("_meta", {}).get("generated_at"),  # keep morning time
+            "refreshed_at": datetime.now(timezone.utc).isoformat(),
+            "generated_by": "daily-brief-lambda",
         },
-        "vitals":   fresh_vitals,
-        "platform": {**ep, "tier0_streak": fresh_streak,
-                     "protein_avg": fresh_vitals.get("nutrition_protein_g"),
-                     "days_in": max(1, (date.today() - exp_start).days + 1) if date.today() >= exp_start else 0},
+        "vitals": fresh_vitals,
+        "platform": {
+            **ep,
+            "tier0_streak": fresh_streak,
+            "protein_avg": fresh_vitals.get("nutrition_protein_g"),
+            "days_in": max(1, (date.today() - exp_start).days + 1) if date.today() >= exp_start else 0,
+        },
     }
 
     # ── 7. Write back ─────────────────────────────────────────────────────────

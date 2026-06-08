@@ -22,19 +22,21 @@ Changes v1.1.0:
   - ALLOWED_SENDERS from env var for easier config updates
 """
 
+import email
 import json
 import logging
-import email
 import os
 import re
-import boto3
 from datetime import datetime, timezone
 from decimal import Decimal
 from email import policy
 
+import boto3
+
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("insight-email-parser")
 except ImportError:
     logger = logging.getLogger("insight-email-parser")
@@ -59,10 +61,14 @@ SENDER = "awsdev@mattsusername.com"
 # Allowed sender addresses (security: only process Matthew's emails)
 # Loaded from env var (comma-separated) with hardcoded fallback
 _env_senders = os.environ.get("ALLOWED_SENDERS", "")
-ALLOWED_SENDERS = {s.strip().lower() for s in _env_senders.split(",") if s.strip()} if _env_senders else {
-    "awsdev@mattsusername.com",
-    # TODO: Add your personal email address(es) here or set ALLOWED_SENDERS env var
-}
+ALLOWED_SENDERS = (
+    {s.strip().lower() for s in _env_senders.split(",") if s.strip()}
+    if _env_senders
+    else {
+        "awsdev@mattsusername.com",
+        # TODO: Add your personal email address(es) here or set ALLOWED_SENDERS env var
+    }
+)
 
 
 def extract_reply_text(email_body):
@@ -85,7 +91,7 @@ def extract_reply_text(email_body):
         stripped = line.strip()
 
         # Stop at quoted original markers
-        if re.match(r'^On .+ wrote:$', stripped):
+        if re.match(r"^On .+ wrote:$", stripped):
             break
         if stripped.startswith("From:") and "@" in stripped:
             break
@@ -107,7 +113,7 @@ def extract_reply_text(email_body):
     text = "\n".join(reply_lines).strip()
 
     # Remove any "track this" / "save this" command prefix (case-insensitive)
-    text = re.sub(r'^(track this|save this|insight|note)[:\s]*', '', text, flags=re.IGNORECASE).strip()
+    text = re.sub(r"^(track this|save this|insight|note)[:\s]*", "", text, flags=re.IGNORECASE).strip()
 
     return text
 
@@ -176,10 +182,12 @@ def send_confirmation(insight_text, insight_id, recipient_email):
     ses.send_email(
         FromEmailAddress=SENDER,
         Destination={"ToAddresses": [recipient_email]},
-        Content={"Simple": {
-            "Subject": {"Data": f"Insight saved: {preview[:50]}", "Charset": "UTF-8"},
-            "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
-        }},
+        Content={
+            "Simple": {
+                "Subject": {"Data": f"Insight saved: {preview[:50]}", "Charset": "UTF-8"},
+                "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
+            }
+        },
     )
 
 
@@ -187,7 +195,7 @@ def lambda_handler(event, context):
     try:
         """
         Triggered by S3 event when SES deposits a raw email.
-    
+
         Event can come from:
         1. S3 Event Notification (has 'Records' with s3 info)
         2. SES direct invocation (has 'Records' with ses info)
@@ -226,7 +234,7 @@ def lambda_handler(event, context):
 
             # Security: check sender
             from_addr = msg.get("From", "")
-            sender_email = re.search(r'[\w.+-]+@[\w-]+\.[\w.]+', from_addr)
+            sender_email = re.search(r"[\w.+-]+@[\w-]+\.[\w.]+", from_addr)
             sender = sender_email.group(0).lower() if sender_email else ""
 
             if sender not in ALLOWED_SENDERS:
@@ -249,7 +257,7 @@ def lambda_handler(event, context):
                         if part.get_content_type() == "text/html":
                             html_content = part.get_content()
                             # Basic HTML stripping
-                            body_text = re.sub(r'<[^>]+>', '', html_content)
+                            body_text = re.sub(r"<[^>]+>", "", html_content)
                             break
             else:
                 body_text = msg.get_content()

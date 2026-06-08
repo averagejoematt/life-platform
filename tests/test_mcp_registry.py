@@ -23,6 +23,7 @@ import ast
 import os
 import re
 import sys
+
 import pytest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -30,7 +31,7 @@ MCP_DIR = os.path.join(ROOT, "mcp")
 REGISTRY_PATH = os.path.join(MCP_DIR, "registry.py")
 
 # Expected tool count range — update when consolidating or adding tools
-EXPECTED_MIN_TOOLS = 75   # updated for SIMP-1 Phase 1c+1d (86 tools as of v3.7.19)
+EXPECTED_MIN_TOOLS = 75  # updated for SIMP-1 Phase 1c+1d (86 tools as of v3.7.19)
 EXPECTED_MAX_TOOLS = 141  # upper bound: bumped 2026-06-01 for get_vacation_fund
 
 
@@ -49,6 +50,7 @@ def _parse_registry():
 # ══════════════════════════════════════════════════════════════════════════════
 # R1 — Every import resolves to a real file
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _get_wildcard_imports(tree):
     """Extract all `from mcp.X import *` module names."""
@@ -80,6 +82,7 @@ def test_r1_all_imports_resolve():
 # ══════════════════════════════════════════════════════════════════════════════
 # R2 — Every "fn" value in TOOLS dict is a real function
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _get_tool_fn_names(src):
     """Extract all function names referenced as 'fn' values in TOOLS dict."""
@@ -125,6 +128,7 @@ def test_r2_all_fn_references_exist():
 # R3 — Every tool has valid schema structure
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _get_tool_names(src):
     """Extract top-level tool names from TOOLS dict."""
     tools_start = src.find("TOOLS = {")
@@ -147,15 +151,15 @@ def test_r3_schema_structure():
         pattern = rf'"name":\s*"{name}"'
         if not re.search(pattern, src):
             missing_schema_names.append(name)
-    assert not missing_schema_names, (
-        f"R3 FAIL: {len(missing_schema_names)} tool(s) missing schema name field:\n"
-        + "\n".join(f"  - {n}" for n in missing_schema_names)
+    assert not missing_schema_names, f"R3 FAIL: {len(missing_schema_names)} tool(s) missing schema name field:\n" + "\n".join(
+        f"  - {n}" for n in missing_schema_names
     )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # R4 — No duplicate tool names
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_r4_no_duplicate_tool_names():
     """R4: No tool name should appear more than once in TOOLS dict."""
@@ -167,14 +171,13 @@ def test_r4_no_duplicate_tool_names():
         if name in seen:
             duplicates.append(name)
         seen[name] = True
-    assert not duplicates, (
-        f"R4 FAIL: Duplicate tool names found: {duplicates}"
-    )
+    assert not duplicates, f"R4 FAIL: Duplicate tool names found: {duplicates}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # R5 — Tool count in expected range
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_r5_tool_count_in_range():
     """R5: Tool count should be within expected range.
@@ -196,6 +199,7 @@ def test_r5_tool_count_in_range():
 # R6 — Registry file parses without syntax errors
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def test_r6_registry_syntax_valid():
     """R6: registry.py must be valid Python syntax."""
     src = _read(REGISTRY_PATH)
@@ -209,6 +213,7 @@ def test_r6_registry_syntax_valid():
 # R7 — All tool module files parse without syntax errors
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def test_r7_all_tool_modules_parseable():
     """R7: Every tools_*.py file must be valid Python syntax."""
     errors = []
@@ -220,10 +225,7 @@ def test_r7_all_tool_modules_parseable():
             ast.parse(_read(filepath))
         except SyntaxError as e:
             errors.append(f"{filename}: {e}")
-    assert not errors, (
-        f"R7 FAIL: {len(errors)} tool module(s) have syntax errors:\n"
-        + "\n".join(f"  - {e}" for e in errors)
-    )
+    assert not errors, f"R7 FAIL: {len(errors)} tool module(s) have syntax errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -232,6 +234,7 @@ def test_r7_all_tool_modules_parseable():
 
 if __name__ == "__main__":
     import subprocess
+
     result = subprocess.run(
         ["python3", "-m", "pytest", __file__, "-v", "--tb=short"],
         cwd=ROOT,

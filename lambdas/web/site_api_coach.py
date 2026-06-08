@@ -17,21 +17,25 @@ Endpoints:
   /api/coach_timeline   — coach thread timeline (?coach_id= param)
   /api/weekly_priority  — integrator synthesis (cross-domain weekly priority)
 """
+
 import json
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401
 
 from boto3.dynamodb.conditions import Key
-
 from phase_filter import with_phase_filter  # ADR-058
-
 from web.site_api_common import (
+    EXPERIMENT_START,
+    PT,
+    USER_ID,
+    USER_PREFIX,
+    _decimal_to_float,
+    _error,
+    _latest_item,
+    _ok,
+    _query_source,
     logger,
     table,
-    USER_ID, USER_PREFIX,
-    EXPERIMENT_START, PT,
-    _ok, _error,
-    _query_source, _latest_item, _decimal_to_float,
 )
 
 
@@ -59,30 +63,42 @@ def handle_field_notes(event):
         if not item:
             return _ok({"entry": None, "week": week_param}, cache_seconds=300)
         item = _decimal_to_float(item)
-        return _ok({"entry": {
-            "week": item.get("week", week_param),
-            "ai_present": item.get("ai_present", ""),
-            "ai_cautionary": item.get("ai_cautionary"),
-            "ai_affirming": item.get("ai_affirming"),
-            "ai_tone": item.get("ai_tone", "mixed"),
-            "ai_generated_at": item.get("ai_generated_at"),
-            "matthew_agreement": item.get("matthew_agreement"),
-            "matthew_logged_at": item.get("matthew_logged_at"),
-        }}, cache_seconds=300)
+        return _ok(
+            {
+                "entry": {
+                    "week": item.get("week", week_param),
+                    "ai_present": item.get("ai_present", ""),
+                    "ai_cautionary": item.get("ai_cautionary"),
+                    "ai_affirming": item.get("ai_affirming"),
+                    "ai_tone": item.get("ai_tone", "mixed"),
+                    "ai_generated_at": item.get("ai_generated_at"),
+                    "matthew_agreement": item.get("matthew_agreement"),
+                    "matthew_logged_at": item.get("matthew_logged_at"),
+                }
+            },
+            cache_seconds=300,
+        )
     else:
         # List mode — return all weeks (most recent first)
-        resp = table.query(**with_phase_filter({  # ADR-058: hide pilot field notes
-            "KeyConditionExpression": Key("pk").eq(fn_pk),
-            "ScanIndexForward": False,
-            "Limit": 52,
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot field notes
+                    "KeyConditionExpression": Key("pk").eq(fn_pk),
+                    "ScanIndexForward": False,
+                    "Limit": 52,
+                }
+            )
+        )
         items = _decimal_to_float(resp.get("Items", []))
-        entries = [{
-            "week": i.get("week", i.get("sk", "").replace("WEEK#", "")),
-            "ai_tone": i.get("ai_tone", "mixed"),
-            "ai_generated_at": i.get("ai_generated_at"),
-            "has_matthew_response": bool(i.get("matthew_agreement")),
-        } for i in items]
+        entries = [
+            {
+                "week": i.get("week", i.get("sk", "").replace("WEEK#", "")),
+                "ai_tone": i.get("ai_tone", "mixed"),
+                "ai_generated_at": i.get("ai_generated_at"),
+                "has_matthew_response": bool(i.get("matthew_agreement")),
+            }
+            for i in items
+        ]
         return _ok({"entries": entries, "count": len(entries)}, cache_seconds=300)
 
     # AI Analysis (GET with ?expert= query param)
@@ -112,12 +128,15 @@ def handle_ai_analysis(event):
                     f"[ai_analysis] {expert_key} record claims day {rec_days} "
                     f"but current is day {_current_day_n()} — withholding stale narrative"
                 )
-                return _ok({
-                    "expert_key": expert_key,
-                    "analysis": None,
-                    "generated_at": None,
-                    "stale": True,
-                }, cache_seconds=300)
+                return _ok(
+                    {
+                        "expert_key": expert_key,
+                        "analysis": None,
+                        "generated_at": None,
+                        "stale": True,
+                    },
+                    cache_seconds=300,
+                )
         except (TypeError, ValueError):
             pass
     analysis_val = ai_item.get("analysis", "")
@@ -148,9 +167,14 @@ def handle_coach_analysis(event):
     qs = event.get("queryStringParameters") or {}
     raw_domain = qs.get("domain", "sleep")
     _coach_map = {
-        "sleep": "sleep_coach", "nutrition": "nutrition_coach", "training": "training_coach",
-        "mind": "mind_coach", "physical": "physical_coach", "glucose": "glucose_coach",
-        "labs": "labs_coach", "explorer": "explorer_coach",
+        "sleep": "sleep_coach",
+        "nutrition": "nutrition_coach",
+        "training": "training_coach",
+        "mind": "mind_coach",
+        "physical": "physical_coach",
+        "glucose": "glucose_coach",
+        "labs": "labs_coach",
+        "explorer": "explorer_coach",
     }
     # The Cockpit (/now/) discloses the 7 CHARACTER PILLARS, whose names differ from the
     # coach-domain names above — alias them so a pillar click resolves to the right coach.
@@ -169,7 +193,12 @@ def handle_coach_analysis(event):
         "sleep_coach": {"name": "Dr. Lisa Park", "initials": "LP", "title": "Sleep & Circadian Rhythm Specialist", "color": "#818cf8"},
         "nutrition_coach": {"name": "Dr. Marcus Webb", "initials": "MW", "title": "Evidence-Based Nutrition", "color": "#10b981"},
         "training_coach": {"name": "Dr. Sarah Chen", "initials": "SC", "title": "Exercise Physiology & Strength", "color": "#3db88a"},
-        "mind_coach": {"name": "Dr. Nathan Reeves", "initials": "NR", "title": "Psychiatrist \u2014 Behavioral Patterns", "color": "#a78bfa"},
+        "mind_coach": {
+            "name": "Dr. Nathan Reeves",
+            "initials": "NR",
+            "title": "Psychiatrist \u2014 Behavioral Patterns",
+            "color": "#a78bfa",
+        },
         "physical_coach": {"name": "Dr. Victor Reyes", "initials": "VR", "title": "Longevity & Body Composition", "color": "#f59e0b"},
         "glucose_coach": {"name": "Dr. Amara Patel", "initials": "AP", "title": "Metabolic Health & CGM", "color": "#2dd4bf"},
         "labs_coach": {"name": "Dr. James Okafor", "initials": "JO", "title": "Clinical Pathology & Preventive Labs", "color": "#5ba4cf"},
@@ -180,10 +209,15 @@ def handle_coach_analysis(event):
         coach_pk = f"COACH#{coach_id}"
 
         # 1. Most recent OUTPUT# record
-        out_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot coach outputs
-            "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("OUTPUT#"),
-            "ScanIndexForward": False, "Limit": 1,
-        }))
+        out_resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot coach outputs
+                    "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("OUTPUT#"),
+                    "ScanIndexForward": False,
+                    "Limit": 1,
+                }
+            )
+        )
         out_items = out_resp.get("Items", [])
         if not out_items:
             return _ok({"coach_id": coach_id, "domain": domain, "analysis": None}, cache_seconds=300)
@@ -197,9 +231,13 @@ def handle_coach_analysis(event):
         # 2. Open threads
         thread_reference = None
         try:
-            thread_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot coach threads
-                "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("THREAD#"),
-            }))
+            thread_resp = table.query(
+                **with_phase_filter(
+                    {  # ADR-058: hide pilot coach threads
+                        "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("THREAD#"),
+                    }
+                )
+            )
             threads = [_decimal_to_float(t) for t in thread_resp.get("Items", []) if t.get("status") == "open"]
             if threads:
                 # Pick most recently referenced thread
@@ -213,7 +251,8 @@ def handle_coach_analysis(event):
         try:
             dig_resp = table.query(
                 KeyConditionExpression=Key("pk").eq("ENSEMBLE#digest") & Key("sk").begins_with("CYCLE#"),
-                ScanIndexForward=False, Limit=1,
+                ScanIndexForward=False,
+                Limit=1,
             )
             dig_items = dig_resp.get("Items", [])
             if dig_items:
@@ -230,10 +269,15 @@ def handle_coach_analysis(event):
         # 4. Computation guardrails — data availability
         data_availability = "preliminary"
         try:
-            comp_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot computation results
-                "KeyConditionExpression": Key("pk").eq("COACH#computation") & Key("sk").begins_with("RESULTS#"),
-                "ScanIndexForward": False, "Limit": 1,
-            }))
+            comp_resp = table.query(
+                **with_phase_filter(
+                    {  # ADR-058: hide pilot computation results
+                        "KeyConditionExpression": Key("pk").eq("COACH#computation") & Key("sk").begins_with("RESULTS#"),
+                        "ScanIndexForward": False,
+                        "Limit": 1,
+                    }
+                )
+            )
             comp_items = comp_resp.get("Items", [])
             if comp_items:
                 guardrails = _decimal_to_float(comp_items[0]).get("statistical_guardrails", {})
@@ -251,10 +295,15 @@ def handle_coach_analysis(event):
         # 5. Revision signal — recent learning records
         revision_signal = None
         try:
-            learn_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot coach learnings
-                "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("LEARNING#"),
-                "ScanIndexForward": False, "Limit": 3,
-            }))
+            learn_resp = table.query(
+                **with_phase_filter(
+                    {  # ADR-058: hide pilot coach learnings
+                        "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("LEARNING#"),
+                        "ScanIndexForward": False,
+                        "Limit": 3,
+                    }
+                )
+            )
             for item in learn_resp.get("Items", []):
                 item = _decimal_to_float(item)
                 if item.get("type") == "position_revision":
@@ -293,9 +342,7 @@ def handle_coach_analysis(event):
             "coach_color": display.get("color", ""),
             "domain": domain,
             "analysis": analysis_text,
-            "key_recommendation": output.get("key_recommendation") or (
-                output.get("themes", [""])[0] if output.get("themes") else None
-            ),
+            "key_recommendation": output.get("key_recommendation") or (output.get("themes", [""])[0] if output.get("themes") else None),
             "elena_quote": output.get("elena_quote"),
             "journaling_prompt": output.get("journaling_prompt"),
             "thread_reference": thread_reference,
@@ -339,17 +386,25 @@ def handle_predictions(event):
         limit = min(int(qs.get("limit", "50")), 200)
 
         _pred_coach_names = {
-            "sleep": "Dr. Lisa Park", "nutrition": "Dr. Marcus Webb",
-            "training": "Dr. Sarah Chen", "mind": "Dr. Nathan Reeves",
-            "physical": "Dr. Victor Reyes", "glucose": "Dr. Amara Patel",
-            "labs": "Dr. James Okafor", "explorer": "Dr. Henning Brandt",
+            "sleep": "Dr. Lisa Park",
+            "nutrition": "Dr. Marcus Webb",
+            "training": "Dr. Sarah Chen",
+            "mind": "Dr. Nathan Reeves",
+            "physical": "Dr. Victor Reyes",
+            "glucose": "Dr. Amara Patel",
+            "labs": "Dr. James Okafor",
+            "explorer": "Dr. Henning Brandt",
         }
         _pred_coach_ids = list(_pred_coach_names.keys())
         _pred_coach_id_map = {
-            "sleep": "sleep_coach", "nutrition": "nutrition_coach",
-            "training": "training_coach", "mind": "mind_coach",
-            "physical": "physical_coach", "glucose": "glucose_coach",
-            "labs": "labs_coach", "explorer": "explorer_coach",
+            "sleep": "sleep_coach",
+            "nutrition": "nutrition_coach",
+            "training": "training_coach",
+            "mind": "mind_coach",
+            "physical": "physical_coach",
+            "glucose": "glucose_coach",
+            "labs": "labs_coach",
+            "explorer": "explorer_coach",
         }
 
         if coach_filter and coach_filter not in _pred_coach_ids:
@@ -364,11 +419,15 @@ def handle_predictions(event):
             by_coach[cid] = {"total": 0, "confirmed": 0, "refuted": 0, "pending": 0}
 
             try:
-                out_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot predictions
-                    "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("OUTPUT#"),
-                    "ScanIndexForward": False,
-                    "Limit": 12,
-                }))
+                out_resp = table.query(
+                    **with_phase_filter(
+                        {  # ADR-058: hide pilot predictions
+                            "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("OUTPUT#"),
+                            "ScanIndexForward": False,
+                            "Limit": 12,
+                        }
+                    )
+                )
                 for out_item in out_resp.get("Items", []):
                     out_item = _decimal_to_float(out_item)
                     preds = out_item.get("predictions", [])
@@ -388,15 +447,17 @@ def handle_predictions(event):
                         if status_filter != "all" and p_status != status_filter:
                             continue
 
-                        all_predictions.append({
-                            "coach_id": cid,
-                            "coach_name": _pred_coach_names[cid],
-                            "text": p.get("text", p.get("prediction", "")),
-                            "confidence": p.get("confidence", "medium"),
-                            "status": p_status,
-                            "date": out_date,
-                            "target_date": p.get("target_date", ""),
-                        })
+                        all_predictions.append(
+                            {
+                                "coach_id": cid,
+                                "coach_name": _pred_coach_names[cid],
+                                "text": p.get("text", p.get("prediction", "")),
+                                "confidence": p.get("confidence", "medium"),
+                                "status": p_status,
+                                "date": out_date,
+                                "target_date": p.get("target_date", ""),
+                            }
+                        )
             except Exception:
                 pass
 
@@ -412,15 +473,20 @@ def handle_predictions(event):
         resolved = confirmed + refuted
         accuracy_pct = round(confirmed / resolved * 100, 1) if resolved > 0 else 0
 
-        return _ok({
-            "overall": {
-                "total": total, "confirmed": confirmed,
-                "refuted": refuted, "pending": pending,
-                "accuracy_pct": accuracy_pct,
+        return _ok(
+            {
+                "overall": {
+                    "total": total,
+                    "confirmed": confirmed,
+                    "refuted": refuted,
+                    "pending": pending,
+                    "accuracy_pct": accuracy_pct,
+                },
+                "by_coach": by_coach,
+                "predictions": all_predictions,
             },
-            "by_coach": by_coach,
-            "predictions": all_predictions,
-        }, cache_seconds=300)
+            cache_seconds=300,
+        )
     except Exception as _e:
         logger.warning(f"[/api/predictions] {_e}")
         return _ok({"overall": {}, "by_coach": {}, "predictions": []}, cache_seconds=60)
@@ -435,16 +501,24 @@ def handle_coach_timeline(event):
         coach_id = qs.get("coach_id", "")
 
         _tl_coach_names = {
-            "sleep": "Dr. Lisa Park", "nutrition": "Dr. Marcus Webb",
-            "training": "Dr. Sarah Chen", "mind": "Dr. Nathan Reeves",
-            "physical": "Dr. Victor Reyes", "glucose": "Dr. Amara Patel",
-            "labs": "Dr. James Okafor", "explorer": "Dr. Henning Brandt",
+            "sleep": "Dr. Lisa Park",
+            "nutrition": "Dr. Marcus Webb",
+            "training": "Dr. Sarah Chen",
+            "mind": "Dr. Nathan Reeves",
+            "physical": "Dr. Victor Reyes",
+            "glucose": "Dr. Amara Patel",
+            "labs": "Dr. James Okafor",
+            "explorer": "Dr. Henning Brandt",
         }
         _tl_coach_id_map = {
-            "sleep": "sleep_coach", "nutrition": "nutrition_coach",
-            "training": "training_coach", "mind": "mind_coach",
-            "physical": "physical_coach", "glucose": "glucose_coach",
-            "labs": "labs_coach", "explorer": "explorer_coach",
+            "sleep": "sleep_coach",
+            "nutrition": "nutrition_coach",
+            "training": "training_coach",
+            "mind": "mind_coach",
+            "physical": "physical_coach",
+            "glucose": "glucose_coach",
+            "labs": "labs_coach",
+            "explorer": "explorer_coach",
         }
 
         if coach_id not in _tl_coach_names:
@@ -455,11 +529,15 @@ def handle_coach_timeline(event):
 
         # Query OUTPUT# records for stance_changes, predictions, surprises, emotional_investment
         try:
-            out_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot timeline outputs
-                "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("OUTPUT#"),
-                "ScanIndexForward": False,
-                "Limit": 20,
-            }))
+            out_resp = table.query(
+                **with_phase_filter(
+                    {  # ADR-058: hide pilot timeline outputs
+                        "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("OUTPUT#"),
+                        "ScanIndexForward": False,
+                        "Limit": 20,
+                    }
+                )
+            )
             prev_investment = None
             for out_item in out_resp.get("Items", []):
                 out_item = _decimal_to_float(out_item)
@@ -470,60 +548,72 @@ def handle_coach_timeline(event):
                 if isinstance(stance_changes, list):
                     for sc in stance_changes:
                         if isinstance(sc, dict):
-                            milestones.append({
-                                "date": out_date,
-                                "type": "stance_change",
-                                "text": sc.get("topic", sc.get("text", "Position revised")),
-                                "detail": sc.get("new_stance", sc.get("detail", "")),
-                            })
+                            milestones.append(
+                                {
+                                    "date": out_date,
+                                    "type": "stance_change",
+                                    "text": sc.get("topic", sc.get("text", "Position revised")),
+                                    "detail": sc.get("new_stance", sc.get("detail", "")),
+                                }
+                            )
                         elif isinstance(sc, str):
-                            milestones.append({
-                                "date": out_date,
-                                "type": "stance_change",
-                                "text": sc,
-                                "detail": "",
-                            })
+                            milestones.append(
+                                {
+                                    "date": out_date,
+                                    "type": "stance_change",
+                                    "text": sc,
+                                    "detail": "",
+                                }
+                            )
 
                 # Resolved predictions
                 preds = out_item.get("predictions", [])
                 if isinstance(preds, list):
                     for p in preds:
                         if isinstance(p, dict) and p.get("status") in ("confirmed", "refuted"):
-                            milestones.append({
-                                "date": out_date,
-                                "type": "prediction_resolved",
-                                "text": p.get("text", p.get("prediction", "")),
-                                "detail": f"Status: {p['status']}",
-                            })
+                            milestones.append(
+                                {
+                                    "date": out_date,
+                                    "type": "prediction_resolved",
+                                    "text": p.get("text", p.get("prediction", "")),
+                                    "detail": f"Status: {p['status']}",
+                                }
+                            )
 
                 # Surprises
                 surprises = out_item.get("surprises", [])
                 if isinstance(surprises, list):
                     for s in surprises:
                         if isinstance(s, dict):
-                            milestones.append({
-                                "date": out_date,
-                                "type": "surprise",
-                                "text": s.get("text", s.get("observation", "")),
-                                "detail": s.get("detail", s.get("significance", "")),
-                            })
+                            milestones.append(
+                                {
+                                    "date": out_date,
+                                    "type": "surprise",
+                                    "text": s.get("text", s.get("observation", "")),
+                                    "detail": s.get("detail", s.get("significance", "")),
+                                }
+                            )
                         elif isinstance(s, str):
-                            milestones.append({
-                                "date": out_date,
-                                "type": "surprise",
-                                "text": s,
-                                "detail": "",
-                            })
+                            milestones.append(
+                                {
+                                    "date": out_date,
+                                    "type": "surprise",
+                                    "text": s,
+                                    "detail": "",
+                                }
+                            )
 
                 # Emotional investment changes
                 current_investment = out_item.get("emotional_investment", "neutral")
                 if prev_investment and current_investment != prev_investment:
-                    milestones.append({
-                        "date": out_date,
-                        "type": "investment_change",
-                        "text": f"Investment shifted: {prev_investment} -> {current_investment}",
-                        "detail": "",
-                    })
+                    milestones.append(
+                        {
+                            "date": out_date,
+                            "type": "investment_change",
+                            "text": f"Investment shifted: {prev_investment} -> {current_investment}",
+                            "detail": "",
+                        }
+                    )
                 prev_investment = current_investment
 
                 # Learning log entries
@@ -531,32 +621,44 @@ def handle_coach_timeline(event):
                 if isinstance(learning_log, list):
                     for entry in learning_log:
                         if isinstance(entry, dict):
-                            milestones.append({
-                                "date": out_date,
-                                "type": "stance_change",
-                                "text": entry.get("lesson", entry.get("text", "")),
-                                "detail": entry.get("detail", ""),
-                            })
+                            milestones.append(
+                                {
+                                    "date": out_date,
+                                    "type": "stance_change",
+                                    "text": entry.get("lesson", entry.get("text", "")),
+                                    "detail": entry.get("detail", ""),
+                                }
+                            )
         except Exception:
             pass
 
         # Also check LEARNING# records
         try:
-            learn_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot timeline learnings
-                "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("LEARNING#"),
-                "ScanIndexForward": False,
-                "Limit": 20,
-            }))
+            learn_resp = table.query(
+                **with_phase_filter(
+                    {  # ADR-058: hide pilot timeline learnings
+                        "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("LEARNING#"),
+                        "ScanIndexForward": False,
+                        "Limit": 20,
+                    }
+                )
+            )
             for l_item in learn_resp.get("Items", []):
                 l_item = _decimal_to_float(l_item)
                 l_date = l_item.get("sk", "").replace("LEARNING#", "")
                 l_type = l_item.get("type", "stance_change")
-                milestones.append({
-                    "date": l_date,
-                    "type": l_type if l_type in ("stance_change", "prediction_resolved", "surprise", "investment_change") else "stance_change",
-                    "text": l_item.get("lesson", l_item.get("revised_position", l_item.get("text", ""))),
-                    "detail": l_item.get("detail", l_item.get("evidence", "")),
-                })
+                milestones.append(
+                    {
+                        "date": l_date,
+                        "type": (
+                            l_type
+                            if l_type in ("stance_change", "prediction_resolved", "surprise", "investment_change")
+                            else "stance_change"
+                        ),
+                        "text": l_item.get("lesson", l_item.get("revised_position", l_item.get("text", ""))),
+                        "detail": l_item.get("detail", l_item.get("evidence", "")),
+                    }
+                )
         except Exception:
             pass
 
@@ -570,11 +672,14 @@ def handle_coach_timeline(event):
                 seen_texts.add(key)
                 unique_milestones.append(m)
 
-        return _ok({
-            "coach_id": coach_id,
-            "coach_name": _tl_coach_names[coach_id],
-            "milestones": unique_milestones[:50],
-        }, cache_seconds=600)
+        return _ok(
+            {
+                "coach_id": coach_id,
+                "coach_name": _tl_coach_names[coach_id],
+                "milestones": unique_milestones[:50],
+            },
+            cache_seconds=600,
+        )
     except Exception as _e:
         logger.warning(f"[/api/coach_timeline] {_e}")
         return _ok({"coach_id": "", "coach_name": "", "milestones": []}, cache_seconds=60)
@@ -589,14 +694,17 @@ def handle_weekly_priority(event):
         _int_item = _decimal_to_float(_int_resp.get("Item", {}))
         if not _int_item:
             return _ok({"weekly_priority": None, "cross_domain_notes": {}}, cache_seconds=300)
-        return _ok({
-            "weekly_priority": _int_item.get("analysis", ""),
-            "cross_domain_notes": _int_item.get("cross_domain_notes", {}),
-            "generated_at": _int_item.get("generated_at", ""),
-            "week_number": _int_item.get("week_number"),
-            "coach_name": "Dr. Kai Nakamura",
-            "coach_title": "Integrative Health Director",
-        }, cache_seconds=300)
+        return _ok(
+            {
+                "weekly_priority": _int_item.get("analysis", ""),
+                "cross_domain_notes": _int_item.get("cross_domain_notes", {}),
+                "generated_at": _int_item.get("generated_at", ""),
+                "week_number": _int_item.get("week_number"),
+                "coach_name": "Dr. Kai Nakamura",
+                "coach_title": "Integrative Health Director",
+            },
+            cache_seconds=300,
+        )
     except Exception as _e:
         logger.warning(f"[/api/weekly_priority] {_e}")
         return _ok({"weekly_priority": None}, cache_seconds=60)

@@ -1,29 +1,53 @@
 """
 Sleep analysis tools.
 """
+
 import json
+import logging
 import math
 import re
-import logging
-from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 
 from mcp.config import (
-    table, s3_client, S3_BUCKET, USER_PREFIX, USER_ID, SOURCES,
-    P40_GROUPS, FIELD_ALIASES, logger,
-    INSIGHTS_PK, EXPERIMENTS_PK, TRAVEL_PK,
+    EXPERIMENTS_PK,
+    FIELD_ALIASES,
+    INSIGHTS_PK,
+    P40_GROUPS,
+    S3_BUCKET,
+    SOURCES,
+    TRAVEL_PK,
+    USER_ID,
+    USER_PREFIX,
+    logger,
+    s3_client,
+    table,
 )
 from mcp.core import (
-    query_source, parallel_query_sources, query_source_range,
-    get_profile, get_sot, decimal_to_float,
-    ddb_cache_get, ddb_cache_set, mem_cache_get, mem_cache_set,
-    date_diff_days, resolve_field,
+    date_diff_days,
+    ddb_cache_get,
+    ddb_cache_set,
+    decimal_to_float,
+    get_profile,
+    get_sot,
+    mem_cache_get,
+    mem_cache_set,
+    parallel_query_sources,
+    query_source,
+    query_source_range,
+    resolve_field,
 )
 from mcp.helpers import (
-    aggregate_items, flatten_strava_activity,
-    compute_daily_load_score, compute_ewa, pearson_r, _linear_regression,
-    classify_day_type, query_chronicling, _habit_series,
+    _habit_series,
+    _linear_regression,
+    aggregate_items,
+    classify_day_type,
+    compute_daily_load_score,
+    compute_ewa,
+    flatten_strava_activity,
     normalize_whoop_sleep,
+    pearson_r,
+    query_chronicling,
 )
 
 
@@ -39,11 +63,9 @@ def tool_get_sleep_analysis(args):
     sees time spent in the pod.
     """
     end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    days = int(args.get("days", 90))   # rolling window
+    days = int(args.get("days", 90))  # rolling window
     target_h = float(args.get("target_sleep_hours", 7.5))
-    start_date = args.get("start_date") or (
-        datetime.now(timezone.utc) - timedelta(days=days)
-    ).strftime("%Y-%m-%d")
+    start_date = args.get("start_date") or (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
 
     raw_items = query_source("whoop", start_date, end_date)
     if not raw_items:
@@ -88,16 +110,16 @@ def tool_get_sleep_analysis(args):
     hrv_vals = series("hrv_avg")
 
     architecture = {
-        "rem_avg_pct":         avg(rem_pcts),
-        "rem_norm":            "20–25%",
+        "rem_avg_pct": avg(rem_pcts),
+        "rem_norm": "20–25%",
         "rem_below_15pct_nights": pct_below(rem_pcts, 15),
-        "deep_avg_pct":        avg(deep_pcts),
-        "deep_norm":           "15–25%",
+        "deep_avg_pct": avg(deep_pcts),
+        "deep_norm": "15–25%",
         "deep_below_10pct_nights": pct_below(deep_pcts, 10),
-        "light_avg_pct":       avg(light_pcts),
-        "avg_sleep_hours":     avg(dur_hrs),
-        "avg_waso_hours":      avg(waso_hrs),
-        "avg_latency_min":     avg(latency),
+        "light_avg_pct": avg(light_pcts),
+        "avg_sleep_hours": avg(dur_hrs),
+        "avg_waso_hours": avg(waso_hrs),
+        "avg_latency_min": avg(latency),
         "latency_over_30min_nights": pct_below([-x for x in latency], -30) if latency else None,
     }
 
@@ -127,11 +149,11 @@ def tool_get_sleep_analysis(args):
 
     # ── 2. Sleep efficiency ───────────────────────────────────────────────────
     efficiency = {
-        "avg_sleep_efficiency_pct":   avg(eff_pcts),
-        "clinical_target":            "≥ 85%",
-        "cbt_i_threshold":            "< 80% consistently",
-        "nights_below_85pct":         pct_below(eff_pcts, 85),
-        "nights_below_80pct":         pct_below(eff_pcts, 80),
+        "avg_sleep_efficiency_pct": avg(eff_pcts),
+        "clinical_target": "≥ 85%",
+        "cbt_i_threshold": "< 80% consistently",
+        "nights_below_85pct": pct_below(eff_pcts, 85),
+        "nights_below_80pct": pct_below(eff_pcts, 80),
     }
 
     # 85%: AASM healthy target; 80%: CBT-I treatment threshold (Morin et al.)
@@ -149,15 +171,13 @@ def tool_get_sleep_analysis(args):
         )
     nb80 = efficiency["nights_below_80pct"]
     if nb80 and nb80 > 40:
-        eff_alerts.append(
-            f"⚠️ {nb80}% of nights show efficiency < 80% — chronic pattern, not isolated nights."
-        )
+        eff_alerts.append(f"⚠️ {nb80}% of nights show efficiency < 80% — chronic pattern, not isolated nights.")
     efficiency["clinical_alerts"] = eff_alerts
 
     # ── 3. Circadian timing & consistency ─────────────────────────────────────
     onset_hours = series("sleep_onset_hour")
     wake_hours = series("wake_hour")
-    midpoint_hours= series("sleep_midpoint_hour")
+    midpoint_hours = series("sleep_midpoint_hour")
 
     onset_sd = std_dev(onset_hours)
     wake_sd = std_dev(wake_hours)
@@ -199,22 +219,23 @@ def tool_get_sleep_analysis(args):
             sin_sum = sum(math.sin(v * math.pi / 12) for v in vals)
             cos_sum = sum(math.cos(v * math.pi / 12) for v in vals)
             return math.atan2(sin_sum / len(vals), cos_sum / len(vals)) * 12 / math.pi % 24
+
         wkday_mean = circ_mean(weekday_mids)
         wkend_mean = circ_mean(weekend_mids)
-        diff = (wkend_mean - wkday_mean + 12) % 24 - 12   # signed, range -12..12
+        diff = (wkend_mean - wkday_mean + 12) % 24 - 12  # signed, range -12..12
         social_jetlag = round(abs(diff), 2)
 
     circadian = {
-        "avg_sleep_onset":          format_hour(avg_onset),
-        "avg_wake_time":            format_hour(avg_wake),
-        "avg_sleep_midpoint":       format_hour(avg_mid),
+        "avg_sleep_onset": format_hour(avg_onset),
+        "avg_wake_time": format_hour(avg_wake),
+        "avg_sleep_midpoint": format_hour(avg_mid),
         "sleep_onset_consistency_sd_hours": onset_sd,
-        "wake_consistency_sd_hours":        wake_sd,
-        "midpoint_consistency_sd_hours":    mid_sd,
-        "social_jetlag_hours":      social_jetlag,
-        "social_jetlag_note":       "Difference in sleep midpoint weekday vs weekend. >1h linked to metabolic risk.",
-        "weekday_nights_analyzed":  len(weekday_mids),
-        "weekend_nights_analyzed":  len(weekend_mids),
+        "wake_consistency_sd_hours": wake_sd,
+        "midpoint_consistency_sd_hours": mid_sd,
+        "social_jetlag_hours": social_jetlag,
+        "social_jetlag_note": "Difference in sleep midpoint weekday vs weekend. >1h linked to metabolic risk.",
+        "weekday_nights_analyzed": len(weekday_mids),
+        "weekend_nights_analyzed": len(weekend_mids),
     }
 
     # Wittmann 2006; wake stricter because it anchors the circadian clock more strongly
@@ -243,23 +264,20 @@ def tool_get_sleep_analysis(args):
 
     # ── 4. Sleep debt ─────────────────────────────────────────────────────────
     nightly_debts = [
-        round(target_h - float(item["sleep_duration_hours"]), 2)
-        for item in items if item.get("sleep_duration_hours") is not None
+        round(target_h - float(item["sleep_duration_hours"]), 2) for item in items if item.get("sleep_duration_hours") is not None
     ]
     cumulative_debt_7d = None
-    cumulative_debt_30d= None
+    cumulative_debt_30d = None
     if nightly_debts:
-        cumulative_debt_7d = round(sum(nightly_debts[-7:]),  2)
+        cumulative_debt_7d = round(sum(nightly_debts[-7:]), 2)
         cumulative_debt_30d = round(sum(nightly_debts[-30:]), 2)
 
     debt = {
         "target_hours_per_night": target_h,
         "avg_nightly_debt_hours": avg(nightly_debts),
-        "cumulative_debt_7d":     cumulative_debt_7d,
-        "cumulative_debt_30d":    cumulative_debt_30d,
-        "nights_meeting_target": round(
-            100.0 * sum(1 for d in nightly_debts if d <= 0) / len(nightly_debts), 1
-        ) if nightly_debts else None,
+        "cumulative_debt_7d": cumulative_debt_7d,
+        "cumulative_debt_30d": cumulative_debt_30d,
+        "nights_meeting_target": round(100.0 * sum(1 for d in nightly_debts if d <= 0) / len(nightly_debts), 1) if nightly_debts else None,
         "note": "Positive debt = below target. Research shows sleep debt accumulates and impairs cognition even when subjective sleepiness adapts.",
     }
 
@@ -292,9 +310,7 @@ def tool_get_sleep_analysis(args):
                 "Sustained elevation warrants evaluation for sleep-disordered breathing (OSA)."
             )
         elif avg_resp and avg_resp > 16:
-            biometrics["respiratory_note_elevated"] = (
-                f"Note: respiratory rate {avg_resp} bpm — upper-normal range. Monitor trend."
-            )
+            biometrics["respiratory_note_elevated"] = f"Note: respiratory rate {avg_resp} bpm — upper-normal range. Monitor trend."
 
     # ── 6. Sleep score trend ──────────────────────────────────────────────────
     scores = series("sleep_score")
@@ -302,33 +318,33 @@ def tool_get_sleep_analysis(args):
     if scores:
         score_summary["avg_sleep_score"] = avg(scores)
         if len(scores) >= 14:
-            recent_half = scores[len(scores)//2:]
-            early_half = scores[:len(scores)//2]
+            recent_half = scores[len(scores) // 2 :]
+            early_half = scores[: len(scores) // 2]
             delta = round(avg(recent_half) - avg(early_half), 1)
             score_summary["trend"] = "improving" if delta > 2 else ("declining" if delta < -2 else "stable")
             score_summary["trend_delta"] = delta
 
     # ── 7. All alerts consolidated ────────────────────────────────────────────
     all_alerts = (
-        architecture.get("clinical_alerts", []) +
-        efficiency.get("clinical_alerts", []) +
-        circadian.get("clinical_alerts", []) +
-        debt.get("clinical_alerts", []) +
-        ([biometrics["respiratory_alert"]] if biometrics.get("respiratory_alert") else [])
+        architecture.get("clinical_alerts", [])
+        + efficiency.get("clinical_alerts", [])
+        + circadian.get("clinical_alerts", [])
+        + debt.get("clinical_alerts", [])
+        + ([biometrics["respiratory_alert"]] if biometrics.get("respiratory_alert") else [])
     )
 
     return {
-        "analysis_window":    {"start": start_date, "end": end_date, "nights_analyzed": n},
+        "analysis_window": {"start": start_date, "end": end_date, "nights_analyzed": n},
         "sleep_architecture": architecture,
-        "sleep_efficiency":   efficiency,
-        "circadian_timing":   circadian,
-        "sleep_debt":         debt,
-        "biometrics":         biometrics,
-        "sleep_score":        score_summary,
-        "all_alerts":         all_alerts,
-        "alert_count":        len(all_alerts),
-        "source":             "whoop",
-        "clinical_note":      (
+        "sleep_efficiency": efficiency,
+        "circadian_timing": circadian,
+        "sleep_debt": debt,
+        "biometrics": biometrics,
+        "sleep_score": score_summary,
+        "all_alerts": all_alerts,
+        "alert_count": len(all_alerts),
+        "source": "whoop",
+        "clinical_note": (
             "Whoop wrist-based sleep staging is consumer-grade. Architecture percentages "
             "should be interpreted as trends and screening signals, not clinical PSG equivalents. "
             "Consistent patterns across 30+ nights are more meaningful than individual night values. "
@@ -337,8 +353,8 @@ def tool_get_sleep_analysis(args):
     }
 
 
-
 # ── BS-SL1: Sleep Environment Optimizer ────────────────────────────────────
+
 
 def tool_get_sleep_environment_analysis(args):
     """
@@ -349,9 +365,7 @@ def tool_get_sleep_environment_analysis(args):
     """
     end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     days = int(args.get("days", 90))
-    start_date = args.get("start_date") or (
-        datetime.now(timezone.utc) - timedelta(days=days)
-    ).strftime("%Y-%m-%d")
+    start_date = args.get("start_date") or (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
 
     data = parallel_query_sources(["eightsleep", "whoop"], start_date, end_date)
     es_items = {i.get("date"): i for i in data.get("eightsleep", []) if i.get("date")}
@@ -379,18 +393,20 @@ def tool_get_sleep_environment_analysis(args):
         if efficiency is None and deep_pct is None:
             continue
 
-        paired.append({
-            "date":          date_key,
-            "bed_temp_f":    float(bed_temp) if bed_temp else None,
-            "room_temp_f":   float(room_temp) if room_temp else None,
-            "temp_level":    es_level,
-            "efficiency":    float(efficiency) if efficiency else None,
-            "deep_pct":      float(deep_pct) if deep_pct else None,
-            "rem_pct":       float(rem_pct) if rem_pct else None,
-            "hrv":           float(hrv) if hrv else None,
-            "sleep_score":   float(sleep_score) if sleep_score else None,
-            "duration_h":    float(duration_h) if duration_h else None,
-        })
+        paired.append(
+            {
+                "date": date_key,
+                "bed_temp_f": float(bed_temp) if bed_temp else None,
+                "room_temp_f": float(room_temp) if room_temp else None,
+                "temp_level": es_level,
+                "efficiency": float(efficiency) if efficiency else None,
+                "deep_pct": float(deep_pct) if deep_pct else None,
+                "rem_pct": float(rem_pct) if rem_pct else None,
+                "hrv": float(hrv) if hrv else None,
+                "sleep_score": float(sleep_score) if sleep_score else None,
+                "duration_h": float(duration_h) if duration_h else None,
+            }
+        )
 
     if len(paired) < 14:
         return {"error": f"Need ≥14 nights of paired Eight Sleep + Whoop data. Found {len(paired)}."}
@@ -410,10 +426,17 @@ def tool_get_sleep_environment_analysis(args):
         else:
             return "hot (73°F+)"
 
-    band_stats = defaultdict(lambda: {
-        "nights": 0, "efficiency": [], "deep_pct": [], "rem_pct": [],
-        "hrv": [], "sleep_score": [], "duration_h": [],
-    })
+    band_stats = defaultdict(
+        lambda: {
+            "nights": 0,
+            "efficiency": [],
+            "deep_pct": [],
+            "rem_pct": [],
+            "hrv": [],
+            "sleep_score": [],
+            "duration_h": [],
+        }
+    )
     for p in paired:
         band = bucket_temp(p.get("bed_temp_f"))
         if not band:
@@ -434,16 +457,18 @@ def tool_get_sleep_environment_analysis(args):
         bs = band_stats.get(band_name)
         if not bs or bs["nights"] < 3:
             continue
-        band_results.append({
-            "band":            band_name,
-            "nights":          bs["nights"],
-            "avg_efficiency":  safe_avg(bs["efficiency"]),
-            "avg_deep_pct":    safe_avg(bs["deep_pct"]),
-            "avg_rem_pct":     safe_avg(bs["rem_pct"]),
-            "avg_hrv":         safe_avg(bs["hrv"]),
-            "avg_sleep_score": safe_avg(bs["sleep_score"]),
-            "avg_duration_h":  safe_avg(bs["duration_h"]),
-        })
+        band_results.append(
+            {
+                "band": band_name,
+                "nights": bs["nights"],
+                "avg_efficiency": safe_avg(bs["efficiency"]),
+                "avg_deep_pct": safe_avg(bs["deep_pct"]),
+                "avg_rem_pct": safe_avg(bs["rem_pct"]),
+                "avg_hrv": safe_avg(bs["hrv"]),
+                "avg_sleep_score": safe_avg(bs["sleep_score"]),
+                "avg_duration_h": safe_avg(bs["duration_h"]),
+            }
+        )
 
     # Find optimal band by composite score (efficiency + deep + HRV)
     best_band = None
@@ -462,23 +487,30 @@ def tool_get_sleep_environment_analysis(args):
     # ── Correlations: bed temp vs sleep metrics ──
     correlations = []
     bed_temps = [p["bed_temp_f"] for p in paired if p.get("bed_temp_f") is not None]
-    for metric_name, metric_key in [("efficiency", "efficiency"), ("deep_sleep_pct", "deep_pct"),
-                                     ("rem_sleep_pct", "rem_pct"), ("HRV", "hrv")]:
+    for metric_name, metric_key in [
+        ("efficiency", "efficiency"),
+        ("deep_sleep_pct", "deep_pct"),
+        ("rem_sleep_pct", "rem_pct"),
+        ("HRV", "hrv"),
+    ]:
         vals = [p[metric_key] for p in paired if p.get("bed_temp_f") is not None and p.get(metric_key) is not None]
         temps = [p["bed_temp_f"] for p in paired if p.get("bed_temp_f") is not None and p.get(metric_key) is not None]
         if len(vals) >= 14:
             r = pearson_r(temps, vals)
             if r is not None:
-                correlations.append({
-                    "metric": metric_name,
-                    "r":      r,
-                    "n":      len(vals),
-                    "interpretation": (
-                        f"{'Cooler' if r < 0 else 'Warmer'} bed temps "
-                        f"correlate with {'better' if (r < 0 and metric_name != 'HRV') or (r > 0 and metric_name == 'HRV') else 'lower'} {metric_name}"
-                        if abs(r) >= 0.2 else f"No meaningful correlation with {metric_name}"
-                    ),
-                })
+                correlations.append(
+                    {
+                        "metric": metric_name,
+                        "r": r,
+                        "n": len(vals),
+                        "interpretation": (
+                            f"{'Cooler' if r < 0 else 'Warmer'} bed temps "
+                            f"correlate with {'better' if (r < 0 and metric_name != 'HRV') or (r > 0 and metric_name == 'HRV') else 'lower'} {metric_name}"
+                            if abs(r) >= 0.2
+                            else f"No meaningful correlation with {metric_name}"
+                        ),
+                    }
+                )
 
     # ── Recommendations ──
     recommendations = []
@@ -496,12 +528,12 @@ def tool_get_sleep_environment_analysis(args):
             )
 
     return {
-        "period":          {"start_date": start_date, "end_date": end_date, "paired_nights": len(paired)},
-        "optimal_band":    best_band,
-        "band_analysis":   band_results,
-        "correlations":    correlations,
+        "period": {"start_date": start_date, "end_date": end_date, "paired_nights": len(paired)},
+        "optimal_band": best_band,
+        "band_analysis": band_results,
+        "correlations": correlations,
         "recommendations": recommendations,
-        "methodology":     (
+        "methodology": (
             "Pairs Eight Sleep bed temperature with Whoop sleep staging nightly. "
             "Groups nights into temperature bands and compares sleep efficiency, deep %, "
             "REM %, and HRV across bands. Composite score weights: efficiency 40%, deep 30%, HRV 30%. "

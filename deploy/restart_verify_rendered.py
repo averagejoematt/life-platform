@@ -69,36 +69,45 @@ JSON_ENDPOINTS = [
 # as illustrative copy if needed).
 FORBIDDEN_TOKENS = [
     # Day-N counters showing >30 — wrong on Day 1 of restart
-    ("Day-30+ counter",        re.compile(r"\bDay\s+(?:[3-9][0-9]|[1-9][0-9]{2,})\b"), []),
+    ("Day-30+ counter", re.compile(r"\bDay\s+(?:[3-9][0-9]|[1-9][0-9]{2,})\b"), []),
     # Old baseline weight
-    ("Old baseline (307)",     re.compile(r"\b307\s*(?:lbs?|pounds|→|to\s+\d{3})"), []),
+    ("Old baseline (307)", re.compile(r"\b307\s*(?:lbs?|pounds|→|to\s+\d{3})"), []),
     # Old genesis literal
-    ("Old genesis literal",    re.compile(r"\b2026-04-01\b"), [
-        "/mission/",   # meta description currently still says "Starting April 1"
-        "/about/",
-    ]),
+    (
+        "Old genesis literal",
+        re.compile(r"\b2026-04-01\b"),
+        [
+            "/mission/",  # meta description currently still says "Starting April 1"
+            "/about/",
+        ],
+    ),
     # Error sentinel value
-    ("999.0 sentinel",         re.compile(r"\b999\.0\b"), []),
+    ("999.0 sentinel", re.compile(r"\b999\.0\b"), []),
     # Earned achievements / milestones (pre-genesis state leak)
-    ("Earned milestone",       re.compile(r"(Hot Streak|Lab Rat|First Experiment|First Week)"
-                                          r"[^<>]{0,80}(earned|achieved|completed|unlocked)"), []),
+    (
+        "Earned milestone",
+        re.compile(r"(Hot Streak|Lab Rat|First Experiment|First Week)" r"[^<>]{0,80}(earned|achieved|completed|unlocked)"),
+        [],
+    ),
     # Character level above 3 — only flag in CURRENT-state English prose
     # ("Character Level 25", "Level: 25", "is at Level 25"). Excludes:
     #   - structural copy: "Reached Level 5", "reaching Level 80 means something"
     #   - JSON/JS variable names: level:21, min_level:1, next_tier_level:21
     # Requires a word-boundary "Level" (capital L) followed by space+digit.
-    ("Character level 4+",     re.compile(
-        r"(?:Character Level|Level:\s|is at Level\s|currently at Level\s)(?:[4-9]|[1-9][0-9]+)\b"), []),
+    ("Character level 4+", re.compile(r"(?:Character Level|Level:\s|is at Level\s|currently at Level\s)(?:[4-9]|[1-9][0-9]+)\b"), []),
     # Past-week recap headers. Only flag when "Week N" appears in a header/title
     # context (followed by " — " or " of <year>") indicating it's an actual
     # weekly entry header. Excludes chart labels like "Week 13+: Integration"
     # and descriptive copy.
-    ("Past week recap (Week 10+)", re.compile(
-        r"\bWeek\s+(?:[1-9][0-9]+)\s+(?:—|of\s+20\d\d|recap|in\s+review)\b"), [
-        "/chronicle/",
-    ]),
+    (
+        "Past week recap (Week 10+)",
+        re.compile(r"\bWeek\s+(?:[1-9][0-9]+)\s+(?:—|of\s+20\d\d|recap|in\s+review)\b"),
+        [
+            "/chronicle/",
+        ],
+    ),
     # Tombstone JSON leaking to the public (would mean a tombstoned record made it through)
-    ("Tombstone leak",         re.compile(r'"tombstone"\s*:\s*true'), []),
+    ("Tombstone leak", re.compile(r'"tombstone"\s*:\s*true'), []),
 ]
 
 

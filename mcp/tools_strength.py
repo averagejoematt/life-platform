@@ -1,35 +1,69 @@
 """
 Strength training tools: exercise history, PRs, volume, progress, frequency, standards.
 """
+
 import json
+import logging
 import math
 import re
-import logging
-from datetime import datetime, timedelta, date, timezone
 from collections import defaultdict
+from datetime import date, datetime, timedelta, timezone
 
 from mcp.config import (
-    table, s3_client, S3_BUCKET, USER_PREFIX, USER_ID, SOURCES,
-    P40_GROUPS, FIELD_ALIASES, logger,
-    INSIGHTS_PK, EXPERIMENTS_PK, TRAVEL_PK,
+    EXPERIMENTS_PK,
+    FIELD_ALIASES,
+    INSIGHTS_PK,
+    P40_GROUPS,
+    S3_BUCKET,
+    SOURCES,
+    TRAVEL_PK,
+    USER_ID,
+    USER_PREFIX,
+    logger,
+    s3_client,
+    table,
 )
 from mcp.core import (
-    query_source, parallel_query_sources, query_source_range,
-    get_profile, get_sot, decimal_to_float,
-    ddb_cache_get, ddb_cache_set, mem_cache_get, mem_cache_set,
-    date_diff_days, resolve_field,
+    date_diff_days,
+    ddb_cache_get,
+    ddb_cache_set,
+    decimal_to_float,
+    get_profile,
+    get_sot,
+    mem_cache_get,
+    mem_cache_set,
+    parallel_query_sources,
+    query_source,
+    query_source_range,
+    resolve_field,
 )
 from mcp.helpers import (
-    aggregate_items, flatten_strava_activity,
-    compute_daily_load_score, compute_ewa, pearson_r, _linear_regression,
-    classify_day_type, query_chronicling, _habit_series,
+    _habit_series,
+    _linear_regression,
+    aggregate_items,
+    classify_day_type,
+    compute_daily_load_score,
+    compute_ewa,
+    flatten_strava_activity,
+    pearson_r,
+    query_chronicling,
 )
 from mcp.strength_helpers import (
-    classify_exercise, is_bodyweight, estimate_1rm,
-    extract_hevy_sessions, normalize_hevy_items, volume_status, classify_standard,
+    _ATTIA_TARGETS,
+    _STANDARD_LEVELS,
+    _STRENGTH_STANDARDS,
+    _VOLUME_LANDMARKS,
     attia_benchmark_status,
-    _VOLUME_LANDMARKS, _STRENGTH_STANDARDS, _STANDARD_LEVELS, _ATTIA_TARGETS,
+    classify_exercise,
+    classify_standard,
+    estimate_1rm,
+    extract_hevy_sessions,
+    is_bodyweight,
+    normalize_hevy_items,
+    volume_status,
 )
+
+
 def tool_get_exercise_history(args):
     """Deep dive on a single exercise: all sessions, PR chronology, estimated 1RM trend."""
     exercise_name = args.get("exercise_name", "").strip()
@@ -111,8 +145,7 @@ def tool_get_strength_prs(args):
             if not name or is_bodyweight(name):
                 continue
             if name not in exercise_data:
-                exercise_data[name] = {"sessions": set(), "best_weight": 0, "best_1rm": 0,
-                                        "best_1rm_date": "", "best_weight_date": ""}
+                exercise_data[name] = {"sessions": set(), "best_weight": 0, "best_1rm": 0, "best_1rm_date": "", "best_weight_date": ""}
             ed = exercise_data[name]
             ed["sessions"].add(date_str)
             for s in ex["sets"]:
@@ -135,16 +168,18 @@ def tool_get_strength_prs(args):
         cls = classify_exercise(name)
         if muscle_filter and not any(muscle_filter in m.lower() for m in cls["muscle_groups"]):
             continue
-        rows.append({
-            "exercise": name,
-            "muscle_groups": cls["muscle_groups"],
-            "movement_pattern": cls["movement_pattern"],
-            "best_estimated_1rm": ed["best_1rm"] if ed["best_1rm"] > 0 else None,
-            "best_1rm_date": ed["best_1rm_date"],
-            "best_weight_lbs": ed["best_weight"],
-            "best_weight_date": ed["best_weight_date"],
-            "total_sessions": len(ed["sessions"]),
-        })
+        rows.append(
+            {
+                "exercise": name,
+                "muscle_groups": cls["muscle_groups"],
+                "movement_pattern": cls["movement_pattern"],
+                "best_estimated_1rm": ed["best_1rm"] if ed["best_1rm"] > 0 else None,
+                "best_1rm_date": ed["best_1rm_date"],
+                "best_weight_lbs": ed["best_weight"],
+                "best_weight_date": ed["best_weight_date"],
+                "total_sessions": len(ed["sessions"]),
+            }
+        )
 
     rows.sort(key=lambda r: r["best_estimated_1rm"] or 0, reverse=True)
 
@@ -178,7 +213,7 @@ def tool_get_muscle_volume(args):
     total_days = max((end_dt - start_dt).days, 1)
     num_periods = total_days / 7 if period == "week" else total_days / 30.44
 
-    muscle_sets:   dict[str, int] = {}
+    muscle_sets: dict[str, int] = {}
     muscle_volume: dict[str, float] = {}
     push_sets = pull_sets = leg_sets = core_sets = 0
 
@@ -194,10 +229,14 @@ def tool_get_muscle_volume(args):
                 muscle_sets[m] = muscle_sets.get(m, 0) + n
                 muscle_volume[m] = muscle_volume.get(m, 0.0) + vol
             pattern = cls["movement_pattern"]
-            if pattern == "Push":   push_sets += n
-            elif pattern == "Pull": pull_sets += n
-            elif pattern == "Legs": leg_sets += n
-            elif pattern == "Core": core_sets += n
+            if pattern == "Push":
+                push_sets += n
+            elif pattern == "Pull":
+                pull_sets += n
+            elif pattern == "Legs":
+                leg_sets += n
+            elif pattern == "Core":
+                core_sets += n
 
     period_label = "week" if period == "week" else "month"
     volume_report = {}
@@ -211,7 +250,7 @@ def tool_get_muscle_volume(args):
             "total_volume_lbs": round(muscle_volume.get(muscle, 0), 0),
             "volume_landmark_status": volume_status(muscle, avg),
             "landmarks": {
-                "MV":  lm["MV"],
+                "MV": lm["MV"],
                 "MEV": lm["MEV"],
                 "MAV": f"{lm['MAV_lo']}–{lm['MAV_hi']}",
                 "MRV": lm["MRV"],
@@ -228,13 +267,17 @@ def tool_get_muscle_volume(args):
         "movement_balance": {
             "push_sets": push_sets,
             "pull_sets": pull_sets,
-            "leg_sets":  leg_sets,
+            "leg_sets": leg_sets,
             "core_sets": core_sets,
             "push_pull_ratio": push_pull_ratio,
             "push_pull_note": (
-                "Balanced" if push_pull_ratio and 0.8 <= push_pull_ratio <= 1.2 else
-                "Push-dominant – add more pulling" if push_pull_ratio and push_pull_ratio > 1.2 else
-                "Pull-dominant" if push_pull_ratio else "No data"
+                "Balanced"
+                if push_pull_ratio and 0.8 <= push_pull_ratio <= 1.2
+                else (
+                    "Push-dominant – add more pulling"
+                    if push_pull_ratio and push_pull_ratio > 1.2
+                    else "Pull-dominant" if push_pull_ratio else "No data"
+                )
             ),
         },
     }
@@ -285,10 +328,11 @@ def tool_get_strength_progress(args):
 
     # Periodization: split into thirds
     n = len(time_series)
-    thirds = [time_series[:n//3], time_series[n//3:2*n//3], time_series[2*n//3:]]
+    thirds = [time_series[: n // 3], time_series[n // 3 : 2 * n // 3], time_series[2 * n // 3 :]]
+
     def avg_1rm(lst):
         vals = [t["estimated_1rm"] for t in lst if t["estimated_1rm"]]
-        return round(sum(vals)/len(vals), 1) if vals else None
+        return round(sum(vals) / len(vals), 1) if vals else None
 
     return {
         "exercise_name": sessions[0]["exercise_name"],
@@ -307,12 +351,16 @@ def tool_get_strength_progress(args):
             "last_pr_date": last_pr_date,
             "in_plateau": in_plateau,
             "plateau_threshold_days": plateau_days,
-            "note": f"No new 1RM PR in {days_since} days. Consider a deload or program change." if in_plateau else f"Active progression – last PR {days_since} days ago.",
+            "note": (
+                f"No new 1RM PR in {days_since} days. Consider a deload or program change."
+                if in_plateau
+                else f"Active progression – last PR {days_since} days ago."
+            ),
         },
         "periodization_phases": {
             "early_avg_1rm": avg_1rm(thirds[0]),
-            "mid_avg_1rm":   avg_1rm(thirds[1]),
-            "late_avg_1rm":  avg_1rm(thirds[2]),
+            "mid_avg_1rm": avg_1rm(thirds[1]),
+            "late_avg_1rm": avg_1rm(thirds[2]),
         },
         "one_rm_time_series": time_series,
     }
@@ -336,7 +384,7 @@ def tool_get_workout_frequency(args):
     cur_streak = 1
     longest_gap = 0
     for i in range(1, len(date_objs)):
-        diff = (date_objs[i] - date_objs[i-1]).days
+        diff = (date_objs[i] - date_objs[i - 1]).days
         if diff == 1:
             cur_streak += 1
             longest_streak = max(longest_streak, cur_streak)
@@ -399,9 +447,9 @@ def tool_get_strength_standards(args):
 
     # Find best 1RM for each standard lift
     standard_lifts = {
-        "bench press":    "Barbell Bench Press",
-        "squat":          "Barbell Back Squat",
-        "deadlift":       "Deadlift",
+        "bench press": "Barbell Bench Press",
+        "squat": "Barbell Back Squat",
+        "deadlift": "Deadlift",
         "overhead press": "Overhead Press",
     }
 
@@ -466,8 +514,7 @@ def tool_get_centenarian_benchmarks(args):
     bodyweight = None
     bw_items = query_source("withings", "2000-01-01", end_date)
     for item in reversed(sorted(bw_items, key=lambda x: x.get("date") or "")):
-        w = (item.get("weight_lbs") or item.get("data", {}).get("weight_lbs")
-             or item.get("data", {}).get("weight"))
+        w = item.get("weight_lbs") or item.get("data", {}).get("weight_lbs") or item.get("data", {}).get("weight")
         if w:
             bodyweight = float(w)
             break
@@ -478,10 +525,10 @@ def tool_get_centenarian_benchmarks(args):
 
     # Canonical exercise names to search for each lift
     _LIFT_SEARCH = {
-        "deadlift":        "deadlift",
-        "squat":           "squat",
-        "bench press":     "bench press",
-        "overhead press":  "overhead press",
+        "deadlift": "deadlift",
+        "squat": "squat",
+        "bench press": "bench press",
+        "overhead press": "overhead press",
     }
 
     hevy_items = query_source("hevy", "2000-01-01", end_date)
@@ -519,29 +566,17 @@ def tool_get_centenarian_benchmarks(args):
         result = attia_benchmark_status(lift_key, ratio)
         result["best_estimated_1rm_lbs"] = best
         result["date_achieved"] = best_date
-        result["lbs_to_target"] = round(
-            max(0, (_ATTIA_TARGETS[lift_key]["target_ratio"] - ratio) * bodyweight), 1
-        )
+        result["lbs_to_target"] = round(max(0, (_ATTIA_TARGETS[lift_key]["target_ratio"] - ratio) * bodyweight), 1)
         lifts_out[lift_key] = result
         statuses.append(result["status"])
 
     # Overall readiness score (0-100) based on weighted pct_of_target
-    pcts = [
-        v["pct_of_target"]
-        for v in lifts_out.values()
-        if "pct_of_target" in v
-    ]
+    pcts = [v["pct_of_target"] for v in lifts_out.values() if "pct_of_target" in v]
     overall_pct = round(sum(pcts) / len(pcts), 1) if pcts else None
 
     # Weakest lift by gap to target
-    lifts_with_gap = [
-        (k, v) for k, v in lifts_out.items()
-        if v.get("gap_to_target_bw_ratio", 0) > 0
-    ]
-    priority_lift = (
-        min(lifts_with_gap, key=lambda x: x[1]["pct_of_target"])[0]
-        if lifts_with_gap else None
-    )
+    lifts_with_gap = [(k, v) for k, v in lifts_out.items() if v.get("gap_to_target_bw_ratio", 0) > 0]
+    priority_lift = min(lifts_with_gap, key=lambda x: x[1]["pct_of_target"])[0] if lifts_with_gap else None
 
     return {
         "bodyweight_lbs": bodyweight,
@@ -559,12 +594,15 @@ def tool_get_centenarian_benchmarks(args):
 def tool_get_strength(args):
     """Unified strength intelligence dispatcher."""
     VALID_VIEWS = {
-        "progress":  tool_get_strength_progress,
-        "prs":       tool_get_strength_prs,
+        "progress": tool_get_strength_progress,
+        "prs": tool_get_strength_prs,
         "standards": tool_get_strength_standards,
     }
     view = (args.get("view") or "progress").lower().strip()
     if view not in VALID_VIEWS:
-        return {"error": f"Unknown view '{view}'.", "valid_views": list(VALID_VIEWS.keys()),
-                "hint": "'progress' for volume/load trends, 'prs' for all-time personal records by lift, 'standards' for bodyweight-relative strength levels."}
+        return {
+            "error": f"Unknown view '{view}'.",
+            "valid_views": list(VALID_VIEWS.keys()),
+            "hint": "'progress' for volume/load trends, 'prs' for all-time personal records by lift, 'standards' for bodyweight-relative strength levels.",
+        }
     return VALID_VIEWS[view](args)

@@ -26,12 +26,13 @@ Usage:
 
 from __future__ import annotations
 
-import time
 import logging
+import time
 from typing import Tuple
 
 try:
     from platform_logger import get_logger
+
     _logger = get_logger("rate-limiter")
 except ImportError:
     _logger = logging.getLogger("rate-limiter")

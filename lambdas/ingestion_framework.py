@@ -60,16 +60,17 @@ v1.0.0 — SIMP-2 (2026-03-09)
 import json
 import os
 import time
-import boto3
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+
+import boto3
 
 # ADR-058 (2026-05-25): tag every DDB write with phase=pilot|experiment so the
 # read-path phase_filter can default-deny pre-genesis data. Without this, every
 # ingestion run leaves untagged records that need a periodic
 # `restart_phase_tag.py --apply` sweep.
 try:
-    from constants import EXPERIMENT_START_DATE, EXPERIMENT_PHASE_CURRENT
+    from constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE
 except ImportError:
     EXPERIMENT_START_DATE = "2026-05-25"
     EXPERIMENT_PHASE_CURRENT = "experiment"
@@ -99,8 +100,13 @@ _AUTH_FAIL_TTL_SECONDS = 24 * 3600  # 24 hours
 
 _AUTH_FAIL_HTTP_CODES = ("401", "403")
 _AUTH_FAIL_KEYWORDS = (
-    "unauthorized", "forbidden", "invalid token", "expired token",
-    "token expired", "auth failed", "authentication failed",
+    "unauthorized",
+    "forbidden",
+    "invalid token",
+    "expired token",
+    "token expired",
+    "auth failed",
+    "authentication failed",
 )
 
 
@@ -174,6 +180,7 @@ def _clear_auth_failure(table, source_name: str, user_id: str, logger):
 # CONFIG
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class IngestionConfig:
     """Per-source configuration. Passed to run_ingestion()."""
 
@@ -216,6 +223,7 @@ class IngestionConfig:
 # SHARED UTILITIES
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _floats_to_decimal(obj):
     """Recursively convert floats to Decimal for DynamoDB."""
     if isinstance(obj, float):
@@ -231,13 +239,15 @@ def _init_logger(source_name):
     """Try to use platform_logger (OBS-1), fall back to print."""
     try:
         from platform_logger import get_logger
+
         return get_logger(source_name)
     except ImportError:
         import logging
+
         logger = logging.getLogger(source_name)
         logger.setLevel(logging.INFO)
         # Add set_date no-op for compatibility
-        if not hasattr(logger, 'set_date'):
+        if not hasattr(logger, "set_date"):
             logger.set_date = lambda d: None
         return logger
 
@@ -256,6 +266,7 @@ def _init_aws(config):
 # ══════════════════════════════════════════════════════════════════════════════
 # GAP DETECTION
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _find_missing_dates(table, config, logger):
     """Query DDB for last N days, return sorted list of missing date strings.
@@ -277,8 +288,7 @@ def _find_missing_dates(table, config, logger):
 
     oldest = min(check_dates)
     resp = table.query(
-        KeyConditionExpression=Key("pk").eq(pk) &
-            Key("sk").between(f"DATE#{oldest}", f"DATE#{today_str}"),
+        KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{oldest}", f"DATE#{today_str}"),
         ProjectionExpression="sk",
     )
     existing = {item["sk"][5:] for item in resp.get("Items", [])}
@@ -297,6 +307,7 @@ def _find_missing_dates(table, config, logger):
 # ══════════════════════════════════════════════════════════════════════════════
 # VALIDATE + STORE (DATA-2 + REL-3)
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _phase_for_date(date_str: str) -> str:
     """Return phase tag ('pilot' or 'experiment') for a given DATE# value.
@@ -318,15 +329,14 @@ def _store_item(table, s3, config, item, date_str, logger):
     # DATA-2: Validate before write
     try:
         from ingestion_validator import validate_item as _validate_item
+
         vr = _validate_item(config.source_name, item, date_str)
         if vr.should_skip_ddb:
-            logger.error(f"[DATA-2] CRITICAL: Skipping {config.source_name} DDB write "
-                         f"for {date_str}: {vr.errors}")
+            logger.error(f"[DATA-2] CRITICAL: Skipping {config.source_name} DDB write " f"for {date_str}: {vr.errors}")
             vr.archive_to_s3(s3, bucket=config.s3_bucket, item=item)
             return False
         if vr.warnings:
-            logger.warning(f"[DATA-2] Validation warnings for "
-                           f"{config.source_name}/{date_str}: {vr.warnings}")
+            logger.warning(f"[DATA-2] Validation warnings for " f"{config.source_name}/{date_str}: {vr.warnings}")
     except ImportError:
         pass  # Validator not available — proceed without
 
@@ -339,6 +349,7 @@ def _store_item(table, s3, config, item, date_str, logger):
     if config.enable_item_size_guard:
         try:
             from item_size_guard import safe_put_item
+
             safe_put_item(table, item, source=config.source_name, date_str=date_str)
             return True
         except ImportError:
@@ -357,10 +368,13 @@ def _archive_raw(s3, config, date_str, raw_data):
         s3.put_object(
             Bucket=config.s3_bucket,
             Key=key,
-            Body=json.dumps({
-                "fetched_at": datetime.now(timezone.utc).isoformat(),
-                "raw": raw_data,
-            }, default=str),
+            Body=json.dumps(
+                {
+                    "fetched_at": datetime.now(timezone.utc).isoformat(),
+                    "raw": raw_data,
+                },
+                default=str,
+            ),
             ContentType="application/json",
         )
     except Exception as e:
@@ -372,8 +386,8 @@ def _archive_raw(s3, config, date_str, raw_data):
 # MAIN RUNNER
 # ══════════════════════════════════════════════════════════════════════════════
 
-def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn,
-                  event, context, post_store_fn=None):
+
+def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, context, post_store_fn=None):
     """Execute the full ingestion pipeline.
 
     Args:
@@ -408,17 +422,21 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn,
     # until the operator rotates the credential. Marker auto-expires after 24h.
     _active_breaker = _check_auth_breaker(table, config.source_name, config.user_id, logger)
     if _active_breaker:
-        msg = (f"auth_breaker_active source={config.source_name} "
-               f"marked_at={_active_breaker.get('marked_at')} "
-               f"error={_active_breaker.get('error', '')[:120]}")
+        msg = (
+            f"auth_breaker_active source={config.source_name} "
+            f"marked_at={_active_breaker.get('marked_at')} "
+            f"error={_active_breaker.get('error', '')[:120]}"
+        )
         logger.info(msg)
         return {
             "statusCode": 200,
-            "body": json.dumps({
-                "skipped": "auth_failure_circuit_breaker",
-                "source": config.source_name,
-                "marker": {k: str(v) for k, v in _active_breaker.items() if k != "ttl"},
-            }),
+            "body": json.dumps(
+                {
+                    "skipped": "auth_failure_circuit_breaker",
+                    "source": config.source_name,
+                    "marker": {k: str(v) for k, v in _active_breaker.items() if k != "ttl"},
+                }
+            ),
         }
 
     # ── Load secrets + authenticate ──
@@ -427,6 +445,7 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn,
         try:
             try:
                 from secret_cache import get_secret_json
+
                 secret_data = get_secret_json(config.secret_id, secrets_client)
             except ImportError:
                 raw_secret = secrets_client.get_secret_value(SecretId=config.secret_id)["SecretString"]
@@ -474,11 +493,13 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn,
         if not dates_to_ingest:
             return {
                 "statusCode": 200,
-                "body": json.dumps({
-                    "message": "No gaps to fill",
-                    "source": config.source_name,
-                    "lookback_days": config.lookback_days,
-                }),
+                "body": json.dumps(
+                    {
+                        "message": "No gaps to fill",
+                        "source": config.source_name,
+                        "lookback_days": config.lookback_days,
+                    }
+                ),
             }
     else:
         # Mode 3: Default — yesterday + today
@@ -515,14 +536,16 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn,
                 pk = f"USER#{config.user_id}#SOURCE#{source}"
                 sk = f"DATE#{date_str}{sk_suffix}"
 
-                db_item = _floats_to_decimal({
-                    "pk": pk,
-                    "sk": sk,
-                    "source": source,
-                    "schema_version": config.schema_version,
-                    "ingested_at": datetime.now(timezone.utc).isoformat(),
-                    **record,
-                })
+                db_item = _floats_to_decimal(
+                    {
+                        "pk": pk,
+                        "sk": sk,
+                        "source": source,
+                        "schema_version": config.schema_version,
+                        "ingested_at": datetime.now(timezone.utc).isoformat(),
+                        **record,
+                    }
+                )
 
                 if _store_item(table, s3, config, db_item, date_str, logger):
                     records_written += 1

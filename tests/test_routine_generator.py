@@ -1,11 +1,11 @@
 """tests/test_routine_generator.py — deterministic engine invariants."""
+
 from __future__ import annotations
 
 import json
 import os
 
 import pytest
-
 import routine_generator as rg
 from routine_generator import GeneratorInputs, generate_routines
 
@@ -68,8 +68,7 @@ def test_add_load_flag_does_not_increase_budget_today():
 
 def test_bounded_outputs_session_set_ceiling():
     inputs = _green_inputs("2026-06-01")
-    inputs.volume_7d = {m: 0 for m in
-                       ("chest", "back", "shoulders", "biceps", "triceps")}
+    inputs.volume_7d = {m: 0 for m in ("chest", "back", "shoulders", "biceps", "triceps")}
     routines = generate_routines(inputs)
     week_cfg = json.load(open(os.path.join(CONFIG, "training_week.json")))
     cap = week_cfg["session_set_ceiling"]
@@ -85,8 +84,7 @@ def test_catalog_has_skill_tier_1_for_each_landmark_muscle():
     for muscle in landmarks["muscles"]:
         if landmarks["muscles"][muscle]["MEV"] == 0:
             continue
-        tier_1 = [k for k, v in catalog["movements"].items()
-                  if v.get("primary_muscle") == muscle and v.get("skill_tier") == 1]
+        tier_1 = [k for k, v in catalog["movements"].items() if v.get("primary_muscle") == muscle and v.get("skill_tier") == 1]
         if not tier_1:
             missing.append(muscle)
     assert not missing, f"Catalog missing skill-tier-1 movements for: {missing}"
@@ -118,18 +116,19 @@ def test_rest_day_returns_placeholder_only():
 def test_exercise_notes_populated_from_history_index(monkeypatch):
     """ADR-068 end-to-end: generator pulls history, renders notes into the IR."""
     import re
+
     fake_index = {
-        "7EB3F7C3": [   # machine_chest_press
-            {"date": "2026-05-24",
-             "sets": [{"weight_kg": 60.0, "reps": 8},
-                      {"weight_kg": 60.0, "reps": 8},
-                      {"weight_kg": 60.0, "reps": 7}],
-             "top_weight_kg": 60.0},
+        "7EB3F7C3": [  # machine_chest_press
+            {
+                "date": "2026-05-24",
+                "sets": [{"weight_kg": 60.0, "reps": 8}, {"weight_kg": 60.0, "reps": 8}, {"weight_kg": 60.0, "reps": 7}],
+                "top_weight_kg": 60.0,
+            },
         ],
     }
     import exercise_history
-    monkeypatch.setattr(exercise_history, "load_recent_history",
-                        lambda lookback_days=180, today=None: fake_index)
+
+    monkeypatch.setattr(exercise_history, "load_recent_history", lambda lookback_days=180, today=None: fake_index)
     routines = generate_routines(_green_inputs("2026-06-01"))
     ideal = next(r for r in routines if r.variant == "ideal")
     notes = [(ex.movement_key, ex.notes) for ex in ideal.exercises]
@@ -142,7 +141,9 @@ def test_exercise_notes_populated_from_history_index(monkeypatch):
 
 def test_exercise_notes_off_mode_yields_empty_notes(monkeypatch, tmp_path):
     """training_week.exercise_notes_mode=off → notes empty, no DDB call."""
-    import json, os
+    import json
+    import os
+
     cfg_dir = tmp_path / "config"
     cfg_dir.mkdir()
     src_dir = os.path.join(os.path.dirname(__file__), "..", "config")
@@ -155,10 +156,13 @@ def test_exercise_notes_off_mode_yields_empty_notes(monkeypatch, tmp_path):
     monkeypatch.setattr(rg, "CONFIG_DIR", str(cfg_dir))
 
     import exercise_history
+
     called = {"loaded": False}
+
     def _spy(*a, **k):
         called["loaded"] = True
         return {}
+
     monkeypatch.setattr(exercise_history, "load_recent_history", _spy)
 
     routines = generate_routines(_green_inputs("2026-06-01"))

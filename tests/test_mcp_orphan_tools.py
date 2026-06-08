@@ -56,50 +56,80 @@ def _registered_tools():
 # the test detected a new orphan that the contributor didn't intend).
 KNOWN_ORPHANS = {
     # Sick days (4 orphans)
-    "tool_clear_sick_day", "tool_get_sick_days", "tool_log_sick_day",
+    "tool_clear_sick_day",
+    "tool_get_sick_days",
+    "tool_log_sick_day",
     # CGM / glucose (4 orphans)
-    "tool_get_cgm_dashboard", "tool_get_fasting_glucose_validation",
-    "tool_get_glucose_exercise_correlation", "tool_get_glucose_sleep_correlation",
+    "tool_get_cgm_dashboard",
+    "tool_get_fasting_glucose_validation",
+    "tool_get_glucose_exercise_correlation",
+    "tool_get_glucose_sleep_correlation",
     # Character / level (4 orphans)
-    "tool_get_character_sheet", "tool_get_level_history",
-    "tool_get_non_scale_victories", "tool_get_pillar_detail",
+    "tool_get_character_sheet",
+    "tool_get_level_history",
+    "tool_get_non_scale_victories",
+    "tool_get_pillar_detail",
     # Habits (7 orphans — tier_report registered)
-    "tool_get_habit_adherence", "tool_get_habit_dashboard",
-    "tool_get_habit_health_correlations", "tool_get_habit_stacks",
+    "tool_get_habit_adherence",
+    "tool_get_habit_dashboard",
+    "tool_get_habit_health_correlations",
+    "tool_get_habit_stacks",
     "tool_get_habit_streaks",
-    "tool_get_keystone_habits", "tool_get_group_trends",
+    "tool_get_keystone_habits",
+    "tool_get_group_trends",
     # Health dashboards + correlations (10 orphans)
-    "tool_get_aggregated_summary", "tool_get_alcohol_sleep_correlation",
-    "tool_get_blood_pressure_correlation", "tool_get_body_composition_snapshot",
-    "tool_get_caffeine_sleep_correlation", "tool_get_exercise_sleep_correlation",
-    "tool_get_exposure_correlation", "tool_get_health_dashboard",
-    "tool_get_health_risk_profile", "tool_get_health_trajectory",
+    "tool_get_aggregated_summary",
+    "tool_get_alcohol_sleep_correlation",
+    "tool_get_blood_pressure_correlation",
+    "tool_get_body_composition_snapshot",
+    "tool_get_caffeine_sleep_correlation",
+    "tool_get_exercise_sleep_correlation",
+    "tool_get_exposure_correlation",
+    "tool_get_health_dashboard",
+    "tool_get_health_risk_profile",
+    "tool_get_health_trajectory",
     # Labs (4 orphans)
-    "tool_get_lab_results", "tool_get_lab_trends",
-    "tool_get_out_of_range_history", "tool_get_next_lab_priorities",
+    "tool_get_lab_results",
+    "tool_get_lab_trends",
+    "tool_get_out_of_range_history",
+    "tool_get_next_lab_priorities",
     # Nutrition (5 orphans)
-    "tool_get_hydration_score", "tool_get_macro_targets",
-    "tool_get_meal_timing", "tool_get_micronutrient_report",
+    "tool_get_hydration_score",
+    "tool_get_macro_targets",
+    "tool_get_meal_timing",
+    "tool_get_micronutrient_report",
     "tool_get_nutrition_biometrics_correlation",
     # Strength + training (4 orphans)
     "tool_get_personal_records",
-    "tool_get_training_load", "tool_get_training_periodization",
-    "tool_get_training_recommendation", "tool_get_exercise_variety",
+    "tool_get_training_load",
+    "tool_get_training_periodization",
+    "tool_get_training_recommendation",
+    "tool_get_exercise_variety",
     # Movement + lifestyle (7 orphans; tool_get_calendar_events removed V2 P4.1)
     "tool_get_daily_summary",
-    "tool_get_day_type_analysis", "tool_get_energy_balance",
-    "tool_get_energy_expenditure", "tool_get_movement_score",
-    "tool_get_ruck_log", "tool_get_exposure_log",
+    "tool_get_day_type_analysis",
+    "tool_get_energy_balance",
+    "tool_get_energy_expenditure",
+    "tool_get_movement_score",
+    "tool_get_ruck_log",
+    "tool_get_exposure_log",
     # Mind / social (7 orphans)
-    "tool_get_gait_analysis", "tool_get_journal_correlations",
-    "tool_get_meditation_correlation", "tool_get_mood_trend",
-    "tool_get_seasonal_patterns", "tool_get_social_isolation_risk",
+    "tool_get_gait_analysis",
+    "tool_get_journal_correlations",
+    "tool_get_meditation_correlation",
+    "tool_get_mood_trend",
+    "tool_get_seasonal_patterns",
+    "tool_get_social_isolation_risk",
     "tool_get_state_of_mind_trend",
     # Misc (8 orphans)
-    "tool_get_latest", "tool_get_nutrition_summary",
+    "tool_get_latest",
+    "tool_get_nutrition_summary",
     "tool_get_supplement_correlation",  # tool_get_schedule_load removed V2 P4.1
-    "tool_get_weather_correlation", "tool_log_exposure",
-    "tool_log_ruck", "tool_remove_board_member", "tool_update_board_member",
+    "tool_get_weather_correlation",
+    "tool_log_exposure",
+    "tool_log_ruck",
+    "tool_remove_board_member",
+    "tool_update_board_member",
 }
 
 
@@ -128,8 +158,7 @@ def test_known_orphans_still_orphans():
     stale = KNOWN_ORPHANS - current_orphans
     assert not stale, (
         f"KNOWN_ORPHANS has {len(stale)} entry(ies) that are no longer orphans "
-        "(either registered or deleted). Remove these from the list:\n"
-        + "\n".join(f"  - {t}" for t in sorted(stale))
+        "(either registered or deleted). Remove these from the list:\n" + "\n".join(f"  - {t}" for t in sorted(stale))
     )
 
 

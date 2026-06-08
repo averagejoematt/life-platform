@@ -13,20 +13,21 @@ The remote transport implements MCP Streamable HTTP (spec 2025-06-18):
 OAuth: Minimal auto-approve flow to satisfy Claude's connector requirement.
 Security is provided by the unguessable 40-char Lambda Function URL, not OAuth.
 """
+
+import base64
+import concurrent.futures
+import hashlib
+import hmac
 import json
 import logging
-import base64
-import uuid
-import hmac
-import hashlib
 import time
-import concurrent.futures
 import urllib.parse
+import uuid
 
-from mcp.config import logger, __version__
-from mcp.core import get_api_key, decimal_to_float
+from mcp.config import __version__, logger
+from mcp.core import decimal_to_float, get_api_key
 from mcp.registry import TOOLS
-from mcp.utils import validate_date_range, validate_single_date, mcp_error
+from mcp.utils import mcp_error, validate_date_range, validate_single_date
 from mcp.warmer import nightly_cache_warmer
 
 # ── MCP protocol constants ────────────────────────────────────────────────────
@@ -45,14 +46,12 @@ _MCP_HEADERS = {
 def handle_initialize(params):
     # Negotiate protocol version — support both current and legacy
     client_version = params.get("protocolVersion", MCP_PROTOCOL_VERSION_LEGACY)
-    server_version = (MCP_PROTOCOL_VERSION
-                      if client_version >= "2025"
-                      else MCP_PROTOCOL_VERSION_LEGACY)
+    server_version = MCP_PROTOCOL_VERSION if client_version >= "2025" else MCP_PROTOCOL_VERSION_LEGACY
 
     return {
         "protocolVersion": server_version,
-        "capabilities":    {"tools": {}},
-        "serverInfo":      {"name": "life-platform", "version": __version__},
+        "capabilities": {"tools": {}},
+        "serverInfo": {"name": "life-platform", "version": __version__},
     }
 
 
@@ -74,10 +73,7 @@ def handle_tools_call(params):
     # R13-F12: Rate limit write tools before execution
     rate_err = _check_write_rate_limit(name)
     if rate_err:
-        return {"content": [{"type": "text", "text": json.dumps(
-            mcp_error(message=rate_err, error_code="RATE_LIMIT"),
-            default=str
-        )}]}
+        return {"content": [{"type": "text", "text": json.dumps(mcp_error(message=rate_err, error_code="RATE_LIMIT"), default=str)}]}
     _t0 = time.time()
     # R6: per-tool soft timeout — returns a structured error instead of hanging
     # the Lambda until the 300s hard limit. 30s is the default; query-too-broad
@@ -91,14 +87,23 @@ def handle_tools_call(params):
             except concurrent.futures.TimeoutError:
                 _emit_tool_metric(name, _TOOL_TIMEOUT_SECS * 1000, success=False)
                 logger.warning(f"Tool '{name}' exceeded {_TOOL_TIMEOUT_SECS}s soft timeout")
-                return {"content": [{"type": "text", "text": json.dumps(
-                    mcp_error(
-                        message=(
-                            f"Tool '{name}' timed out after {_TOOL_TIMEOUT_SECS}s. "
-                            "The query is likely scanning too much data."
-                        ),
-                        error_code="QUERY_TOO_BROAD",
-                    ), default=str)}]}
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": json.dumps(
+                                mcp_error(
+                                    message=(
+                                        f"Tool '{name}' timed out after {_TOOL_TIMEOUT_SECS}s. "
+                                        "The query is likely scanning too much data."
+                                    ),
+                                    error_code="QUERY_TOO_BROAD",
+                                ),
+                                default=str,
+                            ),
+                        }
+                    ]
+                }
         _emit_tool_metric(name, (time.time() - _t0) * 1000, success=True)
         return {"content": [{"type": "text", "text": json.dumps(result, default=str)}]}
     except Exception as e:
@@ -136,12 +141,12 @@ def _validate_tool_args(name: str, arguments: dict) -> str | None:
 
     # 2. Check types of provided arguments against schema
     TYPE_MAP = {
-        "string":  str,
+        "string": str,
         "integer": int,
-        "number":  (int, float),
+        "number": (int, float),
         "boolean": bool,
-        "array":   list,
-        "object":  dict,
+        "array": list,
+        "object": dict,
     }
     for arg_name, arg_val in arguments.items():
         if arg_name not in properties:
@@ -154,28 +159,20 @@ def _validate_tool_args(name: str, arguments: dict) -> str | None:
             # Allow int where float expected (JSON numbers)
             if expected_type == "number" and isinstance(arg_val, int):
                 continue
-            return (
-                f"Argument '{arg_name}' has wrong type: "
-                f"expected {expected_type}, got {type(arg_val).__name__}"
-            )
+            return f"Argument '{arg_name}' has wrong type: " f"expected {expected_type}, got {type(arg_val).__name__}"
 
     # 3. Sanity check: reject suspiciously large string values (prompt injection guard)
     MAX_STRING_LEN = 2000
     for arg_name, arg_val in arguments.items():
         if isinstance(arg_val, str) and len(arg_val) > MAX_STRING_LEN:
-            return (
-                f"Argument '{arg_name}' exceeds maximum length "
-                f"({len(arg_val)} > {MAX_STRING_LEN} chars)"
-            )
+            return f"Argument '{arg_name}' exceeds maximum length " f"({len(arg_val)} > {MAX_STRING_LEN} chars)"
 
     # 4. SEC-3 MEDIUM: Date range validation — prevents unbounded DDB range scans.
     # Automatically applied to any tool that accepts start_date + end_date args.
     # validate_date_range enforces YYYY-MM-DD format, calendar validity, ordering,
     # and a 365-day span cap (730-day hard max). See mcp/utils.py.
     if "start_date" in arguments and "end_date" in arguments:
-        date_err = validate_date_range(
-            arguments["start_date"], arguments["end_date"]
-        )
+        date_err = validate_date_range(arguments["start_date"], arguments["end_date"])
         if date_err:
             return f"Invalid date range: {date_err}"
 
@@ -200,20 +197,22 @@ def _emit_tool_metric(tool_name: str, duration_ms: float, success: bool) -> None
         emf = {
             "_aws": {
                 "Timestamp": ts,
-                "CloudWatchMetrics": [{
-                    "Namespace": "LifePlatform/MCP",
-                    "Dimensions": [["ToolName"]],
-                    "Metrics": [
-                        {"Name": "ToolInvocations", "Unit": "Count"},
-                        {"Name": "ToolDuration",    "Unit": "Milliseconds"},
-                        {"Name": "ToolErrors",      "Unit": "Count"},
-                    ],
-                }],
+                "CloudWatchMetrics": [
+                    {
+                        "Namespace": "LifePlatform/MCP",
+                        "Dimensions": [["ToolName"]],
+                        "Metrics": [
+                            {"Name": "ToolInvocations", "Unit": "Count"},
+                            {"Name": "ToolDuration", "Unit": "Milliseconds"},
+                            {"Name": "ToolErrors", "Unit": "Count"},
+                        ],
+                    }
+                ],
             },
-            "ToolName":        tool_name,
+            "ToolName": tool_name,
             "ToolInvocations": 1,
-            "ToolDuration":    round(duration_ms, 1),
-            "ToolErrors":      0 if success else 1,
+            "ToolDuration": round(duration_ms, 1),
+            "ToolErrors": 0 if success else 1,
         }
         print(json.dumps(emf))
     except Exception as e:
@@ -231,15 +230,17 @@ def _emit_auth_failure_metric() -> None:
         emf = {
             "_aws": {
                 "Timestamp": ts,
-                "CloudWatchMetrics": [{
-                    "Namespace": "LifePlatform/MCP",
-                    "Dimensions": [["EventType"]],
-                    "Metrics": [
-                        {"Name": "AuthFailures", "Unit": "Count"},
-                    ],
-                }],
+                "CloudWatchMetrics": [
+                    {
+                        "Namespace": "LifePlatform/MCP",
+                        "Dimensions": [["EventType"]],
+                        "Metrics": [
+                            {"Name": "AuthFailures", "Unit": "Count"},
+                        ],
+                    }
+                ],
             },
-            "EventType":    "AuthFailure",
+            "EventType": "AuthFailure",
             "AuthFailures": 1,
         }
         print(json.dumps(emf))
@@ -248,9 +249,9 @@ def _emit_auth_failure_metric() -> None:
 
 
 METHOD_HANDLERS = {
-    "initialize":                handle_initialize,
-    "tools/list":                handle_tools_list,
-    "tools/call":                handle_tools_call,
+    "initialize": handle_initialize,
+    "tools/list": handle_tools_list,
+    "tools/call": handle_tools_call,
     "notifications/initialized": lambda _: None,
     "ping": lambda _: {},
 }
@@ -265,8 +266,7 @@ def _process_jsonrpc(body: dict) -> dict | None:
 
     handler = METHOD_HANDLERS.get(method)
     if handler is None:
-        return {"jsonrpc": "2.0", "id": rpc_id,
-                "error": {"code": -32601, "message": f"Method not found: {method}"}}
+        return {"jsonrpc": "2.0", "id": rpc_id, "error": {"code": -32601, "message": f"Method not found: {method}"}}
 
     try:
         result = handler(params)
@@ -274,12 +274,10 @@ def _process_jsonrpc(body: dict) -> dict | None:
             return None  # notification — no response
         return {"jsonrpc": "2.0", "id": rpc_id, "result": result}
     except ValueError as e:
-        return {"jsonrpc": "2.0", "id": rpc_id,
-                "error": {"code": -32602, "message": str(e)}}
+        return {"jsonrpc": "2.0", "id": rpc_id, "error": {"code": -32602, "message": str(e)}}
     except Exception as e:
         logger.error(f"Tool error: {e}", exc_info=True)
-        return {"jsonrpc": "2.0", "id": rpc_id,
-                "error": {"code": -32603, "message": f"Internal error: {str(e)}"}}
+        return {"jsonrpc": "2.0", "id": rpc_id, "error": {"code": -32603, "message": f"Internal error: {str(e)}"}}
 
 
 # ── Remote MCP transport (Streamable HTTP via Function URL) ───────────────────
@@ -293,8 +291,7 @@ def _remote_response(status_code, body="", extra_headers=None):
 
 def _get_base_url(event):
     """Extract base URL from Function URL event."""
-    domain = (event.get("requestContext", {})
-                   .get("domainName", ""))
+    domain = event.get("requestContext", {}).get("domainName", "")
     return f"https://{domain}" if domain else ""
 
 
@@ -339,9 +336,9 @@ _BEARER_CACHE_TTL = 300  # 5 min — ensures warm containers pick up new key aft
 # trips within ~a second; a human-paced multi-step flow never does; and it
 # self-heals as the window slides — no cold start required. Lambda serializes
 # invocations within a container, so no lock is needed.
-_WRITE_TOOL_CALLS: dict[str, list] = {}   # tool -> recent call epoch timestamps
-_WRITE_TOOL_RATE_LIMIT = 20               # max calls per tool within the window
-_WRITE_TOOL_RATE_WINDOW_SECS = 60         # rolling window
+_WRITE_TOOL_CALLS: dict[str, list] = {}  # tool -> recent call epoch timestamps
+_WRITE_TOOL_RATE_LIMIT = 20  # max calls per tool within the window
+_WRITE_TOOL_RATE_WINDOW_SECS = 60  # rolling window
 
 _RATE_LIMITED_TOOLS = {
     "create_todoist_task",
@@ -384,6 +381,7 @@ def _check_write_rate_limit(tool_name: str):
     _WRITE_TOOL_CALLS[tool_name] = recent
     return None
 
+
 def _get_bearer_token():
     """Derive a deterministic Bearer token from the API key using HMAC.
     Cached with 5-min TTL to support key rotation without redeployment."""
@@ -423,31 +421,42 @@ def _validate_bearer(event):
     provided = auth_header[7:].strip()
     return hmac.compare_digest(provided, expected)
 
+
 def _handle_oauth_server_metadata(event):
     """GET /.well-known/oauth-authorization-server — RFC 8414"""
     base = _get_base_url(event)
     logger.info(f"[OAuth] Serving auth server metadata for {base}")
-    return _remote_response(200, json.dumps({
-        "issuer": base,
-        "authorization_endpoint": f"{base}/authorize",
-        "token_endpoint": f"{base}/token",
-        "registration_endpoint": f"{base}/register",
-        "response_types_supported": ["code"],
-        "grant_types_supported": ["authorization_code"],
-        "code_challenge_methods_supported": ["S256"],
-        "token_endpoint_auth_methods_supported": ["none"],
-    }))
+    return _remote_response(
+        200,
+        json.dumps(
+            {
+                "issuer": base,
+                "authorization_endpoint": f"{base}/authorize",
+                "token_endpoint": f"{base}/token",
+                "registration_endpoint": f"{base}/register",
+                "response_types_supported": ["code"],
+                "grant_types_supported": ["authorization_code"],
+                "code_challenge_methods_supported": ["S256"],
+                "token_endpoint_auth_methods_supported": ["none"],
+            }
+        ),
+    )
 
 
 def _handle_resource_metadata(event):
     """GET /.well-known/oauth-protected-resource — RFC 9728"""
     base = _get_base_url(event)
     logger.info(f"[OAuth] Serving resource metadata for {base}")
-    return _remote_response(200, json.dumps({
-        "resource": base,
-        "authorization_servers": [base],
-        "scopes_supported": [],
-    }))
+    return _remote_response(
+        200,
+        json.dumps(
+            {
+                "resource": base,
+                "authorization_servers": [base],
+                "scopes_supported": [],
+            }
+        ),
+    )
 
 
 def _handle_register(event):
@@ -455,14 +464,19 @@ def _handle_register(event):
     body = _parse_body(event)
     client_id = f"lp-{uuid.uuid4().hex[:12]}"
     logger.info(f"[OAuth] Client registration: {body.get('client_name', 'unknown')} → {client_id}")
-    return _remote_response(201, json.dumps({
-        "client_id": client_id,
-        "client_name": body.get("client_name", "claude"),
-        "redirect_uris": body.get("redirect_uris", []),
-        "grant_types": ["authorization_code"],
-        "response_types": ["code"],
-        "token_endpoint_auth_method": "none",
-    }))
+    return _remote_response(
+        201,
+        json.dumps(
+            {
+                "client_id": client_id,
+                "client_name": body.get("client_name", "claude"),
+                "redirect_uris": body.get("redirect_uris", []),
+                "grant_types": ["authorization_code"],
+                "response_types": ["code"],
+                "token_endpoint_auth_method": "none",
+            }
+        ),
+    )
 
 
 def _handle_authorize(event):
@@ -497,11 +511,16 @@ def _handle_token(event):
     body = _parse_body(event)
     logger.info(f"[OAuth] Token exchange: grant_type={body.get('grant_type', '?')}")
     token = _get_bearer_token() or f"lp_{uuid.uuid4().hex}"
-    return _remote_response(200, json.dumps({
-        "access_token": token,
-        "token_type": "Bearer",
-        "expires_in": 86400,
-    }))
+    return _remote_response(
+        200,
+        json.dumps(
+            {
+                "access_token": token,
+                "token_type": "Bearer",
+                "expires_in": 86400,
+            }
+        ),
+    )
 
 
 # ── Remote MCP request handler ────────────────────────────────────────────────
@@ -510,9 +529,7 @@ def handle_remote_mcp(event, method):
     Handle MCP Streamable HTTP transport.
     Routes OAuth endpoints, then MCP JSON-RPC.
     """
-    raw_path = (event.get("requestContext", {})
-                     .get("http", {})
-                     .get("path", "/"))
+    raw_path = event.get("requestContext", {}).get("http", {}).get("path", "/")
 
     logger.info(f"[Remote] {method} {raw_path}")
 
@@ -537,8 +554,7 @@ def handle_remote_mcp(event, method):
     if not _validate_bearer(event):
         logger.warning(f"[Remote] Rejected: invalid/missing Bearer token")
         _emit_auth_failure_metric()
-        return _remote_response(401, json.dumps({"error": "Unauthorized: invalid Bearer token"}),
-                                {"WWW-Authenticate": "Bearer"})
+        return _remote_response(401, json.dumps({"error": "Unauthorized: invalid Bearer token"}), {"WWW-Authenticate": "Bearer"})
 
     # ── MCP protocol ──────────────────────────────────────────────────────
     # HEAD — protocol discovery
@@ -547,13 +563,11 @@ def handle_remote_mcp(event, method):
 
     # GET — SSE stream (not supported in Lambda BUFFERED mode)
     if method == "GET":
-        return _remote_response(405, json.dumps({"error": "Method not allowed. Use POST."}),
-                                {"Allow": "POST, HEAD"})
+        return _remote_response(405, json.dumps({"error": "Method not allowed. Use POST."}), {"Allow": "POST, HEAD"})
 
     # Only POST from here
     if method != "POST":
-        return _remote_response(405, json.dumps({"error": "Method not allowed"}),
-                                {"Allow": "POST, HEAD"})
+        return _remote_response(405, json.dumps({"error": "Method not allowed"}), {"Allow": "POST, HEAD"})
 
     # Parse body (Function URL may base64-encode)
     try:
@@ -563,9 +577,7 @@ def handle_remote_mcp(event, method):
         body = json.loads(raw_body) if raw_body else {}
     except (json.JSONDecodeError, Exception) as e:
         return _remote_response(
-            400,
-            json.dumps({"jsonrpc": "2.0", "id": None,
-                         "error": {"code": -32700, "message": f"Parse error: {str(e)}"}})
+            400, json.dumps({"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": f"Parse error: {str(e)}"}})
         )
 
     # Process JSON-RPC
@@ -585,14 +597,12 @@ def handle_bridge_invoke(event):
     if expected_key:
         provided_key = (event.get("headers") or {}).get("x-api-key", "")
         if provided_key != expected_key:
-            return {"statusCode": 401, "body": json.dumps({"error": "Unauthorized"}),
-                    "headers": {"Content-Type": "application/json"}}
+            return {"statusCode": 401, "body": json.dumps({"error": "Unauthorized"}), "headers": {"Content-Type": "application/json"}}
 
     try:
         body = json.loads(event.get("body") or "{}")
     except json.JSONDecodeError:
-        return {"statusCode": 400, "body": json.dumps({"error": "Invalid JSON"}),
-                "headers": {"Content-Type": "application/json"}}
+        return {"statusCode": 400, "body": json.dumps({"error": "Invalid JSON"}), "headers": {"Content-Type": "application/json"}}
 
     response_body = _process_jsonrpc(body)
 
@@ -601,8 +611,8 @@ def handle_bridge_invoke(event):
 
     return {
         "statusCode": 200,
-        "body":       json.dumps(response_body, default=str),
-        "headers":    {"Content-Type": "application/json"},
+        "body": json.dumps(response_body, default=str),
+        "headers": {"Content-Type": "application/json"},
     }
 
 
@@ -612,14 +622,10 @@ def lambda_handler(event, context):
     if event.get("source") == "aws.events" or event.get("detail-type") == "Scheduled Event":
         logger.info("[lambda_handler] EventBridge trigger — running nightly cache warmer")
         result = nightly_cache_warmer()
-        return {"statusCode": 200, "body": json.dumps(result),
-                "headers": {"Content-Type": "application/json"}}
+        return {"statusCode": 200, "body": json.dumps(result), "headers": {"Content-Type": "application/json"}}
 
     # 2. Detect transport: Function URL (has requestContext.http) vs Bridge
-    http_method = (event.get("requestContext", {})
-                        .get("http", {})
-                        .get("method", "")
-                        .upper())
+    http_method = event.get("requestContext", {}).get("http", {}).get("method", "").upper()
 
     if http_method:
         logger.info(f"[lambda_handler] Remote MCP: {http_method}")

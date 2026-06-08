@@ -33,6 +33,7 @@ def _import(env):
         mr.return_value = MagicMock()
         mc.return_value = MagicMock()
         import delete_user_data_lambda as m
+
         m._table_mock = m.table
         m._s3_mock = m.s3
         m._secrets_mock = m.secrets
@@ -99,7 +100,8 @@ def test_real_run_invokes_batch_delete_and_audit(env):
                         with patch.object(m, "_delete_secrets", return_value=[]):
                             with patch.object(m, "_write_audit_record") as audit:
                                 resp = m.lambda_handler(
-                                    {"user_id": "test_user", "confirm": "DELETE"}, None,
+                                    {"user_id": "test_user", "confirm": "DELETE"},
+                                    None,
                                 )
     assert resp["statusCode"] == 200
     body = json.loads(resp["body"])

@@ -30,6 +30,7 @@ as "autoregulated" while the readiness signal is unvalidated (per Lena's
 dissent in REVIEW §4). Correct phrasing: "deterministic volume-landmark
 programming with red-day deload guard."
 """
+
 from __future__ import annotations
 
 import logging
@@ -41,8 +42,16 @@ from mcp.utils import mcp_error
 logger = logging.getLogger("tools_hevy_routine")
 
 _VALID_ACTIONS = {
-    "draft", "draft_custom", "dry_run", "commit", "list", "get",
-    "archive", "floor", "re_entry", "adherence",
+    "draft",
+    "draft_custom",
+    "dry_run",
+    "commit",
+    "list",
+    "get",
+    "archive",
+    "floor",
+    "re_entry",
+    "adherence",
 }
 
 _LB_TO_KG = 0.45359237
@@ -63,16 +72,15 @@ def _make_resolver():
     mis-map. A title miss raises MovementUnmappable loudly rather than pushing the
     wrong exercise.
     """
-    from hevy_template_cache import (MovementUnmappable, reconcile_custom,
-                                     resolve_movement)
     import hevy_write_client as wc
+    from hevy_template_cache import MovementUnmappable, reconcile_custom, resolve_movement
 
     def _resolve(movement_key: str) -> str:
         # ADR-069 (template index): keys of the form "tmpl:<id>" are already
         # resolved (draft_custom matched a title against the full Hevy index or
         # a live lookup). Short-circuit straight to the id — no catalog needed.
         if movement_key.startswith("tmpl:"):
-            return movement_key[len("tmpl:"):]
+            return movement_key[len("tmpl:") :]
         try:
             return resolve_movement(movement_key)
         except MovementUnmappable:
@@ -83,6 +91,7 @@ def _make_resolver():
 
 def _generator_inputs(args: dict[str, Any]):
     from routine_generator import GeneratorInputs
+
     return GeneratorInputs(
         target_date=args.get("target_date") or datetime.now(timezone.utc).date().isoformat(),
         recovery_tier=args.get("recovery_tier", "yellow"),
@@ -97,6 +106,7 @@ def _generator_inputs(args: dict[str, Any]):
 def _action_draft(args: dict[str, Any]) -> dict[str, Any]:
     from routine_generator import generate_routines
     from routine_repo import put_versioned
+
     inputs = _generator_inputs(args)
     routines = generate_routines(inputs)
     ideal = next((r for r in routines if r.variant == "ideal"), None)
@@ -116,12 +126,14 @@ def _action_draft(args: dict[str, Any]) -> dict[str, Any]:
 
 def _catalog_movements() -> dict[str, Any]:
     from routine_generator import _load_json
+
     return (_load_json("movement_catalog.json") or {}).get("movements", {})
 
 
 def _normalize_title(t: str) -> str:
     """Normalize a title for index lookup: lowercase, collapse whitespace, strip."""
     import re
+
     return re.sub(r"\s+", " ", (t or "").strip().lower())
 
 
@@ -135,6 +147,7 @@ def _template_index() -> dict[str, Any]:
     Hevy lookup.
     """
     from routine_generator import _load_json
+
     try:
         return (_load_json("hevy_template_index.json") or {}).get("templates", {})
     except Exception:
@@ -149,6 +162,7 @@ def _live_template_id_by_title(name: str) -> str | None:
     never a fuzzy guess, to avoid silently pushing the wrong exercise.
     """
     import hevy_write_client as wc
+
     target = _normalize_title(name)
     page = 1
     while page <= 30:
@@ -219,42 +233,105 @@ def _resolve_movement_key(ex: dict[str, Any], catalog: dict[str, Any]) -> str | 
 # (create wants muscle_group/exercise_type/equipment_category; GET returns
 # primary_muscle_group/type/equipment). Body wrapper is {"exercise": {...}}.
 _HEVY_MUSCLE_GROUPS = {
-    "abdominals", "shoulders", "biceps", "triceps", "forearms", "quadriceps",
-    "hamstrings", "calves", "glutes", "abductors", "adductors", "lats",
-    "upper_back", "traps", "lower_back", "chest", "cardio", "neck",
-    "full_body", "other",
+    "abdominals",
+    "shoulders",
+    "biceps",
+    "triceps",
+    "forearms",
+    "quadriceps",
+    "hamstrings",
+    "calves",
+    "glutes",
+    "abductors",
+    "adductors",
+    "lats",
+    "upper_back",
+    "traps",
+    "lower_back",
+    "chest",
+    "cardio",
+    "neck",
+    "full_body",
+    "other",
 }
 _HEVY_EXERCISE_TYPES = {
-    "weight_reps", "reps_only", "bodyweight_reps", "bodyweight_assisted_reps",
-    "duration", "weight_duration", "distance_duration", "short_distance_weight",
+    "weight_reps",
+    "reps_only",
+    "bodyweight_reps",
+    "bodyweight_assisted_reps",
+    "duration",
+    "weight_duration",
+    "distance_duration",
+    "short_distance_weight",
 }
 _HEVY_EQUIPMENT = {
-    "none", "barbell", "dumbbell", "kettlebell", "machine", "plate",
-    "resistance_band", "suspension", "other",
+    "none",
+    "barbell",
+    "dumbbell",
+    "kettlebell",
+    "machine",
+    "plate",
+    "resistance_band",
+    "suspension",
+    "other",
 }
 
 # Title-keyword hints for inferring create metadata when the caller omits it.
 _EQUIP_KEYWORDS = [
-    ("barbell", "barbell"), ("landmine", "barbell"), ("ez bar", "barbell"),
-    ("dumbbell", "dumbbell"), ("db ", "dumbbell"),
-    ("kettlebell", "kettlebell"), ("kb ", "kettlebell"),
-    ("cable", "machine"), ("machine", "machine"), ("smith", "machine"),
-    ("band", "resistance_band"), ("suspension", "suspension"), ("trx", "suspension"),
+    ("barbell", "barbell"),
+    ("landmine", "barbell"),
+    ("ez bar", "barbell"),
+    ("dumbbell", "dumbbell"),
+    ("db ", "dumbbell"),
+    ("kettlebell", "kettlebell"),
+    ("kb ", "kettlebell"),
+    ("cable", "machine"),
+    ("machine", "machine"),
+    ("smith", "machine"),
+    ("band", "resistance_band"),
+    ("suspension", "suspension"),
+    ("trx", "suspension"),
     ("plate", "plate"),
 ]
 _MUSCLE_KEYWORDS = [
-    ("bench", "chest"), ("chest", "chest"), ("fly", "chest"), ("pec", "chest"),
-    ("press", "shoulders"), ("shoulder", "shoulders"), ("delt", "shoulders"),
-    ("lateral raise", "shoulders"), ("snatch", "full_body"), ("clean", "full_body"),
-    ("thruster", "full_body"), ("burpee", "full_body"),
-    ("row", "upper_back"), ("pulldown", "lats"), ("pull-up", "lats"), ("pullup", "lats"),
-    ("curl", "biceps"), ("tricep", "triceps"), ("pushdown", "triceps"), ("dip", "triceps"),
-    ("squat", "quadriceps"), ("lunge", "quadriceps"), ("leg press", "quadriceps"),
-    ("deadlift", "hamstrings"), ("hamstring", "hamstrings"), ("leg curl", "hamstrings"),
-    ("hip thrust", "glutes"), ("glute", "glutes"), ("calf", "calves"),
-    ("crunch", "abdominals"), ("plank", "abdominals"), ("ab ", "abdominals"),
-    ("run", "cardio"), ("cycl", "cardio"), ("bike", "cardio"), ("row erg", "cardio"),
-    ("climber", "cardio"), ("jump rope", "cardio"),
+    ("bench", "chest"),
+    ("chest", "chest"),
+    ("fly", "chest"),
+    ("pec", "chest"),
+    ("press", "shoulders"),
+    ("shoulder", "shoulders"),
+    ("delt", "shoulders"),
+    ("lateral raise", "shoulders"),
+    ("snatch", "full_body"),
+    ("clean", "full_body"),
+    ("thruster", "full_body"),
+    ("burpee", "full_body"),
+    ("row", "upper_back"),
+    ("pulldown", "lats"),
+    ("pull-up", "lats"),
+    ("pullup", "lats"),
+    ("curl", "biceps"),
+    ("tricep", "triceps"),
+    ("pushdown", "triceps"),
+    ("dip", "triceps"),
+    ("squat", "quadriceps"),
+    ("lunge", "quadriceps"),
+    ("leg press", "quadriceps"),
+    ("deadlift", "hamstrings"),
+    ("hamstring", "hamstrings"),
+    ("leg curl", "hamstrings"),
+    ("hip thrust", "glutes"),
+    ("glute", "glutes"),
+    ("calf", "calves"),
+    ("crunch", "abdominals"),
+    ("plank", "abdominals"),
+    ("ab ", "abdominals"),
+    ("run", "cardio"),
+    ("cycl", "cardio"),
+    ("bike", "cardio"),
+    ("row erg", "cardio"),
+    ("climber", "cardio"),
+    ("jump rope", "cardio"),
 ]
 
 
@@ -312,6 +389,7 @@ def _create_template_for(ex: dict[str, Any], title: str) -> tuple[str, dict[str,
     the title never appears in the list.
     """
     import hevy_write_client as wc
+
     meta = {
         "title": title,
         "muscle_group": _infer_muscle_group(ex, title),
@@ -329,9 +407,7 @@ def _create_template_for(ex: dict[str, Any], title: str) -> tuple[str, dict[str,
         if tid:
             break
     if not tid:
-        raise RuntimeError(
-            f"could not create/resolve Hevy exercise {title!r}"
-            + (f" (create error: {create_exc})" if create_exc else ""))
+        raise RuntimeError(f"could not create/resolve Hevy exercise {title!r}" + (f" (create error: {create_exc})" if create_exc else ""))
     return tid, {**meta, "id": tid}
 
 
@@ -354,6 +430,7 @@ def _coerce_sets(raw_sets: list[dict[str, Any]] | None) -> list:
     """Build IR Set objects from a caller spec. lbs -> kg (Hevy stores kg);
     `count` repeats a set N times (ergonomic for '15 lb x 15 (x3)')."""
     from routine_ir import Set
+
     sets: list = []
     for s in raw_sets or []:
         if not isinstance(s, dict):
@@ -364,16 +441,18 @@ def _coerce_sets(raw_sets: list[dict[str, Any]] | None) -> list:
         reps = int(s["reps"]) if s.get("reps") is not None else None
         n = max(1, int(s.get("count") or 1))
         for _ in range(n):
-            sets.append(Set(
-                type=s.get("type", "normal"),
-                weight_kg=weight_kg,
-                reps=reps,
-                rep_range_start=s.get("rep_range_start"),
-                rep_range_end=s.get("rep_range_end"),
-                distance_meters=s.get("distance_meters"),
-                duration_seconds=s.get("duration_seconds"),
-                custom_metric=s.get("custom_metric"),
-            ))
+            sets.append(
+                Set(
+                    type=s.get("type", "normal"),
+                    weight_kg=weight_kg,
+                    reps=reps,
+                    rep_range_start=s.get("rep_range_start"),
+                    rep_range_end=s.get("rep_range_end"),
+                    distance_meters=s.get("distance_meters"),
+                    duration_seconds=s.get("duration_seconds"),
+                    custom_metric=s.get("custom_metric"),
+                )
+            )
     return sets
 
 
@@ -384,8 +463,8 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
     the caller; the platform does not compute them. The resulting draft IR is
     identical in shape to a generator draft, so dry_run/commit work unchanged.
     """
-    from routine_ir import ExerciseBlock, RoutineSpec
     from routine_generator import _new_routine_id, _now_iso
+    from routine_ir import ExerciseBlock, RoutineSpec
     from routine_repo import put_versioned
 
     raw_exercises = args.get("exercises")
@@ -403,9 +482,9 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
 
     catalog = _catalog_movements()
     blocks: list = []
-    unknown: list[str] = []           # unresolved + (no human title OR create disabled)
-    created: list[dict] = []          # newly created Hevy exercises this draft
-    creation_errors: list[str] = []   # create attempts that failed
+    unknown: list[str] = []  # unresolved + (no human title OR create disabled)
+    created: list[dict] = []  # newly created Hevy exercises this draft
+    creation_errors: list[str] = []  # create attempts that failed
     newly_created: dict[str, str] = {}  # norm-title -> "tmpl:<id>" (dedupe within draft)
     for ex in raw_exercises:
         if not isinstance(ex, dict):
@@ -415,7 +494,7 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         mk = _resolve_movement_key(ex, catalog)
         if not mk:
             norm = _normalize_title(human_title)
-            if norm and norm in newly_created:        # already created earlier this draft
+            if norm and norm in newly_created:  # already created earlier this draft
                 mk = newly_created[norm]
             elif create_missing and human_title:
                 # Don't get stuck: create the missing exercise in Hevy, then use it.
@@ -432,25 +511,29 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
                 unknown.append(raw_label)
                 continue
         mdef = catalog.get(mk, {})  # empty for index-resolved / created ("tmpl:") movements
-        blocks.append(ExerciseBlock(
-            movement_key=mk,
-            sets=_coerce_sets(ex.get("sets")),
-            superset_id=(int(ex["superset_id"]) if ex.get("superset_id") is not None else None),
-            rest_seconds=(int(ex["rest_seconds"]) if ex.get("rest_seconds") is not None else None),
-            notes=(ex.get("notes") or ""),
-            joint_friendly_score=int(mdef.get("joint_friendly_score", 3)),
-            skill_tier=int(mdef.get("skill_tier", 1)),
-            # human label for traceability — curated movements keep "custom",
-            # index-resolved / created ones record the title behind the template id.
-            rationale_tag=(mdef.get("title") or raw_label) if mk.startswith("tmpl:") else "custom",
-        ))
+        blocks.append(
+            ExerciseBlock(
+                movement_key=mk,
+                sets=_coerce_sets(ex.get("sets")),
+                superset_id=(int(ex["superset_id"]) if ex.get("superset_id") is not None else None),
+                rest_seconds=(int(ex["rest_seconds"]) if ex.get("rest_seconds") is not None else None),
+                notes=(ex.get("notes") or ""),
+                joint_friendly_score=int(mdef.get("joint_friendly_score", 3)),
+                skill_tier=int(mdef.get("skill_tier", 1)),
+                # human label for traceability — curated movements keep "custom",
+                # index-resolved / created ones record the title behind the template id.
+                rationale_tag=(mdef.get("title") or raw_label) if mk.startswith("tmpl:") else "custom",
+            )
+        )
 
     # Unresolvable with no way to create (bare movement_key, or create disabled) → loud fail.
     if unknown:
-        msg = ("Unknown movement(s): " + ", ".join(unknown) + ". "
-               "Pass a curated movement_key or an exact Hevy exercise title "
-               "(any built-in or custom Hevy exercise resolves by title; a new one "
-               "is auto-created when you give a human title and create_missing is on).")
+        msg = (
+            "Unknown movement(s): " + ", ".join(unknown) + ". "
+            "Pass a curated movement_key or an exact Hevy exercise title "
+            "(any built-in or custom Hevy exercise resolves by title; a new one "
+            "is auto-created when you give a human title and create_missing is on)."
+        )
         suggestions = []
         for u in unknown:
             suggestions += _index_suggestions(u, limit=6)
@@ -461,7 +544,8 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         return mcp_error(
             "No valid exercises after parsing 'exercises'"
             + (f" (creation errors: {'; '.join(creation_errors)})" if creation_errors else ""),
-            error_code="MISSING_ARG")
+            error_code="MISSING_ARG",
+        )
 
     archetype = (args.get("archetype") or "custom").strip().lower()
     target_date = args.get("target_date") or datetime.now(timezone.utc).date().isoformat()
@@ -470,11 +554,12 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
     warnings: list[str] = []
     try:
         from routine_generator import _load_json
+
         ceiling = (_load_json("training_week.json") or {}).get("session_set_ceiling")
         if ceiling and total_sets > int(ceiling):
             warnings.append(
-                f"total_sets {total_sets} exceeds session_set_ceiling {ceiling}; "
-                "allowed for a custom session, just flagging.")
+                f"total_sets {total_sets} exceeds session_set_ceiling {ceiling}; " "allowed for a custom session, just flagging."
+            )
     except Exception:
         pass
 
@@ -492,9 +577,7 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         status="draft",
         exercises=blocks,
         budget_used={},
-        inputs_snapshot={"authored": "custom", "total_sets": total_sets,
-                         "exercise_count": len(blocks),
-                         "created_exercises": created},
+        inputs_snapshot={"authored": "custom", "total_sets": total_sets, "exercise_count": len(blocks), "created_exercises": created},
         rationale=[
             "custom-authored via chat (action=draft_custom)",
             "loads + sets are user-specified; the generator did NOT compute them",
@@ -512,14 +595,16 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         "total_sets": total_sets,
         "warnings": warnings,
         "note": "Run action=dry_run with this routine_id to preview the exact Hevy "
-                "body, then action=commit to push. Commit requires explicit routine_id.",
+        "body, then action=commit to push. Commit requires explicit routine_id.",
     }
     if created:
         resp["created_exercises"] = created
-        resp["note"] = (f"Created {len(created)} new Hevy exercise(s): "
-                        + ", ".join(f"{c['title']} ({c['muscle_group']}/{c['exercise_type']})"
-                                    for c in created)
-                        + ". " + resp["note"])
+        resp["note"] = (
+            f"Created {len(created)} new Hevy exercise(s): "
+            + ", ".join(f"{c['title']} ({c['muscle_group']}/{c['exercise_type']})" for c in created)
+            + ". "
+            + resp["note"]
+        )
     if creation_errors:
         resp["creation_errors"] = creation_errors
     return resp
@@ -531,6 +616,7 @@ def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
         return mcp_error("dry_run requires routine_id", error_code="MISSING_ARG")
     from hevy_compiler import to_create_body
     from routine_repo import get_current
+
     ir = get_current(routine_id)
     if not ir:
         return mcp_error(f"routine_id={routine_id} not found", error_code="NOT_FOUND")
@@ -550,10 +636,11 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
             "commit requires explicit routine_id — no inferred intent",
             error_code="MISSING_ARG",
         )
-    from hevy_compiler import from_hevy_response, to_create_body, to_update_body
     import hevy_write_client as wc
+    from hevy_compiler import from_hevy_response, to_create_body, to_update_body
     from routine_repo import get_current, put_versioned, upsert_id_map
     from routine_title import build_title_context, format_why_note
+
     ir = get_current(routine_id)
     if not ir:
         return mcp_error(f"routine_id={routine_id} not found", error_code="NOT_FOUND")
@@ -562,14 +649,14 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
         title_ctx = build_title_context(ir)
         why = format_why_note(ir)
         if ir.hevy_routine_id:
-            body = to_update_body(ir, resolve,
-                                  title_context=title_ctx, why_note=why)
+            body = to_update_body(ir, resolve, title_context=title_ctx, why_note=why)
             resp = wc.update_routine_with_guard(
-                ir.hevy_routine_id, body, expected_updated_at=ir.hevy_updated_at,
+                ir.hevy_routine_id,
+                body,
+                expected_updated_at=ir.hevy_updated_at,
             )
         else:
-            body = to_create_body(ir, resolve,
-                                  title_context=title_ctx, why_note=why)
+            body = to_create_body(ir, resolve, title_context=title_ctx, why_note=why)
             resp = wc.create_routine(body)
         parsed = from_hevy_response(resp)
         ir.hevy_routine_id = parsed["hevy_routine_id"] or ir.hevy_routine_id
@@ -617,15 +704,14 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
             error_code="HEVY_CONFLICT",
         )
     except wc.HevyAuthError as e:
-        return mcp_error(f"Hevy auth failed (rotate life-platform/hevy-write?): {e}",
-                         error_code="HEVY_AUTH")
+        return mcp_error(f"Hevy auth failed (rotate life-platform/hevy-write?): {e}", error_code="HEVY_AUTH")
     except wc.HevyRetryable as e:
-        return mcp_error(f"Hevy transient error after retries: {e}",
-                         error_code="HEVY_RETRYABLE")
+        return mcp_error(f"Hevy transient error after retries: {e}", error_code="HEVY_RETRYABLE")
 
 
 def _action_list(args: dict[str, Any]) -> dict[str, Any]:
     from routine_repo import list_by_date_range
+
     start = args.get("start_date") or args.get("date") or "2026-05-31"
     end = args.get("end_date") or args.get("date") or start
     items = list_by_date_range(start, end, limit=int(args.get("limit") or 50))
@@ -653,6 +739,7 @@ def _action_get(args: dict[str, Any]) -> dict[str, Any]:
         return mcp_error("get requires routine_id", error_code="MISSING_ARG")
     from routine_ir import serialize
     from routine_repo import get_current
+
     ir = get_current(routine_id)
     if not ir:
         return mcp_error(f"routine_id={routine_id} not found", error_code="NOT_FOUND")
@@ -666,10 +753,11 @@ def _action_archive(args: dict[str, Any]) -> dict[str, Any]:
             "archive requires explicit routine_id — no inferred intent",
             error_code="MISSING_ARG",
         )
+    import hevy_write_client as wc
     from hevy_compiler import to_update_body
     from hevy_template_cache import resolve_movement
-    import hevy_write_client as wc
     from routine_repo import get_current, put_versioned
+
     ir = get_current(routine_id)
     if not ir:
         return mcp_error(f"routine_id={routine_id} not found", error_code="NOT_FOUND")
@@ -678,8 +766,11 @@ def _action_archive(args: dict[str, Any]) -> dict[str, Any]:
         ir.parent_version = ir.version
         ir.version += 1
         put_versioned(ir)
-        return {"status": "archived_local_only", "routine_id": ir.routine_id,
-                "note": "Routine was never pushed to Hevy; nothing to rename."}
+        return {
+            "status": "archived_local_only",
+            "routine_id": ir.routine_id,
+            "note": "Routine was never pushed to Hevy; nothing to rename.",
+        }
     # Ensure an Archive folder, then rename + folder-move in Hevy. Hevy has no DELETE.
     folders = wc.list_folders()
     archive_folder_id = None
@@ -695,35 +786,33 @@ def _action_archive(args: dict[str, Any]) -> dict[str, Any]:
     ir.hevy_folder_id = archive_folder_id
     body = to_update_body(ir, resolve_movement)
     try:
-        wc.update_routine_with_guard(ir.hevy_routine_id, body,
-                                     expected_updated_at=ir.hevy_updated_at)
+        wc.update_routine_with_guard(ir.hevy_routine_id, body, expected_updated_at=ir.hevy_updated_at)
     except wc.HevyConflict as e:
-        return mcp_error(f"Hevy in-app edit detected on archive — refusing to clobber. {e}",
-                         error_code="HEVY_CONFLICT")
+        return mcp_error(f"Hevy in-app edit detected on archive — refusing to clobber. {e}", error_code="HEVY_CONFLICT")
     ir.status = "archived"
     ir.parent_version = ir.version
     ir.version += 1
     put_versioned(ir)
-    return {"status": "archived", "routine_id": ir.routine_id,
-            "archive_folder_id": archive_folder_id}
+    return {"status": "archived", "routine_id": ir.routine_id, "archive_folder_id": archive_folder_id}
 
 
 def _action_floor(args: dict[str, Any]) -> dict[str, Any]:
     from routine_generator import generate_routines
     from routine_repo import put_versioned
+
     inputs = _generator_inputs(args)
     routines = generate_routines(inputs)
     floor = next((r for r in routines if r.variant == "floor"), None)
     if not floor:
         return mcp_error("Generator did not produce a floor variant", error_code="INTERNAL")
     put_versioned(floor)
-    return {"status": "drafted_floor", "routine_id": floor.routine_id,
-            "target_date": floor.target_date}
+    return {"status": "drafted_floor", "routine_id": floor.routine_id, "target_date": floor.target_date}
 
 
 def _action_re_entry(args: dict[str, Any]) -> dict[str, Any]:
     from routine_generator import GeneratorInputs, generate_routines
     from routine_repo import put_versioned
+
     base = _generator_inputs(args)
     inputs = GeneratorInputs(
         target_date=base.target_date,
@@ -738,20 +827,19 @@ def _action_re_entry(args: dict[str, Any]) -> dict[str, Any]:
     routines = generate_routines(inputs)
     re_entry = next((r for r in routines if r.variant == "re_entry"), None)
     if not re_entry:
-        return mcp_error("Generator did not produce a re_entry variant",
-                         error_code="INTERNAL")
+        return mcp_error("Generator did not produce a re_entry variant", error_code="INTERNAL")
     put_versioned(re_entry)
-    return {"status": "drafted_re_entry", "routine_id": re_entry.routine_id,
-            "target_date": re_entry.target_date}
+    return {"status": "drafted_re_entry", "routine_id": re_entry.routine_id, "target_date": re_entry.target_date}
 
 
 def _action_adherence(args: dict[str, Any]) -> dict[str, Any]:
     routine_id = args.get("routine_id")
     if not routine_id:
         return mcp_error("adherence requires routine_id", error_code="MISSING_ARG")
-    from adherence_calc import calculate_adherence
     import hevy_write_client as wc
+    from adherence_calc import calculate_adherence
     from routine_repo import get_current
+
     ir = get_current(routine_id)
     if not ir:
         return mcp_error(f"routine_id={routine_id} not found", error_code="NOT_FOUND")
@@ -762,11 +850,8 @@ def _action_adherence(args: dict[str, Any]) -> dict[str, Any]:
             performed = w
             break
     if not performed:
-        return {"status": "no_workout_for_date", "routine_id": routine_id,
-                "target_date": ir.target_date}
-    return {"status": "ok",
-            "routine_id": routine_id,
-            "adherence": calculate_adherence(ir, performed)}
+        return {"status": "no_workout_for_date", "routine_id": routine_id, "target_date": ir.target_date}
+    return {"status": "ok", "routine_id": routine_id, "adherence": calculate_adherence(ir, performed)}
 
 
 _DISPATCH = {

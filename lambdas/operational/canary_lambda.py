@@ -33,21 +33,23 @@ Timeout: 60s
 Memory: 256 MB
 """
 
-import json
-import os
-import time
 import hashlib
 import hmac
-import urllib.request
-import urllib.error
-import boto3
-from datetime import datetime, timezone, timedelta
-from decimal import Decimal
+import json
 import logging
+import os
+import time
+import urllib.error
+import urllib.request
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+
+import boto3
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("canary")
 except ImportError:
     logger = logging.getLogger("canary")
@@ -57,7 +59,7 @@ except ImportError:
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ["S3_BUCKET"]
-MCP_URL = os.environ.get("MCP_FUNCTION_URL", "")   # set from deploy script
+MCP_URL = os.environ.get("MCP_FUNCTION_URL", "")  # set from deploy script
 MCP_SECRET = os.environ.get("MCP_SECRET_NAME", "life-platform/mcp-api-key")
 
 # Reentry sweep (2026-05-03): Anthropic API canary — catches the "API access
@@ -85,22 +87,26 @@ CW_NAMESPACE = "LifePlatform/Canary"
 
 # ── Metric emission ────────────────────────────────────────────────────────────
 
+
 def emit(metric_name: str, value: float, unit: str = "Count"):
     try:
         cw.put_metric_data(
             Namespace=CW_NAMESPACE,
-            MetricData=[{
-                "MetricName": metric_name,
-                "Value": value,
-                "Unit": unit,
-                "Timestamp": datetime.now(timezone.utc),
-            }],
+            MetricData=[
+                {
+                    "MetricName": metric_name,
+                    "Value": value,
+                    "Unit": unit,
+                    "Timestamp": datetime.now(timezone.utc),
+                }
+            ],
         )
     except Exception as e:
         print(f"[WARN] CloudWatch emit failed ({metric_name}): {e}")
 
 
 # ── Check 1: DynamoDB round-trip ───────────────────────────────────────────────
+
 
 def check_dynamodb(canary_ts: str, payload: dict) -> tuple[bool, str, float]:
     """Write a synthetic record, read it back, verify hash, delete. Returns (ok, msg, latency_ms)."""
@@ -148,6 +154,7 @@ def check_dynamodb(canary_ts: str, payload: dict) -> tuple[bool, str, float]:
 
 # ── Check 2: S3 round-trip ────────────────────────────────────────────────────
 
+
 def check_s3(canary_ts: str, payload: dict) -> tuple[bool, str, float]:
     """Write a synthetic object, read it back, verify content, delete."""
     s3_key = f"canary/{canary_ts}.json"
@@ -186,6 +193,7 @@ def check_s3(canary_ts: str, payload: dict) -> tuple[bool, str, float]:
 
 # ── Check 3: MCP Lambda reachability ─────────────────────────────────────────
 
+
 def get_mcp_api_key() -> str | None:
     """Fetch MCP API key from Secrets Manager.
 
@@ -199,9 +207,7 @@ def get_mcp_api_key() -> str | None:
         # Try JSON parse as fallback for legacy format
         try:
             secret_dict = json.loads(raw)
-            return (secret_dict.get("mcp_api_key")
-                    or secret_dict.get("MCP_API_KEY")
-                    or secret_dict.get("api_key"))
+            return secret_dict.get("mcp_api_key") or secret_dict.get("MCP_API_KEY") or secret_dict.get("api_key")
         except (json.JSONDecodeError, AttributeError):
             return raw.strip()
     except Exception as e:
@@ -236,12 +242,14 @@ def check_mcp(canary_ts: str) -> tuple[bool, str, float]:
         return None, "MCP API key unavailable — skipping", 0.0
 
     # MCP tools/list request — lowest-cost reachability check
-    payload = json.dumps({
-        "jsonrpc": "2.0",
-        "method": "tools/list",
-        "id": f"canary-{canary_ts}",
-        "params": {},
-    }).encode("utf-8")
+    payload = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "method": "tools/list",
+            "id": f"canary-{canary_ts}",
+            "params": {},
+        }
+    ).encode("utf-8")
 
     # Derive Bearer token (R13-F05: fail-closed auth requires HMAC Bearer, not raw x-api-key)
     bearer = derive_mcp_bearer_token(api_key)
@@ -291,6 +299,7 @@ def check_mcp(canary_ts: str) -> tuple[bool, str, float]:
 
 # ── Check 4: Anthropic API reachability (reentry sweep, 2026-05-03) ─────────
 
+
 def get_anthropic_api_key() -> str | None:
     """ADR-062: Bedrock IAM auth — sentinel; see task #90 for full plumbing removal."""
     return "_BEDROCK_IAM_"
@@ -312,8 +321,8 @@ def check_anthropic(canary_ts: str) -> tuple[bool, str, float]:
     """
     t0 = time.monotonic()
     try:
-        from bedrock_client import invoke as _bedrock_invoke
         import botocore.exceptions as _bce
+        from bedrock_client import invoke as _bedrock_invoke
     except Exception as e:
         return None, f"bedrock_client import failed — skipping: {e}", 0.0
 
@@ -356,6 +365,7 @@ def check_subscribe_flow(canary_ts: str) -> tuple[bool, str, float]:
     Returns (None, msg, 0) on environment misconfig (skip).
     """
     import hashlib as _h
+
     canary_email = f"canary+{int(time.time())}@mattsusername.com"
     email_hash = _h.sha256(canary_email.lower().encode()).hexdigest()
     sk = f"EMAIL#{email_hash}"
@@ -367,7 +377,8 @@ def check_subscribe_flow(canary_ts: str) -> tuple[bool, str, float]:
         # POST the subscribe request
         body = json.dumps({"email": canary_email, "source": "canary"}).encode()
         req = urllib.request.Request(
-            api_url, data=body,
+            api_url,
+            data=body,
             headers={"Content-Type": "application/json", "User-Agent": "life-platform-canary/1.0"},
             method="POST",
         )
@@ -401,10 +412,10 @@ def check_subscribe_flow(canary_ts: str) -> tuple[bool, str, float]:
                 UpdateExpression="SET #s = :v, tombstone = :tomb, tombstoned_at = :ts, tombstoned_reason = :r",
                 ExpressionAttributeNames={"#s": "status"},
                 ExpressionAttributeValues={
-                    ":v":    {"S": "canary"},
+                    ":v": {"S": "canary"},
                     ":tomb": {"BOOL": True},
-                    ":ts":   {"S": canary_ts},
-                    ":r":    {"S": "canary_subscribe_check"},
+                    ":ts": {"S": canary_ts},
+                    ":r": {"S": "canary_subscribe_check"},
                 },
             )
         except Exception:
@@ -464,6 +475,7 @@ def send_alert(failures: list[dict], canary_ts: str) -> None:
 
 
 # ── Handler ────────────────────────────────────────────────────────────────────
+
 
 def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
     try:
@@ -556,11 +568,14 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
             _prev = _ddb_cli.get_item(TableName=TABLE_NAME, Key=_state_key).get("Item") or {}
             prev_failed = set((_prev.get("failed_checks", {}).get("SS") or []))
             # Persist current state for the next run's comparison
-            _ddb_cli.put_item(TableName=TABLE_NAME, Item={
-                **_state_key,
-                "failed_checks": {"SS": current_failed} if current_failed else {"SS": ["__none__"]},
-                "ts": {"S": canary_ts},
-            })
+            _ddb_cli.put_item(
+                TableName=TABLE_NAME,
+                Item={
+                    **_state_key,
+                    "failed_checks": {"SS": current_failed} if current_failed else {"SS": ["__none__"]},
+                    "ts": {"S": canary_ts},
+                },
+            )
         except Exception as _se:
             print(f"[WARN] canary state read/write failed (defaulting to no-alert): {_se}")
             prev_failed = set()
@@ -577,12 +592,14 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
 
         return {
             "statusCode": 200 if all_ok else 500,
-            "body": json.dumps({
-                "canary_ts": canary_ts,
-                "all_pass": all_ok,
-                "failures": len(failures),
-                "results": results,
-            }),
+            "body": json.dumps(
+                {
+                    "canary_ts": canary_ts,
+                    "all_pass": all_ok,
+                    "failures": len(failures),
+                    "results": results,
+                }
+            ),
         }
     except Exception as e:
         logger.error("lambda_handler failed: %s", e, exc_info=True)

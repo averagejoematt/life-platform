@@ -14,6 +14,7 @@ Stable module — part of the Layer (ADR-027 stable core tier).
 v1.0.0 — 2026-03-14 (SEC-3 MEDIUM)
 v1.1.0 — 2026-03-15 (R31: mcp_error() + ERROR_CODES)
 """
+
 import re
 from datetime import datetime
 from typing import Any
@@ -101,14 +102,14 @@ def validate_date_range(
 # Canonical error codes used across all MCP tools.
 # Claude reads these to decide how to recover — keep them stable.
 ERROR_CODES = {
-    "NO_DATA":          "No data found for the requested period.",
-    "DATE_RANGE":       "Invalid or out-of-bound date range.",
-    "MISSING_ARG":      "A required argument was not provided.",
-    "SOURCE_UNAVAIL":   "Data source is unavailable or not yet ingested.",
-    "PARTIAL_DATA":     "Data returned but one or more fields are incomplete.",
-    "QUERY_TOO_BROAD":  "Query spans too many days — use a narrower date range.",
-    "INTERNAL":         "Internal processing error.",
-    "RATE_LIMIT":       "Write tool called too many times in a short window.",
+    "NO_DATA": "No data found for the requested period.",
+    "DATE_RANGE": "Invalid or out-of-bound date range.",
+    "MISSING_ARG": "A required argument was not provided.",
+    "SOURCE_UNAVAIL": "Data source is unavailable or not yet ingested.",
+    "PARTIAL_DATA": "Data returned but one or more fields are incomplete.",
+    "QUERY_TOO_BROAD": "Query spans too many days — use a narrower date range.",
+    "INTERNAL": "Internal processing error.",
+    "RATE_LIMIT": "Write tool called too many times in a short window.",
 }
 
 
@@ -146,7 +147,7 @@ def mcp_error(
         suggestions = _default_suggestions(error_code)
 
     response: dict[str, Any] = {
-        "error":      message,
+        "error": message,
         "error_code": error_code,
         "suggestions": suggestions,
     }

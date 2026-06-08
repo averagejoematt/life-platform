@@ -16,14 +16,15 @@ strength tools (tools_strength.py) still read them for legacy continuity.
 Phase filter: applied by default via core.query_source_range — pilot
 records are hidden unless include_pilot=True is set on the tool call.
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
-from mcp.core import query_source_range, table
 from boto3.dynamodb.conditions import Key
 
+from mcp.core import query_source_range, table
 
 _WORKOUT_SOURCES = ("hevy", "macrofactor_export")
 
@@ -54,6 +55,7 @@ def _content_uid(source_label: str, date_str: str, title: str, start_time: str) 
     content-hash scheme, this enables the spec §3.4 dedupe story.
     """
     import hashlib
+
     key = f"{source_label}|{date_str}|{(start_time or '').strip()}|{(title or '').strip()}"
     return f"mf:{hashlib.sha256(key.encode()).hexdigest()[:16]}"
 
@@ -87,7 +89,7 @@ def _expand_legacy_aggregate(item: dict, source_label: str) -> list[dict]:
         set_count = 0
         ex_list = w.get("exercises") or []
         for ex in ex_list:
-            for s in (ex.get("sets") or []):
+            for s in ex.get("sets") or []:
                 set_count += 1
                 w_lbs = s.get("weight_lbs")
                 reps = s.get("reps")
@@ -103,40 +105,42 @@ def _expand_legacy_aggregate(item: dict, source_label: str) -> list[dict]:
                 duration_sec = int(float(duration_min) * 60)
             except (TypeError, ValueError):
                 pass
-        expanded.append({
-            "workout_uid":       wid,
-            "source":            source_label,
-            "source_workout_id": wid.split(":", 1)[-1],  # synthetic but stable
-            "date":              date_str,
-            "title":             title,
-            "start_time":        start_time,
-            "end_time":          end_time,
-            "duration_sec":      duration_sec,
-            "exercise_count":    len(ex_list),
-            "set_count":         set_count,
-            "total_volume_kg":   round(total_volume_kg, 2),
-            "original_unit":     "lbs",   # legacy aggregates always stored lbs
-            "exercises":         ex_list,
-            "_legacy_aggregate": True,    # tell callers this came from the bridge
-        })
+        expanded.append(
+            {
+                "workout_uid": wid,
+                "source": source_label,
+                "source_workout_id": wid.split(":", 1)[-1],  # synthetic but stable
+                "date": date_str,
+                "title": title,
+                "start_time": start_time,
+                "end_time": end_time,
+                "duration_sec": duration_sec,
+                "exercise_count": len(ex_list),
+                "set_count": set_count,
+                "total_volume_kg": round(total_volume_kg, 2),
+                "original_unit": "lbs",  # legacy aggregates always stored lbs
+                "exercises": ex_list,
+                "_legacy_aggregate": True,  # tell callers this came from the bridge
+            }
+        )
     return expanded
 
 
 def _slim_workout(item: dict, include_sets: bool = False) -> dict:
     """Project a DDB workout item into a stable shape for callers."""
     out = {
-        "workout_uid":       item.get("workout_uid"),
-        "source":            item.get("source"),
+        "workout_uid": item.get("workout_uid"),
+        "source": item.get("source"),
         "source_workout_id": item.get("source_workout_id"),
-        "date":              item.get("date"),
-        "title":             item.get("title"),
-        "start_time":        item.get("start_time"),
-        "end_time":          item.get("end_time"),
-        "duration_sec":      item.get("duration_sec"),
-        "exercise_count":    item.get("exercise_count"),
-        "set_count":         item.get("set_count"),
-        "total_volume_kg":   item.get("total_volume_kg"),
-        "original_unit":     item.get("original_unit"),
+        "date": item.get("date"),
+        "title": item.get("title"),
+        "start_time": item.get("start_time"),
+        "end_time": item.get("end_time"),
+        "duration_sec": item.get("duration_sec"),
+        "exercise_count": item.get("exercise_count"),
+        "set_count": item.get("set_count"),
+        "total_volume_kg": item.get("total_volume_kg"),
+        "original_unit": item.get("original_unit"),
     }
     if include_sets:
         out["exercises"] = item.get("exercises", [])
@@ -172,8 +176,7 @@ def tool_get_workouts(args: dict) -> dict:
     seen_uids: set[str] = set()
     for src in sources_to_query:
         try:
-            items = query_source_range(src, start_date, end_date,
-                                       include_pilot=include_pilot) or []
+            items = query_source_range(src, start_date, end_date, include_pilot=include_pilot) or []
         except Exception:
             items = []
         for it in items:
@@ -189,8 +192,7 @@ def tool_get_workouts(args: dict) -> dict:
         if source_filter and source_filter != label:
             continue
         try:
-            items = query_source_range(legacy_src, start_date, end_date,
-                                       include_pilot=include_pilot) or []
+            items = query_source_range(legacy_src, start_date, end_date, include_pilot=include_pilot) or []
         except Exception:
             items = []
         for it in items:
@@ -201,12 +203,12 @@ def tool_get_workouts(args: dict) -> dict:
 
     rows.sort(key=lambda r: (r.get("date") or "", r.get("start_time") or ""), reverse=True)
     return {
-        "count":  len(rows[:limit]),
-        "total":  len(rows),
+        "count": len(rows[:limit]),
+        "total": len(rows),
         "start_date": start_date,
-        "end_date":   end_date,
+        "end_date": end_date,
         "source_filter": source_filter,
-        "workouts":   rows[:limit],
+        "workouts": rows[:limit],
     }
 
 
@@ -243,8 +245,7 @@ def _latest_per_workout_record(source: str) -> dict:
     try:
         resp = table.query(
             KeyConditionExpression=Key("pk").eq(pk) & Key("sk").begins_with("DATE#"),
-            FilterExpression="attribute_exists(source_workout_id) "
-                             "AND (#phase = :exp OR attribute_not_exists(#phase))",
+            FilterExpression="attribute_exists(source_workout_id) " "AND (#phase = :exp OR attribute_not_exists(#phase))",
             ExpressionAttributeNames={"#phase": "phase"},
             ExpressionAttributeValues={":exp": "experiment"},
             ScanIndexForward=False,
@@ -276,12 +277,12 @@ def tool_get_workout_source_status(args: dict) -> dict:
             except Exception:
                 pass
         out["sources"][src] = {
-            "last_workout_date":   last_date,
-            "last_ingested_at":    last_ingested,
-            "age_hours":           age_hours,
-            "title":               rec.get("title"),
-            "set_count":           rec.get("set_count"),
-            "healthy":             (age_hours is not None and age_hours < 36),
+            "last_workout_date": last_date,
+            "last_ingested_at": last_ingested,
+            "age_hours": age_hours,
+            "title": rec.get("title"),
+            "set_count": rec.get("set_count"),
+            "healthy": (age_hours is not None and age_hours < 36),
         }
 
     # Legacy bridge: report freshness of the macrofactor_workouts daily-aggregate
@@ -289,11 +290,16 @@ def tool_get_workout_source_status(args: dict) -> dict:
     # expands those aggregates per workout — see _expand_legacy_aggregate).
     try:
         from mcp.core import _apply_phase_filter
-        resp = table.query(**_apply_phase_filter({
-            "KeyConditionExpression": Key("pk").eq("USER#matthew#SOURCE#macrofactor_workouts")
-                                    & Key("sk").begins_with("DATE#"),
-            "ScanIndexForward": False, "Limit": 1,
-        }))
+
+        resp = table.query(
+            **_apply_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq("USER#matthew#SOURCE#macrofactor_workouts") & Key("sk").begins_with("DATE#"),
+                    "ScanIndexForward": False,
+                    "Limit": 1,
+                }
+            )
+        )
         items = resp.get("Items") or []
         if items:
             rec = items[0]
@@ -310,27 +316,29 @@ def tool_get_workout_source_status(args: dict) -> dict:
             existing_age = existing.get("age_hours")
             if existing_age is None or (age_hours is not None and age_hours < existing_age):
                 out["sources"]["macrofactor_export"] = {
-                    "last_workout_date":   rec.get("date"),
-                    "last_ingested_at":    last_ingested,
-                    "age_hours":           age_hours,
-                    "title":               "(legacy daily aggregate)",
-                    "set_count":           int(rec.get("total_sets") or 0),
-                    "healthy":             (age_hours is not None and age_hours < 36),
-                    "_legacy_aggregate":   True,
+                    "last_workout_date": rec.get("date"),
+                    "last_ingested_at": last_ingested,
+                    "age_hours": age_hours,
+                    "title": "(legacy daily aggregate)",
+                    "set_count": int(rec.get("total_sets") or 0),
+                    "healthy": (age_hours is not None and age_hours < 36),
+                    "_legacy_aggregate": True,
                 }
     except Exception:
         pass
 
     # Hevy backfill state record (high-water mark for the events poller)
     try:
-        resp = table.get_item(Key={
-            "pk": "USER#system",
-            "sk": "INGESTION_STATE#hevy",
-        })
+        resp = table.get_item(
+            Key={
+                "pk": "USER#system",
+                "sk": "INGESTION_STATE#hevy",
+            }
+        )
         state = resp.get("Item") or {}
         out["hevy_backfill"] = {
-            "since_iso":   state.get("since_iso"),
-            "updated_at":  state.get("updated_at"),
+            "since_iso": state.get("since_iso"),
+            "updated_at": state.get("updated_at"),
         }
     except Exception:
         pass

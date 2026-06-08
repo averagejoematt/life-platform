@@ -1,21 +1,34 @@
 """
 Core data access: profile, caching, DynamoDB queries, serialisation.
 """
-import json
-import time
+
 import concurrent.futures
+import json
 import logging
-from decimal import Decimal
+import time
 from datetime import datetime, timezone
+from decimal import Decimal
+
 from boto3.dynamodb.conditions import Key
 
 from mcp.config import (
-    table, secrets, logger, USER_PREFIX, PROFILE_PK, PROFILE_SK,
-    CACHE_PK, CACHE_TTL_SECS, MEM_CACHE_TTL, API_SECRET_NAME,
-    _DEFAULT_SOURCE_OF_TRUTH, _LEAN_STRIP, FIELD_ALIASES,
+    _DEFAULT_SOURCE_OF_TRUTH,
+    _LEAN_STRIP,
+    API_SECRET_NAME,
+    CACHE_PK,
+    CACHE_TTL_SECS,
+    FIELD_ALIASES,
+    MEM_CACHE_TTL,
+    PROFILE_PK,
+    PROFILE_SK,
+    USER_PREFIX,
+    logger,
+    secrets,
+    table,
 )
 
 # ── Serialisation ──
+
 
 def decimal_to_float(obj):
     if isinstance(obj, list):
@@ -37,6 +50,7 @@ def get_api_key():
 
 # ── Profile cache ──
 _PROFILE_CACHE = None
+
 
 def get_profile():
     global _PROFILE_CACHE
@@ -61,6 +75,7 @@ def get_sot(domain: str) -> str:
 # ── In-memory cache ──
 _MEM_CACHE: dict = {}
 
+
 def mem_cache_get(key: str):
     entry = _MEM_CACHE.get(key)
     if entry and (time.time() - entry["ts"]) < MEM_CACHE_TTL:
@@ -68,12 +83,14 @@ def mem_cache_get(key: str):
         return entry["data"]
     return None
 
+
 def mem_cache_set(key: str, data):
     _MEM_CACHE[key] = {"data": data, "ts": time.time()}
     logger.info(f"[cache:mem] stored — {key}")
 
 
 # ── DynamoDB pre-computed cache ──
+
 
 def ddb_cache_get(cache_key: str):
     """Read a pre-computed result from DynamoDB. Returns None on miss/expiry."""
@@ -94,17 +111,20 @@ def ddb_cache_get(cache_key: str):
         logger.warning(f"[cache:ddb] read error for {cache_key}: {e}")
     return None
 
+
 def ddb_cache_set(cache_key: str, data):
     """Write a pre-computed result to DynamoDB cache with a TTL."""
     try:
         ttl_epoch = int(time.time()) + CACHE_TTL_SECS
-        table.put_item(Item={
-            "pk":           CACHE_PK,
-            "sk":           f"TOOL#{cache_key}",
-            "payload":      json.dumps(data, default=str),
-            "ttl":          Decimal(str(ttl_epoch)),
-            "computed_at":  datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        })
+        table.put_item(
+            Item={
+                "pk": CACHE_PK,
+                "sk": f"TOOL#{cache_key}",
+                "payload": json.dumps(data, default=str),
+                "ttl": Decimal(str(ttl_epoch)),
+                "computed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            }
+        )
         logger.info(f"[cache:ddb] stored — {cache_key}")
     except Exception as e:
         logger.warning(f"[cache:ddb] write error for {cache_key}: {e}")
@@ -113,7 +133,8 @@ def ddb_cache_set(cache_key: str, data):
 # ── DynamoDB queries ──
 
 import re
-_SAFE_SOURCE = re.compile(r'^[a-zA-Z0-9_]+$')
+
+_SAFE_SOURCE = re.compile(r"^[a-zA-Z0-9_]+$")
 
 # ADR-058: phase filter — hides phase=pilot records by default. Records without
 # a phase attribute (genome, profile, config, board) pass through.
@@ -127,9 +148,7 @@ def _apply_phase_filter(kwargs: dict, include_pilot: bool = False) -> dict:
         return kwargs
     out = dict(kwargs)
     existing = out.get("FilterExpression")
-    out["FilterExpression"] = (
-        f"({existing}) AND {_PHASE_FILTER_EXPRESSION}" if existing else _PHASE_FILTER_EXPRESSION
-    )
+    out["FilterExpression"] = f"({existing}) AND {_PHASE_FILTER_EXPRESSION}" if existing else _PHASE_FILTER_EXPRESSION
     names = dict(out.get("ExpressionAttributeNames") or {})
     names.update(_PHASE_FILTER_NAMES)
     out["ExpressionAttributeNames"] = names
@@ -145,11 +164,10 @@ def query_source(source, start_date, end_date, lean=False, include_pilot=False):
         logger.warning(f"query_source: rejected invalid source name: {source!r}")
         return []
     pk = f"{USER_PREFIX}{source}"
-    kwargs = _apply_phase_filter({
-        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(
-            f"DATE#{start_date}", f"DATE#{end_date}~"
-        )
-    }, include_pilot=include_pilot)
+    kwargs = _apply_phase_filter(
+        {"KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}~")},
+        include_pilot=include_pilot,
+    )
     items = []
     while True:
         response = table.query(**kwargs)
@@ -169,10 +187,7 @@ def parallel_query_sources(sources, start_date, end_date, lean=False, include_pi
     """Query multiple DynamoDB sources concurrently."""
     results = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(sources), 5)) as pool:
-        future_to_src = {
-            pool.submit(query_source, src, start_date, end_date, lean, include_pilot): src
-            for src in sources
-        }
+        future_to_src = {pool.submit(query_source, src, start_date, end_date, lean, include_pilot): src for src in sources}
         for future in concurrent.futures.as_completed(future_to_src):
             src = future_to_src[future]
             try:

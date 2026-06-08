@@ -15,6 +15,7 @@ Failures:
                    metric, log, return success-with-warning so DLQ doesn't
                    poison-pill on a routine-edit-in-app conflict.
 """
+
 from __future__ import annotations
 
 import logging
@@ -26,6 +27,7 @@ import boto3
 
 try:
     from platform_logger import get_logger
+
     logger = get_logger("hevy-routine-cron")
 except ImportError:
     logger = logging.getLogger("hevy-routine-cron")
@@ -95,6 +97,7 @@ def _gather_inputs(target_date: str, add_load_enabled: bool) -> "GeneratorInputs
     swaps the placeholders for direct DDB reads.
     """
     from routine_generator import GeneratorInputs
+
     return GeneratorInputs(
         target_date=target_date,
         recovery_tier="yellow",
@@ -124,16 +127,15 @@ def lambda_handler(event, context):
         target_date = _target_date_for_event(event or {})
         inputs = _gather_inputs(target_date, gates["add_load_enabled"])
 
-        from hevy_compiler import to_create_body
-        from hevy_template_cache import resolve_movement
         import hevy_write_client as wc
         import routine_repo as repo
+        from hevy_compiler import to_create_body
+        from hevy_template_cache import resolve_movement
         from routine_generator import generate_routines
         from routine_title import build_title_context, format_why_note
 
         routines = generate_routines(inputs)
-        logger.info(f"generated {len(routines)} variant(s) for {target_date}: "
-                    f"{[r.variant for r in routines]}")
+        logger.info(f"generated {len(routines)} variant(s) for {target_date}: " f"{[r.variant for r in routines]}")
 
         summary: list[dict[str, Any]] = []
         pushed_one = False
@@ -145,10 +147,10 @@ def lambda_handler(event, context):
             try:
                 title_ctx = build_title_context(ir)
                 why = format_why_note(ir)
-                body = to_create_body(ir, resolve_movement,
-                                      title_context=title_ctx, why_note=why)
+                body = to_create_body(ir, resolve_movement, title_context=title_ctx, why_note=why)
                 resp = wc.create_routine(body)
                 from hevy_compiler import from_hevy_response
+
                 parsed = from_hevy_response(resp)
                 ir.hevy_routine_id = parsed["hevy_routine_id"]
                 ir.hevy_updated_at = parsed["updated_at"]
@@ -161,12 +163,10 @@ def lambda_handler(event, context):
                     repo.upsert_id_map(ir.routine_id, ir.hevy_routine_id)
                 pushed_one = True
                 _emit_metric("RoutinePushed")
-                summary.append({"routine_id": ir.routine_id, "variant": ir.variant,
-                                "pushed": True, "hevy_routine_id": ir.hevy_routine_id})
+                summary.append({"routine_id": ir.routine_id, "variant": ir.variant, "pushed": True, "hevy_routine_id": ir.hevy_routine_id})
             except wc.HevyOrphanCreated as e:
                 logger.warning(
-                    f"HevyOrphanCreated on push for {ir.routine_id}: "
-                    f"Hevy returned {e.status} but created {e.hevy_routine_id}. Linking."
+                    f"HevyOrphanCreated on push for {ir.routine_id}: " f"Hevy returned {e.status} but created {e.hevy_routine_id}. Linking."
                 )
                 ir.hevy_routine_id = e.hevy_routine_id
                 ir.hevy_updated_at = e.hevy_updated_at
@@ -181,21 +181,25 @@ def lambda_handler(event, context):
                     except Exception:
                         pass
                 _emit_metric("RoutineOrphanRecovered")
-                summary.append({"routine_id": ir.routine_id, "variant": ir.variant,
-                                "pushed": True, "hevy_routine_id": ir.hevy_routine_id,
-                                "warning": f"orphan-recovered (status={e.status})"})
+                summary.append(
+                    {
+                        "routine_id": ir.routine_id,
+                        "variant": ir.variant,
+                        "pushed": True,
+                        "hevy_routine_id": ir.hevy_routine_id,
+                        "warning": f"orphan-recovered (status={e.status})",
+                    }
+                )
                 pushed_one = True
             except wc.HevyConflict as e:
                 logger.warning(f"HevyConflict on push for {ir.routine_id}: {e}")
                 _emit_metric("RoutineConflict")
-                summary.append({"routine_id": ir.routine_id, "variant": ir.variant,
-                                "pushed": False, "error": "conflict"})
+                summary.append({"routine_id": ir.routine_id, "variant": ir.variant, "pushed": False, "error": "conflict"})
             except wc.HevyRetryable:
                 _emit_metric("RoutineRetryable")
                 raise
 
-        return {"status": "ok", "target_date": target_date,
-                "gates": gates, "routines": summary}
+        return {"status": "ok", "target_date": target_date, "gates": gates, "routines": summary}
     except Exception:
         # Let HevyRetryable + boto3 transient errors propagate to Lambda async
         # retry → DLQ. Log + re-raise rather than swallow.
