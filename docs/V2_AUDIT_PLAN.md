@@ -1,5 +1,7 @@
 # V2 Comprehensive Audit Plan — 2026-05-17
 
+> **Status: HISTORICAL.** The V2 audit completed 2026-05-17; findings closed in ADR-057. Kept as the record of that audit (referenced from `CLAUDE.md`'s doc index). Not a live plan.
+
 > Second-round 24-hour-expert audit. Run while v1 work (v7.0.0–v7.21.0) sits **uncommitted in the working tree**. Four parallel deep-dive agents produced ~120 raw findings across codebase, AWS, AI/data-flow, and web/DX. This document is the consolidated plan, ROI-ordered.
 >
 > Sub-reports preserved at `docs/v2-audits/01_codebase.md`, `02_aws.md`, `03_ai_dataflow.md`, `04_web_dx.md`.

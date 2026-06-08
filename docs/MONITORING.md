@@ -34,7 +34,7 @@ In code (CDK), alarm constructor chooses the topic via `digest=True/False` flag 
 
 ---
 
-## Active alarms (104 total as of 2026-05-19)
+## Active alarms (~50 total as of 2026-06-08)
 
 ### Critical (urgent tier — page immediately if firing)
 
@@ -213,7 +213,7 @@ See `docs/BACKLOG.md` for the full backlog. Monitoring-relevant gaps:
 
 | Item | Cost / month |
 |---|---|
-| CloudWatch alarms (104 × $0.10) | $10.40 |
+| CloudWatch alarms (~50 × $0.10, first 10 free) | ~$4-5 |
 | CloudWatch metrics (custom, ~50 metrics) | included in alarms |
 | Logs storage (~1 GB across all Lambdas) | $0.50 |
 | Logs ingestion (~5 GB/mo) | $2.50 |

@@ -208,7 +208,7 @@ bash deploy/maintenance_mode.sh disable   # re-enables
 
 ## Shared Layer Modules
 
-These modules are deployed as Lambda Layer `life-platform-shared-utils` (currently **v51**, mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`). All ingestion, compute, email, and MCP Lambdas reference this layer.
+These modules are deployed as Lambda Layer `life-platform-shared-utils` (currently **v74**, mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`). All ingestion, compute, email, and MCP Lambdas reference this layer.
 
 **If you edit any of these files, run `bash deploy/build_layer.sh` before deploying dependent Lambdas:**
 
@@ -297,9 +297,9 @@ If compute runs before ingestion completes, it uses yesterday's data. If the bri
 - **Mental model**: `docs/ONBOARDING.md`
 - **Architecture catalog**: `docs/ARCHITECTURE.md`
 - **Data model**: `docs/SCHEMA.md`
-- **Decision history**: `docs/DECISIONS.md` (57 ADRs)
+- **Decision history**: `docs/DECISIONS.md` (78 ADRs)
 - **Daily operations**: `docs/RUNBOOK.md`
-- **MCP tool catalog**: `docs/MCP_TOOL_CATALOG.md` (127 tools)
+- **MCP tool catalog**: `docs/MCP_TOOL_CATALOG.md` (133 tools)
 - **V2 audit findings**: `docs/V2_AUDIT_PLAN.md` (76 findings, ~33 shipped, formally closed in ADR-057)
 
 ---
