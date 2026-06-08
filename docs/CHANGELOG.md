@@ -35,6 +35,9 @@
 ### Fixed
 - **Persistent door nav** — the three-door menu (Cockpit · Story · Evidence) used a "you-are-here by omission" rule (each page hid its own door from the menu), so menu items appeared/vanished page-to-page and read as inconsistent. Now every page shows all three doors with the current one marked `aria-current="page"` (ember + underline). Touches `now/index.html`, the story shell (`v4_build_dispatches.py`), the evidence shell (`v4_build_evidence.py`), and the three `.doors` CSS blocks.
 
+### Cost
+- **Production run-rate sweep** (`docs/COST_TRACKER.md`, real Cost Explorer data): steady-state run-rate is **~$25–40/mo** against the **enforcing** $75 ceiling (corrected the stale "observe-only" doc claim — `OBSERVE_MODE=false` since 2026-05-29). Real months: Mar $20.04 → Apr $35.01 → May $48.19 (peak, Bedrock $14.29) → Jun MTD $18.60 (WAF now $0/deleted). **Action:** cost-governor CE polling **hourly → every 4h** (`operational_stack.py`), ~−$2–3/mo of Cost-Explorer self-cost, with no loss of enforcement (AI tier priced from CloudWatch metrics). Audit confirmed Bedrock tiering already optimal (structured→Haiku, narrative→Sonnet, caching comprehensive) and alarms already consolidated — no further safe cuts. Paused `strava` secret retained by owner request.
+
 ---
 
 ## v8.3.4 — 2026-06-07 (ADR-077 phase taxonomy + coherent restart tooling)
