@@ -857,7 +857,7 @@ def gather_all():
 
     # ── 4-week trends ──
     # Build weekly extractions for weeks 3 and 4
-    raw_w3 = {src: {d: r for d, r in query_range(src, w3_start, w2_start).items() if w3_start <= d < w2_start} for src in ["day_grade"]}
+    {src: {d: r for d, r in query_range(src, w3_start, w2_start).items() if w3_start <= d < w2_start} for src in ["day_grade"]}
     # Reuse data already queried (4 weeks in one shot above)
     full_data = {}
     for src in sources:
@@ -1277,7 +1277,7 @@ def build_html(data, commentary, profile):
     # ══════════════════════════════════════════════════════════════════════════
     character_section = ""
     cs = data.get("character_sheet")
-    cs_prior = data.get("character_sheet_prior")
+    data.get("character_sheet_prior")
     if cs:
         tier_colors = {
             "Foundation": {"bg": "#f3f4f6", "bar": "#6b7280", "text": "#374151"},
@@ -1353,7 +1353,7 @@ def build_html(data, commentary, profile):
             for ev in cs_events:
                 ev_type = ev.get("type", "")
                 ev_pillar = ev.get("pillar", "").replace("_", " ").title()
-                ev_date = ev.get("date", "")
+                ev.get("date", "")
                 is_up = "up" in ev_type
                 ev_col = "#059669" if is_up else "#d97706"
                 ev_icon = "\u2b06" if is_up else "\u2b07"

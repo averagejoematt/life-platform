@@ -511,7 +511,7 @@ def handle_habit_streaks() -> dict:
     Returns: Tier 0 habit streaks for public display (aggregate streak only, no habit names).
     Cache: 3600s (1 hr).
     """
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    datetime.now(timezone.utc).strftime("%Y-%m-%d")
     yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
 
     # Read latest habit_scores record
@@ -576,7 +576,7 @@ def handle_experiments() -> dict:
     )
     items = _decimal_to_float(resp.get("Items", []))
 
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     experiments = []
     for item in items:
@@ -849,7 +849,7 @@ def handle_habits() -> dict:
         t01_total = int(item.get("tier01_total", t0_total) or t0_total)
         t0_pct = round(t0_done / t0_total * 100) if t0_total else 0
         t01_pct = round(t01_done / t01_total * 100) if t01_total else 0
-        streak = int(item.get("t0_perfect_streak") or item.get("t0_aggregate_streak") or 0)
+        int(item.get("t0_perfect_streak") or item.get("t0_aggregate_streak") or 0)
 
         # Per-group breakdown: prefer flat group_* fields on habit_scores;
         # fall back to habitify by_group data if present
@@ -873,7 +873,7 @@ def handle_habits() -> dict:
         history.append(day)
 
     # Latest record for current streak
-    latest = history[-1] if history else {}
+    history[-1] if history else {}
     latest_streak = 0
     if items:
         last_item = _decimal_to_float(items[-1])

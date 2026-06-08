@@ -645,7 +645,7 @@ def lambda_handler(event, context):
         def _build_event_description(ev):
             pillar = (ev.get("pillar") or "overall").title()
             etype = ev.get("type", "")
-            old_lv = ev.get("old_level", "?")
+            ev.get("old_level", "?")
             new_lv = ev.get("new_level", "?")
             base = f"{pillar} \u2192 Level {new_lv}"
             if "tier" in etype:

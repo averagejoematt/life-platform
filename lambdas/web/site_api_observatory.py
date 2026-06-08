@@ -817,7 +817,7 @@ def handle_physical_overview() -> dict:
     Source: dexa + measurements DynamoDB partitions.
     Cache: 3600s.
     """
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     # ── 1. DEXA scans (all, sorted ascending) ──
     dexa_pk = f"{USER_PREFIX}dexa"
@@ -858,7 +858,7 @@ def handle_physical_overview() -> dict:
         s360 = item.get("score_360", {})
         seg_fat = item.get("segmental_fat", {})
         seg_lean = item.get("segmental_lean", {})
-        limbs = item.get("limbs", {})
+        item.get("limbs", {})
         targets = item.get("targets", {})
         changes = item.get("changes_vs_baseline", {})
         return {
@@ -1670,7 +1670,7 @@ def handle_strength_deep_dive() -> dict:
     weekly_volume = defaultdict(float)
     exercise_freq = Counter()
     session_days = Counter()  # day of week
-    session_hours = Counter()  # hour of day
+    Counter()  # hour of day
     total_sets_30d = 0
     exercises_30d = set()
 

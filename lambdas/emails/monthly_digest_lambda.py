@@ -326,7 +326,7 @@ def compute_annual_goals(cur, windows, profile=None):
         p = profile or {}
         journey_start_weight = float(p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
         goal_weight = float(p.get("goal_weight_lbs", GOAL_WEIGHT_LBS))
-        journey_start_date_str = str(p.get("journey_start_date", ""))
+        str(p.get("journey_start_date", ""))
 
         current = w["weight_latest"]
         lost = round(journey_start_weight - current, 1)
@@ -651,7 +651,7 @@ def build_html(data, goals, commentary, windows):
     cur = data["cur"]
     prior = data["prior"]
     tl = data["training_load"]
-    pro = data.get("profile", {})
+    data.get("profile", {})
     month = windows["month_label"]
     prior_month = windows["prior_label"]
 
