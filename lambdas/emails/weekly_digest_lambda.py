@@ -1338,7 +1338,7 @@ def build_html(data, commentary, profile):
                 delta_str = f' <span style="color:#d97706;">{p_delta}</span>'
             cs_html += (
                 f'<div style="margin:2px 0;"><table style="width:100%;"><tr>'
-                f'<td style="width:90px;font-size:10px;color:#6b7280;">{p_emoji} {p_name.capitalize()}</td>'
+                f'<td style="width:90px;font-size:10px;color:#6b7280;">{p_emoji} {(p_name or "").capitalize()}</td>'
                 f'<td><div style="background:#e5e7eb;border-radius:3px;height:5px;">'
                 f'<div style="background:{p_tc["bar"]};border-radius:3px;height:5px;width:{p_level}%;"></div></div></td>'
                 f'<td style="width:80px;text-align:right;font-size:10px;color:{p_tc["text"]};font-weight:600;">Lv{p_level}{delta_str}{avg_str}</td>'
@@ -1375,7 +1375,7 @@ def build_html(data, commentary, profile):
         if ctt:
             cs_html += (
                 f'<div style="margin-top:6px;font-size:10px;color:#6b7280;">'
-                f'\U0001f4a1 <b>{ctt["pillar"].capitalize()}</b> is {ctt["levels_needed"]} levels from '
+                f'\U0001f4a1 <b>{(ctt.get("pillar") or "").capitalize()}</b> is {ctt["levels_needed"]} levels from '
                 f'{ctt["next_tier"]} tier</div>'
             )
 
