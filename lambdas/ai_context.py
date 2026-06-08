@@ -719,3 +719,321 @@ def _build_cross_pillar_tradeoffs(component_scores, data, profile):
     lines.append("Don't give equal coaching weight to all pillars \u2014 the constraint determines the ceiling.")
     lines.append("When pillars conflict, state the optimization call: which pillar to PRIORITIZE vs which to hold.")
     return "\n".join(lines)
+
+
+# ==============================================================================
+# Slice 3: insights/milestone/weight/training context + domain-data builders
+# (moved from ai_calls.py 2026-06-08; pure, AST-verified circular-free)
+# ==============================================================================
+
+_MAX_INSIGHTS_CONTEXT_CHARS = 1500
+
+
+def _load_insights_context(data):
+    """Extract the AI context block from the computed_insights record.
+
+    Returns a compact string block for prompt injection, or empty string
+    if the insights Lambda hasn't run yet (graceful degradation).
+
+    TB7-20: Applies a 1500-char hard cap as a second safety valve beyond the
+    700-token budget enforced upstream in _build_prioritized_context_block().
+    Truncates at a newline boundary and appends a truncation note.
+    """
+    insights = data.get("computed_insights")
+    if not insights:
+        return ""
+    block = insights.get("ai_context_block", "")
+    if not block:
+        return ""
+    if len(block) <= _MAX_INSIGHTS_CONTEXT_CHARS:
+        return block
+    # Truncate at the last newline before the cap so we don't cut mid-sentence
+    cutoff = block.rfind("\n", 0, _MAX_INSIGHTS_CONTEXT_CHARS)
+    if cutoff < 0:
+        cutoff = _MAX_INSIGHTS_CONTEXT_CHARS
+    return block[:cutoff] + "\n[...context truncated at 1500-char limit]"
+
+
+_WEIGHT_MILESTONES = [
+    {
+        "weight_lbs": 285,
+        "name": "Sleep Threshold",
+        "significance": "Sleep apnea risk drops substantially (genome flag). First major metabolic milestone on this journey.",
+        "domains": ["sleep", "metabolic"],
+    },
+    {
+        "weight_lbs": 270,
+        "name": "Walking Speed Unlock",
+        "significance": "Walking pace naturally improves ~0.3 mph from reduced load. Zone 2 walks feel meaningfully easier.",
+        "domains": ["movement", "metabolic"],
+    },
+    {
+        "weight_lbs": 250,
+        "name": "Athletic Zone 2",
+        "significance": "Zone 2 achievable at a pace that feels like a real workout — not just a stroll.",
+        "domains": ["movement", "cardiovascular"],
+    },
+    {
+        "weight_lbs": 225,
+        "name": "Athletic FFMI Range",
+        "significance": "FFMI crosses athletic range if muscle is preserved. Body composition makes the turn.",
+        "domains": ["body", "strength"],
+    },
+    {
+        "weight_lbs": 200,
+        "name": "Onederland",
+        "significance": "Under 200 lbs. Cardiovascular age improves dramatically. A threshold few expected.",
+        "domains": ["metabolic", "cardiovascular"],
+    },
+    {
+        "weight_lbs": 185,
+        "name": "Goal Weight — Transformation Complete",
+        "significance": "117 lbs lost from start. Athletic BMI. The person Matthew set out to become.",
+        "domains": ["all"],
+    },
+]
+
+
+def _build_milestone_context(profile, current_weight):
+    """Return milestone alert string if within 10 lbs of upcoming or just passed a milestone.
+
+    Empty string if no milestone is near — zero prompt bloat on normal days.
+    """
+    if current_weight is None:
+        return ""
+
+    milestones = profile.get("weight_milestones", _WEIGHT_MILESTONES)
+    lines = []
+
+    # Upcoming milestone (below current weight, approaching)
+    upcoming = [m for m in milestones if m["weight_lbs"] < current_weight]
+    if upcoming:
+        next_m = max(upcoming, key=lambda x: x["weight_lbs"])
+        lbs_away = round(current_weight - next_m["weight_lbs"], 1)
+        if lbs_away <= 10:
+            lines.append(f"🎯 MILESTONE APPROACHING: '{next_m['name']}' at {next_m['weight_lbs']} lbs ({lbs_away} lbs away)")
+            lines.append(f"   Biological significance: {next_m['significance']}")
+
+    # Most recently achieved milestone (current weight just passed it)
+    achieved = [m for m in milestones if m["weight_lbs"] >= current_weight]
+    if achieved:
+        recent_m = min(achieved, key=lambda x: x["weight_lbs"])
+        lbs_past = round(recent_m["weight_lbs"] - current_weight, 1)
+        if lbs_past <= 5:
+            lines.append(
+                f"🏆 MILESTONE JUST ACHIEVED: '{recent_m['name']}' at {recent_m['weight_lbs']} lbs ({lbs_past} lbs below threshold)"
+            )
+            lines.append(f"   Significance: {recent_m['significance']}")
+            lines.append("   → Acknowledge this in your coaching. This is a real biological event, not just a number.")
+
+    return "\n".join(lines)
+
+
+def _build_weight_context(data, profile):
+    """Dynamic weight context for AI prompts."""
+    start_w = profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
+    goal_w = profile.get("goal_weight_lbs", 185)
+    current_w = data.get("latest_weight")
+    if current_w:
+        lost = round(start_w - current_w, 1)
+        remaining = round(current_w - goal_w, 1)
+        return (
+            f"Started at {start_w} lbs, currently {round(current_w, 1)} lbs, " f"goal {goal_w} lbs ({lost} lost so far, {remaining} to go)"
+        )
+    return f"{start_w}->{goal_w} lbs"
+
+
+def _build_recent_training_summary(data):
+    """Summarize last 7 days of training for AI context."""
+    strava_7d = data.get("strava_7d") or []
+    if not strava_7d:
+        return "No activities in last 7 days."
+    lines = []
+    for day_rec in strava_7d:
+        date_str = day_rec.get("sk", "").replace("DATE#", "")
+        activities = day_rec.get("activities", [])
+        for a in activities:
+            name = a.get("name", "Activity")
+            sport = a.get("sport_type", "?")
+            dur = round((a.get("moving_time_seconds") or 0) / 60)
+            lines.append(f"{date_str}: {name} ({sport}, {dur} min)")
+    return "\n".join(lines) if lines else "No activities in last 7 days."
+
+
+def _build_acwr_coaching_context(data):
+    """IC-28: Extract ACWR training load status for the training coach prompt.
+
+    Reads acwr/acwr_zone/acwr_alert/acwr_alert_reason from the computed_metrics
+    record available in `data`. Returns a compact string for prompt injection,
+    or empty string if no ACWR data present.
+    """
+    computed = data.get("computed_metrics") or {}
+    zone = computed.get("acwr_zone", "")
+    acwr = _safe_float(computed, "acwr")
+    bool(computed.get("acwr_alert"))
+    reason = computed.get("acwr_alert_reason", "")
+    acute = _safe_float(computed, "acute_load_7d")
+    chron = _safe_float(computed, "chronic_load_28d")
+
+    if not zone or zone == "unknown" or acwr is None:
+        return ""
+
+    acwr_str = f"{acwr:.2f}"
+    acute_str = f"{acute:.1f}" if acute is not None else "?"
+    chron_str = f"{chron:.1f}" if chron is not None else "?"
+
+    lines = [f"TRAINING LOAD — ACWR (IC-28): {acwr_str} zone={zone.upper()} | 7d acute={acute_str} | 28d chronic={chron_str}"]
+    if reason:
+        lines.append(f"  {reason}")
+
+    if zone == "danger":
+        lines.append(
+            "  COACHING RULE: ACWR is in the DANGER zone (>1.5). You MUST prescribe specific volume "
+            "reductions in the training section. E.g. 'Zone 2 walk only today', "
+            "'reduce planned volume by 40-50%', 'no PRs, no new load today'. "
+            "Do NOT coach this as a normal training day."
+        )
+    elif zone == "caution":
+        lines.append(
+            "  COACHING RULE: ACWR is elevated (1.3-1.5). Prescribe volume reduction: "
+            "lower intensity, no PRs, prioritise recovery session over planned workout if applicable."
+        )
+    elif zone == "detraining":
+        lines.append(
+            "  COACHING RULE: ACWR is below 0.8 — chronic load exceeds recent load. "
+            "Gently flag under-stimulation. If recovery metrics support it, suggest a "
+            "training session today to bring acute load up. This is an opportunity, not an alarm."
+        )
+    else:  # safe
+        lines.append("  COACHING NOTE: Training load is in the optimal zone (0.8-1.3). Validate current approach.")
+
+    return "\n".join(lines)
+
+
+def _build_sleep_data(data):
+    """Extract sleep-domain data for the sleep coach."""
+    sleep = data.get("sleep") or {}
+    whoop = data.get("whoop") or {}
+    eight = data.get("eightsleep") or {}
+    return {
+        "sleep_score": _safe_float(sleep, "sleep_score") or _safe_float(whoop, "sleep_score"),
+        "sleep_duration_hours": _safe_float(sleep, "sleep_duration_hours") or _safe_float(whoop, "sleep_duration_hours"),
+        "deep_pct": _safe_float(sleep, "deep_pct") or _safe_float(eight, "deep_pct"),
+        "rem_pct": _safe_float(sleep, "rem_pct") or _safe_float(eight, "rem_pct"),
+        "sleep_efficiency": _safe_float(sleep, "sleep_efficiency_pct"),
+        "hrv": _safe_float(whoop, "hrv") or _safe_float(sleep, "hrv"),
+        "recovery_score": _safe_float(whoop, "recovery_score"),
+        "resting_heart_rate": _safe_float(whoop, "resting_heart_rate"),
+        "bed_temp_f": _safe_float(eight, "bed_temp_f"),
+        "sleep_start": sleep.get("sleep_start") or whoop.get("sleep_start"),
+    }
+
+
+def _build_nutrition_data(data):
+    """Extract nutrition-domain data for the nutrition coach."""
+    mf = data.get("macrofactor") or data.get("nutrition") or {}
+    return {
+        "calories": _safe_float(mf, "total_calories_kcal"),
+        "protein_g": _safe_float(mf, "total_protein_g"),
+        "carbs_g": _safe_float(mf, "total_carbs_g"),
+        "fat_g": _safe_float(mf, "total_fat_g"),
+        "fiber_g": _safe_float(mf, "total_fiber_g"),
+        "sodium_mg": _safe_float(mf, "total_sodium_mg"),
+        "meals_logged": mf.get("meals_logged") or mf.get("entries_logged"),
+        "food_log": (mf.get("food_log") or [])[:10],  # first 10 items for context
+    }
+
+
+def _build_training_data(data):
+    """Extract training-domain data for the training coach."""
+    whoop = data.get("whoop") or {}
+    strava_7d = data.get("strava_7d") or []
+    apple = data.get("apple_health") or data.get("apple") or {}
+    garmin = data.get("garmin") or {}
+    return {
+        "recovery_score": _safe_float(whoop, "recovery_score"),
+        "strain": _safe_float(whoop, "strain"),
+        "hrv": _safe_float(whoop, "hrv"),
+        "steps": _safe_float(garmin, "steps") or _safe_float(apple, "steps"),  # Garmin wearable is SOT for steps
+        "recent_activities": [
+            {
+                "type": a.get("type") or a.get("sport_type", "unknown"),
+                "duration_min": round(float(a.get("moving_time_seconds") or a.get("elapsed_time_seconds") or 0) / 60, 1),
+                "distance_miles": round(float(a.get("distance_meters", 0)) / 1609.34, 1) if a.get("distance_meters") else None,
+                "avg_hr": _safe_float(a, "average_heartrate"),
+            }
+            for a in strava_7d[:5]
+        ],
+        "activity_count_7d": len(strava_7d),
+        "training_status": "no_training_logged" if len(strava_7d) == 0 else "active",
+    }
+
+
+def _build_mind_data(data):
+    """Extract mind-domain data for the mind coach."""
+    journal = data.get("journal_entries") or data.get("journal") or []
+    ja = data.get("journal_analysis") or {}
+    som = data.get("state_of_mind") or data.get("som") or {}
+    return {
+        "journal_entry_count": len(journal) if isinstance(journal, list) else (1 if journal else 0),
+        "enriched_mood": _safe_float(ja, "enriched_mood"),
+        "enriched_energy": _safe_float(ja, "enriched_energy"),
+        "enriched_stress": _safe_float(ja, "enriched_stress"),
+        "enriched_sentiment": ja.get("enriched_sentiment"),
+        "enriched_themes": ja.get("enriched_themes", []),
+        "enriched_avoidance_flags": ja.get("enriched_avoidance_flags", []),
+        "enriched_growth_signals": ja.get("enriched_growth_signals", []),
+        "som_avg_valence": _safe_float(som, "som_avg_valence"),
+        "som_check_in_count": _safe_float(som, "som_check_in_count"),
+    }
+
+
+def _build_physical_data(data):
+    """Extract physical-domain data for the physical coach."""
+    withings = data.get("withings") or {}
+    dexa = data.get("dexa") or {}
+    meas = data.get("measurements") or {}
+    return {
+        "weight_lbs": _safe_float(withings, "weight_lbs"),
+        "body_fat_pct": _safe_float(dexa, "body_fat_pct") or _safe_float(withings, "body_fat_pct"),
+        "lean_mass_lb": _safe_float(dexa, "lean_mass_lb"),
+        "visceral_fat_lb": _safe_float(dexa, "visceral_fat_lb"),
+        "waist_height_ratio": _safe_float(meas, "waist_height_ratio"),
+        "latest_weight": data.get("latest_weight"),
+    }
+
+
+def _build_glucose_data(data):
+    """Extract glucose-domain data for the glucose coach."""
+    apple = data.get("apple_health") or data.get("apple") or {}
+    return {
+        "blood_glucose_avg": _safe_float(apple, "blood_glucose_avg"),
+        "blood_glucose_std_dev": _safe_float(apple, "blood_glucose_std_dev"),
+        "blood_glucose_time_in_range_pct": _safe_float(apple, "blood_glucose_time_in_range_pct"),
+        "blood_glucose_time_above_140_pct": _safe_float(apple, "blood_glucose_time_above_140_pct"),
+        "blood_glucose_readings_count": _safe_float(apple, "blood_glucose_readings_count"),
+        "blood_glucose_min": _safe_float(apple, "blood_glucose_min"),
+        "blood_glucose_max": _safe_float(apple, "blood_glucose_max"),
+    }
+
+
+def _build_labs_data(data):
+    """Extract labs-domain data for the labs coach."""
+    labs = data.get("labs") or {}
+    return {
+        "draw_date": labs.get("draw_date") or labs.get("date"),
+        "flagged_markers": labs.get("flagged_markers", []),
+        "flagged_count": labs.get("flagged_count", 0),
+        "total_draws": labs.get("total_draws", 0),
+    }
+
+
+def _build_explorer_data(data):
+    """Extract cross-domain data for the explorer coach."""
+    corr = data.get("weekly_correlations") or {}
+    return {
+        "significant_correlations": corr.get("significant_correlations", 0),
+        "top_pairs": corr.get("top_pairs", [])[:5],
+        "active_experiments": data.get("active_experiments", 0),
+        "experiment_names": data.get("experiment_names", []),
+    }
