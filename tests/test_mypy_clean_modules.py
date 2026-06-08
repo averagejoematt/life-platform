@@ -17,15 +17,22 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
+# Tier-1 (budget/auth/inference core) is listed first — these are the modules
+# whose type-correctness most directly guards spend + security. ADR-080.
 MYPY_CLEAN_MODULES = [
+    # tier-1: budget/auth/inference core
     "lambdas/secret_cache.py",
     "lambdas/retry_utils.py",
     "lambdas/phase_filter.py",
     "lambdas/constants.py",
+    "lambdas/bedrock_client.py",
+    # broader clean set
     "lambdas/scoring_engine.py",
     "lambdas/character_engine.py",
     "lambdas/intelligence_common.py",
     "lambdas/ai_calls.py",
+    "lambdas/ai_context.py",
+    "lambdas/ai_summaries.py",
 ]
 
 

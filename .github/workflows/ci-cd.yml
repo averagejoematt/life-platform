@@ -98,18 +98,19 @@ jobs:
       - name: Lint gate (ruff — ENFORCED; import-sort via ruff's isort rules)
         run: ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
 
-      - name: Mypy (advisory — typed shared modules only)
+      - name: Mypy gate (ENFORCED — clean-module set, ADR-080)
         run: |
           pip install mypy==2.1.0
-          echo "::group::Mypy on type-annotated shared modules"
-          # See tests/test_mypy_clean_modules.py for the authoritative module list.
+          echo "::group::Mypy on the clean-module set (tier-1 core + split AI modules)"
+          # Authoritative list: tests/test_mypy_clean_modules.py::MYPY_CLEAN_MODULES.
+          # Tier-1 (budget/auth/inference): secret_cache, retry_utils, phase_filter,
+          # constants, bedrock_client. Blocking — a type regression here fails CI.
           python -m mypy --config-file mypy.ini \
             lambdas/secret_cache.py lambdas/retry_utils.py lambdas/phase_filter.py \
-            lambdas/constants.py lambdas/scoring_engine.py lambdas/character_engine.py \
-            lambdas/intelligence_common.py lambdas/ai_calls.py || true
+            lambdas/constants.py lambdas/bedrock_client.py lambdas/scoring_engine.py \
+            lambdas/character_engine.py lambdas/intelligence_common.py lambdas/ai_calls.py \
+            lambdas/ai_context.py lambdas/ai_summaries.py
           echo "::endgroup::"
-          # Advisory step — do not fail build. Test test_mypy_clean_modules in
-          # the pytest job enforces the same set as a fail-loud guard.
 
       - name: Syntax check (py_compile)
         # Catches broken syntax that flake8 misses (e.g. invalid f-strings, truncated files)
@@ -290,23 +291,22 @@ jobs:
           python3 -m pytest tests/ -v --tb=short --ignore=tests/test_integration_aws.py
           echo "::endgroup::"
 
-      - name: Test coverage report (Phase 8.2)
-        # Coverage report on every CI run. Non-blocking initially — the goal is
-        # visibility into which Lambda modules lack test coverage. Once we have
-        # a coverage baseline established, this step can gate PRs.
-        # Coverage scope: lambdas/ and mcp/ source dirs only (skip tests/, cdk/).
+      - name: Test coverage gate (regression floor, ADR-080)
+        # ENFORCED regression floor. The codebase is integration-tested (handlers
+        # run live; the ~1600 offline tests are mostly structural/contract), so the
+        # offline line-coverage baseline is ~9% — this floor (8%) prevents BACKSLIDING,
+        # it is not a quality bar. Ratchet up over time (ADR-080).
+        # Scope: lambdas/ + mcp/ only (skip tests/, cdk/).
         run: |
-          echo "::group::Coverage report"
+          echo "::group::Coverage report + gate"
           python3 -m pytest tests/ \
               --ignore=tests/test_integration_aws.py \
               --cov=lambdas --cov=mcp \
               --cov-report=term-missing:skip-covered \
               --cov-report=xml:coverage.xml \
-              -q 2>&1 | tail -100 || true
+              --cov-fail-under=8 \
+              -q 2>&1 | tail -100
           echo "::endgroup::"
-          # Phase 8.2: not yet gated. Once a baseline (say 30%) is established,
-          # add: --cov-fail-under=30 to make this blocking on regressions.
-        continue-on-error: true
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
