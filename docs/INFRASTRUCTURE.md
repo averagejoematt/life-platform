@@ -11,7 +11,7 @@
 |-------|-------|
 | Account ID | `205930651321` |
 | Region | `us-west-2` (Oregon); us-east-1 for Lambda@Edge + OG image + email-subscriber |
-| Budget | $20/month (alerts at 25% / 50% / 100%) |
+| Budget | $75/month all-in, **enforced** (ADR-063; alerts at 50/70/85/100%; cost-governor degrades AI by tier) |
 | CloudTrail | `life-platform-trail` → S3 (data events enabled on `raw/` and `uploads/` S3 prefixes) |
 | Account Lambda concurrency quota | **10** (default; raise request filed 2026-05-19, AWS Support case 177921309700709) |
 
@@ -57,7 +57,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Function URL (remote) | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/` |
 | Auth (remote) | OAuth 2.1 auto-approve + HMAC Bearer via `life-platform/mcp-api-key` secret (auto-rotates every 90 days) |
 | Auth (local) | `mcp_bridge.py` → `.config.json` → Function URL |
-| Tools | **127** across **26** tool modules (`mcp/tools_*.py`) |
+| Tools | **133** across **29** tool modules (`mcp/tools_*.py`) |
 | Cache warmer | 14 warm-steps pre-computed nightly (warmer config) |
 
 ---

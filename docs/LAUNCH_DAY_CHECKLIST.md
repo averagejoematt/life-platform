@@ -1,5 +1,7 @@
 # Launch Day Checklist — 2026-05-25
 
+> **Status: HISTORICAL.** The 2026-05-25 genesis reset completed. This is a record of that run, not a live checklist. The next reset (genesis **2026-06-08**) is staged — see `handovers/HANDOVER_LATEST.md` + the `restart_pipeline.py` runbook. Reusable post-reset manual steps (Garmin re-auth, manual logging) still apply generically.
+
 The launchd watchdog (`~/Library/LaunchAgents/com.matthew.lifeplatform.may25-pivot.plist`) fires at **07:05 PT Monday 2026-05-25** and runs `deploy/restart_pivot_when_ready.py` → `deploy/restart_pipeline.py --genesis 2026-05-25 --apply` once Withings has posted today's reading.
 
 ## Before the watchdog fires (Sunday night / Monday before 7 AM)

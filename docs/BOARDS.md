@@ -16,7 +16,7 @@
 
 Note on identity: the JSON config keeps **legacy keys** (e.g. `peter_attia`, `paul_conti`, `andrew_huberman`, `rhonda_patrick`) holding **fictional replacement personas** for backward-compatibility with existing prompts. The displayed name on every public surface is the fictional persona — never the real public figure. The legacy keys are mirrored by canonical keys (`victor_reyes`, `nathan_reeves`, `integrator`, `amara_patel`) used by observatory pages.
 
-### Active personas (14 distinct)
+### Active personas (20 distinct in the live config; representative set below)
 
 | Display name | Title | Type | Config key(s) | Domains |
 |--------------|-------|------|---------------|---------|

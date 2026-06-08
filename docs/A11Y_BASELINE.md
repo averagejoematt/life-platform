@@ -1,5 +1,7 @@
 # Accessibility & Performance Baseline
 
+> **Status: PRE-v4 baseline (2026-05-24).** Captured on the v3 "dashboard" site, *before* the v4 three-door site (`/now/`, `/story/`, `/evidence/`) went live (v8.3.0, 2026-06-02). The numbers/fixes below reflect v3 and are **not representative of the live v4 site** — a fresh baseline on the v4 pages is needed. (Ongoing v4 a11y/render checks run via `tests/visual_qa.py`, ADR-076.)
+
 First baseline captured 2026-05-24 as part of P2.4. Use this to detect regressions on future Lighthouse runs.
 
 ## How to re-run

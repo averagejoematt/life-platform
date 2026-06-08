@@ -1,7 +1,7 @@
 # Life Platform — Onboarding Guide
 
 > First-day mental model. For commands (AWS auth, deploy, rollback), see `docs/QUICKSTART.md`.
-> Last updated: 2026-06-02 (v8.3.0 — v4 "The Measured Life" front-end live; ADR-071/072/073)
+> Last updated: 2026-06-08 (v8.4.0 — v4 front-end live; ADR-077 phase taxonomy + ADR-078 commercial wedge; PG front-door work)
 >
 > **Resuming a Claude chat session?** Read `handovers/HANDOVER_LATEST.md` first — that's the canonical "what's the current state" doc. This file is the slower onboarding for a fresh contributor.
 
@@ -9,7 +9,7 @@
 
 ## What Is This Platform?
 
-A personal health intelligence system built on AWS for a single user (Matthew). It pulls data from 19 API/webhook/manual sources (wearables, apps, labs, manual uploads), stores everything in a single DynamoDB table, runs a deterministic computation pipeline + an 8-agent coaching layer, and exposes 127 MCP tools so Claude can answer natural-language health questions against real data.
+A personal health intelligence system built on AWS for a single user (Matthew). It pulls data from ~20 API/webhook/manual sources (wearables, apps, labs, manual uploads), stores everything in a single DynamoDB table, runs a deterministic computation pipeline + an 8-agent coaching layer, and exposes 133 MCP tools so Claude can answer natural-language health questions against real data.
 
 The end result: ask Claude a question about your health, and it queries actual readings rather than relying on memory or estimates.
 
@@ -51,7 +51,7 @@ Coach Intelligence pipeline (deterministic math → 8 parallel LLM coaches):
   + site-stats-refresh (writes public_stats.json)
     │
     ▼
-MCP Lambda (127 tools) ← Claude Desktop + claude.ai + mobile via remote MCP
+MCP Lambda (133 tools) ← Claude Desktop + claude.ai + mobile via remote MCP
 site-api Lambda (60+ endpoints, primarily read-only — ADR-037) ← averagejoematt.com
 ```
 
@@ -69,7 +69,7 @@ site-api Lambda (60+ endpoints, primarily read-only — ADR-037) ← averagejoem
 | **EventBridge** | All cron schedules, fixed UTC (no DST drift) | CDK-managed only — never create rules via Console |
 | **Secrets Manager** (`life-platform/*`) | All credentials | 11–14 active secrets (3 in soft-delete recovery). See `docs/SECRETS_MAP.md` |
 | **CloudFront** (4 distributions) | CDN for `averagejoematt.com`, `dash`, `blog`, `buddy` | S3 website endpoint origins (ADR-053/054). Site syncs invalidate via CDK helpers |
-| **MCP Lambda** | 127 tools across 26 domain modules in `mcp/` | The interface Claude uses to query data |
+| **MCP Lambda** | 133 tools across 29 domain modules in `mcp/` | The interface Claude uses to query data |
 | **Anthropic API** | Coach generation + daily brief sections | Prompt caching enabled (ADR-049); Haiku for structured, Sonnet for narrative |
 
 ---
@@ -136,7 +136,7 @@ Don't try to migrate to KMS default encryption — S3 website endpoints can't se
 
 | If I want to find... | Look here |
 |----------------------|-----------|
-| Why a decision was made | `docs/DECISIONS.md` (57 ADRs, ADR-001 → ADR-057) |
+| Why a decision was made | `docs/DECISIONS.md` (78 ADRs, ADR-001 → ADR-078) |
 | How to deploy / roll back | `docs/QUICKSTART.md` + `docs/RUNBOOK.md` |
 | What field a source writes to | `docs/SCHEMA.md` |
 | Full system inventory (Lambdas, alarms, secrets, KMS) | `docs/ARCHITECTURE.md` |
@@ -207,7 +207,7 @@ Reviews are run from `docs/REVIEW_METHODOLOGY.md`. The platform is at audit V2 (
 
 | Term | Meaning |
 |------|---------|
-| **MCP** | Model Context Protocol — Claude's native tool interface. The MCP Lambda exposes 127 tools that Claude calls to query health data. |
+| **MCP** | Model Context Protocol — Claude's native tool interface. The MCP Lambda exposes 133 tools that Claude calls to query health data. |
 | **IC** | Intelligence Capability — the platform's computed health features (IC-1 through IC-30). |
 | **DLQ** | Dead Letter Queue — failed async Lambda invocations. Drained every 6 hours by `dlq-consumer`. |
 | **SOT** | Source of Truth — which device/service owns each health domain (e.g., Whoop owns sleep). See `mcp/config.py`. |
