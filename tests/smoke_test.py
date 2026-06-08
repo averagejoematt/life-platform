@@ -207,7 +207,6 @@ def check_score_sanity(yesterday):
 
 
 def check_blog_links():
-    checks = []
     try:
         resp = s3.get_object(Bucket=S3_BUCKET, Key="blog/index.html")
         html = resp["Body"].read().decode("utf-8")
