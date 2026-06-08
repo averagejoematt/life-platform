@@ -681,13 +681,39 @@ class OperationalStack(Stack):
             rule.add_target(targets.LambdaFunction(site_stats_fn))
 
         # ── 12. OG Image Generator — daily at 19:30 UTC (11:30 AM PT, after daily brief)
-        # DEFERRED (ADR-081): og-image-generator is a CLI-created orphan, but unlike the
-        # 3 intelligence Lambdas adopted in compute_stack on 2026-06-08, its source is NOT
-        # in the lambdas/ asset tree (only web/og_image_lambda.py, the unrelated us-east-1
-        # dynamic-SVG function, is) and it depends on a standalone pillow-layer. Adoption
-        # needs the PNG-generator source relocated into the monorepo first. Runs fine
-        # outside CDK meanwhile. (NB: us-east-1 life-platform-og-image is a different,
-        # already-CDK-managed function — web_stack WR-17 — not a duplicate.)
+        # Adopted into CDK 2026-06-08 (ADR-081): the last CLI orphan. Its source was
+        # already in the monorepo at lambdas/web/og_image_lambda.py (the deployed CLI
+        # package was byte-identical) — no relocation needed, just CDK wiring. Pillow-
+        # renders 12 PNG + WebP share cards from generated/public_stats.json into
+        # generated/assets/images/, then self-invalidates CloudFront. Needs the standalone
+        # pillow-layer; imports no shared platform modules so the shared utils layer is
+        # intentionally omitted. (NB: web_stack's us-east-1 life-platform-og-image points
+        # at the SAME file via a stale `.handler` ref — a separate pre-existing bug; that
+        # function has errored since 2026-03-20. Out of scope here; tracked in ADR-081.)
+        pillow_layer = _lambda.LayerVersion.from_layer_version_arn(
+            self,
+            "PillowLayer",
+            # Externally managed runtime layer (Pillow) — not the platform shared-utils layer.
+            "arn:aws:lambda:us-west-2:205930651321:layer:pillow-layer:1",
+        )
+        create_platform_lambda(
+            self,
+            "OGImageGenerator",
+            function_name="og-image-generator",
+            source_file="lambdas/web/og_image_lambda.py",
+            handler="web.og_image_lambda.lambda_handler",
+            schedule="cron(30 19 * * ? *)",  # 11:30 AM PT daily, after the daily brief refreshes public_stats
+            timeout_seconds=60,
+            memory_mb=512,
+            additional_layers=[pillow_layer],
+            custom_policies=rp.operational_og_image_generator(),
+            table=local_table,
+            bucket=local_bucket,
+            dlq=None,
+            alerts_topic=local_alerts_topic,
+            digest_topic=local_digest_topic,
+            digest=True,
+        )
 
         # ── 13. Pipeline Health Check — daily at 13:00 UTC (6 AM PT)
         # SNS_ARN env added 2026-05-25: Lambda hardcodes life-platform-alerts as
