@@ -78,10 +78,54 @@ class ComputeStack(Stack):
             shared_layer=shared_utils_layer,
         )
 
-        # Observatory Intelligence (ai-expert-analyzer) — manually deployed Lambda
-        # Cannot import to CDK (already exists). Layer updates via deploy script:
-        #   LATEST=$(aws lambda list-layer-versions --layer-name life-platform-shared-utils --query 'LayerVersions[0].Version' --output text)
-        #   aws lambda update-function-configuration --function-name ai-expert-analyzer --layers "arn:aws:lambda:us-west-2:205930651321:layer:life-platform-shared-utils:${LATEST}"
+        # ══════════════════════════════════════════════════════════════
+        # Intelligence Lambdas (ADR-081) — adopted into CDK 2026-06-08.
+        # ai-expert-analyzer, field-notes-generate + journal-analyzer were
+        # CLI-created orphans (no IaC, no shared layer, no DLQ, no error alarm,
+        # shared the daily-insight role). `cdk import` adopts the physical
+        # functions; the first deploy converges them to the platform standard:
+        # dedicated least-priv role, shared layer, DLQ, X-Ray, 30-day logs +
+        # a digest error alarm — identical to their compute siblings.
+        # ══════════════════════════════════════════════════════════════
+        create_platform_lambda(
+            self,
+            "AIExpertAnalyzer",
+            function_name="ai-expert-analyzer",
+            handler="intelligence.ai_expert_analyzer_lambda.lambda_handler",
+            source_file="lambdas/intelligence/ai_expert_analyzer_lambda.py",
+            schedule="cron(0 14 * * ? *)",  # 6:00 AM PT daily (Observatory weekly cadence is enforced in-handler)
+            timeout_seconds=120,
+            memory_mb=256,
+            environment={"AI_SECRET_NAME": "life-platform/ai-keys"},
+            custom_policies=rp.intelligence_ai_expert(),
+            **shared,
+        )
+
+        create_platform_lambda(
+            self,
+            "FieldNotesGenerate",
+            function_name="field-notes-generate",
+            handler="intelligence.field_notes_lambda.lambda_handler",
+            source_file="lambdas/intelligence/field_notes_lambda.py",
+            schedule="cron(0 18 ? * SUN *)",  # 11:00 AM PT Sundays
+            timeout_seconds=120,
+            memory_mb=256,
+            custom_policies=rp.intelligence_field_notes(),
+            **shared,
+        )
+
+        create_platform_lambda(
+            self,
+            "JournalAnalyzer",
+            function_name="journal-analyzer",
+            handler="intelligence.journal_analyzer_lambda.lambda_handler",
+            source_file="lambdas/intelligence/journal_analyzer_lambda.py",
+            schedule="cron(0 10 * * ? *)",  # 3:00 AM PT daily (nightly journal sweep)
+            timeout_seconds=180,
+            memory_mb=256,
+            custom_policies=rp.intelligence_journal_analyzer(),
+            **shared,
+        )
 
         create_platform_lambda(
             self,
