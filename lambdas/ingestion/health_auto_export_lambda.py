@@ -100,14 +100,16 @@ import json
 import logging
 import math
 import os
-import boto3
-from datetime import datetime, timezone, timedelta
+from collections import Counter, defaultdict
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from collections import defaultdict, Counter
+
+import boto3
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("health-auto-export")
 except ImportError:
     logger = logging.getLogger("health-auto-export")
@@ -133,6 +135,7 @@ _secret_cache = {}
 
 def _cached_secret(client, secret_id):
     import time as _t
+
     entry = _secret_cache.get(secret_id)
     if entry and _t.time() - entry[1] < 900:
         return entry[0]
@@ -213,6 +216,7 @@ def parse_timestamp(date_str):
 
 # ── Blood Glucose Processing ──────────────────────────────────────────────────
 
+
 def process_blood_glucose(metric_data, units):
     """
     Process CGM blood glucose readings into daily aggregates + individual readings.
@@ -235,11 +239,13 @@ def process_blood_glucose(metric_data, units):
             # 1 mmol/L = 18.0182 mg/dL (molecular weight of glucose / 10)
             value = round(value * 18.0182, 1)
 
-        daily_readings[date].append({
-            "time": parse_timestamp(reading.get("date")),
-            "value": value,
-            "meal_time": reading.get("mealTime", "Unspecified"),
-        })
+        daily_readings[date].append(
+            {
+                "time": parse_timestamp(reading.get("date")),
+                "value": value,
+                "meal_time": reading.get("mealTime", "Unspecified"),
+            }
+        )
 
     daily_agg = {}
     for date, readings in daily_readings.items():
@@ -292,7 +298,7 @@ def process_blood_glucose(metric_data, units):
 # The app reports device names like "Matt 17" (iPhone), "Apple Watch" etc.
 # We also accept readings with no source field (assumed Apple device).
 APPLE_DEVICE_SUBSTRINGS = {
-    "matt",          # iPhone name ("Matt 17", "Matt's iPhone", etc.)
+    "matt",  # iPhone name ("Matt 17", "Matt's iPhone", etc.)
     "iphone",
     "apple watch",
     "watch",
@@ -323,36 +329,29 @@ def is_apple_device(source_str):
 # the live Lambda's field names (notably weight_lbs vs weight_lbs_apple).
 SOURCE_PRIORITY = {
     # Activity — iPhone is canonical (motion coprocessor + Watch sync)
-    "steps":                       ["matt 17", "matt", "iphone", "apple watch", "watch", "connect"],
-    "active_calories":             ["matt 17", "matt", "iphone", "apple watch", "watch", "connect"],
-    "basal_calories":              ["matt 17", "matt", "iphone", "apple watch", "watch", "connect"],
-    "flights_climbed":             ["matt 17", "matt", "iphone", "apple watch", "watch", "connect"],
-    "distance_walk_run_miles":     ["matt 17", "matt", "iphone", "apple watch", "watch", "connect"],
-
+    "steps": ["matt 17", "matt", "iphone", "apple watch", "watch", "connect"],
+    "active_calories": ["matt 17", "matt", "iphone", "apple watch", "watch", "connect"],
+    "basal_calories": ["matt 17", "matt", "iphone", "apple watch", "watch", "connect"],
+    "flights_climbed": ["matt 17", "matt", "iphone", "apple watch", "watch", "connect"],
+    "distance_walk_run_miles": ["matt 17", "matt", "iphone", "apple watch", "watch", "connect"],
     # Gait — Watch-only typically, iPhone fallback
-    "walking_speed_mph":           ["apple watch", "watch", "matt 17", "matt", "iphone"],
-    "walking_step_length_in":      ["apple watch", "watch", "matt 17", "matt", "iphone"],
-    "walking_double_support_pct":  ["apple watch", "watch", "matt 17", "matt", "iphone"],
-    "walking_asymmetry_pct":       ["apple watch", "watch", "matt 17", "matt", "iphone"],
-
+    "walking_speed_mph": ["apple watch", "watch", "matt 17", "matt", "iphone"],
+    "walking_step_length_in": ["apple watch", "watch", "matt 17", "matt", "iphone"],
+    "walking_double_support_pct": ["apple watch", "watch", "matt 17", "matt", "iphone"],
+    "walking_asymmetry_pct": ["apple watch", "watch", "matt 17", "matt", "iphone"],
     # Water — user-facing logging app first; MacroFactor often mirrors
-    "water_intake_raw":            ["my water", "waterminder", "watermind", "matt 17", "iphone", "macrofactor"],
+    "water_intake_raw": ["my water", "waterminder", "watermind", "matt 17", "iphone", "macrofactor"],
     # Caffeine — same priority as water
-    "caffeine_mg":                 ["my water", "waterminder", "watermind", "matt 17", "iphone", "macrofactor"],
-
+    "caffeine_mg": ["my water", "waterminder", "watermind", "matt 17", "iphone", "macrofactor"],
     # Mindful — meditation/breath apps direct; HAE-style mirrors last
-    "mindful_minutes":             ["balance", "calm", "headspace", "breathwrk", "apple", "matt 17", "iphone"],
-
+    "mindful_minutes": ["balance", "calm", "headspace", "breathwrk", "apple", "matt 17", "iphone"],
     # Audio — iPhone direct (already Tier-1, but priority disambiguates if multiple)
     "headphone_audio_exposure_db": ["matt 17", "matt", "iphone"],
-
     # Weight from Apple — fallback when Withings is delayed; Withings name first if it appears
-    "weight_lbs":                  ["withings", "matt 17", "iphone", "apple"],
-
+    "weight_lbs": ["withings", "matt 17", "iphone", "apple"],
     # BP — single source typically (cuff via Health); priority mostly cosmetic
-    "blood_pressure_systolic":     ["health", "matt 17", "iphone"],
-    "blood_pressure_diastolic":    ["health", "matt 17", "iphone"],
-
+    "blood_pressure_systolic": ["health", "matt 17", "iphone"],
+    "blood_pressure_diastolic": ["health", "matt 17", "iphone"],
     # Tier 2 metrics already filtered by is_apple_device — no priority defined,
     # falls through to all-sources behavior in pick_source_or_all().
 }
@@ -395,40 +394,46 @@ METRIC_MAP = {}
 _METRIC_DEFS = [
     # ── Tier 1: Apple-exclusive (always ingest all readings) ──────────────
     # Activity / energy (Apple Watch TDEE)
-    ({"Active Energy", "active_energy"},                  {"field": "active_calories",            "agg": "sum",         "tier": 1}),
-    ({"Basal Energy Burned", "basal_energy_burned"},      {"field": "basal_calories",             "agg": "sum",         "tier": 1}),
-    ({"Step Count", "step_count"},                        {"field": "steps",                      "agg": "sum",         "tier": 1}),
-    ({"Flights Climbed", "flights_climbed"},              {"field": "flights_climbed",            "agg": "sum",         "tier": 1}),
-    ({"Walking + Running Distance", "walking_running_distance"}, {"field": "distance_walk_run_miles", "agg": "sum",      "tier": 1}),
+    ({"Active Energy", "active_energy"}, {"field": "active_calories", "agg": "sum", "tier": 1}),
+    ({"Basal Energy Burned", "basal_energy_burned"}, {"field": "basal_calories", "agg": "sum", "tier": 1}),
+    ({"Step Count", "step_count"}, {"field": "steps", "agg": "sum", "tier": 1}),
+    ({"Flights Climbed", "flights_climbed"}, {"field": "flights_climbed", "agg": "sum", "tier": 1}),
+    ({"Walking + Running Distance", "walking_running_distance"}, {"field": "distance_walk_run_miles", "agg": "sum", "tier": 1}),
     # Gait / mobility (Apple Watch exclusive)
-    ({"Walking Speed", "walking_speed"},                  {"field": "walking_speed_mph",          "agg": "avg",         "tier": 1}),
-    ({"Walking Step Length", "walking_step_length"},      {"field": "walking_step_length_in",     "agg": "avg",         "tier": 1}),
-    ({"Walking Double Support Percentage", "walking_double_support_percentage"}, {"field": "walking_double_support_pct", "agg": "avg", "tier": 1}),
-    ({"Walking Asymmetry Percentage", "walking_asymmetry_percentage"},           {"field": "walking_asymmetry_pct",     "agg": "avg", "tier": 1}),
+    ({"Walking Speed", "walking_speed"}, {"field": "walking_speed_mph", "agg": "avg", "tier": 1}),
+    ({"Walking Step Length", "walking_step_length"}, {"field": "walking_step_length_in", "agg": "avg", "tier": 1}),
+    (
+        {"Walking Double Support Percentage", "walking_double_support_percentage"},
+        {"field": "walking_double_support_pct", "agg": "avg", "tier": 1},
+    ),
+    ({"Walking Asymmetry Percentage", "walking_asymmetry_percentage"}, {"field": "walking_asymmetry_pct", "agg": "avg", "tier": 1}),
     # Audio (iPhone/AirPods exclusive)
-    ({"Headphone Audio Exposure", "headphone_audio_exposure"}, {"field": "headphone_audio_exposure_db", "agg": "avg",   "tier": 1}),
+    ({"Headphone Audio Exposure", "headphone_audio_exposure"}, {"field": "headphone_audio_exposure_db", "agg": "avg", "tier": 1}),
     # Water intake (dedicated water app → Apple Health)
     # Unit conversion handled in post-processing (fl_oz_us → mL)
-    ({"Dietary Water", "dietary_water", "Water", "water"},      {"field": "water_intake_raw",            "agg": "sum",   "tier": 1}),
+    ({"Dietary Water", "dietary_water", "Water", "water"}, {"field": "water_intake_raw", "agg": "sum", "tier": 1}),
     # Caffeine intake (water/caffeine tracking app → Apple Health)
-    ({"Dietary Caffeine", "dietary_caffeine", "Caffeine", "caffeine"}, {"field": "caffeine_mg",            "agg": "sum",   "tier": 1}),
+    ({"Dietary Caffeine", "dietary_caffeine", "Caffeine", "caffeine"}, {"field": "caffeine_mg", "agg": "sum", "tier": 1}),
     # Mindful minutes (meditation/breathwork apps → Apple Health)
-    ({"Mindful Minutes", "mindful_minutes", "Apple Mindfulness", "apple_mindfulness"},  {"field": "mindful_minutes",           "agg": "sum",         "tier": 1}),
+    (
+        {"Mindful Minutes", "mindful_minutes", "Apple Mindfulness", "apple_mindfulness"},
+        {"field": "mindful_minutes", "agg": "sum", "tier": 1},
+    ),
     # Body weight (Withings scale → Apple Health — v1.4.2 fallback for Withings API delays)
     # v1.7.0 (TD-18): added 'weight_body_mass' — iOS HAE export sends this name variant.
-    ({"Body Mass", "body_mass", "weight_body_mass", "Weight Body Mass"}, {"field": "weight_lbs",                "agg": "avg",         "tier": 1}),
+    ({"Body Mass", "body_mass", "weight_body_mass", "Weight Body Mass"}, {"field": "weight_lbs", "agg": "avg", "tier": 1}),
     # Blood pressure (BP cuff → Apple Health — v1.4.0)
-    ({"Blood Pressure Systolic", "blood_pressure_systolic"},   {"field": "blood_pressure_systolic",   "agg": "avg",         "tier": 1}),
-    ({"Blood Pressure Diastolic", "blood_pressure_diastolic"}, {"field": "blood_pressure_diastolic",  "agg": "avg",         "tier": 1}),
-    ({"Blood Pressure Pulse", "blood_pressure_pulse"},         {"field": "blood_pressure_pulse",      "agg": "avg",         "tier": 1}),
+    ({"Blood Pressure Systolic", "blood_pressure_systolic"}, {"field": "blood_pressure_systolic", "agg": "avg", "tier": 1}),
+    ({"Blood Pressure Diastolic", "blood_pressure_diastolic"}, {"field": "blood_pressure_diastolic", "agg": "avg", "tier": 1}),
+    ({"Blood Pressure Pulse", "blood_pressure_pulse"}, {"field": "blood_pressure_pulse", "agg": "avg", "tier": 1}),
     # ── Tier 2: Cross-device (filter to Apple Watch readings only) ────────
     # These metrics also come from Whoop/Eight Sleep/Garmin — only keep Apple readings
     # to serve as cross-reference without polluting the primary SOT values.
-    ({"Heart Rate", "heart_rate"},                        {"field": "heart_rate_apple",            "agg": "avg_special", "tier": 2}),
-    ({"Resting Heart Rate", "resting_heart_rate"},        {"field": "resting_heart_rate_apple",    "agg": "avg",         "tier": 2}),
-    ({"Heart Rate Variability", "heart_rate_variability"}, {"field": "hrv_sdnn_apple",              "agg": "avg",         "tier": 2}),
-    ({"Respiratory Rate", "respiratory_rate"},            {"field": "respiratory_rate_apple",      "agg": "avg",         "tier": 2}),
-    ({"Oxygen Saturation", "blood_oxygen_saturation"},   {"field": "spo2_pct_apple",              "agg": "avg",         "tier": 2}),
+    ({"Heart Rate", "heart_rate"}, {"field": "heart_rate_apple", "agg": "avg_special", "tier": 2}),
+    ({"Resting Heart Rate", "resting_heart_rate"}, {"field": "resting_heart_rate_apple", "agg": "avg", "tier": 2}),
+    ({"Heart Rate Variability", "heart_rate_variability"}, {"field": "hrv_sdnn_apple", "agg": "avg", "tier": 2}),
+    ({"Respiratory Rate", "respiratory_rate"}, {"field": "respiratory_rate_apple", "agg": "avg", "tier": 2}),
+    ({"Oxygen Saturation", "blood_oxygen_saturation"}, {"field": "spo2_pct_apple", "agg": "avg", "tier": 2}),
 ]
 
 # Build lookup from all name variants
@@ -443,45 +448,80 @@ for names, config in _METRIC_DEFS:
 # body_mass/fat   → Withings is SOT for body composition
 SKIP_METRICS = {
     # Glucose handled separately
-    "Blood Glucose", "blood_glucose",
+    "Blood Glucose",
+    "blood_glucose",
     # Sleep — Eight Sleep is SOT
-    "sleep_analysis", "Sleep Analysis",
+    "sleep_analysis",
+    "Sleep Analysis",
     # Body comp — Withings is primary, but accept body_mass from HAE as fallback
     # "body_mass", "Body Mass",  # v1.4.2: accept weight from HAE (Withings API has sync delays)
-    "body_fat_percentage", "Body Fat Percentage",
+    "body_fat_percentage",
+    "Body Fat Percentage",
     # Nutrition — MacroFactor is SOT (these flow into HealthKit from MF app)
-    "dietary_energy", "Dietary Energy",
-    "protein", "Protein",
-    "carbohydrates", "Carbohydrates",
-    "total_fat", "Total Fat",
-    "fiber", "Fiber",
-    "dietary_sugar", "Dietary Sugar",
-    "sodium", "Sodium",
-    "saturated_fat", "Saturated Fat",
-    "monounsaturated_fat", "Monounsaturated Fat",
-    "polyunsaturated_fat", "Polyunsaturated Fat",
-    "cholesterol", "Cholesterol",
-    "calcium", "Calcium",
-    "iron", "Iron",
-    "potassium", "Potassium",
-    "magnesium", "Magnesium",
-    "zinc", "Zinc",
-    "selenium", "Selenium",
-    "copper", "Copper",
-    "manganese", "Manganese",
-    "phosphorus", "Phosphorus",
-    "vitamin_a", "Vitamin A",
-    "vitamin_c", "Vitamin C",
-    "vitamin_d", "Vitamin D",
-    "vitamin_e", "Vitamin E",
-    "vitamin_k", "Vitamin K",
-    "vitamin_b6", "Vitamin B6",
-    "vitamin_b12", "Vitamin B12",
-    "thiamin", "Thiamin",
-    "riboflavin", "Riboflavin",
-    "niacin", "Niacin",
-    "folate", "Folate",
-    "pantothenic_acid", "Pantothenic Acid",
+    "dietary_energy",
+    "Dietary Energy",
+    "protein",
+    "Protein",
+    "carbohydrates",
+    "Carbohydrates",
+    "total_fat",
+    "Total Fat",
+    "fiber",
+    "Fiber",
+    "dietary_sugar",
+    "Dietary Sugar",
+    "sodium",
+    "Sodium",
+    "saturated_fat",
+    "Saturated Fat",
+    "monounsaturated_fat",
+    "Monounsaturated Fat",
+    "polyunsaturated_fat",
+    "Polyunsaturated Fat",
+    "cholesterol",
+    "Cholesterol",
+    "calcium",
+    "Calcium",
+    "iron",
+    "Iron",
+    "potassium",
+    "Potassium",
+    "magnesium",
+    "Magnesium",
+    "zinc",
+    "Zinc",
+    "selenium",
+    "Selenium",
+    "copper",
+    "Copper",
+    "manganese",
+    "Manganese",
+    "phosphorus",
+    "Phosphorus",
+    "vitamin_a",
+    "Vitamin A",
+    "vitamin_c",
+    "Vitamin C",
+    "vitamin_d",
+    "Vitamin D",
+    "vitamin_e",
+    "Vitamin E",
+    "vitamin_k",
+    "Vitamin K",
+    "vitamin_b6",
+    "Vitamin B6",
+    "vitamin_b12",
+    "Vitamin B12",
+    "thiamin",
+    "Thiamin",
+    "riboflavin",
+    "Riboflavin",
+    "niacin",
+    "Niacin",
+    "folate",
+    "Folate",
+    "pantothenic_acid",
+    "Pantothenic Acid",
 }
 
 # NOTE: dietary_water removed from SKIP_METRICS in v1.3.0 —
@@ -540,9 +580,7 @@ def process_generic_metrics(metrics):
 
         # Per-date per-source accumulators for THIS metric.
         # day_per_source[date][source] = {"sum": float, "vals": [floats], "ts": {ts: qty}}
-        day_per_source = defaultdict(lambda: defaultdict(
-            lambda: {"sum": 0.0, "vals": [], "ts": {}}
-        ))
+        day_per_source = defaultdict(lambda: defaultdict(lambda: {"sum": 0.0, "vals": [], "ts": {}}))
         day_source_counts = defaultdict(Counter)  # date → Counter({source: count})
 
         kept = 0
@@ -651,9 +689,7 @@ def process_generic_metrics(metrics):
             # Carry dedup timestamps from water_intake_raw → water_intake_ml
             if date in daily_timestamps and "water_intake_raw" in daily_timestamps[date]:
                 raw_ts = daily_timestamps[date].pop("water_intake_raw")
-                daily_timestamps[date]["water_intake_ml"] = {
-                    ts: round(qty * 29.5735) for ts, qty in raw_ts.items()
-                }
+                daily_timestamps[date]["water_intake_ml"] = {ts: round(qty * 29.5735) for ts, qty in raw_ts.items()}
 
     # ── Logging ──
     if matched:
@@ -674,6 +710,7 @@ def process_generic_metrics(metrics):
 
 
 # ── DynamoDB Write ─────────────────────────────────────────────────────────────
+
 
 def merge_day_to_dynamo(date_str, fields, reading_timestamps=None):
     """
@@ -890,8 +927,7 @@ def process_state_of_mind(payload):
             entries_raw = data
         elif isinstance(data, dict):
             # Try known keys
-            for key in ("stateOfMind", "state_of_mind", "stateofmind",
-                        "StateOfMind", "entries", "samples"):
+            for key in ("stateOfMind", "state_of_mind", "stateofmind", "StateOfMind", "entries", "samples"):
                 if key in data and isinstance(data[key], list):
                     entries_raw = data[key]
                     break
@@ -904,8 +940,13 @@ def process_state_of_mind(payload):
 
     # ── Valence classification mapping ──
     VALENCE_MAP = {
-        1: "veryUnpleasant", 2: "unpleasant", 3: "slightlyUnpleasant",
-        4: "neutral", 5: "slightlyPleasant", 6: "pleasant", 7: "veryPleasant",
+        1: "veryUnpleasant",
+        2: "unpleasant",
+        3: "slightlyUnpleasant",
+        4: "neutral",
+        5: "slightlyPleasant",
+        6: "pleasant",
+        7: "veryPleasant",
     }
 
     # ── Normalize entries ──
@@ -916,9 +957,15 @@ def process_state_of_mind(payload):
             continue
 
         # Extract date — try multiple field names
-        date_field = (raw.get("date") or raw.get("startDate")
-                      or raw.get("start_date") or raw.get("start")
-                      or raw.get("end") or raw.get("timestamp") or "")
+        date_field = (
+            raw.get("date")
+            or raw.get("startDate")
+            or raw.get("start_date")
+            or raw.get("start")
+            or raw.get("end")
+            or raw.get("timestamp")
+            or ""
+        )
         date_str = parse_date_str(str(date_field)) if date_field else None
         if not date_str:
             continue
@@ -1048,23 +1095,23 @@ def process_state_of_mind(payload):
 # Maps HealthKit workout name → category for DynamoDB fields.
 RECOVERY_WORKOUT_TYPES = {
     # Flexibility / Mobility (Pliability, stretching apps)
-    "Flexibility":      "flexibility",
-    "flexibility":      "flexibility",
+    "Flexibility": "flexibility",
+    "flexibility": "flexibility",
     # Breathwork (Breathwrk, Wim Hof, etc.)
-    "Mind and Body":    "breathwork",
-    "mind_and_body":    "breathwork",
-    "Breathing":        "breathwork",
-    "breathing":        "breathwork",
+    "Mind and Body": "breathwork",
+    "mind_and_body": "breathwork",
+    "Breathing": "breathwork",
+    "breathing": "breathwork",
     # Yoga / Pilates
-    "Yoga":             "yoga",
-    "yoga":             "yoga",
-    "Pilates":          "pilates",
-    "pilates":          "pilates",
+    "Yoga": "yoga",
+    "yoga": "yoga",
+    "Pilates": "pilates",
+    "pilates": "pilates",
     # Cooldown / Tai Chi
-    "Cooldown":         "cooldown",
-    "cooldown":         "cooldown",
-    "Tai Chi":          "tai_chi",
-    "tai_chi":          "tai_chi",
+    "Cooldown": "cooldown",
+    "cooldown": "cooldown",
+    "Tai Chi": "tai_chi",
+    "tai_chi": "tai_chi",
 }
 
 
@@ -1167,9 +1214,7 @@ def process_workouts(workouts):
         total_min = sum(cat_minutes.values())
         agg["recovery_workout_minutes"] = round(total_min, 1)
         agg["recovery_workout_sessions"] = len(recovery)
-        agg["recovery_workout_types"] = ", ".join(sorted(set(
-            w["category"] for w in recovery
-        )))
+        agg["recovery_workout_types"] = ", ".join(sorted(set(w["category"] for w in recovery)))
 
         daily_agg[date] = agg
 
@@ -1209,10 +1254,7 @@ def save_workouts_to_s3(date_str, workouts_list):
 def save_raw_payload(payload):
     """Archive the raw webhook payload to S3."""
     now = datetime.now(timezone.utc)
-    s3_key = (
-        f"raw/{USER_ID}/health_auto_export/"
-        f"{now.strftime('%Y/%m/%d_%H%M%S')}.json"
-    )
+    s3_key = f"raw/{USER_ID}/health_auto_export/" f"{now.strftime('%Y/%m/%d_%H%M%S')}.json"
     s3_client.put_object(
         Bucket=S3_BUCKET,
         Key=s3_key,
@@ -1223,6 +1265,7 @@ def save_raw_payload(payload):
 
 
 # ── Lambda Handler ─────────────────────────────────────────────────────────────
+
 
 def lambda_handler(event, context):
     if event.get("healthcheck"):
@@ -1235,7 +1278,8 @@ def lambda_handler(event, context):
       - Authorization: Bearer <api_key> header
     """
     _request_start = datetime.now(timezone.utc)
-    if hasattr(logger, "set_date"): logger.set_date(_request_start.strftime("%Y-%m-%d"))  # OBS-1
+    if hasattr(logger, "set_date"):
+        logger.set_date(_request_start.strftime("%Y-%m-%d"))  # OBS-1
     logger.info(f"Health Auto Export webhook received")
 
     # ── Auth ──
@@ -1249,8 +1293,7 @@ def lambda_handler(event, context):
         token = query_params.get("key", "")
 
     if not token:
-        logger.warning("hae_auth_failure reason=no_token request_id=%s",
-                       context.aws_request_id if context else "local")
+        logger.warning("hae_auth_failure reason=no_token request_id=%s", context.aws_request_id if context else "local")
         return {"statusCode": 401, "body": json.dumps({"error": "Unauthorized"})}
 
     # Phase 2.7 (2026-05-16): constant-time comparison to prevent timing-attack
@@ -1258,8 +1301,7 @@ def lambda_handler(event, context):
     try:
         expected_key = get_api_key()
         if not hmac.compare_digest(token.encode("utf-8"), (expected_key or "").encode("utf-8")):
-            logger.warning("hae_auth_failure reason=invalid_token request_id=%s",
-                           context.aws_request_id if context else "local")
+            logger.warning("hae_auth_failure reason=invalid_token request_id=%s", context.aws_request_id if context else "local")
             return {"statusCode": 403, "body": json.dumps({"error": "Forbidden"})}
     except Exception as e:
         logger.error("hae_auth_error: %s", e)
@@ -1269,6 +1311,7 @@ def lambda_handler(event, context):
     body = event.get("body", "")
     if event.get("isBase64Encoded"):
         import base64
+
         body = base64.b64decode(body).decode("utf-8")
 
     try:
@@ -1292,7 +1335,9 @@ def lambda_handler(event, context):
     som_days = 0
 
     if som_daily_entries:
-        logger.info(f"State of Mind detected: {sum(len(v) for v in som_daily_entries.values())} entries across {len(som_daily_entries)} days")
+        logger.info(
+            f"State of Mind detected: {sum(len(v) for v in som_daily_entries.values())} entries across {len(som_daily_entries)} days"
+        )
         for date_str, entries in som_daily_entries.items():
             n = save_state_of_mind_to_s3(date_str, entries)
             som_entries_new += n
@@ -1367,24 +1412,31 @@ def lambda_handler(event, context):
                 dia_val = reading.get("diastolic")
                 if not date or sys_val is None:
                     continue
-                bp_daily[date].append({
-                    "time": ts,
-                    "systolic": round(float(sys_val)),
-                    "diastolic": round(float(dia_val)) if dia_val is not None else None,
-                    "pulse": round(float(reading.get("pulse", 0))) if reading.get("pulse") else None,
-                })
+                bp_daily[date].append(
+                    {
+                        "time": ts,
+                        "systolic": round(float(sys_val)),
+                        "diastolic": round(float(dia_val)) if dia_val is not None else None,
+                        "pulse": round(float(reading.get("pulse", 0))) if reading.get("pulse") else None,
+                    }
+                )
             for date_str, readings in bp_daily.items():
                 n = save_bp_readings_to_s3(date_str, readings)
                 bp_readings_new += n
                 avg_sys = round(sum(r["systolic"] for r in readings) / len(readings))
-                avg_dia = round(sum(r["diastolic"] for r in readings if r["diastolic"]) / max(1, len([r for r in readings if r["diastolic"]])))
-                merge_day_to_dynamo(date_str, {
-                    "bp_systolic": avg_sys,
-                    "bp_diastolic": avg_dia,
-                    "blood_pressure_systolic": avg_sys,
-                    "blood_pressure_diastolic": avg_dia,
-                    "blood_pressure_readings_count": len(readings),
-                })
+                avg_dia = round(
+                    sum(r["diastolic"] for r in readings if r["diastolic"]) / max(1, len([r for r in readings if r["diastolic"]]))
+                )
+                merge_day_to_dynamo(
+                    date_str,
+                    {
+                        "bp_systolic": avg_sys,
+                        "bp_diastolic": avg_dia,
+                        "blood_pressure_systolic": avg_sys,
+                        "blood_pressure_diastolic": avg_dia,
+                        "blood_pressure_readings_count": len(readings),
+                    },
+                )
             if bp_readings_new:
                 logger.info(f"Blood Pressure: {bp_readings_new} new readings saved (combined format)")
             break
@@ -1410,12 +1462,14 @@ def lambda_handler(event, context):
                     sys_val = reading.get("qty")
                     if not date or sys_val is None:
                         continue
-                    bp_daily[date].append({
-                        "time": ts,
-                        "systolic": round(float(sys_val)),
-                        "diastolic": round(float(dia_by_time.get(ts, 0))) if dia_by_time.get(ts) else None,
-                        "pulse": round(float(pulse_by_time.get(ts, 0))) if pulse_by_time.get(ts) else None,
-                    })
+                    bp_daily[date].append(
+                        {
+                            "time": ts,
+                            "systolic": round(float(sys_val)),
+                            "diastolic": round(float(dia_by_time.get(ts, 0))) if dia_by_time.get(ts) else None,
+                            "pulse": round(float(pulse_by_time.get(ts, 0))) if pulse_by_time.get(ts) else None,
+                        }
+                    )
                 for date_str, readings in bp_daily.items():
                     n = save_bp_readings_to_s3(date_str, readings)
                     bp_readings_new += n
@@ -1452,8 +1506,10 @@ def lambda_handler(event, context):
             recovery_days += 1
 
         if workout_new or recovery_days:
-            print(f"Workouts: {workout_new} new saved to S3 across {workout_days} days, "
-                  f"{recovery_days} days with recovery aggregates written to DynamoDB")
+            print(
+                f"Workouts: {workout_new} new saved to S3 across {workout_days} days, "
+                f"{recovery_days} days with recovery aggregates written to DynamoDB"
+            )
     else:
         logger.info("No workouts in payload")
 

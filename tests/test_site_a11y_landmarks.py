@@ -9,6 +9,7 @@ v4 cutover (2026-06-01): the old site is preserved verbatim under site/legacy/
 PRESERVED legacy pages; new assertions pin the three v4 doors. System pages
 (subscribe) stayed at root and are still checked there.
 """
+
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent

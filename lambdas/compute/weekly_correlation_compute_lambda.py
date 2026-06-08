@@ -24,19 +24,20 @@ v1.0.0 — 2026-03-14 (R8-LT9)
 """
 
 import json
+import logging
 import math
 import os
 import time
-import logging
-import boto3
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+import boto3
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger
 try:
     from platform_logger import get_logger
+
     logger = get_logger("weekly-correlation-compute")
 except ImportError:
     logger = logging.getLogger("weekly-correlation-compute")
@@ -68,15 +69,20 @@ try:
 except ImportError:
     # Fallback for local testing without layer
     from decimal import Decimal as _Decimal
+
     def d2f(obj):
-        if isinstance(obj, list): return [d2f(i) for i in obj]
-        if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
-        if isinstance(obj, _Decimal): return float(obj)
+        if isinstance(obj, list):
+            return [d2f(i) for i in obj]
+        if isinstance(obj, dict):
+            return {k: d2f(v) for k, v in obj.items()}
+        if isinstance(obj, _Decimal):
+            return float(obj)
         return obj
 
 
 def _to_dec(val):
-    if val is None: return None
+    if val is None:
+        return None
     try:
         return Decimal(str(round(float(val), 6)))
     except Exception:
@@ -91,8 +97,8 @@ def fetch_range(source, start_date, end_date):
             "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
             "ExpressionAttributeValues": {
                 ":pk": USER_PREFIX + source,
-                ":s":  "DATE#" + start_date,
-                ":e":  "DATE#" + end_date,
+                ":s": "DATE#" + start_date,
+                ":e": "DATE#" + end_date,
             },
         }
         while True:
@@ -121,6 +127,7 @@ def safe_float(rec, field):
 # PEARSON CORRELATION
 # ==============================================================================
 
+
 def pearson_r(xs, ys):
     """Compute Pearson r for paired lists. Returns None if insufficient variance."""
     pairs = [(x, y) for x, y in zip(xs, ys) if x is not None and y is not None]
@@ -147,7 +154,7 @@ def pearson_p_value(r: float, n: int) -> float | None:
     """
     if r is None or n <= 2 or abs(r) >= 1.0:
         return None
-    t_stat = r * math.sqrt(n - 2) / math.sqrt(max(1e-10, 1.0 - r ** 2))
+    t_stat = r * math.sqrt(n - 2) / math.sqrt(max(1e-10, 1.0 - r**2))
     df = n - 2
     # Normal approximation: exact for large df, conservative for small df
     if df >= 30:
@@ -212,7 +219,7 @@ def apply_benjamini_hochberg(results: dict, alpha: float = 0.05) -> dict:
 
     for k, (label, _) in enumerate(labeled):
         results[label]["p_value_fdr"] = round(adj[k], 4)
-        results[label]["fdr_significant"] = (k <= last_sig)
+        results[label]["fdr_significant"] = k <= last_sig
 
     return results
 
@@ -220,9 +227,9 @@ def apply_benjamini_hochberg(results: dict, alpha: float = 0.05) -> dict:
 # Minimum sample sizes for each interpretation label (Henning, R9).
 # Pearson r on small n is extremely noisy — a r=0.7 on n=12 must not be called 'strong'.
 _INTERP_N_REQUIRED = {
-    "strong":   50,  # |r| >= 0.6 AND n >= 50
+    "strong": 50,  # |r| >= 0.6 AND n >= 50
     "moderate": 30,  # |r| >= 0.4 AND n >= 30
-    "weak":     10,  # |r| >= 0.2 AND n >= 10
+    "weak": 10,  # |r| >= 0.2 AND n >= 10
 }
 
 
@@ -263,6 +270,7 @@ def interpret_r(r, n=None):
 # DATA ASSEMBLY
 # ==============================================================================
 
+
 def assemble_daily_series(start_date, end_date):
     """
     Fetch all source records for the lookback window and build a
@@ -272,15 +280,15 @@ def assemble_daily_series(start_date, end_date):
     """
     # Fetch all required sources in parallel-ish sequential calls
     sources = {
-        "whoop":       fetch_range("whoop",       start_date, end_date),
-        "strava":      fetch_range("strava",       start_date, end_date),
-        "macrofactor": fetch_range("macrofactor",  start_date, end_date),
-        "apple":       fetch_range("apple_health", start_date, end_date),
-        "habitify":    fetch_range("habitify",     start_date, end_date),
-        "computed":    fetch_range("computed_metrics", start_date, end_date),
+        "whoop": fetch_range("whoop", start_date, end_date),
+        "strava": fetch_range("strava", start_date, end_date),
+        "macrofactor": fetch_range("macrofactor", start_date, end_date),
+        "apple": fetch_range("apple_health", start_date, end_date),
+        "habitify": fetch_range("habitify", start_date, end_date),
+        "computed": fetch_range("computed_metrics", start_date, end_date),
         # R17-14 / ADR-025: composite_scores partition removed — all fields consolidated
         # into computed_metrics since v3.7.28. No new data written to composite_scores.
-        "cgm":         fetch_range("apple_health", start_date, end_date),  # CGM is in apple_health
+        "cgm": fetch_range("apple_health", start_date, end_date),  # CGM is in apple_health
     }
 
     # Build date-indexed lookup per source
@@ -364,43 +372,37 @@ def assemble_daily_series(start_date, end_date):
 # interpreted using the same significance thresholds as cross-sectional.
 CORRELATION_PAIRS = [
     # Recovery / HRV (cross-sectional)
-    ("hrv",           "recovery_score",  "hrv_vs_recovery",               0),
-    ("sleep_duration", "recovery_score",  "sleep_duration_vs_recovery",    0),
-    ("sleep_score",   "recovery_score",  "sleep_score_vs_recovery",       0),
-    ("hrv",           "sleep_score",     "hrv_vs_sleep_score",            0),
-    ("resting_hr",    "recovery_score",  "rhr_vs_recovery",               0),
-
+    ("hrv", "recovery_score", "hrv_vs_recovery", 0),
+    ("sleep_duration", "recovery_score", "sleep_duration_vs_recovery", 0),
+    ("sleep_score", "recovery_score", "sleep_score_vs_recovery", 0),
+    ("hrv", "sleep_score", "hrv_vs_sleep_score", 0),
+    ("resting_hr", "recovery_score", "rhr_vs_recovery", 0),
     # Training (cross-sectional; lagged versions are the higher-value analysis)
-    ("tsb",           "recovery_score",  "tsb_vs_recovery",               0),
-    ("strain",        "hrv",             "strain_vs_hrv",                 0),
-    ("training_kj",   "hrv",             "training_load_vs_hrv",          0),
-    ("training_mins", "recovery_score",  "training_mins_vs_recovery",     0),
-
+    ("tsb", "recovery_score", "tsb_vs_recovery", 0),
+    ("strain", "hrv", "strain_vs_hrv", 0),
+    ("training_kj", "hrv", "training_load_vs_hrv", 0),
+    ("training_mins", "recovery_score", "training_mins_vs_recovery", 0),
     # Nutrition (cross-sectional)
-    ("protein_g",     "recovery_score",  "protein_vs_recovery",           0),
-    ("calories",      "hrv",             "calories_vs_hrv",               0),
-    ("carbs_g",       "hrv",             "carbs_vs_hrv",                  0),
-
+    ("protein_g", "recovery_score", "protein_vs_recovery", 0),
+    ("calories", "hrv", "calories_vs_hrv", 0),
+    ("carbs_g", "hrv", "carbs_vs_hrv", 0),
     # Activity / Steps (cross-sectional)
-    ("steps",         "recovery_score",  "steps_vs_recovery",             0),
-    ("steps",         "hrv",             "steps_vs_hrv",                  0),
-    ("steps",         "sleep_score",     "steps_vs_sleep",                0),
-
+    ("steps", "recovery_score", "steps_vs_recovery", 0),
+    ("steps", "hrv", "steps_vs_hrv", 0),
+    ("steps", "sleep_score", "steps_vs_sleep", 0),
     # Habits (cross-sectional)
-    ("habit_pct",     "day_grade",       "habit_pct_vs_day_grade",        0),
-    ("habit_pct",     "recovery_score",  "habit_pct_vs_recovery",         0),
-    ("tier0_streak",  "day_grade",       "tier0_streak_vs_day_grade",     0),
-
+    ("habit_pct", "day_grade", "habit_pct_vs_day_grade", 0),
+    ("habit_pct", "recovery_score", "habit_pct_vs_recovery", 0),
+    ("tier0_streak", "day_grade", "tier0_streak_vs_day_grade", 0),
     # Weight / Nutrition (cross-sectional)
-    ("calories",      "day_grade",       "calories_vs_day_grade",         0),
-    ("readiness",     "day_grade",       "readiness_vs_day_grade",        0),
-
+    ("calories", "day_grade", "calories_vs_day_grade", 0),
+    ("readiness", "day_grade", "readiness_vs_day_grade", 0),
     # Lagged predictive pairs (lag_days > 0)
     # Henning: lagged pairs test whether metric_a TODAY predicts metric_b TOMORROW.
     # Degrees of freedom reduced by lag_days; interpretation requires higher n thresholds.
-    ("hrv",           "training_kj",     "hrv_predicts_next_day_load",    1),
-    ("recovery_score", "training_kj",     "recovery_predicts_next_day_load", 1),
-    ("training_kj",   "recovery_score",  "load_predicts_next_day_recovery", 1),
+    ("hrv", "training_kj", "hrv_predicts_next_day_load", 1),
+    ("recovery_score", "training_kj", "recovery_predicts_next_day_load", 1),
+    ("training_kj", "recovery_score", "load_predicts_next_day_recovery", 1),
 ]
 
 
@@ -408,29 +410,29 @@ CORRELATION_PAIRS = [
 # When observed direction differs from expected AND |r| >= 0.2, the finding
 # is flagged as counterintuitive for the public Discoveries page.
 EXPECTED_DIRECTIONS = {
-    "hrv_vs_recovery":                  "positive",   # higher HRV → better recovery
-    "sleep_duration_vs_recovery":       "positive",   # more sleep → better recovery
-    "sleep_score_vs_recovery":          "positive",   # better sleep → better recovery
-    "hrv_vs_sleep_score":               "positive",   # higher HRV → better sleep
-    "rhr_vs_recovery":                  "negative",   # lower RHR → better recovery
-    "tsb_vs_recovery":                  "positive",   # positive TSB → better recovery
-    "strain_vs_hrv":                    "negative",   # more strain → lower HRV (same day)
-    "training_load_vs_hrv":             "negative",   # more training → lower HRV
-    "training_mins_vs_recovery":        "negative",   # more training → lower recovery (same day)
-    "protein_vs_recovery":              "positive",   # more protein → better recovery
-    "calories_vs_hrv":                  "positive",   # adequate calories → higher HRV
-    "carbs_vs_hrv":                     "positive",   # adequate carbs → higher HRV
-    "steps_vs_recovery":                "positive",   # more steps → better recovery
-    "steps_vs_hrv":                     "positive",   # more steps → higher HRV
-    "steps_vs_sleep":                   "positive",   # more steps → better sleep
-    "habit_pct_vs_day_grade":           "positive",   # better habits → better day
-    "habit_pct_vs_recovery":            "positive",   # better habits → better recovery
-    "tier0_streak_vs_day_grade":        "positive",   # longer streak → better day
-    "calories_vs_day_grade":            "positive",   # adequate calories → better day
-    "readiness_vs_day_grade":           "positive",   # higher readiness → better day
-    "hrv_predicts_next_day_load":       "positive",   # higher HRV → more training next day
-    "recovery_predicts_next_day_load":  "positive",   # better recovery → more training next day
-    "load_predicts_next_day_recovery":  "negative",   # more load → lower recovery next day
+    "hrv_vs_recovery": "positive",  # higher HRV → better recovery
+    "sleep_duration_vs_recovery": "positive",  # more sleep → better recovery
+    "sleep_score_vs_recovery": "positive",  # better sleep → better recovery
+    "hrv_vs_sleep_score": "positive",  # higher HRV → better sleep
+    "rhr_vs_recovery": "negative",  # lower RHR → better recovery
+    "tsb_vs_recovery": "positive",  # positive TSB → better recovery
+    "strain_vs_hrv": "negative",  # more strain → lower HRV (same day)
+    "training_load_vs_hrv": "negative",  # more training → lower HRV
+    "training_mins_vs_recovery": "negative",  # more training → lower recovery (same day)
+    "protein_vs_recovery": "positive",  # more protein → better recovery
+    "calories_vs_hrv": "positive",  # adequate calories → higher HRV
+    "carbs_vs_hrv": "positive",  # adequate carbs → higher HRV
+    "steps_vs_recovery": "positive",  # more steps → better recovery
+    "steps_vs_hrv": "positive",  # more steps → higher HRV
+    "steps_vs_sleep": "positive",  # more steps → better sleep
+    "habit_pct_vs_day_grade": "positive",  # better habits → better day
+    "habit_pct_vs_recovery": "positive",  # better habits → better recovery
+    "tier0_streak_vs_day_grade": "positive",  # longer streak → better day
+    "calories_vs_day_grade": "positive",  # adequate calories → better day
+    "readiness_vs_day_grade": "positive",  # higher readiness → better day
+    "hrv_predicts_next_day_load": "positive",  # higher HRV → more training next day
+    "recovery_predicts_next_day_load": "positive",  # better recovery → more training next day
+    "load_predicts_next_day_recovery": "negative",  # more load → lower recovery next day
 }
 
 
@@ -479,15 +481,15 @@ def compute_correlations(series):
 
         r, n = pearson_r(xs, ys)
         results[label] = {
-            "metric_a":        metric_a,
-            "metric_b":        metric_b,
-            "pearson_r":       r,
-            "r_squared":       round(r ** 2, 4) if r is not None else None,
-            "n_days":          n,
-            "interpretation":  interpret_r(r, n),  # n-gated: moderate≥30, strong≥50
-            "direction":       ("positive" if r > 0 else "negative") if r is not None else None,
-            "correlation_type": correlation_type,   # Henning R12: cross_sectional vs lagged
-            "lag_days":        lag_days if lag_days > 0 else None,
+            "metric_a": metric_a,
+            "metric_b": metric_b,
+            "pearson_r": r,
+            "r_squared": round(r**2, 4) if r is not None else None,
+            "n_days": n,
+            "interpretation": interpret_r(r, n),  # n-gated: moderate≥30, strong≥50
+            "direction": ("positive" if r > 0 else "negative") if r is not None else None,
+            "correlation_type": correlation_type,  # Henning R12: cross_sectional vs lagged
+            "lag_days": lag_days if lag_days > 0 else None,
         }
         # DISC-1: Flag counterintuitive findings where observed direction
         # differs from domain-knowledge expected direction.
@@ -511,8 +513,7 @@ def compute_correlations(series):
     # Adds p_value, p_value_fdr, and fdr_significant fields to each result.
     results = apply_benjamini_hochberg(results, alpha=0.05)
     fdr_sig = sum(1 for v in results.values() if v.get("fdr_significant"))
-    logger.info("[R13-F15] BH FDR correction applied: %d/%d pairs FDR-significant (alpha=0.05)",
-                fdr_sig, len(results))
+    logger.info("[R13-F15] BH FDR correction applied: %d/%d pairs FDR-significant (alpha=0.05)", fdr_sig, len(results))
 
     return results
 
@@ -521,8 +522,10 @@ def compute_correlations(series):
 # STORE
 # ==============================================================================
 
+
 def store_correlations(week_key, correlations, start_date, end_date, computed_at):
     """Write correlation results to SOURCE#weekly_correlations partition."""
+
     # Convert float values to Decimal for DynamoDB
     def _dec_correlations(corr_dict):
         result = {}
@@ -540,19 +543,20 @@ def store_correlations(week_key, correlations, start_date, end_date, computed_at
         return result
 
     item = {
-        "pk":          USER_PREFIX + "weekly_correlations",
-        "sk":          "WEEK#" + week_key,
-        "week":        week_key,
-        "start_date":  start_date,
-        "end_date":    end_date,
+        "pk": USER_PREFIX + "weekly_correlations",
+        "sk": "WEEK#" + week_key,
+        "week": week_key,
+        "start_date": start_date,
+        "end_date": end_date,
         "lookback_days": Decimal(str(LOOKBACK_DAYS)),
-        "n_pairs":     Decimal(str(len(correlations))),
+        "n_pairs": Decimal(str(len(correlations))),
         "correlations": _dec_correlations(correlations),
         "computed_at": computed_at,
     }
     # V2 P2.6 (2026-05-19): tag with run_id + computed_at
     try:
         from compute_metadata import tag_record
+
         item = tag_record(item, source_id="weekly_correlations")
     except ImportError:
         pass
@@ -567,10 +571,10 @@ def store_correlations(week_key, correlations, start_date, end_date, computed_at
 # Attia centenarian targets: bodyweight-relative 1RM targets at current age,
 # computed to ensure functional independence at 80-85 given ~8-12% decline/decade.
 CENTENARIAN_TARGETS = {
-    "deadlift":         2.0,   # x bodyweight
-    "squat":            1.75,
-    "bench_press":      1.5,
-    "overhead_press":   1.0,
+    "deadlift": 2.0,  # x bodyweight
+    "squat": 1.75,
+    "bench_press": 1.5,
+    "overhead_press": 1.0,
 }
 
 
@@ -598,9 +602,9 @@ def _compute_centenarian_progress(series, end_date):
         # Collect max estimated_1rm per exercise name across all records
         lift_1rm = {}  # normalized_name → max 1RM (lbs)
         LIFT_ALIASES = {
-            "deadlift":       ["deadlift", "romanian deadlift", "rdl"],
-            "squat":          ["squat", "back squat", "front squat", "goblet squat"],
-            "bench_press":    ["bench press", "incline bench", "flat bench"],
+            "deadlift": ["deadlift", "romanian deadlift", "rdl"],
+            "squat": ["squat", "back squat", "front squat", "goblet squat"],
+            "bench_press": ["bench press", "incline bench", "flat bench"],
             "overhead_press": ["overhead press", "ohp", "shoulder press", "military press"],
         }
         ALIAS_TO_LIFT = {}
@@ -643,12 +647,12 @@ def _compute_centenarian_progress(series, end_date):
             else:
                 status = "below_minimum"
             lift_scores[lift] = {
-                "current_lbs":   round(current_lbs, 1),
-                "target_lbs":    round(target_lbs, 1),
-                "target_ratio":  target_ratio,
+                "current_lbs": round(current_lbs, 1),
+                "target_lbs": round(target_lbs, 1),
+                "target_ratio": target_ratio,
                 "pct_of_target": round(pct_of_target * 100, 1),
-                "gap_lbs":       round(gap_lbs, 1),
-                "status":        status,
+                "gap_lbs": round(gap_lbs, 1),
+                "status": status,
             }
             overall_ready += pct_of_target
             lifts_scored += 1
@@ -661,11 +665,11 @@ def _compute_centenarian_progress(series, end_date):
         )
 
         return {
-            "bodyweight_lbs":    round(bodyweight_lbs, 1),
-            "lifts":             lift_scores,
+            "bodyweight_lbs": round(bodyweight_lbs, 1),
+            "lifts": lift_scores,
             "overall_readiness": overall_readiness,
-            "priority_lift":     priority_lift,
-            "lifts_scored":      lifts_scored,
+            "priority_lift": priority_lift,
+            "lifts_scored": lifts_scored,
         }
     except Exception as e:
         logger.warning("BS-TR1 centenarian progress failed (non-fatal): %s", e)
@@ -677,17 +681,21 @@ def store_centenarian_progress(week_key, progress, end_date, computed_at):
     if not progress:
         return
     item = {
-        "pk":          USER_PREFIX + "centenarian_progress",
-        "sk":          "WEEK#" + week_key,
-        "week":        week_key,
-        "date":        end_date,
+        "pk": USER_PREFIX + "centenarian_progress",
+        "sk": "WEEK#" + week_key,
+        "week": week_key,
+        "date": end_date,
         "computed_at": computed_at,
     }
+
     # Decimal-safe fields
     def _safe_dec(v):
-        if v is None: return None
-        try: return Decimal(str(round(float(v), 4)))
-        except Exception: return None
+        if v is None:
+            return None
+        try:
+            return Decimal(str(round(float(v), 4)))
+        except Exception:
+            return None
 
     item["bodyweight_lbs"] = _safe_dec(progress["bodyweight_lbs"])
     item["overall_readiness"] = _safe_dec(progress["overall_readiness"])
@@ -697,12 +705,10 @@ def store_centenarian_progress(week_key, progress, end_date, computed_at):
     # Encode lift_scores as a map
     lifts_enc = {}
     for lift, data in progress["lifts"].items():
-        lifts_enc[lift] = {k: (_safe_dec(v) if isinstance(v, float) else v)
-                          for k, v in data.items() if v is not None}
+        lifts_enc[lift] = {k: (_safe_dec(v) if isinstance(v, float) else v) for k, v in data.items() if v is not None}
     item["lifts"] = lifts_enc
     table.put_item(Item=item)
-    logger.info("BS-TR1: Stored centenarian_progress for week %s (readiness=%.1f%%)",
-                week_key, progress["overall_readiness"] or 0)
+    logger.info("BS-TR1: Stored centenarian_progress for week %s (readiness=%.1f%%)", week_key, progress["overall_readiness"] or 0)
 
 
 # ==============================================================================
@@ -771,11 +777,13 @@ def _compute_zone2_efficiency(series, end_date):
         weekly = []
         for wk in weeks_sorted:
             samples = week_samples[wk]
-            weekly.append({
-                "week":           wk,
-                "avg_efficiency": round(sum(samples) / len(samples), 6),
-                "n_sessions":     len(samples),
-            })
+            weekly.append(
+                {
+                    "week": wk,
+                    "avg_efficiency": round(sum(samples) / len(samples), 6),
+                    "n_sessions": len(samples),
+                }
+            )
 
         # Linear regression trend
         if len(weekly) >= 4:
@@ -803,17 +811,16 @@ def _compute_zone2_efficiency(series, end_date):
         baseline_eff = weekly[0]["avg_efficiency"] if weekly else None
 
         return {
-            "weeks_analyzed":          len(weekly),
-            "weekly":                  weekly,
-            "trend":                   trend,
-            "slope_per_week":          round(slope_per_week, 8) if slope_per_week is not None else None,
-            "pct_change_per_week":     pct_change,
-            "latest_efficiency":       latest_eff,
-            "baseline_efficiency":     baseline_eff,
-            "zone2_hr_range":          f"{ZONE2_HR_LOW}–{ZONE2_HR_HIGH} bpm",
-            "interpretation":          (
-                "Efficiency = speed_mph ÷ avg_HR. Higher = better fitness at same HR. "
-                "Improving trend = aerobic base is growing."
+            "weeks_analyzed": len(weekly),
+            "weekly": weekly,
+            "trend": trend,
+            "slope_per_week": round(slope_per_week, 8) if slope_per_week is not None else None,
+            "pct_change_per_week": pct_change,
+            "latest_efficiency": latest_eff,
+            "baseline_efficiency": baseline_eff,
+            "zone2_hr_range": f"{ZONE2_HR_LOW}–{ZONE2_HR_HIGH} bpm",
+            "interpretation": (
+                "Efficiency = speed_mph ÷ avg_HR. Higher = better fitness at same HR. " "Improving trend = aerobic base is growing."
             ),
         }
     except Exception as e:
@@ -827,31 +834,36 @@ def store_zone2_efficiency(week_key, efficiency, end_date, computed_at):
         return
 
     def _safe_dec(v):
-        if v is None: return None
-        try: return Decimal(str(round(float(v), 8)))
-        except Exception: return None
+        if v is None:
+            return None
+        try:
+            return Decimal(str(round(float(v), 8)))
+        except Exception:
+            return None
 
     # Build weekly list (Decimal-safe)
     weekly_enc = []
     for w in efficiency.get("weekly", []):
-        weekly_enc.append({
-            "week":           w["week"],
-            "avg_efficiency": _safe_dec(w["avg_efficiency"]),
-            "n_sessions":     Decimal(str(w["n_sessions"])),
-        })
+        weekly_enc.append(
+            {
+                "week": w["week"],
+                "avg_efficiency": _safe_dec(w["avg_efficiency"]),
+                "n_sessions": Decimal(str(w["n_sessions"])),
+            }
+        )
 
     item = {
-        "pk":                    USER_PREFIX + "zone2_efficiency",
-        "sk":                    "WEEK#" + week_key,
-        "week":                  week_key,
-        "date":                  end_date,
-        "computed_at":           computed_at,
-        "weeks_analyzed":        Decimal(str(efficiency["weeks_analyzed"])),
-        "trend":                 efficiency["trend"],
-        "latest_efficiency":     _safe_dec(efficiency["latest_efficiency"]),
-        "baseline_efficiency":   _safe_dec(efficiency["baseline_efficiency"]),
-        "zone2_hr_range":        efficiency["zone2_hr_range"],
-        "weekly":                weekly_enc,
+        "pk": USER_PREFIX + "zone2_efficiency",
+        "sk": "WEEK#" + week_key,
+        "week": week_key,
+        "date": end_date,
+        "computed_at": computed_at,
+        "weeks_analyzed": Decimal(str(efficiency["weeks_analyzed"])),
+        "trend": efficiency["trend"],
+        "latest_efficiency": _safe_dec(efficiency["latest_efficiency"]),
+        "baseline_efficiency": _safe_dec(efficiency["baseline_efficiency"]),
+        "zone2_hr_range": efficiency["zone2_hr_range"],
+        "weekly": weekly_enc,
     }
     if efficiency.get("slope_per_week") is not None:
         item["slope_per_week"] = _safe_dec(efficiency["slope_per_week"])
@@ -859,13 +871,15 @@ def store_zone2_efficiency(week_key, efficiency, end_date, computed_at):
         item["pct_change_per_week"] = _safe_dec(efficiency["pct_change_per_week"])
 
     table.put_item(Item=item)
-    logger.info("BS-TR2: Stored zone2_efficiency for week %s (trend=%s, weeks=%d)",
-                week_key, efficiency["trend"], efficiency["weeks_analyzed"])
+    logger.info(
+        "BS-TR2: Stored zone2_efficiency for week %s (trend=%s, weeks=%d)", week_key, efficiency["trend"], efficiency["weeks_analyzed"]
+    )
 
 
 # ==============================================================================
 # LAMBDA HANDLER
 # ==============================================================================
+
 
 def lambda_handler(event, context):
     t0 = time.time()
@@ -890,20 +904,20 @@ def lambda_handler(event, context):
     start_date = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=LOOKBACK_DAYS - 1)).strftime("%Y-%m-%d")
     computed_at = now.isoformat()
 
-    logger.info("Computing correlations for week %s | window: %s → %s (%d days)",
-                week_key, start_date, end_date, LOOKBACK_DAYS)
+    logger.info("Computing correlations for week %s | window: %s → %s (%d days)", week_key, start_date, end_date, LOOKBACK_DAYS)
 
     # Idempotency — skip if already computed this week unless forced
     if not event.get("force"):
         try:
-            existing = table.get_item(Key={
-                "pk": USER_PREFIX + "weekly_correlations",
-                "sk": "WEEK#" + week_key,
-            }).get("Item")
+            existing = table.get_item(
+                Key={
+                    "pk": USER_PREFIX + "weekly_correlations",
+                    "sk": "WEEK#" + week_key,
+                }
+            ).get("Item")
             if existing:
                 stored_at = existing.get("computed_at", "")
-                logger.info("Already computed for week %s at %s — skipping (pass force=true to recompute)",
-                            week_key, stored_at)
+                logger.info("Already computed for week %s at %s — skipping (pass force=true to recompute)", week_key, stored_at)
                 return {
                     "statusCode": 200,
                     "body": f"Already computed for {week_key}",
@@ -919,8 +933,7 @@ def lambda_handler(event, context):
     logger.info("Assembled %d days of data", len(series))
 
     if len(series) < 10:
-        logger.warning("Insufficient data (%d days) — need at least 10 for meaningful correlations",
-                       len(series))
+        logger.warning("Insufficient data (%d days) — need at least 10 for meaningful correlations", len(series))
         return {
             "statusCode": 200,
             "body": f"Insufficient data: {len(series)} days (need ≥10)",
@@ -952,19 +965,17 @@ def lambda_handler(event, context):
         logger.warning("BS-TR2 failed (non-fatal): %s", e)
 
     elapsed = time.time() - t0
-    significant = {k: v for k, v in correlations.items()
-                   if v.get("pearson_r") is not None and abs(v["pearson_r"]) >= 0.3}
-    logger.info("Done in %.1fs — %d pairs computed, %d significant (|r|≥0.3)",
-                elapsed, len(correlations), len(significant))
+    significant = {k: v for k, v in correlations.items() if v.get("pearson_r") is not None and abs(v["pearson_r"]) >= 0.3}
+    logger.info("Done in %.1fs — %d pairs computed, %d significant (|r|≥0.3)", elapsed, len(correlations), len(significant))
 
     return {
-        "statusCode":     200,
-        "body":           f"Weekly correlations computed for {week_key}",
-        "week":           week_key,
-        "start_date":     start_date,
-        "end_date":       end_date,
-        "days_analyzed":  len(series),
+        "statusCode": 200,
+        "body": f"Weekly correlations computed for {week_key}",
+        "week": week_key,
+        "start_date": start_date,
+        "end_date": end_date,
+        "days_analyzed": len(series),
         "pairs_computed": len(correlations),
-        "significant":    len(significant),
+        "significant": len(significant),
         "elapsed_seconds": round(elapsed, 1),
     }

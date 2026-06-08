@@ -7,14 +7,16 @@ Schedule: EventBridge cron(0 16 * * ? *) — 9 AM PT daily
 """
 
 import json
-import os
 import logging
+import os
 import urllib.parse
-import boto3
 from datetime import datetime, timedelta, timezone
+
+import boto3
 
 try:
     from platform_logger import get_logger
+
     logger = get_logger("subscriber-onboarding")
 except ImportError:
     logger = logging.getLogger("subscriber-onboarding")
@@ -64,10 +66,7 @@ def _get_published_posts(max_posts=3):
             return FALLBACK_PAGES
         # Sort by week descending (most recent first), take top N
         published.sort(key=lambda p: p.get("week", 0), reverse=True)
-        return [
-            {"label": f"Week {p.get('week', '?')}", "title": p["title"], "path": p["url"]}
-            for p in published[:max_posts]
-        ]
+        return [{"label": f"Week {p.get('week', '?')}", "title": p["title"], "path": p["url"]} for p in published[:max_posts]]
     except Exception as e:
         logger.warning(f"Could not load posts.json: {e}")
         return FALLBACK_PAGES
@@ -128,7 +127,7 @@ def _build_onboarding_email(email: str) -> tuple[str, str]:
     </p>
     <p style="font-size:11px;text-align:center;margin:0;">
       <a href="{unsub_url}" style="color:#484f58;text-decoration:underline;">Unsubscribe</a>
-      &nbsp;\u00B7&nbsp;
+      &nbsp;\u00b7&nbsp;
       <a href="{SITE_URL}" style="color:#484f58;text-decoration:underline;">averagejoematt.com</a>
     </p>
   </div>
@@ -142,7 +141,7 @@ def _build_onboarding_email(email: str) -> tuple[str, str]:
 
 def lambda_handler(event, context):
     """Query new subscribers and send Day 2 bridge email."""
-    if hasattr(logger, 'set_date'):
+    if hasattr(logger, "set_date"):
         logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))
 
     now = datetime.now(timezone.utc)
@@ -189,10 +188,12 @@ def lambda_handler(event, context):
             ses.send_email(
                 FromEmailAddress=SENDER,
                 Destination={"ToAddresses": [email]},
-                Content={"Simple": {
-                    "Subject": {"Data": subject, "Charset": "UTF-8"},
-                    "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
-                }},
+                Content={
+                    "Simple": {
+                        "Subject": {"Data": subject, "Charset": "UTF-8"},
+                        "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
+                    }
+                },
             )
 
             # Mark as sent

@@ -27,7 +27,6 @@ import time
 import urllib.error
 import urllib.request
 
-
 _BACKOFF_DELAYS = [2, 8]  # 3 attempts: initial + 2 retries
 _RETRYABLE_HTTP = frozenset([429, 500, 502, 503, 504])
 
@@ -78,8 +77,7 @@ def urlopen_with_retry(req, timeout: int = 30):
             last_exc = e
             if e.code in _RETRYABLE_HTTP and attempt < max_attempts:
                 delay = _BACKOFF_DELAYS[attempt - 1]
-                _logger.warning("http_retry HTTP %d attempt %d/%d — retry in %ds",
-                                e.code, attempt, max_attempts, delay)
+                _logger.warning("http_retry HTTP %d attempt %d/%d — retry in %ds", e.code, attempt, max_attempts, delay)
                 time.sleep(delay)
                 continue
             # 4xx (incl. auth) and final-attempt 5xx: raise
@@ -88,8 +86,7 @@ def urlopen_with_retry(req, timeout: int = 30):
             last_exc = e
             if attempt < max_attempts:
                 delay = _BACKOFF_DELAYS[attempt - 1]
-                _logger.warning("http_retry network error attempt %d/%d — retry in %ds: %s",
-                                attempt, max_attempts, delay, e)
+                _logger.warning("http_retry network error attempt %d/%d — retry in %ds: %s", attempt, max_attempts, delay, e)
                 time.sleep(delay)
                 continue
             raise

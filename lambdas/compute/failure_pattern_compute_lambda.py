@@ -25,15 +25,16 @@ v0.1.0 — 2026-03-15 (IC-4 skeleton — data-gated ~2026-05-01)
 """
 
 import json
-import os
 import logging
-import boto3
+import os
 from datetime import datetime, timedelta, timezone
 
+import boto3
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 try:
     from platform_logger import get_logger
+
     logger = get_logger("failure-pattern-compute")
 except ImportError:
     logger = logging.getLogger("failure-pattern-compute")
@@ -49,7 +50,7 @@ USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 # ── Data gate ────────────────────────────────────────────────────────────────
 # Minimum days of behavioral data required before patterns are meaningful.
 # Below this threshold, the Lambda exits early with a data_gate_not_met signal.
-MIN_DAYS_REQUIRED = 42   # 6 weeks
+MIN_DAYS_REQUIRED = 42  # 6 weeks
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
 table = dynamodb.Table(TABLE_NAME)
@@ -59,20 +60,25 @@ table = dynamodb.Table(TABLE_NAME)
 # DATA GATE CHECK
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _check_data_gate():
     """Return (ok: bool, days_available: int) for the habit_scores partition."""
     try:
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         gate_start = (datetime.now(timezone.utc) - timedelta(days=MIN_DAYS_REQUIRED)).strftime("%Y-%m-%d")
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :start AND :end",
-            "ExpressionAttributeValues": {
-                ":pk":    f"{USER_PREFIX}habit_scores",
-                ":start": f"DATE#{gate_start}",
-                ":end":   f"DATE#{today}",
-            },
-            "Select": "COUNT",
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :start AND :end",
+                    "ExpressionAttributeValues": {
+                        ":pk": f"{USER_PREFIX}habit_scores",
+                        ":start": f"DATE#{gate_start}",
+                        ":end": f"DATE#{today}",
+                    },
+                    "Select": "COUNT",
+                }
+            )
+        )
         days = resp.get("Count", 0)
         return days >= MIN_DAYS_REQUIRED, days
     except Exception as e:
@@ -84,7 +90,7 @@ def _check_data_gate():
 # PATTERN DETECTORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-_BAD_GRADE_THRESHOLD = 60   # day_grade.total_score below this → "bad day"
+_BAD_GRADE_THRESHOLD = 60  # day_grade.total_score below this → "bad day"
 _GOOD_GRADE_THRESHOLD = 70  # day_grade.total_score at or above this → "rebounded"
 
 
@@ -148,14 +154,16 @@ def _detect_habit_skip_predictors(habit_records, outcome_records):
         lift = skip_bad_rate / baseline_bad_rate if baseline_bad_rate > 0 else 0
         if lift <= 1.0:
             continue  # skipping this habit doesn't elevate bad-day risk
-        predictors.append({
-            "habit": habit,
-            "n_skipped": n_skipped,
-            "n_skipped_bad": n_skipped_bad,
-            "skip_bad_rate": round(skip_bad_rate, 3),
-            "baseline_bad_rate": round(baseline_bad_rate, 3),
-            "lift": round(lift, 2),
-        })
+        predictors.append(
+            {
+                "habit": habit,
+                "n_skipped": n_skipped,
+                "n_skipped_bad": n_skipped_bad,
+                "skip_bad_rate": round(skip_bad_rate, 3),
+                "baseline_bad_rate": round(baseline_bad_rate, 3),
+                "lift": round(lift, 2),
+            }
+        )
 
     predictors.sort(key=lambda x: x["lift"], reverse=True)
     return predictors[:3]
@@ -222,17 +230,19 @@ def _detect_cascade_patterns(habit_records, outcome_records, sleep_records):
     if lift <= 1.0:
         return []
 
-    return [{
-        "trigger": "poor_sleep_score",
-        "trigger_threshold": "<60",
-        "consequence": "next_day_bad_grade",
-        "consequence_threshold": f"<{_BAD_GRADE_THRESHOLD}",
-        "n_episodes": n_with_next_day_data,
-        "n_followed_by_consequence": n_followed_by_bad,
-        "cascade_rate": round(cascade_rate, 3),
-        "baseline_rate": round(baseline, 3),
-        "lift": round(lift, 2),
-    }]
+    return [
+        {
+            "trigger": "poor_sleep_score",
+            "trigger_threshold": "<60",
+            "consequence": "next_day_bad_grade",
+            "consequence_threshold": f"<{_BAD_GRADE_THRESHOLD}",
+            "n_episodes": n_with_next_day_data,
+            "n_followed_by_consequence": n_followed_by_bad,
+            "cascade_rate": round(cascade_rate, 3),
+            "baseline_rate": round(baseline, 3),
+            "lift": round(lift, 2),
+        }
+    ]
 
 
 def _detect_day_of_week_clusters(habit_records):
@@ -348,22 +358,24 @@ def _detect_rebound_speed(outcome_records):
 # WRITE PATTERN MEMORY
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _write_pattern_memory(patterns, today):
     """Write failure pattern analysis to platform_memory partition."""
     try:
         from decimal import Decimal
+
         item = {
-            "pk":             f"{USER_PREFIX}platform_memory",
-            "sk":             f"MEMORY#failure_patterns#{today}",
-            "date":           today,
-            "computed_at":    datetime.now(timezone.utc).isoformat(),
-            "memory_type":    "failure_patterns",
-            "algo_version":   "0.1.0",
+            "pk": f"{USER_PREFIX}platform_memory",
+            "sk": f"MEMORY#failure_patterns#{today}",
+            "date": today,
+            "computed_at": datetime.now(timezone.utc).isoformat(),
+            "memory_type": "failure_patterns",
+            "algo_version": "0.1.0",
             "habit_skip_predictors": json.dumps(patterns.get("habit_skip_predictors", [])),
-            "cascade_patterns":      json.dumps(patterns.get("cascade_patterns", [])),
-            "dow_clusters":          json.dumps(patterns.get("dow_clusters", {})),
-            "rebound_speed":         json.dumps(patterns.get("rebound_speed", {})),
-            "data_window_days":      patterns.get("data_window_days", 0),
+            "cascade_patterns": json.dumps(patterns.get("cascade_patterns", [])),
+            "dow_clusters": json.dumps(patterns.get("dow_clusters", {})),
+            "rebound_speed": json.dumps(patterns.get("rebound_speed", {})),
+            "data_window_days": patterns.get("data_window_days", 0),
             "note": (
                 "IC-4 failure pattern memory. Correlational only — AI-2. "
                 "Use to inform coaching about recurring struggle patterns, not to predict failures."
@@ -372,6 +384,7 @@ def _write_pattern_memory(patterns, today):
         # V2 P2.6 (2026-05-19): tag with run_id + computed_at
         try:
             from compute_metadata import tag_record
+
             item = tag_record(item, source_id="failure_patterns")
         except ImportError:
             pass
@@ -386,6 +399,7 @@ def _write_pattern_memory(patterns, today):
 # LAMBDA HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def lambda_handler(event, context):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     logger.info(f"[IC-4] failure-pattern-compute START date={today}")
@@ -398,72 +412,80 @@ def lambda_handler(event, context):
             f"Activate when ≥{MIN_DAYS_REQUIRED} days of habit_scores data exists (~2026-05-01)."
         )
         logger.info(f"[IC-4] {msg}")
-        return {"status": "data_gate_not_met", "days_available": days_available,
-                "days_required": MIN_DAYS_REQUIRED, "message": msg}
+        return {"status": "data_gate_not_met", "days_available": days_available, "days_required": MIN_DAYS_REQUIRED, "message": msg}
 
     # ── Data collection ────────────────────────────────────────────────────
     lookback_start = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
 
     try:
-        habit_resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :start AND :end",
-            "ExpressionAttributeValues": {
-                ":pk":    f"{USER_PREFIX}habit_scores",
-                ":start": f"DATE#{lookback_start}",
-                ":end":   f"DATE#{today}",
-            },
-        }))
+        habit_resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :start AND :end",
+                    "ExpressionAttributeValues": {
+                        ":pk": f"{USER_PREFIX}habit_scores",
+                        ":start": f"DATE#{lookback_start}",
+                        ":end": f"DATE#{today}",
+                    },
+                }
+            )
+        )
         habit_records = habit_resp.get("Items", [])
 
-        outcome_resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :start AND :end",
-            "ExpressionAttributeValues": {
-                ":pk":    f"{USER_PREFIX}day_grade",
-                ":start": f"DATE#{lookback_start}",
-                ":end":   f"DATE#{today}",
-            },
-        }))
+        outcome_resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :start AND :end",
+                    "ExpressionAttributeValues": {
+                        ":pk": f"{USER_PREFIX}day_grade",
+                        ":start": f"DATE#{lookback_start}",
+                        ":end": f"DATE#{today}",
+                    },
+                }
+            )
+        )
         outcome_records = outcome_resp.get("Items", [])
 
-        sleep_resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :start AND :end",
-            "ExpressionAttributeValues": {
-                ":pk":    f"{USER_PREFIX}whoop",
-                ":start": f"DATE#{lookback_start}",
-                ":end":   f"DATE#{today}",
-            },
-        }))
+        sleep_resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :start AND :end",
+                    "ExpressionAttributeValues": {
+                        ":pk": f"{USER_PREFIX}whoop",
+                        ":start": f"DATE#{lookback_start}",
+                        ":end": f"DATE#{today}",
+                    },
+                }
+            )
+        )
         sleep_records = sleep_resp.get("Items", [])
 
     except Exception as e:
         logger.error(f"[IC-4] Data collection failed: {e}")
         return {"status": "error", "error": str(e)}
 
-    logger.info(
-        f"[IC-4] Loaded {len(habit_records)} habit, "
-        f"{len(outcome_records)} outcome, {len(sleep_records)} sleep records"
-    )
+    logger.info(f"[IC-4] Loaded {len(habit_records)} habit, " f"{len(outcome_records)} outcome, {len(sleep_records)} sleep records")
 
     # ── Run pattern detectors ──────────────────────────────────────────────
     patterns = {
         "habit_skip_predictors": _detect_habit_skip_predictors(habit_records, outcome_records),
-        "cascade_patterns":      _detect_cascade_patterns(habit_records, outcome_records, sleep_records),
-        "dow_clusters":          _detect_day_of_week_clusters(habit_records),
-        "rebound_speed":         _detect_rebound_speed(outcome_records),
-        "data_window_days":      days_available,
+        "cascade_patterns": _detect_cascade_patterns(habit_records, outcome_records, sleep_records),
+        "dow_clusters": _detect_day_of_week_clusters(habit_records),
+        "rebound_speed": _detect_rebound_speed(outcome_records),
+        "data_window_days": days_available,
     }
 
     # ── Write to memory ────────────────────────────────────────────────────
     _write_pattern_memory(patterns, today)
 
     result = {
-        "status":           "ok",
-        "date":             today,
+        "status": "ok",
+        "date": today,
         "data_window_days": days_available,
         "patterns_found": {
             "habit_predictors": len(patterns["habit_skip_predictors"]),
-            "cascades":         len(patterns["cascade_patterns"]),
-            "dow_clusters":     len(patterns["dow_clusters"]),
+            "cascades": len(patterns["cascade_patterns"]),
+            "dow_clusters": len(patterns["dow_clusters"]),
             "rebound_episodes": patterns["rebound_speed"].get("n_episodes", 0),
         },
         "note": "IC-4: All patterns are correlational, not causal (AI-2).",

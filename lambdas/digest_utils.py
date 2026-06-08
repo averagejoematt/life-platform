@@ -20,16 +20,19 @@ import math
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-
 # ══════════════════════════════════════════════════════════════════════════════
 # PURE SCALAR HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def d2f(obj):
     """Recursively convert DynamoDB Decimal values to float."""
-    if isinstance(obj, list): return [d2f(i) for i in obj]
-    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [d2f(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
 
 
@@ -64,6 +67,7 @@ def safe_float(rec, field, default=None):
 # ══════════════════════════════════════════════════════════════════════════════
 # ACTIVITY DEDUP  (Strava/Garmin duplicate removal)
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def dedup_activities(activities):
     """Remove duplicate activities within a 15-minute window.
@@ -123,6 +127,7 @@ def dedup_activities(activities):
 # WHOOP SLEEP NORMALISATION  (SOT: v2.55.0)
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _normalize_whoop_sleep(item):
     """Map Whoop DynamoDB field aliases to canonical sleep analysis fields.
 
@@ -155,8 +160,8 @@ def _normalize_whoop_sleep(item):
     if dur and dur > 0:
         for src_field, pct_field in [
             ("slow_wave_sleep_hours", "deep_pct"),
-            ("rem_sleep_hours",       "rem_pct"),
-            ("light_sleep_hours",     "light_pct"),
+            ("rem_sleep_hours", "rem_pct"),
+            ("light_sleep_hours", "light_pct"),
         ]:
             val = item.get(src_field)
             if val is not None and pct_field not in item:
@@ -172,6 +177,7 @@ def _normalize_whoop_sleep(item):
 # LIST-BASED EXTRACTORS  (accept a plain list of d2f-processed DDB records)
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def ex_whoop_from_list(recs):
     """Extract Whoop summary stats from a list of records."""
     if not recs:
@@ -181,13 +187,13 @@ def ex_whoop_from_list(recs):
     rhrs = [float(r["resting_heart_rate"]) for r in recs if "resting_heart_rate" in r]
     strs = [float(r["strain"]) for r in recs if "strain" in r]
     return {
-        "hrv_avg":      avg(hrvs),
-        "hrv_min":      min(hrvs, default=None),
-        "hrv_max":      max(hrvs, default=None),
+        "hrv_avg": avg(hrvs),
+        "hrv_min": min(hrvs, default=None),
+        "hrv_max": max(hrvs, default=None),
         "recovery_avg": avg(recov),
-        "rhr_avg":      avg(rhrs),
-        "strain_avg":   avg(strs),
-        "days":         len(recs),
+        "rhr_avg": avg(rhrs),
+        "strain_avg": avg(strs),
+        "days": len(recs),
     }
 
 
@@ -202,12 +208,12 @@ def ex_whoop_sleep_from_list(recs):
     deep_pcts = [float(r["deep_pct"]) for r in normed if "deep_pct" in r]
     rem_pcts = [float(r["rem_pct"]) for r in normed if "rem_pct" in r]
     return {
-        "score_avg":        avg(scores),
+        "score_avg": avg(scores),
         "duration_avg_hrs": avg(durs),
-        "efficiency_avg":   avg(effs),
-        "deep_pct":         avg(deep_pcts),
-        "rem_pct":          avg(rem_pcts),
-        "nights":           len(recs),
+        "efficiency_avg": avg(effs),
+        "deep_pct": avg(deep_pcts),
+        "rem_pct": avg(rem_pcts),
+        "nights": len(recs),
     }
 
 
@@ -220,17 +226,18 @@ def ex_withings_from_list(recs):
     sr = sorted(recs, key=lambda r: r.get("sk", ""), reverse=True)
     return {
         "weight_latest": float(sr[0]["weight_lbs"]) if sr and "weight_lbs" in sr[0] else None,
-        "weight_avg":    avg(weights),
-        "weight_min":    min(weights, default=None),
-        "weight_max":    max(weights, default=None),
-        "body_fat_avg":  avg(bodyfats),
-        "measurements":  len(recs),
+        "weight_avg": avg(weights),
+        "weight_min": min(weights, default=None),
+        "weight_max": max(weights, default=None),
+        "body_fat_avg": avg(bodyfats),
+        "measurements": len(recs),
     }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # BANISTER TRAINING LOAD  (two input-format adapters, shared core)
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def compute_banister_from_list(strava_60d_list, today):
     """Compute Banister CTL/ATL/TSB from a list of Strava day records.
@@ -281,6 +288,7 @@ def _banister_core(kj_by_date, today):
 # Raj: 3 rules cover 90% of cases. Ship that. Refine later.
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 def compute_confidence(n=None, p_value=None, effect_size=None, sources=None, days_of_data=None):
     """
     BS-05 / IC-27: Compute AI insight confidence level.
@@ -324,8 +332,8 @@ def compute_confidence(n=None, p_value=None, effect_size=None, sources=None, day
 
     # HIGH gates (Raj: n≥50 + sig + meaningful effect)
     n_ok = effective_n is not None and effective_n >= 50
-    p_ok = p_value is None or p_value < 0.05   # if no p_value given, assume it's not a correlation
-    eff_ok = effect_size is None or abs(effect_size) >= 0.2   # Cohen's d ≥0.2 or r ≥0.2
+    p_ok = p_value is None or p_value < 0.05  # if no p_value given, assume it's not a correlation
+    eff_ok = effect_size is None or abs(effect_size) >= 0.2  # Cohen's d ≥0.2 or r ≥0.2
 
     if n_ok and p_ok and eff_ok:
         parts = [f"n={effective_n}"]
@@ -354,14 +362,13 @@ def _confidence_badge(level):
     Inline, small caps, fits in prose.
     """
     styles = {
-        "HIGH":   ("background:#0f3d30;color:#34d399;border:1px solid #065f46;", "HIGH CONFIDENCE"),
+        "HIGH": ("background:#0f3d30;color:#34d399;border:1px solid #065f46;", "HIGH CONFIDENCE"),
         "MEDIUM": ("background:#3d2a00;color:#f59e0b;border:1px solid #854d0e;", "MEDIUM CONFIDENCE"),
-        "LOW":    ("background:#1e2530;color:#64748b;border:1px solid #334155;", "LOW CONFIDENCE"),
+        "LOW": ("background:#1e2530;color:#64748b;border:1px solid #334155;", "LOW CONFIDENCE"),
     }
     style, label = styles.get(level, styles["LOW"])
     return (
-        '<span style="' + style + 'border-radius:4px;padding:1px 6px;'
-        'font-size:9px;font-weight:700;letter-spacing:0.08em;'
-        'font-family:-apple-system,sans-serif;white-space:nowrap;">' +
-        label + '</span>'
+        '<span style="' + style + "border-radius:4px;padding:1px 6px;"
+        "font-size:9px;font-weight:700;letter-spacing:0.08em;"
+        'font-family:-apple-system,sans-serif;white-space:nowrap;">' + label + "</span>"
     )

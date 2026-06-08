@@ -22,20 +22,20 @@ v1.1.0: Elena's persona + Board interview descriptions dynamically built from
 """
 
 import json
-import os
 import logging
+import os
+import re
 import secrets as _secrets
 import time
-import re
-import boto3
-
-from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 import urllib.error
 import urllib.request
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from collections import defaultdict
+
+import boto3
+from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger (wired below after optional imports)
 _logger_std = logging.getLogger()
@@ -66,12 +66,14 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 # Board of Directors config loader
 try:
     import board_loader
+
     _HAS_BOARD_LOADER = True
 except ImportError:
     _HAS_BOARD_LOADER = False
 
 try:
     import insight_writer
+
     insight_writer.init(table, USER_ID)
     _HAS_INSIGHT_WRITER = True
 except ImportError:
@@ -79,26 +81,32 @@ except ImportError:
 
 # AI-3: Output validation
 try:
-    from ai_output_validator import validate_ai_output, AIOutputType
+    from ai_output_validator import AIOutputType, validate_ai_output
+
     _HAS_AI_VALIDATOR = True
 except ImportError:
     _HAS_AI_VALIDATOR = False
 
 # BS-05: Confidence badge
 try:
-    from digest_utils import compute_confidence, _confidence_badge
+    from digest_utils import _confidence_badge, compute_confidence
+
     _HAS_CONFIDENCE = True
 except ImportError:
     _HAS_CONFIDENCE = False
+
     def _confidence_badge(level):
         return ""
+
 
 # OBS-1: Structured logger
 try:
     from platform_logger import get_logger
+
     logger = get_logger("wednesday-chronicle")
 except ImportError:
     import logging as _log
+
     logger = _log.getLogger("wednesday-chronicle")
     logger.setLevel(_log.INFO)
 
@@ -106,6 +114,7 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def get_anthropic_key():
     """ADR-062: Bedrock uses IAM auth — this fetch is dead. Returns a truthy
@@ -115,17 +124,25 @@ def get_anthropic_key():
     Full plumbing removal tracked as task #90."""
     return "_BEDROCK_IAM_"
 
+
 def d2f(obj):
-    if isinstance(obj, list): return [d2f(i) for i in obj]
-    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [d2f(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
+
 
 def safe_float(rec, field, default=None):
     if rec and field in rec:
-        try: return float(rec[field])
-        except Exception: return default
+        try:
+            return float(rec[field])
+        except Exception:
+            return default
     return default
+
 
 def query_range(source, start_date, end_date):
     pk = f"USER#{USER_ID}#SOURCE#{source}"
@@ -133,7 +150,9 @@ def query_range(source, start_date, end_date):
     kwargs = {
         "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
         "ExpressionAttributeValues": {
-            ":pk": pk, ":s": f"DATE#{start_date}", ":e": f"DATE#{end_date}",
+            ":pk": pk,
+            ":s": f"DATE#{start_date}",
+            ":e": f"DATE#{end_date}",
         },
     }
     while True:
@@ -146,6 +165,7 @@ def query_range(source, start_date, end_date):
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
     return records
 
+
 def query_range_list(source, start_date, end_date):
     """Like query_range but returns a list, preserving duplicates (for journal)."""
     pk = f"USER#{USER_ID}#SOURCE#{source}"
@@ -153,7 +173,9 @@ def query_range_list(source, start_date, end_date):
     kwargs = {
         "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
         "ExpressionAttributeValues": {
-            ":pk": pk, ":s": f"DATE#{start_date}", ":e": f"DATE#{end_date}~",
+            ":pk": pk,
+            ":s": f"DATE#{start_date}",
+            ":e": f"DATE#{end_date}~",
         },
     }
     while True:
@@ -163,6 +185,7 @@ def query_range_list(source, start_date, end_date):
             break
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
     return items
+
 
 def fetch_profile():
     try:
@@ -177,11 +200,12 @@ def fetch_profile():
 # DATA GATHERING
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def gather_chronicle_data():
     """Gather all data Elena needs for this week's installment."""
     today = datetime.now(timezone.utc).date()
-    end = (today - timedelta(days=1)).isoformat()      # yesterday
-    start = (today - timedelta(days=7)).isoformat()     # 7 days back
+    end = (today - timedelta(days=1)).isoformat()  # yesterday
+    start = (today - timedelta(days=7)).isoformat()  # 7 days back
     weight_start = (today - timedelta(days=30)).isoformat()
 
     profile = fetch_profile()
@@ -204,8 +228,7 @@ def gather_chronicle_data():
     # Journal entries use SK pattern: DATE#YYYY-MM-DD#journal#template#uuid
     journal_entries = query_range_list("notion", start, end)
     # Filter to only journal entries (not other notion records)
-    journal_entries = [e for e in journal_entries
-                       if "#journal#" in e.get("sk", "")]
+    journal_entries = [e for e in journal_entries if "#journal#" in e.get("sk", "")]
     logger.info(f"Journal entries: {len(journal_entries)}")
 
     # --- Day grades + habit scores ---
@@ -226,13 +249,18 @@ def gather_chronicle_data():
     try:
         # ADR-058: phase=pilot hidden by default.
         from phase_filter import with_phase_filter
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
-            "ExpressionAttributeValues": {
-                ":pk": f"USER#{USER_ID}#SOURCE#experiments",
-                ":prefix": "EXP#",
-            },
-        }))
+
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+                    "ExpressionAttributeValues": {
+                        ":pk": f"USER#{USER_ID}#SOURCE#experiments",
+                        ":prefix": "EXP#",
+                    },
+                }
+            )
+        )
         for item in resp.get("Items", []):
             exp = d2f(item)
             if exp.get("status") == "active":
@@ -255,14 +283,20 @@ def gather_chronicle_data():
     try:
         # ADR-058: phase=pilot hidden by default.
         from phase_filter import with_phase_filter
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
-            "ExpressionAttributeValues": {
-                ":pk": f"USER#{USER_ID}#SOURCE#chronicle",
-                ":prefix": "DATE#",
-            },
-            "ScanIndexForward": False, "Limit": 4,
-        }))
+
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+                    "ExpressionAttributeValues": {
+                        ":pk": f"USER#{USER_ID}#SOURCE#chronicle",
+                        ":prefix": "DATE#",
+                    },
+                    "ScanIndexForward": False,
+                    "Limit": 4,
+                }
+            )
+        )
         prev_installments = [d2f(i) for i in resp.get("Items", [])]
         logger.info(f"Previous installments: {len(prev_installments)}")
     except Exception as e:
@@ -273,10 +307,12 @@ def gather_chronicle_data():
     try:
         iso_year, iso_week, _ = today.isocalendar()
         current_week = f"{iso_year}-W{iso_week:02d}"
-        fn_resp = table.get_item(Key={
-            "pk": f"USER#{USER_ID}#SOURCE#field_notes",
-            "sk": f"WEEK#{current_week}",
-        })
+        fn_resp = table.get_item(
+            Key={
+                "pk": f"USER#{USER_ID}#SOURCE#field_notes",
+                "sk": f"WEEK#{current_week}",
+            }
+        )
         fn_item = d2f(fn_resp.get("Item"))
         if fn_item and fn_item.get("ai_present"):
             field_notes = {
@@ -286,20 +322,32 @@ def gather_chronicle_data():
                 "has_matthew_response": bool(fn_item.get("matthew_agreement")),
                 "matthew_agreement": (fn_item.get("matthew_agreement") or "")[:300],
             }
-            logger.info(f"Field notes for {current_week}: tone={field_notes['ai_tone']}, matthew_responded={field_notes['has_matthew_response']}")
+            logger.info(
+                f"Field notes for {current_week}: tone={field_notes['ai_tone']}, matthew_responded={field_notes['has_matthew_response']}"
+            )
     except Exception as e:
         logger.warning(f"Field notes query: {e}")
 
     return {
-        "whoop": whoop, "eightsleep": eightsleep, "garmin": garmin,
-        "strava": strava, "withings": withings, "macrofactor": macrofactor,
-        "apple_health": apple_health, "journal_entries": journal_entries,
-        "day_grades": day_grades, "habit_scores": habit_scores,
-        "habitify": habitify, "state_of_mind": state_of_mind,
-        "supplements": supplements, "experiments": experiments,
-        "anomalies": anomalies, "weather": weather,
+        "whoop": whoop,
+        "eightsleep": eightsleep,
+        "garmin": garmin,
+        "strava": strava,
+        "withings": withings,
+        "macrofactor": macrofactor,
+        "apple_health": apple_health,
+        "journal_entries": journal_entries,
+        "day_grades": day_grades,
+        "habit_scores": habit_scores,
+        "habitify": habitify,
+        "state_of_mind": state_of_mind,
+        "supplements": supplements,
+        "experiments": experiments,
+        "anomalies": anomalies,
+        "weather": weather,
         "character_sheet": character_sheet,
-        "prev_installments": prev_installments, "profile": profile,
+        "prev_installments": prev_installments,
+        "profile": profile,
         "field_notes": field_notes,
         "dates": {"start": start, "end": end},
     }
@@ -308,6 +356,7 @@ def gather_chronicle_data():
 # ══════════════════════════════════════════════════════════════════════════════
 # DATA PACKET BUILDER (narrative-ready, not raw JSON)
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def build_data_packet(data):
     """Transform raw data into a narrative-ready packet for Elena."""
@@ -363,10 +412,14 @@ def build_data_packet(data):
         rhr = safe_float(rec, "resting_heart_rate")
         strain = safe_float(rec, "strain")
         parts = [f"{d}:"]
-        if recovery is not None: parts.append(f"Recovery {recovery:.0f}%")
-        if hrv is not None: parts.append(f"HRV {hrv:.0f}ms")
-        if rhr is not None: parts.append(f"RHR {rhr:.0f}")
-        if strain is not None: parts.append(f"Strain {strain:.1f}")
+        if recovery is not None:
+            parts.append(f"Recovery {recovery:.0f}%")
+        if hrv is not None:
+            parts.append(f"HRV {hrv:.0f}ms")
+        if rhr is not None:
+            parts.append(f"RHR {rhr:.0f}")
+        if strain is not None:
+            parts.append(f"Strain {strain:.1f}")
         packet.append(" | ".join(parts))
     packet.append("")
 
@@ -382,11 +435,16 @@ def build_data_packet(data):
         deep_pct = round(deep_h / dur * 100, 0) if deep_h and dur and dur > 0 else None
         rem_pct = round(rem_h / dur * 100, 0) if rem_h and dur and dur > 0 else None
         parts = [f"{d}:"]
-        if score is not None: parts.append(f"Score {score:.0f}")
-        if dur is not None: parts.append(f"{dur:.1f}h")
-        if eff is not None: parts.append(f"Eff {eff:.0f}%")
-        if deep_pct is not None: parts.append(f"Deep {deep_pct:.0f}%")
-        if rem_pct is not None: parts.append(f"REM {rem_pct:.0f}%")
+        if score is not None:
+            parts.append(f"Score {score:.0f}")
+        if dur is not None:
+            parts.append(f"{dur:.1f}h")
+        if eff is not None:
+            parts.append(f"Eff {eff:.0f}%")
+        if deep_pct is not None:
+            parts.append(f"Deep {deep_pct:.0f}%")
+        if rem_pct is not None:
+            parts.append(f"REM {rem_pct:.0f}%")
         packet.append(" | ".join(parts))
     packet.append("")
 
@@ -398,9 +456,12 @@ def build_data_packet(data):
         room_temp = safe_float(rec, "room_temp_f")
         toss = safe_float(rec, "toss_and_turns") or safe_float(rec, "toss_turn_count")
         parts = [f"{d}:"]
-        if bed_temp is not None: parts.append(f"Bed {bed_temp:.0f}°F")
-        if room_temp is not None: parts.append(f"Room {room_temp:.0f}°F")
-        if toss is not None: parts.append(f"Tosses {toss:.0f}")
+        if bed_temp is not None:
+            parts.append(f"Bed {bed_temp:.0f}°F")
+        if room_temp is not None:
+            parts.append(f"Room {room_temp:.0f}°F")
+        if toss is not None:
+            parts.append(f"Tosses {toss:.0f}")
         if len(parts) > 1:
             packet.append(" | ".join(parts))
     packet.append("")
@@ -421,9 +482,12 @@ def build_data_packet(data):
             start = a.get("start_date_local", "")
             time_part = start.split("T")[1][:5] if "T" in str(start) else ""
             line = f"{d} {time_part}: {name} ({sport}, {dur_min}min"
-            if dist_mi > 0: line += f", {dist_mi}mi"
-            if avg_hr: line += f", HR {avg_hr:.0f}"
-            if elev and elev > 100: line += f", {elev:.0f}ft gain"
+            if dist_mi > 0:
+                line += f", {dist_mi}mi"
+            if avg_hr:
+                line += f", HR {avg_hr:.0f}"
+            if elev and elev > 100:
+                line += f", {elev:.0f}ft gain"
             line += ")"
             packet.append(line)
     if not any(data["strava"].values()):
@@ -488,15 +552,24 @@ def build_data_packet(data):
             # Include full text — Elena needs the emotional texture
             packet.append(f"Text: {raw[:1500]}")
         signals = []
-        if mood is not None: signals.append(f"Mood:{mood}/5")
-        if energy is not None: signals.append(f"Energy:{energy}/5")
-        if stress is not None: signals.append(f"Stress:{stress}/5")
-        if themes: signals.append(f"Themes: {', '.join(themes[:4])}")
-        if emotions: signals.append(f"Emotions: {', '.join(emotions[:5])}")
-        if cognitive: signals.append(f"Cognitive: {', '.join(cognitive[:3])}")
-        if avoidance: signals.append(f"AVOIDANCE FLAG: {avoidance}")
-        if social: signals.append(f"Social: {social}")
-        if ownership: signals.append(f"Ownership: {ownership}")
+        if mood is not None:
+            signals.append(f"Mood:{mood}/5")
+        if energy is not None:
+            signals.append(f"Energy:{energy}/5")
+        if stress is not None:
+            signals.append(f"Stress:{stress}/5")
+        if themes:
+            signals.append(f"Themes: {', '.join(themes[:4])}")
+        if emotions:
+            signals.append(f"Emotions: {', '.join(emotions[:5])}")
+        if cognitive:
+            signals.append(f"Cognitive: {', '.join(cognitive[:3])}")
+        if avoidance:
+            signals.append(f"AVOIDANCE FLAG: {avoidance}")
+        if social:
+            signals.append(f"Social: {social}")
+        if ownership:
+            signals.append(f"Ownership: {ownership}")
         if signals:
             packet.append("Signals: " + " | ".join(signals))
         packet.append("")
@@ -512,8 +585,10 @@ def build_data_packet(data):
         labels = rec.get("emotion_labels", [])
         areas = rec.get("life_areas", [])
         parts = [f"{d}: valence {valence:.2f}" if valence is not None else f"{d}"]
-        if labels: parts.append(f"emotions: {', '.join(labels[:3])}")
-        if areas: parts.append(f"areas: {', '.join(areas[:2])}")
+        if labels:
+            parts.append(f"emotions: {', '.join(labels[:3])}")
+        if areas:
+            parts.append(f"areas: {', '.join(areas[:2])}")
         packet.append(" | ".join(parts))
     packet.append("")
 
@@ -531,8 +606,7 @@ def build_data_packet(data):
         packet.append("")
 
     # --- Anomalies ---
-    anomaly_events = [a for a in data["anomalies"].values()
-                      if a.get("severity") in ("moderate", "high")]
+    anomaly_events = [a for a in data["anomalies"].values() if a.get("severity") in ("moderate", "high")]
     if anomaly_events:
         packet.append("=== ANOMALY EVENTS ===")
         for a in anomaly_events:
@@ -542,7 +616,8 @@ def build_data_packet(data):
             hyp = a.get("hypothesis", "")
             labels = [m.get("label", "?") for m in metrics]
             packet.append(f"{d}: {sev} — {', '.join(labels)}")
-            if hyp: packet.append(f"  Hypothesis: {hyp}")
+            if hyp:
+                packet.append(f"  Hypothesis: {hyp}")
         packet.append("")
 
     # --- Weather (for setting/atmosphere) ---
@@ -553,9 +628,12 @@ def build_data_packet(data):
         precip = safe_float(rec, "precipitation_mm")
         daylight = safe_float(rec, "daylight_hours")
         parts = [d]
-        if temp is not None: parts.append(f"{temp:.0f}°F")
-        if precip is not None: parts.append(f"{'Rain' if precip > 0.5 else 'Dry'}")
-        if daylight is not None: parts.append(f"{daylight:.1f}h daylight")
+        if temp is not None:
+            parts.append(f"{temp:.0f}°F")
+        if precip is not None:
+            parts.append(f"{'Rain' if precip > 0.5 else 'Dry'}")
+        if daylight is not None:
+            parts.append(f"{daylight:.1f}h daylight")
         packet.append(" | ".join(parts))
     packet.append("")
 
@@ -593,10 +671,15 @@ def build_data_packet(data):
 
             # Pillar breakdown (latest day)
             pillar_names = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
-            pillar_labels = {"sleep": "\U0001f634 Sleep", "movement": "\U0001f3cb\ufe0f Movement",
-                            "nutrition": "\U0001f957 Nutrition", "metabolic": "\U0001f4ca Metabolic",
-                            "mind": "\U0001f9e0 Mind", "relationships": "\U0001f4ac Relationships",
-                            "consistency": "\U0001f3af Consistency"}
+            pillar_labels = {
+                "sleep": "\U0001f634 Sleep",
+                "movement": "\U0001f3cb\ufe0f Movement",
+                "nutrition": "\U0001f957 Nutrition",
+                "metabolic": "\U0001f4ca Metabolic",
+                "mind": "\U0001f9e0 Mind",
+                "relationships": "\U0001f4ac Relationships",
+                "consistency": "\U0001f3af Consistency",
+            }
             for pn in pillar_names:
                 pd = latest_cs.get(f"pillar_{pn}", {})
                 ep = earliest_cs.get(f"pillar_{pn}", {})
@@ -797,8 +880,9 @@ Return the installment as clean markdown with:
 
 Write in clean paragraphs. No bullet points. No numbered lists. No headers within the body. Just prose."""
 
-    logger.info("[chronicle] Built Elena prompt from config with %d interviewees",
-                len(board_loader.get_feature_members(config, 'chronicle')) - 1)  # minus Elena herself
+    logger.info(
+        "[chronicle] Built Elena prompt from config with %d interviewees", len(board_loader.get_feature_members(config, "chronicle")) - 1
+    )  # minus Elena herself
     return prompt
 
 
@@ -889,9 +973,11 @@ Write in clean paragraphs. No bullet points. No numbered lists. No headers withi
 # ANTHROPIC API
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def call_anthropic(system_prompt, user_message, api_key):
     # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
     import retry_utils
+
     return retry_utils.call_anthropic_api(
         prompt=user_message,
         api_key=api_key,
@@ -905,6 +991,7 @@ def call_anthropic(system_prompt, user_message, api_key):
 # ══════════════════════════════════════════════════════════════════════════════
 # MARKDOWN → HTML CONVERTER (simple prose conversion)
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def markdown_to_html(md_text):
     """Convert Elena's markdown prose to clean HTML for email and blog."""
@@ -927,9 +1014,9 @@ def markdown_to_html(md_text):
             # End of blockquote
             bq_text = " ".join(bq_buffer)
             # Convert **bold** and *italic*
-            bq_text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', bq_text)
-            bq_text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', bq_text)
-            html_parts.append(f'<blockquote>{bq_text}</blockquote>')
+            bq_text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", bq_text)
+            bq_text = re.sub(r"\*(.+?)\*", r"<em>\1</em>", bq_text)
+            html_parts.append(f"<blockquote>{bq_text}</blockquote>")
             in_blockquote = False
             bq_buffer = []
 
@@ -950,16 +1037,16 @@ def markdown_to_html(md_text):
 
         # Regular paragraph — apply inline formatting
         text = stripped
-        text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
-        text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
+        text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
+        text = re.sub(r"\*(.+?)\*", r"<em>\1</em>", text)
         html_parts.append(f"<p>{text}</p>")
 
     # Flush any remaining blockquote
     if in_blockquote and bq_buffer:
         bq_text = " ".join(bq_buffer)
-        bq_text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', bq_text)
-        bq_text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', bq_text)
-        html_parts.append(f'<blockquote>{bq_text}</blockquote>')
+        bq_text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", bq_text)
+        bq_text = re.sub(r"\*(.+?)\*", r"<em>\1</em>", bq_text)
+        html_parts.append(f"<blockquote>{bq_text}</blockquote>")
 
     return "\n".join(html_parts)
 
@@ -967,6 +1054,7 @@ def markdown_to_html(md_text):
 # ══════════════════════════════════════════════════════════════════════════════
 # PARSE INSTALLMENT
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def parse_installment(raw_text):
     """Extract title, stats line, and body from Elena's output."""
@@ -1008,6 +1096,7 @@ def parse_installment(raw_text):
 # EMAIL HTML
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def build_email_html(title, stats_line, body_html, week_num, date_str, blog_url):
     """Build a newsletter-style email — clean white, editorial, readable."""
     try:
@@ -1024,7 +1113,7 @@ def build_email_html(title, stats_line, body_html, week_num, date_str, blog_url)
     except Exception:
         _badge_html = _confidence_badge("LOW") if _HAS_CONFIDENCE else ""
 
-    return f'''<!DOCTYPE html>
+    return f"""<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>@media (prefers-color-scheme: dark){{body{{background:#1a1a1f !important;color:#e5e5e5 !important}}div[style*="background:#fafaf9"],div[style*="background:#fff"]{{background:#22222a !important;color:#e5e5e5 !important}}h1,h2,h3,h4{{color:#f5f5f5 !important}}td{{color:#d5d5d5 !important}}}}</style></head>
 <body style="margin:0;padding:0;background:#f5f5f0;font-family:Georgia,'Times New Roman',serif;">
@@ -1066,7 +1155,7 @@ def build_email_html(title, stats_line, body_html, week_num, date_str, blog_url)
 
 </div>
 </body>
-</html>'''
+</html>"""
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1077,6 +1166,7 @@ def build_email_html(title, stats_line, body_html, week_num, date_str, blog_url)
 # JOURNAL PUBLISHER (averagejoematt.com/journal/) — Signal aesthetic
 # Writes to generated/journal/posts/week-{nn}/index.html + generated/journal/posts.json
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_installments, write_to_s3=True):
     """Publish installment to the Signal-themed journal on averagejoematt.com.
@@ -1229,16 +1319,18 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     posts_manifest = []
     for inst in sorted(all_installments, key=lambda x: int(x.get("week_number", 0)), reverse=True):
         wn = int(inst.get("week_number", 0))
-        posts_manifest.append({
-            "week": wn,
-            "title": inst.get("title", ""),
-            "date": inst.get("date", ""),
-            "stats_line": inst.get("stats_line", ""),
-            "url": f"/journal/posts/week-{wn:02d}/",
-            "excerpt": (inst.get("content_markdown") or "")[:300].strip(),
-            "word_count": inst.get("word_count", 0),
-            "has_board_interview": inst.get("has_board_interview", False),
-        })
+        posts_manifest.append(
+            {
+                "week": wn,
+                "title": inst.get("title", ""),
+                "date": inst.get("date", ""),
+                "stats_line": inst.get("stats_line", ""),
+                "url": f"/journal/posts/week-{wn:02d}/",
+                "excerpt": (inst.get("content_markdown") or "")[:300].strip(),
+                "word_count": inst.get("word_count", 0),
+                "has_board_interview": inst.get("has_board_interview", False),
+            }
+        )
     posts_json_str = json.dumps(
         {"posts": posts_manifest, "updated_at": datetime.now(timezone.utc).isoformat()},
         indent=2,
@@ -1249,7 +1341,8 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
 
     # Write the post
     s3.put_object(
-        Bucket=S3_BUCKET, Key=post_key,
+        Bucket=S3_BUCKET,
+        Key=post_key,
         Body=post_html.encode("utf-8"),
         ContentType="text/html; charset=utf-8",
         CacheControl="max-age=300",
@@ -1257,7 +1350,8 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     logger.info(f"[journal] Post written: {post_key}")
 
     s3.put_object(
-        Bucket=S3_BUCKET, Key="generated/journal/posts.json",
+        Bucket=S3_BUCKET,
+        Key="generated/journal/posts.json",
         Body=posts_json_str.encode("utf-8"),
         ContentType="application/json",
         CacheControl="max-age=300",
@@ -1267,7 +1361,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     return f"https://averagejoematt.com/journal/posts/week-{week_num:02d}/"
 
 
-BLOG_POST_TEMPLATE = '''<!DOCTYPE html>
+BLOG_POST_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -1300,9 +1394,9 @@ BLOG_POST_TEMPLATE = '''<!DOCTYPE html>
     <p>&copy; 2026 The Measured Life. A chronicle of one man's attempt to change.</p>
   </footer>
 </body>
-</html>'''
+</html>"""
 
-BLOG_CSS = '''/* The Measured Life — Blog Styles */
+BLOG_CSS = """/* The Measured Life — Blog Styles */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
@@ -1447,7 +1541,7 @@ footer {
   header, main, footer { padding-left: 20px; padding-right: 20px; }
   h1 { font-size: 24px; }
   .body p { font-size: 16px; }
-}'''
+}"""
 
 
 def build_blog_index(installments):
@@ -1470,13 +1564,15 @@ def build_blog_index(installments):
         l_filename = f"week-{int(l_wn):02d}.html" if l_wn is not None else "week-01.html"
         l_kicker = "Prologue" if l_wn == 0 else f"Week {l_wn}"
         l_stats = latest.get("stats_line", "")
-        l_stats_html = f'<p style="font-family:-apple-system,sans-serif;font-size:12px;color:#bbb;margin-top:4px;">{l_stats}</p>' if l_stats else ""
-        hero_html = f'''<div class="hero">
+        l_stats_html = (
+            f'<p style="font-family:-apple-system,sans-serif;font-size:12px;color:#bbb;margin-top:4px;">{l_stats}</p>' if l_stats else ""
+        )
+        hero_html = f"""<div class="hero">
       <div class="kicker">{l_kicker} &middot; {l_date_display}</div>
       <h2><a href="{l_filename}">"{l_title}"</a></h2>
       {l_stats_html}
       <a href="{l_filename}" class="read-link">Read {l_kicker.lower()} &rarr;</a>
-    </div>'''
+    </div>"""
 
     # Build archive list
     entries_html = ""
@@ -1491,12 +1587,12 @@ def build_blog_index(installments):
             date_display = date
         filename = f"week-{int(wn):02d}.html" if wn is not None else "week-01.html"
         label = "Prologue" if wn == 0 else f"Week {wn}"
-        entries_html += f'''<li>
+        entries_html += f"""<li>
           <a href="{filename}">\"{title}\" <span class="label">{label}</span></a>
           <span class="date">{date_display}</span>
-        </li>\n'''
+        </li>\n"""
 
-    return f'''<!DOCTYPE html>
+    return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -1544,12 +1640,13 @@ def build_blog_index(installments):
     The Measured Life &middot; A chronicle by Elena Voss &middot; Est. 2026
   </footer>
 </body>
-</html>'''
+</html>"""
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # S3 BLOG PUBLISHING
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def publish_to_blog(title, stats_line, body_html, week_num, date_str, all_installments, write_to_s3=True):
     """Write blog post HTML, CSS, and updated index to S3.
@@ -1573,9 +1670,13 @@ def publish_to_blog(title, stats_line, body_html, week_num, date_str, all_instal
     next_link = ""  # current post is always latest
 
     post_html = BLOG_POST_TEMPLATE.format(
-        title=title, week_num=week_num, date_display=date_display,
-        stats_line=stats_line, body_html=body_html,
-        prev_link=prev_link, next_link=next_link,
+        title=title,
+        week_num=week_num,
+        date_display=date_display,
+        stats_line=stats_line,
+        body_html=body_html,
+        prev_link=prev_link,
+        next_link=next_link,
     )
 
     filename = f"week-{week_num:02d}.html"
@@ -1587,23 +1688,29 @@ def publish_to_blog(title, stats_line, body_html, week_num, date_str, all_instal
 
     # Write post
     s3.put_object(
-        Bucket=S3_BUCKET, Key=post_key,
-        Body=post_html, ContentType="text/html",
+        Bucket=S3_BUCKET,
+        Key=post_key,
+        Body=post_html,
+        ContentType="text/html",
         CacheControl="max-age=3600",
     )
     logger.info(f"Blog post written: {filename}")
 
     # Write/update CSS
     s3.put_object(
-        Bucket=S3_BUCKET, Key=blog_prefix + "style.css",
-        Body=BLOG_CSS, ContentType="text/css",
+        Bucket=S3_BUCKET,
+        Key=blog_prefix + "style.css",
+        Body=BLOG_CSS,
+        ContentType="text/css",
         CacheControl="max-age=86400",
     )
 
     # Rebuild index with all installments (newest first)
     s3.put_object(
-        Bucket=S3_BUCKET, Key=blog_prefix + "index.html",
-        Body=index_html, ContentType="text/html",
+        Bucket=S3_BUCKET,
+        Key=blog_prefix + "index.html",
+        Body=index_html,
+        ContentType="text/html",
         CacheControl="max-age=300",
     )
     logger.info("Blog index updated")
@@ -1615,13 +1722,24 @@ def publish_to_blog(title, stats_line, body_html, week_num, date_str, all_instal
 # STORE INSTALLMENT
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def build_weekly_signal_data(data, week_num):
     """Extract structured metrics for the Weekly Signal email template."""
     BOARD_ROTATION = [
-        "sarah_chen", "marcus_webb", "lisa_park", "james_okafor",
-        "maya_rodriguez", "layne_norton", "rhonda_patrick", "peter_attia",
-        "andrew_huberman", "paul_conti", "vivek_murthy", "the_chair",
-        "margaret_calloway", "elena_voss",
+        "sarah_chen",
+        "marcus_webb",
+        "lisa_park",
+        "james_okafor",
+        "maya_rodriguez",
+        "layne_norton",
+        "rhonda_patrick",
+        "peter_attia",
+        "andrew_huberman",
+        "paul_conti",
+        "vivek_murthy",
+        "the_chair",
+        "margaret_calloway",
+        "elena_voss",
     ]
     OBSERVATORY_ROTATION = [
         {"slug": "sleep", "name": "Sleep Observatory", "hook": "How does recovery score connect to sleep architecture?"},
@@ -1697,15 +1815,30 @@ def build_weekly_signal_data(data, week_num):
     }
 
 
-def store_installment(date_str, week_num, title, stats_line, raw_markdown,
-                      body_html, themes, has_board, confidence_level="MEDIUM", confidence_badge_html="",  # BS-05
-                      status="published", approval_token=None,
-                      draft_blog_post_html=None, draft_blog_post_key=None,
-                      draft_blog_index_html=None, draft_journal_post_html=None,
-                      draft_journal_post_key=None, draft_journal_posts_json=None,
-                      draft_email_html=None,
-                      weekly_signal_data=None, weekly_signal_wins_losses=None,
-                      weekly_signal_board_quote=None):
+def store_installment(
+    date_str,
+    week_num,
+    title,
+    stats_line,
+    raw_markdown,
+    body_html,
+    themes,
+    has_board,
+    confidence_level="MEDIUM",
+    confidence_badge_html="",  # BS-05
+    status="published",
+    approval_token=None,
+    draft_blog_post_html=None,
+    draft_blog_post_key=None,
+    draft_blog_index_html=None,
+    draft_journal_post_html=None,
+    draft_journal_post_key=None,
+    draft_journal_posts_json=None,
+    draft_email_html=None,
+    weekly_signal_data=None,
+    weekly_signal_wins_losses=None,
+    weekly_signal_board_quote=None,
+):
     """Store installment in DynamoDB for continuity and blog generation.
 
     FEAT-12: In preview mode, status="draft" with approval_token + pre-built HTML blobs stored
@@ -1727,7 +1860,7 @@ def store_installment(date_str, week_num, title, stats_line, raw_markdown,
             "has_board_interview": has_board,
             "series_title": "The Measured Life",
             "author": "Elena Voss",
-            "_confidence_level": confidence_level,       # BS-05
+            "_confidence_level": confidence_level,  # BS-05
             "_confidence_badge_html": confidence_badge_html,  # BS-05 — used by chronicle-email-sender
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "status": status,
@@ -1751,7 +1884,9 @@ def store_installment(date_str, week_num, title, stats_line, raw_markdown,
         if weekly_signal_data:
             item["weekly_signal_data"] = json.dumps(weekly_signal_data) if isinstance(weekly_signal_data, dict) else weekly_signal_data
         if weekly_signal_wins_losses:
-            item["weekly_signal_wins_losses"] = json.dumps(weekly_signal_wins_losses) if isinstance(weekly_signal_wins_losses, dict) else weekly_signal_wins_losses
+            item["weekly_signal_wins_losses"] = (
+                json.dumps(weekly_signal_wins_losses) if isinstance(weekly_signal_wins_losses, dict) else weekly_signal_wins_losses
+            )
         if weekly_signal_board_quote:
             item["weekly_signal_board_quote"] = weekly_signal_board_quote
         table.put_item(Item=item)
@@ -1763,6 +1898,7 @@ def store_installment(date_str, week_num, title, stats_line, raw_markdown,
 # ══════════════════════════════════════════════════════════════════════════════
 # FEAT-12: PREVIEW EMAIL
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _send_preview_email(title, week_num, date_str, approval_token, email_html):
     """Send preview email to RECIPIENT with Approve / Request Changes links.
@@ -1801,10 +1937,12 @@ def _send_preview_email(title, week_num, date_str, approval_token, email_html):
         ses.send_email(
             FromEmailAddress=SENDER,
             Destination={"ToAddresses": [RECIPIENT]},
-            Content={"Simple": {
-                "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body":    {"Html": {"Data": preview_email, "Charset": "UTF-8"}},
-            }},
+            Content={
+                "Simple": {
+                    "Subject": {"Data": subject, "Charset": "UTF-8"},
+                    "Body": {"Html": {"Data": preview_email, "Charset": "UTF-8"}},
+                }
+            },
         )
         logger.info(f"FEAT-12: Preview email sent for Week {week_num}")
     except Exception as e:
@@ -1820,15 +1958,18 @@ def _send_preview_email(title, week_num, date_str, approval_token, email_html):
 def record_email_send(table, lambda_name):
     """Write a completion record so the status page can track last send."""
     import time as _time
+
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     try:
-        table.put_item(Item={
-            "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
-            "sk": f"DATE#{today}",
-            "sent_at": datetime.now(timezone.utc).isoformat(),
-            "status": "success",
-            "ttl": int(_time.time()) + 86400 * 90
-        })
+        table.put_item(
+            Item={
+                "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
+                "sk": f"DATE#{today}",
+                "sent_at": datetime.now(timezone.utc).isoformat(),
+                "status": "success",
+                "ttl": int(_time.time()) + 86400 * 90,
+            }
+        )
     except Exception as e:
         logger.info(f"[status-tracking] Non-fatal write failure: {e}")
 
@@ -1840,6 +1981,7 @@ def lambda_handler(event, context):
     # non-essential, subscriber-facing) — no Bedrock spend, clean no-op.
     try:
         from budget_guard import allow as _budget_allow
+
         if not _budget_allow("chronicle"):
             logger.info("Budget tier active — Wednesday chronicle paused this week (no Bedrock spend)")
             return {"statusCode": 200, "body": "skipped: budget tier"}
@@ -1878,7 +2020,9 @@ def lambda_handler(event, context):
             user_parts.append("RECENT THESES (last 4 weeks — do NOT repeat these angles):")
             for t in recent_titles:
                 user_parts.append(f'  - "{t}"')
-            user_parts.append("This week's thesis MUST be orthogonal to the above. Don't write about the same theme two weeks in a row, even if the data supports it. Find the new angle.")
+            user_parts.append(
+                "This week's thesis MUST be orthogonal to the above. Don't write about the same theme two weeks in a row, even if the data supports it. Find the new angle."
+            )
 
         for inst in reversed(prev):  # oldest first
             wn = inst.get("week_number", "?")
@@ -1888,13 +2032,17 @@ def lambda_handler(event, context):
                 # Truncate long previous installments to manage token budget
                 if len(md) > 2000:
                     md = md[:2000] + "\n[...truncated...]"
-                user_parts.append(f"\n--- Week {wn}: \"{t}\" ---\n{md}")
+                user_parts.append(f'\n--- Week {wn}: "{t}" ---\n{md}')
 
         # B3: Thread tracking — ask Elena to advance/resolve/complicate prior threads
         user_parts.append("\n=== CONTINUITY INSTRUCTIONS ===")
-        user_parts.append("Read the previous installments above. Identify 2-3 story threads that are still active (unresolved tensions, patterns mentioned, questions raised). Your job: advance, resolve, or complicate these threads. Don't ignore them, but don't force them either. If a thread has been mentioned for 3+ weeks without development, either close it or introduce new tension.")
+        user_parts.append(
+            "Read the previous installments above. Identify 2-3 story threads that are still active (unresolved tensions, patterns mentioned, questions raised). Your job: advance, resolve, or complicate these threads. Don't ignore them, but don't force them either. If a thread has been mentioned for 3+ weeks without development, either close it or introduce new tension."
+        )
     else:
-        user_parts.append("\n\nThis is the FIRST installment. Establish the story from the beginning. Who is Matthew? Why is he doing this? What are the stakes? Set the scene in Seattle. Introduce the platform, the data, the obsession. Make the reader want to come back next week.")
+        user_parts.append(
+            "\n\nThis is the FIRST installment. Establish the story from the beginning. Who is Matthew? Why is he doing this? What are the stakes? Set the scene in Seattle. Introduce the platform, the data, the obsession. Make the reader want to come back next week."
+        )
 
     user_message = "\n".join(user_parts)
     logger.info(f"Full prompt: {len(user_message)} chars")
@@ -1910,8 +2058,7 @@ def lambda_handler(event, context):
     # IC-16: Progressive context — narrative-relevant insight threads
     if _HAS_INSIGHT_WRITER:
         try:
-            prev_ctx = insight_writer.build_insights_context(
-                days=30, max_items=5, label="PLATFORM INSIGHTS (context for narrative)")
+            prev_ctx = insight_writer.build_insights_context(days=30, max_items=5, label="PLATFORM INSIGHTS (context for narrative)")
             if prev_ctx:
                 # B3: Reframe Field Notes as a hypothesis Elena can agree/disagree with
                 field_notes_framing = (
@@ -1958,10 +2105,7 @@ def lambda_handler(event, context):
     if _HAS_CONFIDENCE:
         try:
             _journey_start = data.get("profile", {}).get("journey_start_date", EXPERIMENT_START_DATE)
-            _journey_days = (
-                datetime.strptime(data["dates"]["end"], "%Y-%m-%d") -
-                datetime.strptime(_journey_start, "%Y-%m-%d")
-            ).days
+            _journey_days = (datetime.strptime(data["dates"]["end"], "%Y-%m-%d") - datetime.strptime(_journey_start, "%Y-%m-%d")).days
             _conf = compute_confidence(days_of_data=_journey_days)
             _conf_level = _conf.get("level", "MEDIUM")
             _conf_badge_html = _conf.get("badge_html", "")
@@ -1970,7 +2114,7 @@ def lambda_handler(event, context):
         except Exception as _ce:
             logger.warning(f"BS-05 confidence compute failed (non-fatal): {_ce}")
 
-    logger.info(f"Title: \"{title}\"")
+    logger.info(f'Title: "{title}"')
 
     # Convert to HTML
     body_html = markdown_to_html(body_md)
@@ -1984,14 +2128,19 @@ def lambda_handler(event, context):
     try:
         # ADR-058: phase=pilot hidden by default.
         from phase_filter import with_phase_filter
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
-            "ExpressionAttributeValues": {
-                ":pk": f"USER#{USER_ID}#SOURCE#chronicle",
-                ":prefix": "DATE#",
-            },
-            "ScanIndexForward": False,
-        }))
+
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+                    "ExpressionAttributeValues": {
+                        ":pk": f"USER#{USER_ID}#SOURCE#chronicle",
+                        ":prefix": "DATE#",
+                    },
+                    "ScanIndexForward": False,
+                }
+            )
+        )
         all_installments = [d2f(i) for i in resp.get("Items", [])]
     except Exception as e:
         logger.warning(f"Failed to query all installments: {e}")
@@ -1999,9 +2148,18 @@ def lambda_handler(event, context):
 
     # Ensure new installment is in the list (not yet stored at this point)
     if not any(i.get("date") == date_str for i in all_installments):
-        all_installments.insert(0, {"title": title, "week_number": week_num, "date": date_str,
-                                    "stats_line": stats_line, "word_count": len(raw_installment.split()),
-                                    "content_markdown": raw_installment[:300], "has_board_interview": has_board})
+        all_installments.insert(
+            0,
+            {
+                "title": title,
+                "week_number": week_num,
+                "date": date_str,
+                "stats_line": stats_line,
+                "word_count": len(raw_installment.split()),
+                "content_markdown": raw_installment[:300],
+                "has_board_interview": has_board,
+            },
+        )
 
     blog_url_draft = f"https://averagejoematt.com/blog/week-{week_num:02d}.html"
 
@@ -2011,7 +2169,12 @@ def lambda_handler(event, context):
 
         try:
             blog_post_key, blog_post_html, blog_index_html = publish_to_blog(
-                title, stats_line, body_html, week_num, date_str, all_installments,
+                title,
+                stats_line,
+                body_html,
+                week_num,
+                date_str,
+                all_installments,
                 write_to_s3=False,
             )
         except Exception as e:
@@ -2020,65 +2183,84 @@ def lambda_handler(event, context):
 
         try:
             journal_post_key, journal_post_html, journal_posts_json = publish_to_journal(
-                title, stats_line, body_html, week_num, date_str, all_installments,
+                title,
+                stats_line,
+                body_html,
+                week_num,
+                date_str,
+                all_installments,
                 write_to_s3=False,
             )
         except Exception as e:
             logger.warning(f"FEAT-12: Failed to build journal artifacts: {e}")
             journal_post_key = journal_post_html = journal_posts_json = None
 
-        draft_email_html = build_email_html(title, stats_line, body_html, week_num,
-                                            date_str, blog_url_draft)
+        draft_email_html = build_email_html(title, stats_line, body_html, week_num, date_str, blog_url_draft)
 
         approval_token = _secrets.token_hex(32)
-        store_installment(date_str, week_num, title, stats_line, raw_installment,
-                          body_html, [], has_board,
-                          confidence_level=_conf_level,
-                          confidence_badge_html=_conf_badge_html,
-                          status="draft",
-                          approval_token=approval_token,
-                          draft_blog_post_html=blog_post_html,
-                          draft_blog_post_key=blog_post_key,
-                          draft_blog_index_html=blog_index_html,
-                          draft_journal_post_html=journal_post_html,
-                          draft_journal_post_key=journal_post_key,
-                          draft_journal_posts_json=journal_posts_json,
-                          draft_email_html=draft_email_html)
+        store_installment(
+            date_str,
+            week_num,
+            title,
+            stats_line,
+            raw_installment,
+            body_html,
+            [],
+            has_board,
+            confidence_level=_conf_level,
+            confidence_badge_html=_conf_badge_html,
+            status="draft",
+            approval_token=approval_token,
+            draft_blog_post_html=blog_post_html,
+            draft_blog_post_key=blog_post_key,
+            draft_blog_index_html=blog_index_html,
+            draft_journal_post_html=journal_post_html,
+            draft_journal_post_key=journal_post_key,
+            draft_journal_posts_json=journal_posts_json,
+            draft_email_html=draft_email_html,
+        )
 
         _send_preview_email(title, week_num, date_str, approval_token, draft_email_html)
         logger.info(f"FEAT-12: Draft Week {week_num} stored — awaiting approval")
 
     else:
         # ── Standard flow: publish immediately ───────────────────────────────
-        store_installment(date_str, week_num, title, stats_line, raw_installment,
-                          body_html, [], has_board,
-                          confidence_level=_conf_level,
-                          confidence_badge_html=_conf_badge_html)
+        store_installment(
+            date_str,
+            week_num,
+            title,
+            stats_line,
+            raw_installment,
+            body_html,
+            [],
+            has_board,
+            confidence_level=_conf_level,
+            confidence_badge_html=_conf_badge_html,
+        )
 
         try:
-            blog_url = publish_to_blog(title, stats_line, body_html, week_num,
-                                       date_str, all_installments)
+            blog_url = publish_to_blog(title, stats_line, body_html, week_num, date_str, all_installments)
         except Exception as e:
             logger.warning(f"Blog publish failed: {e}")
             blog_url = blog_url_draft
 
         try:
-            journal_url = publish_to_journal(title, stats_line, body_html, week_num,
-                                             date_str, all_installments)
+            journal_url = publish_to_journal(title, stats_line, body_html, week_num, date_str, all_installments)
             logger.info(f"[journal] Published: {journal_url}")
         except Exception as e:
             logger.warning(f"[journal] publish_to_journal failed (non-fatal): {e}")
 
-        email_html = build_email_html(title, stats_line, body_html, week_num,
-                                      date_str, blog_url)
+        email_html = build_email_html(title, stats_line, body_html, week_num, date_str, blog_url)
         subject = f'The Measured Life — Week {week_num}: "{title}"'
         ses.send_email(
             FromEmailAddress=SENDER,
             Destination={"ToAddresses": [RECIPIENT]},
-            Content={"Simple": {
-                "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body":    {"Html": {"Data": email_html, "Charset": "UTF-8"}},
-            }},
+            Content={
+                "Simple": {
+                    "Subject": {"Data": subject, "Charset": "UTF-8"},
+                    "Body": {"Html": {"Data": email_html, "Charset": "UTF-8"}},
+                }
+            },
         )
         logger.info(f"Email sent: {subject}")
 
@@ -2086,12 +2268,15 @@ def lambda_handler(event, context):
     if _HAS_INSIGHT_WRITER:
         try:
             insight_writer.write_insight(
-                digest_type="chronicle", insight_type="observation",
+                digest_type="chronicle",
+                insight_type="observation",
                 text=f"Week {week_num}: {title}. {raw_installment[:600]}",
                 pillars=insight_writer._extract_pillars_from_text(raw_installment[:500]),
                 tags=["chronicle", "narrative", f"week_{week_num}"],
-                confidence="high", actionable=False,
-                date=data["dates"]["end"])
+                confidence="high",
+                actionable=False,
+                date=data["dates"]["end"],
+            )
             logger.info("IC-15: chronicle insight persisted")
         except Exception as e:
             logger.warning(f"IC-15 failed: {e}")
@@ -2104,5 +2289,5 @@ def lambda_handler(event, context):
         }
     return {
         "statusCode": 200,
-        "body": f"Chronicle Week {week_num} published: \"{title}\" ({len(raw_installment.split())} words)",
+        "body": f'Chronicle Week {week_num} published: "{title}" ({len(raw_installment.split())} words)',
     }

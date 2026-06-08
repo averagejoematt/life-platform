@@ -20,6 +20,7 @@ def _buddy_days_since(date_str, ref_date):
         return 99
     try:
         from datetime import datetime as _dt
+
         d = _dt.strptime(date_str, "%Y-%m-%d").date() if isinstance(date_str, str) else date_str
         return (ref_date - d).days
     except Exception:
@@ -30,6 +31,7 @@ def _buddy_friendly_date(date_str):
     """Convert YYYY-MM-DD to 'Mon Feb 27' style."""
     try:
         from datetime import datetime as _dt
+
         d = _dt.strptime(date_str, "%Y-%m-%d")
         return d.strftime("%a %b %-d")
     except Exception:
@@ -39,9 +41,14 @@ def _buddy_friendly_date(date_str):
 def _buddy_friendly_name(name, sport_type):
     """Make activity names more readable."""
     friendly = {
-        "Walk": "Walk", "Run": "Run", "Ride": "Bike Ride",
-        "VirtualRide": "Indoor Ride", "WeightTraining": "Weight Training",
-        "Hike": "Hike", "Yoga": "Yoga", "Swim": "Swim",
+        "Walk": "Walk",
+        "Run": "Run",
+        "Ride": "Bike Ride",
+        "VirtualRide": "Indoor Ride",
+        "WeightTraining": "Weight Training",
+        "Hike": "Hike",
+        "Yoga": "Yoga",
+        "Swim": "Swim",
     }
     if name == sport_type or not name:
         return friendly.get(sport_type, sport_type)
@@ -190,7 +197,7 @@ def write_buddy_json(data, profile, yesterday):
         monday_str = monday.isoformat()
         day_of_week = today_dt.strftime("%A")  # e.g. "Tuesday"
 
-        activities = []       # all 7-day activities (for highlights)
+        activities = []  # all 7-day activities (for highlights)
         week_activities = []  # Monday–today only (for count/status)
         latest_activity_date = None
 
@@ -248,10 +255,7 @@ def write_buddy_json(data, profile, yesterday):
 
         # Sort newest first, keep top 4
         activities.sort(key=lambda x: x.get("sort_date", ""), reverse=True)
-        activity_highlights = [
-            {"name": a["name"], "detail": a["detail"], "date": a["date"]}
-            for a in activities[:4]
-        ]
+        activity_highlights = [{"name": a["name"], "detail": a["detail"], "date": a["date"]} for a in activities[:4]]
 
         # ── Routine Signal (Habits) ──
         latest_habit_date = None
@@ -319,7 +323,9 @@ def write_buddy_json(data, profile, yesterday):
             beacon = "red"
             beacon_label = "Check in on him"
             beacon_summary = "Multiple signals have gone quiet. He might be in a rough stretch."
-            prompt = "Time to reach out. Don\u2019t make it about health data \u2014 just ask how he\u2019s really doing. Be direct but kind."
+            prompt = (
+                "Time to reach out. Don\u2019t make it about health data \u2014 just ask how he\u2019s really doing. Be direct but kind."
+            )
         elif red_count >= 1 or yellow_count >= 2:
             beacon = "yellow"
             beacon_label = "Might be a quiet stretch"

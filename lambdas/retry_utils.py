@@ -31,12 +31,11 @@ _MAX_ATTEMPTS = len(_BACKOFF_DELAYS) + 1  # 4
 _RETRYABLE_CODES = frozenset([429, 500, 502, 503, 504, 529])
 
 # AI model constants — override via env to avoid silent deprecation failures
-AI_MODEL = os.environ.get("AI_MODEL",       "claude-sonnet-4-6")
+AI_MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 
-def _emit_token_metrics(input_tokens: int, output_tokens: int,
-                        cache_creation_tokens: int = 0, cache_read_tokens: int = 0) -> None:
+def _emit_token_metrics(input_tokens: int, output_tokens: int, cache_creation_tokens: int = 0, cache_read_tokens: int = 0) -> None:
     """Emit per-Lambda token usage to CloudWatch (non-fatal)."""
     try:
         metric_data = [
@@ -54,18 +53,22 @@ def _emit_token_metrics(input_tokens: int, output_tokens: int,
             },
         ]
         if cache_creation_tokens or cache_read_tokens:
-            metric_data.append({
-                "MetricName": "AnthropicCacheWriteTokens",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": cache_creation_tokens,
-                "Unit": "Count",
-            })
-            metric_data.append({
-                "MetricName": "AnthropicCacheReadTokens",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": cache_read_tokens,
-                "Unit": "Count",
-            })
+            metric_data.append(
+                {
+                    "MetricName": "AnthropicCacheWriteTokens",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": cache_creation_tokens,
+                    "Unit": "Count",
+                }
+            )
+            metric_data.append(
+                {
+                    "MetricName": "AnthropicCacheReadTokens",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": cache_read_tokens,
+                    "Unit": "Count",
+                }
+            )
         _cw.put_metric_data(Namespace=_CW_NAMESPACE, MetricData=metric_data)
     except Exception as e:
         print(f"[WARN] CloudWatch token metric emit failed (non-fatal): {e}")
@@ -76,12 +79,14 @@ def _emit_failure_metric() -> None:
     try:
         _cw.put_metric_data(
             Namespace=_CW_NAMESPACE,
-            MetricData=[{
-                "MetricName": "AnthropicAPIFailure",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": 1,
-                "Unit": "Count",
-            }],
+            MetricData=[
+                {
+                    "MetricName": "AnthropicAPIFailure",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": 1,
+                    "Unit": "Count",
+                }
+            ],
         )
     except Exception as e:
         print(f"[WARN] CloudWatch failure metric emit failed (non-fatal): {e}")
@@ -144,8 +149,8 @@ def call_anthropic_api(
 
     # ADR-062 (2026-05-27): Bedrock invoke_model (was urllib → api.anthropic.com).
     # api_key param ignored (IAM auth). See lambdas/bedrock_client.py.
-    from bedrock_client import invoke as _bedrock_invoke
     import botocore.exceptions as _bce
+    from bedrock_client import invoke as _bedrock_invoke
 
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:
@@ -163,8 +168,10 @@ def call_anthropic_api(
         except _bce.ClientError as e:
             code = e.response.get("Error", {}).get("Code", "Unknown")
             retryable = code in (
-                "ThrottlingException", "ModelTimeoutException",
-                "ServiceUnavailableException", "InternalServerException",
+                "ThrottlingException",
+                "ModelTimeoutException",
+                "ServiceUnavailableException",
+                "InternalServerException",
                 "ModelNotReadyException",
             )
             print(f"[WARN] Bedrock {code} attempt {attempt}/{_MAX_ATTEMPTS}")
@@ -200,8 +207,8 @@ def call_anthropic_raw(req: urllib.request.Request, timeout: int = 55) -> dict[s
     Prompt caching: preserved if the caller's body has cache_control blocks in
     its system message (the wire format is identical on Bedrock).
     """
-    from bedrock_client import invoke as _bedrock_invoke
     import botocore.exceptions as _bce
+    from bedrock_client import invoke as _bedrock_invoke
 
     # Extract the Anthropic Messages body the caller built into the Request.
     raw = req.data
@@ -225,8 +232,10 @@ def call_anthropic_raw(req: urllib.request.Request, timeout: int = 55) -> dict[s
         except _bce.ClientError as e:
             code = e.response.get("Error", {}).get("Code", "Unknown")
             retryable = code in (
-                "ThrottlingException", "ModelTimeoutException",
-                "ServiceUnavailableException", "InternalServerException",
+                "ThrottlingException",
+                "ModelTimeoutException",
+                "ServiceUnavailableException",
+                "InternalServerException",
                 "ModelNotReadyException",
             )
             print(f"[WARN] Bedrock {code} attempt {attempt}/{_MAX_ATTEMPTS}")

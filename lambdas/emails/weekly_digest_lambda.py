@@ -33,27 +33,30 @@ Sections:
 
 import json
 import math
+import os
 import statistics
 import time
-import boto3
 import urllib.error
 import urllib.request
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from collections import defaultdict
 
-import os
-
-from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+import boto3
+from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 
 # ── Shared digest utilities (digest_utils.py) ───────────────────────────────
+from digest_utils import compute_confidence  # BS-05: confidence badges
 from digest_utils import (
-    d2f, avg, fmt, fmt_num, safe_float,
-    dedup_activities,
     _normalize_whoop_sleep,
-    compute_confidence,     # BS-05: confidence badges
+    avg,
+    d2f,
+    dedup_activities,
+    fmt,
+    fmt_num,
+    safe_float,
 )
+from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
 _REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -70,6 +73,7 @@ secrets = boto3.client("secretsmanager", region_name=_REGION)
 # IC-15/16: Insight Ledger — progressive context + insight persistence
 try:
     import insight_writer
+
     insight_writer.init(table, USER_ID)
     _HAS_INSIGHT_WRITER = True
 except ImportError:
@@ -77,7 +81,8 @@ except ImportError:
 
 # AI-3: Output validation
 try:
-    from ai_output_validator import validate_ai_output, AIOutputType
+    from ai_output_validator import AIOutputType, validate_ai_output
+
     _HAS_AI_VALIDATOR = True
 except ImportError:
     _HAS_AI_VALIDATOR = False
@@ -85,9 +90,11 @@ except ImportError:
 # OBS-1: Structured logger
 try:
     from platform_logger import get_logger
+
     logger = get_logger("weekly-digest")
 except ImportError:
     import logging as _log
+
     logger = _log.getLogger("weekly-digest")
     logger.setLevel(_log.INFO)
 
@@ -95,6 +102,7 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def get_anthropic_key():
     """ADR-062: Bedrock uses IAM auth — this fetch is dead. Returns a truthy
@@ -104,7 +112,9 @@ def get_anthropic_key():
     Full plumbing removal tracked as task #90."""
     return "_BEDROCK_IAM_"
 
+
 # d2f, avg, fmt, fmt_num, safe_float imported from digest_utils
+
 
 def fetch_profile():
     try:
@@ -114,6 +124,7 @@ def fetch_profile():
         logger.error(f"fetch_profile: {e}")
         return {}
 
+
 def query_range(source, start_date, end_date):
     """Batch query all records for a source in a date range."""
     pk = f"USER#{USER_ID}#SOURCE#{source}"
@@ -121,7 +132,9 @@ def query_range(source, start_date, end_date):
     kwargs = {
         "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
         "ExpressionAttributeValues": {
-            ":pk": pk, ":s": f"DATE#{start_date}", ":e": f"DATE#{end_date}",
+            ":pk": pk,
+            ":s": f"DATE#{start_date}",
+            ":e": f"DATE#{end_date}",
         },
     }
     while True:
@@ -133,6 +146,7 @@ def query_range(source, start_date, end_date):
             break
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
     return records
+
 
 def query_journal_range(start_date, end_date):
     """Query all journal entries in a range."""
@@ -155,23 +169,30 @@ def query_journal_range(start_date, end_date):
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
     return dict(entries_by_date)
 
+
 def delta_html(cur, prev, unit="", dec=1, invert=False):
-    if cur is None or prev is None: return ""
+    if cur is None or prev is None:
+        return ""
     diff = round(cur - prev, dec)
-    if diff == 0: return '<span style="color:#888;font-size:11px;"> →0</span>'
+    if diff == 0:
+        return '<span style="color:#888;font-size:11px;"> →0</span>'
     better = (diff < 0) if invert else (diff > 0)
     color = "#27ae60" if better else "#e74c3c"
     arrow = "↑" if diff > 0 else "↓"
     return f'<span style="color:{color};font-size:11px;"> {arrow}{abs(diff)}{unit}</span>'
 
+
 def hit_bar(pct, color="#27ae60"):
-    if pct is None: return "—"
+    if pct is None:
+        return "—"
     w = max(0, min(100, pct))
-    return (f'<span style="font-weight:600;">{pct}%</span> '
-            f'<span style="display:inline-block;width:80px;height:8px;background:#eee;'
-            f'border-radius:4px;vertical-align:middle;">'
-            f'<span style="display:inline-block;width:{w}%;height:8px;background:{color};'
-            f'border-radius:4px;"></span></span>')
+    return (
+        f'<span style="font-weight:600;">{pct}%</span> '
+        f'<span style="display:inline-block;width:80px;height:8px;background:#eee;'
+        f'border-radius:4px;vertical-align:middle;">'
+        f'<span style="display:inline-block;width:{w}%;height:8px;background:{color};'
+        f'border-radius:4px;"></span></span>'
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -184,6 +205,7 @@ def hit_bar(pct, color="#27ae60"):
 # ══════════════════════════════════════════════════════════════════════════════
 # EXTRACTORS — return summarized dicts from raw records
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def ex_day_grades(grades_dict):
     """Extract day grade summary from {date: record} dict."""
@@ -202,11 +224,16 @@ def ex_day_grades(grades_dict):
     grade_counts = defaultdict(int)
     for d in days:
         g = d["grade"]
-        if g.startswith("A"): grade_counts["A"] += 1
-        elif g.startswith("B"): grade_counts["B"] += 1
-        elif g.startswith("C"): grade_counts["C"] += 1
-        elif g == "D": grade_counts["D"] += 1
-        elif g == "F": grade_counts["F"] += 1
+        if g.startswith("A"):
+            grade_counts["A"] += 1
+        elif g.startswith("B"):
+            grade_counts["B"] += 1
+        elif g.startswith("C"):
+            grade_counts["C"] += 1
+        elif g == "D":
+            grade_counts["D"] += 1
+        elif g == "F":
+            grade_counts["F"] += 1
     return {
         "days": days,
         "avg_score": avg(scores),
@@ -219,15 +246,22 @@ def ex_day_grades(grades_dict):
 
 def ex_whoop(recs_dict):
     recs = list(recs_dict.values()) if recs_dict else []
-    if not recs: return None
+    if not recs:
+        return None
     hrvs = [float(r["hrv"]) for r in recs if "hrv" in r]
     recoveries = [float(r["recovery_score"]) for r in recs if "recovery_score" in r]
     rhrs = [float(r["resting_heart_rate"]) for r in recs if "resting_heart_rate" in r]
     strains = [float(r["strain"]) for r in recs if "strain" in r]
-    return {"hrv_avg": avg(hrvs), "hrv_min": min(hrvs, default=None),
-            "hrv_max": max(hrvs, default=None),
-            "recovery_avg": avg(recoveries), "recovery_min": min(recoveries, default=None),
-            "rhr_avg": avg(rhrs), "strain_avg": avg(strains), "days": len(recs)}
+    return {
+        "hrv_avg": avg(hrvs),
+        "hrv_min": min(hrvs, default=None),
+        "hrv_max": max(hrvs, default=None),
+        "recovery_avg": avg(recoveries),
+        "recovery_min": min(recoveries, default=None),
+        "rhr_avg": avg(rhrs),
+        "strain_avg": avg(strains),
+        "days": len(recs),
+    }
 
 
 # _normalize_whoop_sleep imported from digest_utils
@@ -236,37 +270,50 @@ def ex_whoop(recs_dict):
 def ex_whoop_sleep(recs_dict):
     """Extract sleep metrics from Whoop records (SOT for sleep duration/staging v2.55.0)."""
     recs = [_normalize_whoop_sleep(r) for r in (recs_dict.values() if recs_dict else [])]
-    if not recs: return None
+    if not recs:
+        return None
     scores = [float(r["sleep_score"]) for r in recs if "sleep_score" in r]
     durs = []
     for r in recs:
         d = safe_float(r, "sleep_duration_hours")
-        if d is not None: durs.append(d)
+        if d is not None:
+            durs.append(d)
     effs = [safe_float(r, "sleep_efficiency_pct") for r in recs]
     effs = [e for e in effs if e is not None]
     deep_pcts = [float(r["deep_pct"]) for r in recs if "deep_pct" in r]
     rem_pcts = [float(r["rem_pct"]) for r in recs if "rem_pct" in r]
-    return {"score_avg": avg(scores), "score_min": min(scores, default=None),
-            "duration_avg_hrs": avg(durs), "efficiency_avg": avg(effs),
-            "deep_pct": avg(deep_pcts), "rem_pct": avg(rem_pcts),
-            "nights": len(recs)}
+    return {
+        "score_avg": avg(scores),
+        "score_min": min(scores, default=None),
+        "duration_avg_hrs": avg(durs),
+        "efficiency_avg": avg(effs),
+        "deep_pct": avg(deep_pcts),
+        "rem_pct": avg(rem_pcts),
+        "nights": len(recs),
+    }
 
 
 def ex_withings(recs_dict):
     recs = list(recs_dict.values()) if recs_dict else []
-    if not recs: return None
+    if not recs:
+        return None
     weights = [float(r["weight_lbs"]) for r in recs if "weight_lbs" in r]
     bodyfats = [float(r["body_fat_pct"]) for r in recs if "body_fat_pct" in r]
     sr = sorted(recs, key=lambda r: r.get("sk", ""), reverse=True)
-    return {"weight_latest": float(sr[0]["weight_lbs"]) if sr and "weight_lbs" in sr[0] else None,
-            "weight_avg": avg(weights), "weight_min": min(weights, default=None),
-            "weight_max": max(weights, default=None), "body_fat_avg": avg(bodyfats),
-            "measurements": len(recs)}
+    return {
+        "weight_latest": float(sr[0]["weight_lbs"]) if sr and "weight_lbs" in sr[0] else None,
+        "weight_avg": avg(weights),
+        "weight_min": min(weights, default=None),
+        "weight_max": max(weights, default=None),
+        "body_fat_avg": avg(bodyfats),
+        "measurements": len(recs),
+    }
 
 
 def ex_strava(recs_dict, profile):
     recs = list(recs_dict.values()) if recs_dict else []
-    if not recs: return None
+    if not recs:
+        return None
     max_hr = profile.get("max_heart_rate", 186)
     z2_low = max_hr * 0.60
     z2_high = max_hr * 0.70
@@ -282,32 +329,46 @@ def ex_strava(recs_dict, profile):
             secs = float(a.get("moving_time_seconds") or 0)
             kj = float(a.get("kilojoules") or 0)
             day_kj += kj
-            obj = {"date": r.get("date", ""),
-                   "name": a.get("enriched_name") or a.get("name", ""),
-                   "sport": a.get("sport_type", ""),
-                   "miles": round(float(a.get("distance_miles") or 0), 1),
-                   "elev": round(float(a.get("total_elevation_gain_feet") or 0)),
-                   "hr": round(hr) if hr else None,
-                   "mins": round(secs / 60), "kj": kj}
+            obj = {
+                "date": r.get("date", ""),
+                "name": a.get("enriched_name") or a.get("name", ""),
+                "sport": a.get("sport_type", ""),
+                "miles": round(float(a.get("distance_miles") or 0), 1),
+                "elev": round(float(a.get("total_elevation_gain_feet") or 0)),
+                "hr": round(hr) if hr else None,
+                "mins": round(secs / 60),
+                "kj": kj,
+            }
             acts.append(obj)
             if hr and z2_low <= hr <= z2_high:
                 zone2_mins += obj["mins"]
-        if day_kj > 0: daily_loads.append(day_kj)
+        if day_kj > 0:
+            daily_loads.append(day_kj)
     total_mins = sum(a["mins"] for a in acts)
     z2_pct = round(zone2_mins / total_mins * 100) if total_mins else 0
-    mono = round(statistics.mean(daily_loads) / statistics.stdev(daily_loads), 2) \
-        if len(daily_loads) >= 3 and statistics.stdev(daily_loads) > 0 else None
-    return {"total_miles": round(sum(a["miles"] for a in acts), 1),
-            "total_elevation_feet": round(sum(a["elev"] for a in acts)),
-            "total_minutes": total_mins, "activity_count": len(acts),
-            "zone2_minutes": round(zone2_mins), "zone2_pct": z2_pct,
-            "zone2_target": 150, "zone2_hr_range": f"{round(z2_low)}-{round(z2_high)}",
-            "training_monotony": mono, "activities": acts}
+    mono = (
+        round(statistics.mean(daily_loads) / statistics.stdev(daily_loads), 2)
+        if len(daily_loads) >= 3 and statistics.stdev(daily_loads) > 0
+        else None
+    )
+    return {
+        "total_miles": round(sum(a["miles"] for a in acts), 1),
+        "total_elevation_feet": round(sum(a["elev"] for a in acts)),
+        "total_minutes": total_mins,
+        "activity_count": len(acts),
+        "zone2_minutes": round(zone2_mins),
+        "zone2_pct": z2_pct,
+        "zone2_target": 150,
+        "zone2_hr_range": f"{round(z2_low)}-{round(z2_high)}",
+        "training_monotony": mono,
+        "activities": acts,
+    }
 
 
 def ex_macrofactor(recs_dict, profile):
     recs = list(recs_dict.values()) if recs_dict else []
-    if not recs: return None
+    if not recs:
+        return None
     cal_target = profile.get("calorie_target", 1800)
     prot_target = profile.get("protein_target_g", 190)
     cals = [float(r["total_calories_kcal"]) for r in recs if "total_calories_kcal" in r]
@@ -316,38 +377,52 @@ def ex_macrofactor(recs_dict, profile):
     carbs = [float(r["total_carbs_g"]) for r in recs if "total_carbs_g" in r]
     fibers = [float(r["total_fiber_g"]) for r in recs if "total_fiber_g" in r]
     return {
-        "calories_avg": avg(cals), "protein_avg_g": avg(prots),
-        "fat_avg_g": avg(fats), "carbs_avg_g": avg(carbs), "fiber_avg_g": avg(fibers),
+        "calories_avg": avg(cals),
+        "protein_avg_g": avg(prots),
+        "fat_avg_g": avg(fats),
+        "carbs_avg_g": avg(carbs),
+        "fiber_avg_g": avg(fibers),
         "days_logged": len(recs),
         "protein_hit_rate": round(sum(1 for p in prots if p >= prot_target) / len(prots) * 100) if prots else None,
         "calorie_hit_rate": round(sum(1 for c in cals if c <= cal_target * 1.10) / len(cals) * 100) if cals else None,
-        "protein_target": prot_target, "calorie_target": cal_target,
+        "protein_target": prot_target,
+        "calorie_target": cal_target,
     }
 
 
 def ex_macrofactor_workouts(recs_dict):
     recs = list(recs_dict.values()) if recs_dict else []
-    if not recs: return None
+    if not recs:
+        return None
     workouts = []
     total_vol = 0
     total_sets = 0
     for r in recs:
         for w in r.get("workouts", []):
-            wk = {"date": r.get("date", ""), "name": w.get("workout_name", "Workout"),
-                  "exercises": len(w.get("exercises", [])),
-                  "volume_lbs": round(float(w.get("total_volume_lbs") or 0))}
+            wk = {
+                "date": r.get("date", ""),
+                "name": w.get("workout_name", "Workout"),
+                "exercises": len(w.get("exercises", [])),
+                "volume_lbs": round(float(w.get("total_volume_lbs") or 0)),
+            }
             workouts.append(wk)
         total_vol += float(r.get("total_volume_lbs") or 0)
         total_sets += int(r.get("total_sets") or 0)
-    if not workouts: return None
-    return {"workout_count": len(workouts), "workouts": workouts,
-            "total_volume_lbs": round(total_vol), "total_sets": total_sets,
-            "best_workout": max(workouts, key=lambda w: w["volume_lbs"], default=None)}
+    if not workouts:
+        return None
+    return {
+        "workout_count": len(workouts),
+        "workouts": workouts,
+        "total_volume_lbs": round(total_vol),
+        "total_sets": total_sets,
+        "best_workout": max(workouts, key=lambda w: w["volume_lbs"], default=None),
+    }
 
 
 def ex_habitify(recs_dict, profile):
     recs = list(recs_dict.values()) if recs_dict else []
-    if not recs: return None
+    if not recs:
+        return None
     mvp_list = profile.get("mvp_habits", [])
     daily_mvp_pcts = []
     daily_overall_pcts = []
@@ -355,7 +430,8 @@ def ex_habitify(recs_dict, profile):
     mvp_days_available = 0
     for r in recs:
         habits_map = r.get("habits", {})
-        if not habits_map: continue
+        if not habits_map:
+            continue
         mvp_days_available += 1
         mvp_done = 0
         for h in mvp_list:
@@ -379,32 +455,39 @@ def ex_habitify(recs_dict, profile):
 
 def ex_apple_health(recs_dict):
     recs = list(recs_dict.values()) if recs_dict else []
-    if not recs: return None
+    if not recs:
+        return None
     steps = [float(r["steps"]) for r in recs if "steps" in r]
     water = [float(r["water_intake_ml"]) for r in recs if "water_intake_ml" in r and float(r.get("water_intake_ml", 0)) >= 118]
     glucose_avgs = [float(r["blood_glucose_avg"]) for r in recs if "blood_glucose_avg" in r]
     tir_vals = [float(r["blood_glucose_time_in_range_pct"]) for r in recs if "blood_glucose_time_in_range_pct" in r]
     gait_speeds = [float(r["walking_speed_mph"]) for r in recs if "walking_speed_mph" in r]
     return {
-        "steps_avg": avg(steps), "steps_total": round(sum(steps)) if steps else None,
-        "water_avg_ml": avg(water), "water_days": len(water),
-        "glucose_avg": avg(glucose_avgs), "glucose_tir_avg": avg(tir_vals),
+        "steps_avg": avg(steps),
+        "steps_total": round(sum(steps)) if steps else None,
+        "water_avg_ml": avg(water),
+        "water_days": len(water),
+        "glucose_avg": avg(glucose_avgs),
+        "glucose_tir_avg": avg(tir_vals),
         "glucose_days": len(glucose_avgs),
-        "gait_speed_avg": avg(gait_speeds), "gait_days": len(gait_speeds),
+        "gait_speed_avg": avg(gait_speeds),
+        "gait_days": len(gait_speeds),
         "days": len(recs),
     }
 
 
 def ex_todoist(recs_dict):
     recs = list(recs_dict.values()) if recs_dict else []
-    if not recs: return None
+    if not recs:
+        return None
     c = [int(r.get("tasks_completed", 0)) for r in recs]
     return {"tasks_completed": sum(c), "avg_per_day": avg(c), "days": len(recs)}
 
 
 def ex_journal(entries_by_date):
     """Extract journal signals from {date: [entries]} dict."""
-    if not entries_by_date: return None
+    if not entries_by_date:
+        return None
     mood_scores, energy_scores, stress_scores = [], [], []
     all_themes, all_emotions, all_avoidance, all_cognitive = [], [], [], []
     notable_quotes = []
@@ -422,8 +505,10 @@ def ex_journal(entries_by_date):
             if m is not None:
                 mood_scores.append(float(m))
                 daily_mood.setdefault(date_str, []).append(float(m))
-            if e is not None: energy_scores.append(float(e))
-            if s is not None: stress_scores.append(float(s))
+            if e is not None:
+                energy_scores.append(float(e))
+            if s is not None:
+                stress_scores.append(float(s))
             if m is None:
                 for field in ("morning_mood", "day_rating"):
                     val = entry.get(field)
@@ -434,27 +519,40 @@ def ex_journal(entries_by_date):
             if e is None:
                 for field in ("morning_energy", "energy_eod"):
                     val = entry.get(field)
-                    if val is not None: energy_scores.append(float(val)); break
+                    if val is not None:
+                        energy_scores.append(float(val))
+                        break
             if s is None:
                 val = entry.get("stress_level")
-                if val is not None: stress_scores.append(float(val))
-            for t in (entry.get("enriched_themes") or []): all_themes.append(str(t))
-            for em in (entry.get("enriched_emotions") or []): all_emotions.append(str(em))
-            for av in (entry.get("enriched_avoidance_flags") or []): all_avoidance.append(str(av))
-            for cp in (entry.get("enriched_cognitive_patterns") or []): all_cognitive.append(str(cp))
+                if val is not None:
+                    stress_scores.append(float(val))
+            for t in entry.get("enriched_themes") or []:
+                all_themes.append(str(t))
+            for em in entry.get("enriched_emotions") or []:
+                all_emotions.append(str(em))
+            for av in entry.get("enriched_avoidance_flags") or []:
+                all_avoidance.append(str(av))
+            for cp in entry.get("enriched_cognitive_patterns") or []:
+                all_cognitive.append(str(cp))
             q = entry.get("enriched_notable_quote")
-            if q: notable_quotes.append({"date": date_str, "quote": str(q)})
-    if total_entries == 0: return None
+            if q:
+                notable_quotes.append({"date": date_str, "quote": str(q)})
+    if total_entries == 0:
+        return None
     theme_freq = defaultdict(int)
-    for t in all_themes: theme_freq[t] += 1
+    for t in all_themes:
+        theme_freq[t] += 1
     emotion_freq = defaultdict(int)
-    for em in all_emotions: emotion_freq[em] += 1
-    daily_mood_avg = {d: round(sum(v)/len(v), 1) for d, v in daily_mood.items() if v}
+    for em in all_emotions:
+        emotion_freq[em] += 1
+    daily_mood_avg = {d: round(sum(v) / len(v), 1) for d, v in daily_mood.items() if v}
     best_day = max(daily_mood_avg.items(), key=lambda x: x[1], default=(None, None))
     worst_day = min(daily_mood_avg.items(), key=lambda x: x[1], default=(None, None))
     return {
-        "mood_avg": avg(mood_scores), "energy_avg": avg(energy_scores),
-        "stress_avg": avg(stress_scores), "entries": total_entries,
+        "mood_avg": avg(mood_scores),
+        "energy_avg": avg(energy_scores),
+        "stress_avg": avg(stress_scores),
+        "entries": total_entries,
         "days_journaled": len(entries_by_date),
         "top_themes": sorted(theme_freq.items(), key=lambda x: -x[1])[:6],
         "top_emotions": sorted(emotion_freq.items(), key=lambda x: -x[1])[:6],
@@ -469,6 +567,7 @@ def ex_journal(entries_by_date):
 # ══════════════════════════════════════════════════════════════════════════════
 # CHARACTER SHEET EXTRACTION (v2.71.0)
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def ex_character_sheet(recs_dict):
     """Extract weekly character sheet summary from pre-computed records."""
@@ -523,8 +622,10 @@ def ex_character_sheet(recs_dict):
             if 0 < gap < min_gap:
                 min_gap = gap
                 closest_to_tier = {
-                    "pillar": p, "current_level": level,
-                    "current_tier": tier, "next_tier": tier_order[tier_idx + 1],
+                    "pillar": p,
+                    "current_level": level,
+                    "current_tier": tier,
+                    "next_tier": tier_order[tier_idx + 1],
                     "levels_needed": gap,
                 }
 
@@ -547,6 +648,7 @@ def ex_character_sheet(recs_dict):
 # TRAINING LOAD (Banister)
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def compute_banister(strava_60d):
     kj = {}
     for date_str, r in strava_60d.items():
@@ -554,7 +656,7 @@ def compute_banister(strava_60d):
         kj[date_str] = sum(float(a.get("kilojoules") or 0) for a in acts)
     today = datetime.now(timezone.utc).date()
     ctl = atl = 0.0
-    cd, ad = math.exp(-1/42), math.exp(-1/7)
+    cd, ad = math.exp(-1 / 42), math.exp(-1 / 7)
     for i in range(59, -1, -1):
         day = (today - timedelta(days=i)).isoformat()
         load = kj.get(day, 0)
@@ -566,6 +668,7 @@ def compute_banister(strava_60d):
 # ══════════════════════════════════════════════════════════════════════════════
 # 4-WEEK TRENDS
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def compute_4week_trends(weekly_data):
     """Given 4 weeks of extracted data (newest first), compute trend arrows."""
@@ -594,6 +697,7 @@ def compute_4week_trends(weekly_data):
 # WEIGHT PROJECTION
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def weight_projection(w4_weight_avgs, goal_weight, current_weight):
     vals = [w for w in w4_weight_avgs if w is not None]
     if len(vals) < 2 or current_weight is None or goal_weight is None:
@@ -606,22 +710,25 @@ def weight_projection(w4_weight_avgs, goal_weight, current_weight):
         return {"status": "not_losing"}
     weeks_to_goal = (current_weight - goal_weight) / abs(rate_per_week)
     eta = datetime.now(timezone.utc).date() + timedelta(weeks=weeks_to_goal)
-    return {"status": "ok", "weeks": round(weeks_to_goal),
-            "rate_per_week": round(abs(rate_per_week), 1), "eta": eta.strftime("%B %Y")}
+    return {"status": "ok", "weeks": round(weeks_to_goal), "rate_per_week": round(abs(rate_per_week), 1), "eta": eta.strftime("%B %Y")}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SLEEP DEBT
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def compute_sleep_debt(whoop_dict, target_hrs=7.5):
     """Compute 7-day sleep debt from Whoop records (SOT for sleep duration v2.55.0)."""
-    if not whoop_dict: return None
+    if not whoop_dict:
+        return None
     durs = []
     for r in whoop_dict.values():
         d = safe_float(r, "sleep_duration_hours")
-        if d is not None: durs.append(d)
-    if not durs: return None
+        if d is not None:
+            durs.append(d)
+    if not durs:
+        return None
     debt = round(max(0, (target_hrs * len(durs)) - sum(durs)), 1)
     return {"debt_hrs": debt, "nights": len(durs), "avg_hrs": avg(durs), "target_hrs": target_hrs}
 
@@ -630,15 +737,20 @@ def compute_sleep_debt(whoop_dict, target_hrs=7.5):
 # OPEN INSIGHTS
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def fetch_stale_insights(days_threshold=7):
     try:
         # ADR-058: phase=pilot hidden by default.
         from phase_filter import with_phase_filter
-        r = table.query(**with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": f"USER#{USER_ID}#SOURCE#insights",
-                ":s": "INSIGHT#0", ":e": "INSIGHT#z"}}))
+
+        r = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                    "ExpressionAttributeValues": {":pk": f"USER#{USER_ID}#SOURCE#insights", ":s": "INSIGHT#0", ":e": "INSIGHT#z"},
+                }
+            )
+        )
         items = r.get("Items", [])
     except Exception as e:
         logger.warning(f"fetch_stale_insights: {e}")
@@ -646,16 +758,23 @@ def fetch_stale_insights(days_threshold=7):
     now = datetime.now(timezone.utc)
     stale = []
     for item in items:
-        if str(item.get("status", "")).lower() != "open": continue
+        if str(item.get("status", "")).lower() != "open":
+            continue
         saved = item.get("date_saved", "")
         try:
             saved_dt = datetime.fromisoformat(saved.replace("Z", "+00:00"))
             days_open = (now - saved_dt).days
-        except Exception: days_open = 0
+        except Exception:
+            days_open = 0
         if days_open >= days_threshold:
-            stale.append({"text": str(item.get("text", "")),
-                          "date_saved": saved[:10], "days_open": days_open,
-                          "tags": [str(t) for t in (item.get("tags") or [])]})
+            stale.append(
+                {
+                    "text": str(item.get("text", "")),
+                    "date_saved": saved[:10],
+                    "days_open": days_open,
+                    "tags": [str(t) for t in (item.get("tags") or [])],
+                }
+            )
     stale.sort(key=lambda x: x["days_open"], reverse=True)
     return stale
 
@@ -663,6 +782,7 @@ def fetch_stale_insights(days_threshold=7):
 # ══════════════════════════════════════════════════════════════════════════════
 # DATA ASSEMBLY
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def gather_all():
     today = datetime.now(timezone.utc).date()
@@ -683,9 +803,19 @@ def gather_all():
         return None, None
 
     # ── Batch query all sources for this week + prior week ──
-    sources = ["whoop", "eightsleep", "strava", "apple_health",
-               "macrofactor", "macrofactor_workouts", "withings",
-               "habitify", "todoist", "garmin", "day_grade"]
+    sources = [
+        "whoop",
+        "eightsleep",
+        "strava",
+        "apple_health",
+        "macrofactor",
+        "macrofactor_workouts",
+        "withings",
+        "habitify",
+        "todoist",
+        "garmin",
+        "day_grade",
+    ]
     raw_this = {}
     raw_prior = {}
     for src in sources:
@@ -729,8 +859,7 @@ def gather_all():
 
     # ── 4-week trends ──
     # Build weekly extractions for weeks 3 and 4
-    raw_w3 = {src: {d: r for d, r in query_range(src, w3_start, w2_start).items()
-                     if w3_start <= d < w2_start} for src in ["day_grade"]}
+    raw_w3 = {src: {d: r for d, r in query_range(src, w3_start, w2_start).items() if w3_start <= d < w2_start} for src in ["day_grade"]}
     # Reuse data already queried (4 weeks in one shot above)
     full_data = {}
     for src in sources:
@@ -769,8 +898,7 @@ def gather_all():
     training_load = compute_banister(strava_60d)
 
     # ── Sleep debt ──
-    sleep_debt = compute_sleep_debt(raw_this["whoop"],
-                                     profile.get("sleep_target_hours_ideal", 7.5))
+    sleep_debt = compute_sleep_debt(raw_this["whoop"], profile.get("sleep_target_hours_ideal", 7.5))
 
     # ── Weight projection ──
     w4_weight_avgs = []
@@ -786,19 +914,23 @@ def gather_all():
     # BS-09: ACWR — read latest computed_metrics record (written by acwr-compute at 9:55am PT)
     acwr_data = None
     try:
-        cm_resp = table.get_item(Key={
-            "pk": f"USER#{USER_ID}#SOURCE#computed_metrics",
-            "sk": f"DATE#{w1_end}",
-        })
+        cm_resp = table.get_item(
+            Key={
+                "pk": f"USER#{USER_ID}#SOURCE#computed_metrics",
+                "sk": f"DATE#{w1_end}",
+            }
+        )
         acwr_data = d2f(cm_resp.get("Item")) or None
         if acwr_data and acwr_data.get("acwr"):
             logger.info(f"  computed_metrics: ACWR {acwr_data['acwr']:.3f} ({acwr_data.get('zone', '?')})")
         else:
             # Fallback: try prior day
-            cm_resp2 = table.get_item(Key={
-                "pk": f"USER#{USER_ID}#SOURCE#computed_metrics",
-                "sk": f"DATE#{(today - timedelta(days=2)).isoformat()}",
-            })
+            cm_resp2 = table.get_item(
+                Key={
+                    "pk": f"USER#{USER_ID}#SOURCE#computed_metrics",
+                    "sk": f"DATE#{(today - timedelta(days=2)).isoformat()}",
+                }
+            )
             acwr_data = d2f(cm_resp2.get("Item")) or None
     except Exception as _e:
         logger.info(f"  [WARN] computed_metrics fetch failed: {_e}")
@@ -812,15 +944,18 @@ def gather_all():
     logger.info(f"  character_sheet: {len(cs_this_raw)} days this week, {len(cs_prior_raw)} prior")
 
     return {
-        "this": this, "prior": prior, "profile": profile,
-        "training_load": training_load, "trends": trends,
-        "sleep_debt": sleep_debt, "projection": projection,
+        "this": this,
+        "prior": prior,
+        "profile": profile,
+        "training_load": training_load,
+        "trends": trends,
+        "sleep_debt": sleep_debt,
+        "projection": projection,
         "open_insights": open_insights,
         "character_sheet": character_sheet,
         "character_sheet_prior": character_sheet_prior,
-        "acwr_data": acwr_data,   # BS-09
-        "dates": {"this_start": w1_start, "this_end": w1_end,
-                  "prior_start": w2_start, "prior_end": w2_end},
+        "acwr_data": acwr_data,  # BS-09
+        "dates": {"this_start": w1_start, "this_end": w1_end, "prior_start": w2_start, "prior_end": w2_end},
     }, profile
 
 
@@ -881,6 +1016,7 @@ Be honest. Be a coach, not a cheerleader."""
 def call_anthropic_with_retry(req, timeout=55, max_attempts=None, backoff_s=None):
     # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
     import retry_utils
+
     return retry_utils.call_anthropic_raw(req, timeout=timeout)
 
 
@@ -905,8 +1041,7 @@ def call_haiku(data, profile, api_key):
     previous_insights = ""
     if _HAS_INSIGHT_WRITER:
         try:
-            previous_insights = insight_writer.build_insights_context(
-                days=30, max_items=8, label="PREVIOUS INSIGHTS (last 30 days)")
+            previous_insights = insight_writer.build_insights_context(days=30, max_items=8, label="PREVIOUS INSIGHTS (last 30 days)")
         except Exception as e:
             logger.warning(f"IC-16 progressive context failed: {e}")
 
@@ -921,8 +1056,10 @@ def call_haiku(data, profile, api_key):
         _pro = profile.get("protein_target_g", 190)
         if _week_num <= 4:
             _stage = "Foundation Stage — habit formation + consistency over intensity"
-            _coaching_note = (f"At Week {_week_num}, walks at {_start_w}+ lbs carry real cardiovascular load. "
-                              "Evaluate movement volume generously. Don't apply intermediate-athlete benchmarks.")
+            _coaching_note = (
+                f"At Week {_week_num}, walks at {_start_w}+ lbs carry real cardiovascular load. "
+                "Evaluate movement volume generously. Don't apply intermediate-athlete benchmarks."
+            )
         elif _week_num <= 12:
             _stage = "Momentum Stage — progressive overload appropriate, recovery-guided intensity"
             _coaching_note = f"Week {_week_num}: bodyweight-adjusted benchmarks apply, not absolute standards."
@@ -940,19 +1077,31 @@ def call_haiku(data, profile, api_key):
     except Exception:
         journey_context = f"JOURNEY STAGE: Week 1 of transformation | {int(round(EXPERIMENT_BASELINE_WEIGHT_LBS))}→185 lbs"
 
-    payload = json.dumps({
-        "model": os.environ.get("AI_MODEL", "claude-sonnet-4-6"), "max_tokens": 1500,
-        "messages": [{"role": "user", "content": BOARD_PROMPT.format(
-            data_json=json.dumps(pd, indent=2, default=str),
-            grade_summary=grade_summary,
-            previous_insights=previous_insights,
-            journey_context=journey_context,
-            start_w=int(round(EXPERIMENT_BASELINE_WEIGHT_LBS)),
-            lbs_to_lose=int(round(EXPERIMENT_BASELINE_WEIGHT_LBS)) - 185)}]
-    }).encode()
-    req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=payload,
-        headers={"Content-Type": "application/json", "x-api-key": api_key,
-                 "anthropic-version": "2023-06-01"}, method="POST")
+    payload = json.dumps(
+        {
+            "model": os.environ.get("AI_MODEL", "claude-sonnet-4-6"),
+            "max_tokens": 1500,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": BOARD_PROMPT.format(
+                        data_json=json.dumps(pd, indent=2, default=str),
+                        grade_summary=grade_summary,
+                        previous_insights=previous_insights,
+                        journey_context=journey_context,
+                        start_w=int(round(EXPERIMENT_BASELINE_WEIGHT_LBS)),
+                        lbs_to_lose=int(round(EXPERIMENT_BASELINE_WEIGHT_LBS)) - 185,
+                    ),
+                }
+            ],
+        }
+    ).encode()
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=payload,
+        headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
+        method="POST",
+    )
     resp = call_anthropic_with_retry(req)
     return resp["content"][0]["text"]
 
@@ -961,11 +1110,16 @@ def call_haiku(data, profile, api_key):
 # HTML BUILDER
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def grade_colour(grade):
-    if grade.startswith("A"): return "#059669"
-    if grade.startswith("B"): return "#2563eb"
-    if grade.startswith("C"): return "#d97706"
+    if grade.startswith("A"):
+        return "#059669"
+    if grade.startswith("B"):
+        return "#2563eb"
+    if grade.startswith("C"):
+        return "#d97706"
     return "#dc2626"
+
 
 def build_html(data, commentary, profile):
     t = data["this"]
@@ -985,15 +1139,19 @@ def build_html(data, commentary, profile):
 
     def row(label, value, dlt="", highlight=False):
         bg = "#fff8e7" if highlight else "#ffffff"
-        return (f'<tr style="background:{bg}">'
-                f'<td style="padding:6px 12px;color:#666;font-size:13px;">{label}</td>'
-                f'<td style="padding:6px 12px;font-size:13px;font-weight:600;">{value}{dlt}</td></tr>')
+        return (
+            f'<tr style="background:{bg}">'
+            f'<td style="padding:6px 12px;color:#666;font-size:13px;">{label}</td>'
+            f'<td style="padding:6px 12px;font-size:13px;font-weight:600;">{value}{dlt}</td></tr>'
+        )
 
     def section(title, emoji, content):
-        return (f'<div style="margin-bottom:28px;">'
-                f'<h2 style="font-size:15px;font-weight:700;color:#1a1a2e;margin:0 0 8px;'
-                f'border-bottom:2px solid #e8e8f0;padding-bottom:6px;">{emoji} {title}</h2>'
-                f'{content}</div>')
+        return (
+            f'<div style="margin-bottom:28px;">'
+            f'<h2 style="font-size:15px;font-weight:700;color:#1a1a2e;margin:0 0 8px;'
+            f'border-bottom:2px solid #e8e8f0;padding-bottom:6px;">{emoji} {title}</h2>'
+            f"{content}</div>"
+        )
 
     def tbl(rows):
         return f'<table style="width:100%;border-collapse:collapse;background:#fafafa;border-radius:8px;overflow:hidden;">{rows}</table>'
@@ -1024,10 +1182,16 @@ def build_html(data, commentary, profile):
     except Exception:
         _insight_badge = ""
 
-    insight_box = (f'<div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:10px;'
-                   f'padding:16px 20px;margin-bottom:24px;">'
-                   + (f'<div style="margin-bottom:8px;">{_insight_badge}</div>' if _insight_badge else "")
-                   + f'{insight_html}</div>') if insight_html else ""
+    insight_box = (
+        (
+            f'<div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:10px;'
+            f'padding:16px 20px;margin-bottom:24px;">'
+            + (f'<div style="margin-bottom:8px;">{_insight_badge}</div>' if _insight_badge else "")
+            + f"{insight_html}</div>"
+        )
+        if insight_html
+        else ""
+    )
 
     # ══════════════════════════════════════════════════════════════════════════
     # DAY GRADE WEEKLY TREND (NEW)
@@ -1038,7 +1202,27 @@ def build_html(data, commentary, profile):
     if dg and dg.get("days"):
         dg_avg = dg["avg_score"]
         dg_prior_avg = dg_prior["avg_score"] if dg_prior else None
-        from_letter = lambda s: "A+" if s >= 95 else "A" if s >= 90 else "A-" if s >= 85 else "B+" if s >= 80 else "B" if s >= 75 else "B-" if s >= 70 else "C+" if s >= 65 else "C" if s >= 60 else "C-" if s >= 55 else "D" if s >= 45 else "F"
+        from_letter = lambda s: (
+            "A+"
+            if s >= 95
+            else (
+                "A"
+                if s >= 90
+                else (
+                    "A-"
+                    if s >= 85
+                    else (
+                        "B+"
+                        if s >= 80
+                        else (
+                            "B"
+                            if s >= 75
+                            else "B-" if s >= 70 else "C+" if s >= 65 else "C" if s >= 60 else "C-" if s >= 55 else "D" if s >= 45 else "F"
+                        )
+                    )
+                )
+            )
+        )
         avg_grade = from_letter(dg_avg)
         avg_color = grade_colour(avg_grade)
         t4_dg = tr.get("day_grade", "→")
@@ -1049,15 +1233,19 @@ def build_html(data, commentary, profile):
             h = max(8, round(d["score"] * 0.75))
             gc = grade_colour(d["grade"])
             day_name = ""
-            try: day_name = datetime.strptime(d["date"], "%Y-%m-%d").strftime("%a")[0]
-            except Exception as e: logger.warning("day_name parse failed for %s: %s", d.get("date"), e)
-            bars_html += (f'<div style="flex:1;text-align:center;">'
-                          f'<div style="font-size:9px;color:{gc};font-weight:700;margin-bottom:2px;">{d["score"]}</div>'
-                          f'<div style="height:{h}px;background:{gc};border-radius:3px 3px 0 0;margin:0 auto;width:80%;"></div>'
-                          f'<div style="font-size:8px;color:#9ca3af;margin-top:2px;">{day_name}</div>'
-                          f'<div style="font-size:8px;color:#9ca3af;">{d["grade"]}</div>'
-                          f'</div>')
-        bars_html += '</div>'
+            try:
+                day_name = datetime.strptime(d["date"], "%Y-%m-%d").strftime("%a")[0]
+            except Exception as e:
+                logger.warning("day_name parse failed for %s: %s", d.get("date"), e)
+            bars_html += (
+                f'<div style="flex:1;text-align:center;">'
+                f'<div style="font-size:9px;color:{gc};font-weight:700;margin-bottom:2px;">{d["score"]}</div>'
+                f'<div style="height:{h}px;background:{gc};border-radius:3px 3px 0 0;margin:0 auto;width:80%;"></div>'
+                f'<div style="font-size:8px;color:#9ca3af;margin-top:2px;">{day_name}</div>'
+                f'<div style="font-size:8px;color:#9ca3af;">{d["grade"]}</div>'
+                f"</div>"
+            )
+        bars_html += "</div>"
 
         # Grade distribution chips
         gc_counts = dg.get("grade_counts", {})
@@ -1066,24 +1254,24 @@ def build_html(data, commentary, profile):
             count = gc_counts.get(g_letter, 0)
             if count > 0:
                 dist_html += f'<span style="background:{g_color}20;color:{g_color};font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;">{count}{g_letter}</span>'
-        dist_html += '</div>'
+        dist_html += "</div>"
 
         dlt = delta_html(dg_avg, dg_prior_avg)
 
         grade_section = (
             f'<div style="background:linear-gradient(135deg,#f8f9fc,#f0f4ff);border-radius:12px;padding:16px 20px;margin-bottom:24px;border:1px solid #e2e8f0;">'
             f'<div style="display:flex;justify-content:space-between;align-items:center;">'
-            f'<div>'
+            f"<div>"
             f'<p style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:1px;margin:0;">Weekly Day Grade</p>'
             f'<p style="font-size:28px;font-weight:800;color:{avg_color};margin:4px 0 0;line-height:1;">{round(dg_avg)} <span style="font-size:16px;">{avg_grade}</span>{dlt}</p>'
             f'<p style="font-size:10px;color:#9ca3af;margin:2px 0 0;">4-week trend: {t4_dg} &middot; Range: {dg["min_score"]}–{dg["max_score"]}</p>'
-            f'</div>'
+            f"</div>"
             f'<div style="text-align:right;">'
             f'<p style="font-size:10px;color:#9ca3af;margin:0;">{dg["days_graded"]} days graded</p>'
-            f'{dist_html}'
-            f'</div></div>'
-            f'{bars_html}'
-            f'</div>'
+            f"{dist_html}"
+            f"</div></div>"
+            f"{bars_html}"
+            f"</div>"
         )
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -1095,33 +1283,45 @@ def build_html(data, commentary, profile):
     if cs:
         tier_colors = {
             "Foundation": {"bg": "#f3f4f6", "bar": "#6b7280", "text": "#374151"},
-            "Momentum":   {"bg": "#fef3c7", "bar": "#d97706", "text": "#92400e"},
+            "Momentum": {"bg": "#fef3c7", "bar": "#d97706", "text": "#92400e"},
             "Discipline": {"bg": "#dbeafe", "bar": "#2563eb", "text": "#1e40af"},
-            "Mastery":    {"bg": "#d1fae5", "bar": "#059669", "text": "#065f46"},
-            "Elite":      {"bg": "#fae8ff", "bar": "#9333ea", "text": "#6b21a8"},
+            "Mastery": {"bg": "#d1fae5", "bar": "#059669", "text": "#065f46"},
+            "Elite": {"bg": "#fae8ff", "bar": "#9333ea", "text": "#6b21a8"},
         }
         cs_tier = cs.get("character_tier", "Foundation")
         cs_emoji = cs.get("character_tier_emoji", "\U0001f528")
         tc = tier_colors.get(cs_tier, tier_colors["Foundation"])
         lvl_end = cs.get("character_level_end", 0)
         lvl_delta = cs.get("character_level_delta", 0)
-        lvl_arrow = f' <span style="color:#059669;font-size:12px;">(+{lvl_delta})</span>' if lvl_delta > 0 else (f' <span style="color:#d97706;font-size:12px;">({lvl_delta})</span>' if lvl_delta < 0 else '')
+        lvl_arrow = (
+            f' <span style="color:#059669;font-size:12px;">(+{lvl_delta})</span>'
+            if lvl_delta > 0
+            else (f' <span style="color:#d97706;font-size:12px;">({lvl_delta})</span>' if lvl_delta < 0 else "")
+        )
         xp_total = cs.get("character_xp", 0)
 
-        cs_html = (f'<div style="background:{tc["bg"]};border-left:4px solid {tc["bar"]};'
-                   f'border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:4px;">'
-                   f'<table style="width:100%;"><tr><td>'
-                   f'<span style="font-size:20px;">{cs_emoji}</span> '
-                   f'<span style="font-size:18px;font-weight:800;color:{tc["text"]};">Level {lvl_end}</span>{lvl_arrow} '
-                   f'<span style="font-size:11px;color:{tc["text"]};font-weight:600;">{cs_tier.upper()}</span>'
-                   f'</td><td style="text-align:right;">'
-                   f'<span style="font-size:10px;color:#9ca3af;">{xp_total:,} XP</span>'
-                   f'</td></tr></table>')
+        cs_html = (
+            f'<div style="background:{tc["bg"]};border-left:4px solid {tc["bar"]};'
+            f'border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:4px;">'
+            f'<table style="width:100%;"><tr><td>'
+            f'<span style="font-size:20px;">{cs_emoji}</span> '
+            f'<span style="font-size:18px;font-weight:800;color:{tc["text"]};">Level {lvl_end}</span>{lvl_arrow} '
+            f'<span style="font-size:11px;color:{tc["text"]};font-weight:600;">{cs_tier.upper()}</span>'
+            f'</td><td style="text-align:right;">'
+            f'<span style="font-size:10px;color:#9ca3af;">{xp_total:,} XP</span>'
+            f"</td></tr></table>"
+        )
 
         # Pillar mini-table with weekly deltas
-        pillar_emojis = {"sleep": "\U0001f634", "movement": "\U0001f3cb", "nutrition": "\U0001f957",
-                         "metabolic": "\U0001fa7a", "mind": "\U0001f9e0", "relationships": "\U0001f91d",
-                         "consistency": "\U0001f3af"}
+        pillar_emojis = {
+            "sleep": "\U0001f634",
+            "movement": "\U0001f3cb",
+            "nutrition": "\U0001f957",
+            "metabolic": "\U0001fa7a",
+            "mind": "\U0001f9e0",
+            "relationships": "\U0001f91d",
+            "consistency": "\U0001f3af",
+        }
         ps = cs.get("pillar_summary", {})
         cs_html += '<div style="margin-top:8px;">'
         for p_name in ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]:
@@ -1132,19 +1332,21 @@ def build_html(data, commentary, profile):
             p_tc = tier_colors.get(p_tier, tier_colors["Foundation"])
             p_emoji = pillar_emojis.get(p_name, "")
             p_avg = pd.get("avg_raw")
-            avg_str = f' avg {round(p_avg)}' if p_avg is not None else ''
-            delta_str = ''
+            avg_str = f" avg {round(p_avg)}" if p_avg is not None else ""
+            delta_str = ""
             if p_delta > 0:
                 delta_str = f' <span style="color:#059669;">+{p_delta}</span>'
             elif p_delta < 0:
                 delta_str = f' <span style="color:#d97706;">{p_delta}</span>'
-            cs_html += (f'<div style="margin:2px 0;"><table style="width:100%;"><tr>'
-                        f'<td style="width:90px;font-size:10px;color:#6b7280;">{p_emoji} {p_name.capitalize()}</td>'
-                        f'<td><div style="background:#e5e7eb;border-radius:3px;height:5px;">'
-                        f'<div style="background:{p_tc["bar"]};border-radius:3px;height:5px;width:{p_level}%;"></div></div></td>'
-                        f'<td style="width:80px;text-align:right;font-size:10px;color:{p_tc["text"]};font-weight:600;">Lv{p_level}{delta_str}{avg_str}</td>'
-                        f'</tr></table></div>')
-        cs_html += '</div>'
+            cs_html += (
+                f'<div style="margin:2px 0;"><table style="width:100%;"><tr>'
+                f'<td style="width:90px;font-size:10px;color:#6b7280;">{p_emoji} {p_name.capitalize()}</td>'
+                f'<td><div style="background:#e5e7eb;border-radius:3px;height:5px;">'
+                f'<div style="background:{p_tc["bar"]};border-radius:3px;height:5px;width:{p_level}%;"></div></div></td>'
+                f'<td style="width:80px;text-align:right;font-size:10px;color:{p_tc["text"]};font-weight:600;">Lv{p_level}{delta_str}{avg_str}</td>'
+                f"</tr></table></div>"
+            )
+        cs_html += "</div>"
 
         # Weekly events
         cs_events = cs.get("events", [])
@@ -1156,26 +1358,30 @@ def build_html(data, commentary, profile):
                 ev_date = ev.get("date", "")
                 is_up = "up" in ev_type
                 ev_col = "#059669" if is_up else "#d97706"
-                ev_icon = "\u2B06" if is_up else "\u2B07"
+                ev_icon = "\u2b06" if is_up else "\u2b07"
                 if "tier" in ev_type:
                     ev_label = f'{ev_pillar}: {ev.get("old_tier", "")} \u2192 {ev.get("new_tier", "")}'
                 elif "character" in ev_type:
                     ev_label = f'Character Level {ev.get("old_level", "")} \u2192 {ev.get("new_level", "")}'
                 else:
                     ev_label = f'{ev_pillar} Lv{ev.get("old_level", "")} \u2192 {ev.get("new_level", "")}'
-                cs_html += (f'<span style="display:inline-block;background:#fff;border:1px solid {ev_col};'
-                            f'border-radius:12px;padding:2px 8px;font-size:10px;color:{ev_col};'
-                            f'margin:2px 3px 2px 0;font-weight:600;">{ev_icon} {ev_label}</span>')
-            cs_html += '</div>'
+                cs_html += (
+                    f'<span style="display:inline-block;background:#fff;border:1px solid {ev_col};'
+                    f"border-radius:12px;padding:2px 8px;font-size:10px;color:{ev_col};"
+                    f'margin:2px 3px 2px 0;font-weight:600;">{ev_icon} {ev_label}</span>'
+                )
+            cs_html += "</div>"
 
         # Closest to tier-up nudge
         ctt = cs.get("closest_to_tier")
         if ctt:
-            cs_html += (f'<div style="margin-top:6px;font-size:10px;color:#6b7280;">'
-                        f'\U0001f4a1 <b>{ctt["pillar"].capitalize()}</b> is {ctt["levels_needed"]} levels from '
-                        f'{ctt["next_tier"]} tier</div>')
+            cs_html += (
+                f'<div style="margin-top:6px;font-size:10px;color:#6b7280;">'
+                f'\U0001f4a1 <b>{ctt["pillar"].capitalize()}</b> is {ctt["levels_needed"]} levels from '
+                f'{ctt["next_tier"]} tier</div>'
+            )
 
-        cs_html += '</div>'
+        cs_html += "</div>"
         character_section = section("Character Sheet", cs_emoji, cs_html)
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -1188,10 +1394,12 @@ def build_html(data, commentary, profile):
             vd = str(round(val))
             vc = "#059669" if val >= 80 else "#2563eb" if val >= 60 else "#d97706" if val >= 40 else "#dc2626"
         det = f'<div style="font-size:9px;color:#9ca3af;margin-top:1px;">{detail}</div>' if detail else ""
-        return (f'<td style="padding:8px 4px;text-align:center;width:12.5%;">'
-                f'<div style="font-size:11px;">{emoji}</div>'
-                f'<div style="font-size:16px;font-weight:700;color:{vc};">{vd}</div>'
-                f'<div style="font-size:9px;color:#6b7280;">{label}</div>{det}</td>')
+        return (
+            f'<td style="padding:8px 4px;text-align:center;width:12.5%;">'
+            f'<div style="font-size:11px;">{emoji}</div>'
+            f'<div style="font-size:16px;font-weight:700;color:{vc};">{vd}</div>'
+            f'<div style="font-size:9px;color:#6b7280;">{label}</div>{det}</td>'
+        )
 
     # Compute weekly avg for each component from day grades
     comp_avgs = {}
@@ -1201,7 +1409,8 @@ def build_html(data, commentary, profile):
             for d_date in [d["date"] for d in dg["days"]]:
                 rec = data.get("_raw_grades", {}).get(d_date, {})
                 v = safe_float(rec, f"component_{comp}")
-                if v is not None: vals.append(v)
+                if v is not None:
+                    vals.append(v)
             comp_avgs[comp] = avg(vals) if vals else None
 
     # Fallback: compute from extracted data
@@ -1226,7 +1435,7 @@ def build_html(data, commentary, profile):
         f'{sc_cell("Water", hydration_avg, "💧")}'
         f'{sc_cell("Journal", journal_avg, "📓")}'
         f'{sc_cell("Glucose", glucose_avg, "📈")}'
-        f'</tr></table></div>'
+        f"</tr></table></div>"
     )
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -1234,9 +1443,14 @@ def build_html(data, commentary, profile):
     # ══════════════════════════════════════════════════════════════════════════
     tr_rows = ""
     if t.get("strava"):
-        s = t["strava"]; sp = p.get("strava") or {}
+        s = t["strava"]
+        sp = p.get("strava") or {}
         tr_rows += row("Activities", str(s.get("activity_count", 0)))
-        tr_rows += row("Total Moving Time", fmt((s.get("total_minutes") or 0) / 60, " hrs"), delta_html(s.get("total_minutes"), sp.get("total_minutes"), " min"))
+        tr_rows += row(
+            "Total Moving Time",
+            fmt((s.get("total_minutes") or 0) / 60, " hrs"),
+            delta_html(s.get("total_minutes"), sp.get("total_minutes"), " min"),
+        )
         tr_rows += row("Total Miles", fmt(s.get("total_miles"), " mi"), delta_html(s.get("total_miles"), sp.get("total_miles"), " mi"))
         tr_rows += row("Elevation Gain", f'{s.get("total_elevation_feet", 0):,} ft')
 
@@ -1244,9 +1458,12 @@ def build_html(data, commentary, profile):
         z2_target = s.get("zone2_target", 150)
         z2_pct = s.get("zone2_pct", 0)
         z2col = "#27ae60" if z2 >= z2_target else "#e67e22" if z2 >= 60 else "#e74c3c"
-        tr_rows += row(f'Zone 2 ({s.get("zone2_hr_range", "?")} bpm)',
+        tr_rows += row(
+            f'Zone 2 ({s.get("zone2_hr_range", "?")} bpm)',
             f'<span style="color:{z2col};font-weight:700;">{z2} / {z2_target} min ({z2_pct}% of cardio)</span>',
-            delta_html(z2, sp.get("zone2_minutes"), " min") if sp.get("zone2_minutes") is not None else "", highlight=True)
+            delta_html(z2, sp.get("zone2_minutes"), " min") if sp.get("zone2_minutes") is not None else "",
+            highlight=True,
+        )
 
         mono = s.get("training_monotony")
         if mono is not None:
@@ -1256,15 +1473,19 @@ def build_html(data, commentary, profile):
 
         for act in s.get("activities", [])[:6]:
             d = f'{act["miles"]} mi · {act["elev"]:,} ft'
-            if act.get("hr"): d += f' · {act["hr"]} bpm'
+            if act.get("hr"):
+                d += f' · {act["hr"]} bpm'
             d += f' · {act["mins"]} min'
             tr_rows += row(f'↳ {act["date"]} {act["name"]}', d)
 
     # Strength (MacroFactor workouts)
     mfw = t.get("mf_workouts")
     if mfw:
-        tr_rows += row("Strength Sessions", str(mfw["workout_count"]),
-                        delta_html(mfw["workout_count"], (p.get("mf_workouts") or {}).get("workout_count")))
+        tr_rows += row(
+            "Strength Sessions",
+            str(mfw["workout_count"]),
+            delta_html(mfw["workout_count"], (p.get("mf_workouts") or {}).get("workout_count")),
+        )
         tr_rows += row("Total Volume", f'{fmt_num(mfw["total_volume_lbs"])} lbs, {mfw["total_sets"]} sets', highlight=True)
         for w in mfw.get("workouts", [])[:4]:
             tr_rows += row(f'↳ {w["date"]} {w["name"]}', f'{w["exercises"]} exercises · {fmt_num(w["volume_lbs"])} lbs')
@@ -1286,12 +1507,15 @@ def build_html(data, commentary, profile):
             _zone = str(_acwr_data.get("zone", "")).upper()
             _acwr_alert = bool(_acwr_data.get("alert", False))
             _acol = "#e74c3c" if _acwr_alert else "#e67e22" if _av > 1.3 or _av < 0.8 else "#27ae60"
-            bl_rows += row("ACWR — Training Load",
+            bl_rows += row(
+                "ACWR — Training Load",
                 f'<span style="color:{_acol};font-weight:700;">{round(_av, 2)}{" — " + _zone if _zone else ""}</span>',
-                highlight=True)
+                highlight=True,
+            )
             if _acwr_alert:
-                bl_rows += row("⚠️ Alert",
-                    f'<span style="color:#e74c3c;font-size:11px;">{str(_acwr_data.get("alert_reason", ""))[:120]}</span>')
+                bl_rows += row(
+                    "⚠️ Alert", f'<span style="color:#e74c3c;font-size:11px;">{str(_acwr_data.get("alert_reason", ""))[:120]}</span>'
+                )
     except Exception as e:
         logger.warning("banister_section_build: %s", e)
     banister_section = section("Training Load — Banister", "📈", tbl(bl_rows))
@@ -1299,26 +1523,50 @@ def build_html(data, commentary, profile):
     # ── Recovery ──
     rec_rows = ""
     if t.get("whoop"):
-        w = t["whoop"]; wp = p.get("whoop") or {}
+        w = t["whoop"]
+        wp = p.get("whoop") or {}
         t4 = tr
-        rec_rows += row("Avg Recovery", fmt(w.get("recovery_avg"), "%"),
-            delta_html(w.get("recovery_avg"), wp.get("recovery_avg"), "%") + f' <span style="font-size:11px;color:#888;">4wk {t4.get("recovery", "→")}</span>', highlight=True)
-        rec_rows += row("Avg HRV", fmt(w.get("hrv_avg"), " ms"),
-            delta_html(w.get("hrv_avg"), wp.get("hrv_avg"), " ms") + f' <span style="font-size:11px;color:#888;">4wk {t4.get("hrv", "→")}</span>')
+        rec_rows += row(
+            "Avg Recovery",
+            fmt(w.get("recovery_avg"), "%"),
+            delta_html(w.get("recovery_avg"), wp.get("recovery_avg"), "%")
+            + f' <span style="font-size:11px;color:#888;">4wk {t4.get("recovery", "→")}</span>',
+            highlight=True,
+        )
+        rec_rows += row(
+            "Avg HRV",
+            fmt(w.get("hrv_avg"), " ms"),
+            delta_html(w.get("hrv_avg"), wp.get("hrv_avg"), " ms")
+            + f' <span style="font-size:11px;color:#888;">4wk {t4.get("hrv", "→")}</span>',
+        )
         rec_rows += row("HRV Range", f'{fmt(w.get("hrv_min"), " ms")} – {fmt(w.get("hrv_max"), " ms")}')
-        rec_rows += row("Avg RHR", fmt(w.get("rhr_avg"), " bpm"),
-            delta_html(w.get("rhr_avg"), wp.get("rhr_avg"), " bpm", invert=True) + f' <span style="font-size:11px;color:#888;">4wk {t4.get("rhr", "→")}</span>')
+        rec_rows += row(
+            "Avg RHR",
+            fmt(w.get("rhr_avg"), " bpm"),
+            delta_html(w.get("rhr_avg"), wp.get("rhr_avg"), " bpm", invert=True)
+            + f' <span style="font-size:11px;color:#888;">4wk {t4.get("rhr", "→")}</span>',
+        )
         rec_rows += row("Avg Strain", fmt(w.get("strain_avg")))
     recovery_section = section("Recovery & HRV", "❤️", tbl(rec_rows)) if rec_rows else ""
 
     # ── Sleep ──
     sl_rows = ""
     if t.get("sleep"):
-        s = t["sleep"]; sp = p.get("sleep") or {}
-        sl_rows += row("Avg Sleep Score", fmt(s.get("score_avg"), "%"),
-            delta_html(s.get("score_avg"), sp.get("score_avg"), "%") + f' <span style="font-size:11px;color:#888;">4wk {tr.get("sleep", "→")}</span>', highlight=True)
+        s = t["sleep"]
+        sp = p.get("sleep") or {}
+        sl_rows += row(
+            "Avg Sleep Score",
+            fmt(s.get("score_avg"), "%"),
+            delta_html(s.get("score_avg"), sp.get("score_avg"), "%")
+            + f' <span style="font-size:11px;color:#888;">4wk {tr.get("sleep", "→")}</span>',
+            highlight=True,
+        )
         sl_rows += row("Worst Night", fmt(s.get("score_min"), "%"))
-        sl_rows += row("Avg Duration", fmt(s.get("duration_avg_hrs"), " hrs"), delta_html(s.get("duration_avg_hrs"), sp.get("duration_avg_hrs"), " hrs"))
+        sl_rows += row(
+            "Avg Duration",
+            fmt(s.get("duration_avg_hrs"), " hrs"),
+            delta_html(s.get("duration_avg_hrs"), sp.get("duration_avg_hrs"), " hrs"),
+        )
         if s.get("efficiency_avg"):
             ecol = "#27ae60" if s["efficiency_avg"] >= 85 else "#e67e22" if s["efficiency_avg"] >= 80 else "#e74c3c"
             sl_rows += row("Efficiency", f'<span style="color:{ecol};">{fmt(s["efficiency_avg"], "%")}</span>')
@@ -1330,13 +1578,16 @@ def build_html(data, commentary, profile):
             sl_rows += row("REM %", f'<span style="color:{rcol};">{fmt(s["rem_pct"], "%")}</span> (target 20-25%)')
         if sd:
             dcol = "#27ae60" if sd["debt_hrs"] <= 2 else "#e67e22" if sd["debt_hrs"] <= 5 else "#e74c3c"
-            sl_rows += row("7-Day Sleep Debt", f'<span style="color:{dcol};font-weight:700;">{fmt(sd["debt_hrs"], " hrs")}</span>', highlight=True)
+            sl_rows += row(
+                "7-Day Sleep Debt", f'<span style="color:{dcol};font-weight:700;">{fmt(sd["debt_hrs"], " hrs")}</span>', highlight=True
+            )
     sleep_section = section("Sleep & Architecture", "😴", tbl(sl_rows)) if sl_rows else ""
 
     # ── Habits ──
     hab_rows = ""
     if t.get("habitify"):
-        h = t["habitify"]; hp = p.get("habitify") or {}
+        h = t["habitify"]
+        hp = p.get("habitify") or {}
         mvp_pct = h.get("mvp_avg_pct")
         mvp_col = "#27ae60" if (mvp_pct or 0) >= 80 else "#e67e22" if (mvp_pct or 0) >= 50 else "#e74c3c"
         # Essential Seven aggregate header
@@ -1352,13 +1603,20 @@ def build_html(data, commentary, profile):
             _e7_days_perfect = _e7_min_done  # at least this many days had all E7 complete
         _e7_bar_pct = round(_e7_days_perfect / max(_e7_tracked, 1) * 100)
         _e7_bar_col = "#27ae60" if _e7_bar_pct >= 70 else "#e67e22" if _e7_bar_pct >= 40 else "#e74c3c"
-        _e7_bar = (f'<span style="display:inline-block;width:80px;height:8px;background:#eee;border-radius:4px;vertical-align:middle;">'
-                   f'<span style="display:inline-block;width:{_e7_bar_pct}%;height:8px;background:{_e7_bar_col};border-radius:4px;"></span></span>')
-        hab_rows += row("⭐ Essential Seven — Perfect Days",
+        _e7_bar = (
+            f'<span style="display:inline-block;width:80px;height:8px;background:#eee;border-radius:4px;vertical-align:middle;">'
+            f'<span style="display:inline-block;width:{_e7_bar_pct}%;height:8px;background:{_e7_bar_col};border-radius:4px;"></span></span>'
+        )
+        hab_rows += row(
+            "⭐ Essential Seven — Perfect Days",
             f'<span style="color:{_e7_bar_col};font-weight:700;">{_e7_days_perfect}/{_e7_tracked} days {_e7_bar}</span>',
-            highlight=True)
-        hab_rows += row("MVP Completion (avg)", f'<span style="color:{mvp_col};font-weight:700;">{fmt(mvp_pct, "%")}</span>',
-            delta_html(mvp_pct, hp.get("mvp_avg_pct"), "%"))
+            highlight=True,
+        )
+        hab_rows += row(
+            "MVP Completion (avg)",
+            f'<span style="color:{mvp_col};font-weight:700;">{fmt(mvp_pct, "%")}</span>',
+            delta_html(mvp_pct, hp.get("mvp_avg_pct"), "%"),
+        )
         if h.get("overall_avg_pct"):
             hab_rows += row("Overall Completion", fmt(h["overall_avg_pct"], "%"))
         hab_rows += row("Days Tracked", str(h.get("days_tracked", 0)))
@@ -1370,45 +1628,67 @@ def build_html(data, commentary, profile):
             pct = round(days_done / mvp_total_days * 100) if mvp_total_days else 0
             hcol = "#27ae60" if pct >= 80 else "#e67e22" if pct >= 50 else "#e74c3c"
             short = habit_name[:30] + "..." if len(habit_name) > 30 else habit_name
-            hab_rows += row(f'↳ {short}', f'<span style="color:{hcol};">{days_done}/{mvp_total_days} ({pct}%)</span>')
+            hab_rows += row(f"↳ {short}", f'<span style="color:{hcol};">{days_done}/{mvp_total_days} ({pct}%)</span>')
     habits_section = section("Habits — MVP Tracker", "✅", tbl(hab_rows)) if hab_rows else ""
 
     # ── Nutrition ──
     nu_rows = ""
     if t.get("macrofactor"):
-        m = t["macrofactor"]; mp = p.get("macrofactor") or {}
-        nu_rows += row("Avg Calories", f'{fmt(m.get("calories_avg"), " kcal")} (target {m.get("calorie_target")})',
-            delta_html(m.get("calories_avg"), mp.get("calories_avg"), " kcal", invert=True), highlight=True)
+        m = t["macrofactor"]
+        mp = p.get("macrofactor") or {}
+        nu_rows += row(
+            "Avg Calories",
+            f'{fmt(m.get("calories_avg"), " kcal")} (target {m.get("calorie_target")})',
+            delta_html(m.get("calories_avg"), mp.get("calories_avg"), " kcal", invert=True),
+            highlight=True,
+        )
         nu_rows += row("Calorie Hit Rate", hit_bar(m.get("calorie_hit_rate")))
-        nu_rows += row("Avg Protein", f'{fmt(m.get("protein_avg_g"), "g")} (target {m.get("protein_target")}g)',
-            delta_html(m.get("protein_avg_g"), mp.get("protein_avg_g"), "g"))
+        nu_rows += row(
+            "Avg Protein",
+            f'{fmt(m.get("protein_avg_g"), "g")} (target {m.get("protein_target")}g)',
+            delta_html(m.get("protein_avg_g"), mp.get("protein_avg_g"), "g"),
+        )
         nu_rows += row("Protein Hit Rate", hit_bar(m.get("protein_hit_rate"), "#2980b9"))
-        if m.get("fat_avg_g"): nu_rows += row("Avg Fat", fmt(m["fat_avg_g"], "g"))
-        if m.get("carbs_avg_g"): nu_rows += row("Avg Carbs", fmt(m["carbs_avg_g"], "g"))
-        if m.get("fiber_avg_g"): nu_rows += row("Avg Fiber", fmt(m["fiber_avg_g"], "g"))
+        if m.get("fat_avg_g"):
+            nu_rows += row("Avg Fat", fmt(m["fat_avg_g"], "g"))
+        if m.get("carbs_avg_g"):
+            nu_rows += row("Avg Carbs", fmt(m["carbs_avg_g"], "g"))
+        if m.get("fiber_avg_g"):
+            nu_rows += row("Avg Fiber", fmt(m["fiber_avg_g"], "g"))
         nu_rows += row("Days Logged", str(m.get("days_logged", 0)))
     nutrition_section = section("Nutrition", "🥗", tbl(nu_rows)) if nu_rows else ""
 
     # ── Weight ──
     wt_rows = ""
     if t.get("withings"):
-        w = t["withings"]; wp = p.get("withings") or {}
-        wt_rows += row("Latest Weight", fmt(w.get("weight_latest"), " lbs"),
-            delta_html(w.get("weight_latest"), wp.get("weight_latest"), " lbs", invert=True) + f' <span style="font-size:11px;color:#888;">4wk {tr.get("weight", "→")}</span>', highlight=True)
+        w = t["withings"]
+        wp = p.get("withings") or {}
+        wt_rows += row(
+            "Latest Weight",
+            fmt(w.get("weight_latest"), " lbs"),
+            delta_html(w.get("weight_latest"), wp.get("weight_latest"), " lbs", invert=True)
+            + f' <span style="font-size:11px;color:#888;">4wk {tr.get("weight", "→")}</span>',
+            highlight=True,
+        )
         wt_rows += row("Weekly Range", f'{fmt(w.get("weight_min"), " lbs")} – {fmt(w.get("weight_max"), " lbs")}')
         if w.get("body_fat_avg"):
-            wt_rows += row("Body Fat %", fmt(w["body_fat_avg"], "%"), delta_html(w.get("body_fat_avg"), wp.get("body_fat_avg"), "%", invert=True))
+            wt_rows += row(
+                "Body Fat %", fmt(w["body_fat_avg"], "%"), delta_html(w.get("body_fat_avg"), wp.get("body_fat_avg"), "%", invert=True)
+            )
         goal = profile.get("goal_weight_lbs", 185)
         if w.get("weight_latest") and goal:
             to_go = round(w["weight_latest"] - goal, 1)
             start = profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
             lost = round(start - w["weight_latest"], 1)
             pct = round(lost / (start - goal) * 100) if start > goal else 0
-            wt_rows += row("Journey Progress", f'{lost} lbs lost · {pct}% · {to_go} lbs to go', highlight=True)
+            wt_rows += row("Journey Progress", f"{lost} lbs lost · {pct}% · {to_go} lbs to go", highlight=True)
         if prj:
             if prj.get("status") == "ok":
                 pcol = "#27ae60" if prj["rate_per_week"] >= 0.5 else "#e67e22"
-                wt_rows += row("📅 Projection", f'<span style="color:{pcol};">{prj["rate_per_week"]} lbs/wk → goal ~{prj["eta"]} ({prj["weeks"]} weeks)</span>')
+                wt_rows += row(
+                    "📅 Projection",
+                    f'<span style="color:{pcol};">{prj["rate_per_week"]} lbs/wk → goal ~{prj["eta"]} ({prj["weeks"]} weeks)</span>',
+                )
             elif prj.get("status") == "not_losing":
                 wt_rows += row("📅 Projection", '<span style="color:#e74c3c;">Weight flat or trending up</span>')
     weight_section = section("Weight & Body Composition", "⚖️", tbl(wt_rows)) if wt_rows else ""
@@ -1416,11 +1696,16 @@ def build_html(data, commentary, profile):
     # ── CGM & Glucose ──
     cgm_rows = ""
     if t.get("apple") and t["apple"].get("glucose_avg"):
-        a = t["apple"]; ap = p.get("apple") or {}
+        a = t["apple"]
+        ap = p.get("apple") or {}
         gavg = a["glucose_avg"]
         gcol = "#059669" if gavg < 100 else "#d97706" if gavg < 120 else "#dc2626"
-        cgm_rows += row("Avg Glucose", f'<span style="color:{gcol};font-weight:700;">{fmt(gavg, " mg/dL")}</span>',
-            delta_html(gavg, ap.get("glucose_avg"), " mg/dL", invert=True), highlight=True)
+        cgm_rows += row(
+            "Avg Glucose",
+            f'<span style="color:{gcol};font-weight:700;">{fmt(gavg, " mg/dL")}</span>',
+            delta_html(gavg, ap.get("glucose_avg"), " mg/dL", invert=True),
+            highlight=True,
+        )
         if a.get("glucose_tir_avg"):
             tir_col = "#059669" if a["glucose_tir_avg"] >= 90 else "#d97706"
             cgm_rows += row("Time in Range", f'<span style="color:{tir_col};">{fmt(a["glucose_tir_avg"], "%")}</span>')
@@ -1438,22 +1723,39 @@ def build_html(data, commentary, profile):
     jt = t.get("journal")
     jp = p.get("journal")
     if jt:
+
         def mood_color(val, invert=False):
-            if val is None: return "#888"
-            if invert: return "#27ae60" if val <= 2 else "#e67e22" if val <= 3 else "#e74c3c"
+            if val is None:
+                return "#888"
+            if invert:
+                return "#27ae60" if val <= 2 else "#e67e22" if val <= 3 else "#e74c3c"
             return "#e74c3c" if val < 3 else "#e67e22" if val < 4 else "#27ae60"
+
         mc = mood_color(jt.get("mood_avg"))
         ec = mood_color(jt.get("energy_avg"))
         sc2 = mood_color(jt.get("stress_avg"), invert=True)
-        jn_rows += row("Mood", f'<span style="color:{mc};font-weight:700;">{fmt(jt.get("mood_avg"))}/5</span>',
-            delta_html(jt.get("mood_avg"), jp.get("mood_avg") if jp else None) if jp else "", highlight=True)
-        jn_rows += row("Energy", f'<span style="color:{ec};font-weight:700;">{fmt(jt.get("energy_avg"))}/5</span>',
-            delta_html(jt.get("energy_avg"), jp.get("energy_avg") if jp else None) if jp else "")
-        jn_rows += row("Stress", f'<span style="color:{sc2};font-weight:700;">{fmt(jt.get("stress_avg"))}/5</span>',
-            delta_html(jt.get("stress_avg"), jp.get("stress_avg") if jp else None, invert=True) if jp else "")
+        jn_rows += row(
+            "Mood",
+            f'<span style="color:{mc};font-weight:700;">{fmt(jt.get("mood_avg"))}/5</span>',
+            delta_html(jt.get("mood_avg"), jp.get("mood_avg") if jp else None) if jp else "",
+            highlight=True,
+        )
+        jn_rows += row(
+            "Energy",
+            f'<span style="color:{ec};font-weight:700;">{fmt(jt.get("energy_avg"))}/5</span>',
+            delta_html(jt.get("energy_avg"), jp.get("energy_avg") if jp else None) if jp else "",
+        )
+        jn_rows += row(
+            "Stress",
+            f'<span style="color:{sc2};font-weight:700;">{fmt(jt.get("stress_avg"))}/5</span>',
+            delta_html(jt.get("stress_avg"), jp.get("stress_avg") if jp else None, invert=True) if jp else "",
+        )
         jn_rows += row("Entries", f'{jt.get("entries", 0)} across {jt.get("days_journaled", 0)} days')
         if jt.get("top_themes"):
-            chips = " ".join(f'<span style="display:inline-block;background:#f0f4ff;color:#4a6cf7;font-size:10px;padding:2px 8px;border-radius:10px;margin:2px;">{t} ({c})</span>' for t, c in jt["top_themes"][:5])
+            chips = " ".join(
+                f'<span style="display:inline-block;background:#f0f4ff;color:#4a6cf7;font-size:10px;padding:2px 8px;border-radius:10px;margin:2px;">{t} ({c})</span>'
+                for t, c in jt["top_themes"][:5]
+            )
             jn_rows += row("Themes", chips)
         if jt.get("avoidance_flags"):
             jn_rows += row("⚠ Avoidance", f'<span style="color:#dc2626;">{", ".join(jt["avoidance_flags"][:3])}</span>')
@@ -1465,8 +1767,11 @@ def build_html(data, commentary, profile):
     # ── Productivity ──
     pr_rows = ""
     if t.get("todoist"):
-        td = t["todoist"]; tdp = p.get("todoist") or {}
-        pr_rows += row("Tasks Completed", str(td.get("tasks_completed", 0)), delta_html(td.get("tasks_completed"), tdp.get("tasks_completed")))
+        td = t["todoist"]
+        tdp = p.get("todoist") or {}
+        pr_rows += row(
+            "Tasks Completed", str(td.get("tasks_completed", 0)), delta_html(td.get("tasks_completed"), tdp.get("tasks_completed"))
+        )
         pr_rows += row("Avg Per Day", fmt(td.get("avg_per_day")))
     productivity_section = section("Productivity", "✅", tbl(pr_rows)) if pr_rows else ""
 
@@ -1477,17 +1782,24 @@ def build_html(data, commentary, profile):
         items = ""
         for ins in oi:
             age_col = "#dc2626" if ins["days_open"] >= 30 else "#d97706"
-            items += (f'<div style="padding:8px 0;border-bottom:1px solid #fde68a;">'
-                      f'<p style="font-size:12px;color:#1a1a2e;margin:0 0 3px;">{ins["text"]}</p>'
-                      f'<p style="font-size:10px;color:#888;margin:0;">Saved {ins["date_saved"]} · '
-                      f'<span style="color:{age_col};font-weight:700;">{ins["days_open"]}d open</span></p></div>')
-        insights_html = (f'<div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:10px;'
-                         f'padding:16px 20px;margin-bottom:24px;">'
-                         f'<p style="font-size:13px;font-weight:700;color:#92400e;margin:0 0 10px;">'
-                         f'⏳ {len(oi)} Open Insight{"s" if len(oi)>1 else ""}</p>{items}</div>')
+            items += (
+                f'<div style="padding:8px 0;border-bottom:1px solid #fde68a;">'
+                f'<p style="font-size:12px;color:#1a1a2e;margin:0 0 3px;">{ins["text"]}</p>'
+                f'<p style="font-size:10px;color:#888;margin:0;">Saved {ins["date_saved"]} · '
+                f'<span style="color:{age_col};font-weight:700;">{ins["days_open"]}d open</span></p></div>'
+            )
+        insights_html = (
+            f'<div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:10px;'
+            f'padding:16px 20px;margin-bottom:24px;">'
+            f'<p style="font-size:13px;font-weight:700;color:#92400e;margin:0 0 10px;">'
+            f'⏳ {len(oi)} Open Insight{"s" if len(oi)>1 else ""}</p>{items}</div>'
+        )
 
-    board_section = section("Board of Advisors", "📋",
-        f'<div style="background:#f0f4ff;border-left:4px solid #4a6cf7;padding:16px;border-radius:0 8px 8px 0;">{board_html}</div>')
+    board_section = section(
+        "Board of Advisors",
+        "📋",
+        f'<div style="background:#f0f4ff;border-left:4px solid #4a6cf7;padding:16px;border-radius:0 8px 8px 0;">{board_html}</div>',
+    )
 
     # ── Assemble ──
     return f"""<!DOCTYPE html>
@@ -1535,14 +1847,11 @@ def get_food_delivery_digest_line():
     Non-fatal — returns None on any error.
     """
     try:
-        resp = table.get_item(Key={
-            'pk': f'USER#{USER_ID}#SOURCE#food_delivery',
-            'sk': 'STREAK#current'
-        })
-        streak = resp.get('Item')
+        resp = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#food_delivery", "sk": "STREAK#current"})
+        streak = resp.get("Item")
         if not streak:
             return None
-        streak_days = int(streak.get('streak_days', 0))
+        streak_days = int(streak.get("streak_days", 0))
         if streak_days >= 30:
             return f"Delivery-free streak: {streak_days} days (nutrition bonus 1.10x active)"
         if streak_days >= 14:
@@ -1559,15 +1868,18 @@ def get_food_delivery_digest_line():
 def record_email_send(table, lambda_name):
     """Write a completion record so the status page can track last send."""
     import time as _time
+
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     try:
-        table.put_item(Item={
-            "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
-            "sk": f"DATE#{today}",
-            "sent_at": datetime.now(timezone.utc).isoformat(),
-            "status": "success",
-            "ttl": int(_time.time()) + 86400 * 90
-        })
+        table.put_item(
+            Item={
+                "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
+                "sk": f"DATE#{today}",
+                "sent_at": datetime.now(timezone.utc).isoformat(),
+                "status": "success",
+                "ttl": int(_time.time()) + 86400 * 90,
+            }
+        )
     except Exception as e:
         logger.info(f"[status-tracking] Non-fatal write failure: {e}")
 
@@ -1586,14 +1898,14 @@ def lambda_handler(event, context):
     data["_raw_grades"] = raw_grades
 
     api_key = get_anthropic_key()
-    if hasattr(logger, "set_date"): logger.set_date(dates.get("this_end", ""))  # OBS-1
+    if hasattr(logger, "set_date"):
+        logger.set_date(dates.get("this_end", ""))  # OBS-1
     logger.info("Calling Haiku for Board commentary...")
     try:
         commentary = call_haiku(data, profile, api_key)
     except Exception as e:
         logger.warning(f"Haiku failed: {e}")
-        commentary = ("🎯 THE CHAIR — OVERVIEW\nCommentary unavailable.\n"
-                      "💡 INSIGHT OF THE WEEK\nReview data sections below.")
+        commentary = "🎯 THE CHAIR — OVERVIEW\nCommentary unavailable.\n" "💡 INSIGHT OF THE WEEK\nReview data sections below."
 
     # AI-3: Validate output before rendering
     if _HAS_AI_VALIDATOR and commentary:
@@ -1612,10 +1924,12 @@ def lambda_handler(event, context):
     ses.send_email(
         FromEmailAddress=SENDER,
         Destination={"ToAddresses": [RECIPIENT]},
-        Content={"Simple": {
-            "Subject": {"Data": f"Weekly Report · {dates['this_end']} · Grade: {grade_str}", "Charset": "UTF-8"},
-            "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
-        }},
+        Content={
+            "Simple": {
+                "Subject": {"Data": f"Weekly Report · {dates['this_end']} · Grade: {grade_str}", "Charset": "UTF-8"},
+                "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
+            }
+        },
         ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
         EmailTags=[{"Name": "message_type", "Value": "weekly_digest"}],
     )
@@ -1626,16 +1940,18 @@ def lambda_handler(event, context):
         try:
             insights = []
             # Write the full Board commentary as a coaching insight
-            insights.append({
-                "digest_type": "weekly_digest",
-                "insight_type": "coaching",
-                "text": commentary[:800],
-                "pillars": ["sleep", "movement", "nutrition", "mind", "consistency"],
-                "tags": ["weekly", "board", "coaching"],
-                "confidence": "high",
-                "actionable": True,
-                "date": dates.get("this_end", ""),
-            })
+            insights.append(
+                {
+                    "digest_type": "weekly_digest",
+                    "insight_type": "coaching",
+                    "text": commentary[:800],
+                    "pillars": ["sleep", "movement", "nutrition", "mind", "consistency"],
+                    "tags": ["weekly", "board", "coaching"],
+                    "confidence": "high",
+                    "actionable": True,
+                    "date": dates.get("this_end", ""),
+                }
+            )
             written = insight_writer.write_insights_batch(insights)
             logger.info(f"IC-15: {written} weekly insights persisted")
         except Exception as e:

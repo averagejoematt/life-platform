@@ -16,14 +16,15 @@ Run this any time you:
   - Deploy a new Lambda
 """
 
-import boto3
 import sys
 
-REGION      = "us-west-2"
-CANONICAL   = "life-platform/api-keys"   # the consolidated secret all Lambdas should use
+import boto3
 
-lambda_client = boto3.client("lambda",         region_name=REGION)
-sm_client     = boto3.client("secretsmanager", region_name=REGION)
+REGION = "us-west-2"
+CANONICAL = "life-platform/api-keys"  # the consolidated secret all Lambdas should use
+
+lambda_client = boto3.client("lambda", region_name=REGION)
+sm_client = boto3.client("secretsmanager", region_name=REGION)
 
 
 def list_all_functions():
@@ -49,14 +50,14 @@ def main():
     fix_mode = "--fix" in sys.argv
 
     print("🔍 Fetching Lambda functions and Secrets Manager inventory...\n")
-    functions       = list_all_functions()
+    functions = list_all_functions()
     existing_secrets = get_existing_secrets()
 
     ok, stale, no_secret_var = [], [], []
 
     for fn in functions:
         name = fn["FunctionName"]
-        env  = fn.get("Environment", {}).get("Variables", {})
+        env = fn.get("Environment", {}).get("Variables", {})
         secret_name = env.get("SECRET_NAME")
 
         if not secret_name:
@@ -91,10 +92,7 @@ def main():
                     config = lambda_client.get_function_configuration(FunctionName=name)
                     env_vars = config.get("Environment", {}).get("Variables", {}).copy()
                     env_vars["SECRET_NAME"] = CANONICAL
-                    lambda_client.update_function_configuration(
-                        FunctionName=name,
-                        Environment={"Variables": env_vars}
-                    )
+                    lambda_client.update_function_configuration(FunctionName=name, Environment={"Variables": env_vars})
                     print(f"   ✅ Fixed {name}: {old_secret} → {CANONICAL}")
                 except Exception as e:
                     print(f"   ❌ Failed to fix {name}: {e}")

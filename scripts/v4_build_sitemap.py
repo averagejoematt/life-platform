@@ -50,16 +50,13 @@ def main() -> int:
     # Story root first, then the rest.
     urls.sort(key=lambda u: (u != f"{BASE}/", u))
 
-    lines = ['<?xml version="1.0" encoding="UTF-8"?>',
-             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    lines = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
     for u in urls:
         prio = "1.0" if u == f"{BASE}/" else ("0.8" if u.rstrip("/").endswith("/evidence") else "0.6")
-        lines.append(f"  <url><loc>{u}</loc><lastmod>{today}</lastmod>"
-                     f"<priority>{prio}</priority></url>")
+        lines.append(f"  <url><loc>{u}</loc><lastmod>{today}</lastmod>" f"<priority>{prio}</priority></url>")
     lines.append("</urlset>")
     (SITE / "sitemap.xml").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"wrote site/sitemap.xml — {len(urls)} indexable URL(s) (Story + Evidence + system; "
-          f"/now and /legacy excluded as noindex).")
+    print(f"wrote site/sitemap.xml — {len(urls)} indexable URL(s) (Story + Evidence + system; " f"/now and /legacy excluded as noindex).")
     return 0
 
 

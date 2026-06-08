@@ -21,22 +21,26 @@ Effects when a date is flagged:
 v1.0.0 — 2026-03-09
 """
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from mcp.config import table, USER_ID, logger
+from mcp.config import USER_ID, logger, table
 
 SICK_DAYS_PK = f"USER#{USER_ID}#SOURCE#sick_days"
 
 
 def _d2f(obj):
-    if isinstance(obj, list): return [_d2f(i) for i in obj]
-    if isinstance(obj, dict): return {k: _d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [_d2f(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: _d2f(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
 
 
 # ── Tool: log_sick_day ────────────────────────────────────────────────────────
+
 
 def tool_log_sick_day(args):
     """Flag one or more dates as sick/rest days."""
@@ -58,10 +62,10 @@ def tool_log_sick_day(args):
     written = []
     for d in dates:
         item = {
-            "pk":             SICK_DAYS_PK,
-            "sk":             f"DATE#{d}",
-            "date":           d,
-            "logged_at":      datetime.now(timezone.utc).isoformat(),
+            "pk": SICK_DAYS_PK,
+            "sk": f"DATE#{d}",
+            "date": d,
+            "logged_at": datetime.now(timezone.utc).isoformat(),
             "schema_version": 1,
         }
         if reason:
@@ -71,9 +75,9 @@ def tool_log_sick_day(args):
         logger.info(f"[sick_days] Logged sick day: {d} reason={reason or 'none'}")
 
     return {
-        "status":  "logged",
-        "dates":   written,
-        "reason":  reason or None,
+        "status": "logged",
+        "dates": written,
+        "reason": reason or None,
         "message": (
             f"Flagged {len(written)} sick day(s): {', '.join(written)}. "
             "Effects: Character Sheet EMA frozen, day grade = 'sick', "
@@ -87,39 +91,45 @@ def tool_log_sick_day(args):
 
 # ── Tool: get_sick_days ───────────────────────────────────────────────────────
 
+
 def tool_get_sick_days(args):
     """List sick/rest days within a date range."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     end_date = args.get("end_date") or today
-    start_date = args.get("start_date") or (
-        datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=90)
-    ).strftime("%Y-%m-%d")
+    start_date = args.get("start_date") or (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=90)).strftime("%Y-%m-%d")
 
     try:
         from mcp.core import _apply_phase_filter  # ADR-058
+
         # ADR-058: longitudinal/clinical archive — cross-phase by design (owner decision 2026-06-06)
-        resp = table.query(**_apply_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": SICK_DAYS_PK,
-                ":s":  f"DATE#{start_date}",
-                ":e":  f"DATE#{end_date}",
-            },
-        }, include_pilot=True))
+        resp = table.query(
+            **_apply_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                    "ExpressionAttributeValues": {
+                        ":pk": SICK_DAYS_PK,
+                        ":s": f"DATE#{start_date}",
+                        ":e": f"DATE#{end_date}",
+                    },
+                },
+                include_pilot=True,
+            )
+        )
         items = [_d2f(i) for i in resp.get("Items", [])]
     except Exception as e:
         logger.error(f"[sick_days] get_sick_days query failed: {e}")
         return {"error": str(e)}
 
     return {
-        "sick_days":  items,
-        "count":      len(items),
+        "sick_days": items,
+        "count": len(items),
         "date_range": {"start": start_date, "end": end_date},
-        "dates":      [i["date"] for i in items],
+        "dates": [i["date"] for i in items],
     }
 
 
 # ── Tool: clear_sick_day ──────────────────────────────────────────────────────
+
 
 def tool_clear_sick_day(args):
     """Remove a sick day flag (use if logged in error)."""
@@ -134,8 +144,8 @@ def tool_clear_sick_day(args):
     resp = table.get_item(Key={"pk": SICK_DAYS_PK, "sk": f"DATE#{date}"})
     if not resp.get("Item"):
         return {
-            "status":  "not_found",
-            "date":    date,
+            "status": "not_found",
+            "date": date,
             "message": f"No sick day record found for {date}.",
         }
 
@@ -143,8 +153,8 @@ def tool_clear_sick_day(args):
     logger.info(f"[sick_days] Cleared sick day: {date}")
 
     return {
-        "status":  "cleared",
-        "date":    date,
+        "status": "cleared",
+        "date": date,
         "message": (
             f"Sick day flag removed for {date}. "
             "Re-run character-sheet-compute and daily-metrics-compute with "
@@ -156,12 +166,15 @@ def tool_clear_sick_day(args):
 def tool_manage_sick_days(args):
     """Unified sick day management dispatcher."""
     VALID_ACTIONS = {
-        "list":  tool_get_sick_days,
-        "log":   tool_log_sick_day,
+        "list": tool_get_sick_days,
+        "log": tool_log_sick_day,
         "clear": tool_clear_sick_day,
     }
     action = (args.get("action") or "list").lower().strip()
     if action not in VALID_ACTIONS:
-        return {"error": f"Unknown action '{action}'.", "valid_actions": list(VALID_ACTIONS.keys()),
-                "hint": "'list' to view sick days, 'log' to flag a date (requires date=), 'clear' to remove flag (requires date=)."}
+        return {
+            "error": f"Unknown action '{action}'.",
+            "valid_actions": list(VALID_ACTIONS.keys()),
+            "hint": "'list' to view sick days, 'log' to flag a date (requires date=), 'clear' to remove flag (requires date=).",
+        }
     return VALID_ACTIONS[action](args)

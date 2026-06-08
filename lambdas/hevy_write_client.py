@@ -18,6 +18,7 @@ Exceptions:
   HevyRetryable      — 429/5xx after retries exhausted (DLQ + alert)
   MovementUnmappable — re-exported from hevy_compiler
 """
+
 from __future__ import annotations
 
 import json
@@ -31,7 +32,6 @@ import urllib.request
 from typing import Any
 
 import boto3
-
 from hevy_compiler import MovementUnmappable  # noqa: F401  re-export
 from http_retry import urlopen_with_retry
 from secret_cache import get_secret_json
@@ -70,15 +70,13 @@ class HevyOrphanCreated(Exception):
     so the caller can link the orphan to the local IR and surface a warning
     instead of silently leaving an untracked routine behind.
     """
-    def __init__(self, hevy_routine_id: str, hevy_updated_at: str | None,
-                 status: int, body: str):
+
+    def __init__(self, hevy_routine_id: str, hevy_updated_at: str | None, status: int, body: str):
         self.hevy_routine_id = hevy_routine_id
         self.hevy_updated_at = hevy_updated_at
         self.status = status
         self.body = body
-        super().__init__(
-            f"Hevy returned {status} but created routine {hevy_routine_id}"
-        )
+        super().__init__(f"Hevy returned {status} but created routine {hevy_routine_id}")
 
 
 def _api_key() -> str:
@@ -98,8 +96,9 @@ def _throttle() -> None:
         _last_request_ts[0] = time.time()
 
 
-def _request(method: str, path: str, body: dict[str, Any] | None = None,
-             query: dict[str, Any] | None = None, timeout: int = 30) -> dict[str, Any]:
+def _request(
+    method: str, path: str, body: dict[str, Any] | None = None, query: dict[str, Any] | None = None, timeout: int = 30
+) -> dict[str, Any]:
     url = f"{API_BASE}{path}"
     if query:
         url = f"{url}?{urllib.parse.urlencode({k: v for k, v in query.items() if v is not None})}"
@@ -122,6 +121,7 @@ def _request(method: str, path: str, body: dict[str, Any] | None = None,
 
 
 # ── Routines ──────────────────────────────────────────────────────────────
+
 
 def list_routines(page: int = 1, page_size: int = 10) -> dict[str, Any]:
     return _request("GET", "/v1/routines", query={"page": page, "pageSize": page_size})
@@ -157,6 +157,7 @@ def _maybe_recover_orphan(title: str | None, http_error: urllib.error.HTTPError)
         created_at = r.get("created_at") or ""
         try:
             from datetime import datetime
+
             iso = created_at.replace("Z", "+00:00")
             age = now - datetime.fromisoformat(iso).timestamp()
         except Exception:
@@ -186,8 +187,7 @@ def create_routine(body: dict[str, Any]) -> dict[str, Any]:
         raise
 
 
-def update_routine_with_guard(routine_id: str, body: dict[str, Any],
-                              expected_updated_at: str | None) -> dict[str, Any]:
+def update_routine_with_guard(routine_id: str, body: dict[str, Any], expected_updated_at: str | None) -> dict[str, Any]:
     """GET-before-PUT conflict guard. Refuses to clobber if remote updated_at moved."""
     if expected_updated_at:
         current = get_routine(routine_id)
@@ -197,13 +197,13 @@ def update_routine_with_guard(routine_id: str, body: dict[str, Any],
         remote_updated = remote_routine.get("updated_at")
         if remote_updated and remote_updated != expected_updated_at:
             raise HevyConflict(
-                f"routine {routine_id}: expected updated_at={expected_updated_at} "
-                f"but remote is {remote_updated} (in-app edit?)"
+                f"routine {routine_id}: expected updated_at={expected_updated_at} " f"but remote is {remote_updated} (in-app edit?)"
             )
     return _request("PUT", f"/v1/routines/{routine_id}", body=body)
 
 
 # ── Exercise templates ────────────────────────────────────────────────────
+
 
 def list_templates(page: int = 1, page_size: int = 100) -> dict[str, Any]:
     return _request("GET", "/v1/exercise_templates", query={"page": page, "pageSize": page_size})
@@ -219,6 +219,7 @@ def create_template(body: dict[str, Any]) -> dict[str, Any]:
 
 # ── Folders ───────────────────────────────────────────────────────────────
 
+
 def list_folders(page: int = 1, page_size: int = 50) -> dict[str, Any]:
     return _request("GET", "/v1/routine_folders", query={"page": page, "pageSize": page_size})
 
@@ -229,17 +230,18 @@ def create_folder(title: str) -> dict[str, Any]:
 
 # ── Workouts + events (Phase 2 readback) ──────────────────────────────────
 
+
 def get_workouts(page: int = 1, page_size: int = 10) -> dict[str, Any]:
     return _request("GET", "/v1/workouts", query={"page": page, "pageSize": page_size})
 
 
 def get_workout_events(since: str, page: int = 1, page_size: int = 10) -> dict[str, Any]:
     """ISO-8601 since cursor; returns events with type=updated|deleted."""
-    return _request("GET", "/v1/workouts/events",
-                    query={"page": page, "pageSize": page_size, "since": since})
+    return _request("GET", "/v1/workouts/events", query={"page": page, "pageSize": page_size, "since": since})
 
 
 # ── Test seam ─────────────────────────────────────────────────────────────
+
 
 def _reset_throttle_for_tests() -> None:
     with _throttle_lock:

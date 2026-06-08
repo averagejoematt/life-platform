@@ -7,25 +7,23 @@ Verifies:
 - WHY-note picks the right line per variant + rationale
 - Title length capped at MAX_TITLE_CHARS
 """
+
 from __future__ import annotations
 
 from unittest.mock import patch
 
 import pytest
-
 import routine_title as rt
 from routine_ir import ExerciseBlock, RoutineSpec, Set
 
 
-def _ir(archetype="upper", variant="ideal", target_date="2026-06-15",
-        rationale=None) -> RoutineSpec:
+def _ir(archetype="upper", variant="ideal", target_date="2026-06-15", rationale=None) -> RoutineSpec:
     return RoutineSpec(
         routine_id="r-1",
         target_date=target_date,
         archetype=archetype,
         variant=variant,
-        exercises=[ExerciseBlock(movement_key="db_bench_press_flat",
-                                 sets=[Set(reps=10)])],
+        exercises=[ExerciseBlock(movement_key="db_bench_press_flat", sets=[Set(reps=10)])],
         rationale=rationale or ["archetype=upper; autoreg=0.85 (recovery=green, acwr=safe)"],
     )
 
@@ -71,10 +69,12 @@ def test_why_note_picks_red_recovery():
 
 
 def test_why_note_picks_portfolio_guard():
-    ir = _ir(rationale=[
-        "archetype=upper; autoreg=0.85 (recovery=yellow, acwr=safe)",
-        "z2 7d=0 < floor 90; portfolio guard active",
-    ])
+    ir = _ir(
+        rationale=[
+            "archetype=upper; autoreg=0.85 (recovery=yellow, acwr=safe)",
+            "z2 7d=0 < floor 90; portfolio guard active",
+        ]
+    )
     note = rt.format_why_note(ir)
     assert "zone 2" in note.lower() or "aerobic" in note.lower()
 
@@ -86,6 +86,7 @@ def test_why_note_floor_variant_is_explicit():
 
 # ── build_title_context: all-time-per-type since EXPERIMENT_START_DATE ──
 
+
 def _phase_state(current="Foundation"):
     return {
         "phases": ["Foundation", "Build", "Forge", "Sustain"],
@@ -96,9 +97,11 @@ def _phase_state(current="Foundation"):
 
 def test_build_context_y_counts_performed_workouts_since_experiment_start():
     """Y = workouts performed since EXPERIMENT_START_DATE + 1."""
-    with patch.object(rt, "load_phase_state", return_value=_phase_state()), \
-         patch.object(rt, "count_performed_workouts_since", return_value=46), \
-         patch.object(rt, "count_experiment_archetype_routines", return_value=2):
+    with (
+        patch.object(rt, "load_phase_state", return_value=_phase_state()),
+        patch.object(rt, "count_performed_workouts_since", return_value=46),
+        patch.object(rt, "count_experiment_archetype_routines", return_value=2),
+    ):
         ctx = rt.build_title_context(_ir(target_date="2026-06-15"))
     assert ctx["all_time_count"] == 47
     assert ctx["type_count_in_phase"] == 3
@@ -108,9 +111,11 @@ def test_build_context_y_counts_performed_workouts_since_experiment_start():
 
 def test_build_context_first_routine_n_is_1():
     """No prior routines of this type since experiment start → N=1."""
-    with patch.object(rt, "load_phase_state", return_value=_phase_state(current="Build")), \
-         patch.object(rt, "count_performed_workouts_since", return_value=99), \
-         patch.object(rt, "count_experiment_archetype_routines", return_value=0):
+    with (
+        patch.object(rt, "load_phase_state", return_value=_phase_state(current="Build")),
+        patch.object(rt, "count_performed_workouts_since", return_value=99),
+        patch.object(rt, "count_experiment_archetype_routines", return_value=0),
+    ):
         ctx = rt.build_title_context(_ir(target_date="2026-09-02"))
     assert ctx["type_count_in_phase"] == 1
     assert ctx["all_time_count"] == 100

@@ -1,43 +1,76 @@
 """
 Data access tools: sources, latest, daily summary, date range, search, compare.
 """
+
+import bisect
 import json
+import logging
 import math
 import re
-import bisect
-import logging
-from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
+
 from boto3.dynamodb.conditions import Key
 
 from mcp.config import (
-    table, s3_client, S3_BUCKET, USER_PREFIX, USER_ID, SOURCES,
-    P40_GROUPS, FIELD_ALIASES, logger,
-    INSIGHTS_PK, EXPERIMENTS_PK, TRAVEL_PK, RAW_DAY_LIMIT,
+    EXPERIMENTS_PK,
+    FIELD_ALIASES,
+    INSIGHTS_PK,
+    P40_GROUPS,
+    RAW_DAY_LIMIT,
+    S3_BUCKET,
+    SOURCES,
+    TRAVEL_PK,
+    USER_ID,
+    USER_PREFIX,
+    logger,
+    s3_client,
+    table,
 )
 from mcp.core import (
-    query_source, parallel_query_sources, query_source_range,
-    get_profile, get_sot, decimal_to_float,
-    ddb_cache_get, ddb_cache_set, mem_cache_get, mem_cache_set,
-    date_diff_days, resolve_field,
+    date_diff_days,
+    ddb_cache_get,
+    ddb_cache_set,
+    decimal_to_float,
+    get_profile,
+    get_sot,
+    mem_cache_get,
+    mem_cache_set,
+    parallel_query_sources,
+    query_source,
+    query_source_range,
+    resolve_field,
 )
 from mcp.helpers import (
-    aggregate_items, flatten_strava_activity,
-    compute_daily_load_score, compute_ewa, pearson_r, _linear_regression,
-    classify_day_type, query_chronicling, _habit_series,
+    _habit_series,
+    _linear_regression,
+    aggregate_items,
+    classify_day_type,
+    compute_daily_load_score,
+    compute_ewa,
+    flatten_strava_activity,
+    pearson_r,
+    query_chronicling,
 )
+
 
 def tool_get_sources(_args):
     result = {}
     for source in SOURCES:
         pk = f"{USER_PREFIX}{source}"
         oldest = table.query(
-            KeyConditionExpression=Key("pk").eq(pk), Limit=1, ScanIndexForward=True,
-            ProjectionExpression="#dt", ExpressionAttributeNames={"#dt": "date"},
+            KeyConditionExpression=Key("pk").eq(pk),
+            Limit=1,
+            ScanIndexForward=True,
+            ProjectionExpression="#dt",
+            ExpressionAttributeNames={"#dt": "date"},
         )
         newest = table.query(
-            KeyConditionExpression=Key("pk").eq(pk), Limit=1, ScanIndexForward=False,
-            ProjectionExpression="#dt", ExpressionAttributeNames={"#dt": "date"},
+            KeyConditionExpression=Key("pk").eq(pk),
+            Limit=1,
+            ScanIndexForward=False,
+            ProjectionExpression="#dt",
+            ExpressionAttributeNames={"#dt": "date"},
         )
         # 2026-05-03: use .get() — at least one source partition has a record
         # without a `date` field; was raising KeyError and tanking the whole tool.
@@ -49,6 +82,7 @@ def tool_get_sources(_args):
 
 def tool_get_latest(args):
     from mcp.core import _apply_phase_filter  # ADR-058
+
     sources = args.get("sources", SOURCES)
     include_pilot = bool(args.get("include_pilot"))
     result = {}
@@ -66,6 +100,7 @@ def tool_get_latest(args):
 
 def tool_get_daily_summary(args):
     from mcp.core import _apply_phase_filter  # ADR-058
+
     date = args.get("date")
     if not date:
         raise ValueError("'date' is required (YYYY-MM-DD)")
@@ -99,9 +134,9 @@ def tool_get_date_range(args):
     if days > RAW_DAY_LIMIT:
         period = "year" if days > 365 * 2 else "month"
         return {
-            "note":       f"Window of {days} days — returning {period}ly aggregates.",
-            "period":     period,
-            "source":     source,
+            "note": f"Window of {days} days — returning {period}ly aggregates.",
+            "period": period,
+            "source": source,
             "aggregated": aggregate_items(items, period),
         }
 
@@ -127,19 +162,33 @@ def tool_find_days(args):
             actual = float(actual)
             value = float(f["value"])
             op = f["op"]
-            if op == ">" and not actual >  value: return False
-            if op == ">=" and not actual >= value: return False
-            if op == "<" and not actual <  value: return False
-            if op == "<=" and not actual <= value: return False
-            if op == "=" and not actual == value: return False
+            if op == ">" and not actual > value:
+                return False
+            if op == ">=" and not actual >= value:
+                return False
+            if op == "<" and not actual < value:
+                return False
+            if op == "<=" and not actual <= value:
+                return False
+            if op == "=" and not actual == value:
+                return False
         return True
 
     matched = [item for item in items if passes(item)]
 
     if len(matched) > 200:
-        key_fields = {"date", "recovery_score", "hrv", "strain", "weight_lbs",
-                      "sleep_duration_hours", "resting_heart_rate",
-                      "total_distance_miles", "total_elevation_gain_feet", "sport_types"}
+        key_fields = {
+            "date",
+            "recovery_score",
+            "hrv",
+            "strain",
+            "weight_lbs",
+            "sleep_duration_hours",
+            "resting_heart_rate",
+            "total_distance_miles",
+            "total_elevation_gain_feet",
+            "sport_types",
+        }
         matched = [{k: v for k, v in m.items() if k in key_fields} for m in matched]
 
     return matched
@@ -180,11 +229,11 @@ def tool_get_aggregated_summary(args):
             result[src] = aggregate_items(items, period)
 
     payload = {
-        "period":     period,
+        "period": period,
         "start_date": start_date,
-        "end_date":   end_date,
-        "note":       "Pass an explicit start_date to override the default window." if not args.get("start_date") else None,
-        "sources":    result,
+        "end_date": end_date,
+        "note": "Pass an explicit start_date to override the default window." if not args.get("start_date") else None,
+        "sources": result,
     }
     mem_cache_set(cache_key, payload)
     return payload
@@ -206,9 +255,7 @@ def tool_search_activities(args):
     for day in day_records:
         all_activities.extend(flatten_strava_activity(day))
 
-    all_sort_vals = sorted(
-        [float(a.get(sort_by, 0) or 0) for a in all_activities if a.get(sort_by) is not None]
-    )
+    all_sort_vals = sorted([float(a.get(sort_by, 0) or 0) for a in all_activities if a.get(sort_by) is not None])
     total_for_rank = len(all_sort_vals)
 
     def percentile_rank(val):
@@ -255,11 +302,11 @@ def tool_search_activities(args):
         results.append(enriched)
 
     return {
-        "total_matched":       len(matched),
-        "showing":             len(results),
-        "sorted_by":           sort_by,
+        "total_matched": len(matched),
+        "showing": len(results),
+        "sorted_by": sort_by,
         "all_time_total_acts": total_for_rank,
-        "activities":          results,
+        "activities": results,
     }
 
 
@@ -286,8 +333,7 @@ def tool_get_field_stats(args):
             values.append((round(float(val), 2), item.get("date", "unknown")))
 
     if not values:
-        return {"source": source, "field": resolved_field,
-                "message": "No data found for this field in the specified range."}
+        return {"source": source, "field": resolved_field, "message": "No data found for this field in the specified range."}
 
     nums = [v for v, _ in values]
     max_val = max(nums)
@@ -311,19 +357,19 @@ def tool_get_field_stats(args):
         trend = f"decreasing ({delta} from early to recent average)"
 
     return {
-        "source":           source,
-        "field":            resolved_field,
-        "start_date":       start_date,
-        "end_date":         end_date,
-        "count":            len(nums),
-        "max":              max_val,
-        "max_dates":        [d for v, d in values if v == max_val],
-        "min":              min_val,
-        "min_dates":        [d for v, d in values if v == min_val],
-        "avg":              avg_val,
-        "top5_highest":     top5_high,
-        "top5_lowest":      top5_low,
-        "trend":            trend,
+        "source": source,
+        "field": resolved_field,
+        "start_date": start_date,
+        "end_date": end_date,
+        "count": len(nums),
+        "max": max_val,
+        "max_dates": [d for v, d in values if v == max_val],
+        "min": min_val,
+        "min_dates": [d for v, d in values if v == min_val],
+        "avg": avg_val,
+        "top5_highest": top5_high,
+        "top5_lowest": top5_low,
+        "trend": trend,
         "early_period_avg": early_avg,
         "recent_period_avg": late_avg,
         "storytelling_tip": "Pair with get_aggregated_summary (period=year) for the full arc.",
@@ -348,7 +394,7 @@ def tool_compare_periods(args):
     result = {
         "period_a": {"label": pa_label, "start": pa_start, "end": pa_end},
         "period_b": {"label": pb_label, "start": pb_start, "end": pb_end},
-        "sources":  {}
+        "sources": {},
     }
 
     for src in sources_to_query:
@@ -380,7 +426,7 @@ def tool_compare_periods(args):
                 delta = round(val_b - val_a, 2)
                 pct = round(100.0 * delta / val_a, 1) if val_a != 0 else None
                 row["delta"] = delta
-                row["pct_change"]= pct
+                row["pct_change"] = pct
                 row["direction"] = "improved" if delta > 0 else ("declined" if delta < 0 else "unchanged")
             comparisons[field] = row
 
@@ -402,15 +448,17 @@ def tool_get_weekly_summary(args):
 
     day_records = query_source(get_sot("cardio"), start_date, end_date)
 
-    weeks = defaultdict(lambda: {
-        "total_distance_miles": 0.0,
-        "total_elevation_gain_feet": 0.0,
-        "total_moving_time_seconds": 0,
-        "activity_count": 0,
-        "days_active": 0,
-        "sport_types": defaultdict(int),
-        "dates": [],
-    })
+    weeks = defaultdict(
+        lambda: {
+            "total_distance_miles": 0.0,
+            "total_elevation_gain_feet": 0.0,
+            "total_moving_time_seconds": 0,
+            "activity_count": 0,
+            "days_active": 0,
+            "sport_types": defaultdict(int),
+            "dates": [],
+        }
+    )
 
     for day in day_records:
         date_str = day.get("date", "")
@@ -430,30 +478,32 @@ def tool_get_weekly_summary(args):
         w["activity_count"] += int(day.get("activity_count") or 0)
         w["days_active"] += 1
         w["dates"].append(date_str)
-        for st in (day.get("sport_types") or []):
+        for st in day.get("sport_types") or []:
             if st:
                 w["sport_types"][st] += 1
 
     rows = []
     for week_key, w in weeks.items():
-        rows.append({
-            "week":                      week_key,
-            "week_start":                min(w["dates"]) if w["dates"] else "",
-            "week_end":                  max(w["dates"]) if w["dates"] else "",
-            "total_distance_miles":      round(w["total_distance_miles"], 2),
-            "total_elevation_gain_feet": round(w["total_elevation_gain_feet"], 1),
-            "total_moving_time_seconds": w["total_moving_time_seconds"],
-            "activity_count":            w["activity_count"],
-            "days_active":               w["days_active"],
-            "sport_types":               dict(w["sport_types"]),
-        })
+        rows.append(
+            {
+                "week": week_key,
+                "week_start": min(w["dates"]) if w["dates"] else "",
+                "week_end": max(w["dates"]) if w["dates"] else "",
+                "total_distance_miles": round(w["total_distance_miles"], 2),
+                "total_elevation_gain_feet": round(w["total_elevation_gain_feet"], 1),
+                "total_moving_time_seconds": w["total_moving_time_seconds"],
+                "activity_count": w["activity_count"],
+                "days_active": w["days_active"],
+                "sport_types": dict(w["sport_types"]),
+            }
+        )
 
     rows.sort(key=lambda x: x.get(sort_by, 0), reverse=not sort_asc)
 
     return {
         "total_weeks_with_data": len(rows),
-        "sorted_by":             sort_by,
-        "weeks":                 rows[:limit],
+        "sorted_by": sort_by,
+        "weeks": rows[:limit],
     }
 
 
@@ -464,7 +514,7 @@ def tool_get_daily_snapshot(args):
     """
     VALID_VIEWS = {
         "summary": tool_get_daily_summary,
-        "latest":  tool_get_latest,
+        "latest": tool_get_latest,
     }
     view = (args.get("view") or "summary").lower().strip()
     if view not in VALID_VIEWS:
@@ -482,9 +532,9 @@ def tool_get_longitudinal_summary(args):
     seasonal_patterns, or personal_records based on view parameter.
     """
     VALID_VIEWS = {
-        "aggregate":  tool_get_aggregated_summary,
-        "seasonal":   tool_get_seasonal_patterns,  # noqa: F821
-        "records":    tool_get_personal_records,  # noqa: F821
+        "aggregate": tool_get_aggregated_summary,
+        "seasonal": tool_get_seasonal_patterns,  # noqa: F821
+        "records": tool_get_personal_records,  # noqa: F821
     }
     view = (args.get("view") or "aggregate").lower().strip()
     if view not in VALID_VIEWS:
@@ -502,8 +552,9 @@ def tool_get_intelligence_quality(args):
     Shows recent validation flags from the post-generation intelligence validator.
     Filters by severity (error/warning), coach, or date range.
     """
-    from mcp.core import USER_PREFIX, table, decimal_to_float
     from boto3.dynamodb.conditions import Key
+
+    from mcp.core import USER_PREFIX, decimal_to_float, table
 
     days = int(args.get("days", 7))
     severity_filter = args.get("severity")  # error, warning, or None for all
@@ -516,12 +567,18 @@ def tool_get_intelligence_quality(args):
     try:
         # ADR-058: phase=pilot hidden by default.
         from mcp.core import _apply_phase_filter
-        resp = table.query(**_apply_phase_filter({
-            "KeyConditionExpression": Key("pk").eq(f"USER#matthew") & Key("sk").between(
-                f"SOURCE#intelligence_quality#{start_date}",
-                f"SOURCE#intelligence_quality#{end_date}~",
-            ),
-        }))
+
+        resp = table.query(
+            **_apply_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(f"USER#matthew")
+                    & Key("sk").between(
+                        f"SOURCE#intelligence_quality#{start_date}",
+                        f"SOURCE#intelligence_quality#{end_date}~",
+                    ),
+                }
+            )
+        )
         items = [decimal_to_float(i) for i in resp.get("Items", [])]
     except Exception as e:
         return {"error": str(e)}
@@ -536,12 +593,14 @@ def tool_get_intelligence_quality(args):
         for flag in item.get("flags", []):
             if severity_filter and flag.get("severity") != severity_filter:
                 continue
-            all_flags.append({
-                "date": item.get("date"),
-                "coach": item.get("coach_id"),
-                "domain": item.get("domain"),
-                **flag,
-            })
+            all_flags.append(
+                {
+                    "date": item.get("date"),
+                    "coach": item.get("coach_id"),
+                    "domain": item.get("domain"),
+                    **flag,
+                }
+            )
 
     # Summary
     total_errors = sum(1 for f in all_flags if f.get("severity") == "error")
@@ -574,12 +633,14 @@ def tool_list_actions(args):
     try:
         # ADR-058: phase=pilot hidden by default.
         from mcp.core import _apply_phase_filter
-        resp = table.query(**_apply_phase_filter({
-            "KeyConditionExpression": (
-                Key("pk").eq("USER#matthew")
-                & Key("sk").begins_with("SOURCE#coach_actions#")
-            ),
-        }))
+
+        resp = table.query(
+            **_apply_phase_filter(
+                {
+                    "KeyConditionExpression": (Key("pk").eq("USER#matthew") & Key("sk").begins_with("SOURCE#coach_actions#")),
+                }
+            )
+        )
         items = [decimal_to_float(i) for i in resp.get("Items", [])]
     except Exception as e:
         return {"error": str(e)}

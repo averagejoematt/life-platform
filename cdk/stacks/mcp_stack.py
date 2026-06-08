@@ -16,33 +16,42 @@ v2.2 (v3.7.22): R9 hardening — dedicated warmer Lambda (life-platform-mcp-warm
 
 import aws_cdk as cdk
 from aws_cdk import (
-    Stack, Duration,
-    aws_lambda as _lambda, aws_iam as iam,
-    aws_events as events, aws_events_targets as targets,
-    aws_cloudwatch as cloudwatch, aws_cloudwatch_actions as cw_actions,
-    aws_dynamodb as dynamodb, aws_s3 as s3, aws_sqs as sqs, aws_sns as sns,
+    Duration,
+    Stack,
 )
+from aws_cdk import aws_cloudwatch as cloudwatch
+from aws_cdk import aws_cloudwatch_actions as cw_actions
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_lambda as _lambda
+from aws_cdk import aws_s3 as s3
+from aws_cdk import aws_sns as sns
+from aws_cdk import aws_sqs as sqs
 from constructs import Construct
-from stacks.lambda_helpers import create_platform_lambda
 from stacks import role_policies as rp
+from stacks.lambda_helpers import create_platform_lambda
 
 REGION = "us-west-2"
 ACCT = "205930651321"
-LIFE_PLATFORM_TABLE  = "life-platform"
+LIFE_PLATFORM_TABLE = "life-platform"
 LIFE_PLATFORM_BUCKET = "matthew-life-platform"
-ALERTS_TOPIC_ARN     = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
-DIGEST_TOPIC_ARN     = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
-MCP_FUNCTION_NAME    = "life-platform-mcp"
+ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
+DIGEST_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
+MCP_FUNCTION_NAME = "life-platform-mcp"
 WARMER_FUNCTION_NAME = "life-platform-mcp-warmer"
 
-def _rule_arn(name): return f"arn:aws:events:{REGION}:{ACCT}:rule/{name}"
+
+def _rule_arn(name):
+    return f"arn:aws:events:{REGION}:{ACCT}:rule/{name}"
 
 
 class McpStack(Stack):
     def __init__(self, scope, construct_id, table, bucket, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
-        local_table        = dynamodb.Table.from_table_name(self, "LifePlatformTable", LIFE_PLATFORM_TABLE)
-        local_bucket       = s3.Bucket.from_bucket_name(self, "LifePlatformBucket", LIFE_PLATFORM_BUCKET)
+        local_table = dynamodb.Table.from_table_name(self, "LifePlatformTable", LIFE_PLATFORM_TABLE)
+        local_bucket = s3.Bucket.from_bucket_name(self, "LifePlatformBucket", LIFE_PLATFORM_BUCKET)
         local_alerts_topic = sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
         local_digest_topic = sns.Topic.from_topic_arn(self, "DigestTopic", DIGEST_TOPIC_ARN)
 
@@ -51,14 +60,15 @@ class McpStack(Stack):
         # in lambdas/. Stage just those files so CDK packages the correct code.
         # Without this, cdk deploy bundles the lambdas/ directory which doesn't
         # contain mcp_server or mcp/.
-        import shutil, os
+        import os
+        import shutil
+
         _stage = os.path.join(os.path.dirname(__file__), "..", "_mcp_staging")
         if os.path.exists(_stage):
             shutil.rmtree(_stage)
         os.makedirs(_stage)
         shutil.copy2("../mcp_server.py", _stage)
-        shutil.copytree("../mcp", os.path.join(_stage, "mcp"),
-                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        shutil.copytree("../mcp", os.path.join(_stage, "mcp"), ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         mcp_code = _lambda.Code.from_asset(_stage)
 
         # ADR-066 (2026-05-31): MCP gets the shared layer so manage_hevy_routine
@@ -67,8 +77,11 @@ class McpStack(Stack):
         # Historically MCP ran with `Layers: null` — no other tool needed cross-layer
         # modules. This attaches the layer so the Hevy write loop works end-to-end.
         from stacks.constants import SHARED_LAYER_ARN
+
         shared_utils_layer = _lambda.LayerVersion.from_layer_version_arn(
-            self, "SharedUtilsLayer", SHARED_LAYER_ARN,
+            self,
+            "SharedUtilsLayer",
+            SHARED_LAYER_ARN,
         )
 
         # ── MCP Server Lambda (request-serving) ───────────────────────────────
@@ -77,7 +90,9 @@ class McpStack(Stack):
         # without requiring aws_xray_sdk in the package. Subsegments for each
         # DDB query appear in the X-Ray service map, enabling per-query latency
         # diagnosis that previously required CloudWatch log parsing.
-        mcp = create_platform_lambda(self, "McpServer",
+        mcp = create_platform_lambda(
+            self,
+            "McpServer",
             function_name=MCP_FUNCTION_NAME,
             source_file="mcp_server.py",
             handler="mcp_server.lambda_handler",
@@ -87,15 +102,19 @@ class McpStack(Stack):
             tracing=_lambda.Tracing.ACTIVE,  # R13-XR: X-Ray active tracing
             environment={"DEPLOY_VERSION": "2.74.0"},
             custom_policies=rp.mcp_server(),
-            table=local_table, bucket=local_bucket, dlq=None, alerts_topic=None,
-            shared_layer=shared_utils_layer)
+            table=local_table,
+            bucket=local_bucket,
+            dlq=None,
+            alerts_topic=None,
+            shared_layer=shared_utils_layer,
+        )
 
         # Existing EventBridge permission kept for legacy nightly-warmer rule.
         # The new dedicated warmer Lambda (below) is the primary warmer from v3.7.22.
         # The old rule is left in place to avoid CDK drift during transition.
-        mcp.add_permission("EBNightlyWarmer",
-            principal=iam.ServicePrincipal("events.amazonaws.com"),
-            source_arn=_rule_arn("life-platform-nightly-warmer"))
+        mcp.add_permission(
+            "EBNightlyWarmer", principal=iam.ServicePrincipal("events.amazonaws.com"), source_arn=_rule_arn("life-platform-nightly-warmer")
+        )
 
         # Function URL: deliberately NOT CDK-managed.
         # Existing URL has 4 resource-based policy statements including duplicates;
@@ -107,7 +126,9 @@ class McpStack(Stack):
         # hold MCP concurrency. Same mcp_server.py source; warmer event triggers
         # the nightly_cache_warmer() path inside mcp/handler.py.
         # Uses same IAM policy as MCP server (reads same DDB partitions, writes cache).
-        warmer = create_platform_lambda(self, "McpWarmer",
+        warmer = create_platform_lambda(
+            self,
+            "McpWarmer",
             function_name=WARMER_FUNCTION_NAME,
             source_file="mcp_server.py",
             handler="mcp_server.lambda_handler",
@@ -118,53 +139,80 @@ class McpStack(Stack):
             alarm_name="mcp-warmer-error",
             environment={"DEPLOY_VERSION": "2.74.0"},
             custom_policies=rp.mcp_server(),
-            table=local_table, bucket=local_bucket, dlq=None,
-            alerts_topic=local_alerts_topic, digest_topic=local_digest_topic, digest=True,
-            shared_layer=shared_utils_layer)
+            table=local_table,
+            bucket=local_bucket,
+            dlq=None,
+            alerts_topic=local_alerts_topic,
+            digest_topic=local_digest_topic,
+            digest=True,
+            shared_layer=shared_utils_layer,
+        )
 
         # ── MCP Server alarms ─────────────────────────────────────────────────
-        duration_alarm = cloudwatch.Alarm(self, "McpDurationHighAlarm",
+        duration_alarm = cloudwatch.Alarm(
+            self,
+            "McpDurationHighAlarm",
             alarm_name="mcp-server-duration-high",
             metric=cloudwatch.Metric(
-                namespace="AWS/Lambda", metric_name="Duration",
+                namespace="AWS/Lambda",
+                metric_name="Duration",
                 dimensions_map={"FunctionName": MCP_FUNCTION_NAME},
-                period=Duration.seconds(86400), statistic="p99"),
-            evaluation_periods=1, threshold=240000,
+                period=Duration.seconds(86400),
+                statistic="p99",
+            ),
+            evaluation_periods=1,
+            threshold=240000,
             comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING)
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
         # ADR-050: duration is a degradation signal, not page-worthy → digest.
         duration_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
-        slo_alarm = cloudwatch.Alarm(self, "SloMcpAvailabilityAlarm",
+        slo_alarm = cloudwatch.Alarm(
+            self,
+            "SloMcpAvailabilityAlarm",
             alarm_name="slo-mcp-availability",
             metric=cloudwatch.Metric(
-                namespace="AWS/Lambda", metric_name="Errors",
+                namespace="AWS/Lambda",
+                metric_name="Errors",
                 dimensions_map={"FunctionName": MCP_FUNCTION_NAME},
-                period=Duration.seconds(3600), statistic="Sum"),
-            evaluation_periods=1, threshold=3,
+                period=Duration.seconds(3600),
+                statistic="Sum",
+            ),
+            evaluation_periods=1,
+            threshold=3,
             comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING)
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
         slo_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
         # ── SLO-5: Warmer completeness alarm (R9 A+ hardening) ────────────────
         # Fires if the dedicated warmer Lambda errors on its daily run.
         # Warmer failure = tools serve stale cached data silently all day.
-        warmer_alarm = cloudwatch.Alarm(self, "SloWarmerCompletenessAlarm",
+        warmer_alarm = cloudwatch.Alarm(
+            self,
+            "SloWarmerCompletenessAlarm",
             alarm_name="slo-warmer-completeness",
             metric=cloudwatch.Metric(
-                namespace="AWS/Lambda", metric_name="Errors",
+                namespace="AWS/Lambda",
+                metric_name="Errors",
                 dimensions_map={"FunctionName": WARMER_FUNCTION_NAME},
-                period=Duration.seconds(86400), statistic="Sum"),
-            evaluation_periods=1, threshold=1,
+                period=Duration.seconds(86400),
+                statistic="Sum",
+            ),
+            evaluation_periods=1,
+            threshold=1,
             comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING)
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
         # ADR-050: warmer failure means stale caches all day, but not user-blocking → digest.
         warmer_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
-        cdk.CfnOutput(self, "McpFunctionArn", value=mcp.function_arn,
-            description="MCP server Lambda ARN")
-        cdk.CfnOutput(self, "McpWarmerArn", value=warmer.function_arn,
-            description="MCP cache warmer Lambda ARN")
-        cdk.CfnOutput(self, "McpFunctionUrl",
+        cdk.CfnOutput(self, "McpFunctionArn", value=mcp.function_arn, description="MCP server Lambda ARN")
+        cdk.CfnOutput(self, "McpWarmerArn", value=warmer.function_arn, description="MCP cache warmer Lambda ARN")
+        cdk.CfnOutput(
+            self,
+            "McpFunctionUrl",
             value="https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/",
-            description="MCP server Function URL (unmanaged)")
+            description="MCP server Function URL (unmanaged)",
+        )

@@ -17,18 +17,20 @@ v1.1.0: Expert panel prompt dynamically built from s3://matthew-life-platform/co
 """
 
 import json
-import os
 import logging
+import os
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 import time
-import boto3
 import urllib.error
 import urllib.request
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from collections import defaultdict
-from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+
+import boto3
+from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 _logger_std = logging.getLogger()
@@ -52,6 +54,7 @@ S3_BUCKET = os.environ["S3_BUCKET"]
 # Board of Directors config loader
 try:
     import board_loader
+
     _HAS_BOARD_LOADER = True
 except ImportError:
     _HAS_BOARD_LOADER = False
@@ -60,6 +63,7 @@ except ImportError:
 # IC-15/16: Insight Ledger
 try:
     import insight_writer
+
     insight_writer.init(table, USER_ID)
     _HAS_INSIGHT_WRITER = True
 except ImportError:
@@ -67,7 +71,8 @@ except ImportError:
 
 # AI-3: Output validation
 try:
-    from ai_output_validator import validate_ai_output, AIOutputType
+    from ai_output_validator import AIOutputType, validate_ai_output
+
     _HAS_AI_VALIDATOR = True
 except ImportError:
     _HAS_AI_VALIDATOR = False
@@ -75,9 +80,11 @@ except ImportError:
 # OBS-1: Structured logger
 try:
     from platform_logger import get_logger
+
     logger = get_logger("nutrition-review")
 except ImportError:
     import logging as _log
+
     logger = _log.getLogger("nutrition-review")
     logger.setLevel(_log.INFO)
 
@@ -85,6 +92,7 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def get_anthropic_key():
     """ADR-062: Bedrock uses IAM auth — this fetch is dead. Returns a truthy
@@ -94,17 +102,25 @@ def get_anthropic_key():
     Full plumbing removal tracked as task #90."""
     return "_BEDROCK_IAM_"
 
+
 def d2f(obj):
-    if isinstance(obj, list): return [d2f(i) for i in obj]
-    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [d2f(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
+
 
 def safe_float(rec, field, default=None):
     if rec and field in rec:
-        try: return float(rec[field])
-        except Exception: return default
+        try:
+            return float(rec[field])
+        except Exception:
+            return default
     return default
+
 
 def query_range(source, start_date, end_date):
     pk = f"USER#{USER_ID}#SOURCE#{source}"
@@ -112,7 +128,9 @@ def query_range(source, start_date, end_date):
     kwargs = {
         "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
         "ExpressionAttributeValues": {
-            ":pk": pk, ":s": f"DATE#{start_date}", ":e": f"DATE#{end_date}",
+            ":pk": pk,
+            ":s": f"DATE#{start_date}",
+            ":e": f"DATE#{end_date}",
         },
     }
     while True:
@@ -124,6 +142,7 @@ def query_range(source, start_date, end_date):
             break
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
     return records
+
 
 def query_all(source):
     pk = f"USER#{USER_ID}#SOURCE#{source}"
@@ -140,6 +159,7 @@ def query_all(source):
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
     return [d2f(i) for i in items]
 
+
 def fetch_profile():
     try:
         r = table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"})
@@ -152,6 +172,7 @@ def fetch_profile():
 # ══════════════════════════════════════════════════════════════════════════════
 # DATA GATHERING
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def gather_nutrition_data():
     today = datetime.now(timezone.utc).date()
@@ -177,8 +198,7 @@ def gather_nutrition_data():
     cgm = query_range("apple_health", w1_start, w1_end)
 
     genome_items = query_all("genome")
-    nutrient_snps = [g for g in genome_items if g.get("category") in
-                     ("nutrient_metabolism", "metabolism", "lipids")]
+    nutrient_snps = [g for g in genome_items if g.get("category") in ("nutrient_metabolism", "metabolism", "lipids")]
     logger.info(f"Genome: {len(nutrient_snps)} relevant SNPs")
 
     lab_items = query_all("labs")
@@ -196,11 +216,16 @@ def gather_nutrition_data():
     prev_review = None
     try:
         pk = f"USER#{USER_ID}#SOURCE#nutrition_review"
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": "pk = :pk",
-            "ExpressionAttributeValues": {":pk": pk},
-            "ScanIndexForward": False, "Limit": 1,
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk",
+                    "ExpressionAttributeValues": {":pk": pk},
+                    "ScanIndexForward": False,
+                    "Limit": 1,
+                }
+            )
+        )
         items = resp.get("Items", [])
         if items:
             prev_review = d2f(items[0])
@@ -209,19 +234,25 @@ def gather_nutrition_data():
         logger.warning(f"No previous review: {e}")
 
     return {
-        "macrofactor_this": mf_this, "macrofactor_prior": mf_prior,
-        "withings": withings, "strava": strava, "cgm": cgm,
-        "genome_snps": nutrient_snps, "latest_lab": latest_lab,
-        "latest_dexa": latest_dexa, "supplements": supplements,
-        "prev_review": prev_review, "profile": profile,
-        "dates": {"this_start": w1_start, "this_end": w1_end,
-                  "prior_start": w2_start, "prior_end": w2_end},
+        "macrofactor_this": mf_this,
+        "macrofactor_prior": mf_prior,
+        "withings": withings,
+        "strava": strava,
+        "cgm": cgm,
+        "genome_snps": nutrient_snps,
+        "latest_lab": latest_lab,
+        "latest_dexa": latest_dexa,
+        "supplements": supplements,
+        "prev_review": prev_review,
+        "profile": profile,
+        "dates": {"this_start": w1_start, "this_end": w1_end, "prior_start": w2_start, "prior_end": w2_end},
     }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # EXTRACT & SUMMARIZE
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def extract_daily_nutrition(mf_data):
     days = []
@@ -233,14 +264,17 @@ def extract_daily_nutrition(mf_data):
             name = item.get("food_name", "unknown")
             if any(s in name.lower() for s in ("supplement",)):
                 continue
-            foods.append({
-                "name": name, "time": item.get("time", "?"),
-                "cal": safe_float(item, "calories_kcal", 0),
-                "protein_g": safe_float(item, "protein_g", 0),
-                "carbs_g": safe_float(item, "carbs_g", 0),
-                "fat_g": safe_float(item, "fat_g", 0),
-                "fiber_g": safe_float(item, "fiber_g"),
-            })
+            foods.append(
+                {
+                    "name": name,
+                    "time": item.get("time", "?"),
+                    "cal": safe_float(item, "calories_kcal", 0),
+                    "protein_g": safe_float(item, "protein_g", 0),
+                    "carbs_g": safe_float(item, "carbs_g", 0),
+                    "fat_g": safe_float(item, "fat_g", 0),
+                    "fiber_g": safe_float(item, "fiber_g"),
+                }
+            )
         day = {
             "date": date_str,
             "total_calories": safe_float(rec, "total_calories_kcal"),
@@ -278,6 +312,7 @@ def extract_daily_nutrition(mf_data):
         days.append(day)
     return days
 
+
 def extract_weight_trend(withings_data):
     weights = []
     for date_str in sorted(withings_data.keys()):
@@ -290,10 +325,13 @@ def extract_weight_trend(withings_data):
     latest = weights[-1]["weight_lbs"]
     earliest = weights[0]["weight_lbs"]
     return {
-        "latest_weight_lbs": latest, "earliest_weight_lbs": earliest,
+        "latest_weight_lbs": latest,
+        "earliest_weight_lbs": earliest,
         "change_30d_lbs": round(latest - earliest, 1),
-        "measurements": len(weights), "readings": weights[-7:],
+        "measurements": len(weights),
+        "readings": weights[-7:],
     }
+
 
 def extract_training(strava_data):
     activities = []
@@ -302,18 +340,27 @@ def extract_training(strava_data):
         acts = rec.get("activities", [])
         if isinstance(acts, list):
             for a in acts:
-                activities.append({
-                    "date": date_str,
-                    "type": a.get("sport_type", a.get("type", "?")),
-                    "name": a.get("name", ""),
-                    "duration_min": round(safe_float(a, "elapsed_time_seconds", 0) / 60, 1)
-                        if safe_float(a, "elapsed_time_seconds") else safe_float(a, "moving_time_minutes"),
-                    "calories": safe_float(a, "calories"),
-                    "avg_hr": safe_float(a, "average_heartrate"),
-                    "distance_miles": round(safe_float(a, "distance_meters", 0) / 1609.34, 2)
-                        if safe_float(a, "distance_meters") else safe_float(a, "distance_miles"),
-                })
+                activities.append(
+                    {
+                        "date": date_str,
+                        "type": a.get("sport_type", a.get("type", "?")),
+                        "name": a.get("name", ""),
+                        "duration_min": (
+                            round(safe_float(a, "elapsed_time_seconds", 0) / 60, 1)
+                            if safe_float(a, "elapsed_time_seconds")
+                            else safe_float(a, "moving_time_minutes")
+                        ),
+                        "calories": safe_float(a, "calories"),
+                        "avg_hr": safe_float(a, "average_heartrate"),
+                        "distance_miles": (
+                            round(safe_float(a, "distance_meters", 0) / 1609.34, 2)
+                            if safe_float(a, "distance_meters")
+                            else safe_float(a, "distance_miles")
+                        ),
+                    }
+                )
     return activities
+
 
 def extract_cgm(cgm_data):
     days = []
@@ -321,18 +368,22 @@ def extract_cgm(cgm_data):
         rec = cgm_data[date_str]
         glucose = safe_float(rec, "glucose_mean_mg_dl")
         if glucose:
-            days.append({
-                "date": date_str, "mean_mg_dl": glucose,
-                "std_dev": safe_float(rec, "glucose_std_dev"),
-                "time_in_range_pct": safe_float(rec, "glucose_time_in_range_pct"),
-                "time_above_140_pct": safe_float(rec, "glucose_time_above_140_pct"),
-                "spikes_above_140": safe_float(rec, "glucose_spikes_above_140"),
-            })
+            days.append(
+                {
+                    "date": date_str,
+                    "mean_mg_dl": glucose,
+                    "std_dev": safe_float(rec, "glucose_std_dev"),
+                    "time_in_range_pct": safe_float(rec, "glucose_time_in_range_pct"),
+                    "time_above_140_pct": safe_float(rec, "glucose_time_above_140_pct"),
+                    "spikes_above_140": safe_float(rec, "glucose_spikes_above_140"),
+                }
+            )
     return days if days else None
 
+
 def extract_genome_context(snps):
-    return [{"gene": s.get("gene"), "risk": s.get("risk_level"),
-             "summary": s.get("summary"), "category": s.get("category")} for s in snps]
+    return [{"gene": s.get("gene"), "risk": s.get("risk_level"), "summary": s.get("summary"), "category": s.get("category")} for s in snps]
+
 
 def extract_dexa_context(dexa):
     if not dexa:
@@ -345,7 +396,8 @@ def extract_dexa_context(dexa):
     except Exception:
         months_ago = None
     return {
-        "scan_date": scan_date, "months_ago": months_ago,
+        "scan_date": scan_date,
+        "months_ago": months_ago,
         "weight_at_scan_lbs": safe_float(bc, "weight_lb"),
         "body_fat_pct": safe_float(bc, "body_fat_pct"),
         "lean_mass_lbs": safe_float(bc, "lean_mass_lb"),
@@ -356,13 +408,16 @@ def extract_dexa_context(dexa):
         "caveat": f"Scan is {months_ago} months old. Weight has changed significantly since.",
     }
 
+
 def compute_weekly_summary(days):
     if not days:
         return {}
     n = len(days)
+
     def avg_field(field):
         vals = [d.get(field) for d in days if d.get(field) is not None]
         return round(sum(vals) / len(vals), 1) if vals else None
+
     return {
         "days_logged": n,
         "avg_calories": avg_field("total_calories"),
@@ -384,6 +439,7 @@ def compute_weekly_summary(days):
 # ══════════════════════════════════════════════════════════════════════════════
 # ANTHROPIC API
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _build_nutrition_prompt_from_config(calorie_target, protein_target_g):
     """Build nutrition review system prompt from S3 board config.
@@ -416,7 +472,7 @@ def _build_nutrition_prompt_from_config(calorie_target, protein_target_g):
         section = f"{header}\n"
         section += f"Analyze: {focus}\n" if not focus.startswith("Analyze:") else f"{focus}\n"
         section += f'Tone: {voice.get("tone", "Professional and direct.")}.\n'
-        section += f'Principle: \"{voice.get("catchphrase", "")}\"' if voice.get("catchphrase") else ""
+        section += f'Principle: "{voice.get("catchphrase", "")}"' if voice.get("catchphrase") else ""
 
         # Render calorie/protein targets into the focus text
         section = section.replace("{calorie_target}", str(calorie_target))
@@ -568,6 +624,7 @@ def build_user_message(data):
 def call_anthropic(system_prompt, user_message, api_key):
     # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
     import retry_utils
+
     return retry_utils.call_anthropic_api(
         prompt=user_message,
         api_key=api_key,
@@ -581,6 +638,7 @@ def call_anthropic(system_prompt, user_message, api_key):
 # ══════════════════════════════════════════════════════════════════════════════
 # HTML EMAIL
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def build_summary_table(days, profile):
     if not days:
@@ -606,7 +664,7 @@ def build_summary_table(days, profile):
         fib_c = "#10b981" if fiber >= 30 else "#f59e0b" if fiber >= 20 else "#ef4444"
         mic_c = "#10b981" if micro_pct >= 70 else "#f59e0b" if micro_pct >= 50 else "#ef4444"
 
-        rows += f'''<tr style="border-bottom:1px solid #2a2d4a;">
+        rows += f"""<tr style="border-bottom:1px solid #2a2d4a;">
             <td style="padding:8px;color:#e0e0e0;font-size:13px;">{day_name}</td>
             <td style="padding:8px;color:{cal_c};font-size:13px;text-align:center;font-weight:600;">{int(cal)}</td>
             <td style="padding:8px;color:{pro_c};font-size:13px;text-align:center;font-weight:600;">{int(pro)}g</td>
@@ -614,7 +672,7 @@ def build_summary_table(days, profile):
             <td style="padding:8px;color:#e0e0e0;font-size:13px;text-align:center;">{int(fat)}g</td>
             <td style="padding:8px;color:{fib_c};font-size:13px;text-align:center;">{fiber:.0f}g</td>
             <td style="padding:8px;color:{mic_c};font-size:13px;text-align:center;">{micro_pct:.0f}%</td>
-        </tr>'''
+        </tr>"""
 
     n = len(days)
     ac = sum(d.get("total_calories") or 0 for d in days) / n
@@ -624,7 +682,7 @@ def build_summary_table(days, profile):
     afb = sum(d.get("total_fiber_g") or 0 for d in days) / n
     am = sum(d.get("micronutrient_avg_pct") or 0 for d in days) / n
 
-    rows += f'''<tr style="border-top:2px solid #4cc9f0;background:#0f1127;">
+    rows += f"""<tr style="border-top:2px solid #4cc9f0;background:#0f1127;">
         <td style="padding:8px;color:#4cc9f0;font-size:13px;font-weight:700;">AVG</td>
         <td style="padding:8px;color:#4cc9f0;font-size:13px;text-align:center;font-weight:700;">{int(ac)}</td>
         <td style="padding:8px;color:#4cc9f0;font-size:13px;text-align:center;font-weight:700;">{int(ap)}g</td>
@@ -632,9 +690,9 @@ def build_summary_table(days, profile):
         <td style="padding:8px;color:#4cc9f0;font-size:13px;text-align:center;font-weight:700;">{int(af)}g</td>
         <td style="padding:8px;color:#4cc9f0;font-size:13px;text-align:center;font-weight:700;">{afb:.0f}g</td>
         <td style="padding:8px;color:#4cc9f0;font-size:13px;text-align:center;font-weight:700;">{am:.0f}%</td>
-    </tr>'''
+    </tr>"""
 
-    return f'''<table style="width:100%;border-collapse:collapse;background:#16213e;border-radius:8px;overflow:hidden;margin-bottom:20px;">
+    return f"""<table style="width:100%;border-collapse:collapse;background:#16213e;border-radius:8px;overflow:hidden;margin-bottom:20px;">
         <tr style="background:#0f1127;">
             <th style="padding:8px;color:#9ca3af;font-size:11px;text-align:left;">DAY</th>
             <th style="padding:8px;color:#9ca3af;font-size:11px;text-align:center;">KCAL</th>
@@ -648,7 +706,7 @@ def build_summary_table(days, profile):
         <tr><td colspan="7" style="padding:4px 8px;color:#6b7280;font-size:10px;">
             Targets: {int(cal_target)} kcal | {int(protein_target)}g protein | 38g fiber | Micro = avg sufficiency %
         </td></tr>
-    </table>'''
+    </table>"""
 
 
 def build_email_html(summary_table, ai_content, dates, weight_info):
@@ -664,9 +722,11 @@ def build_email_html(summary_table, ai_content, dates, weight_info):
         w = weight_info["latest_weight_lbs"]
         delta = weight_info.get("change_30d_lbs", 0)
         arrow = "down" if delta < 0 else "up" if delta > 0 else "flat"
-        weight_line = f'<div style="color:#9ca3af;font-size:13px;margin-top:4px;">Weight: {w:.1f} lbs ({arrow} {abs(delta):.1f} over 30d)</div>'
+        weight_line = (
+            f'<div style="color:#9ca3af;font-size:13px;margin-top:4px;">Weight: {w:.1f} lbs ({arrow} {abs(delta):.1f} over 30d)</div>'
+        )
 
-    return f'''<div style="max-width:600px;margin:0 auto;background:#1a1a2e;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:20px;color:#e0e0e0;">
+    return f"""<div style="max-width:600px;margin:0 auto;background:#1a1a2e;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:20px;color:#e0e0e0;">
     <div style="text-align:center;margin-bottom:24px;">
         <div style="font-size:11px;letter-spacing:2px;color:#4cc9f0;font-weight:600;margin-bottom:4px;">LIFE PLATFORM</div>
         <div style="font-size:20px;font-weight:700;color:#ffffff;">Weekly Nutrition Review</div>
@@ -682,19 +742,21 @@ def build_email_html(summary_table, ai_content, dates, weight_info):
         <div style="color:#6b7280;font-size:11px;">Life Platform - Saturday Nutrition Review</div>
         <div style="color:#9ca3af;font-size:9px;margin-top:6px;">&#9874;&#65039; Personal health tracking only &mdash; not medical advice. Consult a qualified healthcare professional before making changes to your diet, exercise, or supplement regimen.</div>
     </div>
-</div>'''
+</div>"""
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # STORE WEEKLY SUMMARY
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def store_weekly_summary(dates, summary):
     try:
         pk = f"USER#{USER_ID}#SOURCE#nutrition_review"
         sk = f"DATE#{dates['this_end']}"
         item = {
-            "pk": pk, "sk": sk,
+            "pk": pk,
+            "sk": sk,
             "date": dates["this_end"],
             "source": "nutrition_review",
             "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -716,15 +778,18 @@ def store_weekly_summary(dates, summary):
 def record_email_send(table, lambda_name):
     """Write a completion record so the status page can track last send."""
     import time as _time
+
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     try:
-        table.put_item(Item={
-            "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
-            "sk": f"DATE#{today}",
-            "sent_at": datetime.now(timezone.utc).isoformat(),
-            "status": "success",
-            "ttl": int(_time.time()) + 86400 * 90
-        })
+        table.put_item(
+            Item={
+                "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
+                "sk": f"DATE#{today}",
+                "sent_at": datetime.now(timezone.utc).isoformat(),
+                "status": "success",
+                "ttl": int(_time.time()) + 86400 * 90,
+            }
+        )
     except Exception as e:
         logger.info(f"[status-tracking] Non-fatal write failure: {e}")
 
@@ -771,9 +836,11 @@ def lambda_handler(event, context):
         _goal_w = profile.get("goal_weight_lbs", 185)
         if _week_num <= 4:
             _stage = "Foundation Stage"
-            _note = (f"Week {_week_num}: At {_start_w}+ lbs, caloric deficit sustainability and protein consistency "
-                     "matter more than macro fine-tuning. Do NOT apply intermediate-athlete nutrition benchmarks. "
-                     "Acknowledge adherence wins warmly — this is still the hardest phase.")
+            _note = (
+                f"Week {_week_num}: At {_start_w}+ lbs, caloric deficit sustainability and protein consistency "
+                "matter more than macro fine-tuning. Do NOT apply intermediate-athlete nutrition benchmarks. "
+                "Acknowledge adherence wins warmly — this is still the hardest phase."
+            )
         elif _week_num <= 12:
             _stage = "Momentum Stage"
             _note = f"Week {_week_num}: habit foundation established. Progressive nutrition optimization is appropriate."
@@ -783,10 +850,7 @@ def lambda_handler(event, context):
         else:
             _stage = "Advanced Stage"
             _note = f"Week {_week_num}: performance nutrition coaching fully applicable."
-        journey_block = (
-            f"JOURNEY CONTEXT: Week {_week_num} ({_days_in} days in) | {_start_w}→{_goal_w} lbs | {_stage}\n"
-            f"{_note}\n"
-        )
+        journey_block = f"JOURNEY CONTEXT: Week {_week_num} ({_days_in} days in) | {_start_w}→{_goal_w} lbs | {_stage}\n" f"{_note}\n"
         user_message = journey_block + "\n" + user_message
     except Exception as e:
         logger.warning(f"P2 journey context failed: {e}")
@@ -795,8 +859,8 @@ def lambda_handler(event, context):
     if _HAS_INSIGHT_WRITER:
         try:
             prev_ctx = insight_writer.build_insights_context(
-                days=30, pillars=["nutrition"], max_items=5,
-                label="PREVIOUS NUTRITION INSIGHTS (last 30 days)")
+                days=30, pillars=["nutrition"], max_items=5, label="PREVIOUS NUTRITION INSIGHTS (last 30 days)"
+            )
             if prev_ctx:
                 user_message = prev_ctx + "\n\n" + user_message
         except Exception as e:
@@ -830,10 +894,12 @@ def lambda_handler(event, context):
     ses.send_email(
         FromEmailAddress=SENDER,
         Destination={"ToAddresses": [RECIPIENT]},
-        Content={"Simple": {
-            "Subject": {"Data": subject, "Charset": "UTF-8"},
-            "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
-        }},
+        Content={
+            "Simple": {
+                "Subject": {"Data": subject, "Charset": "UTF-8"},
+                "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
+            }
+        },
     )
     logger.info(f"Sent: {subject}")
 
@@ -843,10 +909,16 @@ def lambda_handler(event, context):
     if _HAS_INSIGHT_WRITER and ai_content and not ai_content.startswith("<div"):
         try:
             insight_writer.write_insight(
-                digest_type="nutrition_review", insight_type="coaching",
-                text=ai_content[:800], pillars=["nutrition"],
-                data_sources=["macrofactor"], tags=["nutrition", "weekly", "coaching"],
-                confidence="high", actionable=True, date=dates.get("this_end", ""))
+                digest_type="nutrition_review",
+                insight_type="coaching",
+                text=ai_content[:800],
+                pillars=["nutrition"],
+                data_sources=["macrofactor"],
+                tags=["nutrition", "weekly", "coaching"],
+                confidence="high",
+                actionable=True,
+                date=dates.get("this_end", ""),
+            )
             logger.info("IC-15: nutrition insight persisted")
         except Exception as e:
             logger.warning(f"IC-15 failed: {e}")

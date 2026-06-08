@@ -1,20 +1,27 @@
 """
 Coach Intelligence MCP tools — query coach threads, predictions, disagreements.
 """
-import logging
-from datetime import datetime, timedelta, timezone
-from collections import defaultdict
 
-from mcp.core import USER_PREFIX, table, decimal_to_float
+import logging
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
+
 from boto3.dynamodb.conditions import Key
+
+from mcp.core import USER_PREFIX, decimal_to_float, table
 
 logger = logging.getLogger(__name__)
 
 COACH_IDS = ["sleep", "nutrition", "training", "mind", "physical", "glucose", "labs", "explorer"]
 COACH_NAMES = {
-    "sleep": "Dr. Lisa Park", "nutrition": "Dr. Marcus Webb", "training": "Dr. Sarah Chen",
-    "mind": "Dr. Nathan Reeves", "physical": "Dr. Victor Reyes", "glucose": "Dr. Amara Patel",
-    "labs": "Dr. James Okafor", "explorer": "Dr. Henning Brandt",
+    "sleep": "Dr. Lisa Park",
+    "nutrition": "Dr. Marcus Webb",
+    "training": "Dr. Sarah Chen",
+    "mind": "Dr. Nathan Reeves",
+    "physical": "Dr. Victor Reyes",
+    "glucose": "Dr. Amara Patel",
+    "labs": "Dr. James Okafor",
+    "explorer": "Dr. Henning Brandt",
 }
 
 
@@ -28,12 +35,16 @@ def tool_get_coach_thread(args):
     try:
         # ADR-058: phase=pilot hidden by default.
         from mcp.core import _apply_phase_filter
-        resp = table.query(**_apply_phase_filter({
-            "KeyConditionExpression": Key("pk").eq("USER#matthew") & Key("sk").begins_with(
-                f"SOURCE#coach_thread#{coach_id}#"
-            ),
-            "ScanIndexForward": False, "Limit": limit,
-        }))
+
+        resp = table.query(
+            **_apply_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq("USER#matthew") & Key("sk").begins_with(f"SOURCE#coach_thread#{coach_id}#"),
+                    "ScanIndexForward": False,
+                    "Limit": limit,
+                }
+            )
+        )
         entries = [decimal_to_float(i) for i in resp.get("Items", [])]
         return {
             "coach_id": coach_id,
@@ -70,23 +81,29 @@ def tool_get_predictions(args):
         try:
             # ADR-058: phase=pilot hidden by default.
             from mcp.core import _apply_phase_filter
-            resp = table.query(**_apply_phase_filter({
-                "KeyConditionExpression": Key("pk").eq("USER#matthew") & Key("sk").begins_with(
-                    f"SOURCE#coach_thread#{cid}#"
-                ),
-                "ScanIndexForward": False, "Limit": 8,
-            }))
+
+            resp = table.query(
+                **_apply_phase_filter(
+                    {
+                        "KeyConditionExpression": Key("pk").eq("USER#matthew") & Key("sk").begins_with(f"SOURCE#coach_thread#{cid}#"),
+                        "ScanIndexForward": False,
+                        "Limit": 8,
+                    }
+                )
+            )
             for item in resp.get("Items", []):
                 entry = decimal_to_float(item)
                 for pred in entry.get("predictions", []):
                     if status_filter and pred.get("status") != status_filter:
                         continue
-                    all_predictions.append({
-                        "coach_id": cid,
-                        "coach_name": COACH_NAMES.get(cid, cid),
-                        "date": entry.get("date"),
-                        **pred,
-                    })
+                    all_predictions.append(
+                        {
+                            "coach_id": cid,
+                            "coach_name": COACH_NAMES.get(cid, cid),
+                            "date": entry.get("date"),
+                            **pred,
+                        }
+                    )
         except Exception:
             pass
 
@@ -107,9 +124,7 @@ def tool_get_predictions(args):
 def tool_get_coach_disagreements(args):
     """Find current inter-coach disagreements from the integrator synthesis."""
     try:
-        resp = table.get_item(
-            Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": "EXPERT#integrator"}
-        )
+        resp = table.get_item(Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": "EXPERT#integrator"})
         item = decimal_to_float(resp.get("Item", {}))
         disagreements = item.get("disagreements", [])
         return {
@@ -150,11 +165,15 @@ def tool_get_coach_track_record(args):
         # LEARNING# is the authoritative per-evaluation audit. Query the date
         # range as a between() against the SK pattern LEARNING#{date}#{slug}.
         from mcp.core import _apply_phase_filter  # ADR-058
-        resp = table.query(**_apply_phase_filter({
-            "KeyConditionExpression": Key("pk").eq(coach_pk)
-                & Key("sk").between(f"LEARNING#{cutoff}", "LEARNING#z"),
-            "ScanIndexForward": False,
-        }))
+
+        resp = table.query(
+            **_apply_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").between(f"LEARNING#{cutoff}", "LEARNING#z"),
+                    "ScanIndexForward": False,
+                }
+            )
+        )
     except Exception as ex:
         return {"error": str(ex)}
 
@@ -181,14 +200,16 @@ def tool_get_coach_track_record(args):
     recent = []
     for l in learnings[:10]:
         pred_id = l.get("prediction_id", "")
-        recent.append({
-            "date": l.get("date"),
-            "subdomain": l.get("subdomain"),
-            "metric": l.get("metric"),
-            "status": l.get("status"),
-            "reason": l.get("reason"),
-            "prediction_id": pred_id,
-        })
+        recent.append(
+            {
+                "date": l.get("date"),
+                "subdomain": l.get("subdomain"),
+                "metric": l.get("metric"),
+                "status": l.get("status"),
+                "reason": l.get("reason"),
+                "prediction_id": pred_id,
+            }
+        )
 
     return {
         "coach_id": cid,
@@ -221,12 +242,16 @@ def tool_evaluate_prediction(args):
         try:
             # ADR-058: phase=pilot hidden by default.
             from mcp.core import _apply_phase_filter
-            resp = table.query(**_apply_phase_filter({
-                "KeyConditionExpression": Key("pk").eq("USER#matthew") & Key("sk").begins_with(
-                    f"SOURCE#coach_thread#{cid}#"
-                ),
-                "ScanIndexForward": False, "Limit": 10,
-            }))
+
+            resp = table.query(
+                **_apply_phase_filter(
+                    {
+                        "KeyConditionExpression": Key("pk").eq("USER#matthew") & Key("sk").begins_with(f"SOURCE#coach_thread#{cid}#"),
+                        "ScanIndexForward": False,
+                        "Limit": 10,
+                    }
+                )
+            )
             for item in resp.get("Items", []):
                 entry = decimal_to_float(item)
                 for pred in entry.get("predictions", []):
@@ -235,8 +260,9 @@ def tool_evaluate_prediction(args):
                         pred["outcome_note"] = outcome_note
                         pred["evaluated_at"] = datetime.now(timezone.utc).isoformat()
                         # Write back
-                        from decimal import Decimal
                         import json
+                        from decimal import Decimal
+
                         clean = json.loads(json.dumps(entry, default=str), parse_float=Decimal)
                         table.put_item(Item=clean)
                         return {
@@ -259,35 +285,43 @@ def tool_get_coaching_summary(args):
         try:
             # ADR-058: phase=pilot hidden by default.
             from mcp.core import _apply_phase_filter
-            resp = table.query(**_apply_phase_filter({
-                "KeyConditionExpression": Key("pk").eq("USER#matthew") & Key("sk").begins_with(
-                    f"SOURCE#coach_thread#{cid}#"
-                ),
-                "ScanIndexForward": False, "Limit": 1,
-            }))
+
+            resp = table.query(
+                **_apply_phase_filter(
+                    {
+                        "KeyConditionExpression": Key("pk").eq("USER#matthew") & Key("sk").begins_with(f"SOURCE#coach_thread#{cid}#"),
+                        "ScanIndexForward": False,
+                        "Limit": 1,
+                    }
+                )
+            )
             items = resp.get("Items", [])
             if items:
                 entry = decimal_to_float(items[0])
                 pred_count = len(entry.get("predictions", []))
                 pending = sum(1 for p in entry.get("predictions", []) if p.get("status") == "pending")
-                coaches.append({
-                    "coach_id": cid,
-                    "coach_name": COACH_NAMES.get(cid, cid),
-                    "position_summary": entry.get("position_summary", ""),
-                    "emotional_investment": entry.get("emotional_investment", "observing"),
-                    "prediction_count": pred_count,
-                    "pending_predictions": pending,
-                    "last_updated": entry.get("date"),
-                    "open_questions": entry.get("open_questions", []),
-                })
+                coaches.append(
+                    {
+                        "coach_id": cid,
+                        "coach_name": COACH_NAMES.get(cid, cid),
+                        "position_summary": entry.get("position_summary", ""),
+                        "emotional_investment": entry.get("emotional_investment", "observing"),
+                        "prediction_count": pred_count,
+                        "pending_predictions": pending,
+                        "last_updated": entry.get("date"),
+                        "open_questions": entry.get("open_questions", []),
+                    }
+                )
             else:
-                coaches.append({
-                    "coach_id": cid,
-                    "coach_name": COACH_NAMES.get(cid, cid),
-                    "position_summary": "No thread data yet",
-                    "emotional_investment": "detached",
-                    "prediction_count": 0,
-                })
+                coaches.append(
+                    {
+                        "coach_id": cid,
+                        "coach_name": COACH_NAMES.get(cid, cid),
+                        "position_summary": "No thread data yet",
+                        "emotional_investment": "detached",
+                        "prediction_count": 0,
+                    }
+                )
         except Exception:
             pass
 

@@ -16,18 +16,19 @@ Sections:
 """
 
 import json
+import logging
 import os
 import time
-import logging
 import urllib.parse
-import boto3
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+import boto3
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 try:
     from platform_logger import get_logger
+
     logger = get_logger("weekly-signal")
 except ImportError:
     logger = logging.getLogger("weekly-signal")
@@ -51,26 +52,29 @@ ses = boto3.client("sesv2", region_name=REGION)
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
 OBSERVATORY_ROTATION = [
-    {"name": "Sleep",     "path": "/sleep/",     "hook": "How your sleep patterns shape recovery and readiness."},
-    {"name": "Glucose",   "path": "/glucose/",   "hook": "CGM data revealing how food choices affect energy and metabolic health."},
-    {"name": "Nutrition", "path": "/nutrition/",  "hook": "Macro targets, meal timing, and what the data says about fueling."},
-    {"name": "Training",  "path": "/training/",   "hook": "Strain, recovery balance, and how training load connects to progress."},
-    {"name": "Inner Life", "path": "/mind/",      "hook": "Journaling, habits, and the behavioral data behind consistency."},
+    {"name": "Sleep", "path": "/sleep/", "hook": "How your sleep patterns shape recovery and readiness."},
+    {"name": "Glucose", "path": "/glucose/", "hook": "CGM data revealing how food choices affect energy and metabolic health."},
+    {"name": "Nutrition", "path": "/nutrition/", "hook": "Macro targets, meal timing, and what the data says about fueling."},
+    {"name": "Training", "path": "/training/", "hook": "Strain, recovery balance, and how training load connects to progress."},
+    {"name": "Inner Life", "path": "/mind/", "hook": "Journaling, habits, and the behavioral data behind consistency."},
 ]
 
 BOARD_ROTATION = [
-    {"name": "The Chair",    "title": "Board Chair"},
-    {"name": "Dr. Chen",     "title": "Behavioral Science"},
-    {"name": "Dr. Okafor",   "title": "Longevity Medicine"},
-    {"name": "Dr. Park",     "title": "Sleep & Circadian"},
-    {"name": "Dr. Patrick",  "title": "Metabolic Health"},
+    {"name": "The Chair", "title": "Board Chair"},
+    {"name": "Dr. Chen", "title": "Behavioral Science"},
+    {"name": "Dr. Okafor", "title": "Longevity Medicine"},
+    {"name": "Dr. Park", "title": "Sleep & Circadian"},
+    {"name": "Dr. Patrick", "title": "Metabolic Health"},
 ]
 
 
 def _d2f(obj):
-    if isinstance(obj, list): return [_d2f(i) for i in obj]
-    if isinstance(obj, dict): return {k: _d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [_d2f(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: _d2f(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
 
 
@@ -91,7 +95,7 @@ def _get_confirmed_subscribers():
         "FilterExpression": "#s = :confirmed",
         "ExpressionAttributeNames": {"#s": "status"},
         "ExpressionAttributeValues": {
-            ":pk":        f"{USER_PREFIX}subscribers",
+            ":pk": f"{USER_PREFIX}subscribers",
             ":confirmed": "confirmed",
         },
     }
@@ -112,16 +116,20 @@ def _get_weekly_insight():
     today = datetime.now(timezone.utc).date()
     week_ago = (today - timedelta(days=7)).isoformat()
     try:
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": f"{USER_PREFIX}computed_insights",
-                ":s":  f"DATE#{week_ago}",
-                ":e":  f"DATE#{today.isoformat()}",
-            },
-            "ScanIndexForward": False,
-            "Limit": 5,
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                    "ExpressionAttributeValues": {
+                        ":pk": f"{USER_PREFIX}computed_insights",
+                        ":s": f"DATE#{week_ago}",
+                        ":e": f"DATE#{today.isoformat()}",
+                    },
+                    "ScanIndexForward": False,
+                    "Limit": 5,
+                }
+            )
+        )
         items = [_d2f(i) for i in resp.get("Items", [])]
         for item in items:
             guidance = item.get("guidance_given") or item.get("top_insight") or item.get("summary")
@@ -134,12 +142,13 @@ def _get_weekly_insight():
 
 # ── Section builders ──────────────────────────────────────────────────────────
 
+
 def _sec(title, content):
     """Wrap content in a styled section box."""
-    return f'''<div style="background:#161b22;border-radius:8px;border:1px solid rgba(230,237,243,0.08);padding:24px 28px;margin-bottom:16px;">
+    return f"""<div style="background:#161b22;border-radius:8px;border:1px solid rgba(230,237,243,0.08);padding:24px 28px;margin-bottom:16px;">
   <p style="font-family:'Courier New',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#3db88a;margin:0 0 16px;">{title}</p>
   {content}
-</div>'''
+</div>"""
 
 
 def _build_numbers(stats):
@@ -156,12 +165,20 @@ def _build_numbers(stats):
     if weight is not None:
         arrow = "↓" if delta and delta < 0 else "↑" if delta and delta > 0 else ""
         delta_str = f" ({arrow}{abs(delta):.1f} lbs 30d)" if delta else ""
-        rows.append(f'<tr><td style="color:#8b949e;padding:4px 12px 4px 0;">Weight</td><td style="color:#c9d1d9;font-weight:600;">{weight} lbs{delta_str}</td></tr>')
+        rows.append(
+            f'<tr><td style="color:#8b949e;padding:4px 12px 4px 0;">Weight</td><td style="color:#c9d1d9;font-weight:600;">{weight} lbs{delta_str}</td></tr>'
+        )
     if sleep:
-        rows.append(f'<tr><td style="color:#8b949e;padding:4px 12px 4px 0;">Avg Sleep</td><td style="color:#c9d1d9;font-weight:600;">{sleep:.1f} hrs</td></tr>')
+        rows.append(
+            f'<tr><td style="color:#8b949e;padding:4px 12px 4px 0;">Avg Sleep</td><td style="color:#c9d1d9;font-weight:600;">{sleep:.1f} hrs</td></tr>'
+        )
     if recovery:
-        rows.append(f'<tr><td style="color:#8b949e;padding:4px 12px 4px 0;">Recovery</td><td style="color:#c9d1d9;font-weight:600;">{recovery:.0f}%</td></tr>')
-    rows.append(f'<tr><td style="color:#8b949e;padding:4px 12px 4px 0;">Character</td><td style="color:#c9d1d9;font-weight:600;">Level {level} · {tier}</td></tr>')
+        rows.append(
+            f'<tr><td style="color:#8b949e;padding:4px 12px 4px 0;">Recovery</td><td style="color:#c9d1d9;font-weight:600;">{recovery:.0f}%</td></tr>'
+        )
+    rows.append(
+        f'<tr><td style="color:#8b949e;padding:4px 12px 4px 0;">Character</td><td style="color:#c9d1d9;font-weight:600;">Level {level} · {tier}</td></tr>'
+    )
 
     return _sec("The Numbers", f'<table style="font-size:14px;line-height:1.8;">{"".join(rows)}</table>')
 
@@ -177,31 +194,37 @@ def _build_chronicle(posts_data):
     # Truncate excerpt to ~2 sentences
     sentences = excerpt.split(". ")
     preview = ". ".join(sentences[:2]) + ("." if len(sentences) > 1 else "")
-    return _sec("Chronicle Preview", f'''<p style="font-size:16px;color:#c9d1d9;font-weight:600;margin:0 0 8px;">{title}</p>
+    return _sec(
+        "Chronicle Preview",
+        f"""<p style="font-size:16px;color:#c9d1d9;font-weight:600;margin:0 0 8px;">{title}</p>
   <p style="font-size:13px;color:#8b949e;line-height:1.6;margin:0 0 12px;">{preview}</p>
-  <a href="{SITE_URL}{url}" style="font-family:'Courier New',monospace;font-size:11px;letter-spacing:1px;color:#3db88a;text-decoration:none;">Read more →</a>''')
+  <a href="{SITE_URL}{url}" style="font-family:'Courier New',monospace;font-size:11px;letter-spacing:1px;color:#3db88a;text-decoration:none;">Read more →</a>""",
+    )
 
 
 def _build_worked(insight_text):
     if not insight_text:
         return ""
-    return _sec("What Worked This Week",
-                f'<p style="font-size:13px;color:#c9d1d9;line-height:1.7;margin:0;">{insight_text}</p>')
+    return _sec("What Worked This Week", f'<p style="font-size:13px;color:#c9d1d9;line-height:1.7;margin:0;">{insight_text}</p>')
 
 
 def _build_board_quote(week_num):
     member = BOARD_ROTATION[week_num % len(BOARD_ROTATION)]
-    return _sec("The Board Says",
-                f'<p style="font-size:13px;color:#c9d1d9;line-height:1.7;margin:0 0 8px;font-style:italic;">"Check the data, not the mirror. Progress at this stage is measured in trends, not snapshots."</p>'
-                f'<p style="font-family:\'Courier New\',monospace;font-size:10px;color:#8b949e;margin:0;">— {member["name"]}, {member["title"]}</p>')
+    return _sec(
+        "The Board Says",
+        f'<p style="font-size:13px;color:#c9d1d9;line-height:1.7;margin:0 0 8px;font-style:italic;">"Check the data, not the mirror. Progress at this stage is measured in trends, not snapshots."</p>'
+        f'<p style="font-family:\'Courier New\',monospace;font-size:10px;color:#8b949e;margin:0;">— {member["name"]}, {member["title"]}</p>',
+    )
 
 
 def _build_spotlight(week_num):
     obs = OBSERVATORY_ROTATION[week_num % len(OBSERVATORY_ROTATION)]
-    return _sec("Observatory Spotlight",
-                f'<p style="font-size:14px;color:#c9d1d9;font-weight:600;margin:0 0 8px;">{obs["name"]}</p>'
-                f'<p style="font-size:13px;color:#8b949e;line-height:1.6;margin:0 0 12px;">{obs["hook"]}</p>'
-                f'<a href="{SITE_URL}{obs["path"]}" style="font-family:\'Courier New\',monospace;font-size:11px;letter-spacing:1px;color:#3db88a;text-decoration:none;">Explore {obs["name"]} →</a>')
+    return _sec(
+        "Observatory Spotlight",
+        f'<p style="font-size:14px;color:#c9d1d9;font-weight:600;margin:0 0 8px;">{obs["name"]}</p>'
+        f'<p style="font-size:13px;color:#8b949e;line-height:1.6;margin:0 0 12px;">{obs["hook"]}</p>'
+        f'<a href="{SITE_URL}{obs["path"]}" style="font-family:\'Courier New\',monospace;font-size:11px;letter-spacing:1px;color:#3db88a;text-decoration:none;">Explore {obs["name"]} →</a>',
+    )
 
 
 def _build_email(stats, posts_data, insight_text, week_num, unsub_url):
@@ -243,6 +266,7 @@ def _build_email(stats, posts_data, insight_text, week_num, unsub_url):
 
 # ── Handler ───────────────────────────────────────────────────────────────────
 
+
 def lambda_handler(event, context):
     try:
         if os.environ.get("EXTERNAL_EMAILS_ENABLED", "true").lower() != "true":
@@ -282,10 +306,12 @@ def lambda_handler(event, context):
                 ses.send_email(
                     FromEmailAddress=SENDER,
                     Destination={"ToAddresses": [email]},
-                    Content={"Simple": {
-                        "Subject": {"Data": subject, "Charset": "UTF-8"},
-                        "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
-                    }},
+                    Content={
+                        "Simple": {
+                            "Subject": {"Data": subject, "Charset": "UTF-8"},
+                            "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
+                        }
+                    },
                 )
                 sent += 1
                 logger.info("Sent %d/%d (%s...)", i + 1, len(subscribers), email[:6])

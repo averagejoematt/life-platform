@@ -30,12 +30,12 @@ import urllib.request
 from decimal import Decimal
 
 import boto3
-
 from phase_filter import with_phase_filter  # ADR-058
 
 # Structured logger
 try:
     from platform_logger import get_logger
+
     logger = get_logger("coach-quality-gate")
 except ImportError:
     logger = logging.getLogger("coach-quality-gate")
@@ -90,6 +90,7 @@ def _get_api_key():
 # HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _decimal_to_float(obj):
     """Recursively convert DynamoDB Decimals to float for JSON serialization."""
     if isinstance(obj, Decimal):
@@ -112,8 +113,7 @@ def _float_to_decimal(obj):
     return obj
 
 
-def _emit_token_metrics(input_tokens, output_tokens,
-                        cache_creation_tokens=0, cache_read_tokens=0):
+def _emit_token_metrics(input_tokens, output_tokens, cache_creation_tokens=0, cache_read_tokens=0):
     """Emit per-Lambda token usage to CloudWatch (non-fatal).
 
     V2 P0.6 (2026-05-17): added cache fields. Prior 2-arg signature dropped them,
@@ -124,25 +124,33 @@ def _emit_token_metrics(input_tokens, output_tokens,
             {
                 "MetricName": "AnthropicInputTokens",
                 "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": input_tokens, "Unit": "Count",
+                "Value": input_tokens,
+                "Unit": "Count",
             },
             {
                 "MetricName": "AnthropicOutputTokens",
                 "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": output_tokens, "Unit": "Count",
+                "Value": output_tokens,
+                "Unit": "Count",
             },
         ]
         if cache_creation_tokens or cache_read_tokens:
-            metric_data.append({
-                "MetricName": "AnthropicCacheWriteTokens",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": cache_creation_tokens, "Unit": "Count",
-            })
-            metric_data.append({
-                "MetricName": "AnthropicCacheReadTokens",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": cache_read_tokens, "Unit": "Count",
-            })
+            metric_data.append(
+                {
+                    "MetricName": "AnthropicCacheWriteTokens",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": cache_creation_tokens,
+                    "Unit": "Count",
+                }
+            )
+            metric_data.append(
+                {
+                    "MetricName": "AnthropicCacheReadTokens",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": cache_read_tokens,
+                    "Unit": "Count",
+                }
+            )
         _cw.put_metric_data(Namespace=_CW_NAMESPACE, MetricData=metric_data)
     except Exception as e:
         logger.warning("CloudWatch token metric emit failed (non-fatal): %s", e)
@@ -153,11 +161,14 @@ def _emit_failure_metric():
     try:
         _cw.put_metric_data(
             Namespace=_CW_NAMESPACE,
-            MetricData=[{
-                "MetricName": "AnthropicAPIFailure",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": 1, "Unit": "Count",
-            }],
+            MetricData=[
+                {
+                    "MetricName": "AnthropicAPIFailure",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": 1,
+                    "Unit": "Count",
+                }
+            ],
         )
     except Exception as e:
         logger.warning("CloudWatch failure metric emit failed (non-fatal): %s", e)
@@ -166,6 +177,7 @@ def _emit_failure_metric():
 # ══════════════════════════════════════════════════════════════════════════════
 # ANTHROPIC API CALL
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _call_haiku(system, user_message, max_tokens=800, temperature=0.1):
     """Call Anthropic Haiku with exponential backoff + CloudWatch metrics.
@@ -203,6 +215,7 @@ def _call_haiku(system, user_message, max_tokens=800, temperature=0.1):
     # urllib except handlers are gone. `req` is still built above; call_anthropic_raw
     # extracts its JSON body and forwards to bedrock_client.invoke().
     from retry_utils import call_anthropic_raw
+
     resp = call_anthropic_raw(req)
     text = resp["content"][0]["text"].strip()
     # Try to parse as JSON
@@ -233,6 +246,7 @@ def _call_haiku(system, user_message, max_tokens=800, temperature=0.1):
 # DYNAMODB / S3 OPERATIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _get_item(pk, sk):
     """Get a single DynamoDB item. Returns None if not found or on error."""
     try:
@@ -247,6 +261,7 @@ def _get_item(pk, sk):
 def _query_begins_with(pk, sk_prefix, scan_forward=True, limit=None):
     """Query DynamoDB for items with SK beginning with a prefix."""
     from boto3.dynamodb.conditions import Key
+
     try:
         kwargs = {
             "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
@@ -297,8 +312,14 @@ def _fetch_other_coaches_recent_outputs(coach_id, other_coach_ids=None):
     Returns a dict of {coach_id: output_content_preview}.
     """
     all_coach_ids = [
-        "sleep_coach", "nutrition_coach", "training_coach", "mind_coach",
-        "physical_coach", "glucose_coach", "labs_coach", "explorer_coach",
+        "sleep_coach",
+        "nutrition_coach",
+        "training_coach",
+        "mind_coach",
+        "physical_coach",
+        "glucose_coach",
+        "labs_coach",
+        "explorer_coach",
     ]
 
     if other_coach_ids:
@@ -309,7 +330,8 @@ def _fetch_other_coaches_recent_outputs(coach_id, other_coach_ids=None):
     other_outputs = {}
     for other_id in compare_ids:
         outputs = _query_begins_with(
-            f"COACH#{other_id}", "OUTPUT#",
+            f"COACH#{other_id}",
+            "OUTPUT#",
             scan_forward=False,
             limit=1,
         )
@@ -376,8 +398,7 @@ QUALITY_GATE_SYSTEM_PROMPT = (
 )
 
 
-def _build_quality_gate_message(coach_id, output_text, voice_spec, generation_brief,
-                                other_outputs=None):
+def _build_quality_gate_message(coach_id, output_text, voice_spec, generation_brief, other_outputs=None):
     """Build the user message for the quality gate LLM call."""
     parts = [
         f"## Coach: {coach_id}",
@@ -448,10 +469,7 @@ def _build_quality_gate_message(coach_id, output_text, voice_spec, generation_br
                 parts.append(f"  {other_content}")
         parts.append("")
 
-    parts.append(
-        "Evaluate the output above against all four criteria. "
-        "Return ONLY valid JSON with the quality report."
-    )
+    parts.append("Evaluate the output above against all four criteria. " "Return ONLY valid JSON with the quality report.")
 
     return "\n".join(parts)
 
@@ -459,6 +477,7 @@ def _build_quality_gate_message(coach_id, output_text, voice_spec, generation_br
 # ══════════════════════════════════════════════════════════════════════════════
 # QUALITY GATE LOGIC
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _build_fallback_report(coach_id, error_msg):
     """Build a permissive fallback report when the LLM call fails.
@@ -478,14 +497,17 @@ def _build_fallback_report(coach_id, error_msg):
     }
 
 
-def _run_quality_gate(coach_id, output_text, voice_spec, generation_brief,
-                      other_outputs=None):
+def _run_quality_gate(coach_id, output_text, voice_spec, generation_brief, other_outputs=None):
     """Run the quality gate check via Haiku.
 
     Returns the quality report dict.
     """
     user_message = _build_quality_gate_message(
-        coach_id, output_text, voice_spec, generation_brief, other_outputs,
+        coach_id,
+        output_text,
+        voice_spec,
+        generation_brief,
+        other_outputs,
     )
 
     try:
@@ -497,9 +519,7 @@ def _run_quality_gate(coach_id, output_text, voice_spec, generation_brief,
         )
 
         if not isinstance(result, dict):
-            logger.warning(
-                "Quality gate LLM returned non-dict for %s — using fallback", coach_id
-            )
+            logger.warning("Quality gate LLM returned non-dict for %s — using fallback", coach_id)
             return _build_fallback_report(coach_id, "LLM returned non-JSON")
 
         # Ensure required fields with defaults
@@ -521,13 +541,11 @@ def _run_quality_gate(coach_id, output_text, voice_spec, generation_brief,
                 result["suggestions"].append("Voice distinctiveness below minimum threshold")
 
         logger.info(
-            "Quality gate for %s: passed=%s, score=%s, violations=%d, "
-            "voice_score=%s, similarity_flags=%d",
+            "Quality gate for %s: passed=%s, score=%s, violations=%d, " "voice_score=%s, similarity_flags=%d",
             coach_id,
             result["passed"],
             result["score"],
-            len(result.get("anti_pattern_violations", []))
-            + len(result.get("decision_class_violations", [])),
+            len(result.get("anti_pattern_violations", [])) + len(result.get("decision_class_violations", [])),
             result["voice_distinctiveness_score"],
             len(result.get("cross_coach_similarity_flags", [])),
         )
@@ -542,6 +560,7 @@ def _run_quality_gate(coach_id, output_text, voice_spec, generation_brief,
 # ══════════════════════════════════════════════════════════════════════════════
 # HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def lambda_handler(event, context):
     """Post-generation quality gate for coach output.
@@ -582,7 +601,8 @@ def lambda_handler(event, context):
 
         logger.info(
             "coach-quality-gate START — coach=%s, text_length=%d",
-            coach_id, len(output_text),
+            coach_id,
+            len(output_text),
         )
 
         # Load voice spec — from event or S3
@@ -605,12 +625,18 @@ def lambda_handler(event, context):
 
         # Run the quality gate
         report = _run_quality_gate(
-            coach_id, output_text, voice_spec, generation_brief, other_outputs,
+            coach_id,
+            output_text,
+            voice_spec,
+            generation_brief,
+            other_outputs,
         )
 
         logger.info(
             "coach-quality-gate COMPLETE — coach=%s, passed=%s, score=%s",
-            coach_id, report.get("passed"), report.get("score"),
+            coach_id,
+            report.get("passed"),
+            report.get("score"),
         )
 
         return {

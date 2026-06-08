@@ -39,12 +39,12 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import boto3
-
 from phase_filter import with_phase_filter  # ADR-058
 
 # Structured logger
 try:
     from platform_logger import get_logger
+
     logger = get_logger("coach-history-summarizer")
 except ImportError:
     logger = logging.getLogger("coach-history-summarizer")
@@ -63,20 +63,26 @@ AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 # All coach IDs in the system
 ALL_COACH_IDS = [
-    "sleep_coach", "nutrition_coach", "training_coach", "mind_coach",
-    "physical_coach", "glucose_coach", "labs_coach", "explorer_coach",
+    "sleep_coach",
+    "nutrition_coach",
+    "training_coach",
+    "mind_coach",
+    "physical_coach",
+    "glucose_coach",
+    "labs_coach",
+    "explorer_coach",
 ]
 
 # Coach display names and domains — used in compressed state output
 COACH_META = {
-    "sleep_coach":     {"display_name": "Dr. Lisa Park",       "domain": "sleep_science"},
-    "nutrition_coach": {"display_name": "Elena Vasquez",        "domain": "nutrition"},
-    "training_coach":  {"display_name": "Marcus Chen",          "domain": "training"},
-    "mind_coach":      {"display_name": "Dr. James Okafor",    "domain": "mind_performance"},
-    "physical_coach":  {"display_name": "Dr. Sarah Kim",       "domain": "physical_health"},
-    "glucose_coach":   {"display_name": "Dr. Anil Mehta",      "domain": "glucose_metabolism"},
-    "labs_coach":      {"display_name": "Dr. Rachel Johansson", "domain": "biomarkers"},
-    "explorer_coach":  {"display_name": "Jordan Rivera",        "domain": "cross_domain"},
+    "sleep_coach": {"display_name": "Dr. Lisa Park", "domain": "sleep_science"},
+    "nutrition_coach": {"display_name": "Elena Vasquez", "domain": "nutrition"},
+    "training_coach": {"display_name": "Marcus Chen", "domain": "training"},
+    "mind_coach": {"display_name": "Dr. James Okafor", "domain": "mind_performance"},
+    "physical_coach": {"display_name": "Dr. Sarah Kim", "domain": "physical_health"},
+    "glucose_coach": {"display_name": "Dr. Anil Mehta", "domain": "glucose_metabolism"},
+    "labs_coach": {"display_name": "Dr. Rachel Johansson", "domain": "biomarkers"},
+    "explorer_coach": {"display_name": "Jordan Rivera", "domain": "cross_domain"},
 }
 
 # Maximum OUTPUT# records to fetch per coach
@@ -119,6 +125,7 @@ def _get_api_key():
 # HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _decimal_to_float(obj):
     """Recursively convert DynamoDB Decimals to float for JSON serialization."""
     if isinstance(obj, Decimal):
@@ -141,8 +148,7 @@ def _float_to_decimal(obj):
     return obj
 
 
-def _emit_token_metrics(input_tokens, output_tokens,
-                        cache_creation_tokens=0, cache_read_tokens=0):
+def _emit_token_metrics(input_tokens, output_tokens, cache_creation_tokens=0, cache_read_tokens=0):
     """Emit per-Lambda token usage to CloudWatch (non-fatal).
 
     V2 P0.6 (2026-05-17): added cache fields. Prior 2-arg signature dropped them,
@@ -153,25 +159,33 @@ def _emit_token_metrics(input_tokens, output_tokens,
             {
                 "MetricName": "AnthropicInputTokens",
                 "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": input_tokens, "Unit": "Count",
+                "Value": input_tokens,
+                "Unit": "Count",
             },
             {
                 "MetricName": "AnthropicOutputTokens",
                 "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": output_tokens, "Unit": "Count",
+                "Value": output_tokens,
+                "Unit": "Count",
             },
         ]
         if cache_creation_tokens or cache_read_tokens:
-            metric_data.append({
-                "MetricName": "AnthropicCacheWriteTokens",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": cache_creation_tokens, "Unit": "Count",
-            })
-            metric_data.append({
-                "MetricName": "AnthropicCacheReadTokens",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": cache_read_tokens, "Unit": "Count",
-            })
+            metric_data.append(
+                {
+                    "MetricName": "AnthropicCacheWriteTokens",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": cache_creation_tokens,
+                    "Unit": "Count",
+                }
+            )
+            metric_data.append(
+                {
+                    "MetricName": "AnthropicCacheReadTokens",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": cache_read_tokens,
+                    "Unit": "Count",
+                }
+            )
         _cw.put_metric_data(Namespace=_CW_NAMESPACE, MetricData=metric_data)
     except Exception as e:
         logger.warning("CloudWatch token metric emit failed (non-fatal): %s", e)
@@ -182,11 +196,14 @@ def _emit_failure_metric():
     try:
         _cw.put_metric_data(
             Namespace=_CW_NAMESPACE,
-            MetricData=[{
-                "MetricName": "AnthropicAPIFailure",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": 1, "Unit": "Count",
-            }],
+            MetricData=[
+                {
+                    "MetricName": "AnthropicAPIFailure",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": 1,
+                    "Unit": "Count",
+                }
+            ],
         )
     except Exception as e:
         logger.warning("CloudWatch failure metric emit failed (non-fatal): %s", e)
@@ -195,6 +212,7 @@ def _emit_failure_metric():
 # ══════════════════════════════════════════════════════════════════════════════
 # ANTHROPIC API CALL
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _call_haiku(system, user_message, max_tokens=1500, temperature=0.2):
     """Call Anthropic Haiku with exponential backoff + CloudWatch metrics.
@@ -228,6 +246,7 @@ def _call_haiku(system, user_message, max_tokens=1500, temperature=0.2):
 
     # ADR-062 (2026-05-27): route through retry_utils.call_anthropic_raw (Bedrock).
     from retry_utils import call_anthropic_raw
+
     resp = call_anthropic_raw(req)
     text = resp["content"][0]["text"].strip()
     try:
@@ -255,6 +274,7 @@ def _call_haiku(system, user_message, max_tokens=1500, temperature=0.2):
 # ══════════════════════════════════════════════════════════════════════════════
 # DYNAMODB OPERATIONS
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _get_item(pk, sk):
     """Get a single DynamoDB item. Returns None if not found or on error."""
@@ -284,11 +304,15 @@ def _query_begins_with(pk, sk_prefix, scan_forward=True, limit=None, include_pil
     (phase=pilot) are hidden. Pass include_pilot=True to see them.
     """
     from boto3.dynamodb.conditions import Key
+
     try:
-        kwargs = with_phase_filter({
-            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
-            "ScanIndexForward": scan_forward,
-        }, include_pilot=include_pilot)
+        kwargs = with_phase_filter(
+            {
+                "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
+                "ScanIndexForward": scan_forward,
+            },
+            include_pilot=include_pilot,
+        )
         if limit:
             kwargs["Limit"] = limit
 
@@ -314,6 +338,7 @@ def _query_begins_with(pk, sk_prefix, scan_forward=True, limit=None, include_pil
 # DATA GATHERING
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _gather_coach_state(coach_id):
     """Gather all state for a single coach from DynamoDB.
 
@@ -329,7 +354,8 @@ def _gather_coach_state(coach_id):
 
     # 1. Query OUTPUT# records — most recent first (ScanIndexForward=False)
     outputs = _query_begins_with(
-        coach_pk, "OUTPUT#",
+        coach_pk,
+        "OUTPUT#",
         scan_forward=False,
         limit=MAX_OUTPUT_RECORDS,
     )
@@ -340,18 +366,19 @@ def _gather_coach_state(coach_id):
     open_threads = [t for t in all_threads if t.get("status") == "open"]
     logger.info(
         "Fetched %d THREAD# records for %s (%d open)",
-        len(all_threads), coach_id, len(open_threads),
+        len(all_threads),
+        coach_id,
+        len(open_threads),
     )
 
     # 3. Query all PREDICTION# records, filter to active statuses
     all_predictions = _query_begins_with(coach_pk, "PREDICTION#")
-    active_predictions = [
-        p for p in all_predictions
-        if p.get("status") in ACTIVE_PREDICTION_STATUSES
-    ]
+    active_predictions = [p for p in all_predictions if p.get("status") in ACTIVE_PREDICTION_STATUSES]
     logger.info(
         "Fetched %d PREDICTION# records for %s (%d active)",
-        len(all_predictions), coach_id, len(active_predictions),
+        len(all_predictions),
+        coach_id,
+        len(active_predictions),
     )
 
     # 4. Query all CONFIDENCE# records
@@ -493,10 +520,7 @@ def _build_compression_message(coach_id, state):
             thread_type = thread.get("type", "observation")
             ref_count = thread.get("reference_count", 0)
             last_ref = thread.get("last_referenced", "unknown")
-            parts.append(
-                f"  - [{thread_type}] {slug}: {summary} "
-                f"(refs={ref_count}, last_ref={last_ref})"
-            )
+            parts.append(f"  - [{thread_type}] {slug}: {summary} " f"(refs={ref_count}, last_ref={last_ref})")
         parts.append("")
     else:
         parts.append("## Open Threads: NONE")
@@ -512,10 +536,7 @@ def _build_compression_message(coach_id, state):
             status = pred.get("status", "pending")
             confidence = pred.get("confidence", 0.5)
             subdomain = pred.get("subdomain", "general")
-            parts.append(
-                f"  - [{status}] {pred_id}: {claim} "
-                f"(confidence={confidence}, subdomain={subdomain})"
-            )
+            parts.append(f"  - [{status}] {pred_id}: {claim} " f"(confidence={confidence}, subdomain={subdomain})")
         parts.append("")
     else:
         parts.append("## Active Predictions: NONE")
@@ -584,6 +605,7 @@ def _build_compression_message(coach_id, state):
 # COMPRESSION LOGIC
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _build_fallback_compressed_state(coach_id, state):
     """Build a minimal compressed state when the LLM call fails.
 
@@ -627,15 +649,14 @@ def _build_fallback_compressed_state(coach_id, state):
         "display_name": meta["display_name"],
         "domain": meta["domain"],
         "summary": f"[FALLBACK — LLM compression failed] Coach {meta['display_name']} "
-                   f"has {len(outputs)} outputs, "
-                   f"{len(state.get('open_threads', []))} open threads, "
-                   f"{len(state.get('active_predictions', []))} active predictions. "
-                   f"Manual review recommended.",
+        f"has {len(outputs)} outputs, "
+        f"{len(state.get('open_threads', []))} open threads, "
+        f"{len(state.get('active_predictions', []))} active predictions. "
+        f"Manual review recommended.",
         "key_concerns": [],
         "key_recommendations": [],
         "active_threads": [
-            {"id": t.get("sk", "").replace("THREAD#", ""), "summary": t.get("summary", "")}
-            for t in state.get("open_threads", [])[:5]
+            {"id": t.get("sk", "").replace("THREAD#", ""), "summary": t.get("summary", "")} for t in state.get("open_threads", [])[:5]
         ],
         "active_predictions": [
             {
@@ -677,9 +698,7 @@ def _compress_coach(coach_id, state):
         )
 
         if not isinstance(result, dict):
-            logger.warning(
-                "LLM returned non-dict for %s compression — using fallback", coach_id
-            )
+            logger.warning("LLM returned non-dict for %s compression — using fallback", coach_id)
             return _build_fallback_compressed_state(coach_id, state)
 
         # Ensure required fields are present with defaults
@@ -749,6 +768,7 @@ def _write_compressed_state(coach_id, compressed):
 # HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def lambda_handler(event, context):
     """Weekly history compression for coach intelligence system.
 
@@ -761,7 +781,8 @@ def lambda_handler(event, context):
         coach_ids = event.get("coach_ids", ALL_COACH_IDS)
         logger.info(
             "coach-history-summarizer START — compressing %d coaches: %s",
-            len(coach_ids), coach_ids,
+            len(coach_ids),
+            coach_ids,
         )
 
         results = {}
@@ -776,9 +797,7 @@ def lambda_handler(event, context):
 
                 # Check if there's any data to compress
                 total_records = (
-                    len(state.get("outputs", []))
-                    + len(state.get("open_threads", []))
-                    + len(state.get("active_predictions", []))
+                    len(state.get("outputs", [])) + len(state.get("open_threads", [])) + len(state.get("active_predictions", []))
                 )
                 if total_records == 0:
                     logger.info("No data for %s — skipping compression", coach_id)
@@ -818,7 +837,9 @@ def lambda_handler(event, context):
 
         logger.info(
             "coach-history-summarizer COMPLETE: %d success, %d skipped, %d errors",
-            success_count, skip_count, error_count,
+            success_count,
+            skip_count,
+            error_count,
         )
 
         return {

@@ -23,6 +23,7 @@ A future module may add advisory progression text gated on that SSM flag.
 Data source: USER#matthew#SOURCE#hevy partition. Per-workout records
 have exercises[].template_id + sets[].weight_kg + sets[].reps.
 """
+
 from __future__ import annotations
 
 import logging
@@ -46,9 +47,7 @@ _ddb_table = None
 def _table():
     global _ddb_table
     if _ddb_table is None:
-        _ddb_table = boto3.resource(
-            "dynamodb", region_name=os.environ.get("AWS_REGION", "us-west-2")
-        ).Table(TABLE_NAME)
+        _ddb_table = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "us-west-2")).Table(TABLE_NAME)
     return _ddb_table
 
 
@@ -102,10 +101,14 @@ def load_recent_history(
     # would make the routine generator think every lift is brand-new (owner
     # decision 2026-06-06). include_pilot=True is a deliberate no-op annotation.
     from phase_filter import with_phase_filter
+
     while True:
-        kwargs: dict[str, Any] = with_phase_filter({
-            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").gte(f"DATE#{start}"),
-        }, include_pilot=True)
+        kwargs: dict[str, Any] = with_phase_filter(
+            {
+                "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").gte(f"DATE#{start}"),
+            },
+            include_pilot=True,
+        )
         if last_key:
             kwargs["ExclusiveStartKey"] = last_key
         resp = _table().query(**kwargs)
@@ -129,11 +132,13 @@ def load_recent_history(
                 if not sets:
                     continue
                 top_weight = max((s["weight_kg"] for s in sets), default=0.0)
-                index.setdefault(tid, []).append({
-                    "date": workout_date,
-                    "sets": sets,
-                    "top_weight_kg": top_weight,
-                })
+                index.setdefault(tid, []).append(
+                    {
+                        "date": workout_date,
+                        "sets": sets,
+                        "top_weight_kg": top_weight,
+                    }
+                )
         last_key = resp.get("LastEvaluatedKey")
         if not last_key:
             break
@@ -165,8 +170,7 @@ def history_facts(template_id: str | None, index: dict[str, list[dict[str, Any]]
     }
 
 
-_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
 def _short_date(iso: str) -> str:

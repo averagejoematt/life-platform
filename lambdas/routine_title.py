@@ -24,6 +24,7 @@ Variant overrides:
 Kept in its own module so hevy_compiler stays I/O-free. The compiler
 imports format_title lazily and only when a title_context is supplied.
 """
+
 from __future__ import annotations
 
 import json
@@ -32,7 +33,6 @@ from typing import Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
-
 from constants import EXPERIMENT_START_DATE
 from routine_ir import RoutineSpec
 
@@ -60,9 +60,7 @@ def _s3_client():
 def _table():
     global _ddb_table
     if _ddb_table is None:
-        _ddb_table = boto3.resource(
-            "dynamodb", region_name=os.environ.get("AWS_REGION", "us-west-2")
-        ).Table(TABLE_NAME)
+        _ddb_table = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "us-west-2")).Table(TABLE_NAME)
     return _ddb_table
 
 
@@ -76,9 +74,7 @@ def load_phase_state() -> dict[str, Any]:
     if os.path.exists(local):
         with open(local, encoding="utf-8") as f:
             return json.load(f)
-    obj = _s3_client().get_object(
-        Bucket=S3_BUCKET, Key=f"{S3_CONFIG_PREFIX}training_phases.json"
-    )
+    obj = _s3_client().get_object(Bucket=S3_BUCKET, Key=f"{S3_CONFIG_PREFIX}training_phases.json")
     return json.loads(obj["Body"].read())
 
 
@@ -102,9 +98,7 @@ def count_performed_workouts_since(start_date: str) -> int:
     return total
 
 
-def count_experiment_archetype_routines(
-    archetype: str, target_date_exclusive: str
-) -> int:
+def count_experiment_archetype_routines(archetype: str, target_date_exclusive: str) -> int:
     """Count ROUTINE_INDEX entries with this archetype since EXPERIMENT_START_DATE,
     excluding any with target_date >= target_date_exclusive (the routine being
     committed now). Skips floor/re_entry variants so paired sessions don't
@@ -112,10 +106,7 @@ def count_experiment_archetype_routines(
     """
     pk = f"USER#{USER_ID}#SOURCE#routine_index"
     resp = _table().query(
-        KeyConditionExpression=Key("pk").eq(pk)
-        & Key("sk").between(
-            f"DATE#{EXPERIMENT_START_DATE}", f"DATE#{target_date_exclusive}"
-        ),
+        KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{EXPERIMENT_START_DATE}", f"DATE#{target_date_exclusive}"),
     )
     seen_routine_ids: set[str] = set()
     count = 0
@@ -175,8 +166,7 @@ def format_why_note(ir: RoutineSpec) -> str:
         # Custom-authored session (ADR-069): surface the user's own first note
         # line rather than a generator-flavored rationale that doesn't apply.
         lines = [ln for ln in (ir.notes or "").splitlines() if ln.strip()]
-        return (lines[0].strip()[:140] if lines
-                else "Custom session — manually programmed.")
+        return lines[0].strip()[:140] if lines else "Custom session — manually programmed."
     if ir.variant == "re_entry":
         return "Easing back in after a gap. Take it gently today."
     if ir.variant == "floor":

@@ -74,20 +74,22 @@ Default (no payload): ingests yesterday's wake date.
 """
 
 import gzip
-import os
-import logging
 import json
+import logging
 import math
-import urllib.request
-import urllib.parse
+import os
 import urllib.error
-import boto3
-from datetime import datetime, timezone, timedelta
+import urllib.parse
+import urllib.request
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+
+import boto3
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("eightsleep")
 except ImportError:
     logger = logging.getLogger("eightsleep")
@@ -121,6 +123,7 @@ def _get_es_client_creds():
         _es_client_cache = {}
     return _es_client_cache
 
+
 # ── Timezone offset map ────────────────────────────────────────────────────────
 # No pytz in Lambda. DST offset is ±1h — acceptable for circadian analysis
 # where we care about consistency rather than exact precision.
@@ -130,18 +133,18 @@ _TZ_OFFSETS = {
     "America/Denver": -7,
     "America/Chicago": -6,
     "America/New_York": -5,
-    "Europe/London":        0,
-    "Europe/Paris":         1,
-    "Europe/Berlin":        1,
-    "Asia/Tokyo":           9,
-    "Australia/Sydney":    10,
+    "Europe/London": 0,
+    "Europe/Paris": 1,
+    "Europe/Berlin": 1,
+    "Asia/Tokyo": 9,
+    "Australia/Sydney": 10,
 }
 _DEFAULT_TZ_OFFSET = -8  # PST (Seattle)
 
 # ── AWS clients (module-level — reused across Lambda warm invocations) ─────────
 secrets_client = boto3.client("secretsmanager", region_name=REGION)
-s3_client = boto3.client("s3",             region_name=REGION)
-dynamodb = boto3.resource("dynamodb",      region_name=REGION)
+s3_client = boto3.client("s3", region_name=REGION)
+dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(DYNAMODB_TABLE)
 
 # COST-OPT-1: Cache secrets in warm Lambda containers (15-min TTL)
@@ -150,6 +153,7 @@ _secret_cache = {}
 
 def _cached_secret(client, secret_id):
     import time as _t
+
     entry = _secret_cache.get(secret_id)
     if entry and _t.time() - entry[1] < 900:
         return entry[0]
@@ -163,11 +167,16 @@ def _cached_secret(client, secret_id):
 try:
     from numeric import floats_to_decimal  # noqa: F401
 except ImportError:
+
     def floats_to_decimal(obj):
-        if isinstance(obj, bool): return obj
-        if isinstance(obj, float): return Decimal(str(obj))
-        if isinstance(obj, dict): return {k: floats_to_decimal(v) for k, v in obj.items()}
-        if isinstance(obj, list): return [floats_to_decimal(v) for v in obj]
+        if isinstance(obj, bool):
+            return obj
+        if isinstance(obj, float):
+            return Decimal(str(obj))
+        if isinstance(obj, dict):
+            return {k: floats_to_decimal(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [floats_to_decimal(v) for v in obj]
         return obj
 
 
@@ -187,34 +196,37 @@ def save_secret(secret: dict):
 # ── Auth ───────────────────────────────────────────────────────────────────────
 def login(email: str, password: str, client_id: str = None, client_secret: str = None, **kwargs) -> dict:
     """OAuth2 password-grant. Returns {access_token, refresh_token, user_id}."""
-    payload = json.dumps({
-        "client_id":     client_id or _get_es_client_creds().get("client_id", ""),
-        "client_secret": client_secret or _get_es_client_creds().get("client_secret", ""),
-        "grant_type":    "password",
-        "username":      email,
-        "password":      password,
-    }).encode()
+    payload = json.dumps(
+        {
+            "client_id": client_id or _get_es_client_creds().get("client_id", ""),
+            "client_secret": client_secret or _get_es_client_creds().get("client_secret", ""),
+            "grant_type": "password",
+            "username": email,
+            "password": password,
+        }
+    ).encode()
 
     req = urllib.request.Request(
         f"{AUTH_API}/v1/tokens",
         data=payload,
         headers={
-            "Content-Type":    "application/json",
-            "Accept":          "application/json",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
             "Accept-Encoding": "gzip",
-            "user-agent":      "okhttp/4.9.3",
+            "user-agent": "okhttp/4.9.3",
         },
         method="POST",
     )
     # Phase 3.5 (2026-05-16): retry on transient 429/5xx.
     from http_retry import urlopen_with_retry
+
     with urlopen_with_retry(req, timeout=30) as resp:
         data = json.loads(resp.read())
 
     return {
-        "access_token":  data["access_token"],
+        "access_token": data["access_token"],
         "refresh_token": data.get("refresh_token", ""),
-        "user_id":       data["userId"],
+        "user_id": data["userId"],
     }
 
 
@@ -237,6 +249,7 @@ def ensure_user_id(secret: dict) -> dict:
     )
     # Phase 3.5 (2026-05-16): retry on transient 429/5xx.
     from http_retry import urlopen_with_retry
+
     with urlopen_with_retry(req, timeout=30) as resp:
         data = json.loads(resp.read())
     secret["user_id"] = data["user"]["userId"]
@@ -251,17 +264,18 @@ def api_get(path: str, access_token: str, params: dict = None) -> dict:
     req = urllib.request.Request(
         url,
         headers={
-            "Authorization":   f"Bearer {access_token}",
-            "Content-Type":    "application/json",
-            "Accept":          "application/json",
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
             "Accept-Encoding": "gzip",
-            "user-agent":      "okhttp/4.9.3",
+            "user-agent": "okhttp/4.9.3",
         },
     )
     # Phase 3.5 (2026-05-16): retry on transient 429/5xx.
     # Note: http_retry wraps the response and hides .headers — detect gzip via
     # magic bytes (1f 8b) instead of relying on the Content-Encoding header.
     from http_retry import urlopen_with_retry
+
     with urlopen_with_retry(req, timeout=30) as resp:
         raw = resp.read()
         if raw[:2] == b"\x1f\x8b":
@@ -270,6 +284,7 @@ def api_get(path: str, access_token: str, params: dict = None) -> dict:
 
 
 # ── Derived field helpers ──────────────────────────────────────────────────────
+
 
 def _safe_float(val, divisor=1):
     """Convert val to float; return None on failure."""
@@ -303,7 +318,7 @@ def _sleep_midpoint(onset_hour: float, wake_hour: float) -> float:
     Compute sleep midpoint handling midnight crossing.
     e.g. onset=23.0, wake=7.0 → midpoint=3.0  (not 15.0)
     """
-    if wake_hour <= onset_hour:     # session crosses midnight
+    if wake_hour <= onset_hour:  # session crosses midnight
         wake_hour += 24
     return round(((onset_hour + wake_hour) / 2.0) % 24, 2)
 
@@ -344,13 +359,16 @@ def compute_derived_fields(record: dict, tz_offset: int = _DEFAULT_TZ_OFFSET) ->
     # ── Stage percentages ─────────────────────────────────────────────────────
     if sleep_h and float(sleep_h) > 0:
         sh = float(sleep_h)
-        if rem_h is not None: derived["rem_pct"] = round(float(rem_h) / sh * 100, 1)
-        if deep_h is not None: derived["deep_pct"] = round(float(deep_h) / sh * 100, 1)
-        if light_h is not None: derived["light_pct"] = round(float(light_h) / sh * 100, 1)
+        if rem_h is not None:
+            derived["rem_pct"] = round(float(rem_h) / sh * 100, 1)
+        if deep_h is not None:
+            derived["deep_pct"] = round(float(deep_h) / sh * 100, 1)
+        if light_h is not None:
+            derived["light_pct"] = round(float(light_h) / sh * 100, 1)
 
     # ── Circadian timing ──────────────────────────────────────────────────────
     onset_h = _hour_of_day(sleep_start, tz_offset) if sleep_start else None
-    wake_h = _hour_of_day(sleep_end,   tz_offset) if sleep_end else None
+    wake_h = _hour_of_day(sleep_end, tz_offset) if sleep_end else None
 
     if onset_h is not None:
         derived["sleep_onset_hour"] = onset_h
@@ -363,7 +381,6 @@ def compute_derived_fields(record: dict, tz_offset: int = _DEFAULT_TZ_OFFSET) ->
 
 
 # ── Sleep data parsing ─────────────────────────────────────────────────────────
-
 
 
 def fetch_temperature_data(user_id: str, access_token: str, wake_date: str, tz: str) -> dict:
@@ -403,10 +420,10 @@ def fetch_temperature_data(user_id: str, access_token: str, wake_date: str, tz: 
         # Method 1: Top-level temperature fields
         if target.get("tempBedC") is not None:
             result["bed_temp_c"] = round(float(target["tempBedC"]), 1)
-            result["bed_temp_f"] = round(float(target["tempBedC"]) * 9/5 + 32, 1)
+            result["bed_temp_f"] = round(float(target["tempBedC"]) * 9 / 5 + 32, 1)
         if target.get("tempRoomC") is not None:
             result["room_temp_c"] = round(float(target["tempRoomC"]), 1)
-            result["room_temp_f"] = round(float(target["tempRoomC"]) * 9/5 + 32, 1)
+            result["room_temp_f"] = round(float(target["tempRoomC"]) * 9 / 5 + 32, 1)
 
         # Method 2: Timeseries temperature data
         ts = target.get("timeseries") or {}
@@ -417,13 +434,15 @@ def fetch_temperature_data(user_id: str, access_token: str, wake_date: str, tz: 
             vals = []
             for point in bed_temps:
                 if isinstance(point, (list, tuple)) and len(point) >= 2:
-                    try: vals.append(float(point[1]))
-                    except (ValueError, TypeError): pass
+                    try:
+                        vals.append(float(point[1]))
+                    except (ValueError, TypeError):
+                        pass
                 elif isinstance(point, (int, float)):
                     vals.append(float(point))
             if vals:
                 result["bed_temp_c"] = round(sum(vals) / len(vals), 1)
-                result["bed_temp_f"] = round(result["bed_temp_c"] * 9/5 + 32, 1)
+                result["bed_temp_f"] = round(result["bed_temp_c"] * 9 / 5 + 32, 1)
                 result["bed_temp_min_c"] = round(min(vals), 1)
                 result["bed_temp_max_c"] = round(max(vals), 1)
 
@@ -431,13 +450,15 @@ def fetch_temperature_data(user_id: str, access_token: str, wake_date: str, tz: 
             vals = []
             for point in room_temps:
                 if isinstance(point, (list, tuple)) and len(point) >= 2:
-                    try: vals.append(float(point[1]))
-                    except (ValueError, TypeError): pass
+                    try:
+                        vals.append(float(point[1]))
+                    except (ValueError, TypeError):
+                        pass
                 elif isinstance(point, (int, float)):
                     vals.append(float(point))
             if vals:
                 result["room_temp_c"] = round(sum(vals) / len(vals), 1)
-                result["room_temp_f"] = round(result["room_temp_c"] * 9/5 + 32, 1)
+                result["room_temp_f"] = round(result["room_temp_c"] * 9 / 5 + 32, 1)
 
         # Method 3: Per-stage temperature settings (heating/cooling level)
         stages = target.get("stages") or []
@@ -446,13 +467,15 @@ def fetch_temperature_data(user_id: str, access_token: str, wake_date: str, tz: 
             temp_info = stage.get("temp") or stage.get("temperature") or {}
             level = temp_info.get("level")
             if level is not None:
-                try: temp_levels.append(float(level))
-                except (ValueError, TypeError): pass
+                try:
+                    temp_levels.append(float(level))
+                except (ValueError, TypeError):
+                    pass
             stage_bed = temp_info.get("bedC") or temp_info.get("bed_temp_c")
             if stage_bed is not None and "bed_temp_c" not in result:
                 try:
                     result["bed_temp_c"] = round(float(stage_bed), 1)
-                    result["bed_temp_f"] = round(float(stage_bed) * 9/5 + 32, 1)
+                    result["bed_temp_f"] = round(float(stage_bed) * 9 / 5 + 32, 1)
                 except (ValueError, TypeError):
                     pass
 
@@ -468,7 +491,7 @@ def fetch_temperature_data(user_id: str, access_token: str, wake_date: str, tz: 
             if isinstance(val, dict) and val.get("current") is not None and "bed_temp_c" not in result:
                 try:
                     result["bed_temp_c"] = round(float(val["current"]), 1)
-                    result["bed_temp_f"] = round(result["bed_temp_c"] * 9/5 + 32, 1)
+                    result["bed_temp_f"] = round(result["bed_temp_c"] * 9 / 5 + 32, 1)
                 except (ValueError, TypeError):
                     pass
 
@@ -490,9 +513,9 @@ def fetch_temperature_data(user_id: str, access_token: str, wake_date: str, tz: 
 
 def parse_trends_for_date(
     trends_data: dict,
-    wake_date:   str,
-    bed_side:    str,
-    tz_offset:   int = _DEFAULT_TZ_OFFSET,
+    wake_date: str,
+    bed_side: str,
+    tz_offset: int = _DEFAULT_TZ_OFFSET,
 ) -> dict | None:
     """
     Extract one night matching wake_date from the Eight Sleep trends API response.
@@ -556,28 +579,27 @@ def parse_trends_for_date(
     sleep_end = target.get("sleepEnd")
 
     record = {
-        "sleep_score":          _safe_float(target.get("score")),
-        "sleep_start":          sleep_start,
-        "sleep_end":            sleep_end,
+        "sleep_score": _safe_float(target.get("score")),
+        "sleep_start": sleep_start,
+        "sleep_end": sleep_end,
         "sleep_duration_hours": secs_to_hours(sleep_s),
-        "time_to_sleep_min":    latency_min,
-        "awake_hours":          secs_to_hours(awake_s),
-        "light_hours":          secs_to_hours(target.get("lightDuration")),
-        "deep_hours":           secs_to_hours(target.get("deepDuration")),
-        "rem_hours":            secs_to_hours(target.get("remDuration")),
-        "hr_avg":               hr_avg,
-        "hrv_avg":              hrv_avg,
-        "respiratory_rate":     resp_rate,
-        "toss_turn_count":      _safe_float(target.get("tnt")),
-        "bed_side":             bed_side,
+        "time_to_sleep_min": latency_min,
+        "awake_hours": secs_to_hours(awake_s),
+        "light_hours": secs_to_hours(target.get("lightDuration")),
+        "deep_hours": secs_to_hours(target.get("deepDuration")),
+        "rem_hours": secs_to_hours(target.get("remDuration")),
+        "hr_avg": hr_avg,
+        "hrv_avg": hrv_avg,
+        "respiratory_rate": resp_rate,
+        "toss_turn_count": _safe_float(target.get("tnt")),
+        "bed_side": bed_side,
     }
     # Strip None values before computing derived fields
     record = {k: v for k, v in record.items() if v is not None}
 
     # ── Field presence validation (F2.5) ──────────────────────────────────────
     ES_CRITICAL = ["sleep_score", "sleep_duration_hours", "sleep_start", "sleep_end"]
-    ES_EXPECTED = ["deep_hours", "rem_hours", "light_hours", "hr_avg",
-                   "hrv_avg", "respiratory_rate", "time_to_sleep_min"]
+    ES_EXPECTED = ["deep_hours", "rem_hours", "light_hours", "hr_avg", "hrv_avg", "respiratory_rate", "time_to_sleep_min"]
     missing_crit = [f for f in ES_CRITICAL if f not in record]
     missing_exp = [f for f in ES_EXPECTED if f not in record]
     if missing_crit:
@@ -624,15 +646,13 @@ def fetch_day(credentials: dict, date_str: str) -> dict | None:
     tz = secret.get("timezone", "America/Los_Angeles")
     from_date = (datetime.strptime(date_str, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
     try:
-        trends = api_get(f"/v1/users/{user_id_es}/trends", token,
-                         params={"from": from_date, "to": date_str, "tz": tz})
+        trends = api_get(f"/v1/users/{user_id_es}/trends", token, params={"from": from_date, "to": date_str, "tz": tz})
     except urllib.error.HTTPError as e:
         if e.code == 401:
             logger.info("Eight Sleep 401 — re-logging in and retrying...")
             secret = refresh_token(secret)
             _secret_cache_simp2["secret"] = secret
-            trends = api_get(f"/v1/users/{user_id_es}/trends", secret["access_token"],
-                             params={"from": from_date, "to": date_str, "tz": tz})
+            trends = api_get(f"/v1/users/{user_id_es}/trends", secret["access_token"], params={"from": from_date, "to": date_str, "tz": tz})
         else:
             raise
     temp = fetch_temperature_data(user_id_es, secret["access_token"], date_str, tz)
@@ -647,12 +667,14 @@ def transform(raw: dict, date_str: str) -> list[dict]:
     parsed = parse_trends_for_date(raw["trends"], date_str, raw["bed_side"], tz_offset=tz_offset)
     if not parsed:
         return []
-    return [{
-        "source": "eightsleep",
-        "date":   date_str,
-        **parsed,
-        **(raw["temp"] or {}),
-    }]
+    return [
+        {
+            "source": "eightsleep",
+            "date": date_str,
+            **parsed,
+            **(raw["temp"] or {}),
+        }
+    ]
 
 
 _config = IngestionConfig(
@@ -676,5 +698,3 @@ def lambda_handler(event: dict, context) -> dict:
     except Exception as e:
         logger.error("eightsleep ingestion failed: %s", e, exc_info=True)
         raise
-
-

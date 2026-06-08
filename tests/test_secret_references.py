@@ -28,6 +28,7 @@ v1.0.0 — 2026-03-15 (R13-F04)
 import os
 import re
 import sys
+
 import pytest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -44,8 +45,8 @@ EXCLUDE_PATTERNS = [
     "__pycache__",
     "cdk.out",
     "deprecated_secrets.txt",
-    "test_secret_references.py",       # this file
-    "test_iam_secrets_consistency.py", # already covers IAM layer
+    "test_secret_references.py",  # this file
+    "test_iam_secrets_consistency.py",  # already covers IAM layer
 ]
 
 # ── Canonical known secrets ───────────────────────────────────────────────────
@@ -66,45 +67,44 @@ KNOWN_SECRETS = {
     "life-platform/todoist",  # TD-23 (2026-05-02): added to KNOWN; Phase 2.6 (2026-05-16) added to freshness checker monitoring
     "life-platform/site-api-ai-key",
     "life-platform/eightsleep-client",
-    "life-platform/hevy",                   # ADR-060 / SPEC_HEVY (2026-05-25)
+    "life-platform/hevy",  # ADR-060 / SPEC_HEVY (2026-05-25)
     "life-platform/github-dispatch-token",  # ADR-064 (2026-05-29): remediation dispatcher PAT
-    "life-platform/subscriber-token-secret", # #106 (2026-05-30): dedicated HMAC signing key for subscriber tokens
+    "life-platform/subscriber-token-secret",  # #106 (2026-05-30): dedicated HMAC signing key for subscriber tokens
     # life-platform/google-calendar removed — retired ADR-030 (v3.7.46)
 }
 
 # Secrets permanently deleted — any source reference is an SR2 violation.
 DELETED_SECRETS = {
-    "life-platform/api-keys",          # deleted 2026-03-15 (TB7-4)
-    "life-platform/webhook-key",       # deleted 2026-03-14 (HANDOVER_v3.7.84)
-    "life-platform/anthropic-api-key", # Phase 1.4 (2026-05-16): orphan soft-deleted, permanent 2026-05-23
+    "life-platform/api-keys",  # deleted 2026-03-15 (TB7-4)
+    "life-platform/webhook-key",  # deleted 2026-03-14 (HANDOVER_v3.7.84)
+    "life-platform/anthropic-api-key",  # Phase 1.4 (2026-05-16): orphan soft-deleted, permanent 2026-05-23
 }
 
 # Partial strings that appear in code but are NOT literal secret names.
 # Used to avoid false positives on env var names, variable names, etc.
 FALSE_POSITIVE_PATTERNS = {
-    "SECRET_NAME",           # env var name
-    "ANTHROPIC_SECRET",      # env var name
-    "MCP_SECRET_NAME",       # env var name
+    "SECRET_NAME",  # env var name
+    "ANTHROPIC_SECRET",  # env var name
+    "MCP_SECRET_NAME",  # env var name
     "HABITIFY_SECRET_NAME",  # env var name
-    "NOTION_SECRET_NAME",    # env var name
-    "secret_name",           # local variable name
-    "_secret_name",          # local variable name
-    "SecretString",          # boto3 response field
-    "get_secret_value",      # boto3 call
-    "secret.get(",           # dict access
-    "secrets.get(",          # dict access
+    "NOTION_SECRET_NAME",  # env var name
+    "secret_name",  # local variable name
+    "_secret_name",  # local variable name
+    "SecretString",  # boto3 response field
+    "get_secret_value",  # boto3 call
+    "secret.get(",  # dict access
+    "secrets.get(",  # dict access
 }
 
 # Regex: matches quoted 'life-platform/...' string literals in source code.
-_SECRET_LITERAL_RE = re.compile(
-    r"""['\"](life-platform/[a-zA-Z0-9_\-]+)['\"]"""
-)
+_SECRET_LITERAL_RE = re.compile(r"""['\"](life-platform/[a-zA-Z0-9_\-]+)['\"]""")
 
 # Convention: all secret names must have this prefix.
 _CONVENTION_RE = re.compile(r"^life-platform/")
 
 
 # ── File collection ───────────────────────────────────────────────────────────
+
 
 def _collect_files():
     """Collect all Python source files to scan.
@@ -167,6 +167,7 @@ for _f in _FILES:
 # SR1 — Every referenced secret must be in KNOWN_SECRETS
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def test_sr1_all_secret_references_are_known():
     """SR1: Every 'life-platform/...' string literal in Lambda source must be
     a known or explicitly-deleted secret.
@@ -198,6 +199,7 @@ def test_sr1_all_secret_references_are_known():
 # SR2 — No source file may reference a deleted secret
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def test_sr2_no_deleted_secret_references():
     """SR2: Lambda source must not reference permanently deleted secrets.
 
@@ -211,9 +213,7 @@ def test_sr2_no_deleted_secret_references():
     for filepath, lineno, secret_name in _ALL_REFS:
         if secret_name in DELETED_SECRETS:
             rel = os.path.relpath(filepath, ROOT)
-            violations.append(
-                f"  {rel}:{lineno} — '{secret_name}' has been permanently deleted"
-            )
+            violations.append(f"  {rel}:{lineno} — '{secret_name}' has been permanently deleted")
 
     assert not violations, (
         f"SR2 FAIL: {len(violations)} source file(s) reference DELETED secret(s):\n"
@@ -227,6 +227,7 @@ def test_sr2_no_deleted_secret_references():
 # SR3 — Convention check: all secret names must have life-platform/ prefix
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def test_sr3_secret_names_follow_convention():
     """SR3: All 'life-platform/...' literals must follow the naming convention.
 
@@ -237,9 +238,7 @@ def test_sr3_secret_names_follow_convention():
     for filepath, lineno, secret_name in _ALL_REFS:
         if not _CONVENTION_RE.match(secret_name):
             rel = os.path.relpath(filepath, ROOT)
-            violations.append(
-                f"  {rel}:{lineno} — '{secret_name}' does not follow life-platform/* convention"
-            )
+            violations.append(f"  {rel}:{lineno} — '{secret_name}' does not follow life-platform/* convention")
 
     assert not violations, (
         f"SR3 FAIL: {len(violations)} secret name(s) violate naming convention:\n"
@@ -251,6 +250,7 @@ def test_sr3_secret_names_follow_convention():
 # ══════════════════════════════════════════════════════════════════════════════
 # SR4 — Sanity: scanner must find at least some references
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_sr4_secret_references_found():
     """SR4: The scanner must find at least a minimum number of secret references.
@@ -274,6 +274,7 @@ def test_sr4_secret_references_found():
 
 if __name__ == "__main__":
     import subprocess
+
     result = subprocess.run(
         ["python3", "-m", "pytest", __file__, "-v", "--tb=short"],
         cwd=ROOT,

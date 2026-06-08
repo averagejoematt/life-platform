@@ -21,6 +21,7 @@ Key facts:
 
 This module is part of the shared Lambda layer.
 """
+
 import json
 import os
 
@@ -32,12 +33,12 @@ from botocore.config import Config
 # (e.g. "claude-sonnet-4-6"). Map them to the us-region cross-region inference
 # profiles that Bedrock requires for on-demand throughput.
 _MODEL_MAP = {
-    "claude-sonnet-4-6":           "us.anthropic.claude-sonnet-4-6",
-    "claude-sonnet-4-5-20250929":  "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
-    "claude-haiku-4-5-20251001":   "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-    "claude-opus-4-7":             "us.anthropic.claude-opus-4-7",
-    "claude-opus-4-6":             "us.anthropic.claude-opus-4-6-v1",
-    "claude-3-5-haiku-20241022":   "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+    "claude-sonnet-4-6": "us.anthropic.claude-sonnet-4-6",
+    "claude-sonnet-4-5-20250929": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    "claude-haiku-4-5-20251001": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+    "claude-opus-4-7": "us.anthropic.claude-opus-4-7",
+    "claude-opus-4-6": "us.anthropic.claude-opus-4-6-v1",
+    "claude-3-5-haiku-20241022": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
 }
 
 # Fallback if an unmapped model name shows up — Haiku 4.5 (cheapest current).
@@ -99,12 +100,10 @@ def invoke(body: dict, model_name: str | None = None) -> dict:
     # catch this and degrade (coaches → fallback brief, ai_calls → [AI_UNAVAILABLE]).
     # Fail-open: if budget_guard is unavailable, proceed (never break AI on a blip).
     try:
-        from budget_guard import current_tier, BudgetExceeded
+        from budget_guard import BudgetExceeded, current_tier
+
         if current_tier() >= 3:
-            raise BudgetExceeded(
-                "AI paused — monthly $75 budget ceiling reached (tier 3). "
-                "Auto-resumes at month rollover."
-            )
+            raise BudgetExceeded("AI paused — monthly $75 budget ceiling reached (tier 3). " "Auto-resumes at month rollover.")
     except ImportError:
         pass
 

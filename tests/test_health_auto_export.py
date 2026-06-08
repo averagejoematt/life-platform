@@ -39,9 +39,7 @@ except ImportError as _e:
     hae = None  # type: ignore
 
 if _import_err is not None:
-    pytestmark = pytest.mark.skip(  # type: ignore
-        reason=f"health_auto_export_lambda unavailable: {_import_err}"
-    )
+    pytestmark = pytest.mark.skip(reason=f"health_auto_export_lambda unavailable: {_import_err}")  # type: ignore
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -56,8 +54,7 @@ class TestPickSourceOrAll:
         # SOURCE_PRIORITY['steps']: ["matt 17", "matt", "iphone", "apple watch", "watch", "connect"]
         counts = Counter({"iPhone (Matt 17)": 100, "Garmin Connect": 80})
         chosen = hae.pick_source_or_all("steps", counts)
-        assert chosen == "iPhone (Matt 17)", \
-            f"Expected Matt-17 iPhone to win priority order, got {chosen!r}"
+        assert chosen == "iPhone (Matt 17)", f"Expected Matt-17 iPhone to win priority order, got {chosen!r}"
 
     def test_steps_iphone_wins_when_no_matt17(self):
         # No Matt-17 device — next priority match is 'iphone'
@@ -99,8 +96,7 @@ class TestPickSourceOrAll:
         # 'steps' has a priority list but neither source matches any entry
         counts = Counter({"Unknown App A": 100, "Unknown App B": 50})
         chosen = hae.pick_source_or_all("steps", counts)
-        assert chosen == "Unknown App A", \
-            "Should fall back to most-common when priority defined but no match"
+        assert chosen == "Unknown App A", "Should fall back to most-common when priority defined but no match"
 
     def test_empty_counter_returns_none(self):
         chosen = hae.pick_source_or_all("steps", Counter())
@@ -127,11 +123,13 @@ class TestProcessGenericMetrics:
 
     def test_iphone_garmin_step_dedup_iphone_wins(self):
         """TD-15/16: iPhone steps + Garmin steps for same date → only iPhone writes."""
-        metrics = [_metric(
-            "Step Count",
-            _reading("iPhone (Matt 17)", 5000),
-            _reading("Garmin Connect", 7500),
-        )]
+        metrics = [
+            _metric(
+                "Step Count",
+                _reading("iPhone (Matt 17)", 5000),
+                _reading("Garmin Connect", 7500),
+            )
+        ]
         daily, _, audit = hae.process_generic_metrics(metrics)
         # Only the priority winner's value lands — not the sum (12500)
         assert daily["2026-05-02"]["steps"] == 5000
@@ -142,22 +140,26 @@ class TestProcessGenericMetrics:
 
     def test_single_source_unchanged(self):
         """TD-15: when only one source is present, behavior is unchanged."""
-        metrics = [_metric(
-            "Step Count",
-            _reading("iPhone (Matt 17)", 3000),
-            _reading("iPhone (Matt 17)", 2000),  # second reading from same source
-        )]
+        metrics = [
+            _metric(
+                "Step Count",
+                _reading("iPhone (Matt 17)", 3000),
+                _reading("iPhone (Matt 17)", 2000),  # second reading from same source
+            )
+        ]
         daily, _, audit = hae.process_generic_metrics(metrics)
         assert daily["2026-05-02"]["steps"] == 5000  # sum across same-source readings
         assert audit == {}  # no rejection — nothing to dedup
 
     def test_water_dedup_my_water_wins_over_macrofactor(self):
         """TD-15: water double-count (My Water + MacroFactor mirroring) gets deduped."""
-        metrics = [_metric(
-            "Dietary Water",
-            _reading("My Water", 60),       # 60 fl_oz_us
-            _reading("MacroFactor", 60),    # MacroFactor mirror
-        )]
+        metrics = [
+            _metric(
+                "Dietary Water",
+                _reading("My Water", 60),  # 60 fl_oz_us
+                _reading("MacroFactor", 60),  # MacroFactor mirror
+            )
+        ]
         daily, _, audit = hae.process_generic_metrics(metrics)
         # 60 fl_oz_us → ~1774 mL; not 120 fl_oz / 3548 mL doubled
         assert daily["2026-05-02"]["water_intake_ml"] == round(60 * 29.5735)
@@ -168,11 +170,13 @@ class TestProcessGenericMetrics:
         TD-17 / Tier-2: HAE Lambda keeps these but Whoop is source of truth, so
         the dedup story is "is_apple_device filter, then accept everything Apple."
         Resting Heart Rate is the cleanest Tier-2 to assert on (simple avg agg)."""
-        metrics = [_metric(
-            "Resting Heart Rate",
-            _reading("Apple Watch", 50),
-            _reading("Apple Watch", 60),
-        )]
+        metrics = [
+            _metric(
+                "Resting Heart Rate",
+                _reading("Apple Watch", 50),
+                _reading("Apple Watch", 60),
+            )
+        ]
         daily, _, audit = hae.process_generic_metrics(metrics)
         # 'resting_heart_rate_apple' field, avg agg, no priority rejection
         assert daily["2026-05-02"]["resting_heart_rate_apple"] == 55
@@ -189,26 +193,32 @@ class TestWeightBodyMassAlias:
     only knew 'Body Mass' / 'body_mass' and silently ignored the variant."""
 
     def test_weight_body_mass_lowercase_writes_weight_record(self):
-        metrics = [_metric(
-            "weight_body_mass",
-            _reading("iPhone", 175.0, "2026-05-02 07:00:00 -0800"),
-        )]
+        metrics = [
+            _metric(
+                "weight_body_mass",
+                _reading("iPhone", 175.0, "2026-05-02 07:00:00 -0800"),
+            )
+        ]
         daily, _, _ = hae.process_generic_metrics(metrics)
         assert daily["2026-05-02"]["weight_lbs"] == 175.0
 
     def test_weight_body_mass_titlecase_writes_weight_record(self):
-        metrics = [_metric(
-            "Weight Body Mass",
-            _reading("iPhone", 176.5, "2026-05-02 07:00:00 -0800"),
-        )]
+        metrics = [
+            _metric(
+                "Weight Body Mass",
+                _reading("iPhone", 176.5, "2026-05-02 07:00:00 -0800"),
+            )
+        ]
         daily, _, _ = hae.process_generic_metrics(metrics)
         assert daily["2026-05-02"]["weight_lbs"] == 176.5
 
     def test_body_mass_legacy_name_still_works(self):
         """Regression guard: original 'Body Mass' name keeps working."""
-        metrics = [_metric(
-            "Body Mass",
-            _reading("iPhone", 174.0, "2026-05-02 07:00:00 -0800"),
-        )]
+        metrics = [
+            _metric(
+                "Body Mass",
+                _reading("iPhone", 174.0, "2026-05-02 07:00:00 -0800"),
+            )
+        ]
         daily, _, _ = hae.process_generic_metrics(metrics)
         assert daily["2026-05-02"]["weight_lbs"] == 174.0

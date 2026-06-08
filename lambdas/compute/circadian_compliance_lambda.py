@@ -24,10 +24,10 @@ v1.0.0 — 2026-03-17 (BS-SL2)
 """
 
 import json
-import os
-import time
 import logging
 import math
+import os
+import time
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -35,6 +35,7 @@ import boto3
 
 try:
     from platform_logger import get_logger
+
     logger = get_logger("circadian-compliance")
 except ImportError:
     logger = logging.getLogger("circadian-compliance")
@@ -61,6 +62,7 @@ MORNING_LIGHT_WINDOW_MINUTES = int(os.environ.get("MORNING_LIGHT_WINDOW_MINUTES"
 # HELPERS
 # ==============================================================================
 
+
 def _sf(rec, field, default=None):
     if not rec or field not in rec:
         return default
@@ -80,9 +82,12 @@ def _to_dec(val):
 
 
 def d2f(obj):
-    if isinstance(obj, list): return [d2f(i) for i in obj]
-    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [d2f(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
 
 
@@ -100,15 +105,19 @@ def fetch_range(source, start, end):
     # actual sleep rhythm history, not just the post-restart week (owner
     # decision 2026-06-06). include_pilot=True is a deliberate no-op annotation.
     from phase_filter import with_phase_filter
+
     try:
-        records, kwargs = [], with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": USER_PREFIX + source,
-                ":s":  "DATE#" + start,
-                ":e":  "DATE#" + end,
+        records, kwargs = [], with_phase_filter(
+            {
+                "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                "ExpressionAttributeValues": {
+                    ":pk": USER_PREFIX + source,
+                    ":s": "DATE#" + start,
+                    ":e": "DATE#" + end,
+                },
             },
-        }, include_pilot=True)
+            include_pilot=True,
+        )
         while True:
             r = table.query(**kwargs)
             records.extend(d2f(i) for i in r.get("Items", []))
@@ -129,8 +138,8 @@ def fetch_journal_today(date_str):
             KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
             ExpressionAttributeValues={
                 ":pk": pk,
-                ":s":  f"DATE#{date_str}#journal",
-                ":e":  f"DATE#{date_str}#journal#~",
+                ":s": f"DATE#{date_str}#journal",
+                ":e": f"DATE#{date_str}#journal#~",
             },
         )
         return [d2f(i) for i in resp.get("Items", [])]
@@ -160,6 +169,7 @@ def _parse_time_to_hour(time_str):
 # ==============================================================================
 # SCORING COMPONENTS
 # ==============================================================================
+
 
 def score_morning_light(today_str, journal_entries):
     """
@@ -195,7 +205,7 @@ def score_morning_light(today_str, journal_entries):
     # Check Strava for early walk/run (proxy for outdoor exposure)
     strava = fetch_source_date("strava", today_str)
     if strava:
-        for act in (strava.get("activities") or []):
+        for act in strava.get("activities") or []:
             sport = (act.get("sport_type") or "").lower()
             start_time = act.get("start_date_local") or act.get("start_time") or ""
             hour = _parse_time_to_hour(start_time)
@@ -251,7 +261,7 @@ def score_meal_timing(today_str):
     elif hours_before_bed >= 2.0:
         return 10, f"Last meal ~{last_meal_str} — {hours_before_bed:.1f}h before target sleep (marginal)"
     else:
-        return 3,  f"Last meal ~{last_meal_str} — only {max(0, hours_before_bed):.1f}h before target sleep (too close)"
+        return 3, f"Last meal ~{last_meal_str} — only {max(0, hours_before_bed):.1f}h before target sleep (too close)"
 
 
 def score_screen_windown(journal_entries):
@@ -269,11 +279,35 @@ def score_screen_windown(journal_entries):
       No signal                    → 15 pts (neutral — can't confirm either way)
       Screen use mentioned         → 5 pts
     """
-    windown_positive = ["reading", "meditation", "meditat", "journal", "stretch", "bath",
-                        "dim", "wind down", "wind-down", "candle", "no screen", "no phone",
-                        "book", "quiet", "relaxed evening"]
-    windown_negative = ["scrolling", "netflix", "youtube", "bright", "screens", "phone before bed",
-                        "late night screen", "tv until", "instagram", "tiktok"]
+    windown_positive = [
+        "reading",
+        "meditation",
+        "meditat",
+        "journal",
+        "stretch",
+        "bath",
+        "dim",
+        "wind down",
+        "wind-down",
+        "candle",
+        "no screen",
+        "no phone",
+        "book",
+        "quiet",
+        "relaxed evening",
+    ]
+    windown_negative = [
+        "scrolling",
+        "netflix",
+        "youtube",
+        "bright",
+        "screens",
+        "phone before bed",
+        "late night screen",
+        "tv until",
+        "instagram",
+        "tiktok",
+    ]
 
     for entry in journal_entries:
         raw_text = (entry.get("raw_text") or entry.get("content") or "").lower()
@@ -333,21 +367,22 @@ def score_sleep_consistency(today_str):
     elif sd_minutes < 45:
         return 12, f"Moderate variability — {sd_str} (Huberman: aim for <30 min SD)"
     elif sd_minutes < 60:
-        return 6,  f"High variability — {sd_str} — inconsistent anchor weakens sleep pressure"
+        return 6, f"High variability — {sd_str} — inconsistent anchor weakens sleep pressure"
     else:
-        return 2,  f"Very irregular bedtimes — {sd_str} — circadian rhythm likely disrupted"
+        return 2, f"Very irregular bedtimes — {sd_str} — circadian rhythm likely disrupted"
 
 
 # ==============================================================================
 # SCORE ASSEMBLY
 # ==============================================================================
 
+
 def compute_circadian_score(today_str):
     """Compute all 4 components and return unified score + prescription."""
     journal = fetch_journal_today(today_str)
 
-    light_score,  light_note = score_morning_light(today_str, journal)
-    meal_score,   meal_note = score_meal_timing(today_str)
+    light_score, light_note = score_morning_light(today_str, journal)
+    meal_score, meal_note = score_meal_timing(today_str)
     screen_score, screen_note = score_screen_windown(journal)
     consist_score, consist_note = score_sleep_consistency(today_str)
 
@@ -368,23 +403,23 @@ def compute_circadian_score(today_str):
 
     # Lowest-scoring component = tonight's priority
     components = [
-        ("morning_light",     light_score,   light_note),
-        ("meal_timing",       meal_score,    meal_note),
-        ("screen_wind_down",  screen_score,  screen_note),
+        ("morning_light", light_score, light_note),
+        ("meal_timing", meal_score, meal_note),
+        ("screen_wind_down", screen_score, screen_note),
         ("sleep_consistency", consist_score, consist_note),
     ]
     weakest = min(components, key=lambda c: c[1])
     prescription += f" Priority tonight: {weakest[0].replace('_', ' ')} ({weakest[1]}/25 pts)."
 
     return {
-        "date":        today_str,
-        "score":       total,
-        "category":    category,
+        "date": today_str,
+        "score": total,
+        "category": category,
         "prescription": prescription,
         "components": {
-            "morning_light":     {"score": light_score,   "max": 25, "note": light_note},
-            "meal_timing":       {"score": meal_score,    "max": 25, "note": meal_note},
-            "screen_wind_down":  {"score": screen_score,  "max": 25, "note": screen_note},
+            "morning_light": {"score": light_score, "max": 25, "note": light_note},
+            "meal_timing": {"score": meal_score, "max": 25, "note": meal_note},
+            "screen_wind_down": {"score": screen_score, "max": 25, "note": screen_note},
             "sleep_consistency": {"score": consist_score, "max": 25, "note": consist_note},
         },
         "weakest_component": weakest[0],
@@ -400,38 +435,39 @@ def store_circadian_score(result):
     """Write to SOURCE#circadian | DATE#<today>."""
     date_str = result["date"]
     item = {
-        "pk":           USER_PREFIX + "circadian",
-        "sk":           "DATE#" + date_str,
-        "date":         date_str,
-        "score":        _to_dec(result["score"]),
-        "category":     result["category"],
+        "pk": USER_PREFIX + "circadian",
+        "sk": "DATE#" + date_str,
+        "date": date_str,
+        "score": _to_dec(result["score"]),
+        "category": result["category"],
         "prescription": result["prescription"],
         "weakest_component": result["weakest_component"],
-        "computed_at":  datetime.now(timezone.utc).isoformat(),
+        "computed_at": datetime.now(timezone.utc).isoformat(),
     }
     # Encode components
     components_enc = {}
     for comp_name, comp_data in result["components"].items():
         components_enc[comp_name] = {
             "score": _to_dec(comp_data["score"]),
-            "max":   Decimal(str(comp_data["max"])),
-            "note":  comp_data["note"],
+            "max": Decimal(str(comp_data["max"])),
+            "note": comp_data["note"],
         }
     item["components"] = components_enc
     # V2 P2.6 (2026-05-19): tag with run_id + computed_at
     try:
         from compute_metadata import tag_record
+
         item = tag_record(item, source_id="circadian")
     except ImportError:
         pass
     table.put_item(Item=item)
-    logger.info("BS-SL2: Stored circadian score for %s: %d/100 (%s)",
-                date_str, result["score"], result["category"])
+    logger.info("BS-SL2: Stored circadian score for %s: %d/100 (%s)", date_str, result["score"], result["category"])
 
 
 # ==============================================================================
 # LAMBDA HANDLER
 # ==============================================================================
+
 
 def lambda_handler(event, context):
     try:
@@ -454,11 +490,11 @@ def _lambda_handler_impl(event, context):
     logger.info("Done in %.1fs — score=%d (%s)", elapsed, result["score"], result["category"])
 
     return {
-        "statusCode":        200,
-        "body":              f"Circadian score computed: {result['score']}/100 ({result['category']})",
-        "date":              today_str,
-        "score":             result["score"],
-        "category":          result["category"],
+        "statusCode": 200,
+        "body": f"Circadian score computed: {result['score']}/100 ({result['category']})",
+        "date": today_str,
+        "score": result["score"],
+        "category": result["category"],
         "weakest_component": result["weakest_component"],
-        "elapsed_secs":      round(elapsed, 1),
+        "elapsed_secs": round(elapsed, 1),
     }

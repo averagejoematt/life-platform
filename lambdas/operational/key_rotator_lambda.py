@@ -10,15 +10,18 @@ After rotation completes:
 - Remote MCP (Claude connector): re-authenticates via OAuth on next 401
 - Bridge (.config.json): run `aws secretsmanager get-secret-value` to get new key
 """
+
+import base64
 import json
 import logging
 import secrets
-import base64
+
 import boto3
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("key-rotator")
 except ImportError:
     logger = logging.getLogger("key-rotator")
@@ -36,8 +39,7 @@ def create_secret(secret_id: str, client_request_token: str):
     """Step 1: Generate a new secret and store it as AWSPENDING."""
     # Check if AWSPENDING already exists (idempotency)
     try:
-        sm.get_secret_value(SecretId=secret_id, VersionStage="AWSPENDING",
-                            VersionId=client_request_token)
+        sm.get_secret_value(SecretId=secret_id, VersionStage="AWSPENDING", VersionId=client_request_token)
         logger.info("createSecret: AWSPENDING already exists, skipping.")
         return
     except sm.exceptions.ResourceNotFoundException:
@@ -62,8 +64,7 @@ def set_secret(secret_id: str, client_request_token: str):
 
 def test_secret(secret_id: str, client_request_token: str):
     """Step 3: Verify the pending secret can be retrieved."""
-    resp = sm.get_secret_value(SecretId=secret_id, VersionStage="AWSPENDING",
-                               VersionId=client_request_token)
+    resp = sm.get_secret_value(SecretId=secret_id, VersionStage="AWSPENDING", VersionId=client_request_token)
     new_key = resp["SecretString"]
 
     # Basic sanity: non-empty, reasonable length
@@ -86,8 +87,9 @@ def finish_secret(secret_id: str, client_request_token: str):
                 MoveToVersionId=client_request_token,
                 RemoveFromVersionId=version_id,
             )
-            logger.info(f"finishSecret: Promoted {client_request_token[:8]}... to AWSCURRENT, "
-                        f"demoted {version_id[:8]}... to AWSPREVIOUS")
+            logger.info(
+                f"finishSecret: Promoted {client_request_token[:8]}... to AWSCURRENT, " f"demoted {version_id[:8]}... to AWSPREVIOUS"
+            )
             return
 
     # If we get here, the pending version is somehow already current
@@ -97,8 +99,8 @@ def finish_secret(secret_id: str, client_request_token: str):
 # ── Lambda handler ────────────────────────────────────────────────────────────
 STEPS = {
     "createSecret": create_secret,
-    "setSecret":    set_secret,
-    "testSecret":   test_secret,
+    "setSecret": set_secret,
+    "testSecret": test_secret,
     "finishSecret": finish_secret,
 }
 

@@ -63,20 +63,22 @@ logger = logging.getLogger(__name__)
 
 # ── Output types ───────────────────────────────────────────────────────────────
 
+
 class AIOutputType(str, Enum):
-    BOD_COACHING = "bod_coaching"      # Board of Directors 2-3 sentence coaching
-    TLDR = "tldr"              # TL;DR one-liner
-    GUIDANCE = "guidance"          # Smart guidance bullet item
-    TRAINING_COACH = "training_coach"    # Training coach section
+    BOD_COACHING = "bod_coaching"  # Board of Directors 2-3 sentence coaching
+    TLDR = "tldr"  # TL;DR one-liner
+    GUIDANCE = "guidance"  # Smart guidance bullet item
+    TRAINING_COACH = "training_coach"  # Training coach section
     NUTRITION_COACH = "nutrition_coach"  # Nutrition coach section
-    JOURNAL_COACH = "journal_coach"     # Journal reflection + tactical
-    CHRONICLE = "chronicle"         # Weekly chronicle narrative
-    WEEKLY_DIGEST = "weekly_digest"     # Weekly digest coaching
-    MONTHLY_DIGEST = "monthly_digest"    # Monthly digest coaching
-    GENERIC = "generic"           # Unknown — minimal checks only
+    JOURNAL_COACH = "journal_coach"  # Journal reflection + tactical
+    CHRONICLE = "chronicle"  # Weekly chronicle narrative
+    WEEKLY_DIGEST = "weekly_digest"  # Weekly digest coaching
+    MONTHLY_DIGEST = "monthly_digest"  # Monthly digest coaching
+    GENERIC = "generic"  # Unknown — minimal checks only
 
 
 # ── Validation result ──────────────────────────────────────────────────────────
+
 
 @dataclass
 class AIValidationResult:
@@ -149,13 +151,13 @@ _GENERIC_USELESS_PHRASES = [
 # Tolerance: 25% deviation between number mentioned in text and actual context value.
 # WARN tier only — hallucinated claims are suspicious but not always wrong (rounding, etc.).
 _METRIC_PATTERNS = [
-    ("recovery_score",     r"recovery\s+(?:score\s+)?(?:is|was|of|at|:)?\s*(\d+(?:\.\d+)?)\s*%?",       "recovery score"),
-    ("hrv",                r"HRV\s+(?:of\s+|was\s+|is\s+|at\s+)?(\d+(?:\.\d+)?)\s*ms",                 "HRV (ms)"),
-    ("hrv",                r"(\d+(?:\.\d+)?)\s*ms\s+HRV",                                               "HRV (ms)"),
+    ("recovery_score", r"recovery\s+(?:score\s+)?(?:is|was|of|at|:)?\s*(\d+(?:\.\d+)?)\s*%?", "recovery score"),
+    ("hrv", r"HRV\s+(?:of\s+|was\s+|is\s+|at\s+)?(\d+(?:\.\d+)?)\s*ms", "HRV (ms)"),
+    ("hrv", r"(\d+(?:\.\d+)?)\s*ms\s+HRV", "HRV (ms)"),
     ("resting_heart_rate", r"resting\s+(?:heart\s+rate|HR)\s+(?:of\s+|was\s+|is\s+|at\s+)?(\d+(?:\.\d+)?)\s*(?:bpm)?", "resting HR"),
     ("sleep_quality_score", r"sleep\s+(?:score|quality)\s+(?:of\s+|was\s+|is\s+|at\s+)?(\d+(?:\.\d+)?)\s*%?", "sleep score"),
-    ("latest_weight",      r"weight\s+(?:of\s+|was\s+|is\s+|at\s+)?(\d{2,3}(?:\.\d+)?)\s*(?:lbs?|pounds?)", "weight"),
-    ("tsb",                r"\bTSB\s+(?:of\s+|was\s+|is\s+|at\s+)?(-?\d+(?:\.\d+)?)",                  "TSB"),
+    ("latest_weight", r"weight\s+(?:of\s+|was\s+|is\s+|at\s+)?(\d{2,3}(?:\.\d+)?)\s*(?:lbs?|pounds?)", "weight"),
+    ("tsb", r"\bTSB\s+(?:of\s+|was\s+|is\s+|at\s+)?(-?\d+(?:\.\d+)?)", "TSB"),
 ]
 
 _HALLUCINATION_TOLERANCE = 0.25  # flag if text number differs >25% from actual context value
@@ -180,6 +182,7 @@ _CORRELATION_AS_CAUSATION = [
 
 
 # ── Core validator ─────────────────────────────────────────────────────────────
+
 
 def validate_ai_output(
     text: Optional[str],
@@ -241,8 +244,7 @@ def validate_ai_output(
         if aggressive_found:
             result.blocked = True
             result.block_reason = (
-                f"Dangerous training recommendation with red recovery score ({recovery_score:.0f}): "
-                f"{', '.join(aggressive_found[:3])}"
+                f"Dangerous training recommendation with red recovery score ({recovery_score:.0f}): " f"{', '.join(aggressive_found[:3])}"
             )
             result.safe_fallback = (
                 "⚠️ Recovery is in the red zone — today is a mandatory rest or gentle walk day. "
@@ -250,7 +252,8 @@ def validate_ai_output(
             )
             logger.error(
                 "[ai_validator] BLOCKED dangerous training rec: recovery=%.0f, patterns=%s",
-                recovery_score, aggressive_found[:3],
+                recovery_score,
+                aggressive_found[:3],
             )
             return result
 
@@ -259,10 +262,9 @@ def validate_ai_output(
         low_cal_found = _find_patterns(stripped, _DANGEROUS_CALORIE_PHRASES)
         if low_cal_found:
             # Extract any actual calorie numbers to confirm (avoid false positives on "800 cal deficit")
-            cal_numbers = re.findall(r'\b([1-7]\d{2})\s*(?:kcal|calories|cal)\b', stripped, re.IGNORECASE)
+            cal_numbers = re.findall(r"\b([1-7]\d{2})\s*(?:kcal|calories|cal)\b", stripped, re.IGNORECASE)
             # Only block if numbers are < 800 and not clearly about deficit/restriction context
-            blocked_cals = [c for c in cal_numbers if int(c) < 800
-                            and not re.search(rf'{c}.*(?:deficit|below)', stripped, re.IGNORECASE)]
+            blocked_cals = [c for c in cal_numbers if int(c) < 800 and not re.search(rf"{c}.*(?:deficit|below)", stripped, re.IGNORECASE)]
             if blocked_cals:
                 result.blocked = True
                 result.block_reason = f"Dangerously low calorie recommendation: {blocked_cals} kcal"
@@ -278,8 +280,7 @@ def validate_ai_output(
         aggressive_found = _find_patterns(stripped, _AGGRESSIVE_TRAINING_PHRASES)
         if aggressive_found:
             result.warnings.append(
-                f"Aggressive training language with borderline recovery ({recovery_score:.0f}): "
-                f"{', '.join(aggressive_found[:2])}"
+                f"Aggressive training language with borderline recovery ({recovery_score:.0f}): " f"{', '.join(aggressive_found[:2])}"
             )
 
     # ── Check 7: TSB too negative + training push (WARN) ──────────────────────
@@ -287,31 +288,22 @@ def validate_ai_output(
     if tsb is not None and tsb < -15:
         aggressive_found = _find_patterns(stripped, _AGGRESSIVE_TRAINING_PHRASES)
         if aggressive_found:
-            result.warnings.append(
-                f"Training recommendation with high accumulated fatigue (TSB {tsb:.1f})"
-            )
+            result.warnings.append(f"Training recommendation with high accumulated fatigue (TSB {tsb:.1f})")
 
     # ── Check 8: Generic useless phrases (WARN) ───────────────────────────────
     if output_type not in (AIOutputType.CHRONICLE, AIOutputType.WEEKLY_DIGEST, AIOutputType.MONTHLY_DIGEST):
         generic_found = _find_patterns(stripped.lower(), _GENERIC_USELESS_PHRASES)
         if len(generic_found) >= 2:
-            result.warnings.append(
-                f"Generic coaching phrases detected (context may have been ignored): "
-                f"{', '.join(generic_found[:3])}"
-            )
+            result.warnings.append(f"Generic coaching phrases detected (context may have been ignored): " f"{', '.join(generic_found[:3])}")
 
     # ── Check 9: Correlation presented as causation (WARN) ────────────────────
     causation_found = _find_patterns(stripped.lower(), _CORRELATION_AS_CAUSATION)
     if causation_found:
-        result.warnings.append(
-            f"Correlation-as-causation language: {', '.join(causation_found[:2])}"
-        )
+        result.warnings.append(f"Correlation-as-causation language: {', '.join(causation_found[:2])}")
 
     # ── Check 10: Length warning (WARN, not block) ────────────────────────────
     if len(stripped) > max_length:
-        result.warnings.append(
-            f"Output unusually long ({len(stripped)} chars) — check for prompt injection or runaway generation"
-        )
+        result.warnings.append(f"Output unusually long ({len(stripped)} chars) — check for prompt injection or runaway generation")
 
     # ── Check 11: Output starts with "Matthew" (WARN) ─────────────────────────
     # Prompt explicitly says "DO NOT start with 'Matthew'" — this is a quality signal
@@ -330,7 +322,8 @@ def validate_ai_output(
     elif result.warnings:
         logger.warning(
             "[ai_validator] Output warnings for %s: %s",
-            output_type, result.warnings,
+            output_type,
+            result.warnings,
         )
 
     return result
@@ -401,6 +394,7 @@ def validate_json_output(
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+
 def _find_patterns(text: str, patterns: list[str]) -> list[str]:
     """Return list of patterns that match in text (case-insensitive)."""
     found = []
@@ -449,9 +443,7 @@ def _check_hallucinated_metrics(text: str, health_context: dict) -> list[str]:
                 if abs(mentioned - actual_f) > 5:
                     key = (ctx_key, round(mentioned))
                     if key not in already_warned:
-                        warnings.append(
-                            f"Hallucinated {label}: text says {mentioned}, actual is {actual_f}"
-                        )
+                        warnings.append(f"Hallucinated {label}: text says {mentioned}, actual is {actual_f}")
                         already_warned.add(key)
                 continue
 
@@ -460,8 +452,7 @@ def _check_hallucinated_metrics(text: str, health_context: dict) -> list[str]:
                 key = (ctx_key, round(mentioned))
                 if key not in already_warned:
                     warnings.append(
-                        f"Hallucinated {label}: text says {mentioned}, actual is {actual_f:.1f} "
-                        f"({deviation * 100:.0f}% deviation)"
+                        f"Hallucinated {label}: text says {mentioned}, actual is {actual_f:.1f} " f"({deviation * 100:.0f}% deviation)"
                     )
                     already_warned.add(key)
 
@@ -497,17 +488,12 @@ def _fallback_for_type(output_type: AIOutputType) -> str:
     """Safe fallback text when AI output is blocked."""
     fallbacks = {
         AIOutputType.BOD_COACHING: (
-            "Data analysis complete. Review your metrics above and focus on your top-priority "
-            "habit for today. Consistency compounds."
+            "Data analysis complete. Review your metrics above and focus on your top-priority " "habit for today. Consistency compounds."
         ),
         AIOutputType.TLDR: "Review today's scorecard above for your key takeaways.",
         AIOutputType.GUIDANCE: "📋 Focus on your Tier 0 habits today.",
-        AIOutputType.TRAINING_COACH: (
-            "Training data received. Listen to your body — recovery score should guide today's intensity."
-        ),
-        AIOutputType.NUTRITION_COACH: (
-            "Nutrition data received. Aim for your protein target and stay within your calorie range."
-        ),
+        AIOutputType.TRAINING_COACH: ("Training data received. Listen to your body — recovery score should guide today's intensity."),
+        AIOutputType.NUTRITION_COACH: ("Nutrition data received. Aim for your protein target and stay within your calorie range."),
         AIOutputType.JOURNAL_COACH: "Take a moment to reflect on what's working and what you'd do differently.",
         AIOutputType.CHRONICLE: "(Chronicle generation temporarily unavailable.)",
         AIOutputType.WEEKLY_DIGEST: "(Weekly digest coaching temporarily unavailable.)",
@@ -518,6 +504,7 @@ def _fallback_for_type(output_type: AIOutputType) -> str:
 
 
 # ── Convenience: validate all Daily Brief AI outputs ─────────────────────────
+
 
 def validate_daily_brief_outputs(
     bod_insight: str,

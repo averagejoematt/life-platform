@@ -26,8 +26,8 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-
 # ── Public exception ────────────────────────────────────────────────────────
+
 
 class ValidationError(Exception):
     def __init__(self, message: str, status: int = 400):
@@ -38,23 +38,50 @@ class ValidationError(Exception):
 
 # ── Limits ──────────────────────────────────────────────────────────────────
 
-MAX_BODY_BYTES = 100 * 1024          # 100KB for site-api endpoints (HAE webhook has its own)
-MAX_QUERY_STRING_LENGTH = 2000        # Generous; longest legit ~200 chars
-MAX_PARAM_VALUE_LENGTH = 500          # Single param value cap (longer = something is wrong)
-MAX_PATH_LENGTH = 256                 # AWS URL routing limit; should be far shorter
+MAX_BODY_BYTES = 100 * 1024  # 100KB for site-api endpoints (HAE webhook has its own)
+MAX_QUERY_STRING_LENGTH = 2000  # Generous; longest legit ~200 chars
+MAX_PARAM_VALUE_LENGTH = 500  # Single param value cap (longer = something is wrong)
+MAX_PATH_LENGTH = 256  # AWS URL routing limit; should be far shorter
 
 
 # ── Pattern allowlists ──────────────────────────────────────────────────────
 
 # Known valid sources (extend as new ingestion sources are added).
-KNOWN_SOURCES = frozenset({
-    "whoop", "withings", "strava", "garmin", "eightsleep", "macrofactor",
-    "apple_health", "todoist", "notion", "habitify", "weather", "dropbox",
-    "food_delivery", "measurements", "labs", "genome", "dexa", "supplements",
-    "travel", "state_of_mind", "habit_scores", "character_sheet",
-    "computed_metrics", "platform_memory", "insights", "decisions",
-    "hypotheses", "chronicle", "field_notes", "experiments", "challenges",
-})
+KNOWN_SOURCES = frozenset(
+    {
+        "whoop",
+        "withings",
+        "strava",
+        "garmin",
+        "eightsleep",
+        "macrofactor",
+        "apple_health",
+        "todoist",
+        "notion",
+        "habitify",
+        "weather",
+        "dropbox",
+        "food_delivery",
+        "measurements",
+        "labs",
+        "genome",
+        "dexa",
+        "supplements",
+        "travel",
+        "state_of_mind",
+        "habit_scores",
+        "character_sheet",
+        "computed_metrics",
+        "platform_memory",
+        "insights",
+        "decisions",
+        "hypotheses",
+        "chronicle",
+        "field_notes",
+        "experiments",
+        "challenges",
+    }
+)
 
 # Allowed user_id pattern. Single-user platform today; future-proofed for ids like "matthew", "user_123".
 _USER_ID_RE = re.compile(r"^[a-z0-9_\-]{1,40}$")
@@ -64,22 +91,24 @@ _SOURCE_RE = re.compile(r"^[a-z0-9_]{1,32}$")
 # Patterns that should NEVER appear in well-formed input. Catch obvious abuse.
 # (We don't try to be a full WAF — just sanity checks.)
 _SUSPICIOUS_PATTERNS = [
-    re.compile(r"\.\./", re.IGNORECASE),                  # path traversal
-    re.compile(r"<script", re.IGNORECASE),                # XSS attempt
-    re.compile(r"javascript:", re.IGNORECASE),            # XSS attempt
+    re.compile(r"\.\./", re.IGNORECASE),  # path traversal
+    re.compile(r"<script", re.IGNORECASE),  # XSS attempt
+    re.compile(r"javascript:", re.IGNORECASE),  # XSS attempt
     re.compile(r"(?:^|\W)(?:union|select|drop|insert|update|delete)\s+(?:all\s+)?(?:from|into|table)", re.IGNORECASE),  # SQL injection
-    re.compile(r"\x00"),                                  # null byte
+    re.compile(r"\x00"),  # null byte
 ]
 
 
 # ── Validators ──────────────────────────────────────────────────────────────
+
 
 def _check_suspicious(value: str, where: str) -> None:
     """Raise if a value contains obvious injection patterns."""
     for pat in _SUSPICIOUS_PATTERNS:
         if pat.search(value):
             raise ValidationError(
-                f"Invalid characters in {where}", status=400,
+                f"Invalid characters in {where}",
+                status=400,
             )
 
 

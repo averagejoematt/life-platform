@@ -32,20 +32,21 @@ v1.1.0 — 2026-03-09: Sick day support — grade='sick', streaks preserved
 """
 
 import json
+import logging
 import math
 import os
 import time
-import logging
-import boto3
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+import boto3
 import scoring_engine
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("daily-metrics-compute")
 except ImportError:
     logger = logging.getLogger("daily-metrics-compute")
@@ -69,18 +70,24 @@ table = dynamodb.Table(TABLE_NAME)
 # HELPERS
 # ==============================================================================
 
+
 def d2f(obj):
     """Recursively convert DynamoDB Decimal to float."""
-    if isinstance(obj, list): return [d2f(i) for i in obj]
-    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [d2f(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
 
 
 def safe_float(rec, field, default=None):
     if rec and field in rec:
-        try: return float(rec[field])
-        except Exception: return default
+        try:
+            return float(rec[field])
+        except Exception:
+            return default
     return default
 
 
@@ -96,6 +103,7 @@ def clamp(val, lo=0, hi=100):
 # ==============================================================================
 # DDB FETCH HELPERS
 # ==============================================================================
+
 
 def fetch_date(source, date_str):
     try:
@@ -145,7 +153,8 @@ def fetch_journal_entries(date_str):
             ExpressionAttributeValues={
                 ":pk": USER_PREFIX + "notion",
                 ":prefix": "DATE#" + date_str + "#journal#",
-            })
+            },
+        )
         return [d2f(i) for i in r.get("Items", [])]
     except Exception as e:
         logger.warning(f"fetch_journal_entries({date_str}) failed: {e}")
@@ -155,6 +164,7 @@ def fetch_journal_entries(date_str):
 # ==============================================================================
 # NORMALIZE WHOOP SLEEP  (mirrors daily_brief_lambda)
 # ==============================================================================
+
 
 def normalize_whoop_sleep(item):
     """Map Whoop field names to common schema used by scoring engine."""
@@ -173,8 +183,8 @@ def normalize_whoop_sleep(item):
     if dur and dur > 0:
         for src_field, pct_field in [
             ("slow_wave_sleep_hours", "deep_pct"),
-            ("rem_sleep_hours",       "rem_pct"),
-            ("light_sleep_hours",     "light_pct"),
+            ("rem_sleep_hours", "rem_pct"),
+            ("light_sleep_hours", "light_pct"),
         ]:
             try:
                 hrs = float(out.get(src_field, 0))
@@ -193,6 +203,7 @@ def normalize_whoop_sleep(item):
 # DEDUP ACTIVITIES  (mirrors daily_brief_lambda)
 # ==============================================================================
 
+
 def dedup_activities(activities):
     """Remove overlapping multi-device Strava activities.
 
@@ -205,15 +216,20 @@ def dedup_activities(activities):
 
     def parse_start(a):
         s = a.get("start_date_local") or a.get("start_date") or ""
-        try: return _dt.fromisoformat(str(s).replace("Z", "+00:00"))
-        except (ValueError, TypeError): return None
+        try:
+            return _dt.fromisoformat(str(s).replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            return None
 
     def richness(a):
         score = 0
-        if float(a.get("distance_meters") or 0) > 0: score += 1000
+        if float(a.get("distance_meters") or 0) > 0:
+            score += 1000
         score += float(a.get("moving_time_seconds") or 0)
-        if a.get("summary_polyline"):                 score += 500
-        if a.get("average_cadence") is not None:      score += 100
+        if a.get("summary_polyline"):
+            score += 500
+        if a.get("average_cadence") is not None:
+            score += 100
         return score
 
     indexed = [(i, a, parse_start(a)) for i, a in enumerate(activities)]
@@ -221,15 +237,19 @@ def dedup_activities(activities):
     indexed.sort(key=lambda x: x[2])
     remove = set()
     for j in range(len(indexed)):
-        if j in remove: continue
+        if j in remove:
+            continue
         i_j, a_j, t_j = indexed[j]
         sport_j = (a_j.get("sport_type") or a_j.get("type") or "").lower()
         for k in range(j + 1, len(indexed)):
-            if k in remove: continue
+            if k in remove:
+                continue
             i_k, a_k, t_k = indexed[k]
             sport_k = (a_k.get("sport_type") or a_k.get("type") or "").lower()
-            if sport_j != sport_k: continue
-            if abs((t_k - t_j).total_seconds()) / 60 > 15: break
+            if sport_j != sport_k:
+                continue
+            if abs((t_k - t_j).total_seconds()) / 60 > 15:
+                break
             remove.add(k if richness(a_j) >= richness(a_k) else j)
     kept = [a for i, (_, a, _) in enumerate(indexed) if i not in remove]
     no_time = [a for a in activities if parse_start(a) is None]
@@ -239,6 +259,7 @@ def dedup_activities(activities):
 # ==============================================================================
 # TSB COMPUTATION
 # ==============================================================================
+
 
 def compute_tsb(strava_60d, today):
     """Banister model: Training Stress Balance = CTL − ATL over 60-day window."""
@@ -261,6 +282,7 @@ def compute_tsb(strava_60d, today):
 # ==============================================================================
 # READINESS COMPUTATION
 # ==============================================================================
+
 
 def compute_readiness(data):
     """Composite readiness: recovery (40%), sleep (30%), HRV trend (20%), TSB (10%)."""
@@ -288,14 +310,17 @@ def compute_readiness(data):
         return None, "gray"
     tw = sum(w for _, _, w in components)
     score = round(sum(v * w for _, v, w in components) / tw)
-    if score >= 80: return score, "green"
-    if score >= 60: return score, "yellow"
+    if score >= 80:
+        return score, "green"
+    if score >= 60:
+        return score, "yellow"
     return score, "red"
 
 
 # ==============================================================================
 # HABIT STREAKS
 # ==============================================================================
+
 
 def compute_habit_streaks(profile, yesterday_str):
     """Compute tier0 streak, tier0+1 streak, and per-vice streaks (up to 90-day lookback)."""
@@ -306,7 +331,8 @@ def compute_habit_streaks(profile, yesterday_str):
     tier01_habits = []
     vice_habits = []
     for name, meta in registry.items():
-        if meta.get("status") != "active": continue
+        if meta.get("status") != "active":
+            continue
         tier = meta.get("tier", 2)
         if tier == 0:
             tier0_habits.append(name)
@@ -342,8 +368,10 @@ def compute_habit_streaks(profile, yesterday_str):
                 for h in tier0_habits
                 if not (registry.get(h, {}).get("applicable_days") == "weekdays" and not is_weekday)
             )
-            if all_t0: tier0_streak += 1
-            else:      t0_broken = True
+            if all_t0:
+                tier0_streak += 1
+            else:
+                t0_broken = True
 
         if not t01_broken:
             all_t01 = all(
@@ -352,8 +380,10 @@ def compute_habit_streaks(profile, yesterday_str):
                 if not (registry.get(h, {}).get("applicable_days") == "weekdays" and not is_weekday)
                 and registry.get(h, {}).get("applicable_days") != "post_training"
             )
-            if all_t01: tier01_streak += 1
-            else:       t01_broken = True
+            if all_t01:
+                tier01_streak += 1
+            else:
+                t01_broken = True
 
         for v in vice_habits:
             if not vice_broken[v]:
@@ -367,9 +397,9 @@ def compute_habit_streaks(profile, yesterday_str):
             break
 
     return {
-        "tier0_streak":  tier0_streak,
+        "tier0_streak": tier0_streak,
         "tier01_streak": tier01_streak,
-        "vice_streaks":  vice_streaks,
+        "vice_streaks": vice_streaks,
     }
 
 
@@ -377,8 +407,10 @@ def compute_habit_streaks(profile, yesterday_str):
 # DECIMAL SERIALIZATION HELPERS
 # ==============================================================================
 
+
 def _to_dec(val):
-    if val is None: return None
+    if val is None:
+        return None
     return Decimal(str(round(float(val), 4)))
 
 
@@ -387,11 +419,16 @@ def _deep_dec(obj):
     DynamoDB requires all map keys to be strings — int keys (e.g. tier_status {0:, 1:, 2:})
     are coerced to str here.
     """
-    if isinstance(obj, list): return [_deep_dec(i) for i in obj]
-    if isinstance(obj, dict): return {str(k): _deep_dec(v) for k, v in obj.items()}
-    if isinstance(obj, bool): return obj
-    if isinstance(obj, float): return Decimal(str(round(obj, 4)))
-    if isinstance(obj, int): return Decimal(str(obj))
+    if isinstance(obj, list):
+        return [_deep_dec(i) for i in obj]
+    if isinstance(obj, dict):
+        return {str(k): _deep_dec(v) for k, v in obj.items()}
+    if isinstance(obj, bool):
+        return obj
+    if isinstance(obj, float):
+        return Decimal(str(round(obj, 4)))
+    if isinstance(obj, int):
+        return Decimal(str(obj))
     return obj
 
 
@@ -399,33 +436,50 @@ def _deep_dec(obj):
 # STORE HELPERS
 # ==============================================================================
 
+
 def store_computed_metrics(
-    date_str, day_grade_score, grade, component_scores, component_details,
-    readiness_score, readiness_colour, streak_data,
-    tsb, hrv_7d, hrv_30d, sleep_debt_7d_hrs,
-    latest_weight, week_ago_weight, avatar_weight,
+    date_str,
+    day_grade_score,
+    grade,
+    component_scores,
+    component_details,
+    readiness_score,
+    readiness_colour,
+    streak_data,
+    tsb,
+    hrv_7d,
+    hrv_30d,
+    sleep_debt_7d_hrs,
+    latest_weight,
+    week_ago_weight,
+    avatar_weight,
     source_fingerprints=None,
 ):
     """Write computed_metrics record — primary output of this Lambda."""
     item = {
-        "pk":                 USER_PREFIX + "computed_metrics",
-        "sk":                 "DATE#" + date_str,
-        "date":               date_str,
-        "day_grade_letter":   grade,
-        "readiness_colour":   readiness_colour,
-        "tier0_streak":       Decimal(str(streak_data.get("tier0_streak",  0))),
-        "tier01_streak":      Decimal(str(streak_data.get("tier01_streak", 0))),
-        "sleep_debt_7d_hrs":  _to_dec(sleep_debt_7d_hrs) or Decimal("0"),
-        "computed_at":        datetime.now(timezone.utc).isoformat(),
-        "algo_version":       ALGO_VERSION,
+        "pk": USER_PREFIX + "computed_metrics",
+        "sk": "DATE#" + date_str,
+        "date": date_str,
+        "day_grade_letter": grade,
+        "readiness_colour": readiness_colour,
+        "tier0_streak": Decimal(str(streak_data.get("tier0_streak", 0))),
+        "tier01_streak": Decimal(str(streak_data.get("tier01_streak", 0))),
+        "sleep_debt_7d_hrs": _to_dec(sleep_debt_7d_hrs) or Decimal("0"),
+        "computed_at": datetime.now(timezone.utc).isoformat(),
+        "algo_version": ALGO_VERSION,
     }
     if day_grade_score is not None:
         item["day_grade_score"] = _to_dec(day_grade_score)
     if readiness_score is not None:
         item["readiness_score"] = _to_dec(readiness_score)
-    for field, val in [("tsb", tsb), ("hrv_7d", hrv_7d), ("hrv_30d", hrv_30d),
-                        ("latest_weight", latest_weight), ("week_ago_weight", week_ago_weight),
-                        ("avatar_weight", avatar_weight)]:
+    for field, val in [
+        ("tsb", tsb),
+        ("hrv_7d", hrv_7d),
+        ("hrv_30d", hrv_30d),
+        ("latest_weight", latest_weight),
+        ("week_ago_weight", week_ago_weight),
+        ("avatar_weight", avatar_weight),
+    ]:
         if val is not None:
             item[field] = _to_dec(val)
 
@@ -453,6 +507,7 @@ def store_computed_metrics(
     # to S3 on failure; they log and skip. validate_and_write requires s3_client != None.)
     try:
         from ingestion_validator import validate_item as _vi
+
         _vr = _vi("computed_metrics", item, date_str)
         if _vr.should_skip_ddb:
             logger.error("[DATA-2] Skipping computed_metrics write for %s: %s", date_str, _vr.errors)
@@ -466,6 +521,7 @@ def store_computed_metrics(
     # Phase 3.3 (2026-05-16): tag with run_id + computed_at.
     try:
         from compute_metadata import tag_record
+
         item = tag_record(item, source_id="computed_metrics")
     except ImportError:
         pass
@@ -475,11 +531,14 @@ def store_computed_metrics(
         logger.error(f"[ERROR] CRITICAL: computed_metrics DDB write failed: {ddb_err}")
         raise
     logger.info(
-        "Stored computed_metrics: %s — grade=%s (%s) readiness=%s (%s) "
-        "T0_streak=%s TSB=%s",
-        date_str, day_grade_score, grade,
-        readiness_score, readiness_colour,
-        streak_data.get("tier0_streak", 0), tsb,
+        "Stored computed_metrics: %s — grade=%s (%s) readiness=%s (%s) " "T0_streak=%s TSB=%s",
+        date_str,
+        day_grade_score,
+        grade,
+        readiness_score,
+        readiness_colour,
+        streak_data.get("tier0_streak", 0),
+        tsb,
     )
 
 
@@ -487,14 +546,14 @@ def store_day_grade(date_str, total_score, grade, component_scores, weights):
     """Write day_grade record — preserves existing schema for MCP tool compatibility."""
     try:
         item = {
-            "pk":                USER_PREFIX + "day_grade",
-            "sk":                "DATE#" + date_str,
-            "date":              date_str,
-            "total_score":       Decimal(str(total_score)),
-            "letter_grade":      grade,
+            "pk": USER_PREFIX + "day_grade",
+            "sk": "DATE#" + date_str,
+            "date": date_str,
+            "total_score": Decimal(str(total_score)),
+            "letter_grade": grade,
             "algorithm_version": ALGO_VERSION,
-            "weights_snapshot":  _deep_dec(weights) if weights else {},
-            "computed_at":       datetime.now(timezone.utc).isoformat(),
+            "weights_snapshot": _deep_dec(weights) if weights else {},
+            "computed_at": datetime.now(timezone.utc).isoformat(),
         }
         for comp, score in component_scores.items():
             if score is not None:
@@ -502,6 +561,7 @@ def store_day_grade(date_str, total_score, grade, component_scores, weights):
         # DATA-2: validate_item directly (no S3 client for compute partitions)
         try:
             from ingestion_validator import validate_item as _vi
+
             _vr = _vi("day_grade", item, date_str)
             if _vr.should_skip_ddb:
                 logger.error("[DATA-2] Skipping day_grade write for %s: %s", date_str, _vr.errors)
@@ -538,31 +598,28 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
         synergy_groups = {}
         for h_name, meta in registry.items():
             sg = meta.get("synergy_group")
-            if not sg or meta.get("status") != "active": continue
+            if not sg or meta.get("status") != "active":
+                continue
             synergy_groups.setdefault(sg, {"done": 0, "total": 0})
             synergy_groups[sg]["total"] += 1
             if all_status.get(h_name, False):
                 synergy_groups[sg]["done"] += 1
 
-        sg_pcts = {
-            sg: round(counts["done"] / counts["total"], 3)
-            for sg, counts in synergy_groups.items()
-            if counts["total"] > 0
-        }
+        sg_pcts = {sg: round(counts["done"] / counts["total"], 3) for sg, counts in synergy_groups.items() if counts["total"] > 0}
 
         habit_score = component_scores.get("habits_mvp")
         item = {
-            "pk":            USER_PREFIX + "habit_scores",
-            "sk":            "DATE#" + date_str,
-            "date":          date_str,
+            "pk": USER_PREFIX + "habit_scores",
+            "sk": "DATE#" + date_str,
+            "date": date_str,
             "scoring_method": "tier_weighted_v1",
-            "tier0_done":    t0.get("done",  0),
-            "tier0_total":   t0.get("total", 0),
-            "tier1_done":    t1.get("done",  0),
-            "tier1_total":   t1.get("total", 0),
-            "vices_held":    vices.get("held",  0),
-            "vices_total":   vices.get("total", 0),
-            "computed_at":   datetime.now(timezone.utc).isoformat(),
+            "tier0_done": t0.get("done", 0),
+            "tier0_total": t0.get("total", 0),
+            "tier1_done": t1.get("done", 0),
+            "tier1_total": t1.get("total", 0),
+            "vices_held": vices.get("held", 0),
+            "vices_total": vices.get("total", 0),
+            "computed_at": datetime.now(timezone.utc).isoformat(),
         }
         if habit_score is not None:
             item["composite_score"] = Decimal(str(habit_score))
@@ -580,6 +637,7 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
         # DATA-2: validate_item for habit_scores (Item 3, R12)
         try:
             from ingestion_validator import validate_item as _vi
+
             _vr = _vi("habit_scores", item, date_str)
             if _vr.should_skip_ddb:
                 logger.error("[DATA-2] Skipping habit_scores write for %s: %s", date_str, _vr.errors)
@@ -591,7 +649,9 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
         except Exception as ve:
             logger.warning("[DATA-2] habit_scores validate_item failed (proceeding): %s", ve)
         table.put_item(Item=item)
-        logger.info(f"Stored habit_scores: {date_str} T0={t0.get('done', 0)}/{t0.get('total', 0)} T1={t1.get('done', 0)}/{t1.get('total', 0)}")
+        logger.info(
+            f"Stored habit_scores: {date_str} T0={t0.get('done', 0)}/{t0.get('total', 0)} T1={t1.get('done', 0)}/{t1.get('total', 0)}"
+        )
     except Exception as e:
         logger.warning(f"store_habit_scores failed: {e}")
 
@@ -599,6 +659,7 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
 # ==============================================================================
 # DATA ASSEMBLY
 # ==============================================================================
+
 
 def get_source_fingerprints(yesterday_str, sources=None):
     """Return dict of source → ingested_at timestamp for the key daily sources.
@@ -645,7 +706,7 @@ def fingerprints_changed(stored_fps, current_fps):
     for src, current_ts in current_fps.items():
         stored_ts = stored_fps.get(src)
         if not stored_ts:
-            return True          # new source appeared
+            return True  # new source appeared
         if current_ts > stored_ts:  # ISO string comparison works for UTC timestamps
             return True
     return False
@@ -661,13 +722,13 @@ def assemble_data(yesterday_str, profile):
     today = datetime.now(timezone.utc).date()
 
     # Single-day records
-    whoop = fetch_date("whoop",        yesterday_str)
+    whoop = fetch_date("whoop", yesterday_str)
     sleep = normalize_whoop_sleep(whoop)
     apple = fetch_date("apple_health", yesterday_str)
-    macrofactor = fetch_date("macrofactor",  yesterday_str)
-    strava = fetch_date("strava",       yesterday_str)
-    habitify = fetch_date("habitify",     yesterday_str)
-    whoop_today = fetch_date("whoop",        today.isoformat())
+    macrofactor = fetch_date("macrofactor", yesterday_str)
+    strava = fetch_date("strava", yesterday_str)
+    habitify = fetch_date("habitify", yesterday_str)
+    whoop_today = fetch_date("whoop", today.isoformat())
     journal_entries = fetch_journal_entries(yesterday_str)
 
     # Dedup Strava multi-device activities
@@ -677,12 +738,11 @@ def assemble_data(yesterday_str, profile):
         deduped = len(strava["activities"])
         if deduped < orig:
             strava["activity_count"] = deduped
-            strava["total_moving_time_seconds"] = sum(
-                float(a.get("moving_time_seconds") or 0) for a in strava["activities"])
+            strava["total_moving_time_seconds"] = sum(float(a.get("moving_time_seconds") or 0) for a in strava["activities"])
             logger.info(f"Dedup: {orig} → {deduped} Strava activities")
 
     # HRV averages
-    hrv_7d_recs = fetch_range("whoop", (today - timedelta(days=7)).isoformat(),  yesterday_str)
+    hrv_7d_recs = fetch_range("whoop", (today - timedelta(days=7)).isoformat(), yesterday_str)
     hrv_30d_recs = fetch_range("whoop", (today - timedelta(days=30)).isoformat(), yesterday_str)
     hrv_7d_vals = [float(r["hrv"]) for r in hrv_7d_recs if "hrv" in r]
     hrv_30d_vals = [float(r["hrv"]) for r in hrv_30d_recs if "hrv" in r]
@@ -695,32 +755,28 @@ def assemble_data(yesterday_str, profile):
 
     # Sleep debt (7-day cumulative vs profile target)
     target_hrs = profile.get("sleep_target_hours_ideal", 7.5)
-    sleep_7d = [normalize_whoop_sleep(r)
-                  for r in fetch_range("whoop", (today - timedelta(days=7)).isoformat(), yesterday_str)]
-    sleep_debt_hrs = sum(
-        max(0, target_hrs - (safe_float(s, "sleep_duration_hours") or target_hrs))
-        for s in sleep_7d
-    )
+    sleep_7d = [normalize_whoop_sleep(r) for r in fetch_range("whoop", (today - timedelta(days=7)).isoformat(), yesterday_str)]
+    sleep_debt_hrs = sum(max(0, target_hrs - (safe_float(s, "sleep_duration_hours") or target_hrs)) for s in sleep_7d)
 
     # Weight (latest + week-ago + avatar fallback)
-    withings_7d = fetch_range("withings", (today - timedelta(days=7)).isoformat(),  yesterday_str)
+    withings_7d = fetch_range("withings", (today - timedelta(days=7)).isoformat(), yesterday_str)
     withings_14d = fetch_range("withings", (today - timedelta(days=14)).isoformat(), yesterday_str)
-    latest_weight = next((safe_float(w, "weight_lbs") for w in reversed(withings_7d)
-                           if safe_float(w, "weight_lbs")), None)
+    latest_weight = next((safe_float(w, "weight_lbs") for w in reversed(withings_7d) if safe_float(w, "weight_lbs")), None)
     target_7d_date = (today - timedelta(days=7)).isoformat()
     week_ago_weight = next(
-        (safe_float(w, "weight_lbs") for w in withings_14d
-         if w.get("sk", "").replace("DATE#", "") <= target_7d_date and safe_float(w, "weight_lbs")),
+        (
+            safe_float(w, "weight_lbs")
+            for w in withings_14d
+            if w.get("sk", "").replace("DATE#", "") <= target_7d_date and safe_float(w, "weight_lbs")
+        ),
         None,
     )
     avatar_weight = latest_weight
     if not avatar_weight:
-        avatar_weight = next((safe_float(w, "weight_lbs") for w in reversed(withings_14d)
-                              if safe_float(w, "weight_lbs")), None)
+        avatar_weight = next((safe_float(w, "weight_lbs") for w in reversed(withings_14d) if safe_float(w, "weight_lbs")), None)
     if not avatar_weight:
         withings_30d = fetch_range("withings", (today - timedelta(days=30)).isoformat(), yesterday_str)
-        avatar_weight = next((safe_float(w, "weight_lbs") for w in reversed(withings_30d)
-                              if safe_float(w, "weight_lbs")), None)
+        avatar_weight = next((safe_float(w, "weight_lbs") for w in reversed(withings_30d) if safe_float(w, "weight_lbs")), None)
 
     # Habitify 7-day (tier-2 habit frequency scoring)
     habitify_7d = fetch_range("habitify", (today - timedelta(days=7)).isoformat(), yesterday_str)
@@ -728,34 +784,42 @@ def assemble_data(yesterday_str, profile):
     elapsed = time.time() - t0_timer
     logger.info(
         "Data assembled for %s in %.1fs — sources: %s",
-        yesterday_str, elapsed,
-        ", ".join(k for k, v in [
-            ("whoop", whoop), ("macrofactor", macrofactor), ("apple", apple),
-            ("strava", strava), ("habitify", habitify),
-        ] if v),
+        yesterday_str,
+        elapsed,
+        ", ".join(
+            k
+            for k, v in [
+                ("whoop", whoop),
+                ("macrofactor", macrofactor),
+                ("apple", apple),
+                ("strava", strava),
+                ("habitify", habitify),
+            ]
+            if v
+        ),
     )
 
     data = {
-        "date":             yesterday_str,
-        "whoop":            whoop,
-        "whoop_today":      whoop_today,
-        "sleep":            sleep,
-        "apple":            apple,
-        "macrofactor":      macrofactor,
-        "strava":           strava,
-        "habitify":         habitify,
-        "habitify_7d":      habitify_7d,
-        "journal_entries":  journal_entries,
+        "date": yesterday_str,
+        "whoop": whoop,
+        "whoop_today": whoop_today,
+        "sleep": sleep,
+        "apple": apple,
+        "macrofactor": macrofactor,
+        "strava": strava,
+        "habitify": habitify,
+        "habitify_7d": habitify_7d,
+        "journal_entries": journal_entries,
         "hrv": {
-            "hrv_7d":       hrv_7d_avg,
-            "hrv_30d":      hrv_30d_avg,
+            "hrv_7d": hrv_7d_avg,
+            "hrv_30d": hrv_30d_avg,
             "hrv_yesterday": safe_float(whoop, "hrv"),
         },
-        "tsb":              tsb,
+        "tsb": tsb,
         "sleep_debt_7d_hrs": round(sleep_debt_hrs, 1),
-        "latest_weight":    latest_weight,
-        "week_ago_weight":  week_ago_weight,
-        "avatar_weight":    avatar_weight,
+        "latest_weight": latest_weight,
+        "week_ago_weight": week_ago_weight,
+        "avatar_weight": avatar_weight,
     }
     return data, hrv_7d_avg, hrv_30d_avg
 
@@ -763,6 +827,7 @@ def assemble_data(yesterday_str, profile):
 # ==============================================================================
 # LAMBDA HANDLER
 # ==============================================================================
+
 
 def lambda_handler(event, context):
     if event.get("healthcheck"):
@@ -787,19 +852,19 @@ def lambda_handler(event, context):
             if stored_fps and not fingerprints_changed(stored_fps, current_fps):
                 logger.info(
                     "Already computed for %s (grade=%s) and inputs unchanged — skipping",
-                    yesterday_str, existing.get("day_grade_letter", "?"),
+                    yesterday_str,
+                    existing.get("day_grade_letter", "?"),
                 )
                 return {
-                    "statusCode":       200,
-                    "body":             f"Already computed for {yesterday_str} (inputs unchanged)",
+                    "statusCode": 200,
+                    "body": f"Already computed for {yesterday_str} (inputs unchanged)",
                     "day_grade_letter": existing.get("day_grade_letter"),
-                    "skipped":          True,
+                    "skipped": True,
                 }
             if not stored_fps:
                 reason = "no fingerprint stored (legacy record)"
             else:
-                changed = [s for s, ts in current_fps.items()
-                           if ts > stored_fps.get(s, "")]
+                changed = [s for s, ts in current_fps.items() if ts > stored_fps.get(s, "")]
                 reason = f"newer data in: {', '.join(changed)}"
             logger.info(f"Recomputing {yesterday_str} — {reason}")
 
@@ -810,6 +875,7 @@ def lambda_handler(event, context):
     #   - Anomaly alerts will be suppressed separately by anomaly_detector
     try:
         from sick_day_checker import check_sick_day as _check_sick
+
         _sick_rec = _check_sick(table, USER_ID, yesterday_str)
     except ImportError:
         _sick_rec = None
@@ -822,23 +888,23 @@ def lambda_handler(event, context):
         _dt_y = datetime.strptime(yesterday_str, "%Y-%m-%d")
         _prev_date = (_dt_y - timedelta(days=1)).strftime("%Y-%m-%d")
         _prev_cm = fetch_date("computed_metrics", _prev_date)
-        _t0_streak = int(float(_prev_cm.get("tier0_streak",  0))) if _prev_cm else 0
+        _t0_streak = int(float(_prev_cm.get("tier0_streak", 0))) if _prev_cm else 0
         _t01_streak = int(float(_prev_cm.get("tier01_streak", 0))) if _prev_cm else 0
         _vice_streaks = {k: int(float(v)) for k, v in _prev_cm.get("vice_streaks", {}).items()} if _prev_cm else {}
 
         _sick_item = {
-            "pk":               USER_PREFIX + "computed_metrics",
-            "sk":               "DATE#" + yesterday_str,
-            "date":             yesterday_str,
+            "pk": USER_PREFIX + "computed_metrics",
+            "sk": "DATE#" + yesterday_str,
+            "date": yesterday_str,
             "day_grade_letter": "sick",
-            "sick_day":         True,
-            "sick_day_reason":  _sick_reason,
+            "sick_day": True,
+            "sick_day_reason": _sick_reason,
             "readiness_colour": "gray",
-            "tier0_streak":     Decimal(str(_t0_streak)),
-            "tier01_streak":    Decimal(str(_t01_streak)),
+            "tier0_streak": Decimal(str(_t0_streak)),
+            "tier01_streak": Decimal(str(_t01_streak)),
             "sleep_debt_7d_hrs": Decimal("0"),
-            "computed_at":      datetime.now(timezone.utc).isoformat(),
-            "algo_version":     ALGO_VERSION,
+            "computed_at": datetime.now(timezone.utc).isoformat(),
+            "algo_version": ALGO_VERSION,
         }
         if _vice_streaks:
             _sick_item["vice_streaks"] = {k: Decimal(str(v)) for k, v in _vice_streaks.items()}
@@ -850,12 +916,12 @@ def lambda_handler(event, context):
             raise
         logger.info(f"Sick day record stored for {yesterday_str} — streaks preserved (T0={_t0_streak} T01={_t01_streak})")
         return {
-            "statusCode":       200,
-            "body":             f"Sick day {yesterday_str}: computed_metrics stored with grade='sick'",
+            "statusCode": 200,
+            "body": f"Sick day {yesterday_str}: computed_metrics stored with grade='sick'",
             "day_grade_letter": "sick",
-            "sick_day":         True,
-            "tier0_streak":     _t0_streak,
-            "tier01_streak":    _t01_streak,
+            "sick_day": True,
+            "tier0_streak": _t0_streak,
+            "tier01_streak": _t01_streak,
         }
 
     profile = fetch_profile()
@@ -871,8 +937,7 @@ def lambda_handler(event, context):
     data, hrv_7d_avg, hrv_30d_avg = assemble_data(yesterday_str, profile)
 
     # ── Day grade ──
-    day_grade_score, grade, component_scores, component_details = \
-        scoring_engine.compute_day_grade(data, profile)
+    day_grade_score, grade, component_scores, component_details = scoring_engine.compute_day_grade(data, profile)
     logger.info(f"Day grade: {day_grade_score} ({grade})")
     for comp, score in component_scores.items():
         if score is not None:
@@ -886,29 +951,46 @@ def lambda_handler(event, context):
     streak_data = compute_habit_streaks(profile, yesterday_str)
     logger.info(
         "Streaks: T0=%s T01=%s vices=%s",
-        streak_data["tier0_streak"], streak_data["tier01_streak"],
+        streak_data["tier0_streak"],
+        streak_data["tier01_streak"],
         {k: v for k, v in streak_data["vice_streaks"].items() if v > 0},
     )
 
     # ── Store all three partitions ──
     store_computed_metrics(
-        yesterday_str, day_grade_score, grade, component_scores, component_details,
-        readiness_score, readiness_colour, streak_data,
-        data.get("tsb"), hrv_7d_avg, hrv_30d_avg,
+        yesterday_str,
+        day_grade_score,
+        grade,
+        component_scores,
+        component_details,
+        readiness_score,
+        readiness_colour,
+        streak_data,
+        data.get("tsb"),
+        hrv_7d_avg,
+        hrv_30d_avg,
         data.get("sleep_debt_7d_hrs", 0),
-        data.get("latest_weight"), data.get("week_ago_weight"), data.get("avatar_weight"),
+        data.get("latest_weight"),
+        data.get("week_ago_weight"),
+        data.get("avatar_weight"),
         source_fingerprints=source_fps,
     )
 
     if day_grade_score is not None:
         store_day_grade(
-            yesterday_str, day_grade_score, grade, component_scores,
+            yesterday_str,
+            day_grade_score,
+            grade,
+            component_scores,
             profile.get("day_grade_weights", {}),
         )
 
     store_habit_scores(
-        yesterday_str, component_details, component_scores,
-        streak_data.get("vice_streaks", {}), profile,
+        yesterday_str,
+        component_details,
+        component_scores,
+        streak_data.get("vice_streaks", {}),
+        profile,
     )
 
     # CLEANUP-1 complete (v3.7.28): write_composite_scores() removed per ADR-025.
@@ -919,14 +1001,14 @@ def lambda_handler(event, context):
     logger.info("Done in %.1fs", elapsed)
 
     return {
-        "statusCode":       200,
-        "body":             f"Daily metrics computed for {yesterday_str}: {day_grade_score} ({grade})",
-        "date":             yesterday_str,
-        "day_grade_score":  day_grade_score,
+        "statusCode": 200,
+        "body": f"Daily metrics computed for {yesterday_str}: {day_grade_score} ({grade})",
+        "date": yesterday_str,
+        "day_grade_score": day_grade_score,
         "day_grade_letter": grade,
-        "readiness_score":  readiness_score,
+        "readiness_score": readiness_score,
         "readiness_colour": readiness_colour,
-        "tier0_streak":     streak_data["tier0_streak"],
-        "tier01_streak":    streak_data["tier01_streak"],
-        "elapsed_seconds":  round(elapsed, 1),
+        "tier0_streak": streak_data["tier0_streak"],
+        "tier01_streak": streak_data["tier01_streak"],
+        "elapsed_seconds": round(elapsed, 1),
     }

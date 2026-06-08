@@ -2,27 +2,32 @@
 Character Sheet tools: view character level, pillar detail, and level history.
 Reads pre-computed data from DynamoDB SOURCE#character_sheet partition.
 """
+
 import json
 import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from mcp.config import table, USER_PREFIX, logger
+from mcp.config import USER_PREFIX, logger, table
 
 # ── Constants ──
 CS_PK = USER_PREFIX + "character_sheet"
 
 _TIER_BARS = {
     "Foundation": "██░░░░░░░░",
-    "Momentum":   "████░░░░░░",
+    "Momentum": "████░░░░░░",
     "Discipline": "██████░░░░",
-    "Mastery":    "████████░░",
-    "Elite":      "██████████",
+    "Mastery": "████████░░",
+    "Elite": "██████████",
 }
 
 _PILLAR_EMOJI = {
-    "sleep": "😴", "movement": "🏋️", "nutrition": "🥗",
-    "metabolic": "📊", "mind": "🧠", "relationships": "💬",
+    "sleep": "😴",
+    "movement": "🏋️",
+    "nutrition": "🥗",
+    "metabolic": "📊",
+    "mind": "🧠",
+    "relationships": "💬",
     "consistency": "🎯",
 }
 
@@ -41,13 +46,18 @@ def _fetch_one(date_str):
 
 def _fetch_range(start, end):
     from mcp.core import _apply_phase_filter  # ADR-058
+
     try:
-        kwargs = _apply_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": CS_PK, ":s": "DATE#" + start, ":e": "DATE#" + end,
-            },
-        })
+        kwargs = _apply_phase_filter(
+            {
+                "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                "ExpressionAttributeValues": {
+                    ":pk": CS_PK,
+                    ":s": "DATE#" + start,
+                    ":e": "DATE#" + end,
+                },
+            }
+        )
         resp = table.query(**kwargs)
         items = resp.get("Items", [])
         while resp.get("LastEvaluatedKey"):
@@ -82,6 +92,7 @@ def _format_pillar_line(name, pillar_data):
 
 # ── Tool: get_character_sheet ──
 
+
 def tool_get_character_sheet(args):
     """Get the current character sheet — overall level, all 7 pillars, active effects, recent events."""
     date = args.get("date")
@@ -93,9 +104,11 @@ def tool_get_character_sheet(args):
         yesterday = (datetime.strptime(date, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
         record = _fetch_one(yesterday)
         if not record:
-            return {"error": f"No character sheet found for {date} or {yesterday}. "
-                    "The character sheet may not have been computed yet. "
-                    "Run the backfill or wait for the next Daily Brief."}
+            return {
+                "error": f"No character sheet found for {date} or {yesterday}. "
+                "The character sheet may not have been computed yet. "
+                "Run the backfill or wait for the next Daily Brief."
+            }
         date = yesterday
 
     # 14-day sparkline data
@@ -128,8 +141,7 @@ def tool_get_character_sheet(args):
     effects = record.get("active_effects", [])
     if effects:
         lines.append("")
-        lines.append("Active Effects: " + "  ".join(
-            f"{e.get('emoji', '')} {e['name']}" for e in effects))
+        lines.append("Active Effects: " + "  ".join(f"{e.get('emoji', '')} {e['name']}" for e in effects))
 
     events = record.get("level_events", [])
     if events:
@@ -137,15 +149,16 @@ def tool_get_character_sheet(args):
         for ev in events:
             etype = ev.get("type", "")
             if "tier" in etype:
-                lines.append(f"{'🏆' if 'up' in etype else '📋'} "
-                           f"{ev.get('pillar', 'Overall').capitalize()} "
-                           f"{ev.get('old_tier', '?')} → {ev.get('new_tier', '?')}")
+                lines.append(
+                    f"{'🏆' if 'up' in etype else '📋'} "
+                    f"{ev.get('pillar', 'Overall').capitalize()} "
+                    f"{ev.get('old_tier', '?')} → {ev.get('new_tier', '?')}"
+                )
             elif "character" in etype:
                 lines.append(f"⭐ Character Level {ev.get('old_level')} → {ev.get('new_level')}")
             else:
                 arrow = "↑" if "up" in etype else "↓"
-                lines.append(f"{arrow} {ev.get('pillar', '?').capitalize()} "
-                           f"Level {ev.get('old_level')} → {ev.get('new_level')}")
+                lines.append(f"{arrow} {ev.get('pillar', '?').capitalize()} " f"Level {ev.get('old_level')} → {ev.get('new_level')}")
 
     return {
         "display": "\n".join(lines),
@@ -161,6 +174,7 @@ def tool_get_character_sheet(args):
 
 
 # ── Tool: get_pillar_detail ──
+
 
 def tool_get_pillar_detail(args):
     """Deep dive into a single pillar: component breakdown, daily scores, level history, XP curve."""
@@ -187,10 +201,16 @@ def tool_get_pillar_detail(args):
         raw = pdata.get("raw_score")
         lv = pdata.get("level", 0)
 
-        daily_data.append({
-            "date": date, "raw_score": raw, "level_score": pdata.get("level_score"),
-            "level": lv, "tier": pdata.get("tier", "?"), "xp_delta": pdata.get("xp_delta", 0),
-        })
+        daily_data.append(
+            {
+                "date": date,
+                "raw_score": raw,
+                "level_score": pdata.get("level_score"),
+                "level": lv,
+                "tier": pdata.get("tier", "?"),
+                "xp_delta": pdata.get("xp_delta", 0),
+            }
+        )
         if raw is not None:
             raw_scores.append(raw)
         levels.append(lv)
@@ -230,25 +250,29 @@ def tool_get_pillar_detail(args):
         f"XP Total: {summary['total_xp']}",
         f"Raw Score: avg {summary['raw_score_avg']} | range [{summary['raw_score_min']}-{summary['raw_score_max']}]",
         f"Level Events: {summary['level_change_count']} in {days}d",
-        "", "Component Breakdown (latest):",
+        "",
+        "Component Breakdown (latest):",
     ] + comp_lines
 
     if events:
         display.append("")
         display.append("Level Events:")
         for ev in events[-10:]:
-            display.append(f"  {ev.get('date')}: {ev.get('type')} "
-                         f"(Level {ev.get('old_level', '?')} → {ev.get('new_level', '?')})")
+            display.append(f"  {ev.get('date')}: {ev.get('type')} " f"(Level {ev.get('old_level', '?')} → {ev.get('new_level', '?')})")
 
     return {
         "display": "\n".join(display),
-        "pillar": pillar, "summary": summary, "components": components,
-        "daily_data": daily_data[-30:], "events": events,
+        "pillar": pillar,
+        "summary": summary,
+        "components": components,
+        "daily_data": daily_data[-30:],
+        "events": events,
         "sparkline": _make_sparkline(levels[-14:]),
     }
 
 
 # ── Tool: get_level_history ──
+
 
 def tool_get_level_history(args):
     """Timeline of all level/tier change events across all or one pillar."""
@@ -280,11 +304,11 @@ def tool_get_level_history(args):
     milestones = []
     for rec in records:
         if all((rec.get(f"pillar_{p}", {}).get("level", 0) >= 41) for p in _PILLAR_ORDER):
-            milestones.append({"type": "all_discipline", "date": rec.get("date"),
-                              "description": "🌟 All pillars at Discipline+ tier!"})
+            milestones.append({"type": "all_discipline", "date": rec.get("date"), "description": "🌟 All pillars at Discipline+ tier!"})
         if all((rec.get(f"pillar_{p}", {}).get("level", 0) >= 61) for p in _PILLAR_ORDER):
-            milestones.append({"type": "all_mastery", "date": rec.get("date"),
-                              "description": "👑 All pillars at Mastery+ — Project 40 Complete!"})
+            milestones.append(
+                {"type": "all_mastery", "date": rec.get("date"), "description": "👑 All pillars at Mastery+ — Project 40 Complete!"}
+            )
 
     display = [
         f"📜 Level History — {'All Pillars' if not pillar_filter else pillar_filter.capitalize()} ({days}d)",
@@ -300,14 +324,11 @@ def tool_get_level_history(args):
             emoji = _PILLAR_EMOJI.get(ev.get("pillar", ""), "⭐")
             arrow = "⬆" if "up" in etype else "⬇"
             if "tier" in etype:
-                display.append(f"  {ev['date']} {arrow} {emoji} {pillar}: "
-                             f"{ev.get('old_tier')} → {ev.get('new_tier')}")
+                display.append(f"  {ev['date']} {arrow} {emoji} {pillar}: " f"{ev.get('old_tier')} → {ev.get('new_tier')}")
             elif "character" in etype:
-                display.append(f"  {ev['date']} {arrow} ⭐ Overall: "
-                             f"Level {ev.get('old_level')} → {ev.get('new_level')}")
+                display.append(f"  {ev['date']} {arrow} ⭐ Overall: " f"Level {ev.get('old_level')} → {ev.get('new_level')}")
             else:
-                display.append(f"  {ev['date']} {arrow} {emoji} {pillar}: "
-                             f"Level {ev.get('old_level')} → {ev.get('new_level')}")
+                display.append(f"  {ev['date']} {arrow} {emoji} {pillar}: " f"Level {ev.get('old_level')} → {ev.get('new_level')}")
     else:
         display.append("\nNo level change events in this period.")
 
@@ -318,7 +339,8 @@ def tool_get_level_history(args):
             display.append(f"  {ms['date']}: {ms['description']}")
 
     return {
-        "display": "\n".join(display), "events": all_events,
+        "display": "\n".join(display),
+        "events": all_events,
         "milestones": milestones,
         "timeline_start": timeline[0] if timeline else None,
         "timeline_end": timeline[-1] if timeline else None,
@@ -349,16 +371,19 @@ def _make_sparkline(values, width=14):
 # Phase 4 tools (v2.71.0): Rewards, Config Update, Protocol Recommendations
 # ══════════════════════════════════════════════════════════════════════════════
 
-import time
-import boto3
 import os as _os
+import time
+
+import boto3
 
 REWARDS_PK = USER_PREFIX + "rewards"
 S3_BUCKET = _os.environ.get("S3_BUCKET", "matthew-life-platform")  # PROD-2 Phase 2
-_CS_USER_ID = _os.environ.get("USER_ID", "matthew")                  # PROD-2 Phase 2
-CS_CONFIG_KEY = f"config/{_CS_USER_ID}/character_sheet.json"          # PROD-2 Phase 2
+_CS_USER_ID = _os.environ.get("USER_ID", "matthew")  # PROD-2 Phase 2
+CS_CONFIG_KEY = f"config/{_CS_USER_ID}/character_sheet.json"  # PROD-2 Phase 2
 
 _s3_client = None
+
+
 def _get_s3():
     global _s3_client
     if _s3_client is None:
@@ -367,6 +392,7 @@ def _get_s3():
 
 
 # ── Tool: set_reward ──
+
 
 def tool_set_reward(args):
     """Create or update a user-defined reward milestone."""
@@ -437,20 +463,24 @@ def tool_set_reward(args):
 
 # ── Tool: get_rewards ──
 
+
 def tool_get_rewards(args):
     """View all reward milestones with optional status filter."""
     status_filter = args.get("status", "").lower() or None
     valid_statuses = ["active", "triggered", "claimed"]
 
     from mcp.core import _apply_phase_filter  # ADR-058
+
     try:
-        kwargs = _apply_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
-            "ExpressionAttributeValues": {
-                ":pk": REWARDS_PK,
-                ":prefix": "REWARD#",
-            },
-        })
+        kwargs = _apply_phase_filter(
+            {
+                "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+                "ExpressionAttributeValues": {
+                    ":pk": REWARDS_PK,
+                    ":prefix": "REWARD#",
+                },
+            }
+        )
         resp = table.query(**kwargs)
         items = resp.get("Items", [])
         while resp.get("LastEvaluatedKey"):
@@ -472,7 +502,7 @@ def tool_get_rewards(args):
     if not rewards:
         return {
             "display": "\U0001f381 No rewards found" + (f" with status '{status_filter}'" if status_filter else "") + ".\n"
-                       "Use set_reward to create reward milestones (e.g., 'when Sleep hits Mastery \u2192 buy new pillow').",
+            "Use set_reward to create reward milestones (e.g., 'when Sleep hits Mastery \u2192 buy new pillow').",
             "rewards": [],
             "count": 0,
         }
@@ -510,6 +540,7 @@ def _describe_condition(condition):
 
 # ── Tool: update_character_config ──
 
+
 def tool_update_character_config(args):
     """View or update character sheet configuration in S3."""
     action = args.get("action", "view").lower()
@@ -533,12 +564,14 @@ def tool_update_character_config(args):
             w = pconf.get("weight", 0)
             lines.append(f"  {pname.capitalize()}: {w:.0%}")
 
-        lines.append(f"\nLEVELING: EMA \u03bb={leveling.get('ema_lambda')}, "
-                     f"window={leveling.get('ema_window_days')}d, "
-                     f"level up={leveling.get('level_up_streak_days')}d, "
-                     f"down={leveling.get('level_down_streak_days')}d, "
-                     f"tier up={leveling.get('tier_up_streak_days')}d, "
-                     f"down={leveling.get('tier_down_streak_days')}d")
+        lines.append(
+            f"\nLEVELING: EMA \u03bb={leveling.get('ema_lambda')}, "
+            f"window={leveling.get('ema_window_days')}d, "
+            f"level up={leveling.get('level_up_streak_days')}d, "
+            f"down={leveling.get('level_down_streak_days')}d, "
+            f"tier up={leveling.get('tier_up_streak_days')}d, "
+            f"down={leveling.get('tier_down_streak_days')}d"
+        )
 
         lines.append(f"\nCROSS-PILLAR EFFECTS: {len(effects)}")
         for eff in effects:
@@ -576,8 +609,14 @@ def tool_update_character_config(args):
     elif action == "update_leveling":
         field = args.get("field", "")
         value = args.get("value")
-        valid_fields = ["ema_lambda", "ema_window_days", "level_up_streak_days",
-                       "level_down_streak_days", "tier_up_streak_days", "tier_down_streak_days"]
+        valid_fields = [
+            "ema_lambda",
+            "ema_window_days",
+            "level_up_streak_days",
+            "level_down_streak_days",
+            "tier_up_streak_days",
+            "tier_down_streak_days",
+        ]
         if field not in valid_fields:
             return {"error": f"Unknown leveling field '{field}'. Valid: {valid_fields}"}
         config["leveling"][field] = float(value) if "lambda" in field else int(value)
@@ -588,7 +627,8 @@ def tool_update_character_config(args):
     config["_meta"]["last_updated"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     try:
         s3.put_object(
-            Bucket=S3_BUCKET, Key=CS_CONFIG_KEY,
+            Bucket=S3_BUCKET,
+            Key=CS_CONFIG_KEY,
             Body=json.dumps(config, indent=2, default=str),
             ContentType="application/json",
         )
@@ -603,15 +643,21 @@ def tool_update_character_config(args):
 
 # ── Reward evaluation (called by Daily Brief Lambda) ──
 
+
 def evaluate_rewards(character_sheet, table_resource=None):
     """Check all active rewards against current character sheet. Returns newly triggered rewards."""
     tbl = table_resource or table
     from mcp.core import _apply_phase_filter  # ADR-058
+
     try:
-        resp = tbl.query(**_apply_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
-            "ExpressionAttributeValues": {":pk": REWARDS_PK, ":prefix": "REWARD#"},
-        }))
+        resp = tbl.query(
+            **_apply_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+                    "ExpressionAttributeValues": {":pk": REWARDS_PK, ":prefix": "REWARD#"},
+                }
+            )
+        )
         items = resp.get("Items", [])
     except Exception as e:
         logger.error(f"[rewards] evaluate_rewards query failed: {e}")
@@ -638,8 +684,7 @@ def evaluate_rewards(character_sheet, table_resource=None):
         elif ctype == "character_tier":
             cur = character_sheet.get("character_tier", "Foundation")
             tgt = condition.get("tier", "Elite")
-            met = (tier_order.index(cur) >= tier_order.index(tgt)
-                   if cur in tier_order and tgt in tier_order else False)
+            met = tier_order.index(cur) >= tier_order.index(tgt) if cur in tier_order and tgt in tier_order else False
         elif ctype == "pillar_level":
             p = condition.get("pillar", "")
             met = character_sheet.get(f"pillar_{p}", {}).get("level", 0) >= condition.get("level", 999)
@@ -647,8 +692,7 @@ def evaluate_rewards(character_sheet, table_resource=None):
             p = condition.get("pillar", "")
             cur = character_sheet.get(f"pillar_{p}", {}).get("tier", "Foundation")
             tgt = condition.get("tier", "Elite")
-            met = (tier_order.index(cur) >= tier_order.index(tgt)
-                   if cur in tier_order and tgt in tier_order else False)
+            met = tier_order.index(cur) >= tier_order.index(tgt) if cur in tier_order and tgt in tier_order else False
 
         if met:
             try:
@@ -658,12 +702,14 @@ def evaluate_rewards(character_sheet, table_resource=None):
                     ExpressionAttributeNames={"#s": "status"},
                     ExpressionAttributeValues={":s": "triggered", ":t": now},
                 )
-                triggered.append({
-                    "reward_id": item.get("reward_id", ""),
-                    "title": _d2f(item.get("title", "")),
-                    "description": _d2f(item.get("description", "")),
-                    "condition": condition,
-                })
+                triggered.append(
+                    {
+                        "reward_id": item.get("reward_id", ""),
+                        "title": _d2f(item.get("title", "")),
+                        "description": _d2f(item.get("description", "")),
+                        "condition": condition,
+                    }
+                )
             except Exception as e:
                 logger.error(f"[rewards] failed to update reward {item.get('reward_id')}: {e}")
 
@@ -671,6 +717,7 @@ def evaluate_rewards(character_sheet, table_resource=None):
 
 
 # ── Protocol recommendations helper ──
+
 
 def get_protocol_recommendations(character_sheet, config):
     """Get protocol recs for pillars needing attention (below Discipline or dropped)."""
@@ -692,13 +739,15 @@ def get_protocol_recommendations(character_sheet, config):
             if isinstance(pillar_protos, dict) and tier in pillar_protos:
                 tier_recs = pillar_protos[tier]
                 if tier_recs:
-                    recs.append({
-                        "pillar": pillar,
-                        "tier": tier,
-                        "level": level,
-                        "dropped": pillar in dropped,
-                        "protocols": tier_recs[:2],
-                    })
+                    recs.append(
+                        {
+                            "pillar": pillar,
+                            "tier": tier,
+                            "level": level,
+                            "dropped": pillar in dropped,
+                            "protocols": tier_recs[:2],
+                        }
+                    )
     return recs
 
 
@@ -708,12 +757,15 @@ def tool_get_character(args):
     by character-sheet-compute Lambda) — all views are fast DDB reads.
     """
     VALID_VIEWS = {
-        "sheet":  tool_get_character_sheet,
+        "sheet": tool_get_character_sheet,
         "pillar": tool_get_pillar_detail,
         "history": tool_get_level_history,
     }
     view = (args.get("view") or "sheet").lower().strip()
     if view not in VALID_VIEWS:
-        return {"error": f"Unknown view '{view}'.", "valid_views": list(VALID_VIEWS.keys()),
-                "hint": "'sheet' for overall Character Level + all 7 pillars, 'pillar' for deep dive into one pillar (requires pillar=), 'history' for level-up timeline."}
+        return {
+            "error": f"Unknown view '{view}'.",
+            "valid_views": list(VALID_VIEWS.keys()),
+            "hint": "'sheet' for overall Character Level + all 7 pillars, 'pillar' for deep dive into one pillar (requires pillar=), 'history' for level-up timeline.",
+        }
     return VALID_VIEWS[view](args)

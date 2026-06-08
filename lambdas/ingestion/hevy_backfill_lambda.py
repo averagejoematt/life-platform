@@ -25,6 +25,7 @@ Idempotent: same workout id → upsert, no dupe. Page-based pagination
 The `hevy-webhook` Lambda stays deployed for future Hevy webhook support
 but currently never receives traffic.
 """
+
 from __future__ import annotations
 
 import json
@@ -34,21 +35,22 @@ from datetime import datetime, timezone
 from typing import Any
 
 from hevy_common import (
-    HevyAPIError,
-    fetch_events_page,
-    archive_raw,
-    normalize_workout,
-    write_normalized,
-    load_since,
-    save_since,
     INITIAL_SINCE,
-    _table,
-    USER_ID,
     SOURCE,
+    USER_ID,
+    HevyAPIError,
+    _table,
+    archive_raw,
+    fetch_events_page,
+    load_since,
+    normalize_workout,
+    save_since,
+    write_normalized,
 )
 
 try:
     from platform_logger import get_logger
+
     logger = get_logger("hevy-backfill")
 except ImportError:
     logger = logging.getLogger("hevy-backfill")
@@ -65,13 +67,15 @@ def _tombstone_deleted(workout_id: str) -> None:
     without the full record, so this records a delete marker that the next
     audit pass can reconcile."""
     try:
-        _table.put_item(Item={
-            "pk": f"USER#{USER_ID}#SOURCE#{SOURCE}",
-            "sk": f"DELETE#WORKOUT#{workout_id}",
-            "tombstone": True,
-            "tombstoned_at": datetime.now(timezone.utc).isoformat(),
-            "tombstoned_reason": "hevy_event_delete",
-        })
+        _table.put_item(
+            Item={
+                "pk": f"USER#{USER_ID}#SOURCE#{SOURCE}",
+                "sk": f"DELETE#WORKOUT#{workout_id}",
+                "tombstone": True,
+                "tombstoned_at": datetime.now(timezone.utc).isoformat(),
+                "tombstoned_reason": "hevy_event_delete",
+            }
+        )
         logger.info("hevy delete marker written for %s", workout_id)
     except Exception as e:
         logger.warning("hevy delete-marker write failed for %s: %s", workout_id, e)
@@ -83,7 +87,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
     high-water-mark on success."""
     poll_started_at = datetime.now(timezone.utc).isoformat()
     since = load_since()
-    is_initial = (since == INITIAL_SINCE)
+    is_initial = since == INITIAL_SINCE
     logger.info("hevy backfill starting. since=%s initial=%s", since, is_initial)
 
     ingested = 0
@@ -127,8 +131,11 @@ def lambda_handler(event: dict, context: Any) -> dict:
                         ingested += 1
                         logger.info(
                             "hevy backfill ingest %s date=%s phase=%s sets=%d volume=%.2fkg",
-                            wid, rec["date"], rec.get("phase", "?"),
-                            rec["set_count"], rec["total_volume_kg"],
+                            wid,
+                            rec["date"],
+                            rec.get("phase", "?"),
+                            rec["set_count"],
+                            rec["total_volume_kg"],
                         )
                 except Exception as e:
                     errors += 1
@@ -149,19 +156,24 @@ def lambda_handler(event: dict, context: Any) -> dict:
         else:
             logger.warning(
                 "hevy backfill had %d error(s); since NOT advanced. Failed ids: %s",
-                errors, failed_ids[:10],
+                errors,
+                failed_ids[:10],
             )
 
     except HevyAPIError as e:
         logger.error("hevy backfill fatal API error: %s", e)
         return {
             "statusCode": 500,
-            "body": json.dumps({
-                "source": "hevy",
-                "error": str(e),
-                "ingested": ingested, "deleted": deleted, "errors": errors,
-                "pages_walked": pages_walked,
-            }),
+            "body": json.dumps(
+                {
+                    "source": "hevy",
+                    "error": str(e),
+                    "ingested": ingested,
+                    "deleted": deleted,
+                    "errors": errors,
+                    "pages_walked": pages_walked,
+                }
+            ),
         }
 
     summary = {

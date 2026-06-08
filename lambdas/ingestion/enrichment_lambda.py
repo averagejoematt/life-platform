@@ -24,16 +24,18 @@ Runs on:
 """
 
 import json
-import os
-import boto3
 import logging
-from datetime import datetime, timezone, timedelta
+import os
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+
+import boto3
 from boto3.dynamodb.conditions import Key
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("enrichment")
 except ImportError:
     logger = logging.getLogger("enrichment")
@@ -50,30 +52,37 @@ table = dynamodb.Table(DYNAMODB_TABLE)
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def decimal_to_float(obj):
-    if isinstance(obj, list): return [decimal_to_float(i) for i in obj]
-    if isinstance(obj, dict): return {k: decimal_to_float(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [decimal_to_float(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: decimal_to_float(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
+
 
 # Phase 4.2 (2026-05-16): canonical impl in lambdas/numeric.py.
 try:
     from numeric import floats_to_decimal  # noqa: F401
 except ImportError:
+
     def floats_to_decimal(obj):
-        if isinstance(obj, bool): return obj
-        if isinstance(obj, float): return Decimal(str(obj))
-        if isinstance(obj, dict): return {k: floats_to_decimal(v) for k, v in obj.items()}
-        if isinstance(obj, list): return [floats_to_decimal(v) for v in obj]
+        if isinstance(obj, bool):
+            return obj
+        if isinstance(obj, float):
+            return Decimal(str(obj))
+        if isinstance(obj, dict):
+            return {k: floats_to_decimal(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [floats_to_decimal(v) for v in obj]
         return obj
+
 
 def query_source(source, start_date, end_date):
     pk = f"{USER_PREFIX}{source}"
-    kwargs = {
-        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(
-            f"DATE#{start_date}", f"DATE#{end_date}~"
-        )
-    }
+    kwargs = {"KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}~")}
     items = []
     while True:
         resp = table.query(**kwargs)
@@ -88,13 +97,32 @@ def query_source(source, start_date, end_date):
 # ── Generic name detection ────────────────────────────────────────────────────
 
 GENERIC_PREFIXES = [
-    "morning", "afternoon", "evening", "night", "lunch",
-    "early", "late", "quick", "short", "long",
+    "morning",
+    "afternoon",
+    "evening",
+    "night",
+    "lunch",
+    "early",
+    "late",
+    "quick",
+    "short",
+    "long",
 ]
 GENERIC_TYPES = [
-    "run", "ride", "walk", "hike", "workout", "ride", "swim",
-    "yoga", "cycling", "rowing", "elliptical", "activity",
+    "run",
+    "ride",
+    "walk",
+    "hike",
+    "workout",
+    "ride",
+    "swim",
+    "yoga",
+    "cycling",
+    "rowing",
+    "elliptical",
+    "activity",
 ]
+
 
 def is_generic_name(name: str) -> bool:
     """Return True if the activity name is a Strava auto-generated generic."""
@@ -111,6 +139,7 @@ def is_generic_name(name: str) -> bool:
 
 # ── Percentile rank helpers ───────────────────────────────────────────────────
 
+
 def build_percentile_lookup(all_strava_items):
     """
     Build sorted lists of all-time elevation and distance values
@@ -122,17 +151,22 @@ def build_percentile_lookup(all_strava_items):
         for act in day.get("activities", []):
             elev = act.get("total_elevation_gain_feet")
             dist = act.get("distance_miles")
-            if elev: all_elevations.append(float(elev))
-            if dist: all_distances.append(float(dist))
+            if elev:
+                all_elevations.append(float(elev))
+            if dist:
+                all_distances.append(float(dist))
     return sorted(all_elevations), sorted(all_distances)
+
 
 def percentile(sorted_vals, val):
     """Return what percentile val falls at in sorted_vals (0–100)."""
     if not sorted_vals or val is None:
         return None
     import bisect
+
     pos = bisect.bisect_left(sorted_vals, float(val))
     return round(100.0 * pos / len(sorted_vals), 1)
+
 
 def percentile_label(pct, metric):
     """Convert a percentile to a human-readable note, or None if unremarkable."""
@@ -150,10 +184,11 @@ def percentile_label(pct, metric):
 # ── Recovery context ──────────────────────────────────────────────────────────
 
 RECOVERY_EMOJI = {
-    "green":  "🟢",
+    "green": "🟢",
     "yellow": "🟡",
-    "red":    "🔴",
+    "red": "🔴",
 }
+
 
 def recovery_emoji(recovery_score):
     if recovery_score is None:
@@ -166,6 +201,7 @@ def recovery_emoji(recovery_score):
 
 
 # ── Enriched name builder ─────────────────────────────────────────────────────
+
 
 def build_enriched_name(activity, recovery_score, elev_pcts, dist_pcts, sorted_elevations, sorted_distances):
     name = activity.get("name", "").strip()
@@ -188,9 +224,12 @@ def build_enriched_name(activity, recovery_score, elev_pcts, dist_pcts, sorted_e
             parts[-1] = f"{parts[-1]} — {location_str}"
 
     stats = []
-    if dist:   stats.append(f"{dist:.1f}mi")
-    if elev:   stats.append(f"{int(elev):,}ft")
-    if hr:     stats.append(f"{int(hr)}bpm avg")
+    if dist:
+        stats.append(f"{dist:.1f}mi")
+    if elev:
+        stats.append(f"{int(elev):,}ft")
+    if hr:
+        stats.append(f"{int(hr)}bpm avg")
     if stats:
         parts.append(" · ".join(stats))
 
@@ -204,7 +243,7 @@ def build_enriched_name(activity, recovery_score, elev_pcts, dist_pcts, sorted_e
     dist_pct = percentile(sorted_distances, dist)
     elev_note = percentile_label(elev_pct, "elevation")
     dist_note = percentile_label(dist_pct, "distance")
-    note = elev_note or dist_note   # elevation wins if both notable
+    note = elev_note or dist_note  # elevation wins if both notable
     if note:
         parts.append(note)
 
@@ -217,6 +256,7 @@ def build_enriched_name(activity, recovery_score, elev_pcts, dist_pcts, sorted_e
 
 # ── Main enrichment logic ─────────────────────────────────────────────────────
 
+
 def enrich_date_range(start_date: str, end_date: str):
     logger.info(f"[enrichment] Starting enrichment for {start_date} → {end_date}")
 
@@ -224,7 +264,9 @@ def enrich_date_range(start_date: str, end_date: str):
     logger.info("[enrichment] Loading all Strava data for percentile context...")
     all_strava = query_source("strava", "2000-01-01", end_date)
     sorted_elevations, sorted_distances = build_percentile_lookup(all_strava)
-    logger.info(f"[enrichment] Percentile context: {len(sorted_elevations)} elevation datapoints, {len(sorted_distances)} distance datapoints")
+    logger.info(
+        f"[enrichment] Percentile context: {len(sorted_elevations)} elevation datapoints, {len(sorted_distances)} distance datapoints"
+    )
 
     # Filter to target window
     target_days = [d for d in all_strava if start_date <= d.get("date", "") <= end_date]
@@ -252,10 +294,7 @@ def enrich_date_range(start_date: str, end_date: str):
 
         for act in activities:
             name = act.get("name", "")
-            enriched = build_enriched_name(
-                act, recovery, None, None,
-                sorted_elevations, sorted_distances
-            )
+            enriched = build_enriched_name(act, recovery, None, None, sorted_elevations, sorted_distances)
 
             if enriched != act.get("enriched_name"):
                 act["enriched_name"] = enriched
@@ -277,10 +316,12 @@ def enrich_date_range(start_date: str, end_date: str):
                     "sk": f"DATE#{date_str}",
                 },
                 UpdateExpression="SET activities = :acts, enriched_at = :ts",
-                ExpressionAttributeValues=floats_to_decimal({
-                    ":acts": updated_activities,
-                    ":ts":   datetime.now(timezone.utc).isoformat(),
-                }),
+                ExpressionAttributeValues=floats_to_decimal(
+                    {
+                        ":acts": updated_activities,
+                        ":ts": datetime.now(timezone.utc).isoformat(),
+                    }
+                ),
             )
 
     logger.info(f"[enrichment] Complete — enriched={enriched_count} skipped={skipped_count}")
@@ -289,10 +330,12 @@ def enrich_date_range(start_date: str, end_date: str):
 
 # ── Lambda handler ────────────────────────────────────────────────────────────
 
+
 def lambda_handler(event, context):
     try:
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        if hasattr(logger, "set_date"): logger.set_date(today)  # OBS-1
+        if hasattr(logger, "set_date"):
+            logger.set_date(today)  # OBS-1
         yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
 
         if event.get("backfill"):
@@ -311,12 +354,14 @@ def lambda_handler(event, context):
 
         return {
             "statusCode": 200,
-            "body": json.dumps({
-                "mode":       "backfill" if event.get("backfill") else "nightly",
-                "start_date": start_date,
-                "end_date":   end_date,
-                **result,
-            })
+            "body": json.dumps(
+                {
+                    "mode": "backfill" if event.get("backfill") else "nightly",
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    **result,
+                }
+            ),
         }
     except Exception as e:
         logger.error("lambda_handler failed: %s", e, exc_info=True)

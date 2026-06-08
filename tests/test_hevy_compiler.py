@@ -1,8 +1,8 @@
 """tests/test_hevy_compiler.py — IR <-> Hevy wire format."""
+
 from __future__ import annotations
 
 import pytest
-
 from hevy_compiler import MovementUnmappable, from_hevy_response, to_create_body, to_update_body
 from routine_ir import ExerciseBlock, RoutineSpec, Set
 
@@ -54,15 +54,17 @@ def test_unmappable_movement_raises():
 
 
 def test_from_hevy_response_extracts_diff_keys():
-    raw = {"routine": {
-        "id": "abc12345",
-        "title": "Upper",
-        "folder_id": 42,
-        "notes": "",
-        "updated_at": "2026-06-01T18:00:00Z",
-        "created_at": "2026-06-01T17:55:00Z",
-        "exercises": [{"exercise_template_id": "55E6546B", "sets": [{}, {}]}],
-    }}
+    raw = {
+        "routine": {
+            "id": "abc12345",
+            "title": "Upper",
+            "folder_id": 42,
+            "notes": "",
+            "updated_at": "2026-06-01T18:00:00Z",
+            "created_at": "2026-06-01T17:55:00Z",
+            "exercises": [{"exercise_template_id": "55E6546B", "sets": [{}, {}]}],
+        }
+    }
     parsed = from_hevy_response(raw)
     assert parsed["hevy_routine_id"] == "abc12345"
     assert parsed["updated_at"] == "2026-06-01T18:00:00Z"
@@ -86,8 +88,7 @@ def test_why_note_overrides_default_notes():
 
 def test_update_body_also_takes_title_context():
     ctx = {"phase": "Build", "type_count_in_phase": 2, "all_time_count": 99}
-    body = to_update_body(_ir(), _resolver_fn,
-                         title_context=ctx, why_note="x")
+    body = to_update_body(_ir(), _resolver_fn, title_context=ctx, why_note="x")
     assert body["routine"]["title"] == "Build - Upper - 2 - 99"
     assert body["routine"]["notes"] == "x"
     assert "folder_id" not in body["routine"]
@@ -95,15 +96,17 @@ def test_update_body_also_takes_title_context():
 
 def test_round_trip_response_to_diff():
     body = to_create_body(_ir(), _resolver_fn)
-    simulated_response = {"routine": {
-        "id": "abc12345",
-        "title": body["routine"]["title"],
-        "folder_id": body["routine"]["folder_id"],
-        "notes": body["routine"]["notes"],
-        "updated_at": "2026-06-01T18:00:00Z",
-        "created_at": "2026-06-01T17:55:00Z",
-        "exercises": body["routine"]["exercises"],
-    }}
+    simulated_response = {
+        "routine": {
+            "id": "abc12345",
+            "title": body["routine"]["title"],
+            "folder_id": body["routine"]["folder_id"],
+            "notes": body["routine"]["notes"],
+            "updated_at": "2026-06-01T18:00:00Z",
+            "created_at": "2026-06-01T17:55:00Z",
+            "exercises": body["routine"]["exercises"],
+        }
+    }
     parsed = from_hevy_response(simulated_response)
     assert parsed["hevy_routine_id"] == "abc12345"
     assert parsed["exercises"][0]["exercise_template_id"] == "55E6546B"

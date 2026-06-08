@@ -6,6 +6,7 @@ Read-only: totals workout miles since the experiment start date and converts to 
 USD vacation fund ($1/mile by default). See lambdas/vacation_fund.py for the math
 and config (config/vacation_fund.json).
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -23,6 +24,7 @@ def tool_get_vacation_fund(args: dict[str, Any] | None = None) -> dict[str, Any]
     args = args or {}
     try:
         from vacation_fund import compute_vacation_fund
+
         return compute_vacation_fund(
             start_date=args.get("start_date"),
             end_date=args.get("end_date"),

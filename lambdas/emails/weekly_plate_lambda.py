@@ -20,19 +20,19 @@ Cost: ~$0.04/week.
 """
 
 import json
-import os
 import logging
+import os
+import re
 import time
-import boto3
 import urllib.error
 import urllib.request
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from collections import Counter, defaultdict
 
-from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+import boto3
+from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
-import re
 
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
@@ -58,12 +58,14 @@ MAX_PLATE_HISTORY = 4  # past plates to inject for anti-repeat context
 # Board of Directors config loader (optional — for voice customization)
 try:
     import board_loader
+
     _HAS_BOARD_LOADER = True
 except ImportError:
     _HAS_BOARD_LOADER = False
 
 try:
     import insight_writer
+
     insight_writer.init(table, USER_ID)
     _HAS_INSIGHT_WRITER = True
 except ImportError:
@@ -71,7 +73,8 @@ except ImportError:
 
 # AI-3: Output validation
 try:
-    from ai_output_validator import validate_ai_output, AIOutputType
+    from ai_output_validator import AIOutputType, validate_ai_output
+
     _HAS_AI_VALIDATOR = True
 except ImportError:
     _HAS_AI_VALIDATOR = False
@@ -79,9 +82,11 @@ except ImportError:
 # OBS-1: Structured logger
 try:
     from platform_logger import get_logger
+
     logger = get_logger("weekly-plate")
 except ImportError:
     import logging as _log
+
     logger = _log.getLogger("weekly-plate")
     logger.setLevel(_log.INFO)
 
@@ -90,20 +95,25 @@ except ImportError:
 # PLATE MEMORY (P1) — load/store plate history to prevent weekly repeats
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def load_plate_history(today_str):
     """Load last MAX_PLATE_HISTORY weekly plate summaries from DynamoDB platform_memory."""
     try:
         start_date = (datetime.strptime(today_str, "%Y-%m-%d") - timedelta(days=70)).strftime("%Y-%m-%d")
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": USER_PREFIX_MEMORY,
-                ":s": f"MEMORY#weekly_plate#{start_date}",
-                ":e": f"MEMORY#weekly_plate#{today_str}",
-            },
-            "ScanIndexForward": False,
-            "Limit": MAX_PLATE_HISTORY,
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                    "ExpressionAttributeValues": {
+                        ":pk": USER_PREFIX_MEMORY,
+                        ":s": f"MEMORY#weekly_plate#{start_date}",
+                        ":e": f"MEMORY#weekly_plate#{today_str}",
+                    },
+                    "ScanIndexForward": False,
+                    "Limit": MAX_PLATE_HISTORY,
+                }
+            )
+        )
         items = [d2f(i) for i in resp.get("Items", [])]
         logger.info(f"Plate history: {len(items)} past plates loaded")
         return items
@@ -146,15 +156,25 @@ def extract_plate_summary(ai_content, top_food_names, date_str):
         "recipes": [],
     }
     # Extract wildcard: look for text following Wildcard section header
-    wc_match = re.search(r'(?i)wildcard[^>]*>[^<]{0,30}<[^>]+>([^<]{8,80})', ai_content)
+    wc_match = re.search(r"(?i)wildcard[^>]*>[^<]{0,30}<[^>]+>([^<]{8,80})", ai_content)
     if not wc_match:
-        wc_match = re.search(r'(?i)wildcard[^<>]*>\s*([A-Z][a-z][^<]{5,60})', ai_content)
+        wc_match = re.search(r"(?i)wildcard[^<>]*>\s*([A-Z][a-z][^<]{5,60})", ai_content)
     if wc_match:
         summary["wildcard"] = wc_match.group(1).strip()[:80]
     # Extract recipe names: bold/heading text in Try This area, capitalized multi-word
-    recipe_matches = re.findall(r'(?:font-weight:\s*[6-9]00[^>]*>|<strong>|<b>)([A-Z][^<]{6,60})<', ai_content)
-    skip = {"try this", "greatest hits", "the wildcard", "grocery run", "this week on",
-             "life platform", "weekly plate", "section", "the grocery run", "your greatest hits"}
+    recipe_matches = re.findall(r"(?:font-weight:\s*[6-9]00[^>]*>|<strong>|<b>)([A-Z][^<]{6,60})<", ai_content)
+    skip = {
+        "try this",
+        "greatest hits",
+        "the wildcard",
+        "grocery run",
+        "this week on",
+        "life platform",
+        "weekly plate",
+        "section",
+        "the grocery run",
+        "your greatest hits",
+    }
     recipes = []
     for name in recipe_matches:
         if name.lower().strip() not in skip and len(name.strip()) > 8 and len(recipes) < 5:
@@ -180,7 +200,9 @@ def store_plate_summary(summary, today_str):
         if summary.get("recipes"):
             item["recipes"] = summary["recipes"]
         table.put_item(Item=item)
-        logger.info(f"Plate summary stored: {today_str} | wildcard='{summary.get('wildcard', '')}' | recipes={len(summary.get('recipes', []))}")
+        logger.info(
+            f"Plate summary stored: {today_str} | wildcard='{summary.get('wildcard', '')}' | recipes={len(summary.get('recipes', []))}"
+        )
     except Exception as e:
         logger.warning(f"store_plate_summary failed (non-fatal): {e}")
 
@@ -188,6 +210,7 @@ def store_plate_summary(summary, today_str):
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def get_anthropic_key():
     """ADR-062: Bedrock uses IAM auth — this fetch is dead. Returns a truthy
@@ -197,17 +220,25 @@ def get_anthropic_key():
     Full plumbing removal tracked as task #90."""
     return "_BEDROCK_IAM_"
 
+
 def d2f(obj):
-    if isinstance(obj, list): return [d2f(i) for i in obj]
-    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [d2f(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
+
 
 def safe_float(rec, field, default=None):
     if rec and field in rec:
-        try: return float(rec[field])
-        except Exception: return default
+        try:
+            return float(rec[field])
+        except Exception:
+            return default
     return default
+
 
 def query_range(source, start_date, end_date):
     pk = f"USER#{USER_ID}#SOURCE#{source}"
@@ -230,6 +261,7 @@ def query_range(source, start_date, end_date):
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
     return records
 
+
 def fetch_profile():
     """Load profile from DynamoDB (same as daily brief)."""
     try:
@@ -243,6 +275,7 @@ def fetch_profile():
 # ══════════════════════════════════════════════════════════════════════════════
 # DATA GATHERING
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def gather_data():
     """Gather 14 days of food logs + 30 days of weight data."""
@@ -276,6 +309,7 @@ def gather_data():
 # EXTRACT & ANALYZE
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def extract_food_data(mf_data):
     """Extract all food items and daily summaries from 14 days of MacroFactor data."""
     days = []
@@ -290,7 +324,8 @@ def extract_food_data(mf_data):
             if any(s in name.lower() for s in ("supplement", "vitamin", "fish oil", "creatine", "magnesium")):
                 continue
             food = {
-                "name": name, "time": item.get("time", "?"),
+                "name": name,
+                "time": item.get("time", "?"),
                 "cal": safe_float(item, "calories_kcal", 0),
                 "protein_g": safe_float(item, "protein_g", 0),
                 "carbs_g": safe_float(item, "carbs_g", 0),
@@ -474,9 +509,11 @@ def build_system_prompt(profile, withings_data):
 # AI CALL
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def call_anthropic(system_prompt, user_message, api_key):
     # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
     import retry_utils
+
     return retry_utils.call_anthropic_api(
         prompt=user_message,
         api_key=api_key,
@@ -491,6 +528,7 @@ def call_anthropic(system_prompt, user_message, api_key):
 # HTML EMAIL
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def build_email_html(ai_content, dates, weight_info):
     try:
         dt_end = datetime.strptime(dates["end"], "%Y-%m-%d")
@@ -504,11 +542,13 @@ def build_email_html(ai_content, dates, weight_info):
         delta_7d = weight_info.get("change_7d_lbs")
         if delta_7d is not None:
             arrow = "↓" if delta_7d < 0 else "↑" if delta_7d > 0 else "→"
-            weight_line = f'<div style="color:#9ca3af;font-size:13px;margin-top:4px;">{w:.1f} lbs · {arrow} {abs(delta_7d):.1f} this week</div>'
+            weight_line = (
+                f'<div style="color:#9ca3af;font-size:13px;margin-top:4px;">{w:.1f} lbs · {arrow} {abs(delta_7d):.1f} this week</div>'
+            )
         else:
             weight_line = f'<div style="color:#9ca3af;font-size:13px;margin-top:4px;">{w:.1f} lbs</div>'
 
-    return f'''<div style="max-width:600px;margin:0 auto;background:#1a1a2e;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:20px;color:#e0e0e0;">
+    return f"""<div style="max-width:600px;margin:0 auto;background:#1a1a2e;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:20px;color:#e0e0e0;">
     <div style="text-align:center;margin-bottom:24px;">
         <div style="font-size:11px;letter-spacing:2px;color:#f59e0b;font-weight:600;margin-bottom:4px;">LIFE PLATFORM</div>
         <div style="font-size:22px;font-weight:700;color:#ffffff;">🍽️ The Weekly Plate</div>
@@ -520,7 +560,7 @@ def build_email_html(ai_content, dates, weight_info):
         <div style="color:#6b7280;font-size:11px;">The Weekly Plate · Life Platform · Friday Edition</div>
         <div style="color:#9ca3af;font-size:9px;margin-top:6px;">⚕️ Personal health tracking only &mdash; not medical advice. Consult a qualified healthcare professional before making changes to your diet or supplement regimen.</div>
     </div>
-</div>'''
+</div>"""
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -531,15 +571,18 @@ def build_email_html(ai_content, dates, weight_info):
 def record_email_send(table, lambda_name):
     """Write a completion record so the status page can track last send."""
     import time as _time
+
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     try:
-        table.put_item(Item={
-            "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
-            "sk": f"DATE#{today}",
-            "sent_at": datetime.now(timezone.utc).isoformat(),
-            "status": "success",
-            "ttl": int(_time.time()) + 86400 * 90
-        })
+        table.put_item(
+            Item={
+                "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
+                "sk": f"DATE#{today}",
+                "sent_at": datetime.now(timezone.utc).isoformat(),
+                "status": "success",
+                "ttl": int(_time.time()) + 86400 * 90,
+            }
+        )
     except Exception as e:
         logger.info(f"[status-tracking] Non-fatal write failure: {e}")
 
@@ -577,8 +620,8 @@ def lambda_handler(event, context):
     if _HAS_INSIGHT_WRITER:
         try:
             prev_ctx = insight_writer.build_insights_context(
-                days=14, pillars=["nutrition"], max_items=3,
-                label="RECENT NUTRITION INSIGHTS (context for meal planning)")
+                days=14, pillars=["nutrition"], max_items=3, label="RECENT NUTRITION INSIGHTS (context for meal planning)"
+            )
             if prev_ctx:
                 user_message = prev_ctx + "\n\n" + user_message
         except Exception as e:
@@ -590,15 +633,20 @@ def lambda_handler(event, context):
         ai_content = call_anthropic(system_prompt, user_message, api_key)
     except Exception as e:
         logger.error(f"Anthropic failed: {e}")
-        ai_content = ('<div style="background:#16213e;border-radius:8px;padding:20px;color:#e0e0e0;">'
-                      'AI content unavailable this week. Check CloudWatch logs.</div>')
+        ai_content = (
+            '<div style="background:#16213e;border-radius:8px;padding:20px;color:#e0e0e0;">'
+            "AI content unavailable this week. Check CloudWatch logs.</div>"
+        )
 
     # AI-3: Validate output before rendering
     if _HAS_AI_VALIDATOR and ai_content and "unavailable" not in ai_content[:50]:
         _val = validate_ai_output(ai_content, AIOutputType.NUTRITION_COACH)
         if _val.blocked:
             logger.error(f"[AI-3] Weekly Plate output BLOCKED: {_val.block_reason}")
-            ai_content = _val.safe_fallback or '<div style="background:#16213e;border-radius:8px;padding:20px;color:#e0e0e0;">AI content unavailable this week. Check CloudWatch logs.</div>'
+            ai_content = (
+                _val.safe_fallback
+                or '<div style="background:#16213e;border-radius:8px;padding:20px;color:#e0e0e0;">AI content unavailable this week. Check CloudWatch logs.</div>'
+            )
         elif _val.warnings:
             logger.warning(f"[AI-3] Weekly Plate warnings: {_val.warnings}")
 
@@ -625,10 +673,12 @@ def lambda_handler(event, context):
     ses.send_email(
         FromEmailAddress=SENDER,
         Destination={"ToAddresses": [RECIPIENT]},
-        Content={"Simple": {
-            "Subject": {"Data": subject, "Charset": "UTF-8"},
-            "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
-        }},
+        Content={
+            "Simple": {
+                "Subject": {"Data": subject, "Charset": "UTF-8"},
+                "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
+            }
+        },
     )
     logger.info(f"Sent: {subject}")
 
@@ -636,10 +686,16 @@ def lambda_handler(event, context):
     if _HAS_INSIGHT_WRITER and ai_content and "unavailable" not in ai_content[:50]:
         try:
             insight_writer.write_insight(
-                digest_type="weekly_plate", insight_type="coaching",
-                text=ai_content[:800], pillars=["nutrition"],
-                data_sources=["macrofactor"], tags=["plate", "meal_plan", "nutrition"],
-                confidence="medium", actionable=True, date=dates.get("end", ""))
+                digest_type="weekly_plate",
+                insight_type="coaching",
+                text=ai_content[:800],
+                pillars=["nutrition"],
+                data_sources=["macrofactor"],
+                tags=["plate", "meal_plan", "nutrition"],
+                confidence="medium",
+                actionable=True,
+                date=dates.get("end", ""),
+            )
             logger.info("IC-15: plate insight persisted")
         except Exception as e:
             logger.warning(f"IC-15 failed: {e}")

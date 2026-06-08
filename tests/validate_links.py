@@ -14,19 +14,20 @@ Usage:
 import argparse
 import re
 import sys
+
 import boto3
 
-GREEN  = "\033[92m"
+GREEN = "\033[92m"
 YELLOW = "\033[93m"
-RED    = "\033[91m"
-RESET  = "\033[0m"
-BOLD   = "\033[1m"
-DIM    = "\033[2m"
+RED = "\033[91m"
+RESET = "\033[0m"
+BOLD = "\033[1m"
+DIM = "\033[2m"
 
-REGION   = "us-west-2"
+REGION = "us-west-2"
 S3_BUCKET = "matthew-life-platform"
 BLOG_PREFIX = "blog/"
-INDEX_KEY   = "blog/index.html"
+INDEX_KEY = "blog/index.html"
 
 s3 = boto3.client("s3", region_name=REGION)
 
@@ -56,7 +57,7 @@ def extract_linked(html):
 
 def main():
     parser = argparse.ArgumentParser(description="Blog S3 link validator")
-    parser.add_argument("--fix",     action="store_true", help="Print aws s3 rm commands for orphaned posts")
+    parser.add_argument("--fix", action="store_true", help="Print aws s3 rm commands for orphaned posts")
     parser.add_argument("--verbose", action="store_true", help="Show all links, not just broken ones")
     args = parser.parse_args()
 

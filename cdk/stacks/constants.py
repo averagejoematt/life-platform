@@ -36,21 +36,15 @@ SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 # Shared utils layer — update on every layer rebuild (bash deploy/build_layer.sh)
 SHARED_LAYER_VERSION = 75  # v75: ADR-058 restart pipeline (2026-06-07)
 
-SHARED_LAYER_ARN = (
-    f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
-)
+SHARED_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
 
 # Pillow image processing layer (HP-13: OG image generator)
 PILLOW_LAYER_VERSION = 1
-PILLOW_LAYER_ARN = (
-    f"arn:aws:lambda:{REGION}:{ACCT}:layer:pillow-layer:{PILLOW_LAYER_VERSION}"
-)
+PILLOW_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:pillow-layer:{PILLOW_LAYER_VERSION}"
 
 # Garth + garminconnect layer (Garmin OAuth — native deps, x86_64)
 GARTH_LAYER_VERSION = 2
-GARTH_LAYER_ARN = (
-    f"arn:aws:lambda:{REGION}:{ACCT}:layer:garth-layer:{GARTH_LAYER_VERSION}"
-)
+GARTH_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:garth-layer:{GARTH_LAYER_VERSION}"
 
 # ── Privacy mode (averagejoematt.com password gate) ──
 # True  → attach cf-auth Lambda@Edge to AmjDistribution default behavior (HTML pages gated).
@@ -59,6 +53,4 @@ GARTH_LAYER_ARN = (
 # Bump CF_AUTH_LAMBDA_VERSION when republishing the cf-auth function code.
 PRIVACY_MODE = os.environ.get("PRIVACY_MODE", "false").lower() == "true"
 CF_AUTH_LAMBDA_VERSION = int(os.environ.get("CF_AUTH_LAMBDA_VERSION", "2"))
-CF_AUTH_VERSION_ARN = (
-    f"arn:aws:lambda:us-east-1:{ACCT}:function:life-platform-cf-auth:{CF_AUTH_LAMBDA_VERSION}"
-)
+CF_AUTH_VERSION_ARN = f"arn:aws:lambda:us-east-1:{ACCT}:function:life-platform-cf-auth:{CF_AUTH_LAMBDA_VERSION}"

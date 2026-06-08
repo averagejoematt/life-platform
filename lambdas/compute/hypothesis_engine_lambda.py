@@ -30,22 +30,23 @@ Cost: ~$0.05/week (one Sonnet call + DDB reads/writes)
 """
 
 import json
-import os
 import logging
+import os
 import re
 import time
-import boto3
-import urllib.request
 import urllib.error
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+import boto3
+from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("hypothesis-engine")
 except ImportError:
     logger = logging.getLogger("hypothesis-engine")
@@ -53,7 +54,8 @@ except ImportError:
 
 # AI-3: Output validator — validates AI text before storage/delivery
 try:
-    from ai_output_validator import validate_ai_output, AIOutputType
+    from ai_output_validator import AIOutputType, validate_ai_output
+
     _HAS_AI_VALIDATOR = True
 except ImportError:
     _HAS_AI_VALIDATOR = False
@@ -69,32 +71,37 @@ s3 = boto3.client("s3", region_name=REGION)
 secrets = boto3.client("secretsmanager", region_name=REGION)
 
 # AI model constants — read from env so model can be updated without redeployment
-AI_MODEL = os.environ.get("AI_MODEL",       "claude-haiku-4-5-20251001")
+AI_MODEL = os.environ.get("AI_MODEL", "claude-haiku-4-5-20251001")
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 HYPOTHESES_PK = f"USER#{USER_ID}#SOURCE#hypotheses"
 MAX_NEW_HYPOTHESES = 5
-MAX_PENDING_HYPOTHESES = 20   # don't accumulate stale hypotheses
+MAX_PENDING_HYPOTHESES = 20  # don't accumulate stale hypotheses
 
 # AI-4: Validation thresholds
-MIN_DATA_DAYS = 10            # require >= 10 days with sufficient metrics before generating
-MIN_METRICS_PER_DAY = 5       # a day needs >= 5 non-null metrics to count as "complete"
-HARD_EXPIRY_DAYS = 30         # archive any hypothesis older than 30 days regardless of status
-MIN_SAMPLE_DAYS_FOR_CHECK = 7 # require >= 7 data days since creation before evaluating
+MIN_DATA_DAYS = 10  # require >= 10 days with sufficient metrics before generating
+MIN_METRICS_PER_DAY = 5  # a day needs >= 5 non-null metrics to count as "complete"
+HARD_EXPIRY_DAYS = 30  # archive any hypothesis older than 30 days regardless of status
+MIN_SAMPLE_DAYS_FOR_CHECK = 7  # require >= 7 data days since creation before evaluating
 REQUIRED_HYPOTHESIS_FIELDS = {
-    "hypothesis_id", "hypothesis", "domains", "evidence",
-    "confirmation_criteria", "monitoring_window_days", "confidence",
+    "hypothesis_id",
+    "hypothesis",
+    "domains",
+    "evidence",
+    "confirmation_criteria",
+    "monitoring_window_days",
+    "confidence",
     "actionable_if_confirmed",
 }
 VALID_CONFIDENCE_LEVELS = {"low", "medium", "high"}
 # Pattern: confirmation criteria should contain at least one number (threshold/percentage)
-NUMERIC_PATTERN = re.compile(r'\d+\.?\d*\s*(%|days?|hours?|minutes?|ms|points?|g|kg|lbs?|cal|kcal|bpm|mg)')
-
+NUMERIC_PATTERN = re.compile(r"\d+\.?\d*\s*(%|days?|hours?|minutes?|ms|points?|g|kg|lbs?|cal|kcal|bpm|mg)")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def get_anthropic_key():
     """ADR-062: Bedrock uses IAM auth — this fetch is dead. Returns a truthy
@@ -129,13 +136,16 @@ def safe_float(rec, field, default=None):
 def query_range(source, start_date, end_date):
     """Query DynamoDB for a source's data in a date range."""
     from boto3.dynamodb.conditions import Key
+
     pk = f"USER#{USER_ID}#SOURCE#{source}"
     try:
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(
-                f"DATE#{start_date}", f"DATE#{end_date}"
-            ),
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}"),
+                }
+            )
+        )
         return d2f(resp.get("Items", []))
     except Exception as e:
         logger.warning(f"query_range({source}) failed: {e}")
@@ -156,8 +166,7 @@ def gather_data():
     end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     start_date = (datetime.now(timezone.utc) - timedelta(days=13)).strftime("%Y-%m-%d")
 
-    sources = ["whoop", "garmin", "macrofactor", "apple_health",
-               "withings", "strava", "notion", "habitify", "eightsleep"]
+    sources = ["whoop", "garmin", "macrofactor", "apple_health", "withings", "strava", "notion", "habitify", "eightsleep"]
 
     data = {}
     for source in sources:
@@ -175,11 +184,16 @@ def gather_data():
 def load_existing_hypotheses(status_filter=None):
     """Load existing hypotheses from DynamoDB."""
     from boto3.dynamodb.conditions import Key
+
     try:
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": Key("pk").eq(HYPOTHESES_PK) & Key("sk").begins_with("HYPOTHESIS#"),
-            "ScanIndexForward": False,
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(HYPOTHESES_PK) & Key("sk").begins_with("HYPOTHESIS#"),
+                    "ScanIndexForward": False,
+                }
+            )
+        )
         items = d2f(resp.get("Items", []))
         if status_filter:
             items = [h for h in items if h.get("status") == status_filter]
@@ -216,6 +230,7 @@ def store_hypothesis(hypothesis: dict):
     # V2 P2.6 (2026-05-19): tag with run_id + computed_at for double-write detection
     try:
         from compute_metadata import tag_record
+
         item = tag_record(item, source_id="hypotheses")
     except ImportError:
         pass
@@ -440,23 +455,31 @@ def load_active_experiments():
     EXPERIMENTS_PK = f"USER#{USER_ID}#SOURCE#experiments"
     try:
         from boto3.dynamodb.conditions import Key
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": Key("pk").eq(EXPERIMENTS_PK) & Key("sk").begins_with("EXP#"),
-        }))
+
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(EXPERIMENTS_PK) & Key("sk").begins_with("EXP#"),
+                }
+            )
+        )
         items = []
         for item in resp.get("Items", []):
             status = item.get("status", "")
             if status == "active":
-                items.append({
-                    "experiment_id": item.get("experiment_id", ""),
-                    "name":          str(item.get("name", "")),
-                    "hypothesis":    str(item.get("hypothesis", "")),
-                    "start_date":    str(item.get("start_date", "")),
-                })
+                items.append(
+                    {
+                        "experiment_id": item.get("experiment_id", ""),
+                        "name": str(item.get("name", "")),
+                        "hypothesis": str(item.get("hypothesis", "")),
+                        "start_date": str(item.get("start_date", "")),
+                    }
+                )
         return items
     except Exception as e:
         logger.warning(f"load_active_experiments failed (non-fatal): {e}")
         return []
+
 
 def validate_check_verdict(result):
     """AI-4: Validate the check verdict from Haiku.
@@ -476,7 +499,7 @@ def validate_check_verdict(result):
         return False, "insufficient", "Evidence too brief"
 
     # AI-4: Require evidence to cite at least one number for confirming/refuted verdicts
-    if verdict in ("confirming", "refuted") and not re.search(r'\d', evidence):
+    if verdict in ("confirming", "refuted") and not re.search(r"\d", evidence):
         return False, "insufficient", "Evidence must cite specific values for confirming/refuted verdicts"
 
     return True, verdict, evidence
@@ -578,26 +601,34 @@ Return ONLY this JSON structure:
   ]
 }}"""
 
-    payload = json.dumps({
-        "model": AI_MODEL,
-        # 2026-05-03: bumped 2000 → 4000 — hypothesis JSON with multiple
-        # patterns + confidence reasons was hitting truncation, then 400 on
-        # retry. Sonnet 4.x supports 8192 in standard mode; 4000 is safe.
-        "max_tokens": 4000,
-        "system": [{"type": "text", "text": HYPOTHESIS_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-        "messages": [{"role": "user", "content": user_message}],
-    }).encode()
+    payload = json.dumps(
+        {
+            "model": AI_MODEL,
+            # 2026-05-03: bumped 2000 → 4000 — hypothesis JSON with multiple
+            # patterns + confidence reasons was hitting truncation, then 400 on
+            # retry. Sonnet 4.x supports 8192 in standard mode; 4000 is safe.
+            "max_tokens": 4000,
+            "system": [{"type": "text", "text": HYPOTHESIS_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+            "messages": [{"role": "user", "content": user_message}],
+        }
+    ).encode()
 
     req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages", data=payload,
-        headers={"Content-Type": "application/json", "x-api-key": api_key,
-                 "anthropic-version": "2023-06-01",
-                 "anthropic-beta": "prompt-caching-2024-07-31"}, method="POST",
+        "https://api.anthropic.com/v1/messages",
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "anthropic-beta": "prompt-caching-2024-07-31",
+        },
+        method="POST",
     )
 
     # ADR-062 (2026-05-27): route through retry_utils.call_anthropic_raw (Bedrock).
     try:
         from retry_utils import call_anthropic_raw
+
         resp = call_anthropic_raw(req)
         raw = resp["content"][0]["text"].strip()
         if raw.startswith("```"):
@@ -621,6 +652,7 @@ Return ONLY this JSON structure:
 # ══════════════════════════════════════════════════════════════════════════════
 # HYPOTHESIS CHECKING — evaluate pending hypotheses against new data
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def check_pending_hypotheses(pending_hypotheses, daily_rows, api_key):
     """For each pending hypothesis, check if recent data is confirming or refuting it.
@@ -683,22 +715,16 @@ def check_pending_hypotheses(pending_hypotheses, daily_rows, api_key):
         if active_experiments:
             hyp_lower = hypothesis_text.lower()
             related = [
-                e for e in active_experiments
-                if any(kw in hyp_lower for kw in e["name"].lower().split()[:4]
-                       if len(kw) > 4)
-                or any(kw in hyp_lower for kw in e["hypothesis"].lower().split()[:6]
-                       if len(kw) > 4)
+                e
+                for e in active_experiments
+                if any(kw in hyp_lower for kw in e["name"].lower().split()[:4] if len(kw) > 4)
+                or any(kw in hyp_lower for kw in e["hypothesis"].lower().split()[:6] if len(kw) > 4)
             ]
             if related:
-                exp_lines = [
-                    f"  [{e['experiment_id']}] {e['name']}: {e['hypothesis']!r} (since {e['start_date']})"
-                    for e in related
-                ]
+                exp_lines = [f"  [{e['experiment_id']}] {e['name']}: {e['hypothesis']!r} (since {e['start_date']})" for e in related]
                 exp_context = (
                     "\n\nACTIVE EXPERIMENTS (cross-reference as additional evidence — "
-                    "Henning: small N, keep claims correlative not causal):\n"
-                    + "\n".join(exp_lines)
-                    + "\n"
+                    "Henning: small N, keep claims correlative not causal):\n" + "\n".join(exp_lines) + "\n"
                 )
 
         check_prompt = f"""Hypothesis: {hypothesis_text}
@@ -717,22 +743,30 @@ Be conservative: default to INSUFFICIENT unless the evidence is clear. Cite spec
 
 Respond ONLY with JSON: {{"verdict": "confirming|refuted|insufficient", "evidence": "2-3 sentences citing specific data points and effect sizes"}}"""
 
-        payload = json.dumps({
-            "model": AI_MODEL_HAIKU,
-            "max_tokens": 200,
-            "messages": [{"role": "user", "content": check_prompt}],
-        }).encode()
+        payload = json.dumps(
+            {
+                "model": AI_MODEL_HAIKU,
+                "max_tokens": 200,
+                "messages": [{"role": "user", "content": check_prompt}],
+            }
+        ).encode()
 
         req = urllib.request.Request(
-            "https://api.anthropic.com/v1/messages", data=payload,
-            headers={"Content-Type": "application/json", "x-api-key": api_key,
-                     "anthropic-version": "2023-06-01",
-                     "anthropic-beta": "prompt-caching-2024-07-31"}, method="POST",
+            "https://api.anthropic.com/v1/messages",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "anthropic-beta": "prompt-caching-2024-07-31",
+            },
+            method="POST",
         )
 
         try:
             # ADR-062 (2026-05-27): Bedrock via retry_utils.call_anthropic_raw.
             from retry_utils import call_anthropic_raw
+
             resp = call_anthropic_raw(req)
             raw = resp["content"][0]["text"].strip()
             if raw.startswith("```"):
@@ -778,6 +812,7 @@ Respond ONLY with JSON: {{"verdict": "confirming|refuted|insufficient", "evidenc
 # DOWNSTREAM CONTEXT — write hypothesis context for digest Lambdas
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def write_hypothesis_context_to_memory(active_hypotheses):
     """Write compact hypothesis monitoring block to platform_memory for IC-16 consumption."""
     if not active_hypotheses:
@@ -798,8 +833,7 @@ def write_hypothesis_context_to_memory(active_hypotheses):
                 actionable = h.get("actionable_if_confirmed", "")
                 if actionable:
                     lines.append(
-                        f"  [EXPERIMENT SUGGESTED] {actionable} "
-                        f"— Consider running a formal N=1 experiment to quantify this effect."
+                        f"  [EXPERIMENT SUGGESTED] {actionable} " f"— Consider running a formal N=1 experiment to quantify this effect."
                     )
 
         if pending:
@@ -827,6 +861,7 @@ def write_hypothesis_context_to_memory(active_hypotheses):
         # V2 P2.6 (2026-05-19): tag with run_id + computed_at
         try:
             from compute_metadata import tag_record
+
             item = tag_record(item, source_id="hypothesis_context")
         except ImportError:
             pass
@@ -839,6 +874,7 @@ def write_hypothesis_context_to_memory(active_hypotheses):
 # ══════════════════════════════════════════════════════════════════════════════
 # MAIN HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def lambda_handler(event, context):
     try:
@@ -929,8 +965,7 @@ def lambda_handler(event, context):
 
         # 5. Write monitoring context to platform_memory for IC-16 consumption
         all_hypotheses_updated = load_existing_hypotheses()
-        active = [h for h in all_hypotheses_updated
-                  if h.get("status") in ("pending", "confirming", "confirmed")]
+        active = [h for h in all_hypotheses_updated if h.get("status") in ("pending", "confirming", "confirmed")]
         write_hypothesis_context_to_memory(active)
 
         summary = {

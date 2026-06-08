@@ -28,6 +28,7 @@ ScoreTuple = tuple[Optional[int], dict[str, Any]]
 # SHARED HELPERS  (self-contained — no imports from daily_brief)
 # ==============================================================================
 
+
 def safe_float(rec: Optional[dict[str, Any]], field: str, default: Optional[float] = None) -> Optional[float]:
     if rec and field in rec:
         try:
@@ -50,6 +51,7 @@ def clamp(val: Numeric, lo: Numeric = 0, hi: Numeric = 100) -> Numeric:
 # COMPONENT SCORERS  (each returns (score: int|None, details: dict))
 # ==============================================================================
 
+
 def score_sleep(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
     sleep = data.get("sleep")
     if not sleep:
@@ -62,19 +64,26 @@ def score_sleep(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
     light_pct = safe_float(sleep, "light_pct")
     target_hrs = profile.get("sleep_target_hours_ideal", 7.5)
     details = {
-        "sleep_score": sleep_score, "efficiency": efficiency,
-        "duration_hrs": duration_hrs, "target_hrs": target_hrs,
-        "deep_pct": deep_pct, "rem_pct": rem_pct, "light_pct": light_pct,
+        "sleep_score": sleep_score,
+        "efficiency": efficiency,
+        "duration_hrs": duration_hrs,
+        "target_hrs": target_hrs,
+        "deep_pct": deep_pct,
+        "rem_pct": rem_pct,
+        "light_pct": light_pct,
     }
     # Sleep component: Whoop sleep score 40%, efficiency 30%, duration-vs-target 30%
     parts, weights = [], []
     if sleep_score is not None:
-        parts.append(sleep_score * 0.40); weights.append(0.40)
+        parts.append(sleep_score * 0.40)
+        weights.append(0.40)
     if efficiency is not None:
-        parts.append(efficiency * 0.30); weights.append(0.30)
+        parts.append(efficiency * 0.30)
+        weights.append(0.30)
     if duration_hrs is not None:
         dur_score = clamp(100 - (abs(duration_hrs - target_hrs) / 2.0) * 100)
-        parts.append(dur_score * 0.30); weights.append(0.30)
+        parts.append(dur_score * 0.30)
+        weights.append(0.30)
         details["duration_score"] = round(dur_score, 1)
     if not weights:
         return None, details
@@ -102,8 +111,12 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
     cal_tolerance = profile.get("calorie_tolerance_pct", 10) / 100
     cal_penalty = profile.get("calorie_penalty_threshold_pct", 25) / 100
     details = {
-        "calories": cal, "protein_g": protein, "fat_g": fat, "carbs_g": carbs,
-        "cal_target": cal_target, "protein_target": protein_target,
+        "calories": cal,
+        "protein_g": protein,
+        "fat_g": fat,
+        "carbs_g": carbs,
+        "cal_target": cal_target,
+        "protein_target": protein_target,
     }
     parts, weights = [], []
     if cal is not None and cal_target:
@@ -118,7 +131,8 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
             # Asymmetric: surplus directly stalls weight loss — penalized more than under-eating
             cal_score = max(0, cal_score - 15)
         cal_score = clamp(round(cal_score))
-        parts.append(cal_score * 0.40); weights.append(0.40)
+        parts.append(cal_score * 0.40)
+        weights.append(0.40)
         details["cal_score"] = cal_score
     if protein is not None:
         if protein >= protein_target:
@@ -128,7 +142,8 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
         else:
             prot_score = max(0, 80 * protein / protein_floor)
         prot_score = clamp(round(prot_score))
-        parts.append(prot_score * 0.40); weights.append(0.40)
+        parts.append(prot_score * 0.40)
+        weights.append(0.40)
         details["protein_score"] = prot_score
     fat_target = profile.get("fat_target_g", 60)
     carb_target = profile.get("carb_target_g", 125)
@@ -137,7 +152,8 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
         carb_diff = abs(carbs - carb_target) / carb_target if carb_target else 0
         # 50x multiplier: 100% off target on both macros = score 0
         macro_score = clamp(round(100 - (fat_diff + carb_diff) * 50))
-        parts.append(macro_score * 0.20); weights.append(0.20)
+        parts.append(macro_score * 0.20)
+        weights.append(0.20)
         details["macro_score"] = macro_score
     if not weights:
         return None, details
@@ -160,13 +176,15 @@ def score_movement(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
     else:
         exercise_score = 0
     exercise_score = clamp(round(exercise_score))
-    parts.append(exercise_score * 0.50); weights.append(0.50)
+    parts.append(exercise_score * 0.50)
+    weights.append(0.50)
     details["exercise_score"] = exercise_score
     apple = data.get("apple")
     steps = safe_float(apple, "steps") if apple else None
     if steps is not None:
         step_score = clamp(round(min(100, steps / step_target * 100)))
-        parts.append(step_score * 0.50); weights.append(0.50)
+        parts.append(step_score * 0.50)
+        weights.append(0.50)
         details["step_score"] = step_score
         details["steps"] = round(steps)
     if not weights:
@@ -329,8 +347,10 @@ def score_journal(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
     else:
         score = 40
     return score, {
-        "entries": len(entries), "templates": list(templates),
-        "has_morning": has_morning, "has_evening": has_evening,
+        "entries": len(entries),
+        "templates": list(templates),
+        "has_morning": has_morning,
+        "has_evening": has_evening,
     }
 
 
@@ -347,25 +367,40 @@ def score_glucose(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
     details = {"tir_pct": tir, "avg_glucose": avg_glucose, "std_dev": std_dev, "readings": readings}
     parts, weights = [], []
     if tir is not None:
-        if tir >= 95:   tir_score = 100
-        elif tir >= 90: tir_score = 80 + (tir - 90) * 4
-        elif tir >= 70: tir_score = max(0, 80 * (tir - 70) / 20)
-        else:           tir_score = 0
-        parts.append(tir_score * 0.50); weights.append(0.50)
+        if tir >= 95:
+            tir_score = 100
+        elif tir >= 90:
+            tir_score = 80 + (tir - 90) * 4
+        elif tir >= 70:
+            tir_score = max(0, 80 * (tir - 70) / 20)
+        else:
+            tir_score = 0
+        parts.append(tir_score * 0.50)
+        weights.append(0.50)
         details["tir_score"] = round(tir_score, 1)
     if avg_glucose is not None:
-        if avg_glucose < 95:    glu_score = 100
-        elif avg_glucose < 100: glu_score = 80 + (100 - avg_glucose) * 4
-        elif avg_glucose < 140: glu_score = max(0, 80 * (140 - avg_glucose) / 40)
-        else:                   glu_score = 0
-        parts.append(glu_score * 0.30); weights.append(0.30)
+        if avg_glucose < 95:
+            glu_score = 100
+        elif avg_glucose < 100:
+            glu_score = 80 + (100 - avg_glucose) * 4
+        elif avg_glucose < 140:
+            glu_score = max(0, 80 * (140 - avg_glucose) / 40)
+        else:
+            glu_score = 0
+        parts.append(glu_score * 0.30)
+        weights.append(0.30)
         details["avg_score"] = round(glu_score, 1)
     if std_dev is not None:
-        if std_dev < 15:   var_score = 100
-        elif std_dev < 20: var_score = 80 + (20 - std_dev) * 4
-        elif std_dev < 40: var_score = max(0, 80 * (40 - std_dev) / 20)
-        else:              var_score = 0
-        parts.append(var_score * 0.20); weights.append(0.20)
+        if std_dev < 15:
+            var_score = 100
+        elif std_dev < 20:
+            var_score = 80 + (20 - std_dev) * 4
+        elif std_dev < 40:
+            var_score = max(0, 80 * (40 - std_dev) / 20)
+        else:
+            var_score = 0
+        parts.append(var_score * 0.20)
+        weights.append(0.20)
         details["var_score"] = round(var_score, 1)
     if not weights:
         return None, details
@@ -378,34 +413,47 @@ def score_glucose(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
 
 COMPONENT_SCORERS = {
     "sleep_quality": score_sleep,
-    "recovery":      score_recovery,
-    "nutrition":     score_nutrition,
-    "movement":      score_movement,
-    "habits_mvp":    score_habits_registry,
-    "hydration":     score_hydration,
-    "journal":       score_journal,
-    "glucose":       score_glucose,
+    "recovery": score_recovery,
+    "nutrition": score_nutrition,
+    "movement": score_movement,
+    "habits_mvp": score_habits_registry,
+    "hydration": score_hydration,
+    "journal": score_journal,
+    "glucose": score_glucose,
 }
 
 
 def letter_grade(score: Optional[Numeric]) -> str:
-    if score >= 95: return "A+"
-    if score >= 90: return "A"
-    if score >= 85: return "A-"
-    if score >= 80: return "B+"
-    if score >= 75: return "B"
-    if score >= 70: return "B-"
-    if score >= 65: return "C+"
-    if score >= 60: return "C"
-    if score >= 55: return "C-"
-    if score >= 45: return "D"
+    if score >= 95:
+        return "A+"
+    if score >= 90:
+        return "A"
+    if score >= 85:
+        return "A-"
+    if score >= 80:
+        return "B+"
+    if score >= 75:
+        return "B"
+    if score >= 70:
+        return "B-"
+    if score >= 65:
+        return "C+"
+    if score >= 60:
+        return "C"
+    if score >= 55:
+        return "C-"
+    if score >= 45:
+        return "D"
     return "F"
 
 
 def grade_colour(grade: str) -> str:
-    if grade.startswith("A"): return "#059669"
-    if grade.startswith("B"): return "#2563eb"
-    if grade.startswith("C"): return "#d97706"
+    if grade.startswith("A"):
+        return "#059669"
+    if grade.startswith("B"):
+        return "#2563eb"
+    if grade.startswith("C"):
+        return "#d97706"
     return "#dc2626"
 
 

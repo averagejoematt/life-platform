@@ -30,6 +30,7 @@ import json
 import os
 import re
 import sys
+
 import pytest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -38,6 +39,7 @@ LAMBDAS_DIR = os.path.join(ROOT, "lambdas")
 MANIFEST_PATH = os.path.join(ROOT, "ci", "lambda_s3_paths.json")
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _read(path):
     with open(path, encoding="utf-8") as f:
@@ -57,13 +59,13 @@ def _extract_ingestion_base_calls(src):
     results = []
     pattern = re.compile(
         r'_ingestion_base\s*\(\s*["\'](\w+)["\']'  # source name
-        r'(.*?)\)',                                  # rest of args (lazy)
-        re.DOTALL
+        r"(.*?)\)",  # rest of args (lazy)
+        re.DOTALL,
     )
     for m in pattern.finditer(src):
         source = m.group(1)
         args_body = m.group(2)
-        line = src[:m.start()].count('\n') + 1
+        line = src[: m.start()].count("\n") + 1
 
         prefix_m = re.search(r's3_prefix\s*=\s*["\']([^"\']+)["\']', args_body)
         s3_prefix = prefix_m.group(1) if prefix_m else None
@@ -74,6 +76,7 @@ def _extract_ingestion_base_calls(src):
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
+
 
 def test_s1_all_s3_prefixes_are_convention_or_documented():
     """S1: Every _ingestion_base call uses convention prefix OR is in the exception manifest."""
@@ -117,10 +120,7 @@ def test_s1_all_s3_prefixes_are_convention_or_documented():
                     f"    Update either role_policies.py or ci/lambda_s3_paths.json."
                 )
 
-    assert not failures, (
-        f"S1 FAIL: {len(failures)} undocumented S3 prefix deviation(s):\n"
-        + "\n".join(f"  - {f}" for f in failures)
-    )
+    assert not failures, f"S1 FAIL: {len(failures)} undocumented S3 prefix deviation(s):\n" + "\n".join(f"  - {f}" for f in failures)
 
 
 def test_s2_exception_evidence_in_lambda_source():
@@ -150,9 +150,8 @@ def test_s2_exception_evidence_in_lambda_source():
                 f"    Either the Lambda was refactored (update manifest) or the manifest is wrong."
             )
 
-    assert not failures, (
-        f"S2 FAIL: {len(failures)} manifest exception(s) can't be verified in Lambda source:\n"
-        + "\n".join(f"  - {f}" for f in failures)
+    assert not failures, f"S2 FAIL: {len(failures)} manifest exception(s) can't be verified in Lambda source:\n" + "\n".join(
+        f"  - {f}" for f in failures
     )
 
 
@@ -193,8 +192,8 @@ def test_s4_no_hardcoded_matthew_in_iam_comments():
     src = _read(ROLE_POLICIES_PATH)
     for m in re.finditer(r's3_prefix\s*=\s*["\']([^"\']*matthew[^"\']*)["\']', src):
         prefix = m.group(1)
-        line = src[:m.start()].count('\n') + 1
-        if not re.match(r'^raw/matthew/\w+/\*$', prefix):
+        line = src[: m.start()].count("\n") + 1
+        if not re.match(r"^raw/matthew/\w+/\*$", prefix):
             pytest.fail(
                 f"role_policies.py:{line} — s3_prefix='{prefix}' contains 'matthew' but "
                 f"doesn't match the convention pattern 'raw/matthew/{{source}}/*'.\n"
@@ -206,6 +205,7 @@ def test_s4_no_hardcoded_matthew_in_iam_comments():
 
 if __name__ == "__main__":
     import subprocess
+
     result = subprocess.run(
         ["python3", "-m", "pytest", __file__, "-v", "--tb=short"],
         cwd=ROOT,

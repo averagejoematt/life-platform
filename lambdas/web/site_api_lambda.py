@@ -36,16 +36,18 @@ P1.1 Phase B (2026-05-26):
 
 v1.0.0 — 2026-03-16
 """
+
+import base64 as _b64  # noqa: F401 — used by subscriber-token helpers
+
 # stdlib
 import hashlib  # noqa: F401 — used by handlers
+import hmac as _hmac  # noqa: F401 — used by subscriber-token helpers
 import json
 import os
 import re
 import time
 import urllib.request  # noqa: F401 — used by AI handlers (kept for backward-compat)
-import base64 as _b64  # noqa: F401 — used by subscriber-token helpers
-import hmac as _hmac  # noqa: F401 — used by subscriber-token helpers
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401 — kept for backward-compat with handlers
 
 # third-party
@@ -55,134 +57,139 @@ from boto3.dynamodb.conditions import Key
 # shared layer
 from phase_filter import with_phase_filter  # noqa: F401 — used by handlers below
 
+# P1.1 Phase B extension (2026-05-27): coach + misc inline blocks extracted.
+from web.site_api_coach import (
+    handle_ai_analysis,
+    handle_coach_analysis,
+    handle_coach_timeline,
+    handle_field_notes,
+    handle_predictions,
+    handle_weekly_priority,
+)
+
 # P1.1 Phase B (2026-05-26): shared helpers extracted to sibling module.
 # Re-import as module-level names so the rest of this file (and the
 # ROUTES dict) reference them unchanged.
-from web.site_api_common import (
-    logger,
-    # config
-    TABLE_NAME, USER_ID, USER_PREFIX, PT, DDB_REGION, S3_REGION,
-    EXPERIMENT_START, EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_QUERY_START,
-    # AWS
-    dynamodb, table,
-    # CORS
-    CORS_ORIGIN, SITE_API_ORIGIN_SECRET, CORS_HEADERS,
-    # caches
-    STATUS_CACHE_TTL, PLATFORM_STATS,
-    # helpers
+from web.site_api_common import (  # config; AWS; CORS; caches; helpers; request-id state (set by lambda_handler; read by _ok/_error)
+    CORS_HEADERS,
+    CORS_ORIGIN,
+    DDB_REGION,
+    EXPERIMENT_BASELINE_WEIGHT_LBS,
+    EXPERIMENT_QUERY_START,
+    EXPERIMENT_START,
+    PLATFORM_STATS,
+    PT,
+    S3_REGION,
+    SITE_API_ORIGIN_SECRET,
+    STATUS_CACHE_TTL,
+    TABLE_NAME,
+    USER_ID,
+    USER_PREFIX,
     _cached_secret,
     _decimal_to_float,
-    _experiment_date,
-    _query_source,
-    _latest_item,
-    _get_profile,
-    _load_supp_metadata,
-    _load_content_filter,
-    _scrub_blocked_terms,
-    _is_blocked_vice,
-    _request_id_headers,
-    _ok,
     _error,
-    # request-id state (set by lambda_handler; read by _ok/_error)
-    set_request_id, get_request_id,
-)
-
-# P1.1 Phase B step 2 (2026-05-26): observatory handlers extracted to sibling module.
-from web.site_api_observatory import (
-    handle_nutrition_overview,
-    handle_training_overview,
-    handle_workouts,
-    handle_weekly_physical_summary,
-    handle_protein_sources,
-    handle_physical_overview,
-    handle_journal_analysis,
-    handle_mind_overview,
-    handle_frequent_meals,
-    handle_meal_glucose,
-    handle_strength_benchmarks,
-    handle_food_delivery_overview,
-    handle_strength_deep_dive,
-    handle_benchmark_trends,
-    handle_meal_responses,
-)
-
-# P1.1 Phase B step 3 (2026-05-26): status + pulse handlers extracted.
-from web.site_api_intelligence import (
-    handle_status,
-    handle_status_summary,
-    handle_pulse,
-    handle_pulse_history,
-    handle_hypotheses,
-    handle_intelligence_summary,
-)
-
-# P1.1 Phase B step 4 (2026-05-26): social cluster extracted to sibling module.
-from web.site_api_social import (
-    _handle_verify_subscriber,
-    handle_subscriber_count,
-    _handle_nudge,
-    _handle_submit_finding,
-    handle_experiment_library,
-    _handle_experiment_vote,
-    _handle_experiment_follow,
-    _handle_experiment_detail,
-    _handle_experiment_suggest,
-    handle_challenge_catalog,
-    handle_challenges,
-    _handle_challenge_vote,
-    _handle_challenge_follow,
-    _handle_challenge_checkin,
-    handle_current_challenge,
-)
-
-# P1.1 Phase B step 5 (2026-05-26): vitals cluster extracted.
-from web.site_api_vitals import (
-    handle_vitals,
-    handle_journey,
-    handle_character,
-    handle_weight_progress,
-    handle_character_stats,
-    handle_journey_timeline,
-    handle_journey_waveform,
-    handle_achievements,
-    handle_snapshot,
-    handle_timeline,
+    _experiment_date,
+    _get_profile,
+    _is_blocked_vice,
+    _latest_item,
+    _load_content_filter,
+    _load_supp_metadata,
+    _ok,
+    _query_source,
+    _request_id_headers,
+    _scrub_blocked_terms,
+    dynamodb,
+    get_request_id,
+    logger,
+    set_request_id,
+    table,
 )
 
 # P1.1 Phase B step 6 (2026-05-26): data cluster extracted.
 from web.site_api_data import (
-    handle_glucose,
-    handle_sleep_detail,
-    handle_habits,
-    handle_habit_streaks,
-    handle_habit_registry,
-    handle_correlations,
-    handle_genome_risks,
-    handle_observatory_week,
     handle_changes_since,
-    handle_supplements,
-    handle_vice_streaks,
-    handle_experiments,
-    handle_ledger,
+    handle_correlations,
     handle_discoveries,
-    handle_labs,
-    handle_protocols,
-    handle_tools_baseline,
-    handle_platform_stats,
-    handle_source_freshness,
     handle_domains,
+    handle_experiments,
+    handle_genome_risks,
+    handle_glucose,
+    handle_habit_registry,
+    handle_habit_streaks,
+    handle_habits,
+    handle_labs,
+    handle_ledger,
+    handle_observatory_week,
+    handle_platform_stats,
+    handle_protocols,
+    handle_sleep_detail,
+    handle_source_freshness,
+    handle_supplements,
+    handle_tools_baseline,
+    handle_vice_streaks,
 )
 
-# P1.1 Phase B extension (2026-05-27): coach + misc inline blocks extracted.
-from web.site_api_coach import (
-    handle_field_notes,
-    handle_ai_analysis,
-    handle_coach_analysis,
-    handle_predictions,
-    handle_coach_timeline,
-    handle_weekly_priority,
+# P1.1 Phase B step 3 (2026-05-26): status + pulse handlers extracted.
+from web.site_api_intelligence import (
+    handle_hypotheses,
+    handle_intelligence_summary,
+    handle_pulse,
+    handle_pulse_history,
+    handle_status,
+    handle_status_summary,
 )
 
+# P1.1 Phase B step 2 (2026-05-26): observatory handlers extracted to sibling module.
+from web.site_api_observatory import (
+    handle_benchmark_trends,
+    handle_food_delivery_overview,
+    handle_frequent_meals,
+    handle_journal_analysis,
+    handle_meal_glucose,
+    handle_meal_responses,
+    handle_mind_overview,
+    handle_nutrition_overview,
+    handle_physical_overview,
+    handle_protein_sources,
+    handle_strength_benchmarks,
+    handle_strength_deep_dive,
+    handle_training_overview,
+    handle_weekly_physical_summary,
+    handle_workouts,
+)
+
+# P1.1 Phase B step 4 (2026-05-26): social cluster extracted to sibling module.
+from web.site_api_social import (
+    _handle_challenge_checkin,
+    _handle_challenge_follow,
+    _handle_challenge_vote,
+    _handle_experiment_detail,
+    _handle_experiment_follow,
+    _handle_experiment_suggest,
+    _handle_experiment_vote,
+    _handle_nudge,
+    _handle_submit_finding,
+    _handle_verify_subscriber,
+    handle_challenge_catalog,
+    handle_challenges,
+    handle_current_challenge,
+    handle_experiment_library,
+    handle_subscriber_count,
+)
+
+# P1.1 Phase B step 5 (2026-05-26): vitals cluster extracted.
+from web.site_api_vitals import (
+    handle_achievements,
+    handle_character,
+    handle_character_stats,
+    handle_journey,
+    handle_journey_timeline,
+    handle_journey_waveform,
+    handle_snapshot,
+    handle_timeline,
+    handle_vitals,
+    handle_weight_progress,
+)
 
 # ── Endpoint handlers ───────────────────────────────────────
 
@@ -195,9 +202,6 @@ from web.site_api_coach import (
 # ── BS-BM2: Genome risk data ────────────────────────────────────
 
 # ── WR-24: Subscriber verification ──────────────────────────────────────────
-
-import hmac as _hmac
-import base64 as _b64
 
 
 # ── S2-T2-2: Board Ask ────────────────────────────────────────────────────────
@@ -275,7 +279,7 @@ BOARD_RATE_LIMIT = 5  # per IP per hour
 
 
 # R17-04: Separate Anthropic key for site-api — injected via CDK env var
-AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME",  "life-platform/site-api-ai-key")
+AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/site-api-ai-key")
 
 
 # ── ARCH-03: Achievements endpoint ──────────────────────────
@@ -306,6 +310,7 @@ AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME",  "life-platform/site-api-ai-ke
 #     ROUTES handled by sending None responses — kept the inline block, removed
 #     the misleading function.
 
+
 # ── Phase 1: Changes-Since endpoint ─────────────────────────────
 # ── Phase 1: Observatory Week endpoint ─────────────────────────
 # ── Benchmark trends endpoint ─────────────────────────────────
@@ -316,6 +321,7 @@ def handle_vacation_fund() -> dict:
     Read-only; delegates the math to the shared vacation_fund layer module."""
     try:
         from vacation_fund import compute_vacation_fund
+
         return _ok(compute_vacation_fund(), cache_seconds=900)
     except Exception as e:
         logger.error(f"[site_api] /api/vacation_fund failed: {e}")
@@ -323,102 +329,102 @@ def handle_vacation_fund() -> dict:
 
 
 ROUTES = {
-    "/api/vitals":          handle_vitals,
-    "/api/journey":         handle_journey,
-    "/api/vacation_fund":   handle_vacation_fund,
-    "/api/character":       handle_character,
-    "/api/status":          handle_status,
-    "/api/status/summary":  handle_status_summary,
+    "/api/vitals": handle_vitals,
+    "/api/journey": handle_journey,
+    "/api/vacation_fund": handle_vacation_fund,
+    "/api/character": handle_character,
+    "/api/status": handle_status,
+    "/api/status/summary": handle_status_summary,
     # BS-07: new public endpoints
     "/api/weight_progress": handle_weight_progress,
     "/api/character_stats": handle_character_stats,
-    "/api/habit_streaks":   handle_habit_streaks,
-    "/api/experiments":        handle_experiments,
-    "/api/current_challenge":  handle_current_challenge,
+    "/api/habit_streaks": handle_habit_streaks,
+    "/api/experiments": handle_experiments,
+    "/api/current_challenge": handle_current_challenge,
     # Sprint 4: BS-11, WEB-CE, BS-BM2
-    "/api/timeline":           handle_timeline,
-    "/api/correlations":       handle_correlations,
-    "/api/genome_risks":       handle_genome_risks,
+    "/api/timeline": handle_timeline,
+    "/api/correlations": handle_correlations,
+    "/api/genome_risks": handle_genome_risks,
     # Sprint 9: new public endpoints
-    "/api/supplements":        handle_supplements,
-    "/api/habits":             handle_habits,
-    "/api/vice_streaks":       handle_vice_streaks,
-    "/api/journey_timeline":   handle_journey_timeline,
-    "/api/journey_waveform":   handle_journey_waveform,
+    "/api/supplements": handle_supplements,
+    "/api/habits": handle_habits,
+    "/api/vice_streaks": handle_vice_streaks,
+    "/api/journey_timeline": handle_journey_timeline,
+    "/api/journey_waveform": handle_journey_waveform,
     # Sprint 11: glucose + sleep intelligence pages
-    "/api/glucose":            handle_glucose,
-    "/api/sleep_detail":       handle_sleep_detail,
+    "/api/glucose": handle_glucose,
+    "/api/sleep_detail": handle_sleep_detail,
     # ARCH-03: Achievement badges
-    "/api/achievements":       handle_achievements,
+    "/api/achievements": handle_achievements,
     # ARCH-02: Combined snapshot — single-call summary for pages that need vitals + journey + character
-    "/api/snapshot":           handle_snapshot,
+    "/api/snapshot": handle_snapshot,
     # WR-24 + S2-T2-2: handled specially in lambda_handler (POST routes)
-    "/api/verify_subscriber":  None,
-    "/api/board_ask":          None,
-    "/api/submit_finding":     None,  # NEW-1: POST handler in lambda_handler
+    "/api/verify_subscriber": None,
+    "/api/board_ask": None,
+    "/api/submit_finding": None,  # NEW-1: POST handler in lambda_handler
     # EL-2: Experiment library (GET) + EL-3: Experiment vote (POST)
-    "/api/experiment_library":  handle_experiment_library,
-    "/api/experiment_vote":     None,  # POST handler in lambda_handler
-    "/api/experiment_follow":   None,  # EL-F1: POST handler in lambda_handler
-    "/api/experiment_detail":   None,  # EL-F2: GET with query params
+    "/api/experiment_library": handle_experiment_library,
+    "/api/experiment_vote": None,  # POST handler in lambda_handler
+    "/api/experiment_follow": None,  # EL-F1: POST handler in lambda_handler
+    "/api/experiment_detail": None,  # EL-F2: GET with query params
     # DATA-DRIVEN: S3 config + DynamoDB source-of-truth endpoints
-    "/api/protocols":          handle_protocols,
-    "/api/challenges":         handle_challenges,
-    "/api/challenge_catalog":  handle_challenge_catalog,
-    "/api/challenge_vote":     None,  # POST handler in lambda_handler
-    "/api/challenge_follow":   None,  # POST handler in lambda_handler
-    "/api/challenge_checkin":  None,  # POST handler in lambda_handler
-    "/api/domains":            handle_domains,
-    "/api/habit_registry":     handle_habit_registry,
+    "/api/protocols": handle_protocols,
+    "/api/challenges": handle_challenges,
+    "/api/challenge_catalog": handle_challenge_catalog,
+    "/api/challenge_vote": None,  # POST handler in lambda_handler
+    "/api/challenge_follow": None,  # POST handler in lambda_handler
+    "/api/challenge_checkin": None,  # POST handler in lambda_handler
+    "/api/domains": handle_domains,
+    "/api/habit_registry": handle_habit_registry,
     # PULSE-A4: Daily pulse endpoint
-    "/api/pulse":              handle_pulse,
-    "/api/pulse_history":      handle_pulse_history,
+    "/api/pulse": handle_pulse,
+    "/api/pulse_history": handle_pulse_history,
     # Subscriber count social proof (read-only) — must NOT match /api/subscribe* CloudFront pattern
-    "/api/sub_count":          handle_subscriber_count,
+    "/api/sub_count": handle_subscriber_count,
     # Observatory pages
-    "/api/nutrition_overview":  handle_nutrition_overview,
-    "/api/training_overview":   handle_training_overview,
-    "/api/workouts":            handle_workouts,
-    "/api/mind_overview":       handle_mind_overview,
-    "/api/physical_overview":   handle_physical_overview,
-    "/api/journal_analysis":    handle_journal_analysis,
-    "/api/ai_analysis":         None,  # GET with ?expert= query param, handled in lambda_handler
-    "/api/coach_analysis":      None,  # GET with ?domain= query param, handled in lambda_handler (Coach Intelligence)
-    "/api/weekly_priority":     None,  # GET — integrator synthesis, handled in lambda_handler
+    "/api/nutrition_overview": handle_nutrition_overview,
+    "/api/training_overview": handle_training_overview,
+    "/api/workouts": handle_workouts,
+    "/api/mind_overview": handle_mind_overview,
+    "/api/physical_overview": handle_physical_overview,
+    "/api/journal_analysis": handle_journal_analysis,
+    "/api/ai_analysis": None,  # GET with ?expert= query param, handled in lambda_handler
+    "/api/coach_analysis": None,  # GET with ?domain= query param, handled in lambda_handler (Coach Intelligence)
+    "/api/weekly_priority": None,  # GET — integrator synthesis, handled in lambda_handler
     # BL-03: The Ledger / Snake Fund
-    "/api/ledger":              handle_ledger,
+    "/api/ledger": handle_ledger,
     # BL-04: Field Notes
-    "/api/field_notes":         None,  # GET with optional ?week= query param, handled in lambda_handler
+    "/api/field_notes": None,  # GET with optional ?week= query param, handled in lambda_handler
     # BL-02: Bloodwork/Labs
-    "/api/labs":                handle_labs,
-    "/api/frequent_meals":      handle_frequent_meals,
-    "/api/protein_sources":     handle_protein_sources,
+    "/api/labs": handle_labs,
+    "/api/frequent_meals": handle_frequent_meals,
+    "/api/protein_sources": handle_protein_sources,
     "/api/weekly_physical_summary": handle_weekly_physical_summary,
-    "/api/strength_deep_dive":      handle_strength_deep_dive,
-    "/api/food_delivery_overview":  handle_food_delivery_overview,
-    "/api/meal_glucose":        handle_meal_glucose,
+    "/api/strength_deep_dive": handle_strength_deep_dive,
+    "/api/food_delivery_overview": handle_food_delivery_overview,
+    "/api/meal_glucose": handle_meal_glucose,
     "/api/strength_benchmarks": handle_strength_benchmarks,
     # Benchmark trends + meal responses (stub endpoints)
-    "/api/benchmark_trends":    handle_benchmark_trends,
-    "/api/meal_responses":      handle_meal_responses,
+    "/api/benchmark_trends": handle_benchmark_trends,
+    "/api/meal_responses": handle_meal_responses,
     # Tools page: baseline vs current comparison
-    "/api/tools_baseline":      handle_tools_baseline,
+    "/api/tools_baseline": handle_tools_baseline,
     # Platform stats: single source of truth for all site pages
-    "/api/platform_stats":      handle_platform_stats,
+    "/api/platform_stats": handle_platform_stats,
     # Live pipeline status: per-source freshness (fresh/stale/paused)
-    "/api/source_freshness":    handle_source_freshness,
+    "/api/source_freshness": handle_source_freshness,
     # Discoveries page: active hypotheses + inner life + AI findings
-    "/api/discoveries":         handle_discoveries,
+    "/api/discoveries": handle_discoveries,
     # Experiment suggestion (POST)
-    "/api/experiment_suggest":  None,  # POST handler in lambda_handler
+    "/api/experiment_suggest": None,  # POST handler in lambda_handler
     # Phase 1: Reader engagement
-    "/api/changes-since":       None,  # GET with ?ts= query param
-    "/api/observatory_week":    None,  # GET with ?domain= query param
+    "/api/changes-since": None,  # GET with ?ts= query param
+    "/api/observatory_week": None,  # GET with ?domain= query param
     # Coaching Dashboard
-    "/api/coaching-dashboard":  None,  # GET — assembled coaching dashboard data
+    "/api/coaching-dashboard": None,  # GET — assembled coaching dashboard data
     # Prediction Ledger + Coach Timeline
-    "/api/predictions":         None,  # GET with ?status=&coach_id=&limit= query params
-    "/api/coach_timeline":      None,  # GET with ?coach_id= query param
+    "/api/predictions": None,  # GET with ?status=&coach_id=&limit= query params
+    "/api/coach_timeline": None,  # GET with ?coach_id= query param
 }
 
 
@@ -440,15 +446,15 @@ _COLD_START = True
 
 _SIMPLE_ROUTES = {
     "/api/verify_subscriber": ({"GET", "OPTIONS"}, _handle_verify_subscriber),
-    "/api/nudge":             ({"POST"},           _handle_nudge),
-    "/api/submit_finding":    ({"POST"},           _handle_submit_finding),
-    "/api/experiment_vote":   ({"POST"},           _handle_experiment_vote),
-    "/api/experiment_follow": ({"POST"},           _handle_experiment_follow),
-    "/api/experiment_suggest": ({"POST"},           _handle_experiment_suggest),
-    "/api/challenge_checkin": ({"POST"},           _handle_challenge_checkin),
-    "/api/challenge_vote":    ({"POST"},           _handle_challenge_vote),
-    "/api/challenge_follow":  ({"POST"},           _handle_challenge_follow),
-    "/api/experiment_detail": (None,               _handle_experiment_detail),
+    "/api/nudge": ({"POST"}, _handle_nudge),
+    "/api/submit_finding": ({"POST"}, _handle_submit_finding),
+    "/api/experiment_vote": ({"POST"}, _handle_experiment_vote),
+    "/api/experiment_follow": ({"POST"}, _handle_experiment_follow),
+    "/api/experiment_suggest": ({"POST"}, _handle_experiment_suggest),
+    "/api/challenge_checkin": ({"POST"}, _handle_challenge_checkin),
+    "/api/challenge_vote": ({"POST"}, _handle_challenge_vote),
+    "/api/challenge_follow": ({"POST"}, _handle_challenge_follow),
+    "/api/experiment_detail": (None, _handle_experiment_detail),
 }
 
 
@@ -458,24 +464,25 @@ def lambda_handler(event, context):
     """
     import time as _time
     import uuid as _uuid
+
     _req_start = _time.time()
 
     path = event.get("rawPath") or event.get("path", "/")
-    method = (event.get("requestContext", {}).get("http", {}).get("method") or
-              event.get("httpMethod", "GET")).upper()
+    method = (event.get("requestContext", {}).get("http", {}).get("method") or event.get("httpMethod", "GET")).upper()
 
     # P3.4: assign a per-request correlation ID. Honor an inbound x-request-id
     # header if the client (CloudFront / a debugging operator) set one — this
     # lets the same id flow end-to-end. Otherwise generate a fresh uuid4.
     inbound_headers = event.get("headers") or {}
-    incoming_rid = (inbound_headers.get("x-request-id") or inbound_headers.get("X-Request-Id"))
+    incoming_rid = inbound_headers.get("x-request-id") or inbound_headers.get("X-Request-Id")
     set_request_id(incoming_rid if incoming_rid else _uuid.uuid4().hex[:16])
 
     # Phase 2.2 (2026-05-16): centralized request envelope validation.
     # Catches oversized bodies, injection patterns, malformed user_id/date/source
     # before any handler runs. Returns 4xx for obvious abuse; legit traffic unaffected.
     try:
-        from request_validator import validate_envelope, ValidationError
+        from request_validator import ValidationError, validate_envelope
+
         validate_envelope(event, path=path, method=method)
     except ImportError:
         pass  # Validator not yet deployed; fall through to legacy behavior
@@ -505,24 +512,26 @@ def lambda_handler(event, context):
                 # fields as metrics. Cheap (≤ 5 dimension sets, no API call).
                 "_aws": {
                     "Timestamp": int(_time.time() * 1000),
-                    "CloudWatchMetrics": [{
-                        "Namespace": "LifePlatform/SiteAPI",
-                        "Dimensions": [["Route", "Method"]],
-                        "Metrics": [
-                            {"Name": "DurationMs", "Unit": "Milliseconds"},
-                            {"Name": "ColdStart", "Unit": "Count"},
-                        ],
-                    }],
+                    "CloudWatchMetrics": [
+                        {
+                            "Namespace": "LifePlatform/SiteAPI",
+                            "Dimensions": [["Route", "Method"]],
+                            "Metrics": [
+                                {"Name": "DurationMs", "Unit": "Milliseconds"},
+                                {"Name": "ColdStart", "Unit": "Count"},
+                            ],
+                        }
+                    ],
                 },
-                "_type":      "route_metric",
-                "Route":      path,
-                "Method":     method,
-                "status":     status_code,
+                "_type": "route_metric",
+                "Route": path,
+                "Method": method,
+                "status": status_code,
                 "DurationMs": duration_ms,
-                "ColdStart":  1 if _COLD_START else 0,
+                "ColdStart": 1 if _COLD_START else 0,
                 "request_id": get_request_id(),
                 "duration_ms": duration_ms,  # back-compat field name
-                "cold_start":  _COLD_START,
+                "cold_start": _COLD_START,
             }
             print(json.dumps(emf))
         except Exception:
@@ -568,6 +577,7 @@ def lambda_handler(event, context):
         req_headers = event.get("headers") or {}
         incoming = req_headers.get("x-amj-origin") or req_headers.get("X-AMJ-Origin") or ""
         import hmac as _hmac
+
         if not _hmac.compare_digest(incoming, SITE_API_ORIGIN_SECRET):
             return _error(403, "Forbidden")
 
@@ -603,25 +613,89 @@ def lambda_handler(event, context):
         return handle_observatory_week(qs)
 
     # BL-04: Field Notes (GET with optional ?week= query param)
-    if path == "/api/field_notes": return handle_field_notes(event)
-    if path == "/api/ai_analysis": return handle_ai_analysis(event)
-    if path == "/api/coach_analysis": return handle_coach_analysis(event)
+    if path == "/api/field_notes":
+        return handle_field_notes(event)
+    if path == "/api/ai_analysis":
+        return handle_ai_analysis(event)
+    if path == "/api/coach_analysis":
+        return handle_coach_analysis(event)
     if path == "/api/coaching-dashboard":
         try:
             _cd_coach_display = {
-                "sleep": {"coach_id": "sleep", "name": "Dr. Lisa Park", "initials": "LP", "title": "Sleep & Circadian Rhythm Specialist", "color": "#818cf8", "observatory_link": "/sleep/"},
-                "nutrition": {"coach_id": "nutrition", "name": "Dr. Marcus Webb", "initials": "MW", "title": "Evidence-Based Nutrition", "color": "#10b981", "observatory_link": "/nutrition/"},
-                "training": {"coach_id": "training", "name": "Dr. Sarah Chen", "initials": "SC", "title": "Exercise Physiology & Strength", "color": "#3db88a", "observatory_link": "/training/"},
-                "mind": {"coach_id": "mind", "name": "Dr. Nathan Reeves", "initials": "NR", "title": "Psychiatrist — Behavioral Patterns", "color": "#a78bfa", "observatory_link": "/mind/"},
-                "physical": {"coach_id": "physical", "name": "Dr. Victor Reyes", "initials": "VR", "title": "Longevity & Body Composition", "color": "#f59e0b", "observatory_link": "/physical/"},
-                "glucose": {"coach_id": "glucose", "name": "Dr. Amara Patel", "initials": "AP", "title": "Metabolic Health & CGM", "color": "#2dd4bf", "observatory_link": "/glucose/"},
-                "labs": {"coach_id": "labs", "name": "Dr. James Okafor", "initials": "JO", "title": "Clinical Pathology & Preventive Labs", "color": "#5ba4cf", "observatory_link": "/labs/"},
-                "explorer": {"coach_id": "explorer", "name": "Dr. Henning Brandt", "initials": "HB", "title": "Biostatistics & N=1 Research", "color": "#e879f9", "observatory_link": "/explorer/"},
+                "sleep": {
+                    "coach_id": "sleep",
+                    "name": "Dr. Lisa Park",
+                    "initials": "LP",
+                    "title": "Sleep & Circadian Rhythm Specialist",
+                    "color": "#818cf8",
+                    "observatory_link": "/sleep/",
+                },
+                "nutrition": {
+                    "coach_id": "nutrition",
+                    "name": "Dr. Marcus Webb",
+                    "initials": "MW",
+                    "title": "Evidence-Based Nutrition",
+                    "color": "#10b981",
+                    "observatory_link": "/nutrition/",
+                },
+                "training": {
+                    "coach_id": "training",
+                    "name": "Dr. Sarah Chen",
+                    "initials": "SC",
+                    "title": "Exercise Physiology & Strength",
+                    "color": "#3db88a",
+                    "observatory_link": "/training/",
+                },
+                "mind": {
+                    "coach_id": "mind",
+                    "name": "Dr. Nathan Reeves",
+                    "initials": "NR",
+                    "title": "Psychiatrist — Behavioral Patterns",
+                    "color": "#a78bfa",
+                    "observatory_link": "/mind/",
+                },
+                "physical": {
+                    "coach_id": "physical",
+                    "name": "Dr. Victor Reyes",
+                    "initials": "VR",
+                    "title": "Longevity & Body Composition",
+                    "color": "#f59e0b",
+                    "observatory_link": "/physical/",
+                },
+                "glucose": {
+                    "coach_id": "glucose",
+                    "name": "Dr. Amara Patel",
+                    "initials": "AP",
+                    "title": "Metabolic Health & CGM",
+                    "color": "#2dd4bf",
+                    "observatory_link": "/glucose/",
+                },
+                "labs": {
+                    "coach_id": "labs",
+                    "name": "Dr. James Okafor",
+                    "initials": "JO",
+                    "title": "Clinical Pathology & Preventive Labs",
+                    "color": "#5ba4cf",
+                    "observatory_link": "/labs/",
+                },
+                "explorer": {
+                    "coach_id": "explorer",
+                    "name": "Dr. Henning Brandt",
+                    "initials": "HB",
+                    "title": "Biostatistics & N=1 Research",
+                    "color": "#e879f9",
+                    "observatory_link": "/explorer/",
+                },
             }
             _cd_coach_id_map = {
-                "sleep": "sleep_coach", "nutrition": "nutrition_coach", "training": "training_coach",
-                "mind": "mind_coach", "physical": "physical_coach", "glucose": "glucose_coach",
-                "labs": "labs_coach", "explorer": "explorer_coach",
+                "sleep": "sleep_coach",
+                "nutrition": "nutrition_coach",
+                "training": "training_coach",
+                "mind": "mind_coach",
+                "physical": "physical_coach",
+                "glucose": "glucose_coach",
+                "labs": "labs_coach",
+                "explorer": "explorer_coach",
             }
 
             # 1. Weekly priority from integrator
@@ -638,20 +712,26 @@ def lambda_handler(event, context):
             # 2. Open actions from coach_actions source
             _cd_actions = []
             try:
-                _cd_act_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot coach actions
-                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}coach_actions"),
-                    "Limit": 50,
-                }))
+                _cd_act_resp = table.query(
+                    **with_phase_filter(
+                        {  # ADR-058: hide pilot coach actions
+                            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}coach_actions"),
+                            "Limit": 50,
+                        }
+                    )
+                )
                 for _act in _cd_act_resp.get("Items", []):
                     _act = _decimal_to_float(_act)
                     if _act.get("status") == "open":
-                        _cd_actions.append({
-                            "coach_id": _act.get("coach_id", ""),
-                            "domain": _act.get("domain", ""),
-                            "action_text": _act.get("action_text", _act.get("action", "")),
-                            "issued_date": _act.get("issued_date", _act.get("sk", "").replace("DATE#", "")),
-                            "status": "open",
-                        })
+                        _cd_actions.append(
+                            {
+                                "coach_id": _act.get("coach_id", ""),
+                                "domain": _act.get("domain", ""),
+                                "action_text": _act.get("action_text", _act.get("action", "")),
+                                "issued_date": _act.get("issued_date", _act.get("sk", "").replace("DATE#", "")),
+                                "status": "open",
+                            }
+                        )
             except Exception:
                 pass
 
@@ -668,10 +748,15 @@ def lambda_handler(event, context):
 
                 # Latest output for position_summary
                 try:
-                    _cd_out = table.query(**with_phase_filter({  # ADR-058: hide pilot coach outputs
-                        "KeyConditionExpression": Key("pk").eq(_cd_coach_pk) & Key("sk").begins_with("OUTPUT#"),
-                        "ScanIndexForward": False, "Limit": 1,
-                    }))
+                    _cd_out = table.query(
+                        **with_phase_filter(
+                            {  # ADR-058: hide pilot coach outputs
+                                "KeyConditionExpression": Key("pk").eq(_cd_coach_pk) & Key("sk").begins_with("OUTPUT#"),
+                                "ScanIndexForward": False,
+                                "Limit": 1,
+                            }
+                        )
+                    )
                     _cd_out_items = _cd_out.get("Items", [])
                     if _cd_out_items:
                         _cd_out_item = _decimal_to_float(_cd_out_items[0])
@@ -687,13 +772,15 @@ def lambda_handler(event, context):
                             coach_entry["prediction_count"] = len(preds)
                             for _p in preds[-3:]:
                                 if isinstance(_p, dict):
-                                    _cd_predictions.append({
-                                        "coach_id": _cd_domain,
-                                        "text": _p.get("text", _p.get("prediction", "")),
-                                        "confidence": _p.get("confidence", "medium"),
-                                        "status": _p.get("status", "pending"),
-                                        "date": _cd_out_item.get("sk", "").replace("OUTPUT#", ""),
-                                    })
+                                    _cd_predictions.append(
+                                        {
+                                            "coach_id": _cd_domain,
+                                            "text": _p.get("text", _p.get("prediction", "")),
+                                            "confidence": _p.get("confidence", "medium"),
+                                            "status": _p.get("status", "pending"),
+                                            "date": _cd_out_item.get("sk", "").replace("OUTPUT#", ""),
+                                        }
+                                    )
                 except Exception:
                     pass
 
@@ -706,20 +793,26 @@ def lambda_handler(event, context):
             # Limit predictions to 10 most recent
             _cd_predictions = _cd_predictions[-10:]
 
-            return _ok({
-                "weekly_priority": _cd_priority,
-                "open_actions": _cd_actions,
-                "coaches": _cd_coaches,
-                "predictions": _cd_predictions,
-            }, cache_seconds=300)
+            return _ok(
+                {
+                    "weekly_priority": _cd_priority,
+                    "open_actions": _cd_actions,
+                    "coaches": _cd_coaches,
+                    "predictions": _cd_predictions,
+                },
+                cache_seconds=300,
+            )
         except Exception as _e:
             print(f"[WARN] /api/coaching-dashboard failed: {_e}")
             return _ok({"weekly_priority": {}, "open_actions": [], "coaches": [], "predictions": []}, cache_seconds=60)
 
     # Prediction Ledger (GET with query params)
-    if path == "/api/predictions": return handle_predictions(event)
-    if path == "/api/coach_timeline": return handle_coach_timeline(event)
-    if path == "/api/weekly_priority": return handle_weekly_priority(event)
+    if path == "/api/predictions":
+        return handle_predictions(event)
+    if path == "/api/coach_timeline":
+        return handle_coach_timeline(event)
+    if path == "/api/weekly_priority":
+        return handle_weekly_priority(event)
     if method != "GET":
         return _error(405, "Method not allowed")
 

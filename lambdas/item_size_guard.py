@@ -24,16 +24,17 @@ Thresholds:
 """
 
 import json
-import os
 import logging
-import boto3
+import os
 from decimal import Decimal
+
+import boto3
 
 logger = logging.getLogger(__name__)
 
-WARN_THRESHOLD = 307_200   # 300 KB
-HARD_LIMIT = 389_120   # 380 KB — truncate before this
-DDB_LIMIT = 409_600   # 400 KB — DynamoDB hard limit
+WARN_THRESHOLD = 307_200  # 300 KB
+HARD_LIMIT = 389_120  # 380 KB — truncate before this
+DDB_LIMIT = 409_600  # 400 KB — DynamoDB hard limit
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 CW_NAMESPACE = "LifePlatform/DynamoDB"
@@ -94,8 +95,7 @@ def _truncate_item(item: dict, target_size: int, source: str) -> dict:
         new_len = max(1, int(original_len * 0.8))
         item[field] = item[field][:new_len]
         logger.warning(
-            f"[{source}] Truncated '{field}': {original_len} → {new_len} items "
-            f"(attempt {attempt+1}, size was {current_size:,} bytes)"
+            f"[{source}] Truncated '{field}': {original_len} → {new_len} items " f"(attempt {attempt+1}, size was {current_size:,} bytes)"
         )
     return item
 
@@ -105,12 +105,14 @@ def _emit_size_metric(source: str, size_bytes: int) -> None:
     try:
         _get_cw().put_metric_data(
             Namespace=CW_NAMESPACE,
-            MetricData=[{
-                "MetricName": "ItemSizeBytes",
-                "Dimensions": [{"Name": "Source", "Value": source}],
-                "Value": size_bytes,
-                "Unit": "Bytes",
-            }],
+            MetricData=[
+                {
+                    "MetricName": "ItemSizeBytes",
+                    "Dimensions": [{"Name": "Source", "Value": source}],
+                    "Value": size_bytes,
+                    "Unit": "Bytes",
+                }
+            ],
         )
     except Exception as e:
         logger.warning(f"[{source}] CloudWatch size metric emit failed (non-fatal): {e}")

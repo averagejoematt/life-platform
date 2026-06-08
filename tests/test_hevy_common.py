@@ -7,6 +7,7 @@ the resulting record satisfies the platform's schema contract.
 Re-run the parity check in a separate `tests/test_hevy_live.py` when actual
 payloads are available (left as a TODO so the live shape can be pinned).
 """
+
 import os
 import sys
 
@@ -21,14 +22,19 @@ sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 def _stub_aws(monkeypatch):
     """Stub the boto3 clients hevy_common creates at module load time."""
     import types
+
     fake_boto3 = types.ModuleType("boto3")
 
     class _FakeTable:
-        def put_item(self, **kw): pass
-        def get_item(self, **kw): return {}
+        def put_item(self, **kw):
+            pass
+
+        def get_item(self, **kw):
+            return {}
 
     class _FakeDDBResource:
-        def Table(self, name): return _FakeTable()
+        def Table(self, name):
+            return _FakeTable()
 
     def fake_client(name, region_name=None):
         return object()
@@ -49,7 +55,7 @@ def sample_workout_kg():
             "title": "Push Day A",
             "description": "Bench focus",
             "start_time": "2026-05-25T17:30:00Z",
-            "end_time":   "2026-05-25T18:25:00Z",
+            "end_time": "2026-05-25T18:25:00Z",
             "unit": "kg",
             "exercises": [
                 {
@@ -82,7 +88,7 @@ def sample_workout_lbs():
             "id": "wkt_def456",
             "title": "Squat Day",
             "start_time": "2026-05-25T15:00:00Z",
-            "end_time":   "2026-05-25T16:00:00Z",
+            "end_time": "2026-05-25T16:00:00Z",
             "unit": "lbs",
             "exercises": [
                 {
@@ -100,6 +106,7 @@ def sample_workout_lbs():
 
 def test_normalize_workout_kg_pk_sk(sample_workout_kg):
     from hevy_common import normalize_workout
+
     rec = normalize_workout(sample_workout_kg)
     assert rec["pk"] == "USER#matthew#SOURCE#hevy"
     assert rec["sk"] == "DATE#2026-05-25#WORKOUT#wkt_abc123"
@@ -112,6 +119,7 @@ def test_normalize_workout_kg_pk_sk(sample_workout_kg):
 def test_normalize_workout_kg_volume(sample_workout_kg):
     """Total volume = sum(weight_kg * reps) across all sets."""
     from hevy_common import normalize_workout
+
     rec = normalize_workout(sample_workout_kg)
     expected = (60 * 5) + (70 * 5) + (80 * 5) + (25 * 10) + (25 * 10)
     assert rec["total_volume_kg"] == float(expected)
@@ -122,6 +130,7 @@ def test_normalize_workout_kg_volume(sample_workout_kg):
 def test_normalize_workout_lbs_converts_to_kg(sample_workout_lbs):
     """When unit=lbs, all weights normalize to kg."""
     from hevy_common import normalize_workout
+
     rec = normalize_workout(sample_workout_lbs)
     assert rec["original_unit"] == "lbs"
     sets = rec["exercises"][0]["sets"]
@@ -135,6 +144,7 @@ def test_normalize_workout_lbs_converts_to_kg(sample_workout_lbs):
 
 def test_normalize_workout_duration(sample_workout_kg):
     from hevy_common import normalize_workout
+
     rec = normalize_workout(sample_workout_kg)
     # 17:30 → 18:25 = 55 minutes = 3300s
     assert rec["duration_sec"] == 3300
@@ -142,12 +152,14 @@ def test_normalize_workout_duration(sample_workout_kg):
 
 def test_normalize_workout_raw_ref_points_at_s3(sample_workout_kg):
     from hevy_common import normalize_workout
+
     rec = normalize_workout(sample_workout_kg)
     assert rec["raw_ref"] == "s3://matthew-life-platform/raw/hevy/wkt_abc123.json"
 
 
 def test_normalize_workout_missing_id_raises():
     from hevy_common import normalize_workout
+
     with pytest.raises(ValueError, match="missing workout id"):
         normalize_workout({"workout": {"title": "no id"}})
 
@@ -155,20 +167,25 @@ def test_normalize_workout_missing_id_raises():
 def test_normalize_workout_top_level_id_accepted():
     """Hevy may return the workout at top level (not wrapped in 'workout')."""
     from hevy_common import normalize_workout
-    rec = normalize_workout({
-        "id": "top_level_id",
-        "title": "Flat",
-        "start_time": "2026-05-25T10:00:00Z",
-        "exercises": [],
-    })
+
+    rec = normalize_workout(
+        {
+            "id": "top_level_id",
+            "title": "Flat",
+            "start_time": "2026-05-25T10:00:00Z",
+            "exercises": [],
+        }
+    )
     assert rec["source_workout_id"] == "top_level_id"
 
 
 # ── Webhook signature ────────────────────────────────────────────────────────
 
+
 def test_verify_signature_direct_match(monkeypatch):
     """Direct-string-match path (Hevy's simplest auth mechanism)."""
     from hevy_common import verify_webhook_signature
+
     monkeypatch.setattr(
         "hevy_common.load_secret",
         lambda: {"api_key": "irrelevant", "webhook_secret": "shared-bearer-token-xyz"},
@@ -181,7 +198,9 @@ def test_verify_signature_hmac_match(monkeypatch):
     """HMAC-SHA256 path."""
     import hashlib
     import hmac as _hmac
+
     from hevy_common import verify_webhook_signature
+
     monkeypatch.setattr(
         "hevy_common.load_secret",
         lambda: {"api_key": "irrelevant", "webhook_secret": "k"},

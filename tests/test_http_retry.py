@@ -15,7 +15,7 @@ import os
 import sys
 import urllib.error
 from io import BytesIO
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 

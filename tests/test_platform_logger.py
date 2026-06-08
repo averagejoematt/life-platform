@@ -29,9 +29,7 @@ except ImportError as _e:
     pl = None  # type: ignore
 
 if _import_err is not None:
-    pytestmark = pytest.mark.skip(  # type: ignore
-        reason=f"platform_logger unavailable: {_import_err}"
-    )
+    pytestmark = pytest.mark.skip(reason=f"platform_logger unavailable: {_import_err}")  # type: ignore
 
 
 def _drain_handler_output(logger):
@@ -42,6 +40,7 @@ def _drain_handler_output(logger):
     for the duration of one log call, then return contents.
     """
     from io import StringIO
+
     buf = StringIO()
     original_streams = []
     for h in logger.handlers:
@@ -73,8 +72,7 @@ class TestExcInfoNormalization:
             _restore_streams(originals)
 
         out = buf.getvalue()
-        assert "TypeError" not in out, \
-            f"TD-20 regression: secondary TypeError leaked into log output:\n{out}"
+        assert "TypeError" not in out, f"TD-20 regression: secondary TypeError leaked into log output:\n{out}"
         # Exception details should be in the log
         assert "ValueError" in out
         assert "expected test exception" in out
@@ -92,8 +90,7 @@ class TestExcInfoNormalization:
             _restore_streams(originals)
 
         out = buf.getvalue()
-        assert "TypeError" not in out, \
-            f"TD-20 regression with BaseException form: {out}"
+        assert "TypeError" not in out, f"TD-20 regression with BaseException form: {out}"
         assert "RuntimeError" in out
         assert "boom" in out
 

@@ -18,6 +18,7 @@ os.environ.setdefault("S3_BUCKET", "test-bucket")
 os.environ.setdefault("USER_ID", "matthew")
 
 import types as _t
+
 if "boto3" not in sys.modules:
     boto3_stub = _t.SimpleNamespace(
         resource=lambda *a, **kw: _t.SimpleNamespace(Table=lambda name: None),
@@ -27,18 +28,15 @@ if "boto3" not in sys.modules:
 
 import failure_pattern_compute_lambda as fpc
 
-
 # ── _detect_habit_skip_predictors ─────────────────────────────────────────────
+
 
 def test_predictors_skip_drives_lift():
     # Walk skipped on bad days only; baseline bad-rate = 5/10 = 0.5
     # Walk skipped 5 times, all bad; lift = 1.0 / 0.5 = 2.0
     grades = {f"2026-04-{d:02d}": (50 if d <= 5 else 80) for d in range(1, 11)}
     outcome = [{"date": d, "total_score": s} for d, s in grades.items()]
-    habits = [
-        {"date": f"2026-04-{d:02d}", "missed_tier0": (["Walk 5k"] if d <= 5 else [])}
-        for d in range(1, 11)
-    ]
+    habits = [{"date": f"2026-04-{d:02d}", "missed_tier0": (["Walk 5k"] if d <= 5 else [])} for d in range(1, 11)]
     out = fpc._detect_habit_skip_predictors(habits, outcome)
     assert len(out) == 1
     p = out[0]
@@ -66,8 +64,7 @@ def test_predictors_returns_top_3_only():
     habits = []
     for d in range(1, 11):
         # 4 different habits all skipped every day → lift = 1.0 each → all excluded (lift > 1)
-        habits.append({"date": f"2026-04-{d:02d}", "missed_tier0":
-                       ["H1", "H2", "H3", "H4"]})
+        habits.append({"date": f"2026-04-{d:02d}", "missed_tier0": ["H1", "H2", "H3", "H4"]})
     out = fpc._detect_habit_skip_predictors(habits, outcome)
     # All 4 habits have lift = 1.0 (skip_bad_rate == baseline) → filtered out
     assert out == []
@@ -79,6 +76,7 @@ def test_predictors_handles_empty():
 
 
 # ── _detect_cascade_patterns ──────────────────────────────────────────────────
+
 
 def test_cascade_poor_sleep_to_bad_day():
     # 5 days of poor sleep, all followed by bad days
@@ -112,18 +110,20 @@ def test_cascade_handles_no_sleep_data():
 
 # ── _detect_day_of_week_clusters ──────────────────────────────────────────────
 
+
 def test_dow_clusters_flags_weekend_drop():
     # Build 8 weeks of data: weekday composite_score=80, Saturday=50, Sunday=70
     records = []
     base = "2026-03-01"  # Sunday
     from datetime import datetime, timedelta
+
     base_dt = datetime.strptime(base, "%Y-%m-%d")
     for i in range(56):
         dt = base_dt + timedelta(days=i)
         ds = dt.strftime("%Y-%m-%d")
-        if dt.weekday() == 5:   # Sat
+        if dt.weekday() == 5:  # Sat
             score = 50
-        elif dt.weekday() == 6: # Sun
+        elif dt.weekday() == 6:  # Sun
             score = 70
         else:
             score = 80
@@ -143,6 +143,7 @@ def test_dow_clusters_handles_empty():
 
 
 # ── _detect_rebound_speed ─────────────────────────────────────────────────────
+
 
 def test_rebound_speed_basic():
     # Day 1-3: bad (40); Day 4: recovered (75); Day 5-7: good

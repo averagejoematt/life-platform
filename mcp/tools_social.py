@@ -5,31 +5,49 @@ Social, behavioral, and protocol tools:
   - Temptation logging (#35)
   - Cold/heat exposure logging & correlation (#36)
 """
+
 import json
 import logging
-from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from mcp.config import (
-    table, USER_PREFIX, USER_ID, logger,
-    LIFE_EVENTS_PK, INTERACTIONS_PK, TEMPTATIONS_PK, EXPOSURES_PK,
     ANNOTATIONS_PK,
+    EXPOSURES_PK,
+    INTERACTIONS_PK,
+    LIFE_EVENTS_PK,
+    TEMPTATIONS_PK,
+    USER_ID,
+    USER_PREFIX,
+    logger,
+    table,
 )
 from mcp.core import (
-    query_source, decimal_to_float, get_profile,
+    decimal_to_float,
+    get_profile,
+    query_source,
 )
 from mcp.helpers import pearson_r
-
 
 # ═══════════════════════════════════════════════════════════════════════
 # #40 — LIFE EVENT TAGGING (Sponsor: Elena Voss)
 # ═══════════════════════════════════════════════════════════════════════
 
 _LIFE_EVENT_TYPES = [
-    "birthday", "anniversary", "work_milestone", "social", "conflict",
-    "loss", "health_milestone", "travel", "relationship", "financial",
-    "achievement", "setback", "other",
+    "birthday",
+    "anniversary",
+    "work_milestone",
+    "social",
+    "conflict",
+    "loss",
+    "health_milestone",
+    "travel",
+    "relationship",
+    "financial",
+    "achievement",
+    "setback",
+    "other",
 ]
 
 
@@ -128,15 +146,17 @@ def tool_get_life_events(args):
     # Strip internal fields
     clean = []
     for i in items:
-        clean.append({
-            "date": i.get("date"),
-            "type": i.get("type"),
-            "title": i.get("title"),
-            "description": i.get("description"),
-            "people": i.get("people"),
-            "emotional_weight": i.get("emotional_weight"),
-            "recurring": i.get("recurring"),
-        })
+        clean.append(
+            {
+                "date": i.get("date"),
+                "type": i.get("type"),
+                "title": i.get("title"),
+                "description": i.get("description"),
+                "people": i.get("people"),
+                "emotional_weight": i.get("emotional_weight"),
+                "recurring": i.get("recurring"),
+            }
+        )
 
     return {
         "period": f"{start} to {end}",
@@ -213,14 +233,19 @@ def tool_get_social_dashboard(args):
     start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     from mcp.core import _apply_phase_filter  # ADR-058
-    resp = table.query(**_apply_phase_filter({
-        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-        "ExpressionAttributeValues": {
-            ":pk": INTERACTIONS_PK,
-            ":s": f"DATE#{start}",
-            ":e": f"DATE#{end}\xff",
-        },
-    }))
+
+    resp = table.query(
+        **_apply_phase_filter(
+            {
+                "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                "ExpressionAttributeValues": {
+                    ":pk": INTERACTIONS_PK,
+                    ":s": f"DATE#{start}",
+                    ":e": f"DATE#{end}\xff",
+                },
+            }
+        )
+    )
     items = [decimal_to_float(i) for i in resp.get("Items", [])]
     items.sort(key=lambda x: x.get("date", ""))
 
@@ -265,12 +290,14 @@ def tool_get_social_dashboard(args):
         week_end = (d + timedelta(days=6)).strftime("%Y-%m-%d")
         week_items = [i for i in items if week_start <= i.get("date", "") <= week_end]
         unique_people = len(set(i.get("person") for i in week_items))
-        weekly_trend.append({
-            "week_of": week_start,
-            "interactions": len(week_items),
-            "unique_people": unique_people,
-            "deep_count": sum(1 for i in week_items if i.get("depth") == "deep"),
-        })
+        weekly_trend.append(
+            {
+                "week_of": week_start,
+                "interactions": len(week_items),
+                "unique_people": unique_people,
+                "deep_count": sum(1 for i in week_items if i.get("depth") == "deep"),
+            }
+        )
         d += timedelta(days=7)
 
     # Build person leaderboard
@@ -279,14 +306,16 @@ def tool_get_social_dashboard(args):
         depths = stats["depths"]
         depth_score = sum({"surface": 1, "meaningful": 2, "deep": 3}.get(d, 1) for d in depths) / len(depths)
         days_since = (datetime.strptime(end, "%Y-%m-%d") - datetime.strptime(stats["last_date"], "%Y-%m-%d")).days
-        leaderboard.append({
-            "person": person,
-            "interactions": stats["count"],
-            "avg_depth_score": round(depth_score, 1),
-            "channels": list(stats["types"]),
-            "last_contact": stats["last_date"],
-            "days_since_contact": days_since,
-        })
+        leaderboard.append(
+            {
+                "person": person,
+                "interactions": stats["count"],
+                "avg_depth_score": round(depth_score, 1),
+                "channels": list(stats["types"]),
+                "last_contact": stats["last_date"],
+                "days_since_contact": days_since,
+            }
+        )
 
     # Murthy thresholds
     unique_people = len(person_stats)
@@ -332,8 +361,14 @@ def tool_get_social_dashboard(args):
 # ═══════════════════════════════════════════════════════════════════════
 
 _TEMPTATION_CATEGORIES = [
-    "food", "alcohol", "sleep_sabotage", "skip_workout",
-    "screen_time", "social_avoidance", "impulse_purchase", "other",
+    "food",
+    "alcohol",
+    "sleep_sabotage",
+    "skip_workout",
+    "screen_time",
+    "social_avoidance",
+    "impulse_purchase",
+    "other",
 ]
 
 
@@ -395,14 +430,19 @@ def tool_get_temptation_trend(args):
     start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     from mcp.core import _apply_phase_filter  # ADR-058
-    resp = table.query(**_apply_phase_filter({
-        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-        "ExpressionAttributeValues": {
-            ":pk": TEMPTATIONS_PK,
-            ":s": f"DATE#{start}",
-            ":e": f"DATE#{end}\xff",
-        },
-    }))
+
+    resp = table.query(
+        **_apply_phase_filter(
+            {
+                "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                "ExpressionAttributeValues": {
+                    ":pk": TEMPTATIONS_PK,
+                    ":s": f"DATE#{start}",
+                    ":e": f"DATE#{end}\xff",
+                },
+            }
+        )
+    )
     items = [decimal_to_float(i) for i in resp.get("Items", [])]
     items.sort(key=lambda x: x.get("date", ""))
 
@@ -453,12 +493,14 @@ def tool_get_temptation_trend(args):
         week_items = [i for i in items if ws <= i.get("date", "") <= we]
         if week_items:
             wr = sum(1 for i in week_items if i.get("resisted"))
-            weekly.append({
-                "week_of": ws,
-                "total": len(week_items),
-                "resisted": wr,
-                "resist_rate_pct": round(100 * wr / len(week_items), 1),
-            })
+            weekly.append(
+                {
+                    "week_of": ws,
+                    "total": len(week_items),
+                    "resisted": wr,
+                    "resist_rate_pct": round(100 * wr / len(week_items), 1),
+                }
+            )
         d += timedelta(days=7)
 
     # Time-of-day pattern
@@ -570,14 +612,19 @@ def tool_get_exposure_log(args):
     start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     from mcp.core import _apply_phase_filter  # ADR-058
-    resp = table.query(**_apply_phase_filter({
-        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-        "ExpressionAttributeValues": {
-            ":pk": EXPOSURES_PK,
-            ":s": f"DATE#{start}",
-            ":e": f"DATE#{end}\xff",
-        },
-    }))
+
+    resp = table.query(
+        **_apply_phase_filter(
+            {
+                "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                "ExpressionAttributeValues": {
+                    ":pk": EXPOSURES_PK,
+                    ":s": f"DATE#{start}",
+                    ":e": f"DATE#{end}\xff",
+                },
+            }
+        )
+    )
     items = [decimal_to_float(i) for i in resp.get("Items", [])]
     items.sort(key=lambda x: x.get("date", ""))
 
@@ -608,15 +655,17 @@ def tool_get_exposure_log(args):
     # Build sessions list
     sessions = []
     for i in items:
-        sessions.append({
-            "date": i.get("date"),
-            "type": i.get("type"),
-            "modality": i.get("modality"),
-            "duration_min": i.get("duration_min"),
-            "temperature_f": i.get("temperature_f"),
-            "time_of_day": i.get("time_of_day"),
-            "notes": i.get("notes"),
-        })
+        sessions.append(
+            {
+                "date": i.get("date"),
+                "type": i.get("type"),
+                "modality": i.get("modality"),
+                "duration_min": i.get("duration_min"),
+                "temperature_f": i.get("temperature_f"),
+                "time_of_day": i.get("time_of_day"),
+                "notes": i.get("notes"),
+            }
+        )
 
     return {
         "period": f"{start} to {end}",
@@ -638,14 +687,19 @@ def tool_get_exposure_correlation(args):
 
     # Get exposures
     from mcp.core import _apply_phase_filter  # ADR-058
-    resp = table.query(**_apply_phase_filter({
-        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-        "ExpressionAttributeValues": {
-            ":pk": EXPOSURES_PK,
-            ":s": f"DATE#{start}",
-            ":e": f"DATE#{end}\xff",
-        },
-    }))
+
+    resp = table.query(
+        **_apply_phase_filter(
+            {
+                "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                "ExpressionAttributeValues": {
+                    ":pk": EXPOSURES_PK,
+                    ":s": f"DATE#{start}",
+                    ":e": f"DATE#{end}\xff",
+                },
+            }
+        )
+    )
     exposures = [decimal_to_float(i) for i in resp.get("Items", [])]
 
     if len(exposures) < 3:
@@ -673,9 +727,7 @@ def tool_get_exposure_correlation(args):
     som_by_date = {i.get("date"): decimal_to_float(i) for i in som if i.get("date")}
 
     # Build aligned series
-    all_dates = sorted(set(
-        list(whoop_by_date.keys())
-    ))
+    all_dates = sorted(set(list(whoop_by_date.keys())))
 
     exposure_days = {"hrv": [], "rhr": [], "recovery": [], "sleep_score": [], "som_valence": []}
     rest_days = {"hrv": [], "rhr": [], "recovery": [], "sleep_score": [], "som_valence": []}
@@ -834,28 +886,36 @@ def tool_annotate_discovery(args):
 def tool_get_discovery_annotations(args):
     """List all discovery annotations."""
     from boto3.dynamodb.conditions import Key as _Key
+
     from mcp.core import _apply_phase_filter  # ADR-058
+
     try:
-        resp = table.query(**_apply_phase_filter({
-            "KeyConditionExpression": _Key("pk").eq(ANNOTATIONS_PK),
-            "ScanIndexForward": True,
-        }))
+        resp = table.query(
+            **_apply_phase_filter(
+                {
+                    "KeyConditionExpression": _Key("pk").eq(ANNOTATIONS_PK),
+                    "ScanIndexForward": True,
+                }
+            )
+        )
         items = decimal_to_float(resp.get("Items", []))
     except Exception as e:
         return {"error": f"Failed to query annotations: {e}"}
 
     annotations = []
     for item in items:
-        annotations.append({
-            "event_key": item.get("sk", "").replace("EVENT#", ""),
-            "date": item.get("date", ""),
-            "event_type": item.get("event_type", ""),
-            "event_title": item.get("event_title", ""),
-            "annotation": item.get("annotation", ""),
-            "action_taken": item.get("action_taken"),
-            "outcome": item.get("outcome"),
-            "annotated_at": item.get("annotated_at"),
-        })
+        annotations.append(
+            {
+                "event_key": item.get("sk", "").replace("EVENT#", ""),
+                "date": item.get("date", ""),
+                "event_type": item.get("event_type", ""),
+                "event_title": item.get("event_title", ""),
+                "annotation": item.get("annotation", ""),
+                "action_taken": item.get("action_taken"),
+                "outcome": item.get("outcome"),
+                "annotated_at": item.get("annotated_at"),
+            }
+        )
 
     return {
         "annotations": annotations,

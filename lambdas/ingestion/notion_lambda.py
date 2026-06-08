@@ -30,16 +30,17 @@ import json
 import logging
 import os
 from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
 from decimal import Decimal
-from urllib.request import Request, urlopen
 from urllib.error import HTTPError
+from urllib.request import Request, urlopen
+from zoneinfo import ZoneInfo
 
 import boto3
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("notion")
 except ImportError:
     logger = logging.getLogger("notion")
@@ -51,7 +52,8 @@ USER_ID = os.environ.get("USER_ID", "matthew")
 
 # V2 P2.4 (2026-05-17): OAuth circuit breaker for non-framework Lambdas.
 try:
-    from auth_breaker import check_breaker, mark_failure, clear_failure, looks_like_auth_failure
+    from auth_breaker import check_breaker, clear_failure, looks_like_auth_failure, mark_failure
+
     _HAS_AUTH_BREAKER = True
 except ImportError:
     _HAS_AUTH_BREAKER = False
@@ -65,9 +67,9 @@ TEMPLATE_SK = {
     "Morning": "morning",
     "Evening": "evening",
     "Weekly Reflection": "weekly",
-    "Stressor": "stressor",       # numbered: stressor#1, stressor#2
-    "Health Event": "health",     # numbered: health#1, health#2
-    "journal": "journal",         # fallback for unstructured entries without Template property
+    "Stressor": "stressor",  # numbered: stressor#1, stressor#2
+    "Health Event": "health",  # numbered: health#1, health#2
+    "journal": "journal",  # fallback for unstructured entries without Template property
 }
 
 # Templates that allow multiple entries per day
@@ -84,6 +86,7 @@ _secret_cache = {}
 
 def _cached_secret(client, secret_id):
     import time as _t
+
     entry = _secret_cache.get(secret_id)
     if entry and _t.time() - entry[1] < 900:
         return entry[0]
@@ -102,15 +105,21 @@ def notion_post(endpoint, api_key, body=None):
     """POST request to Notion API. Returns parsed JSON."""
     url = f"{NOTION_API}{endpoint}"
     data = json.dumps(body or {}).encode("utf-8")
-    req = Request(url, data=data, method="POST", headers={
-        "Authorization": f"Bearer {api_key}",
-        "Notion-Version": NOTION_VERSION,
-        "Content-Type": "application/json",
-        "User-Agent": "LifePlatform/1.0",
-    })
+    req = Request(
+        url,
+        data=data,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Notion-Version": NOTION_VERSION,
+            "Content-Type": "application/json",
+            "User-Agent": "LifePlatform/1.0",
+        },
+    )
     try:
         # Phase 3.5 (2026-05-16): retry on transient 429/5xx.
         from http_retry import urlopen_with_retry
+
         with urlopen_with_retry(req, timeout=30) as resp:
             return json.loads(resp.read().decode())
     except HTTPError as e:
@@ -122,14 +131,19 @@ def notion_post(endpoint, api_key, body=None):
 def notion_get(endpoint, api_key):
     """GET request to Notion API. Returns parsed JSON."""
     url = f"{NOTION_API}{endpoint}"
-    req = Request(url, method="GET", headers={
-        "Authorization": f"Bearer {api_key}",
-        "Notion-Version": NOTION_VERSION,
-        "User-Agent": "LifePlatform/1.0",
-    })
+    req = Request(
+        url,
+        method="GET",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Notion-Version": NOTION_VERSION,
+            "User-Agent": "LifePlatform/1.0",
+        },
+    )
     try:
         # Phase 3.5 (2026-05-16): retry on transient 429/5xx.
         from http_retry import urlopen_with_retry
+
         with urlopen_with_retry(req, timeout=30) as resp:
             return json.loads(resp.read().decode())
     except HTTPError as e:
@@ -189,13 +203,11 @@ def fetch_page_body(page_id, api_key):
         cursor = result.get("next_cursor")
 
     body = "\n".join(all_text).strip()
-    logger.info(f"Fetched body for {page_id}: {len(body)} chars, "
-                f"{len(all_text)} blocks")
+    logger.info(f"Fetched body for {page_id}: {len(body)} chars, " f"{len(all_text)} blocks")
     return body
 
 
-def query_database(api_key, database_id, start_date=None, end_date=None,
-                   start_cursor=None, full_sync=False):
+def query_database(api_key, database_id, start_date=None, end_date=None, start_cursor=None, full_sync=False):
     """
     Query Notion database with optional date filter. Handles pagination.
     Returns list of page objects.
@@ -232,20 +244,26 @@ def query_database(api_key, database_id, start_date=None, end_date=None,
                     {"timestamp": "created_time", "created_time": {"on_or_after": start_date}},
                     {"timestamp": "created_time", "created_time": {"on_or_before": created_end}},
                 ]
-                body["filter"] = {"or": [
-                    {"and": date_filters},
-                    {"and": created_filters},
-                ]}
+                body["filter"] = {
+                    "or": [
+                        {"and": date_filters},
+                        {"and": created_filters},
+                    ]
+                }
             elif start_date:
-                body["filter"] = {"or": [
-                    {"property": "Date", "date": {"on_or_after": start_date}},
-                    {"timestamp": "created_time", "created_time": {"on_or_after": start_date}},
-                ]}
+                body["filter"] = {
+                    "or": [
+                        {"property": "Date", "date": {"on_or_after": start_date}},
+                        {"timestamp": "created_time", "created_time": {"on_or_after": start_date}},
+                    ]
+                }
             elif end_date:
-                body["filter"] = {"or": [
-                    {"property": "Date", "date": {"on_or_before": end_date}},
-                    {"timestamp": "created_time", "created_time": {"on_or_before": created_end}},
-                ]}
+                body["filter"] = {
+                    "or": [
+                        {"property": "Date", "date": {"on_or_before": end_date}},
+                        {"timestamp": "created_time", "created_time": {"on_or_before": created_end}},
+                    ]
+                }
 
         # Sort by created_time descending (works for all entries, not just those with Date)
         body["sorts"] = [{"timestamp": "created_time", "direction": "descending"}]
@@ -255,8 +273,7 @@ def query_database(api_key, database_id, start_date=None, end_date=None,
         has_more = result.get("has_more", False)
         cursor = result.get("next_cursor")
 
-        logger.info(f"Fetched {len(result.get('results', []))} pages "
-                    f"(total: {len(all_pages)}, has_more: {has_more})")
+        logger.info(f"Fetched {len(result.get('results', []))} pages " f"(total: {len(all_pages)}, has_more: {has_more})")
 
     return all_pages
 
@@ -266,8 +283,7 @@ def query_database(api_key, database_id, start_date=None, end_date=None,
 # No hardcoded field names — add, rename, or remove fields in Notion freely.
 
 # Properties to skip (Notion system fields or handled separately)
-SKIP_PROPERTIES = {"Date", "Template", "Created", "Created by",
-                   "Last edited time", "Last edited by"}
+SKIP_PROPERTIES = {"Date", "Template", "Created", "Created by", "Last edited time", "Last edited by"}
 
 
 def extract_property_value(prop):
@@ -407,6 +423,7 @@ def extract_select_prop(props, name):
 
 # ── Page → DynamoDB item conversion ──────────────────────────────────────────
 
+
 def parse_page(page, api_key=None):
     """
     Convert a Notion page to a DynamoDB item.
@@ -485,6 +502,7 @@ def parse_page(page, api_key=None):
 
 # ── DynamoDB write ────────────────────────────────────────────────────────────
 
+
 def build_sk(date_str, template, seq=None):
     """Build sort key for a journal entry."""
     suffix = TEMPLATE_SK[template]
@@ -518,6 +536,7 @@ def write_entries(entries_by_date):
                     # DATA-2: Validate before write
                     try:
                         from ingestion_validator import validate_item as _validate_item
+
                         _vr = _validate_item("notion", item, date_str)
                         if _vr.should_skip_ddb:
                             logger.error(f"[DATA-2] CRITICAL: Skipping notion DDB write for {sk}: {_vr.errors}")
@@ -533,11 +552,9 @@ def write_entries(entries_by_date):
                 # Single entry per day: morning, evening, weekly
                 item = items[0]  # Take latest if duplicates
                 if len(items) > 1:
-                    logger.warning(f"Multiple {template} entries for {date_str}, "
-                                   f"using most recent")
+                    logger.warning(f"Multiple {template} entries for {date_str}, " f"using most recent")
                     # Sort by notion_last_edited desc and take first
-                    items.sort(key=lambda x: x.get("notion_last_edited", ""),
-                               reverse=True)
+                    items.sort(key=lambda x: x.get("notion_last_edited", ""), reverse=True)
                     item = items[0]
                 sk = build_sk(date_str, template)
                 item["pk"] = PK
@@ -546,6 +563,7 @@ def write_entries(entries_by_date):
                 # DATA-2: Validate before write
                 try:
                     from ingestion_validator import validate_item as _validate_item
+
                     _vr = _validate_item("notion", item, date_str)
                     if _vr.should_skip_ddb:
                         logger.error(f"[DATA-2] CRITICAL: Skipping notion DDB write for {sk}: {_vr.errors}")
@@ -563,6 +581,7 @@ def write_entries(entries_by_date):
 
 # ── Lambda handler ────────────────────────────────────────────────────────────
 
+
 def lambda_handler(event, context):
     if event.get("healthcheck"):
         return {"statusCode": 200, "body": "ok"}
@@ -572,11 +591,16 @@ def lambda_handler(event, context):
         marker = check_breaker(table, source_name="notion", user_id=USER_ID, logger=logger)
         if marker:
             logger.warning(f"auth_breaker_skip source=notion marked_at={marker.get('marked_at')} error={marker.get('error', '')[:80]}")
-            return {"statusCode": 200, "body": json.dumps({
-                "skipped": "auth_failure_circuit_breaker",
-                "marked_at": marker.get("marked_at"),
-                "error": marker.get("error"),
-            })}
+            return {
+                "statusCode": 200,
+                "body": json.dumps(
+                    {
+                        "skipped": "auth_failure_circuit_breaker",
+                        "marked_at": marker.get("marked_at"),
+                        "error": marker.get("error"),
+                    }
+                ),
+            }
 
     try:
         """
@@ -588,7 +612,8 @@ def lambda_handler(event, context):
           {"start": "...", "end": "..."}  → backfill date range
           {"full_sync": true}             → fetch ALL entries (initial load)
         """
-        if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+        if hasattr(logger, "set_date"):
+            logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
         api_key, database_id = get_secrets()
 
         # Determine date range
@@ -614,18 +639,19 @@ def lambda_handler(event, context):
             logger.info(f"Scheduled mode: {start_date} → {end_date}")
 
         # Query Notion
-        pages = query_database(api_key, database_id, start_date, end_date,
-                               full_sync=full_sync)
+        pages = query_database(api_key, database_id, start_date, end_date, full_sync=full_sync)
         logger.info(f"Retrieved {len(pages)} pages from Notion")
 
         if not pages:
             return {
                 "statusCode": 200,
-                "body": json.dumps({
-                    "message": "No entries found",
-                    "start_date": start_date,
-                    "end_date": end_date,
-                }),
+                "body": json.dumps(
+                    {
+                        "message": "No entries found",
+                        "start_date": start_date,
+                        "end_date": end_date,
+                    }
+                ),
             }
 
         # Parse pages into items grouped by date

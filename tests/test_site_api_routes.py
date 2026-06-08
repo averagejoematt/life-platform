@@ -51,9 +51,7 @@ def test_no_duplicate_paths():
 def test_no_duplicate_handlers():
     routes = _parse_routes()
     handlers = [h for _, _, h in routes]
-    assert len(handlers) == len(set(handlers)), (
-        f"Duplicate handler(s) in _SIMPLE_ROUTES — same handler can't serve two paths in this table"
-    )
+    assert len(handlers) == len(set(handlers)), f"Duplicate handler(s) in _SIMPLE_ROUTES — same handler can't serve two paths in this table"
 
 
 def test_all_handlers_defined():
@@ -79,8 +77,7 @@ def test_all_handlers_defined():
     for path, _, handler in routes:
         pattern = rf"^def {handler}\("
         assert re.search(pattern, combined_src, re.MULTILINE), (
-            f"Route {path} references {handler} but no `def {handler}(` "
-            f"found in any site_api_*.py sibling module."
+            f"Route {path} references {handler} but no `def {handler}(` " f"found in any site_api_*.py sibling module."
         )
 
 
@@ -109,6 +106,5 @@ def test_dispatch_call_exists_in_handler():
     """Verify lambda_handler actually uses _SIMPLE_ROUTES.get(path)."""
     src = _src()
     assert "_SIMPLE_ROUTES.get(path)" in src, (
-        "Dispatch lookup not found in lambda_handler — did the inline branches "
-        "get re-added without removing the table?"
+        "Dispatch lookup not found in lambda_handler — did the inline branches " "get re-added without removing the table?"
     )

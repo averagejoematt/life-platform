@@ -33,9 +33,9 @@ v3.0.0 — 2026-04-07 (Intelligence Layer V2.1)
 import json
 import logging
 import os
-import urllib.request
 import urllib.error
-from datetime import datetime, timezone, timedelta
+import urllib.request
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
@@ -47,11 +47,15 @@ logger.setLevel(logging.INFO)
 # Intelligence Layer V2: shared preamble utilities
 try:
     from intelligence_common import (
-        build_data_inventory, build_data_maturity,
-        load_goals_config, build_coach_preamble,
-        build_thread_prompt_block, write_coach_thread,
+        build_coach_preamble,
+        build_data_inventory,
+        build_data_maturity,
+        build_thread_prompt_block,
         extract_thread_from_narrative,
+        load_goals_config,
+        write_coach_thread,
     )
+
     _HAS_INTELLIGENCE_COMMON = True
 except ImportError:
     _HAS_INTELLIGENCE_COMMON = False
@@ -100,11 +104,7 @@ def _decimal_to_float(obj):
 
 def _query_source(source, start_date, end_date):
     pk = f"{USER_PREFIX}{source}"
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(
-            f"DATE#{start_date}", f"DATE#{end_date}"
-        )
-    )
+    resp = table.query(KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}"))
     return _decimal_to_float(resp.get("Items", []))
 
 
@@ -233,8 +233,9 @@ def gather_data_for_expert(expert_key):
             data["body_fat_pct"] = float(bc.get("body_fat_pct", 0)) if bc.get("body_fat_pct") else None
             data["lean_mass_lb"] = float(bc.get("lean_mass_lb", 0)) if bc.get("lean_mass_lb") else None
             data["visceral_fat_lb"] = float(bc.get("visceral_fat_lb", 0)) if bc.get("visceral_fat_lb") else None
-            data["days_since_dexa"] = (datetime.now(timezone.utc) - datetime.strptime(
-                dexa.get("scan_date", today), "%Y-%m-%d").replace(tzinfo=timezone.utc)).days
+            data["days_since_dexa"] = (
+                datetime.now(timezone.utc) - datetime.strptime(dexa.get("scan_date", today), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            ).days
         if meas:
             whr = meas.get("waist_height_ratio")
             if whr:
@@ -278,7 +279,9 @@ def gather_data_for_expert(expert_key):
         glucose_days = [i for i in cgm_items if i.get("blood_glucose_avg") is not None]
         avg_vals = [float(i["blood_glucose_avg"]) for i in glucose_days]
         avg_glucose = round(sum(avg_vals) / len(avg_vals), 1) if avg_vals else None
-        tir_vals = [float(i["blood_glucose_time_in_range_pct"]) for i in glucose_days if i.get("blood_glucose_time_in_range_pct") is not None]
+        tir_vals = [
+            float(i["blood_glucose_time_in_range_pct"]) for i in glucose_days if i.get("blood_glucose_time_in_range_pct") is not None
+        ]
         tir_pct = round(sum(tir_vals) / len(tir_vals), 1) if tir_vals else None
         sd_vals = [float(i["blood_glucose_std_dev"]) for i in glucose_days if i.get("blood_glucose_std_dev") is not None]
         std_dev = round(sum(sd_vals) / len(sd_vals), 1) if sd_vals else None
@@ -454,7 +457,7 @@ experiment" — these are periodic lab draws over time.
             _maturity = build_data_maturity(_inventory)
             _goals = load_goals_config()
             preamble_block = build_coach_preamble(
-                coach_name=p['name'],
+                coach_name=p["name"],
                 domain=expert_key,
                 goals=_goals,
                 inventory=_inventory,
@@ -464,6 +467,7 @@ experiment" — these are periodic lab draws over time.
             if expert_key == "mind":
                 try:
                     from intelligence_common import compute_builders_paradox_score
+
                     bp = compute_builders_paradox_score(days=7)
                     bp_block = (
                         f"\nBUILDER'S PARADOX CHECK:\n"
@@ -475,8 +479,8 @@ experiment" — these are periodic lab draws over time.
                         f"Avg daily steps: {bp['avg_steps']}\n"
                         f"\n{bp['interpretation']}\n"
                         f"\nIf score > 50: You MUST address this directly. Not as a side note — "
-                        f"as the lead finding. The question to ask: \"Is the building serving "
-                        f"the transformation, or replacing it?\" Be direct. Matthew respects "
+                        f'as the lead finding. The question to ask: "Is the building serving '
+                        f'the transformation, or replacing it?" Be direct. Matthew respects '
                         f"honesty over comfort.\n"
                     )
                     preamble_block += bp_block
@@ -492,9 +496,13 @@ experiment" — these are periodic lab draws over time.
                 logger.warning("Thread injection failed for %s: %s", expert_key, _th_e)
         except Exception as _e:
             logger.warning("Preamble generation failed: %s — proceeding without", _e)
-            preamble_block = f"VOICE: Write in FIRST PERSON. You ARE {p['name']}. Say \"I\" not \"{p['name']}\". Address Matthew directly as \"you\".\n"
+            preamble_block = (
+                f"VOICE: Write in FIRST PERSON. You ARE {p['name']}. Say \"I\" not \"{p['name']}\". Address Matthew directly as \"you\".\n"
+            )
     else:
-        preamble_block = f"VOICE: Write in FIRST PERSON. You ARE {p['name']}. Say \"I\" not \"{p['name']}\". Address Matthew directly as \"you\".\n"
+        preamble_block = (
+            f"VOICE: Write in FIRST PERSON. You ARE {p['name']}. Say \"I\" not \"{p['name']}\". Address Matthew directly as \"you\".\n"
+        )
 
     return f"""You are {p['name']}, {p['title']}.
 
@@ -609,7 +617,8 @@ def _build_shared_system_prompt():
             logger.warning("Shared system prompt generation failed: %s", _e)
 
     # Format instructions (identical for all experts)
-    parts.append("""OBSERVATORY ANALYSIS FORMAT:
+    parts.append(
+        """OBSERVATORY ANALYSIS FORMAT:
 Write a 2-3 paragraph analysis (200-300 words).
 
 STRUCTURE:
@@ -628,7 +637,8 @@ After your analysis, on separate lines write:
 KEY RECOMMENDATION: [One specific action for this week. 1-2 sentences.]
 ELENA QUOTE: [One sentence in Elena Voss's voice — third person, literary journalist. She names the cross-domain observation the expert missed.]
 
-Write only the analysis — no preamble, just paragraphs followed by tagged lines.""")
+Write only the analysis — no preamble, just paragraphs followed by tagged lines."""
+    )
 
     return "\n\n".join(parts)
 
@@ -683,15 +693,14 @@ def generate_and_cache(expert_key, shared_system=None):
     # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
     try:
         from retry_utils import call_anthropic_raw
+
         result = call_anthropic_raw(req, timeout=60)
     except urllib.error.HTTPError as e:
         error_body = e.read().decode("utf-8", errors="replace")
         logger.error("Anthropic API %s: %s", e.code, error_body)
         raise
 
-    analysis_text = "".join(
-        b["text"] for b in result.get("content", []) if b.get("type") == "text"
-    )
+    analysis_text = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
 
     # V3.1: Extract tagged fields — split from bottom up to avoid capture leaks
     key_recommendation = ""
@@ -701,11 +710,11 @@ def generate_and_cache(expert_key, shared_system=None):
     if "ELENA QUOTE:" in analysis_text:
         parts = analysis_text.rsplit("ELENA QUOTE:", 1)
         analysis_text = parts[0].rstrip()
-        elena_quote = parts[1].strip().strip('"').strip('\u201c').strip('\u201d')
+        elena_quote = parts[1].strip().strip('"').strip("\u201c").strip("\u201d")
         # Extract any JOURNALING PROMPT that leaked into elena_quote
         if "JOURNALING PROMPT:" in elena_quote:
             eq_parts = elena_quote.split("JOURNALING PROMPT:", 1)
-            elena_quote = eq_parts[0].strip().strip('"').strip('\u201c').strip('\u201d')
+            elena_quote = eq_parts[0].strip().strip('"').strip("\u201c").strip("\u201d")
             if not journaling_prompt:
                 journaling_prompt = eq_parts[1].strip()
     # JOURNALING PROMPT comes before ELENA QUOTE (Mind page only)
@@ -744,11 +753,14 @@ def generate_and_cache(expert_key, shared_system=None):
     if _HAS_INTELLIGENCE_COMMON:
         try:
             from intelligence_common import validate_coach_output, write_quality_results
+
             _inventory = build_data_inventory()
             _maturity = build_data_maturity(_inventory)
             _flags = validate_coach_output(
-                coach_id=expert_key, domain=expert_key,
-                narrative=analysis_text, inventory=_inventory,
+                coach_id=expert_key,
+                domain=expert_key,
+                narrative=analysis_text,
+                inventory=_inventory,
                 maturity=_maturity,
             )
             today_str = now.strftime("%Y-%m-%d")
@@ -770,11 +782,13 @@ def generate_and_cache(expert_key, shared_system=None):
                 correction_prompt = prompt + "\n\n" + "\n".join(correction_parts)
 
                 try:
-                    corr_body = json.dumps({
-                        "model": AI_MODEL,
-                        "max_tokens": 1200,
-                        "messages": [{"role": "user", "content": correction_prompt}],
-                    })
+                    corr_body = json.dumps(
+                        {
+                            "model": AI_MODEL,
+                            "max_tokens": 1200,
+                            "messages": [{"role": "user", "content": correction_prompt}],
+                        }
+                    )
                     corr_req = urllib.request.Request(
                         "https://api.anthropic.com/v1/messages",
                         data=corr_body.encode(),
@@ -784,18 +798,20 @@ def generate_and_cache(expert_key, shared_system=None):
                     # retry_utils (was raw urlopen, no retry — caused silent quality failures
                     # when Anthropic was briefly unavailable mid-observatory).
                     from retry_utils import call_anthropic_raw
+
                     corr_result = call_anthropic_raw(corr_req, timeout=60)
-                    corrected_text = "".join(
-                        b["text"] for b in corr_result.get("content", []) if b.get("type") == "text"
-                    )
+                    corrected_text = "".join(b["text"] for b in corr_result.get("content", []) if b.get("type") == "text")
                     # Re-parse tagged fields from corrected text
                     if "KEY RECOMMENDATION:" in corrected_text:
                         _cparts = corrected_text.rsplit("KEY RECOMMENDATION:", 1)
                         corrected_text = _cparts[0].rstrip()
                     # Re-validate (don't recurse further)
                     _new_flags = validate_coach_output(
-                        coach_id=expert_key, domain=expert_key,
-                        narrative=corrected_text, inventory=_inventory, maturity=_maturity,
+                        coach_id=expert_key,
+                        domain=expert_key,
+                        narrative=corrected_text,
+                        inventory=_inventory,
+                        maturity=_maturity,
                     )
                     new_errors = sum(1 for f in _new_flags if f["severity"] == "error")
                     if new_errors < len(errors):
@@ -818,7 +834,9 @@ def generate_and_cache(expert_key, shared_system=None):
                 if err_count > 0 or warn_count > 0:
                     logger.warning(
                         "Quality flags for %s: %d errors, %d warnings",
-                        expert_key, err_count, warn_count,
+                        expert_key,
+                        err_count,
+                        warn_count,
                     )
         except Exception as _ve:
             logger.warning("Intelligence validator failed for %s: %s", expert_key, _ve)
@@ -829,10 +847,12 @@ def generate_and_cache(expert_key, shared_system=None):
             thread_data = extract_thread_from_narrative(expert_key, analysis_text, api_key)
             thread_data["generation_context"] = "observatory"
             write_coach_thread(expert_key, thread_data)
-            logger.info("Thread entry written for %s: investment=%s, %d predictions",
-                        expert_key,
-                        thread_data.get("emotional_investment", "?"),
-                        len(thread_data.get("predictions", [])))
+            logger.info(
+                "Thread entry written for %s: investment=%s, %d predictions",
+                expert_key,
+                thread_data.get("emotional_investment", "?"),
+                len(thread_data.get("predictions", [])),
+            )
         except Exception as _te:
             logger.warning("Thread extraction/write failed for %s: %s", expert_key, _te)
 
@@ -854,17 +874,17 @@ def generate_synthesis(all_coach_outputs):
     except Exception:
         goals = {}
 
-    coach_sections = "\n\n".join(
-        f"--- {domain.upper()} COACH ---\n{text[:800]}"
-        for domain, text in all_coach_outputs.items()
-        if text
-    )
+    coach_sections = "\n\n".join(f"--- {domain.upper()} COACH ---\n{text[:800]}" for domain, text in all_coach_outputs.items() if text)
 
-    goals_json = json.dumps({
-        "mission": goals.get("mission", ""),
-        "targets": goals.get("targets", {}),
-        "philosophy": goals.get("philosophy", ""),
-    }, indent=2, default=str)
+    goals_json = json.dumps(
+        {
+            "mission": goals.get("mission", ""),
+            "targets": goals.get("targets", {}),
+            "philosophy": goals.get("philosophy", ""),
+        },
+        indent=2,
+        default=str,
+    )
 
     prompt = f"""You are Dr. Kai Nakamura, Integrative Health Director. You've just read assessments from all domain coaches. Your job: synthesize, resolve contradictions, and make ONE call.
 
@@ -900,11 +920,13 @@ Produce EXACTLY this JSON structure (no markdown, no explanation):
 For disagreements: only flag GENUINE conflicts where two coaches would give Matthew contradictory advice. Do not invent disagreements. Empty list is fine if all coaches are aligned."""
 
     api_key = _get_api_key()
-    req_body = json.dumps({
-        "model": AI_MODEL,
-        "max_tokens": 1200,
-        "messages": [{"role": "user", "content": prompt}],
-    })
+    req_body = json.dumps(
+        {
+            "model": AI_MODEL,
+            "max_tokens": 1200,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+    )
 
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages",
@@ -919,11 +941,10 @@ For disagreements: only flag GENUINE conflicts where two coaches would give Matt
     try:
         # Phase 3.4 (2026-05-16): retry via retry_utils.
         from retry_utils import call_anthropic_raw
+
         result = call_anthropic_raw(req, timeout=60)
 
-        text = "".join(
-            b["text"] for b in result.get("content", []) if b.get("type") == "text"
-        )
+        text = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
 
         # Parse JSON from response (strip markdown fencing if present)
         cleaned = text.strip()
@@ -948,9 +969,11 @@ For disagreements: only flag GENUINE conflicts where two coaches would give Matt
             "ttl": ttl,
         }
         table.put_item(Item=item)
-        logger.info("Synthesis generated and cached: %d chars priority, %d domain notes",
-                     len(synthesis.get("weekly_priority", "")),
-                     len(synthesis.get("cross_domain_notes", {})))
+        logger.info(
+            "Synthesis generated and cached: %d chars priority, %d domain notes",
+            len(synthesis.get("weekly_priority", "")),
+            len(synthesis.get("cross_domain_notes", {})),
+        )
         return synthesis
 
     except Exception as e:

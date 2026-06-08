@@ -34,18 +34,18 @@ Usage in a stack:
 
 from aws_cdk import (
     Duration,
-    aws_lambda as _lambda,
-    aws_iam as iam,
-    aws_sqs as sqs,
-    aws_events as events,
-    aws_events_targets as targets,
-    aws_cloudwatch as cloudwatch,
-    aws_cloudwatch_actions as cw_actions,
-    aws_sns as sns,
-    aws_dynamodb as dynamodb,
-    aws_s3 as s3,
-    aws_logs as logs,
 )
+from aws_cdk import aws_cloudwatch as cloudwatch
+from aws_cdk import aws_cloudwatch_actions as cw_actions
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_lambda as _lambda
+from aws_cdk import aws_logs as logs
+from aws_cdk import aws_s3 as s3
+from aws_cdk import aws_sns as sns
+from aws_cdk import aws_sqs as sqs
 from constructs import Construct
 
 
@@ -125,12 +125,11 @@ def create_platform_lambda(
     if custom_policies is not None:
         # v2.0: CDK-owned role with explicit least-privilege policies.
         role = iam.Role(
-            scope, f"{id}Role",
+            scope,
+            f"{id}Role",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
             managed_policies=[
-                iam.ManagedPolicy.from_aws_managed_policy_name(
-                    "service-role/AWSLambdaBasicExecutionRole"
-                ),
+                iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole"),
             ],
         )
         for stmt in custom_policies:
@@ -146,49 +145,76 @@ def create_platform_lambda(
     else:
         # Fallback: broad default grants (for new Lambdas not yet audited)
         role = iam.Role(
-            scope, f"{id}Role",
+            scope,
+            f"{id}Role",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
             managed_policies=[
-                iam.ManagedPolicy.from_aws_managed_policy_name(
-                    "service-role/AWSLambdaBasicExecutionRole"
-                ),
+                iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole"),
             ],
         )
 
-        ddb_actions = [
-            "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem",
-            "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan",
-            "dynamodb:BatchGetItem", "dynamodb:BatchWriteItem",
-        ] if ddb_write else [
-            "dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:BatchGetItem",
-        ]
-        role.add_to_policy(iam.PolicyStatement(
-            actions=ddb_actions,
-            resources=[table.table_arn, f"{table.table_arn}/index/*"],
-        ))
+        ddb_actions = (
+            [
+                "dynamodb:GetItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:DeleteItem",
+                "dynamodb:Query",
+                "dynamodb:Scan",
+                "dynamodb:BatchGetItem",
+                "dynamodb:BatchWriteItem",
+            ]
+            if ddb_write
+            else [
+                "dynamodb:GetItem",
+                "dynamodb:Query",
+                "dynamodb:Scan",
+                "dynamodb:BatchGetItem",
+            ]
+        )
+        role.add_to_policy(
+            iam.PolicyStatement(
+                actions=ddb_actions,
+                resources=[table.table_arn, f"{table.table_arn}/index/*"],
+            )
+        )
 
-        s3_actions = [
-            "s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket",
-        ] if s3_write else [
-            "s3:GetObject", "s3:ListBucket",
-        ]
-        role.add_to_policy(iam.PolicyStatement(
-            actions=s3_actions,
-            resources=[bucket.bucket_arn, f"{bucket.bucket_arn}/*"],
-        ))
+        s3_actions = (
+            [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject",
+                "s3:ListBucket",
+            ]
+            if s3_write
+            else [
+                "s3:GetObject",
+                "s3:ListBucket",
+            ]
+        )
+        role.add_to_policy(
+            iam.PolicyStatement(
+                actions=s3_actions,
+                resources=[bucket.bucket_arn, f"{bucket.bucket_arn}/*"],
+            )
+        )
 
         if secrets:
             for secret_id in secrets:
-                role.add_to_policy(iam.PolicyStatement(
-                    actions=["secretsmanager:GetSecretValue", "secretsmanager:UpdateSecret"],
-                    resources=[f"arn:aws:secretsmanager:*:*:secret:{secret_id}-*"],
-                ))
+                role.add_to_policy(
+                    iam.PolicyStatement(
+                        actions=["secretsmanager:GetSecretValue", "secretsmanager:UpdateSecret"],
+                        resources=[f"arn:aws:secretsmanager:*:*:secret:{secret_id}-*"],
+                    )
+                )
 
         if needs_ses and ses_domain:
-            role.add_to_policy(iam.PolicyStatement(
-                actions=["ses:SendEmail", "ses:SendRawEmail"],
-                resources=[f"arn:aws:ses:*:*:identity/{ses_domain}"],
-            ))
+            role.add_to_policy(
+                iam.PolicyStatement(
+                    actions=["ses:SendEmail", "ses:SendRawEmail"],
+                    resources=[f"arn:aws:ses:*:*:identity/{ses_domain}"],
+                )
+            )
 
         if dlq:
             dlq.grant_send_messages(role)
@@ -198,20 +224,28 @@ def create_platform_lambda(
     # degradation + the bedrock_client Tier-3 hard stop. Tiny read on one SSM
     # param. Skipped for imported roles (from_role_arn can't be modified by CDK).
     if existing_role_arn is None:
-        role.add_to_policy(iam.PolicyStatement(
-            actions=["ssm:GetParameter"],
-            resources=["arn:aws:ssm:*:*:parameter/life-platform/budget-tier"],
-        ))
+        role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["ssm:GetParameter"],
+                resources=["arn:aws:ssm:*:*:parameter/life-platform/budget-tier"],
+            )
+        )
 
     # ── Lambda Function ──
     _ASSET_EXCLUDES = [
-        "__pycache__", "**/__pycache__/**",
-        "*.pyc", "**/*.pyc",
+        "__pycache__",
+        "**/__pycache__/**",
+        "*.pyc",
+        "**/*.pyc",
         "*.md",
-        "dashboard", "dashboard/**",
-        "buddy", "buddy/**",
-        "cf-auth", "cf-auth/**",
-        "requirements", "requirements/**",
+        "dashboard",
+        "dashboard/**",
+        "buddy",
+        "buddy/**",
+        "cf-auth",
+        "cf-auth/**",
+        "requirements",
+        "requirements/**",
         ".DS_Store",
     ]
 
@@ -222,7 +256,8 @@ def create_platform_lambda(
     use_dlq_constructor = (custom_policies is not None or existing_role_arn is None) and dlq is not None
 
     fn = _lambda.Function(
-        scope, id,
+        scope,
+        id,
         function_name=function_name,
         runtime=_lambda.Runtime.PYTHON_3_12,
         handler=handler,
@@ -245,14 +280,13 @@ def create_platform_lambda(
     # Set DLQ via L1 escape hatch when using existing role — avoids auto-grant.
     if existing_role_arn and dlq:
         cfn_fn = fn.node.default_child
-        cfn_fn.dead_letter_config = _lambda.CfnFunction.DeadLetterConfigProperty(
-            target_arn=dlq.queue_arn
-        )
+        cfn_fn.dead_letter_config = _lambda.CfnFunction.DeadLetterConfigProperty(target_arn=dlq.queue_arn)
 
     # ── EventBridge schedule ──
     if schedule:
         rule = events.Rule(
-            scope, f"{id}Schedule",
+            scope,
+            f"{id}Schedule",
             schedule=events.Schedule.expression(schedule),
         )
         rule.add_target(targets.LambdaFunction(fn))
@@ -278,7 +312,8 @@ def create_platform_lambda(
             period=Duration.hours(1),
             statistic="Sum",
         ).create_alarm(
-            scope, f"{id}ErrorAlarm",
+            scope,
+            f"{id}ErrorAlarm",
             alarm_name=_alarm_name,
             evaluation_periods=1,
             threshold=1,
