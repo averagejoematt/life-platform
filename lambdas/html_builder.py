@@ -679,7 +679,7 @@ def build_html(
                 for eff in cs_effects:
                     eff_name = eff.get("name", "")
                     eff_emoji = eff.get("emoji", "✨")
-                    eff_desc = eff.get("description", "")
+                    eff.get("description", "")
                     eff_color = "#f87171" if "drag" in eff_name.lower() or "penalty" in eff_name.lower() else "#60a5fa"
                     html += (
                         '<span style="display:inline-block;background:rgba(0,0,0,0.3);border-radius:12px;padding:2px 8px;margin:2px;font-size:10px;color:'
@@ -1282,7 +1282,7 @@ def build_html(
         glucose_tir = safe_float(apple, "blood_glucose_time_in_range_pct")
         glucose_std = safe_float(apple, "blood_glucose_std_dev")
         glucose_min = safe_float(apple, "blood_glucose_min")
-        glucose_max = safe_float(apple, "blood_glucose_max")
+        safe_float(apple, "blood_glucose_max")
 
         if glucose_avg is not None:
             tir_color = "#22c55e" if glucose_tir and glucose_tir >= 85 else "#f59e0b" if glucose_tir and glucose_tir >= 70 else "#ef4444"
@@ -1415,7 +1415,7 @@ def build_html(
             precip = safe_float(weather, "precip_in")
             aqi = safe_float(weather, "aqi")
             sunrise = weather.get("sunrise_local", "")
-            sunset = weather.get("sunset_local", "")
+            weather.get("sunset_local", "")
 
             html += '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;">'
             if temp_hi:

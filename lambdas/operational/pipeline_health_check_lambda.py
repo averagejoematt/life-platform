@@ -70,7 +70,7 @@ def _probe_lambda(fn_name: str) -> dict:
             InvocationType="RequestResponse",
             Payload=b'{"healthcheck": true}',
         )
-        status_code = resp.get("StatusCode", 0)
+        resp.get("StatusCode", 0)
         has_error = "FunctionError" in resp
 
         if has_error:

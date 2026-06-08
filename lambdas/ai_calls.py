@@ -555,7 +555,7 @@ def _compute_data_quality(data, profile):
     # --- Nutrition (MacroFactor) ---
     mf = data.get("macrofactor") or {}
     cal = _safe_float(mf, "total_calories_kcal")
-    protein = _safe_float(mf, "total_protein_g")
+    _safe_float(mf, "total_protein_g")
     food_log = mf.get("food_log", [])
     cal_target = profile.get("calorie_target", 1800)
 
@@ -564,7 +564,7 @@ def _compute_data_quality(data, profile):
         scores["nutrition"] = 0.0
     else:
         # Check against 7-day average for consistency
-        apple_7d = data.get("apple_7d") or []
+        data.get("apple_7d") or []
         # Use simple heuristic: if calories < 50% of target, likely incomplete
         if cal < cal_target * 0.50:
             signals.append(
@@ -600,7 +600,7 @@ def _compute_data_quality(data, profile):
 
     # --- Activity (Strava) ---
     strava = data.get("strava") or {}
-    activity_count = strava.get("activity_count", 0)
+    strava.get("activity_count", 0)
     # No activity isn't a quality issue \u2014 could be a rest day
     scores["activity"] = 1.0
 
@@ -1367,7 +1367,7 @@ def _build_acwr_coaching_context(data):
     computed = data.get("computed_metrics") or {}
     zone = computed.get("acwr_zone", "")
     acwr = _safe_float(computed, "acwr")
-    alert = bool(computed.get("acwr_alert"))
+    bool(computed.get("acwr_alert"))
     reason = computed.get("acwr_alert_reason", "")
     acute = _safe_float(computed, "acute_load_7d")
     chron = _safe_float(computed, "chronic_load_28d")
@@ -1421,7 +1421,7 @@ def call_training_nutrition_coach(
     food_summary = build_food_summary(data)
     activity_summary = build_activity_summary(data)
     workout_summary = build_workout_summary(data)
-    weight_ctx = _build_weight_context(data, profile)
+    _build_weight_context(data, profile)
     recent_training = _build_recent_training_summary(data)
 
     # P2: Journey context
@@ -1854,7 +1854,7 @@ def call_tldr_and_guidance(
     if deep is not None:
         sleep_arch = "Deep: " + str(round(deep)) + "%, REM: " + str(round(rem or 0)) + "%"
 
-    weight_ctx = _build_weight_context(data, profile)
+    _build_weight_context(data, profile)
 
     # P2: Journey context
     jctx = _build_journey_context(profile, data.get("date"))

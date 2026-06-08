@@ -1075,7 +1075,7 @@ def handle_challenges() -> dict:
             # Include active, candidate, and recently completed (last 30 days)
             if status in ("active", "candidate", "completed", "failed"):
                 ch = _decimal_to_float(item)
-                sk_raw = ch.pop("pk", "") or ""
+                ch.pop("pk", "") or ""
                 sk_val = ch.pop("sk", "") or ""
                 # Derive catalog_id by stripping CHALLENGE# prefix and date suffix
                 # e.g. CHALLENGE#no-doordash-30d_2026-04-01 → no-doordash-30d → match catalog no-doordash-30
