@@ -1,0 +1,35 @@
+# Formatting & linting config — A-grade "enforced style" tooling.
+#
+# Tools: ruff (lint + import-sort) + black (format). Line length 140 to match
+# .flake8. ruff supersedes flake8 incrementally; flake8's E9/F-class stays the
+# hard CI floor until the baseline lands.
+#
+# SEQUENCING: the repo-wide *baseline reformat* is intentionally deferred until
+# the in-flight PRs merge — reformatting ~130 files now would conflict with
+# every file those PRs touch. Until then this config is staged + advisory:
+#   make format        # apply (the one-time baseline)
+#   make format-check  # verify (wired to CI as a gate with the baseline PR)
+
+[tool.black]
+line-length = 140
+target-version = ["py312"]
+extend-exclude = '''/(\.venv|cdk\.out|layer-build|site|node_modules|archive|datadrops)/'''
+
+[tool.ruff]
+line-length = 140
+target-version = "py312"
+extend-exclude = [".venv", "cdk.out", "layer-build", "site", "node_modules", "archive", "datadrops"]
+
+[tool.ruff.lint]
+# pycodestyle (E/W) + pyflakes (F) + isort (I). Mirror the .flake8 ignores so
+# the baseline is a pure-format diff, not a rules fight.
+select = ["E", "W", "F", "I"]
+ignore = ["E501", "E402", "E741"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+
+[tool.isort]
+profile = "black"
+line_length = 140
+skip_glob = ["**/.venv/**", "**/cdk.out/**", "**/layer-build/**", "**/archive/**"]
