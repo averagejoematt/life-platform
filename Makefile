@@ -24,6 +24,15 @@ test-quick:  ## Run tests, stop on first failure
 lint:  ## Run flake8 on lambdas/ and mcp/
 	$(FLAKE8) lambdas/ mcp/
 
+format:  ## Apply ruff+isort+black (config in pyproject.toml). NB: the one-time baseline reformat is sequenced after in-flight PRs merge.
+	$(PYTHON) -m ruff check --fix lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+	$(PYTHON) -m isort lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+	$(PYTHON) -m black lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+
+format-check:  ## Verify formatting (no changes) — will gate CI once the baseline lands
+	$(PYTHON) -m ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+	$(PYTHON) -m black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+
 syntax:  ## Syntax-check all Python files in lambdas/ and mcp/
 	find lambdas/ mcp/ -name '*.py' -exec $(PYTHON) -m py_compile {} \;
 	@echo "Syntax OK"
