@@ -12,7 +12,7 @@ MODULES=(
     bedrock_client.py
     budget_guard.py
     retry_utils.py board_loader.py insight_writer.py scoring_engine.py
-    character_engine.py output_writers.py ai_calls.py ai_summaries.py html_builder.py
+    character_engine.py output_writers.py ai_calls.py ai_summaries.py ai_context.py html_builder.py
     ai_output_validator.py platform_logger.py ingestion_framework.py
     ingestion_validator.py item_size_guard.py digest_utils.py
     sick_day_checker.py site_writer.py secret_cache.py
