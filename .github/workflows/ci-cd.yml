@@ -89,22 +89,13 @@ jobs:
           # Fail on syntax errors and undefined names; pass on style warnings
           flake8 lambdas/ mcp/ --count --select=E9,F63,F7,F82 --show-source --statistics
 
-      - name: Install black + isort
-        run: pip install black==25.9.0 isort==6.1.0
+      - name: Install black + ruff
+        run: pip install black==25.9.0 ruff==0.14.0
 
-      - name: Format gate (black + isort — ENFORCED, config in pyproject.toml)
-        run: |
-          echo "::group::black --check"
-          black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
-          echo "::endgroup::"
-          echo "::group::isort --check"
-          isort --check-only lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
-          echo "::endgroup::"
+      - name: Format gate (black — ENFORCED, config in pyproject.toml)
+        run: black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
 
-      - name: Install ruff
-        run: pip install ruff==0.14.0
-
-      - name: Lint gate (ruff — ENFORCED, config in pyproject.toml)
+      - name: Lint gate (ruff — ENFORCED; import-sort via ruff's isort rules)
         run: ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
 
       - name: Mypy (advisory — typed shared modules only)

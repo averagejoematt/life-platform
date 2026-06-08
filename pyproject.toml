@@ -41,7 +41,6 @@ external = ["CDK_HANDLER_ORPHAN"]
 [tool.ruff.lint.isort]
 combine-as-imports = true
 
-[tool.isort]
-profile = "black"
-line_length = 140
-skip_glob = ["**/.venv/**", "**/cdk.out/**", "**/layer-build/**", "**/archive/**"]
+# Import sorting is owned by ruff (tool.ruff.lint select "I" + tool.ruff.lint.isort)
+# — standalone isort was removed: two sorters with different output fought each
+# other and red-walled the CI format gate.
