@@ -24,7 +24,6 @@ Covers:
     life-platform-s3-bucket-size-high  BucketSizeBytes Max >= 50GB, 86400s
 """
 
-import aws_cdk as cdk
 from aws_cdk import (
     Duration,
     Stack,
@@ -33,8 +32,7 @@ from aws_cdk import aws_cloudwatch as cloudwatch
 from aws_cdk import aws_cloudwatch_actions as cw_actions
 from aws_cdk import aws_logs as logs
 from aws_cdk import aws_sns as sns
-from constructs import Construct
-from stacks.constants import ACCT, REGION, S3_BUCKET, TABLE_NAME  # CONF-01
+from stacks.constants import ACCT, REGION, S3_BUCKET  # CONF-01
 
 ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
 DIGEST_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"

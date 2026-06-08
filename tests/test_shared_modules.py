@@ -16,7 +16,6 @@ v1.0.0 — 2026-03-10 (Item 4, sprint v3.5.0)
 
 import json
 import logging
-import math
 import os
 import sys
 import traceback
@@ -384,7 +383,6 @@ from digest_utils import (
     d2f,
     dedup_activities,
     ex_whoop_from_list,
-    ex_whoop_sleep_from_list,
     ex_withings_from_list,
     fmt,
     fmt_num,
@@ -635,8 +633,6 @@ _run("list_supported_sources: returns list with whoop, withings", test_list_supp
 # ======================================================================
 print("\n-- call_anthropic middleware -------------------------------------")
 
-import ast
-import glob
 import inspect
 
 from ai_calls import _AI_VALIDATOR_AVAILABLE, AIOutputType, call_anthropic

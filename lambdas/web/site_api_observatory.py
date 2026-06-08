@@ -11,7 +11,6 @@ are imported from site_api_common — no circular references.
 """
 
 import json
-import re
 import time  # noqa: F401 — used by some handlers
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401 — kept for handlers that convert types
@@ -20,21 +19,14 @@ from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # ADR-058
 from web.site_api_common import (
     CORS_HEADERS,
-    EXPERIMENT_BASELINE_WEIGHT_LBS,
     EXPERIMENT_START,
-    USER_ID,
     USER_PREFIX,
     _decimal_to_float,
     _error,
     _experiment_date,
-    _get_profile,
     _is_blocked_vice,
-    _latest_item,
-    _load_content_filter,
-    _load_supp_metadata,
     _ok,
     _query_source,
-    _scrub_blocked_terms,
     logger,
     table,
 )
@@ -1440,7 +1432,7 @@ def handle_frequent_meals() -> dict:
 def handle_meal_glucose() -> dict:
     """GET /api/meal_glucose — Cross-reference MacroFactor meals with Dexcom CGM spikes."""
     from collections import defaultdict
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timezone
 
     now = datetime.now(timezone.utc)
     end_date = now.strftime("%Y-%m-%d")

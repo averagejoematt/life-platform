@@ -19,7 +19,6 @@ Usage:
 """
 import argparse
 import json
-import os
 import sys
 import time
 from datetime import date, datetime, timedelta, timezone

@@ -25,7 +25,6 @@ import json
 import logging
 from typing import Any
 
-import hevy_common
 from hevy_common import (
     HevyAPIError,
     archive_raw,

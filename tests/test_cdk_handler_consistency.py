@@ -26,12 +26,10 @@ Run:  python3 -m pytest tests/test_cdk_handler_consistency.py -v
 v1.0.0 — 2026-03-12 (born from P0 alarm flood)
 """
 
-import ast
 import os
 import re
 import sys
 
-import pytest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 CDK_STACKS_DIR = os.path.join(ROOT, "cdk", "stacks")

@@ -25,7 +25,7 @@ import logging
 import os
 import random
 import uuid
-from datetime import date, timedelta
+from datetime import date
 from typing import Any
 
 from routine_ir import ExerciseBlock, RoutineSpec, Set

@@ -32,7 +32,6 @@ WHAT IT DOES NOT UPDATE (requires human judgment):
 v1.0.0 — 2026-03-14 (post doc-audit that found 19 stale facts)
 """
 
-import os
 import re
 import sys
 from datetime import datetime, timezone

@@ -192,7 +192,7 @@ def get_recent_insights(digest_type=None, days=14, pillars=None, max_results=20)
     try:
         # Query all insights, filter by date
         # SK prefix INSIGHT# sorts chronologically
-        from boto3.dynamodb.conditions import Attr, Key
+        from boto3.dynamodb.conditions import Key
         from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
         kwargs = {

@@ -3,7 +3,6 @@ Freshness Checker Lambda — monitors data source staleness.
 Fires via EventBridge schedule. Alerts via SNS when sources are stale.
 """
 
-import json
 import logging
 import os
 from datetime import datetime, timedelta, timezone

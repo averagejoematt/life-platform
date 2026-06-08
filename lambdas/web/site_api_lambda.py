@@ -44,10 +44,7 @@ import hashlib  # noqa: F401 — used by handlers
 import hmac as _hmac  # noqa: F401 — used by subscriber-token helpers
 import json
 import os
-import re
-import time
 import urllib.request  # noqa: F401 — used by AI handlers (kept for backward-compat)
-from datetime import datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401 — kept for backward-compat with handlers
 
 # third-party
@@ -72,33 +69,12 @@ from web.site_api_coach import (
 # ROUTES dict) reference them unchanged.
 from web.site_api_common import (  # config; AWS; CORS; caches; helpers; request-id state (set by lambda_handler; read by _ok/_error)
     CORS_HEADERS,
-    CORS_ORIGIN,
-    DDB_REGION,
-    EXPERIMENT_BASELINE_WEIGHT_LBS,
-    EXPERIMENT_QUERY_START,
-    EXPERIMENT_START,
-    PLATFORM_STATS,
-    PT,
     S3_REGION,
     SITE_API_ORIGIN_SECRET,
-    STATUS_CACHE_TTL,
-    TABLE_NAME,
-    USER_ID,
     USER_PREFIX,
-    _cached_secret,
     _decimal_to_float,
     _error,
-    _experiment_date,
-    _get_profile,
-    _is_blocked_vice,
-    _latest_item,
-    _load_content_filter,
-    _load_supp_metadata,
     _ok,
-    _query_source,
-    _request_id_headers,
-    _scrub_blocked_terms,
-    dynamodb,
     get_request_id,
     logger,
     set_request_id,

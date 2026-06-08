@@ -17,8 +17,6 @@ from aws_cdk import (
 )
 from aws_cdk import aws_budgets as budgets
 from aws_cdk import aws_dynamodb as dynamodb
-from aws_cdk import aws_iam as iam
-from aws_cdk import aws_kms as kms
 from aws_cdk import aws_lambda as _lambda
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_sns as sns

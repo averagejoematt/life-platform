@@ -20,10 +20,8 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any
 
 import boto3
-from boto3.dynamodb.conditions import Key
 from routine_ir import RoutineSpec, deserialize, serialize
 
 logger = logging.getLogger("routine_repo")
