@@ -2,7 +2,7 @@
 
 Last updated: 2026-06-08 (v8.4.0 — 133 tools, 38-module MCP package, 20 data sources, 73 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed).
 
-> **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **three doors:** Cockpit (`/now/`, live data), Story (`/story/`, the writing hub), Evidence (`/evidence/`, the data archive); the pre-v4 site is preserved verbatim at `/legacy`. Shared layer **v71**. **75 ADRs** (ADR-001 → ADR-075; newest: ADR-073 graceful shaped-empty 200s, ADR-074 Garmin retired (vendor anti-automation), ADR-075 budget-guard early-month + AI cost trim). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
+> **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **three doors:** Cockpit (`/now/`, live data), Story (`/story/`, the writing hub), Evidence (`/evidence/`, the data archive); the pre-v4 site is preserved verbatim at `/legacy`. Shared layer **v74**. **78 ADRs** (ADR-001 → ADR-078; newest: ADR-076 visual + AI-vision QA harness, ADR-077 phase taxonomy, ADR-078 commercial wedge). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
 ---
 
@@ -31,7 +31,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
                          │ DynamoDB queries
 ┌────────────────────────▼────────────────────────────────────┐
 │  SERVE LAYER                                                │
-│  MCP Server Lambda (127 tools, 768 MB) + Lambda Function URL │
+│  MCP Server Lambda (133 tools, 768 MB) + Lambda Function URL │
 │  ← Claude Desktop + claude.ai + Claude mobile via remote MCP│
 │                                                             │
 │  COMPUTE LAYER (IC intelligence features)                   │
@@ -99,7 +99,7 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 
 **Schedule:** Hourly during active hours (4am–10pm PST) for most sources. Exceptions: Garmin at 4x daily (OAuth rate limits), Weather + Todoist at 2x daily (COST-OPT). Maintenance window: 10pm–4am PST (UTC 6–11 skipped).
 
-**Shared Lambda Layer:** **v71** (mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`; latest bumps added the Hevy routine modules and `vacation_fund.py` — ADR-066/070). Includes `ai_calls.py`, `retry_utils.py`, **`bedrock_client.py`** (ADR-062 — all Claude calls funnel here, IAM auth via `bedrock:InvokeModel`), **`budget_guard.py`** (ADR-063 — `allow(feature)` gates AI by SSM tier), `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `intelligence_common.py`, `ingestion_framework.py` (SIMP-2 per ADR-056), `auth_breaker.py`, `http_retry.py`, `rate_limiter.py`, `request_validator.py`, `compute_metadata.py`, `constants.py` (genesis date + baseline), `phase_filter.py` (default-deny by phase), `numeric.py`, `character_engine.py`, `html_builder.py`, `ai_output_validator.py`, `platform_logger.py`, `ingestion_validator.py`, `item_size_guard.py`, `digest_utils.py`, `sick_day_checker.py`, `site_writer.py`, `insight_writer.py`. **28 modules total**. Rebuild with `bash deploy/build_layer.sh`. Source of truth: `cdk/stacks/constants.py:SHARED_LAYER_VERSION` (test `lv6` enforces consistency with the latest AWS-published layer).
+**Shared Lambda Layer:** **v74** (mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`; latest bump added the ADR-058 phase-filter modules — `phase_filter.py` + `include_pilot` passthroughs). Includes `ai_calls.py`, `retry_utils.py`, **`bedrock_client.py`** (ADR-062 — all Claude calls funnel here, IAM auth via `bedrock:InvokeModel`), **`budget_guard.py`** (ADR-063 — `allow(feature)` gates AI by SSM tier), `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `intelligence_common.py`, `ingestion_framework.py` (SIMP-2 per ADR-056), `auth_breaker.py`, `http_retry.py`, `rate_limiter.py`, `request_validator.py`, `compute_metadata.py`, `constants.py` (genesis date + baseline), `phase_filter.py` (default-deny by phase), `numeric.py`, `character_engine.py`, `html_builder.py`, `ai_output_validator.py`, `platform_logger.py`, `ingestion_validator.py`, `item_size_guard.py`, `digest_utils.py`, `sick_day_checker.py`, `site_writer.py`, `insight_writer.py`. **28 modules total**. Rebuild with `bash deploy/build_layer.sh`. Source of truth: `cdk/stacks/constants.py:SHARED_LAYER_VERSION` (test `lv6` enforces consistency with the latest AWS-published layer).
 
 **Secret caching (COST-OPT-1):** 15-min in-memory TTL cache via `secret_cache.py` in shared layer. Reduces Secrets Manager API calls ~90% across 12 active Lambdas.
 
@@ -187,7 +187,7 @@ coaching / generation logic
 
 ### Failure handling
 
-DLQ coverage: all async Lambdas → `life-platform-ingestion-dlq`. CloudWatch: **~104 alarms** total. Alarm actions → SNS `life-platform-alerts`.
+DLQ coverage: all async Lambdas → `life-platform-ingestion-dlq`. CloudWatch: **~50 alarms** total. Alarm actions → SNS `life-platform-alerts`.
 
 Additional safeguards: DLQ Consumer Lambda, Canary Lambda (synthetic health check every 30 min), item size guard.
 
@@ -377,7 +377,7 @@ Target: under $25/month | Current: ~$13/month
 | DynamoDB (on-demand) | ~$1.00 |
 | S3 (~2.5 GB + requests) | ~$0.50 |
 | CloudFront (4 distributions) | ~$1.50 |
-| CloudWatch (~104 alarms + logs) | ~$2.50 |
+| CloudWatch (~50 alarms + logs) | ~$4-5 |
 | Anthropic API (Haiku + Sonnet, with prompt caching — ADR-049) | ~$8-12 |
 | **Total** | **~$18-23** |
 

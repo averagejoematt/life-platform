@@ -1,5 +1,7 @@
 # V2 Comprehensive Audit Prompt
 
+> **Status: HISTORICAL.** The prompt used for the 2026-05-17 V2 audit (findings closed in ADR-057). Reusable as a template for a future audit cycle; not a live document.
+
 > A second-round deep-dive planning prompt, refined from the v1 audit (2026-05-16/17, ~130 findings, ~70 shipped). v1 covered Phase 1-8 thoroughly but had ~10% wrong-premise findings (orphaned WAF that wasn't, "skeleton" coach evaluator that was 982 LOC built, board_ask caching that's no-op below threshold). This prompt encodes those lessons to produce a sharper v2.
 
 ---

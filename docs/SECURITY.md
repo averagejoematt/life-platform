@@ -50,14 +50,12 @@ See `docs/SECRETS_ROTATION.md` for rotation procedures.
 
 ### Layer 3 — Public endpoints (CloudFront → site-api/site-api-ai)
 
-- ✅ **WAF rate limits** on the main CloudFront distribution:
-  - 1000 req/min global per IP
-  - 60 req/min on `/api/subscribe`
-  - 100 req/min on `/api/ask` + `/api/board_ask`
-- ✅ **In-app rate limiting** (DDB-backed since V2 P2.1):
+- ⚠️ **WAF removed** — `life-platform-amj-waf` was **deleted** (2026-06, ~−$8/mo). Rate limiting is now entirely **in-Lambda (DDB-backed)**, which is durable across warm containers and was hardened in PG-10. (NB: `cdk/stacks/web_stack.py` may still reference the dead WAF ARN — flagged for cleanup before the next `cdk deploy LifePlatformWeb`.)
+- ✅ **In-app rate limiting** (DDB-backed, PG-10 hardened):
   - `/api/ask`: 5/hr anon, 20/hr subscriber
   - `/api/board_ask`: 5/IP/hour
-- ✅ **AI cost caps** — Anthropic spend visible per-endpoint via `LifePlatform/AI` namespace (V2 follow-up)
+  - `/api/subscribe`: 60 req / 5 min / IP (DDB atomic counter)
+- ✅ **AI cost caps** — per-request `max_tokens` (300–600) + 500-char input cap + reserved concurrency=2; Bedrock spend visible per-endpoint via `LifePlatform/AI`; the $75 cost-governor pauses public AI at tier 2.
 - ✅ **CORS pinned** to `https://averagejoematt.com` only
 - ✅ **CSP headers** on all responses (no `unsafe-eval`, `script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net`)
 - ✅ **HSTS** max-age 1 year, includeSubDomains
@@ -110,7 +108,7 @@ See `docs/DISASTER_RECOVERY.md`. Summary:
 | Vector | Mitigation |
 |---|---|
 | Bot scans of WordPress admin paths | CloudFront returns 404 (no backend hit) |
-| Anthropic spend runaway via `/api/ask` | WAF 100/min + DDB rate limit 5/hr per IP + token telemetry per-endpoint |
+| Bedrock spend runaway via `/api/ask` | DDB rate limit 5/hr per IP + `max_tokens` cap + reserved concurrency=2 + cost-governor tier-2 pause + token telemetry per-endpoint |
 | Subscriber email scraping | DDB partitioned by `USER#matthew` — no public list endpoint |
 | HAE webhook spoofing | HMAC signature required (ADR-052 follow-up) |
 | OAuth token theft | 15-min secret cache + 24h auth_breaker — first failed auth marks DDB record; subsequent attempts short-circuit |
@@ -148,15 +146,17 @@ aws s3api list-buckets --query 'Buckets[].Name' --output text | tr '\t' '\n' \
     | xargs -I{} aws s3api get-bucket-policy-status --bucket {} 2>/dev/null \
     | grep -B1 'IsPublic.*true'
 
-# 4. Review WAF rules + recent block patterns
-aws wafv2 get-web-acl --name <name> --scope CLOUDFRONT --region us-east-1
+# 4. Review in-Lambda rate-limit hits (WAF removed; rate limiting is DDB-backed)
+aws cloudwatch get-metric-statistics --namespace LifePlatform/SiteApiAi \
+    --metric-name RateLimitHit --start-time $(date -u -v-7d '+%Y-%m-%dT%H:%M:%S') \
+    --end-time $(date -u '+%Y-%m-%dT%H:%M:%S') --period 86400 --statistics Sum --region us-west-2
 
 # 5. Audit CloudTrail for unusual API calls
 aws cloudtrail lookup-events --region us-west-2 \
     --lookup-attributes AttributeKey=EventName,AttributeValue=DeleteBucket \
     --start-time $(date -u -v-90d '+%Y-%m-%dT%H:%M:%S')
 
-# 6. Confirm WAF + CSP headers active
+# 6. Confirm CSP / security headers active
 curl -I https://averagejoematt.com/ | grep -E 'Strict-Transport|Content-Security|X-Frame|X-Content'
 ```
 
