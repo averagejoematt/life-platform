@@ -2,13 +2,13 @@
   "_meta": {
     "version": "1.1.1",
     "description": "Character Sheet v1.1.1: progressive difficulty, confidence scoring, XP-as-buffer, per-pillar EMA. Baseline re-anchored to 2026-05-18 (ADR-058).",
-    "last_updated": "2026-05-31",
+    "last_updated": "2026-06-07",
     "review_ref": "docs/reviews/REVIEW_CHARACTER_LEVELING_2026-03-30.md"
   },
   "baseline": {
-    "start_date": "2026-06-01",
-    "start_weight_lbs": 304.3,
-    "start_weight_kg": 138.028,
+    "start_date": "2026-06-08",
+    "start_weight_lbs": 306.25,
+    "start_weight_kg": 138.913,
     "baseline_source": "withings",
     "goal_weight_lbs": 185,
     "weight_phase": "loss",
