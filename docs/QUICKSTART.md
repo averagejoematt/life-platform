@@ -208,7 +208,7 @@ bash deploy/maintenance_mode.sh disable   # re-enables
 
 ## Shared Layer Modules
 
-These modules are deployed as Lambda Layer `life-platform-shared-utils` (currently **v74**, mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`). All ingestion, compute, email, and MCP Lambdas reference this layer.
+These modules are deployed as Lambda Layer `life-platform-shared-utils` (currently **v76**, mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`). All ingestion, compute, email, and MCP Lambdas reference this layer.
 
 **If you edit any of these files, run `bash deploy/build_layer.sh` before deploying dependent Lambdas:**
 
