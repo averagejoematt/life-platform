@@ -100,7 +100,7 @@ FIELD_COMPLETENESS_CHECKS: dict[str, list[str]] = {
 def lambda_handler(event, context):
     table = dynamodb.Table(TABLE_NAME)
     now = datetime.now(timezone.utc)
-    stale_threshold = now - timedelta(hours=STALE_HOURS)
+    now - timedelta(hours=STALE_HOURS)
 
     # ── Sick day check: suppress stale alerts if any of the last N days was sick ──
     # ADR-052: extended from yesterday-only to a N-day lookback so multi-day

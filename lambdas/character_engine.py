@@ -397,7 +397,7 @@ def compute_nutrition_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
     """Compute Nutrition pillar raw_score (0-100)."""
     pillar_cfg = config.get("pillars", {}).get("nutrition", {})
     components = pillar_cfg.get("components", {})
-    baseline_cfg = config.get("baseline", {})
+    config.get("baseline", {})
     scores = {}
 
     mf = data.get("macrofactor") or {}

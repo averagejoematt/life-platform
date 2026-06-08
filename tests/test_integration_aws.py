@@ -264,14 +264,14 @@ def test_i3_spot_check_lambda_invocability():
     failures = []
     for fn_name in SPOT_CHECK_LAMBDAS:
         try:
-            with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
-                tmp_path = tmp.name
+            with tempfile.NamedTemporaryFile(suffix=".json", delete=False):
+                pass
 
             response = lc.invoke(
                 FunctionName=fn_name,
                 Payload=json.dumps({"dry_run": True, "__integration_test": True}),
             )
-            status = response["StatusCode"]
+            response["StatusCode"]
             payload = json.loads(response["Payload"].read())
 
             # Check for function-level errors

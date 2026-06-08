@@ -65,7 +65,7 @@ def handle_vitals() -> dict:
     # 30d averages + trends
     hrv_vals = sorted([float(w["hrv"]) for w in whoop_30d if w.get("hrv")], key=lambda _: 0)
     rhr_vals = sorted([float(w["resting_heart_rate"]) for w in whoop_30d if w.get("resting_heart_rate")], key=lambda _: 0)
-    rec_vals = [float(w["recovery_score"]) for w in whoop_30d if w.get("recovery_score")]
+    [float(w["recovery_score"]) for w in whoop_30d if w.get("recovery_score")]
 
     def trend(vals):
         if len(vals) < 6:

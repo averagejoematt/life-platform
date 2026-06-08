@@ -1178,10 +1178,8 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     try:
         dt = datetime.strptime(date_str, "%Y-%m-%d")
         date_display = dt.strftime("%B %-d, %Y")
-        date_mono = date_str
     except Exception:
         date_display = date_str
-        date_mono = date_str
 
     # Extract read time (~250 words/min)
     word_count = len(body_html.split())

@@ -973,7 +973,7 @@ def _compute_slow_drift(yesterday_str, profile):
       metric, source, recent_mean, baseline_mean, drift_sd, severity,
       baseline_n, note (optional context string)
     """
-    today = datetime.now(timezone.utc).date()
+    datetime.now(timezone.utc).date()
     yest = datetime.strptime(yesterday_str, "%Y-%m-%d").date()
 
     # Recent window: days 1-14 before yesterday (inclusive) — TB7-22
@@ -1108,7 +1108,6 @@ def _compute_slow_drift(yesterday_str, profile):
                     if aw_cals:
                         aw_tdee = sum(aw_cals) / len(aw_cals)
 
-                    tdee_used = mf_tdee or aw_tdee
                     tdee_source = "MacroFactor" if mf_tdee else ("Apple Watch" if aw_tdee else "unknown")
 
                     # Okafor: always include recomposition caveat
@@ -1180,7 +1179,7 @@ def _build_experiment_context(yesterday_str, profile):
     if not active_exps:
         return ""
 
-    today_dt = datetime.now(timezone.utc).date()
+    datetime.now(timezone.utc).date()
     yest_dt = datetime.strptime(yesterday_str, "%Y-%m-%d").date()
     lines = ["ACTIVE EXPERIMENTS (descriptive only — evaluate with get_experiment_results):"]
 
@@ -1245,7 +1244,7 @@ def _build_experiment_context(yesterday_str, profile):
         if "supplement" in category or "supplement" in name.lower():
             try:
                 supp_name = exp.get("supplement_name") or name
-                supp_pk = USER_PREFIX + "supplements"
+                USER_PREFIX + "supplements"
                 if isinstance(days_in, int):
                     supp_recs = fetch_range("supplements", start_str, yesterday_str)
                     doses_taken = sum(1 for r in supp_recs if supp_name.lower() in (r.get("supplement_name") or "").lower())
@@ -1298,7 +1297,7 @@ def _build_acwr_signal(computed_7d):
 
     acwr = safe_float(latest, "acwr")
     zone = latest.get("acwr_zone", "unknown")
-    alert = bool(latest.get("acwr_alert"))
+    bool(latest.get("acwr_alert"))
     reason = latest.get("acwr_alert_reason", "")
     acute_7d = safe_float(latest, "acute_load_7d")
     chron_28d = safe_float(latest, "chronic_load_28d")
@@ -1480,7 +1479,7 @@ def _compute_deficit_ceiling_alert(yesterday_str, habit_7d, computed_7d, profile
     Non-fatal throughout — returns (None, "") on any failure.
     """
     try:
-        today = datetime.now(timezone.utc).date()
+        datetime.now(timezone.utc).date()
         yest = datetime.strptime(yesterday_str, "%Y-%m-%d").date()
         wt_start = (yest - timedelta(days=13)).isoformat()  # 14-day window
 

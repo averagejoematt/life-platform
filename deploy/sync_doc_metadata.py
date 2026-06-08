@@ -353,7 +353,6 @@ def process_doc(rel_path: str, dry_run: bool) -> list[str]:
 
 def main():
     dry_run = "--apply" not in sys.argv
-    quiet = "--quiet" in sys.argv
     mode = "DRY RUN (pass --apply to write changes)" if dry_run else "APPLYING CHANGES"
 
     # Auto-discover counts from source files before applying rules

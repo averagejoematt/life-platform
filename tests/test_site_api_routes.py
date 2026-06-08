@@ -58,7 +58,7 @@ def test_all_handlers_defined():
     """Every handler referenced in _SIMPLE_ROUTES must be defined somewhere in
     the site_api family of modules (site_api_lambda.py + sibling modules
     extracted in P1.1 Phase B)."""
-    src = _src()
+    _src()
     # P1.1 Phase B (2026-05-26): handlers may live in any of the sibling modules.
     sibling_files = [
         SRC,

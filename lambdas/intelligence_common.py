@@ -657,7 +657,7 @@ def validate_coach_output(coach_id: str, domain: str, narrative: str, inventory:
     # Check for step count discrepancies
     step_match = re.search(r"(\d[,\d]*)\s*steps?", narrative)
     if step_match:
-        cited_steps = int(step_match.group(1).replace(",", ""))
+        int(step_match.group(1).replace(",", ""))
         garmin_data = inventory.get("garmin", {})
         apple_data = inventory.get("apple_health", {})
         if garmin_data.get("exists") and apple_data.get("exists"):
@@ -1123,7 +1123,6 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
         pass
 
     habit_adherence_pct = 0
-    habit_days = 0
     try:
         resp = table.query(
             **with_phase_filter(
@@ -1140,7 +1139,7 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
                 pcts.append(float(p) * (100 if float(p) <= 1 else 1))
         if pcts:
             habit_adherence_pct = round(sum(pcts) / len(pcts))
-            habit_days = len(pcts)
+            len(pcts)
     except Exception:
         pass
 
@@ -1409,7 +1408,7 @@ Rules:
 
     try:
         model = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
-        secret_name = os.environ.get("AI_SECRET_NAME", "life-platform/ai-keys")
+        os.environ.get("AI_SECRET_NAME", "life-platform/ai-keys")
 
         # Use provided API key
         req_body = json.dumps(

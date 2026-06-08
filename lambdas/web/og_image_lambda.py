@@ -250,7 +250,7 @@ def build_builders(stats):
     _draw_header(draw, "For Builders")
     draw.text((48, 100), "THE BUILD", fill=TEXT, font=_font(FONT_DISPLAY, 72))
     draw.text((48, 180), "How to build an AI health platform for $13/month.", fill=MUTED, font=_font(FONT_MONO, 14))
-    platform = stats.get("platform", {})
+    stats.get("platform", {})
     _draw_metric(draw, 48, 260, "116", "MCP TOOLS")
     _draw_metric(draw, 320, 260, "59", "LAMBDAS")
     _draw_metric(draw, 560, 260, "$13", "MONTHLY COST")

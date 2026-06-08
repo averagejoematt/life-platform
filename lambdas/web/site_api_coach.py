@@ -312,7 +312,7 @@ def handle_coach_analysis(event):
         # 6. Confidence language
         confidence_language = "preliminary"
         try:
-            themes = output.get("themes", [])
+            output.get("themes", [])
             # Use the overall confidence from the generation if available
             conf = output.get("confidence")
             if conf is not None:

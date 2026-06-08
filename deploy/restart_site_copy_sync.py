@@ -228,7 +228,7 @@ def rewrite_js_files(apply: bool) -> list[str]:
 
         # Pass 2: bare literals — only rewrite the OLD genesis literal
         def repl_bare(m):
-            q, date = m.group(1), m.group(2)
+            _q, date = m.group(1), m.group(2)
             if date != "2026-04-01":
                 return m.group(0)
             return dynamic

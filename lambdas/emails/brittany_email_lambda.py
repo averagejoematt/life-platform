@@ -599,7 +599,7 @@ def weight_sentence(w):
         return ""
     delta = w.get("week_delta")
     lbs_lost = w.get("lbs_lost")
-    lbs_to_go = w.get("lbs_to_go")
+    w.get("lbs_to_go")
     pct = w.get("pct_to_goal")
 
     if delta is not None and delta < 0:
@@ -641,7 +641,7 @@ def signal_dot(label, good, neutral=None):
 
 def build_html(data, commentary_text):
     sections = parse_sections(commentary_text)
-    w = data["weight"]
+    data["weight"]
     sl = data["sleep"]
     dg = data["day_grade"]
     mood = data["mood"]

@@ -93,7 +93,7 @@ DEST_ORDER = ["cockpit", "story", "evidence", "legacy"]
 def original_url(html_path: Path) -> str:
     """Map site/legacy/<path>/index.html back to the OLD url /<path>/."""
     rel = html_path.relative_to(LEGACY_DIR)
-    parts = rel.as_posix()
+    rel.as_posix()
     if rel.name == "index.html":
         parent = rel.parent.as_posix()
         return "/" if parent == "." else f"/{parent}/"
