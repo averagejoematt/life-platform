@@ -306,13 +306,37 @@ _secret_cache = {"access_token": None}
 
 def authenticate(secret_data: dict) -> dict:
     """Refresh on every cold invocation. Whoop refresh rotates refresh_token,
-    so framework's enable_secret_writeback=True persists both back."""
+    so framework's enable_secret_writeback=True persists both back.
+
+    Concurrency-safe (2026-06-08): EventBridge at-least-once delivery occasionally
+    fires two invocations seconds apart. The first rotates the single-use refresh
+    token; the second then gets HTTP 400. On a 400 we re-read the secret fresh
+    (briefly retrying to cover the winner's secret-writeback window) — if a
+    concurrent invocation already rotated it, we adopt the winner's tokens rather
+    than fail (a raise here DLQs a benign race + false-fires the error alarm).
+    A 400 with an *unchanged* refresh_token is a genuine auth failure and raises.
+    """
     secret = dict(secret_data)
-    access_token, new_refresh = _refresh_access_token(
-        secret["client_id"],
-        secret["client_secret"],
-        secret["refresh_token"],
-    )
+    try:
+        access_token, new_refresh = _refresh_access_token(
+            secret["client_id"],
+            secret["client_secret"],
+            secret["refresh_token"],
+        )
+    except urllib.error.HTTPError as e:
+        if e.code != 400:
+            raise
+        for _ in range(2):
+            time.sleep(1.5)  # let a concurrent invocation persist its rotated token
+            fresh = json.loads(boto3.client("secretsmanager").get_secret_value(SecretId=SECRET_NAME)["SecretString"])
+            if fresh.get("refresh_token") and fresh["refresh_token"] != secret["refresh_token"]:
+                logger.warning("Whoop refresh 400 — a concurrent invocation already rotated the token; adopting it.")
+                secret["access_token"] = fresh["access_token"]
+                secret["refresh_token"] = fresh["refresh_token"]
+                _secret_cache["access_token"] = fresh["access_token"]
+                return secret
+        logger.error("Whoop refresh 400 with unchanged refresh_token — genuine auth failure.")
+        raise
     secret["access_token"] = access_token
     secret["refresh_token"] = new_refresh
     _secret_cache["access_token"] = access_token
