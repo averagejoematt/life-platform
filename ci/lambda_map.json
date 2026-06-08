@@ -256,6 +256,7 @@
     "_comment": "Changes to these files require layer rebuild + consumer redeploy. MUST stay in sync with deploy/build_layer.sh MODULES (source of truth). 2026-05-28: synced — was missing bedrock_client/phase_filter/numeric/rate_limiter/request_validator/auth_breaker/http_retry/compute_metadata/constants/sick_day_checker, so edits to those didn't trigger CI's layer-change detection.",
     "modules": [
       "lambdas/ai_calls.py",
+      "lambdas/ai_summaries.py",
       "lambdas/ai_output_validator.py",
       "lambdas/auth_breaker.py",
       "lambdas/bedrock_client.py",
@@ -378,6 +379,7 @@
       "lambdas/output_writers.py",
       "lambdas/html_builder.py",
       "lambdas/ai_calls.py",
+      "lambdas/ai_summaries.py",
       "lambdas/scoring_engine.py",
       "lambdas/board_loader.py",
       "lambdas/insight_writer.py",
