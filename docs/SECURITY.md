@@ -125,6 +125,7 @@ See `docs/DISASTER_RECOVERY.md`. Summary:
 | Per-user secrets isolation | ADR-057 W-02 | Second user onboards |
 | IAM Access Analyzer findings not remediated | This doc | Annual security review |
 | No SIEM integration | This doc | Compliance requirement |
+| **GuardDuty + AWS Config not enabled** | **ADR-079** | Second/real user, commercial/compliance obligation, or budget headroom (cost ~$5–10/mo on a $75 ceiling; compensating controls: CloudTrail + cost-governor + least-priv IAM + MFA) |
 
 ---
 
