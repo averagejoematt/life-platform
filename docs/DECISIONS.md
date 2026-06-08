@@ -2330,3 +2330,39 @@ Unblocks **PG-06** (Wedge-B build-log surface) and **PG-13 Phase 1** (surface th
 ---
 
 **Verified:** 2026-06-07 (ADR-078 — commercial wedge: B now / A accruing / C shelved; PG-00 resolved)
+
+---
+
+## ADR-079: Defer GuardDuty + AWS Config — accept the gap with compensating controls
+
+**Date:** 2026-06-08
+**Status:** Decided — owner choice during the 2026-06-08 A-grade readiness review. (Reversible: enabling both is a few CLI/CDK calls; revisit on the triggers below.)
+**Related:** `docs/SECURITY.md`, `docs/COST_TRACKER.md` (ADR-063 budget), the A-grade review plan.
+
+### Context
+
+A CTO/CIO-grade AWS review flagged two missing account-level controls: **GuardDuty** (threat detection) and **AWS Config** (compliance baseline / drift rules). Both are standard enterprise-checklist items. Both also carry **recurring cost** — together ~$5–10/mo for an account this size, which is **~20–40% of the platform's ~$25/mo steady-state run-rate** against a hard $75/mo ceiling (ADR-063).
+
+### Decision
+
+**Do not enable GuardDuty or AWS Config at this time. Accept the gap as a documented, reasoned cost/risk trade-off**, rather than reflexively enabling paid services on a single-user, cost-capped personal platform. A reasoned decision with compensating controls is itself sound governance — not an oversight.
+
+### Compensating controls already in place
+
+- **CloudTrail** (`life-platform-trail`) — full API audit log → S3 (the forensic capability GuardDuty would build on).
+- **Cost governor + AWS Budget** (ADR-063) — the most likely "incident" on a personal account is runaway spend; that is already detected and *enforced* (tiered AI degrade + the independent `life-platform-monthly-75` budget). A compromised key's blast radius surfaces as spend and trips the cap.
+- **Least-privilege IAM** — per-Lambda CDK-owned roles, no wildcards beyond AWS-service limitations (`role_policies.py`).
+- **No long-lived keys** — CI is OIDC-federated; only IAM principal is `matthew-admin` with **MFA on root**.
+- **Data protection** — Secrets Manager only; encryption (KMS CMK, rotation on) + 35-day PITR; public AI rate-limited + budget-gated (PG-10).
+
+### Revisit triggers
+
+Enable both (codified in CDK) if any of: a **second/real user** onboards (W-02), a **commercial/compliance obligation** appears (SOC2, customer data), run-rate headroom makes ~$10/mo immaterial, or a security event makes threat detection worth the cost.
+
+### Consequences
+
+The AWS "account-controls" sub-grade stays below a literal-checklist A on those two items, by choice. The rest of the security axis (audit logging, least-privilege, encryption, MFA, budget enforcement, no long-lived credentials) is in place. `docs/SECURITY.md` records this stance so a reviewer sees the reasoning, not a gap.
+
+---
+
+**Verified:** 2026-06-08 (ADR-079 — GuardDuty/Config deferred by choice; compensating controls documented)
