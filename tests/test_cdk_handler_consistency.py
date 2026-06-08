@@ -30,7 +30,6 @@ import os
 import re
 import sys
 
-
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 CDK_STACKS_DIR = os.path.join(ROOT, "cdk", "stacks")
 LAMBDAS_DIR = os.path.join(ROOT, "lambdas")

@@ -1259,8 +1259,8 @@ def _build_experiment_context(yesterday_str, profile):
             is_neg_psych = any(kw in hyp_lower for kw in _NEG_PSYCH_KEYWORDS)
             if is_neg_psych:
                 lines.append(
-                    f"    Context: This experiment tests a potential intervention "
-                    f"opportunity — data is early; treat as exploratory, not diagnostic."
+                    "    Context: This experiment tests a potential intervention "
+                    "opportunity — data is early; treat as exploratory, not diagnostic."
                 )
 
     return "\n".join(lines) if len(lines) > 1 else ""
@@ -1582,7 +1582,7 @@ def _compute_deficit_ceiling_alert(yesterday_str, habit_7d, computed_7d, profile
         else:
             tier = "rate"
             headline = f"⚠️ DEFICIT RATE ALERT (S2-T1-9): {rate_str} loss — threshold >{DEFICIT_RATE_THRESHOLD_LBS_WEEK} lbs/wk"
-            body = f"  Weight loss rate exceeds safe threshold for lean tissue preservation."
+            body = "  Weight loss rate exceeds safe threshold for lean tissue preservation."
 
         prescription = (
             f"  PRESCRIPTION: Increase daily calorie target by {DEFICIT_KCAL_INCREASE} kcal for "

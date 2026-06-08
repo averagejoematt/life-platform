@@ -177,10 +177,10 @@ def main():
     total = len(checks)
     passed = sum(1 for _, ok, _ in checks if ok)
     failed = total - passed
-    print(f"\n══ summary ══")
+    print("\n══ summary ══")
     print(f"  {passed}/{total} checks passed")
     if failed:
-        print(f"\nFailures:")
+        print("\nFailures:")
         for name, ok, detail in checks:
             if not ok:
                 print(f"  ✗  {name}  — {detail}")

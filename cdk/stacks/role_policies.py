@@ -11,6 +11,7 @@ Policy principle: least-privilege per Lambda. No shared roles.
 """
 
 from aws_cdk import aws_iam as iam
+
 from stacks.constants import ACCT, CF_DIST_ID, KMS_KEY_ID, REGION, S3_BUCKET, SES_DOMAIN, TABLE_NAME  # CONF-01, SEC-06, SEC-08
 
 # ── Constants ──────────────────────────────────────────────────────────────

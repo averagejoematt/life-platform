@@ -11,7 +11,6 @@ import os
 import sys
 from unittest.mock import patch
 
-
 # Set required env vars before importing
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")

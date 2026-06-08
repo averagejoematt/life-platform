@@ -126,10 +126,10 @@ def main():
         print(f"  (would invoke {len(days)} times)")
 
     # ── Step 3: spot-check verification hints ──
-    print(f"\n[3/3] Verification hints (run via MCP after apply):")
-    print(f"  - get_habits()              → expect streak=0 for all habits")
-    print(f"  - get_vice_streaks()        → expect streak_days=0 for every vice")
-    print(f"  - get_rewards()             → expect every milestone in active state, 0% progress")
+    print("\n[3/3] Verification hints (run via MCP after apply):")
+    print("  - get_habits()              → expect streak=0 for all habits")
+    print("  - get_vice_streaks()        → expect streak_days=0 for every vice")
+    print("  - get_rewards()             → expect every milestone in active state, 0% progress")
     print(f"  - get_character(view=sheet) → expect days_active matches day_n({end_date})")
 
     # ── Report ──

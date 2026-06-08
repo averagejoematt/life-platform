@@ -1808,8 +1808,7 @@ def build_html(
             # BS-05: confidence badge — daily brief BoD insight confidence from data volume
             # Henning: n = days since journey start (observation count proxy)
             try:
-                from datetime import datetime as _dt
-                from datetime import timezone as _tz
+                from datetime import datetime as _dt, timezone as _tz
 
                 _start = (
                     data.get("profile", profile).get("journey_start_date", EXPERIMENT_START_DATE)

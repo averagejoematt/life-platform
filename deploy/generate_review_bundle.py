@@ -74,7 +74,7 @@ def count_files(directory, pattern="*.py"):
     """Count files matching pattern in directory."""
     try:
         return len(list(Path(directory).glob(pattern)))
-    except:
+    except Exception:
         return "?"
 
 
@@ -85,7 +85,7 @@ def list_dir_compact(directory):
         files = [i for i in items if os.path.isfile(os.path.join(directory, i)) and not i.startswith(".")]
         dirs = [i for i in items if os.path.isdir(os.path.join(directory, i)) and not i.startswith(".")]
         return files, dirs
-    except:
+    except Exception:
         return [], []
 
 
@@ -470,8 +470,8 @@ def build_bundle():
     char_count = len(bundle)
     print(f"✅ Review bundle generated: {OUTPUT_FILE}")
     print(f"   {line_count:,} lines, {char_count:,} chars")
-    print(f"   (compare: reading all docs individually would be 5,000-10,000+ lines)")
-    print(f"\n   Usage: Start a new Claude session and say:")
+    print("   (compare: reading all docs individually would be 5,000-10,000+ lines)")
+    print("\n   Usage: Start a new Claude session and say:")
     print(f'   "Read docs/reviews/REVIEW_BUNDLE_{TODAY}.md, then conduct Architecture Review #N using the Technical Board."')
 
 

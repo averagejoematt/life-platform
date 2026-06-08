@@ -151,7 +151,7 @@ def check_score_sanity(yesterday):
     def rng(name, val, lo, hi, unit="", opt=False):
         c = Check(f"value:{name}", "Score Sanity")
         if val is None:
-            return c.warn(f"null") if opt else c.fail("null")
+            return c.warn("null") if opt else c.fail("null")
         if lo <= float(val) <= hi:
             return c.ok(f"{val}{unit}")
         return c.fail(f"{val}{unit} out of range [{lo}–{hi}]")

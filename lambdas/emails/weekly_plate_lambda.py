@@ -54,7 +54,7 @@ MAX_PLATE_HISTORY = 4  # past plates to inject for anti-repeat context
 
 # Board of Directors config loader (optional — for voice customization)
 try:
-    import board_loader
+    import board_loader  # noqa: F401  (availability probe)
 
     _HAS_BOARD_LOADER = True
 except ImportError:

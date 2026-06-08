@@ -29,7 +29,6 @@ import os
 import re
 import sys
 
-
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 # ── Source directories to scan ────────────────────────────────────────────────

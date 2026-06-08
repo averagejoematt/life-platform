@@ -26,6 +26,7 @@ from decimal import Decimal  # noqa: F401
 import boto3  # noqa: F401 — handlers may instantiate clients
 from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # ADR-058
+
 from web.site_api_common import (
     DDB_REGION,
     EXPERIMENT_BASELINE_WEIGHT_LBS,
@@ -655,7 +656,7 @@ def handle_status() -> dict:
         # Health check override — if daily probe failed, show red
         elif sid in health_check_failures and status not in ("blue", "red"):
             status = "red"
-            comment = f"Daily health check failed \u2014 pipeline error detected"
+            comment = "Daily health check failed \u2014 pipeline error detected"
 
         ds_components.append(
             {
