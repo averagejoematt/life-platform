@@ -31,6 +31,7 @@ body { overflow-x: hidden; }
 .doors { display: flex; align-items: center; gap: var(--sp-4); }
 .doors a { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); text-decoration: none; }
 .doors a:hover { color: var(--ember); }
+.doors a[aria-current="page"] { color: var(--ember); border-bottom: 1px solid var(--ember); padding-bottom: 1px; cursor: default; }
 .theme-toggle { appearance: none; cursor: pointer; background: transparent; border: var(--border-hair); border-radius: 50%; width: 28px; height: 28px; display: grid; place-items: center; }
 .theme-dot { width: 12px; height: 12px; border-radius: 50%; background: linear-gradient(135deg, var(--ink) 0 50%, transparent 50% 100%); border: 1px solid var(--ink-muted); }
 
