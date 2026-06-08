@@ -38,9 +38,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from lambdas.constants import (
-    EXPERIMENT_START_DATE,
     EXPERIMENT_BASELINE_WEIGHT_LBS,
     EXPERIMENT_GOAL_WEIGHT_LBS,
+    EXPERIMENT_START_DATE,
 )
 
 REGION = "us-west-2"
@@ -56,22 +56,23 @@ BUILDERS_HTML = REPO_ROOT / "site" / "builders" / "index.html"
 # writer cron hasn't fired since pivot. Tombstone-overwrite each so the
 # frontend gets a structured empty response and doesn't render stale data.
 ORPHAN_S3_FILES = [
-    "dashboard/data.json",                  # 2026-03-08, no writer
-    "dashboard/clinical.json",              # 2026-03-08, no writer
+    "dashboard/data.json",  # 2026-03-08, no writer
+    "dashboard/clinical.json",  # 2026-03-08, no writer
     "dashboard/data/character_stats.json",  # 2026-04-04, pre-pivot
-    "dashboard/journal/posts.json",         # 2026-03-30, weekly refresh
-    "dashboard/chronicle/posts.json",       # 2026-03-31, weekly refresh
-    "site/data/data_sources.json",          # 15-day stale
+    "dashboard/journal/posts.json",  # 2026-03-30, weekly refresh
+    "dashboard/chronicle/posts.json",  # 2026-03-31, weekly refresh
+    "site/data/data_sources.json",  # 15-day stale
 ]
 
 # Lambdas to invoke after sync to regenerate the JSON files they own.
 # These cover the generated/ prefix files that drive site rendering.
 REGEN_LAMBDAS = [
-    "life-platform-daily-brief",      # generated/public_stats.json + generated/pulse.json + dashboard/matthew/data.json
-    "character-sheet-compute",        # generated/data/character_stats.json
-    "site-stats-refresh",             # refreshes vitals in public_stats.json
-    "og-image-generator",             # OG image PNGs for share cards
+    "life-platform-daily-brief",  # generated/public_stats.json + generated/pulse.json + dashboard/matthew/data.json
+    "character-sheet-compute",  # generated/data/character_stats.json
+    "site-stats-refresh",  # refreshes vitals in public_stats.json
+    "og-image-generator",  # OG image PNGs for share cards
 ]
+
 
 # Clean-slate hero copy. No restart / relapse / starting-over language.
 # References EXPERIMENT_BASELINE_WEIGHT_LBS rounded to integer for display.
@@ -115,6 +116,7 @@ def rewrite_content_manifest(apply: bool) -> tuple[str, str]:
     changed = False
     target_phrase_re = re.compile(r"Started at \d+ lbs\. Goal: \d+\.?")
     new_phrase = f"Started at {start_int} lbs. Goal: {EXPERIMENT_GOAL_WEIGHT_LBS}."
+
     def visit(node):
         nonlocal changed
         if isinstance(node, dict):
@@ -127,6 +129,7 @@ def rewrite_content_manifest(apply: bool) -> tuple[str, str]:
         elif isinstance(node, list):
             for x in node:
                 visit(x)
+
     visit(data)
     after = json.dumps(data, indent=2)
     if apply and changed:
@@ -152,23 +155,23 @@ def rewrite_html_files(apply: bool) -> list[str]:
     # plausibly a baseline-weight literal (200–350) NOT followed by phrases
     # like "page" or "items" (those would be unrelated to the baseline).
     patterns = [
-        (re.compile(r"Day 1 · \d{3} lbs"),                          f"Day 1 · {start_int} lbs"),
-        (re.compile(r"Started at \d{3} lbs"),                       f"Started at {start_int} lbs"),
-        (re.compile(r"\b\d{3} to 185 lbs\b"),                       f"{start_int} to {goal_int} lbs"),
-        (re.compile(r"\b\d{3}→185\b"),                              f"{start_int}→{goal_int}"),
-        (re.compile(r"\b\d{3} → 185\b"),                            f"{start_int} → {goal_int}"),
+        (re.compile(r"Day 1 · \d{3} lbs"), f"Day 1 · {start_int} lbs"),
+        (re.compile(r"Started at \d{3} lbs"), f"Started at {start_int} lbs"),
+        (re.compile(r"\b\d{3} to 185 lbs\b"), f"{start_int} to {goal_int} lbs"),
+        (re.compile(r"\b\d{3}→185\b"), f"{start_int}→{goal_int}"),
+        (re.compile(r"\b\d{3} → 185\b"), f"{start_int} → {goal_int}"),
         # JS fallback patterns next to start_weight references:
-        (re.compile(r"(start_weight[^;\n]{0,60}\|\|\s*)\d{3}"),     rf"\g<1>{start_int}"),
+        (re.compile(r"(start_weight[^;\n]{0,60}\|\|\s*)\d{3}"), rf"\g<1>{start_int}"),
         # Pull-quote dated badge from prior attempt:
-        (re.compile(r"Day 1 [&·]middot;[ ]?\s*April 2026"),         f"Day 1 · {EXPERIMENT_START_DATE[:7]}"),
+        (re.compile(r"Day 1 [&·]middot;[ ]?\s*April 2026"), f"Day 1 · {EXPERIMENT_START_DATE[:7]}"),
         # ADR-058 launch-eve: bare 307 in weight-context substrings (live + physical pages)
-        (re.compile(r"From 307 lbs to goal"),                       f"From {start_int} lbs to goal"),
-        (re.compile(r"down from 307"),                              f"down from {start_int}"),
-        (re.compile(r"\(307 - cur\)"),                              f"({start_int} - cur)"),
+        (re.compile(r"From 307 lbs to goal"), f"From {start_int} lbs to goal"),
+        (re.compile(r"down from 307"), f"down from {start_int}"),
+        (re.compile(r"\(307 - cur\)"), f"({start_int} - cur)"),
         # Generic "307 →" chart anchor (used as Day-1 line on physical/live pages)
-        (re.compile(r"\b307\s*→"),                                  f"{start_int} →"),
+        (re.compile(r"\b307\s*→"), f"{start_int} →"),
         # JS fallback: || 307 in any var-assignment near weight
-        (re.compile(r"(\|\|\s*)307\b"),                             rf"\g<1>{start_int}"),
+        (re.compile(r"(\|\|\s*)307\b"), rf"\g<1>{start_int}"),
     ]
 
     for html in (REPO_ROOT / "site").rglob("*.html"):
@@ -195,10 +198,7 @@ def rewrite_js_files(apply: bool) -> list[str]:
     """
     touched = []
     fallback = EXPERIMENT_START_DATE
-    dynamic = (
-        "((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) "
-        f"|| '{fallback}')"
-    )
+    dynamic = "((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) " f"|| '{fallback}')"
 
     # Two patterns:
     #   1. Bare quoted ISO date like '2026-04-01' or "2026-04-01"
@@ -224,6 +224,7 @@ def rewrite_js_files(apply: bool) -> list[str]:
             if date != "2026-04-01":
                 return m.group(0)  # preserve other dates as-is
             return f"{dynamic} + {q}{suffix}{q}"
+
         new = iso_time_pat.sub(repl_iso_time, text)
 
         # Pass 2: bare literals — only rewrite the OLD genesis literal
@@ -232,6 +233,7 @@ def rewrite_js_files(apply: bool) -> list[str]:
             if date != "2026-04-01":
                 return m.group(0)
             return dynamic
+
         new = bare_pat.sub(repl_bare, new)
 
         if new != text:
@@ -244,21 +246,35 @@ def rewrite_js_files(apply: bool) -> list[str]:
 def tombstone_orphan_s3_files(apply: bool, now_iso: str) -> list[str]:
     """Tombstone-overwrite orphaned S3 JSON files that have no active writer."""
     tombstoned = []
-    payload = json.dumps({
-        "tombstone": True,
-        "tombstoned_at": now_iso,
-        "tombstoned_reason": f"experiment_restart_{EXPERIMENT_START_DATE}",
-        "_note": "This file has no active Lambda writer; was overwritten during the experiment restart to prevent stale-data leak.",
-    }).encode()
+    payload = json.dumps(
+        {
+            "tombstone": True,
+            "tombstoned_at": now_iso,
+            "tombstoned_reason": f"experiment_restart_{EXPERIMENT_START_DATE}",
+            "_note": "This file has no active Lambda writer; was overwritten during the experiment restart to prevent stale-data leak.",
+        }
+    ).encode()
     for key in ORPHAN_S3_FILES:
         if apply:
             subprocess.run(
-                ["aws", "s3api", "put-object",
-                 "--bucket", S3_BUCKET, "--key", key,
-                 "--body", "-",
-                 "--content-type", "application/json",
-                 "--region", REGION],
-                input=payload, check=False, capture_output=True,
+                [
+                    "aws",
+                    "s3api",
+                    "put-object",
+                    "--bucket",
+                    S3_BUCKET,
+                    "--key",
+                    key,
+                    "--body",
+                    "-",
+                    "--content-type",
+                    "application/json",
+                    "--region",
+                    REGION,
+                ],
+                input=payload,
+                check=False,
+                capture_output=True,
             )
         tombstoned.append(key)
     return tombstoned
@@ -270,14 +286,25 @@ def invoke_regen_lambdas(apply: bool) -> list[tuple[str, str]]:
     for fn in REGEN_LAMBDAS:
         if apply:
             proc = subprocess.run(
-                ["aws", "lambda", "invoke",
-                 "--function-name", fn,
-                 "--region", REGION,
-                 "--invocation-type", "RequestResponse",
-                 "--payload", "e30=",  # base64-encoded '{}'
-                 "--cli-binary-format", "raw-in-base64-out",
-                 "/tmp/_regen_" + fn.replace("-", "_") + ".json"],
-                check=False, capture_output=True, text=True,
+                [
+                    "aws",
+                    "lambda",
+                    "invoke",
+                    "--function-name",
+                    fn,
+                    "--region",
+                    REGION,
+                    "--invocation-type",
+                    "RequestResponse",
+                    "--payload",
+                    "e30=",  # base64-encoded '{}'
+                    "--cli-binary-format",
+                    "raw-in-base64-out",
+                    "/tmp/_regen_" + fn.replace("-", "_") + ".json",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
             )
             status = "ok" if proc.returncode == 0 else f"err({proc.returncode})"
         else:
@@ -317,20 +344,18 @@ def sync_to_s3(apply: bool, touched_html: list[str]):
             local = REPO_ROOT / rel
             if not local.exists():
                 continue
-            subprocess.run(["aws", "s3", "cp", str(local), f"s3://{S3_BUCKET}/{rel}",
-                            "--region", REGION], check=False, capture_output=True)
+            subprocess.run(["aws", "s3", "cp", str(local), f"s3://{S3_BUCKET}/{rel}", "--region", REGION], check=False, capture_output=True)
     return keys_to_sync
 
 
 def invalidate_cloudfront(apply: bool, paths: list[str]):
-    cf_paths = ["/" + p[len("site/"):] if p.startswith("site/") else "/" + p for p in paths]
+    cf_paths = ["/" + p[len("site/") :] if p.startswith("site/") else "/" + p for p in paths]
     cf_paths.append("/")  # invalidate root for safety
     if apply:
         subprocess.run(
-            ["aws", "cloudfront", "create-invalidation",
-             "--distribution-id", CLOUDFRONT_DIST,
-             "--paths", *cf_paths],
-            check=False, capture_output=True,
+            ["aws", "cloudfront", "create-invalidation", "--distribution-id", CLOUDFRONT_DIST, "--paths", *cf_paths],
+            check=False,
+            capture_output=True,
         )
     return cf_paths
 
@@ -346,12 +371,12 @@ def main():
 
     # 1. site_constants.js
     js_before, js_after = rewrite_site_constants(args.apply)
-    js_changed = (js_before != js_after)
+    js_changed = js_before != js_after
     print(f"\n[1/5] site_constants.js: {'CHANGED' if js_changed else 'unchanged'}")
 
     # 2. content_manifest.json
     cm_before, cm_after = rewrite_content_manifest(args.apply)
-    cm_changed = (cm_before != cm_after)
+    cm_changed = cm_before != cm_after
     print(f"[2/5] content_manifest.json: {'CHANGED' if cm_changed else 'unchanged'}")
 
     # 3. HTML files
@@ -372,6 +397,7 @@ def main():
 
     # 6. Orphan S3 file tombstones
     from datetime import datetime, timezone
+
     now_iso = datetime.now(timezone.utc).isoformat()
     orphans = tombstone_orphan_s3_files(args.apply, now_iso)
     print(f"[6/8] Orphan S3 files tombstoned: {len(orphans)}")

@@ -11,18 +11,18 @@ build the layer directory at cdk/layer-build/python/*.
 
 import aws_cdk as cdk
 from aws_cdk import (
-    Stack,
-    RemovalPolicy,
     Duration,
-    aws_dynamodb as dynamodb,
-    aws_s3 as s3,
-    aws_sqs as sqs,
-    aws_sns as sns,
-    aws_lambda as _lambda,
-    aws_kms as kms,
-    aws_iam as iam,
-    aws_budgets as budgets,
+    RemovalPolicy,
+    Stack,
 )
+from aws_cdk import aws_budgets as budgets
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_kms as kms
+from aws_cdk import aws_lambda as _lambda
+from aws_cdk import aws_s3 as s3
+from aws_cdk import aws_sns as sns
+from aws_cdk import aws_sqs as sqs
 from constructs import Construct
 
 
@@ -35,19 +35,22 @@ class CoreStack(Stack):
 
         # ── DynamoDB — lookup only (NOT CDK-managed) ──
         self.table = dynamodb.Table.from_table_name(
-            self, "LifePlatformTable",
+            self,
+            "LifePlatformTable",
             table_name=ctx("ddb_table_name") or "life-platform",
         )
 
         # ── S3 — lookup only (NOT CDK-managed) ──
         self.bucket = s3.Bucket.from_bucket_name(
-            self, "LifePlatformBucket",
+            self,
+            "LifePlatformBucket",
             bucket_name=ctx("s3_bucket_name") or "matthew-life-platform",
         )
 
         # ── SQS DLQ (CDK-managed, imported first time) ──
         self.dlq = sqs.Queue(
-            self, "IngestionDLQ",
+            self,
+            "IngestionDLQ",
             queue_name="life-platform-ingestion-dlq",
             retention_period=Duration.days(14),
             visibility_timeout=Duration.seconds(30),
@@ -58,11 +61,13 @@ class CoreStack(Stack):
         # Two-tier alerting (ADR-050): urgent goes straight to inbox; digest
         # accumulates in SQS and is drained once daily by alert_digest_lambda.
         self.alerts_topic = sns.Topic(
-            self, "AlertsTopic",
+            self,
+            "AlertsTopic",
             topic_name="life-platform-alerts",
         )
         self.digest_topic = sns.Topic(
-            self, "DigestTopic",
+            self,
+            "DigestTopic",
             topic_name="life-platform-alerts-digest",
         )
 
@@ -77,7 +82,8 @@ class CoreStack(Stack):
         # Pre-built by deploy/build_layer.sh → cdk/layer-build/python/
         # No Docker needed. CDK zips the directory and publishes.
         self.shared_layer = _lambda.LayerVersion(
-            self, "SharedUtilsLayer",
+            self,
+            "SharedUtilsLayer",
             layer_version_name="life-platform-shared-utils",
             code=_lambda.Code.from_asset("layer-build"),
             compatible_runtimes=[_lambda.Runtime.PYTHON_3_12],
@@ -91,8 +97,7 @@ class CoreStack(Stack):
         # Budgets data trails Bedrock spend 24-48h, so it's notice, not the hard stop.
         budget_email = ctx("budget_email") or "awsdev@mattsusername.com"
         _budget_notifications = []
-        for _thr, _type in [(50, "ACTUAL"), (70, "ACTUAL"), (85, "ACTUAL"),
-                            (100, "ACTUAL"), (100, "FORECASTED")]:
+        for _thr, _type in [(50, "ACTUAL"), (70, "ACTUAL"), (85, "ACTUAL"), (100, "ACTUAL"), (100, "FORECASTED")]:
             _budget_notifications.append(
                 budgets.CfnBudget.NotificationWithSubscribersProperty(
                     notification=budgets.CfnBudget.NotificationProperty(
@@ -101,14 +106,17 @@ class CoreStack(Stack):
                         threshold=_thr,
                         threshold_type="PERCENTAGE",
                     ),
-                    subscribers=[budgets.CfnBudget.SubscriberProperty(
-                        subscription_type="EMAIL",
-                        address=budget_email,
-                    )],
+                    subscribers=[
+                        budgets.CfnBudget.SubscriberProperty(
+                            subscription_type="EMAIL",
+                            address=budget_email,
+                        )
+                    ],
                 )
             )
         budgets.CfnBudget(
-            self, "MonthlyBudget75",
+            self,
+            "MonthlyBudget75",
             budget=budgets.CfnBudget.BudgetDataProperty(
                 budget_name="life-platform-monthly-75",
                 budget_type="COST",

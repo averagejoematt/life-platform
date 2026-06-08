@@ -26,18 +26,20 @@ import json
 import logging
 import os
 import time
-import boto3
 import urllib.error
 import urllib.request
-from datetime import datetime, timedelta, timezone, date
-from decimal import Decimal
 from collections import defaultdict
-from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
+
+import boto3
+from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("partner-weekly")
 except ImportError:
     logger = logging.getLogger("partner-weekly")
@@ -60,25 +62,35 @@ secrets = boto3.client("secretsmanager", region_name=_REGION)
 # HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def get_api_key():
     """ADR-062: Bedrock IAM auth — sentinel; see task #90 for full plumbing removal."""
     return "_BEDROCK_IAM_"
 
+
 def d2f(obj):
-    if isinstance(obj, list): return [d2f(i) for i in obj]
-    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [d2f(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
+
 
 def safe_float(rec, field, default=None):
     if rec and field in rec:
-        try: return float(rec[field])
-        except Exception: return default
+        try:
+            return float(rec[field])
+        except Exception:
+            return default
     return default
+
 
 def avg(vals):
     v = [x for x in vals if x is not None]
     return round(sum(v) / len(v), 1) if v else None
+
 
 def query_range(source, start_date, end_date):
     pk = f"USER#{USER_ID}#SOURCE#{source}"
@@ -96,6 +108,7 @@ def query_range(source, start_date, end_date):
             break
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
     return records
+
 
 def query_journal_range(start_date, end_date):
     entries_by_date = defaultdict(list)
@@ -117,6 +130,7 @@ def query_journal_range(start_date, end_date):
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
     return dict(entries_by_date)
 
+
 def fetch_profile():
     try:
         r = table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"})
@@ -124,6 +138,7 @@ def fetch_profile():
     except Exception as e:
         print("[ERROR] fetch_profile: " + str(e))
         return {}
+
 
 def _normalize_whoop_sleep(item):
     out = dict(item)
@@ -137,14 +152,17 @@ def _normalize_whoop_sleep(item):
         for src_field, pct_field in [("slow_wave_sleep_hours", "deep_pct"), ("rem_sleep_hours", "rem_pct")]:
             val = item.get(src_field)
             if val is not None and pct_field not in item:
-                try: out[pct_field] = round(float(val) / dur * 100, 1)
-                except Exception as e: logger.warning("sleep_pct calc failed for %s: %s", pct_field, e)
+                try:
+                    out[pct_field] = round(float(val) / dur * 100, 1)
+                except Exception as e:
+                    logger.warning("sleep_pct calc failed for %s: %s", pct_field, e)
     return out
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DATA GATHERING
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def gather_all():
     today = datetime.now(timezone.utc).date()
@@ -168,8 +186,10 @@ def gather_all():
         r = _normalize_whoop_sleep(r)
         s = safe_float(r, "sleep_score")
         d = safe_float(r, "sleep_duration_hours")
-        if s: sleep_scores.append(s)
-        if d: sleep_durations.append(d)
+        if s:
+            sleep_scores.append(s)
+        if d:
+            sleep_durations.append(d)
 
     sleep_score_avg = avg(sleep_scores)
     sleep_dur_avg = avg(sleep_durations)
@@ -199,20 +219,30 @@ def gather_all():
             m = entry.get("enriched_mood") or entry.get("morning_mood") or entry.get("day_rating")
             e = entry.get("enriched_energy") or entry.get("morning_energy") or entry.get("energy_eod")
             s = entry.get("enriched_stress") or entry.get("stress_level")
-            if m is not None: mood_scores.append(float(m))
-            if e is not None: energy_scores.append(float(e))
-            if s is not None: stress_scores.append(float(s))
-            for t in (entry.get("enriched_themes") or []): all_themes.append(str(t))
-            for em in (entry.get("enriched_emotions") or []): all_emotions.append(str(em))
-            for av in (entry.get("enriched_avoidance_flags") or []): all_avoidance.append(str(av))
-            for df in (entry.get("enriched_defense_patterns") or []): all_defense.append(str(df))
+            if m is not None:
+                mood_scores.append(float(m))
+            if e is not None:
+                energy_scores.append(float(e))
+            if s is not None:
+                stress_scores.append(float(s))
+            for t in entry.get("enriched_themes") or []:
+                all_themes.append(str(t))
+            for em in entry.get("enriched_emotions") or []:
+                all_emotions.append(str(em))
+            for av in entry.get("enriched_avoidance_flags") or []:
+                all_avoidance.append(str(av))
+            for df in entry.get("enriched_defense_patterns") or []:
+                all_defense.append(str(df))
             q = entry.get("enriched_notable_quote")
-            if q: notable_quotes.append({"date": date_str, "quote": str(q)})
+            if q:
+                notable_quotes.append({"date": date_str, "quote": str(q)})
 
     theme_freq = defaultdict(int)
-    for t in all_themes: theme_freq[t] += 1
+    for t in all_themes:
+        theme_freq[t] += 1
     emotion_freq = defaultdict(int)
-    for em in all_emotions: emotion_freq[em] += 1
+    for em in all_emotions:
+        emotion_freq[em] += 1
 
     mood_avg = avg(mood_scores)
     energy_avg = avg(energy_scores)
@@ -339,7 +369,9 @@ def gather_all():
             "week_summary": week_summary,
         },
         "dates": {"start": w_start, "end": w_end},
-        "journey_week": max(1, ((today - datetime.strptime(profile.get("journey_start_date", EXPERIMENT_START_DATE), "%Y-%m-%d").date()).days // 7) + 1),
+        "journey_week": max(
+            1, ((today - datetime.strptime(profile.get("journey_start_date", EXPERIMENT_START_DATE), "%Y-%m-%d").date()).days // 7) + 1
+        ),
         "profile": profile,
     }
 
@@ -464,18 +496,23 @@ def build_commentary(data):
     # V2 P1.4 + P2.8: route through retry_utils.call_anthropic_raw for
     # 4-attempt backoff + token telemetry + env-overridable model.
     model = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
-    payload = json.dumps({
-        "model": model,
-        "max_tokens": 1400,
-        "messages": [{"role": "user", "content": prompt}],
-    }).encode()
+    payload = json.dumps(
+        {
+            "model": model,
+            "max_tokens": 1400,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+    ).encode()
     req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages", data=payload,
-        headers={"Content-Type": "application/json", "x-api-key": api_key,
-                 "anthropic-version": "2023-06-01"}, method="POST")
+        "https://api.anthropic.com/v1/messages",
+        data=payload,
+        headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
+        method="POST",
+    )
 
     try:
         from retry_utils import call_anthropic_raw
+
         resp = call_anthropic_raw(req, timeout=45)
         text = resp["content"][0]["text"]
         logger.debug("partner_ai_response_excerpt: %s", text[:300])
@@ -485,6 +522,7 @@ def build_commentary(data):
         # (bundled in /var/task via Code.from_asset, so it imports without the layer).
         logger.warning("retry_utils unavailable — direct bedrock_client fallback")
         from bedrock_client import invoke as _bedrock_invoke
+
         resp = _bedrock_invoke(json.loads(payload))
         return resp["content"][0]["text"]
 
@@ -492,6 +530,7 @@ def build_commentary(data):
 # ══════════════════════════════════════════════════════════════════════════════
 # SECTION PARSER
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def parse_sections(text):
     """Split AI output into named sections by header emoji."""
@@ -529,6 +568,7 @@ def parse_sections(text):
 # HTML BUILDER
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def section_html(raw_text, accent_color, bg_color, label_color):
     """Render a board section as clean HTML paragraphs."""
     if not raw_text:
@@ -543,21 +583,16 @@ def section_html(raw_text, accent_color, bg_color, label_color):
         is_header = any(stripped.startswith(e) for e in ["🪞", "💚", "🧠", "🤝", "💪"])
         if is_header:
             html += (
-                '<p style="font-size:12px;font-weight:700;color:' + label_color + ';'
-                'text-transform:uppercase;letter-spacing:1px;margin:0 0 14px;">'
-                + stripped + '</p>'
+                '<p style="font-size:12px;font-weight:700;color:' + label_color + ";"
+                'text-transform:uppercase;letter-spacing:1px;margin:0 0 14px;">' + stripped + "</p>"
             )
         else:
-            html += (
-                '<p style="font-size:15px;color:#2d3748;line-height:1.8;margin:0 0 14px;">'
-                + stripped + '</p>'
-            )
+            html += '<p style="font-size:15px;color:#2d3748;line-height:1.8;margin:0 0 14px;">' + stripped + "</p>"
     return (
-        '<div style="background:' + bg_color + ';border-left:4px solid ' + accent_color + ';'
-        'border-radius:0 12px 12px 0;padding:24px 28px;margin-bottom:16px;">'
-        + html
-        + '</div>'
+        '<div style="background:' + bg_color + ";border-left:4px solid " + accent_color + ";"
+        'border-radius:0 12px 12px 0;padding:24px 28px;margin-bottom:16px;">' + html + "</div>"
     )
+
 
 def weight_sentence(w):
     """One honest sentence about weight progress."""
@@ -583,6 +618,7 @@ def weight_sentence(w):
 
     return " · ".join(parts)
 
+
 def signal_dot(label, good, neutral=None):
     """A simple coloured status indicator."""
     if good is None:
@@ -600,9 +636,9 @@ def signal_dot(label, good, neutral=None):
     return (
         '<span style="display:inline-flex;align-items:center;gap:6px;'
         'font-size:13px;color:#4b5563;margin-right:20px;">'
-        '<span style="color:' + color + ';font-size:10px;">' + symbol + '</span>'
-        + label + '</span>'
+        '<span style="color:' + color + ';font-size:10px;">' + symbol + "</span>" + label + "</span>"
     )
+
 
 def build_html(data, commentary_text):
     sections = parse_sections(commentary_text)
@@ -612,8 +648,7 @@ def build_html(data, commentary_text):
     mood = data["mood"]
     dates = data["dates"]
 
-    logger.debug("partner_parsed_sections=%s lede_excerpt=%s",
-                 list(sections.keys()), sections.get("lede", "(empty)")[:80])
+    logger.debug("partner_parsed_sections=%s lede_excerpt=%s", list(sections.keys()), sections.get("lede", "(empty)")[:80])
 
     try:
         start_dt = datetime.strptime(dates["start"], "%Y-%m-%d")
@@ -634,13 +669,13 @@ def build_html(data, commentary_text):
     if lede_text:
         lede_block = (
             '<div style="background:linear-gradient(135deg,#fdf6ec,#fef9f0);'
-            'border-radius:14px;padding:24px 28px;margin-bottom:28px;'
+            "border-radius:14px;padding:24px 28px;margin-bottom:28px;"
             'border-left:4px solid #f59e0b;">'
             '<p style="font-size:11px;color:#b45309;text-transform:uppercase;'
             'letter-spacing:1px;margin:0 0 8px;font-weight:700;">This week</p>'
             '<p style="font-size:17px;color:#78350f;line-height:1.65;margin:0;'
-            'font-style:italic;">' + lede_text + '</p>'
-            '</div>'
+            'font-style:italic;">' + lede_text + "</p>"
+            "</div>"
         )
 
     # ── At a glance: 3 plain signals ──
@@ -669,7 +704,7 @@ def build_html(data, commentary_text):
         + signal_dot(mood_dot_label, mood_good, mood_neutral)
         + signal_dot(sleep_dot_label, sleep_good, sleep_neutral)
         + signal_dot(grade_dot_label, grade_good, grade_neutral)
-        + '</div></div>'
+        + "</div></div>"
     )
 
     # ── Weight sentence ── (removed per design: Partner doesn't need raw numbers)
@@ -680,9 +715,9 @@ def build_html(data, commentary_text):
 
     # ── Board sections ──
     rodriguez_block = section_html(sections.get("rodriguez", ""), "#22c55e", "#f0fdf4", "#15803d")
-    conti_block = section_html(sections.get("conti", ""),     "#a855f7", "#faf5ff", "#7e22ce")
-    murthy_block = section_html(sections.get("murthy", ""),    "#3b82f6", "#eff6ff", "#1e40af")
-    chair_block = section_html(sections.get("chair", ""),     "#6b7280", "#f9fafb", "#374151")
+    conti_block = section_html(sections.get("conti", ""), "#a855f7", "#faf5ff", "#7e22ce")
+    murthy_block = section_html(sections.get("murthy", ""), "#3b82f6", "#eff6ff", "#1e40af")
+    chair_block = section_html(sections.get("chair", ""), "#6b7280", "#f9fafb", "#374151")
 
     # ── Notable quote ──
     quote_block = ""
@@ -692,11 +727,12 @@ def build_html(data, commentary_text):
             'margin:28px 0;background:#eef2ff;border-radius:0 10px 10px 0;">'
             '<p style="font-size:14px;font-style:italic;color:#4338ca;margin:0 0 6px;">'
             '"' + q["quote"] + '"</p>'
-            '<p style="font-size:11px;color:#818cf8;margin:0;">From his journal · ' + q["date"] + '</p>'
-            '</div>'
+            '<p style="font-size:11px;color:#818cf8;margin:0;">From his journal · ' + q["date"] + "</p>"
+            "</div>"
         )
 
-    return """<!DOCTYPE html>
+    return (
+        """<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -710,20 +746,40 @@ def build_html(data, commentary_text):
   <div style="background:linear-gradient(135deg,#1a1a2e 0%,#2d1b69 100%);padding:28px 32px;">
     <p style="color:#a78bfa;font-size:11px;text-transform:uppercase;letter-spacing:2px;margin:0 0 6px;font-weight:700;">For Partner · Weekly Update</p>
     <h1 style="color:#fff;font-size:22px;font-weight:800;margin:0 0 4px;">How Matthew's Week Went</h1>
-    <p style="color:#c4b5fd;font-size:13px;margin:0;">""" + week_label + """</p>
+    <p style="color:#c4b5fd;font-size:13px;margin:0;">"""
+        + week_label
+        + """</p>
   </div>
 
   <!-- Body -->
   <div style="padding:32px;">
-    """ + lede_block + """
-    """ + glance_block + """
-    """ + weight_block + """
-    """ + sep + """
-    """ + rodriguez_block + """
-    """ + conti_block + """
-    """ + murthy_block + """
-    """ + chair_block + """
-    """ + quote_block + """
+    """
+        + lede_block
+        + """
+    """
+        + glance_block
+        + """
+    """
+        + weight_block
+        + """
+    """
+        + sep
+        + """
+    """
+        + rodriguez_block
+        + """
+    """
+        + conti_block
+        + """
+    """
+        + murthy_block
+        + """
+    """
+        + chair_block
+        + """
+    """
+        + quote_block
+        + """
   </div>
 
   <!-- Footer -->
@@ -738,14 +794,17 @@ def build_html(data, commentary_text):
 </div>
 </body>
 </html>"""
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def lambda_handler(event, context):
-    if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+    if hasattr(logger, "set_date"):
+        logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
     if os.environ.get("EXTERNAL_EMAILS_ENABLED", "true").lower() != "true":
         logger.info("[kill-switch] EXTERNAL_EMAILS_ENABLED=false — skipping Partner send")
         return {"statusCode": 200, "body": "skipped: external emails disabled", "skipped": True}
@@ -758,7 +817,8 @@ def lambda_handler(event, context):
         logger.info("Commentary length: %s chars", len(commentary))
         # AI-3: validate output before rendering
         try:
-            from ai_output_validator import validate_ai_output, AIOutputType
+            from ai_output_validator import AIOutputType, validate_ai_output
+
             _val = validate_ai_output(commentary, AIOutputType.WEEKLY_DIGEST)
             if _val.was_replaced:
                 logger.warning("[AI-3] Partner commentary replaced with fallback: %s", _val.failure_reason)
@@ -782,10 +842,12 @@ def lambda_handler(event, context):
     ses.send_email(
         FromEmailAddress=SENDER,
         Destination={"ToAddresses": [RECIPIENT]},
-        Content={"Simple": {
-            "Subject": {"Data": subject, "Charset": "UTF-8"},
-            "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
-        }},
+        Content={
+            "Simple": {
+                "Subject": {"Data": subject, "Charset": "UTF-8"},
+                "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
+            }
+        },
         ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
         EmailTags=[{"Name": "message_type", "Value": "partner_weekly"}],
     )

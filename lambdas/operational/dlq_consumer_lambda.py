@@ -29,14 +29,16 @@ Environment variables:
 """
 
 import json
-import os
 import logging
-import boto3
+import os
 from datetime import datetime, timezone
+
+import boto3
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("dlq-consumer")
 except ImportError:
     logger = logging.getLogger("dlq-consumer")
@@ -51,32 +53,55 @@ RECIPIENT = "awsdev@mattsusername.com"
 SENDER = "awsdev@mattsusername.com"
 
 MAX_MESSAGES_PER_RUN = 10
-MAX_RETRY_COUNT = 3   # treat as permanent if receive count >= this
+MAX_RETRY_COUNT = 3  # treat as permanent if receive count >= this
 
 # ── AWS clients ────────────────────────────────────────────────────────────────
-sqs = boto3.client("sqs",        region_name=REGION)
-lam = boto3.client("lambda",     region_name=REGION)
-ses = boto3.client("sesv2",      region_name=REGION)
-s3 = boto3.client("s3",         region_name=REGION)
-events = boto3.client("events",  region_name=REGION)
+sqs = boto3.client("sqs", region_name=REGION)
+lam = boto3.client("lambda", region_name=REGION)
+ses = boto3.client("sesv2", region_name=REGION)
+s3 = boto3.client("s3", region_name=REGION)
+events = boto3.client("events", region_name=REGION)
 
 
 # ── Classification ─────────────────────────────────────────────────────────────
 
 # Keywords in error messages that indicate transient failures
 TRANSIENT_PATTERNS = [
-    "timeout", "timed out", "throttl", "rate limit", "503",
-    "502", "connection", "socket", "temporary", "try again",
-    "retryable", "service unavailable", "task timed out",
-    "connection reset", "read timeout", "connect timeout",
+    "timeout",
+    "timed out",
+    "throttl",
+    "rate limit",
+    "503",
+    "502",
+    "connection",
+    "socket",
+    "temporary",
+    "try again",
+    "retryable",
+    "service unavailable",
+    "task timed out",
+    "connection reset",
+    "read timeout",
+    "connect timeout",
 ]
 
 # Keywords that indicate permanent failures
 PERMANENT_PATTERNS = [
-    "auth", "unauthorized", "403", "401", "forbidden",
-    "invalid token", "expired token", "no such key",
-    "nosuchkey", "access denied", "not found", "404",
-    "validation", "malformed", "invalid parameter",
+    "auth",
+    "unauthorized",
+    "403",
+    "401",
+    "forbidden",
+    "invalid token",
+    "expired token",
+    "no such key",
+    "nosuchkey",
+    "access denied",
+    "not found",
+    "404",
+    "validation",
+    "malformed",
+    "invalid parameter",
 ]
 
 
@@ -170,9 +195,7 @@ def extract_function_name(message: dict) -> str | None:
     if not isinstance(body, dict):
         return None
 
-    fn = (body.get("function_name")
-          or body.get("FunctionName")
-          or body.get("lambda_function"))
+    fn = body.get("function_name") or body.get("FunctionName") or body.get("lambda_function")
     if fn:
         return fn
 
@@ -215,6 +238,7 @@ def retry_message(message: dict) -> bool:
 
 # ── Archival ───────────────────────────────────────────────────────────────────
 
+
 def archive_to_s3(message: dict, classification: str, retry_attempted: bool) -> str:
     """Write failed message to S3 dead-letter-archive/ for post-mortem analysis."""
     now = datetime.now(timezone.utc)
@@ -223,14 +247,14 @@ def archive_to_s3(message: dict, classification: str, retry_attempted: bool) -> 
     s3_key = f"dead-letter-archive/{ts}/{msg_id}.json"
 
     archive_record = {
-        "archived_at":      now.isoformat(),
-        "message_id":       msg_id,
-        "classification":   classification,
-        "retry_attempted":  retry_attempted,
-        "receive_count":    message.get("Attributes", {}).get("ApproximateReceiveCount"),
-        "sent_timestamp":   message.get("Attributes", {}).get("SentTimestamp"),
-        "body":             message.get("Body", ""),
-        "attributes":       message.get("Attributes", {}),
+        "archived_at": now.isoformat(),
+        "message_id": msg_id,
+        "classification": classification,
+        "retry_attempted": retry_attempted,
+        "receive_count": message.get("Attributes", {}).get("ApproximateReceiveCount"),
+        "sent_timestamp": message.get("Attributes", {}).get("SentTimestamp"),
+        "body": message.get("Body", ""),
+        "attributes": message.get("Attributes", {}),
         "message_attributes": message.get("MessageAttributes", {}),
     }
 
@@ -249,6 +273,7 @@ def archive_to_s3(message: dict, classification: str, retry_attempted: bool) -> 
 
 
 # ── Alerting ───────────────────────────────────────────────────────────────────
+
 
 def send_alert(permanent_failures: list[dict]) -> None:
     """Send a single consolidated SES alert for all permanent failures in this run."""
@@ -313,6 +338,7 @@ def send_alert(permanent_failures: list[dict]) -> None:
 
 # ── Main handler ───────────────────────────────────────────────────────────────
 
+
 def lambda_handler(event, context):
     try:
         if not DLQ_URL:
@@ -369,13 +395,15 @@ def lambda_handler(event, context):
             if classification == "permanent":
                 stats["permanent"] += 1
                 s3_key = archive_to_s3(msg, classification, retry_attempted)
-                permanent_failures.append({
-                    "message_id": msg_id,
-                    "function_name": fn_name,
-                    "body": msg.get("Body", ""),
-                    "s3_key": s3_key,
-                    "receive_count": receive_count,
-                })
+                permanent_failures.append(
+                    {
+                        "message_id": msg_id,
+                        "function_name": fn_name,
+                        "body": msg.get("Body", ""),
+                        "s3_key": s3_key,
+                        "receive_count": receive_count,
+                    }
+                )
 
             # Always delete from DLQ after processing
             try:
@@ -403,12 +431,14 @@ def lambda_handler(event, context):
 
         return {
             "statusCode": 200,
-            "body": json.dumps({
-                "messages_processed": len(messages),
-                "stats": stats,
-                "permanent_failures": [f["message_id"] for f in permanent_failures],
-                "ran_at": now,
-            }),
+            "body": json.dumps(
+                {
+                    "messages_processed": len(messages),
+                    "stats": stats,
+                    "permanent_failures": [f["message_id"] for f in permanent_failures],
+                    "ran_at": now,
+                }
+            ),
         }
     except Exception as e:
         logger.error("lambda_handler failed: %s", e, exc_info=True)

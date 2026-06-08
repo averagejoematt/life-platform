@@ -41,12 +41,22 @@ SITE_URL = "https://averagejoematt.com"
 # site/assets/js/charts.js's >=4-points rule — so missing-chart is a WARNING.)
 CHART_TOPICS = {"vitals", "physical", "glucose", "sleep", "training"}
 EVIDENCE_TOPICS = [
-    "vitals", "physical", "labs", "glucose", "sleep", "training",
-    "nutrition", "habits", "board", "pipeline",
+    "vitals",
+    "physical",
+    "labs",
+    "glucose",
+    "sleep",
+    "training",
+    "nutrition",
+    "habits",
+    "board",
+    "pipeline",
     # S-05 (2026-06-06): the 3 bespoke renderers added by S-02. Empty this
     # genesis week (honest empty-states), rich readouts as data accrues —
     # the [data-readout] not_empty check covers both states.
-    "intelligence", "predictions", "benchmarks",
+    "intelligence",
+    "predictions",
+    "benchmarks",
 ]
 
 # ── Page definitions (v4 surfaces) ────────────────────────────────────────────
@@ -56,10 +66,16 @@ PAGES = [
         "name": "Home (constellation)",
         "wait_for": ".constellation svg",
         "checks": [
-            {"selector": ".constellation svg a, .constellation svg .node", "min_count": 7,
-             "desc": "7 pillar nodes drawn in the constellation"},
-            {"selector": "a[href='/now/'], a[href='/story/'], a[href='/evidence/']", "min_count": 2,
-             "desc": "the three door links present"},
+            {
+                "selector": ".constellation svg a, .constellation svg .node",
+                "min_count": 7,
+                "desc": "7 pillar nodes drawn in the constellation",
+            },
+            {
+                "selector": "a[href='/now/'], a[href='/story/'], a[href='/evidence/']",
+                "min_count": 2,
+                "desc": "the three door links present",
+            },
         ],
         "charts": [".constellation svg"],
     },
@@ -71,25 +87,36 @@ PAGES = [
             {"selector": "[data-bind='level']", "not_empty": True, "desc": "character level rendered"},
             {"selector": ".row", "min_count": 1, "desc": "at least one pillar row"},
         ],
-        "interact": {"click": ".row", "expect": ".pillar-detail",
-                     "desc": "pillar disclosure opens with the Day-Grade Replay detail"},
+        "interact": {"click": ".row", "expect": ".pillar-detail", "desc": "pillar disclosure opens with the Day-Grade Replay detail"},
     },
     {
         "path": "/story/",
         "name": "Story hub",
         "wait_for": "[data-dx-tabs], [data-dx-read]",
         "checks": [
-            {"selector": "[data-dx-tabs], [data-dx-list]", "min_count": 1,
-             "desc": "dispatches reader (chronicle/journal/lab-notes tabs) rendered"},
+            {
+                "selector": "[data-dx-tabs], [data-dx-list]",
+                "min_count": 1,
+                "desc": "dispatches reader (chronicle/journal/lab-notes tabs) rendered",
+            },
             {"selector": "a[href='/evidence/'], a[href='/now/']", "min_count": 1, "desc": "door links present"},
         ],
     },
-    {"path": "/story/chronicle/", "name": "Story · chronicle",
-     "checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "chronicle content"}]},
-    {"path": "/story/journal/", "name": "Story · journal",
-     "checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "journal content"}]},
-    {"path": "/story/about/", "name": "Story · about",
-     "checks": [{"selector": "main, article", "not_empty": True, "desc": "about content"}]},
+    {
+        "path": "/story/chronicle/",
+        "name": "Story · chronicle",
+        "checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "chronicle content"}],
+    },
+    {
+        "path": "/story/journal/",
+        "name": "Story · journal",
+        "checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "journal content"}],
+    },
+    {
+        "path": "/story/about/",
+        "name": "Story · about",
+        "checks": [{"selector": "main, article", "not_empty": True, "desc": "about content"}],
+    },
     {
         "path": "/evidence/",
         "name": "Evidence hub",
@@ -99,13 +126,15 @@ PAGES = [
 ]
 # Evidence live-data topics — readout must render; chart topics get a soft chart check + crop.
 for _slug in EVIDENCE_TOPICS:
-    PAGES.append({
-        "path": f"/evidence/{_slug}/",
-        "name": f"Evidence · {_slug}",
-        "wait_for": "[data-readout]",
-        "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": f"{_slug} readout rendered"}],
-        "charts": ["[data-readout] svg"] if _slug in CHART_TOPICS else [],
-    })
+    PAGES.append(
+        {
+            "path": f"/evidence/{_slug}/",
+            "name": f"Evidence · {_slug}",
+            "wait_for": "[data-readout]",
+            "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": f"{_slug} readout rendered"}],
+            "charts": ["[data-readout] svg"] if _slug in CHART_TOPICS else [],
+        }
+    )
 
 # Text that should never be visible (stuck/placeholder states).
 _EMPTY_SENTINELS = ("", "—", "...", "··", "•", "Loading", "LOADING", "Loading…")
@@ -115,9 +144,11 @@ _EMPTY_SENTINELS = ("", "—", "...", "··", "•", "Loading", "LOADING", "Load
 # Page-level checks (run in the browser)
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _scroll_and_reveal(page):
     """Scroll the page top-to-bottom, then force all .reveal animations visible."""
-    page.evaluate("""
+    page.evaluate(
+        """
         () => new Promise(resolve => {
             let y = 0; const step = 400;
             const timer = setInterval(() => {
@@ -129,18 +160,22 @@ def _scroll_and_reveal(page):
             }, 80);
             setTimeout(() => { clearInterval(timer); window.scrollTo(0, 0); resolve(); }, 10000);
         })
-    """)
-    page.evaluate("""
+    """
+    )
+    page.evaluate(
+        """
         () => document.querySelectorAll('.reveal').forEach(el => {
             el.classList.add('is-visible'); el.style.opacity = '1'; el.style.transform = 'none';
         })
-    """)
+    """
+    )
     page.wait_for_timeout(1500)
 
 
 def _check_svg_charts(page, selectors):
     """For each chart selector, report whether the SVG has drawn geometry + is visible."""
-    return page.evaluate("""(selectors) => {
+    return page.evaluate(
+        """(selectors) => {
         const out = [];
         for (const sel of selectors) {
             document.querySelectorAll(sel).forEach((svg, i) => {
@@ -151,12 +186,15 @@ def _check_svg_charts(page, selectors):
             });
         }
         return out;
-    }""", selectors)
+    }""",
+        selectors,
+    )
 
 
 def _check_sections_for_blank(page):
     """Visible sections >100px tall with <5 chars of text and no chart (excludes closed <details>)."""
-    return page.evaluate("""
+    return page.evaluate(
+        """
         () => {
             const issues = [];
             const insideClosedDetails = (el) => {
@@ -174,12 +212,14 @@ def _check_sections_for_blank(page):
             });
             return issues;
         }
-    """)
+    """
+    )
 
 
 def _check_stale_text(page):
     """Visible development/placeholder/stuck-loading copy that should never ship."""
-    return page.evaluate(r"""
+    return page.evaluate(
+        r"""
         () => {
             const body = document.body.innerText;
             const issues = [];
@@ -204,14 +244,13 @@ def _check_stale_text(page):
             }
             return issues;
         }
-    """)
+    """
+    )
 
 
 def _mobile_overflow(page):
     """Horizontal overflow in px at the current (mobile) viewport — >4 means a layout break."""
-    return page.evaluate(
-        "() => document.documentElement.scrollWidth - document.documentElement.clientWidth"
-    )
+    return page.evaluate("() => document.documentElement.scrollWidth - document.documentElement.clientWidth")
 
 
 def _write_step_summary(path, passed, failed, warns, results):
@@ -252,6 +291,7 @@ def _navigate_with_fallback(page, url, primary_timeout=15000, fallback_timeout=2
 # Main sweep
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=False):
     """Run the v4 visual QA sweep. Returns True if no page FAILED."""
     from playwright.sync_api import sync_playwright
@@ -269,17 +309,22 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(viewport={"width": 1440, "height": 900}, color_scheme="dark")
 
-        for page_def in (pages or PAGES):
+        for page_def in pages or PAGES:
             page = context.new_page()
             path, name = page_def["path"], page_def["name"]
             issues, warnings, js_errors, failed_responses, shots = [], [], [], [], []
 
             _noncrit = ["favicon", "sub_count", "subscriber_count"]
-            page.on("console", lambda m: js_errors.append(m.text)
-                    if m.type == "error" and not any(nc in m.text for nc in _noncrit) else None)
+            page.on(
+                "console", lambda m: js_errors.append(m.text) if m.type == "error" and not any(nc in m.text for nc in _noncrit) else None
+            )
             page.on("pageerror", lambda err: js_errors.append(str(err)))
-            page.on("response", lambda r: failed_responses.append((r.status, r.url))
-                    if r.status >= 400 and not any(nc in r.url for nc in _noncrit) else None)
+            page.on(
+                "response",
+                lambda r: (
+                    failed_responses.append((r.status, r.url)) if r.status >= 400 and not any(nc in r.url for nc in _noncrit) else None
+                ),
+            )
 
             try:
                 nav = _navigate_with_fallback(page, f"{SITE_URL}{path}")
@@ -387,11 +432,16 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
                 if str(e) not in ("auth_failed", "nav_failed"):
                     issues.append(f"Page load failed: {e}")
 
-            results.append({
-                "page": name, "path": path,
-                "status": "PASS" if not issues else "FAIL",
-                "issues": issues, "warnings": warnings, "screenshots": shots,
-            })
+            results.append(
+                {
+                    "page": name,
+                    "path": path,
+                    "status": "PASS" if not issues else "FAIL",
+                    "issues": issues,
+                    "warnings": warnings,
+                    "screenshots": shots,
+                }
+            )
             icon = "✅" if not issues else "❌"
             warn = f" ({len(warnings)} warning{'s' if len(warnings) != 1 else ''})" if warnings else ""
             print(f"  {icon} {name} ({path}){warn}")
@@ -422,10 +472,17 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
         print(f"Screenshots: {screenshot_dir}/")
 
     with open(os.path.join(screenshot_dir, "report.json"), "w") as f:
-        json.dump({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "passed": passed, "failed": failed, "warnings": warns, "results": results,
-        }, f, indent=2)
+        json.dump(
+            {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "passed": passed,
+                "failed": failed,
+                "warnings": warns,
+                "results": results,
+            },
+            f,
+            indent=2,
+        )
 
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary_path:

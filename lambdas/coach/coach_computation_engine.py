@@ -23,18 +23,19 @@ v1.0.0 — 2026-04-06 (Phase 1B — Coach Intelligence)
 """
 
 import json
-import os
 import logging
 import math
-import boto3
-
-from phase_filter import with_phase_filter  # ADR-058
+import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+
+import boto3
+from phase_filter import with_phase_filter  # ADR-058
 
 # ── Structured logger ────────────────────────────────────────────────────────
 try:
     from platform_logger import get_logger
+
     logger = get_logger("coach-computation-engine")
 except ImportError:
     logger = logging.getLogger("coach-computation-engine")
@@ -53,12 +54,10 @@ from constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
 
 # Metrics by source for EWMA processing
 SOURCE_METRICS = {
-    "whoop": ["hrv", "recovery_score", "resting_heart_rate",
-              "sleep_duration_hours", "sleep_score", "deep_pct", "rem_pct"],
+    "whoop": ["hrv", "recovery_score", "resting_heart_rate", "sleep_duration_hours", "sleep_score", "deep_pct", "rem_pct"],
     "withings": ["weight_lbs"],
     "macrofactor": ["total_calories_kcal", "total_protein_g"],
-    "apple_health": ["steps", "blood_glucose_avg", "blood_glucose_std_dev",
-                     "som_avg_valence"],
+    "apple_health": ["steps", "blood_glucose_avg", "blood_glucose_std_dev", "som_avg_valence"],
     "strava": ["moving_time_seconds"],
     "eightsleep": ["sleep_score", "deep_pct", "rem_pct", "bed_temp_f"],
     "garmin": ["steps"],
@@ -67,8 +66,12 @@ SOURCE_METRICS = {
 # Metrics that are highly autocorrelated — need >=5 consecutive data points
 # before a trend claim is meaningful (Jordan, Expert Panel)
 AUTOCORRELATED_METRICS = {
-    "hrv", "sleep_score", "recovery_score",
-    "resting_heart_rate", "deep_pct", "rem_pct",
+    "hrv",
+    "sleep_score",
+    "recovery_score",
+    "resting_heart_rate",
+    "deep_pct",
+    "rem_pct",
 }
 
 # Domain mapping for each metric — determines which EWMA decay to apply
@@ -93,9 +96,14 @@ METRIC_DOMAIN = {
 
 # Coach IDs for prediction scanning
 COACH_IDS = [
-    "dr_johansson", "fitness_coach", "nutrition_coach",
-    "mind_coach", "sleep_coach", "body_comp_coach",
-    "lifestyle_coach", "recovery_coach",
+    "dr_johansson",
+    "fitness_coach",
+    "nutrition_coach",
+    "mind_coach",
+    "sleep_coach",
+    "body_comp_coach",
+    "lifestyle_coach",
+    "recovery_coach",
 ]
 
 # Default EWMA decay params — used if S3 config unavailable
@@ -110,12 +118,32 @@ DEFAULT_EWMA_PARAMS = {
 # Default seasonal adjustments — used if S3 config unavailable
 DEFAULT_SEASONAL_ADJUSTMENTS = {
     "sleep_duration_hours": {
-        "1": -15, "2": -10, "3": -5, "4": 0, "5": 5, "6": 10,
-        "7": 10, "8": 5, "9": 0, "10": -5, "11": -10, "12": -15,
+        "1": -15,
+        "2": -10,
+        "3": -5,
+        "4": 0,
+        "5": 5,
+        "6": 10,
+        "7": 10,
+        "8": 5,
+        "9": 0,
+        "10": -5,
+        "11": -10,
+        "12": -15,
     },
     "som_avg_valence": {
-        "1": -0.3, "2": -0.2, "3": 0.0, "4": 0.1, "5": 0.2, "6": 0.2,
-        "7": 0.1, "8": 0.1, "9": 0.0, "10": -0.1, "11": -0.2, "12": -0.3,
+        "1": -0.3,
+        "2": -0.2,
+        "3": 0.0,
+        "4": 0.1,
+        "5": 0.2,
+        "6": 0.2,
+        "7": 0.1,
+        "8": 0.1,
+        "9": 0.0,
+        "10": -0.1,
+        "11": -0.2,
+        "12": -0.3,
     },
 }
 
@@ -128,6 +156,7 @@ s3 = boto3.client("s3", region_name=_REGION)
 # =============================================================================
 # HELPERS
 # =============================================================================
+
 
 def _decimal_to_float(obj):
     """Recursively convert DynamoDB Decimal values to Python float."""
@@ -189,6 +218,7 @@ def _decimalize_dict(d):
 # DATA FETCHING
 # =============================================================================
 
+
 def _fetch_range(source, start_date, end_date):
     """Paginated DDB query for source records in date range."""
     try:
@@ -197,8 +227,8 @@ def _fetch_range(source, start_date, end_date):
             "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
             "ExpressionAttributeValues": {
                 ":pk": USER_PREFIX + source,
-                ":s":  "DATE#" + start_date,
-                ":e":  "DATE#" + end_date,
+                ":s": "DATE#" + start_date,
+                ":e": "DATE#" + end_date,
             },
         }
         while True:
@@ -231,7 +261,7 @@ def _fetch_predictions():
             kwargs = {
                 "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
                 "ExpressionAttributeValues": {
-                    ":pk":     f"COACH#{coach_id}",
+                    ":pk": f"COACH#{coach_id}",
                     ":prefix": "PREDICTION#",
                 },
             }
@@ -269,6 +299,7 @@ def _load_seasonal_adjustments():
 # COMPONENT 1: EWMA TREND DETECTION
 # =============================================================================
 
+
 def ewma(values, decay):
     """
     Exponentially weighted moving average.
@@ -277,7 +308,7 @@ def ewma(values, decay):
     if not values:
         return None
     n = len(values)
-    weights = [(1 - decay) * (decay ** i) for i in range(n - 1, -1, -1)]
+    weights = [(1 - decay) * (decay**i) for i in range(n - 1, -1, -1)]
     weight_sum = sum(weights)
     if weight_sum == 0:
         return None
@@ -369,6 +400,7 @@ def _compute_trends(all_data, ewma_params):
 # COMPONENT 2: REGRESSION-TO-MEAN DETECTION
 # =============================================================================
 
+
 def is_likely_regression_to_mean(current, prior, baseline_mean, baseline_std):
     """
     Flag if prior was extreme (z > 1.5) and current moved toward mean.
@@ -415,19 +447,20 @@ def _detect_regression_to_mean(all_data):
 
             if is_likely_regression_to_mean(current, prior, baseline_mean, baseline_std):
                 prior_z = abs(prior - baseline_mean) / baseline_std
-                warnings.append({
-                    "source": source,
-                    "metric": metric,
-                    "current": round(current, 4),
-                    "prior": round(prior, 4),
-                    "baseline_mean": round(baseline_mean, 4),
-                    "baseline_std": round(baseline_std, 4),
-                    "prior_z_score": round(prior_z, 2),
-                    "message": (
-                        f"{metric} change likely reflects regression to mean "
-                        f"(prior z={prior_z:.1f}), not intervention effect."
-                    ),
-                })
+                warnings.append(
+                    {
+                        "source": source,
+                        "metric": metric,
+                        "current": round(current, 4),
+                        "prior": round(prior, 4),
+                        "baseline_mean": round(baseline_mean, 4),
+                        "baseline_std": round(baseline_std, 4),
+                        "prior_z_score": round(prior_z, 2),
+                        "message": (
+                            f"{metric} change likely reflects regression to mean " f"(prior z={prior_z:.1f}), not intervention effect."
+                        ),
+                    }
+                )
 
     return warnings
 
@@ -435,6 +468,7 @@ def _detect_regression_to_mean(all_data):
 # =============================================================================
 # COMPONENT 3: SEASONALITY FLAGS
 # =============================================================================
+
 
 def _compute_seasonality_flags(all_data, seasonal_adjustments, current_month):
     """
@@ -489,18 +523,20 @@ def _compute_seasonality_flags(all_data, seasonal_adjustments, current_month):
                 observed_direction = "up" if observed_change > 0 else "down"
 
                 if seasonal_direction == observed_direction:
-                    flags.append({
-                        "source": source,
-                        "metric": metric,
-                        "month": current_month,
-                        "expected_seasonal_adjustment": expected_adj,
-                        "observed_change": round(observed_change, 4),
-                        "message": (
-                            f"{metric} trend ({observed_direction}) aligns with seasonal "
-                            f"pattern for month {current_month}. "
-                            f"Deseasonalized trend may be flat."
-                        ),
-                    })
+                    flags.append(
+                        {
+                            "source": source,
+                            "metric": metric,
+                            "month": current_month,
+                            "expected_seasonal_adjustment": expected_adj,
+                            "observed_change": round(observed_change, 4),
+                            "message": (
+                                f"{metric} trend ({observed_direction}) aligns with seasonal "
+                                f"pattern for month {current_month}. "
+                                f"Deseasonalized trend may be flat."
+                            ),
+                        }
+                    )
             break  # Found source for this metric, no need to check others
 
     return flags
@@ -509,6 +545,7 @@ def _compute_seasonality_flags(all_data, seasonal_adjustments, current_month):
 # =============================================================================
 # COMPONENT 4: AUTOCORRELATION WARNINGS
 # =============================================================================
+
 
 def _detect_autocorrelation_warnings(all_data):
     """
@@ -551,17 +588,19 @@ def _detect_autocorrelation_warnings(all_data):
                         break
 
             if consecutive < 5:
-                warnings.append({
-                    "source": source,
-                    "metric": metric,
-                    "consecutive_same_direction": consecutive,
-                    "min_required": 5,
-                    "message": (
-                        f"{metric} has only {consecutive} consecutive data points "
-                        f"in the same direction (need 5+). Likely autocorrelation, "
-                        f"not independent signal."
-                    ),
-                })
+                warnings.append(
+                    {
+                        "source": source,
+                        "metric": metric,
+                        "consecutive_same_direction": consecutive,
+                        "min_required": 5,
+                        "message": (
+                            f"{metric} has only {consecutive} consecutive data points "
+                            f"in the same direction (need 5+). Likely autocorrelation, "
+                            f"not independent signal."
+                        ),
+                    }
+                )
 
     return warnings
 
@@ -569,6 +608,7 @@ def _detect_autocorrelation_warnings(all_data):
 # =============================================================================
 # COMPONENT 5: STATISTICAL GUARDRAILS
 # =============================================================================
+
 
 def _compute_statistical_guardrails(all_data):
     """
@@ -621,6 +661,7 @@ def _compute_statistical_guardrails(all_data):
 # =============================================================================
 # COMPONENT 6: PREDICTION EVALUATION
 # =============================================================================
+
 
 def _resolve_metric_value(metric_key, all_data):
     """
@@ -788,31 +829,24 @@ def _update_prediction_outcome(prediction, evaluation):
 
         table.update_item(
             Key={"pk": pk, "sk": sk},
-            UpdateExpression=(
-                "SET #status = :status, outcome = :outcome, "
-                "outcome_date = :odate, outcome_notes = :notes"
-            ),
+            UpdateExpression=("SET #status = :status, outcome = :outcome, " "outcome_date = :odate, outcome_notes = :notes"),
             ExpressionAttributeNames={"#status": "status"},
             ExpressionAttributeValues={
                 ":status": evaluation["status"],
                 ":outcome": evaluation["status"],
                 ":odate": evaluation["evaluated_date"],
-                ":notes": json.dumps({
-                    "actual_value": evaluation["actual_value"],
-                    "beats_null": evaluation["beats_null"],
-                    "bayesian_update": evaluation["bayesian_update"],
-                }),
+                ":notes": json.dumps(
+                    {
+                        "actual_value": evaluation["actual_value"],
+                        "beats_null": evaluation["beats_null"],
+                        "bayesian_update": evaluation["bayesian_update"],
+                    }
+                ),
             },
         )
-        logger.info(
-            "Updated prediction %s -> %s",
-            evaluation["prediction_id"], evaluation["status"]
-        )
+        logger.info("Updated prediction %s -> %s", evaluation["prediction_id"], evaluation["status"])
     except Exception as e:
-        logger.error(
-            "Failed to update prediction %s: %s",
-            evaluation.get("prediction_id"), e
-        )
+        logger.error("Failed to update prediction %s: %s", evaluation.get("prediction_id"), e)
 
 
 def _update_bayesian_confidence(coach_id, subdomain, update_type):
@@ -845,31 +879,28 @@ def _update_bayesian_confidence(coach_id, subdomain, update_type):
         mean_confidence = alpha / (alpha + beta_val)
         sample_size = int(alpha + beta_val - 2)
 
-        table.put_item(Item={
-            "pk": pk,
-            "sk": sk,
-            "alpha": _to_decimal(alpha),
-            "beta_param": _to_decimal(beta_val),
-            "mean_confidence": _to_decimal(mean_confidence),
-            "sample_size": Decimal(str(sample_size)),
-            "subdomain": subdomain,
-            "coach_id": coach_id,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        })
-        logger.info(
-            "Updated confidence for %s/%s: Beta(%.0f,%.0f) = %.2f",
-            coach_id, subdomain, alpha, beta_val, mean_confidence
+        table.put_item(
+            Item={
+                "pk": pk,
+                "sk": sk,
+                "alpha": _to_decimal(alpha),
+                "beta_param": _to_decimal(beta_val),
+                "mean_confidence": _to_decimal(mean_confidence),
+                "sample_size": Decimal(str(sample_size)),
+                "subdomain": subdomain,
+                "coach_id": coach_id,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
         )
+        logger.info("Updated confidence for %s/%s: Beta(%.0f,%.0f) = %.2f", coach_id, subdomain, alpha, beta_val, mean_confidence)
     except Exception as e:
-        logger.error(
-            "Failed to update Bayesian confidence for %s/%s: %s",
-            coach_id, subdomain, e
-        )
+        logger.error("Failed to update Bayesian confidence for %s/%s: %s", coach_id, subdomain, e)
 
 
 # =============================================================================
 # RESULTS WRITER
 # =============================================================================
+
 
 def _write_results(today_str, package):
     """Write the computation results package to DynamoDB for caching."""
@@ -885,36 +916,19 @@ def _write_results(today_str, package):
         # Serialize sub-packages as JSON strings to avoid DynamoDB type issues
         # with deeply nested structures, but keep top-level fields queryable
         item["trends"] = json.dumps(package.get("trends", {}))
-        item["regression_to_mean_warnings"] = json.dumps(
-            package.get("regression_to_mean_warnings", [])
-        )
-        item["seasonality_flags"] = json.dumps(
-            package.get("seasonality_flags", [])
-        )
-        item["autocorrelation_warnings"] = json.dumps(
-            package.get("autocorrelation_warnings", [])
-        )
-        item["statistical_guardrails"] = json.dumps(
-            package.get("statistical_guardrails", {})
-        )
-        item["prediction_evaluations"] = json.dumps(
-            package.get("prediction_evaluations", [])
-        )
+        item["regression_to_mean_warnings"] = json.dumps(package.get("regression_to_mean_warnings", []))
+        item["seasonality_flags"] = json.dumps(package.get("seasonality_flags", []))
+        item["autocorrelation_warnings"] = json.dumps(package.get("autocorrelation_warnings", []))
+        item["statistical_guardrails"] = json.dumps(package.get("statistical_guardrails", {}))
+        item["prediction_evaluations"] = json.dumps(package.get("prediction_evaluations", []))
 
         # Summary counts for quick reads
-        item["trend_count"] = Decimal(str(
-            sum(len(m) for m in package.get("trends", {}).values())
-        ))
-        item["warning_count"] = Decimal(str(
-            len(package.get("regression_to_mean_warnings", []))
-            + len(package.get("autocorrelation_warnings", []))
-        ))
-        item["flag_count"] = Decimal(str(
-            len(package.get("seasonality_flags", []))
-        ))
-        item["prediction_eval_count"] = Decimal(str(
-            len(package.get("prediction_evaluations", []))
-        ))
+        item["trend_count"] = Decimal(str(sum(len(m) for m in package.get("trends", {}).values())))
+        item["warning_count"] = Decimal(
+            str(len(package.get("regression_to_mean_warnings", [])) + len(package.get("autocorrelation_warnings", [])))
+        )
+        item["flag_count"] = Decimal(str(len(package.get("seasonality_flags", []))))
+        item["prediction_eval_count"] = Decimal(str(len(package.get("prediction_evaluations", []))))
 
         table.put_item(Item=item)
         logger.info("Wrote computation results for %s", today_str)
@@ -1003,22 +1017,37 @@ def _detect_arc_transition(trends, guardrails, all_data, today_str):
 
     now_iso = datetime.now(timezone.utc).isoformat()
     transition = {
-        "from": current_phase, "to": new_phase,
-        "date": today_str, "reason": reason,
+        "from": current_phase,
+        "to": new_phase,
+        "date": today_str,
+        "reason": reason,
         "metrics_context": {"up": up_count, "down": down_count, "flat": flat_count, "total": total},
     }
 
     try:
-        table.put_item(Item=_decimalize_dict({
-            "pk": "NARRATIVE#arc", "sk": "STATE#current",
-            "phase": new_phase, "entered_date": today_str,
-            "previous_phase": current_phase, "transition_reason": reason,
-            "last_updated": now_iso,
-        }))
-        table.put_item(Item=_decimalize_dict({
-            "pk": "NARRATIVE#arc", "sk": f"HISTORY#{today_str}",
-            "transition": transition, "created_at": now_iso,
-        }))
+        table.put_item(
+            Item=_decimalize_dict(
+                {
+                    "pk": "NARRATIVE#arc",
+                    "sk": "STATE#current",
+                    "phase": new_phase,
+                    "entered_date": today_str,
+                    "previous_phase": current_phase,
+                    "transition_reason": reason,
+                    "last_updated": now_iso,
+                }
+            )
+        )
+        table.put_item(
+            Item=_decimalize_dict(
+                {
+                    "pk": "NARRATIVE#arc",
+                    "sk": f"HISTORY#{today_str}",
+                    "transition": transition,
+                    "created_at": now_iso,
+                }
+            )
+        )
         logger.info("Arc transition: %s → %s (%s)", current_phase, new_phase, reason)
     except Exception as e:
         logger.error("Failed to write arc transition: %s", e)
@@ -1073,10 +1102,7 @@ def lambda_handler(event, context):
     trends = {}
     try:
         trends = _compute_trends(all_data, ewma_params)
-        logger.info(
-            "Trends computed: %d sources, %d metrics",
-            len(trends), sum(len(m) for m in trends.values())
-        )
+        logger.info("Trends computed: %d sources, %d metrics", len(trends), sum(len(m) for m in trends.values()))
     except Exception as e:
         logger.error("Component 1 (EWMA trends) failed: %s", e)
 
@@ -1091,9 +1117,7 @@ def lambda_handler(event, context):
     # Component 3: Seasonality Flags
     season_flags = []
     try:
-        season_flags = _compute_seasonality_flags(
-            all_data, seasonal_adjustments, current_month
-        )
+        season_flags = _compute_seasonality_flags(all_data, seasonal_adjustments, current_month)
         logger.info("Seasonality flags: %d", len(season_flags))
     except Exception as e:
         logger.error("Component 3 (seasonality) failed: %s", e)
@@ -1110,10 +1134,7 @@ def lambda_handler(event, context):
     guardrails = {}
     try:
         guardrails = _compute_statistical_guardrails(all_data)
-        logger.info(
-            "Statistical guardrails: %d sources",
-            len(guardrails)
-        )
+        logger.info("Statistical guardrails: %d sources", len(guardrails))
     except Exception as e:
         logger.error("Component 5 (statistical guardrails) failed: %s", e)
 

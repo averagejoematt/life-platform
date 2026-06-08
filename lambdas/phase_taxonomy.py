@@ -40,6 +40,7 @@ self-describing even on partitions the tagger cannot reach.
 
 v1.0.0 — 2026-06-07 (ADR-077; supersedes the ad-hoc lists in the restart tools)
 """
+
 from __future__ import annotations
 
 CROSS_PHASE = "cross_phase"
@@ -47,9 +48,7 @@ RAW_TIMESERIES = "raw_timeseries"
 EXPERIMENT_SCOPED = "experiment_scoped"
 SYSTEM_STATE = "system_state"
 
-VALID_CLASSES = frozenset(
-    {CROSS_PHASE, RAW_TIMESERIES, EXPERIMENT_SCOPED, SYSTEM_STATE}
-)
+VALID_CLASSES = frozenset({CROSS_PHASE, RAW_TIMESERIES, EXPERIMENT_SCOPED, SYSTEM_STATE})
 
 # ── Classification by SOURCE name (pk = USER#matthew#SOURCE#<source>) ──────────
 # This is the bulk of the table. Sources absent here raise in classify() so a
@@ -63,36 +62,34 @@ SOURCE_CLASS: dict[str, str] = {
     "garmin": RAW_TIMESERIES,
     "apple_health": RAW_TIMESERIES,
     "eightsleep": RAW_TIMESERIES,
-    "habitify": RAW_TIMESERIES,           # raw completion; habit_scores is the derived one
+    "habitify": RAW_TIMESERIES,  # raw completion; habit_scores is the derived one
     "todoist": RAW_TIMESERIES,
     "weather": RAW_TIMESERIES,
     "macrofactor": RAW_TIMESERIES,
     "macrofactor_workouts": RAW_TIMESERIES,
     "hevy": RAW_TIMESERIES,
-    "notion": RAW_TIMESERIES,             # journal entries — user-authored facts
-    "food_delivery": RAW_TIMESERIES,      # behavioral archive (incl. longest-ever streak)
+    "notion": RAW_TIMESERIES,  # journal entries — user-authored facts
+    "food_delivery": RAW_TIMESERIES,  # behavioral archive (incl. longest-ever streak)
     "sick_days": RAW_TIMESERIES,
-    "measurements": RAW_TIMESERIES,       # ADR-077 dec B: body fact like weight; GA, not hidden
-    "day_grade": RAW_TIMESERIES,          # ADR-077 dec C: keep series for Replay; GA clamps cockpit
-    "sleep_unified": RAW_TIMESERIES,      # reconciled best-estimate of the night, not a verdict
-    "state_of_mind": RAW_TIMESERIES,      # affect self-report series
+    "measurements": RAW_TIMESERIES,  # ADR-077 dec B: body fact like weight; GA, not hidden
+    "day_grade": RAW_TIMESERIES,  # ADR-077 dec C: keep series for Replay; GA clamps cockpit
+    "sleep_unified": RAW_TIMESERIES,  # reconciled best-estimate of the night, not a verdict
+    "state_of_mind": RAW_TIMESERIES,  # affect self-report series
     "mood": RAW_TIMESERIES,
     "travel": RAW_TIMESERIES,
     "interactions": RAW_TIMESERIES,
     "exposures": RAW_TIMESERIES,
-    "temptations": RAW_TIMESERIES,        # accountability/identity log (resisted-temptation facts)
-
+    "temptations": RAW_TIMESERIES,  # accountability/identity log (resisted-temptation facts)
     # — CROSS_PHASE: clinical truths + durable anchors (never touch) —
     "labs": CROSS_PHASE,
     "dexa": CROSS_PHASE,
     "genome": CROSS_PHASE,
-    "supplements": CROSS_PHASE,           # ADR-077 dec A: medication-safety — never hide
-    "chronicling": CROSS_PHASE,           # ADR-077 dec D: frozen pre-platform "before" archive
-    "subscribers": CROSS_PHASE,           # audience identity
-
+    "supplements": CROSS_PHASE,  # ADR-077 dec A: medication-safety — never hide
+    "chronicling": CROSS_PHASE,  # ADR-077 dec D: frozen pre-platform "before" archive
+    "subscribers": CROSS_PHASE,  # audience identity
     # — EXPERIMENT_SCOPED: derived intelligence/progress (tag + wipe + cycle-stamp) —
     "character_sheet": EXPERIMENT_SCOPED,  # RPG-style derived scores; wiped "all" + rebuilt
-    "habit_scores": EXPERIMENT_SCOPED,    # see vice_streaks split note in ADR-077 dec G
+    "habit_scores": EXPERIMENT_SCOPED,  # see vice_streaks split note in ADR-077 dec G
     "computed_metrics": EXPERIMENT_SCOPED,
     "computed_insights": EXPERIMENT_SCOPED,
     "adaptive_mode": EXPERIMENT_SCOPED,
@@ -101,7 +98,7 @@ SOURCE_CLASS: dict[str, str] = {
     "weekly_correlations": EXPERIMENT_SCOPED,
     "centenarian_progress": EXPERIMENT_SCOPED,
     "nutrition_review": EXPERIMENT_SCOPED,
-    "chronicle": EXPERIMENT_SCOPED,       # the Wednesday narrative (curated carry-forward at restart)
+    "chronicle": EXPERIMENT_SCOPED,  # the Wednesday narrative (curated carry-forward at restart)
     "insights": EXPERIMENT_SCOPED,
     "hypotheses": EXPERIMENT_SCOPED,
     "experiments": EXPERIMENT_SCOPED,
@@ -109,33 +106,37 @@ SOURCE_CLASS: dict[str, str] = {
     "protocols": EXPERIMENT_SCOPED,
     "field_notes": EXPERIMENT_SCOPED,
     "discovery_annotations": EXPERIMENT_SCOPED,
-    "ledger": EXPERIMENT_SCOPED,          # TOTALS#current resets; txns tombstone + LIFETIME# (dec F)
+    "ledger": EXPERIMENT_SCOPED,  # TOTALS#current resets; txns tombstone + LIFETIME# (dec F)
     "ai_analysis": EXPERIMENT_SCOPED,
     "decisions": EXPERIMENT_SCOPED,
     "rewards": EXPERIMENT_SCOPED,
     "coach_actions": EXPERIMENT_SCOPED,
-
     # — SYSTEM_STATE: ops/infra/cache/dead (phase machinery ignores) —
-    "journal_analysis": SYSTEM_STATE,     # regenerating Haiku cache (TTL 180d)
+    "journal_analysis": SYSTEM_STATE,  # regenerating Haiku cache (TTL 180d)
     "health_check": SYSTEM_STATE,
     "dropbox_tracker": SYSTEM_STATE,
     "hevy_id_map": SYSTEM_STATE,
     "routine_index": SYSTEM_STATE,
-    "email_log": SYSTEM_STATE,            # ADR-077 dec E: immutable sent-mail archive, GA on read
-    "google_calendar": SYSTEM_STATE,      # dead: no writer (ADR-077 finding 7)
-    "composite_scores": SYSTEM_STATE,     # dead: ADR-025 removed partition
+    "email_log": SYSTEM_STATE,  # ADR-077 dec E: immutable sent-mail archive, GA on read
+    "google_calendar": SYSTEM_STATE,  # dead: no writer (ADR-077 finding 7)
+    "composite_scores": SYSTEM_STATE,  # dead: ADR-025 removed partition
 }
 
 # platform_memory is split BY CATEGORY: durable user facts are cross-phase;
 # coach running-state categories are experiment-scoped (tombstoned at restart).
-MEMORY_DURABLE_CATEGORIES = frozenset(
-    {"baseline_snapshot", "re_entry", "cycle_marker", "cycle"}
-)
+MEMORY_DURABLE_CATEGORIES = frozenset({"baseline_snapshot", "re_entry", "cycle_marker", "cycle"})
 MEMORY_SCOPED_CATEGORIES = frozenset(
     {
-        "failure_pattern", "failure_patterns",  # ADR-077 finding 4: both spellings
-        "what_worked", "coaching_calibration", "personal_curves", "weekly_plate",
-        "journey_milestone", "insight", "experiment_result", "intention_tracking",
+        "failure_pattern",
+        "failure_patterns",  # ADR-077 finding 4: both spellings
+        "what_worked",
+        "coaching_calibration",
+        "personal_curves",
+        "weekly_plate",
+        "journey_milestone",
+        "insight",
+        "experiment_result",
+        "intention_tracking",
         "hypothesis_monitoring",
     }
 )
@@ -178,12 +179,11 @@ def _source_of(pk: str) -> str | None:
     idx = pk.find(marker)
     if idx == -1:
         return None
-    raw = pk[idx + len(marker):]
+    raw = pk[idx + len(marker) :]
     return raw.split("#", 1)[0]
 
 
-def classify(pk: str, sk: str = "", *, category: str | None = None,
-             memory_type: str | None = None) -> str:
+def classify(pk: str, sk: str = "", *, category: str | None = None, memory_type: str | None = None) -> str:
     """Return the taxonomy class for a record.
 
     For platform_memory pass `category` (or `memory_type`) so the per-category
@@ -214,18 +214,16 @@ def classify(pk: str, sk: str = "", *, category: str | None = None,
             return SOURCE_CLASS[source]
         except KeyError:
             raise KeyError(
-                f"phase_taxonomy: unknown SOURCE source '{source}' (pk={pk!r}). "
-                f"Add it to SOURCE_CLASS — do not let it default."
+                f"phase_taxonomy: unknown SOURCE source '{source}' (pk={pk!r}). " f"Add it to SOURCE_CLASS — do not let it default."
             )
     for predicate, cls in _PK_RULES:
         if predicate(pk, sk):
             return cls
-    raise KeyError(
-        f"phase_taxonomy: unclassified pk {pk!r} (sk={sk!r}). Add a rule to _PK_RULES."
-    )
+    raise KeyError(f"phase_taxonomy: unclassified pk {pk!r} (sk={sk!r}). Add a rule to _PK_RULES.")
 
 
 # ── Derived sets the restart tools consume (replaces their hand-rolled lists) ──
+
 
 def is_taggable(cls: str) -> bool:
     """EXPERIMENT_SCOPED is tagged pilot/experiment at restart. RAW_TIMESERIES may
@@ -244,15 +242,7 @@ def never_touch(cls: str) -> bool:
 
 
 # Convenience: the experiment-scoped SOURCE names (for the wipe's source iteration).
-SCOPED_SOURCES = tuple(
-    sorted(s for s, c in SOURCE_CLASS.items() if c == EXPERIMENT_SCOPED)
-)
-CROSS_PHASE_SOURCES = tuple(
-    sorted(s for s, c in SOURCE_CLASS.items() if c == CROSS_PHASE)
-)
-SYSTEM_STATE_SOURCES = tuple(
-    sorted(s for s, c in SOURCE_CLASS.items() if c == SYSTEM_STATE)
-)
-RAW_TIMESERIES_SOURCES = tuple(
-    sorted(s for s, c in SOURCE_CLASS.items() if c == RAW_TIMESERIES)
-)
+SCOPED_SOURCES = tuple(sorted(s for s, c in SOURCE_CLASS.items() if c == EXPERIMENT_SCOPED))
+CROSS_PHASE_SOURCES = tuple(sorted(s for s, c in SOURCE_CLASS.items() if c == CROSS_PHASE))
+SYSTEM_STATE_SOURCES = tuple(sorted(s for s, c in SOURCE_CLASS.items() if c == SYSTEM_STATE))
+RAW_TIMESERIES_SOURCES = tuple(sorted(s for s, c in SOURCE_CLASS.items() if c == RAW_TIMESERIES))

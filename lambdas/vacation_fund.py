@@ -24,6 +24,7 @@ design; the per-source breakdown surfaces it and `manual_adjustment_usd` correct
 No mcp.* imports — this module lives in the shared layer (lambdas/*.py) and uses
 boto3 directly. Read-only: queries DDB + reads S3 config; never writes.
 """
+
 from __future__ import annotations
 
 import json
@@ -35,7 +36,6 @@ from typing import Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
-
 from constants import EXPERIMENT_START_DATE
 
 logger = logging.getLogger("vacation_fund")
@@ -44,8 +44,7 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 S3_CONFIG_PREFIX = os.environ.get("CONFIG_S3_PREFIX", "config/")
-CONFIG_DIR = os.environ.get(
-    "CONFIG_DIR", os.path.join(os.path.dirname(__file__), "..", "config"))
+CONFIG_DIR = os.environ.get("CONFIG_DIR", os.path.join(os.path.dirname(__file__), "..", "config"))
 
 _MI_PER_METER = 1.0 / 1609.34
 _MI_PER_YARD = 1.0 / 1760.0
@@ -59,8 +58,8 @@ _SOURCE_PARTITION = {
 
 _DEFAULT_CONFIG = {
     "rate_per_mile": 1.0,
-    "start_date": None,                       # None → EXPERIMENT_START_DATE
-    "included_sport_types": "all",            # "all" or list of Strava sport_types
+    "start_date": None,  # None → EXPERIMENT_START_DATE
+    "included_sport_types": "all",  # "all" or list of Strava sport_types
     "extra_sources": ["hevy", "macrofactor_export"],
     "manual_adjustment_usd": 0.0,
 }
@@ -71,9 +70,7 @@ _ddb_table = None
 def _table():
     global _ddb_table
     if _ddb_table is None:
-        _ddb_table = boto3.resource(
-            "dynamodb", region_name=os.environ.get("AWS_REGION", "us-west-2")
-        ).Table(TABLE_NAME)
+        _ddb_table = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "us-west-2")).Table(TABLE_NAME)
     return _ddb_table
 
 
@@ -93,6 +90,7 @@ def _today_pt() -> str:
     """Today's date in Pacific (the platform's user-facing zone)."""
     try:
         from zoneinfo import ZoneInfo
+
         return datetime.now(ZoneInfo("America/Los_Angeles")).date().isoformat()
     except Exception:
         return datetime.now(timezone.utc).date().isoformat()
@@ -109,9 +107,9 @@ def load_config() -> dict[str, Any]:
             with open(local, encoding="utf-8") as fh:
                 raw = json.load(fh) or {}
         else:
-            obj = boto3.client(
-                "s3", region_name=os.environ.get("AWS_REGION", "us-west-2")
-            ).get_object(Bucket=S3_BUCKET, Key=f"{S3_CONFIG_PREFIX}vacation_fund.json")
+            obj = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2")).get_object(
+                Bucket=S3_BUCKET, Key=f"{S3_CONFIG_PREFIX}vacation_fund.json"
+            )
             raw = json.loads(obj["Body"].read()) or {}
     except Exception as e:
         logger.info(f"vacation_fund config load fell back to defaults: {e}")
@@ -129,8 +127,7 @@ def _query_range(partition: str, start_date: str, end_date: str) -> list[dict]:
     last_key = None
     while True:
         kwargs: dict[str, Any] = {
-            "KeyConditionExpression": Key("pk").eq(pk)
-            & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}￿"),
+            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}￿"),
         }
         if last_key:
             kwargs["ExclusiveStartKey"] = last_key
@@ -155,7 +152,7 @@ def _strava_miles(start_date: str, end_date: str, included_sport_types):
         activities = rec.get("activities") or []
         # Per-sport breakdown always comes from the activity list.
         for a in activities:
-            sport = (a.get("sport_type") or "Unknown")
+            sport = a.get("sport_type") or "Unknown"
             miles = _f(a.get("distance_miles"))
             if filter_set is not None and sport.lower() not in filter_set:
                 continue
@@ -163,16 +160,15 @@ def _strava_miles(start_date: str, end_date: str, included_sport_types):
         if filter_set is None:
             total += _f(rec.get("total_distance_miles"))
         else:
-            total += sum(_f(a.get("distance_miles")) for a in activities
-                         if (a.get("sport_type") or "").lower() in filter_set)
+            total += sum(_f(a.get("distance_miles")) for a in activities if (a.get("sport_type") or "").lower() in filter_set)
     return round(total, 2), per_sport
 
 
 def _hevy_miles(start_date: str, end_date: str) -> float:
     miles = 0.0
     for w in _query_range("hevy", start_date, end_date):
-        for ex in (w.get("exercises") or []):
-            for s in (ex.get("sets") or []):
+        for ex in w.get("exercises") or []:
+            for s in ex.get("sets") or []:
                 miles += _f(s.get("distance_m")) * _MI_PER_METER
     return round(miles, 2)
 
@@ -180,9 +176,9 @@ def _hevy_miles(start_date: str, end_date: str) -> float:
 def _macrofactor_miles(start_date: str, end_date: str) -> float:
     miles = 0.0
     for day in _query_range(_SOURCE_PARTITION["macrofactor_export"], start_date, end_date):
-        for w in (day.get("workouts") or []):
-            for ex in (w.get("exercises") or []):
-                for s in (ex.get("sets") or []):
+        for w in day.get("workouts") or []:
+            for ex in w.get("exercises") or []:
+                for s in ex.get("sets") or []:
                     if s.get("distance_miles") is not None:
                         miles += _f(s.get("distance_miles"))
                     elif s.get("distance_yards") is not None:
@@ -192,8 +188,7 @@ def _macrofactor_miles(start_date: str, end_date: str) -> float:
     return round(miles, 2)
 
 
-def compute_vacation_fund(start_date: str | None = None,
-                          end_date: str | None = None) -> dict[str, Any]:
+def compute_vacation_fund(start_date: str | None = None, end_date: str | None = None) -> dict[str, Any]:
     """Total workout miles -> USD vacation fund. See module docstring. Never raises
     on missing data/config — returns zeros with a warning instead."""
     cfg = load_config()
@@ -204,8 +199,7 @@ def compute_vacation_fund(start_date: str | None = None,
     included = cfg.get("included_sport_types", "all")
     warnings: list[str] = []
 
-    enabled_extras = [s for s in (cfg.get("extra_sources") or [])
-                      if s in _VALID_EXTRA_SOURCES]
+    enabled_extras = [s for s in (cfg.get("extra_sources") or []) if s in _VALID_EXTRA_SOURCES]
     type_filter_active = isinstance(included, (list, tuple))
 
     strava_miles, per_sport = _strava_miles(start, end, included)
@@ -217,7 +211,8 @@ def compute_vacation_fund(start_date: str | None = None,
     if type_filter_active and enabled_extras:
         warnings.append(
             "included_sport_types filter is active; Hevy/MacroFactor extra sources "
-            "skipped (they have no Strava sport_type to filter on).")
+            "skipped (they have no Strava sport_type to filter on)."
+        )
     else:
         for src in enabled_extras:
             m = _hevy_miles(start, end) if src == "hevy" else _macrofactor_miles(start, end)
@@ -227,7 +222,8 @@ def compute_vacation_fund(start_date: str | None = None,
             warnings.append(
                 "Hevy/MacroFactor miles are added on top of Strava and may overlap it "
                 "(a ride logged in both is counted twice). Per-source breakdown shows each; "
-                "use manual_adjustment_usd to correct.")
+                "use manual_adjustment_usd to correct."
+            )
 
     total_miles = round(total_miles, 2)
     miles_usd = round(total_miles * rate, 2)
@@ -239,9 +235,7 @@ def compute_vacation_fund(start_date: str | None = None,
     projected_usd_1yr = round(miles_per_week * 52 * rate + manual_adj, 2)
 
     if total_miles == 0:
-        warnings.append(
-            f"No workout miles recorded yet for {start}..{end} "
-            f"(experiment genesis is {EXPERIMENT_START_DATE}).")
+        warnings.append(f"No workout miles recorded yet for {start}..{end} " f"(experiment genesis is {EXPERIMENT_START_DATE}).")
 
     return {
         "start_date": start,

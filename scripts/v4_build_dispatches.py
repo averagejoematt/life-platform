@@ -83,15 +83,18 @@ def write(path: Path, html_text: str) -> None:
 
 def main() -> None:
     # hub (defaults to chronicle)
-    write(OUT / "index.html", SHELL.format(
-        title="The Story — averagejoematt",
-        desc="The chronicle, the AI's weekly lab notes, the journal, the timeline, and the context behind the experiment.",
-        canon="", start="chronicle"))
+    write(
+        OUT / "index.html",
+        SHELL.format(
+            title="The Story — averagejoematt",
+            desc="The chronicle, the AI's weekly lab notes, the journal, the timeline, and the context behind the experiment.",
+            canon="",
+            start="chronicle",
+        ),
+    )
     # per-section sub-pages
     for key, label, desc in SECTIONS:
-        write(OUT / key / "index.html", SHELL.format(
-            title=f"{label} — The Story — averagejoematt",
-            desc=desc, canon=f"{key}/", start=key))
+        write(OUT / key / "index.html", SHELL.format(title=f"{label} — The Story — averagejoematt", desc=desc, canon=f"{key}/", start=key))
     print(f"✅ wrote site/story/index.html + {len(SECTIONS)} section shells: " + ", ".join(k for k, _, _ in SECTIONS))
 
 

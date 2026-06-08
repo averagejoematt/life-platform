@@ -25,7 +25,7 @@ import argparse
 import json
 import os
 import sys
-from datetime import date, datetime, timezone, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import boto3
@@ -41,9 +41,9 @@ S3_BUCKET = "matthew-life-platform"
 
 # Each entry: (prefix, archive_prefix, index_key)
 CHRONICLE_PREFIXES = [
-    ("blog/",                       "blog/archive/pilot/",                       "blog/index.html"),
-    ("dashboard/chronicle/posts/",  "dashboard/chronicle/archive/pilot/posts/",  "dashboard/chronicle/index.html"),
-    ("site/chronicle/",             "site/chronicle/archive/pilot/",             "site/chronicle/index.html"),
+    ("blog/", "blog/archive/pilot/", "blog/index.html"),
+    ("dashboard/chronicle/posts/", "dashboard/chronicle/archive/pilot/posts/", "dashboard/chronicle/index.html"),
+    ("site/chronicle/", "site/chronicle/archive/pilot/", "site/chronicle/index.html"),
 ]
 
 
@@ -76,24 +76,30 @@ def s3_exists(s3, key: str) -> bool:
 
 def archive_one(s3, src_key: str, prefix: str, archive_prefix: str, apply: bool, now_iso: str) -> tuple[str, bool]:
     """Archive one chronicle HTML file. Returns (archive_key, did_archive)."""
-    base = src_key[len(prefix):]
+    base = src_key[len(prefix) :]
     dest_key = f"{archive_prefix}{base}"
     if s3_exists(s3, dest_key):
         return dest_key, False
     if apply:
         s3.copy_object(
-            Bucket=S3_BUCKET, Key=dest_key,
+            Bucket=S3_BUCKET,
+            Key=dest_key,
             CopySource={"Bucket": S3_BUCKET, "Key": src_key},
             MetadataDirective="REPLACE",
-            Metadata={"tombstoned_at": now_iso,
-                      "tombstoned_reason": f"experiment_restart_{EXPERIMENT_START_DATE}"},
+            Metadata={"tombstoned_at": now_iso, "tombstoned_reason": f"experiment_restart_{EXPERIMENT_START_DATE}"},
         )
         # Tombstone-overwrite the original (IAM denies DeleteObject).
         s3.put_object(
-            Bucket=S3_BUCKET, Key=src_key,
-            Body=json.dumps({"tombstone": True, "tombstoned_at": now_iso,
-                             "archived_to": dest_key,
-                             "tombstoned_reason": f"experiment_restart_{EXPERIMENT_START_DATE}"}).encode(),
+            Bucket=S3_BUCKET,
+            Key=src_key,
+            Body=json.dumps(
+                {
+                    "tombstone": True,
+                    "tombstoned_at": now_iso,
+                    "archived_to": dest_key,
+                    "tombstoned_reason": f"experiment_restart_{EXPERIMENT_START_DATE}",
+                }
+            ).encode(),
             ContentType="application/json",
         )
     return dest_key, True
@@ -210,10 +216,9 @@ def rewrite_index(s3, index_key: str, apply: bool):
     """Replace a chronicle index page with a full-template Day-1 placeholder."""
     placeholder = _build_chronicle_placeholder()
     if apply:
-        s3.put_object(Bucket=S3_BUCKET, Key=index_key,
-                      Body=placeholder.encode(),
-                      ContentType="text/html",
-                      CacheControl="public, max-age=60")
+        s3.put_object(
+            Bucket=S3_BUCKET, Key=index_key, Body=placeholder.encode(), ContentType="text/html", CacheControl="public, max-age=60"
+        )
     return placeholder
 
 
@@ -235,8 +240,10 @@ def untombstone_and_redate(ddb_table, sk: str, new_date: str, apply: bool):
             ),
             ExpressionAttributeNames={"#d": "date", "#p": "phase"},
             ExpressionAttributeValues={
-                ":d": new_date, ":exp": "experiment",
-                ":ts": datetime.now(timezone.utc).isoformat(), ":osk": sk,
+                ":d": new_date,
+                ":exp": "experiment",
+                ":ts": datetime.now(timezone.utc).isoformat(),
+                ":osk": sk,
             },
         )
 
@@ -244,10 +251,13 @@ def untombstone_and_redate(ddb_table, sk: str, new_date: str, apply: bool):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--apply", action="store_true", help="Commit writes (default: dry-run)")
-    parser.add_argument("--resurrect-sk", action="append", default=[],
-                        help="Chronicle DDB sk to keep + re-date as a pre-genesis lead-in (repeatable, max 2)")
-    parser.add_argument("--keep-days", type=int, default=5,
-                        help="Days before genesis to date the first kept chronicle (default 5)")
+    parser.add_argument(
+        "--resurrect-sk",
+        action="append",
+        default=[],
+        help="Chronicle DDB sk to keep + re-date as a pre-genesis lead-in (repeatable, max 2)",
+    )
+    parser.add_argument("--keep-days", type=int, default=5, help="Days before genesis to date the first kept chronicle (default 5)")
     args = parser.parse_args()
 
     if len(args.resurrect_sk) > 2:
@@ -293,8 +303,7 @@ def main():
         # genesis − N days (default 5), staggered one day earlier per additional
         # keeper so multiple keepers preserve their original chronological order.
         genesis = date.fromisoformat(EXPERIMENT_START_DATE)
-        new_dates = [(genesis - timedelta(days=args.keep_days + i)).isoformat()
-                     for i in range(len(args.resurrect_sk))]
+        new_dates = [(genesis - timedelta(days=args.keep_days + i)).isoformat() for i in range(len(args.resurrect_sk))]
         print(f"\n[3/3] Keeping {len(args.resurrect_sk)} chronicle(s) as pre-genesis lead-ins:")
         for sk, new_date in zip(args.resurrect_sk, new_dates):
             print(f"  {sk} → re-dated to {new_date} (phase=experiment, visible)")

@@ -55,12 +55,13 @@ REGION = os.environ.get("AWS_REGION", "us-west-2")
 
 # ── Validation result ──────────────────────────────────────────────────────────
 
+
 @dataclass
 class ValidationResult:
     source: str
     date_str: str
-    errors: list[str] = field(default_factory=list)     # CRITICAL — skip write
-    warnings: list[str] = field(default_factory=list)   # non-blocking
+    errors: list[str] = field(default_factory=list)  # CRITICAL — skip write
+    warnings: list[str] = field(default_factory=list)  # non-blocking
 
     @property
     def is_valid(self) -> bool:
@@ -105,7 +106,6 @@ class ValidationResult:
 #   at_least_one_of:        list[str] — WARNING if ALL absent
 
 _SCHEMAS: dict[str, dict] = {
-
     "whoop": {
         "required_fields": ["pk", "sk", "date"],
         "typed_fields": {
@@ -124,12 +124,11 @@ _SCHEMAS: dict[str, dict] = {
             "sleep_efficiency_percentage": (0, 100),
         },
         "critical_range_checks": {
-            "recovery_score": (-1, 101),    # allow float edge cases
+            "recovery_score": (-1, 101),  # allow float edge cases
             "sleep_score": (-1, 101),
         },
         "at_least_one_of": ["recovery_score", "sleep_score", "hrv"],
     },
-
     "garmin": {
         "required_fields": ["pk", "sk", "date"],
         "typed_fields": {
@@ -147,7 +146,6 @@ _SCHEMAS: dict[str, dict] = {
         },
         "at_least_one_of": ["steps", "resting_heart_rate", "body_battery_highest"],
     },
-
     "apple_health": {
         "required_fields": ["pk", "sk", "date"],
         "typed_fields": {
@@ -171,7 +169,6 @@ _SCHEMAS: dict[str, dict] = {
         },
         "at_least_one_of": ["steps", "active_energy_kcal", "blood_glucose_avg"],
     },
-
     "macrofactor": {
         "required_fields": ["pk", "sk", "date", "entries_count"],
         "typed_fields": {
@@ -191,7 +188,6 @@ _SCHEMAS: dict[str, dict] = {
         "critical_range_checks": {},
         "at_least_one_of": ["total_calories_kcal", "total_protein_g"],
     },
-
     "macrofactor_workouts": {
         "required_fields": ["pk", "sk", "date", "workouts_count"],
         "typed_fields": {
@@ -206,7 +202,6 @@ _SCHEMAS: dict[str, dict] = {
         },
         "at_least_one_of": ["workouts"],
     },
-
     "strava": {
         "required_fields": ["pk", "sk", "date", "activity_count"],
         "typed_fields": {
@@ -221,7 +216,6 @@ _SCHEMAS: dict[str, dict] = {
         },
         "at_least_one_of": ["activities"],
     },
-
     "eightsleep": {
         "required_fields": ["pk", "sk", "date"],
         "typed_fields": {
@@ -235,7 +229,6 @@ _SCHEMAS: dict[str, dict] = {
         },
         "at_least_one_of": ["sleep_efficiency_pct", "sleep_duration_hours", "bed_temp_f"],
     },
-
     "withings": {
         "required_fields": ["pk", "sk", "date"],
         "typed_fields": {
@@ -253,7 +246,6 @@ _SCHEMAS: dict[str, dict] = {
         },
         "at_least_one_of": ["weight_lbs", "bmi"],
     },
-
     "habitify": {
         "required_fields": ["pk", "sk", "date"],
         "typed_fields": {
@@ -266,14 +258,12 @@ _SCHEMAS: dict[str, dict] = {
         },
         "at_least_one_of": ["habits", "total_completed"],
     },
-
     "notion": {
         "required_fields": ["pk", "sk", "date"],
         "typed_fields": {},
         "range_checks": {},
         "at_least_one_of": ["raw_text", "enriched_mood", "enriched_energy"],
     },
-
     "todoist": {
         "required_fields": ["pk", "sk", "date"],
         "typed_fields": {
@@ -286,31 +276,28 @@ _SCHEMAS: dict[str, dict] = {
         },
         "at_least_one_of": ["tasks_completed", "tasks_added", "overdue_count"],
     },
-
     "weather": {
         "required_fields": ["pk", "sk", "date"],
         "typed_fields": {
             "temp_high_f": (int, float),
-            "temp_low_f":  (int, float),
-            "temp_avg_f":  (int, float),
+            "temp_low_f": (int, float),
+            "temp_avg_f": (int, float),
         },
         "range_checks": {
-            "temp_high_f":        (-100, 150),
-            "temp_low_f":         (-100, 150),
-            "temp_avg_f":         (-100, 150),
-            "precipitation_mm":   (0, 2_000),
-            "uv_index_max":       (0, 20),
+            "temp_high_f": (-100, 150),
+            "temp_low_f": (-100, 150),
+            "temp_avg_f": (-100, 150),
+            "precipitation_mm": (0, 2_000),
+            "uv_index_max": (0, 20),
         },
         "at_least_one_of": ["temp_high_f", "temp_avg_f"],
     },
-
     "supplements": {
         "required_fields": ["pk", "sk", "date"],
         "typed_fields": {},
         "range_checks": {},
         "at_least_one_of": ["batches", "total_supplements_logged"],
     },
-
     "computed_metrics": {
         "required_fields": ["pk", "sk", "date", "computed_at"],
         "typed_fields": {
@@ -323,7 +310,6 @@ _SCHEMAS: dict[str, dict] = {
         },
         "at_least_one_of": ["day_grade_score", "component_scores"],
     },
-
     "character_sheet": {
         "required_fields": ["pk", "sk", "date", "character_level"],
         "typed_fields": {
@@ -336,7 +322,6 @@ _SCHEMAS: dict[str, dict] = {
         },
         "at_least_one_of": ["character_level", "character_tier"],
     },
-
     "day_grade": {
         "required_fields": ["pk", "sk", "date", "total_score", "letter_grade"],
         "typed_fields": {
@@ -347,7 +332,6 @@ _SCHEMAS: dict[str, dict] = {
         },
         "at_least_one_of": ["total_score"],
     },
-
     "habit_scores": {
         "required_fields": ["pk", "sk", "date"],
         "typed_fields": {
@@ -361,22 +345,20 @@ _SCHEMAS: dict[str, dict] = {
         },
         "at_least_one_of": ["tier0_done", "composite_score"],
     },
-
     "google_calendar": {  # R8-ST1 — added v3.7.22
         "required_fields": ["pk", "sk", "date"],
         "typed_fields": {
-            "event_count":     (int, float),
+            "event_count": (int, float),
             "meeting_minutes": (int, float),
         },
         "range_checks": {
-            "event_count":       (0, 100),
-            "meeting_minutes":   (0, 1440),  # max 24h of meetings
-            "focus_block_count": (0, 20),    # null is valid (not computable) — skip range check if absent
+            "event_count": (0, 100),
+            "meeting_minutes": (0, 1440),  # max 24h of meetings
+            "focus_block_count": (0, 20),  # null is valid (not computable) — skip range check if absent
         },
         "critical_range_checks": {},
         "at_least_one_of": ["event_count", "events"],
     },
-
     "adaptive_mode": {  # Feature #50 — added v3.7.25
         "required_fields": ["pk", "sk", "date", "engagement_score", "brief_mode", "computed_at"],
         "typed_fields": {
@@ -388,7 +370,6 @@ _SCHEMAS: dict[str, dict] = {
         "critical_range_checks": {},
         "at_least_one_of": ["brief_mode", "engagement_score"],
     },
-
     "computed_insights": {  # IC-2 — added v3.7.25
         "required_fields": ["pk", "sk", "date", "computed_at"],
         "typed_fields": {},
@@ -409,6 +390,7 @@ _DEFAULT_SCHEMA = {
 
 
 # ── Core validation function ───────────────────────────────────────────────────
+
 
 def validate_item(source: str, item: dict, date_str: str = "") -> ValidationResult:
     """Validate a DynamoDB item for the given source against its schema.
@@ -449,9 +431,7 @@ def validate_item(source: str, item: dict, date_str: str = "") -> ValidationResu
         else:
             valid_types = (expected_types, _Decimal)
         if not isinstance(actual, valid_types):
-            result.warnings.append(
-                f"Type mismatch '{fld}': expected {expected_types}, got {type(actual).__name__} ({actual!r:.40})"
-            )
+            result.warnings.append(f"Type mismatch '{fld}': expected {expected_types}, got {type(actual).__name__} ({actual!r:.40})")
 
     # 3. Range checks (WARNING)
     for fld, (lo, hi) in schema.get("range_checks", {}).items():
@@ -460,9 +440,7 @@ def validate_item(source: str, item: dict, date_str: str = "") -> ValidationResu
         try:
             val = float(item[fld])
             if not (lo <= val <= hi):
-                result.warnings.append(
-                    f"Value out of expected range '{fld}': {val} (expected {lo}–{hi})"
-                )
+                result.warnings.append(f"Value out of expected range '{fld}': {val} (expected {lo}–{hi})")
         except (TypeError, ValueError):
             result.warnings.append(f"Cannot parse numeric value for range check '{fld}': {item[fld]!r:.40}")
 
@@ -473,9 +451,7 @@ def validate_item(source: str, item: dict, date_str: str = "") -> ValidationResu
         try:
             val = float(item[fld])
             if not (lo <= val <= hi):
-                result.errors.append(
-                    f"CRITICAL: value '{fld}' = {val} outside hard bounds ({lo}–{hi})"
-                )
+                result.errors.append(f"CRITICAL: value '{fld}' = {val} outside hard bounds ({lo}–{hi})")
         except (TypeError, ValueError):
             result.errors.append(f"CRITICAL: cannot parse '{fld}' for hard-bound check: {item[fld]!r:.40}")
 
@@ -484,9 +460,7 @@ def validate_item(source: str, item: dict, date_str: str = "") -> ValidationResu
     if at_least_one:
         present = [f for f in at_least_one if item.get(f) is not None]
         if not present:
-            result.warnings.append(
-                f"All optional fields absent — expected at least one of: {at_least_one}"
-            )
+            result.warnings.append(f"All optional fields absent — expected at least one of: {at_least_one}")
 
     # 6. Date format sanity check (WARNING)
     date_in_item = item.get("date", date_str or "")
@@ -504,20 +478,22 @@ def validate_item(source: str, item: dict, date_str: str = "") -> ValidationResu
     if result.errors:
         logger.error(
             "[validator] CRITICAL validation failures for %s/%s: %s",
-            source, date_str, result.errors,
+            source,
+            date_str,
+            result.errors,
         )
     elif result.warnings:
         logger.warning(
             "[validator] Validation warnings for %s/%s: %s",
-            source, date_str, result.warnings,
+            source,
+            date_str,
+            result.warnings,
         )
 
     return result
 
 
-def validate_and_write(table, s3_client, bucket: str, source: str,
-                       item: dict, date_str: str = "",
-                       use_safe_put: bool = False) -> bool:
+def validate_and_write(table, s3_client, bucket: str, source: str, item: dict, date_str: str = "", use_safe_put: bool = False) -> bool:
     """Convenience wrapper: validate → archive on failure → put_item on success.
 
     Returns True if item was written, False if skipped.
@@ -549,6 +525,7 @@ def validate_and_write(table, s3_client, bucket: str, source: str,
     if use_safe_put:
         try:
             from item_size_guard import safe_put_item
+
             safe_put_item(table, item, source=source, date_str=date_str)
         except ImportError:
             table.put_item(Item=item)

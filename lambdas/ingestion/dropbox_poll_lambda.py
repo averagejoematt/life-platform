@@ -31,6 +31,7 @@ import boto3
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("dropbox-poll")
 except ImportError:
     logger = logging.getLogger("dropbox-poll")
@@ -42,7 +43,8 @@ USER_ID = os.environ.get("USER_ID", "matthew")
 
 # V2 P2.4 (2026-05-17): OAuth circuit breaker for non-framework Lambdas.
 try:
-    from auth_breaker import check_breaker, mark_failure, clear_failure, looks_like_auth_failure
+    from auth_breaker import check_breaker, clear_failure, looks_like_auth_failure, mark_failure
+
     _HAS_AUTH_BREAKER = True
 except ImportError:
     _HAS_AUTH_BREAKER = False
@@ -71,6 +73,7 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 # AUTH
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def get_dropbox_secret():
     """Fetch Dropbox credentials from Secrets Manager."""
     resp = secrets.get_secret_value(SecretId=SECRET_NAME)
@@ -80,18 +83,26 @@ def get_dropbox_secret():
 def refresh_access_token(app_key, app_secret, refresh_token):
     """Exchange refresh token for a new short-lived access token."""
     credentials = base64.b64encode(f"{app_key}:{app_secret}".encode()).decode()
-    data = urllib.parse.urlencode({
-        "grant_type": "refresh_token",
-        "refresh_token": refresh_token,
-    }).encode()
+    data = urllib.parse.urlencode(
+        {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+        }
+    ).encode()
 
-    req = urllib.request.Request(TOKEN_URL, data=data, method="POST", headers={
-        "Authorization": f"Basic {credentials}",
-        "Content-Type": "application/x-www-form-urlencoded",
-    })
+    req = urllib.request.Request(
+        TOKEN_URL,
+        data=data,
+        method="POST",
+        headers={
+            "Authorization": f"Basic {credentials}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+    )
 
     # L-04 (2026-06-06): retry on transient 429/5xx via shared layer module.
     from http_retry import urlopen_with_retry
+
     try:
         with urlopen_with_retry(req, timeout=15) as resp:
             tokens = json.loads(resp.read())
@@ -107,16 +118,23 @@ def refresh_access_token(app_key, app_secret, refresh_token):
 # DROPBOX API
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def list_folder(access_token, folder_path="/life-platform"):
     """List files in the specified Dropbox folder. Returns list of file metadata."""
     data = json.dumps({"path": folder_path, "limit": 100}).encode()
-    req = urllib.request.Request(LIST_URL, data=data, method="POST", headers={
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json",
-    })
+    req = urllib.request.Request(
+        LIST_URL,
+        data=data,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        },
+    )
 
     # L-04 (2026-06-06): retry on transient 429/5xx via shared layer module.
     from http_retry import urlopen_with_retry
+
     try:
         with urlopen_with_retry(req, timeout=30) as resp:
             result = json.loads(resp.read())
@@ -127,10 +145,15 @@ def list_folder(access_token, folder_path="/life-platform"):
             # Try root to see what's available
             try:
                 root_data = json.dumps({"path": "", "limit": 50}).encode()
-                root_req = urllib.request.Request(LIST_URL, data=root_data, method="POST", headers={
-                    "Authorization": req.get_header("Authorization"),
-                    "Content-Type": "application/json",
-                })
+                root_req = urllib.request.Request(
+                    LIST_URL,
+                    data=root_data,
+                    method="POST",
+                    headers={
+                        "Authorization": req.get_header("Authorization"),
+                        "Content-Type": "application/json",
+                    },
+                )
                 with urlopen_with_retry(root_req, timeout=30) as root_resp:
                     root_result = json.loads(root_resp.read())
                     entries = root_result.get("entries", [])
@@ -148,35 +171,45 @@ def list_folder(access_token, folder_path="/life-platform"):
 def download_file(access_token, path):
     """Download file content from Dropbox."""
     api_arg = json.dumps({"path": path})
-    req = urllib.request.Request(DOWNLOAD_URL, method="POST", headers={
-        "Authorization": f"Bearer {access_token}",
-        "Dropbox-API-Arg": api_arg,
-        "Content-Type": "application/octet-stream",
-    })
+    req = urllib.request.Request(
+        DOWNLOAD_URL,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Dropbox-API-Arg": api_arg,
+            "Content-Type": "application/octet-stream",
+        },
+    )
     req.data = b""  # Force POST without urllib adding form content-type
 
     # L-04 (2026-06-06): retry on transient 429/5xx via shared layer module.
     from http_retry import urlopen_with_retry
+
     with urlopen_with_retry(req, timeout=60) as resp:
         return resp.read()
 
 
 def move_file(access_token, from_path, to_path):
     """Move a file within Dropbox (used to move to processed/)."""
-    data = json.dumps({
-        "from_path": from_path,
-        "to_path": to_path,
-        "autorename": True,
-    }).encode()
+    data = json.dumps(
+        {
+            "from_path": from_path,
+            "to_path": to_path,
+            "autorename": True,
+        }
+    ).encode()
     req = urllib.request.Request(
         "https://api.dropboxapi.com/2/files/move_v2",
-        data=data, method="POST", headers={
+        data=data,
+        method="POST",
+        headers={
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
         },
     )
     # L-04 (2026-06-06): retry on transient 429/5xx via shared layer module.
     from http_retry import urlopen_with_retry
+
     try:
         with urlopen_with_retry(req, timeout=15):
             logger.info(f"  Moved: {from_path} → {to_path}")
@@ -189,12 +222,18 @@ def move_file(access_token, from_path, to_path):
 def delete_file(access_token, path):
     """Delete a file from Dropbox."""
     data = json.dumps({"path": path}).encode()
-    req = urllib.request.Request(DELETE_URL, data=data, method="POST", headers={
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json",
-    })
+    req = urllib.request.Request(
+        DELETE_URL,
+        data=data,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        },
+    )
     # L-04 (2026-06-06): retry on transient 429/5xx via shared layer module.
     from http_retry import urlopen_with_retry
+
     try:
         with urlopen_with_retry(req, timeout=15):
             logger.info(f"  Deleted from Dropbox: {path}")
@@ -216,7 +255,7 @@ def cleanup_processed(access_token, folder_path="/life-platform/processed", keep
 
     # Sort by server_modified ascending (oldest first)
     files.sort(key=lambda f: f.get("server_modified", ""))
-    to_delete = files[:len(files) - keep]
+    to_delete = files[: len(files) - keep]
 
     for f in to_delete:
         path = f["path_lower"]
@@ -227,6 +266,7 @@ def cleanup_processed(access_token, folder_path="/life-platform/processed", keep
 # ══════════════════════════════════════════════════════════════════════════════
 # TRACKING
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def get_tracker_item() -> dict:
     """Fetch the full tracker DynamoDB item (hashes + last check metadata)."""
@@ -287,14 +327,16 @@ def mark_file_processed(filename, file_hash, file_size):
     )
 
     # Audit trail — individual file record
-    table.put_item(Item={
-        "pk": PK_TRACKER,
-        "sk": f"FILE#{now}#{filename}",
-        "filename": filename,
-        "file_hash": file_hash,
-        "file_size": file_size,
-        "processed_at": now,
-    })
+    table.put_item(
+        Item={
+            "pk": PK_TRACKER,
+            "sk": f"FILE#{now}#{filename}",
+            "filename": filename,
+            "file_hash": file_hash,
+            "file_size": file_size,
+            "processed_at": now,
+        }
+    )
 
 
 def xlsx_to_csv(xlsx_bytes: bytes) -> bytes:
@@ -309,9 +351,9 @@ def xlsx_to_csv(xlsx_bytes: bytes) -> bytes:
     for MacroFactor's tabular exports. If MacroFactor changes their export shape
     we'll see a parse error and surface a real CSV re-export request as fallback.
     """
-    import zipfile
-    import xml.etree.ElementTree as ET
     import csv as _csv
+    import xml.etree.ElementTree as ET
+    import zipfile
     from io import BytesIO, StringIO
 
     NS = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
@@ -377,6 +419,7 @@ def compute_hash(content_bytes):
 # S3 UPLOAD
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def upload_to_s3(filename, content_bytes):
     """Upload CSV to S3 uploads/macrofactor/ to trigger existing pipeline."""
     s3_key = f"uploads/macrofactor/{filename}"
@@ -394,6 +437,7 @@ def upload_to_s3(filename, content_bytes):
 # HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def lambda_handler(event, context):
     if event.get("healthcheck"):
         return {"statusCode": 200, "body": "ok"}
@@ -403,11 +447,16 @@ def lambda_handler(event, context):
         marker = check_breaker(table, source_name="dropbox", user_id=USER_ID, logger=logger)
         if marker:
             logger.warning(f"auth_breaker_skip source=dropbox marked_at={marker.get('marked_at')} error={marker.get('error', '')[:80]}")
-            return {"statusCode": 200, "body": json.dumps({
-                "skipped": "auth_failure_circuit_breaker",
-                "marked_at": marker.get("marked_at"),
-                "error": marker.get("error"),
-            })}
+            return {
+                "statusCode": 200,
+                "body": json.dumps(
+                    {
+                        "skipped": "auth_failure_circuit_breaker",
+                        "marked_at": marker.get("marked_at"),
+                        "error": marker.get("error"),
+                    }
+                ),
+            }
 
     try:
         """

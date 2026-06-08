@@ -14,19 +14,21 @@ Env vars: TABLE_NAME, S3_BUCKET, EMAIL_RECIPIENT, EMAIL_SENDER
 import hashlib
 import hmac
 import json
+import logging
 import os
 import re
-import urllib.request
 import urllib.error
-import boto3
-from boto3.dynamodb.conditions import Key
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-import logging
+
+import boto3
+from boto3.dynamodb.conditions import Key
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("qa-smoke")
 except ImportError:
     logger = logging.getLogger("qa-smoke")
@@ -55,8 +57,10 @@ MCP_SECRET_NAME = os.environ.get("MCP_SECRET_NAME", "life-platform/mcp-api-key")
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def pt_now():
     return datetime.now(timezone.utc) - timedelta(hours=8)
+
 
 def yesterday_str():
     return (pt_now() - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -64,31 +68,42 @@ def yesterday_str():
 
 class Check:
     """Single assertion result."""
+
     def __init__(self, name, category):
         self.name = name
         self.category = category
-        self.passed = None   # True=green, False=red, None=yellow
+        self.passed = None  # True=green, False=red, None=yellow
         self.paused = False  # intentionally-paused surface: shown ⏸, not a fault
         self.message = ""
 
     def ok(self, msg=""):
-        self.passed = True; self.message = msg; return self
+        self.passed = True
+        self.message = msg
+        return self
 
     def fail(self, msg=""):
-        self.passed = False; self.message = msg; return self
+        self.passed = False
+        self.message = msg
+        return self
 
     def warn(self, msg=""):
-        self.passed = None; self.message = msg; return self
+        self.passed = None
+        self.message = msg
+        return self
 
     def pause(self, msg=""):
         # Surface is intentionally paused (will return later). Renders ⏸ and is
         # NOT counted as a failure or a warning — visible, but never a fault.
-        self.passed = True; self.paused = True; self.message = msg; return self
+        self.passed = True
+        self.paused = True
+        self.message = msg
+        return self
 
 
 # ---------------------------------------------------------------------------
 # CHECK 1 — DynamoDB data freshness
 # ---------------------------------------------------------------------------
+
 
 def check_ddb_freshness():
     yesterday = yesterday_str()
@@ -102,15 +117,15 @@ def check_ddb_freshness():
     # (Garmin already covers daily steps/activity). This was the source of the
     # chronic "🔴 QA: 3 failures" emails.
     REQUIRED = [
-        ("whoop",        "Sleep/Recovery"),
-        ("habitify",     "Habits"),
+        ("whoop", "Sleep/Recovery"),
+        ("habitify", "Habits"),
         ("apple_health", "Apple Health (daily steps/activity)"),
     ]
     OPTIONAL = [
-        ("withings",    "Weight (weigh-ins are sporadic)"),
-        ("eightsleep",  "Eight Sleep"),
+        ("withings", "Weight (weigh-ins are sporadic)"),
+        ("eightsleep", "Eight Sleep"),
         ("supplements", "Supplements"),
-        ("journal",     "Notion Journal"),
+        ("journal", "Notion Journal"),
     ]
     # PAUSED = intentionally off, but kept visible so they're not forgotten and can
     # be returned to. Shown ⏸, never a fault. Garmin: 2026 anti-automation crackdown
@@ -150,6 +165,7 @@ def check_ddb_freshness():
 # CHECK 2 — S3 output file freshness
 # ---------------------------------------------------------------------------
 
+
 def check_s3_freshness():
     checks = []
 
@@ -162,8 +178,8 @@ def check_s3_freshness():
     # while the buddy surface is dormant; last written 2026-03-09). Kept visible so it
     # can be returned to.
     FILES = [
-        ("dashboard/matthew/data.json",     "Dashboard JSON",  4,  False),
-        ("dashboard/matthew/clinical.json", "Clinical JSON",  26,  True),
+        ("dashboard/matthew/data.json", "Dashboard JSON", 4, False),
+        ("dashboard/matthew/clinical.json", "Clinical JSON", 26, True),
     ]
 
     for key, label, max_hours, non_critical in FILES:
@@ -184,14 +200,14 @@ def check_s3_freshness():
                 c.fail(f"{label} — error: {e}")
         checks.append(c)
 
-    checks.append(Check("S3:buddy/data.json", "Output Files").pause(
-        "Buddy JSON — paused (buddy surface dormant); will return"))
+    checks.append(Check("S3:buddy/data.json", "Output Files").pause("Buddy JSON — paused (buddy surface dormant); will return"))
     return checks
 
 
 # ---------------------------------------------------------------------------
 # CHECK 3 — Score sanity (read dashboard/data.json, validate value ranges)
 # ---------------------------------------------------------------------------
+
 
 def check_score_sanity():
     checks = []
@@ -231,11 +247,11 @@ def check_score_sanity():
     hydration = (data.get("day_grade", {}).get("components") or {}).get("hydration")
 
     checks += [
-        _range_check("readiness",  readiness,  0, 100, "%",    optional=True),
-        _range_check("sleep",      sleep_s,    0, 100, "",     optional=True),
-        _range_check("weight",     weight,     150, 450, " lbs"),
-        _range_check("hrv",        hrv,        5, 250, " ms",  optional=True),
-        _range_check("glucose",    glucose,    50, 300, " mg/dL", optional=True),
+        _range_check("readiness", readiness, 0, 100, "%", optional=True),
+        _range_check("sleep", sleep_s, 0, 100, "", optional=True),
+        _range_check("weight", weight, 150, 450, " lbs"),
+        _range_check("hrv", hrv, 5, 250, " ms", optional=True),
+        _range_check("glucose", glucose, 50, 300, " mg/dL", optional=True),
     ]
 
     c = Check("score:day_grade", "Score Sanity")
@@ -270,6 +286,7 @@ def check_score_sanity():
 # ---------------------------------------------------------------------------
 # CHECK 4 — Blog link integrity
 # ---------------------------------------------------------------------------
+
 
 def check_blog_links():
     checks = []
@@ -317,9 +334,10 @@ def check_blog_links():
 # CHECK 5 — Lambda secret health
 # ---------------------------------------------------------------------------
 
+
 def check_lambda_secrets():
     """Verify every Lambda's SECRET_NAME env var points to an existing secret."""
-    lm = boto3.client("lambda",         region_name=REGION)
+    lm = boto3.client("lambda", region_name=REGION)
     sm = boto3.client("secretsmanager", region_name=REGION)
 
     # Build set of existing (non-deleted) secrets
@@ -356,6 +374,7 @@ def check_lambda_secrets():
 # CHECK 6 — Avatar PNG assets
 # ---------------------------------------------------------------------------
 
+
 def check_avatar_assets():
     TIERS = ["foundation", "momentum", "discipline", "mastery", "elite"]
     FRAMES = [1, 2, 3]
@@ -371,9 +390,7 @@ def check_avatar_assets():
         return [Check("avatar:sprites", "Avatar Assets").warn(f"Cannot list avatar assets (non-critical): {e}")]
 
     missing = [
-        f"{tier}-frame{frame}.png"
-        for tier in TIERS for frame in FRAMES
-        if f"dashboard/avatar/base/{tier}-frame{frame}.png" not in existing
+        f"{tier}-frame{frame}.png" for tier in TIERS for frame in FRAMES if f"dashboard/avatar/base/{tier}-frame{frame}.png" not in existing
     ]
 
     c = Check("avatar:sprites", "Avatar Assets")
@@ -388,6 +405,7 @@ def check_avatar_assets():
 # ---------------------------------------------------------------------------
 # CHECK 7 — MCP integration: 2 tool calls + cache warm verification
 # ---------------------------------------------------------------------------
+
 
 def check_mcp_tool_calls():
     """
@@ -416,17 +434,18 @@ def check_mcp_tool_calls():
 
     def _mcp_call(tool_name, arguments):
         """Single MCP tools/call. Returns (ok: bool, data_or_error_str)."""
-        payload = json.dumps({
-            "jsonrpc": "2.0",
-            "method": "tools/call",
-            "id": f"qa-{tool_name}",
-            "params": {"name": tool_name, "arguments": arguments},
-        }).encode("utf-8")
+        payload = json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "id": f"qa-{tool_name}",
+                "params": {"name": tool_name, "arguments": arguments},
+            }
+        ).encode("utf-8")
         req = urllib.request.Request(
             MCP_FUNCTION_URL,
             data=payload,
-            headers={"Content-Type": "application/json",
-                     "Authorization": f"Bearer {bearer_token}"},
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {bearer_token}"},
             method="POST",
         )
         try:
@@ -495,6 +514,7 @@ def check_mcp_tool_calls():
 # Report builder
 # ---------------------------------------------------------------------------
 
+
 def build_report_html(all_checks, run_time_str):
     fails = [c for c in all_checks if c.passed is False]
     warns = [c for c in all_checks if c.passed is None]
@@ -561,6 +581,7 @@ def build_report_html(all_checks, run_time_str):
 # Lambda handler
 # ---------------------------------------------------------------------------
 
+
 def lambda_handler(event, context):
     try:
         run_time = pt_now()
@@ -572,11 +593,12 @@ def lambda_handler(event, context):
         all_checks += check_s3_freshness()
         all_checks += check_score_sanity()
         all_checks += check_lambda_secrets()
-        all_checks += check_avatar_assets()    # character avatar visuals — kept (real check)
+        all_checks += check_avatar_assets()  # character avatar visuals — kept (real check)
         all_checks += check_mcp_tool_calls()
         # blog moved to /story/ in v4 — shown paused (not failed) so it's not forgotten.
-        all_checks.append(Check("blog:links", "Blog Links").pause(
-            "Blog — paused (chronicle now lives at /story/ in v4); will return if revived"))
+        all_checks.append(
+            Check("blog:links", "Blog Links").pause("Blog — paused (chronicle now lives at /story/ in v4); will return if revived")
+        )
 
         html = build_report_html(all_checks, run_time_str)
 
@@ -596,10 +618,12 @@ def lambda_handler(event, context):
         ses.send_email(
             FromEmailAddress=SENDER,
             Destination={"ToAddresses": [RECIPIENT]},
-            Content={"Simple": {
-                "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
-            }},
+            Content={
+                "Simple": {
+                    "Subject": {"Data": subject, "Charset": "UTF-8"},
+                    "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
+                }
+            },
         )
 
         print(f"[QA] Done — {len(fails)} failures, {len(warns)} warnings, email sent")

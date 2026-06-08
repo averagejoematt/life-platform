@@ -13,19 +13,21 @@ item per day. Fully idempotent.
 v1.1.0 — Added workout CSV support (merged from backfill_macrofactor_workouts.py)
 """
 
-import json
-import os
-import logging
 import csv
 import io
-import boto3
-from collections import defaultdict, OrderedDict
+import json
+import logging
+import os
+from collections import OrderedDict, defaultdict
 from datetime import datetime, timezone
 from decimal import Decimal
+
+import boto3
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("macrofactor")
 except ImportError:
     logger = logging.getLogger("macrofactor")
@@ -43,63 +45,65 @@ s3_client = boto3.client("s3", region_name=REGION)
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(DYNAMODB_TABLE)
 
-NUTRIENT_COLUMNS = OrderedDict([
-    ("Calories (kcal)",          "calories_kcal"),
-    ("Protein (g)",              "protein_g"),
-    ("Carbs (g)",                "carbs_g"),
-    ("Fat (g)",                  "fat_g"),
-    ("Fiber (g)",                "fiber_g"),
-    ("Alcohol (g)",              "alcohol_g"),
-    ("Saturated Fat (g)",        "saturated_fat_g"),
-    ("Monounsaturated Fat (g)",  "monounsaturated_fat_g"),
-    ("Polyunsaturated Fat (g)",  "polyunsaturated_fat_g"),
-    ("Trans Fat (g)",            "trans_fat_g"),
-    ("Omega-3 (g)",              "omega3_total_g"),
-    ("Omega-3 ALA (g)",          "omega3_ala_g"),
-    ("Omega-3 DHA (g)",          "omega3_dha_g"),
-    ("Omega-3 EPA (g)",          "omega3_epa_g"),
-    ("Omega-6 (g)",              "omega6_g"),
-    ("Sugars (g)",               "sugars_g"),
-    ("Sugars Added (g)",         "sugars_added_g"),
-    ("Starch (g)",               "starch_g"),
-    ("Sodium (mg)",              "sodium_mg"),
-    ("Potassium (mg)",           "potassium_mg"),
-    ("Calcium (mg)",             "calcium_mg"),
-    ("Magnesium (mg)",           "magnesium_mg"),
-    ("Iron (mg)",                "iron_mg"),
-    ("Zinc (mg)",                "zinc_mg"),
-    ("Phosphorus (mg)",          "phosphorus_mg"),
-    ("Selenium (mcg)",           "selenium_mcg"),
-    ("Manganese (mg)",           "manganese_mg"),
-    ("Copper (mg)",              "copper_mg"),
-    ("Vitamin A (mcg)",          "vitamin_a_mcg"),
-    ("Vitamin C (mg)",           "vitamin_c_mg"),
-    ("Vitamin D (mcg)",          "vitamin_d_mcg"),
-    ("Vitamin E (mg)",           "vitamin_e_mg"),
-    ("Vitamin K (mcg)",          "vitamin_k_mcg"),
-    ("B1, Thiamine (mg)",        "b1_thiamine_mg"),
-    ("B2, Riboflavin (mg)",      "b2_riboflavin_mg"),
-    ("B3, Niacin (mg)",          "b3_niacin_mg"),
-    ("B5, Pantothenic Acid (mg)", "b5_pantothenic_mg"),
-    ("B6, Pyridoxine (mg)",      "b6_pyridoxine_mg"),
-    ("B12, Cobalamin (mcg)",     "b12_cobalamin_mcg"),
-    ("Folate (mcg)",             "folate_mcg"),
-    ("Caffeine (mg)",            "caffeine_mg"),
-    ("Cholesterol (mg)",         "cholesterol_mg"),
-    ("Choline (mg)",             "choline_mg"),
-    ("Water (g)",                "water_g"),
-    ("Histidine (g)",            "aa_histidine_g"),
-    ("Isoleucine (g)",           "aa_isoleucine_g"),
-    ("Leucine (g)",              "aa_leucine_g"),
-    ("Lysine (g)",               "aa_lysine_g"),
-    ("Methionine (g)",           "aa_methionine_g"),
-    ("Cysteine (g)",             "aa_cysteine_g"),
-    ("Phenylalanine (g)",        "aa_phenylalanine_g"),
-    ("Threonine (g)",            "aa_threonine_g"),
-    ("Tryptophan (g)",           "aa_tryptophan_g"),
-    ("Tyrosine (g)",             "aa_tyrosine_g"),
-    ("Valine (g)",               "aa_valine_g"),
-])
+NUTRIENT_COLUMNS = OrderedDict(
+    [
+        ("Calories (kcal)", "calories_kcal"),
+        ("Protein (g)", "protein_g"),
+        ("Carbs (g)", "carbs_g"),
+        ("Fat (g)", "fat_g"),
+        ("Fiber (g)", "fiber_g"),
+        ("Alcohol (g)", "alcohol_g"),
+        ("Saturated Fat (g)", "saturated_fat_g"),
+        ("Monounsaturated Fat (g)", "monounsaturated_fat_g"),
+        ("Polyunsaturated Fat (g)", "polyunsaturated_fat_g"),
+        ("Trans Fat (g)", "trans_fat_g"),
+        ("Omega-3 (g)", "omega3_total_g"),
+        ("Omega-3 ALA (g)", "omega3_ala_g"),
+        ("Omega-3 DHA (g)", "omega3_dha_g"),
+        ("Omega-3 EPA (g)", "omega3_epa_g"),
+        ("Omega-6 (g)", "omega6_g"),
+        ("Sugars (g)", "sugars_g"),
+        ("Sugars Added (g)", "sugars_added_g"),
+        ("Starch (g)", "starch_g"),
+        ("Sodium (mg)", "sodium_mg"),
+        ("Potassium (mg)", "potassium_mg"),
+        ("Calcium (mg)", "calcium_mg"),
+        ("Magnesium (mg)", "magnesium_mg"),
+        ("Iron (mg)", "iron_mg"),
+        ("Zinc (mg)", "zinc_mg"),
+        ("Phosphorus (mg)", "phosphorus_mg"),
+        ("Selenium (mcg)", "selenium_mcg"),
+        ("Manganese (mg)", "manganese_mg"),
+        ("Copper (mg)", "copper_mg"),
+        ("Vitamin A (mcg)", "vitamin_a_mcg"),
+        ("Vitamin C (mg)", "vitamin_c_mg"),
+        ("Vitamin D (mcg)", "vitamin_d_mcg"),
+        ("Vitamin E (mg)", "vitamin_e_mg"),
+        ("Vitamin K (mcg)", "vitamin_k_mcg"),
+        ("B1, Thiamine (mg)", "b1_thiamine_mg"),
+        ("B2, Riboflavin (mg)", "b2_riboflavin_mg"),
+        ("B3, Niacin (mg)", "b3_niacin_mg"),
+        ("B5, Pantothenic Acid (mg)", "b5_pantothenic_mg"),
+        ("B6, Pyridoxine (mg)", "b6_pyridoxine_mg"),
+        ("B12, Cobalamin (mcg)", "b12_cobalamin_mcg"),
+        ("Folate (mcg)", "folate_mcg"),
+        ("Caffeine (mg)", "caffeine_mg"),
+        ("Cholesterol (mg)", "cholesterol_mg"),
+        ("Choline (mg)", "choline_mg"),
+        ("Water (g)", "water_g"),
+        ("Histidine (g)", "aa_histidine_g"),
+        ("Isoleucine (g)", "aa_isoleucine_g"),
+        ("Leucine (g)", "aa_leucine_g"),
+        ("Lysine (g)", "aa_lysine_g"),
+        ("Methionine (g)", "aa_methionine_g"),
+        ("Cysteine (g)", "aa_cysteine_g"),
+        ("Phenylalanine (g)", "aa_phenylalanine_g"),
+        ("Threonine (g)", "aa_threonine_g"),
+        ("Tryptophan (g)", "aa_tryptophan_g"),
+        ("Tyrosine (g)", "aa_tyrosine_g"),
+        ("Valine (g)", "aa_valine_g"),
+    ]
+)
 NUTRIENT_FIELD_NAMES = set(NUTRIENT_COLUMNS.values())
 COL_TO_FIELD = dict(NUTRIENT_COLUMNS)
 
@@ -108,11 +112,16 @@ COL_TO_FIELD = dict(NUTRIENT_COLUMNS)
 try:
     from numeric import floats_to_decimal  # noqa: F401
 except ImportError:
+
     def floats_to_decimal(obj):
-        if isinstance(obj, bool): return obj
-        if isinstance(obj, float): return Decimal(str(obj))
-        if isinstance(obj, dict): return {k: floats_to_decimal(v) for k, v in obj.items()}
-        if isinstance(obj, list): return [floats_to_decimal(i) for i in obj]
+        if isinstance(obj, bool):
+            return obj
+        if isinstance(obj, float):
+            return Decimal(str(obj))
+        if isinstance(obj, dict):
+            return {k: floats_to_decimal(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [floats_to_decimal(i) for i in obj]
         return obj
 
 
@@ -142,25 +151,27 @@ def parse_entry(row):
     else:
         return None
 
-    nutrients = {COL_TO_FIELD[col]: safe_float(row.get(col))
-                 for col in COL_TO_FIELD if safe_float(row.get(col)) is not None}
-    entry = {k: v for k, v in {
-        "food_name":    food_name,
-        "time":         row.get("Time", "").strip() or None,
-        "serving_size": row.get("Serving Size", "").strip() or None,
-        "serving_qty":  safe_float(row.get("Serving Qty")),
-        "serving_wt_g": safe_float(row.get("Serving Weight (g)")),
-        **nutrients,
-    }.items() if v is not None}
+    nutrients = {COL_TO_FIELD[col]: safe_float(row.get(col)) for col in COL_TO_FIELD if safe_float(row.get(col)) is not None}
+    entry = {
+        k: v
+        for k, v in {
+            "food_name": food_name,
+            "time": row.get("Time", "").strip() or None,
+            "serving_size": row.get("Serving Size", "").strip() or None,
+            "serving_qty": safe_float(row.get("Serving Qty")),
+            "serving_wt_g": safe_float(row.get("Serving Weight (g)")),
+            **nutrients,
+        }.items()
+        if v is not None
+    }
     return date_str, entry
-
 
 
 # ── Protein Distribution (Derived Metrics Phase 1d) ──────────────────────────
 # Norton/Galpin: ≥30g protein per meal to maximize MPS via leucine threshold.
 # Snacks (<400 kcal) excluded — only real meals count toward the score.
 MEAL_CALORIE_THRESHOLD = 400  # kcal — eating occasions below this are "snacks"
-PROTEIN_MPS_THRESHOLD = 30    # grams — minimum per meal for MPS
+PROTEIN_MPS_THRESHOLD = 30  # grams — minimum per meal for MPS
 
 
 def compute_protein_distribution(food_log):
@@ -226,15 +237,14 @@ def compute_protein_distribution(food_log):
     return score, above_30g, total_meals, total_snacks
 
 
-
 # ── Micronutrient Sufficiency (Derived Metrics Phase 1e) ─────────────────────
 # Board of Directors consensus targets for adult male, active, weight loss phase.
 MICRONUTRIENT_TARGETS = {
-    "fiber_g":         {"target": 38,   "label": "Fiber"},
-    "potassium_mg":    {"target": 3400, "label": "Potassium"},
-    "magnesium_mg":    {"target": 420,  "label": "Magnesium"},
-    "vitamin_d_mcg":   {"target": 100,  "label": "Vitamin D"},   # 4000 IU
-    "omega3_total_g":  {"target": 3,    "label": "Omega-3"},
+    "fiber_g": {"target": 38, "label": "Fiber"},
+    "potassium_mg": {"target": 3400, "label": "Potassium"},
+    "magnesium_mg": {"target": 420, "label": "Magnesium"},
+    "vitamin_d_mcg": {"target": 100, "label": "Vitamin D"},  # 4000 IU
+    "omega3_total_g": {"target": 3, "label": "Omega-3"},
 }
 
 
@@ -242,7 +252,7 @@ def compute_micronutrient_sufficiency(totals_prefixed):
     """
     Compute per-nutrient sufficiency as % of optimal daily target.
     Returns (sufficiency_map, avg_pct) or (None, None) if no data.
-    
+
     sufficiency_map: {nutrient_key: {"actual": float, "target": float, "pct": float}}
     Pct is capped at 100 — exceeding target still scores 100%.
     """
@@ -290,31 +300,34 @@ def build_day_items(rows):
     ingested_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     day_items = {}
     for date_str, data in days.items():
-        totals_prefixed = {f"total_{k}": round(v, 2)
-                           for k, v in data["totals"].items() if v != 0}
+        totals_prefixed = {f"total_{k}": round(v, 2) for k, v in data["totals"].items() if v != 0}
         food_log = sorted(data["entries"], key=lambda e: e.get("time") or "00:00")
         # ── Protein distribution (Phase 1d) ──
         pds_score, pds_above, pds_total, pds_snacks = compute_protein_distribution(food_log)
         # ── Micronutrient sufficiency (Phase 1e) ──
         micro_suff, micro_avg = compute_micronutrient_sufficiency(totals_prefixed)
 
-
         item = {
-            "pk":             PK,
-            "sk":             f"DATE#{date_str}",
-            "date":           date_str,
-            "source":         "macrofactor",
+            "pk": PK,
+            "sk": f"DATE#{date_str}",
+            "date": date_str,
+            "source": "macrofactor",
             "schema_version": 1,
-            "ingested_at":    ingested_at,
+            "ingested_at": ingested_at,
             "entries_count": len(food_log),
-            "food_log":      food_log,
+            "food_log": food_log,
             **totals_prefixed,
-            **({"protein_distribution_score": pds_score,
-                "meals_above_30g_protein": pds_above,
-                "total_meals": pds_total,
-                "total_snacks": pds_snacks} if pds_score is not None else {}),
-            **({"micronutrient_sufficiency": micro_suff,
-                "micronutrient_avg_pct": micro_avg} if micro_suff is not None else {}),
+            **(
+                {
+                    "protein_distribution_score": pds_score,
+                    "meals_above_30g_protein": pds_above,
+                    "total_meals": pds_total,
+                    "total_snacks": pds_snacks,
+                }
+                if pds_score is not None
+                else {}
+            ),
+            **({"micronutrient_sufficiency": micro_suff, "micronutrient_avg_pct": micro_avg} if micro_suff is not None else {}),
         }
         day_items[date_str] = item
     return day_items
@@ -330,18 +343,18 @@ def parse_duration_min(val):
     if not val or not str(val).strip():
         return None
     s = str(val).strip()
-    if 'h' in s or 'm' in s:
+    if "h" in s or "m" in s:
         hours = minutes = 0
-        if 'h' in s:
-            h_part = s.split('h')[0].strip()
+        if "h" in s:
+            h_part = s.split("h")[0].strip()
             hours = float(h_part) if h_part else 0
-            s = s.split('h')[1]
-        if 'm' in s:
-            m_part = s.replace('m', '').strip()
+            s = s.split("h")[1]
+        if "m" in s:
+            m_part = s.replace("m", "").strip()
             minutes = float(m_part) if m_part else 0
         return round(hours * 60 + minutes, 1)
-    if ':' in s:
-        parts = s.split(':')
+    if ":" in s:
+        parts = s.split(":")
         if len(parts) == 3:
             return round(int(parts[0]) * 60 + int(parts[1]) + int(parts[2]) / 60, 1)
         if len(parts) == 2:
@@ -381,16 +394,20 @@ def build_workout_day_items(rows):
             base_weight = safe_float(ex_rows[0].get("Exercise Base Weight (lbs)"))
             sets = []
             for i, row in enumerate(ex_rows, 1):
-                s = {k: v for k, v in {
-                    "set_index":        i,
-                    "set_type":         row.get("Set Type", "").strip() or "normal",
-                    "weight_lbs":       safe_float(row.get("Weight (lbs)")),
-                    "reps":             safe_int(row.get("Reps")),
-                    "rir":              safe_int(row.get("RIR")),
-                    "set_duration_sec": safe_int(row.get("Duration")),
-                    "distance_yards":   safe_float(row.get("Distance short (Yd)")),
-                    "distance_miles":   safe_float(row.get("Distance long (Mi)")),
-                }.items() if v is not None}
+                s = {
+                    k: v
+                    for k, v in {
+                        "set_index": i,
+                        "set_type": row.get("Set Type", "").strip() or "normal",
+                        "weight_lbs": safe_float(row.get("Weight (lbs)")),
+                        "reps": safe_int(row.get("Reps")),
+                        "rir": safe_int(row.get("RIR")),
+                        "set_duration_sec": safe_int(row.get("Duration")),
+                        "distance_yards": safe_float(row.get("Distance short (Yd)")),
+                        "distance_miles": safe_float(row.get("Distance long (Mi)")),
+                    }.items()
+                    if v is not None
+                }
                 sets.append(s)
 
             ex_entry = {"exercise_name": ex_name, "sets": sets}
@@ -398,11 +415,15 @@ def build_workout_day_items(rows):
                 ex_entry["base_weight_lbs"] = base_weight
             exercises.append(ex_entry)
 
-        workout = {k: v for k, v in {
-            "workout_name":         workout_name or "Workout",
-            "workout_duration_min": parse_duration_min(duration_raw),
-            "exercises":            exercises,
-        }.items() if v is not None}
+        workout = {
+            k: v
+            for k, v in {
+                "workout_name": workout_name or "Workout",
+                "workout_duration_min": parse_duration_min(duration_raw),
+                "exercises": exercises,
+            }.items()
+            if v is not None
+        }
         day_workouts[date_str].append(workout)
 
     ingested_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -419,17 +440,17 @@ def build_workout_day_items(rows):
                     total_volume += (s.get("weight_lbs") or 0) * (s.get("reps") or 0)
 
         day_items[date_str] = {
-            "pk":               PK_WORKOUTS,
-            "sk":               f"DATE#{date_str}",
-            "date":             date_str,
-            "source":           "macrofactor_workouts",
-            "schema_version":   1,
-            "ingested_at":      ingested_at,
-            "workouts_count":   len(workouts),
-            "total_sets":       total_sets,
+            "pk": PK_WORKOUTS,
+            "sk": f"DATE#{date_str}",
+            "date": date_str,
+            "source": "macrofactor_workouts",
+            "schema_version": 1,
+            "ingested_at": ingested_at,
+            "workouts_count": len(workouts),
+            "total_sets": total_sets,
             "total_volume_lbs": round(total_volume, 1),
-            "unique_exercises":  len(all_exercises),
-            "workouts":         workouts,
+            "unique_exercises": len(all_exercises),
+            "workouts": workouts,
         }
     return day_items
 
@@ -465,6 +486,7 @@ def build_summary_day_items(rows):
     day_items = {}
     skipped = 0
     from datetime import timedelta as _td
+
     EXCEL_EPOCH = datetime(1899, 12, 30, tzinfo=timezone.utc)  # Excel-1900 system, accounting for 1900 leap-year bug
     for row in rows:
         date_str = (row.get("Date") or "").strip()
@@ -525,15 +547,24 @@ def build_summary_day_items(rows):
             "entries_count": 0,
             "food_log": [],
         }
-        if cal is not None:    item["total_calories_kcal"] = round(cal, 2)
-        if prot is not None:   item["total_protein_g"] = round(prot, 2)
-        if fat is not None:    item["total_fat_g"] = round(fat, 2)
-        if carbs is not None:  item["total_carbs_g"] = round(carbs, 2)
-        if weight is not None and weight > 0: item["weight_lbs_macrofactor"] = round(weight, 2)
-        if trend_weight is not None and trend_weight > 0: item["trend_weight_lbs"] = round(trend_weight, 2)
-        if expenditure is not None and expenditure > 0:   item["expenditure_kcal"] = round(expenditure, 2)
-        if target_cal is not None and target_cal > 0:     item["target_calories_kcal"] = round(target_cal, 2)
-        if target_prot is not None and target_prot > 0:   item["target_protein_g"] = round(target_prot, 2)
+        if cal is not None:
+            item["total_calories_kcal"] = round(cal, 2)
+        if prot is not None:
+            item["total_protein_g"] = round(prot, 2)
+        if fat is not None:
+            item["total_fat_g"] = round(fat, 2)
+        if carbs is not None:
+            item["total_carbs_g"] = round(carbs, 2)
+        if weight is not None and weight > 0:
+            item["weight_lbs_macrofactor"] = round(weight, 2)
+        if trend_weight is not None and trend_weight > 0:
+            item["trend_weight_lbs"] = round(trend_weight, 2)
+        if expenditure is not None and expenditure > 0:
+            item["expenditure_kcal"] = round(expenditure, 2)
+        if target_cal is not None and target_cal > 0:
+            item["target_calories_kcal"] = round(target_cal, 2)
+        if target_prot is not None and target_prot > 0:
+            item["target_protein_g"] = round(target_prot, 2)
         day_items[date_str] = item
     print(f"Summary parser: {len(day_items)} days, skipped {skipped} blank/invalid rows")
     return day_items
@@ -541,8 +572,10 @@ def build_summary_day_items(rows):
 
 def archive_raw(bucket, source_key, content_bytes, subfolder=""):
     from datetime import datetime, timezone
+
     now = datetime.now(timezone.utc)
     import os
+
     fname = os.path.basename(source_key)
     sub = f"/{subfolder}" if subfolder else ""
     dest = f"raw/{USER_ID}/macrofactor{sub}/{now.strftime('%Y/%m')}/{fname}"
@@ -551,7 +584,8 @@ def archive_raw(bucket, source_key, content_bytes, subfolder=""):
 
 
 def lambda_handler(event, context):
-    if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+    if hasattr(logger, "set_date"):
+        logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
     print(f"Event: {json.dumps(event)}")
 
     if "Records" in event:
@@ -596,6 +630,7 @@ def lambda_handler(event, context):
     # REL-3: import safe_put_item once for the whole batch
     try:
         from item_size_guard import safe_put_item as _safe_put
+
         _use_safe_put = True
     except ImportError:
         print("[WARN] item_size_guard not available — falling back to direct put_item")
@@ -604,6 +639,7 @@ def lambda_handler(event, context):
     # DATA-2: import validator once for the batch
     try:
         from ingestion_validator import validate_item as _validate_item
+
         _use_validator = True
     except ImportError:
         _use_validator = False
@@ -631,10 +667,12 @@ def lambda_handler(event, context):
     print(f"Written {written} DynamoDB items ({csv_type})")
     return {
         "statusCode": 200,
-        "body": json.dumps({
-            "source_file":  source_key,
-            "csv_type":     csv_type,
-            "rows_parsed":  len(rows),
-            "days_written": written,
-        })
+        "body": json.dumps(
+            {
+                "source_file": source_key,
+                "csv_type": csv_type,
+                "rows_parsed": len(rows),
+                "days_written": written,
+            }
+        ),
     }

@@ -1,15 +1,16 @@
 """tests/test_tools_hevy_routine.py — MCP fat tool gates + dispatcher."""
+
 from __future__ import annotations
 
 import sys
 from unittest.mock import patch
 
 import pytest
+from routine_ir import ExerciseBlock, RoutineSpec, Set
 
 # The MCP package depends on boto3 + config at import time; conftest sets the
 # path. Importing the tool module is enough.
 from mcp import tools_hevy_routine as t
-from routine_ir import ExerciseBlock, RoutineSpec, Set
 
 
 def test_invalid_action_returns_error():
@@ -30,14 +31,17 @@ def test_archive_requires_routine_id():
 
 def test_dry_run_does_not_call_write_client():
     ir = RoutineSpec(
-        routine_id="r-1", target_date="2026-06-01", archetype="upper",
-        exercises=[ExerciseBlock(movement_key="db_bench_press_flat",
-                                 sets=[Set(reps=10)])],
+        routine_id="r-1",
+        target_date="2026-06-01",
+        archetype="upper",
+        exercises=[ExerciseBlock(movement_key="db_bench_press_flat", sets=[Set(reps=10)])],
     )
-    with patch("routine_repo.get_current", return_value=ir), \
-         patch("hevy_template_cache.resolve_movement", return_value="55E6546B"), \
-         patch("hevy_write_client.create_routine") as create_mock, \
-         patch("hevy_write_client.update_routine_with_guard") as update_mock:
+    with (
+        patch("routine_repo.get_current", return_value=ir),
+        patch("hevy_template_cache.resolve_movement", return_value="55E6546B"),
+        patch("hevy_write_client.create_routine") as create_mock,
+        patch("hevy_write_client.update_routine_with_guard") as update_mock,
+    ):
         result = t.tool_manage_hevy_routine({"action": "dry_run", "routine_id": "r-1"})
     create_mock.assert_not_called()
     update_mock.assert_not_called()
@@ -47,20 +51,25 @@ def test_dry_run_does_not_call_write_client():
 
 def test_archive_calls_update_not_delete():
     ir = RoutineSpec(
-        routine_id="r-1", target_date="2026-06-01", archetype="upper",
+        routine_id="r-1",
+        target_date="2026-06-01",
+        archetype="upper",
         title="Upper",
         hevy_routine_id="abc12345",
         hevy_updated_at="2026-05-31T10:00:00Z",
-        exercises=[ExerciseBlock(movement_key="db_bench_press_flat",
-                                 sets=[Set(reps=10)])],
+        exercises=[ExerciseBlock(movement_key="db_bench_press_flat", sets=[Set(reps=10)])],
     )
-    with patch("routine_repo.get_current", return_value=ir), \
-         patch("routine_repo.put_versioned"), \
-         patch("hevy_template_cache.resolve_movement", return_value="55E6546B"), \
-         patch("hevy_write_client.list_folders", return_value={"routine_folders": []}), \
-         patch("hevy_write_client.create_folder", return_value={"routine_folder": {"id": 99}}), \
-         patch("hevy_write_client.update_routine_with_guard",
-               return_value={"routine": {"id": "abc12345", "updated_at": "2026-05-31T12:00:00Z"}}) as upd:
+    with (
+        patch("routine_repo.get_current", return_value=ir),
+        patch("routine_repo.put_versioned"),
+        patch("hevy_template_cache.resolve_movement", return_value="55E6546B"),
+        patch("hevy_write_client.list_folders", return_value={"routine_folders": []}),
+        patch("hevy_write_client.create_folder", return_value={"routine_folder": {"id": 99}}),
+        patch(
+            "hevy_write_client.update_routine_with_guard",
+            return_value={"routine": {"id": "abc12345", "updated_at": "2026-05-31T12:00:00Z"}},
+        ) as upd,
+    ):
         result = t.tool_manage_hevy_routine({"action": "archive", "routine_id": "r-1"})
     upd.assert_called_once()
     assert result["status"] == "archived"
@@ -70,28 +79,36 @@ def test_archive_calls_update_not_delete():
 def test_commit_handles_orphan_created():
     """When Hevy 400s but the routine was actually created, link the id and return a warning."""
     import hevy_write_client as wc
+
     ir = RoutineSpec(
-        routine_id="r-orphan", target_date="2026-06-01", archetype="upper",
-        exercises=[ExerciseBlock(movement_key="db_bench_press_flat",
-                                 sets=[Set(reps=10)])],
+        routine_id="r-orphan",
+        target_date="2026-06-01",
+        archetype="upper",
+        exercises=[ExerciseBlock(movement_key="db_bench_press_flat", sets=[Set(reps=10)])],
     )
     captured: dict = {}
+
     def fake_put(updated):
         captured["last"] = updated
         return updated
+
     orphan_exc = wc.HevyOrphanCreated(
         hevy_routine_id="orphan-id",
         hevy_updated_at="2026-06-01T03:00:00Z",
-        status=400, body='{"error":"x"}',
+        status=400,
+        body='{"error":"x"}',
     )
-    with patch("routine_repo.get_current", return_value=ir), \
-         patch("routine_repo.put_versioned", side_effect=fake_put), \
-         patch("routine_repo.upsert_id_map") as upsert_mock, \
-         patch("hevy_template_cache.resolve_movement", return_value="55E6546B"), \
-         patch("routine_title.build_title_context", return_value={
-             "phase": "Foundation", "type_count_in_phase": 1,
-             "all_time_count": 1, "experiment_started": "2026-06-01"}), \
-         patch("hevy_write_client.create_routine", side_effect=orphan_exc):
+    with (
+        patch("routine_repo.get_current", return_value=ir),
+        patch("routine_repo.put_versioned", side_effect=fake_put),
+        patch("routine_repo.upsert_id_map") as upsert_mock,
+        patch("hevy_template_cache.resolve_movement", return_value="55E6546B"),
+        patch(
+            "routine_title.build_title_context",
+            return_value={"phase": "Foundation", "type_count_in_phase": 1, "all_time_count": 1, "experiment_started": "2026-06-01"},
+        ),
+        patch("hevy_write_client.create_routine", side_effect=orphan_exc),
+    ):
         result = t.tool_manage_hevy_routine({"action": "commit", "routine_id": "r-orphan"})
     assert "HEVY_ORPHAN_CREATED" in str(result)
     assert captured["last"].hevy_routine_id == "orphan-id"
@@ -104,10 +121,12 @@ def test_draft_custom_requires_exercises():
 
 
 def test_draft_custom_unknown_movement_errors_loudly():
-    out = t.tool_manage_hevy_routine({
-        "action": "draft_custom",
-        "exercises": [{"movement_key": "jetpack_press", "sets": [{"reps": 10}]}],
-    })
+    out = t.tool_manage_hevy_routine(
+        {
+            "action": "draft_custom",
+            "exercises": [{"movement_key": "jetpack_press", "sets": [{"reps": 10}]}],
+        }
+    )
     assert "MOVEMENT_UNMAPPABLE" in str(out) or out.get("error_code") == "MOVEMENT_UNMAPPABLE"
 
 
@@ -126,18 +145,21 @@ def test_draft_custom_builds_ir_lb_to_kg_count_and_supersets():
         "archetype": "push",
         "notes": "Day 1 push. Leave 1-2 RIR.",
         "exercises": [
-            {"movement_key": "barbell_bench_press", "rest_seconds": 165,
-             "notes": "warm up 45/95/135 first",
-             "sets": [{"weight_lbs": 155, "reps": 8}, {"weight_lbs": 185, "reps": 5}]},
+            {
+                "movement_key": "barbell_bench_press",
+                "rest_seconds": 165,
+                "notes": "warm up 45/95/135 first",
+                "sets": [{"weight_lbs": 155, "reps": 8}, {"weight_lbs": 185, "reps": 5}],
+            },
             # mapped by human title rather than movement_key
-            {"title": "Incline Bench Press (Dumbbell)",
-             "sets": [{"weight_lbs": 70, "reps": 8, "count": 3}]},
-            {"movement_key": "db_lateral_raise", "superset_id": 1,
-             "sets": [{"weight_lbs": 15, "rep_range_start": 15, "rep_range_end": 15, "count": 3}]},
-            {"movement_key": "reverse_pec_deck", "superset_id": 1,
-             "sets": [{"reps": 15, "count": 3}]},
-            {"movement_key": "cable_tricep_pushdown", "superset_id": 1,
-             "sets": [{"weight_lbs": 60, "reps": 12, "count": 3}]},
+            {"title": "Incline Bench Press (Dumbbell)", "sets": [{"weight_lbs": 70, "reps": 8, "count": 3}]},
+            {
+                "movement_key": "db_lateral_raise",
+                "superset_id": 1,
+                "sets": [{"weight_lbs": 15, "rep_range_start": 15, "rep_range_end": 15, "count": 3}],
+            },
+            {"movement_key": "reverse_pec_deck", "superset_id": 1, "sets": [{"reps": 15, "count": 3}]},
+            {"movement_key": "cable_tricep_pushdown", "superset_id": 1, "sets": [{"weight_lbs": 60, "reps": 12, "count": 3}]},
         ],
     }
     with patch("routine_repo.put_versioned", side_effect=fake_put):
@@ -165,8 +187,7 @@ def test_draft_custom_builds_ir_lb_to_kg_count_and_supersets():
 
     # superset id preserved across the tri-set
     triset = [b for b in ir.exercises if b.superset_id == 1]
-    assert {b.movement_key for b in triset} == {
-        "db_lateral_raise", "reverse_pec_deck", "cable_tricep_pushdown"}
+    assert {b.movement_key for b in triset} == {"db_lateral_raise", "reverse_pec_deck", "cable_tricep_pushdown"}
 
     # reverse_pec_deck has no weight, just reps
     rpd = next(b for b in ir.exercises if b.movement_key == "reverse_pec_deck")
@@ -184,22 +205,24 @@ def test_draft_custom_resolves_arbitrary_exercise_via_index():
 
     # Both movements are deliberately NOT in the curated catalog, so resolution
     # must fall through to the index (curated keys would short-circuit at step 2).
-    fake_index = {"burpee": {"id": "BB792A36", "title": "Burpee"},
-                  "mountain climber": {"id": "F49E31D6", "title": "Mountain Climber"}}
-    with patch("routine_repo.put_versioned", side_effect=fake_put), \
-         patch.object(t, "_template_index", return_value=fake_index):
-        out = t.tool_manage_hevy_routine({
-            "action": "draft_custom", "target_date": "2026-06-09", "archetype": "circuit",
-            "exercises": [
-                {"title": "Burpee", "sets": [{"reps": 15, "count": 3}], "superset_id": 1},
-                {"title": "Mountain Climber", "sets": [{"duration_seconds": 60}], "superset_id": 1},
-            ],
-        })
+    fake_index = {"burpee": {"id": "BB792A36", "title": "Burpee"}, "mountain climber": {"id": "F49E31D6", "title": "Mountain Climber"}}
+    with patch("routine_repo.put_versioned", side_effect=fake_put), patch.object(t, "_template_index", return_value=fake_index):
+        out = t.tool_manage_hevy_routine(
+            {
+                "action": "draft_custom",
+                "target_date": "2026-06-09",
+                "archetype": "circuit",
+                "exercises": [
+                    {"title": "Burpee", "sets": [{"reps": 15, "count": 3}], "superset_id": 1},
+                    {"title": "Mountain Climber", "sets": [{"duration_seconds": 60}], "superset_id": 1},
+                ],
+            }
+        )
     assert out["status"] == "drafted_custom"
     ir = captured["ir"]
     assert [b.movement_key for b in ir.exercises] == ["tmpl:BB792A36", "tmpl:F49E31D6"]
-    assert ir.exercises[0].rationale_tag == "Burpee"   # human label preserved
-    assert len(ir.exercises[0].sets) == 3              # count expansion
+    assert ir.exercises[0].rationale_tag == "Burpee"  # human label preserved
+    assert len(ir.exercises[0].sets) == 3  # count expansion
     assert ir.exercises[1].sets[0].duration_seconds == 60
 
 
@@ -211,12 +234,14 @@ def test_make_resolver_short_circuits_tmpl_keys():
 def test_draft_custom_unknown_offers_index_suggestions():
     """A near-miss title fails loudly but suggests close index titles."""
     fake_index = {"bench press (barbell)": {"id": "79D0BB3A", "title": "Bench Press (Barbell)"}}
-    with patch.object(t, "_template_index", return_value=fake_index), \
-         patch.object(t, "_live_template_id_by_title", return_value=None):
-        out = t.tool_manage_hevy_routine({
-            "action": "draft_custom", "create_missing": False,
-            "exercises": [{"title": "barbell bench zzz", "sets": [{"reps": 5}]}],
-        })
+    with patch.object(t, "_template_index", return_value=fake_index), patch.object(t, "_live_template_id_by_title", return_value=None):
+        out = t.tool_manage_hevy_routine(
+            {
+                "action": "draft_custom",
+                "create_missing": False,
+                "exercises": [{"title": "barbell bench zzz", "sets": [{"reps": 5}]}],
+            }
+        )
     assert "MOVEMENT_UNMAPPABLE" in str(out)
     assert "Bench Press (Barbell)" in str(out)
 
@@ -237,24 +262,33 @@ def test_draft_custom_auto_creates_missing_exercise():
         return body["exercise"]["title"]  # Hevy returns a bare id-ish string
 
     # live lookup MISSES during resolution, then HITS on the post-create reconcile
-    with patch("routine_repo.put_versioned", side_effect=fake_put), \
-         patch.object(t, "_template_index", return_value={}), \
-         patch("hevy_write_client.create_template", side_effect=fake_create), \
-         patch.object(t, "_live_template_id_by_title", side_effect=[None, "NEWID123"]):
-        out = t.tool_manage_hevy_routine({
-            "action": "draft_custom", "archetype": "push",
-            "exercises": [
-                {"title": "Landmine Snatch", "equipment_category": "barbell",
-                 "muscle_group": "full_body", "sets": [{"weight_lbs": 95, "reps": 5}]},
-            ],
-        })
+    with (
+        patch("routine_repo.put_versioned", side_effect=fake_put),
+        patch.object(t, "_template_index", return_value={}),
+        patch("hevy_write_client.create_template", side_effect=fake_create),
+        patch.object(t, "_live_template_id_by_title", side_effect=[None, "NEWID123"]),
+    ):
+        out = t.tool_manage_hevy_routine(
+            {
+                "action": "draft_custom",
+                "archetype": "push",
+                "exercises": [
+                    {
+                        "title": "Landmine Snatch",
+                        "equipment_category": "barbell",
+                        "muscle_group": "full_body",
+                        "sets": [{"weight_lbs": 95, "reps": 5}],
+                    },
+                ],
+            }
+        )
     assert out["status"] == "drafted_custom"
     assert len(create_calls) == 1
     body = create_calls[0]["exercise"]
     assert body["title"] == "Landmine Snatch"
-    assert body["muscle_group"] == "full_body"           # explicit override honored
+    assert body["muscle_group"] == "full_body"  # explicit override honored
     assert body["equipment_category"] == "barbell"
-    assert body["exercise_type"] == "weight_reps"        # inferred from weight+reps
+    assert body["exercise_type"] == "weight_reps"  # inferred from weight+reps
     assert out["created_exercises"][0]["id"] == "NEWID123"
     assert captured["ir"].exercises[0].movement_key == "tmpl:NEWID123"
 
@@ -262,13 +296,17 @@ def test_draft_custom_auto_creates_missing_exercise():
 def test_draft_custom_does_not_create_from_bare_movement_key():
     """A bare unresolved movement_key (no human title) is treated as a likely typo —
     never auto-created — even with create_missing on."""
-    with patch("hevy_write_client.create_template") as create_mock, \
-         patch.object(t, "_template_index", return_value={}), \
-         patch.object(t, "_live_template_id_by_title", return_value=None):
-        out = t.tool_manage_hevy_routine({
-            "action": "draft_custom",
-            "exercises": [{"movement_key": "jetpack_press", "sets": [{"reps": 5}]}],
-        })
+    with (
+        patch("hevy_write_client.create_template") as create_mock,
+        patch.object(t, "_template_index", return_value={}),
+        patch.object(t, "_live_template_id_by_title", return_value=None),
+    ):
+        out = t.tool_manage_hevy_routine(
+            {
+                "action": "draft_custom",
+                "exercises": [{"movement_key": "jetpack_press", "sets": [{"reps": 5}]}],
+            }
+        )
     create_mock.assert_not_called()
     assert "MOVEMENT_UNMAPPABLE" in str(out)
 
@@ -285,17 +323,20 @@ def test_dry_run_falls_back_to_reconcile_by_title():
     """A movement without a template-id hint resolves via the live Hevy
     template list (reconcile_custom), not a loud failure."""
     from hevy_template_cache import MovementUnmappable
+
     ir = RoutineSpec(
-        routine_id="r-custom", target_date="2026-06-01", archetype="push",
+        routine_id="r-custom",
+        target_date="2026-06-01",
+        archetype="push",
         source_action="draft_custom",
-        exercises=[ExerciseBlock(movement_key="barbell_bench_press",
-                                 sets=[Set(weight_kg=70.3, reps=5)])],
+        exercises=[ExerciseBlock(movement_key="barbell_bench_press", sets=[Set(weight_kg=70.3, reps=5)])],
     )
-    with patch("routine_repo.get_current", return_value=ir), \
-         patch("hevy_template_cache.resolve_movement",
-               side_effect=MovementUnmappable("no hint")), \
-         patch("hevy_template_cache.reconcile_custom", return_value="79D0BB3A") as rec, \
-         patch("hevy_write_client.list_templates"):
+    with (
+        patch("routine_repo.get_current", return_value=ir),
+        patch("hevy_template_cache.resolve_movement", side_effect=MovementUnmappable("no hint")),
+        patch("hevy_template_cache.reconcile_custom", return_value="79D0BB3A") as rec,
+        patch("hevy_write_client.list_templates"),
+    ):
         out = t.tool_manage_hevy_routine({"action": "dry_run", "routine_id": "r-custom"})
     assert out["status"] == "preview"
     rec.assert_called_once()
@@ -305,13 +346,17 @@ def test_dry_run_falls_back_to_reconcile_by_title():
 
 def test_archive_local_only_when_never_pushed():
     ir = RoutineSpec(
-        routine_id="r-2", target_date="2026-06-01", archetype="upper",
+        routine_id="r-2",
+        target_date="2026-06-01",
+        archetype="upper",
         hevy_routine_id=None,
         exercises=[],
     )
-    with patch("routine_repo.get_current", return_value=ir), \
-         patch("routine_repo.put_versioned"), \
-         patch("hevy_write_client.list_folders") as folders_mock:
+    with (
+        patch("routine_repo.get_current", return_value=ir),
+        patch("routine_repo.put_versioned"),
+        patch("hevy_write_client.list_folders") as folders_mock,
+    ):
         result = t.tool_manage_hevy_routine({"action": "archive", "routine_id": "r-2"})
     folders_mock.assert_not_called()
     assert result["status"] == "archived_local_only"

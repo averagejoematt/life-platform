@@ -13,9 +13,10 @@ migration plan; do not change the integer without updating routine_repo.py.
 
 Per SPEC_HEVY_ROUTINE_WRITELOOP_2026_05_31 §3 + PREREQS §B.
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from decimal import Decimal
 from typing import Any
 

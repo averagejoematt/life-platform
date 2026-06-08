@@ -64,12 +64,11 @@ def fetch_withings_for(target_date: str) -> dict:
     item = r.get("Item")
     if not item:
         raise RuntimeError(
-            f"No Withings reading found for {target_date}. "
-            f"Either wait for the morning sync or pass --override-weight-lbs."
+            f"No Withings reading found for {target_date}. " f"Either wait for the morning sync or pass --override-weight-lbs."
         )
     return {
         "weight_lbs": float(item["weight_lbs"]),
-        "weight_kg":  float(item["weight_kg"]),
+        "weight_kg": float(item["weight_kg"]),
         "measurement_utc": item.get("measurement_time_utc"),
     }
 
@@ -82,12 +81,12 @@ def update_ddb_profile(target_date: str, weight_lbs: float, apply: bool):
     if not apply:
         return
     from decimal import Decimal
+
     ddb = boto3.resource("dynamodb", region_name=REGION)
     t = ddb.Table(TABLE)
     t.update_item(
         Key={"pk": f"USER#{USER}", "sk": "PROFILE#v1"},
-        UpdateExpression="SET journey_start_weight_lbs = :w, journey_start_date = :d, "
-                          "baseline_weight_lbs = :w, baseline_date = :d",
+        UpdateExpression="SET journey_start_weight_lbs = :w, journey_start_date = :d, " "baseline_weight_lbs = :w, baseline_date = :d",
         ExpressionAttributeValues={
             ":w": Decimal(str(weight_lbs)),
             ":d": target_date,
@@ -104,6 +103,7 @@ def bust_lambda_warm_cache(apply: bool):
     if not apply:
         return
     from datetime import datetime as _dt
+
     bust_val = _dt.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
     targets = ["life-platform-site-api", "life-platform-site-api-ai", "site-stats-refresh"]
     lam = boto3.client("lambda", region_name=REGION)
@@ -186,9 +186,13 @@ def main():
     parser.add_argument("--override-weight-kg", type=float, help="Override kg too (computed from lbs if absent)")
     parser.add_argument("--skip-deploy", action="store_true", help="Skip CDK deploy step (use if you just deployed)")
     parser.add_argument("--skip-chronicle", action="store_true", help="Skip chronicle handler (rerunning is generally fine)")
-    parser.add_argument("--keep-chronicle", action="append", default=[],
-                        help="Chronicle DDB sk to keep across the restart, re-dated as a pre-genesis "
-                             "lead-in (repeatable, max 2). e.g. --keep-chronicle DATE#2026-02-28")
+    parser.add_argument(
+        "--keep-chronicle",
+        action="append",
+        default=[],
+        help="Chronicle DDB sk to keep across the restart, re-dated as a pre-genesis "
+        "lead-in (repeatable, max 2). e.g. --keep-chronicle DATE#2026-02-28",
+    )
     args = parser.parse_args()
 
     # Resolve target genesis
@@ -196,6 +200,7 @@ def main():
         target = args.genesis
     else:
         from lambdas.constants import EXPERIMENT_START_DATE
+
         target = EXPERIMENT_START_DATE
     print(f"\n╔══ restart_pipeline ══╗")
     print(f"║ target genesis: {target}")
@@ -206,7 +211,7 @@ def main():
     if args.override_weight_lbs:
         wt = {
             "weight_lbs": args.override_weight_lbs,
-            "weight_kg":  args.override_weight_kg or round(args.override_weight_lbs / 2.20462, 3),
+            "weight_kg": args.override_weight_kg or round(args.override_weight_lbs / 2.20462, 3),
             "measurement_utc": None,
         }
         print(f"\n[1] Withings override: {wt['weight_lbs']} lbs / {wt['weight_kg']} kg")
@@ -244,7 +249,9 @@ def main():
             # layer, so all of them need to redeploy when constants change.
             cdk_proc = subprocess.run(
                 ["npx", "cdk", "deploy", "--all", "--require-approval", "never"],
-                cwd=REPO_ROOT / "cdk", capture_output=True, text=True,
+                cwd=REPO_ROOT / "cdk",
+                capture_output=True,
+                text=True,
             )
             log.append(f"=== cdk_deploy === (exit {cdk_proc.returncode})")
             log.append(cdk_proc.stdout[-2000:] if cdk_proc.stdout else "")
@@ -258,12 +265,12 @@ def main():
 
     # Step 6-11: all the restart sub-scripts
     sub_scripts = [
-        ("restart_phase_tag",         ["python3", "deploy/restart_phase_tag.py", "--apply"]),
+        ("restart_phase_tag", ["python3", "deploy/restart_phase_tag.py", "--apply"]),
         ("restart_intelligence_wipe", ["python3", "deploy/restart_intelligence_wipe.py", "--apply"]),
-        ("restart_ledger_reset",      ["python3", "deploy/restart_ledger_reset.py", "--apply"]),
+        ("restart_ledger_reset", ["python3", "deploy/restart_ledger_reset.py", "--apply"]),
         ("restart_character_rebuild", ["python3", "deploy/restart_character_rebuild.py", "--apply"]),
-        ("restart_site_copy_sync",    ["python3", "deploy/restart_site_copy_sync.py", "--apply"]),
-        ("restart_docs_update",       ["python3", "deploy/restart_docs_update.py", "--apply"]),
+        ("restart_site_copy_sync", ["python3", "deploy/restart_site_copy_sync.py", "--apply"]),
+        ("restart_docs_update", ["python3", "deploy/restart_docs_update.py", "--apply"]),
     ]
     if not args.skip_chronicle:
         chron_cmd = ["python3", "deploy/restart_chronicle_handler.py", "--apply"]
@@ -287,10 +294,9 @@ def main():
     if args.apply:
         print(f"\n[verify] restart_verify_rendered.py (hard gate)")
         import time
+
         time.sleep(30)  # let CloudFront invalidation propagate before we curl
-        verify_rc = run_step("restart_verify_rendered",
-                              ["python3", "deploy/restart_verify_rendered.py"],
-                              True, log)
+        verify_rc = run_step("restart_verify_rendered", ["python3", "deploy/restart_verify_rendered.py"], True, log)
         if verify_rc != 0:
             print(f"\n⚠ VERIFY GATE FAILED — public surfaces still show stale tokens.")
             print(f"   Check docs/restart/_verify_rendered_report.txt for the failing URLs.")
@@ -304,8 +310,7 @@ def main():
         f"restart_pipeline report — target={target} — mode={'APPLY' if args.apply else 'DRY-RUN'}\n"
         f"generated={datetime.now(timezone.utc).isoformat()}\n\n"
         f"baseline_weight_lbs = {wt['weight_lbs']}\n"
-        f"baseline_weight_kg  = {wt['weight_kg']}\n\n"
-        + "\n".join(log)
+        f"baseline_weight_kg  = {wt['weight_kg']}\n\n" + "\n".join(log)
     )
     print(f"\n══ pipeline {'COMPLETE' if args.apply else 'DRY-RUN COMPLETE'} ══")
     print(f"Report: docs/restart/_pipeline_report.txt")

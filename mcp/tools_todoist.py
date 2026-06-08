@@ -2,18 +2,20 @@
 Todoist tools: task completion trends, load analysis, project activity, decision fatigue signal.
 Write tools: create_todoist_task, update_todoist_task, close_todoist_task, get_todoist_projects.
 """
+
 import json
 import logging
 import os
-import urllib.request
-import urllib.parse
 import urllib.error
-import boto3
-from datetime import datetime, timedelta, timezone
+import urllib.parse
+import urllib.request
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
+
+import boto3
 
 from mcp.config import USER_PREFIX, logger
-from mcp.core import query_source, decimal_to_float
+from mcp.core import decimal_to_float, query_source
 from mcp.helpers import pearson_r
 
 # ── Todoist API client ────────────────────────────────────────────────────────
@@ -79,7 +81,9 @@ def _list_all_tasks(filter_str=None):
             break
     return all_tasks
 
+
 # ── Helpers ──────────────────────────────────────────────────────────────────
+
 
 def _get_todoist_range(days=30):
     """Fetch todoist records for the last N days. Returns list of day items."""
@@ -93,12 +97,13 @@ def _rolling_avg(series, window=7):
     result = []
     values = [v for _, v in series]
     for i, (date, val) in enumerate(series):
-        window_vals = values[max(0, i - window + 1): i + 1]
+        window_vals = values[max(0, i - window + 1) : i + 1]
         result.append((date, round(sum(window_vals) / len(window_vals), 1)))
     return result
 
 
 # ── Tools ─────────────────────────────────────────────────────────────────────
+
 
 def get_task_completion_trend(days: int = 30):
     """
@@ -140,10 +145,7 @@ def get_task_completion_trend(days: int = 30):
                 "zero_completion_days": zero_days,
                 "current_completion_streak": streak,
             },
-            "daily_series": [
-                {"date": d, "completed": v, "rolling_7d_avg": r}
-                for (d, v), (_, r) in zip(series, rolling)
-            ],
+            "daily_series": [{"date": d, "completed": v, "rolling_7d_avg": r} for (d, v), (_, r) in zip(series, rolling)],
         }
     except Exception as e:
         logger.error(f"get_task_completion_trend error: {e}")
@@ -287,13 +289,13 @@ def get_decision_fatigue_signal(days: int = 30):
                 "error": "No habit_scores data available — Habitify integration required for full analysis",
                 "todoist_summary": {
                     "days_with_data": len(todo_by_date),
-                    "avg_active_tasks": round(
-                        sum(v["active"] for v in todo_by_date.values()) / len(todo_by_date), 1
-                    ) if todo_by_date else 0,
-                    "avg_overdue_tasks": round(
-                        sum(v["overdue"] for v in todo_by_date.values()) / len(todo_by_date), 1
-                    ) if todo_by_date else 0,
-                }
+                    "avg_active_tasks": (
+                        round(sum(v["active"] for v in todo_by_date.values()) / len(todo_by_date), 1) if todo_by_date else 0
+                    ),
+                    "avg_overdue_tasks": (
+                        round(sum(v["overdue"] for v in todo_by_date.values()) / len(todo_by_date), 1) if todo_by_date else 0
+                    ),
+                },
             }
 
         habit_by_date = {}
@@ -320,12 +322,10 @@ def get_decision_fatigue_signal(days: int = 30):
         sorted_by_load = sorted(zip(load_series, habit_series), key=lambda x: x[0])
         median_load = sorted_by_load[len(sorted_by_load) // 2][0]
         low_load_habit_avg = round(
-            sum(h for l, h in sorted_by_load if l <= median_load) /
-            max(sum(1 for l, _ in sorted_by_load if l <= median_load), 1), 1
+            sum(h for l, h in sorted_by_load if l <= median_load) / max(sum(1 for l, _ in sorted_by_load if l <= median_load), 1), 1
         )
         high_load_habit_avg = round(
-            sum(h for l, h in sorted_by_load if l > median_load) /
-            max(sum(1 for l, _ in sorted_by_load if l > median_load), 1), 1
+            sum(h for l, h in sorted_by_load if l > median_load) / max(sum(1 for l, _ in sorted_by_load if l > median_load), 1), 1
         )
 
         return {
@@ -336,9 +336,11 @@ def get_decision_fatigue_signal(days: int = 30):
                 "interpretation": (
                     "Strong negative: high task load reliably suppresses habits"
                     if r_load_habits < -0.4
-                    else "Moderate negative: task load may affect habits"
-                    if r_load_habits < -0.2
-                    else "Weak relationship — task load not strongly affecting habits"
+                    else (
+                        "Moderate negative: task load may affect habits"
+                        if r_load_habits < -0.2
+                        else "Weak relationship — task load not strongly affecting habits"
+                    )
                 ),
             },
             "load_threshold_analysis": {
@@ -396,6 +398,7 @@ def get_todoist_day(date: str = None):
 
 # ── Write tools ────────────────────────────────────────────────────────────────────
 
+
 def get_todoist_projects(args=None):
     """
     List all Todoist projects with their IDs and names.
@@ -406,12 +409,7 @@ def get_todoist_projects(args=None):
     try:
         result = _todoist_request("GET", "/projects")
         projects = result.get("items", result.get("results", result)) if isinstance(result, dict) else result
-        return {
-            "projects": [
-                {"id": str(p.get("id", "")), "name": p.get("name", ""), "color": p.get("color", "")}
-                for p in projects
-            ]
-        }
+        return {"projects": [{"id": str(p.get("id", "")), "name": p.get("name", ""), "color": p.get("color", "")} for p in projects]}
     except Exception as e:
         logger.error(f"get_todoist_projects error: {e}")
         return {"error": str(e)}
@@ -447,9 +445,15 @@ def list_todoist_tasks(filter_str: str = None, limit: int = 200):
         return {"error": str(e)}
 
 
-def update_todoist_task(task_id: str, due_string: str = None, due_date: str = None,
-                        content: str = None, description: str = None,
-                        priority: int = None, project_id: str = None):
+def update_todoist_task(
+    task_id: str,
+    due_string: str = None,
+    due_date: str = None,
+    content: str = None,
+    description: str = None,
+    priority: int = None,
+    project_id: str = None,
+):
     """
     Update an existing Todoist task. Provide task_id plus any fields to change.
     due_string: Todoist natural language e.g. 'every! week', 'every! month', 'Mar 15 every! month'.
@@ -488,9 +492,15 @@ def update_todoist_task(task_id: str, due_string: str = None, due_date: str = No
         return {"error": str(e)}
 
 
-def create_todoist_task(content: str, project_id: str = None, due_string: str = None,
-                        due_date: str = None, priority: int = 4, description: str = None,
-                        labels: list = None):
+def create_todoist_task(
+    content: str,
+    project_id: str = None,
+    due_string: str = None,
+    due_date: str = None,
+    priority: int = 4,
+    description: str = None,
+    labels: list = None,
+):
     """
     Create a new Todoist task.
     content:    Task name/title.
@@ -563,6 +573,9 @@ def tool_get_todoist_snapshot(args):
     }
     view = (args.get("view") or "load").lower().strip()
     if view not in VALID_VIEWS:
-        return {"error": f"Unknown view '{view}'.", "valid_views": list(VALID_VIEWS.keys()),
-                "hint": "'load' for current task load snapshot + cognitive load signal, 'today' for full Todoist day summary."}
+        return {
+            "error": f"Unknown view '{view}'.",
+            "valid_views": list(VALID_VIEWS.keys()),
+            "hint": "'load' for current task load snapshot + cognitive load signal, 'today' for full Todoist day summary.",
+        }
     return VALID_VIEWS[view](args)

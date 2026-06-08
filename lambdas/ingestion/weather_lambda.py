@@ -11,16 +11,20 @@ Schedule: EventBridge, runs before Daily Brief (same schedule as weather_lambda)
 
 SIMP-2 v1.0.0 — Proof of concept migration (2026-03-09)
 """
+
 import json
 import os
 import urllib.request
+
 from ingestion_framework import IngestionConfig, run_ingestion
 
 try:
     from platform_logger import get_logger
+
     logger = get_logger("weather-ingestion")
 except ImportError:
     import logging
+
     logger = logging.getLogger("weather-ingestion")
 
 # ── Seattle coordinates ──
@@ -30,10 +34,10 @@ LON = float(os.environ.get("WEATHER_LON", "-122.3321"))
 # ── Framework config ──
 config = IngestionConfig(
     source_name="weather",
-    secret_id=None,               # No auth needed — Open-Meteo is public
+    secret_id=None,  # No auth needed — Open-Meteo is public
     s3_archive_prefix="raw/weather",
     schema_version=1,
-    enable_gap_detection=False,   # Weather runs yesterday+today by default
+    enable_gap_detection=False,  # Weather runs yesterday+today by default
 )
 
 _OPEN_METEO_FIELDS = (
@@ -44,6 +48,7 @@ _OPEN_METEO_FIELDS = (
 
 
 # ── Source callbacks ──────────────────────────────────────────────────────────
+
 
 def authenticate(secret_data):
     """No authentication required for Open-Meteo."""
@@ -78,18 +83,18 @@ def transform(raw, date_str):
     sunshine_secs = daily.get("sunshine_duration", [None])[i] or 0
 
     record = {
-        "source":             "weather",
-        "date":               date_str,
-        "temp_high_f":        daily.get("temperature_2m_max",        [None])[i],
-        "temp_low_f":         daily.get("temperature_2m_min",        [None])[i],
-        "temp_avg_f":         daily.get("temperature_2m_mean",       [None])[i],
-        "humidity_pct":       daily.get("relative_humidity_2m_mean", [None])[i],
-        "precipitation_mm":   daily.get("precipitation_sum",         [None])[i],
-        "wind_speed_max_mph": daily.get("wind_speed_10m_max",        [None])[i],
-        "pressure_hpa":       daily.get("surface_pressure_mean",     [None])[i],
-        "daylight_hours":     round(daylight_secs / 3600, 2),
-        "sunshine_hours":     round(sunshine_secs / 3600, 2),
-        "uv_index_max":       daily.get("uv_index_max",              [None])[i],
+        "source": "weather",
+        "date": date_str,
+        "temp_high_f": daily.get("temperature_2m_max", [None])[i],
+        "temp_low_f": daily.get("temperature_2m_min", [None])[i],
+        "temp_avg_f": daily.get("temperature_2m_mean", [None])[i],
+        "humidity_pct": daily.get("relative_humidity_2m_mean", [None])[i],
+        "precipitation_mm": daily.get("precipitation_sum", [None])[i],
+        "wind_speed_max_mph": daily.get("wind_speed_10m_max", [None])[i],
+        "pressure_hpa": daily.get("surface_pressure_mean", [None])[i],
+        "daylight_hours": round(daylight_secs / 3600, 2),
+        "sunshine_hours": round(sunshine_secs / 3600, 2),
+        "uv_index_max": daily.get("uv_index_max", [None])[i],
     }
 
     # Strip None values (missing fields)
@@ -97,6 +102,7 @@ def transform(raw, date_str):
 
 
 # ── Lambda entry point ────────────────────────────────────────────────────────
+
 
 def lambda_handler(event, context):
     if event.get("healthcheck"):

@@ -16,14 +16,19 @@ v1.0.0 — 2026-03-07
 
 import json
 from datetime import datetime, timedelta, timezone
-from mcp.config import table as _table_ref, USER_ID as _user_id_ref
+
+from mcp.config import USER_ID as _user_id_ref
+from mcp.config import table as _table_ref
 from mcp.core import decimal_to_float as _d2f
+
 
 def _get_table():
     return _table_ref
 
+
 def _get_user_id():
     return _user_id_ref
+
 
 DECISIONS_SOURCE = "decisions"
 
@@ -35,6 +40,7 @@ def _decisions_pk():
 # ==============================================================================
 # TOOL FUNCTIONS (must be defined BEFORE TOOLS dict in registry.py)
 # ==============================================================================
+
 
 def tool_log_decision(args):
     """Log a platform-guided decision.
@@ -99,13 +105,18 @@ def tool_get_decisions(args):
     outcome_only = args.get("outcome_only", False)
 
     from boto3.dynamodb.conditions import Key
+
     from mcp.core import _apply_phase_filter  # ADR-058
 
-    resp = table.query(**_apply_phase_filter({
-        "KeyConditionExpression": Key("pk").eq(_decisions_pk()) & Key("sk").begins_with("DECISION#"),
-        "ScanIndexForward": False,
-        "Limit": 100,
-    }))
+    resp = table.query(
+        **_apply_phase_filter(
+            {
+                "KeyConditionExpression": Key("pk").eq(_decisions_pk()) & Key("sk").begins_with("DECISION#"),
+                "ScanIndexForward": False,
+                "Limit": 100,
+            }
+        )
+    )
     items = resp.get("Items", [])
 
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
@@ -128,37 +139,44 @@ def tool_get_decisions(args):
     follow_effective = [i for i in effective if i.get("followed") is True]
     override_effective = [i for i in effective if i.get("followed") is False]
 
-    follow_score = (sum(i.get("effectiveness", 0) for i in follow_effective) / len(follow_effective)
-                    if follow_effective else None)
-    override_score = (sum(i.get("effectiveness", 0) for i in override_effective) / len(override_effective)
-                      if override_effective else None)
+    follow_score = sum(i.get("effectiveness", 0) for i in follow_effective) / len(follow_effective) if follow_effective else None
+    override_score = sum(i.get("effectiveness", 0) for i in override_effective) / len(override_effective) if override_effective else None
 
-    return _d2f({
-        "total_decisions": total,
-        "followed": followed_count,
-        "overridden": overridden_count,
-        "pending_followup": total - with_outcome,
-        "trust_calibration": {
-            "follow_effectiveness": round(follow_score, 2) if follow_score is not None else "insufficient data",
-            "override_effectiveness": round(override_score, 2) if override_score is not None else "insufficient data",
-            "recommendation": (
-                "Trust the platform" if (follow_score or 0) > (override_score or 0)
-                else "Your overrides are working well" if override_score and (override_score > (follow_score or 0))
-                else "Need more outcome data to calibrate"
-            ),
-        },
-        "decisions": [{
-            "date": i.get("date"),
-            "decision": i.get("decision"),
-            "source": i.get("source"),
-            "followed": i.get("followed"),
-            "override_reason": i.get("override_reason"),
-            "outcome_metric": i.get("outcome_metric"),
-            "outcome_delta": i.get("outcome_delta"),
-            "outcome_notes": i.get("outcome_notes"),
-            "effectiveness": i.get("effectiveness"),
-        } for i in items[:20]],
-    })
+    return _d2f(
+        {
+            "total_decisions": total,
+            "followed": followed_count,
+            "overridden": overridden_count,
+            "pending_followup": total - with_outcome,
+            "trust_calibration": {
+                "follow_effectiveness": round(follow_score, 2) if follow_score is not None else "insufficient data",
+                "override_effectiveness": round(override_score, 2) if override_score is not None else "insufficient data",
+                "recommendation": (
+                    "Trust the platform"
+                    if (follow_score or 0) > (override_score or 0)
+                    else (
+                        "Your overrides are working well"
+                        if override_score and (override_score > (follow_score or 0))
+                        else "Need more outcome data to calibrate"
+                    )
+                ),
+            },
+            "decisions": [
+                {
+                    "date": i.get("date"),
+                    "decision": i.get("decision"),
+                    "source": i.get("source"),
+                    "followed": i.get("followed"),
+                    "override_reason": i.get("override_reason"),
+                    "outcome_metric": i.get("outcome_metric"),
+                    "outcome_delta": i.get("outcome_delta"),
+                    "outcome_notes": i.get("outcome_notes"),
+                    "effectiveness": i.get("effectiveness"),
+                }
+                for i in items[:20]
+            ],
+        }
+    )
 
 
 def tool_update_decision_outcome(args):

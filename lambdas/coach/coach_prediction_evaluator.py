@@ -38,12 +38,12 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-
 from phase_filter import with_phase_filter  # ADR-058
 
 # ── Structured logger ────────────────────────────────────────────────────────
 try:
     from platform_logger import get_logger
+
     logger = get_logger("coach-prediction-evaluator")
 except ImportError:
     logger = logging.getLogger("coach-prediction-evaluator")
@@ -59,9 +59,14 @@ ALGO_VERSION = "1.0"
 
 # Coach IDs — exhaustive list of all coaches that can issue predictions
 COACH_IDS = [
-    "sleep_coach", "nutrition_coach", "training_coach",
-    "mind_coach", "physical_coach", "glucose_coach",
-    "labs_coach", "explorer_coach",
+    "sleep_coach",
+    "nutrition_coach",
+    "training_coach",
+    "mind_coach",
+    "physical_coach",
+    "glucose_coach",
+    "labs_coach",
+    "explorer_coach",
 ]
 
 # Metric → DynamoDB source mapping
@@ -102,28 +107,45 @@ DOMAIN_MIN_WINDOWS = {
 # Map subdomains to their domain category for window enforcement
 SUBDOMAIN_TO_DOMAIN = {
     # sleep_coach
-    "sleep_quality": "sleep", "sleep_duration": "sleep",
-    "sleep_efficiency": "sleep", "deep_sleep": "sleep", "rem_sleep": "sleep",
+    "sleep_quality": "sleep",
+    "sleep_duration": "sleep",
+    "sleep_efficiency": "sleep",
+    "deep_sleep": "sleep",
+    "rem_sleep": "sleep",
     # nutrition_coach
-    "caloric_intake": "nutrition", "protein_intake": "nutrition",
-    "macros": "nutrition", "meal_timing": "nutrition",
+    "caloric_intake": "nutrition",
+    "protein_intake": "nutrition",
+    "macros": "nutrition",
+    "meal_timing": "nutrition",
     # training_coach
-    "training_load": "training", "training_frequency": "training",
-    "strength": "training", "endurance": "training",
-    "performance": "training", "cardio": "training",
+    "training_load": "training",
+    "training_frequency": "training",
+    "strength": "training",
+    "endurance": "training",
+    "performance": "training",
+    "cardio": "training",
     # mind_coach
-    "mood": "mood", "stress": "mental", "focus": "mental",
+    "mood": "mood",
+    "stress": "mental",
+    "focus": "mental",
     "mindfulness": "mental",
     # physical_coach
-    "body_composition": "body_composition", "weight": "body_composition",
-    "body_fat": "body_composition", "muscle_mass": "body_composition",
+    "body_composition": "body_composition",
+    "weight": "body_composition",
+    "body_fat": "body_composition",
+    "muscle_mass": "body_composition",
     "mobility": "training",
     # glucose_coach
-    "glucose_control": "glucose", "glucose_variability": "glucose",
-    "fasting_glucose": "glucose", "postprandial": "glucose",
+    "glucose_control": "glucose",
+    "glucose_variability": "glucose",
+    "fasting_glucose": "glucose",
+    "postprandial": "glucose",
     # labs_coach
-    "cholesterol": "labs", "hormones": "labs", "inflammation": "labs",
-    "vitamins": "labs", "metabolic": "labs",
+    "cholesterol": "labs",
+    "hormones": "labs",
+    "inflammation": "labs",
+    "vitamins": "labs",
+    "metabolic": "labs",
     # explorer_coach
     "cross_domain": "training",  # default conservative window
 }
@@ -149,6 +171,7 @@ table = dynamodb.Table(TABLE_NAME)
 # =============================================================================
 # HELPERS
 # =============================================================================
+
 
 def _decimal_to_float(obj):
     """Recursively convert DynamoDB Decimal values to Python float."""
@@ -198,13 +221,14 @@ def _decimalize_dict(d):
 
 def _slugify(text):
     """Create a URL-safe slug from text for LEARNING# sort keys."""
-    slug = re.sub(r'[^a-z0-9]+', '-', text.lower().strip())
-    return slug[:60].strip('-')
+    slug = re.sub(r"[^a-z0-9]+", "-", text.lower().strip())
+    return slug[:60].strip("-")
 
 
 # =============================================================================
 # DATA FETCHING
 # =============================================================================
+
 
 def _fetch_range(source, start_date, end_date):
     """Paginated DynamoDB query for source records in a date range."""
@@ -214,8 +238,8 @@ def _fetch_range(source, start_date, end_date):
             "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
             "ExpressionAttributeValues": {
                 ":pk": USER_PREFIX + source,
-                ":s":  "DATE#" + start_date,
-                ":e":  "DATE#" + end_date,
+                ":s": "DATE#" + start_date,
+                ":e": "DATE#" + end_date,
             },
         }
         while True:
@@ -226,8 +250,7 @@ def _fetch_range(source, start_date, end_date):
             kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
         return records
     except Exception as e:
-        logger.warning("fetch_range(%s, %s -> %s) failed: %s",
-                       source, start_date, end_date, e)
+        logger.warning("fetch_range(%s, %s -> %s) failed: %s", source, start_date, end_date, e)
         return []
 
 
@@ -244,7 +267,7 @@ def _fetch_predictions():
             kwargs = {
                 "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
                 "ExpressionAttributeValues": {
-                    ":pk":     f"COACH#{coach_id}",
+                    ":pk": f"COACH#{coach_id}",
                     ":prefix": "PREDICTION#",
                 },
             }
@@ -268,6 +291,7 @@ def _fetch_predictions():
 # =============================================================================
 # METRIC RESOLUTION
 # =============================================================================
+
 
 def _extract_metric_series(records, metric):
     """
@@ -296,7 +320,7 @@ def _resolve_metric_value(metric_key, data_cache, end_date):
     # Handle computed aggregate metrics
     for suffix, days in [("_30day_avg", 30), ("_14day_avg", 14), ("_7day_avg", 7)]:
         if metric_key.endswith(suffix):
-            base_metric = metric_key[:-len(suffix)]
+            base_metric = metric_key[: -len(suffix)]
             return _compute_metric_average(base_metric, data_cache, end_date, days)
 
     # Raw metric — get most recent value from last 7 days
@@ -355,7 +379,7 @@ def _compute_ewma(values, decay):
     if not values:
         return None
     n = len(values)
-    weights = [(1 - decay) * (decay ** i) for i in range(n - 1, -1, -1)]
+    weights = [(1 - decay) * (decay**i) for i in range(n - 1, -1, -1)]
     weight_sum = sum(weights)
     if weight_sum == 0:
         return None
@@ -374,7 +398,7 @@ def _get_ewma_trend(metric_key, data_cache, end_date):
         # Try stripping common suffixes
         for suffix in ["_7day_avg", "_14day_avg", "_30day_avg"]:
             if metric_key.endswith(suffix):
-                source = METRIC_SOURCES.get(metric_key[:-len(suffix)])
+                source = METRIC_SOURCES.get(metric_key[: -len(suffix)])
                 break
     if not source:
         return None, None
@@ -383,7 +407,7 @@ def _get_ewma_trend(metric_key, data_cache, end_date):
     base_metric = metric_key
     for suffix in ["_7day_avg", "_14day_avg", "_30day_avg"]:
         if base_metric.endswith(suffix):
-            base_metric = base_metric[:-len(suffix)]
+            base_metric = base_metric[: -len(suffix)]
             break
 
     series = _extract_metric_series(records, base_metric)
@@ -415,16 +439,17 @@ def _get_ewma_trend(metric_key, data_cache, end_date):
 # EVALUATION LOGIC
 # =============================================================================
 
+
 def _evaluate_condition(actual, condition, threshold):
     """Evaluate a prediction condition against a threshold."""
     if actual is None or threshold is None:
         return None  # Inconclusive — missing data
     cond_map = {
-        "gt":  actual > threshold,
+        "gt": actual > threshold,
         "gte": actual >= threshold,
-        "lt":  actual < threshold,
+        "lt": actual < threshold,
         "lte": actual <= threshold,
-        "eq":  abs(actual - threshold) < 0.01,
+        "eq": abs(actual - threshold) < 0.01,
     }
     return cond_map.get(condition)
 
@@ -501,11 +526,7 @@ def _evaluate_machine(pred, eval_spec, data_cache, today_str):
 
     return {
         "status": status,
-        "reason": (
-            f"{metric_key}={actual_value:.4f} "
-            f"{'meets' if result else 'fails'} "
-            f"{condition} {threshold}"
-        ),
+        "reason": (f"{metric_key}={actual_value:.4f} " f"{'meets' if result else 'fails'} " f"{condition} {threshold}"),
         "actual_value": round(actual_value, 4),
         "beats_null": beats_null,
     }
@@ -544,7 +565,7 @@ def _evaluate_directional(pred, eval_spec, data_cache, today_str):
             "beats_null": False,
         }
 
-    direction_matches = (actual_direction == pred_dir)
+    direction_matches = actual_direction == pred_dir
     magnitude_sufficient = abs(slope) > DIRECTIONAL_NOISE_THRESHOLD if slope else False
 
     if direction_matches and magnitude_sufficient:
@@ -559,10 +580,7 @@ def _evaluate_directional(pred, eval_spec, data_cache, today_str):
 
     return {
         "status": status,
-        "reason": (
-            f"{metric_key} trend={actual_direction} (slope={slope:.4f}), "
-            f"predicted={pred_dir}"
-        ),
+        "reason": (f"{metric_key} trend={actual_direction} (slope={slope:.4f}), " f"predicted={pred_dir}"),
         "actual_value": slope,
         "beats_null": beats_null,
     }
@@ -604,10 +622,7 @@ def _evaluate_conditional(pred, eval_spec, data_cache, today_str):
     if not x_met:
         return {
             "status": "pending",
-            "reason": (
-                f"Precondition not met: {cond_metric}={x_value:.4f} "
-                f"does not satisfy {cond_condition} {cond_threshold}"
-            ),
+            "reason": (f"Precondition not met: {cond_metric}={x_value:.4f} " f"does not satisfy {cond_condition} {cond_threshold}"),
             "actual_value": None,
             "beats_null": False,
         }
@@ -615,10 +630,8 @@ def _evaluate_conditional(pred, eval_spec, data_cache, today_str):
     # Precondition met — evaluate Y
     y_result = _evaluate_machine(pred, eval_spec, data_cache, today_str)
     if y_result:
-        y_result["reason"] = (
-            f"Precondition met ({cond_metric}={x_value:.4f} "
-            f"{cond_condition} {cond_threshold}). "
-            + y_result.get("reason", "")
+        y_result["reason"] = f"Precondition met ({cond_metric}={x_value:.4f} " f"{cond_condition} {cond_threshold}). " + y_result.get(
+            "reason", ""
         )
     return y_result
 
@@ -650,43 +663,37 @@ def _check_expiry(pred, effective_window, today):
 # DYNAMO WRITES
 # =============================================================================
 
+
 def _update_prediction_status(prediction, evaluation):
     """Update a prediction record with its evaluation outcome."""
     try:
         pk = prediction.get("pk") or f"COACH#{prediction.get('coach_id', '')}"
         sk = prediction.get("sk") or f"PREDICTION#{prediction.get('prediction_id', '')}"
 
-        outcome_notes = json.dumps({
-            "actual_value": evaluation.get("actual_value"),
-            "reason": evaluation.get("reason", ""),
-            "beats_null": evaluation.get("beats_null", False),
-            "bayesian_update": evaluation.get("bayesian_update"),
-            "algo_version": ALGO_VERSION,
-        })
+        outcome_notes = json.dumps(
+            {
+                "actual_value": evaluation.get("actual_value"),
+                "reason": evaluation.get("reason", ""),
+                "beats_null": evaluation.get("beats_null", False),
+                "bayesian_update": evaluation.get("bayesian_update"),
+                "algo_version": ALGO_VERSION,
+            }
+        )
 
         table.update_item(
             Key={"pk": pk, "sk": sk},
-            UpdateExpression=(
-                "SET #status = :status, outcome = :outcome, "
-                "outcome_date = :odate, outcome_notes = :notes"
-            ),
+            UpdateExpression=("SET #status = :status, outcome = :outcome, " "outcome_date = :odate, outcome_notes = :notes"),
             ExpressionAttributeNames={"#status": "status"},
             ExpressionAttributeValues={
                 ":status": evaluation["status"],
                 ":outcome": evaluation["status"],
-                ":odate":  evaluation["evaluated_date"],
-                ":notes":  outcome_notes,
+                ":odate": evaluation["evaluated_date"],
+                ":notes": outcome_notes,
             },
         )
-        logger.info(
-            "Updated prediction %s -> %s",
-            evaluation.get("prediction_id", "?"), evaluation["status"]
-        )
+        logger.info("Updated prediction %s -> %s", evaluation.get("prediction_id", "?"), evaluation["status"])
     except Exception as e:
-        logger.error(
-            "Failed to update prediction %s: %s",
-            evaluation.get("prediction_id", "?"), e
-        )
+        logger.error("Failed to update prediction %s: %s", evaluation.get("prediction_id", "?"), e)
 
 
 def _update_bayesian_confidence(coach_id, subdomain, update_type):
@@ -718,26 +725,30 @@ def _update_bayesian_confidence(coach_id, subdomain, update_type):
         mean_confidence = alpha / (alpha + beta_val)
         sample_size = int(alpha + beta_val - 2)
 
-        table.put_item(Item={
-            "pk": pk,
-            "sk": sk,
-            "alpha": _to_decimal(alpha),
-            "beta_param": _to_decimal(beta_val),
-            "mean_confidence": _to_decimal(mean_confidence),
-            "sample_size": Decimal(str(max(0, sample_size))),
-            "subdomain": subdomain,
-            "coach_id": coach_id,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        })
+        table.put_item(
+            Item={
+                "pk": pk,
+                "sk": sk,
+                "alpha": _to_decimal(alpha),
+                "beta_param": _to_decimal(beta_val),
+                "mean_confidence": _to_decimal(mean_confidence),
+                "sample_size": Decimal(str(max(0, sample_size))),
+                "subdomain": subdomain,
+                "coach_id": coach_id,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         logger.info(
             "Updated confidence for %s/%s: Beta(%.0f,%.0f) = %.3f (n=%d)",
-            coach_id, subdomain, alpha, beta_val, mean_confidence, sample_size
+            coach_id,
+            subdomain,
+            alpha,
+            beta_val,
+            mean_confidence,
+            sample_size,
         )
     except Exception as e:
-        logger.error(
-            "Failed to update Bayesian confidence for %s/%s: %s",
-            coach_id, subdomain, e
-        )
+        logger.error("Failed to update Bayesian confidence for %s/%s: %s", coach_id, subdomain, e)
 
 
 def _write_learning_record(coach_id, today_str, evaluation):
@@ -777,13 +788,13 @@ def _write_learning_record(coach_id, today_str, evaluation):
         table.put_item(Item=item)
         logger.info("Wrote LEARNING record: %s / %s", pk, sk)
     except Exception as e:
-        logger.error("Failed to write LEARNING record for %s: %s",
-                     prediction_id, e)
+        logger.error("Failed to write LEARNING record for %s: %s", prediction_id, e)
 
 
 # =============================================================================
 # MAIN EVALUATION LOOP
 # =============================================================================
+
 
 def _evaluate_all(predictions, today_str):
     """
@@ -804,8 +815,12 @@ def _evaluate_all(predictions, today_str):
     data_cache = {}  # Shared cache across all evaluations
     evaluations = []
     stats = {
-        "confirmed": 0, "refuted": 0, "inconclusive": 0,
-        "expired": 0, "skipped_window": 0, "skipped_error": 0,
+        "confirmed": 0,
+        "refuted": 0,
+        "inconclusive": 0,
+        "expired": 0,
+        "skipped_window": 0,
+        "skipped_error": 0,
         "pending": 0,
     }
 
@@ -814,10 +829,7 @@ def _evaluate_all(predictions, today_str):
         eval_type = eval_spec.get("type", "machine")
         coach_id = pred.get("coach_id", "")
         subdomain = pred.get("subdomain", "")
-        prediction_id = (
-            pred.get("prediction_id")
-            or pred.get("sk", "").replace("PREDICTION#", "")
-        )
+        prediction_id = pred.get("prediction_id") or pred.get("sk", "").replace("PREDICTION#", "")
 
         # Determine effective window with domain minimum enforcement
         effective_window = _get_effective_window(eval_spec, subdomain)
@@ -853,10 +865,7 @@ def _evaluate_all(predictions, today_str):
                 stats["skipped_error"] += 1
                 continue
         except Exception as e:
-            logger.error(
-                "Evaluation error for %s (%s): %s",
-                prediction_id, eval_type, e
-            )
+            logger.error("Evaluation error for %s (%s): %s", prediction_id, eval_type, e)
             stats["skipped_error"] += 1
             continue
 
@@ -872,8 +881,7 @@ def _evaluate_all(predictions, today_str):
             result["status"] = "expired"
             result["reason"] = (
                 f"Expired: {(today - created_dt).days} days elapsed "
-                f"(window={effective_window}, max={effective_window * EXPIRY_MULTIPLIER}). "
-                + result.get("reason", "")
+                f"(window={effective_window}, max={effective_window * EXPIRY_MULTIPLIER}). " + result.get("reason", "")
             )
 
         # If conditional evaluation returns 'pending', don't write yet
@@ -884,9 +892,9 @@ def _evaluate_all(predictions, today_str):
         # Determine Bayesian update direction
         bayesian_update = None
         if status == "confirmed" and result.get("beats_null"):
-            bayesian_update = "success"   # alpha += 1
+            bayesian_update = "success"  # alpha += 1
         elif status == "refuted":
-            bayesian_update = "failure"   # beta += 1
+            bayesian_update = "failure"  # beta += 1
         # inconclusive, expired, or confirmed-but-matches-null: no update
 
         evaluation = {
@@ -921,11 +929,14 @@ def _evaluate_all(predictions, today_str):
         stats[status] = stats.get(status, 0) + 1
 
     logger.info(
-        "Evaluation stats: confirmed=%d refuted=%d inconclusive=%d "
-        "expired=%d pending=%d skipped_window=%d skipped_error=%d",
-        stats["confirmed"], stats["refuted"], stats["inconclusive"],
-        stats["expired"], stats["pending"],
-        stats["skipped_window"], stats["skipped_error"],
+        "Evaluation stats: confirmed=%d refuted=%d inconclusive=%d " "expired=%d pending=%d skipped_window=%d skipped_error=%d",
+        stats["confirmed"],
+        stats["refuted"],
+        stats["inconclusive"],
+        stats["expired"],
+        stats["pending"],
+        stats["skipped_window"],
+        stats["skipped_error"],
     )
     return evaluations, stats
 
@@ -933,6 +944,7 @@ def _evaluate_all(predictions, today_str):
 # =============================================================================
 # LAMBDA HANDLER
 # =============================================================================
+
 
 def lambda_handler(event, context):
     """
@@ -965,10 +977,7 @@ def lambda_handler(event, context):
         # Run evaluations
         evaluations, stats = _evaluate_all(predictions, today_str)
 
-        logger.info(
-            "coach-prediction-evaluator COMPLETE: %d predictions evaluated out of %d found",
-            len(evaluations), len(predictions)
-        )
+        logger.info("coach-prediction-evaluator COMPLETE: %d predictions evaluated out of %d found", len(evaluations), len(predictions))
 
         return {
             "statusCode": 200,

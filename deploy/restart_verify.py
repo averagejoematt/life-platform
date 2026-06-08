@@ -23,18 +23,18 @@ Usage:
 import json
 import subprocess
 import sys
+import urllib.request
 from datetime import date, datetime, timezone
 from pathlib import Path
 
 import boto3
-import urllib.request
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from lambdas.constants import (
-    EXPERIMENT_START_DATE,
     EXPERIMENT_BASELINE_WEIGHT_LBS,
+    EXPERIMENT_START_DATE,
     day_n,
 )
 
@@ -64,12 +64,14 @@ def main():
     cfg = json.loads((REPO_ROOT / "config" / "user_goals.json").read_text())
     cfg_start = cfg["timeline"]["start_date"]
     cfg_w = float(cfg["timeline"]["start_weight_lbs"])
-    check("constants.py genesis matches config",
-          cfg_start == EXPERIMENT_START_DATE,
-          f"config={cfg_start} constants={EXPERIMENT_START_DATE}")
-    check("constants.py baseline matches config",
-          abs(cfg_w - EXPERIMENT_BASELINE_WEIGHT_LBS) < 0.01,
-          f"config={cfg_w} constants={EXPERIMENT_BASELINE_WEIGHT_LBS}")
+    check(
+        "constants.py genesis matches config", cfg_start == EXPERIMENT_START_DATE, f"config={cfg_start} constants={EXPERIMENT_START_DATE}"
+    )
+    check(
+        "constants.py baseline matches config",
+        abs(cfg_w - EXPERIMENT_BASELINE_WEIGHT_LBS) < 0.01,
+        f"config={cfg_w} constants={EXPERIMENT_BASELINE_WEIGHT_LBS}",
+    )
 
     # 2. layer version
     lam = boto3.client("lambda", region_name=REGION)
@@ -77,11 +79,10 @@ def main():
     aws_latest = versions[0]["Version"]
     cdk_text = (REPO_ROOT / "cdk" / "stacks" / "constants.py").read_text()
     import re
+
     m = re.search(r"SHARED_LAYER_VERSION = (\d+)", cdk_text)
     cdk_v = int(m.group(1)) if m else None
-    check("CDK SHARED_LAYER_VERSION matches AWS latest",
-          cdk_v == aws_latest,
-          f"cdk={cdk_v} aws={aws_latest}")
+    check("CDK SHARED_LAYER_VERSION matches AWS latest", cdk_v == aws_latest, f"cdk={cdk_v} aws={aws_latest}")
 
     # 3. DDB profile consistency
     ddb = boto3.resource("dynamodb", region_name=REGION)
@@ -89,59 +90,62 @@ def main():
     p = t.get_item(Key={"pk": f"USER#{USER}", "sk": "PROFILE#v1"}).get("Item", {})
     profile_date = p.get("journey_start_date", "")
     profile_w = float(p.get("journey_start_weight_lbs", 0))
-    check("DDB profile date matches genesis",
-          profile_date == EXPERIMENT_START_DATE,
-          f"profile={profile_date}")
-    check("DDB profile weight matches baseline",
-          abs(profile_w - EXPERIMENT_BASELINE_WEIGHT_LBS) < 0.01,
-          f"profile={profile_w} constants={EXPERIMENT_BASELINE_WEIGHT_LBS}")
+    check("DDB profile date matches genesis", profile_date == EXPERIMENT_START_DATE, f"profile={profile_date}")
+    check(
+        "DDB profile weight matches baseline",
+        abs(profile_w - EXPERIMENT_BASELINE_WEIGHT_LBS) < 0.01,
+        f"profile={profile_w} constants={EXPERIMENT_BASELINE_WEIGHT_LBS}",
+    )
 
     # 4 + 5. Live /api/journey
     try:
         with urllib.request.urlopen(f"{API}/api/journey?cb=verify", timeout=10) as r:
             j = json.loads(r.read())["journey"]
-        check("/api/journey started_date matches genesis",
-              j.get("started_date") == EXPERIMENT_START_DATE,
-              f"api={j.get('started_date')}")
+        check("/api/journey started_date matches genesis", j.get("started_date") == EXPERIMENT_START_DATE, f"api={j.get('started_date')}")
         api_w = float(j.get("start_weight_lbs") or 0)
-        check("/api/journey start_weight matches baseline",
-              abs(api_w - EXPERIMENT_BASELINE_WEIGHT_LBS) < 1.5,
-              f"api={api_w} constants={EXPERIMENT_BASELINE_WEIGHT_LBS}")
+        check(
+            "/api/journey start_weight matches baseline",
+            abs(api_w - EXPERIMENT_BASELINE_WEIGHT_LBS) < 1.5,
+            f"api={api_w} constants={EXPERIMENT_BASELINE_WEIGHT_LBS}",
+        )
     except Exception as e:
         check("/api/journey reachable", False, f"error: {e}")
 
     # 6. day_n
     today = date.today().isoformat()
     d = day_n(today)
-    check("day_n(today) >= 1 (past genesis)",
-          d >= 1,
-          f"day_n({today}) = {d}")
+    check("day_n(today) >= 1 (past genesis)", d >= 1, f"day_n({today}) = {d}")
 
     # 7. Withings record for genesis
-    w_record = t.get_item(Key={"pk": f"USER#{USER}#SOURCE#withings",
-                                "sk": f"DATE#{EXPERIMENT_START_DATE}"}).get("Item")
-    check(f"Withings record exists for genesis ({EXPERIMENT_START_DATE})",
-          w_record is not None,
-          f"weight_lbs={w_record.get('weight_lbs') if w_record else '(missing)'}")
+    w_record = t.get_item(Key={"pk": f"USER#{USER}#SOURCE#withings", "sk": f"DATE#{EXPERIMENT_START_DATE}"}).get("Item")
+    check(
+        f"Withings record exists for genesis ({EXPERIMENT_START_DATE})",
+        w_record is not None,
+        f"weight_lbs={w_record.get('weight_lbs') if w_record else '(missing)'}",
+    )
 
     # 8. Post-genesis character sheet exists
-    cs = t.query(KeyConditionExpression="pk = :p AND sk >= :s",
-                 ExpressionAttributeValues={
-                     ":p": f"USER#{USER}#SOURCE#character_sheet",
-                     ":s": f"DATE#{EXPERIMENT_START_DATE}",
-                 })
+    cs = t.query(
+        KeyConditionExpression="pk = :p AND sk >= :s",
+        ExpressionAttributeValues={
+            ":p": f"USER#{USER}#SOURCE#character_sheet",
+            ":s": f"DATE#{EXPERIMENT_START_DATE}",
+        },
+    )
     fresh_sheets = [it for it in cs.get("Items", []) if not it.get("tombstone")]
-    check("At least 1 post-genesis character sheet exists (untombstoned)",
-          len(fresh_sheets) >= 1,
-          f"found {len(fresh_sheets)} fresh sheet(s)")
+    check(
+        "At least 1 post-genesis character sheet exists (untombstoned)", len(fresh_sheets) >= 1, f"found {len(fresh_sheets)} fresh sheet(s)"
+    )
 
     # 9. No habit streak > day_n (would be a pre-genesis leak)
     # Quick check via DDB rather than MCP (avoids MCP scope issues).
-    hs = t.query(KeyConditionExpression="pk = :p AND sk >= :s",
-                 ExpressionAttributeValues={
-                     ":p": f"USER#{USER}#SOURCE#habit_scores",
-                     ":s": f"DATE#{EXPERIMENT_START_DATE}",
-                 })
+    hs = t.query(
+        KeyConditionExpression="pk = :p AND sk >= :s",
+        ExpressionAttributeValues={
+            ":p": f"USER#{USER}#SOURCE#habit_scores",
+            ":s": f"DATE#{EXPERIMENT_START_DATE}",
+        },
+    )
     fresh_habits = [it for it in hs.get("Items", []) if not it.get("tombstone")]
     max_streak = 0
     for h in fresh_habits:
@@ -150,21 +154,24 @@ def main():
                 continue
             if "streak" in str(k).lower() and isinstance(v, (int, float)) and v > max_streak:
                 max_streak = int(v)
-    check("No habit streak > day_n (no pre-genesis leak)",
-          max_streak <= max(d, 1),
-          f"max_streak_in_habit_scores={max_streak} day_n={d}")
+    check("No habit streak > day_n (no pre-genesis leak)", max_streak <= max(d, 1), f"max_streak_in_habit_scores={max_streak} day_n={d}")
 
     # 10. Layer-consistency pytest
     proc = subprocess.run(
-        ["python3", "-m", "pytest",
-         "tests/test_integration_aws.py::test_i2_lambda_layer_version_current",
-         "tests/test_layer_version_consistency.py", "-q"],
-        cwd=REPO_ROOT, capture_output=True, text=True,
+        [
+            "python3",
+            "-m",
+            "pytest",
+            "tests/test_integration_aws.py::test_i2_lambda_layer_version_current",
+            "tests/test_layer_version_consistency.py",
+            "-q",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
     )
     pytest_ok = proc.returncode == 0
-    check("pytest layer-consistency tests pass",
-          pytest_ok,
-          proc.stdout.strip().splitlines()[-1] if proc.stdout else "no output")
+    check("pytest layer-consistency tests pass", pytest_ok, proc.stdout.strip().splitlines()[-1] if proc.stdout else "no output")
 
     # Summary
     total = len(checks)

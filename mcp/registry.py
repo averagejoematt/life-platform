@@ -1,7 +1,33 @@
 """
 Tool registry: maps tool names to their functions and JSON schemas.
 """
-from mcp.config import SOURCES, RAW_DAY_LIMIT, P40_GROUPS
+
+from mcp.config import P40_GROUPS, RAW_DAY_LIMIT, SOURCES
+from mcp.tools_adaptive import get_adaptive_mode
+from mcp.tools_board import tool_get_board_of_directors
+from mcp.tools_cgm import tool_get_cgm, tool_get_glucose_meal_response
+from mcp.tools_challenges import (
+    tool_activate_challenge,
+    tool_checkin_challenge,
+    tool_complete_challenge,
+    tool_create_challenge,
+    tool_list_challenges,
+)
+from mcp.tools_character import (
+    tool_get_character,
+    tool_get_rewards,
+    tool_set_reward,
+    tool_update_character_config,
+)
+from mcp.tools_coach_intelligence import (
+    tool_evaluate_prediction,
+    tool_get_coach_disagreements,
+    tool_get_coach_thread,
+    tool_get_coach_track_record,
+    tool_get_coaching_summary,
+    tool_get_predictions,
+)
+from mcp.tools_correlation import tool_get_zone2_breakdown
 from mcp.tools_data import (
     tool_compare_periods,
     tool_complete_action,
@@ -16,27 +42,18 @@ from mcp.tools_data import (
     tool_list_actions,
     tool_search_activities,
 )
-from mcp.tools_coach_intelligence import (
-    tool_get_coach_thread, tool_get_predictions, tool_get_coach_disagreements,
-    tool_evaluate_prediction, tool_get_coaching_summary, tool_get_coach_track_record,
-)
-# tools_calendar retired v3.7.46 (ADR-030) — google_calendar import removed
-from mcp.tools_strength import (
-    tool_get_exercise_history, tool_get_strength_prs, tool_get_muscle_volume,
-    tool_get_strength_progress, tool_get_workout_frequency, tool_get_strength_standards,
-    tool_get_strength, tool_get_centenarian_benchmarks,
-)
-# SPEC_HEVY_AND_NUTRITION_BRIDGE §2.6 — source-agnostic workout query layer
-from mcp.tools_hevy import (
-    tool_get_workouts, tool_get_workout_detail, tool_get_workout_source_status,
-)
-from mcp.tools_training import (
-    tool_get_acwr_status,
-    tool_get_cross_source_correlation,
-    tool_get_exercise_efficiency_trend,
-    tool_get_hr_recovery_trend,
-    tool_get_lactate_threshold_estimate,
-    tool_get_training,
+from mcp.tools_decisions import tool_get_decisions, tool_log_decision, tool_update_decision_outcome
+from mcp.tools_food_delivery import tool_get_food_delivery
+from mcp.tools_habits import (
+    tool_compare_habit_periods,
+    tool_get_device_agreement,
+    tool_get_essential_seven,
+    tool_get_garmin_summary,
+    tool_get_habit_registry,
+    tool_get_habit_tier_report,
+    tool_get_habits,
+    tool_get_vice_streak_history,
+    tool_get_vice_streaks,
 )
 from mcp.tools_health import (
     tool_get_autonomic_balance,
@@ -46,20 +63,23 @@ from mcp.tools_health import (
     tool_get_readiness_score,
     tool_get_weight_loss_progress,
 )
-from mcp.tools_sleep import tool_get_sleep_analysis, tool_get_sleep_environment_analysis
-from mcp.tools_nutrition import (
-    tool_get_deficit_sustainability,
-    tool_get_food_log,
-    tool_get_metabolic_adaptation,
-    tool_get_nutrition,
+
+# SPEC_HEVY_AND_NUTRITION_BRIDGE §2.6 — source-agnostic workout query layer
+from mcp.tools_hevy import (
+    tool_get_workout_detail,
+    tool_get_workout_source_status,
+    tool_get_workouts,
 )
-from mcp.tools_correlation import tool_get_zone2_breakdown
-from mcp.tools_habits import (
-    tool_get_habits, tool_compare_habit_periods, tool_get_habit_registry,
-    tool_get_habit_tier_report, tool_get_vice_streak_history,
-    tool_get_vice_streaks,
-    tool_get_essential_seven,
-    tool_get_garmin_summary, tool_get_device_agreement,
+
+# ADR-066 (2026-05-31): Hevy routine write-loop fat tool.
+from mcp.tools_hevy_routine import tool_manage_hevy_routine
+from mcp.tools_hypotheses import tool_get_hypotheses, tool_update_hypothesis_outcome
+from mcp.tools_journal import (
+    tool_get_journal_entries,
+    tool_get_journal_insights,
+    tool_get_journal_sentiment_trajectory,
+    tool_get_mood,
+    tool_search_journal,
 )
 from mcp.tools_labs import (
     tool_get_allergies,
@@ -68,15 +88,6 @@ from mcp.tools_labs import (
     tool_get_lab_deltas,
     tool_get_labs,
     tool_search_biomarker,
-)
-from mcp.tools_measurements import tool_get_measurement_trends, tool_get_measurements
-from mcp.tools_cgm import tool_get_cgm, tool_get_glucose_meal_response
-from mcp.tools_journal import (
-    tool_get_journal_entries,
-    tool_get_journal_insights,
-    tool_get_journal_sentiment_trajectory,
-    tool_get_mood,
-    tool_search_journal,
 )
 from mcp.tools_lifestyle import (
     tool_create_experiment,
@@ -97,13 +108,28 @@ from mcp.tools_lifestyle import (
     tool_save_insight,
     tool_update_insight_outcome,
 )
-from mcp.tools_board import tool_get_board_of_directors
-from mcp.tools_character import (
-    tool_get_character,
-    tool_get_rewards,
-    tool_set_reward,
-    tool_update_character_config,
+from mcp.tools_measurements import tool_get_measurement_trends, tool_get_measurements
+from mcp.tools_memory import (
+    tool_capture_baseline,
+    tool_delete_platform_memory,
+    tool_list_memory_categories,
+    tool_read_platform_memory,
+    tool_write_platform_memory,
 )
+from mcp.tools_nutrition import (
+    tool_get_deficit_sustainability,
+    tool_get_food_log,
+    tool_get_metabolic_adaptation,
+    tool_get_nutrition,
+)
+from mcp.tools_protocols import (
+    tool_create_protocol,
+    tool_list_protocols,
+    tool_retire_protocol,
+    tool_update_protocol,
+)
+from mcp.tools_sick_days import tool_manage_sick_days
+from mcp.tools_sleep import tool_get_sleep_analysis, tool_get_sleep_environment_analysis
 from mcp.tools_social import (
     tool_annotate_discovery,
     tool_get_discovery_annotations,
@@ -114,7 +140,18 @@ from mcp.tools_social import (
     tool_log_life_event,
     tool_log_temptation,
 )
-from mcp.tools_adaptive import get_adaptive_mode
+
+# tools_calendar retired v3.7.46 (ADR-030) — google_calendar import removed
+from mcp.tools_strength import (
+    tool_get_centenarian_benchmarks,
+    tool_get_exercise_history,
+    tool_get_muscle_volume,
+    tool_get_strength,
+    tool_get_strength_progress,
+    tool_get_strength_prs,
+    tool_get_strength_standards,
+    tool_get_workout_frequency,
+)
 from mcp.tools_todoist import (
     close_todoist_task,
     create_todoist_task,
@@ -127,29 +164,15 @@ from mcp.tools_todoist import (
     tool_get_todoist_snapshot,
     update_todoist_task,
 )
-from mcp.tools_memory import (
-    tool_capture_baseline,
-    tool_delete_platform_memory,
-    tool_list_memory_categories,
-    tool_read_platform_memory,
-    tool_write_platform_memory,
+from mcp.tools_training import (
+    tool_get_acwr_status,
+    tool_get_cross_source_correlation,
+    tool_get_exercise_efficiency_trend,
+    tool_get_hr_recovery_trend,
+    tool_get_lactate_threshold_estimate,
+    tool_get_training,
 )
-from mcp.tools_memory import tool_capture_baseline
-from mcp.tools_decisions import tool_get_decisions, tool_log_decision, tool_update_decision_outcome
-from mcp.tools_hypotheses import tool_get_hypotheses, tool_update_hypothesis_outcome
-from mcp.tools_sick_days import tool_manage_sick_days
-from mcp.tools_challenges import (
-    tool_create_challenge, tool_activate_challenge,
-    tool_checkin_challenge, tool_list_challenges,
-    tool_complete_challenge,
-)
-from mcp.tools_protocols import (
-    tool_create_protocol, tool_update_protocol,
-    tool_list_protocols, tool_retire_protocol,
-)
-from mcp.tools_food_delivery import tool_get_food_delivery
-# ADR-066 (2026-05-31): Hevy routine write-loop fat tool.
-from mcp.tools_hevy_routine import tool_manage_hevy_routine
+
 # Vacation fund tracker ($1/workout-mile since experiment start).
 from mcp.tools_vacation import tool_get_vacation_fund
 
@@ -172,7 +195,7 @@ TOOLS = {
                 "Unified daily data access. "
                 "'summary' (default) = all available data across every source for a specific date. Best for 'how was my day/yesterday?' questions. Requires date=. "
                 "'latest' = most recent record for each source — useful for current status checks. "
-                "Use for: 'how was yesterday?', 'what\'s my latest data?', 'show me today\'s readings', 'all data for 2026-03-10'."
+                "Use for: 'how was yesterday?', 'what's my latest data?', 'show me today's readings', 'all data for 2026-03-10'."
             ),
             "inputSchema": {
                 "type": "object",
@@ -182,9 +205,12 @@ TOOLS = {
                         "description": "'summary' (default) for a specific date, 'latest' for most recent per source.",
                         "enum": ["summary", "latest"],
                     },
-                    "date":    {"type": "string", "description": "[summary] Date YYYY-MM-DD (required for summary view)."},
-                    "sources": {"type": "array", "items": {"type": "string"},
-                                "description": f"[latest] List of sources to fetch. Defaults to all. Valid: {SOURCES}"},
+                    "date": {"type": "string", "description": "[summary] Date YYYY-MM-DD (required for summary view)."},
+                    "sources": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": f"[latest] List of sources to fetch. Defaults to all. Valid: {SOURCES}",
+                    },
                 },
                 "required": [],
             },
@@ -198,9 +224,9 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "source":     {"type": "string", "description": f"Data source. Valid: {SOURCES}"},
+                    "source": {"type": "string", "description": f"Data source. Valid: {SOURCES}"},
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (inclusive)."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (inclusive)."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (inclusive)."},
                 },
                 "required": ["source", "start_date", "end_date"],
             },
@@ -214,9 +240,9 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "source":     {"type": "string", "description": f"Data source. Valid: {SOURCES}"},
+                    "source": {"type": "string", "description": f"Data source. Valid: {SOURCES}"},
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD."},
                     "filters": {
                         "type": "array",
                         "description": "List of field filter conditions.",
@@ -224,7 +250,7 @@ TOOLS = {
                             "type": "object",
                             "properties": {
                                 "field": {"type": "string"},
-                                "op":    {"type": "string", "enum": [">", ">=", "<", "<=", "="]},
+                                "op": {"type": "string", "enum": [">", ">=", "<", "<=", "="]},
                                 "value": {"type": "number"},
                             },
                             "required": ["field", "op", "value"],
@@ -254,11 +280,14 @@ TOOLS = {
                         "description": "Which analysis: aggregate (default), seasonal, records.",
                         "enum": ["aggregate", "seasonal", "records"],
                     },
-                    "source":     {"type": "string", "description": f"[aggregate/seasonal] Optional source filter. Valid: {SOURCES}"},
+                    "source": {"type": "string", "description": f"[aggregate/seasonal] Optional source filter. Valid: {SOURCES}"},
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "period":     {"type": "string", "enum": ["month", "year"],
-                                   "description": "[aggregate] Use 'year' for multi-year history, 'month' for 1-3 year windows."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "period": {
+                        "type": "string",
+                        "enum": ["month", "year"],
+                        "description": "[aggregate] Use 'year' for multi-year history, 'month' for 1-3 year windows.",
+                    },
                 },
                 "required": [],
             },
@@ -272,10 +301,13 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "source":     {"type": "string", "description": f"Data source. Valid: {SOURCES}"},
-                    "field":      {"type": "string", "description": "The numeric field name to analyze. E.g. 'weight_lbs', 'hrv', 'recovery_score', 'resting_heart_rate', 'total_distance_miles'."},
+                    "source": {"type": "string", "description": f"Data source. Valid: {SOURCES}"},
+                    "field": {
+                        "type": "string",
+                        "description": "The numeric field name to analyze. E.g. 'weight_lbs', 'hrv', 'recovery_score', 'resting_heart_rate', 'total_distance_miles'.",
+                    },
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD. Defaults to 2010-01-01 (all-time)."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
                 },
                 "required": ["source", "field"],
             },
@@ -289,9 +321,13 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "days":     {"type": "number", "description": "Days to look back (default: 7)."},
-                    "severity": {"type": "string", "description": "Filter by severity: 'error' or 'warning'. Default: all.", "enum": ["error", "warning"]},
-                    "coach":    {"type": "string", "description": "Filter by coach ID (e.g., 'glucose', 'physical')."},
+                    "days": {"type": "number", "description": "Days to look back (default: 7)."},
+                    "severity": {
+                        "type": "string",
+                        "description": "Filter by severity: 'error' or 'warning'. Default: all.",
+                        "enum": ["error", "warning"],
+                    },
+                    "coach": {"type": "string", "description": "Filter by coach ID (e.g., 'glucose', 'physical')."},
                 },
                 "required": [],
             },
@@ -305,9 +341,16 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "domain": {"type": "string", "description": "Filter by domain (e.g., 'sleep', 'nutrition', 'training', 'glucose', 'physical', 'mind')."},
-                    "status": {"type": "string", "description": "Filter by status.", "enum": ["open", "completed", "expired", "superseded"]},
-                    "days":   {"type": "number", "description": "Days to look back (default: 30)."},
+                    "domain": {
+                        "type": "string",
+                        "description": "Filter by domain (e.g., 'sleep', 'nutrition', 'training', 'glucose', 'physical', 'mind').",
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "Filter by status.",
+                        "enum": ["open", "completed", "expired", "superseded"],
+                    },
+                    "days": {"type": "number", "description": "Days to look back (default: 30)."},
                 },
                 "required": [],
             },
@@ -322,7 +365,7 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "action_id": {"type": "string", "description": "The action ID to complete (format: YYYY-MM-DD-domain)."},
-                    "note":      {"type": "string", "description": "Optional follow-up note about the completion."},
+                    "note": {"type": "string", "description": "Optional follow-up note about the completion."},
                 },
                 "required": ["action_id"],
             },
@@ -333,7 +376,17 @@ TOOLS = {
         "schema": {
             "name": "get_coach_thread",
             "description": "Read a coach's persistent thread — their running memory of positions, predictions, surprises, and emotional investment. Use for: 'what has Dr. Park been saying?', 'show me the glucose coach's predictions', 'how invested is the training coach?'",
-            "inputSchema": {"type": "object", "properties": {"coach_id": {"type": "string", "description": "Coach domain: sleep, nutrition, training, mind, physical, glucose, labs, explorer"}, "limit": {"type": "number", "description": "Number of thread entries (default 4)"}}, "required": ["coach_id"]},
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "coach_id": {
+                        "type": "string",
+                        "description": "Coach domain: sleep, nutrition, training, mind, physical, glucose, labs, explorer",
+                    },
+                    "limit": {"type": "number", "description": "Number of thread entries (default 4)"},
+                },
+                "required": ["coach_id"],
+            },
         },
     },
     "get_predictions": {
@@ -341,7 +394,15 @@ TOOLS = {
         "schema": {
             "name": "get_predictions",
             "description": "Cross-coach prediction ledger — all predictions from all coaches with statuses (pending/confirmed/refuted). Use for: 'what predictions are pending?', 'which coach is most accurate?', 'prediction scorecard'. NOTE: reads the legacy SOURCE#coach_thread# partition; for hit-rate analysis on the post-ADR-047 COACH# partition, use get_coach_track_record.",
-            "inputSchema": {"type": "object", "properties": {"status": {"type": "string", "enum": ["pending", "confirmed", "refuted"]}, "coach_id": {"type": "string"}, "limit": {"type": "number"}}, "required": []},
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "enum": ["pending", "confirmed", "refuted"]},
+                    "coach_id": {"type": "string"},
+                    "limit": {"type": "number"},
+                },
+                "required": [],
+            },
         },
     },
     "get_coach_track_record": {
@@ -349,7 +410,18 @@ TOOLS = {
         "schema": {
             "name": "get_coach_track_record",
             "description": "Hit-rate track record for a single coach over a configurable window — reads the COACH#{coach_id}/LEARNING# audit trail written daily by the prediction evaluator. Returns by_outcome counts (confirmed/refuted/inconclusive/expired), hit_rate_pct (confirmed / decided), per-subdomain and per-metric breakdowns, and 10 most-recent evaluations. Use for: 'how accurate has the glucose coach been?', 'which subdomain does the sleep coach get right most often?', 'show me recent verdicts on metabolic predictions'.",
-            "inputSchema": {"type": "object", "properties": {"coach_id": {"type": "string", "description": "Coach name: sleep, nutrition, training, mind, physical, glucose, labs, explorer (accepts _coach suffix too)"}, "days": {"type": "number", "description": "Lookback window in days (default 30)"}, "subdomain": {"type": "string", "description": "Optional subdomain filter (e.g. 'sleep_quality', 'caloric_intake')"}}, "required": ["coach_id"]},
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "coach_id": {
+                        "type": "string",
+                        "description": "Coach name: sleep, nutrition, training, mind, physical, glucose, labs, explorer (accepts _coach suffix too)",
+                    },
+                    "days": {"type": "number", "description": "Lookback window in days (default 30)"},
+                    "subdomain": {"type": "string", "description": "Optional subdomain filter (e.g. 'sleep_quality', 'caloric_intake')"},
+                },
+                "required": ["coach_id"],
+            },
         },
     },
     "get_coach_disagreements": {
@@ -365,7 +437,15 @@ TOOLS = {
         "schema": {
             "name": "evaluate_prediction",
             "description": "Manually resolve a coach prediction — mark as confirmed or refuted with an outcome note.",
-            "inputSchema": {"type": "object", "properties": {"prediction_id": {"type": "string"}, "status": {"type": "string", "enum": ["confirmed", "refuted"]}, "outcome_note": {"type": "string"}}, "required": ["prediction_id", "status"]},
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "prediction_id": {"type": "string"},
+                    "status": {"type": "string", "enum": ["confirmed", "refuted"]},
+                    "outcome_note": {"type": "string"},
+                },
+                "required": ["prediction_id", "status"],
+            },
         },
     },
     "get_coaching_summary": {
@@ -384,14 +464,26 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "start_date":              {"type": "string", "description": "Start date YYYY-MM-DD. Defaults to 2010-01-01."},
-                    "end_date":                {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
-                    "name_contains":           {"type": "string", "description": "Keyword to search in activity name (case-insensitive). E.g. 'machu', 'half marathon', 'trail'."},
-                    "sport_type":              {"type": "string", "description": "Filter by sport type (case-insensitive). Common values: 'Run', 'Walk', 'Hike', 'Ride', 'VirtualRide', 'WeightTraining'."},
-                    "min_distance_miles":      {"type": "number", "description": "Only return activities with distance >= this value in miles."},
-                    "min_elevation_gain_feet": {"type": "number", "description": "Only return activities with elevation gain >= this value in feet."},
-                    "sort_by":                 {"type": "string", "description": "Field to sort results by descending. Options: 'distance_miles', 'total_elevation_gain_feet', 'moving_time_seconds', 'kilojoules'. Default: 'distance_miles'."},
-                    "limit":                   {"type": "number", "description": "Max results to return. Default 100."},
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD. Defaults to 2010-01-01."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
+                    "name_contains": {
+                        "type": "string",
+                        "description": "Keyword to search in activity name (case-insensitive). E.g. 'machu', 'half marathon', 'trail'.",
+                    },
+                    "sport_type": {
+                        "type": "string",
+                        "description": "Filter by sport type (case-insensitive). Common values: 'Run', 'Walk', 'Hike', 'Ride', 'VirtualRide', 'WeightTraining'.",
+                    },
+                    "min_distance_miles": {"type": "number", "description": "Only return activities with distance >= this value in miles."},
+                    "min_elevation_gain_feet": {
+                        "type": "number",
+                        "description": "Only return activities with elevation gain >= this value in feet.",
+                    },
+                    "sort_by": {
+                        "type": "string",
+                        "description": "Field to sort results by descending. Options: 'distance_miles', 'total_elevation_gain_feet', 'moving_time_seconds', 'kilojoules'. Default: 'distance_miles'.",
+                    },
+                    "limit": {"type": "number", "description": "Max results to return. Default 100."},
                 },
                 "required": [],
             },
@@ -406,12 +498,21 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "period_a_start": {"type": "string", "description": "Start date of period A (YYYY-MM-DD)."},
-                    "period_a_end":   {"type": "string", "description": "End date of period A (YYYY-MM-DD)."},
+                    "period_a_end": {"type": "string", "description": "End date of period A (YYYY-MM-DD)."},
                     "period_b_start": {"type": "string", "description": "Start date of period B (YYYY-MM-DD)."},
-                    "period_b_end":   {"type": "string", "description": "End date of period B (YYYY-MM-DD)."},
-                    "period_a_label": {"type": "string", "description": "Human-readable label for period A. E.g. 'Peak 2022', 'Pre-injury', 'Last year'."},
-                    "period_b_label": {"type": "string", "description": "Human-readable label for period B. E.g. 'Current', 'Post-injury', 'This year'."},
-                    "source":         {"type": "string", "description": f"Optional. Limit to one source. Valid: {SOURCES}. Omit to compare all sources."},
+                    "period_b_end": {"type": "string", "description": "End date of period B (YYYY-MM-DD)."},
+                    "period_a_label": {
+                        "type": "string",
+                        "description": "Human-readable label for period A. E.g. 'Peak 2022', 'Pre-injury', 'Last year'.",
+                    },
+                    "period_b_label": {
+                        "type": "string",
+                        "description": "Human-readable label for period B. E.g. 'Current', 'Post-injury', 'This year'.",
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": f"Optional. Limit to one source. Valid: {SOURCES}. Omit to compare all sources.",
+                    },
                 },
                 "required": ["period_a_start", "period_a_end", "period_b_start", "period_b_end"],
             },
@@ -438,9 +539,9 @@ TOOLS = {
                         "enum": ["load", "periodization", "recommendation"],
                     },
                     "start_date": {"type": "string", "description": "[load/periodization] Start date YYYY-MM-DD."},
-                    "end_date":   {"type": "string", "description": "[load/periodization] End date YYYY-MM-DD (default: today)."},
-                    "date":       {"type": "string", "description": "[recommendation] Target date YYYY-MM-DD (default: today)."},
-                    "weeks":      {"type": "number", "description": "[periodization] Number of weeks to analyse (default: 12)."},
+                    "end_date": {"type": "string", "description": "[load/periodization] End date YYYY-MM-DD (default: today)."},
+                    "date": {"type": "string", "description": "[recommendation] Target date YYYY-MM-DD (default: today)."},
+                    "weeks": {"type": "number", "description": "[periodization] Number of weeks to analyse (default: 12)."},
                 },
                 "required": [],
             },
@@ -454,11 +555,17 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "start_date":     {"type": "string", "description": "Start date YYYY-MM-DD. Defaults to 2000-01-01 (all-time)."},
-                    "end_date":       {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
-                    "sort_by":        {"type": "string", "description": "Field to sort weeks by. Options: 'total_distance_miles' (default), 'total_elevation_gain_feet', 'total_moving_time_seconds', 'activity_count'."},
-                    "limit":          {"type": "number", "description": "Max weeks to return. Default 52."},
-                    "sort_ascending": {"type": "boolean", "description": "Set true for chronological order (trend view). Default false (best weeks first)."},
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD. Defaults to 2000-01-01 (all-time)."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
+                    "sort_by": {
+                        "type": "string",
+                        "description": "Field to sort weeks by. Options: 'total_distance_miles' (default), 'total_elevation_gain_feet', 'total_moving_time_seconds', 'activity_count'.",
+                    },
+                    "limit": {"type": "number", "description": "Max weeks to return. Default 52."},
+                    "sort_ascending": {
+                        "type": "boolean",
+                        "description": "Set true for chronological order (trend view). Default false (best weeks first).",
+                    },
                 },
                 "required": [],
             },
@@ -472,13 +579,16 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "source_a":   {"type": "string", "description": f"First data source. Valid: {SOURCES}"},
-                    "field_a":    {"type": "string", "description": "Field from source_a (e.g. 'hrv', 'recovery_score', 'weight_lbs')"},
-                    "source_b":   {"type": "string", "description": f"Second data source. Valid: {SOURCES}"},
-                    "field_b":    {"type": "string", "description": "Field from source_b (e.g. 'total_distance_miles', 'recovery_score')"},
-                    "lag_days":   {"type": "number", "description": "Shift source_b forward N days. Use lag=1 to ask 'does A today predict B tomorrow?'. Default 0."},
+                    "source_a": {"type": "string", "description": f"First data source. Valid: {SOURCES}"},
+                    "field_a": {"type": "string", "description": "Field from source_a (e.g. 'hrv', 'recovery_score', 'weight_lbs')"},
+                    "source_b": {"type": "string", "description": f"Second data source. Valid: {SOURCES}"},
+                    "field_b": {"type": "string", "description": "Field from source_b (e.g. 'total_distance_miles', 'recovery_score')"},
+                    "lag_days": {
+                        "type": "number",
+                        "description": "Shift source_b forward N days. Use lag=1 to ask 'does A today predict B tomorrow?'. Default 0.",
+                    },
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD. Defaults to 2019-01-01."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
                 },
                 "required": ["source_a", "field_a", "source_b", "field_b"],
             },
@@ -504,8 +614,8 @@ TOOLS = {
                         "description": "movement (default), energy, or hydration.",
                         "enum": ["movement", "energy", "hydration"],
                     },
-                    "start_date":  {"type": "string", "description": "Start date YYYY-MM-DD (default: 30d ago)."},
-                    "end_date":    {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 30d ago)."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
                     "step_target": {"type": "integer", "description": "[movement] Daily step target (default: 8000)."},
                 },
                 "required": [],
@@ -533,8 +643,10 @@ TOOLS = {
                         "description": "dashboard (default), risk_profile, or trajectory.",
                         "enum": ["dashboard", "risk_profile", "trajectory"],
                     },
-                    "domain": {"type": "string",
-                               "description": "[risk_profile] 'cardiovascular', 'metabolic', 'longevity'. Omit for all. [trajectory] 'all', 'weight', 'biomarkers', 'fitness', 'recovery', 'metabolic'."},
+                    "domain": {
+                        "type": "string",
+                        "description": "[risk_profile] 'cardiovascular', 'metabolic', 'longevity'. Omit for all. [trajectory] 'all', 'weight', 'biomarkers', 'fitness', 'recovery', 'metabolic'.",
+                    },
                 },
                 "required": [],
             },
@@ -548,8 +660,11 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "start_date": {"type": "string", "description": "Override start date YYYY-MM-DD. Defaults to journey_start_date from profile."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
+                    "start_date": {
+                        "type": "string",
+                        "description": "Override start date YYYY-MM-DD. Defaults to journey_start_date from profile.",
+                    },
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
                 },
                 "required": [],
             },
@@ -564,7 +679,7 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD. Defaults to journey_start_date from profile."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
                 },
                 "required": [],
             },
@@ -578,9 +693,12 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "exercise_name":   {"type": "string", "description": "Exercise name to search (case-insensitive, fuzzy match). E.g. 'bench press', 'squat', 'deadlift'."},
-                    "start_date":      {"type": "string", "description": "Start date YYYY-MM-DD. Defaults to 2000-01-01."},
-                    "end_date":        {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
+                    "exercise_name": {
+                        "type": "string",
+                        "description": "Exercise name to search (case-insensitive, fuzzy match). E.g. 'bench press', 'squat', 'deadlift'.",
+                    },
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD. Defaults to 2000-01-01."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
                     "include_warmups": {"type": "boolean", "description": "Include warmup sets. Default false."},
                 },
                 "required": ["exercise_name"],
@@ -596,8 +714,8 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD."},
-                    "period":     {"type": "string", "description": "Aggregation period: 'week' (default) or 'month'."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD."},
+                    "period": {"type": "string", "description": "Aggregation period: 'week' (default) or 'month'."},
                 },
                 "required": [],
             },
@@ -623,10 +741,10 @@ TOOLS = {
                         "description": "progress (default), prs, or standards.",
                         "enum": ["progress", "prs", "standards"],
                     },
-                    "start_date":  {"type": "string", "description": "[progress] Start date YYYY-MM-DD."},
-                    "end_date":    {"type": "string", "description": "[progress/prs] End date YYYY-MM-DD (default: today)."},
-                    "exercise":    {"type": "string", "description": "[prs] Filter by exercise name (partial match)."},
-                    "muscle_group":{"type": "string", "description": "[progress] Filter by muscle group."},
+                    "start_date": {"type": "string", "description": "[progress] Start date YYYY-MM-DD."},
+                    "end_date": {"type": "string", "description": "[progress/prs] End date YYYY-MM-DD (default: today)."},
+                    "exercise": {"type": "string", "description": "[prs] Filter by exercise name (partial match)."},
+                    "muscle_group": {"type": "string", "description": "[progress] Filter by muscle group."},
                 },
                 "required": [],
             },
@@ -650,9 +768,9 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "end_date":         {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "bodyweight_lbs":   {"type": "number", "description": "Override bodyweight in lbs (default: latest Withings reading)."},
-                    "bodyweight_source":{"type": "string", "description": "Source for bodyweight: 'withings' (default)."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "bodyweight_lbs": {"type": "number", "description": "Override bodyweight in lbs (default: latest Withings reading)."},
+                    "bodyweight_source": {"type": "string", "description": "Source for bodyweight: 'withings' (default)."},
                 },
                 "required": [],
             },
@@ -667,7 +785,7 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD."},
                 },
                 "required": [],
             },
@@ -692,10 +810,13 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "start_date":          {"type": "string", "description": "Start date YYYY-MM-DD. Overrides 'days' if provided."},
-                    "end_date":            {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
-                    "days":                {"type": "number", "description": "Rolling window in days from end_date (default: 90). Ignored if start_date provided."},
-                    "target_sleep_hours":  {"type": "number", "description": "Nightly sleep target for debt calculation (default: 7.5h)."},
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD. Overrides 'days' if provided."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
+                    "days": {
+                        "type": "number",
+                        "description": "Rolling window in days from end_date (default: 90). Ignored if start_date provided.",
+                    },
+                    "target_sleep_hours": {"type": "number", "description": "Nightly sleep target for debt calculation (default: 7.5h)."},
                 },
                 "required": [],
             },
@@ -724,10 +845,16 @@ TOOLS = {
                         "description": "summary (default), macros, meal_timing, or micronutrients.",
                         "enum": ["summary", "macros", "meal_timing", "micronutrients"],
                     },
-                    "start_date":     {"type": "string", "description": "Start date YYYY-MM-DD (default: 30 days ago)."},
-                    "end_date":       {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "days":           {"type": "number", "description": "[macros] Rolling window in days (default: 30). Ignored if start_date provided."},
-                    "calorie_target": {"type": "number", "description": "[macros] Override daily calorie target (kcal). Defaults to TDEE estimate."},
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 30 days ago)."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "days": {
+                        "type": "number",
+                        "description": "[macros] Rolling window in days (default: 30). Ignored if start_date provided.",
+                    },
+                    "calorie_target": {
+                        "type": "number",
+                        "description": "[macros] Override daily calorie target (kcal). Defaults to TDEE estimate.",
+                    },
                     "protein_target": {"type": "number", "description": "[macros] Override daily protein target (g). Default: 180g."},
                 },
                 "required": [],
@@ -761,7 +888,7 @@ TOOLS = {
                 "based on average heartrate as a percentage of max HR (from profile). Aggregates weekly Zone 2 "
                 "minutes and compares to the 150 min/week target (Attia, Huberman, WHO moderate-intensity guidelines). "
                 "Shows full 5-zone training distribution, sport type breakdown for Zone 2, weekly trend analysis, "
-                "and training polarization alerts (Zone 3 'no man\'s land' warning per Seiler). "
+                "and training polarization alerts (Zone 3 'no man's land' warning per Seiler). "
                 "Zone 2 (60-70% max HR) is the highest-evidence longevity training modality — builds mitochondrial "
                 "density, fat oxidation capacity, and cardiovascular base. "
                 "Use for: 'how much Zone 2 am I doing?', 'am I hitting my Zone 2 target?', "
@@ -771,10 +898,16 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "start_date":             {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
-                    "end_date":               {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "weekly_target_minutes":   {"type": "integer", "description": "Weekly Zone 2 target in minutes (default: 150, per Attia/WHO guidelines)."},
-                    "min_duration_minutes":    {"type": "integer", "description": "Minimum activity duration in minutes to include (default: 10)."},
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "weekly_target_minutes": {
+                        "type": "integer",
+                        "description": "Weekly Zone 2 target in minutes (default: 150, per Attia/WHO guidelines).",
+                    },
+                    "min_duration_minutes": {
+                        "type": "integer",
+                        "description": "Minimum activity duration in minutes to include (default: 10).",
+                    },
                 },
                 "required": [],
             },
@@ -805,12 +938,12 @@ TOOLS = {
                         "description": "Which analysis to run. One of: dashboard (default), adherence, streaks, tiers, stacks, keystones.",
                         "enum": ["dashboard", "adherence", "streaks", "tiers", "stacks", "keystones"],
                     },
-                    "start_date":      {"type": "string",  "description": "Start date YYYY-MM-DD."},
-                    "end_date":        {"type": "string",  "description": "End date YYYY-MM-DD (default: today)."},
-                    "group":           {"type": "string",  "description": f"[adherence] Filter by P40 group. Valid: {P40_GROUPS}"},
-                    "habit_name":      {"type": "string",  "description": "[streaks] Optional habit name filter (fuzzy match)."},
-                    "top_n":           {"type": "number",  "description": "[keystones/stacks] Number of top results to return (default: 15/20)."},
-                    "min_pct":         {"type": "number",  "description": "[stacks] Minimum base rate to include a habit (default: 0.1)."},
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "group": {"type": "string", "description": f"[adherence] Filter by P40 group. Valid: {P40_GROUPS}"},
+                    "habit_name": {"type": "string", "description": "[streaks] Optional habit name filter (fuzzy match)."},
+                    "top_n": {"type": "number", "description": "[keystones/stacks] Number of top results to return (default: 15/20)."},
+                    "min_pct": {"type": "number", "description": "[stacks] Minimum base rate to include a habit (default: 0.1)."},
                 },
                 "required": [],
             },
@@ -830,9 +963,9 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "period_a_start": {"type": "string", "description": "Start of period A (YYYY-MM-DD)."},
-                    "period_a_end":   {"type": "string", "description": "End of period A (YYYY-MM-DD)."},
+                    "period_a_end": {"type": "string", "description": "End of period A (YYYY-MM-DD)."},
                     "period_b_start": {"type": "string", "description": "Start of period B (YYYY-MM-DD)."},
-                    "period_b_end":   {"type": "string", "description": "End of period B (YYYY-MM-DD)."},
+                    "period_b_end": {"type": "string", "description": "End of period B (YYYY-MM-DD)."},
                     "period_a_label": {"type": "string", "description": "Label for period A (e.g. 'Last month')."},
                     "period_b_label": {"type": "string", "description": "Label for period B (e.g. 'This month')."},
                 },
@@ -880,10 +1013,13 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "text":   {"type": "string",  "description": "The insight text to save. Be specific and actionable."},
-                    "tags":   {"type": "array",   "items": {"type": "string"},
-                               "description": "Optional list of tags (e.g. ['sleep', 'hrv', 'caffeine'])."},
-                    "source": {"type": "string",  "description": "Origin of the insight: 'chat' (default) or 'email'."},
+                    "text": {"type": "string", "description": "The insight text to save. Be specific and actionable."},
+                    "tags": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional list of tags (e.g. ['sleep', 'hrv', 'caffeine']).",
+                    },
+                    "source": {"type": "string", "description": "Origin of the insight: 'chat' (default) or 'email'."},
                 },
                 "required": ["text"],
             },
@@ -904,9 +1040,8 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "status_filter": {"type": "string",
-                                      "description": "Filter by status: 'open', 'acted', or 'resolved'. Omit for all."},
-                    "limit":         {"type": "integer", "description": "Max results to return (default: 50)."},
+                    "status_filter": {"type": "string", "description": "Filter by status: 'open', 'acted', or 'resolved'. Omit for all."},
+                    "limit": {"type": "integer", "description": "Max results to return (default: 50)."},
                 },
                 "required": [],
             },
@@ -925,9 +1060,12 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "insight_id":    {"type": "string", "description": "The insight_id returned by save_insight (e.g. 2026-02-22T09:15:00)."},
+                    "insight_id": {"type": "string", "description": "The insight_id returned by save_insight (e.g. 2026-02-22T09:15:00)."},
                     "outcome_notes": {"type": "string", "description": "What happened — did it work? What did you learn?"},
-                    "status":        {"type": "string", "description": "New status: 'acted' (tried it) or 'resolved' (fully closed). Default: 'acted'."},
+                    "status": {
+                        "type": "string",
+                        "description": "New status: 'acted' (tried it) or 'resolved' (fully closed). Default: 'acted'.",
+                    },
                 },
                 "required": ["insight_id"],
             },
@@ -942,7 +1080,7 @@ TOOLS = {
                 "'results' (default) = latest blood work values across all 7 draws with reference ranges and trend direction. "
                 "'trends' = biomarker trajectory over time — slope, direction, clinical threshold crossings. "
                 "'out_of_range' = all historically out-of-range biomarkers with persistence classification (chronic/recurring/occasional). "
-                "Use for: 'show my blood work', 'lab results', 'biomarker trends', 'what\'s out of range?', "
+                "Use for: 'show my blood work', 'lab results', 'biomarker trends', 'what's out of range?', "
                 "'cholesterol history', 'which labs are chronic issues?'."
             ),
             "inputSchema": {
@@ -954,9 +1092,9 @@ TOOLS = {
                         "enum": ["results", "trends", "out_of_range"],
                     },
                     "biomarker": {"type": "string", "description": "[results/trends] Filter by biomarker name (partial match)."},
-                    "category":  {"type": "string", "description": "[results] Filter by category (e.g. 'lipids', 'metabolic', 'hormones')."},
+                    "category": {"type": "string", "description": "[results] Filter by category (e.g. 'lipids', 'metabolic', 'hormones')."},
                     "start_date": {"type": "string", "description": "[trends] Start date YYYY-MM-DD."},
-                    "end_date":   {"type": "string", "description": "[trends] End date YYYY-MM-DD (default: today)."},
+                    "end_date": {"type": "string", "description": "[trends] End date YYYY-MM-DD (default: today)."},
                 },
                 "required": [],
             },
@@ -1019,7 +1157,10 @@ TOOLS = {
                         "description": "any (default), rising, or falling.",
                         "enum": ["any", "rising", "falling"],
                     },
-                    "panel": {"type": "string", "description": "Optional panel filter (e.g. 'lipid_standard', 'cardio_iq_insulin_resistance')."},
+                    "panel": {
+                        "type": "string",
+                        "description": "Optional panel filter (e.g. 'lipid_standard', 'cardio_iq_insulin_resistance').",
+                    },
                     "limit": {"type": "integer", "description": "Max deltas to return (default 50)."},
                 },
                 "required": [],
@@ -1043,7 +1184,10 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "draw_date": {"type": "string", "description": "Optional YYYY-MM-DD. Default = latest draw with allergy data."},
-                    "min_class": {"type": "integer", "description": "Filter out classes below this (0–6). Default 1 (excludes Class 0 / no detectable)."},
+                    "min_class": {
+                        "type": "integer",
+                        "description": "Filter out classes below this (0–6). Default 1 (excludes Class 0 / no detectable).",
+                    },
                     "category": {
                         "type": "string",
                         "description": "Optional category filter.",
@@ -1084,9 +1228,9 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "category":        {"type": "string", "description": "SNP category filter."},
-                    "risk_level":      {"type": "string", "description": "unfavorable, mixed, neutral, favorable."},
-                    "gene":            {"type": "string", "description": "Gene name: FTO, MTHFR, ABCG8."},
+                    "category": {"type": "string", "description": "SNP category filter."},
+                    "risk_level": {"type": "string", "description": "unfavorable, mixed, neutral, favorable."},
+                    "gene": {"type": "string", "description": "Gene name: FTO, MTHFR, ABCG8."},
                     "cross_reference": {"type": "string", "description": "'labs' or 'nutrition' for cross-ref data."},
                 },
                 "required": [],
@@ -1113,8 +1257,8 @@ TOOLS = {
                         "enum": ["dashboard", "fasting"],
                     },
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "days":       {"type": "number", "description": "[dashboard] Days to analyse (default: 30)."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "days": {"type": "number", "description": "[dashboard] Days to analyse (default: 30)."},
                 },
                 "required": [],
             },
@@ -1137,9 +1281,9 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "start_date":        {"type": "string", "description": "Start date YYYY-MM-DD (default: 30 days ago)."},
-                    "end_date":          {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "meal_gap_minutes":  {"type": "integer", "description": "Minutes gap to consider separate meals (default: 30)."},
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 30 days ago)."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "meal_gap_minutes": {"type": "integer", "description": "Minutes gap to consider separate meals (default: 30)."},
                 },
                 "required": [],
             },
@@ -1161,8 +1305,11 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "start_date": {"type": "string", "description": "Start YYYY-MM-DD (default: 7 days ago)."},
-                    "end_date":   {"type": "string", "description": "End YYYY-MM-DD (default: today)."},
-                    "template":   {"type": "string", "description": "Filter by template: morning, evening, stressor, health_event, weekly. Optional."},
+                    "end_date": {"type": "string", "description": "End YYYY-MM-DD (default: today)."},
+                    "template": {
+                        "type": "string",
+                        "description": "Filter by template: morning, evening, stressor, health_event, weekly. Optional.",
+                    },
                     "include_enriched": {"type": "boolean", "description": "Include Haiku-enriched fields (default: true)."},
                 },
                 "required": [],
@@ -1182,9 +1329,9 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "query":      {"type": "string", "description": "Search keywords (all must match)."},
+                    "query": {"type": "string", "description": "Search keywords (all must match)."},
                     "start_date": {"type": "string", "description": "Start YYYY-MM-DD (default: all time)."},
-                    "end_date":   {"type": "string", "description": "End YYYY-MM-DD (default: today)."},
+                    "end_date": {"type": "string", "description": "End YYYY-MM-DD (default: today)."},
                 },
                 "required": ["query"],
             },
@@ -1210,8 +1357,8 @@ TOOLS = {
                         "enum": ["trend", "state_of_mind"],
                     },
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 30 days ago)."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "days":       {"type": "number", "description": "[trend] Rolling window in days (default: 30)."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "days": {"type": "number", "description": "[trend] Rolling window in days (default: 30)."},
                 },
                 "required": [],
             },
@@ -1235,7 +1382,7 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "start_date": {"type": "string", "description": "Start YYYY-MM-DD (default: 30 days ago)."},
-                    "end_date":   {"type": "string", "description": "End YYYY-MM-DD (default: today)."},
+                    "end_date": {"type": "string", "description": "End YYYY-MM-DD (default: today)."},
                 },
                 "required": [],
             },
@@ -1257,15 +1404,24 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "name":       {"type": "string", "description": "Short name of the intervention (e.g. 'Creatine 5g daily', 'No screens after 9pm')."},
+                    "name": {
+                        "type": "string",
+                        "description": "Short name of the intervention (e.g. 'Creatine 5g daily', 'No screens after 9pm').",
+                    },
                     "hypothesis": {"type": "string", "description": "What you expect to happen (e.g. 'Will improve deep sleep % by >5%')."},
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD. Defaults to today."},
-                    "tags":       {"type": "array", "items": {"type": "string"},
-                                   "description": "Optional tags (e.g. ['sleep', 'supplement', 'caffeine'])."},
-                    "notes":      {"type": "string", "description": "Additional context or protocol details."},
+                    "tags": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional tags (e.g. ['sleep', 'supplement', 'caffeine']).",
+                    },
+                    "notes": {"type": "string", "description": "Additional context or protocol details."},
                     "library_id": {"type": "string", "description": "ID from experiment_library.json to link this run to a library entry."},
                     "duration_tier": {"type": "string", "description": "'7-day sprint', '30-day trial', or '60-day deep dive'."},
-                    "experiment_type": {"type": "string", "description": "'measurable' (has biomarker endpoint) or 'behavioral' (compliance tracking)."},
+                    "experiment_type": {
+                        "type": "string",
+                        "description": "'measurable' (has biomarker endpoint) or 'behavioral' (compliance tracking).",
+                    },
                     "planned_duration_days": {"type": "integer", "description": "Target duration in days."},
                 },
                 "required": ["name", "hypothesis"],
@@ -1328,18 +1484,20 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "experiment_id": {"type": "string", "description": "The experiment_id to end."},
-                    "outcome":       {"type": "string", "description": "What happened — did it work? What did you learn?"},
-                    "status":        {"type": "string", "description": "'completed' (default) or 'abandoned'."},
-                    "end_date":      {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
-                    "grade":         {"type": "string", "description": "'completed', 'partial' (>50% done), or 'failed'. Auto-inferred if omitted."},
+                    "outcome": {"type": "string", "description": "What happened — did it work? What did you learn?"},
+                    "status": {"type": "string", "description": "'completed' (default) or 'abandoned'."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
+                    "grade": {
+                        "type": "string",
+                        "description": "'completed', 'partial' (>50% done), or 'failed'. Auto-inferred if omitted.",
+                    },
                     "compliance_pct": {"type": "integer", "description": "0-100, percentage of days the intervention was performed."},
-                    "reflection":    {"type": "string", "description": "What I'd do differently next time."},
+                    "reflection": {"type": "string", "description": "What I'd do differently next time."},
                 },
                 "required": ["experiment_id"],
             },
         },
     },
-
     "get_hr_recovery_trend": {
         "fn": tool_get_hr_recovery_trend,
         "schema": {
@@ -1382,8 +1540,14 @@ TOOLS = {
                     "name": {"type": "string", "description": "Supplement or medication name (required)."},
                     "dose": {"type": "number", "description": "Dosage amount (e.g. 500 for 500mg)."},
                     "unit": {"type": "string", "description": "Unit: mg, mcg, g, IU, ml, capsule, tablet."},
-                    "timing": {"type": "string", "description": "When taken: morning, with_meal, before_bed, post_workout, evening, afternoon."},
-                    "category": {"type": "string", "description": "Category: supplement, medication, vitamin, mineral. Default: supplement."},
+                    "timing": {
+                        "type": "string",
+                        "description": "When taken: morning, with_meal, before_bed, post_workout, evening, afternoon.",
+                    },
+                    "category": {
+                        "type": "string",
+                        "description": "Category: supplement, medication, vitamin, mineral. Default: supplement.",
+                    },
                     "notes": {"type": "string", "description": "Optional notes."},
                     "date": {"type": "string", "description": "Date YYYY-MM-DD (default: today)."},
                 },
@@ -1452,11 +1616,17 @@ TOOLS = {
                     "action": {"type": "string", "description": "'start' (default) or 'end'."},
                     "destination_city": {"type": "string", "description": "City name (required for start)."},
                     "destination_country": {"type": "string", "description": "Country name."},
-                    "destination_timezone": {"type": "string", "description": "IANA timezone (e.g. 'Europe/London', 'Asia/Tokyo'). Enables jet lag protocol."},
+                    "destination_timezone": {
+                        "type": "string",
+                        "description": "IANA timezone (e.g. 'Europe/London', 'Asia/Tokyo'). Enables jet lag protocol.",
+                    },
                     "start_date": {"type": "string", "description": "Trip start YYYY-MM-DD (default: today)."},
                     "end_date": {"type": "string", "description": "Trip end YYYY-MM-DD (for action='end', default: today)."},
                     "purpose": {"type": "string", "description": "personal, work, family, vacation."},
-                    "trip_id": {"type": "string", "description": "Trip ID to end (for action='end'). If omitted, ends most recent active trip."},
+                    "trip_id": {
+                        "type": "string",
+                        "description": "Trip ID to end (for action='end'). If omitted, ends most recent active trip.",
+                    },
                     "notes": {"type": "string", "description": "Optional notes."},
                 },
                 "required": [],
@@ -1590,9 +1760,9 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "days_back":  {"type": "integer", "description": "Lookback window for streak history (default: 90)."},
-                    "end_date":   {"type": "string",  "description": "End date YYYY-MM-DD (default: yesterday)."},
-                    "vice_name":  {"type": "string",  "description": "Filter by vice name (partial match, case-insensitive)."},
+                    "days_back": {"type": "integer", "description": "Lookback window for streak history (default: 90)."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: yesterday)."},
+                    "vice_name": {"type": "string", "description": "Filter by vice name (partial match, case-insensitive)."},
                 },
                 "required": [],
             },
@@ -1616,7 +1786,10 @@ TOOLS = {
                 "properties": {
                     "member_id": {"type": "string", "description": "Specific member ID (e.g. 'sarah_chen', 'elena_voss'). Omit for all."},
                     "type": {"type": "string", "description": "Filter by type: fictional_advisor, real_expert, narrator, meta_role."},
-                    "feature": {"type": "string", "description": "Filter by feature: weekly_digest, monthly_digest, daily_brief, nutrition_review, chronicle."},
+                    "feature": {
+                        "type": "string",
+                        "description": "Filter by feature: weekly_digest, monthly_digest, daily_brief, nutrition_review, chronicle.",
+                    },
                     "active_only": {"type": "boolean", "description": "Only show active members. Default: true."},
                 },
                 "required": [],
@@ -1640,9 +1813,18 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "title": {"type": "string", "description": "Short reward title (e.g., 'Dinner at Canlis', 'Buy new running shoes')."},
-                    "condition_type": {"type": "string", "description": "Trigger type: pillar_tier, pillar_level, character_level, character_tier."},
-                    "pillar": {"type": "string", "description": "Pillar name (required for pillar_tier/pillar_level): sleep, movement, nutrition, metabolic, mind, relationships, consistency."},
-                    "tier": {"type": "string", "description": "Target tier (for pillar_tier/character_tier): Foundation, Momentum, Discipline, Mastery, Elite."},
+                    "condition_type": {
+                        "type": "string",
+                        "description": "Trigger type: pillar_tier, pillar_level, character_level, character_tier.",
+                    },
+                    "pillar": {
+                        "type": "string",
+                        "description": "Pillar name (required for pillar_tier/pillar_level): sleep, movement, nutrition, metabolic, mind, relationships, consistency.",
+                    },
+                    "tier": {
+                        "type": "string",
+                        "description": "Target tier (for pillar_tier/character_tier): Foundation, Momentum, Discipline, Mastery, Elite.",
+                    },
                     "level": {"type": "integer", "description": "Target level 1-100 (for pillar_level/character_level)."},
                     "description": {"type": "string", "description": "Optional notes about the reward."},
                     "reward_id": {"type": "string", "description": "Optional: specify ID to update existing reward."},
@@ -1690,9 +1872,12 @@ TOOLS = {
                         "description": "sheet (default), pillar, or history.",
                         "enum": ["sheet", "pillar", "history"],
                     },
-                    "pillar":      {"type": "string", "description": "[pillar] Pillar name e.g. 'Sleep', 'Training', 'Nutrition', 'Mind', 'Recovery', 'Metabolic', 'Social'."},
-                    "days":        {"type": "number", "description": "[pillar] Days of history to include (default: 14)."},
-                    "pillar_filter":{"type": "string", "description": "[history] Filter level history by pillar name."},
+                    "pillar": {
+                        "type": "string",
+                        "description": "[pillar] Pillar name e.g. 'Sleep', 'Training', 'Nutrition', 'Mind', 'Recovery', 'Metabolic', 'Social'.",
+                    },
+                    "days": {"type": "number", "description": "[pillar] Days of history to include (default: 14)."},
+                    "pillar_filter": {"type": "string", "description": "[history] Filter level history by pillar name."},
                 },
                 "required": [],
             },
@@ -1717,7 +1902,10 @@ TOOLS = {
                     "component": {"type": "string", "description": "Component name (for update_target, e.g. 'duration_vs_target')."},
                     "target_field": {"type": "string", "description": "Target field name (for update_target, e.g. 'target_hours')."},
                     "value": {"type": "number", "description": "New value (for update_target, update_leveling)."},
-                    "field": {"type": "string", "description": "Leveling field (for update_leveling: ema_lambda, ema_window_days, level_up_streak_days, etc.)."},
+                    "field": {
+                        "type": "string",
+                        "description": "Leveling field (for update_leveling: ema_lambda, ema_window_days, level_up_streak_days, etc.).",
+                    },
                 },
                 "required": ["action"],
             },
@@ -1739,7 +1927,10 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "title": {"type": "string", "description": "Short title of the event."},
-                    "type": {"type": "string", "description": "Event type: birthday, anniversary, work_milestone, social, conflict, loss, health_milestone, travel, relationship, financial, achievement, setback, other."},
+                    "type": {
+                        "type": "string",
+                        "description": "Event type: birthday, anniversary, work_milestone, social, conflict, loss, health_milestone, travel, relationship, financial, achievement, setback, other.",
+                    },
                     "date": {"type": "string", "description": "Event date YYYY-MM-DD (default: today)."},
                     "description": {"type": "string", "description": "Optional longer description."},
                     "people": {"type": "array", "items": {"type": "string"}, "description": "People involved (names)."},
@@ -1759,7 +1950,7 @@ TOOLS = {
                 "'list' (default) = show all logged sick/rest days in a date range. "
                 "'log' = flag a date as sick/rest day (requires date=). Accepts dates= list for multiple days. "
                 "'clear' = remove a sick day flag logged in error (requires date=). "
-                "Use for: 'log a sick day', 'I\'m sick today', 'show my sick days', 'remove sick day flag', 'rest day'."
+                "Use for: 'log a sick day', 'I'm sick today', 'show my sick days', 'remove sick day flag', 'rest day'."
             ),
             "inputSchema": {
                 "type": "object",
@@ -1769,11 +1960,11 @@ TOOLS = {
                         "description": "list (default), log, or clear.",
                         "enum": ["list", "log", "clear"],
                     },
-                    "date":       {"type": "string", "description": "[log/clear] Date YYYY-MM-DD."},
-                    "dates":      {"type": "array", "items": {"type": "string"}, "description": "[log] List of dates to flag at once."},
-                    "reason":     {"type": "string", "description": "[log] Optional reason (e.g. 'flu', 'rest day', 'travel')."},
+                    "date": {"type": "string", "description": "[log/clear] Date YYYY-MM-DD."},
+                    "dates": {"type": "array", "items": {"type": "string"}, "description": "[log] List of dates to flag at once."},
+                    "reason": {"type": "string", "description": "[log] Optional reason (e.g. 'flu', 'rest day', 'travel')."},
                     "start_date": {"type": "string", "description": "[list] Start of range (default: 30 days ago)."},
-                    "end_date":   {"type": "string", "description": "[list] End of range (default: today)."},
+                    "end_date": {"type": "string", "description": "[list] End of range (default: today)."},
                 },
                 "required": [],
             },
@@ -1817,7 +2008,10 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "person": {"type": "string", "description": "Name of the person."},
-                    "type": {"type": "string", "description": "Interaction type: call, text, in_person, video, email, social_media, other."},
+                    "type": {
+                        "type": "string",
+                        "description": "Interaction type: call, text, in_person, video, email, social_media, other.",
+                    },
                     "depth": {"type": "string", "description": "Depth level: surface, meaningful, deep. Default: meaningful."},
                     "date": {"type": "string", "description": "Date YYYY-MM-DD (default: today)."},
                     "duration_min": {"type": "integer", "description": "Duration in minutes (optional)."},
@@ -1865,10 +2059,16 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "category": {"type": "string", "description": "Category: food, alcohol, sleep_sabotage, skip_workout, screen_time, social_avoidance, impulse_purchase, other."},
+                    "category": {
+                        "type": "string",
+                        "description": "Category: food, alcohol, sleep_sabotage, skip_workout, screen_time, social_avoidance, impulse_purchase, other.",
+                    },
                     "resisted": {"type": "boolean", "description": "true if resisted, false if succumbed."},
                     "date": {"type": "string", "description": "Date YYYY-MM-DD (default: today)."},
-                    "trigger": {"type": "string", "description": "What triggered the temptation (e.g. 'stress', 'boredom', 'social pressure')."},
+                    "trigger": {
+                        "type": "string",
+                        "description": "What triggered the temptation (e.g. 'stress', 'boredom', 'social pressure').",
+                    },
                     "intensity": {"type": "integer", "description": "1-5 intensity of the urge."},
                     "time_of_day": {"type": "string", "description": "When it happened: morning, afternoon, evening, night."},
                     "notes": {"type": "string", "description": "Optional notes."},
@@ -1914,10 +2114,16 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "date": {"type": "string", "description": "Date of the timeline event YYYY-MM-DD."},
-                    "event_type": {"type": "string", "description": "Timeline event type: weight, level_up, experiment, discovery, finding, counterintuitive, milestone."},
+                    "event_type": {
+                        "type": "string",
+                        "description": "Timeline event type: weight, level_up, experiment, discovery, finding, counterintuitive, milestone.",
+                    },
                     "title": {"type": "string", "description": "Exact title of the timeline event (used to compute the event key)."},
                     "annotation": {"type": "string", "description": "What I did about this — the behavioral response."},
-                    "action_taken": {"type": "string", "description": "Short label for the action (e.g. 'Added evening walks', 'Started creatine')."},
+                    "action_taken": {
+                        "type": "string",
+                        "description": "Short label for the action (e.g. 'Added evening walks', 'Started creatine').",
+                    },
                     "outcome": {"type": "string", "description": "Optional outcome of the action."},
                 },
                 "required": ["date", "event_type", "title", "annotation"],
@@ -1979,12 +2185,12 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "start_date":       {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
-                    "end_date":         {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "zone2_hr_low":     {"type": "number", "description": "Lower HR bound for Zone 2 sessions (default: 110)."},
-                    "zone2_hr_high":    {"type": "number", "description": "Upper HR bound for Zone 2 sessions (default: 139)."},
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "zone2_hr_low": {"type": "number", "description": "Lower HR bound for Zone 2 sessions (default: 110)."},
+                    "zone2_hr_high": {"type": "number", "description": "Upper HR bound for Zone 2 sessions (default: 139)."},
                     "min_duration_min": {"type": "number", "description": "Minimum session duration in minutes (default: 20)."},
-                    "sport_type":       {"type": "string", "description": "Filter by sport type e.g. 'run', 'ride' (default: all)."},
+                    "sport_type": {"type": "string", "description": "Filter by sport type e.g. 'run', 'ride' (default: all)."},
                 },
                 "required": [],
             },
@@ -2008,10 +2214,10 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "start_date":       {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
-                    "end_date":         {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "sport_type":       {"type": "string", "description": "Filter by sport type e.g. 'run', 'ride' (default: all)."},
-                    "min_hr":           {"type": "number", "description": "Minimum avg HR to include (default: 100)."},
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "sport_type": {"type": "string", "description": "Filter by sport type e.g. 'run', 'ride' (default: all)."},
+                    "min_hr": {"type": "number", "description": "Minimum avg HR to include (default: 100)."},
                     "min_duration_min": {"type": "number", "description": "Minimum duration in minutes (default: 10)."},
                 },
                 "required": [],
@@ -2148,13 +2354,13 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "task_id":     {"type": "string", "description": "Task ID from list_todoist_tasks."},
-                    "due_string":  {"type": "string", "description": "Recurrence e.g. 'every! week', 'every! month'. Use every! not every."},
-                    "due_date":    {"type": "string", "description": "First-fire date YYYY-MM-DD."},
-                    "content":     {"type": "string", "description": "New task name."},
+                    "task_id": {"type": "string", "description": "Task ID from list_todoist_tasks."},
+                    "due_string": {"type": "string", "description": "Recurrence e.g. 'every! week', 'every! month'. Use every! not every."},
+                    "due_date": {"type": "string", "description": "First-fire date YYYY-MM-DD."},
+                    "content": {"type": "string", "description": "New task name."},
                     "description": {"type": "string", "description": "Task description/notes."},
-                    "priority":    {"type": "integer", "description": "1=urgent 2=high 3=medium 4=normal."},
-                    "project_id":  {"type": "string", "description": "Move to project ID."},
+                    "priority": {"type": "integer", "description": "1=urgent 2=high 3=medium 4=normal."},
+                    "project_id": {"type": "string", "description": "Move to project ID."},
                 },
                 "required": ["task_id"],
             },
@@ -2171,11 +2377,11 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "content":     {"type": "string", "description": "Task name."},
-                    "project_id":  {"type": "string", "description": "Project ID from get_todoist_projects."},
-                    "due_string":  {"type": "string", "description": "e.g. 'every! Sunday', 'every! month'. Use every! for recurring."},
-                    "due_date":    {"type": "string", "description": "YYYY-MM-DD for one-time or first-fire date."},
-                    "priority":    {"type": "integer", "description": "1=urgent 2=high 3=medium 4=normal."},
+                    "content": {"type": "string", "description": "Task name."},
+                    "project_id": {"type": "string", "description": "Project ID from get_todoist_projects."},
+                    "due_string": {"type": "string", "description": "e.g. 'every! Sunday', 'every! month'. Use every! for recurring."},
+                    "due_date": {"type": "string", "description": "YYYY-MM-DD for one-time or first-fire date."},
+                    "priority": {"type": "integer", "description": "1=urgent 2=high 3=medium 4=normal."},
                     "description": {"type": "string", "description": "Task description."},
                 },
                 "required": ["content"],
@@ -2210,7 +2416,6 @@ TOOLS = {
             },
         },
     },
-
     # ── IC-1: Platform Memory (tools 136–139) ──────────────────────────────────
     "write_platform_memory": {
         "fn": tool_write_platform_memory,
@@ -2226,9 +2431,15 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "category": {"type": "string", "description": "Memory category (e.g. 'failure_pattern', 'what_worked', 'journey_milestone')."},
-                    "content":  {"type": "object", "description": "Key-value dict of data to store. E.g. {\"pattern\": \"high-stress Tuesdays correlate with missed nutrition\", \"conditions\": [...]}"},
-                    "date":     {"type": "string", "description": "Date for the record (YYYY-MM-DD). Defaults to today."},
+                    "category": {
+                        "type": "string",
+                        "description": "Memory category (e.g. 'failure_pattern', 'what_worked', 'journey_milestone').",
+                    },
+                    "content": {
+                        "type": "object",
+                        "description": 'Key-value dict of data to store. E.g. {"pattern": "high-stress Tuesdays correlate with missed nutrition", "conditions": [...]}',
+                    },
+                    "date": {"type": "string", "description": "Date for the record (YYYY-MM-DD). Defaults to today."},
                     "overwrite": {"type": "boolean", "description": "Overwrite if record exists (default true)."},
                 },
                 "required": ["category", "content"],
@@ -2247,8 +2458,8 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "category": {"type": "string", "description": "Memory category to retrieve."},
-                    "days":     {"type": "integer", "description": "How many days back to look (default 30, max 365)."},
-                    "limit":    {"type": "integer", "description": "Max records to return (default 10, max 50)."},
+                    "days": {"type": "integer", "description": "How many days back to look (default 30, max 365)."},
+                    "limit": {"type": "integer", "description": "Max records to return (default 10, max 50)."},
                 },
                 "required": ["category"],
             },
@@ -2280,7 +2491,7 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "category": {"type": "string", "description": "Memory category."},
-                    "date":     {"type": "string", "description": "Date of the record to delete (YYYY-MM-DD)."},
+                    "date": {"type": "string", "description": "Date of the record to delete (YYYY-MM-DD)."},
                 },
                 "required": ["category", "date"],
             },
@@ -2300,7 +2511,7 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "date":  {"type": "string", "description": "Date for the snapshot (YYYY-MM-DD). Defaults to today."},
+                    "date": {"type": "string", "description": "Date for the snapshot (YYYY-MM-DD). Defaults to today."},
                     "label": {"type": "string", "description": "Label for this snapshot (e.g. 'day_1', 'month_3'). Defaults to 'day_1'."},
                     "force": {"type": "boolean", "description": "If true, overwrite existing snapshot for this date. Default false."},
                 },
@@ -2321,14 +2532,26 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "decision":        {"type": "string", "description": "What the platform recommended (e.g. 'Take a rest day', 'Front-load protein')."},
-                    "followed":        {"type": "boolean", "description": "True if Matthew followed the advice, False if overridden. Omit if not yet decided."},
+                    "decision": {
+                        "type": "string",
+                        "description": "What the platform recommended (e.g. 'Take a rest day', 'Front-load protein').",
+                    },
+                    "followed": {
+                        "type": "boolean",
+                        "description": "True if Matthew followed the advice, False if overridden. Omit if not yet decided.",
+                    },
                     "override_reason": {"type": "string", "description": "Why Matthew chose differently (if overridden). Optional."},
-                    "source":          {"type": "string", "description": "Which digest/email made the recommendation. Default: daily_brief.",
-                                        "enum": ["daily_brief", "weekly_digest", "monthly_digest", "nutrition_review", "chronicle", "mcp"]},
-                    "pillars":         {"type": "array", "items": {"type": "string"},
-                                        "description": "Pillars this decision touches (e.g. ['sleep', 'movement'])."},
-                    "date":            {"type": "string", "description": "Date of the decision (YYYY-MM-DD). Defaults to today."},
+                    "source": {
+                        "type": "string",
+                        "description": "Which digest/email made the recommendation. Default: daily_brief.",
+                        "enum": ["daily_brief", "weekly_digest", "monthly_digest", "nutrition_review", "chronicle", "mcp"],
+                    },
+                    "pillars": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Pillars this decision touches (e.g. ['sleep', 'movement']).",
+                    },
+                    "date": {"type": "string", "description": "Date of the decision (YYYY-MM-DD). Defaults to today."},
                 },
                 "required": ["decision"],
             },
@@ -2349,7 +2572,7 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "date":      {"type": "string", "description": "Target date (YYYY-MM-DD). Defaults to yesterday."},
+                    "date": {"type": "string", "description": "Target date (YYYY-MM-DD). Defaults to yesterday."},
                     "days_back": {"type": "integer", "description": "Lookback window for streaks and completion rates (default 30)."},
                 },
                 "required": [],
@@ -2371,7 +2594,7 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "start_date": {"type": "string", "description": "Start date (YYYY-MM-DD). Defaults to 7 days ago."},
-                    "end_date":   {"type": "string", "description": "End date (YYYY-MM-DD). Defaults to today."},
+                    "end_date": {"type": "string", "description": "End date (YYYY-MM-DD). Defaults to today."},
                 },
                 "required": [],
             },
@@ -2392,7 +2615,7 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "start_date": {"type": "string", "description": "Start date (YYYY-MM-DD). Defaults to 30 days ago."},
-                    "end_date":   {"type": "string", "description": "End date (YYYY-MM-DD). Defaults to today."},
+                    "end_date": {"type": "string", "description": "End date (YYYY-MM-DD). Defaults to today."},
                 },
                 "required": [],
             },
@@ -2413,7 +2636,7 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "date":      {"type": "string", "description": "End date for status query (YYYY-MM-DD). Defaults to yesterday."},
+                    "date": {"type": "string", "description": "End date for status query (YYYY-MM-DD). Defaults to yesterday."},
                     "days_back": {"type": "integer", "description": "Days of history to return (default 14)."},
                 },
                 "required": [],
@@ -2433,8 +2656,8 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "days":         {"type": "integer", "description": "Look back N days (default 30)."},
-                    "pillar":       {"type": "string", "description": "Filter by pillar (e.g. 'sleep', 'nutrition')."},
+                    "days": {"type": "integer", "description": "Look back N days (default 30)."},
+                    "pillar": {"type": "string", "description": "Filter by pillar (e.g. 'sleep', 'nutrition')."},
                     "outcome_only": {"type": "boolean", "description": "If true, only return decisions with recorded outcomes."},
                 },
                 "required": [],
@@ -2453,11 +2676,14 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "sk":             {"type": "string", "description": "Sort key of the decision to update (from get_decisions)."},
-                    "outcome_metric": {"type": "string", "description": "Which metric was affected (e.g. 'HRV', 'sleep_score', 'protein_g')."},
-                    "outcome_delta":  {"type": "number", "description": "Change in the metric (positive = improved, negative = worsened)."},
-                    "outcome_notes":  {"type": "string", "description": "Free-text notes on what happened."},
-                    "effectiveness":  {"type": "integer", "description": "1-5 rating: 1=bad outcome, 3=neutral, 5=great outcome."},
+                    "sk": {"type": "string", "description": "Sort key of the decision to update (from get_decisions)."},
+                    "outcome_metric": {
+                        "type": "string",
+                        "description": "Which metric was affected (e.g. 'HRV', 'sleep_score', 'protein_g').",
+                    },
+                    "outcome_delta": {"type": "number", "description": "Change in the metric (positive = improved, negative = worsened)."},
+                    "outcome_notes": {"type": "string", "description": "Free-text notes on what happened."},
+                    "effectiveness": {"type": "integer", "description": "1-5 rating: 1=bad outcome, 3=neutral, 5=great outcome."},
                 },
                 "required": ["sk"],
             },
@@ -2480,12 +2706,16 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "status":           {"type": "string",
-                                         "description": "Filter by lifecycle status.",
-                                         "enum": ["pending", "confirming", "confirmed", "refuted", "archived"]},
-                    "domain":           {"type": "string",
-                                         "description": "Filter by domain (e.g. 'sleep', 'nutrition', 'movement', 'mind', 'metabolic')."},
-                    "days":             {"type": "integer", "description": "How many days back to search (default 90)."},
+                    "status": {
+                        "type": "string",
+                        "description": "Filter by lifecycle status.",
+                        "enum": ["pending", "confirming", "confirmed", "refuted", "archived"],
+                    },
+                    "domain": {
+                        "type": "string",
+                        "description": "Filter by domain (e.g. 'sleep', 'nutrition', 'movement', 'mind', 'metabolic').",
+                    },
+                    "days": {"type": "integer", "description": "How many days back to search (default 90)."},
                     "include_archived": {"type": "boolean", "description": "Include archived hypotheses (default false)."},
                 },
                 "required": [],
@@ -2505,15 +2735,14 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "sk":            {"type": "string",
-                                      "description": "Sort key from get_hypotheses (starts with 'HYPOTHESIS#')."},
-                    "verdict":       {"type": "string",
-                                      "description": "Your assessment of the evidence.",
-                                      "enum": ["confirming", "confirmed", "refuted", "insufficient", "archived"]},
-                    "evidence_note": {"type": "string",
-                                      "description": "What you observed (free text)."},
-                    "effectiveness": {"type": "integer",
-                                      "description": "Optional 1-5 strength of evidence (5=very strong confirmation)."},
+                    "sk": {"type": "string", "description": "Sort key from get_hypotheses (starts with 'HYPOTHESIS#')."},
+                    "verdict": {
+                        "type": "string",
+                        "description": "Your assessment of the evidence.",
+                        "enum": ["confirming", "confirmed", "refuted", "insufficient", "archived"],
+                    },
+                    "evidence_note": {"type": "string", "description": "What you observed (free text)."},
+                    "effectiveness": {"type": "integer", "description": "Optional 1-5 strength of evidence (5=very strong confirmation)."},
                 },
                 "required": ["sk", "verdict"],
             },
@@ -2537,8 +2766,8 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "days":       {"type": "integer", "description": "Rolling window in days (default: 14)."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "days": {"type": "integer", "description": "Rolling window in days (default: 14)."},
                 },
                 "required": [],
             },
@@ -2561,8 +2790,8 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "weeks":      {"type": "integer", "description": "Weeks of data to analyse (default: 8)."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "weeks": {"type": "integer", "description": "Weeks of data to analyse (default: 8)."},
                 },
                 "required": [],
             },
@@ -2586,8 +2815,8 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "days":       {"type": "integer", "description": "Rolling window in days (default: 90)."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "days": {"type": "integer", "description": "Rolling window in days (default: 90)."},
                 },
                 "required": [],
             },
@@ -2611,8 +2840,8 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "days":       {"type": "integer", "description": "Rolling window in days (default: 30)."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "days": {"type": "integer", "description": "Rolling window in days (default: 30)."},
                 },
                 "required": [],
             },
@@ -2636,8 +2865,8 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "days":       {"type": "integer", "description": "Rolling window in days (default: 60)."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "days": {"type": "integer", "description": "Rolling window in days (default: 60)."},
                 },
                 "required": [],
             },
@@ -2659,20 +2888,32 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "name":             {"type": "string", "description": "Challenge name (e.g. '10,000 Steps Every Day')."},
-                    "catalog_id":       {"type": "string", "description": "ID from challenges_catalog.json to link this DDB record back to the catalog tile."},
-                    "description":      {"type": "string", "description": "What and why — the motivation."},
-                    "source":           {"type": "string", "description": "Generation source: journal_mining, data_signal, hypothesis_graduate, science_scan, manual, community. Default: manual."},
-                    "source_detail":    {"type": "string", "description": "Specific trigger (e.g. 'avoidance_flag: late_night_snacking x6 in 14d')."},
-                    "domain":           {"type": "string", "description": "Pillar: sleep, movement, nutrition, supplements, mental, social, discipline, metabolic, general."},
-                    "difficulty":       {"type": "string", "description": "easy, moderate, hard. Default: moderate."},
-                    "duration_days":    {"type": "integer", "description": "Challenge length in days (default: 7)."},
-                    "protocol":         {"type": "string", "description": "What to do — the specific actions."},
+                    "name": {"type": "string", "description": "Challenge name (e.g. '10,000 Steps Every Day')."},
+                    "catalog_id": {
+                        "type": "string",
+                        "description": "ID from challenges_catalog.json to link this DDB record back to the catalog tile.",
+                    },
+                    "description": {"type": "string", "description": "What and why — the motivation."},
+                    "source": {
+                        "type": "string",
+                        "description": "Generation source: journal_mining, data_signal, hypothesis_graduate, science_scan, manual, community. Default: manual.",
+                    },
+                    "source_detail": {
+                        "type": "string",
+                        "description": "Specific trigger (e.g. 'avoidance_flag: late_night_snacking x6 in 14d').",
+                    },
+                    "domain": {
+                        "type": "string",
+                        "description": "Pillar: sleep, movement, nutrition, supplements, mental, social, discipline, metabolic, general.",
+                    },
+                    "difficulty": {"type": "string", "description": "easy, moderate, hard. Default: moderate."},
+                    "duration_days": {"type": "integer", "description": "Challenge length in days (default: 7)."},
+                    "protocol": {"type": "string", "description": "What to do — the specific actions."},
                     "success_criteria": {"type": "string", "description": "How to know you succeeded."},
-                    "metric_targets":   {"type": "object", "description": "Optional measurable targets (e.g. {'steps': 10000})."},
-                    "status":           {"type": "string", "description": "'candidate' (default) or 'active' to start immediately."},
+                    "metric_targets": {"type": "object", "description": "Optional measurable targets (e.g. {'steps': 10000})."},
+                    "status": {"type": "string", "description": "'candidate' (default) or 'active' to start immediately."},
                     "verification_method": {"type": "string", "description": "self_report (default), metric_auto, or hybrid."},
-                    "tags":             {"type": "array", "items": {"type": "string"}, "description": "Optional tags."},
+                    "tags": {"type": "array", "items": {"type": "string"}, "description": "Optional tags."},
                     "related_experiment_id": {"type": "string", "description": "Link to experiment if graduated from one."},
                 },
                 "required": ["name"],
@@ -2710,10 +2951,10 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "challenge_id": {"type": "string", "description": "Challenge ID."},
-                    "completed":    {"type": "boolean", "description": "true if you did it, false if missed."},
-                    "note":         {"type": "string", "description": "Optional reflection."},
-                    "rating":       {"type": "integer", "description": "Optional 1-5 difficulty rating."},
-                    "date":         {"type": "string", "description": "Date YYYY-MM-DD (default: today)."},
+                    "completed": {"type": "boolean", "description": "true if you did it, false if missed."},
+                    "note": {"type": "string", "description": "Optional reflection."},
+                    "rating": {"type": "integer", "description": "Optional 1-5 difficulty rating."},
+                    "date": {"type": "string", "description": "Date YYYY-MM-DD (default: today)."},
                 },
                 "required": ["challenge_id", "completed"],
             },
@@ -2735,7 +2976,7 @@ TOOLS = {
                     "status": {"type": "string", "description": "Filter: candidate, active, completed, failed, declined. Omit for all."},
                     "source": {"type": "string", "description": "Filter by source: journal_mining, data_signal, etc."},
                     "domain": {"type": "string", "description": "Filter by domain: sleep, movement, nutrition, etc."},
-                    "limit":  {"type": "integer", "description": "Max results (default: 50)."},
+                    "limit": {"type": "integer", "description": "Max results (default: 50)."},
                 },
                 "required": [],
             },
@@ -2755,15 +2996,14 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "challenge_id": {"type": "string", "description": "Challenge ID to end."},
-                    "status":       {"type": "string", "description": "'completed' (default) or 'failed'."},
-                    "outcome":      {"type": "string", "description": "What happened — summary."},
-                    "reflection":   {"type": "string", "description": "What I'd do differently."},
+                    "status": {"type": "string", "description": "'completed' (default) or 'failed'."},
+                    "outcome": {"type": "string", "description": "What happened — summary."},
+                    "reflection": {"type": "string", "description": "What I'd do differently."},
                 },
                 "required": ["challenge_id"],
             },
         },
     },
-
     # ── Protocols ────────────────────────────────────────────────────────
     "create_protocol": {
         "fn": tool_create_protocol,
@@ -2777,24 +3017,39 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "name":                {"type": "string", "description": "Protocol name (e.g. 'Sleep Protocol')."},
-                    "slug":                {"type": "string", "description": "URL-safe ID. Auto-generated from name if omitted."},
-                    "domain":              {"type": "string", "description": "Domain: sleep, movement, nutrition, supplements, mental, social, discipline, metabolic, general."},
-                    "category":            {"type": "string", "description": "Display category (defaults to domain name)."},
-                    "pillar":              {"type": "string", "description": "Character sheet pillar this feeds."},
-                    "status":              {"type": "string", "description": "'active' (default), 'paused', or 'retired'."},
-                    "start_date":          {"type": "string", "description": "Start date YYYY-MM-DD (defaults to today)."},
-                    "description":         {"type": "string", "description": "Short description of the protocol."},
-                    "why":                 {"type": "string", "description": "Rationale — why this protocol matters."},
-                    "key_metrics":         {"type": "array", "items": {"type": "string"}, "description": "Metrics tracked by this protocol."},
-                    "key_finding":         {"type": "string", "description": "Most important finding so far."},
-                    "tracked_by":          {"type": "array", "items": {"type": "string"}, "description": "Data sources tracking this protocol."},
-                    "related_habits":      {"type": "array", "items": {"type": "string"}, "description": "Daily habits that execute this protocol."},
-                    "related_supplements": {"type": "array", "items": {"type": "string"}, "description": "Supplements supporting this protocol."},
-                    "experiment_tags":     {"type": "array", "items": {"type": "string"}, "description": "Tags linking to related experiments."},
-                    "adherence_target":    {"type": "integer", "description": "Target adherence percentage (default 90)."},
-                    "signal_status":       {"type": "string", "description": "'positive', 'neutral', 'negative', or 'pending'."},
-                    "signal_note":         {"type": "string", "description": "Short note on current signal."},
+                    "name": {"type": "string", "description": "Protocol name (e.g. 'Sleep Protocol')."},
+                    "slug": {"type": "string", "description": "URL-safe ID. Auto-generated from name if omitted."},
+                    "domain": {
+                        "type": "string",
+                        "description": "Domain: sleep, movement, nutrition, supplements, mental, social, discipline, metabolic, general.",
+                    },
+                    "category": {"type": "string", "description": "Display category (defaults to domain name)."},
+                    "pillar": {"type": "string", "description": "Character sheet pillar this feeds."},
+                    "status": {"type": "string", "description": "'active' (default), 'paused', or 'retired'."},
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (defaults to today)."},
+                    "description": {"type": "string", "description": "Short description of the protocol."},
+                    "why": {"type": "string", "description": "Rationale — why this protocol matters."},
+                    "key_metrics": {"type": "array", "items": {"type": "string"}, "description": "Metrics tracked by this protocol."},
+                    "key_finding": {"type": "string", "description": "Most important finding so far."},
+                    "tracked_by": {"type": "array", "items": {"type": "string"}, "description": "Data sources tracking this protocol."},
+                    "related_habits": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Daily habits that execute this protocol.",
+                    },
+                    "related_supplements": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Supplements supporting this protocol.",
+                    },
+                    "experiment_tags": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Tags linking to related experiments.",
+                    },
+                    "adherence_target": {"type": "integer", "description": "Target adherence percentage (default 90)."},
+                    "signal_status": {"type": "string", "description": "'positive', 'neutral', 'negative', or 'pending'."},
+                    "signal_note": {"type": "string", "description": "Short note on current signal."},
                 },
                 "required": ["name"],
             },
@@ -2812,23 +3067,23 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "protocol_id":         {"type": "string", "description": "Protocol ID (slug) to update."},
-                    "name":                {"type": "string", "description": "New name."},
-                    "description":         {"type": "string", "description": "New description."},
-                    "why":                 {"type": "string", "description": "New rationale."},
-                    "status":              {"type": "string", "description": "'active', 'paused', or 'retired'."},
-                    "domain":              {"type": "string", "description": "New domain."},
-                    "category":            {"type": "string", "description": "New category."},
-                    "pillar":              {"type": "string", "description": "New pillar."},
-                    "key_finding":         {"type": "string", "description": "Updated key finding."},
-                    "signal_status":       {"type": "string", "description": "'positive', 'neutral', 'negative', or 'pending'."},
-                    "signal_note":         {"type": "string", "description": "Updated signal note."},
-                    "key_metrics":         {"type": "array", "items": {"type": "string"}, "description": "Updated metrics list."},
-                    "tracked_by":          {"type": "array", "items": {"type": "string"}, "description": "Updated data sources."},
-                    "related_habits":      {"type": "array", "items": {"type": "string"}, "description": "Updated related habits."},
+                    "protocol_id": {"type": "string", "description": "Protocol ID (slug) to update."},
+                    "name": {"type": "string", "description": "New name."},
+                    "description": {"type": "string", "description": "New description."},
+                    "why": {"type": "string", "description": "New rationale."},
+                    "status": {"type": "string", "description": "'active', 'paused', or 'retired'."},
+                    "domain": {"type": "string", "description": "New domain."},
+                    "category": {"type": "string", "description": "New category."},
+                    "pillar": {"type": "string", "description": "New pillar."},
+                    "key_finding": {"type": "string", "description": "Updated key finding."},
+                    "signal_status": {"type": "string", "description": "'positive', 'neutral', 'negative', or 'pending'."},
+                    "signal_note": {"type": "string", "description": "Updated signal note."},
+                    "key_metrics": {"type": "array", "items": {"type": "string"}, "description": "Updated metrics list."},
+                    "tracked_by": {"type": "array", "items": {"type": "string"}, "description": "Updated data sources."},
+                    "related_habits": {"type": "array", "items": {"type": "string"}, "description": "Updated related habits."},
                     "related_supplements": {"type": "array", "items": {"type": "string"}, "description": "Updated related supplements."},
-                    "experiment_tags":     {"type": "array", "items": {"type": "string"}, "description": "Updated experiment tags."},
-                    "adherence_target":    {"type": "integer", "description": "Updated adherence target percentage."},
+                    "experiment_tags": {"type": "array", "items": {"type": "string"}, "description": "Updated experiment tags."},
+                    "adherence_target": {"type": "integer", "description": "Updated adherence target percentage."},
                 },
                 "required": ["protocol_id"],
             },
@@ -2864,7 +3119,7 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "protocol_id": {"type": "string", "description": "Protocol ID (slug) to retire."},
-                    "reason":      {"type": "string", "description": "Why this protocol is being retired."},
+                    "reason": {"type": "string", "description": "Why this protocol is being retired."},
                 },
                 "required": ["protocol_id"],
             },
@@ -2883,8 +3138,11 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "view": {"type": "string", "enum": ["dashboard", "history", "binge", "streaks", "annual"],
-                             "description": "Which view to return. Default: dashboard."},
+                    "view": {
+                        "type": "string",
+                        "enum": ["dashboard", "history", "binge", "streaks", "annual"],
+                        "description": "Which view to return. Default: dashboard.",
+                    },
                     "months": {"type": "integer", "description": "Months of history for history view. Default 12."},
                 },
                 "required": [],
@@ -2945,8 +3203,7 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "week": {"type": "string",
-                             "description": "ISO week e.g. '2026-W14'. Defaults to current week."},
+                    "week": {"type": "string", "description": "ISO week e.g. '2026-W14'. Defaults to current week."},
                 },
                 "required": [],
             },
@@ -2965,16 +3222,15 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "week":      {"type": "string",
-                                  "description": "ISO week e.g. '2026-W14'. Required."},
-                    "notes":     {"type": "string",
-                                  "description": "Matthew's prose response. No length limit."},
-                    "agreement": {"type": "string", "enum": ["agree", "disagree", "mixed"],
-                                  "description": "Matthew's overall take on the AI notes."},
-                    "disputed":  {"type": "array", "items": {"type": "string"},
-                                  "description": "Specific AI claims Matthew pushes back on."},
-                    "added":     {"type": "string",
-                                  "description": "What Matthew noticed that the AI missed."},
+                    "week": {"type": "string", "description": "ISO week e.g. '2026-W14'. Required."},
+                    "notes": {"type": "string", "description": "Matthew's prose response. No length limit."},
+                    "agreement": {
+                        "type": "string",
+                        "enum": ["agree", "disagree", "mixed"],
+                        "description": "Matthew's overall take on the AI notes.",
+                    },
+                    "disputed": {"type": "array", "items": {"type": "string"}, "description": "Specific AI claims Matthew pushes back on."},
+                    "added": {"type": "string", "description": "What Matthew noticed that the AI missed."},
                 },
                 "required": ["week", "notes"],
             },
@@ -2994,24 +3250,29 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "source_type": {"type": "string", "enum": ["achievement", "challenge", "experiment"],
-                                    "description": "Type of trigger."},
-                    "source_id":   {"type": "string",
-                                    "description": "ID of the achievement badge, challenge, or experiment. "
-                                                   "e.g. 'weight_280', '30_day_walk', 'glucose_exp_3'."},
-                    "outcome":     {"type": "string", "enum": ["earned", "passed", "failed", "abandoned"],
-                                    "description": "Result. Achievements use 'earned'. Challenges/experiments use "
-                                                   "'passed', 'failed', or 'abandoned'."},
-                    "date":        {"type": "string",
-                                    "description": "Date of outcome (YYYY-MM-DD). Defaults to today."},
-                    "notes":       {"type": "string",
-                                    "description": "Optional context about what happened."},
+                    "source_type": {
+                        "type": "string",
+                        "enum": ["achievement", "challenge", "experiment"],
+                        "description": "Type of trigger.",
+                    },
+                    "source_id": {
+                        "type": "string",
+                        "description": "ID of the achievement badge, challenge, or experiment. "
+                        "e.g. 'weight_280', '30_day_walk', 'glucose_exp_3'.",
+                    },
+                    "outcome": {
+                        "type": "string",
+                        "enum": ["earned", "passed", "failed", "abandoned"],
+                        "description": "Result. Achievements use 'earned'. Challenges/experiments use "
+                        "'passed', 'failed', or 'abandoned'.",
+                    },
+                    "date": {"type": "string", "description": "Date of outcome (YYYY-MM-DD). Defaults to today."},
+                    "notes": {"type": "string", "description": "Optional context about what happened."},
                 },
                 "required": ["source_type", "source_id", "outcome"],
             },
         },
     },
-
     # SPEC_HEVY_AND_NUTRITION_BRIDGE §2.6 — source-agnostic workout tools.
     # Read the new per-workout schema (sk=DATE#yyyy-mm-dd#WORKOUT#<id>).
     # Coexists with the legacy tool_get_workout_frequency / tool_get_strength
@@ -3030,21 +3291,19 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "start_date": {"type": "string",
-                                   "description": "ISO yyyy-mm-dd. Default: 30 days ago."},
-                    "end_date":   {"type": "string",
-                                   "description": "ISO yyyy-mm-dd. Default: today."},
-                    "source":     {"type": "string",
-                                   "enum": ["hevy", "macrofactor_export"],
-                                   "description": "Optional source filter. Omit for all."},
-                    "limit":      {"type": "integer", "default": 100, "minimum": 1, "maximum": 500,
-                                   "description": "Max workouts to return."},
+                    "start_date": {"type": "string", "description": "ISO yyyy-mm-dd. Default: 30 days ago."},
+                    "end_date": {"type": "string", "description": "ISO yyyy-mm-dd. Default: today."},
+                    "source": {
+                        "type": "string",
+                        "enum": ["hevy", "macrofactor_export"],
+                        "description": "Optional source filter. Omit for all.",
+                    },
+                    "limit": {"type": "integer", "default": 100, "minimum": 1, "maximum": 500, "description": "Max workouts to return."},
                 },
                 "required": [],
             },
         },
     },
-
     "get_workout_detail": {
         "fn": tool_get_workout_detail,
         "schema": {
@@ -3057,14 +3316,12 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "workout_uid": {"type": "string",
-                                    "description": "Stable workout uid, '<source>:<id>'."},
+                    "workout_uid": {"type": "string", "description": "Stable workout uid, '<source>:<id>'."},
                 },
                 "required": ["workout_uid"],
             },
         },
     },
-
     "get_workout_source_status": {
         "fn": tool_get_workout_source_status,
         "schema": {
@@ -3078,7 +3335,6 @@ TOOLS = {
             "inputSchema": {"type": "object", "properties": {}, "required": []},
         },
     },
-
     # ADR-066 (2026-05-31): Hevy routine write-loop. Single fat tool with action
     # dispatcher; respects SPEC §9 "fewer fat tools" guidance. Cron + add-load
     # both ship gated off (SSM defaults false). See docs/SPEC_HEVY_ROUTINE_WRITELOOP_2026_05_31.md.
@@ -3105,8 +3361,10 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "action": {"type": "string",
-                               "description": "One of: draft, draft_custom, dry_run, commit, list, get, archive, floor, re_entry, adherence."},
+                    "action": {
+                        "type": "string",
+                        "description": "One of: draft, draft_custom, dry_run, commit, list, get, archive, floor, re_entry, adherence.",
+                    },
                     "exercises": {
                         "type": "array",
                         "description": (
@@ -3126,35 +3384,38 @@ TOOLS = {
                         "items": {"type": "object"},
                     },
                     "create_missing": {
-                        "type": "boolean", "default": True,
+                        "type": "boolean",
+                        "default": True,
                         "description": (
                             "draft_custom only: when an exercise title isn't found in Hevy, "
                             "create it (so the draft never gets stuck) and report it under "
                             "created_exercises. Set false to instead fail loudly with "
                             "suggestions. Only creates from a human title, never a bare movement_key."
-                        )},
-                    "archetype": {"type": "string",
-                                  "description": "draft_custom only: session type for the title (e.g. 'push', 'pull', 'upper'). Defaults to 'custom'."},
-                    "title": {"type": "string",
-                              "description": "draft_custom only: optional literal title fallback (commit normally renders the ADR-067 convention from archetype)."},
-                    "notes": {"type": "string",
-                              "description": "draft_custom only: one-line session WHY-note shown in Hevy."},
-                    "routine_id": {"type": "string",
-                                   "description": "Platform routine_id. Required for dry_run, commit, get, archive, adherence."},
-                    "target_date": {"type": "string",
-                                    "description": "ISO YYYY-MM-DD. Defaults to today (UTC)."},
-                    "start_date": {"type": "string",
-                                   "description": "List action: range start (YYYY-MM-DD)."},
-                    "end_date": {"type": "string",
-                                 "description": "List action: range end (YYYY-MM-DD)."},
-                    "limit": {"type": "integer", "default": 50,
-                              "description": "Max items returned by list."},
-                    "recovery_tier": {"type": "string",
-                                      "description": "green | yellow | red — overrides default yellow for draft/floor/re_entry."},
-                    "acwr_flag": {"type": "string",
-                                  "description": "safe | caution | high | very_high."},
-                    "volume_7d": {"type": "object",
-                                  "description": "Optional map of muscle->sets completed in last 7d."},
+                        ),
+                    },
+                    "archetype": {
+                        "type": "string",
+                        "description": "draft_custom only: session type for the title (e.g. 'push', 'pull', 'upper'). Defaults to 'custom'.",
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "draft_custom only: optional literal title fallback (commit normally renders the ADR-067 convention from archetype).",
+                    },
+                    "notes": {"type": "string", "description": "draft_custom only: one-line session WHY-note shown in Hevy."},
+                    "routine_id": {
+                        "type": "string",
+                        "description": "Platform routine_id. Required for dry_run, commit, get, archive, adherence.",
+                    },
+                    "target_date": {"type": "string", "description": "ISO YYYY-MM-DD. Defaults to today (UTC)."},
+                    "start_date": {"type": "string", "description": "List action: range start (YYYY-MM-DD)."},
+                    "end_date": {"type": "string", "description": "List action: range end (YYYY-MM-DD)."},
+                    "limit": {"type": "integer", "default": 50, "description": "Max items returned by list."},
+                    "recovery_tier": {
+                        "type": "string",
+                        "description": "green | yellow | red — overrides default yellow for draft/floor/re_entry.",
+                    },
+                    "acwr_flag": {"type": "string", "description": "safe | caution | high | very_high."},
+                    "volume_7d": {"type": "object", "description": "Optional map of muscle->sets completed in last 7d."},
                     "z2_minutes_7d": {"type": "number"},
                     "days_since_last_workout": {"type": "integer"},
                 },
@@ -3162,7 +3423,6 @@ TOOLS = {
             },
         },
     },
-
     "get_vacation_fund": {
         "fn": tool_get_vacation_fund,
         "schema": {
@@ -3180,16 +3440,13 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "start_date": {"type": "string",
-                                   "description": "ISO YYYY-MM-DD. Defaults to experiment start (2026-06-01)."},
-                    "end_date": {"type": "string",
-                                 "description": "ISO YYYY-MM-DD. Defaults to today (Pacific)."},
+                    "start_date": {"type": "string", "description": "ISO YYYY-MM-DD. Defaults to experiment start (2026-06-01)."},
+                    "end_date": {"type": "string", "description": "ISO YYYY-MM-DD. Defaults to today (Pacific)."},
                 },
                 "required": [],
             },
         },
     },
-
     # Phase 4.9 (2026-05-16): meta-tool for tool discoverability across the
     # 116+ registered tools. Function defined just below the dict, referenced
     # here via _list_tools_proxy which forwards to the real impl at call time.
@@ -3210,14 +3467,18 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "domain": {"type": "string",
-                               "description": "Optional domain filter (short module name)."},
-                    "keyword": {"type": "string",
-                                "description": "Optional case-insensitive substring "
-                                               "match against name + description."},
-                    "limit": {"type": "integer",
-                              "description": "Max results to return (default 30, max 100).",
-                              "minimum": 1, "maximum": 100, "default": 30},
+                    "domain": {"type": "string", "description": "Optional domain filter (short module name)."},
+                    "keyword": {
+                        "type": "string",
+                        "description": "Optional case-insensitive substring " "match against name + description.",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max results to return (default 30, max 100).",
+                        "minimum": 1,
+                        "maximum": 100,
+                        "default": 30,
+                    },
                 },
                 "required": [],
             },
@@ -3229,6 +3490,7 @@ TOOLS = {
 # ═══════════════════════════════════════════════════════════════════════════
 # Phase 4.9 (2026-05-16): list_available_tools — meta-tool implementation
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def tool_list_available_tools(domain: str = None, keyword: str = None, limit: int = 30):
     """List MCP tools, optionally filtered by domain (module short-name) or
@@ -3244,7 +3506,7 @@ def tool_list_available_tools(domain: str = None, keyword: str = None, limit: in
     for tool_name, entry in TOOLS.items():
         fn = entry.get("fn")
         schema = entry.get("schema", {})
-        description = (schema.get("description") or "")
+        description = schema.get("description") or ""
         module = getattr(fn, "__module__", "") if fn else ""
         short_module = module.rsplit(".tools_", 1)[-1] if ".tools_" in module else module
 
@@ -3254,11 +3516,13 @@ def tool_list_available_tools(domain: str = None, keyword: str = None, limit: in
             haystack = (tool_name + " " + description).lower()
             if kw_lower not in haystack:
                 continue
-        matches.append({
-            "name": tool_name,
-            "domain": short_module,
-            "description": description[:200] + ("…" if len(description) > 200 else ""),
-        })
+        matches.append(
+            {
+                "name": tool_name,
+                "domain": short_module,
+                "description": description[:200] + ("…" if len(description) > 200 else ""),
+            }
+        )
 
     matches.sort(key=lambda m: m["name"])
     return {

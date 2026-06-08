@@ -28,25 +28,28 @@ Cost: ~$0.05/week (one Sonnet call + DDB reads/writes)
 """
 
 import json
-import os
 import logging
+import os
 import re
 import time
-import boto3
-import urllib.request
 import urllib.error
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+import boto3
+
 try:
     from platform_logger import get_logger
+
     logger = get_logger("challenge-generator")
 except ImportError:
     logger = logging.getLogger("challenge-generator")
     logger.setLevel(logging.INFO)
 
 try:
-    from ai_output_validator import validate_ai_output, AIOutputType
+    from ai_output_validator import AIOutputType, validate_ai_output
+
     _HAS_AI_VALIDATOR = True
 except ImportError:
     _HAS_AI_VALIDATOR = False
@@ -76,6 +79,7 @@ LOOKBACK_DAYS = 14
 # HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def get_anthropic_key():
     """ADR-062: Bedrock uses IAM auth — this fetch is dead. Returns a truthy
     sentinel so callers' `api_key = get_anthropic_key()` + `if api_key:`
@@ -98,13 +102,10 @@ def d2f(obj):
 
 def query_range(source, start_date, end_date):
     from boto3.dynamodb.conditions import Key
+
     pk = f"USER#{USER_ID}#SOURCE#{source}"
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(
-                f"DATE#{start_date}", f"DATE#{end_date}"
-            )
-        )
+        resp = table.query(KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}"))
         return d2f(resp.get("Items", []))
     except Exception as e:
         logger.warning(f"query_range({source}) failed: {e}")
@@ -129,6 +130,7 @@ def slug(name):
 # DATA GATHERING
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def gather_context():
     """Gather all context needed for challenge generation."""
     now = datetime.now(timezone.utc)
@@ -147,17 +149,23 @@ def gather_context():
                 "template": entry.get("template", ""),
             }
             # Enriched fields — the gold for challenge mining
-            for field in ["enriched_themes", "enriched_avoidance_flags",
-                          "enriched_growth_signals", "enriched_emotions",
-                          "enriched_cognitive_patterns", "enriched_stress",
-                          "enriched_mood", "enriched_energy",
-                          "enriched_primary_defense", "enriched_defense_context"]:
+            for field in [
+                "enriched_themes",
+                "enriched_avoidance_flags",
+                "enriched_growth_signals",
+                "enriched_emotions",
+                "enriched_cognitive_patterns",
+                "enriched_stress",
+                "enriched_mood",
+                "enriched_energy",
+                "enriched_primary_defense",
+                "enriched_defense_context",
+            ]:
                 val = entry.get(field)
                 if val:
                     j[field] = val
             # Raw text snippets for context (truncated)
-            for field in ["win_of_the_day", "what_drained_me", "todays_intention",
-                          "biggest_challenge", "what_would_i_change"]:
+            for field in ["win_of_the_day", "what_drained_me", "todays_intention", "biggest_challenge", "what_would_i_change"]:
                 val = entry.get(field, "")
                 if val:
                     j[field] = val[:200]
@@ -167,10 +175,12 @@ def gather_context():
 
     # 2. Character sheet — latest pillar scores
     from boto3.dynamodb.conditions import Key
+
     try:
         cs_resp = table.query(
             KeyConditionExpression=Key("pk").eq(CHARACTER_PK) & Key("sk").begins_with("DATE#"),
-            ScanIndexForward=False, Limit=1,
+            ScanIndexForward=False,
+            Limit=1,
         )
         cs_items = d2f(cs_resp.get("Items", []))
         if cs_items:
@@ -203,7 +213,7 @@ def gather_context():
             t0_pct = h.get("tier0_pct")
             if t0_pct is not None:
                 avg_t0_pct.append(float(t0_pct))
-            for missed in (h.get("missed_tier0") or []):
+            for missed in h.get("missed_tier0") or []:
                 missed_t0_freq[missed] = missed_t0_freq.get(missed, 0) + 1
 
         context["habits"] = {
@@ -226,13 +236,15 @@ def gather_context():
             ScanIndexForward=False,
         )
         confirmed = [
-            d2f(h) for h in hyp_resp.get("Items", [])
-            if h.get("status") in ("confirmed", "confirming") and h.get("check_count", 0) >= 2
+            d2f(h) for h in hyp_resp.get("Items", []) if h.get("status") in ("confirmed", "confirming") and h.get("check_count", 0) >= 2
         ]
         if confirmed:
             context["confirmed_hypotheses"] = [
-                {"hypothesis": h.get("hypothesis"), "domains": h.get("domains"),
-                 "actionable_if_confirmed": h.get("actionable_if_confirmed")}
+                {
+                    "hypothesis": h.get("hypothesis"),
+                    "domains": h.get("domains"),
+                    "actionable_if_confirmed": h.get("actionable_if_confirmed"),
+                }
                 for h in confirmed[:5]
             ]
             logger.info(f"Confirmed hypotheses: {len(confirmed)}")
@@ -246,10 +258,7 @@ def gather_context():
             ScanIndexForward=False,
         )
         existing = d2f(ch_resp.get("Items", []))
-        context["existing_challenges"] = [
-            {"name": c.get("name"), "status": c.get("status"), "domain": c.get("domain")}
-            for c in existing
-        ]
+        context["existing_challenges"] = [{"name": c.get("name"), "status": c.get("status"), "domain": c.get("domain")} for c in existing]
         logger.info(f"Existing challenges: {len(existing)}")
     except Exception as e:
         logger.warning(f"Challenge load failed: {e}")
@@ -359,23 +368,31 @@ EXISTING CHALLENGES (do NOT duplicate):
 Generate 1-5 challenge candidates based on the strongest signals in this data.
 If no clear signal exists, return 0 challenges. Quality over quantity."""
 
-    payload = json.dumps({
-        "model": AI_MODEL,
-        "max_tokens": 2000,
-        "system": [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-        "messages": [{"role": "user", "content": user_message}],
-    }).encode()
+    payload = json.dumps(
+        {
+            "model": AI_MODEL,
+            "max_tokens": 2000,
+            "system": [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+            "messages": [{"role": "user", "content": user_message}],
+        }
+    ).encode()
 
     req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages", data=payload,
-        headers={"Content-Type": "application/json", "x-api-key": api_key,
-                 "anthropic-version": "2023-06-01",
-                 "anthropic-beta": "prompt-caching-2024-07-31"}, method="POST",
+        "https://api.anthropic.com/v1/messages",
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "anthropic-beta": "prompt-caching-2024-07-31",
+        },
+        method="POST",
     )
 
     # ADR-062 (2026-05-27): route through retry_utils.call_anthropic_raw (Bedrock).
     try:
         from retry_utils import call_anthropic_raw
+
         resp = call_anthropic_raw(req)
         raw = resp["content"][0]["text"].strip()
         # Strip markdown fences
@@ -399,6 +416,7 @@ If no clear signal exists, return 0 challenges. Quality over quantity."""
 # STORAGE
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def store_challenge(challenge: dict):
     """Write a challenge candidate to DynamoDB."""
     now = datetime.now(timezone.utc)
@@ -415,8 +433,7 @@ def store_challenge(challenge: dict):
         return None
 
     # Valid domains
-    valid_domains = ["sleep", "movement", "nutrition", "supplements",
-                     "mental", "social", "discipline", "metabolic", "general"]
+    valid_domains = ["sleep", "movement", "nutrition", "supplements", "mental", "social", "discipline", "metabolic", "general"]
     domain = challenge.get("domain", "general")
     if domain not in valid_domains:
         domain = "general"
@@ -432,32 +449,32 @@ def store_challenge(challenge: dict):
         source = "science_scan"
 
     item = {
-        "pk":                   CHALLENGES_PK,
-        "sk":                   sk,
-        "challenge_id":         challenge_id,
-        "name":                 name,
-        "description":          challenge.get("description", ""),
-        "source":               source,
-        "source_detail":        challenge.get("source_detail", ""),
-        "domain":               domain,
-        "difficulty":           difficulty,
-        "duration_days":        int(challenge.get("duration_days", 7)),
-        "protocol":             challenge.get("protocol", ""),
-        "success_criteria":     challenge.get("success_criteria", ""),
-        "metric_targets":       challenge.get("metric_targets", {}),
-        "status":               "candidate",
-        "verification_method":  challenge.get("verification_method", "self_report"),
-        "tags":                 challenge.get("tags", []),
-        "daily_checkins":       [],
-        "outcome":              "",
+        "pk": CHALLENGES_PK,
+        "sk": sk,
+        "challenge_id": challenge_id,
+        "name": name,
+        "description": challenge.get("description", ""),
+        "source": source,
+        "source_detail": challenge.get("source_detail", ""),
+        "domain": domain,
+        "difficulty": difficulty,
+        "duration_days": int(challenge.get("duration_days", 7)),
+        "protocol": challenge.get("protocol", ""),
+        "success_criteria": challenge.get("success_criteria", ""),
+        "metric_targets": challenge.get("metric_targets", {}),
+        "status": "candidate",
+        "verification_method": challenge.get("verification_method", "self_report"),
+        "tags": challenge.get("tags", []),
+        "daily_checkins": [],
+        "outcome": "",
         "character_xp_awarded": 0,
-        "badge_earned":         "",
+        "badge_earned": "",
         "related_experiment_id": "",
-        "generated_by":         "challenge-generator",
-        "generated_at":         now.strftime("%Y-%m-%dT%H:%M:%S"),
-        "activated_at":         "",
-        "completed_at":         "",
-        "created_at":           now.strftime("%Y-%m-%dT%H:%M:%S"),
+        "generated_by": "challenge-generator",
+        "generated_at": now.strftime("%Y-%m-%dT%H:%M:%S"),
+        "activated_at": "",
+        "completed_at": "",
+        "created_at": now.strftime("%Y-%m-%dT%H:%M:%S"),
     }
 
     table.put_item(Item=to_decimal(item))
@@ -468,6 +485,7 @@ def store_challenge(challenge: dict):
 # ══════════════════════════════════════════════════════════════════════════════
 # LAMBDA HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def lambda_handler(event, context):
     """Weekly challenge generation pipeline."""

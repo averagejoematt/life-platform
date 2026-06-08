@@ -33,16 +33,18 @@ v1.0.0 — 2026-03-16 (BS-03)
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 import time
 import urllib.parse
-import logging
-import boto3
 from datetime import datetime, timedelta, timezone
+
+import boto3
 
 try:
     from platform_logger import get_logger
+
     logger = get_logger("email-subscriber")
 except ImportError:
     logger = logging.getLogger("email-subscriber")
@@ -51,9 +53,9 @@ except ImportError:
 # AWS_REGION is set automatically by Lambda to the function's deployment region.
 # email-subscriber deploys to us-east-1 (web_stack.py) but DDB is in us-west-2.
 # DYNAMODB_REGION env var overrides to ensure cross-region DDB access.
-REGION = os.environ.get("AWS_REGION", "us-east-1")      # Lambda's own region
-DYNAMODB_REGION = os.environ.get("DYNAMODB_REGION", "us-west-2") # DDB table region
-SES_REGION = os.environ.get("SES_REGION", "us-west-2")      # SES verified identity region
+REGION = os.environ.get("AWS_REGION", "us-east-1")  # Lambda's own region
+DYNAMODB_REGION = os.environ.get("DYNAMODB_REGION", "us-west-2")  # DDB table region
+SES_REGION = os.environ.get("SES_REGION", "us-west-2")  # SES verified identity region
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
@@ -64,20 +66,23 @@ SUBSCRIBERS_PK = f"USER#{USER_ID}#SOURCE#subscribers"
 
 dynamodb = boto3.resource("dynamodb", region_name=DYNAMODB_REGION)  # us-west-2
 table = dynamodb.Table(TABLE_NAME)
-ses = boto3.client("sesv2", region_name=SES_REGION)             # us-west-2 (verified identity)
+ses = boto3.client("sesv2", region_name=SES_REGION)  # us-west-2 (verified identity)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _email_hash(email: str) -> str:
     """SHA256 of lowercased email — used as SK and for dedup."""
     return hashlib.sha256(email.strip().lower().encode()).hexdigest()
 
+
 def _ip_hash(ip: str) -> str:
     """SHA256 of IP — non-reversible, for abuse detection only."""
     return hashlib.sha256((ip or "").encode()).hexdigest()[:16]
+
 
 def _get_record(email_hash: str) -> dict | None:
     try:
@@ -87,12 +92,14 @@ def _get_record(email_hash: str) -> dict | None:
         logger.error("_get_record failed: %s", exc)
         return None
 
+
 def _cors_headers():
     return {
-        "Access-Control-Allow-Origin":  SITE_URL,
+        "Access-Control-Allow-Origin": SITE_URL,
         "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
     }
+
 
 def _json_response(status: int, body: dict) -> dict:
     return {
@@ -100,6 +107,7 @@ def _json_response(status: int, body: dict) -> dict:
         "headers": {**_cors_headers(), "Content-Type": "application/json"},
         "body": json.dumps(body),
     }
+
 
 def _redirect(url: str) -> dict:
     return {
@@ -158,10 +166,22 @@ def _check_subscribe_rate_limit(source_ip: str) -> tuple[bool, int]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 _BLOCKED_DOMAINS = {
-    "example.com", "example.org", "example.net", "test.com", "test.org",
-    "localhost", "invalid", "mailinator.com", "guerrillamail.com",
-    "tempmail.com", "throwaway.email", "yopmail.com", "sharklasers.com",
-    "guerrillamailblock.com", "grr.la", "dispostable.com",
+    "example.com",
+    "example.org",
+    "example.net",
+    "test.com",
+    "test.org",
+    "localhost",
+    "invalid",
+    "mailinator.com",
+    "guerrillamail.com",
+    "tempmail.com",
+    "throwaway.email",
+    "yopmail.com",
+    "sharklasers.com",
+    "guerrillamailblock.com",
+    "grr.la",
+    "dispostable.com",
 }
 
 
@@ -183,7 +203,7 @@ def handle_subscribe(email: str, source_ip: str = "", referrer: str = "", source
         # Return success silently — don't reveal we blocked it
         return _json_response(200, {"status": "pending_confirmation", "message": "Check your inbox."})
 
-    is_canary = (source == "canary")
+    is_canary = source == "canary"
 
     email_hash = _email_hash(email)
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -207,17 +227,17 @@ def handle_subscribe(email: str, source_ip: str = "", referrer: str = "", source
 
     # Write DDB record
     item = {
-        "pk":           SUBSCRIBERS_PK,
-        "sk":           f"EMAIL#{email_hash}",
-        "email":        email,
-        "email_hash":   email_hash,
-        "status":       "pending_confirmation",
-        "created_at":   now_iso,
+        "pk": SUBSCRIBERS_PK,
+        "sk": f"EMAIL#{email_hash}",
+        "email": email,
+        "email_hash": email_hash,
+        "status": "pending_confirmation",
+        "created_at": now_iso,
         "confirm_token": token,
         "token_expires": token_exp,
-        "ip_hash":      _ip_hash(source_ip),
-        "source":       referrer or "subscribe_page",
-        "updated_at":   now_iso,
+        "ip_hash": _ip_hash(source_ip),
+        "source": referrer or "subscribe_page",
+        "updated_at": now_iso,
     }
     if existing:
         # Preserve original created_at and confirmed_at if resubscribing
@@ -277,10 +297,12 @@ def _send_confirmation_email(email: str, confirm_url: str) -> None:
         ses.send_email(
             FromEmailAddress=SENDER,
             Destination={"ToAddresses": [email]},
-            Content={"Simple": {
-                "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
-            }},
+            Content={
+                "Simple": {
+                    "Subject": {"Data": subject, "Charset": "UTF-8"},
+                    "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
+                }
+            },
         )
         logger.info("confirmation email sent")
     except Exception as exc:
@@ -290,6 +312,7 @@ def _send_confirmation_email(email: str, confirm_url: str) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIRM
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def handle_confirm(token: str, email_hash_prefix: str) -> dict:
     """Validate token, confirm subscription, send welcome email."""
@@ -305,7 +328,7 @@ def handle_confirm(token: str, email_hash_prefix: str) -> dict:
             FilterExpression="confirm_token = :t",
             ExpressionAttributeValues={
                 ":pk": SUBSCRIBERS_PK,
-                ":t":  token,
+                ":t": token,
             },
         )
         items = resp.get("Items", [])
@@ -390,10 +413,12 @@ def _send_welcome_email(email: str) -> None:
         ses.send_email(
             FromEmailAddress=SENDER,
             Destination={"ToAddresses": [email]},
-            Content={"Simple": {
-                "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body":    {"Text": {"Data": body_text, "Charset": "UTF-8"}},
-            }},
+            Content={
+                "Simple": {
+                    "Subject": {"Data": subject, "Charset": "UTF-8"},
+                    "Body": {"Text": {"Data": body_text, "Charset": "UTF-8"}},
+                }
+            },
         )
         logger.info("welcome email sent")
     except Exception as exc:
@@ -403,6 +428,7 @@ def _send_welcome_email(email: str) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 # UNSUBSCRIBE
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def handle_unsubscribe(email: str) -> dict:
     """Mark status=unsubscribed. Raj directive: NEVER hard-delete. Row retained for analytics."""
@@ -436,6 +462,7 @@ def handle_unsubscribe(email: str) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 # HANDLER
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def lambda_handler(event, context):
     try:
@@ -475,9 +502,7 @@ def lambda_handler(event, context):
             allowed, count = _check_subscribe_rate_limit(source_ip)
             if not allowed:
                 logger.info(f"Subscribe rate-limit hit ip={source_ip[:8]}... count={count}")
-                return _json_response(429, {
-                    "error": "Too many requests. Try again in a few minutes."
-                })
+                return _json_response(429, {"error": "Too many requests. Try again in a few minutes."})
             try:
                 body = json.loads(event.get("body") or "{}")
                 email = body.get("email", "").strip()

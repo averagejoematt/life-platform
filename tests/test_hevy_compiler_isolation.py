@@ -4,6 +4,7 @@ If a future agent inlines `exercise_template_id` somewhere else, a Hevy v2
 spec change would require multi-file edits. This guard keeps Elena's
 "API change touches one file" invariant honest.
 """
+
 from __future__ import annotations
 
 import os

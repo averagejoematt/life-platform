@@ -18,14 +18,16 @@ Writes results to DynamoDB for status page consumption.
 """
 
 import json
-import os
 import logging
+import os
 import time
-import boto3
 from datetime import datetime, timezone
+
+import boto3
 
 try:
     from platform_logger import get_logger
+
     logger = get_logger("pipeline-health-check")
 except ImportError:
     logger = logging.getLogger("pipeline-health-check")
@@ -107,14 +109,15 @@ def _check_compute_outputs(today_str: str) -> dict:
     encodes this per-partition.
     """
     from datetime import timedelta as _td
+
     yesterday_str = (datetime.strptime(today_str, "%Y-%m-%d") - _td(days=1)).strftime("%Y-%m-%d")
 
     EXPECTED = [
         # (partition_source_id, display_name, expected_date)
-        ("character_sheet",   "Character Sheet",  yesterday_str),
-        ("computed_metrics",  "Daily Metrics",    yesterday_str),
-        ("computed_insights", "Daily Insights",   yesterday_str),
-        ("adaptive_mode",     "Adaptive Mode",    yesterday_str),
+        ("character_sheet", "Character Sheet", yesterday_str),
+        ("computed_metrics", "Daily Metrics", yesterday_str),
+        ("computed_insights", "Daily Insights", yesterday_str),
+        ("adaptive_mode", "Adaptive Mode", yesterday_str),
     ]
     missing, present = [], []
     for source_id, display, expected_date in EXPECTED:
@@ -125,8 +128,7 @@ def _check_compute_outputs(today_str: str) -> dict:
             if resp.get("Item"):
                 present.append(source_id)
             else:
-                missing.append({"source_id": source_id, "display": display, "pk": pk, "sk": sk,
-                                "expected_date": expected_date})
+                missing.append({"source_id": source_id, "display": display, "pk": pk, "sk": sk, "expected_date": expected_date})
         except Exception as e:
             missing.append({"source_id": source_id, "display": display, "error": str(e)[:120]})
 
@@ -135,11 +137,13 @@ def _check_compute_outputs(today_str: str) -> dict:
         cw = boto3.client("cloudwatch", region_name=REGION)
         cw.put_metric_data(
             Namespace="LifePlatform/Pipeline",
-            MetricData=[{
-                "MetricName": "ComputeOutputsMissing",
-                "Value": float(len(missing)),
-                "Unit": "Count",
-            }],
+            MetricData=[
+                {
+                    "MetricName": "ComputeOutputsMissing",
+                    "Value": float(len(missing)),
+                    "Unit": "Count",
+                }
+            ],
         )
     except Exception as e:
         logger.warning(f"compute_outputs metric emit failed: {e}")
@@ -148,7 +152,7 @@ def _check_compute_outputs(today_str: str) -> dict:
 
 
 def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
-    if hasattr(logger, 'set_date'):
+    if hasattr(logger, "set_date"):
         logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))
 
     now = datetime.now(timezone.utc)
@@ -159,9 +163,11 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
         result = _check_compute_outputs(today_str)
         if result["missing"]:
             missing_names = [m.get("display", m.get("source_id")) for m in result["missing"]]
-            msg = (f"⚠️ Compute pipeline incomplete for {today_str}: "
-                   f"missing {len(result['missing'])} record(s) — {', '.join(missing_names)}. "
-                   f"Daily-brief will read yesterday's data for these.")
+            msg = (
+                f"⚠️ Compute pipeline incomplete for {today_str}: "
+                f"missing {len(result['missing'])} record(s) — {', '.join(missing_names)}. "
+                f"Daily-brief will read yesterday's data for these."
+            )
             logger.warning(msg)
             # Publish to digest SNS so it lands in tomorrow's 8 AM digest.
             try:
@@ -212,64 +218,76 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
     # Secret health check — detect deleted/missing secrets
     sm = boto3.client("secretsmanager", region_name=REGION)
     REQUIRED_SECRETS = [
-        "life-platform/whoop", "life-platform/withings", "life-platform/strava",
-        "life-platform/eightsleep", "life-platform/garmin", "life-platform/habitify",
-        "life-platform/notion", "life-platform/dropbox", "life-platform/ai-keys",
-        "life-platform/site-api-ai-key", "life-platform/ingestion-keys",
+        "life-platform/whoop",
+        "life-platform/withings",
+        "life-platform/strava",
+        "life-platform/eightsleep",
+        "life-platform/garmin",
+        "life-platform/habitify",
+        "life-platform/notion",
+        "life-platform/dropbox",
+        "life-platform/ai-keys",
+        "life-platform/site-api-ai-key",
+        "life-platform/ingestion-keys",
     ]
     for secret_name in REQUIRED_SECRETS:
         try:
             desc = sm.describe_secret(SecretId=secret_name)
             if desc.get("DeletedDate"):
                 fail_count += 1
-                results.append({
-                    "function_name": f"secret:{secret_name}",
-                    "display_name": f"Secret: {secret_name}",
-                    "source_id": secret_name.replace("life-platform/", ""),
-                    "healthy": False,
-                    "error_type": "SecretDeleted",
-                    "error_message": f"Secret {secret_name} is scheduled for deletion",
-                })
+                results.append(
+                    {
+                        "function_name": f"secret:{secret_name}",
+                        "display_name": f"Secret: {secret_name}",
+                        "source_id": secret_name.replace("life-platform/", ""),
+                        "healthy": False,
+                        "error_type": "SecretDeleted",
+                        "error_message": f"Secret {secret_name} is scheduled for deletion",
+                    }
+                )
                 logger.warning(f"SECRET DELETED: {secret_name}")
         except Exception as e:
             if "ResourceNotFoundException" in str(e):
                 fail_count += 1
-                results.append({
-                    "function_name": f"secret:{secret_name}",
-                    "display_name": f"Secret: {secret_name}",
-                    "source_id": secret_name.replace("life-platform/", ""),
-                    "healthy": False,
-                    "error_type": "SecretMissing",
-                    "error_message": f"Secret {secret_name} does not exist",
-                })
+                results.append(
+                    {
+                        "function_name": f"secret:{secret_name}",
+                        "display_name": f"Secret: {secret_name}",
+                        "source_id": secret_name.replace("life-platform/", ""),
+                        "healthy": False,
+                        "error_type": "SecretMissing",
+                        "error_message": f"Secret {secret_name} does not exist",
+                    }
+                )
                 logger.warning(f"SECRET MISSING: {secret_name}")
 
     # Write results to DynamoDB
     try:
-        table.put_item(Item={
-            "pk": f"USER#{USER_ID}#SOURCE#health_check",
-            "sk": f"DATE#{now.strftime('%Y-%m-%d')}",
-            "date": now.strftime("%Y-%m-%d"),
-            "checked_at": now.isoformat(),
-            "total": len(PIPELINES),
-            "passed": pass_count,
-            "failed": fail_count,
-            "results": json.dumps(results),
-            "failures": json.dumps([r for r in results if not r["healthy"]]),
-        })
+        table.put_item(
+            Item={
+                "pk": f"USER#{USER_ID}#SOURCE#health_check",
+                "sk": f"DATE#{now.strftime('%Y-%m-%d')}",
+                "date": now.strftime("%Y-%m-%d"),
+                "checked_at": now.isoformat(),
+                "total": len(PIPELINES),
+                "passed": pass_count,
+                "failed": fail_count,
+                "results": json.dumps(results),
+                "failures": json.dumps([r for r in results if not r["healthy"]]),
+            }
+        )
         logger.info(f"Health check stored: {pass_count} pass, {fail_count} fail")
     except Exception as e:
         logger.error(f"Failed to store health check: {e}")
 
     return {
         "statusCode": 200,
-        "body": json.dumps({
-            "passed": pass_count,
-            "failed": fail_count,
-            "total": len(PIPELINES),
-            "failures": [
-                {"name": r["display_name"], "error": r.get("error_message", "")}
-                for r in results if not r["healthy"]
-            ],
-        }),
+        "body": json.dumps(
+            {
+                "passed": pass_count,
+                "failed": fail_count,
+                "total": len(PIPELINES),
+                "failures": [{"name": r["display_name"], "error": r.get("error_message", "")} for r in results if not r["healthy"]],
+            }
+        ),
     }

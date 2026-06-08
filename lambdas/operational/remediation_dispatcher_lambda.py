@@ -42,6 +42,7 @@ import boto3
 
 try:
     from platform_logger import get_logger
+
     logger = get_logger("remediation-dispatcher")
 except ImportError:
     logger = logging.getLogger("remediation-dispatcher")
@@ -58,10 +59,7 @@ DEDUPE_WINDOW_MIN = int(os.environ.get("DEDUPE_WINDOW_MIN", "30"))
 # 07:45 PT sweep already handles routine ingestion-source errors / QA smoke /
 # freshness — those should NOT fire urgent dispatches and cost a workflow run.
 _DEFAULT_PATTERNS = "canary,dlq-depth,site-api-error,budget-tier,bedrock-throttle,slo-"
-URGENT_PATTERNS = tuple(
-    p.strip().lower() for p in os.environ.get("URGENT_PATTERNS", _DEFAULT_PATTERNS).split(",")
-    if p.strip()
-)
+URGENT_PATTERNS = tuple(p.strip().lower() for p in os.environ.get("URGENT_PATTERNS", _DEFAULT_PATTERNS).split(",") if p.strip())
 
 _sm = boto3.client("secretsmanager", region_name=REGION)
 _s3 = boto3.client("s3", region_name=REGION)
@@ -101,9 +99,7 @@ def _seen(key):
 
 
 def _mark(key, payload):
-    _s3.put_object(Bucket=DEDUPE_BUCKET, Key=key,
-                   Body=json.dumps(payload, default=str),
-                   ContentType="application/json")
+    _s3.put_object(Bucket=DEDUPE_BUCKET, Key=key, Body=json.dumps(payload, default=str), ContentType="application/json")
 
 
 def _dispatch(payload):
@@ -111,7 +107,9 @@ def _dispatch(payload):
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/dispatches"
     body = json.dumps({"event_type": "urgent_alarm", "client_payload": payload}).encode()
     req = urllib.request.Request(
-        url, data=body, method="POST",
+        url,
+        data=body,
+        method="POST",
         headers={
             "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {_get_token()}",
@@ -134,8 +132,7 @@ def _parse_alarm(sns_message):
 
 
 def lambda_handler(event, context):
-    results = {"dispatched": 0, "skipped_filter": 0, "skipped_dedupe": 0,
-               "skipped_state": 0, "errors": 0}
+    results = {"dispatched": 0, "skipped_filter": 0, "skipped_dedupe": 0, "skipped_state": 0, "errors": 0}
     try:
         for rec in event.get("Records", []):
             try:
@@ -163,8 +160,7 @@ def lambda_handler(event, context):
                     "alarm_name": name,
                     "state": state,
                     "reason": reason,
-                    "timestamp": alarm.get("StateChangeTime")
-                                 or datetime.now(timezone.utc).isoformat(),
+                    "timestamp": alarm.get("StateChangeTime") or datetime.now(timezone.utc).isoformat(),
                     "metric": alarm.get("Trigger", {}).get("MetricName"),
                     "namespace": alarm.get("Trigger", {}).get("Namespace"),
                 }

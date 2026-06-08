@@ -63,16 +63,18 @@ Schedule: 9:30 AM PT daily (17:30 UTC)
 """
 
 import json
-import os
 import logging
+import os
 import time
-import boto3
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+
+import boto3
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("garmin")
 except ImportError:
     logger = logging.getLogger("garmin")
@@ -89,8 +91,8 @@ LOOKBACK_DAYS = int(os.environ.get("LOOKBACK_DAYS", "7"))
 
 # ── AWS clients ────────────────────────────────────────────────────────────────
 secrets_client = boto3.client("secretsmanager", region_name=REGION)
-s3_client = boto3.client("s3",             region_name=REGION)
-dynamodb = boto3.resource("dynamodb",      region_name=REGION)
+s3_client = boto3.client("s3", region_name=REGION)
+dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(DYNAMODB_TABLE)
 
 
@@ -99,11 +101,16 @@ table = dynamodb.Table(DYNAMODB_TABLE)
 try:
     from numeric import floats_to_decimal  # noqa: F401
 except ImportError:
+
     def floats_to_decimal(obj):
-        if isinstance(obj, bool): return obj
-        if isinstance(obj, float): return Decimal(str(obj))
-        if isinstance(obj, dict): return {k: floats_to_decimal(v) for k, v in obj.items()}
-        if isinstance(obj, list): return [floats_to_decimal(v) for v in obj]
+        if isinstance(obj, bool):
+            return obj
+        if isinstance(obj, float):
+            return Decimal(str(obj))
+        if isinstance(obj, dict):
+            return {k: floats_to_decimal(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [floats_to_decimal(v) for v in obj]
         return obj
 
 
@@ -136,9 +143,7 @@ def save_secret(secret: dict):
             cw = boto3.client("cloudwatch", region_name=REGION)
             cw.put_metric_data(
                 Namespace="LifePlatform/OAuth",
-                MetricData=[{"MetricName": "TokenWritebackFailure",
-                             "Dimensions": [{"Name": "Source", "Value": "garmin"}],
-                             "Value": 1.0}],
+                MetricData=[{"MetricName": "TokenWritebackFailure", "Dimensions": [{"Name": "Source", "Value": "garmin"}], "Value": 1.0}],
             )
         except Exception:
             pass
@@ -185,12 +190,14 @@ def refresh_breaker_cooldown() -> int:
 def mark_refresh_breaker(err) -> None:
     now = time.time()
     try:
-        table.put_item(Item={
-            **_breaker_key(),
-            "marked_at": Decimal(str(int(now))),
-            "error": str(err)[:300],
-            "ttl": int(now) + _REFRESH_BREAKER_TTL,
-        })
+        table.put_item(
+            Item={
+                **_breaker_key(),
+                "marked_at": Decimal(str(int(now))),
+                "error": str(err)[:300],
+                "ttl": int(now) + _REFRESH_BREAKER_TTL,
+            }
+        )
         logger.warning(f"Garmin refresh-429 breaker tripped — cooling down {_REFRESH_BREAKER_TTL // 3600}h")
     except Exception as e:
         logger.warning(f"refresh breaker mark failed: {e}")
@@ -239,10 +246,7 @@ def get_garmin_client(secret: dict):
     from garminconnect import Garmin
 
     if not secret.get("garth_tokens"):
-        raise RuntimeError(
-            "No garth tokens in Secrets Manager. "
-            "Run setup_garmin_browser_auth.py locally to authenticate."
-        )
+        raise RuntimeError("No garth tokens in Secrets Manager. " "Run setup_garmin_browser_auth.py locally to authenticate.")
 
     # ── Detect token format and load accordingly ──
     token_data = secret["garth_tokens"]
@@ -252,7 +256,9 @@ def get_garmin_client(secret: dict):
     try:
         parsed = json.loads(token_data) if isinstance(token_data, str) else token_data
         if isinstance(parsed, dict) and "oauth1" in parsed and "oauth2" in parsed:
-            import os, tempfile
+            import os
+            import tempfile
+
             garth_dir = os.path.join(tempfile.gettempdir(), ".garth_tokens")
             os.makedirs(garth_dir, exist_ok=True)
             with open(os.path.join(garth_dir, "oauth1_token.json"), "w") as f:
@@ -275,8 +281,7 @@ def get_garmin_client(secret: dict):
             loaded = True
         except Exception as e:
             raise RuntimeError(
-                f"Could not load garth tokens in any format ({e}). "
-                "Run setup_garmin_browser_auth.py locally to re-authenticate."
+                f"Could not load garth tokens in any format ({e}). " "Run setup_garmin_browser_auth.py locally to re-authenticate."
             ) from e
 
     # ── Log token expiry for observability ──
@@ -303,9 +308,7 @@ def get_garmin_client(secret: dict):
             # Token unusable AND we're throttled — skip this run cleanly so the
             # cooldown can clear. The OAuth1 token is still valid; a later run
             # will refresh successfully once Garmin lifts the throttle.
-            raise GarminRefreshRateLimited(
-                f"OAuth2 expired but refresh in 429 cooldown ({cooldown}s left)."
-            )
+            raise GarminRefreshRateLimited(f"OAuth2 expired but refresh in 429 cooldown ({cooldown}s left).")
         # Only near-expiry (still valid) — serve data with the current token and
         # defer the refresh rather than poking the throttled endpoint.
         logger.info(f"Deferring proactive refresh — in 429 cooldown ({cooldown}s left), token still valid.")
@@ -334,8 +337,7 @@ def get_garmin_client(secret: dict):
                     time.sleep(refresh_backoff[refresh_attempt])
                     continue
                 raise RuntimeError(
-                    f"Garmin OAuth refresh failed ({e}). "
-                    "Run setup_garmin_browser_auth.py locally to re-authenticate."
+                    f"Garmin OAuth refresh failed ({e}). " "Run setup_garmin_browser_auth.py locally to re-authenticate."
                 ) from e
 
     # ── Save refreshed tokens eagerly (before any data calls) ──
@@ -369,9 +371,7 @@ def get_garmin_client(secret: dict):
                 profile = garth.client.connectapi(profile_path)
                 name = None
                 if isinstance(profile, dict):
-                    name = (profile.get("displayName")
-                            or profile.get("userName")
-                            or profile.get("fullName"))
+                    name = profile.get("displayName") or profile.get("userName") or profile.get("fullName")
                 elif isinstance(profile, str):
                     name = profile.strip()
                 if name:
@@ -383,8 +383,7 @@ def get_garmin_client(secret: dict):
 
     if not api.display_name:
         raise RuntimeError(
-            "Could not resolve Garmin display_name — tokens may be expired. "
-            "Run setup_garmin_browser_auth.py locally to re-authenticate."
+            "Could not resolve Garmin display_name — tokens may be expired. " "Run setup_garmin_browser_auth.py locally to re-authenticate."
         )
 
     # Save again after profile resolution (profile calls may have triggered a refresh)
@@ -410,7 +409,9 @@ def extract_body_battery(api, date_str: str) -> dict:
             result["body_battery_high"] = max(values)
             result["body_battery_low"] = min(values)
             result["body_battery_end"] = values[-1]
-            logger.info(f"Body Battery: high={result['body_battery_high']}, low={result['body_battery_low']}, end={result['body_battery_end']}")
+            logger.info(
+                f"Body Battery: high={result['body_battery_high']}, low={result['body_battery_low']}, end={result['body_battery_end']}"
+            )
     except Exception as e:
         logger.info(f"Warning: body battery extraction failed: {e}")
     return result
@@ -566,7 +567,9 @@ def extract_training_status(api, date_str: str) -> dict:
                 break
 
         if result:
-            logger.info(f"Training status: {result.get('training_status')} acute={result.get('garmin_acute_load')} chronic={result.get('garmin_chronic_load')} ACWR={result.get('garmin_acwr')}")
+            logger.info(
+                f"Training status: {result.get('training_status')} acute={result.get('garmin_acute_load')} chronic={result.get('garmin_chronic_load')} ACWR={result.get('garmin_acwr')}"
+            )
     except Exception as e:
         logger.info(f"Warning: training status extraction failed: {e}")
 
@@ -587,7 +590,9 @@ def extract_training_status(api, date_str: str) -> dict:
             if recovery_time is not None:
                 result["recovery_time_hours"] = int(recovery_time)
             if result.get("training_readiness"):
-                logger.info(f"Training readiness: {result['training_readiness']} ({result.get('training_readiness_level')}) HRV_weekly={result.get('hrv_weekly_average')}ms recovery={result.get('recovery_time_hours')}h")
+                logger.info(
+                    f"Training readiness: {result['training_readiness']} ({result.get('training_readiness_level')}) HRV_weekly={result.get('hrv_weekly_average')}ms recovery={result.get('recovery_time_hours')}h"
+                )
         elif data and isinstance(data, dict):
             # Fallback for dict response (older API versions)
             score = data.get("score") or data.get("trainingReadinessScore")
@@ -640,11 +645,11 @@ def extract_sleep(api, date_str: str) -> dict:
 
         # ── Sleep stages ──
         for field, key in [
-            ("deep_sleep_seconds",          "deepSleepSeconds"),
-            ("light_sleep_seconds",         "lightSleepSeconds"),
-            ("rem_sleep_seconds",           "remSleepSeconds"),
-            ("awake_sleep_seconds",         "awakeSleepSeconds"),
-            ("unmeasurable_sleep_seconds",  "unmeasurableSleepSeconds"),
+            ("deep_sleep_seconds", "deepSleepSeconds"),
+            ("light_sleep_seconds", "lightSleepSeconds"),
+            ("rem_sleep_seconds", "remSleepSeconds"),
+            ("awake_sleep_seconds", "awakeSleepSeconds"),
+            ("unmeasurable_sleep_seconds", "unmeasurableSleepSeconds"),
         ]:
             val = daily.get(key)
             if val is not None and val >= 0:
@@ -690,12 +695,12 @@ def extract_sleep(api, date_str: str) -> dict:
         # ── Sleep sub-scores (breakdown of overall sleep_score) ──
         sleep_scores = daily.get("sleepScores") or {}
         for field, key in [
-            ("sleep_score_quality",     "qualityScore"),
-            ("sleep_score_duration",    "durationScore"),
-            ("sleep_score_deep",        "deepScore"),
-            ("sleep_score_rem",         "remScore"),
-            ("sleep_score_light",       "lightScore"),
-            ("sleep_score_awakenings",  "awakeningsScore"),
+            ("sleep_score_quality", "qualityScore"),
+            ("sleep_score_duration", "durationScore"),
+            ("sleep_score_deep", "deepScore"),
+            ("sleep_score_rem", "remScore"),
+            ("sleep_score_light", "lightScore"),
+            ("sleep_score_awakenings", "awakeningsScore"),
         ]:
             val = sleep_scores.get(key)
             if val is not None and val > 0:
@@ -712,8 +717,10 @@ def extract_sleep(api, date_str: str) -> dict:
             if "awake_sleep_seconds" in result:
                 stages.append(f"awake={result['awake_sleep_seconds']//60}m")
             stage_str = " ".join(stages)
-            logger.info(f"Sleep: {result.get('sleep_duration_seconds')}s score={result.get('sleep_score')} "
-                        f"{stage_str} spo2={result.get('sleep_spo2_avg')} restless={result.get('restless_moments_count')}")
+            logger.info(
+                f"Sleep: {result.get('sleep_duration_seconds')}s score={result.get('sleep_score')} "
+                f"{stage_str} spo2={result.get('sleep_spo2_avg')} restless={result.get('restless_moments_count')}"
+            )
 
     except Exception as e:
         logger.info(f"Warning: sleep extraction failed: {e}")
@@ -780,7 +787,9 @@ def extract_stats(api, date_str: str) -> dict:
             if total and total > 0:
                 result["total_calories_burned"] = int(total)
         if result:
-            logger.info(f"Stats: floors={result.get('floors_climbed')} active_cal={result.get('active_calories')} bmr={result.get('bmr_calories')}")
+            logger.info(
+                f"Stats: floors={result.get('floors_climbed')} active_cal={result.get('active_calories')} bmr={result.get('bmr_calories')}"
+            )
     except Exception as e:
         logger.info(f"Warning: stats extraction failed: {e}")
     return result
@@ -824,14 +833,14 @@ def extract_activities(api, date_str: str) -> dict:
 
             # Training analytics (Garmin proprietary)
             for key, field in [
-                ("aerobic_training_effect",   "aerobicTrainingEffect"),
-                ("anaerobic_training_effect",  "anaerobicTrainingEffect"),
-                ("performance_condition",      "performanceCondition"),
-                ("lactate_threshold_hr",       "lactateThresholdHeartRate"),
+                ("aerobic_training_effect", "aerobicTrainingEffect"),
+                ("anaerobic_training_effect", "anaerobicTrainingEffect"),
+                ("performance_condition", "performanceCondition"),
+                ("lactate_threshold_hr", "lactateThresholdHeartRate"),
                 ("lactate_threshold_speed_mps", "lactateThresholdSpeed"),
-                ("activity_training_load",     "activityTrainingLoad"),
-                ("normalized_power_watts",     "normalizedPower"),
-                ("training_stress_score",      "trainingStressScore"),
+                ("activity_training_load", "activityTrainingLoad"),
+                ("normalized_power_watts", "normalizedPower"),
+                ("training_stress_score", "trainingStressScore"),
             ]:
                 v = safe_float(act.get(field))
                 if v is not None:
@@ -847,11 +856,11 @@ def extract_activities(api, date_str: str) -> dict:
 
             # Running dynamics
             for key, field in [
-                ("avg_cadence",             "averageRunningCadenceInStepsPerMinute"),
-                ("stride_length_m",          "strideLength"),
-                ("ground_contact_time_ms",   "groundContactTime"),
-                ("vertical_oscillation_cm",  "verticalOscillation"),
-                ("vertical_ratio_pct",       "verticalRatio"),
+                ("avg_cadence", "averageRunningCadenceInStepsPerMinute"),
+                ("stride_length_m", "strideLength"),
+                ("ground_contact_time_ms", "groundContactTime"),
+                ("vertical_oscillation_cm", "verticalOscillation"),
+                ("vertical_ratio_pct", "verticalRatio"),
             ]:
                 v = safe_float(act.get(field))
                 if v is not None:

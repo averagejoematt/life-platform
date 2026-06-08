@@ -12,10 +12,10 @@ Usage:
 Output: site/rss.xml
 """
 
-import re
 import argparse
-from pathlib import Path
+import re
 from datetime import datetime
+from pathlib import Path
 from xml.sax.saxutils import escape
 
 SITE_DIR = Path(__file__).resolve().parent.parent / "site"
@@ -46,7 +46,7 @@ def extract_meta(html: str) -> dict:
     meta = {}
 
     # <title>
-    m = re.search(r'<title>(.*?)</title>', html)
+    m = re.search(r"<title>(.*?)</title>", html)
     if m:
         meta["title"] = m.group(1).strip()
 
@@ -75,13 +75,15 @@ def build_rss(posts: list) -> str:
     items = []
     for p in posts:
         pub_date = datetime.strptime(p["date"], "%Y-%m-%d").strftime("%a, %d %b %Y 12:00:00 +0000")
-        items.append(f"""    <item>
+        items.append(
+            f"""    <item>
       <title>{escape(p['title'])}</title>
       <link>{escape(p['url'])}</link>
       <guid isPermaLink="true">{escape(p['url'])}</guid>
       <description>{escape(p['description'])}</description>
       <pubDate>{pub_date}</pubDate>
-    </item>""")
+    </item>"""
+        )
 
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
@@ -144,18 +146,21 @@ def main():
                 week_num = int(m.group(1))
                 # Calculate from journey start
                 from datetime import timedelta
+
                 start = datetime(2026, 2, 9)
                 date = (start + timedelta(weeks=week_num, days=3)).strftime("%Y-%m-%d")  # Wednesdays
             else:
                 date = "2026-03-01"  # fallback
 
-        posts.append({
-            "slug": slug,
-            "title": title,
-            "description": description,
-            "date": date,
-            "url": f"{SITE_URL}/chronicle/posts/{slug}/",
-        })
+        posts.append(
+            {
+                "slug": slug,
+                "title": title,
+                "description": description,
+                "date": date,
+                "url": f"{SITE_URL}/chronicle/posts/{slug}/",
+            }
+        )
 
     # Sort by date descending (newest first)
     posts.sort(key=lambda p: p["date"], reverse=True)

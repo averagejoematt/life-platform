@@ -28,14 +28,16 @@ Security:
 """
 
 import json
-import os
 import logging
+import os
 import urllib.parse
-import boto3
 from datetime import datetime, timezone
+
+import boto3
 
 try:
     from platform_logger import get_logger
+
     logger = get_logger("chronicle-approve")
 except ImportError:
     logger = logging.getLogger("chronicle-approve")
@@ -60,6 +62,7 @@ lam = boto3.client("lambda", region_name=REGION)
 # ─────────────────────────────────────────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _html_response(status_code: int, title: str, body: str) -> dict:
     """Return a Lambda Function URL response with a minimal HTML page."""
@@ -125,8 +128,10 @@ def _publish_to_s3(item: dict) -> list[str]:
 
     if blog_post_key and blog_post_html:
         s3.put_object(
-            Bucket=S3_BUCKET, Key=blog_post_key,
-            Body=blog_post_html, ContentType="text/html",
+            Bucket=S3_BUCKET,
+            Key=blog_post_key,
+            Body=blog_post_html,
+            ContentType="text/html",
             CacheControl="max-age=3600",
         )
         logger.info("S3: wrote %s", blog_post_key)
@@ -134,8 +139,10 @@ def _publish_to_s3(item: dict) -> list[str]:
 
     if blog_index_html:
         s3.put_object(
-            Bucket=S3_BUCKET, Key="blog/index.html",
-            Body=blog_index_html, ContentType="text/html",
+            Bucket=S3_BUCKET,
+            Key="blog/index.html",
+            Body=blog_index_html,
+            ContentType="text/html",
             CacheControl="max-age=300",
         )
         logger.info("S3: wrote blog/index.html")
@@ -149,7 +156,8 @@ def _publish_to_s3(item: dict) -> list[str]:
 
     if journal_post_key and journal_post_html:
         s3.put_object(
-            Bucket=S3_BUCKET, Key=journal_post_key,
+            Bucket=S3_BUCKET,
+            Key=journal_post_key,
             Body=journal_post_html.encode("utf-8"),
             ContentType="text/html; charset=utf-8",
             CacheControl="max-age=300",
@@ -161,7 +169,8 @@ def _publish_to_s3(item: dict) -> list[str]:
 
     if journal_posts_json:
         s3.put_object(
-            Bucket=S3_BUCKET, Key="generated/journal/posts.json",
+            Bucket=S3_BUCKET,
+            Key="generated/journal/posts.json",
             Body=journal_posts_json.encode("utf-8"),
             ContentType="application/json",
             CacheControl="max-age=300",
@@ -249,6 +258,7 @@ def _invoke_email_sender() -> None:
 # HANDLER
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def lambda_handler(event, context):
     """Handle GET requests from the preview email approve/request_changes links."""
     logger.info("chronicle-approve: invoked")
@@ -256,10 +266,13 @@ def lambda_handler(event, context):
         return _handle(event)
     except Exception as exc:
         logger.exception("chronicle-approve: unhandled error: %s", exc)
-        return _html_response(500, "Error",
+        return _html_response(
+            500,
+            "Error",
             '<div class="icon">⚠️</div>'
-            '<h1>Something went wrong</h1>'
-            '<p>An unexpected error occurred. Check CloudWatch logs for details.</p>')
+            "<h1>Something went wrong</h1>"
+            "<p>An unexpected error occurred. Check CloudWatch logs for details.</p>",
+        )
 
 
 def _handle(event: dict) -> dict:
@@ -272,19 +285,23 @@ def _handle(event: dict) -> dict:
 
     # ── Validate inputs ──────────────────────────────────────────────────────
     if not date_str or not token or action not in ("approve", "request_changes"):
-        return _html_response(400, "Invalid Request",
+        return _html_response(
+            400,
+            "Invalid Request",
             '<div class="icon">⚠️</div>'
-            '<h1>Invalid Link</h1>'
-            '<p>This approval link is missing required parameters. '
-            'Check the preview email for the correct link.</p>')
+            "<h1>Invalid Link</h1>"
+            "<p>This approval link is missing required parameters. "
+            "Check the preview email for the correct link.</p>",
+        )
 
     # ── Load draft ───────────────────────────────────────────────────────────
     item = _get_draft(date_str)
     if not item:
-        return _html_response(404, "Not Found",
-            '<div class="icon">🔍</div>'
-            '<h1>Installment Not Found</h1>'
-            f'<p>No Chronicle draft found for {date_str}.</p>')
+        return _html_response(
+            404,
+            "Not Found",
+            '<div class="icon">🔍</div>' "<h1>Installment Not Found</h1>" f"<p>No Chronicle draft found for {date_str}.</p>",
+        )
 
     current_status = item.get("status", "")
     stored_token = item.get("approval_token", "")
@@ -293,27 +310,37 @@ def _handle(event: dict) -> dict:
 
     # ── Already processed? ───────────────────────────────────────────────────
     if current_status == "published":
-        return _html_response(200, "Already Published",
+        return _html_response(
+            200,
+            "Already Published",
             f'<div class="icon">✅</div>'
-            f'<h1>Already Published</h1>'
-            f'<p>Week {week_num}: &ldquo;{title}&rdquo; was already published.</p>')
+            f"<h1>Already Published</h1>"
+            f"<p>Week {week_num}: &ldquo;{title}&rdquo; was already published.</p>",
+        )
 
     if current_status == "changes_requested":
-        return _html_response(200, "Changes Already Requested",
+        return _html_response(
+            200,
+            "Changes Already Requested",
             f'<div class="icon">📝</div>'
-            f'<h1>Changes Already Requested</h1>'
-            f'<p>Week {week_num} is queued for regeneration. '
-            f'Re-run the wednesday-chronicle Lambda to generate a new draft.</p>')
+            f"<h1>Changes Already Requested</h1>"
+            f"<p>Week {week_num} is queued for regeneration. "
+            f"Re-run the wednesday-chronicle Lambda to generate a new draft.</p>",
+        )
 
     # ── Validate token ───────────────────────────────────────────────────────
     import hmac
+
     if not stored_token or not hmac.compare_digest(stored_token, token):
         logger.warning("chronicle-approve: token mismatch for %s", date_str)
-        return _html_response(403, "Invalid Token",
+        return _html_response(
+            403,
+            "Invalid Token",
             '<div class="icon">🔒</div>'
-            '<h1>Invalid Token</h1>'
-            '<p>The approval token is incorrect or has expired. '
-            'Use the link from the preview email.</p>')
+            "<h1>Invalid Token</h1>"
+            "<p>The approval token is incorrect or has expired. "
+            "Use the link from the preview email.</p>",
+        )
 
     # ── Perform action ───────────────────────────────────────────────────────
     if action == "approve":
@@ -324,18 +351,24 @@ def _handle(event: dict) -> dict:
         _mark_published(date_str)
         _invoke_email_sender()
 
-        return _html_response(200, "Published!",
+        return _html_response(
+            200,
+            "Published!",
             f'<div class="icon">🎉</div>'
-            f'<h1>Published!</h1>'
-            f'<p>Week {week_num}: &ldquo;{title}&rdquo; is now live on averagejoematt.com.<br>'
-            f'Subscribers will receive their email shortly.</p>')
+            f"<h1>Published!</h1>"
+            f"<p>Week {week_num}: &ldquo;{title}&rdquo; is now live on averagejoematt.com.<br>"
+            f"Subscribers will receive their email shortly.</p>",
+        )
 
     else:  # request_changes
         logger.info("chronicle-approve: CHANGES REQUESTED for Week %s (%s)", week_num, date_str)
         _mark_changes_requested(date_str)
 
-        return _html_response(200, "Changes Requested",
+        return _html_response(
+            200,
+            "Changes Requested",
             f'<div class="icon">📝</div>'
-            f'<h1>Changes Requested</h1>'
-            f'<p>Week {week_num}: &ldquo;{title}&rdquo; has been flagged for revision.<br>'
-            f'Re-run the wednesday-chronicle Lambda (with a new prompt if needed) to generate a new draft.</p>')
+            f"<h1>Changes Requested</h1>"
+            f"<p>Week {week_num}: &ldquo;{title}&rdquo; has been flagged for revision.<br>"
+            f"Re-run the wednesday-chronicle Lambda (with a new prompt if needed) to generate a new draft.</p>",
+        )

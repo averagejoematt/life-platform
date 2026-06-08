@@ -26,12 +26,12 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import boto3
-
 from phase_filter import with_phase_filter  # ADR-058
 
 # Structured logger
 try:
     from platform_logger import get_logger
+
     logger = get_logger("coach-state-updater")
 except ImportError:
     logger = logging.getLogger("coach-state-updater")
@@ -76,19 +76,30 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 # of any base key — the evaluator computes those on-the-fly.
 #
 # Keep in sync with lambdas/coach_prediction_evaluator.py:65 (METRIC_SOURCES).
-MEASURABLE_METRICS = frozenset({
-    # whoop
-    "hrv", "hrv_7day_avg", "recovery_score", "resting_heart_rate",
-    "sleep_duration_hours", "sleep_score", "deep_pct", "rem_pct",
-    # withings
-    "weight_lbs",
-    # macrofactor
-    "total_calories_kcal", "total_protein_g",
-    # apple_health
-    "steps", "blood_glucose_avg", "blood_glucose_std_dev",
-    # dexa
-    "body_fat_pct",
-})
+MEASURABLE_METRICS = frozenset(
+    {
+        # whoop
+        "hrv",
+        "hrv_7day_avg",
+        "recovery_score",
+        "resting_heart_rate",
+        "sleep_duration_hours",
+        "sleep_score",
+        "deep_pct",
+        "rem_pct",
+        # withings
+        "weight_lbs",
+        # macrofactor
+        "total_calories_kcal",
+        "total_protein_g",
+        # apple_health
+        "steps",
+        "blood_glucose_avg",
+        "blood_glucose_std_dev",
+        # dexa
+        "body_fat_pct",
+    }
+)
 
 # Substring → measurable-metric mapping for normalizing prose-y metric hints.
 # Checked in declared order — first match wins, so multi-word/specific patterns
@@ -99,35 +110,35 @@ MEASURABLE_METRICS = frozenset({
 # all due to unmapped metrics).
 _METRIC_HINT_NORMALIZERS = (
     # Multi-word specific patterns first (precedence)
-    ("heart rate variability",          "hrv"),
-    ("resting heart rate",              "resting_heart_rate"),
-    ("resting hr",                      "resting_heart_rate"),
-    ("hours of sleep",                  "sleep_duration_hours"),
-    ("sleep duration",                  "sleep_duration_hours"),
-    ("sleep score",                     "sleep_score"),
-    ("sleep quality",                   "sleep_score"),
-    ("sleep efficiency",                "sleep_score"),
-    ("deep sleep",                      "deep_pct"),
-    ("rem sleep",                       "rem_pct"),
-    ("rem percentage",                  "rem_pct"),
-    ("blood glucose",                   "blood_glucose_avg"),
-    ("glucose variability",             "blood_glucose_std_dev"),
-    ("glucose excursion",               "blood_glucose_avg"),
-    ("postprandial glucose",            "blood_glucose_avg"),
-    ("post-meal glucose",               "blood_glucose_avg"),
-    ("body fat",                        "body_fat_pct"),
-    ("step count",                      "steps"),
-    ("daily steps",                     "steps"),
-    ("recovery score",                  "recovery_score"),
-    ("recovery",                        "recovery_score"),
+    ("heart rate variability", "hrv"),
+    ("resting heart rate", "resting_heart_rate"),
+    ("resting hr", "resting_heart_rate"),
+    ("hours of sleep", "sleep_duration_hours"),
+    ("sleep duration", "sleep_duration_hours"),
+    ("sleep score", "sleep_score"),
+    ("sleep quality", "sleep_score"),
+    ("sleep efficiency", "sleep_score"),
+    ("deep sleep", "deep_pct"),
+    ("rem sleep", "rem_pct"),
+    ("rem percentage", "rem_pct"),
+    ("blood glucose", "blood_glucose_avg"),
+    ("glucose variability", "blood_glucose_std_dev"),
+    ("glucose excursion", "blood_glucose_avg"),
+    ("postprandial glucose", "blood_glucose_avg"),
+    ("post-meal glucose", "blood_glucose_avg"),
+    ("body fat", "body_fat_pct"),
+    ("step count", "steps"),
+    ("daily steps", "steps"),
+    ("recovery score", "recovery_score"),
+    ("recovery", "recovery_score"),
     # Single-word fallbacks (checked last)
-    ("hrv",                             "hrv"),
-    ("weight",                          "weight_lbs"),
-    ("calorie",                         "total_calories_kcal"),
-    ("kcal",                            "total_calories_kcal"),
-    ("protein",                         "total_protein_g"),
-    ("glucose",                         "blood_glucose_avg"),
-    ("steps",                           "steps"),
+    ("hrv", "hrv"),
+    ("weight", "weight_lbs"),
+    ("calorie", "total_calories_kcal"),
+    ("kcal", "total_calories_kcal"),
+    ("protein", "total_protein_g"),
+    ("glucose", "blood_glucose_avg"),
+    ("steps", "steps"),
 )
 
 
@@ -141,8 +152,7 @@ def _parse_confidence(raw) -> float:
     if raw is None or raw == "":
         return 0.5
     s = str(raw).strip().lower()
-    word_map = {"high": 0.85, "medium": 0.5, "med": 0.5, "low": 0.2,
-                "very high": 0.95, "very low": 0.1, "unknown": 0.5}
+    word_map = {"high": 0.85, "medium": 0.5, "med": 0.5, "low": 0.2, "very high": 0.95, "very low": 0.1, "unknown": 0.5}
     if s in word_map:
         return word_map[s]
     try:
@@ -202,6 +212,7 @@ def _get_api_key():
 # HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _decimal_to_float(obj):
     """Recursively convert DynamoDB Decimals to float for JSON serialization."""
     if isinstance(obj, Decimal):
@@ -224,8 +235,7 @@ def _float_to_decimal(obj):
     return obj
 
 
-def _emit_token_metrics(input_tokens, output_tokens,
-                        cache_creation_tokens=0, cache_read_tokens=0):
+def _emit_token_metrics(input_tokens, output_tokens, cache_creation_tokens=0, cache_read_tokens=0):
     """Emit per-Lambda token usage to CloudWatch (non-fatal).
 
     V2 P0.6 (2026-05-17): added cache_creation/cache_read fields. Prior 2-arg
@@ -237,25 +247,33 @@ def _emit_token_metrics(input_tokens, output_tokens,
             {
                 "MetricName": "AnthropicInputTokens",
                 "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": input_tokens, "Unit": "Count",
+                "Value": input_tokens,
+                "Unit": "Count",
             },
             {
                 "MetricName": "AnthropicOutputTokens",
                 "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": output_tokens, "Unit": "Count",
+                "Value": output_tokens,
+                "Unit": "Count",
             },
         ]
         if cache_creation_tokens or cache_read_tokens:
-            metric_data.append({
-                "MetricName": "AnthropicCacheWriteTokens",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": cache_creation_tokens, "Unit": "Count",
-            })
-            metric_data.append({
-                "MetricName": "AnthropicCacheReadTokens",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": cache_read_tokens, "Unit": "Count",
-            })
+            metric_data.append(
+                {
+                    "MetricName": "AnthropicCacheWriteTokens",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": cache_creation_tokens,
+                    "Unit": "Count",
+                }
+            )
+            metric_data.append(
+                {
+                    "MetricName": "AnthropicCacheReadTokens",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": cache_read_tokens,
+                    "Unit": "Count",
+                }
+            )
         _cw.put_metric_data(Namespace=_CW_NAMESPACE, MetricData=metric_data)
     except Exception as e:
         logger.warning("CloudWatch token metric emit failed (non-fatal): %s", e)
@@ -266,11 +284,14 @@ def _emit_failure_metric():
     try:
         _cw.put_metric_data(
             Namespace=_CW_NAMESPACE,
-            MetricData=[{
-                "MetricName": "AnthropicAPIFailure",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": 1, "Unit": "Count",
-            }],
+            MetricData=[
+                {
+                    "MetricName": "AnthropicAPIFailure",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": 1,
+                    "Unit": "Count",
+                }
+            ],
         )
     except Exception as e:
         logger.warning("CloudWatch failure metric emit failed (non-fatal): %s", e)
@@ -279,6 +300,7 @@ def _emit_failure_metric():
 # ══════════════════════════════════════════════════════════════════════════════
 # ANTHROPIC API CALL
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _call_haiku(system, user_message, max_tokens=3000, temperature=0.1):
     """Call Anthropic Haiku with exponential backoff + CloudWatch metrics.
@@ -315,6 +337,7 @@ def _call_haiku(system, user_message, max_tokens=3000, temperature=0.1):
 
     # ADR-062 (2026-05-27): route through retry_utils.call_anthropic_raw (Bedrock).
     from retry_utils import call_anthropic_raw
+
     resp = call_anthropic_raw(req)
     text = resp["content"][0]["text"].strip()
     try:
@@ -343,6 +366,7 @@ def _call_haiku(system, user_message, max_tokens=3000, temperature=0.1):
 # DYNAMODB OPERATIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _get_item(pk, sk):
     """Get a single DynamoDB item. Returns None if not found or on error."""
     try:
@@ -367,11 +391,16 @@ def _put_item(item):
 def _query_begins_with(pk, sk_prefix, scan_forward=True):
     """Query DynamoDB for items with SK beginning with a prefix. ADR-058: phase-filtered."""
     from boto3.dynamodb.conditions import Key
+
     try:
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
-            "ScanIndexForward": scan_forward,
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
+                    "ScanIndexForward": scan_forward,
+                }
+            )
+        )
         return _decimal_to_float(resp.get("Items", []))
     except Exception as e:
         logger.warning("query_begins_with(%s, %s) failed: %s", pk, sk_prefix, e)
@@ -381,6 +410,7 @@ def _query_begins_with(pk, sk_prefix, scan_forward=True):
 # ══════════════════════════════════════════════════════════════════════════════
 # VOICE SPEC LOADER
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _load_voice_spec(coach_id):
     """Load the coach's voice specification from S3 for anti-pattern checking.
@@ -497,12 +527,12 @@ def _build_extraction_message(coach_id, output_text, output_type, voice_spec):
         if phrase_bl:
             parts.append("### Forbidden Phrases")
             for phrase in phrase_bl:
-                parts.append(f"  - \"{phrase}\"")
+                parts.append(f'  - "{phrase}"')
         structural_bl = anti_patterns.get("structural_blacklist", [])
         if structural_bl:
             parts.append("### Forbidden Structural Patterns")
             for pattern in structural_bl:
-                parts.append(f"  - \"{pattern}\"")
+                parts.append(f'  - "{pattern}"')
         parts.append("")
 
     parts.append(
@@ -518,6 +548,7 @@ def _build_extraction_message(coach_id, output_text, output_type, voice_spec):
 # ══════════════════════════════════════════════════════════════════════════════
 # STATE WRITES
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _write_output_record(coach_id, date, output_type, output_text, extraction):
     """Write the OUTPUT# record with full content and extracted metadata."""
@@ -546,7 +577,8 @@ def _write_output_record(coach_id, date, output_type, output_text, extraction):
     if success:
         logger.info(
             "Wrote OUTPUT# for %s — %d words, %d themes, %d threads opened",
-            coach_id, word_count,
+            coach_id,
+            word_count,
             len(extraction.get("themes", [])),
             len(extraction.get("threads_opened", [])),
         )
@@ -575,25 +607,20 @@ def _update_voice_state(coach_id, extraction):
     recent_window = recent_openings[-STALENESS_WINDOW:]
     if len(recent_window) >= STALENESS_THRESHOLD:
         from collections import Counter
+
         counts = Counter(recent_window)
         for pattern, count in counts.items():
             if count >= STALENESS_THRESHOLD:
                 overused_patterns.append(f"opening_with_{pattern}")
 
     # Preserve existing signature patterns and anti-patterns
-    signature_patterns = (
-        current.get("signature_patterns_to_reinforce", []) if current else []
-    )
-    anti_patterns = (
-        current.get("anti_patterns", []) if current else []
-    )
+    signature_patterns = current.get("signature_patterns_to_reinforce", []) if current else []
+    anti_patterns = current.get("anti_patterns", []) if current else []
 
     # Add any new anti-pattern violations detected
     violations = extraction.get("anti_pattern_violations", [])
     if violations:
-        logger.warning(
-            "Anti-pattern violations detected for %s: %s", coach_id, violations
-        )
+        logger.warning("Anti-pattern violations detected for %s: %s", coach_id, violations)
 
     item = {
         "pk": coach_pk,
@@ -610,7 +637,9 @@ def _update_voice_state(coach_id, extraction):
     if success:
         logger.info(
             "Updated VOICE#state for %s — opening: %s, overused: %s",
-            coach_id, opening_type, overused_patterns,
+            coach_id,
+            opening_type,
+            overused_patterns,
         )
     return success
 
@@ -689,20 +718,17 @@ def _update_referenced_threads(coach_id, date, threads_referenced):
                 try:
                     table.update_item(
                         Key={"pk": coach_pk, "sk": thread["sk"]},
-                        UpdateExpression=(
-                            "SET last_referenced = :lr, "
-                            "reference_count = if_not_exists(reference_count, :zero) + :one"
+                        UpdateExpression=("SET last_referenced = :lr, " "reference_count = if_not_exists(reference_count, :zero) + :one"),
+                        ExpressionAttributeValues=_float_to_decimal(
+                            {
+                                ":lr": date,
+                                ":zero": 0,
+                                ":one": 1,
+                            }
                         ),
-                        ExpressionAttributeValues=_float_to_decimal({
-                            ":lr": date,
-                            ":zero": 0,
-                            ":one": 1,
-                        }),
                     )
                     updated += 1
-                    logger.debug(
-                        "Updated thread %s for reference to '%s'", thread["sk"], topic
-                    )
+                    logger.debug("Updated thread %s for reference to '%s'", thread["sk"], topic)
                 except Exception as e:
                     logger.warning("Failed to update thread %s: %s", thread.get("sk"), e)
                 break  # Only update the first matching thread per reference
@@ -725,34 +751,33 @@ def _build_reasoning_trace(coach_id, date, output_type, extraction):
     themes = extraction.get("themes", [])
 
     # Predictions
-    predictions = [
-        p.get("claim_natural", "") for p in extraction.get("predictions_made", [])
-    ]
+    predictions = [p.get("claim_natural", "") for p in extraction.get("predictions_made", [])]
 
     # Cross-coach inputs — extracted from threads_referenced that mention other coaches
     cross_coach_inputs = []
     for ref in extraction.get("threads_referenced", []):
         topic = ref.get("topic", "")
         context = ref.get("context", "")
-        if any(
-            kw in topic.lower() or kw in context.lower()
-            for kw in ["coach", "training", "nutrition", "mind", "glucose", "labs"]
-        ):
+        if any(kw in topic.lower() or kw in context.lower() for kw in ["coach", "training", "nutrition", "mind", "glucose", "labs"]):
             cross_coach_inputs.append(f"{topic}: {context}")
 
     # Thread status summary
     threads_status = []
     for t in extraction.get("threads_opened", []):
-        threads_status.append({
-            "thread": t.get("thread_slug", ""),
-            "action": "opened",
-            "type": t.get("type", "observation"),
-        })
+        threads_status.append(
+            {
+                "thread": t.get("thread_slug", ""),
+                "action": "opened",
+                "type": t.get("type", "observation"),
+            }
+        )
     for t in extraction.get("threads_referenced", []):
-        threads_status.append({
-            "thread": t.get("topic", ""),
-            "action": "referenced",
-        })
+        threads_status.append(
+            {
+                "thread": t.get("topic", ""),
+                "action": "referenced",
+            }
+        )
 
     trace = {
         "pk": f"COACH#{coach_id}",
@@ -774,6 +799,7 @@ def _build_reasoning_trace(coach_id, date, output_type, extraction):
 # ══════════════════════════════════════════════════════════════════════════════
 # DEFAULT EXTRACTION
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _build_default_extraction(output_text):
     """Build a minimal extraction when the LLM call fails.
@@ -803,6 +829,7 @@ def _build_default_extraction(output_text):
 # HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def lambda_handler(event, context):
     """Extract metadata from a coach's generated output and update state.
 
@@ -830,7 +857,10 @@ def lambda_handler(event, context):
 
     logger.info(
         "Starting state update for %s — output_type: %s, date: %s, text_length: %d",
-        coach_id, output_type, generation_date, len(output_text),
+        coach_id,
+        output_type,
+        generation_date,
+        len(output_text),
     )
 
     # Load voice spec from S3 for anti-pattern checking
@@ -849,9 +879,7 @@ def lambda_handler(event, context):
 
         # Validate we got a dict
         if not isinstance(extraction, dict):
-            logger.warning(
-                "LLM returned non-dict extraction for %s — using default", coach_id
-            )
+            logger.warning("LLM returned non-dict extraction for %s — using default", coach_id)
             extraction = _build_default_extraction(output_text)
     except Exception as e:
         logger.error("LLM extraction failed for %s: %s — using default", coach_id, e)
@@ -902,14 +930,16 @@ def lambda_handler(event, context):
         metric_hint = _normalize_metric_hint(raw_metric_hint) or ""
         if raw_metric_hint and not metric_hint:
             logger.info(
-                "Prediction metric_hint %r did not normalize to MEASURABLE_METRICS — "
-                "marking qualitative for coach=%s", raw_metric_hint, coach_id,
+                "Prediction metric_hint %r did not normalize to MEASURABLE_METRICS — " "marking qualitative for coach=%s",
+                raw_metric_hint,
+                coach_id,
             )
         timeframe_hint = pred.get("timeframe_hint", "")
         confidence_stated = pred.get("confidence_stated")
 
         # Build a slug-based prediction ID
         import re
+
         slug = re.sub(r"[^a-z0-9]+", "_", claim.lower()[:40]).strip("_")
         pred_id = f"pred_{generation_date.replace('-', '')}_{slug}"
 
@@ -936,8 +966,7 @@ def lambda_handler(event, context):
         subdomain = "general"
         if metric_hint:
             mh = metric_hint.lower()
-            for sd_key in ["sleep", "hrv", "recovery", "weight", "calories", "protein",
-                           "glucose", "training", "mood", "stress"]:
+            for sd_key in ["sleep", "hrv", "recovery", "weight", "calories", "protein", "glucose", "training", "mood", "stress"]:
                 if sd_key in mh:
                     subdomain = sd_key
                     break
@@ -965,7 +994,11 @@ def lambda_handler(event, context):
             "outcome": None,
             "outcome_date": None,
             "outcome_notes": None,
-            "decision_class": extraction.get("decision_classes_used", ["observational"])[0] if extraction.get("decision_classes_used") else "observational",
+            "decision_class": (
+                extraction.get("decision_classes_used", ["observational"])[0]
+                if extraction.get("decision_classes_used")
+                else "observational"
+            ),
             "surfaced_to_subject": True,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }

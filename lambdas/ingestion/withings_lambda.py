@@ -22,7 +22,7 @@ import logging
 import os
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
@@ -30,6 +30,7 @@ from boto3.dynamodb.conditions import Key
 
 try:
     from platform_logger import get_logger
+
     logger = get_logger("withings")
 except ImportError:
     logger = logging.getLogger("withings")
@@ -48,12 +49,12 @@ WITHINGS_MEAS_URL = "https://wbsapi.withings.net/measure"
 
 # Measurement type IDs from Withings API → field names in DDB record.
 MEAS_TYPES = {
-    1:  "weight_kg",
-    4:  "height_m",
-    5:  "fat_free_mass_kg",
-    6:  "fat_ratio_pct",
-    8:  "fat_mass_kg",
-    9:  "diastolic_blood_pressure",
+    1: "weight_kg",
+    4: "height_m",
+    5: "fat_free_mass_kg",
+    6: "fat_ratio_pct",
+    8: "fat_mass_kg",
+    9: "diastolic_blood_pressure",
     10: "systolic_blood_pressure",
     11: "heart_pulse",
     12: "temperature_c",
@@ -79,6 +80,7 @@ _table = _dynamodb.Table(os.environ.get("TABLE_NAME", "life-platform"))
 
 # ── Withings API helpers ───────────────────────────────────────────────────────
 
+
 def _hmac_sha256(key: str, message: str) -> str:
     return hmac.new(key.encode(), message.encode(), hashlib.sha256).hexdigest()
 
@@ -89,18 +91,22 @@ def _post_form(url: str, params: dict) -> dict:
     req = urllib.request.Request(url, data=data, method="POST")
     req.add_header("Content-Type", "application/x-www-form-urlencoded")
     from http_retry import urlopen_with_retry
+
     with urlopen_with_retry(req, timeout=30) as resp:
         return json.loads(resp.read())
 
 
 def _get_nonce(client_id: str, client_secret: str) -> str:
     sig = _hmac_sha256(client_secret, f"getnonce,{client_id},{int(datetime.now().timestamp())}")
-    resp = _post_form(WITHINGS_SIG_URL, {
-        "action":    "getnonce",
-        "client_id": client_id,
-        "timestamp": int(datetime.now().timestamp()),
-        "signature": sig,
-    })
+    resp = _post_form(
+        WITHINGS_SIG_URL,
+        {
+            "action": "getnonce",
+            "client_id": client_id,
+            "timestamp": int(datetime.now().timestamp()),
+            "signature": sig,
+        },
+    )
     if resp.get("status") != 0:
         raise RuntimeError(f"getnonce failed: {resp}")
     return resp["body"]["nonce"]
@@ -115,14 +121,17 @@ def _refresh_access_token(secret: dict) -> dict:
 
     nonce = _get_nonce(client_id, client_secret)
     signature = _hmac_sha256(client_secret, f"requesttoken,{client_id},{nonce}")
-    resp = _post_form(WITHINGS_OAUTH_URL, {
-        "action":        "requesttoken",
-        "grant_type":    "refresh_token",
-        "client_id":     client_id,
-        "refresh_token": refresh_token,
-        "nonce":         nonce,
-        "signature":     signature,
-    })
+    resp = _post_form(
+        WITHINGS_OAUTH_URL,
+        {
+            "action": "requesttoken",
+            "grant_type": "refresh_token",
+            "client_id": client_id,
+            "refresh_token": refresh_token,
+            "nonce": nonce,
+            "signature": signature,
+        },
+    )
     if resp.get("status") != 0:
         raise RuntimeError(f"Token refresh failed: {resp}")
     body = resp["body"]
@@ -135,10 +144,10 @@ def _withings_get(secret: dict, url: str, params: dict) -> tuple[dict, dict]:
     """Bearer-token POST; refresh on 401-in-body. Returns (body, possibly-updated secret)."""
     params["action"] = params.get("action", "")
     data = urllib.parse.urlencode(params).encode()
-    req = urllib.request.Request(url, data=data, method="POST",
-                                  headers={"Authorization": f"Bearer {secret['access_token']}"})
+    req = urllib.request.Request(url, data=data, method="POST", headers={"Authorization": f"Bearer {secret['access_token']}"})
     req.add_header("Content-Type", "application/x-www-form-urlencoded")
     from http_retry import urlopen_with_retry
+
     with urlopen_with_retry(req, timeout=30) as resp:
         result = json.loads(resp.read())
 
@@ -146,8 +155,7 @@ def _withings_get(secret: dict, url: str, params: dict) -> tuple[dict, dict]:
     if result.get("status") == 401:
         logger.info("Withings access token expired, refreshing...")
         secret = _refresh_access_token(secret)
-        req2 = urllib.request.Request(url, data=data, method="POST",
-                                       headers={"Authorization": f"Bearer {secret['access_token']}"})
+        req2 = urllib.request.Request(url, data=data, method="POST", headers={"Authorization": f"Bearer {secret['access_token']}"})
         req2.add_header("Content-Type", "application/x-www-form-urlencoded")
         with urlopen_with_retry(req2, timeout=30) as resp2:
             result = json.loads(resp2.read())
@@ -166,7 +174,7 @@ def _parse_measurements(raw_body: dict) -> dict:
     latest_ts = grps_sorted[0]["date"]
     result = {
         "measurement_timestamp": latest_ts,
-        "measurement_time_utc":  datetime.fromtimestamp(latest_ts, tz=timezone.utc).isoformat(),
+        "measurement_time_utc": datetime.fromtimestamp(latest_ts, tz=timezone.utc).isoformat(),
     }
     for grp in grps_sorted:
         for meas in grp.get("measures", []):
@@ -178,8 +186,7 @@ def _parse_measurements(raw_body: dict) -> dict:
                 continue  # keep most-recent only
             value = meas["value"] * (10 ** meas["unit"])
             result[field_name] = round(value, 4)
-            if field_name in ("weight_kg", "fat_mass_kg", "fat_free_mass_kg",
-                              "muscle_mass_kg", "bone_mass_kg"):
+            if field_name in ("weight_kg", "fat_mass_kg", "fat_free_mass_kg", "muscle_mass_kg", "bone_mass_kg"):
                 result[field_name.replace("_kg", "_lbs")] = round(value * 2.20462, 2)
     return result
 
@@ -196,11 +203,11 @@ def _compute_body_comp_deltas(date_str: str, measurements: dict) -> dict:
     search_end = (target_dt - timedelta(days=11)).strftime("%Y-%m-%d")
     try:
         resp = _table.query(
-            KeyConditionExpression=Key("pk").eq(DYNAMO_PK)
-                & Key("sk").between(f"DATE#{search_start}", f"DATE#{search_end}"),
+            KeyConditionExpression=Key("pk").eq(DYNAMO_PK) & Key("sk").between(f"DATE#{search_start}", f"DATE#{search_end}"),
             ProjectionExpression="fat_free_mass_lbs, fat_mass_lbs, #d",
             ExpressionAttributeNames={"#d": "date"},
-            ScanIndexForward=False, Limit=1,
+            ScanIndexForward=False,
+            Limit=1,
         )
     except Exception as e:
         logger.warning("body_comp_deltas query failed: %s", e)
@@ -241,11 +248,11 @@ def fetch_day(credentials: dict, date_str: str) -> dict | None:
     day_start = datetime(target_dt.year, target_dt.month, target_dt.day, tzinfo=timezone.utc)
     day_end = day_start + timedelta(days=1)
     params = {
-        "action":    "getmeas",
+        "action": "getmeas",
         "meastypes": ",".join(str(k) for k in MEAS_TYPES.keys()),
-        "category":  "1",
+        "category": "1",
         "startdate": int(day_start.timestamp()),
-        "enddate":   int(day_end.timestamp()),
+        "enddate": int(day_end.timestamp()),
     }
     body, updated_secret = _withings_get(secret, WITHINGS_MEAS_URL, params)
     _secret_cache["secret"] = updated_secret  # keep cache fresh if refresh happened
@@ -261,12 +268,14 @@ def transform(raw: dict, date_str: str) -> list[dict]:
         return []
     deltas = _compute_body_comp_deltas(date_str, measurements)
     measurements.update(deltas)
-    return [{
-        "source":       "withings",
-        "date":         date_str,
-        "captured_at":  datetime.now(timezone.utc).isoformat(),
-        **measurements,
-    }]
+    return [
+        {
+            "source": "withings",
+            "date": date_str,
+            "captured_at": datetime.now(timezone.utc).isoformat(),
+            **measurements,
+        }
+    ]
 
 
 # ── Framework config ───────────────────────────────────────────────────────────
@@ -278,9 +287,9 @@ _config = IngestionConfig(
     schema_version=1,
     enable_gap_detection=True,
     lookback_days=int(os.environ.get("LOOKBACK_DAYS", "7")),
-    enable_secret_writeback=True,    # OAuth refresh tokens persist back
+    enable_secret_writeback=True,  # OAuth refresh tokens persist back
     enable_item_size_guard=True,
-    refresh_today=True,              # users may weigh in any time today
+    refresh_today=True,  # users may weigh in any time today
 )
 
 

@@ -36,15 +36,17 @@ The MCP get_acwr_status tool also reads this record for on-demand queries.
 v1.0.0 — 2026-03-16 (BS-09)
 """
 
+import logging
 import os
 import time
-import logging
-import boto3
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+import boto3
+
 try:
     from platform_logger import get_logger
+
     logger = get_logger("acwr-compute")
 except ImportError:
     logger = logging.getLogger("acwr-compute")
@@ -64,11 +66,15 @@ table = dynamodb.Table(TABLE_NAME)
 # HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _d2f(obj):
     """Recursively convert DynamoDB Decimal to float."""
-    if isinstance(obj, list): return [_d2f(i) for i in obj]
-    if isinstance(obj, dict): return {k: _d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [_d2f(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: _d2f(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
 
 
@@ -79,15 +85,19 @@ def _fetch_range(source: str, start: str, end: str) -> list:
     # causes false ACWR spikes for ~3 weeks after any restart (owner decision
     # 2026-06-06). include_pilot=True is a deliberate no-op annotation.
     from phase_filter import with_phase_filter
+
     records = []
-    kwargs = with_phase_filter({
-        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-        "ExpressionAttributeValues": {
-            ":pk": USER_PREFIX + source,
-            ":s":  "DATE#" + start,
-            ":e":  "DATE#" + end,
+    kwargs = with_phase_filter(
+        {
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {
+                ":pk": USER_PREFIX + source,
+                ":s": "DATE#" + start,
+                ":e": "DATE#" + end,
+            },
         },
-    }, include_pilot=True)
+        include_pilot=True,
+    )
     try:
         while True:
             resp = table.query(**kwargs)
@@ -148,15 +158,13 @@ def _classify_acwr(acwr):
         return (
             "caution",
             True,
-            f"ACWR {acwr:.2f} is above 1.3 — elevated injury risk. "
-            "Reduce training volume this week and increase recovery focus.",
+            f"ACWR {acwr:.2f} is above 1.3 — elevated injury risk. " "Reduce training volume this week and increase recovery focus.",
         )
     if acwr >= 0.8:
         return (
             "safe",
             False,
-            f"ACWR {acwr:.2f} is within the safe zone (0.8–1.3). "
-            "Current training load is appropriate for continued adaptation.",
+            f"ACWR {acwr:.2f} is within the safe zone (0.8–1.3). " "Current training load is appropriate for continued adaptation.",
         )
     return (
         "detraining",
@@ -170,8 +178,8 @@ def _classify_acwr(acwr):
 # WRITE TO COMPUTED_METRICS
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _write_acwr(date_str, acwr, acute_7d, chronic_28d,
-                zone, alert, alert_reason, n_days_acute, n_days_chronic):
+
+def _write_acwr(date_str, acwr, acute_7d, chronic_28d, zone, alert, alert_reason, n_days_acute, n_days_chronic):
     """
     UpdateItem on computed_metrics — merges ACWR fields with existing record
     (day grade, readiness, streaks) written earlier by daily-metrics-compute.
@@ -180,12 +188,12 @@ def _write_acwr(date_str, acwr, acute_7d, chronic_28d,
 
     set_parts = []
     expr_vals = {
-        ":zone":   zone,
-        ":alert":  alert,
+        ":zone": zone,
+        ":alert": alert,
         ":reason": alert_reason,
-        ":cat":    now_iso,
-        ":da":     Decimal(str(n_days_acute)),
-        ":dc":     Decimal(str(n_days_chronic)),
+        ":cat": now_iso,
+        ":da": Decimal(str(n_days_acute)),
+        ":dc": Decimal(str(n_days_chronic)),
     }
 
     set_parts += [
@@ -220,7 +228,8 @@ def _write_acwr(date_str, acwr, acute_7d, chronic_28d,
             "ACWR written for %s — acwr=%s zone=%s alert=%s acute=%.2f chronic=%.2f",
             date_str,
             f"{acwr:.3f}" if acwr is not None else "null",
-            zone, alert,
+            zone,
+            alert,
             acute_7d if acute_7d is not None else 0,
             chronic_28d if chronic_28d is not None else 0,
         )
@@ -232,6 +241,7 @@ def _write_acwr(date_str, acwr, acute_7d, chronic_28d,
 # ─────────────────────────────────────────────────────────────────────────────
 # HANDLER
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def lambda_handler(event, context):
     try:
@@ -254,18 +264,18 @@ def _lambda_handler_impl(event, context):
         target_date = (today - timedelta(days=1)).isoformat()
 
     # Fetch Whoop strain records — 30 days back gives us full 28d chronic window
-    fetch_start = (
-        datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=30)
-    ).strftime("%Y-%m-%d")
+    fetch_start = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
 
     whoop_items = _fetch_range("whoop", fetch_start, target_date)
     logger.info(
         "Fetched %d Whoop records (%s to %s)",
-        len(whoop_items), fetch_start, target_date,
+        len(whoop_items),
+        fetch_start,
+        target_date,
     )
 
     # Compute rolling averages
-    acute_7d,    n_acute = _rolling_avg(whoop_items, "strain", 7,  target_date)
+    acute_7d, n_acute = _rolling_avg(whoop_items, "strain", 7, target_date)
     chronic_28d, n_chronic = _rolling_avg(whoop_items, "strain", 28, target_date)
 
     # ACWR ratio
@@ -276,9 +286,14 @@ def _lambda_handler_impl(event, context):
     zone, alert, reason = _classify_acwr(acwr)
 
     logger.info(
-        "ACWR=%s zone=%s alert=%s | acute_7d=%s chronic_28d=%s "
-        "(data coverage: %d/7d, %d/28d)",
-        acwr, zone, alert, acute_7d, chronic_28d, n_acute, n_chronic,
+        "ACWR=%s zone=%s alert=%s | acute_7d=%s chronic_28d=%s " "(data coverage: %d/7d, %d/28d)",
+        acwr,
+        zone,
+        alert,
+        acute_7d,
+        chronic_28d,
+        n_acute,
+        n_chronic,
     )
 
     _write_acwr(
@@ -297,16 +312,16 @@ def _lambda_handler_impl(event, context):
     logger.info("Done in %ss", elapsed)
 
     return {
-        "statusCode":      200,
-        "body":            f"ACWR computed for {target_date}: {acwr} ({zone})",
-        "date":            target_date,
-        "acwr":            acwr,
-        "zone":            zone,
-        "alert":           alert,
-        "alert_reason":    reason,
-        "acute_load_7d":   acute_7d,
+        "statusCode": 200,
+        "body": f"ACWR computed for {target_date}: {acwr} ({zone})",
+        "date": target_date,
+        "acwr": acwr,
+        "zone": zone,
+        "alert": alert,
+        "alert_reason": reason,
+        "acute_load_7d": acute_7d,
         "chronic_load_28d": chronic_28d,
-        "n_acute_data":    n_acute,
-        "n_chronic_data":  n_chronic,
+        "n_acute_data": n_acute,
+        "n_chronic_data": n_chronic,
         "elapsed_seconds": elapsed,
     }

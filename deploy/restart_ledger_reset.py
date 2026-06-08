@@ -79,12 +79,13 @@ def main() -> int:
     new_lifetime = {f: _num(lifetime.get(f)) + _num(totals.get(f)) for f in _MONEY_FIELDS}
     new_counts = {f: int(_num(lifetime.get(f)) + _num(totals.get(f))) for f in _COUNT_FIELDS}
 
-    print(f"ledger reset — cycle={cycle} — {len(txns)} transaction(s); "
-          f"TOTALS#current {'present' if totals else 'absent'}; "
-          f"LIFETIME#aggregate {'present' if lifetime else 'absent'}")
+    print(
+        f"ledger reset — cycle={cycle} — {len(txns)} transaction(s); "
+        f"TOTALS#current {'present' if totals else 'absent'}; "
+        f"LIFETIME#aggregate {'present' if lifetime else 'absent'}"
+    )
     print("  closing-run totals: " + ", ".join(f"{f}={totals.get(f, 0)}" for f in _MONEY_FIELDS))
-    print("  lifetime after roll-forward: "
-          + ", ".join(f"{f}={new_lifetime[f]}" for f in _MONEY_FIELDS))
+    print("  lifetime after roll-forward: " + ", ".join(f"{f}={new_lifetime[f]}" for f in _MONEY_FIELDS))
     print(f"  mode: {'APPLY' if apply else 'DRY RUN (pass --apply to commit)'}")
     if not apply:
         print("  (dry run — nothing changed; would tombstone txns, roll LIFETIME, zero TOTALS)")
@@ -95,12 +96,16 @@ def main() -> int:
     item.update({f: new_lifetime[f] for f in _MONEY_FIELDS})
     item.update({f: new_counts[f] for f in _COUNT_FIELDS})
     table.put_item(Item=item)
-    table.put_item(Item={
-        "pk": LEDGER_PK, "sk": f"CYCLE_TOTALS#{cycle:03d}",
-        "cycle": cycle, "closed_at": now_iso,
-        **{f: _num(totals.get(f)) for f in _MONEY_FIELDS},
-        **{f: int(_num(totals.get(f))) for f in _COUNT_FIELDS},
-    })
+    table.put_item(
+        Item={
+            "pk": LEDGER_PK,
+            "sk": f"CYCLE_TOTALS#{cycle:03d}",
+            "cycle": cycle,
+            "closed_at": now_iso,
+            **{f: _num(totals.get(f)) for f in _MONEY_FIELDS},
+            **{f: int(_num(totals.get(f))) for f in _COUNT_FIELDS},
+        }
+    )
 
     # 2. Tombstone the transactions (keep history, hide from current run).
     for x in txns:
@@ -112,14 +117,24 @@ def main() -> int:
         )
 
     # 3. Zero TOTALS#current for the fresh run.
-    table.put_item(Item={
-        "pk": LEDGER_PK, "sk": "TOTALS#current",
-        "total_donated_usd": 0, "total_bounties_usd": 0, "total_punishments_usd": 0,
-        "bounty_count": 0, "punishment_count": 0,
-        "reset_at": now_iso, "reset_reason": "experiment_restart", "reset_cycle": cycle,
-    })
-    print(f"  ✓ rolled LIFETIME (donated=${new_lifetime['total_donated_usd']}); "
-          f"tombstoned {len(txns)} txn(s) as cycle {cycle}; TOTALS#current zeroed → run starts at $0.")
+    table.put_item(
+        Item={
+            "pk": LEDGER_PK,
+            "sk": "TOTALS#current",
+            "total_donated_usd": 0,
+            "total_bounties_usd": 0,
+            "total_punishments_usd": 0,
+            "bounty_count": 0,
+            "punishment_count": 0,
+            "reset_at": now_iso,
+            "reset_reason": "experiment_restart",
+            "reset_cycle": cycle,
+        }
+    )
+    print(
+        f"  ✓ rolled LIFETIME (donated=${new_lifetime['total_donated_usd']}); "
+        f"tombstoned {len(txns)} txn(s) as cycle {cycle}; TOTALS#current zeroed → run starts at $0."
+    )
     return 0
 
 

@@ -27,22 +27,46 @@ def _float(val):
 # Coaching rules: biomarker → threshold → coaching delta
 # Each rule: (biomarker_key, condition_fn, coaching_text)
 COACHING_RULES = [
-    ("ferritin", lambda v: v < 40,
-     "Low ferritin ({val} ng/mL) — may limit oxygen carry and HRV recovery. Consider iron bisglycinate 25mg + Vitamin C. Recheck in 6 weeks."),
-    ("vitamin_d", lambda v: v < 30,
-     "Vitamin D low ({val} ng/mL) — suboptimal for immune function and mood. Supplement D3 4000-5000 IU daily with fat-containing meal."),
-    ("hs_crp", lambda v: v > 3.0,
-     "hs-CRP elevated ({val} mg/L) — systemic inflammation marker. Prioritize anti-inflammatory protocol: omega-3, turmeric, reduce processed food, check sleep quality."),
-    ("hba1c", lambda v: v > 5.6,
-     "HbA1c above optimal ({val}%) — 90-day glucose average suggests prediabetic territory. CGM data + carb timing should be priority."),
-    ("fasting_insulin", lambda v: v > 10,
-     "Fasting insulin elevated ({val} uIU/mL) — insulin resistance signal. Prioritize Zone 2 exercise, reduce refined carbs, consider berberine."),
-    ("apob", lambda v: v > 90,
-     "ApoB elevated ({val} mg/dL) — cardiovascular risk marker. Attia recommendation: target <80 mg/dL. Consider dietary changes or statin discussion."),
-    ("testosterone_total", lambda v: v < 400,
-     "Testosterone low-normal ({val} ng/dL) — may affect energy, recovery, mood. Prioritize sleep, resistance training, stress management. Recheck in 3 months."),
-    ("tsh", lambda v: v > 2.5,
-     "TSH above optimal ({val} mIU/L) — thyroid may be struggling. Prioritize selenium, iodine, stress reduction. Recheck in 6 weeks."),
+    (
+        "ferritin",
+        lambda v: v < 40,
+        "Low ferritin ({val} ng/mL) — may limit oxygen carry and HRV recovery. Consider iron bisglycinate 25mg + Vitamin C. Recheck in 6 weeks.",
+    ),
+    (
+        "vitamin_d",
+        lambda v: v < 30,
+        "Vitamin D low ({val} ng/mL) — suboptimal for immune function and mood. Supplement D3 4000-5000 IU daily with fat-containing meal.",
+    ),
+    (
+        "hs_crp",
+        lambda v: v > 3.0,
+        "hs-CRP elevated ({val} mg/L) — systemic inflammation marker. Prioritize anti-inflammatory protocol: omega-3, turmeric, reduce processed food, check sleep quality.",
+    ),
+    (
+        "hba1c",
+        lambda v: v > 5.6,
+        "HbA1c above optimal ({val}%) — 90-day glucose average suggests prediabetic territory. CGM data + carb timing should be priority.",
+    ),
+    (
+        "fasting_insulin",
+        lambda v: v > 10,
+        "Fasting insulin elevated ({val} uIU/mL) — insulin resistance signal. Prioritize Zone 2 exercise, reduce refined carbs, consider berberine.",
+    ),
+    (
+        "apob",
+        lambda v: v > 90,
+        "ApoB elevated ({val} mg/dL) — cardiovascular risk marker. Attia recommendation: target <80 mg/dL. Consider dietary changes or statin discussion.",
+    ),
+    (
+        "testosterone_total",
+        lambda v: v < 400,
+        "Testosterone low-normal ({val} ng/dL) — may affect energy, recovery, mood. Prioritize sleep, resistance training, stress management. Recheck in 3 months.",
+    ),
+    (
+        "tsh",
+        lambda v: v > 2.5,
+        "TSH above optimal ({val} mIU/L) — thyroid may be struggling. Prioritize selenium, iodine, stress reduction. Recheck in 6 weeks.",
+    ),
 ]
 
 
@@ -53,17 +77,24 @@ def build_labs_coaching_context(table, user_prefix):
     """
     try:
         from boto3.dynamodb.conditions import Key
+
         # ADR-058: clinical archive — lab draws are date-independent; filtering
         # pilot draws would blind the coach to the entire lab history (owner
         # decision 2026-06-06). include_pilot=True is a deliberate no-op annotation.
         from phase_filter import with_phase_filter
+
         # Read latest labs — try the clinical.json S3 approach used by handle_labs
         labs_pk = f"{user_prefix}labs"
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": Key("pk").eq(labs_pk),
-            "ScanIndexForward": False,
-            "Limit": 20,
-        }, include_pilot=True))
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(labs_pk),
+                    "ScanIndexForward": False,
+                    "Limit": 20,
+                },
+                include_pilot=True,
+            )
+        )
         items = resp.get("Items", [])
         if not items:
             return ""

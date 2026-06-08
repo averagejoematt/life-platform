@@ -17,6 +17,7 @@ Invariants:
 All randomness is seeded by (target_date + variant) so the same inputs
 yield the same routine. Tested via golden + property + cap tests.
 """
+
 from __future__ import annotations
 
 import json
@@ -54,6 +55,7 @@ def _load_json(name: str) -> dict[str, Any]:
     global _s3_loader_client
     if _s3_loader_client is None:
         import boto3
+
         _s3_loader_client = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2"))
     obj = _s3_loader_client.get_object(Bucket=S3_BUCKET, Key=f"{S3_CONFIG_PREFIX}{name}")
     return json.loads(obj["Body"].read())
@@ -61,21 +63,23 @@ def _load_json(name: str) -> dict[str, Any]:
 
 def _config_hash(payload: dict[str, Any]) -> str:
     import hashlib
+
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()[:10]
 
 
 class GeneratorInputs:
     """Caller-supplied runtime inputs. Keep this thin; everything else is config."""
+
     def __init__(
         self,
         target_date: str,
-        recovery_tier: str = "yellow",       # green | yellow | red
-        acwr_flag: str = "safe",             # safe | caution | high | very_high
-        volume_7d: dict[str, int] | None = None,   # muscle -> sets completed in last 7d
+        recovery_tier: str = "yellow",  # green | yellow | red
+        acwr_flag: str = "safe",  # safe | caution | high | very_high
+        volume_7d: dict[str, int] | None = None,  # muscle -> sets completed in last 7d
         z2_minutes_7d: float = 0.0,
         days_since_last_workout: int = 1,
         history_last_dates: dict[str, str] | None = None,  # movement_key -> last YYYY-MM-DD
-        add_load_enabled: bool = False,      # SSM gate — default false until N>=30
+        add_load_enabled: bool = False,  # SSM gate — default false until N>=30
     ) -> None:
         self.target_date = target_date
         self.recovery_tier = recovery_tier
@@ -145,9 +149,9 @@ def _select_movements_for_muscle(
     if set_count <= 0:
         return []
     candidates = [
-        (k, v) for k, v in catalog["movements"].items()
-        if v.get("primary_muscle") == muscle and v.get("skill_tier", 99) <= skill_ceiling
-        and k not in chosen_so_far
+        (k, v)
+        for k, v in catalog["movements"].items()
+        if v.get("primary_muscle") == muscle and v.get("skill_tier", 99) <= skill_ceiling and k not in chosen_so_far
     ]
     if not candidates:
         return []
@@ -163,8 +167,7 @@ def _select_movements_for_muscle(
         first, second = candidates[0], candidates[1]
         first_sets = (set_count + 1) // 2
         second_sets = set_count - first_sets
-        return [(first[0], first[1] | {"_sets": first_sets}),
-                (second[0], second[1] | {"_sets": second_sets})]
+        return [(first[0], first[1] | {"_sets": first_sets}), (second[0], second[1] | {"_sets": second_sets})]
     chosen = candidates[0]
     return [(chosen[0], chosen[1] | {"_sets": set_count})]
 
@@ -209,9 +212,8 @@ def _build_exercise_note(
     comment hook is wired but currently always None — see ADR-068.
     """
     from exercise_history import history_facts, pick_note, render_history_cue
-    template_id = (catalog.get("movements", {})
-                          .get(movement_key, {})
-                          .get("hevy_template_id_hint"))
+
+    template_id = catalog.get("movements", {}).get(movement_key, {}).get("hevy_template_id_hint")
     facts = history_facts(template_id, history_index)
     history_cue = render_history_cue(facts)
     return pick_note(history_cue, ai_comment=None, mode=notes_mode)
@@ -228,6 +230,7 @@ def _new_routine_id() -> str:
 
 def _now_iso() -> str:
     from datetime import datetime, timezone
+
     return datetime.now(timezone.utc).isoformat()
 
 
@@ -279,6 +282,7 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
     if notes_mode != "off":
         try:
             from exercise_history import load_recent_history
+
             history_index = load_recent_history(
                 lookback_days=int(week_cfg.get("exercise_notes_lookback_days", 180)),
             )
@@ -292,7 +296,12 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
         if budget <= 0:
             continue
         picks = _select_movements_for_muscle(
-            muscle, budget, catalog, skill_ceiling, inputs.history_last_dates, rng,
+            muscle,
+            budget,
+            catalog,
+            skill_ceiling,
+            inputs.history_last_dates,
+            rng,
             [b.movement_key for b in exercises],
         )
         muscle_sets = 0
@@ -344,8 +353,12 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
 
 
 def _make_floor(
-    inputs: GeneratorInputs, archetype: str, targets: list[str],
-    catalog: dict[str, Any], week_cfg: dict[str, Any], sibling_id: str,
+    inputs: GeneratorInputs,
+    archetype: str,
+    targets: list[str],
+    catalog: dict[str, Any],
+    week_cfg: dict[str, Any],
+    sibling_id: str,
 ) -> RoutineSpec:
     """≈20-min minimum-effective-dose. One movement per major muscle, machine/DB only."""
     rng = _seeded_random(inputs.target_date, "floor")
@@ -354,8 +367,12 @@ def _make_floor(
     per_muscle = max(1, floor_count // max(1, len(targets)))
     for muscle in targets[:floor_count]:
         picks = _select_movements_for_muscle(
-            muscle, per_muscle, catalog, skill_ceiling=1,
-            history_last_dates=inputs.history_last_dates, rng=rng,
+            muscle,
+            per_muscle,
+            catalog,
+            skill_ceiling=1,
+            history_last_dates=inputs.history_last_dates,
+            rng=rng,
             chosen_so_far=[b.movement_key for b in exercises],
         )
         for mk, mdef in picks[:1]:  # always one movement per muscle in the floor variant
@@ -383,8 +400,12 @@ def _make_floor(
 
 
 def _make_re_entry(
-    inputs: GeneratorInputs, archetype: str, targets: list[str],
-    catalog: dict[str, Any], week_cfg: dict[str, Any], sibling_id: str,
+    inputs: GeneratorInputs,
+    archetype: str,
+    targets: list[str],
+    catalog: dict[str, Any],
+    week_cfg: dict[str, Any],
+    sibling_id: str,
 ) -> RoutineSpec:
     """Re-entry after ≥7 days: half the volume, skill_tier 1 only, no make-up volume."""
     rng = _seeded_random(inputs.target_date, "re_entry")
@@ -392,8 +413,12 @@ def _make_re_entry(
     for muscle in targets:
         budget = max(1, week_cfg.get("floor_session_set_count", 6) // max(1, len(targets)))
         picks = _select_movements_for_muscle(
-            muscle, budget, catalog, skill_ceiling=1,
-            history_last_dates=inputs.history_last_dates, rng=rng,
+            muscle,
+            budget,
+            catalog,
+            skill_ceiling=1,
+            history_last_dates=inputs.history_last_dates,
+            rng=rng,
             chosen_so_far=[b.movement_key for b in exercises],
         )
         for mk, mdef in picks:
@@ -420,8 +445,11 @@ def _make_re_entry(
 
 
 def _non_lifting_pair(
-    inputs: GeneratorInputs, archetype: str, week_cfg: dict[str, Any],
-    landmarks: dict[str, Any], catalog: dict[str, Any],
+    inputs: GeneratorInputs,
+    archetype: str,
+    week_cfg: dict[str, Any],
+    landmarks: dict[str, Any],
+    catalog: dict[str, Any],
 ) -> list[RoutineSpec]:
     ideal = RoutineSpec(
         routine_id=_new_routine_id(),
@@ -429,9 +457,11 @@ def _non_lifting_pair(
         archetype=archetype,
         variant="ideal",
         title=f"{archetype.title()} day — {inputs.target_date}",
-        notes={"rest": "Full rest day.",
-               "aerobic": "Zone 2 work — 45-60 min easy.",
-               "mobility": "Mobility / movement quality. Hips, T-spine, ankles."}.get(archetype, ""),
+        notes={
+            "rest": "Full rest day.",
+            "aerobic": "Zone 2 work — 45-60 min easy.",
+            "mobility": "Mobility / movement quality. Hips, T-spine, ankles.",
+        }.get(archetype, ""),
         version=1,
         created_at=_now_iso(),
         created_by="cron",

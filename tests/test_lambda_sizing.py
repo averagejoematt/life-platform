@@ -12,6 +12,7 @@ Thresholds:
 import ast
 import os
 import re
+
 import pytest
 
 CDK_DIR = os.path.join(os.path.dirname(__file__), "..", "cdk", "stacks")
@@ -30,14 +31,17 @@ def _parse_memory_calls(filepath: str) -> list[tuple[str, int]]:
     # This catches both create_platform_lambda(..., memory_mb=512) and
     # _lambda.Function(..., memory_size=256)
     for pattern, key in [
-        (r'memory_mb\s*=\s*(\d+)', 'memory_mb'),
-        (r'memory_size\s*=\s*(\d+)', 'memory_size'),
+        (r"memory_mb\s*=\s*(\d+)", "memory_mb"),
+        (r"memory_size\s*=\s*(\d+)", "memory_size"),
     ]:
         for match in re.finditer(pattern, source):
             mb = int(match.group(1))
-            # Grab a bit of context for the error message
-            start = max(0, match.start() - 100)
-            ctx = source[start:match.start() + 40].replace('\n', ' ')
+            # Anchor the context at the nearest preceding `function_name=` so the
+            # construct's name is always captured — robust to formatting/line-wrapping
+            # (black puts each kwarg on its own line, which a fixed char-window misses).
+            fn_idx = source.rfind("function_name", 0, match.start())
+            start = fn_idx if (fn_idx != -1 and match.start() - fn_idx < 800) else max(0, match.start() - 100)
+            ctx = source[start : match.start() + 40].replace("\n", " ")
             results.append((ctx.strip(), mb))
     return results
 
@@ -46,20 +50,14 @@ def test_ingestion_stack_memory_limits():
     path = os.path.join(CDK_DIR, "ingestion_stack.py")
     findings = _parse_memory_calls(path)
     for ctx, mb in findings:
-        assert mb <= 512, (
-            f"ingestion_stack.py: memory setting {mb}MB exceeds 512MB cap.\n"
-            f"Context: ...{ctx}..."
-        )
+        assert mb <= 512, f"ingestion_stack.py: memory setting {mb}MB exceeds 512MB cap.\n" f"Context: ...{ctx}..."
 
 
 def test_compute_stack_memory_limits():
     path = os.path.join(CDK_DIR, "compute_stack.py")
     findings = _parse_memory_calls(path)
     for ctx, mb in findings:
-        assert mb <= 512, (
-            f"compute_stack.py: memory setting {mb}MB exceeds 512MB cap.\n"
-            f"Context: ...{ctx}..."
-        )
+        assert mb <= 512, f"compute_stack.py: memory setting {mb}MB exceeds 512MB cap.\n" f"Context: ...{ctx}..."
 
 
 def test_web_stack_memory_limits():
@@ -67,10 +65,7 @@ def test_web_stack_memory_limits():
     path = os.path.join(CDK_DIR, "web_stack.py")
     findings = _parse_memory_calls(path)
     for ctx, mb in findings:
-        assert mb <= 256, (
-            f"web_stack.py: memory setting {mb}MB exceeds 256MB cap for web-facing Lambdas.\n"
-            f"Context: ...{ctx}..."
-        )
+        assert mb <= 256, f"web_stack.py: memory setting {mb}MB exceeds 256MB cap for web-facing Lambdas.\n" f"Context: ...{ctx}..."
 
 
 def test_email_stack_memory_limits():
@@ -85,10 +80,7 @@ def test_email_stack_memory_limits():
         ctx_lower = ctx.lower()
         is_daily_brief = "daily-brief" in ctx_lower or "daily_brief" in ctx_lower or "DailyBrief" in ctx
         cap = 768 if is_daily_brief else 512
-        assert mb <= cap, (
-            f"email_stack.py: memory setting {mb}MB exceeds {cap}MB cap.\n"
-            f"Context: ...{ctx}..."
-        )
+        assert mb <= cap, f"email_stack.py: memory setting {mb}MB exceeds {cap}MB cap.\n" f"Context: ...{ctx}..."
 
 
 def test_no_3008mb_anywhere():
@@ -99,7 +91,4 @@ def test_no_3008mb_anywhere():
         path = os.path.join(CDK_DIR, fname)
         findings = _parse_memory_calls(path)
         for ctx, mb in findings:
-            assert mb != 3008, (
-                f"{fname}: memory_size=3008 (AWS max-default) found — likely debugging artefact.\n"
-                f"Context: ...{ctx}..."
-            )
+            assert mb != 3008, f"{fname}: memory_size=3008 (AWS max-default) found — likely debugging artefact.\n" f"Context: ...{ctx}..."

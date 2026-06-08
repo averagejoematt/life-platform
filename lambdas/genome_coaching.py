@@ -72,6 +72,7 @@ def build_genome_coaching_context(table, user_prefix):
     """
     try:
         from boto3.dynamodb.conditions import Key
+
         genome_pk = f"{user_prefix}genome"
         resp = table.query(
             KeyConditionExpression=Key("pk").eq(genome_pk),
@@ -102,10 +103,7 @@ def build_genome_coaching_context(table, user_prefix):
             gene_key = insight["gene"].split("/")[0].upper()
             if gene_key in snps:
                 # Gene exists in genome data — use specific coaching
-                coaching = (insight.get("variant_coaching")
-                           or insight.get("risk_coaching")
-                           or insight.get("slow_variant_coaching")
-                           or "")
+                coaching = insight.get("variant_coaching") or insight.get("risk_coaching") or insight.get("slow_variant_coaching") or ""
                 if coaching:
                     selected.append(coaching)
 

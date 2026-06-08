@@ -3,8 +3,8 @@
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from mcp.core import query_source, _apply_phase_filter
-from mcp.config import table, USER_ID
+from mcp.config import USER_ID, table
+from mcp.core import _apply_phase_filter, query_source
 
 
 def _float(val):
@@ -18,12 +18,17 @@ def _get_sessions(start_date=None, end_date=None, latest_only=False):
     """Fetch measurement sessions from DynamoDB."""
     if latest_only:
         import boto3.dynamodb.conditions as cond
+
         # ADR-058: phase=pilot hidden by default.
-        resp = table.query(**_apply_phase_filter({
-            "KeyConditionExpression": cond.Key("pk").eq(f"USER#{USER_ID}#SOURCE#measurements"),
-            "ScanIndexForward": False,
-            "Limit": 1,
-        }))
+        resp = table.query(
+            **_apply_phase_filter(
+                {
+                    "KeyConditionExpression": cond.Key("pk").eq(f"USER#{USER_ID}#SOURCE#measurements"),
+                    "ScanIndexForward": False,
+                    "Limit": 1,
+                }
+            )
+        )
         items = resp.get("Items", [])
     else:
         if not start_date:
@@ -39,21 +44,22 @@ def _get_sessions(start_date=None, end_date=None, latest_only=False):
         for k, v in item.items():
             if k in ("pk", "sk", "ingested_at", "source_file", "unit", "measured_by", "date", "session_number"):
                 continue
-            if k in ("waist_height_ratio", "bilateral_symmetry_bicep_in", "bilateral_symmetry_thigh_in",
-                      "trunk_sum_in", "limb_avg_in"):
+            if k in ("waist_height_ratio", "bilateral_symmetry_bicep_in", "bilateral_symmetry_thigh_in", "trunk_sum_in", "limb_avg_in"):
                 derived[k] = _float(v)
             elif k.endswith("_in"):
                 raw[k] = _float(v)
 
-        sessions.append({
-            "date": item.get("date", item.get("sk", "").replace("DATE#", "")),
-            "session_number": int(item.get("session_number", 0)),
-            "measurements": raw,
-            "derived": {
-                **derived,
-                "waist_height_ratio_target": 0.5,
-            },
-        })
+        sessions.append(
+            {
+                "date": item.get("date", item.get("sk", "").replace("DATE#", "")),
+                "session_number": int(item.get("session_number", 0)),
+                "measurements": raw,
+                "derived": {
+                    **derived,
+                    "waist_height_ratio_target": 0.5,
+                },
+            }
+        )
 
     return sessions
 
@@ -74,11 +80,14 @@ def tool_get_measurements(args):
         bicep_sym = latest["derived"].get("bilateral_symmetry_bicep_in", 0)
 
         if whr and whr > 0.6:
-            board_note = f"Dr. Peter Attia: Current waist-to-height ratio is {whr:.3f} — target is <0.500. " \
-                         f"Ratio above 0.5 is associated with increased visceral fat and metabolic risk."
+            board_note = (
+                f"Dr. Peter Attia: Current waist-to-height ratio is {whr:.3f} — target is <0.500. "
+                f"Ratio above 0.5 is associated with increased visceral fat and metabolic risk."
+            )
         if bicep_sym and bicep_sym > 1.0:
-            board_note += f" Dr. Layne Norton: Bicep asymmetry of {bicep_sym:.1f}\" detected — " \
-                          f"consider unilateral training to address imbalance."
+            board_note += (
+                f' Dr. Layne Norton: Bicep asymmetry of {bicep_sym:.1f}" detected — ' f"consider unilateral training to address imbalance."
+            )
 
     return {
         "sessions": sessions,
@@ -141,10 +150,7 @@ def tool_get_measurement_trends(args):
     for i in range(1, len(sessions)):
         prev = sessions[i - 1]
         curr = sessions[i]
-        trunk_shrinking = (
-            (curr["measurements"].get("waist_navel_in", 999) or 999) <
-            (prev["measurements"].get("waist_navel_in", 0) or 0)
-        )
+        trunk_shrinking = (curr["measurements"].get("waist_navel_in", 999) or 999) < (prev["measurements"].get("waist_navel_in", 0) or 0)
         limb_holding = True
         for limb in ["bicep_relaxed_left_in", "bicep_relaxed_right_in", "thigh_left_in", "thigh_right_in"]:
             cv = curr["measurements"].get(limb) or 0
@@ -166,9 +172,15 @@ def tool_get_measurement_trends(args):
         "recomposition_score": {
             "sessions": recomp_sessions,
             "recomposition_rate": round(recomp_rate, 2),
-            "verdict": "Strong — trunk reducing while limbs hold" if recomp_rate >= 0.7
-                       else "Mixed — some sessions show trunk reduction without limb preservation"
-                       if recomp_rate >= 0.3 else "Early — insufficient recomposition signal",
+            "verdict": (
+                "Strong — trunk reducing while limbs hold"
+                if recomp_rate >= 0.7
+                else (
+                    "Mixed — some sessions show trunk reduction without limb preservation"
+                    if recomp_rate >= 0.3
+                    else "Early — insufficient recomposition signal"
+                )
+            ),
         },
     }
 

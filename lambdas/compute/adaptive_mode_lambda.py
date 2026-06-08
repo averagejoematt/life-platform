@@ -16,8 +16,8 @@ DynamoDB:
 """
 
 import json
-import os
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 
 import boto3
@@ -26,6 +26,7 @@ from boto3.dynamodb.conditions import Key
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("adaptive-mode-compute")
 except ImportError:
     logger = logging.getLogger("adaptive-mode-compute")
@@ -41,6 +42,7 @@ table = dynamodb.Table(TABLE_NAME)
 
 
 # ── DynamoDB helpers ──────────────────────────────────────────────────────────
+
 
 def fetch_record(source, date_str):
     """Fetch a single DynamoDB record by source + date."""
@@ -87,6 +89,7 @@ def store_adaptive_mode(date_str, result):
     # DATA-2: validate_item for adaptive_mode (Item 3, R12)
     try:
         from ingestion_validator import validate_item as _vi
+
         _vr = _vi("adaptive_mode", item, date_str)
         if _vr.should_skip_ddb:
             logger.error("[DATA-2] Skipping adaptive_mode write for %s: %s", date_str, _vr.errors)
@@ -100,6 +103,7 @@ def store_adaptive_mode(date_str, result):
     # Phase 3.3 (2026-05-16): tag with run_id + computed_at.
     try:
         from compute_metadata import tag_record
+
         item = tag_record(item, source_id="adaptive_mode")
     except ImportError:
         pass
@@ -108,6 +112,7 @@ def store_adaptive_mode(date_str, result):
 
 
 # ── Scoring components ────────────────────────────────────────────────────────
+
 
 def score_journal(date_str):
     """
@@ -215,6 +220,7 @@ def score_grade_trend(base_date_str):
 
 # ── Core computation ──────────────────────────────────────────────────────────
 
+
 def compute_adaptive_mode(date_str):
     """
     Compute engagement score and brief_mode for a given date.
@@ -276,6 +282,7 @@ def compute_adaptive_mode(date_str):
 
 
 # ── Lambda handler ────────────────────────────────────────────────────────────
+
 
 def lambda_handler(event, context):
     if event.get("healthcheck"):

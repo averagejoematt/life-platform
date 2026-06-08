@@ -11,20 +11,22 @@ Logic:
 5. Move processed file to imports/apple_health/processed/{timestamp}_export.xml.gz
 """
 
-import xml.etree.ElementTree as ET
-import logging
-import json
-import boto3
 import gzip
 import io
+import json
+import logging
 import os
-from datetime import datetime, timezone, timedelta
-from decimal import Decimal
+import xml.etree.ElementTree as ET
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+
+import boto3
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("apple-health")
 except ImportError:
     logger = logging.getLogger("apple-health")
@@ -43,86 +45,124 @@ table = dynamodb.Table(DYNAMODB_TABLE)
 
 # ── Same field maps as backfill (keep in sync) ───────────────────────────────
 QUANTITY_RECORDS = {
-    "HKQuantityTypeIdentifierStepCount":                    "steps",
-    "HKQuantityTypeIdentifierActiveEnergyBurned":           "active_calories",
-    "HKQuantityTypeIdentifierBasalEnergyBurned":            "basal_calories",
-    "HKQuantityTypeIdentifierFlightsClimbed":               "flights_climbed",
-    "HKQuantityTypeIdentifierDistanceWalkingRunning":        "distance_walk_run_miles",
-    "HKQuantityTypeIdentifierDistanceCycling":              "distance_cycling_miles",
-    "HKQuantityTypeIdentifierHeartRate":                    "heart_rate",
-    "HKQuantityTypeIdentifierRestingHeartRate":             "resting_heart_rate",
-    "HKQuantityTypeIdentifierHeartRateVariabilitySDNN":     "hrv_sdnn",
-    "HKQuantityTypeIdentifierWalkingHeartRateAverage":      "walking_heart_rate_avg",
-    "HKQuantityTypeIdentifierBodyMass":                     "weight_lbs",
-    "HKQuantityTypeIdentifierBodyMassIndex":                "bmi",
-    "HKQuantityTypeIdentifierBodyFatPercentage":            "body_fat_pct",
-    "HKQuantityTypeIdentifierLeanBodyMass":                 "lean_mass_lbs",
-    "HKQuantityTypeIdentifierWaistCircumference":           "waist_inches",
-    "HKQuantityTypeIdentifierOxygenSaturation":             "spo2_pct",
-    "HKQuantityTypeIdentifierRespiratoryRate":              "respiratory_rate",
-    "HKQuantityTypeIdentifierVO2Max":                       "vo2max",
-    "HKQuantityTypeIdentifierBloodGlucose":                 "blood_glucose_mgdl",
-    "HKQuantityTypeIdentifierBloodPressureSystolic":        "bp_systolic",
-    "HKQuantityTypeIdentifierBloodPressureDiastolic":       "bp_diastolic",
-    "HKQuantityTypeIdentifierWalkingSpeed":                 "walking_speed_mph",
-    "HKQuantityTypeIdentifierWalkingStepLength":            "walking_step_length_in",
-    "HKQuantityTypeIdentifierWalkingAsymmetryPercentage":   "walking_asymmetry_pct",
+    "HKQuantityTypeIdentifierStepCount": "steps",
+    "HKQuantityTypeIdentifierActiveEnergyBurned": "active_calories",
+    "HKQuantityTypeIdentifierBasalEnergyBurned": "basal_calories",
+    "HKQuantityTypeIdentifierFlightsClimbed": "flights_climbed",
+    "HKQuantityTypeIdentifierDistanceWalkingRunning": "distance_walk_run_miles",
+    "HKQuantityTypeIdentifierDistanceCycling": "distance_cycling_miles",
+    "HKQuantityTypeIdentifierHeartRate": "heart_rate",
+    "HKQuantityTypeIdentifierRestingHeartRate": "resting_heart_rate",
+    "HKQuantityTypeIdentifierHeartRateVariabilitySDNN": "hrv_sdnn",
+    "HKQuantityTypeIdentifierWalkingHeartRateAverage": "walking_heart_rate_avg",
+    "HKQuantityTypeIdentifierBodyMass": "weight_lbs",
+    "HKQuantityTypeIdentifierBodyMassIndex": "bmi",
+    "HKQuantityTypeIdentifierBodyFatPercentage": "body_fat_pct",
+    "HKQuantityTypeIdentifierLeanBodyMass": "lean_mass_lbs",
+    "HKQuantityTypeIdentifierWaistCircumference": "waist_inches",
+    "HKQuantityTypeIdentifierOxygenSaturation": "spo2_pct",
+    "HKQuantityTypeIdentifierRespiratoryRate": "respiratory_rate",
+    "HKQuantityTypeIdentifierVO2Max": "vo2max",
+    "HKQuantityTypeIdentifierBloodGlucose": "blood_glucose_mgdl",
+    "HKQuantityTypeIdentifierBloodPressureSystolic": "bp_systolic",
+    "HKQuantityTypeIdentifierBloodPressureDiastolic": "bp_diastolic",
+    "HKQuantityTypeIdentifierWalkingSpeed": "walking_speed_mph",
+    "HKQuantityTypeIdentifierWalkingStepLength": "walking_step_length_in",
+    "HKQuantityTypeIdentifierWalkingAsymmetryPercentage": "walking_asymmetry_pct",
     "HKQuantityTypeIdentifierWalkingDoubleSupportPercentage": "walking_double_support_pct",
-    "HKQuantityTypeIdentifierAppleWalkingSteadiness":       "walking_steadiness_pct",
-    "HKQuantityTypeIdentifierDietaryEnergyConsumed":        "nutrition_calories",
-    "HKQuantityTypeIdentifierDietaryProtein":               "nutrition_protein_g",
-    "HKQuantityTypeIdentifierDietaryCarbohydrates":         "nutrition_carbs_g",
-    "HKQuantityTypeIdentifierDietaryFatTotal":              "nutrition_fat_g",
-    "HKQuantityTypeIdentifierDietaryFatSaturated":          "nutrition_fat_saturated_g",
-    "HKQuantityTypeIdentifierDietaryFatMonounsaturated":    "nutrition_fat_mono_g",
-    "HKQuantityTypeIdentifierDietaryFatPolyunsaturated":    "nutrition_fat_poly_g",
-    "HKQuantityTypeIdentifierDietarySugar":                 "nutrition_sugar_g",
-    "HKQuantityTypeIdentifierDietaryFiber":                 "nutrition_fiber_g",
-    "HKQuantityTypeIdentifierDietarySodium":                "nutrition_sodium_mg",
-    "HKQuantityTypeIdentifierDietaryCholesterol":           "nutrition_cholesterol_mg",
-    "HKQuantityTypeIdentifierDietaryWater":                 "nutrition_water_ml",
-    "HKQuantityTypeIdentifierDietaryPotassium":             "nutrition_potassium_mg",
-    "HKQuantityTypeIdentifierDietaryCalcium":               "nutrition_calcium_mg",
-    "HKQuantityTypeIdentifierDietaryIron":                  "nutrition_iron_mg",
-    "HKQuantityTypeIdentifierDietaryMagnesium":             "nutrition_magnesium_mg",
-    "HKQuantityTypeIdentifierDietaryVitaminA":              "nutrition_vitamin_a_mcg",
-    "HKQuantityTypeIdentifierDietaryVitaminC":              "nutrition_vitamin_c_mg",
-    "HKQuantityTypeIdentifierDietaryVitaminD":              "nutrition_vitamin_d_mcg",
-    "HKQuantityTypeIdentifierDietaryVitaminE":              "nutrition_vitamin_e_mg",
-    "HKQuantityTypeIdentifierDietaryVitaminK":              "nutrition_vitamin_k_mcg",
-    "HKQuantityTypeIdentifierDietaryVitaminB6":             "nutrition_vitamin_b6_mg",
-    "HKQuantityTypeIdentifierDietaryVitaminB12":            "nutrition_vitamin_b12_mcg",
-    "HKQuantityTypeIdentifierDietaryZinc":                  "nutrition_zinc_mg",
-    "HKQuantityTypeIdentifierDietarySelenium":              "nutrition_selenium_mcg",
-    "HKQuantityTypeIdentifierDietaryCaffeine":              "nutrition_caffeine_mg",
-    "HKQuantityTypeIdentifierDietaryNiacin":                "nutrition_niacin_mg",
-    "HKQuantityTypeIdentifierDietaryThiamin":               "nutrition_thiamin_mg",
-    "HKQuantityTypeIdentifierDietaryRiboflavin":            "nutrition_riboflavin_mg",
-    "HKQuantityTypeIdentifierDietaryFolate":                "nutrition_folate_mcg",
+    "HKQuantityTypeIdentifierAppleWalkingSteadiness": "walking_steadiness_pct",
+    "HKQuantityTypeIdentifierDietaryEnergyConsumed": "nutrition_calories",
+    "HKQuantityTypeIdentifierDietaryProtein": "nutrition_protein_g",
+    "HKQuantityTypeIdentifierDietaryCarbohydrates": "nutrition_carbs_g",
+    "HKQuantityTypeIdentifierDietaryFatTotal": "nutrition_fat_g",
+    "HKQuantityTypeIdentifierDietaryFatSaturated": "nutrition_fat_saturated_g",
+    "HKQuantityTypeIdentifierDietaryFatMonounsaturated": "nutrition_fat_mono_g",
+    "HKQuantityTypeIdentifierDietaryFatPolyunsaturated": "nutrition_fat_poly_g",
+    "HKQuantityTypeIdentifierDietarySugar": "nutrition_sugar_g",
+    "HKQuantityTypeIdentifierDietaryFiber": "nutrition_fiber_g",
+    "HKQuantityTypeIdentifierDietarySodium": "nutrition_sodium_mg",
+    "HKQuantityTypeIdentifierDietaryCholesterol": "nutrition_cholesterol_mg",
+    "HKQuantityTypeIdentifierDietaryWater": "nutrition_water_ml",
+    "HKQuantityTypeIdentifierDietaryPotassium": "nutrition_potassium_mg",
+    "HKQuantityTypeIdentifierDietaryCalcium": "nutrition_calcium_mg",
+    "HKQuantityTypeIdentifierDietaryIron": "nutrition_iron_mg",
+    "HKQuantityTypeIdentifierDietaryMagnesium": "nutrition_magnesium_mg",
+    "HKQuantityTypeIdentifierDietaryVitaminA": "nutrition_vitamin_a_mcg",
+    "HKQuantityTypeIdentifierDietaryVitaminC": "nutrition_vitamin_c_mg",
+    "HKQuantityTypeIdentifierDietaryVitaminD": "nutrition_vitamin_d_mcg",
+    "HKQuantityTypeIdentifierDietaryVitaminE": "nutrition_vitamin_e_mg",
+    "HKQuantityTypeIdentifierDietaryVitaminK": "nutrition_vitamin_k_mcg",
+    "HKQuantityTypeIdentifierDietaryVitaminB6": "nutrition_vitamin_b6_mg",
+    "HKQuantityTypeIdentifierDietaryVitaminB12": "nutrition_vitamin_b12_mcg",
+    "HKQuantityTypeIdentifierDietaryZinc": "nutrition_zinc_mg",
+    "HKQuantityTypeIdentifierDietarySelenium": "nutrition_selenium_mcg",
+    "HKQuantityTypeIdentifierDietaryCaffeine": "nutrition_caffeine_mg",
+    "HKQuantityTypeIdentifierDietaryNiacin": "nutrition_niacin_mg",
+    "HKQuantityTypeIdentifierDietaryThiamin": "nutrition_thiamin_mg",
+    "HKQuantityTypeIdentifierDietaryRiboflavin": "nutrition_riboflavin_mg",
+    "HKQuantityTypeIdentifierDietaryFolate": "nutrition_folate_mcg",
 }
 
 SUM_TYPES = {
-    "steps", "active_calories", "basal_calories", "flights_climbed",
-    "distance_walk_run_miles", "distance_cycling_miles",
-    "nutrition_calories", "nutrition_protein_g", "nutrition_carbs_g",
-    "nutrition_fat_g", "nutrition_fat_saturated_g", "nutrition_fat_mono_g",
-    "nutrition_fat_poly_g", "nutrition_sugar_g", "nutrition_fiber_g",
-    "nutrition_sodium_mg", "nutrition_cholesterol_mg", "nutrition_water_ml",
-    "nutrition_potassium_mg", "nutrition_calcium_mg", "nutrition_iron_mg",
-    "nutrition_magnesium_mg", "nutrition_vitamin_a_mcg", "nutrition_vitamin_c_mg",
-    "nutrition_vitamin_d_mcg", "nutrition_vitamin_e_mg", "nutrition_vitamin_k_mcg",
-    "nutrition_vitamin_b6_mg", "nutrition_vitamin_b12_mcg", "nutrition_zinc_mg",
-    "nutrition_selenium_mcg", "nutrition_caffeine_mg", "nutrition_niacin_mg",
-    "nutrition_thiamin_mg", "nutrition_riboflavin_mg", "nutrition_folate_mcg",
+    "steps",
+    "active_calories",
+    "basal_calories",
+    "flights_climbed",
+    "distance_walk_run_miles",
+    "distance_cycling_miles",
+    "nutrition_calories",
+    "nutrition_protein_g",
+    "nutrition_carbs_g",
+    "nutrition_fat_g",
+    "nutrition_fat_saturated_g",
+    "nutrition_fat_mono_g",
+    "nutrition_fat_poly_g",
+    "nutrition_sugar_g",
+    "nutrition_fiber_g",
+    "nutrition_sodium_mg",
+    "nutrition_cholesterol_mg",
+    "nutrition_water_ml",
+    "nutrition_potassium_mg",
+    "nutrition_calcium_mg",
+    "nutrition_iron_mg",
+    "nutrition_magnesium_mg",
+    "nutrition_vitamin_a_mcg",
+    "nutrition_vitamin_c_mg",
+    "nutrition_vitamin_d_mcg",
+    "nutrition_vitamin_e_mg",
+    "nutrition_vitamin_k_mcg",
+    "nutrition_vitamin_b6_mg",
+    "nutrition_vitamin_b12_mcg",
+    "nutrition_zinc_mg",
+    "nutrition_selenium_mcg",
+    "nutrition_caffeine_mg",
+    "nutrition_niacin_mg",
+    "nutrition_thiamin_mg",
+    "nutrition_riboflavin_mg",
+    "nutrition_folate_mcg",
 }
 
 AVG_TYPES = {
-    "heart_rate", "resting_heart_rate", "hrv_sdnn", "walking_heart_rate_avg",
-    "weight_lbs", "bmi", "body_fat_pct", "lean_mass_lbs",
-    "spo2_pct", "respiratory_rate", "vo2max",
-    "blood_glucose_mgdl", "bp_systolic", "bp_diastolic",
-    "walking_speed_mph", "walking_step_length_in", "walking_asymmetry_pct",
-    "walking_double_support_pct", "walking_steadiness_pct", "waist_inches",
+    "heart_rate",
+    "resting_heart_rate",
+    "hrv_sdnn",
+    "walking_heart_rate_avg",
+    "weight_lbs",
+    "bmi",
+    "body_fat_pct",
+    "lean_mass_lbs",
+    "spo2_pct",
+    "respiratory_rate",
+    "vo2max",
+    "blood_glucose_mgdl",
+    "bp_systolic",
+    "bp_diastolic",
+    "walking_speed_mph",
+    "walking_step_length_in",
+    "walking_asymmetry_pct",
+    "walking_double_support_pct",
+    "walking_steadiness_pct",
+    "waist_inches",
 }
 
 
@@ -130,11 +170,16 @@ AVG_TYPES = {
 try:
     from numeric import floats_to_decimal  # noqa: F401
 except ImportError:
+
     def floats_to_decimal(obj):
-        if isinstance(obj, bool): return obj
-        if isinstance(obj, float): return Decimal(str(obj))
-        if isinstance(obj, dict): return {k: floats_to_decimal(v) for k, v in obj.items()}
-        if isinstance(obj, list): return [floats_to_decimal(v) for v in obj]
+        if isinstance(obj, bool):
+            return obj
+        if isinstance(obj, float):
+            return Decimal(str(obj))
+        if isinstance(obj, dict):
+            return {k: floats_to_decimal(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [floats_to_decimal(v) for v in obj]
         return obj
 
 
@@ -168,13 +213,16 @@ def get_latest_stored_date():
     try:
         # ADR-058: phase=pilot hidden by default.
         from phase_filter import with_phase_filter
-        response = table.query(**with_phase_filter({
-            "KeyConditionExpression": boto3.dynamodb.conditions.Key("pk").eq(
-                f"USER#{USER_ID}#SOURCE#apple_health"
-            ),
-            "ScanIndexForward": False,
-            "Limit": 1,
-        }))
+
+        response = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": boto3.dynamodb.conditions.Key("pk").eq(f"USER#{USER_ID}#SOURCE#apple_health"),
+                    "ScanIndexForward": False,
+                    "Limit": 1,
+                }
+            )
+        )
         items = response.get("items") or response.get("Items", [])
         if items:
             sk = items[0].get("sk", "DATE#2000-01-01")
@@ -227,12 +275,14 @@ def process_xml(xml_stream, cutoff_date):
                     day_avg_acc[start_date][field][1] += 1
 
             elif rtype == "HKCategoryTypeIdentifierSleepAnalysis":
-                day_sleep[start_date].append({
-                    "source": elem.get("sourceName", ""),
-                    "start": elem.get("startDate", ""),
-                    "end": elem.get("endDate", ""),
-                    "value": elem.get("value", ""),
-                })
+                day_sleep[start_date].append(
+                    {
+                        "source": elem.get("sourceName", ""),
+                        "start": elem.get("startDate", ""),
+                        "end": elem.get("endDate", ""),
+                        "value": elem.get("value", ""),
+                    }
+                )
 
             elem.clear()
 
@@ -255,16 +305,18 @@ def process_xml(xml_stream, cutoff_date):
             except (ValueError, TypeError):
                 distance = 0.0
 
-            day_workouts[start_date].append({
-                "type": elem.get("workoutActivityType", "").replace("HKWorkoutActivityType", ""),
-                "source": elem.get("sourceName", ""),
-                "duration_min": round(duration, 1),
-                "calories": round(energy, 1),
-                "distance": round(distance, 2),
-                "distance_unit": elem.get("totalDistanceUnit", ""),
-                "start": elem.get("startDate", ""),
-                "end": elem.get("endDate", ""),
-            })
+            day_workouts[start_date].append(
+                {
+                    "type": elem.get("workoutActivityType", "").replace("HKWorkoutActivityType", ""),
+                    "source": elem.get("sourceName", ""),
+                    "duration_min": round(duration, 1),
+                    "calories": round(energy, 1),
+                    "distance": round(distance, 2),
+                    "distance_unit": elem.get("totalDistanceUnit", ""),
+                    "start": elem.get("startDate", ""),
+                    "end": elem.get("endDate", ""),
+                }
+            )
             elem.clear()
 
         elif tag in ("ActivitySummary", "ClinicalRecord", "Audiogram"):
@@ -298,9 +350,7 @@ def build_day_record(date_str, day_sums, day_avg_acc, bg_readings, day_workouts,
     if date_str in day_workouts:
         day["workouts"] = day_workouts[date_str]
         day["workout_count"] = len(day_workouts[date_str])
-        day["workout_total_minutes"] = round(
-            sum(w["duration_min"] for w in day_workouts[date_str]), 1
-        )
+        day["workout_total_minutes"] = round(sum(w["duration_min"] for w in day_workouts[date_str]), 1)
         day["workout_types"] = list({w["type"] for w in day_workouts[date_str]})
 
     if date_str in day_sleep:
@@ -330,6 +380,7 @@ def save_day(date_str, day):
     # DATA-2: Validate before write
     try:
         from ingestion_validator import validate_item as _validate_item
+
         _vr = _validate_item("apple_health", floats_to_decimal(db_item), date_str)
         if _vr.should_skip_ddb:
             logger.error(f"[DATA-2] CRITICAL: Skipping apple_health DDB write for {date_str}: {_vr.errors}")
@@ -385,9 +436,7 @@ def lambda_handler(event, context):
 
         # Parse
         print("Parsing XML...")
-        day_sums, day_avg_acc, bg_readings, day_workouts, day_sleep = process_xml(
-            xml_stream, cutoff_date
-        )
+        day_sums, day_avg_acc, bg_readings, day_workouts, day_sleep = process_xml(xml_stream, cutoff_date)
 
         # Collect all dates in this parse
         all_dates = set()
@@ -404,9 +453,7 @@ def lambda_handler(event, context):
         errors = 0
         for date_str in sorted(all_dates):
             try:
-                day = build_day_record(
-                    date_str, day_sums, day_avg_acc, bg_readings, day_workouts, day_sleep
-                )
+                day = build_day_record(date_str, day_sums, day_avg_acc, bg_readings, day_workouts, day_sleep)
                 save_day(date_str, day)
                 saved += 1
             except Exception as e:
@@ -425,12 +472,14 @@ def lambda_handler(event, context):
 
         return {
             "statusCode": 200,
-            "body": json.dumps({
-                "days_saved": saved,
-                "errors": errors,
-                "date_range": f"{min(all_dates)} → {max(all_dates)}" if all_dates else "none",
-                "cutoff_used": cutoff_date,
-            }),
+            "body": json.dumps(
+                {
+                    "days_saved": saved,
+                    "errors": errors,
+                    "date_range": f"{min(all_dates)} → {max(all_dates)}" if all_dates else "none",
+                    "cutoff_used": cutoff_date,
+                }
+            ),
         }
     except Exception as e:
         logger.error("lambda_handler failed: %s", e, exc_info=True)

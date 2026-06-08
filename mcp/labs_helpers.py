@@ -1,12 +1,14 @@
 """
 Lab / DEXA / Genome query helpers.
 """
+
 import json
 import logging
 
 from boto3.dynamodb.conditions import Key
-from mcp.config import table, s3_client, S3_BUCKET, USER_PREFIX, logger
-from mcp.core import decimal_to_float, query_source, _apply_phase_filter
+
+from mcp.config import S3_BUCKET, USER_PREFIX, logger, s3_client, table
+from mcp.core import _apply_phase_filter, decimal_to_float, query_source
 
 _GENOME_CACHE_V2 = None
 
@@ -84,22 +86,21 @@ def _query_lab_meta():
     return [i for i in all_items if not i.get("sk", "").startswith("DATE#")]
 
 
-
 _GENOME_LAB_XREF = {
-    "ldl_c":             ["ABCG8", "SLCO1B1"],
+    "ldl_c": ["ABCG8", "SLCO1B1"],
     "cholesterol_total": ["ABCG8"],
-    "triglycerides":     ["ADIPOQ"],
-    "glucose":           ["FTO", "IRS1", "TCF7L2"],
-    "hba1c":             ["FTO", "IRS1", "TCF7L2"],
-    "vitamin_d_25oh":    ["VDR", "GC", "CYP2R1"],
-    "homocysteine":      ["MTHFR", "MTRR"],
-    "ferritin":          ["HFE"],
-    "crp_hs":            ["CRP", "IL6"],
-    "folate":            ["MTHFR", "MTRR"],
-    "vitamin_b12":       ["MTHFR", "MTRR"],
-    "omega_3_index":     ["FADS2"],
+    "triglycerides": ["ADIPOQ"],
+    "glucose": ["FTO", "IRS1", "TCF7L2"],
+    "hba1c": ["FTO", "IRS1", "TCF7L2"],
+    "vitamin_d_25oh": ["VDR", "GC", "CYP2R1"],
+    "homocysteine": ["MTHFR", "MTRR"],
+    "ferritin": ["HFE"],
+    "crp_hs": ["CRP", "IL6"],
+    "folate": ["MTHFR", "MTRR"],
+    "vitamin_b12": ["MTHFR", "MTRR"],
+    "omega_3_index": ["FADS2"],
     "testosterone_total": ["SHBG"],
-    "apolipoprotein_b":  ["ABCG8", "SLCO1B1"],
+    "apolipoprotein_b": ["ABCG8", "SLCO1B1"],
 }
 
 
@@ -121,9 +122,14 @@ def _genome_context_for_biomarkers(biomarker_keys):
             continue
         matches = [s for s in relevant if s.get("gene") in genes]
         if matches:
-            result[bk] = [{
-                "gene": s.get("gene"), "rsid": s.get("rsid"),
-                "genotype": s.get("genotype"), "risk_level": s.get("risk_level"),
-                "summary": s.get("summary"),
-            } for s in matches]
+            result[bk] = [
+                {
+                    "gene": s.get("gene"),
+                    "rsid": s.get("rsid"),
+                    "genotype": s.get("genotype"),
+                    "risk_level": s.get("risk_level"),
+                    "summary": s.get("summary"),
+                }
+                for s in matches
+            ]
     return result

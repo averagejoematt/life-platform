@@ -27,6 +27,7 @@ import boto3
 
 try:
     from platform_logger import get_logger
+
     logger = get_logger("alert-digest")
 except ImportError:
     logger = logging.getLogger("alert-digest")
@@ -140,10 +141,12 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
         ses.send_email(
             FromEmailAddress=EMAIL_SENDER,
             Destination={"ToAddresses": [EMAIL_RECIPIENT]},
-            Content={"Simple": {
-                "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body": {"Text": {"Data": body, "Charset": "UTF-8"}},
-            }},
+            Content={
+                "Simple": {
+                    "Subject": {"Data": subject, "Charset": "UTF-8"},
+                    "Body": {"Text": {"Data": body, "Charset": "UTF-8"}},
+                }
+            },
         )
         logger.info("digest_sent drained=%d distinct=%d", len(alarms), len(grouped))
         return {"statusCode": 200, "drained": len(alarms), "distinct": len(grouped), "sent": True}

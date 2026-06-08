@@ -14,34 +14,38 @@ Endpoints in this module:
   /api/labs, /api/protocols
   /api/tools_baseline, /api/platform_stats, /api/domains
 """
+
 import json
 import os
 import re
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401
 
 import boto3
 from boto3.dynamodb.conditions import Key
-
 from phase_filter import with_phase_filter  # ADR-058
-
 from web.site_api_common import (
-    logger,
-    table,
-    USER_ID, USER_PREFIX,
-    EXPERIMENT_START, EXPERIMENT_BASELINE_WEIGHT_LBS,
-    S3_REGION,
-    PT,
+    EXPERIMENT_BASELINE_WEIGHT_LBS,
+    EXPERIMENT_START,
     PLATFORM_STATS,
-    _ok, _error,
-    _query_source, _latest_item, _decimal_to_float,
+    PT,
+    S3_REGION,
+    USER_ID,
+    USER_PREFIX,
+    _decimal_to_float,
+    _error,
     _experiment_date,
     _get_profile,
-    _load_supp_metadata,
+    _is_blocked_vice,
+    _latest_item,
     _load_content_filter,
     _load_s3_json,
-    _is_blocked_vice,
+    _load_supp_metadata,
+    _ok,
+    _query_source,
+    logger,
+    table,
 )
 
 # Module-owned S3 config caches (read by handle_protocols + handle_domains)
@@ -59,8 +63,7 @@ def handle_tools_baseline() -> dict:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     # Baseline: first 7 days of the experiment
-    baseline_end = (datetime.strptime(EXPERIMENT_START, "%Y-%m-%d")
-                    + timedelta(days=7)).strftime("%Y-%m-%d")
+    baseline_end = (datetime.strptime(EXPERIMENT_START, "%Y-%m-%d") + timedelta(days=7)).strftime("%Y-%m-%d")
 
     # Current: last 7 days
     d7 = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
@@ -98,17 +101,17 @@ def handle_tools_baseline() -> dict:
     baseline["weight_lbs"] = float(_p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
 
     latest_withings = _latest_item("withings")
-    current["weight_lbs"] = (round(float(latest_withings["weight_lbs"]))
-                             if latest_withings and latest_withings.get("weight_lbs")
-                             else None)
+    current["weight_lbs"] = round(float(latest_withings["weight_lbs"])) if latest_withings and latest_withings.get("weight_lbs") else None
 
-    return _ok({
-        "baseline": baseline,
-        "baseline_date": EXPERIMENT_START,
-        "current": current,
-        "current_date": today,
-    }, cache_seconds=3600)
-
+    return _ok(
+        {
+            "baseline": baseline,
+            "baseline_date": EXPERIMENT_START,
+            "current": current,
+            "current_date": today,
+        },
+        cache_seconds=3600,
+    )
 
 
 def handle_platform_stats() -> dict:
@@ -121,23 +124,23 @@ def handle_platform_stats() -> dict:
 # BEHAVIORAL_SOURCES / paused list). KEEP IN SYNC if sources are added/paused there.
 # Active = ingested into DATE# records; paused = intentionally off (shown, never "stale").
 _FRESHNESS_SOURCES = {
-    "whoop":         {"label": "Whoop",        "desc": "Recovery, sleep, HRV",            "category": "Wearables"},
-    "withings":      {"label": "Withings",     "desc": "Weight & body composition",       "category": "Wearables"},
-    "eightsleep":    {"label": "Eight Sleep",  "desc": "Sleep stages, HR, HRV",           "category": "Wearables"},
-    "apple_health":  {"label": "Apple Health", "desc": "Steps & active energy",           "category": "Wearables"},
-    "habitify":      {"label": "Habitify",     "desc": "Daily habit completions",         "category": "Inputs"},
-    "todoist":       {"label": "Todoist",      "desc": "Tasks completed",                 "category": "Inputs"},
-    "measurements":  {"label": "Tape measure", "desc": "Body measurements",               "category": "Manual logs", "behavioral": True},
-    "food_delivery": {"label": "Food delivery", "desc": "Delivery behavioral signal",     "category": "Manual logs", "behavioral": True},
+    "whoop": {"label": "Whoop", "desc": "Recovery, sleep, HRV", "category": "Wearables"},
+    "withings": {"label": "Withings", "desc": "Weight & body composition", "category": "Wearables"},
+    "eightsleep": {"label": "Eight Sleep", "desc": "Sleep stages, HR, HRV", "category": "Wearables"},
+    "apple_health": {"label": "Apple Health", "desc": "Steps & active energy", "category": "Wearables"},
+    "habitify": {"label": "Habitify", "desc": "Daily habit completions", "category": "Inputs"},
+    "todoist": {"label": "Todoist", "desc": "Tasks completed", "category": "Inputs"},
+    "measurements": {"label": "Tape measure", "desc": "Body measurements", "category": "Manual logs", "behavioral": True},
+    "food_delivery": {"label": "Food delivery", "desc": "Delivery behavioral signal", "category": "Manual logs", "behavioral": True},
 }
 # Per-source stale thresholds in hours (default 48). Mirrors SOURCE_STALE_HOURS.
 _FRESHNESS_STALE_HOURS = {"withings": 7 * 24, "todoist": 48, "measurements": 60 * 24, "food_delivery": 90 * 24}
 _FRESHNESS_DEFAULT_STALE_HOURS = 48
 # Intentionally paused — reported as status "paused", never counted stale (ADR-074 etc.).
 _FRESHNESS_PAUSED = {
-    "garmin":      {"label": "Garmin",      "desc": "Biometrics — paused (vendor anti-automation, ADR-074)", "category": "Wearables"},
-    "strava":      {"label": "Strava",      "desc": "Activities — paused (API 402)",                          "category": "Wearables"},
-    "macrofactor": {"label": "MacroFactor", "desc": "Nutrition — retired (Firebase App Check)",               "category": "Manual logs"},
+    "garmin": {"label": "Garmin", "desc": "Biometrics — paused (vendor anti-automation, ADR-074)", "category": "Wearables"},
+    "strava": {"label": "Strava", "desc": "Activities — paused (API 402)", "category": "Wearables"},
+    "macrofactor": {"label": "MacroFactor", "desc": "Nutrition — retired (Firebase App Check)", "category": "Manual logs"},
 }
 
 
@@ -147,12 +150,14 @@ def _latest_date_str(source: str) -> str | None:
     Uses begins_with('DATE#') so non-DATE sort keys (e.g. measurements' YEAR# rollup)
     don't shadow the real latest day. Projects sk only — cheap.
     """
-    kwargs = with_phase_filter({
-        "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}{source}") & Key("sk").begins_with("DATE#"),
-        "ScanIndexForward": False,
-        "Limit": 1,
-        "ProjectionExpression": "sk",
-    })
+    kwargs = with_phase_filter(
+        {
+            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}{source}") & Key("sk").begins_with("DATE#"),
+            "ScanIndexForward": False,
+            "Limit": 1,
+            "ProjectionExpression": "sk",
+        }
+    )
     items = table.query(**kwargs).get("Items", [])
     if not items:
         return None
@@ -192,11 +197,18 @@ def handle_source_freshness() -> dict:
         except Exception as e:  # never let one source break the feed
             logger.warning("source_freshness: %s failed: %s", sid, e)
             status = "unknown"
-        sources.append({
-            "id": sid, "label": meta["label"], "desc": meta["desc"], "category": meta["category"],
-            "last_update": last_update, "age_hours": age_hours, "status": status,
-            "is_behavioral": bool(meta.get("behavioral")),
-        })
+        sources.append(
+            {
+                "id": sid,
+                "label": meta["label"],
+                "desc": meta["desc"],
+                "category": meta["category"],
+                "last_update": last_update,
+                "age_hours": age_hours,
+                "status": status,
+                "is_behavioral": bool(meta.get("behavioral")),
+            }
+        )
         summary["total"] += 1
         if status == "fresh":
             summary["fresh"] += 1
@@ -204,10 +216,18 @@ def handle_source_freshness() -> dict:
             summary["stale"] += 1
 
     for sid, meta in _FRESHNESS_PAUSED.items():
-        sources.append({
-            "id": sid, "label": meta["label"], "desc": meta["desc"], "category": meta["category"],
-            "last_update": None, "age_hours": None, "status": "paused", "is_behavioral": False,
-        })
+        sources.append(
+            {
+                "id": sid,
+                "label": meta["label"],
+                "desc": meta["desc"],
+                "category": meta["category"],
+                "last_update": None,
+                "age_hours": None,
+                "status": "paused",
+                "is_behavioral": False,
+            }
+        )
         summary["paused"] += 1
         summary["total"] += 1
 
@@ -277,28 +297,34 @@ def handle_ledger() -> dict:
     for cause_cfg in ledger_config.get("earned_causes", []):
         cid = cause_cfg.get("id", "")
         cause_data = by_cause_raw.get(cid, {})
-        earned_causes.append({
-            **cause_cfg,
-            "total_usd": cause_data.get("total_usd", 0),
-            "count": cause_data.get("count", 0),
-        })
+        earned_causes.append(
+            {
+                **cause_cfg,
+                "total_usd": cause_data.get("total_usd", 0),
+                "count": cause_data.get("count", 0),
+            }
+        )
 
     reluctant_causes = []
     for cause_cfg in ledger_config.get("reluctant_causes", []):
         cid = cause_cfg.get("id", "")
         cause_data = by_cause_raw.get(cid, {})
-        reluctant_causes.append({
-            **cause_cfg,
-            "total_usd": cause_data.get("total_usd", 0),
-            "count": cause_data.get("count", 0),
-        })
+        reluctant_causes.append(
+            {
+                **cause_cfg,
+                "total_usd": cause_data.get("total_usd", 0),
+                "count": cause_data.get("count", 0),
+            }
+        )
 
-    return _ok({
-        "totals": totals,
-        "by_event": {"earned": earned, "reluctant": reluctant},
-        "by_cause": {"earned_causes": earned_causes, "reluctant_causes": reluctant_causes},
-    }, cache_seconds=3600)
-
+    return _ok(
+        {
+            "totals": totals,
+            "by_event": {"earned": earned, "reluctant": reluctant},
+            "by_cause": {"earned_causes": earned_causes, "reluctant_causes": reluctant_causes},
+        },
+        cache_seconds=3600,
+    )
 
 
 def handle_discoveries() -> dict:
@@ -315,37 +341,42 @@ def handle_discoveries() -> dict:
     active_hypotheses = []
     try:
         s3_client = boto3.client("s3", region_name=S3_REGION)
-        obj = s3_client.get_object(Bucket=S3_BUCKET,
-                                   Key="config/experiment_library.json")
+        obj = s3_client.get_object(Bucket=S3_BUCKET, Key="config/experiment_library.json")
         lib = json.loads(obj["Body"].read())
         for exp in lib.get("experiments", []):
             if exp.get("status") != "active":
                 continue
-            active_hypotheses.append({
-                "name": exp.get("name", ""),
-                "description": exp.get("description", ""),
-                "hypothesis": exp.get("hypothesis_template", ""),
-                "protocol": exp.get("protocol_template", ""),
-                "pillar": exp.get("pillar", ""),
-                "evidence_tier": exp.get("evidence_tier", ""),
-                "metrics": exp.get("metrics_measurable", []),
-                "duration_days": exp.get("suggested_duration_days"),
-                "why": exp.get("why_it_matters", ""),
-                "evidence_for": exp.get("evidence_for", []),
-                "evidence_against": exp.get("evidence_against", []),
-                "rationale": exp.get("rationale", ""),
-            })
+            active_hypotheses.append(
+                {
+                    "name": exp.get("name", ""),
+                    "description": exp.get("description", ""),
+                    "hypothesis": exp.get("hypothesis_template", ""),
+                    "protocol": exp.get("protocol_template", ""),
+                    "pillar": exp.get("pillar", ""),
+                    "evidence_tier": exp.get("evidence_tier", ""),
+                    "metrics": exp.get("metrics_measurable", []),
+                    "duration_days": exp.get("suggested_duration_days"),
+                    "why": exp.get("why_it_matters", ""),
+                    "evidence_for": exp.get("evidence_for", []),
+                    "evidence_against": exp.get("evidence_against", []),
+                    "rationale": exp.get("rationale", ""),
+                }
+            )
     except Exception as e:
         logger.warning(f"[discoveries] experiment library read failed: {e}")
 
     # ── 2. Inner life observations from insights partition ──
     inner_life = []
     try:
-        resp = table.query(**with_phase_filter({  # ADR-058: hide pilot insights
-            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}insights"),
-            "ScanIndexForward": False,
-            "Limit": 50,
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot insights
+                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}insights"),
+                    "ScanIndexForward": False,
+                    "Limit": 50,
+                }
+            )
+        )
         for item in _decimal_to_float(resp.get("Items", [])):
             digest_type = item.get("digest_type", "")
             insight_type = item.get("insight_type", "")
@@ -367,13 +398,13 @@ def handle_discoveries() -> dict:
             title = ""
             # Try to find a heading in the HTML
             import re
-            heading_match = re.search(
-                r'font-weight:\s*7[0-9]{2}[^>]*>([^<]{10,80})<', text)
+
+            heading_match = re.search(r"font-weight:\s*7[0-9]{2}[^>]*>([^<]{10,80})<", text)
             if heading_match:
                 title = heading_match.group(1).strip()
             if not title:
                 # Fall back to first substantial text
-                text_match = re.search(r'>([A-Z][^<]{20,100})<', text)
+                text_match = re.search(r">([A-Z][^<]{20,100})<", text)
                 if text_match:
                     title = text_match.group(1).strip()
             if not title:
@@ -382,20 +413,21 @@ def handle_discoveries() -> dict:
             # Extract a body snippet
             body = ""
             # Find first paragraph-like content
-            para_match = re.search(
-                r'font-size:\s*1[3-5]px[^>]*>([^<]{30,200})<', text)
+            para_match = re.search(r"font-size:\s*1[3-5]px[^>]*>([^<]{30,200})<", text)
             if para_match:
                 body = para_match.group(1).strip()
 
-            inner_life.append({
-                "date": date,
-                "category": category,
-                "title": title,
-                "body": body,
-                "confidence": item.get("confidence", ""),
-                "actionable": item.get("actionable", False),
-                "pillars": item.get("pillars", []),
-            })
+            inner_life.append(
+                {
+                    "date": date,
+                    "category": category,
+                    "title": title,
+                    "body": body,
+                    "confidence": item.get("confidence", ""),
+                    "actionable": item.get("actionable", False),
+                    "pillars": item.get("pillars", []),
+                }
+            )
 
         # Dedupe by title, keep most recent
         seen_titles = set()
@@ -411,19 +443,28 @@ def handle_discoveries() -> dict:
     # ── 3. AI findings from weekly correlations ──
     ai_findings = []
     try:
-        corr_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot correlations
-            "KeyConditionExpression": Key("pk").eq(
-                f"{USER_PREFIX}weekly_correlations"),
-            "ScanIndexForward": False,
-            "Limit": 4,
-        }))
+        corr_resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot correlations
+                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}weekly_correlations"),
+                    "ScanIndexForward": False,
+                    "Limit": 4,
+                }
+            )
+        )
         _LABELS = {
-            "hrv": "HRV", "recovery_score": "Recovery",
-            "sleep_duration": "Sleep Duration", "sleep_score": "Sleep Score",
-            "resting_hr": "Resting HR", "strain": "Strain",
-            "training_kj": "Training Load", "protein_g": "Protein",
-            "calories": "Calories", "steps": "Steps",
-            "habit_pct": "Habit Completion", "day_grade": "Day Grade",
+            "hrv": "HRV",
+            "recovery_score": "Recovery",
+            "sleep_duration": "Sleep Duration",
+            "sleep_score": "Sleep Score",
+            "resting_hr": "Resting HR",
+            "strain": "Strain",
+            "training_kj": "Training Load",
+            "protein_g": "Protein",
+            "calories": "Calories",
+            "steps": "Steps",
+            "habit_pct": "Habit Completion",
+            "day_grade": "Day Grade",
         }
         for item in _decimal_to_float(corr_resp.get("Items", [])):
             week = item.get("week", item.get("sk", "").replace("WEEK#", ""))
@@ -442,25 +483,28 @@ def handle_discoveries() -> dict:
                 b = _LABELS.get(c.get("metric_b", ""), c.get("metric_b", ""))
                 r = c.get("r", 0)
                 direction = "positively" if r > 0 else "negatively"
-                ai_findings.append({
-                    "week": week,
-                    "metric_a": a,
-                    "metric_b": b,
-                    "r": round(r, 2) if r else 0,
-                    "n": c.get("n", 0),
-                    "title": f"{a} × {b}: {direction} correlated",
-                    "body": f"r={r:+.2f}, n={c.get('n', '?')} days. "
-                            f"FDR-corrected significant finding from {week}.",
-                })
+                ai_findings.append(
+                    {
+                        "week": week,
+                        "metric_a": a,
+                        "metric_b": b,
+                        "r": round(r, 2) if r else 0,
+                        "n": c.get("n", 0),
+                        "title": f"{a} × {b}: {direction} correlated",
+                        "body": f"r={r:+.2f}, n={c.get('n', '?')} days. " f"FDR-corrected significant finding from {week}.",
+                    }
+                )
     except Exception as e:
         logger.warning(f"[discoveries] correlations read failed: {e}")
 
-    return _ok({
-        "active_hypotheses": active_hypotheses,
-        "inner_life": inner_life,
-        "ai_findings": ai_findings,
-    }, cache_seconds=1800)
-
+    return _ok(
+        {
+            "active_hypotheses": active_hypotheses,
+            "inner_life": inner_life,
+            "ai_findings": ai_findings,
+        },
+        cache_seconds=1800,
+    )
 
 
 def handle_habit_streaks() -> dict:
@@ -474,19 +518,25 @@ def handle_habit_streaks() -> dict:
 
     # Read latest habit_scores record
     pk = f"{USER_PREFIX}habit_scores"
-    resp = table.query(**with_phase_filter({  # ADR-058: hide pilot habit scores
-        "KeyConditionExpression": "pk = :pk",
-        "ExpressionAttributeValues": {":pk": pk},
-        "ScanIndexForward": False,
-        "Limit": 3,
-    }))
+    resp = table.query(
+        **with_phase_filter(
+            {  # ADR-058: hide pilot habit scores
+                "KeyConditionExpression": "pk = :pk",
+                "ExpressionAttributeValues": {":pk": pk},
+                "ScanIndexForward": False,
+                "Limit": 3,
+            }
+        )
+    )
     items = _decimal_to_float(resp.get("Items", []))
     record = items[0] if items else None
 
     if not record:
         # Genesis week — shaped-empty 200 (the Essential-Seven badge shows 0, not an error).
-        return _ok({"habit_streaks": {"as_of_date": yesterday, "tier0_pct": 0, "tier0_done": 0,
-                                      "tier0_total": 1, "aggregate_streak": 0}}, cache_seconds=300)
+        return _ok(
+            {"habit_streaks": {"as_of_date": yesterday, "tier0_pct": 0, "tier0_done": 0, "tier0_total": 1, "aggregate_streak": 0}},
+            cache_seconds=300,
+        )
 
     t0_done = int(record.get("tier0_done", 0))
     t0_total = int(record.get("tier0_total", 1))
@@ -495,16 +545,18 @@ def handle_habit_streaks() -> dict:
     # Compute aggregate T0 streak from habit_scores (t0_streak field if present)
     t0_streak = int(record.get("t0_perfect_streak") or record.get("t0_aggregate_streak") or 0)
 
-    return _ok({
-        "habit_streaks": {
-            "as_of_date":      record.get("date", yesterday),
-            "tier0_pct":       t0_pct,
-            "tier0_done":      t0_done,
-            "tier0_total":     t0_total,
-            "aggregate_streak": t0_streak,
-        }
-    }, cache_seconds=3600)
-
+    return _ok(
+        {
+            "habit_streaks": {
+                "as_of_date": record.get("date", yesterday),
+                "tier0_pct": t0_pct,
+                "tier0_done": t0_done,
+                "tier0_total": t0_total,
+                "aggregate_streak": t0_streak,
+            }
+        },
+        cache_seconds=3600,
+    )
 
 
 def handle_experiments() -> dict:
@@ -514,12 +566,16 @@ def handle_experiments() -> dict:
     Cache: 3600s (1 hr).
     """
     pk = f"{USER_PREFIX}experiments"
-    resp = table.query(**with_phase_filter({  # ADR-058: hide pilot experiments
-        "KeyConditionExpression": "pk = :pk",
-        "ExpressionAttributeValues": {":pk": pk},
-        "ScanIndexForward": False,
-        "Limit": 50,
-    }))
+    resp = table.query(
+        **with_phase_filter(
+            {  # ADR-058: hide pilot experiments
+                "KeyConditionExpression": "pk = :pk",
+                "ExpressionAttributeValues": {":pk": pk},
+                "ScanIndexForward": False,
+                "Limit": 50,
+            }
+        )
+    )
     items = _decimal_to_float(resp.get("Items", []))
 
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -555,45 +611,46 @@ def handle_experiments() -> dict:
         if status == "active" and days_in is not None and planned_duration:
             progress_pct = min(100, round(days_in / int(planned_duration) * 100))
 
-        experiments.append({
-            "id":                item.get("sk", "").replace("EXP#", ""),
-            "name":              item.get("name", "Unnamed"),
-            "status":            status,
-            "start_date":        start,
-            "end_date":          end,
-            "hypothesis":        item.get("hypothesis", ""),
-            "tags":              item.get("tags", []),
-            # Phase 2 additions
-            "outcome":           item.get("outcome") or item.get("result_summary"),
-            "result_summary":    item.get("result_summary") or item.get("outcome"),
-            "primary_metric":    item.get("primary_metric"),
-            "baseline_value":    item.get("baseline_value"),
-            "result_value":      item.get("result_value"),
-            "metrics_tracked":   item.get("metrics_tracked", []),
-            "planned_duration_days": planned_duration,
-            "duration_days":     duration_days,
-            "days_in":           days_in,
-            "progress_pct":      progress_pct,
-            "confirmed":         item.get("confirmed", False),
-            "hypothesis_confirmed": item.get("hypothesis_confirmed"),
-            # EXP-2: depth fields
-            "mechanism":         item.get("mechanism"),
-            "key_finding":       item.get("key_finding"),
-            "protocol":          item.get("protocol"),
-            "evidence_tier":     item.get("evidence_tier"),
-            # EL-16+: Evolution fields for Record zone
-            "grade":             item.get("grade"),
-            "compliance_pct":    item.get("compliance_pct"),
-            "reflection":        item.get("reflection"),
-            "library_id":        item.get("library_id"),
-            "duration_tier":     item.get("duration_tier"),
-            "experiment_type":   item.get("experiment_type"),
-            "iteration":         item.get("iteration", 1),
-        })
+        experiments.append(
+            {
+                "id": item.get("sk", "").replace("EXP#", ""),
+                "name": item.get("name", "Unnamed"),
+                "status": status,
+                "start_date": start,
+                "end_date": end,
+                "hypothesis": item.get("hypothesis", ""),
+                "tags": item.get("tags", []),
+                # Phase 2 additions
+                "outcome": item.get("outcome") or item.get("result_summary"),
+                "result_summary": item.get("result_summary") or item.get("outcome"),
+                "primary_metric": item.get("primary_metric"),
+                "baseline_value": item.get("baseline_value"),
+                "result_value": item.get("result_value"),
+                "metrics_tracked": item.get("metrics_tracked", []),
+                "planned_duration_days": planned_duration,
+                "duration_days": duration_days,
+                "days_in": days_in,
+                "progress_pct": progress_pct,
+                "confirmed": item.get("confirmed", False),
+                "hypothesis_confirmed": item.get("hypothesis_confirmed"),
+                # EXP-2: depth fields
+                "mechanism": item.get("mechanism"),
+                "key_finding": item.get("key_finding"),
+                "protocol": item.get("protocol"),
+                "evidence_tier": item.get("evidence_tier"),
+                # EL-16+: Evolution fields for Record zone
+                "grade": item.get("grade"),
+                "compliance_pct": item.get("compliance_pct"),
+                "reflection": item.get("reflection"),
+                "library_id": item.get("library_id"),
+                "duration_tier": item.get("duration_tier"),
+                "experiment_type": item.get("experiment_type"),
+                "iteration": item.get("iteration", 1),
+            }
+        )
     experiments.sort(key=lambda x: x["start_date"], reverse=True)
 
     return _ok({"experiments": experiments}, cache_seconds=3600)
-
 
 
 def handle_supplements() -> dict:
@@ -606,8 +663,10 @@ def handle_supplements() -> dict:
     registry = _load_supp_metadata()
     if not registry or not registry.get("groups"):
         # Registry config unavailable — shaped-empty 200 rather than a console 503.
-        return _ok({"groups": {}, "total_count": 0, "genome_snps": [],
-                    "as_of_date": datetime.now(timezone.utc).strftime("%Y-%m-%d")}, cache_seconds=300)
+        return _ok(
+            {"groups": {}, "total_count": 0, "genome_snps": [], "as_of_date": datetime.now(timezone.utc).strftime("%Y-%m-%d")},
+            cache_seconds=300,
+        )
 
     # Try to merge DynamoDB adherence data
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -622,7 +681,8 @@ def handle_supplements() -> dict:
     if not item:
         resp = table.query(
             KeyConditionExpression=Key("pk").eq(pk),
-            ScanIndexForward=False, Limit=5,
+            ScanIndexForward=False,
+            Limit=5,
         )
         items = _decimal_to_float(resp.get("Items", []))
         item = items[0] if items else None
@@ -646,13 +706,15 @@ def handle_supplements() -> dict:
             if adh is not None:
                 supp["adherence_pct"] = adh
 
-    return _ok({
-        "as_of_date": as_of_date,
-        "groups": groups,
-        "genome_snps": registry.get("genome_snps", []),
-        "total_count": total_count,
-    }, cache_seconds=3600)
-
+    return _ok(
+        {
+            "as_of_date": as_of_date,
+            "groups": groups,
+            "genome_snps": registry.get("genome_snps", []),
+            "total_count": total_count,
+        },
+        cache_seconds=3600,
+    )
 
 
 def handle_vice_streaks() -> dict:
@@ -671,12 +733,14 @@ def handle_vice_streaks() -> dict:
     # only the former was filtered here, while the client shipped the keyword
     # list to do the substring check itself — leaking the keywords in JS.
     pk = f"{USER_PREFIX}habit_scores"
-    resp = table.query(**with_phase_filter({  # ADR-058: hide pilot habit scores
-        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(
-            f"DATE#{ninety_days_ago}", f"DATE#{today}"
-        ),
-        "ScanIndexForward": True,
-    }))
+    resp = table.query(
+        **with_phase_filter(
+            {  # ADR-058: hide pilot habit scores
+                "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{ninety_days_ago}", f"DATE#{today}"),
+                "ScanIndexForward": True,
+            }
+        )
+    )
     items = _decimal_to_float(resp.get("Items", []))
 
     if not items:
@@ -711,13 +775,15 @@ def handle_vice_streaks() -> dict:
         best_streak = max(history) if history else 0
         # Relapse = streak dropped from >0 to 0
         relapses = sum(1 for i in range(1, len(history)) if history[i - 1] > 0 and history[i] == 0)
-        vices.append({
-            "name":           vice_name,
-            "current_streak": current_streak,
-            "best_streak":    best_streak,
-            "relapses_90d":   relapses,
-            "holding":        current_streak > 0,
-        })
+        vices.append(
+            {
+                "name": vice_name,
+                "current_streak": current_streak,
+                "best_streak": best_streak,
+                "relapses_90d": relapses,
+                "holding": current_streak > 0,
+            }
+        )
 
     # Sort: holding first, then by streak descending
     vices.sort(key=lambda v: (-int(v["holding"]), -v["current_streak"]))
@@ -725,13 +791,15 @@ def handle_vice_streaks() -> dict:
     total_held = int(latest.get("vices_held", 0) or 0)
     total_tracked = len(vices)
 
-    return _ok({
-        "as_of_date":    latest.get("date", today),
-        "vices":         vices,
-        "total_held":    total_held,
-        "total_tracked": total_tracked,
-    }, cache_seconds=3600)
-
+    return _ok(
+        {
+            "as_of_date": latest.get("date", today),
+            "vices": vices,
+            "total_held": total_held,
+            "total_tracked": total_tracked,
+        },
+        cache_seconds=3600,
+    )
 
 
 def handle_habits() -> dict:
@@ -745,22 +813,26 @@ def handle_habits() -> dict:
     ninety_days_ago = _experiment_date(90)
 
     pk = f"{USER_PREFIX}habit_scores"
-    resp = table.query(**with_phase_filter({  # ADR-058: hide pilot habit scores
-        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(
-            f"DATE#{ninety_days_ago}", f"DATE#{today}"
-        ),
-        "ScanIndexForward": True,
-    }))
+    resp = table.query(
+        **with_phase_filter(
+            {  # ADR-058: hide pilot habit scores
+                "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{ninety_days_ago}", f"DATE#{today}"),
+                "ScanIndexForward": True,
+            }
+        )
+    )
     items = _decimal_to_float(resp.get("Items", []))
 
     # ── Also pull by_group from habitify partition (group data lives there, not in habit_scores)
     hab_pk = f"{USER_PREFIX}habitify"
-    hab_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot habitify records
-        "KeyConditionExpression": Key("pk").eq(hab_pk) & Key("sk").between(
-            f"DATE#{ninety_days_ago}", f"DATE#{today}"
-        ),
-        "ScanIndexForward": True,
-    }))
+    hab_resp = table.query(
+        **with_phase_filter(
+            {  # ADR-058: hide pilot habitify records
+                "KeyConditionExpression": Key("pk").eq(hab_pk) & Key("sk").between(f"DATE#{ninety_days_ago}", f"DATE#{today}"),
+                "ScanIndexForward": True,
+            }
+        )
+    )
     habitify_by_date = {}
     for hi in _decimal_to_float(hab_resp.get("Items", [])):
         date_key = hi.get("date") or hi.get("sk", "").replace("DATE#", "")
@@ -768,11 +840,7 @@ def handle_habits() -> dict:
         if by_group and isinstance(by_group, dict):
             # by_group[Group] = {completed, possible, pct, habits_done}
             # pct is 0.0–1.0, convert to 0–100
-            habitify_by_date[date_key] = {
-                g: round(float(v.get("pct", 0) or 0) * 100)
-                for g, v in by_group.items()
-                if isinstance(v, dict)
-            }
+            habitify_by_date[date_key] = {g: round(float(v.get("pct", 0) or 0) * 100) for g, v in by_group.items() if isinstance(v, dict)}
 
     history = []
     for item in items:
@@ -795,12 +863,12 @@ def handle_habits() -> dict:
             group_data = habitify_by_date[date_str]
 
         day = {
-            "date":      date_str,
+            "date": date_str,
             "tier0_pct": t0_pct,
             "tier01_pct": t01_pct,
-            "t0_done":   t0_done,
-            "t0_total":  t0_total,
-            "perfect":   t0_pct == 100,
+            "t0_done": t0_done,
+            "t0_total": t0_total,
+            "perfect": t0_pct == 100,
         }
         if group_data:
             day["groups"] = group_data
@@ -824,10 +892,7 @@ def handle_habits() -> dict:
             dow_counts[dow] += 1
         except Exception:
             pass
-    dow_avgs = [
-        round(dow_sums[i] / dow_counts[i]) if dow_counts[i] else None
-        for i in range(7)
-    ]
+    dow_avgs = [round(dow_sums[i] / dow_counts[i]) if dow_counts[i] else None for i in range(7)]
     valid_dow = [(i, v) for i, v in enumerate(dow_avgs) if v is not None]
     best_dow = max(valid_dow, key=lambda x: x[1])[0] if valid_dow else None
     worst_dow = min(valid_dow, key=lambda x: x[1])[0] if valid_dow else None
@@ -840,11 +905,7 @@ def handle_habits() -> dict:
             if isinstance(gpct, (int, float)):
                 group_90d_sums[gname] = group_90d_sums.get(gname, 0) + gpct
                 group_90d_counts[gname] = group_90d_counts.get(gname, 0) + 1
-    group_90d_avgs = {
-        g: round(group_90d_sums[g] / group_90d_counts[g])
-        for g in group_90d_sums
-        if group_90d_counts.get(g, 0) > 0
-    }
+    group_90d_avgs = {g: round(group_90d_sums[g] / group_90d_counts[g]) for g in group_90d_sums if group_90d_counts.get(g, 0) > 0}
     keystone_group = max(group_90d_avgs, key=group_90d_avgs.get) if group_90d_avgs else None
     keystone_group_pct = group_90d_avgs.get(keystone_group) if keystone_group else None
 
@@ -855,17 +916,26 @@ def handle_habits() -> dict:
 
         # Fetch character_sheet records for same window
         cs_pk = f"{USER_PREFIX}character_sheet"
-        cs_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot character sheets
-            "KeyConditionExpression": Key("pk").eq(cs_pk) & Key("sk").between(
-                f"DATE#{ninety_days_ago}", f"DATE#{today}"
-            ),
-            "ScanIndexForward": True,
-        }))
+        cs_resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot character sheets
+                    "KeyConditionExpression": Key("pk").eq(cs_pk) & Key("sk").between(f"DATE#{ninety_days_ago}", f"DATE#{today}"),
+                    "ScanIndexForward": True,
+                }
+            )
+        )
         cs_items = _decimal_to_float(cs_resp.get("Items", []))
 
         # Build date → pillar sum (character health proxy)
-        PILLARS_CS = ["pillar_sleep", "pillar_movement", "pillar_nutrition",
-                      "pillar_metabolic", "pillar_mind", "pillar_relationships", "pillar_consistency"]
+        PILLARS_CS = [
+            "pillar_sleep",
+            "pillar_movement",
+            "pillar_nutrition",
+            "pillar_metabolic",
+            "pillar_mind",
+            "pillar_relationships",
+            "pillar_consistency",
+        ]
         char_by_date = {}
         for ci in cs_items:
             cs_date = ci.get("date") or ci.get("sk", "").replace("DATE#", "")
@@ -912,32 +982,36 @@ def handle_habits() -> dict:
         for gname, pairs in group_series.items():
             r = _pearson(pairs)
             if r is not None:
-                corr_list.append({
-                    "group":         gname,
-                    "correlation_r": r,
-                    "avg_pct":       group_90d_avgs.get(gname),
-                    "n_days":        len(pairs),
-                })
+                corr_list.append(
+                    {
+                        "group": gname,
+                        "correlation_r": r,
+                        "avg_pct": group_90d_avgs.get(gname),
+                        "n_days": len(pairs),
+                    }
+                )
         corr_list.sort(key=lambda x: abs(x["correlation_r"]), reverse=True)
         keystone_correlations = corr_list[:5]
     except Exception as _hc_e:
         logger.warning("[handle_habits] keystone_correlations failed (non-fatal): %s", _hc_e)
 
-    return _ok({
-        "as_of_date":             today,
-        "days_tracked":           len(history),
-        "current_streak":         latest_streak,
-        "history":                history,
-        "day_of_week_avgs":       dow_avgs,
-        "best_day":               best_dow,
-        "worst_day":              worst_dow,
-        "group_90d_avgs":         group_90d_avgs,
-        "keystone_group":         keystone_group,
-        "keystone_group_pct":     keystone_group_pct,
-        # HAB-3: top 5 habit groups by |Pearson r| vs character score
-        "keystone_correlations":  keystone_correlations,
-    }, cache_seconds=3600)
-
+    return _ok(
+        {
+            "as_of_date": today,
+            "days_tracked": len(history),
+            "current_streak": latest_streak,
+            "history": history,
+            "day_of_week_avgs": dow_avgs,
+            "best_day": best_dow,
+            "worst_day": worst_dow,
+            "group_90d_avgs": group_90d_avgs,
+            "keystone_group": keystone_group,
+            "keystone_group_pct": keystone_group_pct,
+            # HAB-3: top 5 habit groups by |Pearson r| vs character score
+            "keystone_correlations": keystone_correlations,
+        },
+        cache_seconds=3600,
+    )
 
 
 def handle_correlations(event: dict = None) -> dict:
@@ -967,17 +1041,20 @@ def handle_correlations(event: dict = None) -> dict:
             pass
 
     pk = f"{USER_PREFIX}weekly_correlations"
-    resp = table.query(**with_phase_filter({  # ADR-058: hide pilot weekly correlations
-        "KeyConditionExpression": Key("pk").eq(pk),
-        "ScanIndexForward": False,
-        "Limit": 1,
-    }))
+    resp = table.query(
+        **with_phase_filter(
+            {  # ADR-058: hide pilot weekly correlations
+                "KeyConditionExpression": Key("pk").eq(pk),
+                "ScanIndexForward": False,
+                "Limit": 1,
+            }
+        )
+    )
     items = _decimal_to_float(resp.get("Items", []))
     if not items:
         # Genesis week / weekly-correlation compute hasn't run — shaped-empty 200
         # so the site shows an honest "fills as data accrues" state, not a 503.
-        return _ok({"correlations": [], "week": None, "start_date": None,
-                    "end_date": None, "count": 0}, cache_seconds=300)
+        return _ok({"correlations": [], "week": None, "start_date": None, "end_date": None, "count": 0}, cache_seconds=300)
 
     record = items[0]
     week = record.get("sk", "").replace("WEEK#", "")
@@ -1002,24 +1079,24 @@ def handle_correlations(event: dict = None) -> dict:
 
     # Human-readable labels and source names for each metric
     _METRIC_META = {
-        "hrv":            {"label": "Heart Rate Variability", "source": "Whoop"},
-        "recovery_score": {"label": "Recovery Score",         "source": "Whoop"},
-        "sleep_duration": {"label": "Sleep Duration",         "source": "Whoop"},
-        "sleep_score":    {"label": "Sleep Score",            "source": "Whoop"},
-        "resting_hr":     {"label": "Resting Heart Rate",     "source": "Whoop"},
-        "strain":         {"label": "Strain",                 "source": "Whoop"},
-        "tsb":            {"label": "Training Stress Balance", "source": "Computed"},
-        "training_kj":    {"label": "Training Load (kJ)",     "source": "Strava"},
-        "training_mins":  {"label": "Training Minutes",       "source": "Strava"},
-        "protein_g":      {"label": "Protein (g)",            "source": "MacroFactor"},
-        "calories":       {"label": "Calories",               "source": "MacroFactor"},
-        "carbs_g":        {"label": "Carbs (g)",              "source": "MacroFactor"},
-        "fat_g":          {"label": "Fat (g)",                "source": "MacroFactor"},
-        "steps":          {"label": "Steps",                  "source": "Apple Health"},
-        "habit_pct":      {"label": "Habit Completion %",     "source": "Habitify"},
-        "day_grade":      {"label": "Day Grade",              "source": "Computed"},
-        "readiness":      {"label": "Readiness Score",        "source": "Computed"},
-        "tier0_streak":   {"label": "Tier 0 Streak",          "source": "Computed"},
+        "hrv": {"label": "Heart Rate Variability", "source": "Whoop"},
+        "recovery_score": {"label": "Recovery Score", "source": "Whoop"},
+        "sleep_duration": {"label": "Sleep Duration", "source": "Whoop"},
+        "sleep_score": {"label": "Sleep Score", "source": "Whoop"},
+        "resting_hr": {"label": "Resting Heart Rate", "source": "Whoop"},
+        "strain": {"label": "Strain", "source": "Whoop"},
+        "tsb": {"label": "Training Stress Balance", "source": "Computed"},
+        "training_kj": {"label": "Training Load (kJ)", "source": "Strava"},
+        "training_mins": {"label": "Training Minutes", "source": "Strava"},
+        "protein_g": {"label": "Protein (g)", "source": "MacroFactor"},
+        "calories": {"label": "Calories", "source": "MacroFactor"},
+        "carbs_g": {"label": "Carbs (g)", "source": "MacroFactor"},
+        "fat_g": {"label": "Fat (g)", "source": "MacroFactor"},
+        "steps": {"label": "Steps", "source": "Apple Health"},
+        "habit_pct": {"label": "Habit Completion %", "source": "Habitify"},
+        "day_grade": {"label": "Day Grade", "source": "Computed"},
+        "readiness": {"label": "Readiness Score", "source": "Computed"},
+        "tier0_streak": {"label": "Tier 0 Streak", "source": "Computed"},
     }
 
     public_pairs = []
@@ -1029,29 +1106,31 @@ def handle_correlations(event: dict = None) -> dict:
         meta_a = _METRIC_META.get(metric_a, {})
         meta_b = _METRIC_META.get(metric_b, {})
         r_val = float(p.get("pearson_r", p.get("r", 0)) or 0)
-        public_pairs.append({
-            "source_a":  meta_a.get("source", p.get("source_a", "")),
-            "field_a":   metric_a,
-            "label_a":   meta_a.get("label", p.get("label_a", metric_a)),
-            "source_b":  meta_b.get("source", p.get("source_b", "")),
-            "field_b":   metric_b,
-            "label_b":   meta_b.get("label", p.get("label_b", metric_b)),
-            "r":         round(r_val, 3),
-            "p":         round(float(p.get("p_value", p.get("p", 1)) or 1), 4),
-            "n":         int(p.get("n_days", p.get("n", 0)) or 0),
-            "strength":  p.get("interpretation", p.get("strength", "weak")),
-            "fdr_significant": p.get("fdr_significant", False),
-            "correlation_type": p.get("correlation_type", "cross_sectional"),
-            "lag_days":  int(p.get("lag_days", 0) or 0),
-            "description": p.get("description", ""),
-            "direction":   p.get("direction", ""),
-            # DISC-1: counterintuitive flag from compute lambda
-            "counterintuitive":    p.get("counterintuitive", False),
-            "expected_direction":  p.get("expected_direction", ""),
-            # HP-06: metric labels for homepage cards
-            "metric_a":  meta_a.get("label", p.get("label_a", metric_a)),
-            "metric_b":  meta_b.get("label", p.get("label_b", metric_b)),
-        })
+        public_pairs.append(
+            {
+                "source_a": meta_a.get("source", p.get("source_a", "")),
+                "field_a": metric_a,
+                "label_a": meta_a.get("label", p.get("label_a", metric_a)),
+                "source_b": meta_b.get("source", p.get("source_b", "")),
+                "field_b": metric_b,
+                "label_b": meta_b.get("label", p.get("label_b", metric_b)),
+                "r": round(r_val, 3),
+                "p": round(float(p.get("p_value", p.get("p", 1)) or 1), 4),
+                "n": int(p.get("n_days", p.get("n", 0)) or 0),
+                "strength": p.get("interpretation", p.get("strength", "weak")),
+                "fdr_significant": p.get("fdr_significant", False),
+                "correlation_type": p.get("correlation_type", "cross_sectional"),
+                "lag_days": int(p.get("lag_days", 0) or 0),
+                "description": p.get("description", ""),
+                "direction": p.get("direction", ""),
+                # DISC-1: counterintuitive flag from compute lambda
+                "counterintuitive": p.get("counterintuitive", False),
+                "expected_direction": p.get("expected_direction", ""),
+                # HP-06: metric labels for homepage cards
+                "metric_a": meta_a.get("label", p.get("label_a", metric_a)),
+                "metric_b": meta_b.get("label", p.get("label_b", metric_b)),
+            }
+        )
 
     # Sort all by absolute r descending
     public_pairs.sort(key=lambda x: -abs(x["r"]))
@@ -1064,34 +1143,35 @@ def handle_correlations(event: dict = None) -> dict:
         if not significant:
             significant = public_pairs
         # Apply limit (default 3)
-        top = significant[:limit or 3]
+        top = significant[: limit or 3]
         # Auto-generate description if missing
         for p in top:
             if not p.get("description"):
                 direction = "positive" if p["r"] > 0 else "inverse"
-                p["description"] = (
-                    f"{direction.title()} correlation between "
-                    f"{p['metric_a']} and {p['metric_b']} "
-                    f"(r={p['r']:.2f})"
-                )
-        return _ok({
-            "correlations": top,
-            "week":  week,
-            "count": len(top),
-        }, cache_seconds=3600)
+                p["description"] = f"{direction.title()} correlation between " f"{p['metric_a']} and {p['metric_b']} " f"(r={p['r']:.2f})"
+        return _ok(
+            {
+                "correlations": top,
+                "week": week,
+                "count": len(top),
+            },
+            cache_seconds=3600,
+        )
 
     # Standard mode — return full object for explorer page
-    return _ok({
-        "correlations": {
-            "week":  week,
-            "start_date": start_date,
-            "end_date":   end_date,
-            "pairs": public_pairs,
-            "count": len(public_pairs),
-            "methodology": "Pearson r over 90-day rolling window. Benjamini-Hochberg FDR correction. n-gated strength labels.",
-        }
-    }, cache_seconds=3600)
-
+    return _ok(
+        {
+            "correlations": {
+                "week": week,
+                "start_date": start_date,
+                "end_date": end_date,
+                "pairs": public_pairs,
+                "count": len(public_pairs),
+                "methodology": "Pearson r over 90-day rolling window. Benjamini-Hochberg FDR correction. n-gated strength labels.",
+            }
+        },
+        cache_seconds=3600,
+    )
 
 
 def handle_genome_risks() -> dict:
@@ -1106,9 +1186,10 @@ def handle_genome_risks() -> dict:
 
     if not items:
         # No genome uploaded yet — shaped-empty 200 so the page shows "not yet published".
-        return _ok({"genome": {"total_snps": 0,
-                               "risk_summary": {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0},
-                               "categories": {}}}, cache_seconds=3600)
+        return _ok(
+            {"genome": {"total_snps": 0, "risk_summary": {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}, "categories": {}}},
+            cache_seconds=3600,
+        )
 
     categories = {}
     risk_summary = {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}
@@ -1120,27 +1201,31 @@ def handle_genome_risks() -> dict:
 
         if cat not in categories:
             categories[cat] = []
-        categories[cat].append({
-            "gene":         snp.get("gene", ""),
-            "rsid":         snp.get("rsid", snp.get("sk", "").replace("SNP#", "")),
-            "risk_level":   risk,
-            "summary":      snp.get("summary", ""),
-            "implications":  snp.get("implications", ""),
-            "interventions": snp.get("interventions", []),
-            "evidence":     snp.get("evidence_strength", "moderate"),
-        })
+        categories[cat].append(
+            {
+                "gene": snp.get("gene", ""),
+                "rsid": snp.get("rsid", snp.get("sk", "").replace("SNP#", "")),
+                "risk_level": risk,
+                "summary": snp.get("summary", ""),
+                "implications": snp.get("implications", ""),
+                "interventions": snp.get("interventions", []),
+                "evidence": snp.get("evidence_strength", "moderate"),
+            }
+        )
 
     for cat in categories:
         categories[cat].sort(key=lambda x: {"unfavorable": 0, "mixed": 1, "neutral": 2, "favorable": 3}.get(x["risk_level"], 2))
 
-    return _ok({
-        "genome": {
-            "total_snps":   len(items),
-            "risk_summary": risk_summary,
-            "categories":   categories,
-        }
-    }, cache_seconds=86400)
-
+    return _ok(
+        {
+            "genome": {
+                "total_snps": len(items),
+                "risk_summary": risk_summary,
+                "categories": categories,
+            }
+        },
+        cache_seconds=86400,
+    )
 
 
 def handle_glucose() -> dict:
@@ -1154,11 +1239,7 @@ def handle_glucose() -> dict:
     d30 = _experiment_date(30)
 
     records = _query_source("apple_health", d30, today)
-    cgm_days = [
-        r for r in records
-        if r.get("blood_glucose_avg") is not None
-        and r.get("sk", "").replace("DATE#", "") >= EXPERIMENT_START
-    ]
+    cgm_days = [r for r in records if r.get("blood_glucose_avg") is not None and r.get("sk", "").replace("DATE#", "") >= EXPERIMENT_START]
     cgm_days.sort(key=lambda x: x.get("sk", ""))
 
     if not cgm_days:
@@ -1195,37 +1276,54 @@ def handle_glucose() -> dict:
     best_day = None
     worst_day = None
     if len(cgm_days) >= 2:
-        sorted_by_tir = sorted(cgm_days, key=lambda r: (
-            float(r.get("blood_glucose_time_in_range_pct", 0)),
-            -float(r.get("blood_glucose_std_dev", 99))
-        ))
+        sorted_by_tir = sorted(
+            cgm_days, key=lambda r: (float(r.get("blood_glucose_time_in_range_pct", 0)), -float(r.get("blood_glucose_std_dev", 99)))
+        )
         worst_r = sorted_by_tir[0]
         best_r = sorted_by_tir[-1]
-        worst_day = {"date": worst_r.get("sk", "").replace("DATE#", ""), "avg": round(float(worst_r.get("blood_glucose_avg", 0)), 1), "tir": round(float(worst_r.get("blood_glucose_time_in_range_pct", 0)), 1)}
-        best_day = {"date": best_r.get("sk", "").replace("DATE#", ""), "avg": round(float(best_r.get("blood_glucose_avg", 0)), 1), "tir": round(float(best_r.get("blood_glucose_time_in_range_pct", 0)), 1)}
+        worst_day = {
+            "date": worst_r.get("sk", "").replace("DATE#", ""),
+            "avg": round(float(worst_r.get("blood_glucose_avg", 0)), 1),
+            "tir": round(float(worst_r.get("blood_glucose_time_in_range_pct", 0)), 1),
+        }
+        best_day = {
+            "date": best_r.get("sk", "").replace("DATE#", ""),
+            "avg": round(float(best_r.get("blood_glucose_avg", 0)), 1),
+            "tir": round(float(best_r.get("blood_glucose_time_in_range_pct", 0)), 1),
+        }
 
-    return _ok({
-        "glucose": {
-            "avg_mg_dl":          round(float(latest.get("blood_glucose_avg", 0)), 1) if latest.get("blood_glucose_avg") else None,
-            "std_dev":            round(float(latest.get("blood_glucose_std_dev", 0)), 1) if latest.get("blood_glucose_std_dev") else None,
-            "time_in_range_pct":  round(tir_today, 1),
-            "time_in_optimal_pct": round(float(latest.get("blood_glucose_time_in_optimal_pct", 0)), 1) if latest.get("blood_glucose_time_in_optimal_pct") else None,
-            "time_above_140_pct": round(float(latest.get("blood_glucose_time_above_140_pct", 0)), 1) if latest.get("blood_glucose_time_above_140_pct") else None,
-            "cgm_source":         latest.get("cgm_source", "unknown"),
-            "tir_status":         tir_status,
-            "variability_status": variability_status,
-            "30d_avg_mg_dl":      avg(avg_vals),
-            "30d_avg_tir":        avg(tir_vals),
-            "30d_avg_optimal":    avg(opt_vals),
-            "30d_avg_std":        avg(std_vals),
-            "days_tracked":       len(cgm_days),
-            "as_of_date":         latest.get("sk", "").replace("DATE#", ""),
-            "best_day":           best_day,
-            "worst_day":          worst_day,
+    return _ok(
+        {
+            "glucose": {
+                "avg_mg_dl": round(float(latest.get("blood_glucose_avg", 0)), 1) if latest.get("blood_glucose_avg") else None,
+                "std_dev": round(float(latest.get("blood_glucose_std_dev", 0)), 1) if latest.get("blood_glucose_std_dev") else None,
+                "time_in_range_pct": round(tir_today, 1),
+                "time_in_optimal_pct": (
+                    round(float(latest.get("blood_glucose_time_in_optimal_pct", 0)), 1)
+                    if latest.get("blood_glucose_time_in_optimal_pct")
+                    else None
+                ),
+                "time_above_140_pct": (
+                    round(float(latest.get("blood_glucose_time_above_140_pct", 0)), 1)
+                    if latest.get("blood_glucose_time_above_140_pct")
+                    else None
+                ),
+                "cgm_source": latest.get("cgm_source", "unknown"),
+                "tir_status": tir_status,
+                "variability_status": variability_status,
+                "30d_avg_mg_dl": avg(avg_vals),
+                "30d_avg_tir": avg(tir_vals),
+                "30d_avg_optimal": avg(opt_vals),
+                "30d_avg_std": avg(std_vals),
+                "days_tracked": len(cgm_days),
+                "as_of_date": latest.get("sk", "").replace("DATE#", ""),
+                "best_day": best_day,
+                "worst_day": worst_day,
+            },
+            "glucose_trend": trend,
         },
-        "glucose_trend": trend,
-    }, cache_seconds=3600)
-
+        cache_seconds=3600,
+    )
 
 
 def handle_sleep_detail() -> dict:
@@ -1242,18 +1340,13 @@ def handle_sleep_detail() -> dict:
     whoop_days = _query_source("whoop", d30, today)
 
     # Index whoop by date for cross-referencing
-    whoop_by_date = {
-        r.get("sk", "").replace("DATE#", ""): r
-        for r in whoop_days
-        if r.get("sk")
-    }
+    whoop_by_date = {r.get("sk", "").replace("DATE#", ""): r for r in whoop_days if r.get("sk")}
 
     eight_days.sort(key=lambda x: x.get("sk", ""))
     # Filter to experiment window — EXPERIMENT_QUERY_START fetches 1 day early for sleep lookback,
     # but we only display data from EXPERIMENT_START onwards
     eight_with_data = [
-        r for r in eight_days
-        if r.get("sleep_score") is not None and r.get("sk", "").replace("DATE#", "") >= EXPERIMENT_START
+        r for r in eight_days if r.get("sleep_score") is not None and r.get("sk", "").replace("DATE#", "") >= EXPERIMENT_START
     ]
 
     if not eight_with_data:
@@ -1278,9 +1371,7 @@ def handle_sleep_detail() -> dict:
 
     # Find best-performing temp range by pairing temp with sleep score
     temp_score_pairs = [
-        (float(r["bed_temp_f"]), float(r["sleep_score"]))
-        for r in eight_with_data
-        if r.get("bed_temp_f") and r.get("sleep_score")
+        (float(r["bed_temp_f"]), float(r["sleep_score"])) for r in eight_with_data if r.get("bed_temp_f") and r.get("sleep_score")
     ]
     optimal_temp = None
     if len(temp_score_pairs) >= 7:
@@ -1302,23 +1393,25 @@ def handle_sleep_detail() -> dict:
         if date < EXPERIMENT_START:
             continue  # Don't include pre-experiment days in trend output
         w = whoop_by_date.get(date, {})
-        trend.append({
-            "date":          date,
-            "sleep_score":   round(float(r["sleep_score"]), 0) if r.get("sleep_score") else None,
-            "efficiency":    round(float(r["sleep_efficiency_pct"]), 1) if r.get("sleep_efficiency_pct") else None,
-            "bed_temp_f":    round(float(r["bed_temp_f"]), 1) if r.get("bed_temp_f") else None,
-            "hours":         round(float(w["sleep_duration_hours"]), 1) if w.get("sleep_duration_hours") else None,
-            "whoop_quality": round(float(w["sleep_quality_score"]), 0) if w.get("sleep_quality_score") else None,
-            "deep_sleep_hours":  round(float(w["slow_wave_sleep_hours"]), 2) if w.get("slow_wave_sleep_hours") else None,
-            "rem_sleep_hours":   round(float(w["rem_sleep_hours"]), 2) if w.get("rem_sleep_hours") else None,
-            "deep_pct":          round(float(r["deep_pct"]), 1) if r.get("deep_pct") else None,
-            "rem_pct":           round(float(r["rem_pct"]), 1) if r.get("rem_pct") else None,
-            "light_pct":         round(float(r["light_pct"]), 1) if r.get("light_pct") else None,
-            "recovery_score":    round(float(w["recovery_score"]), 0) if w.get("recovery_score") else None,
-            "hrv":               round(float(w["hrv"]), 1) if w.get("hrv") else None,
-            "rhr":               round(float(w["resting_heart_rate"]), 0) if w.get("resting_heart_rate") else None,
-            "sleep_start":       w.get("sleep_start"),
-        })
+        trend.append(
+            {
+                "date": date,
+                "sleep_score": round(float(r["sleep_score"]), 0) if r.get("sleep_score") else None,
+                "efficiency": round(float(r["sleep_efficiency_pct"]), 1) if r.get("sleep_efficiency_pct") else None,
+                "bed_temp_f": round(float(r["bed_temp_f"]), 1) if r.get("bed_temp_f") else None,
+                "hours": round(float(w["sleep_duration_hours"]), 1) if w.get("sleep_duration_hours") else None,
+                "whoop_quality": round(float(w["sleep_quality_score"]), 0) if w.get("sleep_quality_score") else None,
+                "deep_sleep_hours": round(float(w["slow_wave_sleep_hours"]), 2) if w.get("slow_wave_sleep_hours") else None,
+                "rem_sleep_hours": round(float(w["rem_sleep_hours"]), 2) if w.get("rem_sleep_hours") else None,
+                "deep_pct": round(float(r["deep_pct"]), 1) if r.get("deep_pct") else None,
+                "rem_pct": round(float(r["rem_pct"]), 1) if r.get("rem_pct") else None,
+                "light_pct": round(float(r["light_pct"]), 1) if r.get("light_pct") else None,
+                "recovery_score": round(float(w["recovery_score"]), 0) if w.get("recovery_score") else None,
+                "hrv": round(float(w["hrv"]), 1) if w.get("hrv") else None,
+                "rhr": round(float(w["resting_heart_rate"]), 0) if w.get("resting_heart_rate") else None,
+                "sleep_start": w.get("sleep_start"),
+            }
+        )
 
     score_today = float(latest.get("sleep_score", 0))
     score_status = "excellent" if score_today >= 85 else ("good" if score_today >= 70 else "needs_attention")
@@ -1366,49 +1459,71 @@ def handle_sleep_detail() -> dict:
     avg_wake = round(sum(wake_times) / len(wake_times), 2) if wake_times else None
     social_jet_lag_hrs = round(abs((avg_bed_wd or 0) - (avg_bed_we or 0)), 1) if avg_bed_wd is not None and avg_bed_we is not None else None
 
-    return _ok({
-        "sleep_detail": {
-            "sleep_score":       round(score_today, 0),
-            "sleep_efficiency":  round(float(latest.get("sleep_efficiency_pct", 0)), 1) if latest.get("sleep_efficiency_pct") else None,
-            "bed_temp_f":        round(float(latest.get("bed_temp_f", 0)), 1) if latest.get("bed_temp_f") else None,
-            "total_sleep_hours": round(float(latest.get("sleep_duration_hours", 0)), 1) if latest.get("sleep_duration_hours") else None,
-            "whoop_quality":     round(float(whoop_latest.get("sleep_quality_score", 0)), 0) if whoop_latest.get("sleep_quality_score") else None,
-            "whoop_hours":       round(float(whoop_latest.get("sleep_duration_hours", 0)), 1) if whoop_latest.get("sleep_duration_hours") else None,
-            "deep_sleep_hours":  round(float(whoop_latest.get("slow_wave_sleep_hours", 0)), 2) if whoop_latest.get("slow_wave_sleep_hours") else None,
-            "rem_sleep_hours":   round(float(whoop_latest.get("rem_sleep_hours", 0)), 2) if whoop_latest.get("rem_sleep_hours") else None,
-            "recovery_score":    round(float(whoop_latest.get("recovery_score", 0)), 0) if whoop_latest.get("recovery_score") else None,
-            "hrv":               round(float(whoop_latest.get("hrv", 0)), 1) if whoop_latest.get("hrv") else None,
-            "rhr":               round(float(whoop_latest.get("resting_heart_rate", 0)), 0) if whoop_latest.get("resting_heart_rate") else None,
-            "score_status":      score_status,
-            "deep_pct":          round(float(latest.get("deep_pct", 0)), 1) if latest.get("deep_pct") else None,
-            "rem_pct":           round(float(latest.get("rem_pct", 0)), 1) if latest.get("rem_pct") else None,
-            "light_pct":         round(float(latest.get("light_pct", 0)), 1) if latest.get("light_pct") else None,
-            "30d_avg_recovery":  avg([float(whoop_by_date.get(r.get("sk", "").replace("DATE#", ""), {}).get("recovery_score", 0)) for r in eight_with_data if whoop_by_date.get(r.get("sk", "").replace("DATE#", ""), {}).get("recovery_score")]) if whoop_by_date else None,
-            "optimal_temp_f":    optimal_temp,
-            "30d_avg_score":     avg(score_vals),
-            "30d_avg_efficiency": avg(eff_vals),
-            "30d_avg_temp":      avg(temp_vals),
-            "days_tracked":      len(eight_with_data),
-            "as_of_date":        latest_date,
-            "avg_bedtime":       _fmt_hour(avg_bed) if avg_bed is not None else None,
-            "avg_bedtime_weekday": _fmt_hour(avg_bed_wd) if avg_bed_wd is not None else None,
-            "avg_bedtime_weekend": _fmt_hour(avg_bed_we) if avg_bed_we is not None else None,
-            "avg_waketime":      _fmt_hour(avg_wake) if avg_wake is not None else None,
-            "social_jet_lag_hrs": social_jet_lag_hrs,
+    return _ok(
+        {
+            "sleep_detail": {
+                "sleep_score": round(score_today, 0),
+                "sleep_efficiency": round(float(latest.get("sleep_efficiency_pct", 0)), 1) if latest.get("sleep_efficiency_pct") else None,
+                "bed_temp_f": round(float(latest.get("bed_temp_f", 0)), 1) if latest.get("bed_temp_f") else None,
+                "total_sleep_hours": round(float(latest.get("sleep_duration_hours", 0)), 1) if latest.get("sleep_duration_hours") else None,
+                "whoop_quality": (
+                    round(float(whoop_latest.get("sleep_quality_score", 0)), 0) if whoop_latest.get("sleep_quality_score") else None
+                ),
+                "whoop_hours": (
+                    round(float(whoop_latest.get("sleep_duration_hours", 0)), 1) if whoop_latest.get("sleep_duration_hours") else None
+                ),
+                "deep_sleep_hours": (
+                    round(float(whoop_latest.get("slow_wave_sleep_hours", 0)), 2) if whoop_latest.get("slow_wave_sleep_hours") else None
+                ),
+                "rem_sleep_hours": round(float(whoop_latest.get("rem_sleep_hours", 0)), 2) if whoop_latest.get("rem_sleep_hours") else None,
+                "recovery_score": round(float(whoop_latest.get("recovery_score", 0)), 0) if whoop_latest.get("recovery_score") else None,
+                "hrv": round(float(whoop_latest.get("hrv", 0)), 1) if whoop_latest.get("hrv") else None,
+                "rhr": round(float(whoop_latest.get("resting_heart_rate", 0)), 0) if whoop_latest.get("resting_heart_rate") else None,
+                "score_status": score_status,
+                "deep_pct": round(float(latest.get("deep_pct", 0)), 1) if latest.get("deep_pct") else None,
+                "rem_pct": round(float(latest.get("rem_pct", 0)), 1) if latest.get("rem_pct") else None,
+                "light_pct": round(float(latest.get("light_pct", 0)), 1) if latest.get("light_pct") else None,
+                "30d_avg_recovery": (
+                    avg(
+                        [
+                            float(whoop_by_date.get(r.get("sk", "").replace("DATE#", ""), {}).get("recovery_score", 0))
+                            for r in eight_with_data
+                            if whoop_by_date.get(r.get("sk", "").replace("DATE#", ""), {}).get("recovery_score")
+                        ]
+                    )
+                    if whoop_by_date
+                    else None
+                ),
+                "optimal_temp_f": optimal_temp,
+                "30d_avg_score": avg(score_vals),
+                "30d_avg_efficiency": avg(eff_vals),
+                "30d_avg_temp": avg(temp_vals),
+                "days_tracked": len(eight_with_data),
+                "as_of_date": latest_date,
+                "avg_bedtime": _fmt_hour(avg_bed) if avg_bed is not None else None,
+                "avg_bedtime_weekday": _fmt_hour(avg_bed_wd) if avg_bed_wd is not None else None,
+                "avg_bedtime_weekend": _fmt_hour(avg_bed_we) if avg_bed_we is not None else None,
+                "avg_waketime": _fmt_hour(avg_wake) if avg_wake is not None else None,
+                "social_jet_lag_hrs": social_jet_lag_hrs,
+            },
+            "sleep_trend": trend,
         },
-        "sleep_trend": trend,
-    }, cache_seconds=3600)
-
+        cache_seconds=3600,
+    )
 
 
 def handle_protocols() -> dict:
     """GET /api/protocols — Return protocol definitions from DynamoDB."""
     protocols_pk = f"{USER_PREFIX}protocols"
     try:
-        resp = table.query(**with_phase_filter({  # ADR-058: hide pilot protocols
-            "KeyConditionExpression": Key("pk").eq(protocols_pk) & Key("sk").begins_with("PROTOCOL#"),
-            "ScanIndexForward": True,
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot protocols
+                    "KeyConditionExpression": Key("pk").eq(protocols_pk) & Key("sk").begins_with("PROTOCOL#"),
+                    "ScanIndexForward": True,
+                }
+            )
+        )
         protocols = []
         for item in _decimal_to_float(resp.get("Items", [])):
             item.pop("pk", None)
@@ -1422,7 +1537,6 @@ def handle_protocols() -> dict:
             _protocols_cache = _load_s3_json("site/config/protocols.json", "protocols")
         protocols = _protocols_cache.get("protocols", [])
         return _ok({"protocols": protocols, "count": len(protocols)}, cache_seconds=3600)
-
 
 
 def handle_domains() -> dict:
@@ -1461,7 +1575,6 @@ def handle_habit_registry() -> dict:
         return _error(500, "Failed to load habit registry")
 
 
-
 def handle_labs() -> dict:
     """GET /api/labs — Returns lab biomarkers from clinical.json in S3."""
     try:
@@ -1478,7 +1591,6 @@ def handle_labs() -> dict:
         return _error(503, "Lab data temporarily unavailable.")
 
 
-
 def handle_changes_since(qs: dict = None) -> dict:
     """GET /api/changes-since?ts=EPOCH — Returns notable changes since timestamp."""
     qs = qs or {}
@@ -1491,7 +1603,8 @@ def handle_changes_since(qs: dict = None) -> dict:
     except (ValueError, TypeError):
         return _error(400, "Invalid ts parameter")
 
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta, timezone
+
     since_dt = datetime.fromtimestamp(since_ts, tz=timezone.utc)
     now = datetime.now(timezone.utc)
     days_ago = max(1, (now - since_dt).days)
@@ -1510,13 +1623,16 @@ def handle_changes_since(qs: dict = None) -> dict:
         withings_items = _query_source("withings", start_date, end_date)
 
         # Weight delta
-        weights = [float(i.get("weight_kg", 0)) * 2.20462 for i in withings_items
-                    if i.get("weight_kg") and float(i.get("weight_kg", 0)) > 0]
+        weights = [
+            float(i.get("weight_kg", 0)) * 2.20462 for i in withings_items if i.get("weight_kg") and float(i.get("weight_kg", 0)) > 0
+        ]
         if len(weights) >= 2:
             spark = weights[-7:] if len(weights) > 7 else weights
             deltas["weight"] = {
-                "from": round(weights[0], 1), "to": round(weights[-1], 1),
-                "change": round(weights[-1] - weights[0], 1), "unit": "lbs",
+                "from": round(weights[0], 1),
+                "to": round(weights[-1], 1),
+                "change": round(weights[-1] - weights[0], 1),
+                "unit": "lbs",
                 "sparkline": [round(w, 1) for w in spark],
             }
 
@@ -1526,21 +1642,30 @@ def handle_changes_since(qs: dict = None) -> dict:
             spark = hrvs[-7:] if len(hrvs) > 7 else hrvs
             trend = "climbing" if hrvs[-1] > hrvs[0] else "declining" if hrvs[-1] < hrvs[0] else "stable"
             deltas["hrv"] = {
-                "from": round(hrvs[0]), "to": round(hrvs[-1]),
-                "change": round(hrvs[-1] - hrvs[0]), "unit": "ms",
-                "trend": trend, "sparkline": [round(h) for h in spark],
+                "from": round(hrvs[0]),
+                "to": round(hrvs[-1]),
+                "change": round(hrvs[-1] - hrvs[0]),
+                "unit": "ms",
+                "trend": trend,
+                "sparkline": [round(h) for h in spark],
             }
 
         # Sleep delta
-        sleeps = [float(i.get("sleep_duration_hours", 0)) for i in whoop_items
-                  if i.get("sleep_duration_hours") and float(i.get("sleep_duration_hours", 0)) > 0]
+        sleeps = [
+            float(i.get("sleep_duration_hours", 0))
+            for i in whoop_items
+            if i.get("sleep_duration_hours") and float(i.get("sleep_duration_hours", 0)) > 0
+        ]
         if len(sleeps) >= 2:
             spark = sleeps[-7:] if len(sleeps) > 7 else sleeps
             trend = "improving" if sleeps[-1] > sleeps[0] else "declining"
             deltas["sleep"] = {
-                "from": round(sleeps[0], 1), "to": round(sleeps[-1], 1),
-                "change": round(sleeps[-1] - sleeps[0], 1), "unit": "hrs",
-                "trend": trend, "sparkline": [round(s, 1) for s in spark],
+                "from": round(sleeps[0], 1),
+                "to": round(sleeps[-1], 1),
+                "change": round(sleeps[-1] - sleeps[0], 1),
+                "unit": "hrs",
+                "trend": trend,
+                "sparkline": [round(s, 1) for s in spark],
             }
     except Exception as e:
         logger.warning(f"[changes-since] DynamoDB query failed: {e}")
@@ -1551,8 +1676,10 @@ def handle_changes_since(qs: dict = None) -> dict:
         scores = [float(i.get("overall_score", 0)) for i in char_items if i.get("overall_score")]
         if len(scores) >= 2:
             deltas["character"] = {
-                "from": round(scores[0]), "to": round(scores[-1]),
-                "change": round(scores[-1] - scores[0]), "unit": "pts",
+                "from": round(scores[0]),
+                "to": round(scores[-1]),
+                "change": round(scores[-1] - scores[0]),
+                "unit": "pts",
                 "sparkline": [round(s) for s in (scores[-7:] if len(scores) > 7 else scores)],
             }
     except Exception:
@@ -1564,22 +1691,26 @@ def handle_changes_since(qs: dict = None) -> dict:
         exp_items = _query_source("experiments", start_date, end_date)
         for e in exp_items:
             if e.get("status") == "completed":
-                events_list.append({
-                    "type": "experiment_complete",
-                    "title": e.get("name", "Experiment"),
-                    "link": "/experiments/",
-                    "date": e.get("sk", "").replace("DATE#", ""),
-                })
+                events_list.append(
+                    {
+                        "type": "experiment_complete",
+                        "title": e.get("name", "Experiment"),
+                        "link": "/experiments/",
+                        "date": e.get("sk", "").replace("DATE#", ""),
+                    }
+                )
     except Exception:
         pass
 
-    return _ok({
-        "since": since_dt.isoformat(),
-        "days_ago": days_ago,
-        "deltas": deltas,
-        "events": events_list[:5],
-    }, cache_seconds=300)
-
+    return _ok(
+        {
+            "since": since_dt.isoformat(),
+            "days_ago": days_ago,
+            "deltas": deltas,
+            "events": events_list[:5],
+        },
+        cache_seconds=300,
+    )
 
 
 def handle_observatory_week(qs: dict = None) -> dict:
@@ -1590,7 +1721,8 @@ def handle_observatory_week(qs: dict = None) -> dict:
     if domain not in valid_domains:
         return _error(400, f"Invalid domain. Use: {', '.join(sorted(valid_domains))}")
 
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta, timezone
+
     now = datetime.now(timezone.utc)
     end_date = now.strftime("%Y-%m-%d")
     start_date = max((now - timedelta(days=7)).strftime("%Y-%m-%d"), EXPERIMENT_START)
@@ -1610,18 +1742,33 @@ def handle_observatory_week(qs: dict = None) -> dict:
             best = max(items, key=lambda i: float(i.get("sleep_duration_hours", 0)), default={})
             worst = min(items, key=lambda i: float(i.get("sleep_duration_hours", 99)), default={})
 
-            eff_vals = [float(i.get("sleep_quality_score") or i.get("sleep_efficiency_pct") or 0)
-                       for i in items if i.get("sleep_quality_score") or i.get("sleep_efficiency_pct")]
+            eff_vals = [
+                float(i.get("sleep_quality_score") or i.get("sleep_efficiency_pct") or 0)
+                for i in items
+                if i.get("sleep_quality_score") or i.get("sleep_efficiency_pct")
+            ]
             best_eff = max(eff_vals) if eff_vals else None
 
             summary = {
-                "primary": {"label": "Average Duration", "value": round(avg_dur, 1), "unit": "hrs",
-                            "delta": round(avg_dur - prev_avg, 1), "delta_label": f"vs {round(prev_avg, 1)} last week",
-                            "trend": "up" if avg_dur > prev_avg else "down", "sparkline": [round(d, 1) for d in durations]},
-                "highlight": {"label": "Best Night", "value": f"{best.get('sk', '').replace('DATE#', '')[5:]} · {round(float(best.get('sleep_duration_hours', 0)), 1)}h",
-                              "detail": f"Recovery {round(float(best.get('recovery_score', 0)))}%"},
-                "lowlight": {"label": "Worst Night", "value": f"{worst.get('sk', '').replace('DATE#', '')[5:]} · {round(float(worst.get('sleep_duration_hours', 0)), 1)}h",
-                             "detail": ""},
+                "primary": {
+                    "label": "Average Duration",
+                    "value": round(avg_dur, 1),
+                    "unit": "hrs",
+                    "delta": round(avg_dur - prev_avg, 1),
+                    "delta_label": f"vs {round(prev_avg, 1)} last week",
+                    "trend": "up" if avg_dur > prev_avg else "down",
+                    "sparkline": [round(d, 1) for d in durations],
+                },
+                "highlight": {
+                    "label": "Best Night",
+                    "value": f"{best.get('sk', '').replace('DATE#', '')[5:]} · {round(float(best.get('sleep_duration_hours', 0)), 1)}h",
+                    "detail": f"Recovery {round(float(best.get('recovery_score', 0)))}%",
+                },
+                "lowlight": {
+                    "label": "Worst Night",
+                    "value": f"{worst.get('sk', '').replace('DATE#', '')[5:]} · {round(float(worst.get('sleep_duration_hours', 0)), 1)}h",
+                    "detail": "",
+                },
                 "best_efficiency": round(best_eff) if best_eff else None,
             }
             notable = f"Avg sleep {'improved' if avg_dur > prev_avg else 'declined'} {abs(round(avg_dur - prev_avg, 1))}h vs last week"
@@ -1630,17 +1777,33 @@ def handle_observatory_week(qs: dict = None) -> dict:
             items = _query_source("macrofactor", start_date, end_date)
             prev_items = _query_source("macrofactor", prev_start, prev_end)
 
-            cals = [float(i.get("total_calories_kcal") or i.get("calories") or 0) for i in items if i.get("total_calories_kcal") or i.get("calories")]
-            prev_cals = [float(i.get("total_calories_kcal") or i.get("calories") or 0) for i in prev_items if i.get("total_calories_kcal") or i.get("calories")]
+            cals = [
+                float(i.get("total_calories_kcal") or i.get("calories") or 0)
+                for i in items
+                if i.get("total_calories_kcal") or i.get("calories")
+            ]
+            prev_cals = [
+                float(i.get("total_calories_kcal") or i.get("calories") or 0)
+                for i in prev_items
+                if i.get("total_calories_kcal") or i.get("calories")
+            ]
             avg_cal = sum(cals) / len(cals) if cals else 0
             prev_avg_cal = sum(prev_cals) / len(prev_cals) if prev_cals else 0
-            proteins = [float(i.get("total_protein_g") or i.get("protein_g") or 0) for i in items if i.get("total_protein_g") or i.get("protein_g")]
+            proteins = [
+                float(i.get("total_protein_g") or i.get("protein_g") or 0) for i in items if i.get("total_protein_g") or i.get("protein_g")
+            ]
             avg_protein = sum(proteins) / len(proteins) if proteins else 0
 
             summary = {
-                "primary": {"label": "Avg Calories", "value": round(avg_cal), "unit": "kcal",
-                            "delta": round(avg_cal - prev_avg_cal), "delta_label": f"vs {round(prev_avg_cal)} last week",
-                            "trend": "up" if avg_cal > prev_avg_cal else "down", "sparkline": [round(c) for c in cals]},
+                "primary": {
+                    "label": "Avg Calories",
+                    "value": round(avg_cal),
+                    "unit": "kcal",
+                    "delta": round(avg_cal - prev_avg_cal),
+                    "delta_label": f"vs {round(prev_avg_cal)} last week",
+                    "trend": "up" if avg_cal > prev_avg_cal else "down",
+                    "sparkline": [round(c) for c in cals],
+                },
                 "highlight": {"label": "Avg Protein", "value": f"{round(avg_protein)}g/day", "detail": ""},
                 "lowlight": {"label": "Logged Days", "value": f"{len(cals)}/7", "detail": ""},
             }
@@ -1654,9 +1817,15 @@ def handle_observatory_week(qs: dict = None) -> dict:
             avg_recovery = sum(recoveries) / len(recoveries) if recoveries else 0
 
             summary = {
-                "primary": {"label": "Avg Strain", "value": round(avg_strain, 1), "unit": "",
-                            "delta": 0, "delta_label": "", "trend": "flat",
-                            "sparkline": [round(s, 1) for s in strains]},
+                "primary": {
+                    "label": "Avg Strain",
+                    "value": round(avg_strain, 1),
+                    "unit": "",
+                    "delta": 0,
+                    "delta_label": "",
+                    "trend": "flat",
+                    "sparkline": [round(s, 1) for s in strains],
+                },
                 "highlight": {"label": "Avg Recovery", "value": f"{round(avg_recovery)}%", "detail": ""},
                 "lowlight": {"label": "Active Days", "value": f"{len([s for s in strains if s > 5])}/7", "detail": ""},
             }
@@ -1670,10 +1839,20 @@ def handle_observatory_week(qs: dict = None) -> dict:
             avg_glucose = sum(avg_glucoses) / len(avg_glucoses) if avg_glucoses else 0
 
             summary = {
-                "primary": {"label": "Avg TIR", "value": round(avg_tir, 1), "unit": "%",
-                            "delta": 0, "delta_label": "", "trend": "flat",
-                            "sparkline": [round(t, 1) for t in tirs]},
-                "highlight": {"label": "Best Day", "value": f"{round(max(tirs))}% TIR" if tirs else "\u2014", "detail": f"Avg glucose {round(avg_glucose)} mg/dL" if avg_glucose else ""},
+                "primary": {
+                    "label": "Avg TIR",
+                    "value": round(avg_tir, 1),
+                    "unit": "%",
+                    "delta": 0,
+                    "delta_label": "",
+                    "trend": "flat",
+                    "sparkline": [round(t, 1) for t in tirs],
+                },
+                "highlight": {
+                    "label": "Best Day",
+                    "value": f"{round(max(tirs))}% TIR" if tirs else "\u2014",
+                    "detail": f"Avg glucose {round(avg_glucose)} mg/dL" if avg_glucose else "",
+                },
                 "lowlight": {"label": "Worst Day", "value": f"{round(min(tirs))}% TIR" if tirs else "\u2014", "detail": ""},
             }
             notable = f"Average time-in-range {round(avg_tir)}% this week"
@@ -1684,9 +1863,15 @@ def handle_observatory_week(qs: dict = None) -> dict:
             avg_mood = sum(moods) / len(moods) if moods else 0
 
             summary = {
-                "primary": {"label": "Avg Mood", "value": round(avg_mood, 2), "unit": "",
-                            "delta": 0, "delta_label": "", "trend": "flat",
-                            "sparkline": [round(m, 2) for m in moods]},
+                "primary": {
+                    "label": "Avg Mood",
+                    "value": round(avg_mood, 2),
+                    "unit": "",
+                    "delta": 0,
+                    "delta_label": "",
+                    "trend": "flat",
+                    "sparkline": [round(m, 2) for m in moods],
+                },
                 "highlight": {"label": "Journal Entries", "value": str(len(items)), "detail": "this week"},
                 "lowlight": {"label": "Energy", "value": "—", "detail": ""},
             }
@@ -1700,16 +1885,30 @@ def handle_observatory_week(qs: dict = None) -> dict:
                 end_w = weights[-1]
                 delta = round(end_w - start_w, 1)
                 summary = {
-                    "primary": {"label": "Weight Change", "value": round(end_w), "unit": "lbs",
-                                "delta": delta, "delta_label": f"{delta:+.1f} lbs this week",
-                                "trend": "down" if delta < 0 else "up", "sparkline": [round(w) for w in weights]},
+                    "primary": {
+                        "label": "Weight Change",
+                        "value": round(end_w),
+                        "unit": "lbs",
+                        "delta": delta,
+                        "delta_label": f"{delta:+.1f} lbs this week",
+                        "trend": "down" if delta < 0 else "up",
+                        "sparkline": [round(w) for w in weights],
+                    },
                     "highlight": {"label": "Weigh-ins", "value": str(len(weights)), "detail": "this week"},
                     "lowlight": {"label": "Current", "value": f"{round(end_w)} lbs", "detail": ""},
                 }
                 notable = f"Weight {'dropped' if delta < 0 else 'gained'} {abs(delta)} lbs this week"
             else:
                 summary = {
-                    "primary": {"label": "Weight", "value": None, "unit": "lbs", "delta": 0, "delta_label": "", "trend": "flat", "sparkline": []},
+                    "primary": {
+                        "label": "Weight",
+                        "value": None,
+                        "unit": "lbs",
+                        "delta": 0,
+                        "delta_label": "",
+                        "trend": "flat",
+                        "sparkline": [],
+                    },
                     "highlight": {"label": "Weigh-ins", "value": "0", "detail": "this week"},
                     "lowlight": {"label": "", "value": "", "detail": ""},
                 }
@@ -1718,16 +1917,17 @@ def handle_observatory_week(qs: dict = None) -> dict:
         else:
             return _error(400, "Unsupported domain")
 
-        return _ok({
-            "domain": domain,
-            "period": {"start": start_date, "end": end_date},
-            "summary": summary,
-            "notable": notable,
-            "last_updated": now.isoformat(),
-        }, cache_seconds=900)
+        return _ok(
+            {
+                "domain": domain,
+                "period": {"start": start_date, "end": end_date},
+                "summary": summary,
+                "notable": notable,
+                "last_updated": now.isoformat(),
+            },
+            cache_seconds=900,
+        )
 
     except Exception as e:
         logger.warning(f"[observatory_week] {domain} failed: {e}")
         return _error(503, f"Weekly {domain} data temporarily unavailable.")
-
-

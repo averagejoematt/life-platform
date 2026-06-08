@@ -1,4 +1,5 @@
 """tests/test_routine_ir.py — IR serialize/deserialize round-trip + Decimal safety."""
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -61,6 +62,7 @@ def test_serialize_emits_decimal_for_floats():
 
 def test_deserialize_empty_raises():
     import pytest
+
     with pytest.raises(ValueError):
         deserialize({})
 

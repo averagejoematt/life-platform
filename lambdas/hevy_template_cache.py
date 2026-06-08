@@ -10,6 +10,7 @@ hevy_template_id_hint per movement; the cache validates the hint against
 the live template list and reconciles custom-created templates (which
 return integer ids per PREREQS §A.6).
 """
+
 from __future__ import annotations
 
 import json
@@ -46,7 +47,8 @@ def _read_s3_json(key: str) -> dict[str, Any]:
 
 def _write_s3_json(key: str, payload: dict[str, Any]) -> None:
     _s3.put_object(
-        Bucket=S3_BUCKET, Key=key,
+        Bucket=S3_BUCKET,
+        Key=key,
         Body=json.dumps(payload).encode("utf-8"),
         ContentType="application/json",
     )

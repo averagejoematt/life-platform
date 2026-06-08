@@ -38,14 +38,15 @@ import logging
 import os
 from datetime import datetime, timezone
 from decimal import Decimal
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request
-from urllib.error import HTTPError
 
 import boto3
 
 try:
     from platform_logger import get_logger
+
     logger = get_logger("habitify")
 except ImportError:
     logger = logging.getLogger("habitify")
@@ -58,8 +59,7 @@ REGION = os.environ.get("AWS_REGION", "us-west-2")
 USER_ID = os.environ.get("USER_ID", "matthew")
 BASE_URL = "https://api.habitify.me"
 MOOD_LABELS = {1: "Terrible", 2: "Bad", 3: "Okay", 4: "Good", 5: "Excellent"}
-P40_GROUPS = ["Data", "Discipline", "Growth", "Hygiene", "Nutrition",
-               "Performance", "Recovery", "Supplements", "Wellbeing"]
+P40_GROUPS = ["Data", "Discipline", "Growth", "Hygiene", "Nutrition", "Performance", "Recovery", "Supplements", "Wellbeing"]
 
 # AWS clients used directly by the supplement bridge (post-store hook needs DDB
 # access independent of the framework's table reference).
@@ -72,33 +72,34 @@ _SUPPLEMENTS_PK = f"USER#{USER_ID}#SOURCE#supplements"
 
 SUPPLEMENT_MAP = {
     # ── Morning batch (fasted) ──
-    "Probiotics":    {"dose": 1,    "unit": "capsule", "timing": "morning",    "category": "supplement"},
-    "L Glutamine":   {"dose": 5,    "unit": "g",       "timing": "morning",    "category": "supplement"},
-    "Collagen":      {"dose": 10,   "unit": "g",       "timing": "morning",    "category": "supplement"},
-    "Electrolytes":  {"dose": 1,    "unit": "packet",  "timing": "morning",    "category": "supplement"},
+    "Probiotics": {"dose": 1, "unit": "capsule", "timing": "morning", "category": "supplement"},
+    "L Glutamine": {"dose": 5, "unit": "g", "timing": "morning", "category": "supplement"},
+    "Collagen": {"dose": 10, "unit": "g", "timing": "morning", "category": "supplement"},
+    "Electrolytes": {"dose": 1, "unit": "packet", "timing": "morning", "category": "supplement"},
     # ── Afternoon batch (with food) ──
-    "Multivitamin":          {"dose": 1,    "unit": "capsule", "timing": "with_meal", "category": "vitamin"},
-    "Vitamin D":             {"dose": 5000, "unit": "IU",      "timing": "with_meal", "category": "vitamin"},
-    "Omega 3":               {"dose": 2000, "unit": "mg",      "timing": "with_meal", "category": "supplement"},
-    "Zinc Picolinate":       {"dose": 30,   "unit": "mg",      "timing": "with_meal", "category": "mineral"},
-    "Basic B Complex":       {"dose": 1,    "unit": "capsule", "timing": "with_meal", "category": "vitamin"},
-    "Creatine":              {"dose": 5,    "unit": "g",       "timing": "with_meal", "category": "supplement"},
-    "Lions Mane":            {"dose": 1000, "unit": "mg",      "timing": "with_meal", "category": "supplement"},
-    "Green Tea Phytosome":   {"dose": 500,  "unit": "mg",      "timing": "with_meal", "category": "supplement"},
-    "NAC":                   {"dose": 600,  "unit": "mg",      "timing": "with_meal", "category": "supplement"},
-    "Cordyceps":             {"dose": 1000, "unit": "mg",      "timing": "with_meal", "category": "supplement"},
-    "Inositol":              {"dose": 2000, "unit": "mg",      "timing": "with_meal", "category": "supplement"},
-    "Protein Supplement":    {"dose": 25,   "unit": "g",       "timing": "with_meal", "category": "supplement"},
+    "Multivitamin": {"dose": 1, "unit": "capsule", "timing": "with_meal", "category": "vitamin"},
+    "Vitamin D": {"dose": 5000, "unit": "IU", "timing": "with_meal", "category": "vitamin"},
+    "Omega 3": {"dose": 2000, "unit": "mg", "timing": "with_meal", "category": "supplement"},
+    "Zinc Picolinate": {"dose": 30, "unit": "mg", "timing": "with_meal", "category": "mineral"},
+    "Basic B Complex": {"dose": 1, "unit": "capsule", "timing": "with_meal", "category": "vitamin"},
+    "Creatine": {"dose": 5, "unit": "g", "timing": "with_meal", "category": "supplement"},
+    "Lions Mane": {"dose": 1000, "unit": "mg", "timing": "with_meal", "category": "supplement"},
+    "Green Tea Phytosome": {"dose": 500, "unit": "mg", "timing": "with_meal", "category": "supplement"},
+    "NAC": {"dose": 600, "unit": "mg", "timing": "with_meal", "category": "supplement"},
+    "Cordyceps": {"dose": 1000, "unit": "mg", "timing": "with_meal", "category": "supplement"},
+    "Inositol": {"dose": 2000, "unit": "mg", "timing": "with_meal", "category": "supplement"},
+    "Protein Supplement": {"dose": 25, "unit": "g", "timing": "with_meal", "category": "supplement"},
     # ── Evening batch (before bed — sleep stack) ──
-    "Glycine":       {"dose": 3,    "unit": "g",  "timing": "before_bed", "category": "supplement"},
-    "L-Threonate":   {"dose": 2000, "unit": "mg", "timing": "before_bed", "category": "supplement"},
-    "Apigenin":      {"dose": 50,   "unit": "mg", "timing": "before_bed", "category": "supplement"},
-    "Theanine":      {"dose": 200,  "unit": "mg", "timing": "before_bed", "category": "supplement"},
-    "Reishi":        {"dose": 1000, "unit": "mg", "timing": "before_bed", "category": "supplement"},
+    "Glycine": {"dose": 3, "unit": "g", "timing": "before_bed", "category": "supplement"},
+    "L-Threonate": {"dose": 2000, "unit": "mg", "timing": "before_bed", "category": "supplement"},
+    "Apigenin": {"dose": 50, "unit": "mg", "timing": "before_bed", "category": "supplement"},
+    "Theanine": {"dose": 200, "unit": "mg", "timing": "before_bed", "category": "supplement"},
+    "Reishi": {"dose": 1000, "unit": "mg", "timing": "before_bed", "category": "supplement"},
 }
 
 
 # ── Habitify API helpers ──────────────────────────────────────────────────────
+
 
 def api_get(endpoint, api_key, params=None):
     """GET request to Habitify API. Returns parsed JSON `data` field.
@@ -109,6 +110,7 @@ def api_get(endpoint, api_key, params=None):
     req = Request(url, headers={"Authorization": api_key, "User-Agent": "LifePlatform/1.0"})
     try:
         from http_retry import urlopen_with_retry
+
         with urlopen_with_retry(req, timeout=30) as resp:
             body = json.loads(resp.read().decode())
             if not body.get("status"):
@@ -144,6 +146,7 @@ def fetch_moods(api_key, target_date):
 
 # ── SIMP-2 framework callbacks ────────────────────────────────────────────────
 
+
 def authenticate(secret_data: dict) -> dict:
     """Habitify uses a long-lived API key. No OAuth refresh."""
     key = secret_data.get("habitify_api_key") or secret_data.get("api_key")
@@ -163,10 +166,10 @@ def fetch_day(credentials: dict, date_str: str) -> dict | None:
         return None
     moods = fetch_moods(api_key, date_str)
     return {
-        "date":     date_str,
+        "date": date_str,
         "area_map": area_map,
-        "journal":  journal,
-        "moods":    moods,
+        "journal": journal,
+        "moods": moods,
     }
 
 
@@ -197,8 +200,8 @@ def transform(raw: dict, date_str: str) -> list[dict]:
         status = entry.get("status", "none")
         if isinstance(status, dict):
             status = status.get("status", "none")
-        is_completed = (status == "completed")
-        is_skipped = (status == "skipped")
+        is_completed = status == "completed"
+        is_skipped = status == "skipped"
         habits[name] = Decimal("1") if is_completed else Decimal("0")
         if is_skipped:
             skipped_count += 1
@@ -220,11 +223,11 @@ def transform(raw: dict, date_str: str) -> list[dict]:
 
         progress = entry.get("progress") or {}
         habit_statuses[name] = {
-            "status":           resolved,
-            "current_value":    Decimal(str(progress.get("current_value", 0))),
-            "target_value":     Decimal(str(progress.get("target_value", 1))),
-            "periodicity":      progress.get("periodicity", "daily"),
-            "scheduled_today":  True,  # All current habits are RRULE=DAILY per audit
+            "status": resolved,
+            "current_value": Decimal(str(progress.get("current_value", 0))),
+            "target_value": Decimal(str(progress.get("target_value", 1))),
+            "periodicity": progress.get("periodicity", "daily"),
+            "scheduled_today": True,  # All current habits are RRULE=DAILY per audit
         }
         if is_completed:
             # Habitify doesn't expose a per-completion timestamp on the journal
@@ -244,9 +247,9 @@ def transform(raw: dict, date_str: str) -> list[dict]:
         done_list = group_habits_done.get(group, [])
         if possible_list:
             by_group[group] = {
-                "completed":   len(done_list),
-                "possible":    len(possible_list),
-                "pct":         Decimal(str(round(len(done_list) / len(possible_list), 4))),
+                "completed": len(done_list),
+                "possible": len(possible_list),
+                "pct": Decimal(str(round(len(done_list) / len(possible_list), 4))),
                 "habits_done": done_list,
             }
 
@@ -260,30 +263,24 @@ def transform(raw: dict, date_str: str) -> list[dict]:
     # the math is identical for historical records.
     pending_count = sum(1 for hs in habit_statuses.values() if hs["status"] == "pending")
     resolved_possible = max(total_possible - pending_count, 0)
-    completion_pct = (
-        Decimal(str(round(total_completed / resolved_possible, 4)))
-        if resolved_possible > 0 else Decimal("0")
-    )
+    completion_pct = Decimal(str(round(total_completed / resolved_possible, 4))) if resolved_possible > 0 else Decimal("0")
     # Legacy completion_pct kept under a clearly-named slot in case any reader
     # wants the strict "pending counts as miss" interpretation for comparison.
-    completion_pct_strict = (
-        Decimal(str(round(total_completed / total_possible, 4)))
-        if total_possible > 0 else Decimal("0")
-    )
+    completion_pct_strict = Decimal(str(round(total_completed / total_possible, 4))) if total_possible > 0 else Decimal("0")
 
     record = {
-        "source":               "habitify",
-        "date":                 date_str,
-        "habits":               habits,
-        "habit_statuses":       habit_statuses,  # TD-11 Phase 1 — structured status alongside binary
-        "by_group":             by_group,
-        "total_completed":      total_completed,
-        "total_possible":       total_possible,
-        "pending_count":        pending_count,        # TD-11 Phase 2
-        "completion_pct":       completion_pct,       # pending-aware (the bug fix)
-        "completion_pct_strict": completion_pct_strict, # legacy interpretation, for comparison
-        "skipped_count":        skipped_count,
-        "updated_at":           datetime.now(timezone.utc).isoformat(),
+        "source": "habitify",
+        "date": date_str,
+        "habits": habits,
+        "habit_statuses": habit_statuses,  # TD-11 Phase 1 — structured status alongside binary
+        "by_group": by_group,
+        "total_completed": total_completed,
+        "total_possible": total_possible,
+        "pending_count": pending_count,  # TD-11 Phase 2
+        "completion_pct": completion_pct,  # pending-aware (the bug fix)
+        "completion_pct_strict": completion_pct_strict,  # legacy interpretation, for comparison
+        "skipped_count": skipped_count,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
     if moods:
@@ -314,31 +311,35 @@ def supplement_bridge(items: list[dict], date_str: str) -> None:
         if habit_name not in SUPPLEMENT_MAP:
             continue
         meta = SUPPLEMENT_MAP[habit_name]
-        entries.append({
-            "name":      habit_name,
-            "dose":      Decimal(str(meta["dose"])),
-            "unit":      meta["unit"],
-            "timing":    meta["timing"],
-            "category":  meta["category"],
-            "logged_at": datetime.now(timezone.utc).isoformat(),
-            "source":    "habitify_bridge",
-        })
+        entries.append(
+            {
+                "name": habit_name,
+                "dose": Decimal(str(meta["dose"])),
+                "unit": meta["unit"],
+                "timing": meta["timing"],
+                "category": meta["category"],
+                "logged_at": datetime.now(timezone.utc).isoformat(),
+                "source": "habitify_bridge",
+            }
+        )
 
     if not entries:
         logger.info("Supplement bridge: no supplements checked for %s", date_str)
         return
 
     try:
-        _table.put_item(Item={
-            "pk":             _SUPPLEMENTS_PK,
-            "sk":             f"DATE#{date_str}",
-            "date":           date_str,
-            "source":         "supplements",
-            "schema_version": 1,
-            "supplements":    entries,
-            "bridge_source":  "habitify",
-            "updated_at":     datetime.now(timezone.utc).isoformat(),
-        })
+        _table.put_item(
+            Item={
+                "pk": _SUPPLEMENTS_PK,
+                "sk": f"DATE#{date_str}",
+                "date": date_str,
+                "source": "supplements",
+                "schema_version": 1,
+                "supplements": entries,
+                "bridge_source": "habitify",
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         logger.info("Supplement bridge: wrote %d supplements for %s", len(entries), date_str)
     except Exception as e:
         logger.error("Supplement bridge write failed for %s: %s", date_str, e)
@@ -360,16 +361,15 @@ _config = IngestionConfig(
 
 def lambda_handler(event: dict, context) -> dict:
     """SIMP-2 entry point. Same event shapes as Todoist:
-      {}                                 — gap-aware backfill (default, includes today)
-      {"date_override": "today"}         — force today's data only
-      {"date_override": "2026-05-15"}    — single explicit date
-      {"healthcheck": true}              — boot check, returns 200/"ok"
+    {}                                 — gap-aware backfill (default, includes today)
+    {"date_override": "today"}         — force today's data only
+    {"date_override": "2026-05-15"}    — single explicit date
+    {"healthcheck": true}              — boot check, returns 200/"ok"
     """
     try:
         if event.get("healthcheck"):
             return {"statusCode": 200, "body": "ok"}
-        return run_ingestion(_config, authenticate, fetch_day, transform,
-                             event, context, post_store_fn=supplement_bridge)
+        return run_ingestion(_config, authenticate, fetch_day, transform, event, context, post_store_fn=supplement_bridge)
     except Exception as e:
         logger.error("habitify ingestion failed: %s", e, exc_info=True)
         raise

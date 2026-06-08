@@ -17,27 +17,44 @@ DynamoDB schema:
   pk: USER#<user_id>#SOURCE#challenges
   sk: CHALLENGE#<slug>_<created_date>
 """
-import re
+
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+
 from boto3.dynamodb.conditions import Key
 
 from mcp.config import (
-    table, CHALLENGES_PK, EXPERIMENTS_PK, USER_ID, logger,
+    CHALLENGES_PK,
+    EXPERIMENTS_PK,
+    USER_ID,
+    logger,
+    table,
 )
 from mcp.core import decimal_to_float, get_profile
 
 # ── Valid enums ──
 VALID_SOURCES = [
-    "journal_mining", "data_signal", "hypothesis_graduate",
-    "science_scan", "manual", "community",
+    "journal_mining",
+    "data_signal",
+    "hypothesis_graduate",
+    "science_scan",
+    "manual",
+    "community",
 ]
 VALID_STATUSES = ["candidate", "active", "completed", "failed", "declined"]
 VALID_DIFFICULTIES = ["easy", "moderate", "hard"]
 VALID_DOMAINS = [
-    "sleep", "movement", "nutrition", "supplements", "mental",
-    "social", "discipline", "metabolic", "general",
+    "sleep",
+    "movement",
+    "nutrition",
+    "supplements",
+    "mental",
+    "social",
+    "discipline",
+    "metabolic",
+    "general",
 ]
 VALID_VERIFICATION = ["self_report", "metric_auto", "hybrid"]
 VALID_CHALLENGE_TYPES = ["standard", "connection"]
@@ -59,6 +76,7 @@ def _now_iso() -> str:
 # ═══════════════════════════════════════════════════════════════════════
 # Tool 1: create_challenge
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def tool_create_challenge(args):
     """Create a new challenge — manually or from an AI-generated candidate.
@@ -118,37 +136,37 @@ def tool_create_challenge(args):
         raise ValueError(f"Challenge '{challenge_id}' already exists.")
 
     item = {
-        "pk":                   CHALLENGES_PK,
-        "sk":                   sk,
-        "challenge_id":         challenge_id,
-        "catalog_id":           catalog_id,
-        "name":                 name,
-        "description":          description,
-        "source":               source,
-        "source_detail":        source_detail,
-        "domain":               domain,
-        "difficulty":           difficulty,
-        "duration_days":        duration_days,
-        "protocol":             protocol,
-        "success_criteria":     success_criteria,
-        "metric_targets":       metric_targets or {},
-        "challenge_type":       challenge_type,
-        "public_label":         public_label,
-        "relationship_type":    relationship_type,
-        "target_hours":         Decimal(str(float(target_hours))) if target_hours else 0,
-        "status":               status,
-        "verification_method":  verification,
-        "tags":                 tags,
-        "daily_checkins":       [],
-        "outcome":              "",
+        "pk": CHALLENGES_PK,
+        "sk": sk,
+        "challenge_id": challenge_id,
+        "catalog_id": catalog_id,
+        "name": name,
+        "description": description,
+        "source": source,
+        "source_detail": source_detail,
+        "domain": domain,
+        "difficulty": difficulty,
+        "duration_days": duration_days,
+        "protocol": protocol,
+        "success_criteria": success_criteria,
+        "metric_targets": metric_targets or {},
+        "challenge_type": challenge_type,
+        "public_label": public_label,
+        "relationship_type": relationship_type,
+        "target_hours": Decimal(str(float(target_hours))) if target_hours else 0,
+        "status": status,
+        "verification_method": verification,
+        "tags": tags,
+        "daily_checkins": [],
+        "outcome": "",
         "character_xp_awarded": 0,
-        "badge_earned":         "",
+        "badge_earned": "",
         "related_experiment_id": related_experiment or "",
-        "generated_by":         source,
-        "generated_at":         _now_iso(),
-        "activated_at":         _now_iso() if status == "active" else "",
-        "completed_at":         "",
-        "created_at":           _now_iso(),
+        "generated_by": source,
+        "generated_at": _now_iso(),
+        "activated_at": _now_iso() if status == "active" else "",
+        "completed_at": "",
+        "created_at": _now_iso(),
     }
 
     # Convert for DynamoDB (Decimal)
@@ -170,22 +188,23 @@ def tool_create_challenge(args):
     logger.info(f"create_challenge: created {challenge_id} (source={source})")
 
     return {
-        "created":        True,
-        "challenge_id":   challenge_id,
-        "name":           name,
-        "status":         status,
-        "source":         source,
-        "domain":          domain,
-        "challenge_type":  challenge_type,
-        "difficulty":      difficulty,
-        "duration_days":   duration_days,
-        "protocol":        protocol,
+        "created": True,
+        "challenge_id": challenge_id,
+        "name": name,
+        "status": status,
+        "source": source,
+        "domain": domain,
+        "challenge_type": challenge_type,
+        "difficulty": difficulty,
+        "duration_days": duration_days,
+        "protocol": protocol,
     }
 
 
 # ═══════════════════════════════════════════════════════════════════════
 # Tool 2: activate_challenge
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def tool_activate_challenge(args):
     """Activate a candidate challenge — transitions status from 'candidate' to 'active'."""
@@ -218,11 +237,11 @@ def tool_activate_challenge(args):
     logger.info(f"activate_challenge: {challenge_id} → active")
 
     return {
-        "activated":      True,
-        "challenge_id":   challenge_id,
-        "name":           item.get("name", ""),
-        "duration_days":  decimal_to_float(item.get("duration_days", 7)),
-        "activated_at":   now,
+        "activated": True,
+        "challenge_id": challenge_id,
+        "name": item.get("name", ""),
+        "duration_days": decimal_to_float(item.get("duration_days", 7)),
+        "activated_at": now,
     }
 
 
@@ -232,14 +251,14 @@ def tool_activate_challenge(args):
 
 # Metric → DDB source + field mapping for auto-verification
 AUTO_METRIC_MAP = {
-    "daily_steps":         {"source": "apple",       "field": "steps"},
-    "weight_lbs":          {"source": "withings",    "field": "weight_lbs"},
-    "eating_window_hours": {"source": "macrofactor",  "field": "eating_window_hours"},
-    "zone2_minutes":       {"source": "strava",       "field": "zone2_minutes"},
-    "sleep_hours":         {"source": "whoop",        "field": "sleep_hours"},
-    "hrv":                 {"source": "whoop",        "field": "hrv"},
-    "calories":            {"source": "macrofactor",  "field": "calories"},
-    "protein_g":           {"source": "macrofactor",  "field": "protein_g"},
+    "daily_steps": {"source": "apple", "field": "steps"},
+    "weight_lbs": {"source": "withings", "field": "weight_lbs"},
+    "eating_window_hours": {"source": "macrofactor", "field": "eating_window_hours"},
+    "zone2_minutes": {"source": "strava", "field": "zone2_minutes"},
+    "sleep_hours": {"source": "whoop", "field": "sleep_hours"},
+    "hrv": {"source": "whoop", "field": "hrv"},
+    "calories": {"source": "macrofactor", "field": "calories"},
+    "protein_g": {"source": "macrofactor", "field": "protein_g"},
 }
 
 
@@ -297,7 +316,7 @@ def _check_metric_targets(metric_targets, date_str):
             results[metric_key] = {
                 "target": decimal_to_float(target_spec),
                 "actual": round(actual, 2),
-                "met":    met,
+                "met": met,
             }
         except Exception as e:
             logger.warning(f"Auto-verify {metric_key} failed: {e}")
@@ -310,6 +329,7 @@ def _check_metric_targets(metric_targets, date_str):
 # ═══════════════════════════════════════════════════════════════════════
 # Tool 3: checkin_challenge
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def tool_checkin_challenge(args):
     """Record a daily check-in for an active challenge.
@@ -353,7 +373,7 @@ def tool_checkin_challenge(args):
 
     # Build checkin entry
     checkin = {
-        "date":      date,
+        "date": date,
         "completed": completed,
         "logged_at": _now_iso(),
     }
@@ -382,10 +402,10 @@ def tool_checkin_challenge(args):
             logger.info(f"checkin_challenge: {challenge_id} date={date} REPLACED")
             result = {
                 "checked_in": True,
-                "replaced":   True,
+                "replaced": True,
                 "challenge_id": challenge_id,
-                "date":       date,
-                "completed":  completed,
+                "date": date,
+                "completed": completed,
                 "total_checkins": len(existing_checkins),
             }
             if auto_result:
@@ -397,7 +417,7 @@ def tool_checkin_challenge(args):
         Key={"pk": CHALLENGES_PK, "sk": sk},
         UpdateExpression="SET daily_checkins = list_append(if_not_exists(daily_checkins, :empty), :ci)",
         ExpressionAttributeValues={
-            ":ci":    [checkin],
+            ":ci": [checkin],
             ":empty": [],
         },
     )
@@ -409,12 +429,12 @@ def tool_checkin_challenge(args):
     logger.info(f"checkin_challenge: {challenge_id} date={date} completed={completed}")
 
     result = {
-        "checked_in":     True,
-        "challenge_id":   challenge_id,
-        "date":           date,
-        "completed":      completed,
+        "checked_in": True,
+        "challenge_id": challenge_id,
+        "date": date,
+        "completed": completed,
         "total_checkins": total,
-        "duration_days":  duration,
+        "duration_days": duration,
         "days_remaining": days_remaining,
         "completion_pct": round(total / duration * 100) if duration else 0,
     }
@@ -426,6 +446,7 @@ def tool_checkin_challenge(args):
 # ═══════════════════════════════════════════════════════════════════════
 # Tool 4: list_challenges
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def tool_list_challenges(args):
     """List challenges with optional status filter.
@@ -440,12 +461,15 @@ def tool_list_challenges(args):
     limit = min(int(args.get("limit", 50)), 100)
 
     from mcp.core import _apply_phase_filter  # ADR-058
-    resp = table.query(**_apply_phase_filter({
-        "KeyConditionExpression": (
-            Key("pk").eq(CHALLENGES_PK) & Key("sk").begins_with("CHALLENGE#")
-        ),
-        "ScanIndexForward": False,
-    }))
+
+    resp = table.query(
+        **_apply_phase_filter(
+            {
+                "KeyConditionExpression": (Key("pk").eq(CHALLENGES_PK) & Key("sk").begins_with("CHALLENGE#")),
+                "ScanIndexForward": False,
+            }
+        )
+    )
     items = resp.get("Items", [])
 
     # Apply filters
@@ -484,14 +508,14 @@ def tool_list_challenges(args):
                 except Exception:
                     pass
             ch["progress"] = {
-                "checkin_days":   len(checkins),
+                "checkin_days": len(checkins),
                 "completed_days": completed_days,
-                "duration_days":  duration,
+                "duration_days": duration,
                 "completion_pct": round(len(checkins) / duration * 100) if duration else 0,
-                "success_rate":   round(completed_days / len(checkins) * 100) if checkins else 0,
+                "success_rate": round(completed_days / len(checkins) * 100) if checkins else 0,
                 "days_since_activation": days_since_activation,
-                "overdue":        overdue,
-                "days_overdue":   days_overdue,
+                "overdue": overdue,
+                "days_overdue": days_overdue,
             }
 
         result.append(ch)
@@ -512,25 +536,26 @@ def tool_list_challenges(args):
                 except Exception:
                     pass
     summary = {
-        "total":     len(all_items),
+        "total": len(all_items),
         "candidate": sum(1 for i in all_items if i.get("status") == "candidate"),
-        "active":    sum(1 for i in all_items if i.get("status") == "active"),
+        "active": sum(1 for i in all_items if i.get("status") == "active"),
         "completed": sum(1 for i in all_items if i.get("status") == "completed"),
-        "failed":    sum(1 for i in all_items if i.get("status") == "failed"),
-        "declined":  sum(1 for i in all_items if i.get("status") == "declined"),
-        "overdue":   overdue_count,
+        "failed": sum(1 for i in all_items if i.get("status") == "failed"),
+        "declined": sum(1 for i in all_items if i.get("status") == "declined"),
+        "overdue": overdue_count,
     }
 
     return {
         "challenges": result,
-        "count":      len(result),
-        "summary":    summary,
+        "count": len(result),
+        "summary": summary,
     }
 
 
 # ═══════════════════════════════════════════════════════════════════════
 # Tool 5: complete_challenge
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def tool_complete_challenge(args):
     """End an active challenge and compute outcome.
@@ -581,15 +606,17 @@ def tool_complete_challenge(args):
     if final_status == "completed":
         # Count total completed challenges (including this one)
         from mcp.core import _apply_phase_filter  # ADR-058
-        all_resp = table.query(**_apply_phase_filter({
-            "KeyConditionExpression": (
-                Key("pk").eq(CHALLENGES_PK) & Key("sk").begins_with("CHALLENGE#")
-            ),
-        }))
-        completed_count = sum(
-            1 for i in all_resp.get("Items", [])
-            if i.get("status") == "completed"
-        ) + 1  # +1 for this one about to be completed
+
+        all_resp = table.query(
+            **_apply_phase_filter(
+                {
+                    "KeyConditionExpression": (Key("pk").eq(CHALLENGES_PK) & Key("sk").begins_with("CHALLENGE#")),
+                }
+            )
+        )
+        completed_count = (
+            sum(1 for i in all_resp.get("Items", []) if i.get("status") == "completed") + 1
+        )  # +1 for this one about to be completed
 
         if completed_count == 1:
             badge = "first_challenge"
@@ -605,15 +632,12 @@ def tool_complete_challenge(args):
             badge = badge or f"perfect_{duration}d"
 
     now = _now_iso()
-    update_expr = (
-        "SET #s = :s, completed_at = :ca, outcome = :o, "
-        "character_xp_awarded = :xp, badge_earned = :badge"
-    )
+    update_expr = "SET #s = :s, completed_at = :ca, outcome = :o, " "character_xp_awarded = :xp, badge_earned = :badge"
     expr_values = {
-        ":s":     final_status,
-        ":ca":    now,
-        ":o":     outcome,
-        ":xp":    xp_awarded,
+        ":s": final_status,
+        ":ca": now,
+        ":o": outcome,
+        ":xp": xp_awarded,
         ":badge": badge,
     }
     if reflection:
@@ -627,22 +651,19 @@ def tool_complete_challenge(args):
         ExpressionAttributeValues=expr_values,
     )
 
-    logger.info(
-        f"complete_challenge: {challenge_id} → {final_status} "
-        f"(success={success_rate}%, xp={xp_awarded}, badge={badge})"
-    )
+    logger.info(f"complete_challenge: {challenge_id} → {final_status} " f"(success={success_rate}%, xp={xp_awarded}, badge={badge})")
 
     return {
-        "completed":         True,
-        "challenge_id":      challenge_id,
-        "name":              item.get("name", ""),
-        "final_status":      final_status,
-        "duration_days":     duration,
-        "checkin_days":      len(checkins),
-        "completed_days":    completed_days,
-        "success_rate_pct":  success_rate,
+        "completed": True,
+        "challenge_id": challenge_id,
+        "name": item.get("name", ""),
+        "final_status": final_status,
+        "duration_days": duration,
+        "checkin_days": len(checkins),
+        "completed_days": completed_days,
+        "success_rate_pct": success_rate,
         "character_xp_awarded": xp_awarded,
-        "badge_earned":      badge or None,
-        "completed_at":      now,
-        "outcome":           outcome,
+        "badge_earned": badge or None,
+        "completed_at": now,
+        "outcome": outcome,
     }

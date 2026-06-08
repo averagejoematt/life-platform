@@ -24,14 +24,19 @@ Categories seeded now:
 
 import json
 from datetime import datetime, timedelta, timezone
-from mcp.config import table as _table_ref, USER_ID as _user_id_ref
+
+from mcp.config import USER_ID as _user_id_ref
+from mcp.config import table as _table_ref
 from mcp.core import decimal_to_float as _d2f
+
 
 def _get_table():
     return _table_ref
 
+
 def _get_user_id():
     return _user_id_ref
+
 
 MEMORY_SOURCE = "platform_memory"
 
@@ -59,6 +64,7 @@ def _sk(category, date_str):
 # ==============================================================================
 # TOOL FUNCTIONS
 # ==============================================================================
+
 
 def tool_write_platform_memory(args: dict) -> dict:
     """
@@ -102,6 +108,7 @@ def tool_write_platform_memory(args: dict) -> dict:
 
     # Convert any float values to Decimal for DynamoDB compatibility
     from decimal import Decimal as _Dec
+
     for k, v in item.items():
         if isinstance(v, float):
             item[k] = _Dec(str(v))
@@ -153,16 +160,21 @@ def tool_read_platform_memory(args: dict) -> dict:
 
     try:
         from mcp.core import _apply_phase_filter  # ADR-058
-        resp = table.query(**_apply_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": pk,
-                ":s": start_sk,
-                ":e": end_sk,
-            },
-            "ScanIndexForward": False,
-            "Limit": limit,
-        }))
+
+        resp = table.query(
+            **_apply_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                    "ExpressionAttributeValues": {
+                        ":pk": pk,
+                        ":s": start_sk,
+                        ":e": end_sk,
+                    },
+                    "ScanIndexForward": False,
+                    "Limit": limit,
+                }
+            )
+        )
         records = [_d2f(i) for i in resp.get("Items", [])]
         # Remove internal DDB keys from response for readability
         clean = []
@@ -199,20 +211,26 @@ def tool_list_memory_categories(args: dict) -> dict:
 
     try:
         from mcp.core import _apply_phase_filter  # ADR-058
-        resp = table.query(**_apply_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": pk,
-                ":s": start_sk,
-                ":e": end_sk,
-            },
-            "ProjectionExpression": "sk, category, #d",
-            "ExpressionAttributeNames": {"#d": "date"},
-        }))
+
+        resp = table.query(
+            **_apply_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                    "ExpressionAttributeValues": {
+                        ":pk": pk,
+                        ":s": start_sk,
+                        ":e": end_sk,
+                    },
+                    "ProjectionExpression": "sk, category, #d",
+                    "ExpressionAttributeNames": {"#d": "date"},
+                }
+            )
+        )
         items = resp.get("Items", [])
 
         # Group by category
         from collections import defaultdict
+
         cats = defaultdict(list)
         for item in items:
             cat = item.get("category", "unknown")
@@ -221,12 +239,14 @@ def tool_list_memory_categories(args: dict) -> dict:
 
         result = []
         for cat, dates in sorted(cats.items()):
-            result.append({
-                "category": cat,
-                "count": len(dates),
-                "latest_date": max(dates) if dates else None,
-                "oldest_date": min(dates) if dates else None,
-            })
+            result.append(
+                {
+                    "category": cat,
+                    "count": len(dates),
+                    "latest_date": max(dates) if dates else None,
+                    "oldest_date": min(dates) if dates else None,
+                }
+            )
 
         return {
             "categories": result,
@@ -270,6 +290,7 @@ def tool_delete_platform_memory(args: dict) -> dict:
 # BASELINE SNAPSHOT — Day 1 capture
 # ==============================================================================
 
+
 def tool_capture_baseline(args: dict) -> dict:
     """
     Capture a full-state baseline snapshot across all key domains.
@@ -287,8 +308,9 @@ def tool_capture_baseline(args: dict) -> dict:
     Returns:
         Full snapshot record with all captured metrics.
     """
-    from boto3.dynamodb.conditions import Key as DDBKey
     from decimal import Decimal
+
+    from boto3.dynamodb.conditions import Key as DDBKey
 
     table = _get_table()
     uid = _get_user_id()
@@ -370,10 +392,7 @@ def tool_capture_baseline(args: dict) -> dict:
     char_sot = _latest_sot("character")
     if char_sot:
         snapshot["character_composite"] = char_sot.get("composite_score")
-        snapshot["character_pillars"] = {
-            k: v for k, v in char_sot.items()
-            if k.endswith("_score") and k != "composite_score"
-        }
+        snapshot["character_pillars"] = {k: v for k, v in char_sot.items() if k.endswith("_score") and k != "composite_score"}
         snapshot["character_date"] = char_sot.get("date")
 
     # Habit completion (latest SOT)
@@ -386,10 +405,7 @@ def tool_capture_baseline(args: dict) -> dict:
     # Vice streaks
     vice_sot = _latest_sot("vices")
     if vice_sot:
-        snapshot["vice_streaks"] = {
-            k: v for k, v in vice_sot.items()
-            if "streak" in k.lower() or "days" in k.lower()
-        }
+        snapshot["vice_streaks"] = {k: v for k, v in vice_sot.items() if "streak" in k.lower() or "days" in k.lower()}
         snapshot["vice_date"] = vice_sot.get("date")
 
     # CGM / glucose (if available)
@@ -410,19 +426,22 @@ def tool_capture_baseline(args: dict) -> dict:
     # Reentry sweep (2026-05-03): fix latent bug — tool_write_platform_memory takes
     # args: dict, not kwargs. Pre-existing typing bug; surfaced when capture_baseline
     # was first invoked since the function landed.
-    result = tool_write_platform_memory({
-        "category": "baseline_snapshot",
-        "content": snapshot,
-        "date": date_str,
-        "overwrite": force,
-    })
+    result = tool_write_platform_memory(
+        {
+            "category": "baseline_snapshot",
+            "content": snapshot,
+            "date": date_str,
+            "overwrite": force,
+        }
+    )
 
     return {
         "status": result.get("status", "error"),
         "label": label,
         "date": date_str,
         "domains_captured": [
-            k for k in [
+            k
+            for k in [
                 "weight" if "weight_lbs" in snapshot else None,
                 "blood_pressure" if "systolic" in snapshot else None,
                 "recovery" if "hrv" in snapshot else None,
@@ -431,7 +450,8 @@ def tool_capture_baseline(args: dict) -> dict:
                 "vices" if "vice_streaks" in snapshot else None,
                 "glucose" if "avg_glucose" in snapshot else None,
                 "nutrition" if "calories" in snapshot else None,
-            ] if k
+            ]
+            if k
         ],
         "snapshot": snapshot,
     }

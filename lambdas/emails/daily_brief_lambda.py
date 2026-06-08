@@ -44,15 +44,16 @@ v2.54.0: Board of Directors prompt dynamically built from s3://matthew-life-plat
 """
 
 import json
-import os
 import math
+import os
 import time
-import boto3
-from boto3.dynamodb.conditions import Key
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+
+import boto3
+from boto3.dynamodb.conditions import Key
 
 # -- Configuration from environment variables (with backwards-compatible defaults) --
 _REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -64,13 +65,15 @@ SENDER = os.environ.get("EMAIL_SENDER", "")
 ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
 
 # BUG-11: Validate required env vars at startup with descriptive errors
-_MISSING = [k for k, v in [("S3_BUCKET", S3_BUCKET), ("USER_ID", USER_ID),
-                             ("EMAIL_RECIPIENT", RECIPIENT), ("EMAIL_SENDER", SENDER)] if not v]
+_MISSING = [
+    k for k, v in [("S3_BUCKET", S3_BUCKET), ("USER_ID", USER_ID), ("EMAIL_RECIPIENT", RECIPIENT), ("EMAIL_SENDER", SENDER)] if not v
+]
 if _MISSING:
     raise RuntimeError(f"daily-brief Lambda misconfigured — missing required env vars: {_MISSING}")
 
 # BUG-10: Validate email format for recipient and sender
 import re as _re
+
 _EMAIL_RE = _re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 for _var, _addr in [("EMAIL_RECIPIENT", RECIPIENT), ("EMAIL_SENDER", SENDER)]:
     if not _EMAIL_RE.match(_addr):
@@ -86,14 +89,28 @@ ses = boto3.client("sesv2", region_name=_REGION)
 s3 = boto3.client("s3", region_name=_REGION)
 secrets = boto3.client("secretsmanager", region_name=_REGION)
 
+
 # BUG-08: Emit EMF metric when optional layer module fails to import.
 def _emit_module_load_failure(module_name: str) -> None:
     try:
-        print(json.dumps({"_aws": {"Timestamp": int(time.time() * 1000),
-            "CloudWatchMetrics": [{"Namespace": "LifePlatform/DailyBrief",
-                "Dimensions": [["Module"]],
-                "Metrics": [{"Name": "ModuleLoadFailure", "Unit": "Count"}]}]},
-            "Module": module_name, "ModuleLoadFailure": 1}))
+        print(
+            json.dumps(
+                {
+                    "_aws": {
+                        "Timestamp": int(time.time() * 1000),
+                        "CloudWatchMetrics": [
+                            {
+                                "Namespace": "LifePlatform/DailyBrief",
+                                "Dimensions": [["Module"]],
+                                "Metrics": [{"Name": "ModuleLoadFailure", "Unit": "Count"}],
+                            }
+                        ],
+                    },
+                    "Module": module_name,
+                    "ModuleLoadFailure": 1,
+                }
+            )
+        )
     except Exception as _e:
         logger.warning("[_emit_module_load_failure] metric emit failed: %s", _e)
 
@@ -101,16 +118,19 @@ def _emit_module_load_failure(module_name: str) -> None:
 # Board of Directors config loader
 try:
     import board_loader
+
     _HAS_BOARD_LOADER = True
 except ImportError:
     _HAS_BOARD_LOADER = False
     import logging as _log
+
     _log.getLogger().warning("[daily] board_loader not available — using fallback prompts")
     _emit_module_load_failure("board_loader")
 
 # Insight Ledger (IC-15)
 try:
     import insight_writer
+
     insight_writer.init(table, USER_ID)
     _HAS_INSIGHT_WRITER = True
 except ImportError:
@@ -122,6 +142,7 @@ except ImportError:
 # AI-3: Output Validator — validates coaching text before delivery
 try:
     from ai_output_validator import validate_daily_brief_outputs
+
     _HAS_AI_VALIDATOR = True
 except ImportError:
     _HAS_AI_VALIDATOR = False
@@ -132,17 +153,20 @@ except ImportError:
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
+
     logger = get_logger("daily-brief")
 except ImportError:
     import logging as _log
+
     logger = _log.getLogger("daily-brief")
     logger.setLevel(_log.INFO)
 
+import ai_calls
+
 # -- Extracted module imports ---------------------------------------------------
 import html_builder
-import ai_calls
 import output_writers
-from constants import EXPERIMENT_START_DATE, EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # ai_calls can be init'd at import time (no dependency on locally-defined functions)
@@ -159,6 +183,7 @@ ai_calls.init(
 # HELPERS
 # ==============================================================================
 
+
 def get_anthropic_key():
     """ADR-062: Bedrock uses IAM auth — this fetch is dead. Returns a truthy
     sentinel so callers' `api_key = get_anthropic_key()` + `if api_key:`
@@ -167,24 +192,34 @@ def get_anthropic_key():
     Full plumbing removal tracked as task #90."""
     return "_BEDROCK_IAM_"
 
+
 def d2f(obj):
-    if isinstance(obj, list): return [d2f(i) for i in obj]
-    if isinstance(obj, dict): return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    if isinstance(obj, list):
+        return [d2f(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
     return obj
+
 
 def safe_float(rec, field, default=None):
     if rec and field in rec:
-        try: return float(rec[field])
-        except Exception: return default
+        try:
+            return float(rec[field])
+        except Exception:
+            return default
     return default
+
 
 def avg(vals):
     v = [x for x in vals if x is not None]
-    return round(sum(v)/len(v), 1) if v else None
+    return round(sum(v) / len(v), 1) if v else None
+
 
 def clamp(val, lo=0, hi=100):
     return max(lo, min(hi, val))
+
 
 def fmt_num(val):
     if val is None:
@@ -199,13 +234,17 @@ def fetch_date(source, date_str):
     except Exception:
         return None
 
+
 def _latest_item(source):
     """Fetch the most recent record for a source (e.g., dexa, labs, measurements)."""
     try:
-        kwargs = with_phase_filter({
-            "KeyConditionExpression": Key("pk").eq(USER_PREFIX + source) & Key("sk").begins_with("DATE#"),
-            "ScanIndexForward": False, "Limit": 1,
-        })
+        kwargs = with_phase_filter(
+            {
+                "KeyConditionExpression": Key("pk").eq(USER_PREFIX + source) & Key("sk").begins_with("DATE#"),
+                "ScanIndexForward": False,
+                "Limit": 1,
+            }
+        )
         r = table.query(**kwargs)
         items = r.get("Items", [])
         return d2f(items[0]) if items else None
@@ -215,15 +254,17 @@ def _latest_item(source):
 
 def fetch_range(source, start, end):
     try:
-        kwargs = with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {":pk": USER_PREFIX + source,
-                                          ":s": "DATE#" + start, ":e": "DATE#" + end},
-        })
+        kwargs = with_phase_filter(
+            {
+                "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                "ExpressionAttributeValues": {":pk": USER_PREFIX + source, ":s": "DATE#" + start, ":e": "DATE#" + end},
+            }
+        )
         r = table.query(**kwargs)
         return [d2f(i) for i in r.get("Items", [])]
     except Exception:
         return []
+
 
 def _normalize_whoop_sleep(item):
     """Map Whoop sleep field names to common schema used by Daily Brief."""
@@ -240,9 +281,11 @@ def _normalize_whoop_sleep(item):
     except (TypeError, ValueError):
         pass
     if dur and dur > 0:
-        for src_field, pct_field in [("slow_wave_sleep_hours", "deep_pct"),
-                                      ("rem_sleep_hours", "rem_pct"),
-                                      ("light_sleep_hours", "light_pct")]:
+        for src_field, pct_field in [
+            ("slow_wave_sleep_hours", "deep_pct"),
+            ("rem_sleep_hours", "rem_pct"),
+            ("light_sleep_hours", "light_pct"),
+        ]:
             try:
                 hrs = float(out.get(src_field, 0))
                 if pct_field not in out:
@@ -255,20 +298,21 @@ def _normalize_whoop_sleep(item):
         out["toss_and_turns"] = out["disturbance_count"]
     return out
 
+
 def fetch_journal_entries(date_str):
     try:
-        kwargs = with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
-            "ExpressionAttributeValues": {
-                ":pk": USER_PREFIX + "notion",
-                ":prefix": "DATE#" + date_str + "#journal#"
-            },
-        })
+        kwargs = with_phase_filter(
+            {
+                "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+                "ExpressionAttributeValues": {":pk": USER_PREFIX + "notion", ":prefix": "DATE#" + date_str + "#journal#"},
+            }
+        )
         r = table.query(**kwargs)
         return [d2f(i) for i in r.get("Items", [])]
     except Exception as e:
         logger.warning("fetch_journal_entries: " + str(e))
         return []
+
 
 def fetch_profile():
     try:
@@ -277,6 +321,7 @@ def fetch_profile():
     except Exception as e:
         logger.error("fetch_profile: " + str(e))
         return {}
+
 
 def get_current_phase(profile, current_weight_lbs):
     phases = profile.get("weight_loss_phases", [])
@@ -290,16 +335,30 @@ def get_current_phase(profile, current_weight_lbs):
 # DATA GATHERING
 # ==============================================================================
 
+
 def _emit_source_fetch_metrics(sources: dict) -> None:
     """OBS-06: Per-source DataPresent metric via EMF stdout. Zero-config CloudWatch."""
     ts = int(time.time() * 1000)
     for source, data in sources.items():
         try:
-            print(json.dumps({"_aws": {"Timestamp": ts,
-                "CloudWatchMetrics": [{"Namespace": "LifePlatform/DailyBrief",
-                    "Dimensions": [["Source"]],
-                    "Metrics": [{"Name": "DataPresent", "Unit": "Count"}]}]},
-                "Source": source, "DataPresent": 1 if data else 0}))
+            print(
+                json.dumps(
+                    {
+                        "_aws": {
+                            "Timestamp": ts,
+                            "CloudWatchMetrics": [
+                                {
+                                    "Namespace": "LifePlatform/DailyBrief",
+                                    "Dimensions": [["Source"]],
+                                    "Metrics": [{"Name": "DataPresent", "Unit": "Count"}],
+                                }
+                            ],
+                        },
+                        "Source": source,
+                        "DataPresent": 1 if data else 0,
+                    }
+                )
+            )
         except Exception as _e:
             logger.warning("[_emit_source_fetch_metrics] metric emit failed for %s: %s", source, _e)
 
@@ -307,13 +366,13 @@ def _emit_source_fetch_metrics(sources: dict) -> None:
 def gather_daily_data(profile, yesterday):
     today = datetime.now(timezone.utc).date()
 
-    whoop = fetch_date("whoop",        yesterday)
+    whoop = fetch_date("whoop", yesterday)
     sleep = _normalize_whoop_sleep(whoop)  # Whoop is now SOT for sleep duration/staging
     apple = fetch_date("apple_health", yesterday)
-    macrofactor = fetch_date("macrofactor",  yesterday)
-    strava = fetch_date("strava",       yesterday)
-    habitify = fetch_date("habitify",     yesterday)
-    garmin = fetch_date("garmin",       yesterday)
+    macrofactor = fetch_date("macrofactor", yesterday)
+    strava = fetch_date("strava", yesterday)
+    habitify = fetch_date("habitify", yesterday)
+    garmin = fetch_date("garmin", yesterday)
     whoop_today = fetch_date("whoop", today.isoformat())
 
     # DEXA, measurements, labs — latest records (not date-specific; periodic data)
@@ -410,10 +469,12 @@ def gather_daily_data(profile, yesterday):
     # Travel — check if currently traveling (v2.40.0)
     travel_active = None
     try:
-        travel_kwargs = with_phase_filter({
-            "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
-            "ExpressionAttributeValues": {":pk": USER_PREFIX + "travel", ":prefix": "TRIP#"},
-        })
+        travel_kwargs = with_phase_filter(
+            {
+                "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+                "ExpressionAttributeValues": {":pk": USER_PREFIX + "travel", ":prefix": "TRIP#"},
+            }
+        )
         travel_resp = table.query(**travel_kwargs)
         for trip in travel_resp.get("Items", []):
             start = trip.get("start_date", "")
@@ -437,21 +498,27 @@ def gather_daily_data(profile, yesterday):
     bp_dia = safe_float(apple, "blood_pressure_diastolic")
     if bp_sys is not None and bp_dia is not None:
         bp_data = {
-            "systolic": bp_sys, "diastolic": bp_dia,
+            "systolic": bp_sys,
+            "diastolic": bp_dia,
             "pulse": safe_float(apple, "blood_pressure_pulse"),
             "readings": int(apple.get("blood_pressure_readings_count", 1)) if apple.get("blood_pressure_readings_count") else 1,
         }
         # AHA classification
         if bp_sys > 180 or bp_dia > 120:
-            bp_data["class"] = "Crisis"; bp_data["class_color"] = "#dc2626"
+            bp_data["class"] = "Crisis"
+            bp_data["class_color"] = "#dc2626"
         elif bp_sys >= 140 or bp_dia >= 90:
-            bp_data["class"] = "Stage 2"; bp_data["class_color"] = "#dc2626"
+            bp_data["class"] = "Stage 2"
+            bp_data["class_color"] = "#dc2626"
         elif bp_sys >= 130 or bp_dia >= 80:
-            bp_data["class"] = "Stage 1"; bp_data["class_color"] = "#d97706"
+            bp_data["class"] = "Stage 1"
+            bp_data["class_color"] = "#d97706"
         elif bp_sys >= 120:
-            bp_data["class"] = "Elevated"; bp_data["class_color"] = "#d97706"
+            bp_data["class"] = "Elevated"
+            bp_data["class_color"] = "#d97706"
         else:
-            bp_data["class"] = "Normal"; bp_data["class_color"] = "#059669"
+            bp_data["class"] = "Normal"
+            bp_data["class_color"] = "#059669"
 
     # IC-2: Pre-computed insight context (written by daily-insight-compute Lambda at 9:42 AM)
     computed_insights = fetch_date("computed_insights", yesterday)
@@ -476,26 +543,40 @@ def gather_daily_data(profile, yesterday):
         logger.info("No computed_metrics/ACWR for " + yesterday + " — acwr-compute may not have run yet")
 
     # OBS-06: Emit per-source data presence metrics to CloudWatch via EMF
-    _emit_source_fetch_metrics({
-        "whoop": whoop, "apple_health": apple, "macrofactor": macrofactor,
-        "strava": strava, "garmin": garmin, "habitify": habitify,
-        "withings": latest_weight, "supplements": supplements_today,
-        "todoist": todoist_yesterday, "weather": weather_yesterday,
-    })
+    _emit_source_fetch_metrics(
+        {
+            "whoop": whoop,
+            "apple_health": apple,
+            "macrofactor": macrofactor,
+            "strava": strava,
+            "garmin": garmin,
+            "habitify": habitify,
+            "withings": latest_weight,
+            "supplements": supplements_today,
+            "todoist": todoist_yesterday,
+            "weather": weather_yesterday,
+        }
+    )
 
     return {
         "date": yesterday,
-        "whoop": whoop, "whoop_today": whoop_today, "sleep": sleep,
-        "apple": apple, "macrofactor": macrofactor, "strava": strava,
-        "habitify": habitify, "garmin": garmin,
+        "whoop": whoop,
+        "whoop_today": whoop_today,
+        "sleep": sleep,
+        "apple": apple,
+        "macrofactor": macrofactor,
+        "strava": strava,
+        "habitify": habitify,
+        "garmin": garmin,
         "mf_workouts": mf_workouts,
-        "hrv": {"hrv_7d": avg(hrv_7d_vals), "hrv_30d": avg(hrv_30d_vals),
-                "hrv_yesterday": safe_float(whoop, "hrv")},
+        "hrv": {"hrv_7d": avg(hrv_7d_vals), "hrv_30d": avg(hrv_30d_vals), "hrv_yesterday": safe_float(whoop, "hrv")},
         "tsb": tsb,
-        "journal": journal, "journal_entries": journal_entries,
+        "journal": journal,
+        "journal_entries": journal_entries,
         "apple_7d": apple_7d,
         "anomaly": anomaly,
-        "latest_weight": latest_weight, "week_ago_weight": week_ago_weight,
+        "latest_weight": latest_weight,
+        "week_ago_weight": week_ago_weight,
         "avatar_weight": avatar_weight,
         "sleep_debt_7d_hrs": round(sleep_debt_hrs, 1),
         "supplements_today": supplements_today,
@@ -508,7 +589,7 @@ def gather_daily_data(profile, yesterday):
         "strava_7d": strava_7d,
         "todoist": todoist_yesterday,
         "computed_insights": computed_insights,
-        "computed_metrics": computed_metrics,   # BS-09: ACWR + training load alert
+        "computed_metrics": computed_metrics,  # BS-09: ACWR + training load alert
         "dexa": dexa,
         "measurements": measurements,
         "labs": labs_latest,
@@ -528,12 +609,15 @@ def extract_journal_signals(entries):
         m = entry.get("enriched_mood")
         e = entry.get("enriched_energy")
         s = entry.get("enriched_stress")
-        if m is not None: mood_scores.append(float(m))
-        if e is not None: energy_scores.append(float(e))
-        if s is not None: stress_scores.append(float(s))
-        for t in (entry.get("enriched_themes") or []):
+        if m is not None:
+            mood_scores.append(float(m))
+        if e is not None:
+            energy_scores.append(float(e))
+        if s is not None:
+            stress_scores.append(float(s))
+        for t in entry.get("enriched_themes") or []:
             all_themes.append(t)
-        for em in (entry.get("enriched_emotions") or []):
+        for em in entry.get("enriched_emotions") or []:
             all_emotions.append(em)
         q = entry.get("enriched_notable_quote")
         if q and (template.lower() == "evening" or notable_quote is None):
@@ -560,16 +644,16 @@ def extract_journal_signals(entries):
     social_quality_readings, ownership_readings = [], []
     stress_sources = []
     for entry in entries:
-        for cp in (entry.get("enriched_cognitive_patterns") or []):
+        for cp in entry.get("enriched_cognitive_patterns") or []:
             all_cognitive_patterns.append(cp)
-        for dp in (entry.get("enriched_defense_patterns") or []):
+        for dp in entry.get("enriched_defense_patterns") or []:
             all_defense_patterns.append(dp)
         primary_defense = entry.get("enriched_primary_defense")
         if primary_defense and primary_defense not in all_defense_patterns:
             all_defense_patterns.insert(0, primary_defense)
-        for af in (entry.get("enriched_avoidance_flags") or []):
+        for af in entry.get("enriched_avoidance_flags") or []:
             all_avoidance_flags.append(af)
-        for gs in (entry.get("enriched_growth_signals") or []):
+        for gs in entry.get("enriched_growth_signals") or []:
             all_growth_signals.append(gs)
         sq = entry.get("enriched_social_quality")
         if sq:
@@ -582,9 +666,9 @@ def extract_journal_signals(entries):
             stress_sources.append(ss)
 
     return {
-        "mood_avg": round(sum(mood_scores)/len(mood_scores), 1) if mood_scores else None,
-        "energy_avg": round(sum(energy_scores)/len(energy_scores), 1) if energy_scores else None,
-        "stress_avg": round(sum(stress_scores)/len(stress_scores), 1) if stress_scores else None,
+        "mood_avg": round(sum(mood_scores) / len(mood_scores), 1) if mood_scores else None,
+        "energy_avg": round(sum(energy_scores) / len(energy_scores), 1) if energy_scores else None,
+        "stress_avg": round(sum(stress_scores) / len(stress_scores), 1) if stress_scores else None,
         "themes": list(dict.fromkeys(all_themes))[:4],
         "emotions": list(dict.fromkeys(all_emotions))[:5],
         "notable_quote": notable_quote,
@@ -595,7 +679,7 @@ def extract_journal_signals(entries):
         "avoidance_flags": list(dict.fromkeys(all_avoidance_flags))[:3],
         "growth_signals": list(dict.fromkeys(all_growth_signals))[:3],
         "social_quality": social_quality_readings[-1] if social_quality_readings else None,
-        "ownership_avg": round(sum(ownership_readings)/len(ownership_readings), 1) if ownership_readings else None,
+        "ownership_avg": round(sum(ownership_readings) / len(ownership_readings), 1) if ownership_readings else None,
         "stress_sources": list(dict.fromkeys(stress_sources))[:3],
     }
 
@@ -615,8 +699,8 @@ def compute_tsb(strava_60d, today):
         if d:
             kj[d] = sum(float(a.get("kilojoules") or 0) for a in r.get("activities", []))
     ctl = atl = 0.0
-    cd = math.exp(-1/42)
-    ad = math.exp(-1/7)
+    cd = math.exp(-1 / 42)
+    ad = math.exp(-1 / 7)
     for i in range(59, -1, -1):
         day = (today - timedelta(days=i)).isoformat()
         load = kj.get(day, 0)
@@ -629,6 +713,7 @@ def compute_tsb(strava_60d, today):
 # COMPONENT SCORERS (each -> 0-100, or None if no data)
 # ==============================================================================
 
+
 def score_sleep(data, profile):
     sleep = data.get("sleep")
     if not sleep:
@@ -640,17 +725,26 @@ def score_sleep(data, profile):
     rem_pct = safe_float(sleep, "rem_pct")
     light_pct = safe_float(sleep, "light_pct")
     target_hrs = profile.get("sleep_target_hours_ideal", 7.5)
-    details = {"sleep_score": sleep_score, "efficiency": efficiency,
-               "duration_hrs": duration_hrs, "target_hrs": target_hrs,
-               "deep_pct": deep_pct, "rem_pct": rem_pct, "light_pct": light_pct}
+    details = {
+        "sleep_score": sleep_score,
+        "efficiency": efficiency,
+        "duration_hrs": duration_hrs,
+        "target_hrs": target_hrs,
+        "deep_pct": deep_pct,
+        "rem_pct": rem_pct,
+        "light_pct": light_pct,
+    }
     parts, weights = [], []
     if sleep_score is not None:
-        parts.append(sleep_score * 0.40); weights.append(0.40)
+        parts.append(sleep_score * 0.40)
+        weights.append(0.40)
     if efficiency is not None:
-        parts.append(efficiency * 0.30); weights.append(0.30)
+        parts.append(efficiency * 0.30)
+        weights.append(0.30)
     if duration_hrs is not None:
         dur_score = clamp(100 - (abs(duration_hrs - target_hrs) / 2.0) * 100)
-        parts.append(dur_score * 0.30); weights.append(0.30)
+        parts.append(dur_score * 0.30)
+        weights.append(0.30)
         details["duration_score"] = round(dur_score, 1)
     if not weights:
         return None, details
@@ -677,34 +771,48 @@ def score_nutrition(data, profile):
     protein_floor = profile.get("protein_floor_g", 170)
     cal_tolerance = profile.get("calorie_tolerance_pct", 10) / 100
     cal_penalty = profile.get("calorie_penalty_threshold_pct", 25) / 100
-    details = {"calories": cal, "protein_g": protein, "fat_g": fat, "carbs_g": carbs,
-               "cal_target": cal_target, "protein_target": protein_target}
+    details = {
+        "calories": cal,
+        "protein_g": protein,
+        "fat_g": fat,
+        "carbs_g": carbs,
+        "cal_target": cal_target,
+        "protein_target": protein_target,
+    }
     parts, weights = [], []
     if cal is not None and cal_target:
         pct_off = abs(cal - cal_target) / cal_target
-        if pct_off <= cal_tolerance: cal_score = 100
-        elif pct_off >= cal_penalty: cal_score = 0
-        else: cal_score = 100 * (1 - (pct_off - cal_tolerance) / (cal_penalty - cal_tolerance))
+        if pct_off <= cal_tolerance:
+            cal_score = 100
+        elif pct_off >= cal_penalty:
+            cal_score = 0
+        else:
+            cal_score = 100 * (1 - (pct_off - cal_tolerance) / (cal_penalty - cal_tolerance))
         if cal > cal_target * (1 + cal_tolerance):
             cal_score = max(0, cal_score - 15)
         cal_score = clamp(round(cal_score))
-        parts.append(cal_score * 0.40); weights.append(0.40)
+        parts.append(cal_score * 0.40)
+        weights.append(0.40)
         details["cal_score"] = cal_score
     if protein is not None:
-        if protein >= protein_target: prot_score = 100
+        if protein >= protein_target:
+            prot_score = 100
         elif protein >= protein_floor:
             prot_score = 80 + 20 * (protein - protein_floor) / (protein_target - protein_floor)
-        else: prot_score = max(0, 80 * protein / protein_floor)
+        else:
+            prot_score = max(0, 80 * protein / protein_floor)
         prot_score = clamp(round(prot_score))
-        parts.append(prot_score * 0.40); weights.append(0.40)
+        parts.append(prot_score * 0.40)
+        weights.append(0.40)
         details["protein_score"] = prot_score
-    fat_target = profile.get("fat_target_g", 60)    # Matthew's cut-phase macro targets; override via profile
+    fat_target = profile.get("fat_target_g", 60)  # Matthew's cut-phase macro targets; override via profile
     carb_target = profile.get("carb_target_g", 125)  # Matthew's cut-phase macro targets; override via profile
     if fat is not None and carbs is not None:
         fat_diff = abs(fat - fat_target) / fat_target if fat_target else 0
         carb_diff = abs(carbs - carb_target) / carb_target if carb_target else 0
         macro_score = clamp(round(100 - (fat_diff + carb_diff) * 50))
-        parts.append(macro_score * 0.20); weights.append(0.20)
+        parts.append(macro_score * 0.20)
+        weights.append(0.20)
         details["macro_score"] = macro_score
     if not weights:
         return None, details
@@ -724,13 +832,15 @@ def score_movement(data, profile):
     else:
         exercise_score = 0
     exercise_score = clamp(round(exercise_score))
-    parts.append(exercise_score * 0.50); weights.append(0.50)
+    parts.append(exercise_score * 0.50)
+    weights.append(0.50)
     details["exercise_score"] = exercise_score
     apple = data.get("apple")
     steps = safe_float(apple, "steps") if apple else None
     if steps is not None:
         step_score = clamp(round(min(100, steps / step_target * 100)))
-        parts.append(step_score * 0.50); weights.append(0.50)
+        parts.append(step_score * 0.50)
+        weights.append(0.50)
         details["step_score"] = step_score
         details["steps"] = round(steps)
     if not weights:
@@ -870,8 +980,7 @@ def score_hydration(data, profile):
     if water_ml is None or water_ml < 500:
         return None, {}
     score = clamp(round(min(100, water_ml / target_ml * 100)))
-    return score, {"water_ml": round(water_ml), "water_oz": round(water_ml / 29.5735, 1),
-                   "target_oz": round(target_ml / 29.5735, 1)}
+    return score, {"water_ml": round(water_ml), "water_oz": round(water_ml / 29.5735, 1), "target_oz": round(target_ml / 29.5735, 1)}
 
 
 def score_journal(data, profile):
@@ -885,11 +994,13 @@ def score_journal(data, profile):
             templates.add(t)
     has_morning = "morning" in templates
     has_evening = "evening" in templates
-    if has_morning and has_evening: score = 100
-    elif has_morning or has_evening: score = 60
-    else: score = 40
-    return score, {"entries": len(entries), "templates": list(templates),
-                   "has_morning": has_morning, "has_evening": has_evening}
+    if has_morning and has_evening:
+        score = 100
+    elif has_morning or has_evening:
+        score = 60
+    else:
+        score = 40
+    return score, {"entries": len(entries), "templates": list(templates), "has_morning": has_morning, "has_evening": has_evening}
 
 
 def score_glucose(data, profile):
@@ -906,27 +1017,42 @@ def score_glucose(data, profile):
     parts, weights = [], []
     if tir is not None:
         # CGM TIR: >=95% optimal (athlete target), >=90% good, >=70% ADA standard for T2DM
-        if tir >= 95: tir_score = 100
-        elif tir >= 90: tir_score = 80 + (tir - 90) * 4
-        elif tir >= 70: tir_score = max(0, 80 * (tir - 70) / 20)
-        else: tir_score = 0
-        parts.append(tir_score * 0.50); weights.append(0.50)
+        if tir >= 95:
+            tir_score = 100
+        elif tir >= 90:
+            tir_score = 80 + (tir - 90) * 4
+        elif tir >= 70:
+            tir_score = max(0, 80 * (tir - 70) / 20)
+        else:
+            tir_score = 0
+        parts.append(tir_score * 0.50)
+        weights.append(0.50)
         details["tir_score"] = round(tir_score, 1)
     if avg_glucose is not None:
         # Avg glucose: <95 optimal, <100 ADA normal boundary, >=140 ADA post-prandial threshold
-        if avg_glucose < 95: glu_score = 100
-        elif avg_glucose < 100: glu_score = 80 + (100 - avg_glucose) * 4
-        elif avg_glucose < 140: glu_score = max(0, 80 * (140 - avg_glucose) / 40)
-        else: glu_score = 0
-        parts.append(glu_score * 0.30); weights.append(0.30)
+        if avg_glucose < 95:
+            glu_score = 100
+        elif avg_glucose < 100:
+            glu_score = 80 + (100 - avg_glucose) * 4
+        elif avg_glucose < 140:
+            glu_score = max(0, 80 * (140 - avg_glucose) / 40)
+        else:
+            glu_score = 0
+        parts.append(glu_score * 0.30)
+        weights.append(0.30)
         details["avg_score"] = round(glu_score, 1)
     if std_dev is not None:
         # Glucose SD: <15 low variability (ideal), <20 acceptable, >=40 high variability (concern)
-        if std_dev < 15: var_score = 100
-        elif std_dev < 20: var_score = 80 + (20 - std_dev) * 4
-        elif std_dev < 40: var_score = max(0, 80 * (40 - std_dev) / 20)
-        else: var_score = 0
-        parts.append(var_score * 0.20); weights.append(0.20)
+        if std_dev < 15:
+            var_score = 100
+        elif std_dev < 20:
+            var_score = 80 + (20 - std_dev) * 4
+        elif std_dev < 40:
+            var_score = max(0, 80 * (40 - std_dev) / 20)
+        else:
+            var_score = 0
+        parts.append(var_score * 0.20)
+        weights.append(0.20)
         details["var_score"] = round(var_score, 1)
     if not weights:
         return None, details
@@ -1007,30 +1133,50 @@ def dedup_activities(activities):
 # ==============================================================================
 
 COMPONENT_SCORERS = {
-    "sleep_quality": score_sleep, "recovery": score_recovery,
-    "nutrition": score_nutrition, "movement": score_movement,
-    "habits_mvp": score_habits_registry, "hydration": score_hydration,
-    "journal": score_journal, "glucose": score_glucose,
+    "sleep_quality": score_sleep,
+    "recovery": score_recovery,
+    "nutrition": score_nutrition,
+    "movement": score_movement,
+    "habits_mvp": score_habits_registry,
+    "hydration": score_hydration,
+    "journal": score_journal,
+    "glucose": score_glucose,
 }
 
+
 def letter_grade(score):
-    if score >= 95: return "A+"
-    if score >= 90: return "A"
-    if score >= 85: return "A-"
-    if score >= 80: return "B+"
-    if score >= 75: return "B"
-    if score >= 70: return "B-"
-    if score >= 65: return "C+"
-    if score >= 60: return "C"
-    if score >= 55: return "C-"
-    if score >= 45: return "D"
+    if score >= 95:
+        return "A+"
+    if score >= 90:
+        return "A"
+    if score >= 85:
+        return "A-"
+    if score >= 80:
+        return "B+"
+    if score >= 75:
+        return "B"
+    if score >= 70:
+        return "B-"
+    if score >= 65:
+        return "C+"
+    if score >= 60:
+        return "C"
+    if score >= 55:
+        return "C-"
+    if score >= 45:
+        return "D"
     return "F"
 
+
 def grade_colour(grade):
-    if grade.startswith("A"): return "#059669"
-    if grade.startswith("B"): return "#2563eb"
-    if grade.startswith("C"): return "#d97706"
+    if grade.startswith("A"):
+        return "#059669"
+    if grade.startswith("B"):
+        return "#2563eb"
+    if grade.startswith("C"):
+        return "#d97706"
     return "#dc2626"
+
 
 def compute_day_grade(data, profile):
     weights = profile.get("day_grade_weights", {})
@@ -1053,12 +1199,17 @@ def compute_day_grade(data, profile):
 
 def store_day_grade(date_str, total_score, grade, component_scores, weights, algo_version):
     try:
-        item = {"pk": USER_PREFIX + "day_grade", "sk": "DATE#" + date_str,
-                "date": date_str, "total_score": Decimal(str(total_score)),
-                "letter_grade": grade, "algorithm_version": algo_version,
-                "weights_snapshot": json.loads(json.dumps(weights), parse_float=Decimal) if weights else {},
-                "computed_at": datetime.now(timezone.utc).isoformat(),
-                "schema_version": 1}
+        item = {
+            "pk": USER_PREFIX + "day_grade",
+            "sk": "DATE#" + date_str,
+            "date": date_str,
+            "total_score": Decimal(str(total_score)),
+            "letter_grade": grade,
+            "algorithm_version": algo_version,
+            "weights_snapshot": json.loads(json.dumps(weights), parse_float=Decimal) if weights else {},
+            "computed_at": datetime.now(timezone.utc).isoformat(),
+            "schema_version": 1,
+        }
         for comp, score in component_scores.items():
             if score is not None:
                 item["component_" + comp] = Decimal(str(score))
@@ -1107,7 +1258,9 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
             "sk": "DATE#" + date_str,
             "date": date_str,
             "scoring_method": "tier_weighted_v1",
-            "composite_score": Decimal(str(component_scores.get("habits_mvp", 0))) if component_scores.get("habits_mvp") is not None else None,
+            "composite_score": (
+                Decimal(str(component_scores.get("habits_mvp", 0))) if component_scores.get("habits_mvp") is not None else None
+            ),
             "tier0_done": t0.get("done", 0),
             "tier0_total": t0.get("total", 0),
             "tier0_pct": Decimal(str(round(t0["done"] / t0["total"], 3))) if t0.get("total") else None,
@@ -1134,6 +1287,7 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
 # ==============================================================================
 # HABIT STREAKS
 # ==============================================================================
+
 
 def compute_habit_streaks(profile, yesterday_str):
     """Compute streaks: Tier 0 streak, Tier 0+1 streak, and per-vice streaks."""
@@ -1231,6 +1385,7 @@ def compute_habit_streaks(profile, yesterday_str):
 # READINESS
 # ==============================================================================
 
+
 def compute_readiness(data):
     components = []
     whoop_today = data.get("whoop_today")
@@ -1253,14 +1408,17 @@ def compute_readiness(data):
         return None, "gray"
     tw = sum(w for _, _, w in components)
     score = round(sum(v * w for _, v, w in components) / tw)
-    if score >= 80: return score, "green"
-    if score >= 60: return score, "yellow"
+    if score >= 80:
+        return score, "green"
+    if score >= 60:
+        return score, "yellow"
     return score, "red"
 
 
 # ==============================================================================
 # HANDLER
 # ==============================================================================
+
 
 def _regrade_handler(dates, profile):
     """Recompute and store day grades for a list of dates (no email)."""
@@ -1269,13 +1427,12 @@ def _regrade_handler(dates, profile):
         try:
             data = gather_daily_data(profile, date_str)
             score, grade, comp_scores, comp_details = compute_day_grade(data, profile)
-            store_day_grade(date_str, score, grade, comp_scores,
-                            profile.get("day_grade_weights", {}),
-                            profile.get("day_grade_algorithm_version", "1.1"))
+            store_day_grade(
+                date_str, score, grade, comp_scores, profile.get("day_grade_weights", {}), profile.get("day_grade_algorithm_version", "1.1")
+            )
             hyd = comp_scores.get("hydration", "—")
             logger.info(f"[REGRADE] {date_str}: {score} ({grade}) hydration={hyd}")
-            results.append({"date": date_str, "score": score, "grade": grade,
-                            "hydration": hyd, "components": comp_scores})
+            results.append({"date": date_str, "score": score, "grade": grade, "hydration": hyd, "components": comp_scores})
         except Exception as e:
             logger.info(f"[REGRADE] {date_str} FAILED: {e}")
             results.append({"date": date_str, "error": str(e)})
@@ -1309,16 +1466,13 @@ def get_food_delivery_brief_signal():
     Non-fatal — returns None on any error.
     """
     try:
-        resp = table.get_item(Key={
-            'pk': f'USER#{USER_ID}#SOURCE#food_delivery',
-            'sk': 'STREAK#current'
-        })
-        streak = resp.get('Item')
+        resp = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#food_delivery", "sk": "STREAK#current"})
+        streak = resp.get("Item")
         if not streak:
             return None
-        streak_days = int(streak.get('streak_days', 0))
-        last_order = streak.get('last_order_date', '')
-        today_str = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+        streak_days = int(streak.get("streak_days", 0))
+        last_order = streak.get("last_order_date", "")
+        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         if last_order == today_str:
             return "Food delivery ordered today — nutrition score modifier applied (0.85x)."
         if streak_days >= 30:
@@ -1337,15 +1491,18 @@ def get_food_delivery_brief_signal():
 def record_email_send(table, lambda_name):
     """Write a completion record so the status page can track last send."""
     import time as _time
+
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     try:
-        table.put_item(Item={
-            "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
-            "sk": f"DATE#{today}",
-            "sent_at": datetime.now(timezone.utc).isoformat(),
-            "status": "success",
-            "ttl": int(_time.time()) + 86400 * 90
-        })
+        table.put_item(
+            Item={
+                "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
+                "sk": f"DATE#{today}",
+                "sent_at": datetime.now(timezone.utc).isoformat(),
+                "status": "success",
+                "ttl": int(_time.time()) + 86400 * 90,
+            }
+        )
     except Exception as e:
         logger.error(f"Status tracking write failed — monitoring will be blind: {e}")
         # Don't re-raise (email already sent) but log as ERROR for CloudWatch alarm
@@ -1362,10 +1519,7 @@ def lambda_handler(event, context):
     # invocations during testing actually ship to recipients.
     # Caller can also pass {"force_send": true} to override env DRY_RUN
     # for one-off real sends.
-    _dry_run = bool(event.get("dry_run")) or (
-        os.environ.get("DRY_RUN", "").lower() in ("1", "true", "yes")
-        and not event.get("force_send")
-    )
+    _dry_run = bool(event.get("dry_run")) or (os.environ.get("DRY_RUN", "").lower() in ("1", "true", "yes") and not event.get("force_send"))
     if _dry_run:
         logger.info("[daily-brief] DRY_RUN mode — generating brief but skipping SES send")
     # Stash on event so the two send_email paths can read it without plumbing
@@ -1409,6 +1563,7 @@ def lambda_handler(event, context):
     # summary instead of the full brief. Skip scoring, habits, and coaching.
     try:
         from sick_day_checker import check_sick_day as _check_sick_brief
+
         _sick_brief_rec = _check_sick_brief(table, USER_ID, yesterday)
     except ImportError:
         _sick_brief_rec = None
@@ -1486,10 +1641,12 @@ def lambda_handler(event, context):
             ses.send_email(
                 FromEmailAddress=SENDER,
                 Destination={"ToAddresses": [RECIPIENT]},
-                Content={"Simple": {
-                    "Subject": {"Data": _sb_subject, "Charset": "UTF-8"},
-                    "Body":    {"Html": {"Data": _sb_html, "Charset": "UTF-8"}},
-                }},
+                Content={
+                    "Simple": {
+                        "Subject": {"Data": _sb_subject, "Charset": "UTF-8"},
+                        "Body": {"Html": {"Data": _sb_html, "Charset": "UTF-8"}},
+                    }
+                },
                 ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
                 EmailTags=[{"Name": "message_type", "Value": "daily_brief_sick"}],
             )
@@ -1497,9 +1654,10 @@ def lambda_handler(event, context):
 
         try:
             output_writers.write_buddy_json(
-                {"date": yesterday, "whoop": _sb_whoop, "sick_day": True,
-                 "sick_day_reason": _sick_brief_reason},
-                profile, yesterday, character_sheet=None,
+                {"date": yesterday, "whoop": _sb_whoop, "sick_day": True, "sick_day_reason": _sick_brief_reason},
+                profile,
+                yesterday,
+                character_sheet=None,
             )
         except Exception as _sbe:
             logger.warning(f"write_buddy_json (sick) failed: {_sbe}")
@@ -1514,8 +1672,7 @@ def lambda_handler(event, context):
         deduped_count = len(strava["activities"])
         if deduped_count < orig_count:
             strava["activity_count"] = deduped_count
-            strava["total_moving_time_seconds"] = sum(
-                float(a.get("moving_time_seconds") or 0) for a in strava["activities"])
+            strava["total_moving_time_seconds"] = sum(float(a.get("moving_time_seconds") or 0) for a in strava["activities"])
             logger.info("Dedup: " + str(orig_count) + " → " + str(deduped_count) + " activities")
 
     # Try to read pre-computed metrics from daily-metrics-compute Lambda (9:40 AM PT).
@@ -1524,7 +1681,7 @@ def lambda_handler(event, context):
     # Risk-7: emit CloudWatch metric when compute pipeline is stale/missing so alarm can fire.
     _cloudwatch = boto3.client("cloudwatch", region_name=_REGION)
     _computed = None
-    _compute_stale = False   # REL-1: flag stale/missing compute for email banner
+    _compute_stale = False  # REL-1: flag stale/missing compute for email banner
     _compute_age_msg = ""
     try:
         _computed = fetch_date("computed_metrics", yesterday)
@@ -1559,12 +1716,14 @@ def lambda_handler(event, context):
     try:
         _cloudwatch.put_metric_data(
             Namespace="LifePlatform",
-            MetricData=[{
-                "MetricName": "ComputePipelineStaleness",
-                "Value": 1.0 if _compute_stale else 0.0,
-                "Unit": "Count",
-                "Dimensions": [{"Name": "Source", "Value": "computed_metrics"}],
-            }]
+            MetricData=[
+                {
+                    "MetricName": "ComputePipelineStaleness",
+                    "Value": 1.0 if _compute_stale else 0.0,
+                    "Unit": "Count",
+                    "Dimensions": [{"Name": "Source", "Value": "computed_metrics"}],
+                }
+            ],
         )
     except Exception as _cw_e:
         logger.warning("Risk-7: failed to emit compute staleness metric: " + str(_cw_e))
@@ -1574,17 +1733,23 @@ def lambda_handler(event, context):
         _cm_score = _computed.get("day_grade_score")
         day_grade_score = int(float(_cm_score)) if _cm_score is not None else None
         grade = _computed.get("day_grade_letter", "—")
-        component_scores = {k: int(float(v)) if v is not None else None
-                             for k, v in _computed.get("component_scores", {}).items()}
+        component_scores = {k: int(float(v)) if v is not None else None for k, v in _computed.get("component_scores", {}).items()}
         component_details = _computed.get("component_details", {})
         # Overwrite data dict with pre-computed derived values for HTML rendering
-        if _computed.get("tsb") is not None: data["tsb"] = float(_computed["tsb"])
-        if _computed.get("hrv_7d") is not None: data["hrv"]["hrv_7d"] = float(_computed["hrv_7d"])
-        if _computed.get("hrv_30d") is not None: data["hrv"]["hrv_30d"] = float(_computed["hrv_30d"])
-        if _computed.get("sleep_debt_7d_hrs") is not None: data["sleep_debt_7d_hrs"] = float(_computed["sleep_debt_7d_hrs"])
-        if _computed.get("latest_weight"):   data["latest_weight"] = float(_computed["latest_weight"])
-        if _computed.get("week_ago_weight"): data["week_ago_weight"] = float(_computed["week_ago_weight"])
-        if _computed.get("avatar_weight"):   data["avatar_weight"] = float(_computed["avatar_weight"])
+        if _computed.get("tsb") is not None:
+            data["tsb"] = float(_computed["tsb"])
+        if _computed.get("hrv_7d") is not None:
+            data["hrv"]["hrv_7d"] = float(_computed["hrv_7d"])
+        if _computed.get("hrv_30d") is not None:
+            data["hrv"]["hrv_30d"] = float(_computed["hrv_30d"])
+        if _computed.get("sleep_debt_7d_hrs") is not None:
+            data["sleep_debt_7d_hrs"] = float(_computed["sleep_debt_7d_hrs"])
+        if _computed.get("latest_weight"):
+            data["latest_weight"] = float(_computed["latest_weight"])
+        if _computed.get("week_ago_weight"):
+            data["week_ago_weight"] = float(_computed["week_ago_weight"])
+        if _computed.get("avatar_weight"):
+            data["avatar_weight"] = float(_computed["avatar_weight"])
         logger.info("Day Grade (pre-computed): " + str(day_grade_score) + " (" + grade + ")")
     else:
         # Fallback: compute inline and store (pre-computed Lambda not yet run)
@@ -1597,9 +1762,14 @@ def lambda_handler(event, context):
 
         if day_grade_score is not None and not demo_mode:
             try:
-                store_day_grade(yesterday, day_grade_score, grade, component_scores,
-                                profile.get("day_grade_weights", {}),
-                                profile.get("day_grade_algorithm_version", "1.1"))
+                store_day_grade(
+                    yesterday,
+                    day_grade_score,
+                    grade,
+                    component_scores,
+                    profile.get("day_grade_weights", {}),
+                    profile.get("day_grade_algorithm_version", "1.1"),
+                )
             except Exception as e:
                 logger.warning("store_day_grade failed: " + str(e))
 
@@ -1644,15 +1814,15 @@ def lambda_handler(event, context):
 
     streak_data = None  # FIX: always initialise so write_public_stats_json ref is safe
     if _computed:
-        mvp_streak = int(float(_computed.get("tier0_streak",  0)))
+        mvp_streak = int(float(_computed.get("tier0_streak", 0)))
         full_streak = int(float(_computed.get("tier01_streak", 0)))
         vice_streaks = {k: int(float(v)) for k, v in _computed.get("vice_streaks", {}).items()}
     else:
         try:
             streak_data = compute_habit_streaks(profile, yesterday)
-            mvp_streak = streak_data.get("tier0_streak",  0)
+            mvp_streak = streak_data.get("tier0_streak", 0)
             full_streak = streak_data.get("tier01_streak", 0)
-            vice_streaks = streak_data.get("vice_streaks",  {})
+            vice_streaks = streak_data.get("vice_streaks", {})
         except Exception as e:
             logger.warning("compute_habit_streaks failed: " + str(e))
             mvp_streak, full_streak, vice_streaks = 0, 0, {}
@@ -1668,6 +1838,7 @@ def lambda_handler(event, context):
     _genome_ctx = ""
     try:
         from labs_coaching import build_labs_coaching_context
+
         _labs_ctx = build_labs_coaching_context(table, USER_PREFIX)
         if _labs_ctx:
             logger.info(f"Phase 4: Labs coaching context loaded ({len(_labs_ctx)} chars)")
@@ -1675,6 +1846,7 @@ def lambda_handler(event, context):
         logger.warning(f"Phase 4: Labs coaching failed (non-fatal): {_lc_e}")
     try:
         from genome_coaching import build_genome_coaching_context
+
         _genome_ctx = build_genome_coaching_context(table, USER_PREFIX)
         if _genome_ctx:
             logger.info(f"Phase 4: Genome coaching context loaded ({len(_genome_ctx)} chars)")
@@ -1781,32 +1953,36 @@ def lambda_handler(event, context):
         # False on all 4 daily-brief calls in ai_calls.py. (coach-narrative-
         # orchestrator is high-frequency and keeps a region warm, so it still caches.)
         try:
-            shared_system = ai_calls.daily_brief_shared_system(
-                data, profile, day_grade=day_grade_score, grade=grade)
+            shared_system = ai_calls.daily_brief_shared_system(data, profile, day_grade=day_grade_score, grade=grade)
         except Exception as e:
             shared_system = None
             logger.warning("shared_system build failed (proceeding without): " + str(e))
 
         try:
             bod_insight = ai_calls.call_board_of_directors(
-                data, profile, day_grade_score, grade, component_scores, api_key,
-                character_sheet=character_sheet, brief_mode=brief_mode,
-                shared_system=shared_system)
+                data,
+                profile,
+                day_grade_score,
+                grade,
+                component_scores,
+                api_key,
+                character_sheet=character_sheet,
+                brief_mode=brief_mode,
+                shared_system=shared_system,
+            )
             logger.info("BoD: " + bod_insight[:80])
         except Exception as e:
             logger.warning("BoD failed: " + str(e))
 
         try:
-            training_nutrition = ai_calls.call_training_nutrition_coach(
-                data, profile, api_key, shared_system=shared_system)
+            training_nutrition = ai_calls.call_training_nutrition_coach(data, profile, api_key, shared_system=shared_system)
             logger.info("Training/Nutrition coach returned")
         except Exception as e:
             logger.warning("Training/Nutrition coach failed: " + str(e))
 
         if data.get("journal_entries"):
             try:
-                journal_coach_text = ai_calls.call_journal_coach(
-                    data, profile, api_key, shared_system=shared_system)
+                journal_coach_text = ai_calls.call_journal_coach(data, profile, api_key, shared_system=shared_system)
                 # V2 P3.5 (2026-05-17): substitute a stub if LLM returned empty
                 # (validator blocks empty + falls through). Stub keeps the section
                 # rendered with a graceful no-op rather than a missing block.
@@ -1814,8 +1990,7 @@ def lambda_handler(event, context):
                     n_entries = len(data.get("journal_entries", []))
                     logger.info(f"Journal coach: empty after {n_entries} entries — using stub")
                     journal_coach_text = (
-                        "Quieter journal day — no clear pattern surfaced. "
-                        "|| One small thing: jot down what you're saving energy for."
+                        "Quieter journal day — no clear pattern surfaced. " "|| One small thing: jot down what you're saving energy for."
                     )
                 else:
                     logger.info("Journal coach: " + journal_coach_text[:80])
@@ -1824,10 +1999,17 @@ def lambda_handler(event, context):
 
         try:
             tldr_guidance = ai_calls.call_tldr_and_guidance(
-                data, profile, day_grade_score, grade,
-                component_scores, component_details,
-                readiness_score, readiness_colour, api_key,
-                shared_system=shared_system)
+                data,
+                profile,
+                day_grade_score,
+                grade,
+                component_scores,
+                component_details,
+                readiness_score,
+                readiness_colour,
+                api_key,
+                shared_system=shared_system,
+            )
             logger.info("TL;DR+Guidance: " + str(tldr_guidance.get("tldr", ""))[:80])
         except Exception as e:
             logger.warning("TL;DR+Guidance failed: " + str(e))
@@ -1840,6 +2022,7 @@ def lambda_handler(event, context):
             _guidance_given = [_tldr_text] + _guidance_items if _tldr_text else _guidance_items
             if _guidance_given:
                 import json as _gg_json
+
                 table.update_item(
                     Key={"pk": f"USER#{USER_ID}#SOURCE#computed_insights", "sk": f"DATE#{yesterday}"},
                     UpdateExpression="SET guidance_given = :gg",
@@ -1857,8 +2040,8 @@ def lambda_handler(event, context):
             if len(_tldr) <= 200:  # 200 chars fits the homepage pull-quote block without overflow
                 _elena_hero_line = _tldr
             else:
-                cutoff = _tldr[:200].rfind('. ')
-                _elena_hero_line = _tldr[:cutoff + 1] if cutoff > 0 else _tldr[:200] + "\u2026"
+                cutoff = _tldr[:200].rfind(". ")
+                _elena_hero_line = _tldr[: cutoff + 1] if cutoff > 0 else _tldr[:200] + "\u2026"
     except Exception as _e:
         logger.warning(f"HP-12: elena_hero_line generation failed: {_e}")
 
@@ -1905,7 +2088,8 @@ def lambda_handler(event, context):
     _weekly_habit_review = None
     try:
         import calendar
-        _is_sunday = (datetime.now(timezone.utc).weekday() == 6)  # 6 = Sunday
+
+        _is_sunday = datetime.now(timezone.utc).weekday() == 6  # 6 = Sunday
         if _is_sunday:
             # Fetch 7-day habit_scores for the review
             _whr_habit_7d = fetch_range(
@@ -1915,6 +2099,7 @@ def lambda_handler(event, context):
             )
             if _whr_habit_7d:
                 from html_builder import _compute_weekly_habit_review
+
                 _weekly_habit_review = _compute_weekly_habit_review(_whr_habit_7d, profile)
                 logger.info("S2-T1-10: Weekly Habit Review computed for Sunday brief")
             else:
@@ -1927,19 +2112,35 @@ def lambda_handler(event, context):
     _vacation_fund = None
     try:
         from vacation_fund import compute_vacation_fund
+
         _vacation_fund = compute_vacation_fund()
     except Exception as _vf_err:
         logger.warning("vacation fund compute failed (non-fatal): " + str(_vf_err))
 
     try:
         html = html_builder.build_html(
-            data, profile, day_grade_score, grade, component_scores, component_details,
-            readiness_score, readiness_colour, tldr_guidance, bod_insight,
-            training_nutrition, journal_coach_text, mvp_streak, full_streak, vice_streaks,
-            character_sheet=character_sheet, brief_mode=brief_mode,
+            data,
+            profile,
+            day_grade_score,
+            grade,
+            component_scores,
+            component_details,
+            readiness_score,
+            readiness_colour,
+            tldr_guidance,
+            bod_insight,
+            training_nutrition,
+            journal_coach_text,
+            mvp_streak,
+            full_streak,
+            vice_streaks,
+            character_sheet=character_sheet,
+            brief_mode=brief_mode,
             engagement_score=engagement_score,
-            triggered_rewards=triggered_rewards, protocol_recs=protocol_recs,
-            compute_stale=_compute_stale, compute_age_msg=_compute_age_msg,
+            triggered_rewards=triggered_rewards,
+            protocol_recs=protocol_recs,
+            compute_stale=_compute_stale,
+            compute_age_msg=_compute_age_msg,
             weekly_habit_review=_weekly_habit_review,
             sleep_coach_v2_text=sleep_coach_v2_text,
             nutrition_coach_v2_text=nutrition_coach_v2_text,
@@ -1949,16 +2150,19 @@ def lambda_handler(event, context):
             glucose_coach_v2_text=glucose_coach_v2_text,
             labs_coach_v2_text=labs_coach_v2_text,
             explorer_coach_v2_text=explorer_coach_v2_text,
-            vacation_fund=_vacation_fund)
+            vacation_fund=_vacation_fund,
+        )
     except Exception as e:
         logger.error("build_html crashed, sending minimal brief: " + str(e))
-        html = ('<!DOCTYPE html><html><body style="font-family:sans-serif;padding:20px;">'
-                '<h2>⚠ Daily Brief — Partial Failure</h2>'
-                '<p>The HTML builder crashed: <code>' + str(e) + '</code></p>'
-                '<p>Day Grade: ' + str(day_grade_score) + ' (' + grade + ')</p>'
-                '<p>Readiness: ' + str(readiness_score) + ' (' + readiness_colour + ')</p>'
-                '<p>Check CloudWatch logs for details.</p>'
-                '</body></html>')
+        html = (
+            '<!DOCTYPE html><html><body style="font-family:sans-serif;padding:20px;">'
+            "<h2>⚠ Daily Brief — Partial Failure</h2>"
+            "<p>The HTML builder crashed: <code>" + str(e) + "</code></p>"
+            "<p>Day Grade: " + str(day_grade_score) + " (" + grade + ")</p>"
+            "<p>Readiness: " + str(readiness_score) + " (" + readiness_colour + ")</p>"
+            "<p>Check CloudWatch logs for details.</p>"
+            "</body></html>"
+        )
 
     grade_str = str(day_grade_score) + " (" + grade + ")" if day_grade_score is not None else "—"
     r_emoji = {"green": "🟢", "yellow": "🟡", "red": "🔴", "gray": "⚪"}.get(readiness_colour, "⚪")
@@ -1977,8 +2181,21 @@ def lambda_handler(event, context):
     # fails like it did for 30 days).
     try:
         from boto3.dynamodb.conditions import Key as _DDBKey
-        _SOURCES = ["whoop", "withings", "strava", "todoist", "apple_health", "eightsleep",
-                    "macrofactor", "garmin", "habitify", "food_delivery", "measurements", "notion"]
+
+        _SOURCES = [
+            "whoop",
+            "withings",
+            "strava",
+            "todoist",
+            "apple_health",
+            "eightsleep",
+            "macrofactor",
+            "garmin",
+            "habitify",
+            "food_delivery",
+            "measurements",
+            "notion",
+        ]
         _STALE_OVERRIDE = {"food_delivery": 90, "measurements": 60}
         _today_d = datetime.now(timezone.utc).date()
         _stale = []
@@ -1987,10 +2204,13 @@ def lambda_handler(event, context):
             _threshold_d = _STALE_OVERRIDE.get(_src, 2)
             _pk = f"USER#{_user_id}#SOURCE#{_src}"
             try:
-                _kwargs = with_phase_filter({
-                    "KeyConditionExpression": _DDBKey("pk").eq(_pk) & _DDBKey("sk").begins_with("DATE#"),
-                    "Limit": 1, "ScanIndexForward": False,
-                })
+                _kwargs = with_phase_filter(
+                    {
+                        "KeyConditionExpression": _DDBKey("pk").eq(_pk) & _DDBKey("sk").begins_with("DATE#"),
+                        "Limit": 1,
+                        "ScanIndexForward": False,
+                    }
+                )
                 _resp = table.query(**_kwargs)
                 _items = _resp.get("Items", [])
                 if not _items:
@@ -2022,14 +2242,19 @@ def lambda_handler(event, context):
                 f'<strong style="color:#92400e">⚠️ Data Status — {len(_stale)} source{"s" if len(_stale)>1 else ""} stale</strong>'
                 f'<ul style="margin:6px 0 0;padding-left:18px;color:#78350f">{_banner_rows}</ul>'
                 '<div style="margin-top:8px;font-size:11px;color:#92400e">'
-                'The intelligence below is based on the data we have. '
-                'Stale sources can pull the day grade down without reflecting your actual behavior.'
-                '</div></div>'
+                "The intelligence below is based on the data we have. "
+                "Stale sources can pull the day grade down without reflecting your actual behavior."
+                "</div></div>"
             )
             # Inject banner immediately after <body...> tag
             import re as _re
+
             html = _re.sub(
-                r'(<body[^>]*>)', r'\1' + _banner, html, count=1, flags=_re.IGNORECASE,
+                r"(<body[^>]*>)",
+                r"\1" + _banner,
+                html,
+                count=1,
+                flags=_re.IGNORECASE,
             )
             logger.info(f"WR-48 banner prepended: {len(_stale)} stale sources")
     except Exception as _be:
@@ -2047,10 +2272,12 @@ def lambda_handler(event, context):
         ses.send_email(
             FromEmailAddress=SENDER,
             Destination={"ToAddresses": [RECIPIENT]},
-            Content={"Simple": {
-                "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
-            }},
+            Content={
+                "Simple": {
+                    "Subject": {"Data": subject, "Charset": "UTF-8"},
+                    "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
+                }
+            },
             ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
             EmailTags=[{"Name": "message_type", "Value": "daily_brief"}],
         )
@@ -2058,9 +2285,18 @@ def lambda_handler(event, context):
 
     if not demo_mode:
         output_writers.write_dashboard_json(
-            data, profile, day_grade_score, grade, component_scores,
-            readiness_score, readiness_colour, tldr_guidance, yesterday,
-            component_details=component_details, character_sheet=character_sheet)
+            data,
+            profile,
+            day_grade_score,
+            grade,
+            component_scores,
+            readiness_score,
+            readiness_colour,
+            tldr_guidance,
+            yesterday,
+            component_details=component_details,
+            character_sheet=character_sheet,
+        )
         output_writers.write_clinical_json(data, profile, yesterday)
         output_writers.write_buddy_json(data, profile, yesterday, character_sheet=character_sheet)
         # BS-02: hero stats for averagejoematt.com homepage (Jordan: delta, not absolute)
@@ -2109,7 +2345,7 @@ def lambda_handler(event, context):
             _strava_7d = data.get("strava_7d") or []
             _z2_this_week = 0.0
             for _act_day in _strava_7d:
-                for _act in (_act_day.get("activities") or []):
+                for _act in _act_day.get("activities") or []:
                     _sport = (_act.get("sport_type") or _act.get("type") or "").lower()
                     if any(z in _sport for z in ["run", "walk", "ride", "swim", "elliptical", "workout"]):
                         _z2_this_week += float(_act.get("moving_time_seconds") or 0) / 60
@@ -2120,6 +2356,7 @@ def lambda_handler(event, context):
             # Journey start date → days_in
             try:
                 from datetime import date as _date
+
                 _started = profile.get("journey_start_date", EXPERIMENT_START_DATE)
                 _days_in = max(1, (_date.today() - _date.fromisoformat(_started)).days + 1)
             except Exception:
@@ -2135,12 +2372,14 @@ def lambda_handler(event, context):
 
             # v1.2.0: Build trend arrays for homepage sparklines
             _trends = {}
-            _weight_as_of = None       # G-3: date of last known weight reading
+            _weight_as_of = None  # G-3: date of last known weight reading
             _sleep_hours_30d_avg = None  # HOME-3: 30-day average sleep hours
             try:
                 # Weight trend (last 12 weeks of weekly averages)
                 _wt_90d = fetch_range("withings", (today - timedelta(days=84)).isoformat(), yesterday)
-                _wt_vals = [(w.get("sk", "").replace("DATE#", ""), safe_float(w, "weight_lbs")) for w in _wt_90d if safe_float(w, "weight_lbs")]
+                _wt_vals = [
+                    (w.get("sk", "").replace("DATE#", ""), safe_float(w, "weight_lbs")) for w in _wt_90d if safe_float(w, "weight_lbs")
+                ]
                 if _wt_vals:
                     _trends["weight_daily"] = [{"date": d, "lbs": round(v, 1)} for d, v in _wt_vals[-30:]]
                     # G-3 FIX: track date of latest known weight for staleness display
@@ -2155,13 +2394,21 @@ def lambda_handler(event, context):
                     _trends["hrv_daily"] = [{"date": d, "ms": round(v, 1)} for d, v in _hrv_vals]
 
                 # Sleep trend (last 14 days) + HOME-3: 30d average
-                _sleep_vals = [(r.get("sk", "").replace("DATE#", ""), safe_float(r, "sleep_duration_hours")) for r in _whoop_30d if safe_float(r, "sleep_duration_hours")]
+                _sleep_vals = [
+                    (r.get("sk", "").replace("DATE#", ""), safe_float(r, "sleep_duration_hours"))
+                    for r in _whoop_30d
+                    if safe_float(r, "sleep_duration_hours")
+                ]
                 if _sleep_vals:
                     _trends["sleep_daily"] = [{"date": d, "hrs": round(v, 1)} for d, v in _sleep_vals[-14:]]
                 _sleep_hours_30d_avg = round(sum(v for _, v in _sleep_vals) / len(_sleep_vals), 2) if _sleep_vals else None
 
                 # Recovery trend (last 14 days)
-                _rec_vals = [(r.get("sk", "").replace("DATE#", ""), safe_float(r, "recovery_score")) for r in _whoop_30d if safe_float(r, "recovery_score")]
+                _rec_vals = [
+                    (r.get("sk", "").replace("DATE#", ""), safe_float(r, "recovery_score"))
+                    for r in _whoop_30d
+                    if safe_float(r, "recovery_score")
+                ]
                 if _rec_vals:
                     _trends["recovery_daily"] = [{"date": d, "pct": round(v, 0)} for d, v in _rec_vals[-14:]]
             except Exception as _te:
@@ -2186,8 +2433,7 @@ def lambda_handler(event, context):
                 if _curr_wt and _lost is not None:
                     _group_narratives["body"] = (
                         f"Currently at {round(_curr_wt, 1)} lbs — {abs(_lost)} lbs "
-                        f"{'down' if _lost > 0 else 'up'} from Day 1"
-                        + (f", {_prog_pct}% of goal." if _prog_pct else ".")
+                        f"{'down' if _lost > 0 else 'up'} from Day 1" + (f", {_prog_pct}% of goal." if _prog_pct else ".")
                     )
                 # Recovery
                 _hrv_val = _hrv.get("hrv_yesterday") or _hrv.get("hrv_7d")
@@ -2212,9 +2458,8 @@ def lambda_handler(event, context):
                 _cgm_data = data.get("cgm") or data.get("cgm_today") or {}
                 _tir = safe_float(_cgm_data, "time_in_range_pct") or safe_float(_cgm_data, "tir_pct")
                 if _tir:
-                    _group_narratives["nutrition"] = (
-                        f"Time in range (70–140 mg/dL): {round(_tir)}% today"
-                        + (" — on target." if _tir >= 70 else " — below target.")
+                    _group_narratives["nutrition"] = f"Time in range (70–140 mg/dL): {round(_tir)}% today" + (
+                        " — on target." if _tir >= 70 else " — below target."
                     )
                 # Food delivery streak signal (appended to nutrition narrative)
                 _fd_signal = get_food_delivery_brief_signal()
@@ -2241,10 +2486,7 @@ def lambda_handler(event, context):
                     _cs_level = _cs.get("level") or _cs.get("character_level")
                     _cs_tier = _cs.get("tier") or _cs.get("tier_name")
                     if _cs_level:
-                        _group_narratives["mind"] = (
-                            f"Character at Level {_cs_level}"
-                            + (f" — {_cs_tier} tier." if _cs_tier else ".")
-                        )
+                        _group_narratives["mind"] = f"Character at Level {_cs_level}" + (f" — {_cs_tier} tier." if _cs_tier else ".")
                 # Platform — use TL;DR if available, else systems count
                 if _brief_excerpt:
                     _group_narratives["platform"] = _brief_excerpt[:160].rstrip() + ("…" if len(_brief_excerpt) > 160 else "")
@@ -2254,80 +2496,87 @@ def lambda_handler(event, context):
             write_public_stats(
                 s3_client=s3,
                 vitals={
-                    "weight_lbs":       round(_curr_wt, 1) if _curr_wt else None,
-                    "weight_as_of":     _weight_as_of,  # G-3: date of reading for staleness display
+                    "weight_lbs": round(_curr_wt, 1) if _curr_wt else None,
+                    "weight_as_of": _weight_as_of,  # G-3: date of reading for staleness display
                     "weight_delta_30d": round(_curr_wt - float(_week_ago), 1) if _week_ago and _curr_wt else None,
-                    "hrv_ms":           round(float(_hrv.get("hrv_yesterday") or _hrv.get("hrv_7d") or 0), 1) or None,
-                    "hrv_trend":        html_builder.hrv_trend_str(_hrv.get("hrv_7d"), _hrv.get("hrv_30d")),
-                    "rhr_bpm":          safe_float(_w, "resting_heart_rate"),
-                    "rhr_trend":        "improving",
-                    "recovery_pct":     round(_rec, 0) if _rec else None,
-                    "recovery_status":  _rec_status,
-                    "sleep_hours":         safe_float(data.get("sleep"), "sleep_duration_hours"),
+                    "hrv_ms": round(float(_hrv.get("hrv_yesterday") or _hrv.get("hrv_7d") or 0), 1) or None,
+                    "hrv_trend": html_builder.hrv_trend_str(_hrv.get("hrv_7d"), _hrv.get("hrv_30d")),
+                    "rhr_bpm": safe_float(_w, "resting_heart_rate"),
+                    "rhr_trend": "improving",
+                    "recovery_pct": round(_rec, 0) if _rec else None,
+                    "recovery_status": _rec_status,
+                    "sleep_hours": safe_float(data.get("sleep"), "sleep_duration_hours"),
                     "sleep_hours_30d_avg": _sleep_hours_30d_avg,  # HOME-3
                 },
                 journey={
-                    "start_weight_lbs":   _start_wt,
-                    "goal_weight_lbs":    _goal_wt,
+                    "start_weight_lbs": _start_wt,
+                    "goal_weight_lbs": _goal_wt,
                     "current_weight_lbs": _curr_wt,
-                    "lost_lbs":           _lost,
-                    "remaining_lbs":      _remain,
-                    "progress_pct":       _prog_pct,
-                    "weekly_rate_lbs":    _weekly_rate,
+                    "lost_lbs": _lost,
+                    "remaining_lbs": _remain,
+                    "progress_pct": _prog_pct,
+                    "weekly_rate_lbs": _weekly_rate,
                     "projected_goal_date": profile.get("goal_date", "2026-07-31"),
-                    "started_date":       profile.get("journey_start_date", EXPERIMENT_START_DATE),
-                    "current_phase":      (get_current_phase(profile, _curr_wt) or {}).get("name", "Ignition") if _curr_wt else None,
-                    "days_in":            _days_in,
+                    "started_date": profile.get("journey_start_date", EXPERIMENT_START_DATE),
+                    "current_phase": (get_current_phase(profile, _curr_wt) or {}).get("name", "Ignition") if _curr_wt else None,
+                    "days_in": _days_in,
                 },
                 training={
-                    "ctl_fitness":          float(data.get("tsb") or 0) + 6.0,
-                    "atl_fatigue":          float(data.get("tsb") or 0) + 6.5,
-                    "tsb_form":             float(data.get("tsb") or 0),
-                    "acwr":                 _acwr,
-                    "form_status":          _cm.get("zone", "neutral"),
-                    "injury_risk":          "high" if _cm.get("alert") else "low",
-                    "total_miles_30d":      0,
-                    "activity_count_30d":   0,
-                    "zone2_this_week_min":  round(_z2_this_week),
-                    "zone2_target_min":     150,
+                    "ctl_fitness": float(data.get("tsb") or 0) + 6.0,
+                    "atl_fatigue": float(data.get("tsb") or 0) + 6.5,
+                    "tsb_form": float(data.get("tsb") or 0),
+                    "acwr": _acwr,
+                    "form_status": _cm.get("zone", "neutral"),
+                    "injury_risk": "high" if _cm.get("alert") else "low",
+                    "total_miles_30d": 0,
+                    "activity_count_30d": 0,
+                    "zone2_this_week_min": round(_z2_this_week),
+                    "zone2_target_min": 150,
                 },
                 platform={
-                    "mcp_tools":          121,
-                    "data_sources":       26,
-                    "lambdas":            62,
-                    "last_review_grade":  "A-",
-                    "tier0_streak":       _tier0_streak,
-                    "days_in":            _days_in,
+                    "mcp_tools": 121,
+                    "data_sources": 26,
+                    "lambdas": 62,
+                    "last_review_grade": "A-",
+                    "tier0_streak": _tier0_streak,
+                    "days_in": _days_in,
                 },
                 trends=_trends,
                 brief_excerpt=_brief_excerpt,
                 group_narratives=_group_narratives,
                 # D10: Day 1 baseline from profile — historical constants, not live data
                 baseline={
-                    "date":         profile.get("baseline_date") or profile.get("journey_start_date", EXPERIMENT_START_DATE),
-                    "weight_lbs":   float(profile.get("baseline_weight_lbs") or profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)),
-                    "hrv_ms":       float(profile.get("baseline_hrv_ms", 45)),
-                    "rhr_bpm":      float(profile.get("baseline_rhr_bpm", 62)),
+                    "date": profile.get("baseline_date") or profile.get("journey_start_date", EXPERIMENT_START_DATE),
+                    "weight_lbs": float(
+                        profile.get("baseline_weight_lbs") or profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
+                    ),
+                    "hrv_ms": float(profile.get("baseline_hrv_ms", 45)),
+                    "rhr_bpm": float(profile.get("baseline_rhr_bpm", 62)),
                     "recovery_pct": float(profile.get("baseline_recovery_pct", 55)),
                 },
                 elena_hero_line=_elena_hero_line,
                 # PB-R1: Character sheet headline data for homepage heartbeat + nav badge
-                character={
-                    "level":          (character_sheet or {}).get("level") or (character_sheet or {}).get("character_level"),
-                    "tier":           (character_sheet or {}).get("tier") or (character_sheet or {}).get("tier_name"),
-                    "tier_emoji":     (character_sheet or {}).get("tier_emoji", "\U0001f528"),
-                    "xp_total":       (character_sheet or {}).get("xp_total"),
-                    "composite_score": (character_sheet or {}).get("composite_score"),
-                    "next_level_xp":  (character_sheet or {}).get("next_level_xp"),
-                    "xp_to_next":     (character_sheet or {}).get("xp_to_next"),
-                    "days_active":    (character_sheet or {}).get("days_active"),
-                } if character_sheet else None,
+                character=(
+                    {
+                        "level": (character_sheet or {}).get("level") or (character_sheet or {}).get("character_level"),
+                        "tier": (character_sheet or {}).get("tier") or (character_sheet or {}).get("tier_name"),
+                        "tier_emoji": (character_sheet or {}).get("tier_emoji", "\U0001f528"),
+                        "xp_total": (character_sheet or {}).get("xp_total"),
+                        "composite_score": (character_sheet or {}).get("composite_score"),
+                        "next_level_xp": (character_sheet or {}).get("next_level_xp"),
+                        "xp_to_next": (character_sheet or {}).get("xp_to_next"),
+                        "days_active": (character_sheet or {}).get("days_active"),
+                    }
+                    if character_sheet
+                    else None
+                ),
             )
             logger.info("site_writer: public_stats.json written with baseline + character")
 
             # PULSE-A1: Write pulse.json to S3 + DynamoDB for /api/pulse endpoint
             try:
                 from site_writer import write_pulse_json
+
                 _journal_pulse = {
                     "entries": len(data.get("journal_entries") or []),
                     "themes": (data.get("journal") or {}).get("themes", []),

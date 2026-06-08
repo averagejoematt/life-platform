@@ -9,30 +9,34 @@ strength deep-dive, journal analysis, benchmark trends, meal responses).
 All shared helpers (_ok, _error, table, _query_source, _latest_item, etc.)
 are imported from site_api_common — no circular references.
 """
+
 import json
 import re
 import time  # noqa: F401 — used by some handlers
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401 — kept for handlers that convert types
 
 from boto3.dynamodb.conditions import Key
-
 from phase_filter import with_phase_filter  # ADR-058
-
 from web.site_api_common import (
-    logger,
-    table,
-    USER_ID, USER_PREFIX,
-    EXPERIMENT_START, EXPERIMENT_BASELINE_WEIGHT_LBS,
     CORS_HEADERS,
-    _ok, _error,
-    _query_source, _latest_item, _decimal_to_float,
+    EXPERIMENT_BASELINE_WEIGHT_LBS,
+    EXPERIMENT_START,
+    USER_ID,
+    USER_PREFIX,
+    _decimal_to_float,
+    _error,
     _experiment_date,
     _get_profile,
-    _load_supp_metadata,
-    _load_content_filter,
-    _scrub_blocked_terms,
     _is_blocked_vice,
+    _latest_item,
+    _load_content_filter,
+    _load_supp_metadata,
+    _ok,
+    _query_source,
+    _scrub_blocked_terms,
+    logger,
+    table,
 )
 
 
@@ -51,19 +55,43 @@ def handle_nutrition_overview() -> dict:
     if not items:
         # Genesis week / no logging yet — return a shaped-but-empty 200 so the
         # site renders an honest empty state instead of a console 503.
-        _empty_grp = {"avg_calories": None, "avg_protein_g": None, "avg_carbs_g": None,
-                      "avg_fat_g": None, "avg_fiber_g": None, "days": 0, "count": 0, "protein_hit_pct": 0}
-        return _ok({
-            "nutrition": {"avg_calories": None, "avg_protein_g": None, "avg_carbs_g": None,
-                          "avg_fat_g": None, "avg_fiber_g": None, "protein_target_g": 190,
-                          "protein_hit_pct": 0, "protein_hit_days": 0, "days_logged": 0,
-                          "tdee": None, "avg_deficit": None, "cal_7d_avg": None, "pro_7d_avg": None,
-                          "latest_date": today, "latest_calories": None, "latest_protein_g": None},
-            "nutrition_trend": [],
-            "weekday_vs_weekend": {"weekday": dict(_empty_grp), "weekend": dict(_empty_grp)},
-            "eating_window": None,
-            "periodization": {"training_day": dict(_empty_grp), "rest_day": dict(_empty_grp)},
-        }, cache_seconds=300)
+        _empty_grp = {
+            "avg_calories": None,
+            "avg_protein_g": None,
+            "avg_carbs_g": None,
+            "avg_fat_g": None,
+            "avg_fiber_g": None,
+            "days": 0,
+            "count": 0,
+            "protein_hit_pct": 0,
+        }
+        return _ok(
+            {
+                "nutrition": {
+                    "avg_calories": None,
+                    "avg_protein_g": None,
+                    "avg_carbs_g": None,
+                    "avg_fat_g": None,
+                    "avg_fiber_g": None,
+                    "protein_target_g": 190,
+                    "protein_hit_pct": 0,
+                    "protein_hit_days": 0,
+                    "days_logged": 0,
+                    "tdee": None,
+                    "avg_deficit": None,
+                    "cal_7d_avg": None,
+                    "pro_7d_avg": None,
+                    "latest_date": today,
+                    "latest_calories": None,
+                    "latest_protein_g": None,
+                },
+                "nutrition_trend": [],
+                "weekday_vs_weekend": {"weekday": dict(_empty_grp), "weekend": dict(_empty_grp)},
+                "eating_window": None,
+                "periodization": {"training_day": dict(_empty_grp), "rest_day": dict(_empty_grp)},
+            },
+            cache_seconds=300,
+        )
 
     items.sort(key=lambda x: x.get("sk", ""))
 
@@ -109,13 +137,17 @@ def handle_nutrition_overview() -> dict:
     trend = []
     for i in items:
         d = i.get("date") or i.get("sk", "").replace("DATE#", "")
-        trend.append({
-            "date": d,
-            "calories": round(_mf(i, "calories")) if _mf(i, "calories") is not None else None,
-            "protein_g": round(_mf(i, "protein_g", "total_protein_g"), 1) if _mf(i, "protein_g", "total_protein_g") is not None else None,
-            "carbs_g": round(_mf(i, "carbs_g", "total_carbs_g"), 1) if _mf(i, "carbs_g", "total_carbs_g") is not None else None,
-            "fat_g": round(_mf(i, "fat_g", "total_fat_g"), 1) if _mf(i, "fat_g", "total_fat_g") is not None else None,
-        })
+        trend.append(
+            {
+                "date": d,
+                "calories": round(_mf(i, "calories")) if _mf(i, "calories") is not None else None,
+                "protein_g": (
+                    round(_mf(i, "protein_g", "total_protein_g"), 1) if _mf(i, "protein_g", "total_protein_g") is not None else None
+                ),
+                "carbs_g": round(_mf(i, "carbs_g", "total_carbs_g"), 1) if _mf(i, "carbs_g", "total_carbs_g") is not None else None,
+                "fat_g": round(_mf(i, "fat_g", "total_fat_g"), 1) if _mf(i, "fat_g", "total_fat_g") is not None else None,
+            }
+        )
 
     # ── Weekday vs Weekend comparison ──
     weekday_items = []
@@ -178,11 +210,13 @@ def handle_nutrition_overview() -> dict:
             first = min(times)
             last = max(times)
             window_hrs = round((last - first) / 60, 1)
-            eating_windows.append({
-                "first_meal_min": first,
-                "last_meal_min": last,
-                "window_hrs": window_hrs,
-            })
+            eating_windows.append(
+                {
+                    "first_meal_min": first,
+                    "last_meal_min": last,
+                    "window_hrs": window_hrs,
+                }
+            )
 
     eating_window = None
     if eating_windows:
@@ -230,31 +264,35 @@ def handle_nutrition_overview() -> dict:
             avg = periodization[key]["avg_calories"]
             periodization[key]["avg_deficit"] = round(tdee - avg) if avg else None
 
-    return _ok({
-        "nutrition": {
-            "avg_calories": round(sum(cal_vals) / len(cal_vals)) if cal_vals else None,
-            "avg_protein_g": round(sum(pro_vals) / len(pro_vals), 1) if pro_vals else None,
-            "avg_carbs_g": round(sum(carb_vals) / len(carb_vals), 1) if carb_vals else None,
-            "avg_fat_g": round(sum(fat_vals) / len(fat_vals), 1) if fat_vals else None,
-            "avg_fiber_g": round(sum(fiber_vals) / len(fiber_vals), 1) if fiber_vals else None,
-            "protein_target_g": protein_target,
-            "protein_hit_pct": protein_hit_pct,
-            "protein_hit_days": protein_hit_days,
-            "days_logged": len(items),
-            "tdee": round(tdee) if tdee else None,
-            "avg_deficit": deficit,
-            "cal_7d_avg": round(sum(cal_7d) / len(cal_7d)) if cal_7d else None,
-            "pro_7d_avg": round(sum(pro_7d) / len(pro_7d), 1) if pro_7d else None,
-            "latest_date": latest_date,
-            "latest_calories": round(_mf(latest, "calories")) if _mf(latest, "calories") else None,
-            "latest_protein_g": round(_mf(latest, "protein_g", "total_protein_g"), 1) if _mf(latest, "protein_g", "total_protein_g") else None,
+    return _ok(
+        {
+            "nutrition": {
+                "avg_calories": round(sum(cal_vals) / len(cal_vals)) if cal_vals else None,
+                "avg_protein_g": round(sum(pro_vals) / len(pro_vals), 1) if pro_vals else None,
+                "avg_carbs_g": round(sum(carb_vals) / len(carb_vals), 1) if carb_vals else None,
+                "avg_fat_g": round(sum(fat_vals) / len(fat_vals), 1) if fat_vals else None,
+                "avg_fiber_g": round(sum(fiber_vals) / len(fiber_vals), 1) if fiber_vals else None,
+                "protein_target_g": protein_target,
+                "protein_hit_pct": protein_hit_pct,
+                "protein_hit_days": protein_hit_days,
+                "days_logged": len(items),
+                "tdee": round(tdee) if tdee else None,
+                "avg_deficit": deficit,
+                "cal_7d_avg": round(sum(cal_7d) / len(cal_7d)) if cal_7d else None,
+                "pro_7d_avg": round(sum(pro_7d) / len(pro_7d), 1) if pro_7d else None,
+                "latest_date": latest_date,
+                "latest_calories": round(_mf(latest, "calories")) if _mf(latest, "calories") else None,
+                "latest_protein_g": (
+                    round(_mf(latest, "protein_g", "total_protein_g"), 1) if _mf(latest, "protein_g", "total_protein_g") else None
+                ),
+            },
+            "nutrition_trend": trend,
+            "weekday_vs_weekend": weekday_vs_weekend,
+            "eating_window": eating_window,
+            "periodization": periodization,
         },
-        "nutrition_trend": trend,
-        "weekday_vs_weekend": weekday_vs_weekend,
-        "eating_window": eating_window,
-        "periodization": periodization,
-    }, cache_seconds=3600)
-
+        cache_seconds=3600,
+    )
 
 
 def handle_training_overview() -> dict:
@@ -336,8 +374,7 @@ def handle_training_overview() -> dict:
 
     # Total training minutes and distance (30d)
     def _act_minutes(a):
-        return float(a.get("duration_minutes") or a.get("moving_time_minutes") or
-                      (a.get("moving_time_seconds") or 0) / 60 or 0)
+        return float(a.get("duration_minutes") or a.get("moving_time_minutes") or (a.get("moving_time_seconds") or 0) / 60 or 0)
 
     def _act_miles(a):
         if a.get("distance_miles"):
@@ -353,10 +390,18 @@ def handle_training_overview() -> dict:
 
     # ── Modality breakdown (30d) — group by sport_type with per-modality stats ──
     from collections import defaultdict as _dd2
-    modality_map = _dd2(lambda: {
-        "count": 0, "total_min": 0, "total_mi": 0, "total_elev_ft": 0,
-        "hr_sum": 0, "hr_count": 0, "z2_min": 0,
-    })
+
+    modality_map = _dd2(
+        lambda: {
+            "count": 0,
+            "total_min": 0,
+            "total_mi": 0,
+            "total_elev_ft": 0,
+            "hr_sum": 0,
+            "hr_count": 0,
+            "z2_min": 0,
+        }
+    )
     # Also compute prior 30d for trend (days 31-60)
     d60 = _experiment_date(60)
     prior_30d_acts = []
@@ -389,17 +434,19 @@ def handle_training_overview() -> dict:
     for sport, m in sorted(modality_map.items(), key=lambda x: -x[1]["count"]):
         prior_count = prior_type_counts.get(sport, 0)
         trend = m["count"] - prior_count  # positive = more active
-        modality_breakdown.append({
-            "type": sport,
-            "count_30d": m["count"],
-            "total_minutes_30d": round(m["total_min"]),
-            "avg_duration_min": round(m["total_min"] / m["count"]) if m["count"] else 0,
-            "avg_hr": round(m["hr_sum"] / m["hr_count"]) if m["hr_count"] else None,
-            "total_distance_mi": round(m["total_mi"], 1),
-            "total_elevation_ft": round(m["total_elev_ft"]),
-            "z2_minutes": round(m["z2_min"]),
-            "trend_vs_prior_30d": trend,
-        })
+        modality_breakdown.append(
+            {
+                "type": sport,
+                "count_30d": m["count"],
+                "total_minutes_30d": round(m["total_min"]),
+                "avg_duration_min": round(m["total_min"] / m["count"]) if m["count"] else 0,
+                "avg_hr": round(m["hr_sum"] / m["hr_count"]) if m["hr_count"] else None,
+                "total_distance_mi": round(m["total_mi"], 1),
+                "total_elevation_ft": round(m["total_elev_ft"]),
+                "z2_minutes": round(m["z2_min"]),
+                "trend_vs_prior_30d": trend,
+            }
+        )
 
     # Recalculate Z2 from all flattened activities
     z2_minutes_30d = 0
@@ -428,24 +475,31 @@ def handle_training_overview() -> dict:
                 _step_dow = datetime.strptime(_step_date, "%Y-%m-%d").weekday()
             except Exception:
                 _step_dow = 0
-            daily_steps_trend.append({
-                "date": _step_date,
-                "steps": int(float(g["steps"])),
-                "is_weekend": _step_dow >= 5,
-            })
+            daily_steps_trend.append(
+                {
+                    "date": _step_date,
+                    "steps": int(float(g["steps"])),
+                    "is_weekend": _step_dow >= 5,
+                }
+            )
 
     walk_activities = [a for a in all_activities_30d if (a.get("sport_type") or "").lower() in ("walk", "hike")]
-    ruck_activities = [a for a in all_activities_30d if "ruck" in (a.get("name") or "").lower() or "ruck" in (a.get("sport_type") or "").lower()]
+    ruck_activities = [
+        a for a in all_activities_30d if "ruck" in (a.get("name") or "").lower() or "ruck" in (a.get("sport_type") or "").lower()
+    ]
     walking_data = {
         "avg_daily_steps": avg_daily_steps,
         "total_walks_30d": len(walk_activities),
         "total_rucks_30d": len(ruck_activities),
         "total_miles_30d": round(sum(_act_miles(a) for a in walk_activities), 1),
         "avg_pace_min_per_mi": None,
-        "z2_minutes_walking": round(sum(
-            _act_minutes(a) for a in walk_activities
-            if a.get("average_heartrate") and z2_low <= float(a["average_heartrate"]) <= z2_high
-        )),
+        "z2_minutes_walking": round(
+            sum(
+                _act_minutes(a)
+                for a in walk_activities
+                if a.get("average_heartrate") and z2_low <= float(a["average_heartrate"]) <= z2_high
+            )
+        ),
         "daily_steps_trend": daily_steps_trend,
     }
     # Avg walking pace (min/mi)
@@ -494,10 +548,14 @@ def handle_training_overview() -> dict:
 
     # ── V2: Daily modality minutes (30 days) for stacked bar chart ──
     _MODALITY_MAP = {
-        "WeightTraining": "strength", "Workout": "strength",
-        "Walk": "walking", "Hike": "hiking",
-        "Ride": "cycling", "VirtualRide": "cycling",
-        "Stretch": "stretching", "Yoga": "stretching",
+        "WeightTraining": "strength",
+        "Workout": "strength",
+        "Walk": "walking",
+        "Hike": "hiking",
+        "Ride": "cycling",
+        "VirtualRide": "cycling",
+        "Stretch": "stretching",
+        "Yoga": "stretching",
         "Soccer": "soccer",
         "Breathwork": "breathwork",
     }
@@ -539,11 +597,14 @@ def handle_training_overview() -> dict:
     # Whoop workouts — per-workout HR zone data (enriches Strava)
     whoop_workouts = []
     try:
-        resp = table.query(**with_phase_filter({  # ADR-058: hide pilot workouts
-            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}whoop") & Key("sk").between(
-                f"DATE#{d30}#WORKOUT#", f"DATE#{today}#WORKOUT#~"
-            ),
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot workouts
+                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}whoop")
+                    & Key("sk").between(f"DATE#{d30}#WORKOUT#", f"DATE#{today}#WORKOUT#~"),
+                }
+            )
+        )
         whoop_workouts = _decimal_to_float(resp.get("Items", []))
         # Add Whoop Z2 minutes from actual HR zones to the Z2 calculation
         for ww in whoop_workouts:
@@ -563,6 +624,7 @@ def handle_training_overview() -> dict:
 
     # Weekly trend (for chart) — use flattened activities
     from collections import defaultdict as _dd
+
     week_buckets = _dd(lambda: {"workouts": 0, "minutes": 0, "z2_min": 0})
     for a in all_activities_90d:
         d = a.get("_day_date") or ""
@@ -578,44 +640,54 @@ def handle_training_overview() -> dict:
         if avg_hr and z2_low <= float(avg_hr) <= z2_high:
             week_buckets[week_key]["z2_min"] += dur
 
-    weekly_trend = sorted([
-        {"week": k, "workouts": v["workouts"], "minutes": round(v["minutes"]), "z2_min": round(v["z2_min"])}
-        for k, v in week_buckets.items()
-    ], key=lambda x: x["week"])[-12:]  # last 12 weeks
+    weekly_trend = sorted(
+        [
+            {"week": k, "workouts": v["workouts"], "minutes": round(v["minutes"]), "z2_min": round(v["z2_min"])}
+            for k, v in week_buckets.items()
+        ],
+        key=lambda x: x["week"],
+    )[
+        -12:
+    ]  # last 12 weeks
 
-    return _ok({
-        "training": {
-            "workouts_30d": total_workouts_30d,
-            "workouts_90d": total_workouts_90d,
-            "weekly_avg": weekly_avg,
-            "total_minutes_30d": round(total_minutes_30d),
-            "total_distance_mi": round(total_distance_mi, 1),
-            "z2_weekly_avg_min": z2_weekly_avg,
-            "z2_target_min": z2_target,
-            "z2_pct": min(z2_pct, 100),
-            "avg_strain": avg_strain,
-            "strength_sessions_30d": strength_sessions_30d,
-            "top_activities": [{"type": t, "count": c} for t, c in top_activities],
-            "whoop_workout_count": len(whoop_workouts),
-            "active_modalities": len(modality_breakdown),
-            "avg_daily_steps": walking_data["avg_daily_steps"],
+    return _ok(
+        {
+            "training": {
+                "workouts_30d": total_workouts_30d,
+                "workouts_90d": total_workouts_90d,
+                "weekly_avg": weekly_avg,
+                "total_minutes_30d": round(total_minutes_30d),
+                "total_distance_mi": round(total_distance_mi, 1),
+                "z2_weekly_avg_min": z2_weekly_avg,
+                "z2_target_min": z2_target,
+                "z2_pct": min(z2_pct, 100),
+                "avg_strain": avg_strain,
+                "strength_sessions_30d": strength_sessions_30d,
+                "top_activities": [{"type": t, "count": c} for t, c in top_activities],
+                "whoop_workout_count": len(whoop_workouts),
+                "active_modalities": len(modality_breakdown),
+                "avg_daily_steps": walking_data["avg_daily_steps"],
+            },
+            "modality_breakdown": modality_breakdown,
+            "daily_modality_minutes_30d": daily_modality_minutes_30d,
+            "walking": walking_data,
+            "breathwork": breathwork_data,
+            "weekly_trend": weekly_trend,
+            "whoop_workouts": [
+                {
+                    "date": w.get("date"),
+                    "sport_name": w.get("sport_name", "Activity"),
+                    "strain": w.get("strain"),
+                    "zone_2_minutes": w.get("zone_2_minutes"),
+                    "zone_3_minutes": w.get("zone_3_minutes"),
+                    "distance_meter": w.get("distance_meter"),
+                    "average_heart_rate": w.get("average_heart_rate"),
+                }
+                for w in whoop_workouts[:20]
+            ],
         },
-        "modality_breakdown": modality_breakdown,
-        "daily_modality_minutes_30d": daily_modality_minutes_30d,
-        "walking": walking_data,
-        "breathwork": breathwork_data,
-        "weekly_trend": weekly_trend,
-        "whoop_workouts": [{
-            "date": w.get("date"),
-            "sport_name": w.get("sport_name", "Activity"),
-            "strain": w.get("strain"),
-            "zone_2_minutes": w.get("zone_2_minutes"),
-            "zone_3_minutes": w.get("zone_3_minutes"),
-            "distance_meter": w.get("distance_meter"),
-            "average_heart_rate": w.get("average_heart_rate"),
-        } for w in whoop_workouts[:20]],
-    }, cache_seconds=3600)
-
+        cache_seconds=3600,
+    )
 
 
 def handle_weekly_physical_summary() -> dict:
@@ -637,6 +709,7 @@ def handle_weekly_physical_summary() -> dict:
 
     # Flatten Strava activities by day, dedup by activity ID
     from collections import defaultdict
+
     day_activities = defaultdict(list)
     _seen_activity_ids = set()
     for s in strava_items:
@@ -650,8 +723,7 @@ def handle_weekly_physical_summary() -> dict:
             if _aid:
                 _seen_activity_ids.add(_aid)
             sport = a.get("sport_type") or a.get("type") or "Other"
-            dur = float(a.get("duration_minutes") or a.get("moving_time_minutes") or
-                        (a.get("moving_time_seconds") or 0) / 60 or 0)
+            dur = float(a.get("duration_minutes") or a.get("moving_time_minutes") or (a.get("moving_time_seconds") or 0) / 60 or 0)
             day_activities[d].append({"type": sport, "minutes": round(dur)})
 
     # Build 7-day array
@@ -671,16 +743,17 @@ def handle_weekly_physical_summary() -> dict:
         if bw_min > 0:
             activities.append({"type": "Breathwork", "minutes": round(bw_min)})
             total_active_min += bw_min
-        days.append({
-            "date": d,
-            "day_of_week": dow,
-            "steps": int(float(garmin.get("steps", 0))) if garmin.get("steps") else None,
-            "activities": activities,
-            "total_active_minutes": round(total_active_min),
-        })
+        days.append(
+            {
+                "date": d,
+                "day_of_week": dow,
+                "steps": int(float(garmin.get("steps", 0))) if garmin.get("steps") else None,
+                "activities": activities,
+                "total_active_minutes": round(total_active_min),
+            }
+        )
 
     return _ok({"days": days}, cache_seconds=3600)
-
 
 
 def handle_protein_sources() -> dict:
@@ -697,6 +770,7 @@ def handle_protein_sources() -> dict:
         return _ok({"sources": [], "as_of_date": today}, cache_seconds=300)
 
     from collections import defaultdict
+
     # Aggregate protein contribution by food name
     food_protein = defaultdict(lambda: {"total_protein": 0.0, "frequency": 0, "total_cal": 0.0})
     days_count = len(items)
@@ -720,23 +794,27 @@ def handle_protein_sources() -> dict:
     for name, f in sorted(food_protein.items(), key=lambda x: -x[1]["total_protein"]):
         avg_daily = round(f["total_protein"] / days_count, 1) if days_count else 0
         pct = round(f["total_protein"] / total_protein_all * 100, 1) if total_protein_all else 0
-        sources.append({
-            "food": name,
-            "avg_daily_g": avg_daily,
-            "pct_of_total": pct,
-            "frequency": f["frequency"],
-            "avg_protein_per_serving": round(f["total_protein"] / f["frequency"], 1) if f["frequency"] else 0,
-            "protein_cal_pct": round((f["total_protein"] * 4) / f["total_cal"] * 100) if f["total_cal"] > 0 else 0,
-        })
+        sources.append(
+            {
+                "food": name,
+                "avg_daily_g": avg_daily,
+                "pct_of_total": pct,
+                "frequency": f["frequency"],
+                "avg_protein_per_serving": round(f["total_protein"] / f["frequency"], 1) if f["frequency"] else 0,
+                "protein_cal_pct": round((f["total_protein"] * 4) / f["total_cal"] * 100) if f["total_cal"] > 0 else 0,
+            }
+        )
         if len(sources) >= 12:
             break
 
-    return _ok({
-        "protein_sources": sources,
-        "total_protein_30d_avg_g": round(total_protein_all / days_count, 1) if days_count else 0,
-        "days_analyzed": days_count,
-    }, cache_seconds=3600)
-
+    return _ok(
+        {
+            "protein_sources": sources,
+            "total_protein_30d_avg_g": round(total_protein_all / days_count, 1) if days_count else 0,
+            "days_analyzed": days_count,
+        },
+        cache_seconds=3600,
+    )
 
 
 def handle_physical_overview() -> dict:
@@ -751,10 +829,15 @@ def handle_physical_overview() -> dict:
     # ── 1. DEXA scans (all, sorted ascending) ──
     dexa_pk = f"{USER_PREFIX}dexa"
     # clinical archive — DEXA is date-independent (owner decision 2026-06-06)
-    dexa_resp = table.query(**with_phase_filter({
-        "KeyConditionExpression": Key("pk").eq(dexa_pk),
-        "ScanIndexForward": True,
-    }, include_pilot=True))
+    dexa_resp = table.query(
+        **with_phase_filter(
+            {
+                "KeyConditionExpression": Key("pk").eq(dexa_pk),
+                "ScanIndexForward": True,
+            },
+            include_pilot=True,
+        )
+    )
     dexa_items = _decimal_to_float(dexa_resp.get("Items", []))
 
     # Baseline = most recent scan on or before EXPERIMENT_START (the starting point)
@@ -807,31 +890,47 @@ def handle_physical_overview() -> dict:
                 "t_score": bone.get("t_score"),
                 "z_score": bone.get("z_score"),
             },
-            "indices": {
-                "almi_kg_m2": idx.get("almi_kg_m2"),
-                "ffmi_kg_m2": idx.get("ffmi_kg_m2"),
-                "fmi_kg_m2": idx.get("fmi_kg_m2"),
-                "almi_percentile": idx.get("almi_percentile"),
-                "ffmi_rating": idx.get("ffmi_rating"),
-                "fmi_rating": idx.get("fmi_rating"),
-            } if idx else None,
-            "score_360": {
-                "score": s360.get("score"),
-                "biological_age": s360.get("biological_age"),
-                "chronological_age": s360.get("chronological_age"),
-                "biological_age_delta": s360.get("biological_age_delta"),
-            } if s360 else None,
-            "segmental_fat": {
-                "arms_pct": seg_fat.get("arms_pct"),
-                "trunk_pct": seg_fat.get("trunk_pct"),
-                "legs_pct": seg_fat.get("legs_pct"),
-            } if seg_fat else None,
-            "segmental_lean": {
-                "total_lb": seg_lean.get("total_lb"),
-                "arms_lb": seg_lean.get("arms_lb"),
-                "trunk_lb": seg_lean.get("trunk_lb"),
-                "legs_lb": seg_lean.get("legs_lb"),
-            } if seg_lean else None,
+            "indices": (
+                {
+                    "almi_kg_m2": idx.get("almi_kg_m2"),
+                    "ffmi_kg_m2": idx.get("ffmi_kg_m2"),
+                    "fmi_kg_m2": idx.get("fmi_kg_m2"),
+                    "almi_percentile": idx.get("almi_percentile"),
+                    "ffmi_rating": idx.get("ffmi_rating"),
+                    "fmi_rating": idx.get("fmi_rating"),
+                }
+                if idx
+                else None
+            ),
+            "score_360": (
+                {
+                    "score": s360.get("score"),
+                    "biological_age": s360.get("biological_age"),
+                    "chronological_age": s360.get("chronological_age"),
+                    "biological_age_delta": s360.get("biological_age_delta"),
+                }
+                if s360
+                else None
+            ),
+            "segmental_fat": (
+                {
+                    "arms_pct": seg_fat.get("arms_pct"),
+                    "trunk_pct": seg_fat.get("trunk_pct"),
+                    "legs_pct": seg_fat.get("legs_pct"),
+                }
+                if seg_fat
+                else None
+            ),
+            "segmental_lean": (
+                {
+                    "total_lb": seg_lean.get("total_lb"),
+                    "arms_lb": seg_lean.get("arms_lb"),
+                    "trunk_lb": seg_lean.get("trunk_lb"),
+                    "legs_lb": seg_lean.get("legs_lb"),
+                }
+                if seg_lean
+                else None
+            ),
             "targets": targets if targets else None,
             "changes_vs_baseline": changes if changes else None,
         }
@@ -852,21 +951,29 @@ def handle_physical_overview() -> dict:
     meas_pk = f"{USER_PREFIX}measurements"
     # ADR-058: tape measurements are progress-tracking — hide pilot records
     # (page shows an honest empty state until post-restart measurements exist)
-    meas_resp = table.query(**with_phase_filter({
-        "KeyConditionExpression": Key("pk").eq(meas_pk),
-        "ScanIndexForward": False,
-        "Limit": 1,
-    }))
+    meas_resp = table.query(
+        **with_phase_filter(
+            {
+                "KeyConditionExpression": Key("pk").eq(meas_pk),
+                "ScanIndexForward": False,
+                "Limit": 1,
+            }
+        )
+    )
     meas_items = _decimal_to_float(meas_resp.get("Items", []))
     tape = None
     tape_session_count = 0
     if meas_items:
         m = meas_items[0]
         # Count total sessions
-        count_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot measurements
-            "KeyConditionExpression": Key("pk").eq(meas_pk),
-            "Select": "COUNT",
-        }))
+        count_resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot measurements
+                    "KeyConditionExpression": Key("pk").eq(meas_pk),
+                    "Select": "COUNT",
+                }
+            )
+        )
         tape_session_count = count_resp.get("Count", 1)
 
         # Build tape data from raw measurement fields
@@ -875,8 +982,7 @@ def handle_physical_overview() -> dict:
         for k, v in m.items():
             if k in ("pk", "sk", "ingested_at", "source_file", "unit", "measured_by", "date", "session_number"):
                 continue
-            if k in ("waist_height_ratio", "bilateral_symmetry_bicep_in", "bilateral_symmetry_thigh_in",
-                      "trunk_sum_in", "limb_avg_in"):
+            if k in ("waist_height_ratio", "bilateral_symmetry_bicep_in", "bilateral_symmetry_thigh_in", "trunk_sum_in", "limb_avg_in"):
                 derived[k] = v
             elif k.endswith("_in"):
                 raw[k] = v
@@ -895,14 +1001,19 @@ def handle_physical_overview() -> dict:
     bp_data = None
     try:
         ah_pk = f"{USER_PREFIX}apple_health"
-        ah_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot BP records
-            "KeyConditionExpression": Key("pk").eq(ah_pk) & Key("sk").begins_with("DATE#"),
-            "FilterExpression": "attribute_exists(bp_systolic) OR attribute_exists(blood_pressure_systolic)",
-            "ScanIndexForward": False,
-            "Limit": 30,
-            "ProjectionExpression": ("sk, bp_systolic, bp_diastolic, blood_pressure_systolic, "
-                                     "blood_pressure_diastolic, blood_pressure_readings_count"),
-        }))
+        ah_resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot BP records
+                    "KeyConditionExpression": Key("pk").eq(ah_pk) & Key("sk").begins_with("DATE#"),
+                    "FilterExpression": "attribute_exists(bp_systolic) OR attribute_exists(blood_pressure_systolic)",
+                    "ScanIndexForward": False,
+                    "Limit": 30,
+                    "ProjectionExpression": (
+                        "sk, bp_systolic, bp_diastolic, blood_pressure_systolic, " "blood_pressure_diastolic, blood_pressure_readings_count"
+                    ),
+                }
+            )
+        )
         bp_items = _decimal_to_float(ah_resp.get("Items", []))
         if bp_items:
             latest_bp = bp_items[0]
@@ -921,11 +1032,13 @@ def handle_physical_overview() -> dict:
                 s = bpi.get("bp_systolic") or bpi.get("blood_pressure_systolic")
                 d = bpi.get("bp_diastolic") or bpi.get("blood_pressure_diastolic")
                 if s:
-                    bp_trend.append({
-                        "date": bpi.get("sk", "").replace("DATE#", ""),
-                        "systolic": float(s),
-                        "diastolic": float(d) if d else None,
-                    })
+                    bp_trend.append(
+                        {
+                            "date": bpi.get("sk", "").replace("DATE#", ""),
+                            "systolic": float(s),
+                            "diastolic": float(d) if d else None,
+                        }
+                    )
             bp_data = {
                 "systolic": float(sys_val) if sys_val else None,
                 "diastolic": float(dia_val) if dia_val else None,
@@ -937,17 +1050,19 @@ def handle_physical_overview() -> dict:
     except Exception as _bp_e:
         logger.warning(f"BP query failed (non-fatal): {_bp_e}")
 
-    return _ok({
-        "latest_dexa": _dexa_summary(latest_dexa),
-        "baseline_dexa": _dexa_summary(baseline_dexa),
-        "dexa_scan_count": len(dexa_items),
-        "days_since_dexa": days_since_dexa,
-        "next_dexa_recommended": next_dexa_recommended,
-        "tape_measurements": tape,
-        "tape_session_count": tape_session_count,
-        "blood_pressure": bp_data,
-    }, cache_seconds=3600)
-
+    return _ok(
+        {
+            "latest_dexa": _dexa_summary(latest_dexa),
+            "baseline_dexa": _dexa_summary(baseline_dexa),
+            "dexa_scan_count": len(dexa_items),
+            "days_since_dexa": days_since_dexa,
+            "next_dexa_recommended": next_dexa_recommended,
+            "tape_measurements": tape,
+            "tape_session_count": tape_session_count,
+            "blood_pressure": bp_data,
+        },
+        cache_seconds=3600,
+    )
 
 
 def handle_journal_analysis() -> dict:
@@ -960,10 +1075,14 @@ def handle_journal_analysis() -> dict:
     d90 = _experiment_date(90)
 
     ja_pk = f"{USER_PREFIX}journal_analysis"
-    resp = table.query(**with_phase_filter({  # ADR-058: hide pilot journal analysis
-        "KeyConditionExpression": Key("pk").eq(ja_pk) & Key("sk").between(f"DATE#{d90}", f"DATE#{today}"),
-        "ScanIndexForward": True,
-    }))
+    resp = table.query(
+        **with_phase_filter(
+            {  # ADR-058: hide pilot journal analysis
+                "KeyConditionExpression": Key("pk").eq(ja_pk) & Key("sk").between(f"DATE#{d90}", f"DATE#{today}"),
+                "ScanIndexForward": True,
+            }
+        )
+    )
     items = _decimal_to_float(resp.get("Items", []))
 
     # Build theme frequency counts
@@ -983,32 +1102,38 @@ def handle_journal_analysis() -> dict:
     sentiment_trend = []
     daily_scores = [(item.get("date", ""), float(item.get("sentiment_score", 0))) for item in items]
     for i, (date, _) in enumerate(daily_scores):
-        window = [s for _, s in daily_scores[max(0, i - 6):i + 1]]
-        sentiment_trend.append({
-            "date": date,
-            "avg_sentiment": round(sum(window) / len(window), 3) if window else 0,
-        })
+        window = [s for _, s in daily_scores[max(0, i - 6) : i + 1]]
+        sentiment_trend.append(
+            {
+                "date": date,
+                "avg_sentiment": round(sum(window) / len(window), 3) if window else 0,
+            }
+        )
 
     daily_themes = []
     for item in items:
-        daily_themes.append({
-            "date": item.get("date", item.get("sk", "").replace("DATE#", "")),
-            "dominant_theme": item.get("dominant_theme", "other"),
-            "themes": item.get("themes", []),
-            "sentiment_score": float(item.get("sentiment_score", 0)),
-            "sentiment_label": item.get("sentiment_label", "neutral"),
-            "word_count": item.get("word_count", 0),
-            "one_line_summary": item.get("one_line_summary", ""),
-        })
+        daily_themes.append(
+            {
+                "date": item.get("date", item.get("sk", "").replace("DATE#", "")),
+                "dominant_theme": item.get("dominant_theme", "other"),
+                "themes": item.get("themes", []),
+                "sentiment_score": float(item.get("sentiment_score", 0)),
+                "sentiment_label": item.get("sentiment_label", "neutral"),
+                "word_count": item.get("word_count", 0),
+                "one_line_summary": item.get("one_line_summary", ""),
+            }
+        )
 
-    return _ok({
-        "daily_themes": daily_themes,
-        "top_themes": top_themes,
-        "total_analyzed": total,
-        "date_range": {"start": d90, "end": today},
-        "sentiment_trend": sentiment_trend,
-    }, cache_seconds=3600)
-
+    return _ok(
+        {
+            "daily_themes": daily_themes,
+            "top_themes": top_themes,
+            "total_analyzed": total,
+            "date_range": {"start": d90, "end": today},
+            "sentiment_trend": sentiment_trend,
+        },
+        cache_seconds=3600,
+    )
 
 
 def handle_mind_overview() -> dict:
@@ -1044,22 +1169,26 @@ def handle_mind_overview() -> dict:
     for s in som_items:
         valence = s.get("valence")
         if valence is not None:
-            mood_entries.append({
-                "date": s.get("date") or s.get("sk", "").replace("DATE#", ""),
-                "valence": float(valence),
-                "label": s.get("label", ""),
-            })
+            mood_entries.append(
+                {
+                    "date": s.get("date") or s.get("sk", "").replace("DATE#", ""),
+                    "valence": float(valence),
+                    "label": s.get("label", ""),
+                }
+            )
     # Fallback: check apple_health partition for som_avg_valence (HAE writes here)
     if not mood_entries:
         ah_som = _query_source("apple_health", d30, today)
         for s in ah_som:
             valence = s.get("som_avg_valence")
             if valence is not None:
-                mood_entries.append({
-                    "date": s.get("date") or s.get("sk", "").replace("DATE#", ""),
-                    "valence": float(valence),
-                    "label": "",
-                })
+                mood_entries.append(
+                    {
+                        "date": s.get("date") or s.get("sk", "").replace("DATE#", ""),
+                        "valence": float(valence),
+                        "label": "",
+                    }
+                )
     mood_entries.sort(key=lambda x: x["date"])
     avg_valence = None
     if mood_entries:
@@ -1071,11 +1200,15 @@ def handle_mind_overview() -> dict:
     # blocked_vices full names AND blocked_vice_keywords substrings) so the
     # client doesn't have to ship a keyword list to filter what we missed.
     hs_pk = f"{USER_PREFIX}habit_scores"
-    hs_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot habit scores
-        "KeyConditionExpression": Key("pk").eq(hs_pk),
-        "ScanIndexForward": False,
-        "Limit": 1,
-    }))
+    hs_resp = table.query(
+        **with_phase_filter(
+            {  # ADR-058: hide pilot habit scores
+                "KeyConditionExpression": Key("pk").eq(hs_pk),
+                "ScanIndexForward": False,
+                "Limit": 1,
+            }
+        )
+    )
     hs_items = _decimal_to_float(hs_resp.get("Items", []))
     vice_data = []
     if hs_items:
@@ -1085,22 +1218,26 @@ def handle_mind_overview() -> dict:
             for name, streak_val in raw_vs.items():
                 if _is_blocked_vice(name):
                     continue
-                vice_data.append({
-                    "name": name,
-                    "current_streak": int(streak_val or 0),
-                    "holding": int(streak_val or 0) > 0,
-                })
+                vice_data.append(
+                    {
+                        "name": name,
+                        "current_streak": int(streak_val or 0),
+                        "holding": int(streak_val or 0) > 0,
+                    }
+                )
         vice_data.sort(key=lambda v: -v["current_streak"])
 
     # ── 4. Social connection quality (interactions) ──
     int_pk = f"{USER_PREFIX}interactions"
     try:
-        int_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot interactions
-            "KeyConditionExpression": Key("pk").eq(int_pk) & Key("sk").between(
-                f"DATE#{d30}", f"DATE#{today}~"
-            ),
-            "ScanIndexForward": True,
-        }))
+        int_resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot interactions
+                    "KeyConditionExpression": Key("pk").eq(int_pk) & Key("sk").between(f"DATE#{d30}", f"DATE#{today}~"),
+                    "ScanIndexForward": True,
+                }
+            )
+        )
         interactions = _decimal_to_float(int_resp.get("Items", []))
     except Exception:
         interactions = []
@@ -1116,11 +1253,13 @@ def handle_mind_overview() -> dict:
     # ── 5. Temptation resist rate (90d) ──
     temp_pk = f"{USER_PREFIX}temptations"
     try:
-        temp_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot temptations
-            "KeyConditionExpression": Key("pk").eq(temp_pk) & Key("sk").between(
-                f"DATE#{d90}", f"DATE#{today}~"
-            ),
-        }))
+        temp_resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot temptations
+                    "KeyConditionExpression": Key("pk").eq(temp_pk) & Key("sk").between(f"DATE#{d90}", f"DATE#{today}~"),
+                }
+            )
+        )
         temptations = _decimal_to_float(temp_resp.get("Items", []))
     except Exception:
         temptations = []
@@ -1132,12 +1271,14 @@ def handle_mind_overview() -> dict:
     # ── 6. Journal entry count (as journaling progress signal) ──
     journal_pk = f"{USER_PREFIX}notion"
     try:
-        j_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot journal records
-            "KeyConditionExpression": Key("pk").eq(journal_pk) & Key("sk").between(
-                f"DATE#{d30}", f"DATE#{today}"
-            ),
-            "Select": "COUNT",
-        }))
+        j_resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot journal records
+                    "KeyConditionExpression": Key("pk").eq(journal_pk) & Key("sk").between(f"DATE#{d30}", f"DATE#{today}"),
+                    "Select": "COUNT",
+                }
+            )
+        )
         journal_count = j_resp.get("Count", 0)
     except Exception:
         journal_count = 0
@@ -1157,11 +1298,13 @@ def handle_mind_overview() -> dict:
             _bw_min = _mm_min
             _bw_sess = max(_bw_sess, 1)  # At least 1 session if we have minutes
         if _bw_min > 0 or _bw_sess > 0:
-            meditation_sessions.append({
-                "date": _md,
-                "minutes": round(_bw_min, 1),
-                "sessions": _bw_sess,
-            })
+            meditation_sessions.append(
+                {
+                    "date": _md,
+                    "minutes": round(_bw_min, 1),
+                    "sessions": _bw_sess,
+                }
+            )
             med_total_min += _bw_min
             med_session_count += _bw_sess
     meditation_sessions.sort(key=lambda x: x["date"])
@@ -1173,10 +1316,14 @@ def handle_mind_overview() -> dict:
     }
 
     # ── 8. Vice streak timeline (30-day daily history) ──
-    hs_30d_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot habit scores
-        "KeyConditionExpression": Key("pk").eq(hs_pk) & Key("sk").between(f"DATE#{d30}", f"DATE#{today}"),
-        "ScanIndexForward": True,
-    }))
+    hs_30d_resp = table.query(
+        **with_phase_filter(
+            {  # ADR-058: hide pilot habit scores
+                "KeyConditionExpression": Key("pk").eq(hs_pk) & Key("sk").between(f"DATE#{d30}", f"DATE#{today}"),
+                "ScanIndexForward": True,
+            }
+        )
+    )
     hs_30d_items = _decimal_to_float(hs_30d_resp.get("Items", []))
     vice_timeline = []
     for hs_day in hs_30d_items:
@@ -1196,10 +1343,16 @@ def handle_mind_overview() -> dict:
     # ── 9. Energy level from journal analysis (latest entry) ──
     energy_level = None
     try:
-        ja_resp = table.query(**with_phase_filter({  # ADR-058: hide pilot journal analysis
-            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}journal_analysis") & Key("sk").between(f"DATE#{d30}", f"DATE#{today}"),
-            "ScanIndexForward": False, "Limit": 5,
-        }))
+        ja_resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot journal analysis
+                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}journal_analysis")
+                    & Key("sk").between(f"DATE#{d30}", f"DATE#{today}"),
+                    "ScanIndexForward": False,
+                    "Limit": 5,
+                }
+            )
+        )
         ja_items = _decimal_to_float(ja_resp.get("Items", []))
         energy_vals = [i.get("energy_level") for i in ja_items if i.get("energy_level")]
         if energy_vals:
@@ -1207,32 +1360,35 @@ def handle_mind_overview() -> dict:
     except Exception:
         pass
 
-    return _ok({
-        "mind": {
-            "mind_pillar": mind_pillar,
-            "avg_valence": avg_valence,
-            "mood_entries_count": len(mood_entries),
-            "journal_entries_30d": journal_count,
-            "resist_rate_pct": resist_rate,
-            "total_temptations_90d": total_temptations,
-            "resisted_90d": resisted,
-            "total_interactions_30d": total_interactions,
-            "meaningful_pct": meaningful_pct,
-            "depth_counts": depth_counts,
-            "energy_level": energy_level,
+    return _ok(
+        {
+            "mind": {
+                "mind_pillar": mind_pillar,
+                "avg_valence": avg_valence,
+                "mood_entries_count": len(mood_entries),
+                "journal_entries_30d": journal_count,
+                "resist_rate_pct": resist_rate,
+                "total_temptations_90d": total_temptations,
+                "resisted_90d": resisted,
+                "total_interactions_30d": total_interactions,
+                "meaningful_pct": meaningful_pct,
+                "depth_counts": depth_counts,
+                "energy_level": energy_level,
+            },
+            "vice_streaks": vice_data,
+            "vice_timeline": vice_timeline,
+            "mood_trend": mood_entries[-30:],
+            "meditation": meditation_data,
         },
-        "vice_streaks": vice_data,
-        "vice_timeline": vice_timeline,
-        "mood_trend": mood_entries[-30:],
-        "meditation": meditation_data,
-    }, cache_seconds=3600)
-
+        cache_seconds=3600,
+    )
 
 
 def handle_frequent_meals() -> dict:
     """GET /api/frequent_meals — Top meals by frequency from MacroFactor food logs."""
-    from datetime import datetime, timezone, timedelta
     from collections import Counter, defaultdict
+    from datetime import datetime, timedelta, timezone
+
     now = datetime.now(timezone.utc)
     end_date = now.strftime("%Y-%m-%d")
     start_date = (now - timedelta(days=30)).strftime("%Y-%m-%d")
@@ -1264,14 +1420,16 @@ def handle_frequent_meals() -> dict:
             avg_pro = round(m["protein"] / cnt)
             avg_carb = round(m["carbs"] / cnt)
             ppc = round((avg_pro * 4 / avg_cal * 100)) if avg_cal > 0 else 0
-            top_meals.append({
-                "name": name,
-                "frequency": freq,
-                "avg_calories": avg_cal,
-                "avg_protein_g": avg_pro,
-                "avg_carbs_g": avg_carb,
-                "protein_cal_pct": ppc,
-            })
+            top_meals.append(
+                {
+                    "name": name,
+                    "frequency": freq,
+                    "avg_calories": avg_cal,
+                    "avg_protein_g": avg_pro,
+                    "avg_carbs_g": avg_carb,
+                    "protein_cal_pct": ppc,
+                }
+            )
 
         return _ok({"meals": top_meals, "period_days": 30}, cache_seconds=3600)
     except Exception as e:
@@ -1279,11 +1437,11 @@ def handle_frequent_meals() -> dict:
         return _error(503, "Meal data temporarily unavailable.")
 
 
-
 def handle_meal_glucose() -> dict:
     """GET /api/meal_glucose — Cross-reference MacroFactor meals with Dexcom CGM spikes."""
-    from datetime import datetime, timezone, timedelta
     from collections import defaultdict
+    from datetime import datetime, timedelta, timezone
+
     now = datetime.now(timezone.utc)
     end_date = now.strftime("%Y-%m-%d")
     start_date = _experiment_date(30)
@@ -1304,10 +1462,9 @@ def handle_meal_glucose() -> dict:
                 daily_glucose[date] = {"avg": avg, "peak": peak, "baseline": baseline, "tir": tir}
 
         # Aggregate meals with glucose context
-        meal_data = defaultdict(lambda: {
-            "cal": 0, "protein": 0, "carbs": 0, "count": 0,
-            "spike_sum": 0, "spike_count": 0, "category": "meal"
-        })
+        meal_data = defaultdict(
+            lambda: {"cal": 0, "protein": 0, "carbs": 0, "count": 0, "spike_sum": 0, "spike_count": 0, "category": "meal"}
+        )
 
         for day in mf_items:
             date = day.get("sk", "").replace("DATE#", "")
@@ -1382,16 +1539,18 @@ def handle_meal_glucose() -> dict:
                 grade = "D"
                 curve = "steep"
 
-            results.append({
-                "meal": name,
-                "category": m["category"],
-                "calories": avg_cal,
-                "protein": avg_pro,
-                "carbs": avg_carb,
-                "spike": avg_spike if avg_spike is not None else 0,
-                "grade": grade,
-                "curve": curve,
-            })
+            results.append(
+                {
+                    "meal": name,
+                    "category": m["category"],
+                    "calories": avg_cal,
+                    "protein": avg_pro,
+                    "carbs": avg_carb,
+                    "spike": avg_spike if avg_spike is not None else 0,
+                    "grade": grade,
+                    "curve": curve,
+                }
+            )
 
         return _ok({"meals": results, "period_days": 30, "has_cgm": bool(daily_glucose)}, cache_seconds=3600)
     except Exception as e:
@@ -1399,17 +1558,20 @@ def handle_meal_glucose() -> dict:
         return _error(503, "Meal glucose data temporarily unavailable.")
 
 
-
 def handle_strength_benchmarks() -> dict:
     """GET /api/strength_benchmarks — Current 1RM and progress from Hevy data."""
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta, timezone
+
     now = datetime.now(timezone.utc)
     end_date = now.strftime("%Y-%m-%d")
     start_date = (now - timedelta(days=90)).strftime("%Y-%m-%d")
 
     targets = {
         # Matthew's personal 1RM goals -- should migrate to profile.strength_targets
-        "Deadlift": 315, "Squat": 265, "Bench Press": 185, "Overhead Press": 135,
+        "Deadlift": 315,
+        "Squat": 265,
+        "Bench Press": 185,
+        "Overhead Press": 135,
     }
 
     try:
@@ -1431,18 +1593,19 @@ def handle_strength_benchmarks() -> dict:
         benchmarks = []
         for lift, target in targets.items():
             current = best.get(lift, 0)
-            benchmarks.append({
-                "lift": lift,
-                "current_1rm": round(current),
-                "target": target,
-                "progress_pct": round((current / target) * 100) if target > 0 else 0,
-            })
+            benchmarks.append(
+                {
+                    "lift": lift,
+                    "current_1rm": round(current),
+                    "target": target,
+                    "progress_pct": round((current / target) * 100) if target > 0 else 0,
+                }
+            )
 
         return _ok({"benchmarks": benchmarks, "period_days": 90}, cache_seconds=3600)
     except Exception as e:
         logger.warning(f"[strength_benchmarks] Failed: {e}")
         return _error(503, "Strength data temporarily unavailable.")
-
 
 
 def handle_food_delivery_overview() -> dict:
@@ -1459,6 +1622,7 @@ def handle_food_delivery_overview() -> dict:
         return _ok({"food_delivery": None}, cache_seconds=3600)
 
     from collections import Counter, defaultdict
+
     total_orders = len(items)
     total_spend = sum(float(i.get("amount") or 0) for i in items)
     platform_counts = Counter()
@@ -1478,17 +1642,19 @@ def handle_food_delivery_overview() -> dict:
 
     weekly_trend = sorted([{"week": k, "orders": v} for k, v in weekly_counts.items()], key=lambda x: x["week"])
 
-    return _ok({
-        "food_delivery": {
-            "orders_30d": total_orders,
-            "avg_spend": round(total_spend / total_orders, 2) if total_orders else 0,
-            "total_spend_30d": round(total_spend, 2),
-            "binge_days_30d": binge_days,
+    return _ok(
+        {
+            "food_delivery": {
+                "orders_30d": total_orders,
+                "avg_spend": round(total_spend / total_orders, 2) if total_orders else 0,
+                "total_spend_30d": round(total_spend, 2),
+                "binge_days_30d": binge_days,
+            },
+            "platform_breakdown": [{"platform": p, "count": c} for p, c in platform_counts.most_common()],
+            "weekly_trend": weekly_trend,
         },
-        "platform_breakdown": [{"platform": p, "count": c} for p, c in platform_counts.most_common()],
-        "weekly_trend": weekly_trend,
-    }, cache_seconds=3600)
-
+        cache_seconds=3600,
+    )
 
 
 def handle_strength_deep_dive() -> dict:
@@ -1505,7 +1671,7 @@ def handle_strength_deep_dive() -> dict:
     if not items:
         return _ok({"strength": None, "message": "No strength data available"}, cache_seconds=3600)
 
-    from collections import defaultdict, Counter
+    from collections import Counter, defaultdict
 
     # Volume load per week (sets × reps × weight)
     weekly_volume = defaultdict(float)
@@ -1540,25 +1706,24 @@ def handle_strength_deep_dive() -> dict:
         if d >= d30:
             session_days[dt.strftime("%a")] += 1
 
-    volume_trend = sorted([
-        {"week": k, "volume_lbs": round(v)}
-        for k, v in weekly_volume.items()
-    ], key=lambda x: x["week"])[-12:]
+    volume_trend = sorted([{"week": k, "volume_lbs": round(v)} for k, v in weekly_volume.items()], key=lambda x: x["week"])[-12:]
 
     top_exercises = [{"name": n, "frequency": c} for n, c in exercise_freq.most_common(10)]
 
-    return _ok({
-        "strength": {
-            "sessions_90d": len(items),
-            "sessions_30d": len([i for i in items if (i.get("date") or i.get("sk", "").replace("DATE#", "")) >= d30]),
-            "distinct_exercises_30d": len(exercises_30d),
-            "total_sets_30d": total_sets_30d,
+    return _ok(
+        {
+            "strength": {
+                "sessions_90d": len(items),
+                "sessions_30d": len([i for i in items if (i.get("date") or i.get("sk", "").replace("DATE#", "")) >= d30]),
+                "distinct_exercises_30d": len(exercises_30d),
+                "total_sets_30d": total_sets_30d,
+            },
+            "volume_trend": volume_trend,
+            "top_exercises": top_exercises,
+            "session_days": dict(session_days),
         },
-        "volume_trend": volume_trend,
-        "top_exercises": top_exercises,
-        "session_days": dict(session_days),
-    }, cache_seconds=3600)
-
+        cache_seconds=3600,
+    )
 
 
 def handle_benchmark_trends() -> dict:
@@ -1566,26 +1731,26 @@ def handle_benchmark_trends() -> dict:
     try:
         # ADR-058: phase=pilot hidden by default; pre-genesis benchmarks won't leak.
         from phase_filter import with_phase_filter
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": 'pk = :pk',
-            "ExpressionAttributeValues": {':pk': 'USER#matthew#SOURCE#benchmarks'},
-            "ScanIndexForward": False,
-            "Limit": 30,
-        }))
-        items = resp.get('Items', [])
+
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk",
+                    "ExpressionAttributeValues": {":pk": "USER#matthew#SOURCE#benchmarks"},
+                    "ScanIndexForward": False,
+                    "Limit": 30,
+                }
+            )
+        )
+        items = resp.get("Items", [])
         return {
-            'statusCode': 200,
-            'headers': {**CORS_HEADERS, 'Cache-Control': 'max-age=300'},
-            'body': json.dumps({'trends': items}, default=str)
+            "statusCode": 200,
+            "headers": {**CORS_HEADERS, "Cache-Control": "max-age=300"},
+            "body": json.dumps({"trends": items}, default=str),
         }
     except Exception as e:
         logger.warning(f"[site_api] benchmark_trends: {e}")
-        return {
-            'statusCode': 200,
-            'headers': {**CORS_HEADERS, 'Cache-Control': 'max-age=300'},
-            'body': json.dumps({'trends': []})
-        }
-
+        return {"statusCode": 200, "headers": {**CORS_HEADERS, "Cache-Control": "max-age=300"}, "body": json.dumps({"trends": []})}
 
 
 def handle_meal_responses() -> dict:
@@ -1593,25 +1758,26 @@ def handle_meal_responses() -> dict:
     try:
         # ADR-058: phase=pilot hidden by default.
         from phase_filter import with_phase_filter
-        resp = table.query(**with_phase_filter({
-            "KeyConditionExpression": 'pk = :pk',
-            "ExpressionAttributeValues": {':pk': 'USER#matthew#SOURCE#meal_responses'},
-            "ScanIndexForward": False,
-            "Limit": 50,
-        }))
-        items = resp.get('Items', [])
+
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk",
+                    "ExpressionAttributeValues": {":pk": "USER#matthew#SOURCE#meal_responses"},
+                    "ScanIndexForward": False,
+                    "Limit": 50,
+                }
+            )
+        )
+        items = resp.get("Items", [])
         return {
-            'statusCode': 200,
-            'headers': {**CORS_HEADERS, 'Cache-Control': 'max-age=600'},
-            'body': json.dumps({'meals': items}, default=str)
+            "statusCode": 200,
+            "headers": {**CORS_HEADERS, "Cache-Control": "max-age=600"},
+            "body": json.dumps({"meals": items}, default=str),
         }
     except Exception as e:
         logger.warning(f"[site_api] meal_responses: {e}")
-        return {
-            'statusCode': 200,
-            'headers': {**CORS_HEADERS, 'Cache-Control': 'max-age=600'},
-            'body': json.dumps({'meals': []})
-        }
+        return {"statusCode": 200, "headers": {**CORS_HEADERS, "Cache-Control": "max-age=600"}, "body": json.dumps({"meals": []})}
 
 
 def handle_workouts() -> dict:
@@ -1624,12 +1790,15 @@ def handle_workouts() -> dict:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
     try:
-        resp = table.query(**with_phase_filter({  # ADR-058: hide pilot workouts
-            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}hevy") & Key("sk").between(
-                f"DATE#{d30}#WORKOUT#", f"DATE#{today}#WORKOUT#~"
-            ),
-            "ScanIndexForward": False,
-        }))
+        resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot workouts
+                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}hevy")
+                    & Key("sk").between(f"DATE#{d30}#WORKOUT#", f"DATE#{today}#WORKOUT#~"),
+                    "ScanIndexForward": False,
+                }
+            )
+        )
         items = _decimal_to_float(resp.get("Items", []))
     except Exception as exc:  # noqa: BLE001
         return _ok({"workouts": [], "error": str(exc)[:120]}, cache_seconds=300)
@@ -1643,24 +1812,28 @@ def handle_workouts() -> dict:
     workouts = []
     for w in items[:30]:
         exercises = []
-        for ex in (w.get("exercises") or []):
+        for ex in w.get("exercises") or []:
             sets = []
-            for s in (ex.get("sets") or []):
-                sets.append({
-                    "type": s.get("type") or "normal",
-                    "reps": _num(s.get("reps")),
-                    "weight_kg": _num(s.get("weight_kg")),
-                    "rpe": _num(s.get("rpe")),
-                    "distance_m": _num(s.get("distance_m")),
-                })
+            for s in ex.get("sets") or []:
+                sets.append(
+                    {
+                        "type": s.get("type") or "normal",
+                        "reps": _num(s.get("reps")),
+                        "weight_kg": _num(s.get("weight_kg")),
+                        "rpe": _num(s.get("rpe")),
+                        "distance_m": _num(s.get("distance_m")),
+                    }
+                )
             exercises.append({"name": ex.get("name"), "notes": ex.get("notes") or "", "sets": sets})
-        workouts.append({
-            "date": w.get("date"),
-            "title": w.get("title"),
-            "duration_min": round((_num(w.get("duration_sec")) or 0) / 60),
-            "total_volume_kg": _num(w.get("total_volume_kg")),
-            "exercise_count": w.get("exercise_count"),
-            "set_count": w.get("set_count"),
-            "exercises": exercises,
-        })
+        workouts.append(
+            {
+                "date": w.get("date"),
+                "title": w.get("title"),
+                "duration_min": round((_num(w.get("duration_sec")) or 0) / 60),
+                "total_volume_kg": _num(w.get("total_volume_kg")),
+                "exercise_count": w.get("exercise_count"),
+                "set_count": w.get("set_count"),
+                "exercises": exercises,
+            }
+        )
     return _ok({"workouts": workouts, "count": len(workouts)}, cache_seconds=900)
