@@ -22,15 +22,16 @@ V2 P2.9 (2026-05-17): docstring corrected to match actual ADR-052 reordering
 
 from aws_cdk import (
     Stack,
+    aws_dynamodb as dynamodb,
+    aws_events as events,
+    aws_events_targets as targets,
+    aws_lambda as _lambda,
+    aws_s3 as s3,
+    aws_sns as sns,
+    aws_sqs as sqs,
 )
-from aws_cdk import aws_dynamodb as dynamodb
-from aws_cdk import aws_events as events
-from aws_cdk import aws_events_targets as targets
-from aws_cdk import aws_lambda as _lambda
-from aws_cdk import aws_s3 as s3
-from aws_cdk import aws_sns as sns
-from aws_cdk import aws_sqs as sqs
 from constructs import Construct
+
 from stacks import role_policies as rp
 from stacks.constants import ACCT, AI_MODEL_HAIKU, REGION, S3_BUCKET, SHARED_LAYER_ARN, TABLE_NAME  # CONF-01, CONF-04
 from stacks.lambda_helpers import create_platform_lambda

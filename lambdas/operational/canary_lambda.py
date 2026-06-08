@@ -176,7 +176,7 @@ def check_s3(canary_ts: str, payload: dict) -> tuple[bool, str, float]:
 
         # Verify
         if read_obj.get("hash") != payload["hash"]:
-            return False, f"S3 integrity mismatch", (time.monotonic() - t0) * 1000
+            return False, "S3 integrity mismatch", (time.monotonic() - t0) * 1000
 
         latency = (time.monotonic() - t0) * 1000
         return True, f"S3 round-trip OK ({latency:.0f}ms)", latency
@@ -392,7 +392,7 @@ def check_subscribe_flow(canary_ts: str) -> tuple[bool, str, float]:
         ddb_client = boto3.client("dynamodb", region_name=REGION)
         rec_resp = ddb_client.get_item(
             TableName=TABLE_NAME,
-            Key={"pk": {"S": f"USER#matthew#SOURCE#subscribers"}, "sk": {"S": sk}},
+            Key={"pk": {"S": "USER#matthew#SOURCE#subscribers"}, "sk": {"S": sk}},
         )
         item = rec_resp.get("Item")
         latency = (time.monotonic() - t0) * 1000
@@ -452,7 +452,7 @@ def send_alert(failures: list[dict], canary_ts: str) -> None:
     {rows}
   </table>
   <div class="footer">
-    Lambda: life-platform-canary | 
+    Lambda: life-platform-canary |
     <a href="https://us-west-2.console.aws.amazon.com/cloudwatch/home?region=us-west-2#dashboards:name=life-platform-ops" style="color:#888;">Dashboard</a>
   </div>
 </div></body></html>"""

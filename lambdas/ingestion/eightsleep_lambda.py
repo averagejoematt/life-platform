@@ -497,7 +497,7 @@ def fetch_temperature_data(user_id: str, access_token: str, wake_date: str, tz: 
         if result:
             print(f"Temperature data found: {list(result.keys())}")
         else:
-            print(f"No temperature data found in intervals response")
+            print("No temperature data found in intervals response")
             print(f"  Interval keys: {list(target.keys())[:15]}")
 
         return result

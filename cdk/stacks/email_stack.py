@@ -18,13 +18,14 @@ Lambdas (11):
 import aws_cdk as cdk
 from aws_cdk import (
     Stack,
+    aws_dynamodb as dynamodb,
+    aws_lambda as _lambda,
+    aws_s3 as s3,
+    aws_sns as sns,
+    aws_sqs as sqs,
 )
-from aws_cdk import aws_dynamodb as dynamodb
-from aws_cdk import aws_lambda as _lambda
-from aws_cdk import aws_s3 as s3
-from aws_cdk import aws_sns as sns
-from aws_cdk import aws_sqs as sqs
 from constructs import Construct
+
 from stacks import role_policies as rp
 from stacks.constants import ACCT, CF_DIST_ID, REGION, SHARED_LAYER_ARN  # single source of truth for layer version
 from stacks.lambda_helpers import create_platform_lambda

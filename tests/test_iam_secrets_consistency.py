@@ -23,7 +23,6 @@ import os
 import re
 import sys
 
-
 # ── Add cdk/ and cdk/stacks/ to path ─────────────────────────────────────────
 # cdk/ is needed so `from stacks.constants import ...` resolves as a package.
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))

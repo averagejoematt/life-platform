@@ -126,7 +126,7 @@ def main():
     print(f"[{mode}] rollback. current_genesis={EXPERIMENT_START_DATE}")
     print(f"  current tombstoned_reason='{TOMBSTONE_REASON_CURRENT}'")
     if args.full_unwind:
-        print(f"  Mode: FULL UNWIND — removes ALL phase tags + ALL tombstones")
+        print("  Mode: FULL UNWIND — removes ALL phase tags + ALL tombstones")
     else:
         print(f"  Mode: ROLL BACK to genesis={args.to_genesis}")
 
@@ -140,11 +140,11 @@ def main():
 
     # ── 2. Strip phase tags (only on full unwind) ──
     if args.full_unwind:
-        print(f"\n[2] Removing ALL phase attributes")
+        print("\n[2] Removing ALL phase attributes")
         phases = remove_all_phase_tags(table, args.apply)
         print(f"  {phases} items {'untagged' if args.apply else 'would be untagged'}")
     else:
-        print(f"\n[2] Skipping phase strip (rolling back to a different genesis, not full unwind)")
+        print("\n[2] Skipping phase strip (rolling back to a different genesis, not full unwind)")
 
     # ── 3. If rolling back to a specific genesis, kick off the pipeline ──
     if args.to_genesis and args.apply:
@@ -162,7 +162,7 @@ def main():
             cwd=REPO_ROOT,
         )
         print(f"  pipeline exit={proc.returncode}")
-        print(f"  NOTE: weight defaulted to 297.24 placeholder; re-run restart_pipeline with --override or wait for genesis-day Withings.")
+        print("  NOTE: weight defaulted to 297.24 placeholder; re-run restart_pipeline with --override or wait for genesis-day Withings.")
 
     # Report
     report = REPO_ROOT / "docs" / "restart" / "_rollback_report.txt"
@@ -176,7 +176,7 @@ def main():
     )
     print(f"\nReport: {report.relative_to(REPO_ROOT)}")
     if not args.apply:
-        print(f"\n(dry-run) — pass --apply to commit.")
+        print("\n(dry-run) — pass --apply to commit.")
 
 
 if __name__ == "__main__":

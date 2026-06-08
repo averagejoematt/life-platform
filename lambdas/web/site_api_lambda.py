@@ -457,7 +457,7 @@ def lambda_handler(event, context):
     # Catches oversized bodies, injection patterns, malformed user_id/date/source
     # before any handler runs. Returns 4xx for obvious abuse; legit traffic unaffected.
     try:
-        from request_validator import ValidationError, validate_envelope
+        from request_validator import validate_envelope
 
         validate_envelope(event, path=path, method=method)
     except ImportError:

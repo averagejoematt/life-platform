@@ -548,7 +548,7 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
     # Phase 2.2: centralized request envelope validation (Body size cap +
     # injection pattern detection + param format checks). Returns 4xx on abuse.
     try:
-        from request_validator import ValidationError, validate_envelope
+        from request_validator import validate_envelope
 
         path = event.get("rawPath") or event.get("path", "/")
         method = (event.get("requestContext", {}).get("http", {}).get("method") or event.get("httpMethod", "POST")).upper()

@@ -635,7 +635,7 @@ print("\n-- call_anthropic middleware -------------------------------------")
 
 import inspect
 
-from ai_calls import _AI_VALIDATOR_AVAILABLE, AIOutputType, call_anthropic
+from ai_calls import _AI_VALIDATOR_AVAILABLE, call_anthropic
 
 
 def test_call_anthropic_has_output_type_param():

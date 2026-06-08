@@ -317,7 +317,6 @@ def tool_get_cross_source_correlation(args):
     P-value: two-tailed t-test on r (t = r * sqrt(n-2) / sqrt(1-r²), df=n-2).
     95% CI: Fisher z-transform method.
     """
-    import math
 
     source_a = args.get("source_a")
     field_a = args.get("field_a")
@@ -394,8 +393,8 @@ def tool_get_cross_source_correlation(args):
         # Regularised incomplete beta function approximation
         # For df > 5 this gives p accurate to <0.005
         try:
-            import math
-
+            # math is imported at module top (line 7); a local `import math` here
+            # shadowed it and made the earlier math.sqrt() an UnboundLocalError (F823).
             # Use a simple but sufficiently accurate p-value from the t-distribution
             # via the beta function approximation
             a = df / 2.0
