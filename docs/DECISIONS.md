@@ -2366,3 +2366,22 @@ The AWS "account-controls" sub-grade stays below a literal-checklist A on those 
 ---
 
 **Verified:** 2026-06-08 (ADR-079 — GuardDuty/Config deferred by choice; compensating controls documented)
+
+---
+
+## ADR-080: CI quality gates — enforced mypy (tier-1), coverage floor, Lambda size gate
+
+**Status:** Accepted (2026-06-08)
+
+**Context:** After the A-grade overhaul (black + ruff already enforced; the `ai_calls` split done), the remaining code-quality gaps were *unformalized good practice*: mypy ran advisory, coverage was measured but not gated, and nothing stopped a new god-module. A CTO inspection wants these as enforced gates, not conventions.
+
+**Decision:**
+1. **mypy is ENFORCED** on a curated clean-module set (`tests/test_mypy_clean_modules.py::MYPY_CLEAN_MODULES`, mirrored by a blocking CI step). **Tier-1** = the budget/auth/inference core (`secret_cache`, `retry_utils`, `phase_filter`, `constants`, `bedrock_client`) — a type regression there is exactly the class of silent bug that risks spend or security. The broader clean set (`scoring_engine`, `character_engine`, `intelligence_common`, `ai_calls`/`ai_context`/`ai_summaries`) is enforced too; modules join the set only once clean (ratchet outward).
+2. **Coverage regression floor** `--cov-fail-under=8` on `lambdas/`+`mcp/`. The offline line-coverage baseline is ~9% **by design** — handlers are integration-tested (live smoke + the post-deploy I1–I9 checks); the ~1600 offline tests are mostly structural/contract (wiring, role-policy, registry, schema). The floor prevents *backsliding*; it is not a quality bar. Ratchet up as offline coverage grows.
+3. **Lambda size gate** (`tests/test_lambda_size_gate.py`): no NEW `*_lambda.py` may exceed 2000 lines. Three existing handlers are **grandfathered accepted-complexity** — `daily_brief_lambda.py`, `wednesday_chronicle_lambda.py`, `daily_insight_compute_lambda.py` — tightly-coupled email/compute pipelines whose split is deferred. The set may only shrink (split), never grow.
+
+**Consequences:** Type-correctness on the spend/security core, coverage, and module size are now machine-enforced — quality can't silently decay. The grandfathered set + the low coverage floor are honest, documented trade-offs rather than hidden gaps.
+
+---
+
+**Verified:** 2026-06-08 (ADR-080 — mypy tier-1 + coverage floor + size gate all enforced in CI)
