@@ -257,6 +257,7 @@
     "modules": [
       "lambdas/ai_calls.py",
       "lambdas/ai_summaries.py",
+      "lambdas/ai_context.py",
       "lambdas/ai_output_validator.py",
       "lambdas/auth_breaker.py",
       "lambdas/bedrock_client.py",
@@ -380,6 +381,7 @@
       "lambdas/html_builder.py",
       "lambdas/ai_calls.py",
       "lambdas/ai_summaries.py",
+      "lambdas/ai_context.py",
       "lambdas/scoring_engine.py",
       "lambdas/board_loader.py",
       "lambdas/insight_writer.py",
