@@ -162,16 +162,22 @@ class OperationalStack(Stack):
             shared_layer=shared_utils_layer,
         )
 
-        # ── 3b. Cost Governor — hourly budget-tier estimator (budget guardrails)
+        # ── 3b. Cost Governor — budget-tier estimator (budget guardrails)
         # Estimates near-real-time spend (Cost Explorer non-AI + Bedrock token
         # metrics) and writes /life-platform/budget-tier to SSM. The AI features
         # read it (budget_guard) to degrade gracefully; bedrock_client enforces
         # the Tier-3 hard stop. AWS Budgets is the lagged backstop.
+        # Cadence: every 4h (was hourly). Each run makes one Cost Explorer
+        # GetCostAndUsage call ($0.01 each) — hourly was ~$2-4/mo of self-cost to
+        # poll a slow-moving non-AI bill. 6×/day keeps the tier fresh enough (the
+        # fast-moving AI half is priced from cheap CloudWatch token metrics, and
+        # public AI is rate-limited + the AWS Budget alerts independently) while
+        # cutting the CE-API line ~80%.
         create_platform_lambda(self, "CostGovernor",
             function_name="life-platform-cost-governor",
             source_file="lambdas/operational/cost_governor_lambda.py",
             handler="operational.cost_governor_lambda.lambda_handler",
-            schedule="cron(0 * * * ? *)",  # hourly
+            schedule="cron(0 0/4 * * ? *)",  # every 4 hours (CE self-cost reduction)
             timeout_seconds=60, memory_mb=256,
             # 2026-05-29: enforcement ENABLED — the projection fix makes the
             # estimate reliable (projected ~$45, Tier 0). Writes the SSM tier +
