@@ -4,7 +4,7 @@ Last updated: 2026-06-08 (v8.4.0 — 133 MCP tools, 38-module package, 73 Lambda
 
 **Ground truth at last verification:**
 - Lambda functions deployed: 73 (5 power-tuning Lambdas deleted in V2 P4)
-- Shared layer `life-platform-shared-utils`: v74 (verify: `aws lambda list-layer-versions --layer-name life-platform-shared-utils --max-items 1`)
+- Shared layer `life-platform-shared-utils`: v76 (verify: `aws lambda list-layer-versions --layer-name life-platform-shared-utils --max-items 1`)
 - Account concurrency limit: **10** (AWS Support case 177921309700709 filed 2026-05-19; awaiting raise to 100; CDK reservations pre-staged but commented out — see `docs/RESERVED_CONCURRENCY.md`)
 - Active alarms in ALARM (2026-05-19): `life-platform-garmin-data-ingestion-errors`, `life-platform-weather-data-ingestion-errors`, `life-platform-compute-pipeline-stale`, `life-platform-dlq-depth-warning`, `life-platform-ingestion-dlq-messages`, `ai-tokens-daily-brief-daily`, `slo-source-freshness` — Garmin-related expected to clear within 24h post-OAuth refresh
 - DLQ: `life-platform-ingestion-dlq`, retention 14d, currently 66 messages (normally near-empty — investigate via `dlq-consumer` Lambda logs)
@@ -76,11 +76,11 @@ aws s3api delete-bucket-policy --bucket matthew-life-platform
 
 ## Shared Lambda Layer
 
-**Current version:** v74 (2026-06-07). Rebuild with `bash deploy/build_layer.sh`. The layer is consumed by the majority of Lambdas (verify count via `aws lambda list-functions --query 'Functions[?Layers[?contains(Arn, \`life-platform-shared-utils\`)]].FunctionName' --output text | wc -w`).
+**Current version:** v76 (2026-06-08). Rebuild with `bash deploy/build_layer.sh`. The layer is consumed by the majority of Lambdas (verify count via `aws lambda list-functions --query 'Functions[?Layers[?contains(Arn, \`life-platform-shared-utils\`)]].FunctionName' --output text | wc -w`).
 
 Source of truth for the expected version is `cdk/stacks/constants.py:SHARED_LAYER_VERSION`. A CI guard (`tests/test_layer_version_consistency.py`) blocks PRs that mismatch.
 
-Modules included (33+ as of v74): `ai_calls.py`, `auth_breaker.py`, `bedrock_client.py`, `budget_guard.py`, `board_loader.py`, `character_engine.py`, `compute_metadata.py`, `digest_utils.py`, `html_builder.py`, `http_retry.py`, `ai_output_validator.py`, `ingestion_framework.py`, `ingestion_validator.py`, `insight_writer.py`, `intelligence_common.py`, `item_size_guard.py`, `numeric.py`, `output_writers.py`, `phase_filter.py`, `platform_logger.py`, `rate_limiter.py`, `request_validator.py`, `retry_utils.py`, `scoring_engine.py`, `secret_cache.py`, `site_writer.py`, plus shared helpers. (`email_framework.py` was removed in V2 — replaced inline.) See `ci/lambda_map.json` `skip_deploy` list for layer-resident modules that should NOT be deployed as standalone Lambda code.
+Modules included (33+ as of v76): `ai_calls.py` (+ its split modules `ai_context.py`/`ai_summaries.py`), `auth_breaker.py`, `bedrock_client.py`, `budget_guard.py`, `board_loader.py`, `character_engine.py`, `compute_metadata.py`, `digest_utils.py`, `html_builder.py`, `http_retry.py`, `ai_output_validator.py`, `ingestion_framework.py`, `ingestion_validator.py`, `insight_writer.py`, `intelligence_common.py`, `item_size_guard.py`, `numeric.py`, `output_writers.py`, `phase_filter.py`, `platform_logger.py`, `rate_limiter.py`, `request_validator.py`, `retry_utils.py`, `scoring_engine.py`, `secret_cache.py`, `site_writer.py`, plus shared helpers. (`email_framework.py` was removed in V2 — replaced inline.) See `ci/lambda_map.json` `skip_deploy` list for layer-resident modules that should NOT be deployed as standalone Lambda code.
 
 **After rebuilding:** Update all dependent Lambdas to the new layer version via CDK deploy (`cd cdk && npx cdk deploy --all`). The version bump in `cdk/stacks/constants.py` propagates to every Lambda's `Layers=` arg.
 
