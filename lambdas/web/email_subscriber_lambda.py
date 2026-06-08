@@ -348,9 +348,13 @@ def handle_confirm(token: str, email_hash_prefix: str) -> dict:
     return _redirect(f"{SITE_URL}/subscribe/confirm/?confirmed=true")
 
 
-def _send_welcome_email(email: str) -> None:
-    """Welcome email — direct dispatch from Matthew. Sets honest expectations
-    and gives the subscriber one concrete thing to do right now."""
+def _welcome_email_content(email: str) -> tuple[str, str]:
+    """Build the welcome email (subject, plaintext body). Factored out of the
+    sender so the copy + links can be verified offline without hitting SES.
+
+    Links are v4 ("three doors": Story / Cockpit / Evidence) and lead with the
+    first dispatch so a new subscriber can read the journey from the beginning
+    (PG-03's "start from the beginning")."""
     subject = "You're in. Here's what you just signed up for."
     unsub_url = f"{SITE_URL}/api/subscribe?action=unsubscribe&email={urllib.parse.quote(email)}"
     body_text = f"""Hey —
@@ -363,8 +367,9 @@ Right now, the site is brand new and the data is just starting to accumulate. Th
 
 A few things worth looking at while you're here:
 
--> The Score (character sheet): {SITE_URL}/character/
--> Inner Life Observatory: {SITE_URL}/mind/
+-> Start from the beginning — the first dispatch: {SITE_URL}/story/chronicle/
+-> The live cockpit (today's score, updated every morning): {SITE_URL}/now/
+-> The evidence (every number, every source): {SITE_URL}/evidence/
 -> The Story (why I started): {SITE_URL}/story/
 
 See you Wednesday.
@@ -373,6 +378,13 @@ See you Wednesday.
 
 averagejoematt.com
 Unsubscribe: {unsub_url}"""
+    return subject, body_text
+
+
+def _send_welcome_email(email: str) -> None:
+    """Welcome email — direct dispatch from Matthew. Sets honest expectations
+    and gives the subscriber one concrete thing to do right now."""
+    subject, body_text = _welcome_email_content(email)
 
     try:
         ses.send_email(

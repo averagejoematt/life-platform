@@ -58,8 +58,8 @@
 | **🛑 Defer-with-rationale (won't do)** | 9 | Documented `won't-do` unless trigger fires |
 | **📦 New work surfaced (post-V2)** | 7 | N-01 ✅ closed · N-08 ✅ resolved 2026-06-06 (tier 3→1) |
 | **🌐 v4 website + ops follow-ups** | 5 | S-01 ✅ + S-02 ✅ + S-06 ✅ deployed · B-03 ✅ · S-03/S-04/S-05 open · S-07 deferred |
-| **🚀 Product & Growth (PG)** | 8 | NEW 2026-06-07 summit. PG-00 ✅ · **PG-01/02/03/05/06 ✅ deployed; PG-14 ✅ spike (Tier-A go)** · PG-04 ✅ native-SES (PR #36) · PG-04b/PG-13 + PG-14 productionization post-reset |
-| **TOTAL OPEN** | **~33** | 2026-06-07: +14 PG from summit; PG-00/01/02/03/05/06 + PG-14-spike closed same day; PG-04 in PR #36; PG-04b + PG-14-prod logged |
+| **🚀 Product & Growth (PG)** | 8 | NEW 2026-06-07 summit. PG-00 ✅ · **PG-01/02/03/05/06 ✅ deployed; PG-04 ✅ native-SES (CI-deploy pending); PG-14 ✅ spike (Tier-A go)** · PG-04b/PG-13 + PG-14 productionization post-reset |
+| **TOTAL OPEN** | **~33** | 2026-06-07: +14 PG from summit; PG-00/01/02/03/04/05/06 + PG-14-spike closed same day; PG-04b + PG-14-prod logged |
 
 ---
 
@@ -105,12 +105,12 @@
 - **Acceptance:** CTA present on all dispatches post-rebuild; back-catalogue navigable; smoke test green.
 - **Effort:** S (template). **Gate:** none.
 
-### PG-04 — Start the email list + welcome sequence (READY, needs an ESP decision)
-- **Why:** the list is the durable owned channel and the slow-accrual asset for Wedge A; Sofia: start now even with no product.
-- **Files:** `lambdas/web/email_subscriber_lambda.py`, `/api/subscribe` flow (already exists incl. canary handling). A welcome sequence may be a new lightweight scheduled send or ESP-side.
-- **Action:** confirm subscribe→confirm→welcome path end-to-end; add a short welcome sequence (what the site is, the honesty pitch, link to dispatch #1). Decide ESP/native-SES.
-- **Acceptance:** real subscribe produces a confirmed subscriber + welcome email; no canary/MAILER-DAEMON regressions.
-- **Effort:** S + decision. **Gate:** Matthew picks ESP vs native SES.
+### PG-04 — Start the email list + welcome sequence ✅ DONE 2026-06-07 (native SES; v4-corrected welcome + day-2 bridge)
+- **Decision (Matthew):** native SES (not an external ESP) — the path already runs on SES.
+- **Found:** the full subscribe→confirm→welcome **sequence already existed** on native SES — double opt-in, day-0 welcome, day-2 "bridge" (EventBridge daily), non-destructive unsub, rate-limit, canary skip. The gap was **v4-migration staleness**, not missing infra.
+- **Fixed:** welcome email links repointed legacy `/character//mind/` → v4 doors (`/story/chronicle/` first, `/now/`, `/evidence/`, `/story/`); day-2 bridge `FALLBACK_PAGES` repointed (`/live/`→`/now/`, `/chronicle/`→`/story/chronicle/`). Welcome body factored into `_welcome_email_content()` + offline-verified. Pure Lambda code (no IAM/CDK) — deploys via CI on merge (production-approval gate), off the reset path.
+- **PG-04b follow-up (deferred, post-reset):** the `subscriber-onboarding` role has **no `s3:GetObject` grant**, so the bridge's dynamic dispatch-card loading has always AccessDenied→fallback in prod. To surface real dispatch cards: add an S3 grant for `site/chronicle/posts.json` in `role_policies.subscriber_onboarding()`, point the key there, deep-link `/story/chronicle/#<week>`, then `cdk deploy` the email stack. Held off Monday so the IAM/CDK change doesn't ride the reset.
+- **Acceptance:** confirmed-subscriber + welcome path intact on native SES; canary still skips send (no MAILER-DAEMON). ✓ offline-verified; live after CI deploy.
 
 ### PG-05 — Evidence empty-states say *why* ✅ DONE 2026-06-07 (deployed; genesis-aware copy on correlations/predictions/benchmarks, PR #31)
 - **Why:** genesis-week Evidence pages (correlations/predictions/benchmarks) are honestly empty; a visitor must read *integrity*, not breakage.
