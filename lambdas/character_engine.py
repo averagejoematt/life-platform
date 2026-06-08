@@ -84,12 +84,14 @@ def load_character_config(
 
 
 def _clamp(val, lo=0, hi=100):
+    """Clamp a numeric score to [lo, hi]; pass None through unchanged."""
     if val is None:
         return None
     return max(lo, min(hi, val))
 
 
 def _safe_float(rec, field, default=None):
+    """Return rec[field] coerced to float, or default if absent/non-numeric."""
     if rec and field in rec:
         try:
             return float(rec[field])
@@ -926,6 +928,12 @@ def compute_cross_pillar_effects(pillar_levels: dict[str, float], config: dict[s
 
 
 def _evaluate_condition(condition_str, pillar_levels):
+    """Evaluate a cross-pillar effect condition against current pillar levels.
+
+    Supports "all_pillars <op> <val>", a single "<pillar> <op> <val>" comparison,
+    and " AND "-joined conjunctions. vice_streak conditions are data-driven and
+    always return False here. Returns True if the condition holds.
+    """
     if not condition_str:
         return False
     condition_str = condition_str.strip()
@@ -952,6 +960,7 @@ def _evaluate_condition(condition_str, pillar_levels):
 
 
 def _compare(a, op, b):
+    """Apply a comparison operator given as a string (<, <=, >, >=, ==, !=)."""
     if op == "<":
         return a < b
     if op == "<=":
@@ -1150,6 +1159,10 @@ def store_character_sheet(table_resource: Any, user_prefix: str, record: dict[st
 
 
 def fetch_character_sheet(table_resource: Any, user_prefix: str, date_str: str) -> Optional[dict[str, Any]]:
+    """Fetch one day's character_sheet record from DynamoDB, decoded from Decimal.
+
+    Returns None if the record is missing or the read fails.
+    """
     try:
         resp = table_resource.get_item(Key={"pk": user_prefix + "character_sheet", "sk": "DATE#" + date_str})
         item = resp.get("Item")
@@ -1191,6 +1204,7 @@ def fetch_character_sheet_range(
 
 
 def _to_decimal(obj):
+    """Recursively convert floats to Decimal for DynamoDB writes (NaN/Inf -> None)."""
     if isinstance(obj, float):
         if math.isnan(obj) or math.isinf(obj):
             return None
@@ -1203,6 +1217,7 @@ def _to_decimal(obj):
 
 
 def _from_decimal(obj):
+    """Recursively convert DynamoDB Decimal values back to float."""
     from decimal import Decimal
 
     if isinstance(obj, Decimal):
