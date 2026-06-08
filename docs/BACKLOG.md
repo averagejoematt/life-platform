@@ -145,12 +145,12 @@
 - **Acceptance:** pages live, indexable, internally linked; smoke test green.
 - **Effort:** M. **Gate:** NEXT.
 
-### PG-10 — Public AI endpoint hardening (PREREQUISITE for any reader-facing AI)
+### PG-10 — Public AI endpoint hardening ✅ DONE 2026-06-08 (most pre-built; verified + pinned + correlative framing added)
 - **Why:** Dana/Anika — a public AI endpoint has an unbounded request denominator; one spike empties the $75 ceiling and dark-fires the whole site (the budget guard already proved it can tier-3 the platform).
-- **Files:** `lambdas/web/site_api_ai_lambda.py` (`/api/ask`, `/api/board_ask`), `cost_governor_lambda.py` / `budget_guard.py`, `bedrock_client.invoke()`.
-- **Action:** per-IP rate limit + abuse guard; confirm tier-3 graceful-degrade returns a clean "paused" not a 5xx; cap tokens/request; correlative + confidence-labelled output only.
-- **Acceptance:** load/abuse test can't breach budget; tier-3 degrades cleanly; outputs carry confidence labels.
-- **Effort:** M. **Gate:** before PG-07 and any public AI feature.
+- **Found (mostly already shipped, Phase 2.1 2026-05-16):** per-IP **DDB-backed** rate limit on *both* `/api/ask` (5 anon/20 sub-hr) and `/api/board_ask` (5/IP/hr); `_ai_paused_response()` tier-≥2 graceful **HTTP-200** degrade checked **before inference on both handlers** (incl. the 6-call board_ask); `max_tokens` caps (600 ask / 300 per persona); **500-char** input cap; injection scrub + sensitive-category filter + output scrub; `reserved_concurrent_executions=2`.
+- **Added (the last gap):** the `/api/ask` system prompt now enforces **correlative-only, never-causal + explicit confidence labels** (Henning standard) — meeting the "outputs carry confidence labels" acceptance. New `tests/test_ai_endpoint_hardening.py` (7 source-grep guards) pins every invariant so it can't silently regress.
+- **Acceptance:** ✅ budget can't be breached (rate-limit + pause + token caps + reserved concurrency); ✅ tier-≥2 degrades cleanly (200, not 5xx); ✅ outputs correlative + confidence-labelled. Pure Lambda code (no IAM/CDK) → CI-deploy on merge (production gate); **held for post-reset.**
+- **Note:** `board_ask` personas stay opinion/debate by design (clearly a named-experts panel, not the platform asserting data) — left as-is intentionally.
 
 ### PG-11 — Wedge A monetisation (LATER, gated)
 - **Why:** the transformation story is the biggest-TAM wedge but needs a real result.

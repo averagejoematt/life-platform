@@ -10,6 +10,7 @@
 ### Changed
 - **PG-01 — Hero "who it's for" line** (`index.html` + `story.css`, deployed): adds the 10-second audience line the summit's audience panel found missing — everyman / Wedge-A framing ("…tired of transformation theater and wants to watch a real one happen — slowly, honestly, in public"), set apart with an ember left-rule.
 - **PG-05 — Genesis-aware Evidence empty-states** (`evidence.js`, deployed): the three reset-emptied surfaces (correlations / predictions / benchmarks) now read as integrity — the experiment deliberately restarted; data accrues from the current genesis — rather than a broken pipeline.
+- **PG-10 — Public AI endpoint hardening** (`site_api_ai_lambda.py` + `tests/test_ai_endpoint_hardening.py`): the unbounded-denominator endpoints (`/api/ask`, `/api/board_ask`) were already well-hardened (Phase 2.1) — DDB per-IP rate limits, tier-≥2 HTTP-200 paused-degrade before inference on *both* handlers, `max_tokens` + 500-char caps, reserved concurrency=2, content/injection filters — all **verified and pinned by 7 source-grep guard tests**. Added the last acceptance gap: the `/api/ask` prompt now enforces **correlative-only + confidence-labelled** output (Henning standard). Pure Lambda code (no IAM/CDK); CI-deploy on merge, held post-reset.
 
 ### Operational
 - PG-01 + PG-05 deployed to averagejoematt.com (content-hashed sync + CloudFront invalidation); smoke 65/0, both verified live.

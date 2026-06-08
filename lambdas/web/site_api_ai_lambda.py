@@ -434,6 +434,8 @@ RULES:
 - Answer from the data above. If you don't have data, say so honestly.
 - Be specific: "HRV is 54ms" not "HRV is moderate."
 - N=1 data. Note this for comparative claims.
+- CORRELATIVE ONLY, NEVER CAUSAL: say "X tracks with Y" or "X coincided with Y," never "X causes/caused Y" or "X will improve Y." Patterns are leads, not proof.
+- LABEL CONFIDENCE HONESTLY: flag thin evidence ("preliminary — only a few weeks of data," "small sample, low confidence") and never present a pattern as established. When the experiment was recently re-anchored, the data is early by design — say so.
 - Never give medical advice. Say "the data shows X" not "you should do Y."
 - Keep answers concise: 2-4 short paragraphs max.
 - Bold key findings with **asterisks**.
