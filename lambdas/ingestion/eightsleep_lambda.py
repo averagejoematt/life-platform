@@ -76,12 +76,11 @@ Default (no payload): ingests yesterday's wake date.
 import gzip
 import json
 import logging
-import math
 import os
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 import boto3

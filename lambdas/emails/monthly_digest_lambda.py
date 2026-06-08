@@ -13,17 +13,13 @@ v1.1.0: Board prompt now dynamically built from s3://matthew-life-platform/confi
 
 import json
 import logging
-import math
 import os
-import statistics
-import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
 import boto3
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
@@ -79,7 +75,6 @@ except ImportError:
 
 # ── Shared digest utilities ────────────────────────────────────────────
 from digest_utils import (
-    _normalize_whoop_sleep,
     avg,
     compute_banister_from_list,
     d2f,

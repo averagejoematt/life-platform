@@ -31,7 +31,6 @@ v1.0.0 — 2026-03-07
 v1.1.0 — 2026-03-09: Sick day support — grade='sick', streaks preserved
 """
 
-import json
 import logging
 import math
 import os

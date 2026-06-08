@@ -24,7 +24,6 @@ All limits are intentionally generous; tighten per-endpoint as needed.
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 # ── Public exception ────────────────────────────────────────────────────────
 

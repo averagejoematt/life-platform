@@ -23,7 +23,6 @@ Schedule: cron(30 18 ? * SUN *) — Sunday 11:30 AM PT (30 min before hypothesis
 v1.0.0 — 2026-03-14 (R8-LT9)
 """
 
-import json
 import logging
 import math
 import os

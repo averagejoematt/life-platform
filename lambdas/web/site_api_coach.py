@@ -18,8 +18,7 @@ Endpoints:
   /api/weekly_priority  — integrator synthesis (cross-domain weekly priority)
 """
 
-import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from decimal import Decimal  # noqa: F401
 
 from boto3.dynamodb.conditions import Key
@@ -27,13 +26,10 @@ from phase_filter import with_phase_filter  # ADR-058
 from web.site_api_common import (
     EXPERIMENT_START,
     PT,
-    USER_ID,
     USER_PREFIX,
     _decimal_to_float,
     _error,
-    _latest_item,
     _ok,
-    _query_source,
     logger,
     table,
 )

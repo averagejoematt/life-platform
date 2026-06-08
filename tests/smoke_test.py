@@ -15,11 +15,9 @@ Requirements: AWS credentials configured (same profile used for deployments)
 
 import argparse
 import json
-import os
 import re
 import sys
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
 import boto3
 

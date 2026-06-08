@@ -25,11 +25,10 @@ by The Chair into plain English for a partner audience.
 import json
 import logging
 import os
-import time
 import urllib.error
 import urllib.request
 from collections import defaultdict
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3

@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import sys
 from unittest.mock import patch
 
-import pytest
 from routine_ir import ExerciseBlock, RoutineSpec, Set
 
 # The MCP package depends on boto3 + config at import time; conftest sets the

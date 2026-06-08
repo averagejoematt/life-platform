@@ -8,9 +8,7 @@ AI coaching references actual lab data.
 Used by: daily_brief_lambda.py (import, not standalone)
 """
 
-import json
 import logging
-from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 

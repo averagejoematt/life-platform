@@ -23,7 +23,6 @@ Writes to: SOURCE#circadian | DATE#<today>
 v1.0.0 — 2026-03-17 (BS-SL2)
 """
 
-import json
 import logging
 import math
 import os

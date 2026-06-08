@@ -34,7 +34,6 @@ import time
 from datetime import datetime, timezone
 
 import boto3
-from boto3.dynamodb.conditions import Key
 
 try:
     from platform_logger import get_logger

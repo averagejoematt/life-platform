@@ -26,7 +26,6 @@ Thresholds:
 import json
 import logging
 import os
-from decimal import Decimal
 
 import boto3
 

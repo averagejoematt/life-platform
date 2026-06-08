@@ -22,10 +22,6 @@ import os
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-import time
-import urllib.error
-import urllib.request
-from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 

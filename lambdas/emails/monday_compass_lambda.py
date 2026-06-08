@@ -31,7 +31,6 @@ import os
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-import time
 import urllib.error
 import urllib.parse
 import urllib.request

@@ -22,27 +22,21 @@ Endpoints:
 
 import hashlib  # used by handle_achievements stable-event-key hash
 import json
-import re
-import time
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401
 
-import boto3
 from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # ADR-058 — used by handle_timeline
 from web.site_api_common import (
     CORS_HEADERS,
     EXPERIMENT_BASELINE_WEIGHT_LBS,
     EXPERIMENT_START,
-    S3_REGION,
     USER_ID,
     USER_PREFIX,
     _decimal_to_float,
     _error,
-    _experiment_date,
     _get_profile,
     _latest_item,
-    _load_s3_json,
     _ok,
     _query_source,
     logger,

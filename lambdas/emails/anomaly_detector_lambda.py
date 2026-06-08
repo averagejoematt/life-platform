@@ -63,7 +63,6 @@ import logging
 import math
 import os
 import statistics
-import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone

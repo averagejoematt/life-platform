@@ -29,7 +29,6 @@ import os
 import re
 import sys
 
-import pytest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
