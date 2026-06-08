@@ -10,8 +10,6 @@ Exports:
   _section_error_html()  — graceful section error placeholder
 """
 
-import json
-import math
 from datetime import datetime
 
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058

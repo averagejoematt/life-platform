@@ -7,7 +7,6 @@ Rotates which insights surface each week to prevent repetition.
 Used by: daily_brief_lambda.py (import, not standalone)
 """
 
-import json
 import logging
 from datetime import datetime, timezone
 

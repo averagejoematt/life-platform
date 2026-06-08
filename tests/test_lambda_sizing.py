@@ -9,7 +9,6 @@ Thresholds:
   - Webhooks: <= 256MB
 """
 
-import ast
 import os
 import re
 

@@ -19,12 +19,10 @@ Run:  python3 -m pytest tests/test_iam_secrets_consistency.py -v
 v1.0.0 — 2026-03-13 (Architecture Review #8)
 """
 
-import json
 import os
 import re
 import sys
 
-import pytest
 
 # ── Add cdk/ and cdk/stacks/ to path ─────────────────────────────────────────
 # cdk/ is needed so `from stacks.constants import ...` resolves as a package.

@@ -34,7 +34,6 @@ from character_engine import (
     _weighted_pillar_score,
     compute_ema_level_score,
     evaluate_level_changes,
-    get_tier,
 )
 
 # ── Version ──

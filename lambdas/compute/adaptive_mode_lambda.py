@@ -21,7 +21,6 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import boto3
-from boto3.dynamodb.conditions import Key
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:

@@ -24,7 +24,7 @@ import json
 import subprocess
 import sys
 import urllib.request
-from datetime import date, datetime, timezone
+from datetime import date
 from pathlib import Path
 
 import boto3

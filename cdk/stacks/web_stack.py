@@ -31,7 +31,6 @@ from aws_cdk import (
     Stack,
 )
 from aws_cdk import aws_cloudfront as cloudfront
-from aws_cdk import aws_cloudfront_origins as origins
 from aws_cdk import aws_cloudwatch as cloudwatch
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_iam as iam

@@ -101,7 +101,7 @@ import logging
 import math
 import os
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from decimal import Decimal
 
 import boto3

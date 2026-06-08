@@ -362,7 +362,6 @@ def _detect_rebound_speed(outcome_records):
 def _write_pattern_memory(patterns, today):
     """Write failure pattern analysis to platform_memory partition."""
     try:
-        from decimal import Decimal
 
         item = {
             "pk": f"{USER_PREFIX}platform_memory",

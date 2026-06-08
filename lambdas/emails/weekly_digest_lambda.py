@@ -35,12 +35,10 @@ import json
 import math
 import os
 import statistics
-import time
 import urllib.error
 import urllib.request
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
 import boto3
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058

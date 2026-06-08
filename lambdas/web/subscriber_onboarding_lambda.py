@@ -10,7 +10,7 @@ import json
 import logging
 import os
 import urllib.parse
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import boto3
 

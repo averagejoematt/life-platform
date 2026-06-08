@@ -26,10 +26,6 @@ import logging
 import os
 import re
 import secrets as _secrets
-import time
-import urllib.error
-import urllib.request
-from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 

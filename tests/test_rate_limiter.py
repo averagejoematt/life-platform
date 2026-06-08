@@ -13,10 +13,8 @@ Run:  python3 -m pytest tests/test_rate_limiter.py -v
 
 import os
 import sys
-import time
 from unittest.mock import MagicMock
 
-import pytest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))

@@ -43,7 +43,6 @@ v1.1.0 — 2026-03-15 (R12: +I11 data-reconciliation check, manual-only doc)
 import json
 import os
 import sys
-import time
 
 import pytest
 
@@ -924,7 +923,6 @@ def test_i15_reserved_concurrency_guard():
     deploys fail). They SHOULD be uncommented once AWS Support raises the
     quota (case 177921309700709).
     """
-    import re
 
     boto3 = _get_boto3()
     lambda_client = boto3.client("lambda", region_name=REGION)

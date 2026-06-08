@@ -23,10 +23,8 @@ v1.0.0 — 2026-03-10
 v1.1.0 — 2026-03-14 — Updated grade table with R13 results
 """
 
-import json
 import os
 import subprocess
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 

@@ -43,7 +43,6 @@ v1.1.0 — 2026-03-08 (IC-8: Intent vs Execution Gap)
 
 import json
 import logging
-import math
 import os
 import statistics
 import urllib.error

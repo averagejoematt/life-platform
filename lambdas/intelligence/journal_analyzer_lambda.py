@@ -28,7 +28,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-from boto3.dynamodb.conditions import Attr, Key
+from boto3.dynamodb.conditions import Key
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

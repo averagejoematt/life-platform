@@ -27,16 +27,13 @@ import hmac as _hmac
 import json
 import os
 import re
-import time
-import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import boto3
 from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # ADR-058
 from web.site_api_common import (
     CORS_HEADERS,
-    EXPERIMENT_START,
     PT,
     S3_REGION,
     USER_ID,
@@ -44,16 +41,9 @@ from web.site_api_common import (
     _cached_secret,
     _decimal_to_float,
     _error,
-    _get_profile,
-    _is_blocked_vice,
-    _latest_item,
     _load_s3_json,
     _ok,
-    _query_source,
-    _scrub_blocked_terms,
-    get_request_id,
     logger,
-    set_request_id,
     table,
 )
 
