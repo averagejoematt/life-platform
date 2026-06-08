@@ -31,6 +31,7 @@ except ImportError:
 
 
 def safe_float(rec, field, default=None):
+    """Return ``rec[field]`` coerced to float, or ``default`` if missing/uncastable."""
     if rec and field in rec:
         try:
             return float(rec[field])
@@ -40,6 +41,7 @@ def safe_float(rec, field, default=None):
 
 
 def d2f(obj):
+    """Recursively convert DynamoDB ``Decimal`` values to floats within lists/dicts."""
     from decimal import Decimal
 
     if isinstance(obj, list):
@@ -52,21 +54,29 @@ def d2f(obj):
 
 
 def avg(vals):
+    """Return the mean of non-None values rounded to 1 decimal, or None if empty."""
     v = [x for x in vals if x is not None]
     return round(sum(v) / len(v), 1) if v else None
 
 
 def clamp(val, lo=0, hi=100):
+    """Constrain ``val`` to the inclusive ``[lo, hi]`` range (defaults 0-100)."""
     return max(lo, min(hi, val))
 
 
 def fmt_num(val):
+    """Format a number as a comma-grouped rounded string, or an em dash if None."""
     if val is None:
         return "—"
     return "{:,}".format(round(val))
 
 
 def get_current_phase(profile, current_weight_lbs):
+    """Return the weight-loss phase dict whose band contains the current weight.
+
+    Picks the first phase the weight still qualifies for (weight >= its end_lbs),
+    falling back to the final phase, or None if the profile defines no phases.
+    """
     phases = profile.get("weight_loss_phases", [])
     for p in phases:
         if current_weight_lbs >= p.get("end_lbs", 0):
@@ -96,6 +106,11 @@ def _section_error_html(section_name, error):
 
 
 def hrv_trend_str(hrv_7d, hrv_30d):
+    """Return a scorecard HRV trend phrase comparing the 7-day to 30-day average.
+
+    Produces e.g. "62ms 7d avg (+4% vs 30d, trending up)"; the direction band is
+    up/stable/down at the +/-2% thresholds. Returns "no trend data" if inputs are missing.
+    """
     if not hrv_7d or not hrv_30d or hrv_30d == 0:
         return "no trend data"
     pct = round((hrv_7d / hrv_30d - 1) * 100)
