@@ -681,8 +681,13 @@ class OperationalStack(Stack):
             rule.add_target(targets.LambdaFunction(site_stats_fn))
 
         # ── 12. OG Image Generator — daily at 19:30 UTC (11:30 AM PT, after daily brief)
-        # DEFERRED: og-image-generator already exists (CLI-created). Needs CDK import before
-        # CDK can manage it. Tracked as R18-F02. Lambda runs fine outside CDK.
+        # DEFERRED (ADR-081): og-image-generator is a CLI-created orphan, but unlike the
+        # 3 intelligence Lambdas adopted in compute_stack on 2026-06-08, its source is NOT
+        # in the lambdas/ asset tree (only web/og_image_lambda.py, the unrelated us-east-1
+        # dynamic-SVG function, is) and it depends on a standalone pillow-layer. Adoption
+        # needs the PNG-generator source relocated into the monorepo first. Runs fine
+        # outside CDK meanwhile. (NB: us-east-1 life-platform-og-image is a different,
+        # already-CDK-managed function — web_stack WR-17 — not a duplicate.)
 
         # ── 13. Pipeline Health Check — daily at 13:00 UTC (6 AM PT)
         # SNS_ARN env added 2026-05-25: Lambda hardcodes life-platform-alerts as
