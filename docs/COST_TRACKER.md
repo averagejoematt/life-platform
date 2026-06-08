@@ -6,7 +6,26 @@ Last updated: 2026-06-08 (v8.4.0)
 
 ---
 
-## Current Monthly Cost Breakdown (actuals, 2026-05-29)
+## Production Run-Rate Sweep — 2026-06-08 (real Cost Explorer data)
+
+Cross-functional sweep of the steady-state run-rate. **Real monthly bill (CE, unblended):**
+Mar **$20.04** → Apr **$35.01** → May **$48.19** (peak) → Jun MTD ~**$18.60** (partial).
+
+- **The bill is two things:** a **fixed floor (~$15–17/mo all-in, post-WAF)** — Secrets ~$6.45, CloudWatch alarms ~$4–5, **Cost-Explorer API ~$2–4**, KMS ~$1, Route 53 $0.50, Lambda/DDB/S3/CloudFront ~$0.50, +~10% tax — plus **variable Bedrock AI**, which is spiky and *development-driven* (marathon days $4–6, quiet days $0.80–1.10), not steady.
+- **Expected steady-state production run-rate: ~$25–40/mo.** The May $48 peak was the Bedrock-cutover/v4-launch build phase, not the designed steady state. Hard-capped at $75 by the **enforcing** governor (above).
+- **WAF deleted** (~−$8/mo; June shows $0). Confirmed banked alongside the earlier ingestion-alarm consolidation (−$4.60) and V2 sweep (−$3.65).
+
+**Audit of reduction levers (what's left is small — the system is near its floor):**
+- **CE-API polling (done 2026-06-08):** governor hourly → **every 4h**, ~−$2–3/mo. The AI estimate stays fresh from CloudWatch token metrics; only the slow non-AI bill is polled less.
+- **Bedrock model tiering — already optimal:** structured passes (IC-3 analysis) run on **Haiku**; narrative (coaches, board, TL;DR, the 8-agent ensemble) run on **Sonnet** deliberately for prose quality (ADR-049). `call_anthropic(cache_system=True)` caches every system block by default — caching coverage is comprehensive. The only further "saving" would trade narrative quality; **not recommended** unless budget pressure rises.
+- **CloudWatch alarms — already consolidated** (87 → ~25); no safe consolidation remains.
+- **Secrets (~$6.45) — mostly irreducible** per-service OAuth isolation; the paused `strava` secret is intentionally retained.
+
+**Net:** run-rate is excellent and hard-capped; ~$6–10/mo of micro-savings exist but the high-value wins were already banked.
+
+---
+
+## Current Monthly Cost Breakdown (actuals, 2026-05-29 — superseded by the 2026-06-08 sweep above)
 
 Rewritten from Cost Explorer + the cost-governor estimator. The prior "~$10/mo"
 figure was stale fiction (it predated Bedrock and three cost drivers the doc got
@@ -45,9 +64,12 @@ Three layers — see `lambdas/budget_guard.py`, `lambdas/operational/cost_govern
    | 2 Restrict | $65-73 | + public website AI paused (friendly "paused" message) |
    | 3 Hard stop | ≥ $73 | + ALL Bedrock paused (`bedrock_client` refuses); daily brief is data-only |
 
-   Auto-resumes at month rollover. **Status: deployed observe-only** — the governor emits
-   metrics + computes the tier but doesn't enforce yet; flip `OBSERVE_MODE=false` on
-   `life-platform-cost-governor` to enable once the estimate is validated against the real bill.
+   Auto-resumes at month rollover. **Status: ENFORCING** — `OBSERVE_MODE=false` on
+   `life-platform-cost-governor` (since 2026-05-29). The governor sets the SSM tier and
+   `budget_guard` gates AI accordingly; `bedrock_client` enforces the Tier-3 hard stop.
+   AWS Budgets is the independent lagged backstop. **Cadence: every 4h** (was hourly, cut
+   2026-06-08 to reduce Cost-Explorer self-cost — the AI half is priced from cheap
+   CloudWatch token metrics, so only the slow non-AI half needs the CE call).
 
 Budget email: `awsdev@mattsusername.com`
 
@@ -81,10 +103,10 @@ Decisions where cost was a factor in the design:
 | Month | AWS Bill | Notes |
 |-------|---------|-------|
 | Feb 2026 | $1.92 | Platform built Feb 22, partial month. 22 Lambdas, 19 sources, CloudFront CDN |
-| Mar 2026 | ~$13-14 est (pre-COST-A) | First full month. 41 Lambdas, 87 alarms (real run-rate). COST-A cleanup in progress — target ~$9-10/mo post-cleanup. |
-| Mar 2026 (post-COST-A) | ~$9-10 est | 47 alarms, `api-keys` secret deleted 2026-03-14 (saves $0.40/mo from April onward). |
-| Apr 2026 | est ~$12-13 | Platform growth; Lambda count ~78 before V2 audit. |
-| May 2026 MTD (through 2026-05-19) | $18.58 | Mid-month spend includes pre-V2 baseline; V2 P5 savings ($3.65/mo) land June. End-of-May expected ~$24-26 unadjusted. |
+| Mar 2026 | **$20.04** (CE actual) | First full month. Fixed infra only (Secrets $5.12, CloudWatch $4.84, WAF $4.12, CE-API $2.50, Tax $1.88, KMS $0.75) — pre-Bedrock. The earlier "~$9-14 est" was wrong (under-counted). |
+| Apr 2026 | **$35.01** (CE actual) | Infra grew: CloudWatch $9.56, WAF $9.04, Secrets $6.90, CE-API $4.25. AI still negligible. |
+| May 2026 | **$48.19** (CE actual, peak) | + Bedrock **$14.29** (Sonnet $9.31 + Haiku $4.98) — Bedrock-cutover marathon + reset + v4 launch. The $75 ceiling held. |
+| Jun 2026 (MTD ~8d) | **$18.60** (CE actual, partial) | WAF now $0 (deleted, ~−$8/mo). Bedrock $11.44 so far — inflated by this build week; steady-state expected lower. |
 
 ---
 
@@ -101,4 +123,4 @@ Decisions where cost was a factor in the design:
 
 ---
 
-**Verified:** 2026-05-19 (V2 audit operational sweep)
+**Verified:** 2026-06-08 (production run-rate sweep — real CE data; governor enforcing; CE polling 4h)
