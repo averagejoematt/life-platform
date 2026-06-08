@@ -787,7 +787,7 @@ def tool_get_weather_correlation(args):
         journal_items = query_source("notion", start_date, end_date)
         for item in journal_items:
             d = item.get("date")
-            if d and not d in journal_by_date:
+            if d and d not in journal_by_date:
                 journal_by_date[d] = {}
             for field in ["morning_mood", "morning_energy", "stress_level", "day_rating"]:
                 v = _sf(item.get(field))

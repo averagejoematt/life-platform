@@ -23,6 +23,7 @@ from decimal import Decimal  # noqa: F401
 import boto3
 from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # ADR-058
+
 from web.site_api_common import (
     EXPERIMENT_BASELINE_WEIGHT_LBS,
     EXPERIMENT_START,

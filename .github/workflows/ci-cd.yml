@@ -101,6 +101,12 @@ jobs:
           isort --check-only lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
           echo "::endgroup::"
 
+      - name: Install ruff
+        run: pip install ruff==0.14.0
+
+      - name: Lint gate (ruff — ENFORCED, config in pyproject.toml)
+        run: ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+
       - name: Mypy (advisory — typed shared modules only)
         run: |
           pip install mypy==2.1.0

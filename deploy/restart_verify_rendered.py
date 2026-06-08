@@ -181,7 +181,7 @@ def main():
         else:
             print(f"  ✓ {path}")
 
-    print(f"\n══ summary ══")
+    print("\n══ summary ══")
     print(f"  {total_pages - failed_pages}/{total_pages} pages clean")
 
     # Persist report

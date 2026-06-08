@@ -1280,7 +1280,7 @@ def lambda_handler(event, context):
     _request_start = datetime.now(timezone.utc)
     if hasattr(logger, "set_date"):
         logger.set_date(_request_start.strftime("%Y-%m-%d"))  # OBS-1
-    logger.info(f"Health Auto Export webhook received")
+    logger.info("Health Auto Export webhook received")
 
     # ── Auth ──
     headers = event.get("headers", {})

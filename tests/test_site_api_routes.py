@@ -51,7 +51,7 @@ def test_no_duplicate_paths():
 def test_no_duplicate_handlers():
     routes = _parse_routes()
     handlers = [h for _, _, h in routes]
-    assert len(handlers) == len(set(handlers)), f"Duplicate handler(s) in _SIMPLE_ROUTES — same handler can't serve two paths in this table"
+    assert len(handlers) == len(set(handlers)), "Duplicate handler(s) in _SIMPLE_ROUTES — same handler can't serve two paths in this table"
 
 
 def test_all_handlers_defined():

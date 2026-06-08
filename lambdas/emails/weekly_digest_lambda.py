@@ -44,10 +44,10 @@ import boto3
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 
 # ── Shared digest utilities (digest_utils.py) ───────────────────────────────
-from digest_utils import compute_confidence  # BS-05: confidence badges
 from digest_utils import (
     _normalize_whoop_sleep,
     avg,
+    compute_confidence,  # BS-05: confidence badges
     d2f,
     dedup_activities,
     fmt,
@@ -1182,8 +1182,8 @@ def build_html(data, commentary, profile):
 
     insight_box = (
         (
-            f'<div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:10px;'
-            f'padding:16px 20px;margin-bottom:24px;">'
+            '<div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:10px;'
+            'padding:16px 20px;margin-bottom:24px;">'
             + (f'<div style="margin-bottom:8px;">{_insight_badge}</div>' if _insight_badge else "")
             + f"{insight_html}</div>"
         )

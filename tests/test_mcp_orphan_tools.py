@@ -19,7 +19,6 @@ Run:  python3 -m pytest tests/test_mcp_orphan_tools.py -v
 import os
 import re
 
-
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 MCP_DIR = os.path.join(ROOT, "mcp")
 

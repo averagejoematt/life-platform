@@ -65,7 +65,7 @@ def _get_boto3():
     """Return boto3 or skip if not available / no credentials."""
     try:
         import boto3
-        from botocore.exceptions import ClientError, NoCredentialsError
+        from botocore.exceptions import ClientError, NoCredentialsError  # noqa: F401
 
         # Quick credential check
         sts = boto3.client("sts", region_name=REGION)
@@ -1087,9 +1087,9 @@ def test_i17_character_sheet_recent_record():
             return
 
     pytest.fail(
-        f"I17 FAIL: no character_sheet DATE# record for today or yesterday. "
-        f"character-sheet-compute may have silently failed; investigate "
-        f"/aws/lambda/character-sheet-compute logs."
+        "I17 FAIL: no character_sheet DATE# record for today or yesterday. "
+        "character-sheet-compute may have silently failed; investigate "
+        "/aws/lambda/character-sheet-compute logs."
     )
 
 
@@ -1129,7 +1129,7 @@ def test_i18_daily_brief_recently_invoked():
         Statistics=["Sum"],
     )
     total = sum(p["Sum"] for p in resp.get("Datapoints", []))
-    assert total >= 1, f"I18 FAIL: daily-brief has 0 invocations in the last 48h. " f"Check EventBridge rule + Lambda permissions."
+    assert total >= 1, "I18 FAIL: daily-brief has 0 invocations in the last 48h. " "Check EventBridge rule + Lambda permissions."
 
 
 # ══════════════════════════════════════════════════════════════════════════════

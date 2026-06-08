@@ -1128,9 +1128,7 @@ def tool_get_body_composition_snapshot(args):
             }
 
     try:
-        from datetime import datetime as _dt
-        from datetime import timedelta as _td
-        from datetime import timezone
+        from datetime import datetime as _dt, timedelta as _td, timezone
 
         today = _dt.now().strftime("%Y-%m-%d")
         week_ago = (_dt.now() - _td(days=7)).strftime("%Y-%m-%d")
@@ -1160,9 +1158,7 @@ def tool_get_health_risk_profile(args):
     genome_snps = [s for s in genome if s.get("sk", "").startswith("GENE#")]
     dexa = _query_dexa_scans()
 
-    from datetime import datetime as _dt
-    from datetime import timedelta as _td
-    from datetime import timezone
+    from datetime import datetime as _dt, timedelta as _td, timezone
 
     today = _dt.now().strftime("%Y-%m-%d")
     result = {"assessment_date": today}

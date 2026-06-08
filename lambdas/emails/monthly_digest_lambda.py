@@ -79,11 +79,9 @@ from digest_utils import (
     compute_banister_from_list,
     d2f,
     dedup_activities,
-)
-from digest_utils import ex_whoop_from_list as ex_whoop
-from digest_utils import ex_whoop_sleep_from_list as ex_whoop_sleep
-from digest_utils import ex_withings_from_list as ex_withings
-from digest_utils import (
+    ex_whoop_from_list as ex_whoop,
+    ex_whoop_sleep_from_list as ex_whoop_sleep,
+    ex_withings_from_list as ex_withings,
     fmt,
 )
 
@@ -769,9 +767,9 @@ def build_html(data, goals, commentary, windows):
     w_bar = max(0, min(100, pct_done))
     y_bar = max(0, min(100, year_pct))
     goals_html = (
-        f'<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:14px 18px;margin-bottom:24px;">'
-        f'<p style="font-size:12px;font-weight:700;color:#166534;margin:0 0 10px;'
-        f'text-transform:uppercase;letter-spacing:0.5px;">2026 Annual Goals Progress</p>'
+        '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:14px 18px;margin-bottom:24px;">'
+        '<p style="font-size:12px;font-weight:700;color:#166534;margin:0 0 10px;'
+        'text-transform:uppercase;letter-spacing:0.5px;">2026 Annual Goals Progress</p>'
         + (
             f'<div style="margin-bottom:8px;">'
             f'<div style="display:flex;justify-content:space-between;font-size:12px;color:#15803d;margin-bottom:3px;">'
@@ -788,7 +786,7 @@ def build_html(data, goals, commentary, windows):
         f"<span>📅 Year elapsed</span><span>{year_pct}%</span></div>"
         f'<div style="background:#dcfce7;border-radius:4px;height:8px;">'
         f'<div style="background:#86efac;width:{y_bar}%;height:8px;border-radius:4px;"></div></div>'
-        f"</div>" + f"</div>"
+        f"</div>" + "</div>"
     )
 
     # ── Training ──

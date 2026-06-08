@@ -99,7 +99,7 @@ def main():
         else:
             print(f"\n  Run with --fix to automatically update stale functions to '{CANONICAL}'")
     else:
-        print(f"\n✅ All Lambda secret references are valid.")
+        print("\n✅ All Lambda secret references are valid.")
 
     return 1 if stale else 0
 

@@ -552,7 +552,7 @@ def handle_remote_mcp(event, method):
 
     # ── Bearer token validation for MCP endpoints ─────────────────────────
     if not _validate_bearer(event):
-        logger.warning(f"[Remote] Rejected: invalid/missing Bearer token")
+        logger.warning("[Remote] Rejected: invalid/missing Bearer token")
         _emit_auth_failure_metric()
         return _remote_response(401, json.dumps({"error": "Unauthorized: invalid Bearer token"}), {"WWW-Authenticate": "Bearer"})
 

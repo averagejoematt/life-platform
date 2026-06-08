@@ -953,12 +953,10 @@ def tool_get_zone2_breakdown(args):
         return {"error": "No qualifying activities found.", "start_date": start_date, "end_date": end_date}
 
     # ── Weekly aggregation ───────────────────────────────────────────────────
-    from collections import defaultdict
 
     def iso_week(date_str):
         """Return ISO year-week string like '2025-W48'."""
-        from datetime import datetime as dt
-        from datetime import timezone
+        from datetime import datetime as dt, timezone
 
         d = dt.strptime(date_str, "%Y-%m-%d")
         iso = d.isocalendar()
@@ -966,8 +964,7 @@ def tool_get_zone2_breakdown(args):
 
     def week_start(date_str):
         """Return Monday of the week for a given date."""
-        from datetime import datetime as dt
-        from datetime import timezone
+        from datetime import datetime as dt, timezone
 
         d = dt.strptime(date_str, "%Y-%m-%d")
         monday = d - timedelta(days=d.weekday())
