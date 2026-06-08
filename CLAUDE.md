@@ -11,7 +11,7 @@ Deep documentation lives in `docs/`. Start here when context is needed:
 - `docs/ARCHITECTURE.md` — full system design, ~73 Lambdas (CDK-defined; canonical count via `sync_doc_metadata.py` — ~55 currently deployed across us-west-2 + us-east-1), 8 CDK stacks, data flows (updated v8.4.0)
 - `docs/SCHEMA.md` — DynamoDB field reference (authoritative)
 - `docs/RUNBOOK.md` — daily operations, troubleshooting
-- `docs/DECISIONS.md` — ADRs (ADR-001 through ADR-078), why things are the way they are
+- `docs/DECISIONS.md` — ADRs (ADR-001 through ADR-081), why things are the way they are
 - `docs/PHASE_TAXONOMY.md` — experiment-restart data semantics (ADR-077): the 4-class registry for what resets vs. what's kept
 - `docs/REMEDIATION_TAXONOMY.md` — classifier rubric for the self-healing agent (auto-fix-safe / fix-via-pr / needs-human / stale)
 - `docs/DATA_GOVERNANCE.md` — PII classification + retention policy (added v7.2.0)
@@ -152,4 +152,4 @@ Regenerates constants, bumps the layer, deploys Core/Compute/Email, phase-tags D
 
 ---
 
-**Verified:** 2026-06-05 (v8.3.0 — v4 live; Pipeline-status dashboard + `/api/source_freshness`; Cockpit 503 fix + Day-Grade Replay; a11y; v4 smoke test; visual + AI-vision test harness (ADR-076))
+**Verified:** 2026-06-08 (v8.5.0 — 2026-06-08 experiment reset run (genesis 2026-06-08, baseline 311.62, cycle 3); A-grade CI gates ADR-080 (mypy tier-1 + coverage floor + size gate); `ai_calls` god-module split; **all CLI Lambda orphans adopted into CDK — `list-functions ∖ CDK = ∅`, ADR-081**; `/og` handler bug + Whoop refresh-race + qa-smoke genesis-awareness fixed; CI now flags undeployed Lambda config changes)
