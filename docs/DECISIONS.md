@@ -2423,3 +2423,46 @@ The AWS "account-controls" sub-grade stays below a literal-checklist A on those 
 ---
 
 **Verified:** 2026-06-09 (ADR-082 — ruff `S` SAST enabled + tuned; all GitHub Actions SHA-pinned; Dependabot added; pip-audit broadened)
+
+---
+
+## ADR-083: Single-region is an accepted risk (no cross-region DR)
+
+**Status:** Accepted (2026-06-09)
+
+**Context:** The platform runs in **us-west-2** (data plane: Lambdas, DynamoDB, S3, SQS, SNS) with a small **us-east-1** edge footprint (CloudFront + its Function-URL Lambdas). There is no second region, no cross-region replica, no Route 53 failover. A blind-spot audit flagged this as an undocumented acceptance — acknowledged in the DR doc but never made a decision of record.
+
+**Decision:** **Accept single-region operation.** A full us-west-2 regional outage is a tolerated failure mode for a solo-operated, single-user personal platform:
+- **RPO ≈ 0 within-region** — DynamoDB PITR + S3 versioning protect against the *likely* incident (corruption/deletion), and a PITR restore has been rehearsed (`docs/DISASTER_RECOVERY.md`).
+- **RTO for a region loss = hours-to-days, and that's acceptable** — the "service" is a daily-brief email + a personal site; a multi-hour outage during a (rare) regional event has no real cost. Ingestion is **gap-aware**, so once the region returns the next scheduled run backfills automatically — no manual catch-up.
+- **Cost/complexity not justified** — cross-region DDB global tables + S3 CRR + warm Lambda/CloudFront failover add real monthly cost (against the $75 ceiling, ADR-063) + standing complexity to defend against an event whose blast radius is "my email is late."
+
+**Revisit triggers:** a second/paying user, an SLA commitment, or the platform becoming something whose multi-hour unavailability actually matters.
+
+**Consequences:** The single-region posture is now a decision, not a silent gap. The DR doc covers the within-region scenarios (the ones that happen); region-loss is explicitly out of scope by choice.
+
+---
+
+## ADR-084: Test-coverage philosophy + the ratchet cadence
+
+**Status:** Accepted (2026-06-09) · refines ADR-080
+
+**Context:** Offline line coverage sits at ~**10%**, which looks alarming against a reflexive "aim for 80%." The number is honest but needs its rationale on the record so it isn't mistaken for a gap to inflate.
+
+**Decision — coverage strategy is layered, not line-%-driven:**
+- **Why offline line coverage is low by design:** the bulk of `lambdas/` is integration *glue* — "call an upstream API → reshape → write DynamoDB." Driving that to 80% offline means mocking every `boto3`/`urllib` call and asserting the code calls the mocks as instructed — testing the mocks, not reality (high effort, false confidence). Line coverage is a poor proxy for safety in an integration-heavy serverless platform.
+- **The real safety net (what replaces line-%):** ~1,600 **contract/structural** tests (the breakages that actually occur here — an unmapped Lambda, a missing role grant, an unwired tool, a schema drift), **pure-logic unit tests** (scoring, character engine, the ingestion `transform`/normalize layer — #79), and **live integration** (post-deploy I1–I9 + auto-rollback, canary, qa-smoke, freshness-checker, the `life-platform-ops` dashboard + alarms). The platform runs daily on real data; real failures alarm within minutes.
+- **The accepted risk:** a handler-logic bug that contract tests miss surfaces *live* (caught fast by alarms/rollback), not at dev time. We buy that down where it pays — **pure logic** — not by mocking glue.
+
+**Ratchet cadence (the teeth ADR-080 lacked):**
+1. **Coverage floor** raised **8 → 9%** (current offline ~10%; the floor tracks ~1 pt under actual to block backsliding without being brittle). Re-baseline upward whenever a batch of pure-logic tests lands.
+2. **mypy-clean set** (currently 11 modules, `tests/test_mypy_clean_modules.py`) grows **outward by intent** — add a module the same PR it's made type-clean; no blanket target.
+3. New `transform()`/scoring/normalization code ships **with** its unit test (the highest-ROI layer).
+
+**Not done (accepted):** a **pre-commit framework** (`.pre-commit-config.yaml`) was evaluated and **deferred** — it installs to `.git/hooks/pre-commit`, which already holds the bespoke `sync_doc_metadata` doc-header hook; integrating the two is more work than the solo-dev value justifies, and **CI already enforces** ruff/black/mypy on every push.
+
+**Consequences:** "10% coverage" now reads as a deliberate, documented strategy rather than negligence; the ratchet has concrete mechanics; the pre-commit trade-off is explicit.
+
+---
+
+**Verified:** 2026-06-09 (ADR-083 single-region accepted; ADR-084 coverage philosophy + ratchet — floor 8→9, mypy-set grows by intent, pre-commit deferred)
