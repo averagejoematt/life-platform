@@ -1,6 +1,6 @@
 # Life Platform — Runbook
 
-Last updated: 2026-06-08 (v8.5.0 — 133 MCP tools, 38-module package, 77 Lambdas, 20 data sources)
+Last updated: 2026-06-09 (v8.6.0 — 133 MCP tools, 38-module package, 77 Lambdas, 20 data sources)
 
 **Ground truth at last verification:**
 - Lambda functions deployed: 73 (5 power-tuning Lambdas deleted in V2 P4)
@@ -208,6 +208,27 @@ daily-brief-schedule                cron(0 17 * * ? *)
 **⚠️ Health Auto Export gotcha:** The app must be configured for hourly (not "since last run") sync to reliably include all metric types. With infrequent syncs, payload size grows and the app may silently drop metrics like Dietary Water and Dietary Caffeine, sending only activity data. If water/caffeine stop appearing in webhook logs, check the app's sync interval.
 
 ---
+
+## Logs-Insights Triage Queries (2026-06-09)
+
+Paste these into **CloudWatch → Logs Insights** (pick the matching log groups) for fast incident triage instead of re-typing filters. The `life-platform-ops` dashboard is the at-a-glance view; these are the drill-down.
+
+**Ingestion errors** — log groups: every `/aws/lambda/*-ingestion`:
+```
+fields @timestamp, @logStream, @message
+| filter @message like /(?i)(error|exception|failed|traceback)/
+| sort @timestamp desc
+| limit 100
+```
+**Compute-pipeline errors** — log groups: `character-sheet-compute`, `adaptive-mode-compute`, `daily-metrics-compute`, `daily-insight-compute`, `daily-brief`: same filter as above.
+
+**AI / Bedrock failures** — log groups: the compute set above:
+```
+fields @timestamp, @logStream, @message
+| filter @message like /(?i)(bedrock|anthropic|budgetexceeded|throttl|AI call failed|inference)/
+| sort @timestamp desc
+| limit 100
+```
 
 ## How to Check If Ingestion Ran
 
