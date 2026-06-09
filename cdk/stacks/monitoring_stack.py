@@ -311,6 +311,55 @@ class MonitoringStack(Stack):
             to_digest=True,
         )
 
+        # ══════════════════════════════════════════════════════════════
+        # 2026-06-09 (Tier-2 observability): three previously-UNWATCHED signals.
+        # NB: per-Lambda *ingestion* alarms stay removed by design (see the
+        # 2026-05-29 note above) — these are NOT that; they watch the self-healer,
+        # the DLQ drainer, and the cost-governor, none of which had any alarm.
+        # ══════════════════════════════════════════════════════════════
+        # The self-healing remediation agent itself was unwatched — if its daily
+        # run (~07:45 PT) errors, nobody hears. Digest (not page-worthy same-hour).
+        _alarm(
+            "RemediationDispatcherErrors",
+            "life-platform-remediation-dispatcher-errors",
+            "AWS/Lambda",
+            "Errors",
+            86400,
+            "Sum",
+            1,
+            GTE,
+            {"FunctionName": "life-platform-remediation-dispatcher"},
+            to_digest=True,
+        )
+
+        # DLQ has a depth alarm, but if the dlq-consumer that drains it is broken,
+        # failures pile up silently behind a firing depth alarm. Urgent.
+        _alarm(
+            "DlqConsumerErrors",
+            "life-platform-dlq-consumer-errors",
+            "AWS/Lambda",
+            "Errors",
+            300,
+            "Sum",
+            1,
+            GTE,
+            {"FunctionName": "life-platform-dlq-consumer"},
+        )
+
+        # Budget-tier escalation: tier >= 2 means website AI is paused (cost-governor,
+        # ADR-063). The tier rides SSM + this metric, but nothing alerted on the jump.
+        _alarm(
+            "BudgetTierEscalation",
+            "life-platform-budget-tier-escalation",
+            "LifePlatform/Budget",
+            "BudgetTier",
+            3600,
+            "Maximum",
+            2,
+            GTE,
+            to_digest=True,
+        )
+
         # NOTE: OBS-07 email-subscriber alarm lives in web_stack.py (us-east-1).
         # email-subscriber Lambda runs in us-east-1; Lambda metrics are regional.
         # Cross-region alarm would never fire. See web_stack.py SubscriberErrors alarm.
@@ -456,6 +505,178 @@ class MonitoringStack(Stack):
                         label=r,
                     )
                     for r in TOP_ROUTES
+                ],
+            ),
+        )
+
+        # ══════════════════════════════════════════════════════════════
+        # OPS-DASH (2026-06-09, Tier-2): the CDK-managed `life-platform-ops`
+        # dashboard — replaces the hand-built console one (which was the headline
+        # ops view but lived nowhere in code). The row that matters most is
+        # ingestion health: the 2026 Garmin 44-day outage was caught by a MANUAL
+        # audit, not an alarm — this surfaces a source that stops or starts erroring
+        # on day 1. All metrics here are already emitted; this just composes them.
+        # ══════════════════════════════════════════════════════════════
+        COMPUTE_FNS = ["character-sheet-compute", "adaptive-mode-compute", "daily-metrics-compute", "daily-insight-compute", "daily-brief"]
+        # SEARCH auto-discovers every ingestion Lambda (all 13 names contain "ingestion")
+        # and graphs one line each — no hardcoded list to drift.
+        _ingest_errors = cloudwatch.MathExpression(
+            expression="SEARCH('{AWS/Lambda,FunctionName} MetricName=\"Errors\" ingestion', 'Sum', 300)",
+            period=Duration.minutes(5),
+            using_metrics={},
+        )
+        _ingest_invocations = cloudwatch.MathExpression(
+            expression="SEARCH('{AWS/Lambda,FunctionName} MetricName=\"Invocations\" ingestion', 'Sum', 300)",
+            period=Duration.minutes(5),
+            using_metrics={},
+        )
+
+        def _lambda_metric(fn, metric_name, statistic="Sum", period_min=5):
+            return cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name=metric_name,
+                dimensions_map={"FunctionName": fn},
+                statistic=statistic,
+                period=Duration.minutes(period_min),
+                label=fn,
+            )
+
+        def _freshness_metric(metric_name, label, color):
+            return cloudwatch.Metric(
+                namespace="LifePlatform/Freshness",
+                metric_name=metric_name,
+                statistic="Maximum",
+                period=Duration.hours(1),
+                label=label,
+                color=color,
+            )
+
+        ops_dash = cloudwatch.Dashboard(
+            self,
+            "OpsDashboard",
+            dashboard_name="life-platform-ops",
+            period_override=cloudwatch.PeriodOverride.AUTO,
+            start="-PT24H",
+        )
+
+        # Row 1 — Ingestion freshness (aggregate source-health counts)
+        ops_dash.add_widgets(
+            cloudwatch.GraphWidget(
+                title="Ingestion freshness — source counts (stale / warning / partial)",
+                width=16,
+                height=6,
+                left=[
+                    _freshness_metric("StaleSourceCount", "Stale (actionable)", cloudwatch.Color.RED),
+                    _freshness_metric("WarningSourceCount", "Warning", cloudwatch.Color.ORANGE),
+                    _freshness_metric("PartialCompletenessCount", "Partial fields", cloudwatch.Color.BLUE),
+                ],
+            ),
+            cloudwatch.SingleValueWidget(
+                title="Stale sources (now)",
+                width=8,
+                height=6,
+                metrics=[_freshness_metric("StaleSourceCount", "stale", cloudwatch.Color.RED)],
+            ),
+        )
+
+        # Row 2 — Per-source ingestion Lambda health (SEARCH-discovered, one line per source)
+        ops_dash.add_widgets(
+            cloudwatch.GraphWidget(
+                title="Ingestion Lambda errors per source (Sum 5min) — a source going dark shows here",
+                width=12,
+                height=6,
+                left=[_ingest_errors],
+            ),
+            cloudwatch.GraphWidget(
+                title="Ingestion Lambda invocations per source (Sum 5min)",
+                width=12,
+                height=6,
+                left=[_ingest_invocations],
+            ),
+        )
+
+        # Row 3 — Compute pipeline (the daily-brief dependency chain)
+        ops_dash.add_widgets(
+            cloudwatch.GraphWidget(
+                title="Compute pipeline — duration p99 (ms)",
+                width=12,
+                height=6,
+                left=[_lambda_metric(fn, "Duration", "p99") for fn in COMPUTE_FNS],
+                left_y_axis=cloudwatch.YAxisProps(label="ms", show_units=False),
+            ),
+            cloudwatch.GraphWidget(
+                title="Compute pipeline — errors (Sum 1h)",
+                width=12,
+                height=6,
+                left=[_lambda_metric(fn, "Errors", "Sum", period_min=60) for fn in COMPUTE_FNS],
+            ),
+        )
+
+        # Row 4 — AI spend + budget tier (cost-governor)
+        ops_dash.add_widgets(
+            cloudwatch.GraphWidget(
+                title="AI output tokens (Sum 1h) + projected month-end spend ($)",
+                width=12,
+                height=6,
+                left=[
+                    cloudwatch.Metric(
+                        namespace="LifePlatform/AI",
+                        metric_name="AnthropicOutputTokens",
+                        statistic="Sum",
+                        period=Duration.hours(1),
+                        label="output tokens",
+                    )
+                ],
+                right=[
+                    cloudwatch.Metric(
+                        namespace="LifePlatform/Budget",
+                        metric_name="ProjectedMonthlySpend",
+                        statistic="Maximum",
+                        period=Duration.hours(1),
+                        label="projected $/mo",
+                        color=cloudwatch.Color.ORANGE,
+                    )
+                ],
+                right_y_axis=cloudwatch.YAxisProps(label="USD", show_units=False),
+            ),
+            cloudwatch.GraphWidget(
+                title="Budget tier (0 normal → 3 hard cutoff)",
+                width=12,
+                height=6,
+                left=[
+                    cloudwatch.Metric(
+                        namespace="LifePlatform/Budget",
+                        metric_name="BudgetTier",
+                        statistic="Maximum",
+                        period=Duration.hours(1),
+                        label="tier",
+                        color=cloudwatch.Color.ORANGE,
+                    )
+                ],
+                left_y_axis=cloudwatch.YAxisProps(min=0, max=3, show_units=False),
+            ),
+        )
+
+        # Row 5 — Ingestion DLQ depth + consumer health
+        ops_dash.add_widgets(
+            cloudwatch.GraphWidget(
+                title="Ingestion DLQ — depth + consumer health",
+                width=24,
+                height=6,
+                left=[
+                    cloudwatch.Metric(
+                        namespace="AWS/SQS",
+                        metric_name="ApproximateNumberOfMessagesVisible",
+                        dimensions_map={"QueueName": "life-platform-ingestion-dlq"},
+                        statistic="Maximum",
+                        period=Duration.minutes(5),
+                        label="DLQ depth",
+                        color=cloudwatch.Color.RED,
+                    )
+                ],
+                right=[
+                    _lambda_metric("life-platform-dlq-consumer", "Errors", "Sum"),
+                    _lambda_metric("life-platform-dlq-consumer", "Invocations", "Sum"),
                 ],
             ),
         )
