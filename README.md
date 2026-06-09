@@ -33,6 +33,7 @@ A personal **health-intelligence platform** — it ingests data from ~20 wearabl
 | You want to… | Read |
 |---|---|
 | Build the mental model | [`docs/ONBOARDING.md`](docs/ONBOARDING.md) |
+| Find your way around the repo | [`docs/REPO_STRUCTURE.md`](docs/REPO_STRUCTURE.md) |
 | Run first-day commands | [`docs/QUICKSTART.md`](docs/QUICKSTART.md) |
 | Understand the system | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
 | Operate / troubleshoot | [`docs/RUNBOOK.md`](docs/RUNBOOK.md) |

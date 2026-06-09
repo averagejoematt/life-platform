@@ -9,6 +9,7 @@ top and stop when you have what you need.
 | Doc | What it gives you |
 |---|---|
 | [ONBOARDING.md](ONBOARDING.md) | First-day mental model, key concepts |
+| [REPO_STRUCTURE.md](REPO_STRUCTURE.md) | Canonical top-level layout + "where does X go" rules |
 | [QUICKSTART.md](QUICKSTART.md) | First-day commands (AWS auth, deploy, rollback) |
 | [../README.md](../README.md) · [../CLAUDE.md](../CLAUDE.md) | Repo overview · the AI-agent brief |
 
