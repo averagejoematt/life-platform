@@ -1,0 +1,253 @@
+"""
+tests/test_ingestion_transforms.py — unit tests for the ingestion normalize layer.
+
+Blind-spot audit (2026-06-09): the ingestion `transform()`/`_extract_*`/`_normalize`
+functions map raw upstream-API payloads → the DynamoDB item schema, and had ZERO
+unit tests — a schema regression (an API renames a field, a unit conversion drifts,
+a value mis-maps) only surfaced LIVE at the next scheduled run, not at dev time.
+
+These tests pin the raw-payload → normalized-field contract for the four
+highest-churn sources (whoop, withings, strava, garmin) using representative
+sample payloads. They are pure-function tests — no AWS, no network — so they run
+in the offline suite and catch upstream/our-side breakage before deploy.
+
+(The full `transform()` for whoop/withings does a cross-day DDB query for
+deltas/consistency; that I/O path is integration-tested live. Here we cover the
+pure extraction/normalization core, which is where the schema mapping lives.)
+"""
+
+import os
+from decimal import Decimal
+
+# The ingestion modules build an IngestionConfig at import time, which reads
+# S3_BUCKET/TABLE_NAME from the environment. Set harmless dummies before import.
+for _k, _v in {
+    "S3_BUCKET": "test-bucket",
+    "TABLE_NAME": "life-platform",
+    "USER_ID": "matthew",
+    "AWS_DEFAULT_REGION": "us-west-2",
+    "AWS_REGION": "us-west-2",
+}.items():
+    os.environ.setdefault(_k, _v)
+
+from ingestion.garmin_lambda import transform as garmin_transform  # noqa: E402
+from ingestion.strava_lambda import _normalize as strava_normalize  # noqa: E402
+from ingestion.whoop_lambda import (  # noqa: E402
+    _extract_cycle,
+    _extract_recovery,
+    _extract_sleep,
+    _extract_workout,
+)
+from ingestion.withings_lambda import _parse_measurements  # noqa: E402
+
+
+def _f(v):
+    """Coerce a possibly-Decimal field to float for numeric comparison."""
+    return float(v) if isinstance(v, Decimal) else v
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Whoop — recovery
+# ══════════════════════════════════════════════════════════════════════════
+def test_whoop_recovery_scored_maps_all_fields():
+    raw = {
+        "records": [
+            {
+                "score_state": "SCORED",
+                "score": {
+                    "recovery_score": 66,
+                    "resting_heart_rate": 52,
+                    "hrv_rmssd_milli": 45.678,  # rounds to 2dp
+                    "spo2_percentage": 95.513,
+                    "skin_temp_celsius": 33.21,
+                },
+            }
+        ]
+    }
+    out = _extract_recovery(raw)
+    assert _f(out["recovery_score"]) == 66
+    assert _f(out["resting_heart_rate"]) == 52
+    assert _f(out["hrv"]) == 45.68  # rounded
+    assert _f(out["spo2_percentage"]) == 95.51
+    assert _f(out["skin_temp_celsius"]) == 33.21
+
+
+def test_whoop_recovery_empty_and_unscored_return_empty():
+    assert _extract_recovery({"records": []}) == {}
+    assert _extract_recovery({}) == {}
+    assert _extract_recovery({"records": [{"score_state": "PENDING_SCORE"}]}) == {}
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Whoop — sleep (the most complex extractor)
+# ══════════════════════════════════════════════════════════════════════════
+def test_whoop_sleep_duration_and_aliases():
+    raw = {
+        "records": [
+            {
+                "nap": False,
+                "score_state": "SCORED",
+                "start": "2026-06-08T05:00:00.000Z",
+                "end": "2026-06-08T13:00:00.000Z",
+                "score": {
+                    "stage_summary": {
+                        "total_in_bed_time_milli": 28_800_000,  # 8h
+                        "total_awake_time_milli": 1_800_000,  # 0.5h → sleep = 7.5h
+                        "total_rem_sleep_time_milli": 5_400_000,  # 1.5h
+                        "total_slow_wave_sleep_time_milli": 7_200_000,  # 2h
+                        "total_light_sleep_time_milli": 10_800_000,  # 3h
+                        "disturbance_count": 4,
+                    },
+                    "respiratory_rate": 15.2,
+                    "sleep_performance_percentage": 88,
+                },
+            }
+        ]
+    }
+    out = _extract_sleep(raw)
+    assert _f(out["sleep_duration_hours"]) == 7.5  # (28.8M - 1.8M) / 3.6M
+    assert _f(out["rem_sleep_hours"]) == 1.5
+    assert _f(out["slow_wave_sleep_hours"]) == 2.0
+    assert _f(out["light_sleep_hours"]) == 3.0
+    assert _f(out["time_awake_hours"]) == 0.5
+    assert out["disturbance_count"] == 4
+    assert _f(out["respiratory_rate"]) == 15.2
+    # sleep_performance is exposed under both the new name and the legacy alias
+    assert _f(out["sleep_performance_percentage"]) == 88
+    assert _f(out["sleep_quality_score"]) == 88
+    assert out["sleep_start"] == "2026-06-08T05:00:00.000Z"
+    assert out["sleep_end"] == "2026-06-08T13:00:00.000Z"
+
+
+def test_whoop_sleep_picks_main_over_nap_and_counts_naps():
+    raw = {
+        "records": [
+            {
+                "nap": True,
+                "score_state": "SCORED",
+                "score": {"stage_summary": {"total_in_bed_time_milli": 1_800_000, "total_awake_time_milli": 0}},
+            },
+            {
+                "nap": False,
+                "score_state": "SCORED",
+                "score": {"stage_summary": {"total_in_bed_time_milli": 28_800_000, "total_awake_time_milli": 1_800_000}},
+            },
+        ]
+    }
+    out = _extract_sleep(raw)
+    assert _f(out["sleep_duration_hours"]) == 7.5  # from the MAIN (non-nap) record
+    assert out["nap_count"] == 1
+    assert _f(out["nap_duration_hours"]) == 0.5  # the nap's 1.8M ms
+
+
+def test_whoop_sleep_empty_and_unscored_return_empty():
+    assert _extract_sleep({"records": []}) == {}
+    assert _extract_sleep({"records": [{"nap": False, "score_state": "PENDING_SCORE"}]}) == {}
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Whoop — cycle (strain) + workout (sport mapping)
+# ══════════════════════════════════════════════════════════════════════════
+def test_whoop_cycle_scored():
+    raw = {
+        "records": [
+            {"score_state": "SCORED", "score": {"strain": 12.345, "kilojoule": 8000.6, "average_heart_rate": 70, "max_heart_rate": 160}}
+        ]
+    }
+    out = _extract_cycle(raw)
+    assert _f(out["strain"]) == 12.35  # _round(x, 2)
+    assert _f(out["kilojoule"]) == 8000.6
+    assert _f(out["average_heart_rate"]) == 70
+    assert _f(out["max_heart_rate"]) == 160
+
+
+def test_whoop_workout_maps_known_and_unknown_sport():
+    known = _extract_workout({"sport_id": 1, "start": "s", "end": "e", "score_state": "SCORED", "score": {"strain": 8.5}})
+    assert known["sport_id"] == 1
+    assert known["sport_name"] == "Cycling"  # WHOOP_SPORT_NAMES[1]
+    assert known["start_time"] == "s" and known["end_time"] == "e"
+    assert _f(known["strain"]) == 8.5
+
+    unknown = _extract_workout({"sport_id": 999, "score_state": "PENDING_SCORE"})
+    assert unknown["sport_name"] == "Sport_999"  # fallback label
+    assert "strain" not in unknown  # unscored → no score fields
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Withings — measurement flattening + kg→lbs conversion
+# ══════════════════════════════════════════════════════════════════════════
+def test_withings_weight_value_scaling_and_lbs():
+    # value * 10**unit  →  70000 * 10**-3 = 70.0 kg ; lbs = 70 * 2.20462
+    raw = {"measuregrps": [{"date": 1_700_000_000, "measures": [{"type": 1, "value": 70000, "unit": -3}]}]}
+    out = _parse_measurements(raw)
+    assert _f(out["weight_kg"]) == 70.0
+    assert _f(out["weight_lbs"]) == 154.32  # round(70 * 2.20462, 2)
+    assert out["measurement_timestamp"] == 1_700_000_000
+
+
+def test_withings_most_recent_group_wins():
+    raw = {
+        "measuregrps": [
+            {"date": 1_700_000_000, "measures": [{"type": 1, "value": 70000, "unit": -3}]},
+            {"date": 1_700_100_000, "measures": [{"type": 1, "value": 68000, "unit": -3}]},  # newer
+        ]
+    }
+    out = _parse_measurements(raw)
+    assert _f(out["weight_kg"]) == 68.0  # newest date wins
+    assert out["measurement_timestamp"] == 1_700_100_000
+
+
+def test_withings_empty_and_unknown_type():
+    assert _parse_measurements({"measuregrps": []}) == {}
+    # unknown measure type is skipped, but the timestamp scaffold still returns
+    out = _parse_measurements({"measuregrps": [{"date": 1_700_000_000, "measures": [{"type": 99999, "value": 1, "unit": 0}]}]})
+    assert "weight_kg" not in out
+    assert out["measurement_timestamp"] == 1_700_000_000
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Strava — activity normalization + unit conversions
+# ══════════════════════════════════════════════════════════════════════════
+def test_strava_normalize_core_and_conversions():
+    out = strava_normalize(
+        {
+            "id": 123,
+            "name": "Morning Ride",
+            "type": "Ride",
+            "distance": 5000,  # m → 3.11 miles
+            "total_elevation_gain": 100,  # m → 328.1 feet
+            "average_heartrate": 150,
+            "has_heartrate": True,
+            "map": {"summary_polyline": "abc"},
+        }
+    )
+    assert out["strava_id"] == "123"  # coerced to str
+    assert out["name"] == "Morning Ride"
+    assert out["distance_miles"] == 3.11  # round(5000 * 0.000621371, 2)
+    assert out["total_elevation_gain_feet"] == 328.1  # round(100 * 3.28084, 1)
+    assert out["average_heartrate"] == 150
+    assert out["has_heartrate"] is True
+    assert out["summary_polyline"] == "abc"
+
+
+def test_strava_none_distance_yields_none_miles():
+    out = strava_normalize({"id": 9, "name": "Walk"})
+    assert out["distance_miles"] is None
+    assert out["total_elevation_gain_feet"] is None
+    assert out["strava_id"] == "9"
+
+
+def test_strava_merges_zone_and_hr_recovery():
+    out = strava_normalize({"id": 1}, zone_data={"zone2_minutes": 30}, hr_recovery={"bpm_drop_60s": 22})
+    assert out["zone2_minutes"] == 30
+    assert out["hr_recovery"] == {"bpm_drop_60s": 22}
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Garmin — transform is a pass-through wrapper (the mapping is upstream)
+# ══════════════════════════════════════════════════════════════════════════
+def test_garmin_transform_passthrough_and_empty():
+    out = garmin_transform({"steps": 5000, "body_battery": 60}, "2026-06-09")
+    assert out == [{"source": "garmin", "date": "2026-06-09", "steps": 5000, "body_battery": 60}]
+    assert garmin_transform({}, "2026-06-09") == []
+    assert garmin_transform(None, "2026-06-09") == []
