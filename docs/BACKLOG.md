@@ -1,6 +1,6 @@
 # Life Platform — Open Backlog
 
-**Last updated:** 2026-06-07 (v8.4.0 — PG product/growth summit added; prior: ADR-077 phase taxonomy + restart tooling, Monday reset staged)
+**Last updated:** 2026-06-09 (ER external-review-lens rigor series added — ER-01..08; prior: 2026-06-07 v8.4.0 PG product/growth summit, ADR-077 phase taxonomy + restart tooling, Monday reset staged)
 **Source:** Synthesis of V1 audit (2026-05-17, ADR-057), V2 audit (2026-05-17, `docs/V2_AUDIT_PLAN.md`), V2 follow-up sessions (2026-05-18/19), the 2026-05-29 marathon (Bedrock cutover, budget guard, remediation agent, May-30 restart), the 2026-06-01/02 v4 website launch + QA sweep, and the 2026-06-03 operations/cost session (ADR-074/075). Data-blocked items D-01/D-03/D-04 + N-01/L-11 re-checked against live AWS on 2026-06-03.
 
 > Single source of truth for everything **not done**. Items closed-with-rationale (ADR-057) and items shipped are not listed — see `docs/CHANGELOG.md` for what landed and `docs/DECISIONS.md` for what was formally closed.
@@ -59,7 +59,8 @@
 | **📦 New work surfaced (post-V2)** | 7 | N-01 ✅ closed · N-08 ✅ resolved 2026-06-06 (tier 3→1) |
 | **🌐 v4 website + ops follow-ups** | 5 | S-01 ✅ + S-02 ✅ + S-06 ✅ deployed · B-03 ✅ · S-03/S-04/S-05 open · S-07 deferred |
 | **🚀 Product & Growth (PG)** | 8 | NEW 2026-06-07 summit. PG-00 ✅ · **PG-01/02/03/05/06 ✅ deployed; PG-04 ✅ native-SES (CI-deploy pending); PG-14 ✅ spike (Tier-A go)** · PG-04b/PG-13 + PG-14 productionization post-reset |
-| **TOTAL OPEN** | **~33** | 2026-06-07: +14 PG from summit; PG-00/01/02/03/04/05/06 + PG-14-spike closed same day; PG-04b + PG-14-prod logged |
+| **🔬 External-Review rigor (ER)** | 8 | NEW 2026-06-09 external-lens review. ER-01/02/03 = the objective gap (do first); ER-04..08 = recorded-decision / honesty items. Full spec: `docs/specs/ER_EXTERNAL_REVIEW_RIGOR_2026-06-09.md` |
+| **TOTAL OPEN** | **~41** | 2026-06-09: +8 ER from external-review lens. 2026-06-07: +14 PG from summit; PG-00/01/02/03/04/05/06 + PG-14-spike closed same day; PG-04b + PG-14-prod logged |
 
 ---
 
@@ -187,6 +188,64 @@
 - **Spike first (Claude Code, time-boxed ~1 session):** prototype **Tier A** with current data — map weight/measurements → body params, render 3–5 milestone frames, assess fidelity vs. your real measurements. Output a short writeup (`docs/specs/`) + sample frames; decide go/no-go before any Tier B/C work.
 - **Gate:** PG-00 (Wedge B framing). Tier B blocked on an explicit Matthew privacy decision + a label-as-fiction commitment. Tier C deferred. **Effort:** Tier A spike S–M; Tier A full M; Tier B L + privacy review; Tier C deferred.
 - **Adversarial note:** a creative artifact, not an analytic engine — fine *as* a contained Wedge-B showcase, not a reason to expand the core platform. The most motivating *and* honest version is Tier A driven by real numbers (it moves with actual progress — reinforcing the §1 "185" test).
+
+---
+
+## 🔬 External-Review rigor (ER-series) — 2026-06-09
+
+**Source:** External technical-review lens (2026-06-09 session) — "how would ~10 senior engineers who don't share the platform's own rubric react?" Distinct from the internal Technical Board (R1–R20), which is self-assessment against a self-authored rubric. **Full spec with per-item approach/files/acceptance:** `docs/specs/ER_EXTERNAL_REVIEW_RIGOR_2026-06-09.md`.
+
+**Governing distinction:** ER-01/02/03 close an *objective* gap no external reviewer would sign off without (the silent-outage class, thin upstream-seam coverage, untested AI-output truthfulness). ER-04..08 convert *arguable* critiques (over-provisioning, self-grading, the DB choice) into explicit recorded decisions. None of these are feature expansion — rigor that de-risks what already ships is exempt from the PG build-cap.
+
+**How Claude Code works an ER item:** one item per session; ER-01/02/03 first; new tests must run **offline** so CI can gate; held to the standard they enforce (correlative-only, math-in-Python, Henning confidence bands). Deploy discipline unchanged (Matthew runs deploys in terminal; layer changes need a rebuild + `SHARED_LAYER_VERSION` bump). On close: CHANGELOG + PROJECT_PLAN, ADR where called for, move the item to CHANGELOG.
+
+### ER-01 — Infra-liveness heartbeat (the 44-day-outage class) · Tier 1 · Effort M
+- **Why:** the Garmin outage ran 44 days unseen. `freshness_checker`/`slo-source-freshness` are *behavioral* checks — "no new data" can't distinguish "didn't log" from "ingestion has been erroring for weeks" (the S-06/N-01 noise problem). Missing signal = **infra-liveness**: did each active-source ingestion Lambda *run and 200 without error*, independent of whether data came back.
+- **Action:** emit per-run outcome (`last_success_ts`/`last_attempt_ts`/`consecutive_failures`/`last_error_class`) from `ingestion_framework.py` to a `USER#system / INGEST_HEALTH#{source}` sentinel + EMF; extend `pipeline_health_check_lambda.py` to assert per-source liveness on a *streak* (reuse the canary 2-fail buffer); separate infra-liveness alarm in `monitoring_stack.py`; keep freshness behavioral-only.
+- **Acceptance:** a source erroring every run (mock 401) alerts within ≤2 intervals with **zero new data**; a genuinely un-fed source does NOT alert; a de-scheduled source is caught by attempt-staleness; offline unit tests for all 4 error classes + the streak buffer.
+- **Gate:** none — do first.
+
+### ER-02 — Upstream-API contract tests (recorded fixtures) · Tier 1 · Effort M
+- **Why:** the ~14 transform unit tests pin *your* logic vs a fixed input; nothing catches the *vendor* changing the payload (field rename/renest/retype). That silent drift is the mechanism of the next 44-day incident.
+- **Action:** scrubbed recorded fixtures `tests/fixtures/upstream/{source}/{endpoint}.json`; `tests/test_upstream_contracts.py` asserts the shape contract; `deploy/refresh_upstream_fixtures.py` re-pulls+scrubs+diffs (the diff IS the drift report); CI gating offline job. Prioritise Whoop, Withings (L-08 found 3 wrong field names), Apple Health/HAE (L-08 found XML 6-of-7 wrong).
+- **Acceptance:** each active source has a fixture + contract test; mutating a read field fails its test; refresh tool diffs + a scrub assertion blocks tokens/PII.
+- **Gate:** none — the handover's flagged "next testing step."
+
+### ER-03 — AI-output eval harness (the "is the advice correct" gap) · Tier 1 · Effort M–L
+- **Why:** `visual_ai_qa.py` checks pages *render*; nothing checks the coach/insight *content* is correlative-only, confidence-labelled, fabricates no numbers, does no LLM math. The board can't see this — it's the same kind of AI grading itself. **Truthfulness gate, not a new engine — build-cap does not apply.**
+- **Action:** *Layer 1 (offline, gating, ~zero cost):* feed fixture inputs (fixed day / genesis-empty / sparse / outlier) through `ai_calls`/`ai_summaries`/`coach_computation_engine`, assert no banned causal connectives on correlations, confidence labels when N<30 / "preliminary" <12, **every output number present in the input** (anti-fabrication), no "Matthew"-prefixed output. Pattern = `test_ai_endpoint_hardening.py` applied to *output*. *Layer 2 (optional, budget-gated):* Haiku judge vs an in-repo rubric, self-skips at tier ≥2.
+- **Acceptance:** Layer 1 gates in CI; seeded fabricated-number / causal-claim / unlabelled-N=4 fails it; Layer 2 self-skips tier ≥2, never blocks on 5xx; documented in `docs/TESTING.md`.
+- **Gate:** none for Layer 1; Layer 2 on a tier-0 window + cost check.
+
+### ER-04 — MCP tool utilisation audit + prune (the 8% problem) · Tier 3 · Effort M
+- **Why:** 133 tools, ~11 used in 30d (EMF `LifePlatform/MCP ToolInvocations`). Sharpens **B-02** from time-gated (re-eval 2026-07-17) to decision-driven now.
+- **Action:** classify every tool used / justified-long-tail (annotate the cadence) / dead-weight; prune dead-weight in 10–20 batches via the existing `AUDITED_AT` ratchet; ADR records the keep/justify/prune rule + 90d trigger. First candidates (B-02): `tools_lifestyle.py` orphans (~3,400 LOC), `tools_correlation.py` (~1,553 LOC), `compare_*_periods` variants.
+- **Acceptance:** every tool classified; `test_wiring_coverage.py` + registry tests green; catalog/registry reconcile via `sync_doc_metadata.py`; ADR recorded.
+- **Gate:** supersedes B-02's date gate; don't ride a reset.
+
+### ER-05 — De-weight the self-grade + external-review readiness · Tier 2 · Effort S
+- **Why:** the A- is self-assessment vs a self-authored rubric, grades only ratchet up, and nothing in-repo says so.
+- **Action:** prominent caveat in `REVIEW_METHODOLOGY.md` + atop each review (internal self-assessment, not external validation); confirm `generate_review_bundle.py` reads coherently cold; record "one real external senior-engineer review" as the path to a trusted grade.
+- **Acceptance:** caveat unmissable; bundle coherent with no repo access; external-review recommendation recorded.
+- **Gate:** none.
+
+### ER-06 — PII-to-public-surface guarantee (tested) · Tier 2 · Effort S–M
+- **Why:** editorial guardrails + `DATA_GOVERNANCE.md` are policy with no structural test; the daily-written `generated/` prefix could surface a guarded string with nothing catching it.
+- **Action:** `tests/test_public_surface_pii_guard.py` scans `site/` build + a dry-run of the `generated/` writers (public_stats/character_stats/journal/chronicle/OG alt) against a denylist (employer/role/industry, partner name, vice categories beyond the allowed two, bereavement-unless-opted-in) + DATA_GOVERNANCE PII classes; denylist loaded from secret/gitignored config (repo may be public); gate before `sync_site_to_s3.sh`.
+- **Acceptance:** injecting a guarded string fails the gate; denylist never in cleartext in a public repo; runs before any publish path.
+- **Gate:** none.
+
+### ER-07 — Complexity posture ledger (load-bearing vs scaffolding) · Tier 3 · Effort M
+- **Why:** the "over-provisioned for N=1" verdict splits entirely on *purpose*; today that's implicit, so complexity accretes undecided. **Scope: a technical posture decision, NOT a build-vs-health referendum.**
+- **Action:** classify each major subsystem (remediation agent + auto-merge, us-east-1 edge, budget tiers, per-Lambda DLQs vs consolidated, X-Ray-everywhere, the 3 boards) as (a) load-bearing / (b) justified-as-portfolio / (c) retire-candidate; one ADR ("complexity posture, 2026-06"); act on (c); record the standing rule that new enterprise-pattern infra must name which frame justifies it.
+- **Acceptance:** every listed subsystem has an explicit verdict + rationale; (c) scheduled/removed; standing rule in the ADR.
+- **Gate:** none — decision-only, no deploy risk.
+
+### ER-08 — DynamoDB-vs-analytical-store decision ADR · Tier 4 (defer-leaning) · Effort S + optional spike
+- **Why:** single-table DDB (no GSIs) is an awkward fit for analytical/time-series/cross-source data and the big MCP query layer partly compensates; the choice may be right but is implicit. **Do NOT migrate.**
+- **Action:** ADR stating why DDB, what it costs in query expressiveness, and the revisit trigger (e.g. DuckDB-over-Parquet-in-S3 as a read-side layer *alongside* DDB if ad-hoc analytics are needed); optional `spikes/er08_duckdb_readside/` re-implementing one correlation query to size the alternative.
+- **Acceptance:** ADR makes the implicit explicit with an honest cost statement + concrete trigger; any spike stays in `spikes/`, ships nothing.
+- **Gate:** low priority; defer behind Tiers 1–3.
 
 ---
 
