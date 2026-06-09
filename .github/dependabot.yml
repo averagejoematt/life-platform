@@ -27,6 +27,17 @@ updates:
     groups:
       dev-tooling:
         patterns: ["*"]
+    ignore:
+      # The formatters/linters are version-pinned in BOTH requirements-dev.txt
+      # AND inline in ci-cd.yml (the format gate installs exact versions). A black
+      # or ruff bump that reformats code is a deliberate "reformat the whole repo +
+      # move both pins in lockstep" event, NOT a routine auto-bump — left to
+      # Dependabot it silently drifts `make format` from CI and red-walls the next
+      # push. So ignore ruff/black minor+major here; patch bumps still flow.
+      - dependency-name: "ruff"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "black"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   # CDK toolchain (cdk/requirements.txt: aws-cdk-lib, constructs).
   - package-ecosystem: "pip"
