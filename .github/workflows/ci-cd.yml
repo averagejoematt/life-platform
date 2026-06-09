@@ -66,9 +66,9 @@ jobs:
     name: Lint + Syntax Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
           cache: 'pip'  # V2 P4.14: speeds up CI by ~20s per job
@@ -133,13 +133,24 @@ jobs:
           echo "✅ All files pass syntax check"
 
       - name: Dependency Security Scan (advisory)
-        # R19 Phase 6: pip-audit for known vulnerabilities in dependencies
+        # pip-audit for known CVEs. 2026-06-09 (Tier-1 hardening): broadened from
+        # cdk-only to BOTH dependency manifests + a loud, actionable warning on any
+        # finding (the platform's "advisory-but-visible" pattern). Stays NON-blocking
+        # — Dependabot (.github/dependabot.yml) opens the fix PRs, so a sudden
+        # unfixable transitive CVE never red-walls deploys. (Lambda runtime is
+        # stdlib-only, so there is no lambdas/ requirements to scan.)
         run: |
           pip install pip-audit 2>/dev/null
-          echo "::group::Scanning cdk/requirements.txt"
-          pip-audit -r cdk/requirements.txt --desc on 2>&1 || true
-          echo "::endgroup::"
-          echo "Advisory scan complete — failures are non-blocking"
+          FOUND=0
+          for req in requirements-dev.txt cdk/requirements.txt; do
+            echo "::group::pip-audit $req"
+            pip-audit -r "$req" --desc on 2>&1 || FOUND=1
+            echo "::endgroup::"
+          done
+          if [ "$FOUND" = "1" ]; then
+            echo "::warning title=Dependency vulnerability (advisory)::pip-audit flagged known CVEs — review the grouped logs; Dependabot will open a bump PR for the affected package."
+          fi
+          echo "Dependency scan complete — advisory (non-blocking); Dependabot drives remediation."
 
       - name: Check lambda_map coverage
         # R18-F03: Detect Lambda source files missing from ci/lambda_map.json.
@@ -171,9 +182,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
           cache: 'pip'  # V2 P4.14: speeds up CI by ~20s per job
@@ -309,7 +320,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage-report
           path: coverage.xml
@@ -329,7 +340,7 @@ jobs:
       layer_changed: ${{ steps.plan.outputs.layer_changed }}
       mcp_changed: ${{ steps.plan.outputs.mcp_changed }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 2  # Need HEAD~1 for diff
 
@@ -361,7 +372,7 @@ jobs:
           echo "✅ lambda_map.json valid — all source files present"
 
       - name: Configure AWS credentials (OIDC) — plan
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
@@ -629,10 +640,10 @@ jobs:
     if: needs.plan.outputs.has_deploys == 'true'
     environment: production   # ← Manual approval gate
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
@@ -799,7 +810,7 @@ jobs:
     needs: deploy
     steps:
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
@@ -904,9 +915,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: deploy
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -918,7 +929,7 @@ jobs:
           python -m playwright install --with-deps chromium
 
       - name: Configure AWS credentials (OIDC — for Bedrock vision QA)
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
@@ -929,7 +940,7 @@ jobs:
 
       - name: Upload screenshots + report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: visual-qa-screenshots
           path: qa-screenshots/
@@ -954,9 +965,9 @@ jobs:
     needs: deploy
     if: needs.deploy.result == 'success'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
           cache: 'pip'  # V2 P4.14: speeds up CI by ~20s per job
@@ -965,7 +976,7 @@ jobs:
         run: pip install boto3 pytest --quiet
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
@@ -1040,10 +1051,10 @@ jobs:
     needs: [plan, deploy, smoke-test]
     if: needs.smoke-test.result == 'failure' && needs.deploy.result == 'success'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
@@ -1107,7 +1118,7 @@ jobs:
     if: failure()
     steps:
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
