@@ -1,0 +1,38 @@
+# Dependabot — automated dependency-update PRs (2026-06-09, Tier-1 hardening).
+# Actions are SHA-pinned; Dependabot bumps the SHA + version comment for us.
+# Lambda runtime deps are stdlib-only (no requirements there) — only the dev +
+# CDK toolchains are tracked.
+version: 2
+updates:
+  # GitHub Actions — keep the SHA-pinned actions current + patched.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci(deps)"
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Dev/test toolchain (requirements-dev.txt: ruff, black, mypy, pytest, …).
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps-dev)"
+    groups:
+      dev-tooling:
+        patterns: ["*"]
+
+  # CDK toolchain (cdk/requirements.txt: aws-cdk-lib, constructs).
+  - package-ecosystem: "pip"
+    directory: "/cdk"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps-cdk)"
