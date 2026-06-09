@@ -87,8 +87,8 @@ commit:  ## Stage all modified tracked files and open commit prompt
 # ── Housekeeping ──────────────────────────────────────────────────────────────
 
 clean:  ## Remove local build/cache cruft (all gitignored; regenerated on demand)
-	rm -rf cdk/cdk.out layer-build cdk/layer-build
+	rm -rf cdk/cdk.out layer-build
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +
 	rm -rf .mypy_cache .pytest_cache .ruff_cache cdk/.pytest_cache
-	@echo "Cleaned cdk.out + caches. Left intact: .venv, cdk/.venv, datadrops/, qa-screenshots/, captures/."
+	@echo "Cleaned cdk.out + caches. Left intact: .venv, cdk/.venv, cdk/layer-build (CDK asset — needed for synth, rebuilt by build_layer.sh), datadrops/, qa-screenshots/, captures/."
 	@echo "(For the big .venv dirs use: rm -rf .venv cdk/.venv show_and_tell/.venv && reinstall.)"
