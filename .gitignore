@@ -37,6 +37,18 @@ env/
 # CDK build artifacts
 cdk/cdk.out/
 cdk/.venv/
+cdk.out/
+layer-build/
+cdk/layer-build/
+
+# Node
+node_modules/
+**/node_modules/
+
+# Tool caches (regenerated; each writes its own internal .gitignore, but pin here too)
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
 
 # macOS
 .DS_Store
@@ -54,6 +66,13 @@ token*.json
 
 # Visual QA artifacts (regenerated per run; auth cookie is sensitive)
 qa-screenshots/
+
+# Stale committed QA report snapshot (regenerated, unreferenced — untracked 2026-06-08)
+deploy/qa_report/
+
+# Local scratch / superseded harnesses (PDF builder venv, pre-v4 page captures)
+show_and_tell/
+captures/
 
 # Personal backup snapshots — not project code, may contain sensitive material
 archive/051726_downloadsfolder_backup/
