@@ -315,7 +315,7 @@ jobs:
               --cov=lambdas --cov=mcp \
               --cov-report=term-missing:skip-covered \
               --cov-report=xml:coverage.xml \
-              --cov-fail-under=8 \
+              --cov-fail-under=9 \
               -q 2>&1 | tail -100
           echo "::endgroup::"
 

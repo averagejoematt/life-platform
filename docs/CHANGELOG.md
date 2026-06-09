@@ -1,3 +1,21 @@
+## v8.6.0 — 2026-06-09 (local-folder hygiene + blind-spot sweep: security · observability · testing · governance)
+
+### Added
+- **Repo hygiene** (PRs #71/#72): hardened `.gitignore`, removed dead top-level dirs (`blog/`, `audit/`, `captures/`, root `layer-build/`), a `make clean` target, and **`docs/REPO_STRUCTURE.md`** (canonical layout). Reclaimed ~6.5 GB of local build cruft (10 GB → 3.5 GB).
+- **Security/supply-chain — ADR-082** (PR #73): ruff `S` (flake8-bandit) SAST; all GitHub Actions SHA-pinned; Dependabot (github-actions + dev/cdk pip); pip-audit broadened. (Secret scanning + push protection confirmed already enabled.)
+- **Observability — Tier 2** (PR #78, **deployed**): CDK-managed `life-platform-ops` dashboard (5 rows incl. per-source ingestion health via SEARCH) + 3 alarms on previously-unwatched signals (`remediation-dispatcher-errors`, `dlq-consumer-errors`, `budget-tier-escalation`). 13 → 16 alarms.
+- **Testing** (PR #79): 14 ingestion-`transform()` unit tests (whoop/withings/strava/garmin) — pins the raw-payload → DDB-schema contract; suite 1598 → 1612.
+- **Governance — ADR-083** (single-region accepted) + **ADR-084** (coverage philosophy + ratchet cadence). Saved Logs-Insights triage queries in `docs/RUNBOOK.md`.
+
+### Changed
+- Coverage regression floor raised **8 → 9%** (offline coverage is ~10% after the transform tests).
+- `make clean` fixed to preserve `cdk/layer-build` (a required CDK asset, not cruft).
+- Dependabot configured to **skip ruff/black minor+major** bumps (formatter upgrades are a deliberate reformat event, not auto-merge).
+
+### Fixed
+- The `make clean` footgun that deleted `cdk/layer-build` and broke `cdk synth` until `build_layer.sh` re-ran.
+
+
 ## v8.5.0 — 2026-06-08 (reset run · A-grade hardening · CDK orphan adoption → ∅ · inbox triage)
 
 ### Added
