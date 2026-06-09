@@ -21,13 +21,28 @@ target-version = "py312"
 extend-exclude = [".venv", "cdk.out", "layer-build", "site", "node_modules", "archive", "datadrops", "_mcp_staging"]
 
 [tool.ruff.lint]
-# pycodestyle (E/W) + pyflakes (F) + isort (I).
-select = ["E", "W", "F", "I"]
+# pycodestyle (E/W) + pyflakes (F) + isort (I) + flake8-bandit (S, security/SAST).
+select = ["E", "W", "F", "I", "S"]
 # E501 line-length (formatter) · E402 import-order (Lambda handlers) · E741
 # ambiguous names · E701/E702 compound statements (intentional compact style;
 # black keeps them) · E731 lambda-assign. F841 (unused-vars) is ENFORCED — cleaned
 # across lambdas/tests/scripts/deploy after verifying every RHS was side-effect-free.
-ignore = ["E501", "E402", "E741", "E701", "E702", "E731"]
+#
+# bandit (S) tuning (ADR follow-up, 2026-06-09): the high-signal security rules
+# (S102 exec · S307 eval · S301 pickle · S506 unsafe-yaml · S602/S604/S605 shell
+# injection · S324 weak-hash · S501 no-cert-verify · etc.) stay ON to catch future
+# real issues. The rules below are silenced because they only ever fire on this
+# single-user, stdlib-only platform's intentional conventions — each audited to
+# have zero genuine finding (no hardcoded secret *values* exist; Secrets-Manager-only):
+#   S101 assert (invariants + tests) · S108 hardcoded /tmp (only writable Lambda path)
+#   S110/S112 try-except-pass/continue (deliberate best-effort fallbacks)
+#   S310 urlopen (the stdlib-urllib HTTP convention — no requests/httpx; URLs are constant API bases)
+#   S311 non-crypto pseudo-random (workout variety / retry jitter)
+#   S603/S607 subprocess — only ever called with list-form args (no shell=True, so
+#     no shell injection) and partial paths (python3/git) that resolve via the
+#     controlled CI/Lambda PATH; these are the test-harness + tooling self-invocations.
+ignore = ["E501", "E402", "E741", "E701", "E702", "E731",
+          "S101", "S108", "S110", "S112", "S310", "S311", "S603", "S607"]
 # `# noqa: CDK_HANDLER_ORPHAN` belongs to the custom CDK handler-consistency
 # linter (tests/test_cdk_handler_consistency.py), not ruff — don't warn on it.
 external = ["CDK_HANDLER_ORPHAN"]
@@ -40,6 +55,11 @@ external = ["CDK_HANDLER_ORPHAN"]
 # cdk/stacks: `lambda_x = SomeLambda(...)` bindings are often unused but the call
 # CREATES the resource — auto-removing F841 there would delete infrastructure.
 "cdk/stacks/*.py" = ["F841"]
+# bandit (S) per-file false-positives — secret *names*/URLs/sentinels, not values:
+"cdk/stacks/role_policies.py" = ["F841", "S106"]   # secret_name="life-platform/..." is a Secrets Manager identifier
+"lambdas/ingestion/*_lambda.py" = ["S105", "S314"] # SECRET_NAME/*_TOKEN_URL constants + own-data (Apple Health / xlsx) XML
+"mcp/handler.py" = ["F401", "F811", "F841", "S105"]  # fail-closed bearer-token sentinel ("__NO_KEY_CONFIGURED__")
+"tests/*.py" = ["S105", "S106"]                    # dummy tokens/secrets in fixtures
 
 [tool.ruff.lint.isort]
 combine-as-imports = true

@@ -2404,4 +2404,22 @@ The AWS "account-controls" sub-grade stays below a literal-checklist A on those 
 
 ---
 
-**Verified:** 2026-06-08 (ADR-081 — 4 CLI orphans (3 intelligence + og-image-generator) adopted into CDK; orphan set → ∅; latent web_stack og-image handler bug flagged)
+## ADR-082: Security & supply-chain hardening (SAST, action pinning, Dependabot)
+
+**Status:** Accepted (2026-06-09)
+
+**Context:** A "blind-spot" audit found the security baseline strong (per-Lambda least-priv, Secrets-Manager-only, OIDC, budget guard) but missing three cheap, standard supply-chain controls: no SAST (ruff `select` lacked the `S`/bandit ruleset), GitHub Actions pinned to **mutable** `@vN` tags (silent-injection vector), and no automated dependency-update channel.
+
+**Decision:**
+1. **Enable ruff `S` (flake8-bandit) as SAST**, gated by the existing CI ruff step — zero new tooling. The high-signal rules stay ON (`S102` exec, `S307` eval, `S301` pickle, `S506` unsafe-yaml, `S602/4/5` shell-injection, `S324` weak-hash, `S501` no-cert-verify, …). Rules that only ever fire on this **single-user, stdlib-only, Secrets-Manager-only** platform's intentional conventions are silenced with documented reasons (`pyproject.toml`): `S310` (the urllib-only HTTP convention; URLs are constant API bases), `S110/S112` (deliberate best-effort try/except), `S101/S108/S311`, `S603/S607` (subprocess always list-form, no shell). The full audit found **zero genuine findings** — no hardcoded secret *values* (S105/S106 only flagged secret *names*/URLs/sentinels), so `S`'s value is forward-looking: catch a future real `eval`/`pickle`/`shell=True`/hardcoded value.
+2. **Pin all GitHub Actions to commit SHAs** (`# vN` comment kept for readability) across every workflow — eliminates the mutable-tag injection vector.
+3. **Add Dependabot** (`.github/dependabot.yml`) for `github-actions` + the dev and CDK pip toolchains — updates (incl. the action SHAs) arrive as reviewable PRs.
+4. **Broaden `pip-audit`** to both dependency manifests with a loud `::warning::` on any CVE, kept **non-blocking** (Dependabot is the remediation channel, so an unfixable transitive CVE never red-walls deploys).
+
+**Not done (accepted):** GuardDuty/Config stay deferred (ADR-079). GitHub native secret-scanning + push-protection is an owner repo-settings toggle (recommended, complements the bespoke `ci/deprecated_secrets.txt` grep).
+
+**Consequences:** SAST now runs every CI; supply-chain injection via action tags is closed; dependency drift is surfaced + auto-PR'd. All at ~zero added cost/latency. The `S`-ignore list is the documented contract for "what's an accepted convention vs a real smell" going forward.
+
+---
+
+**Verified:** 2026-06-09 (ADR-082 — ruff `S` SAST enabled + tuned; all GitHub Actions SHA-pinned; Dependabot added; pip-audit broadened)
