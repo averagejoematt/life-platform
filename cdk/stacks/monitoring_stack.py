@@ -126,6 +126,23 @@ class MonitoringStack(Stack):
             to_digest=True,
         )
 
+        # ER-01: infra-liveness — separate from behavioral freshness above. Fires
+        # when an ingestion Lambda is running-but-erroring (failure streak) or has
+        # stopped running (attempt staleness), independent of whether new data was
+        # expected. This is the signal the silent 44-day Garmin outage lacked.
+        # Set by pipeline_health_check's check_ingest_liveness mode (daily).
+        _alarm(
+            "IngestLivenessUnhealthy",
+            "ingest-liveness-unhealthy",
+            "LifePlatform/IngestLiveness",
+            "UnhealthySourceCount",
+            86400,
+            "Maximum",
+            1,
+            GTE,
+            to_digest=True,
+        )
+
         # ══════════════════════════════════════════════════════════════
         # Daily-brief operational alarms (not in EmailStack)
         # ══════════════════════════════════════════════════════════════
