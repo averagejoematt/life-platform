@@ -1,0 +1,14 @@
+{
+  "data": {
+    "metrics": [
+      {
+        "name": "blood_pressure",
+        "units": "mmHg",
+        "data": [
+          {"date": "2026-06-08 07:30:00 -0700", "systolic": 118, "diastolic": 76, "pulse": 58},
+          {"date": "2026-06-08 21:15:00 -0700", "systolic": 122, "diastolic": 79, "pulse": 61}
+        ]
+      }
+    ]
+  }
+}

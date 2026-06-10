@@ -61,6 +61,28 @@ PIPELINES = [
     ("anomaly-detector", "Anomaly Detector", "anomaly_detector"),
 ]
 
+# ── ER-01 infra-liveness ──────────────────────────────────────────────────────
+# Active OAuth/API *pull* sources that should run at least once per day. These are
+# the sources whose silent auth-rot / de-scheduling is the 44-day-outage class.
+# Webhook/push sources (apple_health/CGM, hevy) are excluded — they have no cron to
+# go stale, so the attempt-staleness arm doesn't apply to them.
+ACTIVE_API_SOURCES = [
+    "whoop", "withings", "garmin", "strava", "eightsleep",
+    "habitify", "todoist", "notion", "weather", "dropbox",
+]
+
+# Per-source attempt-gap overrides (minutes). Unlisted sources use the default in
+# ingest_health (~26h). Garmin runs only 4x/day but still attempts daily, so the
+# default holds; this map exists for future sources with sparser-than-daily cadence.
+SOURCE_MAX_GAP_MINUTES = {}
+
+try:
+    from ingest_health import SYSTEM_PK, evaluate_source_health
+
+    _INGEST_HEALTH_AVAILABLE = True
+except ImportError:  # pragma: no cover - layer-module fallback
+    _INGEST_HEALTH_AVAILABLE = False
+
 
 def _probe_lambda(fn_name: str) -> dict:
     """Invoke a Lambda and check if it crashes. Returns result dict."""
@@ -150,12 +172,104 @@ def _check_compute_outputs(today_str: str) -> dict:
     return {"missing": missing, "present": present, "all_present": not missing}
 
 
+def _check_ingest_liveness(now: datetime) -> dict:
+    """ER-01: read the INGEST_HEALTH sentinels and assert per-source infra-liveness.
+
+    Distinct from behavioral freshness: this fires when an ingestion Lambda has been
+    running-but-erroring (failure streak) or has stopped running entirely (attempt
+    staleness) — independent of whether the user logged any new data. Emits
+    UnhealthySourceCount to LifePlatform/IngestLiveness and pushes a distinct-subject
+    digest alert when any source is unhealthy.
+    """
+    if not _INGEST_HEALTH_AVAILABLE:
+        logger.warning("ingest_liveness: ingest_health module unavailable (layer not rebuilt?) — skipping")
+        return {"skipped": "ingest_health_unavailable"}
+
+    # Pull every sentinel under the USER#system partition in one query.
+    sentinels = {}
+    try:
+        resp = table.query(
+            KeyConditionExpression="pk = :pk AND begins_with(sk, :pfx)",
+            ExpressionAttributeValues={":pk": SYSTEM_PK, ":pfx": "INGEST_HEALTH#"},
+        )
+        for item in resp.get("Items", []):
+            src = item.get("source") or item.get("sk", "").replace("INGEST_HEALTH#", "")
+            sentinels[src] = item
+    except Exception as e:
+        logger.error(f"ingest_liveness: sentinel query failed: {e}")
+        return {"error": str(e)}
+
+    verdicts = []
+    for source in ACTIVE_API_SOURCES:
+        verdict = evaluate_source_health(
+            sentinels.get(source),
+            now=now,
+            max_gap_minutes=SOURCE_MAX_GAP_MINUTES.get(source, 1560),
+            source=source,
+        )
+        verdicts.append(verdict)
+        if verdict["alert"]:
+            logger.warning(f"INGEST UNHEALTHY: {source} — {verdict['status']}: {verdict['reason']}")
+
+    alerting = [v for v in verdicts if v["alert"]]
+    unhealthy_count = len(alerting)
+
+    # Emit the metric the ingest-liveness alarm watches.
+    try:
+        cw = boto3.client("cloudwatch", region_name=REGION)
+        cw.put_metric_data(
+            Namespace="LifePlatform/IngestLiveness",
+            MetricData=[{"MetricName": "UnhealthySourceCount", "Value": unhealthy_count, "Unit": "Count"}],
+        )
+    except Exception as e:
+        logger.warning(f"ingest_liveness metric emit failed: {e}")
+
+    # Distinct-subject digest alert so a failing source is unmissable (no pager).
+    if alerting:
+        lines = [f"• {v['source']}: {v['status'].upper()} — {v['reason']} (last_error={v['last_error_class']})" for v in alerting]
+        msg = (
+            f"🔌 Ingestion infra-liveness: {unhealthy_count} source(s) unhealthy "
+            f"(running-but-erroring or stopped running):\n\n" + "\n".join(lines) +
+            "\n\nThis is infra-liveness, NOT data-freshness — these sources are failing "
+            "their upstream fetch regardless of whether new data was expected."
+        )
+        try:
+            sns = boto3.client("sns", region_name=REGION)
+            digest_arn = os.environ.get("DIGEST_SNS_ARN", f"arn:aws:sns:{REGION}:205930651321:life-platform-alerts-digest")
+            sns.publish(TopicArn=digest_arn, Subject=f"⚠️ Ingest-liveness: {unhealthy_count} source(s) failing", Message=msg)
+        except Exception as e:
+            logger.warning(f"ingest_liveness SNS publish failed: {e}")
+
+    # Persist for the status page.
+    try:
+        table.put_item(
+            Item={
+                "pk": f"USER#{USER_ID}#SOURCE#ingest_liveness",
+                "sk": f"DATE#{now.strftime('%Y-%m-%d')}",
+                "date": now.strftime("%Y-%m-%d"),
+                "checked_at": now.isoformat(),
+                "unhealthy_count": unhealthy_count,
+                "verdicts": json.dumps(verdicts, default=str),
+            }
+        )
+    except Exception as e:
+        logger.warning(f"ingest_liveness store failed: {e}")
+
+    logger.info(f"ingest_liveness: {unhealthy_count} unhealthy of {len(ACTIVE_API_SOURCES)} active sources")
+    return {"unhealthy_count": unhealthy_count, "verdicts": verdicts}
+
+
 def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
     if hasattr(logger, "set_date"):
         logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))
 
     now = datetime.now(timezone.utc)
     today_str = now.strftime("%Y-%m-%d")
+
+    # ER-01: infra-liveness mode — assert each active source's ingestion Lambda ran
+    # and 200'd, independent of whether new data came back.
+    if event.get("check_ingest_liveness"):
+        return {"statusCode": 200, "body": json.dumps(_check_ingest_liveness(now), default=str)}
 
     # Phase 3.2: compute-output verification mode
     if event.get("check_compute_outputs"):
