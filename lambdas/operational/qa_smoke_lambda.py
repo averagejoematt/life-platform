@@ -66,7 +66,9 @@ MCP_SECRET_NAME = os.environ.get("MCP_SECRET_NAME", "life-platform/mcp-api-key")
 
 
 def pt_now():
-    return datetime.now(timezone.utc) - timedelta(hours=8)
+    from zoneinfo import ZoneInfo
+
+    return datetime.now(ZoneInfo("America/Los_Angeles"))  # DST-aware (fixed -8 was PST year-round)
 
 
 def yesterday_str():

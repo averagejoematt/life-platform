@@ -80,7 +80,7 @@ import os
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
@@ -138,7 +138,22 @@ _TZ_OFFSETS = {
     "Asia/Tokyo": 9,
     "Australia/Sydney": 10,
 }
-_DEFAULT_TZ_OFFSET = -8  # PST (Seattle)
+_DEFAULT_TZ_OFFSET = -8  # PST (Seattle) — static-map fallback only
+
+
+def _tz_offset_hours(tz_name: str) -> float:
+    """Current UTC offset for an IANA zone, DST-aware. The static _TZ_OFFSETS
+    map pinned standard time, so every stored sleep hour landed 1h off from
+    March to November (found 2026-06-12). Ingestion runs near-real-time, so
+    today's offset matches the night being parsed."""
+    try:
+        from zoneinfo import ZoneInfo
+
+        off = datetime.now(timezone.utc).astimezone(ZoneInfo(tz_name)).utcoffset()
+        return off.total_seconds() / 3600
+    except Exception:
+        return _TZ_OFFSETS.get(tz_name, _DEFAULT_TZ_OFFSET)
+
 
 # ── AWS clients (module-level — reused across Lambda warm invocations) ─────────
 secrets_client = boto3.client("secretsmanager", region_name=REGION)
@@ -662,7 +677,7 @@ def transform(raw: dict, date_str: str) -> list[dict]:
     """Parse sleep + merge environment temperature."""
     if not raw:
         return []
-    tz_offset = _TZ_OFFSETS.get(raw["tz"], _DEFAULT_TZ_OFFSET)
+    tz_offset = _tz_offset_hours(raw["tz"])
     parsed = parse_trends_for_date(raw["trends"], date_str, raw["bed_side"], tz_offset=tz_offset)
     if not parsed:
         return []

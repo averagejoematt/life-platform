@@ -127,8 +127,9 @@ def update_configs(target_date: str, weight_lbs: float, weight_kg: float, measur
     cfg["timeline"]["start_weight_lbs"] = weight_lbs
     cfg["timeline"]["start_weight_kg"] = weight_kg
     cfg["timeline"]["baseline_source"] = "withings"
-    if measurement_utc:
-        cfg["timeline"]["baseline_measurement_utc"] = measurement_utc
+    # Always assign — a conditional here let the PREVIOUS cycle's timestamp
+    # survive a restart whose genesis date had no weigh-in yet (None clears it).
+    cfg["timeline"]["baseline_measurement_utc"] = measurement_utc
     if apply:
         USER_GOALS.write_text(json.dumps(cfg, indent=2) + "\n")
 

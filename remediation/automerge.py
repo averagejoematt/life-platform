@@ -96,7 +96,9 @@ def eligible(files):
         path = f["path"]
         if any(s in path for s in DENYLIST_SUBSTR):
             return False, f"denylisted path: {path}"
-        if not any(path == p or path.startswith(p) for p in ALLOWLIST):
+        # Exact match for file entries; prefix match only for directory entries
+        # ("tests/") — bare startswith let "role_policies.py.bak" ride through.
+        if not any(path == p or (p.endswith("/") and path.startswith(p)) for p in ALLOWLIST):
             return False, f"not on allowlist: {path}"
         if f.get("additions", 0) and path.endswith(".py") and "/" not in path:
             return False, f"new top-level file: {path}"
