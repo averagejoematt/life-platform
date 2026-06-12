@@ -29,7 +29,8 @@ echo ""
 echo "[1/4] Checking for obviously broken internal links..."
 BROKEN=0
 for f in $(find "$SITE_DIR" -name '*.html'); do
-  grep -oP 'href="/([^"#?]+)"' "$f" 2>/dev/null | sed 's|href="/||;s|"||' | while read -r link; do
+  # BSD-grep compatible (-P is GNU-only; macOS exits 2 and set -e kills the deploy)
+  { grep -oE 'href="/[^"#?]+"' "$f" 2>/dev/null || true; } | sed 's|href="/||;s|"||' | while read -r link; do
     [[ "$link" == http* ]] && continue
     [[ "$link" == api/* ]] && continue
     [[ "$link" == mailto* ]] && continue
