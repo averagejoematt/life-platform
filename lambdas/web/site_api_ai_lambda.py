@@ -373,7 +373,9 @@ def _ask_fetch_context() -> dict:
         ctx["tier0_streak"] = int(hs_items[0].get("t0_perfect_streak", 0) or 0)
     # Fetch start/goal from profile for dynamic prompt injection
     try:
-        prof_resp = table.get_item(Key={"pk": f"{USER_PREFIX}profile", "sk": "PROFILE"})
+        # Canonical profile key — the old {USER_PREFIX}profile/PROFILE item never
+        # existed, so this read silently fell back to constants (found 2026-06-12).
+        prof_resp = table.get_item(Key={"pk": "USER#matthew", "sk": "PROFILE#v1"})
         prof = _decimal_to_float(prof_resp.get("Item", {}))
         ctx["start_weight"] = float(prof.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
         ctx["goal_weight"] = float(prof.get("goal_weight_lbs", 185))
