@@ -618,7 +618,7 @@ def tool_get_weight_loss_progress(args):
                 break
 
     plateau = None
-    recent_14 = [pt for pt in weight_series if (datetime.now(timezone.utc) - datetime.strptime(pt["date"], "%Y-%m-%d")).days <= 14]
+    recent_14 = [pt for pt in weight_series if (datetime.now(timezone.utc).date() - datetime.strptime(pt["date"], "%Y-%m-%d").date()).days <= 14]
     if len(recent_14) >= 3:
         wts = [pt["weight_lbs"] for pt in recent_14]
         spread = max(wts) - min(wts)
