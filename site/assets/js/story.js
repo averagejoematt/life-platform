@@ -139,11 +139,17 @@ function renderWave(days) {
     if (wrap) wrap.textContent = "The waveform fills in as the daily scores accrue.";
     return;
   }
-  const max = Math.max(700, ...days.map((d) => d.score || 0));
+  // Normalize to the window's own range, not a fixed 0–700 scale: real scores
+  // cluster in a narrow band, and against 700 every bar rendered near-identical —
+  // the arc read as a flat strip instead of "every day, including the dips".
+  // A 14%-floor + 86%-span keeps small days visible without faking zeros.
+  const scores = days.map((d) => d.score || 0).filter(Boolean);
+  const lo = scores.length ? Math.min(...scores) : 0;
+  const span = Math.max(1, (scores.length ? Math.max(...scores) : 1) - lo);
   wrap.replaceChildren(...days.map((d) => {
     const bar = document.createElement("span");
     bar.className = `bar ${tierOf(d.score)}`;
-    const h = d.score ? Math.max(4, (d.score / max) * 100) : 6;
+    const h = d.score ? 14 + ((d.score - lo) / span) * 86 : 6;
     bar.style.height = `${h}%`;
     bar.title = `${d.date || ""}: ${d.score ?? "no data"}`;
     return bar;

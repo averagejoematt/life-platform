@@ -39,7 +39,6 @@ from web.site_api_common import (
     S3_REGION,
     USER_ID,
     USER_PREFIX,
-    _cached_secret,
     _decimal_to_float,
     _error,
     _load_s3_json,
@@ -131,7 +130,6 @@ def handle_current_challenge() -> dict:
 
 
 _SUBSCRIBER_TOKEN_SECRET_NAME = os.environ.get("SUBSCRIBER_TOKEN_SECRET_NAME", "life-platform/subscriber-token-secret")
-_legacy_token_secret_cache = None
 
 
 def _get_token_secret() -> str:
@@ -142,12 +140,9 @@ def _get_token_secret() -> str:
       (1) AI-key rotation no longer invalidates every subscriber token.
       (2) AI-key compromise no longer enables token forgery.
 
-    Rollout safety: if the new secret isn't available yet (because the IAM
-    grant from cdk/stacks/role_policies.py:site_api / site_api_ai has not been
-    applied via `cdk deploy LifePlatformOperational`), this falls back to the
-    legacy derivation so the migration can land in any deploy order without
-    breaking subscriber-token signing. Once both halves are deployed, the
-    fallback never fires and only the new secret is used.
+    The pre-#106 fallback (derived from the Anthropic API key) was removed
+    2026-06-12 — its 24h migration window expired 2026-05-31, and a loud
+    failure beats silently signing with a derivable key.
     """
     global _token_secret_cache
     if _token_secret_cache:
@@ -157,27 +152,8 @@ def _get_token_secret() -> str:
         _token_secret_cache = sm.get_secret_value(SecretId=_SUBSCRIBER_TOKEN_SECRET_NAME)["SecretString"]
         return _token_secret_cache
     except Exception as e:
-        logger.warning(f"[token_secret] Falling back to legacy derivation; new secret " f"unavailable: {e}")
-        legacy = _get_legacy_token_secret()
-        if not legacy:
-            raise RuntimeError("Token signing secret unavailable") from e
-        return legacy
-
-
-def _get_legacy_token_secret() -> str:
-    """The pre-#106 derived signing secret. Used only by the validator for
-    a 24h fallback so tokens minted before the migration still work until
-    they expire on their own (token TTL is 86400s). Remove after 2026-05-31."""
-    global _legacy_token_secret_cache
-    if _legacy_token_secret_cache:
-        return _legacy_token_secret_cache
-    import hashlib as _h
-
-    api_key = _get_anthropic_key()
-    if not api_key:
-        return ""  # legacy path is best-effort; missing key just means no fallback
-    _legacy_token_secret_cache = _h.sha256(f"subscriber-token-v1:{api_key}".encode()).hexdigest()
-    return _legacy_token_secret_cache
+        logger.error(f"[token_secret] Signing secret unavailable: {e}")
+        raise RuntimeError("Token signing secret unavailable") from e
 
 
 def _generate_subscriber_token(email: str) -> str:
@@ -273,16 +249,6 @@ def handle_subscriber_count() -> dict:
         logger.warning(f"[subscriber_count] DDB query failed: {e}")
         count = 0
     return _ok({"count": count}, cache_seconds=600)
-
-
-def _get_anthropic_key():
-    """Fetch Anthropic API key from Secrets Manager (cached with 15-min TTL)."""
-    try:
-        sm = boto3.client("secretsmanager", region_name="us-west-2")
-        return _cached_secret(sm, AI_SECRET_NAME)
-    except Exception as e:
-        logger.error(f"[ask] Failed to fetch API key from {AI_SECRET_NAME}: {e}")
-        return None
 
 
 def _emit_rate_limit_metric(endpoint: str) -> None:
@@ -593,11 +559,37 @@ def handle_experiment_library() -> dict:
     )
 
 
+_library_ids_cache: tuple = (0.0, frozenset())  # (loaded_at_epoch, ids)
+
+
+def _valid_library_ids() -> frozenset:
+    """Experiment ids from the S3 library, cached 15 min. Votes are validated
+    against this set so arbitrary library_ids can't mint unbounded DDB records."""
+    global _library_ids_cache
+    import time as _time
+
+    loaded_at, ids = _library_ids_cache
+    if ids and _time.time() - loaded_at < 900:
+        return ids
+    try:
+        s3_client = boto3.client("s3", region_name=S3_REGION)
+        bucket = os.environ.get("S3_BUCKET", "matthew-life-platform")
+        resp = s3_client.get_object(Bucket=bucket, Key="site/config/experiment_library.json")
+        library = json.loads(resp["Body"].read().decode("utf-8"))
+        ids = frozenset((e.get("id") or "").lower() for e in library.get("experiments", []) if e.get("id"))
+        _library_ids_cache = (_time.time(), ids)
+    except Exception as e:
+        logger.warning(f"[experiment_vote] Library allowlist load failed: {e}")
+        # Keep serving a stale allowlist if we ever had one; empty set → 503 upstream.
+    return _library_ids_cache[1]
+
+
 def _handle_experiment_vote(event: dict) -> dict:
     """
     POST /api/experiment_vote
     Body: {"library_id": "post-dinner-walk"}
     Rate limit: 1 vote per IP per experiment per 24 hours via DynamoDB TTL.
+    library_id must exist in the experiment library (anti-pollution, 2026-06-12).
     """
     source_ip = _extract_client_ip(event)
     try:
@@ -608,6 +600,11 @@ def _handle_experiment_vote(event: dict) -> dict:
     library_id = (body.get("library_id") or "").strip().lower()
     if not library_id or len(library_id) > 80:
         return _error(400, "library_id is required (max 80 chars)")
+    valid_ids = _valid_library_ids()
+    if not valid_ids:
+        return _error(503, "Experiment library unavailable — try again shortly")
+    if library_id not in valid_ids:
+        return _error(400, "Unknown experiment")
 
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
     rate_pk = "VOTES#rate_limit"
