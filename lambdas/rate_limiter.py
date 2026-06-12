@@ -50,13 +50,17 @@ def check_rate_limit(
     ip_hash: str,
     limit: int,
     window_seconds: int = 3600,
+    fail_open: bool = True,
 ) -> Tuple[bool, int, int]:
     """Atomic per-IP rate check via DynamoDB.
 
     Returns: (allowed, remaining, retry_after_seconds).
-    On any DDB error, returns (True, limit, 0) — fail-open is safer for a
-    personal platform than blocking legit traffic on infrastructure hiccup.
-    Errors are logged for observability.
+    On any DDB error, returns (fail_open, …). Fail-open is the default — safer
+    for a personal platform than blocking legit traffic on an infrastructure
+    hiccup. Cost-bearing endpoints (each /api/board_ask fans out multiple
+    Bedrock calls) pass fail_open=False so a DDB outage can't become an
+    unmetered AI bill; they return a short retry_after since DDB blips are
+    transient. Errors are logged for observability.
     """
     now = int(time.time())
     bucket_start = _bucket_for_window(now, window_seconds)
@@ -75,8 +79,11 @@ def check_rate_limit(
             ReturnValues="UPDATED_NEW",
         )
     except Exception as e:
-        _logger.warning("rate_limit_ddb_error endpoint=%s err=%s — failing open", endpoint, e)
-        return True, limit, 0
+        _logger.warning(
+            "rate_limit_ddb_error endpoint=%s err=%s — failing %s",
+            endpoint, e, "open" if fail_open else "closed",
+        )
+        return (True, limit, 0) if fail_open else (False, 0, 60)
 
     count = int(resp.get("Attributes", {}).get("count", 1))
     remaining = max(0, limit - count)

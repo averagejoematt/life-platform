@@ -64,6 +64,7 @@ body { overflow-x: hidden; }
   border-bottom: 1px solid var(--ember-line); padding-bottom: 2px;
 }
 .cta:hover { border-color: var(--ember); }
+.cta:active { border-color: var(--ember); opacity: 0.8; }
 .cta-quiet { color: var(--ink-faint); border-color: var(--rule); }
 .cta-quiet:hover { color: var(--ink-muted); }
 

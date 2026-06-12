@@ -159,8 +159,17 @@ def _query_source(source: str, start_date: str, end_date: str, include_pilot: bo
         },
         include_pilot=include_pilot,
     )
-    resp = table.query(**kwargs)
-    return _decimal_to_float(resp.get("Items", []))
+    # Paginate: a long date range (or large items) can exceed DynamoDB's 1 MB
+    # response limit; without the loop, trend endpoints silently truncate.
+    items = []
+    while True:
+        resp = table.query(**kwargs)
+        items.extend(resp.get("Items", []))
+        last_key = resp.get("LastEvaluatedKey")
+        if not last_key:
+            break
+        kwargs["ExclusiveStartKey"] = last_key
+    return _decimal_to_float(items)
 
 
 def _latest_item(source: str, include_pilot: bool = False) -> dict | None:

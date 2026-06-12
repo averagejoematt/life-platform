@@ -165,6 +165,7 @@ async function togglePillar(btn, key) {
   btn.setAttribute("aria-expanded", "true");
   const detail = document.createElement("div");
   detail.className = "pillar-detail";
+  detail.setAttribute("aria-live", "polite");
   detail.innerHTML = `<p class="pd-read"><span class="pd-who">loading ${PILLAR_LABEL[key]}…</span></p>`;
   withTransition(() => btn.after(detail));
 
