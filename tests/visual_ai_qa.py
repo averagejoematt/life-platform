@@ -92,6 +92,12 @@ def _parse_verdict(text):
 
 
 def _assess_page(bedrock, name, path, shots):
+    # Skip zero/near-empty captures (a zero-height element crop produces an
+    # empty PNG that Bedrock rejects with a ValidationException — seen on the
+    # labs chart crop 2026-06-12).
+    shots = [s for s in shots if os.path.getsize(s["path"]) > 256]
+    if not shots:
+        return {"severity": "ok", "renders_ok": True, "summary": "(no usable screenshots — skipped)"}
     content = [_image_block(s["path"]) for s in shots]
     content.append({"type": "text", "text": _PROMPT.format(name=name, path=path)})
     body = {"messages": [{"role": "user", "content": content}], "max_tokens": 700}
