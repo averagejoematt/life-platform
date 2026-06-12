@@ -84,14 +84,7 @@ def _floats_to_decimal(obj):
     return obj
 
 
-def _decimal_to_float(obj):
-    if isinstance(obj, Decimal):
-        return float(obj)
-    if isinstance(obj, list):
-        return [_decimal_to_float(x) for x in obj]
-    if isinstance(obj, dict):
-        return {k: _decimal_to_float(v) for k, v in obj.items()}
-    return obj
+from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
 
 
 def serialize(ir: RoutineSpec) -> dict[str, Any]:

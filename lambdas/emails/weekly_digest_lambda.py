@@ -115,12 +115,9 @@ def get_anthropic_key():
 
 
 def fetch_profile():
-    try:
-        r = table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"})
-        return d2f(r.get("Item", {}))
-    except Exception as e:
-        logger.error(f"fetch_profile: {e}")
-        return {}
+    from intelligence_common import fetch_profile as _shared_fetch_profile
+
+    return _shared_fetch_profile(table, USER_ID)
 
 
 def query_range(source, start_date, end_date):

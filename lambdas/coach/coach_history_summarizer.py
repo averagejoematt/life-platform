@@ -125,15 +125,7 @@ def _get_api_key():
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _decimal_to_float(obj):
-    """Recursively convert DynamoDB Decimals to float for JSON serialization."""
-    if isinstance(obj, Decimal):
-        return float(obj)
-    if isinstance(obj, dict):
-        return {k: _decimal_to_float(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_decimal_to_float(v) for v in obj]
-    return obj
+from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
 
 
 def _float_to_decimal(obj):
@@ -147,47 +139,8 @@ def _float_to_decimal(obj):
     return obj
 
 
-def _emit_token_metrics(input_tokens, output_tokens, cache_creation_tokens=0, cache_read_tokens=0):
-    """Emit per-Lambda token usage to CloudWatch (non-fatal).
-
-    V2 P0.6 (2026-05-17): added cache fields. Prior 2-arg signature dropped them,
-    leaving AnthropicCacheReadTokens with zero datapoints despite caching wired.
-    """
-    try:
-        metric_data = [
-            {
-                "MetricName": "AnthropicInputTokens",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": input_tokens,
-                "Unit": "Count",
-            },
-            {
-                "MetricName": "AnthropicOutputTokens",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": output_tokens,
-                "Unit": "Count",
-            },
-        ]
-        if cache_creation_tokens or cache_read_tokens:
-            metric_data.append(
-                {
-                    "MetricName": "AnthropicCacheWriteTokens",
-                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                    "Value": cache_creation_tokens,
-                    "Unit": "Count",
-                }
-            )
-            metric_data.append(
-                {
-                    "MetricName": "AnthropicCacheReadTokens",
-                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                    "Value": cache_read_tokens,
-                    "Unit": "Count",
-                }
-            )
-        _cw.put_metric_data(Namespace=_CW_NAMESPACE, MetricData=metric_data)
-    except Exception as e:
-        logger.warning("CloudWatch token metric emit failed (non-fatal): %s", e)
+# Canonical emitter lives in the layer — local copy removed 2026-06-12.
+from retry_utils import _emit_token_metrics  # noqa: E402,F401
 
 
 def _emit_failure_metric():

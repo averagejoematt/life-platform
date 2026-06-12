@@ -313,12 +313,9 @@ def fetch_journal_entries(date_str):
 
 
 def fetch_profile():
-    try:
-        r = table.get_item(Key={"pk": PROFILE_PK, "sk": "PROFILE#v1"})
-        return d2f(r.get("Item", {}))
-    except Exception as e:
-        logger.error("fetch_profile: " + str(e))
-        return {}
+    from intelligence_common import fetch_profile as _shared_fetch_profile
+
+    return _shared_fetch_profile(table, USER_ID)
 
 
 def get_current_phase(profile, current_weight_lbs):

@@ -26,7 +26,6 @@ import json
 import logging
 import os
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -139,15 +138,7 @@ DOMAIN_SOURCE_MAP = {
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _decimal_to_float(obj):
-    """Recursively convert DynamoDB Decimal values to Python float."""
-    if isinstance(obj, Decimal):
-        return float(obj)
-    if isinstance(obj, dict):
-        return {k: _decimal_to_float(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_decimal_to_float(v) for v in obj]
-    return obj
+from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
 
 
 def _confidence_to_language(confidence_float):
