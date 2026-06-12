@@ -62,7 +62,7 @@
         <div class="sub-card-b">
           <div class="sub-field">
             <label class="sub-label" for="email">Email address</label>
-            <input type="email" class="sub-input" id="email" placeholder="your@email.com" autocomplete="email">
+            <input type="email" class="sub-input" id="email" placeholder="your@email.com" autocomplete="email" aria-invalid="false">
           </div>
           <div class="sub-field">
             <label class="sub-label" for="source-field">How'd you find this? <span class="opt">(optional)</span></label>
@@ -70,7 +70,7 @@
           </div>
           <p class="sub-note">You'll get a confirmation email. Double opt-in — no surprises. Unsubscribe anytime. <a href="/privacy/">Privacy policy →</a></p>
           <button class="sub-btn" id="submit-btn">Subscribe to The Measured Life →</button>
-          <p class="sub-status" id="form-status"></p>
+          <p class="sub-status" id="form-status" role="status" aria-live="polite"></p>
         </div>
       </div>
       <div class="sub-success" id="success-block">
@@ -124,17 +124,27 @@
         .catch(() => { document.getElementById('form-status').textContent = 'Error — try again.'; });
     }
 
+    function setStatus(status, text, kind) {
+      status.textContent = text;
+      status.classList.toggle('is-error', kind === 'error');
+      status.classList.toggle('is-info', kind === 'info');
+    }
     document.getElementById('submit-btn').addEventListener('click', async () => {
-      const email = document.getElementById('email').value.trim();
+      const btn = document.getElementById('submit-btn');
+      if (btn.disabled) return;
+      const emailEl = document.getElementById('email');
+      const email = emailEl.value.trim();
       const src = document.getElementById('source-field').value.trim();
       const status = document.getElementById('form-status');
       if (!email || !email.includes('@')) {
-        status.textContent = 'Enter a valid email address.';
-        status.style.color = 'var(--ember)';
+        emailEl.setAttribute('aria-invalid', 'true');
+        setStatus(status, 'Enter a valid email address.', 'error');
+        emailEl.focus();
         return;
       }
-      status.textContent = 'Sending…';
-      status.style.color = 'var(--ink-muted)';
+      emailEl.setAttribute('aria-invalid', 'false');
+      btn.disabled = true;
+      setStatus(status, 'Sending…', 'info');
       try {
         const res = await fetch('/api/subscribe', {
           method: 'POST',
@@ -146,10 +156,15 @@
           document.getElementById('form-block').style.display = 'none';
           document.getElementById('success-block').style.display = 'block';
         } else {
-          status.textContent = data.error || 'Something went wrong — try again.';
-          status.style.color = 'var(--ember)';
+          setStatus(status, data.error || 'Something went wrong — try again.', 'error');
         }
-      } catch { status.textContent = 'Network error — try again.'; status.style.color = 'var(--ember)'; }
+      } catch { setStatus(status, 'Network error — try again.', 'error'); }
+      btn.disabled = false;
+    });
+    document.getElementById('email').addEventListener('input', e => {
+      if (e.target.getAttribute('aria-invalid') === 'true' && e.target.value.includes('@')) {
+        e.target.setAttribute('aria-invalid', 'false');
+      }
     });
     document.getElementById('email').addEventListener('keydown', e => {
       if (e.key === 'Enter') document.getElementById('submit-btn').click();

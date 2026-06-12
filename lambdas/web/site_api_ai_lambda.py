@@ -339,6 +339,7 @@ def _ask_rate_check(ip_hash: str, limit: int = 5) -> tuple:
             ip_hash=ip_hash,
             limit=limit,
             window_seconds=3600,
+            fail_open=False,  # AI endpoint: a DDB blip must not unmeter Bedrock spend
         )
         return allowed, remaining
     # Legacy fallback (warm-container only)
@@ -685,6 +686,7 @@ def _handle_board_ask(event: dict) -> dict:
             ip_hash=ip_hash,
             limit=BOARD_RATE_LIMIT,
             window_seconds=3600,
+            fail_open=False,  # each board_ask costs ~6 Haiku calls — never unmetered
         )
         if not _board_allowed:
             _emit_rate_limit_metric("board_ask")

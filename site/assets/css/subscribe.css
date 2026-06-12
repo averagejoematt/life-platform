@@ -52,7 +52,12 @@
   border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: var(--fs-small);
   letter-spacing: 0.04em; padding: var(--sp-3) var(--sp-4); }
 .sub-btn:hover { filter: brightness(1.06); }
+.sub-btn:active { filter: brightness(0.94); }
+.sub-btn:disabled { opacity: 0.55; cursor: progress; filter: none; }
+.sub-input[aria-invalid="true"] { border-color: var(--ember); }
 .sub-status { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-muted); text-align: center; min-height: 18px; }
+.sub-status.is-error { color: var(--ember); }
+.sub-status.is-info { color: var(--ink-muted); }
 
 .sub-success { display: none; border: var(--border-hair); border-radius: var(--radius-sm); background: var(--ember-wash);
   padding: var(--sp-7) var(--sp-5); text-align: center; }
