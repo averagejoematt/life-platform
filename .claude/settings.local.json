@@ -8,7 +8,11 @@
       "mcp__life-platform__get_nutrition",
       "WebFetch(domain:api.hevyapp.com)",
       "WebSearch",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "mcp__life-platform__get_weight_loss_progress",
+      "mcp__life-platform__get_hypotheses",
+      "mcp__life-platform__get_sleep_analysis",
+      "mcp__life-platform__get_deficit_sustainability"
     ]
   },
   "enableAllProjectMcpServers": true,
