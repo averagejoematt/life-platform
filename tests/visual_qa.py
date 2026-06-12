@@ -381,6 +381,11 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
                         try:
                             target.click(timeout=3000)
                             page.wait_for_selector(it["expect"], state="visible", timeout=4000)
+                            # The cockpit disclosure animates via View Transitions — a
+                            # screenshot mid-crossfade captures both frames overlapped
+                            # ("garbled text" AI-vision false-FAIL, found 2026-06-12).
+                            # Let the transition settle before anything is captured.
+                            page.wait_for_timeout(800)
                         except Exception:
                             issues.append(f"Interaction failed: clicking '{it['click']}' did not reveal '{it['expect']}' — {it['desc']}")
 

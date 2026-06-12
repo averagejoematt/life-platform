@@ -571,6 +571,22 @@ class WebStack(Stack):
                         if PRIVACY_MODE
                         else None
                     ),
+                    # v4 legacy-URL 301s (ADR-071). The cutover left this as a manual
+                    # "attach via console" step that never happened — the function sat
+                    # published-but-unassociated and every old URL kept serving stale
+                    # old-site objects from S3 (found 2026-06-12). CloudFront allows
+                    # only one of {Function, Lambda@Edge} per viewer-request, so this
+                    # yields to the privacy-gate Lambda when PRIVACY_MODE is on.
+                    function_associations=(
+                        None
+                        if PRIVACY_MODE
+                        else [
+                            cloudfront.CfnDistribution.FunctionAssociationProperty(
+                                event_type="viewer-request",
+                                function_arn=f"arn:aws:cloudfront::{ACCT}:function/v4-redirects",
+                            ),
+                        ]
+                    ),
                 ),
                 # Cache behaviors — ORDER MATTERS: most-specific first.
                 cache_behaviors=[
