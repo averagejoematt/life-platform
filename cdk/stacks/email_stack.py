@@ -140,7 +140,10 @@ class EmailStack(Stack):
             schedule="cron(0 15 ? * WED *)",
             timeout_seconds=120,
             memory_mb=256,
-            environment=_email_env,
+            # Flagship public narrative (the chronicle) runs on the top model
+            # tier. Weekly cadence keeps the cost delta small (~$2-3/mo); the
+            # cost governor prices fable explicitly and tier-3 still gates it.
+            environment={**_email_env, "AI_MODEL": "claude-fable-5"},
             custom_policies=rp.email_wednesday_chronicle(),
             **shared,
         )

@@ -33,6 +33,8 @@ from botocore.config import Config
 # (e.g. "claude-sonnet-4-6"). Map them to the us-region cross-region inference
 # profiles that Bedrock requires for on-demand throughput.
 _MODEL_MAP = {
+    "claude-fable-5": "us.anthropic.claude-fable-5",
+    "claude-opus-4-8": "us.anthropic.claude-opus-4-8",
     "claude-sonnet-4-6": "us.anthropic.claude-sonnet-4-6",
     "claude-sonnet-4-5-20250929": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
     "claude-haiku-4-5-20251001": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
@@ -40,6 +42,11 @@ _MODEL_MAP = {
     "claude-opus-4-6": "us.anthropic.claude-opus-4-6-v1",
     "claude-3-5-haiku-20241022": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
 }
+
+# Fable 5 / Opus 4.7+ removed sampling params (temperature/top_p/top_k → 400);
+# Fable additionally rejects an explicit thinking disable. Scrub at this single
+# chokepoint so callers (retry_utils, ai_calls) stay model-agnostic.
+_ADAPTIVE_SURFACE_MARKERS = ("fable", "opus-4-7", "opus-4-8")
 
 # Fallback if an unmapped model name shows up — Haiku 4.5 (cheapest current).
 _DEFAULT_PROFILE = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
@@ -109,6 +116,11 @@ def invoke(body: dict, model_name: str | None = None) -> dict:
 
     model_id = resolve_model_id(model_name or body.get("model"))
     bedrock_body = {k: v for k, v in body.items() if k != "model"}
+    if any(marker in model_id.lower() for marker in _ADAPTIVE_SURFACE_MARKERS):
+        for param in ("temperature", "top_p", "top_k"):
+            bedrock_body.pop(param, None)
+        if "fable" in model_id.lower() and (bedrock_body.get("thinking") or {}).get("type") == "disabled":
+            bedrock_body.pop("thinking", None)
     # Bedrock requires this exact version string for the Anthropic schema.
     bedrock_body["anthropic_version"] = "bedrock-2023-05-31"
 
