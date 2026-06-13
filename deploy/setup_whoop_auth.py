@@ -16,9 +16,13 @@ Prerequisites:
     bar, the page itself need not exist).
 
 Usage:
-  python3 deploy/setup_whoop_auth.py
-  python3 deploy/setup_whoop_auth.py --redirect-uri http://localhost:8080/callback
+  python3 deploy/setup_whoop_auth.py                 # uses the registered http://localhost:3000/callback
+  python3 deploy/setup_whoop_auth.py --redirect-uri http://localhost:3000/callback
   python3 deploy/setup_whoop_auth.py --backfill      # also trigger ingestion after
+
+Note: the default redirect_uri matches the Whoop app's registered Redirect URL
+(http://localhost:3000/callback). The page won't load (nothing runs there) — just
+copy the full redirected URL from the address bar and paste it back.
 
 Flow: prints an authorize URL → you open it, approve → Whoop redirects to your
 redirect URI with ?code=... → paste that full URL (or just the code) back here.
@@ -39,7 +43,7 @@ TOKEN_URL = "https://api.prod.whoop.com/oauth/oauth2/token"  # noqa: S105 — OA
 API_BASE = "https://api.prod.whoop.com/developer/v2"
 # Must include `offline` or Whoop returns no refresh_token (matches whoop_lambda).
 SCOPES = "offline read:recovery read:cycles read:workout read:sleep read:profile read:body_measurement"
-DEFAULT_REDIRECT = "http://localhost:8080/callback"
+DEFAULT_REDIRECT = "http://localhost:3000/callback"  # must match the Whoop app's registered Redirect URL (developer.whoop.com)
 
 
 def _post_form(url: str, fields: dict) -> dict:
