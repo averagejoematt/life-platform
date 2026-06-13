@@ -59,6 +59,16 @@ def test_ddb_error_fails_open():
     assert retry == 0
 
 
+def test_ddb_error_fails_closed_when_requested():
+    """AI endpoints pass fail_open=False so a DDB blip can't unmeter Bedrock spend."""
+    table = MagicMock()
+    table.update_item.side_effect = Exception("Throttle")
+    allowed, remaining, retry = rl.check_rate_limit(table, "board_ask", "abc123", limit=5, fail_open=False)
+    assert allowed is False
+    assert remaining == 0
+    assert 0 < retry <= 3600  # short retry — DDB blips are transient, not an hour-long block
+
+
 def test_pk_starts_with_rate_prefix_for_iam_allowlist():
     """IAM scopes UpdateItem to dynamodb:LeadingKeys starting with RATE# — verify."""
     table = _fake_table_with_count(1)

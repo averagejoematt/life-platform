@@ -33,15 +33,7 @@ table = dynamodb.Table(TABLE_NAME)
 s3 = boto3.client("s3", region_name="us-west-2")
 
 
-def _decimal_to_float(obj):
-    """Recursively convert DynamoDB Decimal values to floats in dicts/lists/scalars."""
-    if isinstance(obj, Decimal):
-        return float(obj)
-    if isinstance(obj, dict):
-        return {k: _decimal_to_float(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_decimal_to_float(i) for i in obj]
-    return obj
+from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -66,6 +58,21 @@ _INVENTORY_SOURCES = [
     ("habitify", "habitify"),
     ("cgm", "apple_health"),  # CGM data stored in apple_health partition
 ]
+
+
+def fetch_profile(table, user_id: str = "matthew") -> dict:
+    """Canonical profile read — pk USER#{user_id}, sk PROFILE#v1.
+
+    This is the only profile key that exists in the table. Ten lambdas carried
+    local copies, and two other key shapes circulated that silently returned
+    {} on every call (hypothesis_engine, site-api AI context — found 2026-06-12).
+    """
+    try:
+        r = table.get_item(Key={"pk": f"USER#{user_id}", "sk": "PROFILE#v1"})
+        return _decimal_to_float(r.get("Item", {}))
+    except Exception as e:
+        logging.getLogger("intelligence-common").error(f"fetch_profile: {e}")
+        return {}
 
 
 def build_data_inventory() -> dict:

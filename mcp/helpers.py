@@ -289,22 +289,21 @@ def normalize_whoop_sleep(item):
     if "disturbance_count" in item and "toss_and_turns" not in item:
         out["toss_and_turns"] = item["disturbance_count"]
 
-    # Circadian timing derived from ISO timestamps
-    def _hour_from_iso(ts_str, tz_offset_hours=-8):
-        """Extract decimal hour (local) from ISO timestamp string."""
+    # Circadian timing derived from ISO timestamps. Convert via zoneinfo so
+    # DST is honored — a fixed -8 offset put every PDT sleep/wake hour off by
+    # one from March to November.
+    def _hour_from_iso(ts_str):
+        """Extract decimal hour (Pacific local) from an ISO timestamp string."""
         if not ts_str:
             return None
         try:
-            clean = ts_str.replace("Z", "+00:00")
-            t_part = clean.split("T")[1] if "T" in clean else None
-            if not t_part:
-                return None
-            parts = t_part.split("+")[0].split("-")[0].split(":")
-            utc_h = int(parts[0]) + int(parts[1]) / 60
-            if len(parts) > 2:
-                utc_h += float(parts[2].split(".")[0]) / 3600
-            local_h = (utc_h + tz_offset_hours) % 24
-            return round(local_h, 2)
+            from zoneinfo import ZoneInfo
+
+            dt = datetime.fromisoformat(str(ts_str).replace("Z", "+00:00"))
+            if dt.tzinfo is None:  # offset-less timestamps are UTC (Whoop convention)
+                dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+            local = dt.astimezone(ZoneInfo("America/Los_Angeles"))
+            return round(local.hour + local.minute / 60 + local.second / 3600, 2)
         except Exception:
             return None
 

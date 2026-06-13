@@ -600,7 +600,7 @@ def handle_experiments() -> dict:
         planned_duration = item.get("planned_duration_days")
         if status == "active" and start:
             try:
-                days_in = (datetime.now(PT).replace(tzinfo=None) - datetime.strptime(start, "%Y-%m-%d")).days + 1
+                days_in = (datetime.now(PT).date() - datetime.strptime(start, "%Y-%m-%d").date()).days + 1
             except Exception:
                 pass
 

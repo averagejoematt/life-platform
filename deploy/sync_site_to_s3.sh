@@ -24,7 +24,7 @@ if [ "${1:-}" != "--dry-run" ]; then
 fi
 
 BUCKET="matthew-life-platform"
-SITE_DIR="/Users/matthewwalker/Documents/Claude/life-platform/site"
+SITE_DIR="$(cd "$(dirname "$0")/.." && pwd)/site"
 S3_PREFIX="site"
 REGION="us-west-2"
 DRY_RUN="${1:-}"
