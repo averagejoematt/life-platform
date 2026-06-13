@@ -34,6 +34,7 @@ from web.site_api_common import (
     EXPERIMENT_START,
     USER_ID,
     USER_PREFIX,
+    _clamp_today,
     _decimal_to_float,
     _error,
     _get_profile,
@@ -534,7 +535,7 @@ def handle_journey_timeline() -> dict:
     Cache: 3600s (1 hr).
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    start_date = EXPERIMENT_START
+    start_date = _clamp_today(EXPERIMENT_START)  # future-genesis guard: keep sk.between(lower<=upper) valid
     _p = _get_profile()
     start_weight = float(_p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
     goal_weight = float(_p.get("goal_weight_lbs", 185.0))

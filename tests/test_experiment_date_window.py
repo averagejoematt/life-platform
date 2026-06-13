@@ -54,3 +54,21 @@ def test_genesis_today_is_valid(monkeypatch):
     monkeypatch.setattr(C, "EXPERIMENT_START", _today())
     start = C._experiment_date(90)
     assert start == _today() and start <= _today()
+
+
+def test_clamp_today_helper():
+    """_clamp_today caps a future date to today; leaves a past date untouched."""
+    future = (datetime.now(timezone.utc) + timedelta(days=10)).strftime("%Y-%m-%d")
+    past = "2026-01-01"
+    assert C._clamp_today(future) == _today(), "future date must clamp to today"
+    assert C._clamp_today(past) == past, "past date must pass through unchanged"
+
+
+def test_vacation_fund_query_range_guards_future_genesis():
+    """vacation_fund._query_range (layer) returns [] when start > end — no DynamoDB
+    ValidationException — instead of 500'ing /api/vacation_fund on a future genesis."""
+    import vacation_fund as V
+
+    future = (datetime.now(timezone.utc) + timedelta(days=3)).strftime("%Y-%m-%d")
+    # start (future) > end (today): guard must short-circuit before any AWS call
+    assert V._query_range("strava", future, _today()) == []
