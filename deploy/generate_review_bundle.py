@@ -62,7 +62,7 @@ def read_file(path, max_lines=None):
 def run_cmd(cmd, timeout=15):
     """Run a shell command, return stdout or error string."""
     try:
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)  # noqa: S602 dev-only tool
         return result.stdout.strip() if result.returncode == 0 else f"[CMD FAILED: {result.stderr.strip()[:200]}]"
     except subprocess.TimeoutExpired:
         return "[CMD TIMEOUT]"

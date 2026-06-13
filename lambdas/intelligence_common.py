@@ -35,7 +35,6 @@ s3 = boto3.client("s3", region_name="us-west-2")
 
 from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
 
-
 # ══════════════════════════════════════════════════════════════════════════════
 # DATA INVENTORY
 # ══════════════════════════════════════════════════════════════════════════════

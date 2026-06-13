@@ -85,6 +85,7 @@ from web.site_api_common import (  # config; AWS; CORS; caches; helpers; request
 from web.site_api_data import (
     handle_changes_since,
     handle_correlations,
+    handle_cycle_compare,
     handle_discoveries,
     handle_domains,
     handle_experiments,
@@ -93,6 +94,7 @@ from web.site_api_data import (
     handle_habit_registry,
     handle_habit_streaks,
     handle_habits,
+    handle_inference_receipt,
     handle_labs,
     handle_ledger,
     handle_observatory_week,
@@ -101,12 +103,10 @@ from web.site_api_data import (
     handle_sleep_detail,
     handle_source_freshness,
     handle_supplements,
+    handle_survival,
     handle_tools_baseline,
     handle_vice_streaks,
-    handle_cycle_compare,
-    handle_inference_receipt,
     handle_wrong,
-    handle_survival,
 )
 
 # P1.1 Phase B step 3 (2026-05-26): status + pulse handlers extracted.

@@ -35,6 +35,7 @@ from web.site_api_common import (
     USER_ID,
     USER_PREFIX,
     _decimal_to_float,
+    _error,
     _get_profile,
     _latest_item,
     _ok,
@@ -272,9 +273,7 @@ def handle_character(date: str | None = None) -> dict:
         )
 
     pk = f"{USER_PREFIX}character_sheet"
-    _key_cond = Key("pk").eq(pk) & (
-        Key("sk").between("DATE#0000-00-00", f"DATE#{date}") if date else Key("sk").begins_with("DATE#")
-    )
+    _key_cond = Key("pk").eq(pk) & (Key("sk").between("DATE#0000-00-00", f"DATE#{date}") if date else Key("sk").begins_with("DATE#"))
     _resp = table.query(
         **with_phase_filter(
             {  # ADR-058: hide pilot character sheets (unless time-travelling)
