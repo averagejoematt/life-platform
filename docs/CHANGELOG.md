@@ -1,3 +1,24 @@
+## Stabilization sweep — 2026-06-13 (CI-green restore · future-genesis 500s · build_html split · Whoop re-auth · DLQ drain)
+
+Nine PRs (#90–#98) merged to `main` (`c256750`); full CI/CD verified green end-to-end. See `handovers/HANDOVER_2026-06-13_StabilizationFutureGenesisSweep.md` for the Deploy Ledger (live vs merged-only).
+
+### Fixed
+- **Future-genesis 500 class** — cycle-4 genesis (`2026-06-14`) is staged in the future, so `Key('sk').between(DATE#genesis, DATE#today)` queries 500'd (`lower > upper`). #97 clamps `_experiment_date` to today (fixes `/api/habits` + all `_experiment_date` callers); #98 adds a shared `_clamp_today()` and guards the two direct-genesis paths (`handle_journey_timeline`, `vacation_fund._query_range`). **Site-API web fixes DEPLOYED + verified; `vacation_fund` guard is layer-resident (merged, self-heals at genesis).** Tests: `tests/test_experiment_date_window.py`.
+- **CI red (F821)** — #92 imported the missing `_error` in `site_api_vitals.py` (time-scrubber bug) + cleared the now-enforced black/ruff lint debt (10 files) shadowing it.
+- **Ingestion triage F1–F4** (#91, DEPLOYED) — `get_weight_loss_progress`/`get_body_composition_trend` window guards + honest messaging; `food_delivery` staleness guard + `freshness_checker` threshold 90→14d. Verdict: failures were independent manual-CSV abandonment, not systemic → Monarch gate cleared. RCA: `docs/rca/RCA_2026-06-13_ingestion_triage.md`.
+- **Whoop ingestion** — refresh-token rotation had broken it; re-authorized live (`deploy/setup_whoop_auth.py`, #90) + gap-backfill. #96 fixed the script's default redirect to the registered `http://localhost:3000/callback`.
+
+### Changed
+- **`html_builder.build_html` decomposed** (#94 / #18) — ~1,534-line monolith → a 72-line orchestrator + 7 `_brief_*` section helpers. Behavior-preserving (verified byte-identical via the daily-brief golden + a 10-scenario equivalence harness). Layer-resident: merged, ships on next layer deploy.
+
+### Added
+- **Email golden nets** — `weekly_digest`/`monthly_digest` render goldens (#93, via the real `ex_*` extractors) + a second "everything-on" daily-brief golden and a no-silent-section-error invariant (#95).
+
+### Ops
+- **DLQ drained** — purged 55 stale Whoop token-outage scheduled-event messages (`life-platform-ingestion-dlq` → 0); `test_i9_dlq_empty` + DLQ alarms clear.
+
+---
+
 ## [Restart 2026-06-14] — 2026-06-13
 
 ### Added
