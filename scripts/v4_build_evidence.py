@@ -310,6 +310,16 @@ REGISTRY = [
         "/legacy/tools/",
     ),
     (
+        "wrong",
+        "The wrong page",
+        "Every time the AI was wrong — caught claims, refuted calls, in public.",
+        "Credibility & the machine",
+        "data",
+        "/api/wrong",
+        None,
+        None,
+    ),
+    (
         "inference",
         "The inference receipt",
         "Every AI call, priced — the meter behind the $75 ceiling, live.",
