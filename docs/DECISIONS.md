@@ -2485,3 +2485,23 @@ The AWS "account-controls" sub-grade stays below a literal-checklist A on those 
 ---
 
 **Verified:** 2026-06-09 (ADR-085 infra-liveness heartbeat — INGEST_HEALTH sentinel + ingest_health decision core + check_ingest_liveness mode + ingest-liveness-unhealthy alarm; layer v77; ADR-083 single-region; ADR-084 coverage philosophy)
+
+---
+
+## ADR-086: Public honesty surfaces — and the line we will not cross (the ghost-projection refusal)
+
+**Status:** Accepted (2026-06-13)
+
+**Context:** The platform's thesis is the "anti-Blueprint" — an honest documentary, not a transformation highlight reel. A batch of public features built 2026-06-13 (the chronicle podcast, the cockpit time scrubber, the inference receipt, the Wrong Page, the survival curve, cycle post-mortems, the visitor mirror) all draw on a shared principle worth recording, because the principle is what makes the features defensible and one of them is a deliberate *refusal*.
+
+**Decision — the honesty surfaces and the rule behind them:**
+- **Every public AI-derived surface shows its own uncertainty and its own misses.** The Wrong Page (`/api/wrong`) publishes the validator's caught claims + the per-coach prediction ledger (confirmed/refuted/inconclusive/expired), uncurated. The survival curve (`/api/survival`) publishes a Laplace-smoothed odds-of-reaching-day-30 with the `n=2 is narrative, not statistics` caveat *in the payload itself*. The inference receipt (`/api/inference_receipt`) publishes the live AI meter against the $75 ceiling. Coach narratives now carry each coach's own track record and are instructed to own misses in their own voice.
+- **Engagement is measured by deliberate acts only** (weigh-ins, food logs, journal entries) — never passive wearable streams, which flow whether or not the user shows up. The survival/post-mortem "collapse" definition (4+ consecutive silent days) follows from this.
+- **History is cross-cycle and immutable.** The time scrubber serves any past morning's sheet (pilot/prior-cycle records included); past responses are cached 24h because the past does not change.
+- **Visitor inputs never leave the browser.** The mirror computes percentiles client-side against the published distribution; nothing typed is sent, stored, or logged.
+
+**The line we will not cross (ghost counterfactuals, feature #5 — HELD, not built):** the originally-pitched "had sleep held ≥7.5h, the model projects weight *here*" would extrapolate a counterfactual **time series** from a **cross-sectional Pearson r**. That is correlation presented as causation with a fabricated forward line — the precise move every other surface on the site exists to refuse. **Decision:** never ship the projection form. If built, #5 must be a **within-sample contrast only** ("on the N days sleep was ≥7.5h, recovery averaged A; on the M days below, B; r=…, q=…; a contrast, not a projection"), gated on FDR-significant correlations actually existing in the engine (currently zero — cycle 3 is too young), and verified against live data before shipping. Held until ~2 weeks of cycle-3 data exist.
+
+**Consequences:** the public surfaces are credible *because* they expose failure; the refusal is on the record so a future "just add the projection line, it looks cooler" request is met with the documented reason it stays out. The honesty is the product.
+
+---
