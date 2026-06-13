@@ -329,3 +329,11 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
   .wk-row { grid-template-columns: 72px 96px auto auto; }
   .wk-note { display: none; }
 }
+
+/* Time scrubber — any past morning's sheet (2026-06-13) */
+.scrub-wrap { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.scrub { background: transparent; border: var(--border-hair); border-radius: var(--radius-xs);
+  color: var(--ink-muted); font-family: var(--font-mono); font-size: var(--fs-label);
+  padding: 2px var(--sp-2); color-scheme: dark; }
+[data-theme="light"] .scrub { color-scheme: light; }
+.scrub:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
