@@ -218,12 +218,19 @@ def handle_journey() -> dict:
     )
 
 
-def handle_character() -> dict:
+def handle_character(date: str | None = None) -> dict:
     """
-    GET /api/character
+    GET /api/character[?date=YYYY-MM-DD]
     Returns: character level, pillar scores, recent events.
     Cache: 900s (15 min) — computed nightly but visitors expect freshness.
+    With ?date= (the time scrubber, 2026-06-13): the sheet as of that morning —
+    latest record at-or-before the date, pilot/prior-cycle records included
+    (history is explicitly cross-cycle), cached a day since the past is immutable.
     """
+    import re as _re
+
+    if date and not _re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+        return _error(400, "date must be YYYY-MM-DD")
     # Character-sheet compute writes YESTERDAY's sheet daily ~16:30 UTC, so the freshest
     # record is routinely 1-2 days old. Take the latest available DATE# record (plus the
     # one before it, for day-over-day deltas) rather than a fixed today/yesterday window —
@@ -265,13 +272,17 @@ def handle_character() -> dict:
         )
 
     pk = f"{USER_PREFIX}character_sheet"
+    _key_cond = Key("pk").eq(pk) & (
+        Key("sk").between("DATE#0000-00-00", f"DATE#{date}") if date else Key("sk").begins_with("DATE#")
+    )
     _resp = table.query(
         **with_phase_filter(
-            {  # ADR-058: hide pilot character sheets
-                "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with("DATE#"),
+            {  # ADR-058: hide pilot character sheets (unless time-travelling)
+                "KeyConditionExpression": _key_cond,
                 "ScanIndexForward": False,
                 "Limit": 2,
-            }
+            },
+            include_pilot=bool(date),
         )
     )
     _recs = _decimal_to_float(_resp.get("Items", []))
@@ -326,10 +337,11 @@ def handle_character() -> dict:
                 "as_of_date": date_str,
                 "composite_score": round(composite, 1),
                 "composite_delta_1d": composite_delta_1d,
+                "time_travel": bool(date),
             },
             "pillars": pillars,
         },
-        cache_seconds=900,
+        cache_seconds=86400 if date else 900,  # the past is immutable
     )
 
 

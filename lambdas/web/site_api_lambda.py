@@ -585,6 +585,11 @@ def lambda_handler(event, context):
         qs = event.get("queryStringParameters") or {}
         return handle_changes_since(qs)
 
+    # Time scrubber (2026-06-13): /api/character?date=YYYY-MM-DD — any past
+    # morning's sheet. Dateless requests fall through to the ROUTES default.
+    if path == "/api/character" and (event.get("queryStringParameters") or {}).get("date"):
+        return handle_character(date=event["queryStringParameters"]["date"].strip())
+
     # Phase 1: Observatory week (GET with query params)
     if path == "/api/observatory_week":
         qs = event.get("queryStringParameters") or {}
