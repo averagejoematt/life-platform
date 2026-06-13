@@ -142,10 +142,17 @@ def _decimal_to_float(obj):
 
 
 def _experiment_date(days_back=30):
-    """Compute a date N days ago, clamped to EXPERIMENT_START.
-    Use this for ALL date range queries to prevent pre-experiment data leaking through."""
+    """Compute a date N days ago, clamped to EXPERIMENT_START (lower) and today (upper).
+    Use this for ALL date range queries to prevent pre-experiment data leaking through.
+
+    The today-clamp matters when EXPERIMENT_START is in the FUTURE (a reset whose
+    genesis is tomorrow): without it the lower bound exceeds today and any direct
+    Key.between(_experiment_date(N), today) query throws a ValidationException
+    (DynamoDB requires upper >= lower). Clamping yields the empty [today, today]
+    range — 'no data yet' — instead of a 500. No-op in normal operation."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     raw = (datetime.now(timezone.utc) - timedelta(days=days_back)).strftime("%Y-%m-%d")
-    return max(raw, EXPERIMENT_START)
+    return min(max(raw, EXPERIMENT_START), today)
 
 
 def _query_source(source: str, start_date: str, end_date: str, include_pilot: bool = False) -> list:
