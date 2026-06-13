@@ -269,6 +269,7 @@
       "lambdas/digest_utils.py",
       "lambdas/html_builder.py",
       "lambdas/http_retry.py",
+      "lambdas/ingest_health.py",
       "lambdas/ingestion_framework.py",
       "lambdas/ingestion_validator.py",
       "lambdas/insight_writer.py",

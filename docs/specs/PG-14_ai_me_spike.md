@@ -1,6 +1,6 @@
 # PG-14 — "AI me dropping weight": Tier-A spike + go/no-go
 
-**Date:** 2026-06-07 · **Status:** spike complete — **decision pending (owner)** · **Scope:** PG-14 (BACKLOG), ADR-078 Wedge-B
+**Date:** 2026-06-07 · **Status:** ✅ **Tier-A PRODUCTIONIZED 2026-06-09** (owner approved; live on `/evidence/results/` via `evidence.js`/`evidence.css` — see CHANGELOG "PG-14 — 2026-06-09"). Tier B/C remain deferred. · **Scope:** PG-14 (BACKLOG), ADR-078 Wedge-B
 **Prototype:** `spikes/pg14_ai_me/index.html` (self-contained, no deps; **not** under `site/`, so it is **not deployed**)
 **Sample frames:** `spikes/pg14_ai_me/frame_304.png` · `frame_245.png` · `frame_185.png`
 

@@ -1,0 +1,13 @@
+{
+  "steps": 9421,
+  "resting_heart_rate": 51,
+  "hrv_last_night": 62,
+  "hrv_status": "BALANCED",
+  "avg_stress": 33,
+  "max_stress": 88,
+  "stress_qualifier": "BALANCED",
+  "body_battery_high": 91,
+  "body_battery_low": 18,
+  "body_battery_end": 74,
+  "avg_respiration": 14.2
+}
