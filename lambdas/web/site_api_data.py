@@ -2174,3 +2174,94 @@ def handle_wrong() -> dict:
     except Exception as e:
         logger.warning(f"[wrong] failed: {e}")
         return _error(503, "The wrong page is temporarily unavailable.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# The Survival Curve (2026-06-13) — the model handicaps its own human.
+# "Engagement" = a day with any deliberate behavioral input: a weigh-in
+# (withings), a food log (macrofactor), or a journal entry (notion). Passive
+# wearable streams don't count — they flow whether or not Matthew shows up.
+# Collapse = the first 4+ consecutive silent days. With n=2 prior cycles this
+# is narrative statistics, and the payload says so loudly.
+# ══════════════════════════════════════════════════════════════════════════════
+_ENGAGEMENT_SOURCES = ("withings", "macrofactor", "notion")
+_COLLAPSE_GAP = 4
+_SURVIVAL_HORIZON = 30
+
+
+def _engaged_dates(start: str, end: str) -> set:
+    days = set()
+    for src in _ENGAGEMENT_SOURCES:
+        for r in _query_source(src, start, end, include_pilot=True):
+            days.add(str(r.get("sk", ""))[5:15])
+    return days
+
+
+def handle_survival() -> dict:
+    """GET /api/survival — per-cycle engagement strips + a loudly-caveated
+    probability that the current cycle reaches day 30."""
+    try:
+        today = datetime.now(PT).date()
+        geneses = sorted(CYCLE_GENESES.items())
+        cycles, priors = [], []
+        for idx, (n, genesis) in enumerate(geneses):
+            g = datetime.strptime(genesis, "%Y-%m-%d").date()
+            next_g = datetime.strptime(geneses[idx + 1][1], "%Y-%m-%d").date() if idx + 1 < len(geneses) else None
+            last = min((next_g - timedelta(days=1)) if next_g else today, g + timedelta(days=69))
+            window = (last - g).days + 1
+            if window < 1:
+                continue
+            engaged = _engaged_dates(genesis, last.isoformat())
+            strip = [(g + timedelta(days=i)).isoformat() in engaged for i in range(window)]
+            collapse_day = None
+            for i in range(0, window - _COLLAPSE_GAP + 1):
+                if not any(strip[i:i + _COLLAPSE_GAP]):
+                    collapse_day = i + 1
+                    break
+            is_current = next_g is None
+            ended_by_reset = next_g is not None and collapse_day is None
+            cycles.append(
+                {
+                    "cycle": n,
+                    "genesis": genesis,
+                    "is_current": is_current,
+                    "window_days": window,
+                    "engaged_days": sum(strip),
+                    "strip": "".join("█" if d else "·" for d in strip),
+                    "collapse_day": collapse_day,
+                    "censored": ended_by_reset,  # re-anchored while still engaged
+                }
+            )
+            if not is_current:
+                priors.append((collapse_day, window))
+
+        # Laplace-smoothed survival-to-30 from prior cycles: a cycle counts as a
+        # survivor if it stayed engaged through day 30 OR was reset while still
+        # engaged before 30 (censored — treated optimistically, and we say so).
+        survivors = sum(1 for cd, w in priors if cd is None or cd > _SURVIVAL_HORIZON)
+        p30 = round((survivors + 1) / (len(priors) + 2) * 100)
+
+        cur = next((c for c in cycles if c["is_current"]), None)
+        cur_strip = cur["strip"] if cur else ""
+        silent_now = len(cur_strip) - len(cur_strip.rstrip("·")) if cur else 0
+
+        return _ok(
+            {
+                "horizon_days": _SURVIVAL_HORIZON,
+                "p_reach_30_pct": p30,
+                "method": f"Laplace-smoothed over {len(priors)} prior cycles: (survivors+1)/(n+2). n=2 is narrative, not statistics.",
+                "current_silent_days": silent_now,
+                "collapse_definition": f"{_COLLAPSE_GAP}+ consecutive days with no weigh-in, food log, or journal entry",
+                "cycles": cycles,
+                "confidence": "preliminary pattern · n=2 cycles",
+                "note": (
+                    "The model handicapping its own human. Engagement counts only deliberate "
+                    "acts — weigh-ins, food logs, journal entries — never passive wearable data. "
+                    "Treat the probability as a mirror, not a forecast."
+                ),
+            },
+            cache_seconds=3600,
+        )
+    except Exception as e:
+        logger.warning(f"[survival] failed: {e}")
+        return _error(503, "Survival curve temporarily unavailable.")

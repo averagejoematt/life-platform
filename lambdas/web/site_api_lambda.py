@@ -106,6 +106,7 @@ from web.site_api_data import (
     handle_cycle_compare,
     handle_inference_receipt,
     handle_wrong,
+    handle_survival,
 )
 
 # P1.1 Phase B step 3 (2026-05-26): status + pulse handlers extracted.
@@ -319,6 +320,7 @@ ROUTES = {
     "/api/cycle_compare": handle_cycle_compare,
     "/api/inference_receipt": handle_inference_receipt,
     "/api/wrong": handle_wrong,
+    "/api/survival": handle_survival,
     "/api/character_stats": handle_character_stats,
     "/api/habit_streaks": handle_habit_streaks,
     "/api/experiments": handle_experiments,
