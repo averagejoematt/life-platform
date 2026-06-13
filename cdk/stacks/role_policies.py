@@ -1592,6 +1592,18 @@ def site_api() -> list[iam.PolicyStatement]:
             actions=["secretsmanager:GetSecretValue"],
             resources=[_secret_arn("life-platform/subscriber-token-secret")],
         ),
+        # Inference receipt (2026-06-13): read-only token metrics + budget tier.
+        # CloudWatch read APIs don't support resource-level scoping.
+        iam.PolicyStatement(
+            sid="InferenceReceiptMetrics",
+            actions=["cloudwatch:GetMetricStatistics", "cloudwatch:ListMetrics"],
+            resources=["*"],
+        ),
+        iam.PolicyStatement(
+            sid="BudgetTierRead",
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier"],
+        ),
     ]
 
 

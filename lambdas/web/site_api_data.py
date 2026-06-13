@@ -1998,3 +1998,104 @@ def handle_cycle_compare() -> dict:
     except Exception as e:
         logger.warning(f"[cycle_compare] failed: {e}")
         return _error(503, "Cycle comparison temporarily unavailable.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# The inference receipt (2026-06-13) — radical cost transparency.
+# Every Claude call already lands in two metric streams: AWS/Bedrock emits
+# token counts per ModelId, and the shared layer emits per-Lambda tokens to
+# LifePlatform/AI. This endpoint reads both, prices them with the same table
+# the cost governor enforces, and publishes the meter.
+# ══════════════════════════════════════════════════════════════════════════════
+_BEDROCK_PRICES = {  # USD per 1M tokens — keep in sync with cost_governor_lambda._PRICES
+    "fable": {"in": 10.00, "out": 50.00},
+    "sonnet": {"in": 3.00, "out": 15.00},
+    "haiku": {"in": 1.00, "out": 5.00},
+    "opus": {"in": 5.00, "out": 25.00},
+}
+
+
+def _price_for_model(model_id: str) -> dict:
+    m = (model_id or "").lower()
+    for k, p in _BEDROCK_PRICES.items():
+        if k in m:
+            return p
+    return _BEDROCK_PRICES["sonnet"]
+
+
+def handle_inference_receipt() -> dict:
+    """GET /api/inference_receipt — today's AI calls + month-to-date, priced."""
+    try:
+        cw = boto3.client("cloudwatch", region_name="us-west-2")
+        ssm = boto3.client("ssm", region_name="us-west-2")
+        now = datetime.now(timezone.utc)
+        day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        def _sum(namespace, metric, dim_name, dim_value, start):
+            r = cw.get_metric_statistics(
+                Namespace=namespace, MetricName=metric,
+                Dimensions=[{"Name": dim_name, "Value": dim_value}],
+                StartTime=start, EndTime=now, Period=86400, Statistics=["Sum"],
+            )
+            return sum(p["Sum"] for p in r.get("Datapoints", []))
+
+        # Per-model (AWS/Bedrock emits these for every invoke)
+        models = []
+        seen = cw.list_metrics(Namespace="AWS/Bedrock", MetricName="InputTokenCount")
+        for m in seen.get("Metrics", []):
+            mid = next((d["Value"] for d in m["Dimensions"] if d["Name"] == "ModelId"), None)
+            if not mid:
+                continue
+            price = _price_for_model(mid)
+            row = {"model": mid.split("/")[-1]}
+            for label, start in (("today", day_start), ("month", month_start)):
+                tin = _sum("AWS/Bedrock", "InputTokenCount", "ModelId", mid, start)
+                tout = _sum("AWS/Bedrock", "OutputTokenCount", "ModelId", mid, start)
+                row[label] = {
+                    "input_tokens": int(tin),
+                    "output_tokens": int(tout),
+                    "est_cost_usd": round((tin * price["in"] + tout * price["out"]) / 1_000_000, 4),
+                }
+            if row["month"]["input_tokens"] or row["month"]["output_tokens"]:
+                models.append(row)
+
+        # Per-feature (the shared layer dimensions by Lambda function)
+        features = []
+        fn_metrics = cw.list_metrics(Namespace="LifePlatform/AI", MetricName="AnthropicInputTokens")
+        for m in fn_metrics.get("Metrics", []):
+            fn = next((d["Value"] for d in m["Dimensions"] if d["Name"] == "LambdaFunction"), None)
+            if not fn:
+                continue
+            tin = _sum("LifePlatform/AI", "AnthropicInputTokens", "LambdaFunction", fn, month_start)
+            tout = _sum("LifePlatform/AI", "AnthropicOutputTokens", "LambdaFunction", fn, month_start)
+            if tin or tout:
+                features.append({"lambda": fn, "month_input_tokens": int(tin), "month_output_tokens": int(tout)})
+        features.sort(key=lambda f: -(f["month_input_tokens"] + f["month_output_tokens"]))
+
+        try:
+            tier = int(ssm.get_parameter(Name="/life-platform/budget-tier")["Parameter"]["Value"])
+        except Exception:
+            tier = None
+
+        month_total = round(sum(r["month"]["est_cost_usd"] for r in models), 2)
+        return _ok(
+            {
+                "as_of": now.isoformat(timespec="seconds"),
+                "budget_ceiling_usd": 75,
+                "budget_tier": tier,
+                "ai_month_to_date_usd": month_total,
+                "models": models,
+                "features": features,
+                "note": (
+                    "Every Claude call routes through one audited chokepoint (ADR-062). "
+                    "Costs are estimated from token metrics x list prices — the same math "
+                    "the budget governor enforces. The $75 ceiling covers the WHOLE platform, "
+                    "not just AI."
+                ),
+            },
+            cache_seconds=900,
+        )
+    except Exception as e:
+        logger.warning(f"[inference_receipt] failed: {e}")
+        return _error(503, "Inference receipt temporarily unavailable.")
