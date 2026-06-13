@@ -317,3 +317,9 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 
 /* Survival curve day strips */
 .sv-strip { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 1px; color: var(--ember); word-break: break-all; max-width: 38ch; }
+
+/* The mirror — client-side comparison inputs */
+.mi-grid { display: grid; gap: var(--sp-4); max-width: var(--measure); }
+.mi-row { display: grid; gap: var(--sp-1); }
+.mi-in { max-width: 220px; }
+.mi-out { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ember); min-height: 18px; }
