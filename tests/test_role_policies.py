@@ -91,6 +91,7 @@ WILDCARD_RESOURCE_ALLOWLIST = {
     "cloudwatch:getmetricdata",  # CloudWatch read APIs have no resource-level scoping
     "cloudwatch:getmetricstatistics",  # CloudWatch read APIs have no resource-level scoping
     "cloudwatch:listmetrics",  # List operation — no resource-level support
+    "polly:synthesizespeech",  # Polly is a stateless transform — no resource-level scoping
 }
 
 
