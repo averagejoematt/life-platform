@@ -500,7 +500,7 @@ def tool_get_readiness_score(args):
 
 def tool_get_weight_loss_progress(args):
     end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", "2010-01-01")
+    explicit_start = args.get("start_date")  # None when caller didn't pass one
     profile = get_profile()
 
     journey_start = profile.get("journey_start_date")
@@ -510,7 +510,23 @@ def tool_get_weight_loss_progress(args):
     height_in = profile.get("height_inches", 70)
     dob_str = profile.get("date_of_birth")
 
-    effective_start = journey_start if journey_start else start_date
+    # HONOR an explicit start_date verbatim — the old code always overrode it
+    # with journey_start. No leak risk: query_source's phase filter (ADR-058)
+    # hides pre-genesis pilot data regardless of window width. Default to genesis
+    # when no start is passed, then a far-past floor.
+    effective_start = explicit_start or journey_start or "2010-01-01"
+
+    # Future/empty-window guard: a freshly re-anchored genesis can sit AHEAD of
+    # today (e.g. genesis 2026-06-14 set on 2026-06-13). query_source would then
+    # get start > end and raise a DynamoDB BETWEEN ValidationException. Return the
+    # honest pre-genesis state instead of erroring.
+    if effective_start > end_date:
+        return {
+            "error": f"No weight data yet — the experiment is anchored to {journey_start or effective_start}, "
+            f"which is after {end_date}. Progress appears once weigh-ins accrue.",
+            "pre_genesis": True,
+            "journey_start_date": journey_start,
+        }
 
     withings_items = query_source("withings", effective_start, end_date)
     if not withings_items:
@@ -671,16 +687,22 @@ def tool_get_weight_loss_progress(args):
 
 
 def tool_get_body_composition_trend(args):
-    start_date = args.get("start_date", "2010-01-01")
+    explicit_start = args.get("start_date")  # None when caller didn't pass one
     end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     profile = get_profile()
-    journey_start = profile.get("journey_start_date", start_date)
+    journey_start = profile.get("journey_start_date")
     height_in = profile.get("height_inches", 70)
 
-    effective_start = journey_start if journey_start < start_date else start_date
+    # Same window discipline as get_weight_loss_progress: honor an explicit
+    # start_date, clamp to genesis, and guard a future/empty window so a
+    # re-anchored genesis ahead of today can't raise a BETWEEN ValidationException.
+    effective_start = explicit_start or journey_start or "2010-01-01"
+    if effective_start > end_date:
+        return {"error": f"No data yet — experiment anchored to {journey_start or effective_start}, after {end_date}.", "pre_genesis": True}
+
     items = query_source("withings", effective_start, end_date)
     if not items:
-        return {"error": "No Withings data found."}
+        return {"error": "No Withings weight data in range."}
 
     series = []
     for item in sorted(items, key=lambda x: x.get("date", "")):
@@ -712,7 +734,15 @@ def tool_get_body_composition_trend(args):
         series.append(pt)
 
     if not series:
-        return {"error": "Weight data present but no body composition fields. Check Withings ingestor captures these fields."}
+        # The Withings scale here is weight-only — it has NEVER carried body-fat/
+        # lean-mass (verified across cycles). Body composition lives in the `dexa`
+        # source (richer, periodic scans), which this tool does not yet read.
+        # Repointing to DEXA is tracked as a follow-up; a trend needs ≥2 scans.
+        return {
+            "error": "Body composition isn't available from the Withings scale (weight only). "
+            "It comes from periodic DEXA scans — see the dexa source. A composition trend needs ≥2 scans on record.",
+            "weight_only_source": True,
+        }
 
     has_composition = any("body_fat_pct" in pt for pt in series)
     summary = {"has_composition_data": has_composition}

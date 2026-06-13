@@ -56,9 +56,13 @@ SOURCES = {
 }
 
 # R18-F04: Per-source stale threshold overrides (hours). Sources not listed use STALE_HOURS default.
-# food_delivery is a quarterly CSV import — 90 days before stale alert.
+# food_delivery: manual CSV import (uploads/food_delivery/). The old 90-day
+# threshold let a dead source read "fresh" for a full quarter — it masked a
+# 77-day gap (2026-03-13 triage). Lowered to 14 days: a behavioral signal this
+# central shouldn't go unmonitored for more than two weeks. (Slated for
+# replacement by the automated Monarch delivery feed — see DESIGN_BRIEF.)
 SOURCE_STALE_HOURS = {
-    "food_delivery": 90 * 24,  # 90 days
+    "food_delivery": 14 * 24,  # 14 days (was 90 — masking defect)
     "measurements": 60 * 24,  # 60 days — one missed session before alert
     # 2026-05-29: weigh-ins are sporadic (often ~weekly), so the 48h default
     # false-fired "stale" constantly. A missed week before alerting.
