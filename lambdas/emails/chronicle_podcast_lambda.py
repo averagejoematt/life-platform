@@ -93,9 +93,18 @@ def _published_posts() -> list:
 
 
 def _content_for(date_str: str) -> str | None:
-    r = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#chronicle", "sk": f"DATE#{date_str}"})
-    item = r.get("Item") or {}
-    return item.get("content_markdown")
+    """posts.json carries the ISSUE date; the DDB record is keyed by the
+    GENERATION date — usually the same day, sometimes ±1-3 days. Search out."""
+    from datetime import timedelta as _td
+
+    base = datetime.strptime(date_str, "%Y-%m-%d")
+    for off in (0, 1, -1, 2, -2, 3, -3):
+        d = (base + _td(days=off)).strftime("%Y-%m-%d")
+        r = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#chronicle", "sk": f"DATE#{d}"})
+        md = (r.get("Item") or {}).get("content_markdown")
+        if md:
+            return md
+    return None
 
 
 def _episode_exists(week) -> bool:
