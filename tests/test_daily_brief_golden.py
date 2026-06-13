@@ -1,21 +1,22 @@
-"""
-tests/test_daily_brief_golden.py — golden-snapshot harness for the daily brief HTML.
+"""tests/test_daily_brief_golden.py — golden-snapshot harness for the daily brief HTML.
 
-Purpose: html_builder.build_html is ~1,500 lines with no output-level test —
-any refactor of it (or of the daily-brief pipeline that feeds it) currently has
-no safety net beyond eyeballing a diff of the platform's flagship email.
+Purpose: html_builder.build_html renders the platform's flagship email. This pins
+its FULL rendered HTML for frozen, synthetic-but-realistic data packets against
+checked-in golden files. Time-dependent fragments (anything derived from "now")
+are normalized out before comparison, so the snapshots are stable across days.
 
-This pins the FULL rendered HTML for a frozen, synthetic-but-realistic data
-packet against a checked-in golden file. Time-dependent fragments (anything
-derived from "now") are normalized out before comparison, so the snapshot is
-stable across days.
+Two scenarios are covered:
+  - "standard": a quiet day, brief_mode=standard, optional sections absent. This
+    is the original golden.
+  - "rich": everything-on — flourishing mode, character sheet, all V2 coaches,
+    vacation fund, triggered rewards, a Sunday weekly-habit-review, plus CGM /
+    blood-pressure / weather / task-load / anomaly data. This guards the
+    param-conditional sections the "standard" scenario never exercises (the gap
+    the build_html decomposition, #18, had to verify with a throwaway harness).
 
 To intentionally change the brief's output:
     GOLDEN_UPDATE=1 python3 -m pytest tests/test_daily_brief_golden.py
 then review the golden diff in the PR like any other code change.
-
-This is the prerequisite for decomposing build_html (and lambda_handler):
-extract a section, re-run, byte-identical golden ⇒ the refactor changed nothing.
 """
 
 import os
@@ -23,10 +24,12 @@ import re
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 
-GOLDEN = Path(__file__).parent / "fixtures" / "daily_brief_golden.html"
+FIXTURES = Path(__file__).parent / "fixtures"
 
 PROFILE = {
     "calorie_target": 1500,
@@ -100,6 +103,54 @@ KWARGS = dict(
     brief_mode="standard",
 )
 
+# ── Rich "everything-on" scenario ──────────────────────────────────────────
+# Exercises the optional/param-driven sections absent from the standard golden.
+_COACHES = dict(
+    sleep_coach_v2_text="Sleep: wind down by 9.",
+    nutrition_coach_v2_text="Nutrition: protein first.",
+    training_coach_v2_text="Training: easy aerobic.",
+    mind_coach_v2_text="Mind: 5 min breathing.",
+    physical_coach_v2_text="Physical: hips mobility.",
+    glucose_coach_v2_text="Glucose: walk post-meal.",
+    labs_coach_v2_text="Labs: ferritin trending up.",
+    explorer_coach_v2_text="Explorer: try a new trail.",
+)
+_CHARACTER = {
+    "level": 7,
+    "xp": 4200,
+    "xp_to_next": 800,
+    "tier": "Operator",
+    "attributes": {"vitality": 72, "discipline": 81, "resilience": 65},
+}
+_VACATION = {"balance_usd": 128, "total_earned_usd": 412, "this_week_usd": 14, "miles_this_week": 14}
+RICH_DATA = {
+    **DATA,
+    "date": "2026-06-14",  # a Sunday → weekly-habit-review section renders
+    "cgm": {"mean_glucose": 98, "time_in_range_pct": 88, "readings": 240},
+    "blood_pressure": {"systolic": 118, "diastolic": 76, "readings": 2},
+    "weather": {"temp_high_f": 72, "temp_low_f": 54, "condition": "Clear"},
+    "todoist": {"due_today": 5, "completed_today": 3, "overdue": 1},
+    "anomalies": [{"metric": "hrv", "msg": "HRV 2.1σ below 30-day mean"}],
+}
+RICH_KWARGS = {
+    **KWARGS,
+    **_COACHES,
+    "data": RICH_DATA,
+    "brief_mode": "flourishing",
+    "character_sheet": _CHARACTER,
+    "vacation_fund": _VACATION,
+    "vice_streaks": {"streaks": [{"name": "No alcohol", "days": 12}]},
+    "weekly_habit_review": {"habits": [{"name": "Walk", "rate": 0.86}], "summary": "Strong week."},
+    "triggered_rewards": [{"name": "Movie night", "reason": "7-day streak"}],
+    "protocol_recs": [{"title": "Magnesium", "detail": "200mg pre-bed"}],
+    "engagement_score": 91,
+}
+
+SCENARIOS = {
+    "standard": (KWARGS, "daily_brief_golden.html"),
+    "rich": (RICH_KWARGS, "daily_brief_golden_rich.html"),
+}
+
 # Volatile fragments derived from "now" at render time → normalize before compare.
 _NORMALIZERS = [
     (re.compile(r"n=\d+"), "n=N"),
@@ -113,27 +164,30 @@ def _normalize(html: str) -> str:
     return html
 
 
-def _render() -> str:
+@pytest.mark.parametrize("scenario", sorted(SCENARIOS))
+def test_daily_brief_golden_snapshot(scenario):
     from html_builder import build_html
 
-    return build_html(**KWARGS)
+    kwargs, golden_name = SCENARIOS[scenario]
+    html = build_html(**kwargs)
 
-
-def test_daily_brief_golden_snapshot():
-    html = _render()
     # Structural floor: these must exist regardless of styling churn.
-    assert "<html" in html.lower() and len(html) > 5000, "brief rendered suspiciously small"
+    assert "<html" in html.lower() and len(html) > 5000, f"{scenario}: brief rendered suspiciously small"
+    # No section may silently fall back to its error placeholder.
+    assert "section unavailable" not in html, f"{scenario}: a section crashed into _section_error_html"
+
     norm = _normalize(html)
-    if os.environ.get("GOLDEN_UPDATE") or not GOLDEN.exists():
-        GOLDEN.parent.mkdir(parents=True, exist_ok=True)
-        GOLDEN.write_text(norm)
+    golden = FIXTURES / golden_name
+    if os.environ.get("GOLDEN_UPDATE") or not golden.exists():
+        golden.parent.mkdir(parents=True, exist_ok=True)
+        golden.write_text(norm)
         if not os.environ.get("GOLDEN_UPDATE"):
-            raise AssertionError("golden file created — commit it and re-run")
+            raise AssertionError(f"{scenario}: golden file created — commit it and re-run")
         return
-    golden = GOLDEN.read_text()
-    assert norm == golden, (
-        "daily brief HTML changed vs golden snapshot.\n"
+    expected = golden.read_text()
+    assert norm == expected, (
+        f"{scenario}: daily brief HTML changed vs golden snapshot.\n"
         "If intentional: GOLDEN_UPDATE=1 python3 -m pytest tests/test_daily_brief_golden.py "
         "and review the golden diff in the PR.\n"
-        f"(rendered {len(norm)} bytes vs golden {len(golden)} bytes)"
+        f"(rendered {len(norm)} bytes vs golden {len(expected)} bytes)"
     )
