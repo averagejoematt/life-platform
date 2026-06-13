@@ -1929,3 +1929,72 @@ def handle_observatory_week(qs: dict = None) -> dict:
     except Exception as e:
         logger.warning(f"[observatory_week] {domain} failed: {e}")
         return _error(503, f"Weekly {domain} data temporarily unavailable.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Cycle-over-cycle comparison (2026-06-13)
+# The experiment restarts under ADR-058/077; raw timeseries survive every reset,
+# so the same first-K-days window can be compared across restart generations.
+# Genesis dates per cycle — there is no machine registry of past geneses (SSM
+# holds only the current cycle number), so this is the explicit record:
+# ══════════════════════════════════════════════════════════════════════════════
+CYCLE_GENESES = {
+    1: "2026-04-01",  # original launch (Day 1)
+    2: "2026-06-01",  # first reset (ADR-077 tooling)
+    3: "2026-06-08",  # current run (baseline 311.62)
+}
+
+
+def handle_cycle_compare() -> dict:
+    """GET /api/cycle_compare — matched-window comparison across cycles.
+
+    Window K = days elapsed in the CURRENT cycle (capped at 28), applied
+    identically to every cycle so day-5 of cycle 3 is compared with day-5 of
+    cycles 1 and 2 — never a 5-day run vs a 60-day run.
+    """
+    try:
+        current = max(CYCLE_GENESES)
+        today = datetime.now(PT).date()
+        elapsed = (today - datetime.strptime(CYCLE_GENESES[current], "%Y-%m-%d").date()).days + 1
+        window = max(1, min(elapsed, 28))
+
+        cycles = []
+        for n, genesis in sorted(CYCLE_GENESES.items()):
+            g = datetime.strptime(genesis, "%Y-%m-%d").date()
+            end = (g + timedelta(days=window - 1)).isoformat()
+            wd = _query_source("withings", genesis, end, include_pilot=True)
+            wh = _query_source("whoop", genesis, end, include_pilot=True)
+
+            weights = [(r["sk"][5:], float(r["weight_lbs"])) for r in wd if r.get("weight_lbs")]
+            weights.sort()
+            rec = [float(r["recovery_score"]) for r in wh if r.get("recovery_score")]
+            slp = [float(r["sleep_duration_hours"]) for r in wh if r.get("sleep_duration_hours")]
+
+            cycles.append(
+                {
+                    "cycle": n,
+                    "genesis": genesis,
+                    "is_current": n == current,
+                    "weight_start_lbs": round(weights[0][1], 1) if weights else None,
+                    "weight_delta_lbs": round(weights[-1][1] - weights[0][1], 1) if len(weights) >= 2 else None,
+                    "avg_recovery_pct": round(sum(rec) / len(rec), 1) if rec else None,
+                    "avg_sleep_hours": round(sum(slp) / len(slp), 2) if slp else None,
+                    "days_with_data": len({r["sk"] for r in wd} | {r["sk"] for r in wh}),
+                }
+            )
+
+        return _ok(
+            {
+                "window_days": window,
+                "current_cycle": current,
+                "cycles": cycles,
+                "note": (
+                    f"Each cycle measured over its own first {window} days — matched windows, "
+                    "never a short run vs a long one. Correlative, N=1."
+                ),
+            },
+            cache_seconds=3600,
+        )
+    except Exception as e:
+        logger.warning(f"[cycle_compare] failed: {e}")
+        return _error(503, "Cycle comparison temporarily unavailable.")

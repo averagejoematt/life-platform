@@ -103,6 +103,7 @@ from web.site_api_data import (
     handle_supplements,
     handle_tools_baseline,
     handle_vice_streaks,
+    handle_cycle_compare,
 )
 
 # P1.1 Phase B step 3 (2026-05-26): status + pulse handlers extracted.
@@ -313,6 +314,7 @@ ROUTES = {
     "/api/status/summary": handle_status_summary,
     # BS-07: new public endpoints
     "/api/weight_progress": handle_weight_progress,
+    "/api/cycle_compare": handle_cycle_compare,
     "/api/character_stats": handle_character_stats,
     "/api/habit_streaks": handle_habit_streaks,
     "/api/experiments": handle_experiments,
