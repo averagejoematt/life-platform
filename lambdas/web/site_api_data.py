@@ -2099,3 +2099,78 @@ def handle_inference_receipt() -> dict:
     except Exception as e:
         logger.warning(f"[inference_receipt] failed: {e}")
         return _error(503, "Inference receipt temporarily unavailable.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# The Wrong Page (2026-06-13) — the AI's misses, in public.
+# Three streams of being wrong, all already recorded:
+#   1. The post-generation validator: coach claims contradicted by the data
+#      (USER#matthew / SOURCE#intelligence_quality#date — errors[] + flags[])
+#   2. The prediction evaluator: per-coach LEARNING# verdicts
+#      (confirmed / refuted / inconclusive / expired)
+#   3. Refuted hypotheses from the weekly engine
+# Nothing here is curated. An empty refuted column after a reset is honest,
+# not flattering — the ledger fills as calls resolve.
+# ══════════════════════════════════════════════════════════════════════════════
+_WRONG_COACHES = ("sleep", "nutrition", "training", "glucose", "mind", "physical", "labs", "explorer")
+
+
+def handle_wrong() -> dict:
+    """GET /api/wrong — the public ledger of AI misses."""
+    try:
+        # 1. Validator catches (last 120 days)
+        start = (datetime.now(timezone.utc) - timedelta(days=120)).strftime("%Y-%m-%d")
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq("USER#matthew")
+            & Key("sk").between(f"SOURCE#intelligence_quality#{start}", "SOURCE#intelligence_quality#~"),
+        )
+        items = _decimal_to_float(resp.get("Items", []))
+        checks_run = int(sum(i.get("checks_run", 0) or 0 for i in items))
+        catches, numeric_caught = [], 0
+        for i in items:
+            for field, sev in (("errors", "error"), ("flags", "flag")):
+                v = i.get(field)
+                if isinstance(v, list):
+                    for e in v:
+                        what = (e.get("detail") or e.get("check") or str(e)) if isinstance(e, dict) else str(e)
+                        catches.append({"date": i.get("date"), "coach": i.get("coach_id"), "severity": sev, "what": str(what)[:240]})
+                elif isinstance(v, (int, float)) and v:
+                    numeric_caught += int(v)  # older records store counts, not detail
+        catches.sort(key=lambda c: c.get("date") or "", reverse=True)
+
+        # 2. Prediction verdicts per coach
+        ledger, recent_misses = [], []
+        for c in _WRONG_COACHES:
+            r = table.query(
+                KeyConditionExpression=Key("pk").eq(f"COACH#{c}_coach") & Key("sk").begins_with("LEARNING#"),
+            )
+            recs = _decimal_to_float(r.get("Items", []))
+            live = [x for x in recs if not x.get("tombstone")]
+            counts = {}
+            for x in live:
+                counts[x.get("status", "unknown")] = counts.get(x.get("status", "unknown"), 0) + 1
+            if live:
+                ledger.append({"coach": c, **{k: counts.get(k, 0) for k in ("confirmed", "refuted", "inconclusive", "expired")}})
+            for x in live:
+                if x.get("status") == "refuted":
+                    recent_misses.append(
+                        {"date": x.get("date"), "coach": c, "what": str(x.get("condition") or x.get("reason") or "")[:240]}
+                    )
+        recent_misses.sort(key=lambda m: m.get("date") or "", reverse=True)
+
+        return _ok(
+            {
+                "validator": {"claims_checked": checks_run, "caught": len(catches) + numeric_caught, "recent": catches[:25]},
+                "predictions": {"by_coach": ledger, "refuted_recent": recent_misses[:25]},
+                "note": (
+                    "Uncurated. The validator audits every coach claim against the data it cites; "
+                    "the evaluator scores every dated prediction. A thin refuted column right after "
+                    "a reset means the slate is young, not that the model is right — inconclusive "
+                    "and expired are claims that could not be proven either."
+                ),
+            },
+            cache_seconds=3600,
+        )
+    except Exception as e:
+        logger.warning(f"[wrong] failed: {e}")
+        return _error(503, "The wrong page is temporarily unavailable.")
