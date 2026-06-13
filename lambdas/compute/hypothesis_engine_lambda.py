@@ -153,12 +153,9 @@ def query_range(source, start_date, end_date):
 
 
 def fetch_profile():
-    """Load user profile from DynamoDB."""
-    try:
-        resp = table.get_item(Key={"pk": f"USER#{USER_ID}#profile", "sk": "PROFILE"})
-        return d2f(resp.get("Item", {}))
-    except Exception:
-        return {}
+    from intelligence_common import fetch_profile as _shared_fetch_profile
+
+    return _shared_fetch_profile(table, USER_ID)
 
 
 def gather_data():

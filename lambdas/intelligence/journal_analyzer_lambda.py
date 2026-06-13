@@ -25,7 +25,6 @@ import os
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -61,14 +60,7 @@ def _get_api_key():
     return _api_key_cache
 
 
-def _decimal_to_float(obj):
-    if isinstance(obj, Decimal):
-        return float(obj)
-    if isinstance(obj, dict):
-        return {k: _decimal_to_float(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_decimal_to_float(i) for i in obj]
-    return obj
+from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
 
 
 def lambda_handler(event, context):

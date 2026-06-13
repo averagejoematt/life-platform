@@ -54,11 +54,12 @@ OBSERVE_MODE = os.environ.get("OBSERVE_MODE", "true").lower() in ("1", "true", "
 # VERIFY against the Bedrock pricing page on model changes. We bias conservative
 # (a buffer below) so the estimate never under-counts the real bill.
 _PRICES = {
+    "fable": {"in": 10.00, "out": 50.00, "cache_read": 1.00, "cache_write": 12.50},
     "sonnet": {"in": 3.00, "out": 15.00, "cache_read": 0.30, "cache_write": 3.75},
     "haiku": {"in": 1.00, "out": 5.00, "cache_read": 0.10, "cache_write": 1.25},
     "opus": {"in": 5.00, "out": 25.00, "cache_read": 0.50, "cache_write": 6.25},
 }
-_DEFAULT_PRICE = _PRICES["sonnet"]  # unknown model → price as the most expensive tier
+_DEFAULT_PRICE = _PRICES["fable"]  # unknown model → price as the most expensive tier
 _AI_SAFETY_BUFFER = 1.15  # bias the AI estimate high so we degrade early, never overshoot
 
 # Tier thresholds on PROJECTED month-end total (USD).

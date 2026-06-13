@@ -255,7 +255,17 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .ask-in:focus-visible { outline: 2px solid var(--ember); outline-offset: 1px; }
 .ask-btn { cursor: pointer; background: var(--ember); color: var(--page); border: 0; border-radius: var(--radius-sm);
   font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.04em; padding: 0 var(--sp-5); }
-.ask-out { margin-top: var(--sp-4); }
+.ask-btn:disabled { opacity: 0.55; cursor: progress; }
+.ask-chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-4); max-width: var(--measure); }
+.ask-chip { cursor: pointer; background: transparent; border: var(--border-hair); border-radius: var(--radius-sm);
+  color: var(--ink-muted); font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.02em;
+  padding: var(--sp-2) var(--sp-3); transition: color var(--dur-fast), border-color var(--dur-fast); }
+.ask-chip:hover { color: var(--ember); border-color: var(--ember-line); }
+.ask-chip:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
+.ask-out { margin-top: var(--sp-4); display: grid; gap: var(--sp-4); }
+.ask-turn { display: grid; gap: var(--sp-2); }
+.ask-q { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-muted); max-width: var(--measure); }
+.ask-q .label, .ask-answer .label { display: block; color: var(--ink-faint); margin-bottom: 2px; }
 .ask-answer { font-family: var(--font-serif); font-size: var(--fs-quote); line-height: 1.5; max-width: var(--measure); color: var(--ink); }
 
 /* Phase 3: always-visible keyboard focus on the tab/tile nav */

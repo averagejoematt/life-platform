@@ -1,50 +1,68 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-door="story">
 <head>
   <meta charset="UTF-8">
-  <style>.nav-overlay{display:none}</style>
-  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta property="og:title" content="Page Not Found — Matthew">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>404 — averagejoematt</title>
+  <meta name="robots" content="noindex">
+  <meta property="og:title" content="Page not found — averagejoematt">
   <meta property="og:description" content="This page does not exist on averagejoematt.com.">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>404 — Matthew</title>
-  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
-  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
-  <meta name="theme-color" content="#080c0a">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-home.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="alternate" type="application/rss+xml" title="averagejoematt" href="/rss.xml">
+  <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/tokens.css">
-  <link rel="stylesheet" href="/assets/css/base.css">
+  <link rel="stylesheet" href="/assets/css/story.css">
+  <script>(function(){try{var t=localStorage.getItem("ajm-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <style>
+    .nf-main { min-height: 72vh; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; text-align: center; padding: var(--sp-8) var(--sp-4); }
+    .nf-kicker { color: var(--ember); }
+    .nf-h { font-family: var(--font-serif); font-size: clamp(4rem, 14vw, 7rem); line-height: 1;
+      color: var(--ink); margin: var(--sp-3) 0; }
+    .nf-sub { color: var(--ink-muted); max-width: 44ch; line-height: var(--lh-relaxed); }
+    .nf-doors { display: flex; flex-wrap: wrap; gap: var(--sp-4); justify-content: center; margin-top: var(--sp-6); }
+  </style>
 </head>
 <body>
-<div id="amj-nav"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="story-top">
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span></a>
+    <nav class="doors" aria-label="Doors">
+      <a href="/now/">the cockpit</a>
+      <a href="/story/">the story</a>
+      <a href="/evidence/">the evidence</a>
+      <button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button>
+    </nav>
+  </header>
 
-<div style="
-  min-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-16) var(--page-padding);
-  text-align: center;
-">
-  <div class="eyebrow" style="margin-bottom:var(--space-6);color:var(--c-amber-500)">Signal lost</div>
-  <h1 style="font-family:var(--font-display);font-size:var(--text-hero);color:var(--text);margin-bottom:var(--space-6)">404</h1>
-  <p style="font-size:var(--text-lg);color:var(--text-muted);max-width:400px;line-height:var(--lh-body);margin-bottom:var(--space-8)">
-    This page doesn't exist yet — or the data source disconnected. Either way, the platform is still running.
-  </p>
-  <div style="display:flex;gap:var(--space-4);">
-    <a href="/" class="btn btn--primary" style="background:var(--accent);border-color:var(--accent);color:var(--bg)">Back to Signal</a>
-    <a href="/ask/" class="btn btn--ghost">Ask the platform</a>
-  </div>
-</div>
+  <main id="main" class="nf-main">
+    <p class="nf-kicker label">signal lost</p>
+    <h1 class="nf-h">404</h1>
+    <p class="nf-sub">This page doesn't exist — or it moved when the site did. Either way, the experiment is still running. Pick a door.</p>
+    <p class="nf-doors">
+      <a href="/" class="cta">Back to the story →</a>
+      <a href="/now/" class="cta cta-quiet">Today in the cockpit →</a>
+      <a href="/evidence/" class="cta cta-quiet">The evidence →</a>
+    </p>
+  </main>
 
-<div id="amj-bottom-nav"></div>
-<div id="amj-footer"></div>
+  <footer class="story-foot">
+    <span class="label">averagejoematt · the measured life</span>
+  </footer>
 
-<script src="/assets/js/site_constants.js"></script>
-<script src="/assets/js/components.js"></script>
-<script src="/assets/js/nav.js"></script>
+  <script>
+    (function(){
+      var tb = document.querySelector(".theme-toggle");
+      if (tb) tb.addEventListener("click", function(){
+        var cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+        document.documentElement.dataset.theme = cur === "light" ? "dark" : "light";
+        try { localStorage.setItem("ajm-theme", document.documentElement.dataset.theme); } catch (e) {}
+      });
+    })();
+  </script>
 </body>
 </html>

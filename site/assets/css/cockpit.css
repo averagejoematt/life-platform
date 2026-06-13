@@ -155,7 +155,7 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
   font-family: var(--font-mono); font-size: var(--fs-small);
   color: var(--honest-ink); border: var(--honest-border);
   border-radius: var(--radius-xs); padding: var(--sp-2) var(--sp-3);
-  letter-spacing: 0.01em; max-width: var(--measure);
+  letter-spacing: 0.01em; max-width: min(100%, var(--measure));
 }
 
 /* Signature 2 — the machine ↔ human dialogue */

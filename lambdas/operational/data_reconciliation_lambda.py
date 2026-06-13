@@ -167,7 +167,6 @@ def build_html_report(dates: list[str], source_results: list[dict], severity: st
         if r["gaps"] > 0:
             badge_color = "#dc2626" if r["gaps"] >= 3 else "#d97706"
             gaps_badge = f"<span style='background:{badge_color};color:white;border-radius:4px;padding:2px 6px;font-size:11px;margin-left:6px;'>{r['gaps']} gap{'s' if r['gaps'] > 1 else ''}</span>"
-        round(r["days_present"] / max(1, r["days_checked"]) * 100)
         cov_color = "#059669" if r["gaps"] == 0 else ("#d97706" if r["gaps"] <= 2 else "#dc2626")
         rows_html += f"""
         <tr>
@@ -238,7 +237,6 @@ def lambda_handler(event, context):
             continue
         coverage = check_source_coverage(source, dates)
         days_present = sum(1 for v in coverage.values() if v is True)
-        sum(1 for v in coverage.values() if v is False)
         # Only count as "gap" if below expected_days threshold
         # e.g. strava expected 5/7 — if only 4, that's 1 gap
         expected_present = min(expected_days, len(dates))

@@ -72,7 +72,23 @@ function renderTools(d) { return figs([fig(d.mcp_tools ?? "—", "MCP tools"), f
 function renderGeneric(d, t) { const root = (t && t.root && d[t.root]) ? d[t.root] : d; const scal = Object.entries(root).filter(([k, v]) => !k.startsWith("_") && ["string", "number", "boolean"].includes(typeof v)); let arr = null, key = null; for (const [k, v] of Object.entries(root)) if (Array.isArray(v) && v.length && typeof v[0] === "object") { arr = v; key = k; break; } let tbl = ""; if (arr) { const cols = [...new Set(arr.flatMap((r) => Object.keys(r)))].filter((c) => !c.startsWith("_")).slice(0, 5); tbl = sec(key, `<table class="rd-tbl"><thead><tr>${cols.map((c) => `<th>${esc(ttl(c))}</th>`).join("")}</tr></thead><tbody>${arr.slice(0, 40).map((r) => `<tr>${cols.map((c) => `<td class="num">${esc(fmt(r[c]))}</td>`).join("")}</tr>`).join("")}</tbody></table>`); } if (!scal.length && !tbl) return empty("No data published for this section yet — it fills from the live pipeline."); return figs(scal.slice(0, 4).map(([k, v]) => fig(fmt(v), ttl(k)))) + tbl + note("Correlative read only."); }
 
 /* Interactive: Ask the data + Explorer (wired after insert) */
-function renderAsk() { return `<form class="ask-form" data-ask><label class="label" for="askq">Ask a question of the experiment's data</label><div class="ask-row"><input id="askq" class="ask-in" type="text" placeholder="e.g. how does my sleep affect recovery?" autocomplete="off"><button class="ask-btn" type="submit">Ask</button></div></form><div class="ask-out" data-ask-out></div>` + note("Answers are AI-generated from the published data, rate-limited, and may be paused by the budget guard."); }
+const ASK_CHIPS = [
+  "How's the sleep trending lately?",
+  "What predicts good recovery days?",
+  "Is the weight loss on track?",
+  "What foods spike the glucose most?",
+  "Any signs of overtraining?",
+  "What changed in the data this week?",
+];
+function renderAsk() {
+  return `<form class="ask-form" data-ask>` +
+    `<label class="label" for="askq">Ask a question of the experiment's data</label>` +
+    `<div class="ask-row"><input id="askq" class="ask-in" type="text" placeholder="e.g. how does my sleep affect recovery?" autocomplete="off" maxlength="300"><button class="ask-btn" type="submit">Ask</button></div>` +
+    `</form>` +
+    `<div class="ask-chips" aria-label="Suggested questions">${ASK_CHIPS.map((q) => `<button type="button" class="ask-chip" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>` +
+    `<div class="ask-out" data-ask-out aria-live="polite"></div>` +
+    note("Answers are AI-generated from the published data — correlative, never medical advice. Rate-limited (5/hour), and may be paused by the budget guard.");
+}
 function renderExplorer(d) { const v = (d.vitals && d.vitals.vitals) || d.vitals || {}; const ch = (d.character && d.character.character) || {}; const j = (d.journey && d.journey.journey) || d.journey || {}; const rows = { weight_lbs: j.current_weight_lbs, character_level: ch.level, ...Object.fromEntries(Object.entries(v).filter(([k, x]) => ["string", "number"].includes(typeof x)).slice(0, 12)) }; return `<p class="rd-archive">Today's raw record, straight from the pipeline. For the full historical day-by-day browser, open the preserved Explorer below.</p>` + sec("Today", kvtable(rows)) + note("The unfiltered daily record."); }
 
 // Live Pulse — current status narrative + daily vitals trends (the old /live).
@@ -144,7 +160,42 @@ function renderBenchmarks(d) {
 const RENDERERS = {
   vitals: renderPulse, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, explorer: renderExplorer, intelligence: renderCorrelations, predictions: renderPredictions, benchmarks: renderBenchmarks };
 const WIRE = {
-  ask: () => { const f = document.querySelector("[data-ask]"); if (!f) return; f.addEventListener("submit", async (e) => { e.preventDefault(); const q = f.querySelector(".ask-in").value.trim(); const out = document.querySelector("[data-ask-out]"); if (!q) return; out.innerHTML = `<p class="rd-archive"><span class="shimmer">Asking…</span></p>`; try { const r = await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ question: q }) }); const d = await r.json(); const ans = d.answer || d.response || d.text || (d.error ? "" : ""); out.innerHTML = ans && !isBad(ans) ? `<p class="ask-answer">${esc(ans)}</p>` : `<p class="rd-archive">The data Q&A is paused right now (budget guard) — try again later, or browse the Evidence directly.</p>`; } catch (x) { out.innerHTML = `<p class="rd-archive">Couldn't reach the Q&A service just now.</p>`; } }); },
+  ask: () => {
+    const f = document.querySelector("[data-ask]");
+    if (!f) return;
+    const input = f.querySelector(".ask-in");
+    const btn = f.querySelector(".ask-btn");
+    const out = document.querySelector("[data-ask-out]");
+    const submit = async () => {
+      const q = input.value.trim();
+      if (!q || btn.disabled) return;
+      btn.disabled = true;
+      input.value = "";
+      // Thread, not replace: each exchange appends so a visitor can follow up.
+      out.insertAdjacentHTML("beforeend",
+        `<div class="ask-turn"><p class="ask-q"><span class="label">you</span>${esc(q)}</p><p class="ask-answer is-pending"><span class="shimmer">Reading the data…</span></p></div>`);
+      const slot = out.lastElementChild.querySelector(".ask-answer");
+      slot.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      try {
+        const r = await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ question: q }) });
+        const d = await r.json().catch(() => ({}));
+        const ans = d.answer || d.response || d.text || "";
+        if (r.status === 429) {
+          slot.outerHTML = `<p class="rd-archive">Hourly question limit reached — it resets within the hour. <a href="/subscribe/">Subscribers</a> get a higher limit.</p>`;
+        } else if (ans && !isBad(ans)) {
+          slot.outerHTML = `<p class="ask-answer"><span class="label">the platform</span>${esc(ans)}</p>`;
+        } else {
+          slot.outerHTML = `<p class="rd-archive">The data Q&amp;A is paused right now (budget guard) — try again later, or browse the Evidence directly.</p>`;
+        }
+      } catch (x) {
+        slot.outerHTML = `<p class="rd-archive">Couldn't reach the Q&amp;A service just now.</p>`;
+      }
+      btn.disabled = false;
+      input.focus();
+    };
+    f.addEventListener("submit", (e) => { e.preventDefault(); submit(); });
+    document.querySelectorAll(".ask-chip").forEach((c) => c.addEventListener("click", () => { input.value = c.dataset.q; submit(); }));
+  },
   board: () => {
     const picks = [...document.querySelectorAll(".coach-pick")];
     if (!picks.length) return;
