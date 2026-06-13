@@ -1941,7 +1941,8 @@ def handle_observatory_week(qs: dict = None) -> dict:
 CYCLE_GENESES = {
     1: "2026-04-01",  # original launch (Day 1)
     2: "2026-06-01",  # first reset (ADR-077 tooling)
-    3: "2026-06-08",  # current run (baseline 311.62)
+    3: "2026-06-08",  # baseline 311.62
+    4: "2026-06-14",  # current run — Sunday-anchored routine (baseline 306.87)
 }
 
 
