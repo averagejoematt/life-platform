@@ -1,3 +1,20 @@
+## [Restart 2026-06-14] — 2026-06-13
+
+### Added
+- `lambdas/constants.py` — runtime constants (genesis date, baseline weight). Generated from `config/user_goals.json` via `deploy/sync_constants_from_config.py`.
+- `lambdas/phase_filter.py` — `with_phase_filter()` helper. Wired into `site_api._query_source`, `mcp.core.query_source`, and all 13 queries in `intelligence_common.py`.
+- 6 restart scripts under `deploy/`: `restart_phase_tag.py`, `restart_intelligence_wipe.py`, `restart_character_rebuild.py`, `restart_chronicle_handler.py`, `restart_site_copy_sync.py`, `restart_pipeline.py`.
+
+### Changed
+- Genesis re-anchored to **2026-06-14**. Baseline weight: **306.87 lbs** (Withings).
+- All Lambda code that referenced `"2026-04-01"` or `307` literals migrated to import from `lambdas.constants`.
+- `character_sheet_lambda.fetch_date` now filters tombstones (clean-slate cascade).
+
+### Removed
+- `S3DataKey` customer-managed KMS key resource from `cdk/stacks/core_stack.py`. Bucket already on AES256.
+- Public-facing references to prior attempts: hero copy, CTA, build-history references on `site/builders/`.
+
+
 ## PG-14 — 2026-06-09 (the data figure · "AI me", productionized · Tier-A)
 
 Productionizes the PG-14 Tier-A spike (`spikes/pg14_ai_me/`, ADR-078 Wedge-B). The "AI version of me dropping weight" — built as its *honest* form: a faceless, monochrome body silhouette whose girth is a **direct function of the real measured weight** (start → current → goal), no photo, no face, nothing generated or guessed. Front-end only — no new Lambda, no inference, no IAM. **✅ DEPLOYED 2026-06-09** (`sync_site_to_s3.sh` → `evidence.679d90c4.js`/`evidence.2cab809c.css` live; CloudFront invalidated).
