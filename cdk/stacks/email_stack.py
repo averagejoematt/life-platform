@@ -131,6 +131,21 @@ class EmailStack(Stack):
             **shared,
         )
 
+        create_platform_lambda(
+            self,
+            "ChroniclePodcast",
+            function_name="chronicle-podcast",
+            handler="emails.chronicle_podcast_lambda.lambda_handler",
+            source_file="lambdas/emails/chronicle_podcast_lambda.py",
+            # Wed 15:40 UTC — after the chronicle publishes (15:00) and emails (15:10)
+            schedule="cron(40 15 ? * WED *)",
+            timeout_seconds=300,
+            memory_mb=512,
+            environment=_email_env,
+            custom_policies=rp.email_chronicle_podcast(),
+            **shared,
+        )
+
         wednesday_chronicle = create_platform_lambda(
             self,
             "WednesdayChronicle",

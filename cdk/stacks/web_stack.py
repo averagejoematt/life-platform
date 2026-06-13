@@ -686,6 +686,17 @@ class WebStack(Stack):
                     # instead of the default S3SiteOrigin (/site prefix), so deploy --delete
                     # on /site can never touch Lambda-generated content.
                     cloudfront.CfnDistribution.CacheBehaviorProperty(
+                        path_pattern="/podcast/*",
+                        target_origin_id="S3GeneratedOrigin",
+                        viewer_protocol_policy="redirect-to-https",
+                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(query_string=False),
+                        default_ttl=3600,
+                        max_ttl=86400,
+                        min_ttl=0,
+                        allowed_methods=["GET", "HEAD"],
+                        cached_methods=["GET", "HEAD"],
+                    ),
+                    cloudfront.CfnDistribution.CacheBehaviorProperty(
                         path_pattern="/public_stats.json",
                         target_origin_id="S3GeneratedOrigin",
                         viewer_protocol_policy="redirect-to-https",

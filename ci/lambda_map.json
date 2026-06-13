@@ -1,70 +1,141 @@
 {
   "_comment": "Lambda source file \u2192 AWS function name mapping for CI/CD. Used by .github/workflows/ci-cd.yml",
   "_updated": "2026-03-28 v4.3.1",
+  "acwr_compute": {
+    "lambdas/acwr_compute_lambda.py": {
+      "function": "acwr-compute",
+      "handler": "acwr_compute_lambda.lambda_handler",
+      "note": "BS-09: Whoop strain ACWR. Runs 9:55 AM PT daily. Writes to computed_metrics partition.",
+      "stack": "LifePlatformCompute"
+    }
+  },
+  "chronicle_email_sender": {
+    "lambdas/chronicle_email_sender_lambda.py": {
+      "function": "chronicle-email-sender",
+      "handler": "chronicle_email_sender_lambda.lambda_handler",
+      "note": "BS-03: Delivers Chronicle installment to confirmed subscribers. Wed 8:10 AM PT. Viktor guard: no-op if no installment this week.",
+      "stack": "LifePlatformEmail"
+    }
+  },
+  "circadian_compliance": {
+    "lambdas/circadian_compliance_lambda.py": {
+      "function": "circadian-compliance",
+      "handler": "circadian_compliance_lambda.lambda_handler",
+      "note": "BS-SL2: Circadian Compliance Score \u2014 pre-sleep behavioral score (0-100). Runs 7:00 PM PT daily. Writes to circadian partition. Surfaces in Evening Nudge.",
+      "stack": "LifePlatformCompute"
+    }
+  },
+  "email_subscriber": {
+    "lambdas/email_subscriber_lambda.py": {
+      "function": "email-subscriber",
+      "handler": "email_subscriber_lambda.lambda_handler",
+      "note": "BS-03: subscribe/confirm/unsubscribe. DDB subscribers partition. SES double opt-in. No Function URL \u2014 wired to API Gateway /api/subscribe.",
+      "stack": "LifePlatformOperational"
+    }
+  },
+  "lambda_edge": {
+    "_comment": "Lambda@Edge functions \u2014 deployed in us-east-1, manually managed outside CDK. NOT auto-deployed via CI/CD pipeline. Metrics aggregated to us-east-1 per AWS requirement.",
+    "functions": {
+      "lambdas/cf-auth/index.mjs": {
+        "cloudfront_distribution": "EM5NPX6NJN095",
+        "function": "life-platform-cf-auth",
+        "note": "Manually deployed \u2014 NOT CDK-managed. Lambda@Edge requires us-east-1 and cannot be deployed from us-west-2 CDK stacks. Secret: life-platform/cf-auth (must exist in us-east-1). Alarm: life-platform-cf-auth-errors (us-east-1 CloudWatch).",
+        "protects": "dash.averagejoematt.com",
+        "region": "us-east-1"
+      },
+      "lambdas/site_api_lambda.py": {
+        "function": "life-platform-site-api",
+        "note": "CDK-managed (LifePlatformWeb stack). Read-only public API for averagejoematt.com. Reserved concurrency=20."
+      }
+    }
+  },
   "lambdas": {
-    "lambdas/operational/hevy_routine_cron_lambda.py": {
-      "function": "hevy-routine-cron",
-      "cdk_only": true,
-      "_cdk_only_reason": "Imports many sibling layer modules (routine_ir, hevy_compiler, hevy_write_client, hevy_template_cache, routine_repo, routine_generator). Single-file hot-deploy via deploy_lambda.sh would miss them. Only `cdk deploy` ships the full Lambda layer bundle."
+    "lambdas/coach/coach_computation_engine.py": {
+      "function": "coach-computation-engine"
     },
-    "lambdas/ingestion/strava_lambda.py": {
-      "function": "strava-data-ingestion"
+    "lambdas/coach/coach_ensemble_digest.py": {
+      "function": "coach-ensemble-digest"
     },
-    "lambdas/ingestion/hevy_webhook_lambda.py": {
-      "function": "hevy-webhook",
-      "cdk_only": true,
-      "_cdk_only_reason": "Has sibling imports (web.site_api_*, hevy_common, etc.) that deploy_lambda.sh doesn't bundle. Single-file hot-deploy would break Runtime.ImportModuleError at next invoke. Only `cdk deploy` ships the full Code.from_asset('../lambdas') bundle correctly."
+    "lambdas/coach/coach_history_summarizer.py": {
+      "function": "coach-history-summarizer"
     },
-    "lambdas/ingestion/hevy_backfill_lambda.py": {
-      "function": "hevy-backfill",
-      "cdk_only": true,
-      "_cdk_only_reason": "Has sibling imports (web.site_api_*, hevy_common, etc.) that deploy_lambda.sh doesn't bundle. Single-file hot-deploy would break Runtime.ImportModuleError at next invoke. Only `cdk deploy` ships the full Code.from_asset('../lambdas') bundle correctly."
+    "lambdas/coach/coach_narrative_orchestrator.py": {
+      "function": "coach-narrative-orchestrator"
     },
-    "lambdas/ingestion/whoop_lambda.py": {
-      "function": "whoop-data-ingestion"
+    "lambdas/coach/coach_observatory_renderer.py": {
+      "function": "coach-observatory-renderer"
     },
-    "lambdas/ingestion/garmin_lambda.py": {
-      "function": "garmin-data-ingestion",
-      "native_deps": true
+    "lambdas/coach/coach_prediction_evaluator.py": {
+      "function": "coach-prediction-evaluator"
     },
-    "lambdas/ingestion/eightsleep_lambda.py": {
-      "function": "eightsleep-data-ingestion"
+    "lambdas/coach/coach_quality_gate.py": {
+      "function": "coach-quality-gate"
     },
-    "lambdas/ingestion/habitify_lambda.py": {
-      "function": "habitify-data-ingestion"
+    "lambdas/coach/coach_state_updater.py": {
+      "function": "coach-state-updater"
     },
-    "lambdas/ingestion/withings_lambda.py": {
-      "function": "withings-data-ingestion"
+    "lambdas/compute/acwr_compute_lambda.py": {
+      "function": "acwr-compute"
     },
-    "lambdas/ingestion/todoist_lambda.py": {
-      "function": "todoist-data-ingestion"
+    "lambdas/compute/adaptive_mode_lambda.py": {
+      "function": "adaptive-mode-compute"
     },
-    "lambdas/ingestion/notion_lambda.py": {
-      "function": "notion-journal-ingestion"
+    "lambdas/compute/character_sheet_lambda.py": {
+      "function": "character-sheet-compute"
     },
-    "lambdas/ingestion/macrofactor_lambda.py": {
-      "function": "macrofactor-data-ingestion"
+    "lambdas/compute/circadian_compliance_lambda.py": {
+      "function": "circadian-compliance"
     },
-    "lambdas/ingestion/apple_health_lambda.py": {
-      "function": "apple-health-ingestion"
+    "lambdas/compute/daily_insight_compute_lambda.py": {
+      "function": "daily-insight-compute"
     },
-    "lambdas/ingestion/health_auto_export_lambda.py": {
-      "function": "health-auto-export-webhook"
+    "lambdas/compute/daily_metrics_compute_lambda.py": {
+      "function": "daily-metrics-compute"
     },
-    "lambdas/ingestion/dropbox_poll_lambda.py": {
-      "function": "dropbox-poll"
+    "lambdas/compute/dashboard_refresh_lambda.py": {
+      "function": "dashboard-refresh"
     },
-    "lambdas/ingestion/enrichment_lambda.py": {
-      "function": "activity-enrichment"
+    "lambdas/compute/failure_pattern_compute_lambda.py": {
+      "function": "failure-pattern-compute"
     },
-    "lambdas/ingestion/journal_enrichment_lambda.py": {
-      "function": "journal-enrichment"
+    "lambdas/compute/hypothesis_engine_lambda.py": {
+      "function": "hypothesis-engine"
+    },
+    "lambdas/compute/sleep_reconciler_lambda.py": {
+      "function": "sleep-reconciler"
+    },
+    "lambdas/compute/weekly_correlation_compute_lambda.py": {
+      "function": "weekly-correlation-compute"
+    },
+    "lambdas/compute/weekly_signal_lambda.py": {
+      "function": "weekly-signal"
+    },
+    "lambdas/emails/anomaly_detector_lambda.py": {
+      "function": "anomaly-detector"
+    },
+    "lambdas/emails/brittany_email_lambda.py": {
+      "function": "brittany-weekly-email"
+    },
+    "lambdas/emails/chronicle_approve_lambda.py": {
+      "function": "chronicle-approve"
+    },
+    "lambdas/emails/chronicle_email_sender_lambda.py": {
+      "function": "chronicle-email-sender"
     },
     "lambdas/emails/daily_brief_lambda.py": {
       "function": "daily-brief"
     },
-    "lambdas/emails/weekly_digest_lambda.py": {
-      "function": "weekly-digest"
+    "lambdas/emails/evening_nudge_lambda.py": {
+      "function": "evening-nudge"
+    },
+    "lambdas/emails/freshness_checker_lambda.py": {
+      "function": "life-platform-freshness-checker"
+    },
+    "lambdas/emails/insight_email_parser_lambda.py": {
+      "function": "insight-email-parser"
+    },
+    "lambdas/emails/monday_compass_lambda.py": {
+      "function": "monday-compass"
     },
     "lambdas/emails/monthly_digest_lambda.py": {
       "function": "monthly-digest"
@@ -75,50 +146,86 @@
     "lambdas/emails/wednesday_chronicle_lambda.py": {
       "function": "wednesday-chronicle"
     },
+    "lambdas/emails/weekly_digest_lambda.py": {
+      "function": "weekly-digest"
+    },
     "lambdas/emails/weekly_plate_lambda.py": {
       "function": "weekly-plate"
     },
-    "lambdas/emails/monday_compass_lambda.py": {
-      "function": "monday-compass"
+    "lambdas/ingestion/apple_health_lambda.py": {
+      "function": "apple-health-ingestion"
     },
-    "lambdas/emails/anomaly_detector_lambda.py": {
-      "function": "anomaly-detector"
+    "lambdas/ingestion/dropbox_poll_lambda.py": {
+      "function": "dropbox-poll"
     },
-    "lambdas/emails/freshness_checker_lambda.py": {
-      "function": "life-platform-freshness-checker"
+    "lambdas/ingestion/eightsleep_lambda.py": {
+      "function": "eightsleep-data-ingestion"
     },
-    "lambdas/emails/insight_email_parser_lambda.py": {
-      "function": "insight-email-parser"
+    "lambdas/ingestion/enrichment_lambda.py": {
+      "function": "activity-enrichment"
     },
-    "lambdas/compute/character_sheet_lambda.py": {
-      "function": "character-sheet-compute"
+    "lambdas/ingestion/food_delivery_lambda.py": {
+      "function": "food-delivery-ingestion"
     },
-    "lambdas/compute/adaptive_mode_lambda.py": {
-      "function": "adaptive-mode-compute"
+    "lambdas/ingestion/garmin_lambda.py": {
+      "function": "garmin-data-ingestion",
+      "native_deps": true
     },
-    "lambdas/compute/daily_metrics_compute_lambda.py": {
-      "function": "daily-metrics-compute"
+    "lambdas/ingestion/habitify_lambda.py": {
+      "function": "habitify-data-ingestion"
     },
-    "lambdas/compute/daily_insight_compute_lambda.py": {
-      "function": "daily-insight-compute"
+    "lambdas/ingestion/health_auto_export_lambda.py": {
+      "function": "health-auto-export-webhook"
     },
-    "lambdas/compute/hypothesis_engine_lambda.py": {
-      "function": "hypothesis-engine"
+    "lambdas/ingestion/hevy_backfill_lambda.py": {
+      "_cdk_only_reason": "Has sibling imports (web.site_api_*, hevy_common, etc.) that deploy_lambda.sh doesn't bundle. Single-file hot-deploy would break Runtime.ImportModuleError at next invoke. Only `cdk deploy` ships the full Code.from_asset('../lambdas') bundle correctly.",
+      "cdk_only": true,
+      "function": "hevy-backfill"
     },
-    "lambdas/compute/dashboard_refresh_lambda.py": {
-      "function": "dashboard-refresh"
+    "lambdas/ingestion/hevy_webhook_lambda.py": {
+      "_cdk_only_reason": "Has sibling imports (web.site_api_*, hevy_common, etc.) that deploy_lambda.sh doesn't bundle. Single-file hot-deploy would break Runtime.ImportModuleError at next invoke. Only `cdk deploy` ships the full Code.from_asset('../lambdas') bundle correctly.",
+      "cdk_only": true,
+      "function": "hevy-webhook"
     },
-    "lambdas/operational/data_export_lambda.py": {
-      "function": "life-platform-data-export"
+    "lambdas/ingestion/journal_enrichment_lambda.py": {
+      "function": "journal-enrichment"
     },
-    "lambdas/operational/delete_user_data_lambda.py": {
-      "function": "life-platform-delete-user-data"
+    "lambdas/ingestion/macrofactor_lambda.py": {
+      "function": "macrofactor-data-ingestion"
     },
-    "lambdas/operational/data_reconciliation_lambda.py": {
-      "function": "life-platform-data-reconciliation"
+    "lambdas/ingestion/measurements_ingestion_lambda.py": {
+      "function": "measurements-ingestion"
     },
-    "lambdas/operational/dlq_consumer_lambda.py": {
-      "function": "life-platform-dlq-consumer"
+    "lambdas/ingestion/notion_lambda.py": {
+      "function": "notion-journal-ingestion"
+    },
+    "lambdas/ingestion/strava_lambda.py": {
+      "function": "strava-data-ingestion"
+    },
+    "lambdas/ingestion/todoist_lambda.py": {
+      "function": "todoist-data-ingestion"
+    },
+    "lambdas/ingestion/weather_lambda.py": {
+      "function": "weather-data-ingestion"
+    },
+    "lambdas/ingestion/whoop_lambda.py": {
+      "function": "whoop-data-ingestion"
+    },
+    "lambdas/ingestion/withings_lambda.py": {
+      "function": "withings-data-ingestion"
+    },
+    "lambdas/intelligence/ai_expert_analyzer_lambda.py": {
+      "_note": "Primary observatory generator. NOT deprecated. Coach Intelligence pipeline (ai_calls.py) serves daily brief email separately.",
+      "function": "ai-expert-analyzer"
+    },
+    "lambdas/intelligence/challenge_generator_lambda.py": {
+      "function": "challenge-generator"
+    },
+    "lambdas/intelligence/field_notes_lambda.py": {
+      "function": "field-notes-generate"
+    },
+    "lambdas/intelligence/journal_analyzer_lambda.py": {
+      "function": "journal-analyzer"
     },
     "lambdas/operational/alert_digest_lambda.py": {
       "function": "life-platform-alert-digest"
@@ -126,8 +233,25 @@
     "lambdas/operational/canary_lambda.py": {
       "function": "life-platform-canary"
     },
-    "lambdas/operational/qa_smoke_lambda.py": {
-      "function": "life-platform-qa-smoke"
+    "lambdas/operational/cost_governor_lambda.py": {
+      "function": "life-platform-cost-governor"
+    },
+    "lambdas/operational/data_export_lambda.py": {
+      "function": "life-platform-data-export"
+    },
+    "lambdas/operational/data_reconciliation_lambda.py": {
+      "function": "life-platform-data-reconciliation"
+    },
+    "lambdas/operational/delete_user_data_lambda.py": {
+      "function": "life-platform-delete-user-data"
+    },
+    "lambdas/operational/dlq_consumer_lambda.py": {
+      "function": "life-platform-dlq-consumer"
+    },
+    "lambdas/operational/hevy_routine_cron_lambda.py": {
+      "_cdk_only_reason": "Imports many sibling layer modules (routine_ir, hevy_compiler, hevy_write_client, hevy_template_cache, routine_repo, routine_generator). Single-file hot-deploy via deploy_lambda.sh would miss them. Only `cdk deploy` ships the full Lambda layer bundle.",
+      "cdk_only": true,
+      "function": "hevy-routine-cron"
     },
     "lambdas/operational/key_rotator_lambda.py": {
       "function": "life-platform-key-rotator"
@@ -135,125 +259,67 @@
     "lambdas/operational/pip_audit_lambda.py": {
       "function": "life-platform-pip-audit"
     },
-    "lambdas/emails/brittany_email_lambda.py": {
-      "function": "brittany-weekly-email"
+    "lambdas/operational/pipeline_health_check_lambda.py": {
+      "function": "pipeline-health-check"
     },
-    "lambdas/emails/evening_nudge_lambda.py": {
-      "function": "evening-nudge"
+    "lambdas/operational/qa_smoke_lambda.py": {
+      "function": "life-platform-qa-smoke"
     },
-    "lambdas/compute/weekly_correlation_compute_lambda.py": {
-      "function": "weekly-correlation-compute"
-    },
-    "lambdas/compute/failure_pattern_compute_lambda.py": {
-      "function": "failure-pattern-compute"
-    },
-    "lambdas/emails/chronicle_email_sender_lambda.py": {
-      "function": "chronicle-email-sender"
-    },
-    "lambdas/compute/weekly_signal_lambda.py": {
-      "function": "weekly-signal"
-    },
-    "lambdas/emails/chronicle_approve_lambda.py": {
-      "function": "chronicle-approve"
-    },
-    "lambdas/web/site_api_lambda.py": {
-      "function": "life-platform-site-api",
-      "cdk_only": true,
-      "_cdk_only_reason": "Has sibling imports (web.site_api_*, hevy_common, etc.) that deploy_lambda.sh doesn't bundle. Single-file hot-deploy would break Runtime.ImportModuleError at next invoke. Only `cdk deploy` ships the full Code.from_asset('../lambdas') bundle correctly."
-    },
-    "lambdas/web/site_stats_refresh_lambda.py": {
-      "function": "site-stats-refresh"
-    },
-    "lambdas/intelligence/challenge_generator_lambda.py": {
-      "function": "challenge-generator"
-    },
-    "lambdas/ingestion/food_delivery_lambda.py": {
-      "function": "food-delivery-ingestion"
-    },
-    "lambdas/web/og_image_lambda.py": {
-      "function": "og-image-generator"
+    "lambdas/operational/remediation_dispatcher_lambda.py": {
+      "function": "life-platform-remediation-dispatcher"
     },
     "lambdas/web/email_subscriber_lambda.py": {
       "function": "email-subscriber",
       "region": "us-east-1"
     },
-    "lambdas/web/subscriber_onboarding_lambda.py": {
-      "function": "subscriber-onboarding"
-    },
-    "lambdas/operational/pipeline_health_check_lambda.py": {
-      "function": "pipeline-health-check"
-    },
-    "lambdas/ingestion/measurements_ingestion_lambda.py": {
-      "function": "measurements-ingestion"
-    },
-    "lambdas/intelligence/ai_expert_analyzer_lambda.py": {
-      "function": "ai-expert-analyzer",
-      "_note": "Primary observatory generator. NOT deprecated. Coach Intelligence pipeline (ai_calls.py) serves daily brief email separately."
-    },
-    "lambdas/intelligence/journal_analyzer_lambda.py": {
-      "function": "journal-analyzer"
-    },
-    "lambdas/intelligence/field_notes_lambda.py": {
-      "function": "field-notes-generate"
-    },
-    "lambdas/coach/coach_computation_engine.py": {
-      "function": "coach-computation-engine"
-    },
-    "lambdas/coach/coach_narrative_orchestrator.py": {
-      "function": "coach-narrative-orchestrator"
-    },
-    "lambdas/coach/coach_state_updater.py": {
-      "function": "coach-state-updater"
-    },
-    "lambdas/coach/coach_ensemble_digest.py": {
-      "function": "coach-ensemble-digest"
-    },
-    "lambdas/coach/coach_prediction_evaluator.py": {
-      "function": "coach-prediction-evaluator"
-    },
-    "lambdas/coach/coach_observatory_renderer.py": {
-      "function": "coach-observatory-renderer"
-    },
-    "lambdas/coach/coach_history_summarizer.py": {
-      "function": "coach-history-summarizer"
-    },
-    "lambdas/coach/coach_quality_gate.py": {
-      "function": "coach-quality-gate"
-    },
-    "lambdas/ingestion/weather_lambda.py": {
-      "function": "weather-data-ingestion"
-    },
-    "lambdas/compute/acwr_compute_lambda.py": {
-      "function": "acwr-compute"
-    },
-    "lambdas/compute/circadian_compliance_lambda.py": {
-      "function": "circadian-compliance"
-    },
-    "lambdas/compute/sleep_reconciler_lambda.py": {
-      "function": "sleep-reconciler"
+    "lambdas/web/og_image_lambda.py": {
+      "function": "og-image-generator"
     },
     "lambdas/web/site_api_ai_lambda.py": {
       "function": "life-platform-site-api-ai"
     },
-    "lambdas/operational/cost_governor_lambda.py": {
-      "function": "life-platform-cost-governor"
+    "lambdas/web/site_api_lambda.py": {
+      "_cdk_only_reason": "Has sibling imports (web.site_api_*, hevy_common, etc.) that deploy_lambda.sh doesn't bundle. Single-file hot-deploy would break Runtime.ImportModuleError at next invoke. Only `cdk deploy` ships the full Code.from_asset('../lambdas') bundle correctly.",
+      "cdk_only": true,
+      "function": "life-platform-site-api"
     },
-    "lambdas/operational/remediation_dispatcher_lambda.py": {
-      "function": "life-platform-remediation-dispatcher"
+    "lambdas/web/site_stats_refresh_lambda.py": {
+      "function": "site-stats-refresh"
+    },
+    "lambdas/web/subscriber_onboarding_lambda.py": {
+      "function": "subscriber-onboarding"
     }
   },
+  "lambdas/emails/chronicle_podcast_lambda.py": "chronicle-podcast",
   "mcp": {
     "_comment": "MCP server is special \u2014 requires full mcp/ package; lives at project root not lambdas/",
-    "source": "mcp_server.py",
     "function": "life-platform-mcp",
     "package_dir": "mcp/",
+    "source": "mcp_server.py",
     "triggers": [
       "mcp_server.py",
       "mcp/"
     ]
   },
   "shared_layer": {
-    "_comment": "Changes to these files require layer rebuild + consumer redeploy. MUST stay in sync with deploy/build_layer.sh MODULES (source of truth). 2026-05-28: synced — was missing bedrock_client/phase_filter/numeric/rate_limiter/request_validator/auth_breaker/http_retry/compute_metadata/constants/sick_day_checker, so edits to those didn't trigger CI's layer-change detection.",
+    "_comment": "Changes to these files require layer rebuild + consumer redeploy. MUST stay in sync with deploy/build_layer.sh MODULES (source of truth). 2026-05-28: synced \u2014 was missing bedrock_client/phase_filter/numeric/rate_limiter/request_validator/auth_breaker/http_retry/compute_metadata/constants/sick_day_checker, so edits to those didn't trigger CI's layer-change detection.",
+    "consumers": [
+      "daily-brief",
+      "weekly-digest",
+      "monthly-digest",
+      "nutrition-review",
+      "wednesday-chronicle",
+      "weekly-plate",
+      "monday-compass",
+      "anomaly-detector",
+      "character-sheet-compute",
+      "daily-metrics-compute",
+      "daily-insight-compute",
+      "adaptive-mode-compute",
+      "hypothesis-engine",
+      "dashboard-refresh",
+      "weekly-correlation-compute"
+    ],
     "modules": [
       "lambdas/ai_calls.py",
       "lambdas/ai_summaries.py",
@@ -296,80 +362,7 @@
       "lambdas/routine_title.py",
       "lambdas/exercise_history.py",
       "lambdas/vacation_fund.py"
-    ],
-    "consumers": [
-      "daily-brief",
-      "weekly-digest",
-      "monthly-digest",
-      "nutrition-review",
-      "wednesday-chronicle",
-      "weekly-plate",
-      "monday-compass",
-      "anomaly-detector",
-      "character-sheet-compute",
-      "daily-metrics-compute",
-      "daily-insight-compute",
-      "adaptive-mode-compute",
-      "hypothesis-engine",
-      "dashboard-refresh",
-      "weekly-correlation-compute"
     ]
-  },
-  "lambda_edge": {
-    "_comment": "Lambda@Edge functions \u2014 deployed in us-east-1, manually managed outside CDK. NOT auto-deployed via CI/CD pipeline. Metrics aggregated to us-east-1 per AWS requirement.",
-    "functions": {
-      "lambdas/cf-auth/index.mjs": {
-        "function": "life-platform-cf-auth",
-        "region": "us-east-1",
-        "cloudfront_distribution": "EM5NPX6NJN095",
-        "protects": "dash.averagejoematt.com",
-        "note": "Manually deployed \u2014 NOT CDK-managed. Lambda@Edge requires us-east-1 and cannot be deployed from us-west-2 CDK stacks. Secret: life-platform/cf-auth (must exist in us-east-1). Alarm: life-platform-cf-auth-errors (us-east-1 CloudWatch)."
-      },
-      "lambdas/site_api_lambda.py": {
-        "function": "life-platform-site-api",
-        "note": "CDK-managed (LifePlatformWeb stack). Read-only public API for averagejoematt.com. Reserved concurrency=20."
-      }
-    }
-  },
-  "email_subscriber": {
-    "lambdas/email_subscriber_lambda.py": {
-      "function": "email-subscriber",
-      "handler": "email_subscriber_lambda.lambda_handler",
-      "stack": "LifePlatformOperational",
-      "note": "BS-03: subscribe/confirm/unsubscribe. DDB subscribers partition. SES double opt-in. No Function URL \u2014 wired to API Gateway /api/subscribe."
-    }
-  },
-  "acwr_compute": {
-    "lambdas/acwr_compute_lambda.py": {
-      "function": "acwr-compute",
-      "handler": "acwr_compute_lambda.lambda_handler",
-      "stack": "LifePlatformCompute",
-      "note": "BS-09: Whoop strain ACWR. Runs 9:55 AM PT daily. Writes to computed_metrics partition."
-    }
-  },
-  "sleep_reconciler": {
-    "lambdas/sleep_reconciler_lambda.py": {
-      "function": "sleep-reconciler",
-      "handler": "sleep_reconciler_lambda.lambda_handler",
-      "stack": "LifePlatformCompute",
-      "note": "BS-08: Unified Sleep Record \u2014 merges Whoop/Eight Sleep/Apple Health nightly. Runs 7:00 AM PT daily. Writes to sleep_unified partition."
-    }
-  },
-  "circadian_compliance": {
-    "lambdas/circadian_compliance_lambda.py": {
-      "function": "circadian-compliance",
-      "handler": "circadian_compliance_lambda.lambda_handler",
-      "stack": "LifePlatformCompute",
-      "note": "BS-SL2: Circadian Compliance Score \u2014 pre-sleep behavioral score (0-100). Runs 7:00 PM PT daily. Writes to circadian partition. Surfaces in Evening Nudge."
-    }
-  },
-  "chronicle_email_sender": {
-    "lambdas/chronicle_email_sender_lambda.py": {
-      "function": "chronicle-email-sender",
-      "handler": "chronicle_email_sender_lambda.lambda_handler",
-      "stack": "LifePlatformEmail",
-      "note": "BS-03: Delivers Chronicle installment to confirmed subscribers. Wed 8:10 AM PT. Viktor guard: no-op if no installment this week."
-    }
   },
   "skip_deploy": {
     "_comment": "Files that are part of the repo but not directly deployable Lambdas (Layer modules or utilities). V2 P0.8: 17 layer-resident shared modules added 2026-05-17.",
@@ -408,5 +401,13 @@
       "lambdas/labs_coaching.py",
       "lambdas/ingestion_framework.py"
     ]
+  },
+  "sleep_reconciler": {
+    "lambdas/sleep_reconciler_lambda.py": {
+      "function": "sleep-reconciler",
+      "handler": "sleep_reconciler_lambda.lambda_handler",
+      "note": "BS-08: Unified Sleep Record \u2014 merges Whoop/Eight Sleep/Apple Health nightly. Runs 7:00 AM PT daily. Writes to sleep_unified partition.",
+      "stack": "LifePlatformCompute"
+    }
   }
 }

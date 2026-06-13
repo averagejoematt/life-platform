@@ -819,6 +819,18 @@ def email_nutrition_review() -> list[iam.PolicyStatement]:
     return _email_base()
 
 
+def email_chronicle_podcast() -> list[iam.PolicyStatement]:
+    """Chronicle podcast: DDB read (content_markdown), S3 read posts.json +
+    write generated/podcast/*, Polly synthesize (no resource-level scoping)."""
+    return _email_base(
+        needs_s3_write=["generated/podcast/*"],
+        extra_statements=[
+            iam.PolicyStatement(sid="Polly", actions=["polly:SynthesizeSpeech"], resources=["*"]),
+            iam.PolicyStatement(sid="ChroniclePostsRead", actions=["s3:GetObject"], resources=[f"{BUCKET_ARN}/site/chronicle/posts.json"]),
+        ],
+    )
+
+
 def email_wednesday_chronicle() -> list[iam.PolicyStatement]:
     """Wednesday chronicle: DDB read, S3 config, ai-keys, SES, writes blog/* + site/journal/* to S3.
     site/journal/posts/week-{nn}/index.html + site/journal/posts.json written via publish_to_journal.
