@@ -122,6 +122,8 @@ def load_config() -> dict[str, Any]:
 def _query_range(partition: str, start_date: str, end_date: str) -> list[dict]:
     """All items for a source partition with sk in [DATE#start, DATE#end + suffixes].
     The high sentinel captures DATE#end and any DATE#end#WORKOUT#... suffix."""
+    if start_date > end_date:
+        return []  # future-genesis guard: EXPERIMENT_START staged ahead of today → no data yet
     pk = f"USER#{USER_ID}#SOURCE#{partition}"
     items: list[dict] = []
     last_key = None
