@@ -295,6 +295,17 @@ jobs:
           python3 -m pytest tests/test_layer_version_consistency.py -v --tb=short
           echo "::endgroup::"
 
+      - name: Upstream-API contract tests (test_upstream_contracts.py)
+        # ER-02: assert each active source's transform contract against committed,
+        # scrubbed fixtures (tests/fixtures/upstream/**). Catches vendor payload
+        # drift (field rename/renest/retype) before it corrupts data at 4 AM.
+        # Fully offline — no live AWS/vendor calls; the live-refresh path is
+        # deploy/refresh_upstream_fixtures.py (run by hand, with creds).
+        run: |
+          echo "::group::Upstream-API contract tests (ER-02)"
+          python3 -m pytest tests/test_upstream_contracts.py -v --tb=short
+          echo "::endgroup::"
+
       - name: Full test suite
         # R20-F01: Run the complete pytest suite (excluding AWS integration tests)
         run: |

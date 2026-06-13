@@ -2465,4 +2465,23 @@ The AWS "account-controls" sub-grade stays below a literal-checklist A on those 
 
 ---
 
-**Verified:** 2026-06-09 (ADR-083 single-region accepted; ADR-084 coverage philosophy + ratchet — floor 8→9, mypy-set grows by intent, pre-commit deferred)
+## ADR-085: Infra-liveness is a separate signal from data-freshness (ER-01)
+
+**Status:** Accepted (2026-06-09) · closes the 44-day-outage finding · implements the S-06(b) split as mandatory
+
+**Context:** The 2026 Garmin outage ran **44 days** unnoticed. The existing `freshness_checker` + `slo-source-freshness` alarm are **behavioral-freshness** checks — "is the newest `DATE#` record recent?" On a personal platform that signal is structurally ambiguous: "no new data" can mean *the user didn't log / didn't wear the device* (benign) **or** *the ingestion Lambda has been erroring on every run for weeks* (critical). That ambiguity is exactly why the gap was ignored until it was 44 days wide (the S-06 / N-01 "structurally noisy alarm" problem).
+
+**Decision — track infra-liveness as a second, independent metric:**
+- For each **active OAuth/API pull source**, the SIMP-2 `ingestion_framework` now records a per-run outcome to a `USER#system / INGEST_HEALTH#{source}` sentinel — `last_success_ts`, `last_attempt_ts`, `consecutive_failures`, `last_error_class` (auth / throttle / transport / parse) — plus an EMF metric (`LifePlatform/IngestLiveness`). `last_attempt_ts` is stamped whenever the **Lambda ran**, decoupled from whether new data came back. The auth-breaker-suppressed path records a continued failure, so a source 401-ing every run grows its streak **with zero new data**.
+- The daily `pipeline_health_check` `check_ingest_liveness` mode (an extension, **not** a new Lambda) reads the sentinels and asserts two arms via the pure `ingest_health.evaluate_source_health`:
+  - **failure-streak arm** (running-but-erroring): `consecutive_failures >= 3` → alert. Tight, fires fast; reuses the canary's 2-consecutive-fail buffer precedent so single blips stay silent.
+  - **attempt-staleness arm** (cron silently stopped / Lambda dead): no attempt in ~26h → alert. Generous, so overnight gaps (hourly sources pause 10 PM–4 AM) never false-fire; this is the arm that notices a de-scheduled cron.
+- **Two metrics, two alarms, kept separate:** behavioral `StaleSourceCount` (`slo-source-freshness`, unchanged) and infra `UnhealthySourceCount` (`ingest-liveness-unhealthy`, new). `freshness_checker` stays behavioral-only by design.
+
+**Why not just tune the freshness alarm:** the two questions are genuinely different — "did the user feed this?" vs. "did the pipeline run?" — and conflating them is what produced a signal noisy enough to ignore. The decision core is a pure, offline-tested module (`lambdas/ingest_health.py`) so the streak/staleness logic is verified in isolation across all four error classes.
+
+**Consequences:** a source whose OAuth has rotted alerts within ≤2 daily heartbeats even if the user logged nothing; a genuinely-unfed-but-healthy source stays silent; a silently-removed schedule is caught by attempt-staleness. The 44-day-class incident now has a dedicated detector. Layer bumped **v76 → v77** (new `ingest_health` module). New alarm: 16 → 17.
+
+---
+
+**Verified:** 2026-06-09 (ADR-085 infra-liveness heartbeat — INGEST_HEALTH sentinel + ingest_health decision core + check_ingest_liveness mode + ingest-liveness-unhealthy alarm; layer v77; ADR-083 single-region; ADR-084 coverage philosophy)
