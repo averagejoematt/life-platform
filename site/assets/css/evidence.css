@@ -314,3 +314,6 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .df-play { color: var(--ink); border-color: var(--rule); background: transparent; }
 .df-note { max-width: 340px; text-align: center; margin-top: var(--sp-4); }
 @media (prefers-reduced-motion: reduce) { .df-fig { transition: none; } }
+
+/* Survival curve day strips */
+.sv-strip { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 1px; color: var(--ember); word-break: break-all; max-width: 38ch; }

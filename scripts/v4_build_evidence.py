@@ -310,6 +310,16 @@ REGISTRY = [
         "/legacy/tools/",
     ),
     (
+        "survival",
+        "The survival curve",
+        "The model handicaps its own human — odds this cycle reaches day 30.",
+        "Protocol & experiments",
+        "data",
+        "/api/survival",
+        None,
+        None,
+    ),
+    (
         "wrong",
         "The wrong page",
         "Every time the AI was wrong — caught claims, refuted calls, in public.",
