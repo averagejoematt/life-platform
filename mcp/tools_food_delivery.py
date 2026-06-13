@@ -87,6 +87,24 @@ def get_food_delivery(view="dashboard", months=12):
         )
         sd = int(streak.get("streak_days", 0)) if streak else 0
         idx = float(monthly.get("delivery_index", 0)) if monthly else 0.0
+
+        # Staleness guard (2026-06-13): food_delivery is a manual CSV import
+        # (uploads/food_delivery/, S3-triggered). When no CSV has been uploaded
+        # recently, delivery_index is 0 and _classify_state returns "clean" — the
+        # platform asserts a clean streak it has NO current data to back (Monarch
+        # showed continuous DoorDash while this read "clean"). Refuse to claim
+        # "clean" on stale data: derive age from the freshest date the source knows.
+        last_known = (streak.get("last_order_date") if streak else None) or (recent[0].get("month") if recent else None)
+        data_age_days = None
+        if last_known:
+            try:
+                s = str(last_known)
+                last_dt = datetime.strptime(s[:10], "%Y-%m-%d") if len(s) >= 10 else datetime.strptime(s[:7], "%Y-%m")
+                data_age_days = (datetime.now(timezone.utc).replace(tzinfo=None) - last_dt).days
+            except Exception:
+                data_age_days = None
+        is_stale = data_age_days is not None and data_age_days > 35
+
         return {
             "clean_streak_days": sd,
             "streak_start": streak.get("streak_start") if streak else None,
@@ -99,9 +117,19 @@ def get_food_delivery(view="dashboard", months=12):
             "this_month_binge_days": int(monthly.get("binge_days", 0)) if monthly else 0,
             "this_month_delivery_index": idx,
             "this_month_orders_per_week": float(monthly.get("orders_per_week", 0)) if monthly else 0,
-            "trend_3m": trend,
+            "trend_3m": "unknown" if is_stale else trend,
             "recent_indices": indices,
-            "behavioral_state": _classify_state(idx, sd),
+            "behavioral_state": "stale" if is_stale else _classify_state(idx, sd),
+            "data_stale": is_stale,
+            "data_age_days": data_age_days,
+            "_stale_note": (
+                (
+                    f"No delivery CSV imported in {data_age_days} days (manual source, uploads/food_delivery/). "
+                    "'clean' cannot be asserted without current data — cross-check Monarch/financial truth."
+                )
+                if is_stale
+                else None
+            ),
             "_note": "Dollar amounts private — do not include in public API responses.",
         }
 
