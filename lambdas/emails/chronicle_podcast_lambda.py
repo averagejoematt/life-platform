@@ -167,33 +167,49 @@ def _xml(s: str) -> str:
 def lambda_handler(event, context):
     event = event or {}
     force = bool(event.get("force"))
-    posts = _published_posts()
-    episodes, rendered = [], 0
+    episodes, rendered, errors = [], 0, 0
+
+    try:
+        posts = _published_posts()
+    except Exception as e:
+        logger.error(f"podcast: could not load posts.json — {e}")
+        return {"statusCode": 503, "body": json.dumps({"error": "posts.json unavailable"})}
 
     for p in sorted(posts, key=lambda x: x.get("week", 0), reverse=True):
         week, date_str, title = p.get("week"), p.get("date"), p.get("title", f"Week {p.get('week')}")
         if week is None or not date_str:
             continue
-        key = f"{PREFIX}/wk{week}.mp3"
-        if force or not _episode_exists(week):
-            md = _content_for(date_str)
-            if not md:
-                logger.warning(f"wk{week}: no content_markdown for {date_str} — skipped")
-                continue
-            narration = (
-                f"The Measured Life, issue {week}: {title}. "
-                f"Written by Elena Voss — a language model embedded with the experiment — "
-                f"and read by a synthetic voice.\n\n" + _markdown_to_narration(md)
+        # Per-episode isolation: one Polly/S3 failure must not abort the others
+        # or skip the index rebuild (this runs weekly, unattended).
+        try:
+            key = f"{PREFIX}/wk{week}.mp3"
+            if force or not _episode_exists(week):
+                md = _content_for(date_str)
+                if not md:
+                    logger.warning(f"wk{week}: no content_markdown for {date_str} — skipped")
+                    continue
+                narration = (
+                    f"The Measured Life, issue {week}: {title}. "
+                    f"Written by Elena Voss — a language model embedded with the experiment — "
+                    f"and read by a synthetic voice.\n\n" + _markdown_to_narration(md)
+                )
+                audio = _synthesize(narration)
+                s3.put_object(Bucket=S3_BUCKET, Key=key, Body=audio, ContentType="audio/mpeg", CacheControl="max-age=86400, public")
+                rendered += 1
+                logger.info(f"wk{week}: rendered {len(audio)} bytes ({len(narration)} chars)")
+            size = s3.head_object(Bucket=S3_BUCKET, Key=key)["ContentLength"]
+            episodes.append(
+                {"week": week, "title": title, "date": date_str, "url": f"/podcast/wk{week}.mp3", "bytes": size, "excerpt": p.get("excerpt", "")}
             )
-            audio = _synthesize(narration)
-            s3.put_object(Bucket=S3_BUCKET, Key=key, Body=audio, ContentType="audio/mpeg", CacheControl="max-age=86400, public")
-            rendered += 1
-            logger.info(f"wk{week}: rendered {len(audio)} bytes ({len(narration)} chars)")
-        size = s3.head_object(Bucket=S3_BUCKET, Key=key)["ContentLength"]
-        episodes.append(
-            {"week": week, "title": title, "date": date_str, "url": f"/podcast/wk{week}.mp3", "bytes": size, "excerpt": p.get("excerpt", "")}
-        )
+        except Exception as e:
+            errors += 1
+            logger.error(f"wk{week}: episode failed (non-fatal) — {e}")
 
-    _write_indexes(episodes)
-    logger.info(f"podcast: {rendered} rendered, {len(episodes)} episodes indexed")
-    return {"statusCode": 200, "body": json.dumps({"rendered": rendered, "episodes": len(episodes)})}
+    try:
+        _write_indexes(episodes)
+    except Exception as e:
+        logger.error(f"podcast: index rebuild failed — {e}")
+        return {"statusCode": 500, "body": json.dumps({"rendered": rendered, "errors": errors, "index": "failed"})}
+
+    logger.info(f"podcast: {rendered} rendered, {len(episodes)} indexed, {errors} errors")
+    return {"statusCode": 200, "body": json.dumps({"rendered": rendered, "episodes": len(episodes), "errors": errors})}
