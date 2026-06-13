@@ -169,6 +169,16 @@ REGISTRY = [
         "/legacy/experiments/",
     ),
     (
+        "cycles",
+        "Cycle vs cycle",
+        "Same-window comparison across experiment restarts — what's different this time.",
+        "Protocol & experiments",
+        "data",
+        "/api/cycle_compare",
+        None,
+        None,
+    ),
+    (
         "challenges",
         "Challenges",
         "Time-boxed challenges — activated, completed, XP earned. Read-only.",

@@ -576,10 +576,24 @@ def _handle_ask(event: dict) -> dict:
         or "unknown"
     )
     try:
-        question = json.loads(event.get("body") or "{}").get("question", "").strip()[:500]
+        _body = json.loads(event.get("body") or "{}")
+        question = (_body.get("question") or "").strip()[:500]
         question = re.sub(r"<[^>]+>", "", question)
         if len(question) < 5:
             return _error(400, "Question too short")
+
+        # Follow-up memory (2026-06-13): up to 3 prior Q/A pairs from the same
+        # browser session become real conversation turns, so "what about REM?"
+        # works after a sleep question. Strictly validated and capped — history
+        # is untrusted client input.
+        history = []
+        for turn in (_body.get("history") or [])[-3:]:
+            if not isinstance(turn, dict):
+                continue
+            q = re.sub(r"<[^>]+>", "", str(turn.get("q", "")))[:500].strip()
+            a = re.sub(r"<[^>]+>", "", str(turn.get("a", "")))[:1200].strip()
+            if q and a and _ask_question_safe(q)[0]:
+                history.append((q, a))
 
         # WR-40: Safety filter
         is_safe, safety_reason = _ask_question_safe(question)
@@ -617,7 +631,10 @@ def _handle_ask(event: dict) -> dict:
                 "model": AI_MODEL_HAIKU,
                 "max_tokens": 600,
                 "system": system_prompt,
-                "messages": [{"role": "user", "content": question}],
+                "messages": (
+                    [m for q_, a_ in history for m in ({"role": "user", "content": q_}, {"role": "assistant", "content": a_})]
+                    + [{"role": "user", "content": question}]
+                ),
             }
         )
 
