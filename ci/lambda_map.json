@@ -146,6 +146,9 @@
     "lambdas/emails/wednesday_chronicle_lambda.py": {
       "function": "wednesday-chronicle"
     },
+    "lambdas/emails/chronicle_podcast_lambda.py": {
+      "function": "chronicle-podcast"
+    },
     "lambdas/emails/weekly_digest_lambda.py": {
       "function": "weekly-digest"
     },

@@ -148,6 +148,43 @@ def _emit_failure_metric():
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def _track_record_block(coach_id: str) -> str:
+    """Summarize this coach's resolved LEARNING# verdicts for prompt injection.
+
+    Counts by outcome + the two most recent resolved calls verbatim. Returns a
+    plain statement when nothing has resolved yet (post-reset normal). Failure
+    here must never block the narrative run.
+    """
+    try:
+        from datetime import timedelta as _td
+
+        from boto3.dynamodb.conditions import Key as _Key
+
+        cutoff = (datetime.now(timezone.utc) - _td(days=60)).strftime("%Y-%m-%d")
+        r = table.query(
+            KeyConditionExpression=_Key("pk").eq(f"COACH#{coach_id}") & _Key("sk").gt(f"LEARNING#{cutoff}"),
+        )
+        recs = [x for x in r.get("Items", []) if not x.get("tombstone")]
+        if not recs:
+            return "Nothing resolved yet this cycle. Make calls; they will be scored."
+        counts = {}
+        for x in recs:
+            st = str(x.get("status", "unknown"))
+            counts[st] = counts.get(st, 0) + 1
+        lines = [", ".join(f"{k}: {v}" for k, v in sorted(counts.items()))]
+        resolved = [x for x in recs if x.get("status") in ("confirmed", "refuted")]
+        resolved.sort(key=lambda x: str(x.get("date", "")), reverse=True)
+        for x in resolved[:2]:
+            lines.append(f"- {x.get('date', '?')}: {x.get('status')} — {str(x.get('condition') or x.get('reason') or '')[:160]}")
+        lines.append(
+            "When relevant, reference your own past calls in your narrative — "
+            "own the misses plainly; credibility here comes from being scored, not from being right."
+        )
+        return "\n".join(lines)
+    except Exception as _e:
+        return "Track record unavailable this run."
+
+
 def _call_haiku(system, user_message, max_tokens=6000, temperature=0.3):
     """Call Anthropic Haiku with exponential backoff + CloudWatch metrics.
 
@@ -502,6 +539,13 @@ def _build_user_message(state, coach_id, today):
         parts.append(json.dumps(state["active_predictions"], indent=2, default=str))
     else:
         parts.append("No active predictions — coach has not yet made formal predictions.")
+    parts.append("")
+
+    # Coach memory (2026-06-13): the coach's own resolved track record, so it
+    # can reference past calls — and acknowledge misses — in its own voice.
+    # Empty right after a reset; fills as the evaluator resolves predictions.
+    parts.append("## Your Track Record (resolved predictions, last 60 days)")
+    parts.append(_track_record_block(coach_id))
     parts.append("")
 
     parts.append("## Instructions")
