@@ -143,7 +143,8 @@ def test_every_static_get_item_key_exists_in_table():
             missing.append(f"{loc}: ({pk!r}, {sk!r}) — no such item; reads silently return nothing")
 
     print(f"\n  key-contract coverage: {len(set(found))} static keys verified, {skipped} dynamic keys skipped")
-    assert not missing, (
-        "Dead DynamoDB key reads (the hypothesis_engine bug class — fix the key "
-        "or add to KNOWN_OPTIONAL with a reason):\n" + "\n".join(missing)
+    assert (
+        not missing
+    ), "Dead DynamoDB key reads (the hypothesis_engine bug class — fix the key " "or add to KNOWN_OPTIONAL with a reason):\n" + "\n".join(
+        missing
     )

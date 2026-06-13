@@ -81,7 +81,9 @@ def check_rate_limit(
     except Exception as e:
         _logger.warning(
             "rate_limit_ddb_error endpoint=%s err=%s — failing %s",
-            endpoint, e, "open" if fail_open else "closed",
+            endpoint,
+            e,
+            "open" if fail_open else "closed",
         )
         return (True, limit, 0) if fail_open else (False, 0, 60)
 

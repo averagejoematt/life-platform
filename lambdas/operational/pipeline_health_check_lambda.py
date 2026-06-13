@@ -67,8 +67,16 @@ PIPELINES = [
 # Webhook/push sources (apple_health/CGM, hevy) are excluded — they have no cron to
 # go stale, so the attempt-staleness arm doesn't apply to them.
 ACTIVE_API_SOURCES = [
-    "whoop", "withings", "garmin", "strava", "eightsleep",
-    "habitify", "todoist", "notion", "weather", "dropbox",
+    "whoop",
+    "withings",
+    "garmin",
+    "strava",
+    "eightsleep",
+    "habitify",
+    "todoist",
+    "notion",
+    "weather",
+    "dropbox",
 ]
 
 # Per-source attempt-gap overrides (minutes). Unlisted sources use the default in
@@ -229,8 +237,9 @@ def _check_ingest_liveness(now: datetime) -> dict:
         lines = [f"• {v['source']}: {v['status'].upper()} — {v['reason']} (last_error={v['last_error_class']})" for v in alerting]
         msg = (
             f"🔌 Ingestion infra-liveness: {unhealthy_count} source(s) unhealthy "
-            f"(running-but-erroring or stopped running):\n\n" + "\n".join(lines) +
-            "\n\nThis is infra-liveness, NOT data-freshness — these sources are failing "
+            f"(running-but-erroring or stopped running):\n\n"
+            + "\n".join(lines)
+            + "\n\nThis is infra-liveness, NOT data-freshness — these sources are failing "
             "their upstream fetch regardless of whether new data was expected."
         )
         try:

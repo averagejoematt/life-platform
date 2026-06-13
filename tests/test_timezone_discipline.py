@@ -69,7 +69,4 @@ def _scan():
 
 def test_no_fixed_offset_or_naive_mixed_pacific_math():
     hits = _scan()
-    assert not hits, (
-        "Timezone-discipline violations (see module docstring for the 2026-06-12 bug class):\n"
-        + "\n".join(hits)
-    )
+    assert not hits, "Timezone-discipline violations (see module docstring for the 2026-06-12 bug class):\n" + "\n".join(hits)

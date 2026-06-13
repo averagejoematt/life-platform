@@ -38,16 +38,25 @@ PROFILE = {
     "journey_start_date": "2026-06-08",
     "journey_start_weight_lbs": 311.62,
     "day_grade_weights": {
-        "sleep_quality": 0.2, "recovery": 0.1, "nutrition": 0.25, "movement": 0.2,
-        "habits_mvp": 0.15, "hydration": 0.05, "journal": 0.05, "glucose": 0.0,
+        "sleep_quality": 0.2,
+        "recovery": 0.1,
+        "nutrition": 0.25,
+        "movement": 0.2,
+        "habits_mvp": 0.15,
+        "hydration": 0.05,
+        "journal": 0.05,
+        "glucose": 0.0,
     },
 }
 
 DATA = {
     "date": "2026-06-10",
     "whoop": {
-        "recovery_score": 68, "hrv": 41.2, "resting_heart_rate": 58,
-        "sleep_duration_hours": 8.1, "sleep_quality_score": 82,
+        "recovery_score": 68,
+        "hrv": 41.2,
+        "resting_heart_rate": 58,
+        "sleep_duration_hours": 8.1,
+        "sleep_quality_score": 82,
     },
     "sleep": {"sleep_efficiency_pct": 89.0, "rem_pct": 24.0, "deep_pct": 19.0},
     "macrofactor": {"calories": 1480, "protein_g": 185, "fat_g": 55, "carbs_g": 120},
@@ -58,8 +67,14 @@ DATA = {
 }
 
 COMPONENT_SCORES = {
-    "sleep_quality": 84, "recovery": 68, "nutrition": 91, "movement": 77,
-    "habits_mvp": 67, "hydration": 80, "journal": None, "glucose": None,
+    "sleep_quality": 84,
+    "recovery": 68,
+    "nutrition": 91,
+    "movement": 77,
+    "habits_mvp": 67,
+    "hydration": 80,
+    "journal": None,
+    "glucose": None,
 }
 
 KWARGS = dict(

@@ -199,7 +199,14 @@ def lambda_handler(event, context):
                 logger.info(f"wk{week}: rendered {len(audio)} bytes ({len(narration)} chars)")
             size = s3.head_object(Bucket=S3_BUCKET, Key=key)["ContentLength"]
             episodes.append(
-                {"week": week, "title": title, "date": date_str, "url": f"/podcast/wk{week}.mp3", "bytes": size, "excerpt": p.get("excerpt", "")}
+                {
+                    "week": week,
+                    "title": title,
+                    "date": date_str,
+                    "url": f"/podcast/wk{week}.mp3",
+                    "bytes": size,
+                    "excerpt": p.get("excerpt", ""),
+                }
             )
         except Exception as e:
             errors += 1

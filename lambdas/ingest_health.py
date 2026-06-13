@@ -25,6 +25,7 @@ path; `pipeline_health_check_lambda` reads the sentinels and evaluates them dail
 The two metrics (behavioral StaleSourceCount, infra UnhealthySourceCount) stay
 separate, with separate alarms — the S-06(b) split, now mandatory.
 """
+
 from __future__ import annotations
 
 import json
@@ -56,12 +57,36 @@ def ingest_health_sk(source: str) -> str:
 
 # ── Error classification ──────────────────────────────────────────────────────
 
-_AUTH_TOKENS = ("401", "403", "unauthorized", "forbidden", "invalid token", "expired token", "token expired", "auth failed",
-                "authentication failed", "invalid_grant", "invalid_client")
+_AUTH_TOKENS = (
+    "401",
+    "403",
+    "unauthorized",
+    "forbidden",
+    "invalid token",
+    "expired token",
+    "token expired",
+    "auth failed",
+    "authentication failed",
+    "invalid_grant",
+    "invalid_client",
+)
 _THROTTLE_TOKENS = ("429", "rate limit", "rate-limit", "ratelimit", "too many requests", "throttl", "quota")
 _PARSE_TOKENS = ("jsondecode", "expecting value", "keyerror", "schema", "unexpected key", "no records after transform")
-_TRANSPORT_TOKENS = ("timeout", "timed out", "connection", "network", "urlerror", "name resolution", "reset by peer",
-                     "500", "502", "503", "504", "bad gateway", "service unavailable")
+_TRANSPORT_TOKENS = (
+    "timeout",
+    "timed out",
+    "connection",
+    "network",
+    "urlerror",
+    "name resolution",
+    "reset by peer",
+    "500",
+    "502",
+    "503",
+    "504",
+    "bad gateway",
+    "service unavailable",
+)
 
 
 def classify_error(exc) -> str:

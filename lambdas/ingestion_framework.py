@@ -81,8 +81,7 @@ except ImportError:
 # for weeks" (the 44-day-outage class). Optional import — ingestion never breaks if
 # the layer module is absent.
 try:
-    from ingest_health import classify_error, emf_metric_line, ingest_health_sk, update_outcome
-    from ingest_health import SYSTEM_PK as _INGEST_SYSTEM_PK
+    from ingest_health import SYSTEM_PK as _INGEST_SYSTEM_PK, classify_error, emf_metric_line, ingest_health_sk, update_outcome
 
     _INGEST_HEALTH_AVAILABLE = True
 except ImportError:  # pragma: no cover - layer-module fallback

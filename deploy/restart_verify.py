@@ -44,7 +44,7 @@ USER = "matthew"
 LAYER = "life-platform-shared-utils"
 API = "https://averagejoematt.com"
 
-PASS = "\033[32m✓\033[0m"
+PASS = "\033[32m✓\033[0m"  # noqa: S105 — ANSI green-checkmark constant, not a secret
 FAIL = "\033[31m✗\033[0m"
 
 

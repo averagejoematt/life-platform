@@ -2035,9 +2035,13 @@ def handle_inference_receipt() -> dict:
 
         def _sum(namespace, metric, dim_name, dim_value, start):
             r = cw.get_metric_statistics(
-                Namespace=namespace, MetricName=metric,
+                Namespace=namespace,
+                MetricName=metric,
                 Dimensions=[{"Name": dim_name, "Value": dim_value}],
-                StartTime=start, EndTime=now, Period=86400, Statistics=["Sum"],
+                StartTime=start,
+                EndTime=now,
+                Period=86400,
+                Statistics=["Sum"],
             )
             return sum(p["Sum"] for p in r.get("Datapoints", []))
 
@@ -2216,7 +2220,7 @@ def handle_survival() -> dict:
             strip = [(g + timedelta(days=i)).isoformat() in engaged for i in range(window)]
             collapse_day = None
             for i in range(0, window - _COLLAPSE_GAP + 1):
-                if not any(strip[i:i + _COLLAPSE_GAP]):
+                if not any(strip[i : i + _COLLAPSE_GAP]):
                     collapse_day = i + 1
                     break
             is_current = next_g is None
