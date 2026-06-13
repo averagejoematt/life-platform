@@ -2,8 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <style>.nav-overlay{display:none}</style>
-    <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+    <meta property="og:image" content="https://averagejoematt.com/assets/images/og-home.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
@@ -11,14 +10,31 @@
   <meta property="og:description" content="Privacy policy and AI disclaimer for averagejoematt.com.">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Privacy policy for averagejoematt.com — how subscriber data is handled.">
-  <title>Privacy Policy — Matthew / Signal</title>
+  <title>Privacy Policy — averagejoematt</title>
     <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
-  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
-  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
-  <meta name="theme-color" content="#080c0a">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
+  <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/tokens.css">
-  <link rel="stylesheet" href="/assets/css/base.css">
+  <link rel="stylesheet" href="/assets/css/story.css">
+  <style>
+    /* Old-design token shim — the page content predates v4; map its tokens
+       onto the v4 design system instead of resurrecting base.css. */
+    :root {
+      --text: var(--ink); --text-muted: var(--ink-muted); --text-faint: var(--ink-faint);
+      --accent: var(--ember); --surface: var(--paper); --border: var(--rule);
+      --border-subtle: var(--rule); --page-padding: var(--gutter);
+      --font-display: var(--font-serif);
+      --text-h1: var(--fs-h1); --text-base: var(--fs-body); --text-xs: var(--fs-small);
+      --lh-display: 1.15; --lh-body: var(--lh-relaxed);
+      --ls-display: -0.01em; --ls-label: 0.06em; --ls-tag: 0.08em;
+      --space-2: var(--sp-2); --space-3: var(--sp-3); --space-4: var(--sp-4);
+      --space-6: var(--sp-5); --space-8: var(--sp-6); --space-10: var(--sp-7);
+      --space-12: var(--sp-7); --space-16: var(--sp-8); --space-20: var(--sp-8);
+    }
+  </style>
   <style>
     .policy-layout {
       max-width: 680px;
@@ -91,7 +107,15 @@
 </head>
 <body>
 
-<div id="amj-nav"></div>
+<header class="story-top">
+  <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">privacy</span></a>
+  <nav class="doors" aria-label="Doors">
+    <a href="/now/">the cockpit</a>
+    <a href="/story/">the story</a>
+    <a href="/evidence/">the evidence</a>
+    <button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button>
+  </nav>
+</header>
 </div>
 
 
@@ -171,11 +195,9 @@
 </div>
 
 <!-- Mobile bottom nav -->
-<div id="amj-bottom-nav"></div>
-<div id="amj-footer"></div>
+<footer class="dx-foot-bar"><span class="label">averagejoematt · privacy</span> <span class="label"><a href="/">← home</a></span></footer>
 
-<script src="/assets/js/site_constants.js"></script>
-<script src="/assets/js/components.js"></script>
-<script src="/assets/js/nav.js"></script>
+<script>(function(){try{var t=localStorage.getItem("ajm-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}
+var tb=document.querySelector(".theme-toggle");if(tb)tb.addEventListener("click",function(){var c=document.documentElement.dataset.theme||(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");document.documentElement.dataset.theme=c==="light"?"dark":"light";try{localStorage.setItem("ajm-theme",document.documentElement.dataset.theme);}catch(e){}});})();</script>
 </body>
 </html>

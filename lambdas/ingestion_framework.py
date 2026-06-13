@@ -75,6 +75,19 @@ except ImportError:
     EXPERIMENT_START_DATE = "2026-05-25"
     EXPERIMENT_PHASE_CURRENT = "experiment"
 
+# ER-01 (2026-06-09): infra-liveness sentinel. Record per-run outcome to
+# USER#system / INGEST_HEALTH#{source} + an EMF metric, so the daily heartbeat can
+# tell "the user didn't log" (benign) from "the ingestion Lambda has been erroring
+# for weeks" (the 44-day-outage class). Optional import — ingestion never breaks if
+# the layer module is absent.
+try:
+    from ingest_health import classify_error, emf_metric_line, ingest_health_sk, update_outcome
+    from ingest_health import SYSTEM_PK as _INGEST_SYSTEM_PK
+
+    _INGEST_HEALTH_AVAILABLE = True
+except ImportError:  # pragma: no cover - layer-module fallback
+    _INGEST_HEALTH_AVAILABLE = False
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # AUTH-FAILURE CIRCUIT BREAKER (ADR-052)
@@ -174,6 +187,43 @@ def _clear_auth_failure(table, source_name: str, user_id: str, logger):
         table.delete_item(Key={"pk": _auth_breaker_pk(source_name, user_id), "sk": _AUTH_FAIL_SK})
     except Exception as e:
         logger.warning(f"auth_breaker_clear_failed: {e}")
+
+
+def _record_ingest_health(table, config, logger, *, attempted: bool, succeeded: bool, error_class: str = "none"):
+    """ER-01: read-modify-write the source's INGEST_HEALTH sentinel + emit an EMF metric.
+
+    Best-effort: a failure here must never break ingestion. `attempted` stamps
+    last_attempt_ts (the Lambda ran), independent of whether new data came back —
+    that decoupling is the whole point (running-but-erroring ≠ unfed-but-healthy).
+    """
+    if not _INGEST_HEALTH_AVAILABLE:
+        return
+    try:
+        now = datetime.now(timezone.utc)
+        sk = ingest_health_sk(config.source_name)
+        key = {"pk": _INGEST_SYSTEM_PK, "sk": sk}
+        prev = table.get_item(Key=key).get("Item")
+        sentinel = update_outcome(
+            prev,
+            attempted=attempted,
+            succeeded=succeeded,
+            error_class=error_class,
+            now_iso=now.isoformat(),
+            source=config.source_name,
+        )
+        table.put_item(Item={**key, **sentinel, "updated_at": now.isoformat()})
+        # EMF line — CloudWatch extracts RunSuccess + ConsecutiveFailures.
+        print(
+            emf_metric_line(
+                source=config.source_name,
+                succeeded=succeeded,
+                consecutive_failures=int(sentinel.get("consecutive_failures", 0)),
+                error_class=sentinel.get("last_error_class", error_class),
+                timestamp_ms=int(now.timestamp() * 1000),
+            )
+        )
+    except Exception as e:  # never let health-recording break ingestion
+        logger.warning(f"ingest_health_record_failed source={config.source_name}: {e}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -428,6 +478,10 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
             f"error={_active_breaker.get('error', '')[:120]}"
         )
         logger.info(msg)
+        # ER-01: the Lambda ran, but the upstream fetch is being suppressed by an
+        # unresolved auth failure — record it as a continued failure so the streak
+        # grows even with zero new data (this IS the running-but-dead case).
+        _record_ingest_health(table, config, logger, attempted=True, succeeded=False, error_class="auth")
         return {
             "statusCode": 200,
             "body": json.dumps(
@@ -452,6 +506,7 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
                 secret_data = json.loads(raw_secret)
         except Exception as e:
             logger.error(f"Failed to load secret {config.secret_id}: {e}")
+            _record_ingest_health(table, config, logger, attempted=True, succeeded=False, error_class="transport")
             return {"statusCode": 500, "body": json.dumps({"error": f"Secret load failed: {e}"})}
 
         # ADR-052: trip the circuit breaker on auth failures so the next 24h
@@ -461,6 +516,8 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
         except Exception as auth_exc:
             if _looks_like_auth_failure(auth_exc):
                 _mark_auth_failure(table, config.source_name, config.user_id, auth_exc, logger)
+            _err_class = classify_error(auth_exc) if _INGEST_HEALTH_AVAILABLE else "auth"
+            _record_ingest_health(table, config, logger, attempted=True, succeeded=False, error_class=_err_class)
             raise
 
         # Write back updated credentials (OAuth token refresh)
@@ -491,6 +548,10 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
         # Mode 2: Gap-aware lookback
         dates_to_ingest = _find_missing_dates(table, config, logger)
         if not dates_to_ingest:
+            # ER-01: gap detection ran and found nothing missing — the source is
+            # up to date. A healthy run (Lambda ran, no error), so it counts as a
+            # success for liveness even though no API call was needed.
+            _record_ingest_health(table, config, logger, attempted=True, succeeded=True)
             return {
                 "statusCode": 200,
                 "body": json.dumps(
@@ -510,6 +571,7 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
     results = {}
     records_written = 0
     errors = 0
+    last_error_class = "none"  # ER-01: classify the most recent per-date failure
 
     for i, date_str in enumerate(dates_to_ingest):
         try:
@@ -568,6 +630,8 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
             logger.error(f"  {date_str}: ERROR — {e}")
             results[date_str] = f"error: {e}"
             errors += 1
+            if _INGEST_HEALTH_AVAILABLE:
+                last_error_class = classify_error(e)
             # ADR-052: trip the breaker if the per-date error looks like 401/403.
             if _looks_like_auth_failure(e):
                 _mark_auth_failure(table, config.source_name, config.user_id, e, logger)
@@ -584,6 +648,20 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
     # behaves normally even before the 24h TTL expires.
     if errors == 0 and records_written > 0:
         _clear_auth_failure(table, config.source_name, config.user_id, logger)
+
+    # ── ER-01 infra-liveness sentinel ──
+    # The Lambda ran and completed its fetch loop. succeeded iff no per-date errors
+    # (a date that simply had no data is NOT an error → still a healthy run). This
+    # is what distinguishes "user didn't log" (succeeded) from "ingestion erroring"
+    # (errors > 0 → streak grows → heartbeat alerts).
+    _record_ingest_health(
+        table,
+        config,
+        logger,
+        attempted=True,
+        succeeded=(errors == 0),
+        error_class="none" if errors == 0 else last_error_class,
+    )
 
     # ── Summary ──
     summary = {

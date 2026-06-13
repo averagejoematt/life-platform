@@ -756,6 +756,25 @@ class OperationalStack(Stack):
             )
         )
 
+        # ER-01 (2026-06-09): infra-liveness heartbeat. Fires once daily at 17:10
+        # UTC = 10:10 AM PT — after the morning ingestion crons (4–10 AM PT hourly)
+        # have all run, so the INGEST_HEALTH sentinels reflect the day's attempts.
+        # Invokes with {check_ingest_liveness: true} so the Lambda asserts each
+        # active source ran + 200'd (vs. behavioral freshness), emitting
+        # UnhealthySourceCount for the ingest-liveness-unhealthy alarm.
+        liveness_check_rule = events.Rule(
+            self,
+            "PipelineHealthIngestLiveness",
+            schedule=events.Schedule.cron(hour="17", minute="10"),
+            description="ER-01: assert each active source's ingestion Lambda ran + 200'd (infra-liveness)",
+        )
+        liveness_check_rule.add_target(
+            targets.LambdaFunction(
+                pipeline_health,
+                event=events.RuleTargetInput.from_object({"check_ingest_liveness": True}),
+            )
+        )
+
         # ── 14. Hevy Routine Cron (ADR-066) — Phase 3 scheduled generator ──
         # SHIPS DISABLED at the EventBridge level AND SSM /life-platform/hevy/cron_enabled
         # defaults to "false" (belt-and-suspenders gate). Operator flips both ON

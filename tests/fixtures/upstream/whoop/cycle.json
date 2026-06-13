@@ -1,0 +1,22 @@
+{
+  "records": [
+    {
+      "id": 93845,
+      "user_id": 0,
+      "created_at": "2026-06-08T13:05:00.000Z",
+      "updated_at": "2026-06-08T13:06:00.000Z",
+      "start": "2026-06-08T11:00:00.000Z",
+      "end": null,
+      "timezone_offset": "-07:00",
+      "score_state": "SCORED",
+      "score": {
+        "strain": 12.345,
+        "kilojoule": 8000.6,
+        "average_heart_rate": 70,
+        "max_heart_rate": 160,
+        "percent_recorded": 100
+      }
+    }
+  ],
+  "next_token": null
+}

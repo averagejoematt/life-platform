@@ -1,0 +1,23 @@
+{
+  "id": 14785236901,
+  "name": "Morning Ride",
+  "type": "Ride",
+  "sport_type": "Ride",
+  "start_date": "2026-06-08T14:02:11Z",
+  "start_date_local": "2026-06-08T07:02:11Z",
+  "distance": 24140.5,
+  "moving_time": 3960,
+  "elapsed_time": 4210,
+  "total_elevation_gain": 312.0,
+  "average_speed": 6.096,
+  "max_speed": 13.4,
+  "average_heartrate": 142.3,
+  "max_heartrate": 171,
+  "has_heartrate": true,
+  "average_watts": 168.2,
+  "kilojoules": 665.9,
+  "map": {
+    "id": "a14785236901",
+    "summary_polyline": "_p~iF~ps|U_ulLnnqC_mqNvxq`@"
+  }
+}

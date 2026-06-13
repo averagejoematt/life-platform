@@ -295,3 +295,31 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
   .ev-side { min-width: 0; }
   .rd-sec { overflow-x: auto; }
 }
+
+/* ── PG-14 "the data figure" (results hero) ───────────────────────────────── */
+.df-sec { display: flex; flex-direction: column; align-items: center; }
+.df-stage { width: 300px; max-width: 84vw; }
+.df-svg { width: 100%; height: auto; display: block; }
+.df-fig { fill: var(--ink); transition: none; }
+.df-readout { display: flex; justify-content: space-between; align-items: baseline; width: 100%; max-width: 300px; margin-top: var(--sp-3); }
+.df-weight { font-family: var(--font-mono); font-size: var(--fs-h2, 32px); font-weight: 600; color: var(--ink); }
+.df-weight small { font-size: var(--fs-small); color: var(--ink-muted); font-weight: 400; margin-left: 4px; }
+.df-togoal { text-align: right; }
+.df-togoal .num { display: block; font-family: var(--font-mono); color: var(--ember); font-size: var(--fs-base, 16px); }
+.df-scrub { width: 100%; max-width: 300px; margin: var(--sp-4) 0 var(--sp-2); accent-color: var(--ember); }
+.df-axis { display: flex; justify-content: space-between; width: 100%; max-width: 300px; }
+.df-buttons { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-top: var(--sp-3); }
+.df-btn { font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.04em; color: var(--ember); background: var(--ember-wash); border: 1px solid var(--ember-line); border-radius: 6px; padding: 7px 10px; cursor: pointer; }
+.df-btn:hover { background: var(--ember-soft); }
+.df-play { color: var(--ink); border-color: var(--rule); background: transparent; }
+.df-note { max-width: 340px; text-align: center; margin-top: var(--sp-4); }
+@media (prefers-reduced-motion: reduce) { .df-fig { transition: none; } }
+
+/* Survival curve day strips */
+.sv-strip { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 1px; color: var(--ember); word-break: break-all; max-width: 38ch; }
+
+/* The mirror — client-side comparison inputs */
+.mi-grid { display: grid; gap: var(--sp-4); max-width: var(--measure); }
+.mi-row { display: grid; gap: var(--sp-1); }
+.mi-in { max-width: 220px; }
+.mi-out { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ember); min-height: 18px; }

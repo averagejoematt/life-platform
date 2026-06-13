@@ -1,69 +1,70 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-door="story">
 <head>
   <meta charset="UTF-8">
-  <style>.nav-overlay{display:none}</style>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Almost there — check your inbox to confirm your subscription.">
-  <title>Confirm Your Subscription — averagejoematt.com</title>
-  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
-  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
-  <meta name="theme-color" content="#080c0a">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Confirmation — The Measured Life</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/tokens.css">
-  <link rel="stylesheet" href="/assets/css/base.css">
-  <link rel="canonical" href="https://averagejoematt.com/subscribe/confirm/">
+  <link rel="stylesheet" href="/assets/css/story.css">
+  <link rel="stylesheet" href="/assets/css/subscribe.css">
+  <script>(function(){try{var t=localStorage.getItem("ajm-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>
 </head>
-<body>
-<div id="amj-nav"></div>
+<body class="dx-page">
+  <header class="story-top">
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">subscribe</span></a>
+    <nav class="doors" aria-label="Doors">
+      <a href="/now/">the cockpit</a>
+      <a href="/story/">the story</a>
+      <a href="/evidence/">the evidence</a>
+      <button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button>
+    </nav>
+  </header>
 
-<section style="
-  min-height:80vh;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  padding:var(--space-16) var(--page-padding) var(--space-16);
-  text-align:center;
-">
-  <div style="font-size:48px;margin-bottom:var(--space-6);">✉️</div>
-  <h1 style="font-family:var(--font-display);font-size:var(--text-h2);color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-4);">Check Your Inbox</h1>
-  <p style="font-size:var(--text-lg);color:var(--text-muted);max-width:480px;line-height:var(--lh-body);margin-bottom:var(--space-10);">
-    A confirmation email is on its way. Click the link inside to lock in your subscription to <strong style="color:var(--text)">The Measured Life</strong>.
-  </p>
-
-  <div style="max-width:500px;width:100%;">
-    <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-6);">While you wait</div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);">
-      <a href="/story/" style="display:block;background:var(--surface);padding:var(--space-5);text-decoration:none;transition:background 0.15s;">
-        <div style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">The Story</div>
-        <div style="font-size:var(--text-xs);color:var(--text-muted);">How this started. 307 lbs and a decision.</div>
-      </a>
-      <a href="/live/" style="display:block;background:var(--surface);padding:var(--space-5);text-decoration:none;transition:background 0.15s;">
-        <div style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">Today's Data</div>
-        <div style="font-size:var(--text-xs);color:var(--text-muted);">Live numbers from <span data-const="platform.data_sources">26</span> sources.</div>
-      </a>
-      <a href="/chronicle/" style="display:block;background:var(--surface);padding:var(--space-5);text-decoration:none;transition:background 0.15s;">
-        <div style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">The Chronicle</div>
-        <div style="font-size:var(--text-xs);color:var(--text-muted);">Elena Voss writes every week.</div>
-      </a>
-      <a href="/platform/" style="display:block;background:var(--surface);padding:var(--space-5);text-decoration:none;transition:background 0.15s;">
-        <div style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">The Platform</div>
-        <div style="font-size:var(--text-xs);color:var(--text-muted);">How it's built. The tech.</div>
-      </a>
+  <main id="main" class="sub-main" style="grid-template-columns: 1fr; max-width: 560px; margin-inline: auto;">
+    <div class="sub-success" id="confirm-card" style="display:block;">
+      <div class="si" aria-hidden="true" id="cc-icon">…</div>
+      <p class="st" id="cc-title">Checking your confirmation…</p>
+      <p class="sb" id="cc-body"></p>
     </div>
-  </div>
+  </main>
 
-  <p style="margin-top:var(--space-8);font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);">
-    No email? Check your spam folder or <a href="/subscribe/" style="color:var(--accent);text-decoration:none;">try again</a>.
-  </p>
-</section>
+  <footer class="dx-foot-bar"><span class="label">averagejoematt · subscribe</span>
+    <span class="label"><a href="/">← home</a></span></footer>
 
-<div id="amj-bottom-nav"></div>
-<div id="amj-footer"></div>
-<script src="/assets/js/site_constants.js"></script>
-<script src="/assets/js/countdown.js"></script>
-<script src="/assets/js/components.js"></script>
-<script src="/assets/js/nav.js"></script>
+  <script>
+    (function () {
+      var tb = document.querySelector(".theme-toggle");
+      if (tb) tb.addEventListener("click", function () {
+        var cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+        document.documentElement.dataset.theme = cur === "light" ? "dark" : "light";
+        try { localStorage.setItem("ajm-theme", document.documentElement.dataset.theme); } catch (e) {}
+      });
+
+      // The email-confirm API lands here with ?confirmed=true|already or
+      // ?error=invalid_token|token_expired|server_error. The previous page
+      // ignored these entirely — every visitor saw "check your inbox".
+      var p = new URLSearchParams(location.search);
+      var states = {
+        "confirmed:true":    ["✓", "You're in.", 'Subscription confirmed — The Measured Life lands every Wednesday.<br><br><a href="/story/chronicle/">Read the chronicle while you wait →</a>'],
+        "confirmed:already": ["✓", "Already confirmed.", 'You were already on the list — nothing more to do.<br><br><a href="/story/chronicle/">Read the chronicle →</a>'],
+        "error:invalid_token": ["·", "That link didn't check out.", 'The confirmation link is invalid — it may have been clipped by your email client.<br><br><a href="/subscribe/">Subscribe again →</a>'],
+        "error:token_expired": ["·", "That link expired.", 'Confirmation links are time-limited. Re-subscribe and a fresh one will land in your inbox.<br><br><a href="/subscribe/">Subscribe again →</a>'],
+        "error:server_error":  ["·", "Something went wrong on our side.", 'Not you — us. Try the link again in a minute, or re-subscribe.<br><br><a href="/subscribe/">Back to subscribe →</a>'],
+        "none:none":           ["✉", "Check your inbox.", 'A confirmation email is on its way — click the link inside to lock in your subscription.<br><br>No email? Check spam, or <a href="/subscribe/">try again →</a>'],
+      };
+      var key = p.get("confirmed") ? "confirmed:" + p.get("confirmed")
+              : p.get("error") ? "error:" + p.get("error")
+              : "none:none";
+      var s = states[key] || states["error:invalid_token"];
+      document.getElementById("cc-icon").textContent = s[0];
+      document.getElementById("cc-title").textContent = s[1];
+      document.getElementById("cc-body").innerHTML = s[2];
+    })();
+  </script>
 </body>
 </html>

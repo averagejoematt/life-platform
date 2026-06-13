@@ -240,8 +240,6 @@ def create_platform_lambda(
         "*.md",
         "dashboard",
         "dashboard/**",
-        "buddy",
-        "buddy/**",
         "cf-auth",
         "cf-auth/**",
         "requirements",

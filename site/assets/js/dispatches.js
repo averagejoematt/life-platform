@@ -19,6 +19,18 @@ const BYKEY = Object.fromEntries(SECTIONS.map((s) => [s.key, s]));
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+let _podcastEpisodes = null;  // week → {url, bytes}; loaded once, fails silent
+async function podcastEpisode(week) {
+  if (_podcastEpisodes === null) {
+    try {
+      const d = await getJSON("/podcast/episodes.json");
+      _podcastEpisodes = {};
+      for (const e of d.episodes || []) _podcastEpisodes[String(e.week)] = e;
+    } catch (e) { _podcastEpisodes = {}; }
+  }
+  return _podcastEpisodes[String(week)];
+}
+
 async function getJSON(p) { const r = await fetch(p, { headers: { accept: "application/json" } }); if (!r.ok) throw new Error(p + " " + r.status); return r.json(); }
 async function tryJSON(p) { try { return await getJSON(p); } catch (e) { return null; } }
 const cache = {};
@@ -66,8 +78,12 @@ async function renderRead(s, id) {
   const readmore = ent.url
     ? `<p class="dx-readmore"><button type="button" class="dx-readfull" data-url="${esc(ent.url)}">Read the full piece${ent.word_count ? ` (${esc(ent.word_count)} words)` : ""} →</button></p><div class="dx-fulltext" data-fulltext hidden></div>`
     : (ent.word_count ? `<p class="dx-foot label">${esc(ent.word_count)} words</p>` : "");
+  const episode = s.key === "chronicle" ? await podcastEpisode(ent.id) : null;
+  const listen = episode
+    ? `<div class="dx-listen"><audio controls preload="none" src="${esc(episode.url)}"></audio><span class="label">listen · AI-voiced (~${Math.max(1, Math.round((episode.bytes || 0) / 1024 / 1024 / 0.12))} min)</span></div>`
+    : "";
   read.innerHTML = `<p class="dx-kicker label">${s.key === "chronicle" ? "chronicle · Elena Voss" : "journal"} · week ${esc(ent.id)}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
-    `<h3 class="dx-title">${esc(ent.title)}</h3>` + (ent.meta ? `<p class="dx-stats label">${esc(ent.meta)}</p>` : "") +
+    `<h3 class="dx-title">${esc(ent.title)}</h3>` + listen + (ent.meta ? `<p class="dx-stats label">${esc(ent.meta)}</p>` : "") +
     `<p class="dx-prose dx-excerpt">${esc(ent.excerpt || "")}</p>` + readmore + dispatchFoot(s, ent, all);
   const rf = read.querySelector(".dx-readfull");
   if (rf) rf.addEventListener("click", () => loadFull(rf, read.querySelector("[data-fulltext]"), read.querySelector(".dx-excerpt")));
