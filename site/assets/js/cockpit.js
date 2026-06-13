@@ -381,9 +381,30 @@ function wireFirstRun() {
 }
 
 /* ── load + orchestrate ──────────────────────────────────────────────────── */
-async function load() {
+async function load(dateStr) {
   const main = $("#cockpit");
   try {
+    // Time travel: a dated request renders that morning's sheet. The board's
+    // verdict/boardline stay present-tense only, so they're replaced by an
+    // honest note rather than faked for the past.
+    if (dateStr) {
+      const charBody = await getJSON(`${API}/character?date=${encodeURIComponent(dateStr)}`);
+      const character = charBody?.character;
+      state.pillars = {};
+      for (const p of charBody?.pillars || []) state.pillars[p.name] = p;
+      if (!character || !Object.keys(state.pillars).length) throw new Error("no sheet for that date");
+      renderHub(character);
+      renderDomains();
+      bind("boardline").hidden = true;
+      bind("verdict").innerHTML =
+        `<span class="mark">&rsaquo;</span> Time travel — this is the sheet as of <strong>${escapeHTML(character.as_of_date || dateStr)}</strong>. ` +
+        `The board speaks only in the present. <a href="/now/">Back to today →</a>`;
+      bind("asof").textContent = `as of ${character.as_of_date || dateStr} (history)`;
+      main.dataset.state = "ready";
+      $(".panel").setAttribute("aria-busy", "false");
+      return;
+    }
+
     const [snap, priority] = await Promise.allSettled([
       getJSON(`${API}/snapshot`),
       getJSON(`${API}/weekly_priority`),
@@ -431,8 +452,27 @@ function escapeHTML(s) {
     .replace(/"/g, "&quot;");
 }
 
+function wireScrub() {
+  const inp = document.querySelector("[data-scrub]");
+  if (!inp) return;
+  const today = new Date().toISOString().slice(0, 10);
+  inp.max = today;
+  inp.min = "2026-04-01";  // cycle 1 genesis — the first morning with a sheet
+  const fromUrl = new URLSearchParams(location.search).get("date");
+  if (fromUrl) inp.value = fromUrl;
+  inp.addEventListener("change", () => {
+    const d = inp.value;
+    const url = d && d < today ? `/now/?date=${d}` : "/now/";
+    try { history.replaceState({}, "", url); } catch (e) {}
+    if (d && d < today) load(d);
+    else { inp.value = ""; load(); }
+  });
+}
+
 wireScope();
 wireTheme();
 wireFirstRun();
+wireScrub();
 bind("scopeLabel").textContent = "today";
-load();
+const _deepDate = new URLSearchParams(location.search).get("date");
+load(_deepDate && /^\d{4}-\d{2}-\d{2}$/.test(_deepDate) ? _deepDate : undefined);

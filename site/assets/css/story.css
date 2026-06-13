@@ -264,3 +264,7 @@ body { overflow-x: hidden; }
   .doors { gap: var(--sp-2); }
   .doors a { font-size: 0.5625rem; }
 }
+
+/* Chronicle audio (the AI-voiced podcast) */
+.dx-listen { display: flex; align-items: center; gap: var(--sp-3); margin: var(--sp-3) 0; flex-wrap: wrap; }
+.dx-listen audio { height: 36px; max-width: 100%; }

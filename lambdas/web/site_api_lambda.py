@@ -103,6 +103,10 @@ from web.site_api_data import (
     handle_supplements,
     handle_tools_baseline,
     handle_vice_streaks,
+    handle_cycle_compare,
+    handle_inference_receipt,
+    handle_wrong,
+    handle_survival,
 )
 
 # P1.1 Phase B step 3 (2026-05-26): status + pulse handlers extracted.
@@ -313,6 +317,10 @@ ROUTES = {
     "/api/status/summary": handle_status_summary,
     # BS-07: new public endpoints
     "/api/weight_progress": handle_weight_progress,
+    "/api/cycle_compare": handle_cycle_compare,
+    "/api/inference_receipt": handle_inference_receipt,
+    "/api/wrong": handle_wrong,
+    "/api/survival": handle_survival,
     "/api/character_stats": handle_character_stats,
     "/api/habit_streaks": handle_habit_streaks,
     "/api/experiments": handle_experiments,
@@ -582,6 +590,11 @@ def lambda_handler(event, context):
     if path == "/api/changes-since":
         qs = event.get("queryStringParameters") or {}
         return handle_changes_since(qs)
+
+    # Time scrubber (2026-06-13): /api/character?date=YYYY-MM-DD — any past
+    # morning's sheet. Dateless requests fall through to the ROUTES default.
+    if path == "/api/character" and (event.get("queryStringParameters") or {}).get("date"):
+        return handle_character(date=event["queryStringParameters"]["date"].strip())
 
     # Phase 1: Observatory week (GET with query params)
     if path == "/api/observatory_week":

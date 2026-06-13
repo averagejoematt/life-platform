@@ -1,6 +1,6 @@
 # Life Platform — Open Backlog
 
-**Last updated:** 2026-06-09 (ER external-review-lens rigor series added — ER-01..08; prior: 2026-06-07 v8.4.0 PG product/growth summit, ADR-077 phase taxonomy + restart tooling, Monday reset staged)
+**Last updated:** 2026-06-09 (ER-02 upstream-API contract tests DONE → CHANGELOG; ER external-review-lens rigor series added — ER-01..08; prior: 2026-06-07 v8.4.0 PG product/growth summit, ADR-077 phase taxonomy + restart tooling, Monday reset staged)
 **Source:** Synthesis of V1 audit (2026-05-17, ADR-057), V2 audit (2026-05-17, `docs/V2_AUDIT_PLAN.md`), V2 follow-up sessions (2026-05-18/19), the 2026-05-29 marathon (Bedrock cutover, budget guard, remediation agent, May-30 restart), the 2026-06-01/02 v4 website launch + QA sweep, and the 2026-06-03 operations/cost session (ADR-074/075). Data-blocked items D-01/D-03/D-04 + N-01/L-11 re-checked against live AWS on 2026-06-03.
 
 > Single source of truth for everything **not done**. Items closed-with-rationale (ADR-057) and items shipped are not listed — see `docs/CHANGELOG.md` for what landed and `docs/DECISIONS.md` for what was formally closed.
@@ -58,9 +58,9 @@
 | **🛑 Defer-with-rationale (won't do)** | 9 | Documented `won't-do` unless trigger fires |
 | **📦 New work surfaced (post-V2)** | 7 | N-01 ✅ closed · N-08 ✅ resolved 2026-06-06 (tier 3→1) |
 | **🌐 v4 website + ops follow-ups** | 5 | S-01 ✅ + S-02 ✅ + S-06 ✅ deployed · B-03 ✅ · S-03/S-04/S-05 open · S-07 deferred |
-| **🚀 Product & Growth (PG)** | 8 | NEW 2026-06-07 summit. PG-00 ✅ · **PG-01/02/03/05/06 ✅ deployed; PG-04 ✅ native-SES (CI-deploy pending); PG-14 ✅ spike (Tier-A go)** · PG-04b/PG-13 + PG-14 productionization post-reset |
-| **🔬 External-Review rigor (ER)** | 8 | NEW 2026-06-09 external-lens review. ER-01/02/03 = the objective gap (do first); ER-04..08 = recorded-decision / honesty items. Full spec: `docs/specs/ER_EXTERNAL_REVIEW_RIGOR_2026-06-09.md` |
-| **TOTAL OPEN** | **~41** | 2026-06-09: +8 ER from external-review lens. 2026-06-07: +14 PG from summit; PG-00/01/02/03/04/05/06 + PG-14-spike closed same day; PG-04b + PG-14-prod logged |
+| **🚀 Product & Growth (PG)** | 7 | NEW 2026-06-07 summit. PG-00 ✅ · **PG-01/02/03/05/06 ✅ deployed; PG-04 ✅ native-SES (CI-deploy pending); PG-14 ✅ Tier-A productionized 2026-06-09 → CHANGELOG** · PG-04b/PG-13 remain · **PG-07 gate-blocked on D-05 (~2026-06-17)** |
+| **🔬 External-Review rigor (ER)** | 6 | NEW 2026-06-09 external-lens review. **ER-01 ✅ + ER-02 ✅ done → CHANGELOG.** ER-03 remains the objective-gap tier (do next); ER-04..08 = recorded-decision / honesty items. Full spec: `docs/specs/ER_EXTERNAL_REVIEW_RIGOR_2026-06-09.md` |
+| **TOTAL OPEN** | **~38** | 2026-06-09: ER-01 + ER-02 + PG-14 ✅ closed; +8 ER from external-review lens. 2026-06-07: +14 PG from summit; PG-00/01/02/03/04/05/06 + PG-14-spike closed same day; PG-04b logged |
 
 ---
 
@@ -176,7 +176,9 @@
 - **Gate:** PG-00 (Wedge B) for the public surface; Phase 2 additionally gated on PG-10 + a cost check (Dana). **Effort:** Phase 1 M; Phase 2 M–L each.
 - **Adversarial note:** Reeves/Viktor flag new agents as build-itch. Phase 1 is sanctioned (surfacing, ~zero build). Phase 2 is the itch — keep it contained and Wedge-B-justified, not core-platform expansion.
 
-### PG-14 — "AI me" weight-loss visualization — ✅ SPIKE DONE 2026-06-07 (Tier-A go; B/C defer) · productionization decision pending owner
+### PG-14 — "AI me" weight-loss visualization — ✅ DONE + DEPLOYED 2026-06-09 (Tier-A → CHANGELOG; B/C deferred)
+- **Shipped + live** (front-end only; site synced, CloudFront invalidated): the Tier-A "data figure" — a faceless, monochrome SVG silhouette whose girth is a direct function of the real `/api/journey` weight — renders as the `/evidence/results/` hero (`evidence.js` `dataFigure`/`renderResults`/`WIRE.results` + `evidence.css` `.df-*`). Data-driven, theme-adaptive (`var(--ink)`), `prefers-reduced-motion`-aware, "representative figure, not a photo" disclaimer baked in. Tier B (photoreal) + Tier C (video) remain deferred (honesty/privacy bar unchanged). Final browser visual QA pending CloudFront propagation. See CHANGELOG → "PG-14 — 2026-06-09" + `docs/specs/PG-14_ai_me_spike.md`.
+
 *Matthew's idea: "an AI version of myself that drops weight, like those creative AI videos — how hard would it be?"*
 
 - **✅ Spike complete:** `spikes/pg14_ai_me/` (self-contained prototype + 3 frames) + `docs/specs/PG-14_ai_me_spike.md` (go/no-go). **Finding:** the *honest* version is the *buildable* one — a faceless, monochrome SVG silhouette whose girth is a direct function of the real weight (304→185), morphs convincingly, hallucinates nothing, privacy-safe, on-brand. Torso morph strong; limbs stylised (2D-procedural ceiling). **Rec: GO Tier A** as ONE contained data-driven artifact (e.g. `/evidence/results/` hero or chronicle milestone); **NO-GO/defer Tier B** (photoreal = honesty+privacy bar) **& Tier C** (video = quality). Not deployed (lives in `spikes/`). **Productionization (≈S–M, no new backend) is the owner's call — hold until post-reset to anchor the new genesis weight.**
@@ -199,17 +201,11 @@
 
 **How Claude Code works an ER item:** one item per session; ER-01/02/03 first; new tests must run **offline** so CI can gate; held to the standard they enforce (correlative-only, math-in-Python, Henning confidence bands). Deploy discipline unchanged (Matthew runs deploys in terminal; layer changes need a rebuild + `SHARED_LAYER_VERSION` bump). On close: CHANGELOG + PROJECT_PLAN, ADR where called for, move the item to CHANGELOG.
 
-### ER-01 — Infra-liveness heartbeat (the 44-day-outage class) · Tier 1 · Effort M
-- **Why:** the Garmin outage ran 44 days unseen. `freshness_checker`/`slo-source-freshness` are *behavioral* checks — "no new data" can't distinguish "didn't log" from "ingestion has been erroring for weeks" (the S-06/N-01 noise problem). Missing signal = **infra-liveness**: did each active-source ingestion Lambda *run and 200 without error*, independent of whether data came back.
-- **Action:** emit per-run outcome (`last_success_ts`/`last_attempt_ts`/`consecutive_failures`/`last_error_class`) from `ingestion_framework.py` to a `USER#system / INGEST_HEALTH#{source}` sentinel + EMF; extend `pipeline_health_check_lambda.py` to assert per-source liveness on a *streak* (reuse the canary 2-fail buffer); separate infra-liveness alarm in `monitoring_stack.py`; keep freshness behavioral-only.
-- **Acceptance:** a source erroring every run (mock 401) alerts within ≤2 intervals with **zero new data**; a genuinely un-fed source does NOT alert; a de-scheduled source is caught by attempt-staleness; offline unit tests for all 4 error classes + the streak buffer.
-- **Gate:** none — do first.
+### ER-01 — Infra-liveness heartbeat (the 44-day-outage class) · Tier 1 · ✅ DONE + DEPLOYED 2026-06-09 (ADR-085)
+- **Shipped + live** (layer v77 published via Core; Ingestion/Operational/Monitoring deployed): new layer module `lambdas/ingest_health.py` (pure decision core); `ingestion_framework` records a `USER#system / INGEST_HEALTH#{source}` sentinel + EMF at every terminal path; `pipeline_health_check` `check_ingest_liveness` mode (daily 17:10 UTC) emits `UnhealthySourceCount` + a distinct-subject digest alert; new `ingest-liveness-unhealthy` alarm (16→17); freshness left behavioral-only. 31 offline tests + live smoke (garmin 2/3 throttle streak correctly stayed silent). See CHANGELOG → "ER-01 — 2026-06-09" + ADR-085.
 
-### ER-02 — Upstream-API contract tests (recorded fixtures) · Tier 1 · Effort M
-- **Why:** the ~14 transform unit tests pin *your* logic vs a fixed input; nothing catches the *vendor* changing the payload (field rename/renest/retype). That silent drift is the mechanism of the next 44-day incident.
-- **Action:** scrubbed recorded fixtures `tests/fixtures/upstream/{source}/{endpoint}.json`; `tests/test_upstream_contracts.py` asserts the shape contract; `deploy/refresh_upstream_fixtures.py` re-pulls+scrubs+diffs (the diff IS the drift report); CI gating offline job. Prioritise Whoop, Withings (L-08 found 3 wrong field names), Apple Health/HAE (L-08 found XML 6-of-7 wrong).
-- **Acceptance:** each active source has a fixture + contract test; mutating a read field fails its test; refresh tool diffs + a scrub assertion blocks tokens/PII.
-- **Gate:** none — the handover's flagged "next testing step."
+### ER-02 — Upstream-API contract tests (recorded fixtures) · Tier 1 · ✅ DONE 2026-06-09
+- **Shipped** (tests only, no deploy): `tests/test_upstream_contracts.py` + 9 scrubbed fixtures `tests/fixtures/upstream/**` (whoop/withings/hae priority + strava/garmin) + `deploy/refresh_upstream_fixtures.py` (live re-pull/scrub/diff) + a CI gating step. Offline suite 1630 green; injection-tested (rename fails shape+roundtrip; planted token fails the scrub guard). See CHANGELOG → "ER-02 — 2026-06-09".
 
 ### ER-03 — AI-output eval harness (the "is the advice correct" gap) · Tier 1 · Effort M–L
 - **Why:** `visual_ai_qa.py` checks pages *render*; nothing checks the coach/insight *content* is correlative-only, confidence-labelled, fabricates no numbers, does no LLM math. The board can't see this — it's the same kind of AI grading itself. **Truthfulness gate, not a new engine — build-cap does not apply.**

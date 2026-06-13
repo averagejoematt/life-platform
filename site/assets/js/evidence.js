@@ -67,8 +67,205 @@ async function renderBoard(d) {
 function renderPlatform(d) { return figs([fig(d.data_sources, "data sources"), fig(d.mcp_tools, "MCP tools"), fig(d.lambdas, "lambdas"), fig(d.cdk_stacks, "CDK stacks")]) + sec("By the numbers", kvtable({ adrs: d.adrs, alarms: d.alarms, test_count: d.test_count, review_grade: d.review_grade, active_secrets: d.active_secrets, site_pages: d.site_pages, board_technical: d.board_technical, board_product: d.board_product })) + note("Built with Claude + the wearables already on his body — not a million-dollar lab."); }
 function renderCost(d) { return figs([fig("$" + String(d.monthly_cost || "").replace("$", ""), "per month"), fig("$75", "hard ceiling")]) + `<p class="rd-archive">The whole platform runs for about ${esc(d.monthly_cost || "$20")}/month against a self-imposed $75 hard ceiling (ADR-063). Radical accessibility is the point: an ordinary person did this with a model and consumer wearables, not a lab.</p>` + note("Cost is the receipt for 'you could do this too.'"); }
 function renderData(d) { const src = d.sources || []; if (!src.length) return empty("Data-source registry unavailable."); const by = {}; for (const s of src) (by[s.category || "other"] ||= []).push(s); const secs = Object.entries(by).map(([cat, rows]) => sec(cat, `<table class="rd-tbl"><tbody>${rows.map((s) => `<tr><td class="rd-name">${esc(s.name)}</td><td>${esc(s.metrics || "")}</td><td class="rd-range">${esc(s.method || "")}</td></tr>`).join("")}</tbody></table>`)).join(""); return figs([fig(src.length, "data sources")]) + secs + note(`Single source of truth${d._meta && d._meta.updated ? ` · updated ${esc(d._meta.updated)}` : ""}.`); }
-async function renderResults(d) { const j = d.journey || d; const wp = await tryJSON("/api/weight_progress"); const chart = sec("Weight trajectory", lineChart((wp && wp.weight_progress) || [], { valueKey: "weight_lbs", goal: j.goal_weight_lbs, unit: " lb", label: "Weight · recent readings", emptyMsg: "Weight trajectory fills as weigh-ins accrue." })); const lost = j.lost_lbs != null ? Number(j.lost_lbs) : null; const wdir = lost == null ? "" : (lost < -0.05 ? "up" : (Math.abs(lost) <= 0.05 ? "even" : "down")); return chart + figs([lost != null && fig(dualWeight(Math.abs(lost), "lb"), wdir), j.current_weight_lbs != null && fig(dualWeight(j.current_weight_lbs, "lb"), "today"), j.progress_pct != null && fig(fmt(j.progress_pct) + "%", "to goal"), j.projected_goal_date && fig(j.projected_goal_date, "projected goal")]) + `<p class="rd-archive">The headline outcome is weight, but the real results live in the mechanisms — see Experiments for what's confirmed, Bloodwork for what changed inside, and the Story for the arc.</p>` + note("Correlative projection — not a promise."); }
+/* ── PG-14 Tier-A: "the data figure" ──────────────────────────────────────────
+   A faceless, monochrome body silhouette whose girth is a *direct function* of
+   the real weight number (start → current → goal). No photo, no face, nothing
+   generated or guessed — it moves only when the measured number moves. Honest
+   (Henning standard), privacy-safe, on-brand. Productionised from spikes/pg14_ai_me
+   (PG-14, ADR-078 Wedge-B). Fill = var(--ink) so it adapts to light/dark. */
+const DF_CX = 150, DF_CROTCH = 372, DF_FOOT = 606;
+const DF_NECK = [[100, 16, 9], [135, 54, 14], [188, 47, 30], [250, 35, 64], [306, 52, 42], [350, 42, 26]];
+const DF_LEG_OUT = [[470, 32, 12], [582, 23, 8]], DF_LEG_IN = [[582, 9, 5], [470, 15, 6]];
+const DF_FOOT_OUT = [27, 8], DF_FOOT_IN = [11, 0];
+const dfHalf = (lm, g) => lm[1] + lm[2] * g;
+function dfSmooth(pts) {
+  if (pts.length < 3) return pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
+  let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += ` C${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+  }
+  return d;
+}
+function dfBody(g) {
+  const right = [[DF_CX + dfHalf(DF_NECK[0], g), DF_NECK[0][0]]];
+  for (const lm of DF_NECK) right.push([DF_CX + dfHalf(lm, g), lm[0]]);
+  for (const lm of DF_LEG_OUT) right.push([DF_CX + dfHalf(lm, g), lm[0]]);
+  right.push([DF_CX + DF_FOOT_OUT[0] + DF_FOOT_OUT[1] * g, DF_FOOT]);
+  right.push([DF_CX + DF_FOOT_IN[0] + DF_FOOT_IN[1] * g, DF_FOOT]);
+  for (const lm of DF_LEG_IN) right.push([DF_CX + dfHalf(lm, g), lm[0]]);
+  right.push([DF_CX, DF_CROTCH]);
+  const left = right.slice(0, -1).reverse().map(([x, y]) => [2 * DF_CX - x, y]);
+  return dfSmooth(right.concat(left)) + " Z";
+}
+function dataFigure(j) {
+  const start = Number(j.start_weight_lbs), goal = Number(j.goal_weight_lbs), now = Number(j.current_weight_lbs);
+  if (!isFinite(start) || !isFinite(goal) || !isFinite(now) || start === goal) return "";
+  const lost = Number(j.lost_lbs);
+  const moved = isFinite(lost) ? (lost > 0.05 ? `down ${fmt(Math.abs(lost))} lb` : (lost < -0.05 ? `up ${fmt(Math.abs(lost))} lb` : "even")) : "";
+  const ms = [[start, "start"], [now, "now"], [Math.round((start + goal) / 2), ""], [goal, "goal"]]
+    .filter(([w], i, a) => a.findIndex(([x]) => Math.round(x) === Math.round(w)) === i);
+  return `<section class="rd-sec df-sec" data-df data-start="${start}" data-goal="${goal}" data-now="${now}">
+    <h2 class="rd-h">The figure, drawn from the numbers</h2>
+    <div class="df-stage">
+      <svg class="df-svg" viewBox="0 0 300 620" role="img" aria-label="A stylised body silhouette that slims as the weight number falls from ${Math.round(start)} toward ${Math.round(goal)} lb">
+        <circle class="df-fig" data-df-head cx="150" cy="64" r="32"></circle>
+        <path class="df-fig" data-df-body d=""></path>
+      </svg>
+    </div>
+    <div class="df-readout">
+      <div class="df-weight"><span data-df-w class="num">${Math.round(now)}</span><small>lb</small></div>
+      <div class="df-togoal"><span class="label">to goal</span><span data-df-tg class="num">—</span></div>
+    </div>
+    <input class="df-scrub" data-df-scrub type="range" min="0" max="1" step="0.001" value="0" aria-label="Scrub the figure between start and goal weight">
+    <div class="df-axis"><span class="label">${Math.round(start)} start</span><span class="label">${Math.round(goal)} goal</span></div>
+    <div class="df-buttons">${ms.map(([w, lbl]) => `<button class="df-btn" data-df-to="${w}">${lbl ? lbl + " · " : ""}${Math.round(w)}</button>`).join("")}<button class="df-btn df-play" data-df-play>▶ morph</button></div>
+    <p class="rd-why df-note"><strong>A representative figure, not a photo.</strong> The silhouette's girth is a direct function of the real measured weight — heaviest at ${Math.round(start)}, leanest at ${Math.round(goal)} — with no face, no identity, and nothing generated or guessed. It moves only when the actual number moves${moved && moved !== "even" ? ` (currently ${moved} from the start)` : ""}.</p>
+  </section>`;
+}
+
+async function renderResults(d) { const j = d.journey || d; const wp = await tryJSON("/api/weight_progress"); const chart = sec("Weight trajectory", lineChart((wp && wp.weight_progress) || [], { valueKey: "weight_lbs", goal: j.goal_weight_lbs, unit: " lb", label: "Weight · recent readings", emptyMsg: "Weight trajectory fills as weigh-ins accrue." })); const lost = j.lost_lbs != null ? Number(j.lost_lbs) : null; const wdir = lost == null ? "" : (lost < -0.05 ? "up" : (Math.abs(lost) <= 0.05 ? "even" : "down")); return dataFigure(j) + chart + figs([lost != null && fig(dualWeight(Math.abs(lost), "lb"), wdir), j.current_weight_lbs != null && fig(dualWeight(j.current_weight_lbs, "lb"), "today"), j.progress_pct != null && fig(fmt(j.progress_pct) + "%", "to goal"), j.projected_goal_date && fig(j.projected_goal_date, "projected goal")]) + `<p class="rd-archive">The headline outcome is weight, but the real results live in the mechanisms — see Experiments for what's confirmed, Bloodwork for what changed inside, and the Story for the arc.</p>` + note("Correlative projection — not a promise."); }
 function renderTools(d) { return figs([fig(d.mcp_tools ?? "—", "MCP tools"), fig(d.data_sources ?? "—", "data sources")]) + `<p class="rd-archive">The tools Claude uses to read this data back — spanning sleep, training, nutrition, labs, CGM, the character sheet, the board, correlations and more. They're how a conversation with the data is possible at all.</p>` + note("The interface between the model and the measured life."); }
+// Post-mortems — what each closed cycle taught, derived live from the record.
+async function renderPostmortems(d) {
+  const cc = await tryJSON("/api/cycle_compare");
+  const byN = {};
+  for (const c of (cc && cc.cycles) || []) byN[c.cycle] = c;
+  const closed = (d.cycles || []).filter((c) => !c.is_current);
+  if (!closed.length) return empty("No closed cycles yet — post-mortems write themselves at each reset.");
+  const cards = closed.map((c) => {
+    const m = byN[c.cycle] || {};
+    const fate = c.collapse_day ? `Engagement collapsed on day ${fmt(c.collapse_day)} — ${esc(d.collapse_definition || "")}.`
+      : "Re-anchored while still engaged (administrative reset, not a collapse).";
+    const next = (d.cycles || []).find((x) => x.cycle === c.cycle + 1);
+    const changed = next ? `Restarted ${esc(next.genesis)} as cycle ${fmt(next.cycle)}.` : "";
+    return sec(`Cycle ${fmt(c.cycle)} — ${esc(c.genesis)}, ${fmt(c.window_days)} days`,
+      `<p class="rd-prose">${fate} Showed up ${fmt(c.engaged_days)} of ${fmt(c.window_days)} days.` +
+      (m.weight_delta_lbs != null ? ` First-window weight: ${m.weight_delta_lbs > 0 ? "+" : ""}${fmt(m.weight_delta_lbs)} lb from ${fmt(m.weight_start_lbs)} lb.` : "") +
+      (m.avg_recovery_pct != null ? ` Avg recovery ${fmt(m.avg_recovery_pct)}%.` : "") +
+      (m.avg_sleep_hours != null ? ` Avg sleep ${fmt(m.avg_sleep_hours)}h.` : "") +
+      ` ${changed}</p>` +
+      `<p class="rd-meta label">strip: <span class="sv-strip">${esc(c.strip)}</span></p>`);
+  }).join("");
+  return cards + `<p class="correlative">Derived live from the engagement and comparison records — nothing curated, nothing deleted. The restarts are part of the experiment, not failures of it.</p>`;
+}
+
+
+// The Survival Curve — engagement strips per cycle + loudly-caveated odds.
+function renderSurvival(d) {
+  const head = figs([
+    fig(`${fmt(d.p_reach_30_pct)}%`, `odds of reaching day ${fmt(d.horizon_days)}`),
+    fig(fmt(d.current_silent_days), "silent days right now"),
+  ]);
+  const rows = (d.cycles || []).map((c) => {
+    const fate = c.is_current ? `day ${fmt(c.window_days)} · live`
+      : c.collapse_day ? `collapsed day ${fmt(c.collapse_day)}`
+      : c.censored ? "re-anchored while engaged" : "survived window";
+    return `<tr class="${c.is_current ? "rd-flagmark" : c.collapse_day ? "rd-flag" : ""}"><td class="rd-name">cycle ${esc(String(c.cycle))}</td><td class="num">${esc(c.genesis)}</td><td class="sv-strip">${esc(c.strip)}</td><td class="num">${fmt(c.engaged_days)}/${fmt(c.window_days)}</td><td>${esc(fate)}</td></tr>`;
+  }).join("");
+  return head +
+    sec("Engagement, day by day (█ showed up · — silent)", `<table class="rd-tbl"><thead><tr><th>cycle</th><th>genesis</th><th>the strip</th><th>engaged</th><th>fate</th></tr></thead><tbody>${rows}</tbody></table>`) +
+    `<p class="rd-archive">Collapse = ${esc(d.collapse_definition || "")}. Method: ${esc(d.method || "")}</p>` +
+    `<p class="correlative">${esc(d.note || "")} <span class="confidence conf-low">${esc(d.confidence || "")}</span></p>`;
+}
+
+
+// The mirror — visitor's numbers vs the experiment's distributions. Pure
+// client-side: nothing is sent, stored, or logged.
+function renderMirror(d) {
+  const hist = (d && d.pulse_history) || [];
+  const series = (k) => hist.map((h) => h[k]).filter((v) => typeof v === "number");
+  const DIMS = [
+    ["sleep_hours", "Sleep last night (hours)", "h", 0.1],
+    ["steps", "Steps yesterday", "", 100],
+    ["recovery_pct", "Recovery this morning (%)", "%", 1],
+  ];
+  const inputs = DIMS.map(([k, label, , step]) => {
+    const s_ = series(k);
+    return `<div class="mi-row"><label class="label" for="mi-${k}">${esc(label)}</label>` +
+      `<input id="mi-${k}" class="ask-in mi-in" type="number" step="${step}" data-mi="${k}" ${s_.length ? "" : "disabled"}>` +
+      `<span class="mi-out" data-mi-out="${k}">${s_.length ? "" : "no data yet"}</span></div>`;
+  }).join("");
+  setTimeout(() => {
+    document.querySelectorAll(".mi-in").forEach((inp) => inp.addEventListener("input", () => {
+      const k = inp.dataset.mi, v = parseFloat(inp.value);
+      const out = document.querySelector(`[data-mi-out="${k}"]`);
+      const s_ = series(k);
+      if (!out || !s_.length || !isFinite(v)) { if (out) out.textContent = ""; return; }
+      const pct = Math.round(s_.filter((x) => x < v).length / s_.length * 100);
+      out.textContent = `beats ${pct}% of Matthew's last ${s_.length} days`;
+    }));
+  }, 0);
+  return `<p class="rd-lede">Where would your day sit inside this experiment? Type a number — the comparison runs in your browser against the last ${fmt(hist.length)} days of the record. Nothing you type is sent, stored, or seen.</p>` +
+    sec("Your numbers vs the record", `<div class="mi-grid">${inputs}</div>`) +
+    `<p class="correlative">A mirror, not a benchmark — this is one person's distribution, N=1. For population reference ranges, see Benchmarks.</p>`;
+}
+
+
+// The Wrong Page — the AI's misses, uncurated.
+function renderWrong(d) {
+  const v = d.validator || {}, pr = d.predictions || {};
+  const head = figs([
+    fig(fmt(v.claims_checked), "claims audited"),
+    fig(fmt(v.caught), "caught wrong"),
+    fig(fmt((pr.refuted_recent || []).length), "predictions refuted"),
+  ]);
+  const cr = (v.recent || []).map((c) =>
+    `<tr class="${c.severity === "error" ? "rd-flag" : ""}"><td class="rd-name">${esc(String(c.date || "").slice(0, 10))}</td><td>${esc(c.coach || "")}</td><td>${esc(c.what)}</td></tr>`).join("");
+  const caught = cr
+    ? sec("Caught by the validator — claims the data contradicted", `<table class="rd-tbl"><thead><tr><th>date</th><th>coach</th><th>what was wrong</th></tr></thead><tbody>${cr}</tbody></table>`)
+    : sec("Caught by the validator", `<p class="rd-archive">No catches in the window — every audited claim matched the data it cited.</p>`);
+  const lr = (pr.by_coach || []).map((c) =>
+    `<tr><td class="rd-name">${esc(c.coach)}</td><td class="num">${fmt(c.confirmed)}</td><td class="num">${fmt(c.refuted)}</td><td class="num">${fmt(c.inconclusive)}</td><td class="num">${fmt(c.expired)}</td></tr>`).join("");
+  const ledger = lr
+    ? sec("The prediction ledger — every dated call, scored", `<table class="rd-tbl"><thead><tr><th>coach</th><th>confirmed</th><th>refuted</th><th>inconclusive</th><th>expired</th></tr></thead><tbody>${lr}</tbody></table>`)
+    : "";
+  const mr = (pr.refuted_recent || []).map((m) =>
+    `<tr class="rd-flag"><td class="rd-name">${esc(String(m.date || "").slice(0, 10))}</td><td>${esc(m.coach)}</td><td>${esc(m.what)}</td></tr>`).join("");
+  const misses = mr ? sec("Refuted predictions", `<table class="rd-tbl"><thead><tr><th>date</th><th>coach</th><th>the call</th></tr></thead><tbody>${mr}</tbody></table>`) : "";
+  return head + caught + ledger + misses + `<p class="correlative">${esc(d.note || "")}</p>`;
+}
+
+
+// The inference receipt — every AI call priced, the meter behind the $75 cap.
+function renderInference(d) {
+  const head = figs([
+    d.ai_month_to_date_usd != null && fig(`$${fmt(d.ai_month_to_date_usd)}`, "AI spend MTD"),
+    fig(`$${fmt(d.budget_ceiling_usd)}`, "hard ceiling (all-in)"),
+    d.budget_tier != null && fig(String(d.budget_tier), "budget tier (0–3)"),
+  ]);
+  const mrows = (d.models || []).map((m) =>
+    `<tr><td class="rd-name">${esc(m.model)}</td><td class="num">${fmt(m.today.input_tokens)} / ${fmt(m.today.output_tokens)}</td><td class="num">$${fmt(m.today.est_cost_usd)}</td><td class="num">${fmt(m.month.input_tokens)} / ${fmt(m.month.output_tokens)}</td><td class="num">$${fmt(m.month.est_cost_usd)}</td></tr>`).join("");
+  const models = mrows ? sec("By model", `<table class="rd-tbl"><thead><tr><th>model</th><th>today in/out</th><th>today $</th><th>month in/out</th><th>month $</th></tr></thead><tbody>${mrows}</tbody></table>`) : "";
+  const frows = (d.features || []).slice(0, 14).map((f) =>
+    `<tr><td class="rd-name">${esc(f.lambda)}</td><td class="num">${fmt(f.month_input_tokens)}</td><td class="num">${fmt(f.month_output_tokens)}</td></tr>`).join("");
+  const features = frows ? sec("By feature (month-to-date tokens)", `<table class="rd-tbl"><thead><tr><th>lambda</th><th>input</th><th>output</th></tr></thead><tbody>${frows}</tbody></table>`) : "";
+  return head + models + features + `<p class="correlative">${esc(d.note || "")}</p>`;
+}
+
+
+// Cycle vs cycle — matched first-K-days windows across experiment restarts.
+function renderCycles(d) {
+  const cs = d.cycles || [];
+  if (!cs.length) return empty("Cycle comparison fills in once a restart has data to compare.");
+  const K = d.window_days;
+  const rows = [
+    ["Genesis", (c) => c.genesis],
+    ["Start weight", (c) => c.weight_start_lbs != null ? `${fmt(c.weight_start_lbs)} lb` : "—"],
+    [`Weight change (first ${K}d)`, (c) => c.weight_delta_lbs != null ? `${c.weight_delta_lbs > 0 ? "+" : ""}${fmt(c.weight_delta_lbs)} lb` : "—"],
+    ["Avg recovery", (c) => c.avg_recovery_pct != null ? `${fmt(c.avg_recovery_pct)}%` : "—"],
+    ["Avg sleep", (c) => c.avg_sleep_hours != null ? `${fmt(c.avg_sleep_hours)} h` : "—"],
+    ["Days with data", (c) => fmt(c.days_with_data)],
+  ];
+  const head = `<tr><th></th>${cs.map((c) => `<th>cycle ${esc(String(c.cycle))}${c.is_current ? " · now" : ""}</th>`).join("")}</tr>`;
+  const body = rows.map(([lbl, f]) => `<tr><td class="rd-name">${esc(lbl)}</td>${cs.map((c) => `<td class="num${c.is_current ? " rd-flagmark" : ""}">${f(c)}</td>`).join("")}</tr>`).join("");
+  return sec(`The same first ${K} days, every restart`, `<table class="rd-tbl"><thead>${head}</thead><tbody>${body}</tbody></table>`) +
+    `<p class="correlative">${esc(d.note || "")}</p>`;
+}
+
+
 function renderGeneric(d, t) { const root = (t && t.root && d[t.root]) ? d[t.root] : d; const scal = Object.entries(root).filter(([k, v]) => !k.startsWith("_") && ["string", "number", "boolean"].includes(typeof v)); let arr = null, key = null; for (const [k, v] of Object.entries(root)) if (Array.isArray(v) && v.length && typeof v[0] === "object") { arr = v; key = k; break; } let tbl = ""; if (arr) { const cols = [...new Set(arr.flatMap((r) => Object.keys(r)))].filter((c) => !c.startsWith("_")).slice(0, 5); tbl = sec(key, `<table class="rd-tbl"><thead><tr>${cols.map((c) => `<th>${esc(ttl(c))}</th>`).join("")}</tr></thead><tbody>${arr.slice(0, 40).map((r) => `<tr>${cols.map((c) => `<td class="num">${esc(fmt(r[c]))}</td>`).join("")}</tr>`).join("")}</tbody></table>`); } if (!scal.length && !tbl) return empty("No data published for this section yet — it fills from the live pipeline."); return figs(scal.slice(0, 4).map(([k, v]) => fig(fmt(v), ttl(k)))) + tbl + note("Correlative read only."); }
 
 /* Interactive: Ask the data + Explorer (wired after insert) */
@@ -158,7 +355,7 @@ function renderBenchmarks(d) {
 }
 
 const RENDERERS = {
-  vitals: renderPulse, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, explorer: renderExplorer, intelligence: renderCorrelations, predictions: renderPredictions, benchmarks: renderBenchmarks };
+  vitals: renderPulse, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, cycles: renderCycles, inference: renderInference, wrong: renderWrong, survival: renderSurvival, postmortems: renderPostmortems, mirror: renderMirror, explorer: renderExplorer, intelligence: renderCorrelations, predictions: renderPredictions, benchmarks: renderBenchmarks };
 const WIRE = {
   ask: () => {
     const f = document.querySelector("[data-ask]");
@@ -166,6 +363,7 @@ const WIRE = {
     const input = f.querySelector(".ask-in");
     const btn = f.querySelector(".ask-btn");
     const out = document.querySelector("[data-ask-out]");
+    const history = [];  // last 3 Q/A pairs → follow-ups have context server-side
     const submit = async () => {
       const q = input.value.trim();
       if (!q || btn.disabled) return;
@@ -177,12 +375,13 @@ const WIRE = {
       const slot = out.lastElementChild.querySelector(".ask-answer");
       slot.scrollIntoView({ behavior: "smooth", block: "nearest" });
       try {
-        const r = await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ question: q }) });
+        const r = await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ question: q, history: history.slice(-3) }) });
         const d = await r.json().catch(() => ({}));
         const ans = d.answer || d.response || d.text || "";
         if (r.status === 429) {
           slot.outerHTML = `<p class="rd-archive">Hourly question limit reached — it resets within the hour. <a href="/subscribe/">Subscribers</a> get a higher limit.</p>`;
         } else if (ans && !isBad(ans)) {
+          history.push({ q, a: ans });
           slot.outerHTML = `<p class="ask-answer"><span class="label">the platform</span>${esc(ans)}</p>`;
         } else {
           slot.outerHTML = `<p class="rd-archive">The data Q&amp;A is paused right now (budget guard) — try again later, or browse the Evidence directly.</p>`;
@@ -214,6 +413,50 @@ const WIRE = {
     picks.forEach((b) => b.addEventListener("click", () => load(b)));
     const start = picks.find((p) => p.dataset.coach === "training") || picks[0]; // open the lifting coach first
     if (start) load(start);
+  },
+  results: () => {
+    const stage = document.querySelector("[data-df]");
+    if (!stage) return;
+    const START = parseFloat(stage.dataset.start), GOAL = parseFloat(stage.dataset.goal), NOW = parseFloat(stage.dataset.now);
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const bodyEl = stage.querySelector("[data-df-body]"), headEl = stage.querySelector("[data-df-head]");
+    const wEl = stage.querySelector("[data-df-w]"), tgEl = stage.querySelector("[data-df-tg]"), scrub = stage.querySelector("[data-df-scrub]");
+    const heaviness = (w) => Math.max(0, Math.min(1, (w - GOAL) / (START - GOAL)));
+    function render(w) {
+      const g = heaviness(w);
+      bodyEl.setAttribute("d", dfBody(g));
+      headEl.setAttribute("r", (29 + 6 * g).toFixed(1));
+      wEl.textContent = Math.round(w);
+      const toGo = Math.max(0, w - GOAL);
+      tgEl.textContent = toGo <= 0 ? "reached" : "-" + Math.round(toGo) + " lb";
+      scrub.value = (1 - g).toFixed(3);
+    }
+    scrub.addEventListener("input", () => render(START + (GOAL - START) * parseFloat(scrub.value)));
+    let raf = null;
+    function animateTo(target) {
+      cancelAnimationFrame(raf);
+      const from = START + (GOAL - START) * parseFloat(scrub.value);
+      if (reduce) { render(target); return; }
+      const t0 = performance.now(), dur = 900;
+      (function step(t) {
+        const k = Math.min(1, (t - t0) / dur), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+        render(from + (target - from) * e);
+        if (k < 1) raf = requestAnimationFrame(step);
+      })(t0);
+    }
+    stage.querySelectorAll("[data-df-to]").forEach((b) => b.addEventListener("click", () => animateTo(parseFloat(b.dataset.to))));
+    const playBtn = stage.querySelector("[data-df-play]");
+    if (reduce) { playBtn.remove(); } else {
+      let playing = false, ploop = null;
+      playBtn.addEventListener("click", (e) => {
+        playing = !playing; e.target.textContent = playing ? "❚❚ pause" : "▶ morph";
+        if (playing) {
+          let dir = -1, w = START; cancelAnimationFrame(raf);
+          (function loop() { w += dir * 1.4; if (w <= GOAL) { w = GOAL; dir = 1; } if (w >= START) { w = START; dir = -1; } render(w); if (playing) ploop = requestAnimationFrame(loop); })();
+        } else { cancelAnimationFrame(ploop); }
+      });
+    }
+    render(NOW);   // open on the honest current state
   },
 };
 

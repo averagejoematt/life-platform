@@ -126,6 +126,23 @@ class MonitoringStack(Stack):
             to_digest=True,
         )
 
+        # ER-01: infra-liveness — separate from behavioral freshness above. Fires
+        # when an ingestion Lambda is running-but-erroring (failure streak) or has
+        # stopped running (attempt staleness), independent of whether new data was
+        # expected. This is the signal the silent 44-day Garmin outage lacked.
+        # Set by pipeline_health_check's check_ingest_liveness mode (daily).
+        _alarm(
+            "IngestLivenessUnhealthy",
+            "ingest-liveness-unhealthy",
+            "LifePlatform/IngestLiveness",
+            "UnhealthySourceCount",
+            86400,
+            "Maximum",
+            1,
+            GTE,
+            to_digest=True,
+        )
+
         # ══════════════════════════════════════════════════════════════
         # Daily-brief operational alarms (not in EmailStack)
         # ══════════════════════════════════════════════════════════════
@@ -175,6 +192,28 @@ class MonitoringStack(Stack):
         # duplicate of daily-brief-no-invocations-24h above. COST-A cleanup.
 
         # ══════════════════════════════════════════════════════════════
+        # ══════════════════════════════════════════════════════════════
+        # Ingest consecutive-failure alarms (ER-01 follow-up, 2026-06-13)
+        # Whoop's refresh token died 2026-06-10 and failed 49 consecutive runs
+        # before a human noticed — auth-class outages were only visible in the
+        # daily digest. These fire URGENT when any OAuth-token source reports
+        # ConsecutiveFailures >= 3 (the ingest_health heartbeat emits the
+        # running count per run). Sources that don't emit simply never fire
+        # (missing data = not breaching).
+        # ══════════════════════════════════════════════════════════════
+        for _src in ("whoop", "withings", "strava", "eightsleep", "garmin", "hevy"):
+            _alarm(
+                f"IngestConsecFail{_src.title()}",
+                f"ingest-consecutive-failures-{_src}",
+                "LifePlatform/IngestLiveness",
+                "ConsecutiveFailures",
+                21600,
+                "Maximum",
+                3,
+                GTE,
+                dims={"Source": _src},
+            )
+
         # AI token budget alarms — consolidated 2026-03-10 (COST-A)
         # Removed 11 per-Lambda alarms ($1.10/mo). Kept: daily-brief
         # (highest-cost Lambda) + platform total (catch-all).

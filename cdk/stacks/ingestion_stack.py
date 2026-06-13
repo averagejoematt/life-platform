@@ -417,8 +417,6 @@ class IngestionStack(Stack):
             ".DS_Store",
             "dashboard",
             "dashboard/**",
-            "buddy",
-            "buddy/**",
             "cf-auth",
             "cf-auth/**",
             "requirements",

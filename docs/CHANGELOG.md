@@ -1,3 +1,52 @@
+## PG-14 — 2026-06-09 (the data figure · "AI me", productionized · Tier-A)
+
+Productionizes the PG-14 Tier-A spike (`spikes/pg14_ai_me/`, ADR-078 Wedge-B). The "AI version of me dropping weight" — built as its *honest* form: a faceless, monochrome body silhouette whose girth is a **direct function of the real measured weight** (start → current → goal), no photo, no face, nothing generated or guessed. Front-end only — no new Lambda, no inference, no IAM. **✅ DEPLOYED 2026-06-09** (`sync_site_to_s3.sh` → `evidence.679d90c4.js`/`evidence.2cab809c.css` live; CloudFront invalidated).
+
+### Added
+- **The data figure on `/evidence/results/`** (one contained instance, the spec's first-choice home). `site/assets/js/evidence.js`: ported the parametric inline-SVG morph (`dataFigure(j)` + `dfBody`/`dfSmooth`) from the spike; `renderResults` now prepends it, fed by the existing `/api/journey` (`start_weight_lbs`/`goal_weight_lbs`/`current_weight_lbs`). Interactivity (scrub, milestone buttons, play-loop) wired via the established `WIRE.results` post-render hook.
+- `site/assets/css/evidence.css`: `.df-*` styles using the design tokens — fill = `var(--ink)` so the figure **adapts to light/dark**; accent = `var(--ember)`.
+
+### Honesty / guardrails (Tier-A only; B/C remain deferred)
+- Always **data-driven** (never a hardcoded "after"); opens on the honest current number and reflects an up-week if there is one. **`prefers-reduced-motion`** respected (play removed, scrub-to-set instant). Faceless + monochrome + the "**representative figure, not a photo — nothing generated or guessed**" disclaimer baked in. Passes the Henning/Lena correlative-honesty standard; no third-party generative API, no identity, privacy-safe.
+
+### Verified
+- `node --check` clean on `evidence.js`; morph path-generation tested across the weight range (185 → 311.62) — valid closed SVG paths, no `NaN`. Deployed to `/evidence/results/`; final browser visual QA (`tests/visual_qa.py --ai-qa`) pending CloudFront propagation.
+
+
+## ER-01 — 2026-06-09 (infra-liveness heartbeat · the 44-day-outage class) — ADR-085
+
+Second ER-series item (Tier 1). Closes the headline finding: a data source died silently for 44 days and nothing screamed. **✅ DEPLOYED 2026-06-09** (layer v77 published via `LifePlatformCore`; `LifePlatformIngestion`/`Operational`/`Monitoring` deployed).
+
+### Added
+- **`lambdas/ingest_health.py`** (new layer module) — the pure, offline-tested infra-liveness decision core: `classify_error` (auth/throttle/transport/parse), `update_outcome` (sentinel streak math), `evaluate_source_health` (failure-streak arm ≥3 + attempt-staleness arm ~26h), `emf_metric_line`.
+- **INGEST_HEALTH sentinel + EMF:** `ingestion_framework.run_ingestion()` records a per-run outcome to `USER#system / INGEST_HEALTH#{source}` at every terminal path (best-effort, never breaks ingestion) — `last_success_ts`/`last_attempt_ts`/`consecutive_failures`/`last_error_class` + an EMF metric in `LifePlatform/IngestLiveness`. The auth-breaker-suppressed path records a continued failure, so a source erroring every run alerts **with zero new data**.
+- **`pipeline_health_check` `check_ingest_liveness` mode** (extension, not a new Lambda) — reads the sentinels daily, emits `UnhealthySourceCount`, and pushes a distinct-subject digest alert for any running-but-erroring or stopped-running source. New daily EventBridge rule at 17:10 UTC (10:10 AM PT).
+- **`ingest-liveness-unhealthy` alarm** (`monitoring_stack`) — separate from `slo-source-freshness`; 16 → 17 alarms.
+- **`tests/test_ingest_health.py`** — 31 offline tests: all four error classes, the streak buffer, both alert arms, and the two ER-01 acceptance scenarios (erroring-every-run alerts with zero data; genuinely-unfed source stays silent).
+
+### Changed
+- `SHARED_LAYER_VERSION` **76 → 77**; `ingest_health.py` added to `build_layer.sh` + `ci/lambda_map.json`.
+- `freshness_checker` left **behavioral-only** by design — infra-liveness is the new, separate signal (ADR-085).
+
+### Verified
+- Offline suite green: **1660 passed**, 43 skipped, 10 xfailed.
+- **Live smoke (post-deploy):** `pipeline-health-check {"check_ingest_liveness": true}` → `unhealthy_count: 0`; sentinels populating from the morning crons (whoop/withings/eightsleep/habitify/todoist/weather `ok`); **the streak buffer is visibly working** — garmin showed 2 consecutive `throttle` failures and correctly stayed `ok` ("under the 3-streak buffer"), no alert. lv6 layer-version check now passes (v77 published).
+
+
+## ER-02 — 2026-06-09 (upstream-API contract tests · recorded-response fixtures)
+
+First item of the **ER-series** (external-review rigor — `docs/specs/ER_EXTERNAL_REVIEW_RIGOR_2026-06-09.md`). Tier 1. **Tests only — no deploy, no layer change.**
+
+### Added
+- **`tests/test_upstream_contracts.py`** — gating, **fully offline** contract tests. Where the `transform()` unit tests pin *our* logic against a fixed input, these pin the **vendor's shape**: each test asserts the key-paths/types a transform reads (catches a field rename / renest / retype) and round-trips the fixture through the *real* extractor (`_extract_recovery`, `_parse_measurements`, `process_blood_glucose`, …) so drift on either side fails. A third test forbids any token/PII in a committed fixture.
+- **`tests/fixtures/upstream/{source}/{endpoint}.json`** — 9 scrubbed, committed fixtures across the active sources: **whoop** (recovery/sleep/cycle/workout), **withings** (measures), **hae/Apple Health** (blood_glucose/blood_pressure), strava (activity), garmin (daily). Bootstrapped offline from the blind-spot-sweep `transform()` sample payloads + the documented HAE webhook shape — no secrets needed for a first green suite. `tests/fixtures/upstream/README.md` records provenance + the refresh workflow.
+- **`deploy/refresh_upstream_fixtures.py`** — the LIVE-refresh path (run by hand, with creds): re-pulls one day per source, **scrubs** tokens/PII, asserts the scrub is clean before writing, and prints a unified diff vs. the committed fixture — *the diff is the drift report*. Live-refreshable: whoop/withings/garmin; `--from-file` (scrub a captured payload) for strava/hae. Its scrub/secret-scanner is the single source of truth shared with the no-secrets test.
+- CI: explicit **"Upstream-API contract tests (ER-02)"** gating step in the `test` job (in addition to the full-suite run).
+
+### Verified
+- Offline suite green: **1630 passed**, 43 skipped, 10 xfailed. Acceptance proven by injection: renaming a read field in a fixture fails (shape + round-trip); planting an `access_token` fails the no-secrets guard; the refresh tool drops credential keys and refuses to write if a scrub leaves a secret.
+
+
 ## v8.6.0 — 2026-06-09 (local-folder hygiene + blind-spot sweep: security · observability · testing · governance)
 
 ### Added

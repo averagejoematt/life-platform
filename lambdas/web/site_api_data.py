@@ -1929,3 +1929,339 @@ def handle_observatory_week(qs: dict = None) -> dict:
     except Exception as e:
         logger.warning(f"[observatory_week] {domain} failed: {e}")
         return _error(503, f"Weekly {domain} data temporarily unavailable.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Cycle-over-cycle comparison (2026-06-13)
+# The experiment restarts under ADR-058/077; raw timeseries survive every reset,
+# so the same first-K-days window can be compared across restart generations.
+# Genesis dates per cycle — there is no machine registry of past geneses (SSM
+# holds only the current cycle number), so this is the explicit record:
+# ══════════════════════════════════════════════════════════════════════════════
+CYCLE_GENESES = {
+    1: "2026-04-01",  # original launch (Day 1)
+    2: "2026-06-01",  # first reset (ADR-077 tooling)
+    3: "2026-06-08",  # current run (baseline 311.62)
+}
+
+
+def handle_cycle_compare() -> dict:
+    """GET /api/cycle_compare — matched-window comparison across cycles.
+
+    Window K = days elapsed in the CURRENT cycle (capped at 28), applied
+    identically to every cycle so day-5 of cycle 3 is compared with day-5 of
+    cycles 1 and 2 — never a 5-day run vs a 60-day run.
+    """
+    try:
+        current = max(CYCLE_GENESES)
+        today = datetime.now(PT).date()
+        elapsed = (today - datetime.strptime(CYCLE_GENESES[current], "%Y-%m-%d").date()).days + 1
+        window = max(1, min(elapsed, 28))
+
+        cycles = []
+        for n, genesis in sorted(CYCLE_GENESES.items()):
+            g = datetime.strptime(genesis, "%Y-%m-%d").date()
+            end = (g + timedelta(days=window - 1)).isoformat()
+            wd = _query_source("withings", genesis, end, include_pilot=True)
+            wh = _query_source("whoop", genesis, end, include_pilot=True)
+
+            weights = [(r["sk"][5:], float(r["weight_lbs"])) for r in wd if r.get("weight_lbs")]
+            weights.sort()
+            rec = [float(r["recovery_score"]) for r in wh if r.get("recovery_score")]
+            slp = [float(r["sleep_duration_hours"]) for r in wh if r.get("sleep_duration_hours")]
+
+            cycles.append(
+                {
+                    "cycle": n,
+                    "genesis": genesis,
+                    "is_current": n == current,
+                    "weight_start_lbs": round(weights[0][1], 1) if weights else None,
+                    "weight_delta_lbs": round(weights[-1][1] - weights[0][1], 1) if len(weights) >= 2 else None,
+                    "avg_recovery_pct": round(sum(rec) / len(rec), 1) if rec else None,
+                    "avg_sleep_hours": round(sum(slp) / len(slp), 2) if slp else None,
+                    "days_with_data": len({r["sk"] for r in wd} | {r["sk"] for r in wh}),
+                }
+            )
+
+        return _ok(
+            {
+                "window_days": window,
+                "current_cycle": current,
+                "cycles": cycles,
+                "note": (
+                    f"Each cycle measured over its own first {window} days — matched windows, "
+                    "never a short run vs a long one. Correlative, N=1."
+                ),
+            },
+            cache_seconds=3600,
+        )
+    except Exception as e:
+        logger.warning(f"[cycle_compare] failed: {e}")
+        return _error(503, "Cycle comparison temporarily unavailable.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# The inference receipt (2026-06-13) — radical cost transparency.
+# Every Claude call already lands in two metric streams: AWS/Bedrock emits
+# token counts per ModelId, and the shared layer emits per-Lambda tokens to
+# LifePlatform/AI. This endpoint reads both, prices them with the same table
+# the cost governor enforces, and publishes the meter.
+# ══════════════════════════════════════════════════════════════════════════════
+_BEDROCK_PRICES = {  # USD per 1M tokens — keep in sync with cost_governor_lambda._PRICES
+    "fable": {"in": 10.00, "out": 50.00},
+    "sonnet": {"in": 3.00, "out": 15.00},
+    "haiku": {"in": 1.00, "out": 5.00},
+    "opus": {"in": 5.00, "out": 25.00},
+}
+
+
+def _price_for_model(model_id: str) -> dict:
+    m = (model_id or "").lower()
+    for k, p in _BEDROCK_PRICES.items():
+        if k in m:
+            return p
+    return _BEDROCK_PRICES["sonnet"]
+
+
+def handle_inference_receipt() -> dict:
+    """GET /api/inference_receipt — today's AI calls + month-to-date, priced."""
+    try:
+        cw = boto3.client("cloudwatch", region_name="us-west-2")
+        ssm = boto3.client("ssm", region_name="us-west-2")
+        now = datetime.now(timezone.utc)
+        day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        def _sum(namespace, metric, dim_name, dim_value, start):
+            r = cw.get_metric_statistics(
+                Namespace=namespace, MetricName=metric,
+                Dimensions=[{"Name": dim_name, "Value": dim_value}],
+                StartTime=start, EndTime=now, Period=86400, Statistics=["Sum"],
+            )
+            return sum(p["Sum"] for p in r.get("Datapoints", []))
+
+        # Per-model (AWS/Bedrock emits these for every invoke)
+        models = []
+        seen = cw.list_metrics(Namespace="AWS/Bedrock", MetricName="InputTokenCount")
+        for m in seen.get("Metrics", []):
+            mid = next((d["Value"] for d in m["Dimensions"] if d["Name"] == "ModelId"), None)
+            if not mid:
+                continue
+            price = _price_for_model(mid)
+            row = {"model": mid.split("/")[-1]}
+            for label, start in (("today", day_start), ("month", month_start)):
+                tin = _sum("AWS/Bedrock", "InputTokenCount", "ModelId", mid, start)
+                tout = _sum("AWS/Bedrock", "OutputTokenCount", "ModelId", mid, start)
+                row[label] = {
+                    "input_tokens": int(tin),
+                    "output_tokens": int(tout),
+                    "est_cost_usd": round((tin * price["in"] + tout * price["out"]) / 1_000_000, 4),
+                }
+            if row["month"]["input_tokens"] or row["month"]["output_tokens"]:
+                models.append(row)
+
+        # Per-feature (the shared layer dimensions by Lambda function)
+        features = []
+        fn_metrics = cw.list_metrics(Namespace="LifePlatform/AI", MetricName="AnthropicInputTokens")
+        for m in fn_metrics.get("Metrics", []):
+            fn = next((d["Value"] for d in m["Dimensions"] if d["Name"] == "LambdaFunction"), None)
+            if not fn:
+                continue
+            tin = _sum("LifePlatform/AI", "AnthropicInputTokens", "LambdaFunction", fn, month_start)
+            tout = _sum("LifePlatform/AI", "AnthropicOutputTokens", "LambdaFunction", fn, month_start)
+            if tin or tout:
+                features.append({"lambda": fn, "month_input_tokens": int(tin), "month_output_tokens": int(tout)})
+        features.sort(key=lambda f: -(f["month_input_tokens"] + f["month_output_tokens"]))
+
+        try:
+            tier = int(ssm.get_parameter(Name="/life-platform/budget-tier")["Parameter"]["Value"])
+        except Exception:
+            tier = None
+
+        month_total = round(sum(r["month"]["est_cost_usd"] for r in models), 2)
+        return _ok(
+            {
+                "as_of": now.isoformat(timespec="seconds"),
+                "budget_ceiling_usd": 75,
+                "budget_tier": tier,
+                "ai_month_to_date_usd": month_total,
+                "models": models,
+                "features": features,
+                "note": (
+                    "Every Claude call routes through one audited chokepoint (ADR-062). "
+                    "Costs are estimated from token metrics x list prices — the same math "
+                    "the budget governor enforces. The $75 ceiling covers the WHOLE platform, "
+                    "not just AI."
+                ),
+            },
+            cache_seconds=900,
+        )
+    except Exception as e:
+        logger.warning(f"[inference_receipt] failed: {e}")
+        return _error(503, "Inference receipt temporarily unavailable.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# The Wrong Page (2026-06-13) — the AI's misses, in public.
+# Three streams of being wrong, all already recorded:
+#   1. The post-generation validator: coach claims contradicted by the data
+#      (USER#matthew / SOURCE#intelligence_quality#date — errors[] + flags[])
+#   2. The prediction evaluator: per-coach LEARNING# verdicts
+#      (confirmed / refuted / inconclusive / expired)
+#   3. Refuted hypotheses from the weekly engine
+# Nothing here is curated. An empty refuted column after a reset is honest,
+# not flattering — the ledger fills as calls resolve.
+# ══════════════════════════════════════════════════════════════════════════════
+_WRONG_COACHES = ("sleep", "nutrition", "training", "glucose", "mind", "physical", "labs", "explorer")
+
+
+def handle_wrong() -> dict:
+    """GET /api/wrong — the public ledger of AI misses."""
+    try:
+        # 1. Validator catches (last 120 days)
+        start = (datetime.now(timezone.utc) - timedelta(days=120)).strftime("%Y-%m-%d")
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq("USER#matthew")
+            & Key("sk").between(f"SOURCE#intelligence_quality#{start}", "SOURCE#intelligence_quality#~"),
+        )
+        items = _decimal_to_float(resp.get("Items", []))
+        checks_run = int(sum(i.get("checks_run", 0) or 0 for i in items))
+        catches, numeric_caught = [], 0
+        for i in items:
+            for field, sev in (("errors", "error"), ("flags", "flag")):
+                v = i.get(field)
+                if isinstance(v, list):
+                    for e in v:
+                        what = (e.get("detail") or e.get("check") or str(e)) if isinstance(e, dict) else str(e)
+                        catches.append({"date": i.get("date"), "coach": i.get("coach_id"), "severity": sev, "what": str(what)[:240]})
+                elif isinstance(v, (int, float)) and v:
+                    numeric_caught += int(v)  # older records store counts, not detail
+        catches.sort(key=lambda c: c.get("date") or "", reverse=True)
+
+        # 2. Prediction verdicts per coach
+        ledger, recent_misses = [], []
+        for c in _WRONG_COACHES:
+            r = table.query(
+                KeyConditionExpression=Key("pk").eq(f"COACH#{c}_coach") & Key("sk").begins_with("LEARNING#"),
+            )
+            recs = _decimal_to_float(r.get("Items", []))
+            live = [x for x in recs if not x.get("tombstone")]
+            counts = {}
+            for x in live:
+                counts[x.get("status", "unknown")] = counts.get(x.get("status", "unknown"), 0) + 1
+            if live:
+                ledger.append({"coach": c, **{k: counts.get(k, 0) for k in ("confirmed", "refuted", "inconclusive", "expired")}})
+            for x in live:
+                if x.get("status") == "refuted":
+                    recent_misses.append(
+                        {"date": x.get("date"), "coach": c, "what": str(x.get("condition") or x.get("reason") or "")[:240]}
+                    )
+        recent_misses.sort(key=lambda m: m.get("date") or "", reverse=True)
+
+        return _ok(
+            {
+                "validator": {"claims_checked": checks_run, "caught": len(catches) + numeric_caught, "recent": catches[:25]},
+                "predictions": {"by_coach": ledger, "refuted_recent": recent_misses[:25]},
+                "note": (
+                    "Uncurated. The validator audits every coach claim against the data it cites; "
+                    "the evaluator scores every dated prediction. A thin refuted column right after "
+                    "a reset means the slate is young, not that the model is right — inconclusive "
+                    "and expired are claims that could not be proven either."
+                ),
+            },
+            cache_seconds=3600,
+        )
+    except Exception as e:
+        logger.warning(f"[wrong] failed: {e}")
+        return _error(503, "The wrong page is temporarily unavailable.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# The Survival Curve (2026-06-13) — the model handicaps its own human.
+# "Engagement" = a day with any deliberate behavioral input: a weigh-in
+# (withings), a food log (macrofactor), or a journal entry (notion). Passive
+# wearable streams don't count — they flow whether or not Matthew shows up.
+# Collapse = the first 4+ consecutive silent days. With n=2 prior cycles this
+# is narrative statistics, and the payload says so loudly.
+# ══════════════════════════════════════════════════════════════════════════════
+_ENGAGEMENT_SOURCES = ("withings", "macrofactor", "notion")
+_COLLAPSE_GAP = 4
+_SURVIVAL_HORIZON = 30
+
+
+def _engaged_dates(start: str, end: str) -> set:
+    days = set()
+    for src in _ENGAGEMENT_SOURCES:
+        for r in _query_source(src, start, end, include_pilot=True):
+            days.add(str(r.get("sk", ""))[5:15])
+    return days
+
+
+def handle_survival() -> dict:
+    """GET /api/survival — per-cycle engagement strips + a loudly-caveated
+    probability that the current cycle reaches day 30."""
+    try:
+        today = datetime.now(PT).date()
+        geneses = sorted(CYCLE_GENESES.items())
+        cycles, priors = [], []
+        for idx, (n, genesis) in enumerate(geneses):
+            g = datetime.strptime(genesis, "%Y-%m-%d").date()
+            next_g = datetime.strptime(geneses[idx + 1][1], "%Y-%m-%d").date() if idx + 1 < len(geneses) else None
+            last = min((next_g - timedelta(days=1)) if next_g else today, g + timedelta(days=69))
+            window = (last - g).days + 1
+            if window < 1:
+                continue
+            engaged = _engaged_dates(genesis, last.isoformat())
+            strip = [(g + timedelta(days=i)).isoformat() in engaged for i in range(window)]
+            collapse_day = None
+            for i in range(0, window - _COLLAPSE_GAP + 1):
+                if not any(strip[i:i + _COLLAPSE_GAP]):
+                    collapse_day = i + 1
+                    break
+            is_current = next_g is None
+            ended_by_reset = next_g is not None and collapse_day is None
+            cycles.append(
+                {
+                    "cycle": n,
+                    "genesis": genesis,
+                    "is_current": is_current,
+                    "window_days": window,
+                    "engaged_days": sum(strip),
+                    "strip": "".join("█" if d else "·" for d in strip),
+                    "collapse_day": collapse_day,
+                    "censored": ended_by_reset,  # re-anchored while still engaged
+                }
+            )
+            if not is_current:
+                priors.append((collapse_day, window))
+
+        # Laplace-smoothed survival-to-30 from prior cycles: a cycle counts as a
+        # survivor if it stayed engaged through day 30 OR was reset while still
+        # engaged before 30 (censored — treated optimistically, and we say so).
+        survivors = sum(1 for cd, w in priors if cd is None or cd > _SURVIVAL_HORIZON)
+        p30 = round((survivors + 1) / (len(priors) + 2) * 100)
+
+        cur = next((c for c in cycles if c["is_current"]), None)
+        cur_strip = cur["strip"] if cur else ""
+        silent_now = len(cur_strip) - len(cur_strip.rstrip("·")) if cur else 0
+
+        return _ok(
+            {
+                "horizon_days": _SURVIVAL_HORIZON,
+                "p_reach_30_pct": p30,
+                "method": f"Laplace-smoothed over {len(priors)} prior cycles: (survivors+1)/(n+2). n=2 is narrative, not statistics.",
+                "current_silent_days": silent_now,
+                "collapse_definition": f"{_COLLAPSE_GAP}+ consecutive days with no weigh-in, food log, or journal entry",
+                "cycles": cycles,
+                "confidence": "preliminary pattern · n=2 cycles",
+                "note": (
+                    "The model handicapping its own human. Engagement counts only deliberate "
+                    "acts — weigh-ins, food logs, journal entries — never passive wearable data. "
+                    "Treat the probability as a mirror, not a forecast."
+                ),
+            },
+            cache_seconds=3600,
+        )
+    except Exception as e:
+        logger.warning(f"[survival] failed: {e}")
+        return _error(503, "Survival curve temporarily unavailable.")
