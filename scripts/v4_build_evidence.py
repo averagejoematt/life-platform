@@ -310,6 +310,16 @@ REGISTRY = [
         "/legacy/tools/",
     ),
     (
+        "inference",
+        "The inference receipt",
+        "Every AI call, priced — the meter behind the $75 ceiling, live.",
+        "Credibility & the machine",
+        "data",
+        "/api/inference_receipt",
+        None,
+        None,
+    ),
+    (
         "cost",
         "Cost",
         "What running this costs — the radical-accessibility receipt.",
