@@ -128,6 +128,31 @@ function dataFigure(j) {
 
 async function renderResults(d) { const j = d.journey || d; const wp = await tryJSON("/api/weight_progress"); const chart = sec("Weight trajectory", lineChart((wp && wp.weight_progress) || [], { valueKey: "weight_lbs", goal: j.goal_weight_lbs, unit: " lb", label: "Weight · recent readings", emptyMsg: "Weight trajectory fills as weigh-ins accrue." })); const lost = j.lost_lbs != null ? Number(j.lost_lbs) : null; const wdir = lost == null ? "" : (lost < -0.05 ? "up" : (Math.abs(lost) <= 0.05 ? "even" : "down")); return dataFigure(j) + chart + figs([lost != null && fig(dualWeight(Math.abs(lost), "lb"), wdir), j.current_weight_lbs != null && fig(dualWeight(j.current_weight_lbs, "lb"), "today"), j.progress_pct != null && fig(fmt(j.progress_pct) + "%", "to goal"), j.projected_goal_date && fig(j.projected_goal_date, "projected goal")]) + `<p class="rd-archive">The headline outcome is weight, but the real results live in the mechanisms — see Experiments for what's confirmed, Bloodwork for what changed inside, and the Story for the arc.</p>` + note("Correlative projection — not a promise."); }
 function renderTools(d) { return figs([fig(d.mcp_tools ?? "—", "MCP tools"), fig(d.data_sources ?? "—", "data sources")]) + `<p class="rd-archive">The tools Claude uses to read this data back — spanning sleep, training, nutrition, labs, CGM, the character sheet, the board, correlations and more. They're how a conversation with the data is possible at all.</p>` + note("The interface between the model and the measured life."); }
+// Post-mortems — what each closed cycle taught, derived live from the record.
+async function renderPostmortems(d) {
+  const cc = await tryJSON("/api/cycle_compare");
+  const byN = {};
+  for (const c of (cc && cc.cycles) || []) byN[c.cycle] = c;
+  const closed = (d.cycles || []).filter((c) => !c.is_current);
+  if (!closed.length) return empty("No closed cycles yet — post-mortems write themselves at each reset.");
+  const cards = closed.map((c) => {
+    const m = byN[c.cycle] || {};
+    const fate = c.collapse_day ? `Engagement collapsed on day ${fmt(c.collapse_day)} — ${esc(d.collapse_definition || "")}.`
+      : "Re-anchored while still engaged (administrative reset, not a collapse).";
+    const next = (d.cycles || []).find((x) => x.cycle === c.cycle + 1);
+    const changed = next ? `Restarted ${esc(next.genesis)} as cycle ${fmt(next.cycle)}.` : "";
+    return sec(`Cycle ${fmt(c.cycle)} — ${esc(c.genesis)}, ${fmt(c.window_days)} days`,
+      `<p class="rd-prose">${fate} Showed up ${fmt(c.engaged_days)} of ${fmt(c.window_days)} days.` +
+      (m.weight_delta_lbs != null ? ` First-window weight: ${m.weight_delta_lbs > 0 ? "+" : ""}${fmt(m.weight_delta_lbs)} lb from ${fmt(m.weight_start_lbs)} lb.` : "") +
+      (m.avg_recovery_pct != null ? ` Avg recovery ${fmt(m.avg_recovery_pct)}%.` : "") +
+      (m.avg_sleep_hours != null ? ` Avg sleep ${fmt(m.avg_sleep_hours)}h.` : "") +
+      ` ${changed}</p>` +
+      `<p class="rd-meta label">strip: <span class="sv-strip">${esc(c.strip)}</span></p>`);
+  }).join("");
+  return cards + `<p class="correlative">Derived live from the engagement and comparison records — nothing curated, nothing deleted. The restarts are part of the experiment, not failures of it.</p>`;
+}
+
+
 // The Survival Curve — engagement strips per cycle + loudly-caveated odds.
 function renderSurvival(d) {
   const head = figs([
@@ -144,6 +169,38 @@ function renderSurvival(d) {
     sec("Engagement, day by day (█ showed up · — silent)", `<table class="rd-tbl"><thead><tr><th>cycle</th><th>genesis</th><th>the strip</th><th>engaged</th><th>fate</th></tr></thead><tbody>${rows}</tbody></table>`) +
     `<p class="rd-archive">Collapse = ${esc(d.collapse_definition || "")}. Method: ${esc(d.method || "")}</p>` +
     `<p class="correlative">${esc(d.note || "")} <span class="confidence conf-low">${esc(d.confidence || "")}</span></p>`;
+}
+
+
+// The mirror — visitor's numbers vs the experiment's distributions. Pure
+// client-side: nothing is sent, stored, or logged.
+function renderMirror(d) {
+  const hist = (d && d.pulse_history) || [];
+  const series = (k) => hist.map((h) => h[k]).filter((v) => typeof v === "number");
+  const DIMS = [
+    ["sleep_hours", "Sleep last night (hours)", "h", 0.1],
+    ["steps", "Steps yesterday", "", 100],
+    ["recovery_pct", "Recovery this morning (%)", "%", 1],
+  ];
+  const inputs = DIMS.map(([k, label, , step]) => {
+    const s_ = series(k);
+    return `<div class="mi-row"><label class="label" for="mi-${k}">${esc(label)}</label>` +
+      `<input id="mi-${k}" class="ask-in mi-in" type="number" step="${step}" data-mi="${k}" ${s_.length ? "" : "disabled"}>` +
+      `<span class="mi-out" data-mi-out="${k}">${s_.length ? "" : "no data yet"}</span></div>`;
+  }).join("");
+  setTimeout(() => {
+    document.querySelectorAll(".mi-in").forEach((inp) => inp.addEventListener("input", () => {
+      const k = inp.dataset.mi, v = parseFloat(inp.value);
+      const out = document.querySelector(`[data-mi-out="${k}"]`);
+      const s_ = series(k);
+      if (!out || !s_.length || !isFinite(v)) { if (out) out.textContent = ""; return; }
+      const pct = Math.round(s_.filter((x) => x < v).length / s_.length * 100);
+      out.textContent = `beats ${pct}% of Matthew's last ${s_.length} days`;
+    }));
+  }, 0);
+  return `<p class="rd-lede">Where would your day sit inside this experiment? Type a number — the comparison runs in your browser against the last ${fmt(hist.length)} days of the record. Nothing you type is sent, stored, or seen.</p>` +
+    sec("Your numbers vs the record", `<div class="mi-grid">${inputs}</div>`) +
+    `<p class="correlative">A mirror, not a benchmark — this is one person's distribution, N=1. For population reference ranges, see Benchmarks.</p>`;
 }
 
 
@@ -298,7 +355,7 @@ function renderBenchmarks(d) {
 }
 
 const RENDERERS = {
-  vitals: renderPulse, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, cycles: renderCycles, inference: renderInference, wrong: renderWrong, survival: renderSurvival, explorer: renderExplorer, intelligence: renderCorrelations, predictions: renderPredictions, benchmarks: renderBenchmarks };
+  vitals: renderPulse, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, cycles: renderCycles, inference: renderInference, wrong: renderWrong, survival: renderSurvival, postmortems: renderPostmortems, mirror: renderMirror, explorer: renderExplorer, intelligence: renderCorrelations, predictions: renderPredictions, benchmarks: renderBenchmarks };
 const WIRE = {
   ask: () => {
     const f = document.querySelector("[data-ask]");
