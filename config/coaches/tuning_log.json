@@ -77,6 +77,15 @@
       "rationale": "Coaches were amnesiac about their own prior calls; track-record context lets them reference and learn from past predictions.",
       "ref": "commit fa9124d",
       "observed_effect": null
+    },
+    {
+      "date": "2026-06-13",
+      "coach": "all",
+      "change_type": "persona",
+      "summary": "Stage-ladder stances authored for all 8 coaches (config/coaches/<coach>_stance.json).",
+      "rationale": "CC-09: each coach now has a per-stage philosophy (read_of_him / cares_most / cares_less_right_now / plan / graduation_gate / watches) so the coaching visibly levels up as Matthew progresses. Nutrition stance wellbeing-guarded.",
+      "ref": "BACKLOG CC-09; SPEC_COACHES_AS_CHARACTERS_2026-06-13",
+      "observed_effect": null
     }
   ]
 }

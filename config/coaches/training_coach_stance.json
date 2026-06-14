@@ -1,0 +1,51 @@
+{
+  "coach": "training_coach",
+  "band_metric": "weight_lbs",
+  "_note": "Hand-authored stage ladder (CC-09). Bands tile weight_lbs from -inf to +inf; the current rung resolves from real weight. Stable config — not a data claim.",
+  "stage_ladder": [
+    {
+      "stage_id": "foundation",
+      "entry": {"metric": "weight_lbs", "min": 270, "max": null},
+      "headline": "Just get to the gym.",
+      "read_of_him": "At this weight the win is showing up at all. Everything else is noise right now.",
+      "cares_most": ["consistency — three sessions a week", "slow cardio the joints can take", "light resistance, low injury risk"],
+      "cares_less_right_now": ["program optimization", "intensity and RPE", "PRs", "the specific 'what'"],
+      "plan": "Slow steady cardio plus basic full-body resistance. Protect joints at high load; build the habit before the stimulus.",
+      "graduation_gate": "Three sessions a week for three straight weeks unlocks the 'build' rung.",
+      "watches": ["session_frequency", "joint_discomfort_flags"]
+    },
+    {
+      "stage_id": "build",
+      "entry": {"metric": "weight_lbs", "min": 240, "max": 270},
+      "headline": "Now we add a little structure.",
+      "read_of_him": "The habit is real and the body can take more. Time to make the work progressive.",
+      "cares_most": ["progressive resistance", "Zone 2 volume", "keeping the streak alive"],
+      "cares_less_right_now": ["max intensity", "advanced periodization"],
+      "plan": "Introduce light periodization and a Zone 2 base; nudge load up week over week.",
+      "graduation_gate": "Consistent progressive overload for four weeks, ACWR in range, unlocks 'develop'.",
+      "watches": ["acwr", "load_progression", "zone2_minutes"]
+    },
+    {
+      "stage_id": "develop",
+      "entry": {"metric": "weight_lbs", "min": 210, "max": 240},
+      "headline": "Train like an athlete in training.",
+      "read_of_him": "Real fitness is accruing. We can periodize properly and chase adaptation, not just attendance.",
+      "cares_most": ["periodization compliance", "Zone 2 plus some intensity", "heart-rate recovery trend"],
+      "cares_less_right_now": ["chasing soreness", "ego lifts"],
+      "plan": "Structured blocks with intensity where recovery allows; defend the cardio base.",
+      "graduation_gate": "HR-recovery trend improving over a block while load climbs unlocks 'refine'.",
+      "watches": ["acwr", "hr_recovery", "zone2_minutes"]
+    },
+    {
+      "stage_id": "refine",
+      "entry": {"metric": "weight_lbs", "min": null, "max": 210},
+      "headline": "Dial it in.",
+      "read_of_him": "Lean and capable. Now it's about quality, durability, and holding the gains.",
+      "cares_most": ["training quality over volume", "durability and joint health", "performance markers"],
+      "cares_less_right_now": ["sheer volume", "scale obsession"],
+      "plan": "Sharpen intensity, manage fatigue tightly, keep the engine and the joints healthy for the long arc.",
+      "graduation_gate": "This is the maintenance rung — the goal is to stay here.",
+      "watches": ["acwr", "hr_recovery", "session_frequency"]
+    }
+  ]
+}

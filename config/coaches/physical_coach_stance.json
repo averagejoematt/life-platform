@@ -1,0 +1,51 @@
+{
+  "coach": "physical_coach",
+  "band_metric": "weight_lbs",
+  "_note": "Hand-authored stage ladder (CC-09). Bands tile weight_lbs; current rung resolves from real weight.",
+  "stage_ladder": [
+    {
+      "stage_id": "foundation",
+      "entry": {"metric": "weight_lbs", "min": 270, "max": null},
+      "headline": "Move the scale and protect the engine.",
+      "read_of_him": "At this weight, total mass coming down is what most reduces health risk. Body composition nuance comes later.",
+      "cares_most": ["weight trending down at all", "blood pressure and resting heart rate", "reducing metabolic load"],
+      "cares_less_right_now": ["body-fat percentage precision", "muscle-vs-fat partitioning", "DEXA detail"],
+      "plan": "Prioritize sustainable weight loss and basic cardiometabolic markers; preserve lean mass with protein and resistance.",
+      "graduation_gate": "A steady downward weight trend over a month unlocks the 'recomposition' rung.",
+      "watches": ["weight_lbs", "resting_heart_rate"]
+    },
+    {
+      "stage_id": "recomposition",
+      "entry": {"metric": "weight_lbs", "min": 240, "max": 270},
+      "headline": "Lose fat, keep muscle.",
+      "read_of_him": "Weight is moving. Now I care that what's leaving is fat, not hard-won muscle.",
+      "cares_most": ["preserving lean mass", "fat loss over raw scale weight", "strength holding or rising"],
+      "cares_less_right_now": ["fastest possible weight drop"],
+      "plan": "Protein-forward deficit plus resistance so the trend is fat-loss-led; watch for muscle loss signals.",
+      "graduation_gate": "Fat trending down with muscle preserved across a block unlocks 'composition'.",
+      "watches": ["weight_lbs", "body_fat_pct", "muscle_volume"]
+    },
+    {
+      "stage_id": "composition",
+      "entry": {"metric": "weight_lbs", "min": 210, "max": 240},
+      "headline": "Now we shape it.",
+      "read_of_him": "Healthy weight is in reach. The focus shifts to composition and metabolic efficiency.",
+      "cares_most": ["body-fat percentage", "muscle volume", "metabolic adaptation signals"],
+      "cares_less_right_now": ["the scale number alone"],
+      "plan": "Manage the deficit against metabolic adaptation; prioritize composition markers over scale weight.",
+      "graduation_gate": "Composition markers in healthy bands with adaptation under control unlocks 'longevity'.",
+      "watches": ["body_fat_pct", "muscle_volume", "metabolic_adaptation"]
+    },
+    {
+      "stage_id": "longevity",
+      "entry": {"metric": "weight_lbs", "min": null, "max": 210},
+      "headline": "Build the body that lasts.",
+      "read_of_him": "Composition is good. The job now is the long game — strength, resilience, healthspan.",
+      "cares_most": ["maintaining lean mass", "metabolic health", "durability over decades"],
+      "cares_less_right_now": ["aesthetic micro-tweaks"],
+      "plan": "Hold composition, defend muscle, keep metabolic markers strong for the long arc to 185 and beyond.",
+      "graduation_gate": "Maintenance rung — stay here.",
+      "watches": ["body_fat_pct", "muscle_volume", "weight_lbs"]
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "coach": "nutrition_coach",
+  "band_metric": "logging_consistency",
+  "_note": "WELLBEING-GUARDED (CC-09). Bands tile logging_consistency (0..1). Leads with logging and consistency; never publishes an aggressive numeric rate — the deficit pace defers to get_deficit_sustainability. concern_watches are supportive/correlative only, never restrictive instructions. Down-weeks always visible. Hand-review before ship (Marcus/Maya/Henning).",
+  "stage_ladder": [
+    {
+      "stage_id": "visibility",
+      "entry": {"metric": "logging_consistency", "min": null, "max": 0.5},
+      "headline": "First, I just need to see what you eat.",
+      "read_of_him": "I can't coach what I can't see. Right now the only job is logging — honestly, not perfectly.",
+      "cares_most": ["log food most days", "honest entries over complete ones", "no shame about what's in them"],
+      "cares_less_right_now": ["macro precision", "hitting an exact deficit", "cutting any food out"],
+      "concern_watches": ["very-low-intake days", "long gaps then large swings"],
+      "plan": "Build the logging habit. Once we can see the pattern, we tune gently toward a sustainable, protein-forward way of eating — pace set by the deficit-sustainability monitor, not a number I hand you.",
+      "graduation_gate": "Logging six of seven days for two weeks unlocks the 'consistency' rung.",
+      "watches": ["logging_consistency"]
+    },
+    {
+      "stage_id": "consistency",
+      "entry": {"metric": "logging_consistency", "min": 0.5, "max": 0.8},
+      "headline": "Good — now let's make it a habit, not a chore.",
+      "read_of_him": "You're logging often enough that I can start to see real patterns. Let's reinforce the habit and add protein, gently.",
+      "cares_most": ["keep logging steady", "protein with meals", "noticing patterns together"],
+      "cares_less_right_now": ["a strict calorie ceiling", "perfect macros"],
+      "concern_watches": ["days with no food logged at all", "intake far below your usual baseline"],
+      "plan": "Steady the habit and lean protein-forward. We talk about patterns, not punishments. Any deficit stays in the range the sustainability monitor says is safe.",
+      "graduation_gate": "Logging most days for a month, protein trending up, unlocks the 'tune' rung.",
+      "watches": ["logging_consistency", "total_protein_g"]
+    },
+    {
+      "stage_id": "tune",
+      "entry": {"metric": "logging_consistency", "min": 0.8, "max": null},
+      "headline": "Now we can actually tune it.",
+      "read_of_him": "The logging is reliable, so the numbers mean something. We aim for a sustainable, protein-forward deficit — and we celebrate the down-weeks and ride out the flat ones.",
+      "cares_most": ["protein target", "a sustainable deficit (pace per the sustainability monitor)", "energy and adherence over speed"],
+      "cares_less_right_now": ["maximizing weekly loss", "chasing the scale day to day"],
+      "concern_watches": ["sustained intake well under target", "rigid restriction followed by rebound"],
+      "plan": "Hold a protein-forward intake at a deficit the deficit-sustainability monitor rates as sustainable. Trend over weeks, down-weeks shown, no crash targets.",
+      "graduation_gate": "This is the working rung — consistency and sustainability are the goal, not a finish line.",
+      "watches": ["logging_consistency", "total_protein_g", "deficit_sustainability"]
+    }
+  ]
+}
