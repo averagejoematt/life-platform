@@ -962,38 +962,6 @@
       "status": "backlog"
     },
     {
-      "id": "no-redacted-2",
-      "name": "Clear Mind",
-      "icon": "🚭",
-      "one_liner": "No cannabis for 30 days",
-      "category": "discipline",
-      "duration_days": 30,
-      "difficulty": 5,
-      "evidence_tier": "strong",
-      "evidence_summary": "Cannabis disrupts REM sleep architecture; 30-day abstinence restores sleep stages and improves motivation",
-      "board_recommender": "Dr. Lena Johansson",
-      "board_quote": "REM is where emotional processing happens. Cannabis suppresses it. The dreams come back — that's the healing.",
-      "protocol": "Zero cannabis in any form for 30 days. Track sleep quality, dream recall, motivation, and cravings daily. Use vice streak tracker.",
-      "status": "backlog",
-      "public": false
-    },
-    {
-      "id": "no-redacted-1",
-      "name": "Eyes Forward",
-      "icon": "👁️",
-      "one_liner": "No pornography for 30 days",
-      "category": "discipline",
-      "duration_days": 30,
-      "difficulty": 5,
-      "evidence_tier": "moderate",
-      "evidence_summary": "Pornography abstinence associated with improved motivation, reduced compulsive behavior, and restored dopamine sensitivity",
-      "board_recommender": "Dr. Lena Johansson",
-      "board_quote": "The dopamine circuit doesn't care about the source. Superstimulus withdrawal restores baseline.",
-      "protocol": "Zero pornography in any form for 30 days. Note triggers, use redirect strategies. Track via vice streak. Journal urges.",
-      "status": "backlog",
-      "public": false
-    },
-    {
       "id": "wake-same-time",
       "name": "Clockwork",
       "icon": "⏰",
@@ -1326,5 +1294,5 @@
       "status": "available"
     }
   ],
-  "total_challenges": 83
+  "total_challenges": 82
 }

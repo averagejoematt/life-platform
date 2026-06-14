@@ -91,3 +91,7 @@ cdk/_mcp_staging/
 .coverage.*
 coverage.xml
 htmlcov/
+
+# ER-06: personal PII denylist — real literals (partner name, employer, …) never
+# committed to this PUBLIC repo. Only config/pii_denylist.example.json is tracked.
+config/pii_denylist.local.json
