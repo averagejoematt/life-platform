@@ -236,6 +236,9 @@ def transform(raw: dict, date_str: str) -> list[dict]:
 
         area = entry.get("area")
         group = area_map.get(area["id"]) if area and area.get("id") else None
+        # Persist the resolved group per-habit so read-only surfaces (the public
+        # habits page) can render the registry grouped without re-deriving it.
+        habit_statuses[name]["group"] = group or "Other"
         if group and group in P40_GROUPS:
             group_habits_possible.setdefault(group, []).append(name)
             if is_completed:
