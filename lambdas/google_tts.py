@@ -56,12 +56,15 @@ def _chunks(text: str):
     return out
 
 
-def _synthesize_chunk(text: str, voice_name: str, lang: str) -> bytes:
+def _synthesize_chunk(text: str, voice_name: str, lang: str, volume_gain_db: float = 0.0) -> bytes:
+    audio_cfg = {"audioEncoding": "MP3"}
+    if volume_gain_db:
+        audio_cfg["volumeGainDb"] = volume_gain_db
     body = json.dumps(
         {
             "input": {"text": text},
             "voice": {"languageCode": lang, "name": voice_name},
-            "audioConfig": {"audioEncoding": "MP3"},
+            "audioConfig": audio_cfg,
         }
     ).encode("utf-8")
     req = urllib.request.Request(
@@ -82,11 +85,12 @@ def _synthesize_chunk(text: str, voice_name: str, lang: str) -> bytes:
     return base64.b64decode(audio_b64)
 
 
-def synthesize(text: str, voice_name: str, lang: str = DEFAULT_LANG) -> bytes:
+def synthesize(text: str, voice_name: str, lang: str = DEFAULT_LANG, volume_gain_db: float = 0.0) -> bytes:
     """Synthesize text to MP3 bytes in a specific Chirp 3: HD voice. Chunks long
-    text and concatenates MP3 frames (valid: same voice/bitrate per call)."""
+    text and concatenates MP3 frames (valid: same voice/bitrate per call).
+    ``volume_gain_db`` balances loudness across voices in a multi-voice dialogue."""
     audio = b""
     for chunk in _chunks(text):
         if chunk.strip():
-            audio += _synthesize_chunk(chunk, voice_name, lang)
+            audio += _synthesize_chunk(chunk, voice_name, lang, volume_gain_db)
     return audio

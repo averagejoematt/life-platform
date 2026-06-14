@@ -88,6 +88,15 @@ async function renderTeamView(read) {
   catch (e) { read.innerHTML = `<p class="dx-prose">Couldn't load the team just now.</p>`; return; }
   let h = `<p class="dx-kicker label">your team · the collective read on you right now</p><h3 class="dx-title">My Team</h3>`;
   if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
+  if (d.lead) {
+    const L = d.lead;
+    h += `<section class="team-lead"><p class="dx-kicker label">running the program</p>`;
+    h += `<div class="tl-head"><span class="tl-name">${esc(L.emoji || "")} ${esc(L.name || "")}</span><span class="tl-role label">${esc(L.role || "")}</span></div>`;
+    if (L.short_bio) h += `<p class="dx-prose tl-bio">${esc(L.short_bio)}</p>`;
+    if (L.philosophy) h += `<blockquote class="tl-philosophy">${esc(L.philosophy)}</blockquote>`;
+    if ((L.staff_focus || []).length) h += `<p class="tl-focus label">what he's got the staff focused on: ${L.staff_focus.map(esc).join(" · ")}</p>`;
+    h += `</section>`;
+  }
   if ((d.team_focus || []).length) {
     h += `<section class="team-focus"><p class="dx-kicker label">what the team is focused on for you${d.current_stage ? ` · the ${esc(d.current_stage)} stage` : ""}</p>`;
     h += `<ul class="tf-list">${d.team_focus.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></section>`;

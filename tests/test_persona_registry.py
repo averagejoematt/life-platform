@@ -185,6 +185,23 @@ def test_accessors_resolve_known_coach():
     assert "the_chair" in persona_registry.board_personas()
 
 
+def test_lead_persona_nonoperational_with_distinct_voice():
+    """The Principal Investigator (Dr. Eli Marsh) is the lead ABOVE the 8 coaches —
+    a non-operational orchestrator persona. He must NOT be operational (that would
+    pull him into the compute engine / break the 8-coach invariants), and his TTS
+    voice must not clash with any coach or Elena."""
+    lead = _personas().get("eli_marsh")
+    assert lead, "Principal Investigator persona (eli_marsh) missing"
+    assert lead.get("operational") is False, "lead must be non-operational"
+    assert lead.get("lead") is True
+    assert lead.get("type") in VALID_TYPES
+    assert len(_operational()) == 8, "adding the lead must not change the operational count"
+    v = lead.get("tts_voice")
+    assert v and v.startswith("en-US-Chirp3-HD-"), f"lead voice unexpected: {v!r}"
+    taken = {persona_registry.tts_voice(s) for s in list(persona_registry.OPERATIONAL_COACH_IDS) + ["elena_voss"]}
+    assert v not in taken, f"lead voice {v!r} clashes with an existing persona"
+
+
 def test_podcast_voice_map_complete_and_unique():
     """Every operational coach + Elena has a distinct persistent TTS voice (podcasts)."""
     speakers = list(persona_registry.OPERATIONAL_COACH_IDS) + ["elena_voss"]

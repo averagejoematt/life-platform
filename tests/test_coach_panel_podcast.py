@@ -47,16 +47,18 @@ def test_pick_coach_fallback_is_operational(monkeypatch):
     assert cid == persona_registry.OPERATIONAL_COACH_IDS[3 % 8]
 
 
-def test_intro_gate_resolves_any_speaker_and_drops_unsafe():
+def test_intro_gate_resolves_two_speakers_and_drops_unsafe():
+    # Episode 0 is a two-hander: Elena (host) + Eli (the PI guest). Only those two
+    # resolve; coaches/unknowns drop; ER-03 still kills causal claims.
     turns = [
         {"speaker": "elena", "line": "Welcome — we're just getting started."},  # -> elena_voss
-        {"speaker": "training_coach", "line": "I'm here for the early movement trend."},  # coach id kept
-        {"speaker": "Dr. Lisa Park", "line": "Sleep is where it begins, early days."},  # display name -> sleep_coach
-        {"speaker": "training_coach", "line": "You lost it because you skipped sleep."},  # causal -> drop
-        {"speaker": "nobody", "line": "ghost"},  # unknown speaker -> drop
+        {"speaker": "eli", "line": "Glad to be here. Early days, but it's promising."},  # -> eli_marsh
+        {"speaker": "Dr. Eli Marsh", "line": "The data's a lead, not a verdict."},  # display name -> eli_marsh
+        {"speaker": "eli", "line": "He lost the weight because he slept more."},  # causal -> drop
+        {"speaker": "training_coach", "line": "I'm a coach, not in this episode."},  # not a valid intro speaker -> drop
     ]
     speakers = [t["speaker"] for t in panel._gate_intro(turns, allowed_numbers=set())]
-    assert speakers == ["elena_voss", "training_coach", "sleep_coach"]
+    assert speakers == ["elena_voss", "eli_marsh", "eli_marsh"]
 
 
 def test_voice_routing_returns_chirp_voice():
