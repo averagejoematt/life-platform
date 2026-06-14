@@ -14,6 +14,7 @@ const SECTIONS = [
   { key: "chronicle", label: "Chronicle", kicker: "written weekly by Elena Voss", kind: "posts", url: "/chronicle/posts.json" },
   { key: "lab-notes", label: "AI lab notes", kicker: "what the AI saw ↔ how it felt", kind: "fieldnotes", url: "/api/field_notes" },
   { key: "coaches", label: "The Coaches", kicker: "the AI team reading your data", kind: "coaches", url: "/api/coaches" },
+  { key: "panel", label: "The Panel", kicker: "Elena + a coach review the week", kind: "podcast", url: "/panelcast/episodes.json" },
   { key: "journal", label: "In my own words", kicker: "the daily journal", kind: "posts", url: "/journal/posts.json" },
   { key: "timeline", label: "Timeline", kicker: "level-ups & milestones", kind: "timeline", url: "/api/journey_timeline" },
   { key: "about", label: "About", kicker: "the experiment, in context", kind: "about" },
@@ -49,6 +50,7 @@ const ABOUT = `
 function entriesFor(s, data) {
   if (!data) return [];
   if (s.kind === "coaches") return [{ id: "team", title: "🧭 My Team", date: "the team's read on you" }].concat((data.coaches || []).map((c) => ({ id: c.persona_id, title: `${c.emoji || ""} ${c.name}`.trim(), date: c.headline_stat || c.domain || "" })));
+  if (s.kind === "podcast") return (data.episodes || []).map((e) => ({ id: e.week, title: e.title || `Week ${e.week}`, date: e.date, url: e.url, bytes: e.bytes, excerpt: e.excerpt }));
   if (s.kind === "fieldnotes") return (data.entries || []).map((e) => ({ id: e.week, title: `Week ${e.week} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "" }));
   if (s.kind === "posts") { const ps = data.posts || data.entries || (Array.isArray(data) ? data : []); return ps.map((p) => ({ id: p.week, title: p.title || `Week ${p.week}`, date: p.date, excerpt: p.excerpt, meta: p.stats_line, word_count: p.word_count, url: p.url })); }
   return [];
@@ -181,6 +183,19 @@ async function renderRead(s, id) {
   const read = $("[data-dx-read]");
   if (s.kind === "about") { read.innerHTML = ABOUT; return; }
   if (s.kind === "coaches") { if (String(id) === "team") { await renderTeamView(read); } else { await renderCoachPage(read, id); } return; }
+  if (s.kind === "podcast") {
+    const all = entriesFor(s, await secFetch(s));
+    const ent = all.find((x) => String(x.id) === String(id)) || all[0];
+    if (!ent) { read.innerHTML = `<p class="dx-prose">No episodes yet — the first weekly review drops here once the chronicle's been running a week.</p>`; return; }
+    const mins = Math.max(1, Math.round((ent.bytes || 0) / 1024 / 1024 / 0.12));
+    read.innerHTML =
+      `<p class="dx-kicker label">the panel · weekly review · two AI voices</p>` +
+      `<h3 class="dx-title">${esc(ent.title)}</h3>` +
+      (ent.date ? `<p class="dx-stats label">${esc(ent.date)}</p>` : "") +
+      `<div class="dx-listen"><audio controls preload="none" src="${esc(ent.url)}"></audio><span class="label">listen · Elena + a coach (~${mins} min)</span></div>` +
+      (ent.excerpt ? `<p class="dx-prose">${esc(ent.excerpt)}</p>` : "");
+    return;
+  }
   if (s.kind === "timeline") {
     read.innerHTML = `<p class="dx-kicker label">${esc(s.kicker)}</p><h3 class="dx-title">The journey so far</h3><p class="dx-loading shimmer">Loading the timeline…</p>`;
     const d = await secFetch(s); const events = (d && d.events) || [];

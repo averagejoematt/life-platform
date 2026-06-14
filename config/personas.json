@@ -27,7 +27,8 @@
       "short_id": "sleep",
       "voice_spec_ref": "config/coaches/sleep_coach.json",
       "board_persona_key": "lisa_park",
-      "board_role": "Sleep Scientist & Circadian Specialist"
+      "board_role": "Sleep Scientist & Circadian Specialist",
+      "tts_voice": "en-US-Chirp3-HD-Kore"
     },
     "training_coach": {
       "name": "Dr. Sarah Chen",
@@ -42,7 +43,8 @@
       "short_id": "training",
       "voice_spec_ref": "config/coaches/training_coach.json",
       "board_persona_key": "sarah_chen",
-      "board_role": "Sports Scientist"
+      "board_role": "Sports Scientist",
+      "tts_voice": "en-US-Chirp3-HD-Leda"
     },
     "nutrition_coach": {
       "name": "Dr. Marcus Webb",
@@ -57,7 +59,8 @@
       "short_id": "nutrition",
       "voice_spec_ref": "config/coaches/nutrition_coach.json",
       "board_persona_key": "marcus_webb",
-      "board_role": "Nutritionist"
+      "board_role": "Nutritionist",
+      "tts_voice": "en-US-Chirp3-HD-Charon"
     },
     "mind_coach": {
       "name": "Dr. Nathan Reeves",
@@ -72,7 +75,8 @@
       "short_id": "mind",
       "voice_spec_ref": "config/coaches/mind_coach.json",
       "board_persona_key": "nathan_reeves",
-      "board_role": "Psychiatrist — Behavioral Patterns"
+      "board_role": "Psychiatrist — Behavioral Patterns",
+      "tts_voice": "en-US-Chirp3-HD-Fenrir"
     },
     "physical_coach": {
       "name": "Dr. Victor Reyes",
@@ -87,7 +91,8 @@
       "short_id": "physical",
       "voice_spec_ref": "config/coaches/physical_coach.json",
       "board_persona_key": "victor_reyes",
-      "board_role": "Longevity Physician — Body Composition Specialist"
+      "board_role": "Longevity Physician — Body Composition Specialist",
+      "tts_voice": "en-US-Chirp3-HD-Orus"
     },
     "glucose_coach": {
       "name": "Dr. Amara Patel",
@@ -102,7 +107,8 @@
       "short_id": "glucose",
       "voice_spec_ref": "config/coaches/glucose_coach.json",
       "board_persona_key": "amara_patel",
-      "board_role": "Metabolic Health Researcher"
+      "board_role": "Metabolic Health Researcher",
+      "tts_voice": "en-US-Chirp3-HD-Zephyr"
     },
     "labs_coach": {
       "name": "Dr. James Okafor",
@@ -117,7 +123,8 @@
       "short_id": "labs",
       "voice_spec_ref": "config/coaches/labs_coach.json",
       "board_persona_key": "james_okafor",
-      "board_role": "Longevity & Preventive Medicine"
+      "board_role": "Longevity & Preventive Medicine",
+      "tts_voice": "en-US-Chirp3-HD-Puck"
     },
     "explorer_coach": {
       "name": "Dr. Henning Brandt",
@@ -132,7 +139,8 @@
       "short_id": "explorer",
       "voice_spec_ref": "config/coaches/explorer_coach.json",
       "board_persona_key": "henning_brandt",
-      "board_role": "Biostatistician — N=1 Research"
+      "board_role": "Biostatistician — N=1 Research",
+      "tts_voice": "en-US-Chirp3-HD-Iapetus"
     },
     "the_chair": {
       "name": "The Chair",
@@ -154,7 +162,8 @@
       "emoji": "✍️",
       "color": "#94a3b8",
       "board_persona_key": "elena_voss",
-      "board_role": "Embedded Journalist — The Measured Life"
+      "board_role": "Embedded Journalist — The Measured Life",
+      "tts_voice": "en-US-Chirp3-HD-Aoede"
     },
     "margaret_calloway": {
       "name": "Margaret Calloway",

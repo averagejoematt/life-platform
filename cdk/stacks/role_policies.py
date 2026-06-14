@@ -833,11 +833,26 @@ def email_nutrition_review() -> list[iam.PolicyStatement]:
 
 def email_chronicle_podcast() -> list[iam.PolicyStatement]:
     """Chronicle podcast: DDB read (content_markdown), S3 read posts.json +
-    write generated/podcast/*, Polly synthesize (no resource-level scoping)."""
+    write generated/podcast/*. Voice via Google Chirp 3: HD (API key in
+    life-platform/google-tts) — Polly dropped 2026-06-14."""
     return _email_base(
         needs_s3_write=["generated/podcast/*"],
+        extra_secrets=["life-platform/google-tts"],
         extra_statements=[
-            iam.PolicyStatement(sid="Polly", actions=["polly:SynthesizeSpeech"], resources=["*"]),
+            iam.PolicyStatement(sid="ChroniclePostsRead", actions=["s3:GetObject"], resources=[f"{BUCKET_ARN}/site/chronicle/posts.json"]),
+        ],
+    )
+
+
+def email_coach_panel_podcast() -> list[iam.PolicyStatement]:
+    """The Panel (two-host show): DDB read (chronicle + COACH#/OUTPUT#), S3 read
+    posts.json, Bedrock (Haiku) script-gen, Google Chirp 3: HD voices
+    (life-platform/google-tts), write generated/panelcast/*. Bedrock + budget-tier
+    SSM granted by _email_base / create_platform_lambda."""
+    return _email_base(
+        needs_s3_write=["generated/panelcast/*"],
+        extra_secrets=["life-platform/google-tts"],
+        extra_statements=[
             iam.PolicyStatement(sid="ChroniclePostsRead", actions=["s3:GetObject"], resources=[f"{BUCKET_ARN}/site/chronicle/posts.json"]),
         ],
     )

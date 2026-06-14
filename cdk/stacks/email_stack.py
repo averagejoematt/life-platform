@@ -146,6 +146,23 @@ class EmailStack(Stack):
             **shared,
         )
 
+        # "The Panel" — weekly two-host show (Elena + a rotating coach). Runs at
+        # 16:20 UTC, ~40 min after the chronicle podcast, so posts.json + the
+        # week's COACH#/OUTPUT# are settled. Bedrock script-gen + Google Chirp 3: HD.
+        create_platform_lambda(
+            self,
+            "CoachPanelPodcast",
+            function_name="coach-panel-podcast",
+            handler="emails.coach_panel_podcast_lambda.lambda_handler",
+            source_file="lambdas/emails/coach_panel_podcast_lambda.py",
+            schedule="cron(20 16 ? * WED *)",
+            timeout_seconds=600,
+            memory_mb=512,
+            environment=_email_env,
+            custom_policies=rp.email_coach_panel_podcast(),
+            **shared,
+        )
+
         wednesday_chronicle = create_platform_lambda(
             self,
             "WednesdayChronicle",

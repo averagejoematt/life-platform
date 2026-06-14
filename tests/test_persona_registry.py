@@ -183,3 +183,13 @@ def test_accessors_resolve_known_coach():
     assert persona_registry.display_name("glucose_coach") == "Dr. Amara Patel"
     assert len(persona_registry.operational_personas()) == 8
     assert "the_chair" in persona_registry.board_personas()
+
+
+def test_podcast_voice_map_complete_and_unique():
+    """Every operational coach + Elena has a distinct persistent TTS voice (podcasts)."""
+    speakers = list(persona_registry.OPERATIONAL_COACH_IDS) + ["elena_voss"]
+    voices = {s: persona_registry.tts_voice(s) for s in speakers}
+    for s, v in voices.items():
+        assert v, f"{s} missing tts_voice"
+        assert v.startswith("en-US-Chirp3-HD-"), f"{s} unexpected voice {v!r}"
+    assert len(set(voices.values())) == len(voices), "two speakers share a voice"

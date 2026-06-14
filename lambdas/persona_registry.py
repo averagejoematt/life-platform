@@ -121,3 +121,9 @@ def display_name(persona_id, s3_client=None, bucket=None):
     """Human-facing name for a persona_id; falls back to the id itself."""
     p = resolve(persona_id, s3_client, bucket)
     return p.get("name") if p else persona_id
+
+
+def tts_voice(persona_id, s3_client=None, bucket=None):
+    """The persistent Google Chirp 3: HD voice assigned to a persona (podcasts), or None."""
+    p = resolve(persona_id, s3_client, bucket)
+    return p.get("tts_voice") if p else None

@@ -128,6 +128,9 @@
     "lambdas/emails/chronicle_podcast_lambda.py": {
       "function": "chronicle-podcast"
     },
+    "lambdas/emails/coach_panel_podcast_lambda.py": {
+      "function": "coach-panel-podcast"
+    },
     "lambdas/emails/daily_brief_lambda.py": {
       "function": "daily-brief"
     },

@@ -324,3 +324,12 @@ body { overflow-x: hidden; }
 /* ── Coach daily reflection (CC-08) ───────────────────────────────────────── */
 .coach-daily { margin-top: var(--sp-4); padding: var(--sp-3) var(--sp-4); border-left: 2px solid var(--ember-line); background: var(--surface-raised); border-radius: var(--radius-sm); }
 .cd-text { margin-top: var(--sp-2); color: var(--ink); font-family: var(--font-serif); font-size: var(--fs-body-lg); line-height: var(--lh-relaxed); max-width: var(--measure); }
+
+/* ── Coach/Panel page type consistency (2026-06-14) ───────────────────────────
+   Fix mixed fonts: coaches SPEAK in serif (human voice); labels, dates, rates,
+   chips, names stay mono (machine & data). One rule so sections stop alternating. */
+.coach-stance, .coach-progress, .coach-report, .coach-journey, .coach-rel,
+.coach-daily, .team-focus, .team-tension, .team-huddle { font-family: var(--font-serif); }
+.coach-stance .label, .coach-progress .label, .coach-report .label, .coach-journey .label,
+.coach-rel .label, .coach-daily .label, .team-focus .label, .team-tension .label,
+.team-huddle .label, .cr-rate, .tf-list li, .th-name, .cj-date { font-family: var(--font-mono); }
