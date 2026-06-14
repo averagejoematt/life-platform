@@ -233,15 +233,34 @@ def _write_indexes(episodes: list) -> None:
     )
 
 
-# ── Episode 0: the full welcome/trailer (event {"intro": true}) ──────────────
+# ── Episode 0 + series creative spine (event {"intro": true}) ─────────────────
 
-MISSION_BRIEF = (
-    "The Measured Life is an honest, public documentary of one ordinary person — Matthew — rebuilding his health with AI. "
-    "He starts at roughly 311 pounds; the goal is about 185. It is an N=1 experiment: every claim is correlative, never causal, "
-    "and the down weeks are shown too. The website has three doors: the Cockpit (today's live data), the Story (the weekly "
-    "chronicle, the AI lab notes, and this podcast), and the Evidence (the full data archive). Elena Voss writes the chronicle. "
-    "A board of eight AI coaches reads the data and argues about it — that's the team you're about to meet."
-)
+BIBLE_KEY = "config/podcast_series_bible.json"  # durable config/ prefix (reset-safe)
+SERIES_STATE_KEY = f"{PREFIX}/series_state.json"  # continuity state across episodes
+
+# Day-Zero hallucination guard: Episode 0 is recorded at the starting line, so a
+# line must NOT fabricate elapsed time, results, a back-catalogue, or a weight.
+_HALLUCINATION_PATTERNS = [
+    r"\b(weeks?|days?|months?)\s+(in|into)\b",
+    r"\b(two|three|four|five|several|a few|a couple|couple of)\s+(weeks?|days?|months?)\b",
+    r"\bweek\s+\d+\b",
+    r"\bso far\b",
+    r"\blast (episode|time|week)\b",
+    r"\bprevious(ly)?\b",
+    r"\b(the )?(data|numbers|results|trends?) (show|are showing|already|so far)\b",
+    r"\b\d{2,3}\s*(lbs?|pounds?|kg|kilograms?)\b",
+    r"\bstarting weight\b",
+    r"\bempty (journal|chronicle)\b",
+]
+_HALLUCINATION_RE = re.compile("|".join(_HALLUCINATION_PATTERNS), re.IGNORECASE)
+
+
+def _load_bible() -> dict:
+    try:
+        return json.loads(s3.get_object(Bucket=S3_BUCKET, Key=BIBLE_KEY)["Body"].read())
+    except Exception as e:
+        logger.warning("[panel] series bible unavailable — %s", e)
+        return {}
 
 
 INTRO_GUEST_ID = "eli_marsh"  # Dr. Eli Marsh — Principal Investigator (the lead)
@@ -267,32 +286,41 @@ def _intro_guest() -> dict:
     }
 
 
-def _build_intro_script(prequel_text: str) -> list:
-    """Episode 0 as a two-person interview: Elena (host) interviews the PI."""
+def _build_intro_script(bible: dict) -> list:
+    """Episode 0 as a two-person interview, driven by the series bible."""
     import bedrock_client
 
     g = _intro_guest()
+    ch = bible.get("characters", {})
+    sc = bible.get("site_concepts", {})
+    arc = "\n".join(f"  {i + 1}. {step}" for i, step in enumerate(bible.get("episode0_arc", [])))
+    guards = "\n".join(f"  - {x}" for x in bible.get("guardrails", []))
+    site = "\n".join(f"  - {k.title()}: {v}" for k, v in sc.items())
+
     system = (
-        "You write Episode 0 of a podcast: a warm, intriguing TWO-PERSON interview that introduces a public health-experiment "
-        "website to a complete stranger and makes them want to follow the series. "
-        f"HOST is Elena Voss, the embedded journalist. GUEST is {g['name']}, {g['role']} — he runs the experiment and directs a "
-        "coaching staff of eight specialists. It must feel like a REAL conversation, not narration: Elena asks sharp, curious, "
-        "human questions and reacts to the answers; the guest replies like a person — warm, plain-spoken, the occasional vivid line. "
-        "Follow a natural arc: a hook about who Matthew is and why this is worth watching; the goal and what's at stake; the story "
-        "so far; how the experiment actually works (one experiment at a time, eight specialists pointed at a single goal, the data "
-        "out in the open); and a closing line that makes the listener want to come back. "
-        'Output ONLY a JSON array of turns: [{"speaker":"elena"|"eli","line":"..."}]. 16–24 turns. Vary turn length; let them build '
-        "on each other. Rules: correlative only (never claim causation); use only numbers present in the brief; frame it as early "
-        "days; never open a line with 'Matthew'; no preamble, no stage directions, no JSON fences."
+        f'You are the head writer for "{bible.get("show_name", "The Measured Life")}", a narrative podcast. Write EPISODE 0: a '
+        "warm, intriguing, genuinely human two-person interview that introduces the show to a COMPLETE STRANGER (someone who has "
+        "never heard of Matthew) and makes them want to follow the series. Energy of a great narrative-podcast trailer: hook fast, "
+        "raise a real and slightly philosophical question, be honest rather than hypey, leave them wanting episode one. "
+        f"HOST is Elena Voss; GUEST is {g['name']}, {g['role']}. A REAL conversation — Elena asks what a curious skeptic would ask "
+        "and reacts; the guest answers like a person, warm and plain-spoken with the occasional vivid line. They build on each "
+        "other, vary turn length, and use a little wry humor.\n\n"
+        f"THE BIG QUESTION (the emotional hook — land it, don't rush past it):\n{bible.get('thesis', '')}\n\n"
+        f"WHAT'S ACTUALLY BEING MEASURED:\n{bible.get('what_we_measure', '')}\n\n"
+        f"TONE: {bible.get('tone', '')}\n\n"
+        f"FOLLOW THIS ARC:\n{arc}\n\n"
+        f"HARD GUARDRAILS (breaking any of these ruins the episode):\n{guards}\n\n"
+        'OUTPUT: ONLY a JSON array of turns [{"speaker":"elena"|"eli","line":"..."}], 18–26 turns. '
+        "No preamble, no stage directions, no JSON fences."
     )
     user = (
-        f"MISSION BRIEF:\n{MISSION_BRIEF}\n\n"
-        f"THE GUEST — {g['name']} ({g['role']}):\nBio: {g['bio']}\nPhilosophy: {g['philosophy']}\n"
-        f"Expertise: {', '.join(g['expertise'])}\n\n"
-        f"BACKGROUND for texture (Elena's prequel chronicle):\n{prequel_text[:2000]}\n\n"
-        "Write the JSON interview now."
+        f"ELENA (host): {ch.get('elena', '')}\n\n"
+        f"MATTHEW (the subject — NEVER a weight or body number): {ch.get('matthew', '')}\n\n"
+        f"ELI (guest): {ch.get('eli', '')}\nHis philosophy: {g['philosophy']}\nHis expertise: {', '.join(g['expertise'])}\n\n"
+        f"WHAT A LISTENER CAN EXPLORE (weave these in naturally, do NOT list them robotically):\n{site}\n\n"
+        "Write Episode 0 now."
     )
-    body = {"model": MODEL, "max_tokens": 3000, "system": system, "messages": [{"role": "user", "content": user}]}
+    body = {"model": MODEL, "max_tokens": 3500, "system": system, "messages": [{"role": "user", "content": user}]}
     resp = bedrock_client.invoke(body, model_name=MODEL)
     text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()
     text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
@@ -305,9 +333,10 @@ def _build_intro_script(prequel_text: str) -> list:
 
 
 def _gate_intro(turns: list, allowed_numbers) -> list:
-    """ER-03 gate + resolve the two speakers — Elena (host) and Eli (guest)."""
+    """Resolve the two speakers + ER-03 + the Day-Zero hallucination guard (drop any
+    line fabricating elapsed time, results, a back-catalogue, or a starting weight)."""
     eli_aliases = {"eli", "eli_marsh", "dr. eli marsh", "eli marsh", "marsh", "guest", "principal investigator", "pi"}
-    clean = []
+    clean, dropped = [], 0
     for t in turns:
         if not isinstance(t, dict):
             continue
@@ -321,24 +350,52 @@ def _gate_intro(turns: list, allowed_numbers) -> list:
         line = (t.get("line") or "").strip()
         if not line:
             continue
+        if _HALLUCINATION_RE.search(line):
+            dropped += 1
+            logger.info("[panel] intro: dropped Day-Zero-guard line — %s", line[:90])
+            continue
         ok, _r = er03_gate.er03_check(line, allowed_numbers=allowed_numbers, n=None)
         if ok:
             clean.append({"speaker": spk, "line": line})
+    if dropped:
+        logger.info("[panel] intro: hallucination guard dropped %d line(s)", dropped)
     return clean
 
 
+def _seed_series_state(bible: dict, ep: dict) -> None:
+    """Seed continuity state so the weekly Panel can pick up where the series left off."""
+    state = {
+        "episode_count": 1,
+        "last_episode": {
+            "week": 0,
+            "title": ep.get("title"),
+            "summary": (
+                "Episode 0 introduced the show — who Elena and Matthew are, the eight-coach AI team Dr. Eli Marsh runs, "
+                "and the central bet: can technology and a person's own data genuinely improve a whole life, or is it just "
+                "over-optimization theater?"
+            ),
+            "hook": "The experiment begins now; the weekly Panel tracks the question with real data as it comes in.",
+        },
+        "running_threads": bible.get("through_lines", []),
+        "recurring_bits": bible.get("recurring_bits", []),
+        "updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+    }
+    s3.put_object(
+        Bucket=S3_BUCKET,
+        Key=SERIES_STATE_KEY,
+        Body=json.dumps(state, indent=2).encode("utf-8"),
+        ContentType="application/json",
+        CacheControl="max-age=300, public",
+    )
+
+
 def _run_intro() -> dict:
-    posts = _published_posts()
-    prequel = ""
-    for p in sorted(posts, key=lambda x: x.get("week", 0)):  # earliest chronicle first
-        md = _chronicle_md(p.get("date", ""))
-        if md:
-            prequel = _strip_md(md)
-            break
-    g = _intro_guest()
-    allowed = er03_gate.numbers_in(" ".join([MISSION_BRIEF, prequel, g["bio"], g["philosophy"]]))
-    turns = _gate_intro(_build_intro_script(prequel), allowed)
-    if len(turns) < 6:
+    bible = _load_bible()
+    # Numbers allowed by ER-03 = only those in the bible (it has essentially none →
+    # this enforces "no invented numbers"). No elapsed-time/results context is fed.
+    allowed = er03_gate.numbers_in(json.dumps(bible))
+    turns = _gate_intro(_build_intro_script(bible), allowed)
+    if len(turns) < 8:
         logger.warning("[panel] intro: too few clean turns (%d)", len(turns))
         return {"statusCode": 500, "body": json.dumps({"intro": "too few turns", "turns": len(turns)})}
     # Single-pass conversation via Gemini (Elena + Eli genuinely talking).
@@ -348,6 +405,15 @@ def _run_intro() -> dict:
     label_turns = [{"speaker": label_of.get(t["speaker"], "Elena"), "line": t["line"]} for t in turns]
     audio = gemini_tts.synthesize_dialogue(label_turns, INTRO_GEMINI_VOICES, INTRO_STYLE)
     s3.put_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/wk0.wav", Body=audio, ContentType="audio/wav", CacheControl="max-age=86400, public")
+    # Transcript alongside the audio — for review and to verify the guardrails held.
+    transcript = "\n\n".join(f"{label_of.get(t['speaker'], 'Elena')}: {t['line']}" for t in turns)
+    s3.put_object(
+        Bucket=S3_BUCKET,
+        Key=f"{PREFIX}/wk0.transcript.txt",
+        Body=transcript.encode("utf-8"),
+        ContentType="text/plain; charset=utf-8",
+        CacheControl="max-age=300, public",
+    )
     try:
         existing = json.loads(s3.get_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/episodes.json")["Body"].read()).get("episodes", [])
     except Exception:
@@ -358,7 +424,7 @@ def _run_intro() -> dict:
         "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "url": "/panelcast/wk0.wav",
         "bytes": len(audio),
-        "excerpt": "Elena sits down with Dr. Eli Marsh, the Principal Investigator running the experiment — who Matthew is, the goal, the story, and what his coaching staff is chasing.",
+        "excerpt": "Meet Elena, meet Matthew, and meet the question this whole experiment is built to answer: can AI and your own data actually make a life better — or is it just over-optimization? The starting line.",
     }
     existing = [e for e in existing if e.get("week") != 0] + [ep]
     existing.sort(key=lambda e: e.get("week", 0), reverse=True)
