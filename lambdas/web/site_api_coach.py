@@ -18,6 +18,7 @@ Endpoints:
   /api/weekly_priority  — integrator synthesis (cross-domain weekly priority)
 """
 
+import json
 import os
 from datetime import datetime
 from decimal import Decimal  # noqa: F401
@@ -332,6 +333,30 @@ def _lead_block(team_focus):
         "expertise": lp.get("expertise", []),
         "staff_focus": (team_focus or [])[:3],  # what he's got the staff focused on
     }
+
+
+def handle_panel_ledger(event):
+    """GET /api/panel_ledger — The Panel's running bet scoreboard (the proof-of-honesty
+    artifact) + the current open bet. Reads the podcast series_state (PANELCAST#).
+    Shaped-empty 200 before the first weekly episode."""
+    try:
+        it = table.get_item(Key={"pk": f"{USER_PREFIX}panelcast", "sk": "STATE#current"}).get("Item")
+        state = json.loads(it.get("state_json", "{}")) if it else {}
+    except Exception as _e:
+        logger.warning(f"[panel_ledger] {_e}")
+        state = {}
+    ledger = state.get("bet_ledger", [])
+    record = {o: sum(1 for b in ledger if b.get("outcome") == o) for o in ("won", "lost", "open")}
+    return _ok(
+        {
+            "open_bet": state.get("open_bet"),
+            "episode_count": state.get("episode_count", 0),
+            "ledger": list(reversed(ledger)),  # newest first
+            "record": record,
+            "disclosure": "The coaches make falsifiable calls; we score them against real data, hits and misses alike.",
+        },
+        cache_seconds=300,
+    )
 
 
 def handle_coach_team(event):

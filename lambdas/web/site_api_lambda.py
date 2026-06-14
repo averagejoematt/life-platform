@@ -63,6 +63,7 @@ from web.site_api_coach import (
     handle_coach_timeline,
     handle_coaches,
     handle_field_notes,
+    handle_panel_ledger,
     handle_predictions,
     handle_weekly_priority,
 )
@@ -616,6 +617,8 @@ def lambda_handler(event, context):
         return handle_coaches(event)
     if path == "/api/coach_team":
         return handle_coach_team(event)
+    if path == "/api/panel_ledger":
+        return handle_panel_ledger(event)
     if path.startswith("/api/coach/"):
         return handle_coach(event)
     if path == "/api/coaching-dashboard":

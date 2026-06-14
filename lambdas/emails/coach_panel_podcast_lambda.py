@@ -655,6 +655,7 @@ def _build_weekly_script(beats: dict, bible: dict) -> dict:
         "process over outcome — never a report-card or judgmental tone; handle a hard week with compassion; never open a line with 'Matt'. "
         f"{CONVO_DIRECTIVE} "
         'OUTPUT ONLY JSON: {"turns":[{"speaker":"elena"|"coach","line":"..."}], "open_bet":"<the one new falsifiable bet for next week>", '
+        '"last_bet_result":{"outcome":"won"|"lost"|"open"|"none"}, '
         '"pull_quote":"<one shareable line>"}. 14–22 turns. No fences.'
     )
     user = (
@@ -816,12 +817,23 @@ def _run_weekly(force: bool) -> dict:
     existing.sort(key=lambda e: e.get("week", 0), reverse=True)
     # series_state + RSS committed LAST (atomic-ish: audio already durable).
     recent = ([beats["title"]] + beats.get("recent_topics", []))[:5]
+    # Bet ledger (the Panel scoreboard): resolve the prior open bet with THIS week's
+    # reported outcome, then record the new open bet. Capped, reset-safe in DDB.
+    ledger = list(state.get("bet_ledger", []))
+    outcome = ((script.get("last_bet_result") or {}).get("outcome") or "open").lower()
+    for entry in reversed(ledger):
+        if entry.get("outcome") == "open":
+            entry["outcome"] = outcome if outcome in ("won", "lost", "open", "none") else "open"
+            break
+    if script.get("open_bet"):
+        ledger.append({"week": week, "bet": script["open_bet"], "outcome": "open", "date": beats["date"]})
     _state_write(
         {
             "episode_count": state.get("episode_count", 1) + 1,
             "last_episode": ep,
             "open_bet": script.get("open_bet"),
             "recent_topics": recent,
+            "bet_ledger": ledger[-20:],
         }
     )
     _write_indexes(existing)
