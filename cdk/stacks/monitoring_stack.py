@@ -214,6 +214,36 @@ class MonitoringStack(Stack):
                 dims={"Source": _src},
             )
 
+        # ══════════════════════════════════════════════════════════════
+        # Panelcast liveness — "the weekly show went silent" (2026-06-14)
+        # The Panel publishes every Friday and emits LifePlatform/Podcast
+        # PanelcastPublished=1 on each successful publish. This is the ONLY
+        # alarm in this stack with treat_missing_data=BREACHING: absence IS
+        # the failure signal. 7 consecutive days with no datapoint fires URGENT.
+        # The weekly cadence means a healthy gap is only 6 empty days, so 7
+        # straight empty days = a genuinely missed week. A held episode
+        # (panelcast-holds/) does NOT emit, so a long HOLD streak surfaces here.
+        # NB: CloudWatch caps EvaluationPeriods*Period at 604800s (7d) for
+        # period>=3600, so 7*86400 is the hard ceiling — can't widen the window
+        # at daily granularity.
+        _panelcast_silent = cloudwatch.Alarm(
+            self,
+            "PanelcastWentSilent",
+            alarm_name="panelcast-no-episode-7d",
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/Podcast",
+                metric_name="PanelcastPublished",
+                period=Duration.seconds(86400),
+                statistic="Sum",
+            ),
+            evaluation_periods=7,
+            datapoints_to_alarm=7,
+            threshold=1,
+            comparison_operator=LT,
+            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+        )
+        _panelcast_silent.add_alarm_action(cw_actions.SnsAction(topic))
+
         # AI token budget alarms — consolidated 2026-03-10 (COST-A)
         # Removed 11 per-Lambda alarms ($1.10/mo). Kept: daily-brief
         # (highest-cost Lambda) + platform total (catch-all).
