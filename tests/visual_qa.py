@@ -86,6 +86,7 @@ PAGES = [
         "checks": [
             {"selector": "[data-bind='level']", "not_empty": True, "desc": "character level rendered"},
             {"selector": ".row", "min_count": 1, "desc": "at least one pillar row"},
+            {"selector": ".site-foot-cols .sf-col", "min_count": 4, "desc": "footer mega-menu (4 columns) present (CC-05)"},
         ],
         "interact": {"click": ".row", "expect": ".pillar-detail", "desc": "pillar disclosure opens with the Day-Grade Replay detail"},
     },
