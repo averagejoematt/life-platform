@@ -19,6 +19,7 @@ Haiku script-gen is pennies.
 import json
 import os
 import re
+import urllib.parse
 from datetime import datetime, timezone
 
 import boto3
@@ -26,6 +27,7 @@ import er03_gate
 import google_tts
 import persona_registry
 from boto3.dynamodb.conditions import Key
+from constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor
 from phase_filter import with_phase_filter
 
 try:
@@ -48,9 +50,12 @@ PREFIX = "generated/panelcast"
 SKIP_TIER = 2  # PG-10
 ELENA = "elena_voss"
 ELENA_VOICE_FALLBACK = "en-US-Chirp3-HD-Aoede"
+SENDER = os.environ.get("EMAIL_SENDER", "lifeplatform@mattsusername.com")
+SUBSCRIBERS_PK = f"USER#{USER_ID}#SOURCE#subscribers"
 
 s3 = boto3.client("s3", region_name=REGION)
 table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE_NAME)
+ses = boto3.client("sesv2", region_name=REGION)
 
 
 # ── inputs ───────────────────────────────────────────────────────────────────
@@ -771,38 +776,139 @@ def _notify_new_episode(ep: dict) -> None:
         logger.warning("[panel] new-episode notify failed — %s", e)
 
 
-def _run_weekly(force: bool) -> dict:
-    """Produce the latest week's episode autonomously, publish-or-HOLD."""
+def _confirmed_subscribers() -> list:
+    """Confirmed email subscribers (SOURCE#subscribers, status=confirmed). Same
+    partition + FilterExpression pattern as chronicle_email_sender (fine <10K)."""
+    out, ek = [], None
+    try:
+        while True:
+            kw = {
+                "KeyConditionExpression": Key("pk").eq(SUBSCRIBERS_PK),
+                "FilterExpression": "#s = :c",
+                "ExpressionAttributeNames": {"#s": "status"},
+                "ExpressionAttributeValues": {":c": "confirmed"},
+            }
+            if ek:
+                kw["ExclusiveStartKey"] = ek
+            resp = table.query(**kw)
+            out.extend(resp.get("Items", []))
+            ek = resp.get("LastEvaluatedKey")
+            if not ek:
+                break
+    except Exception as e:
+        logger.error("[panel] subscriber query failed — %s", e)
+    return out
+
+
+def _subscriber_email(ep: dict, email: str) -> tuple:
+    """(subject, html) for a new-episode announcement, with a CAN-SPAM unsubscribe."""
+    title = ep.get("title") or "A new episode of The Panel"
+    listen = f"{SITE}{ep.get('url', '/story/panel/')}"
+    excerpt = ep.get("excerpt") or ""
+    byline = ep.get("byline") or "Elena + a coach"
+    unsub = f"{SITE}/api/subscribe?action=unsubscribe&email={urllib.parse.quote(email)}"
+    subject = f"The Panel — {title}"[:120]
+    html = (
+        f'<div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;color:#1a1a1a;line-height:1.55">'
+        f'<p style="letter-spacing:.08em;text-transform:uppercase;font-size:12px;color:#8a7f6a">The Measured Life · The Panel</p>'
+        f'<h1 style="font-size:24px;margin:.2em 0">{title}</h1>'
+        f'<p style="color:#555;font-size:14px;margin:.2em 0 1em">A new weekly episode — {byline}.</p>'
+        f'{f"<p>{excerpt}</p>" if excerpt else ""}'
+        f'<p style="margin:1.4em 0"><a href="{listen}" style="background:#1a1a1a;color:#fff;padding:12px 22px;'
+        f'text-decoration:none;border-radius:6px;display:inline-block">▶ Listen now</a></p>'
+        f'<p style="font-size:13px;color:#777">Or open <a href="{SITE}/story/panel/">the Panel hub</a> for the full archive and the bet ledger.</p>'
+        f'<hr style="border:none;border-top:1px solid #eee;margin:2em 0">'
+        f'<p style="font-size:11px;color:#aaa">You subscribed at averagejoematt.com. '
+        f'<a href="{unsub}" style="color:#aaa">Unsubscribe</a>.</p></div>'
+    )
+    return subject, html
+
+
+def _email_subscribers(ep: dict, test_to: str = None) -> dict:
+    """Email confirmed subscribers that a new episode dropped. Honors the
+    EXTERNAL_EMAILS_ENABLED kill-switch. test_to=<addr> sends ONLY to that
+    address (the test-first path) and never touches the subscriber list."""
+    if os.environ.get("EXTERNAL_EMAILS_ENABLED", "true").lower() != "true":
+        logger.info("[panel] EXTERNAL_EMAILS_ENABLED=false — subscriber notify skipped")
+        return {"sent": 0, "skipped": "kill-switch"}
+    recipients = [{"email": test_to}] if test_to else _confirmed_subscribers()
+    if not recipients:
+        return {"sent": 0, "note": "no recipients"}
+    sent = failed = 0
+    for sub in recipients:
+        email = (sub.get("email") or "").strip()
+        if not email:
+            continue
+        try:
+            subject, html = _subscriber_email(ep, email)
+            ses.send_email(
+                FromEmailAddress=SENDER,
+                Destination={"ToAddresses": [email]},
+                Content={"Simple": {"Subject": {"Data": subject, "Charset": "UTF-8"}, "Body": {"Html": {"Data": html, "Charset": "UTF-8"}}}},
+            )
+            sent += 1
+        except Exception as e:
+            failed += 1
+            logger.warning("[panel] subscriber send failed (%s) — %s", email, e)
+    logger.info("[panel] subscriber notify — sent=%d failed=%d test=%s", sent, failed, bool(test_to))
+    return {"sent": sent, "failed": failed, "test": bool(test_to)}
+
+
+def _dry(week, decision, **extra) -> dict:
+    """Dry-run summary — what the live run WOULD do, no TTS and no writes."""
+    return {"statusCode": 200, "body": json.dumps({"dry_run": True, "week": week, "would": decision, **extra})}
+
+
+def _run_weekly(force: bool, dry_run: bool = False) -> dict:
+    """Produce the latest week's episode autonomously, publish-or-HOLD.
+
+    dry_run=True runs the full decision pipeline (gather → write → editor → gate)
+    but synthesizes NO audio and writes NOTHING (no S3/DDB/SNS/metric) — it returns
+    what the live run would do. The pre-flight tool for every Friday / post-reset."""
     import gemini_tts
 
     posts = _published_posts()
-    weekly = [p for p in posts if p.get("week") and p.get("week") > 0 and p.get("date")]
+    # Reset-proof selection (ADR-077): a reset restarts week-numbering at 1, but old
+    # high-numbered chronicles linger in posts.json. Pick the most RECENT weekly post
+    # in the CURRENT cycle (dated >= genesis), never the stale pre-reset max-week.
+    # ISO dates compare lexically. If none exist yet (before the cycle's first
+    # Wednesday chronicle), skip cleanly — the liveness alarm catches a truly silent show.
+    weekly = [
+        p for p in posts if p.get("week") and p.get("week") > 0 and p.get("date") and p["date"] >= EXPERIMENT_START_DATE
+    ]
     if not weekly:
-        return {"statusCode": 200, "body": json.dumps({"weekly": "no published weeks yet"})}
-    post = max(weekly, key=lambda x: x["week"])
+        return {"statusCode": 200, "body": json.dumps({"weekly": "no current-cycle weekly chronicle yet"})}
+    post = max(weekly, key=lambda x: x["date"])
     week = post["week"]
-    if not force and _episode_exists(week):
+    if not force and not dry_run and _episode_exists(week):
         return {"statusCode": 200, "body": json.dumps({"week": week, "already_published": True})}
 
     bible = _load_bible()
     state = _state_read()
     beats = _gather_week(post, state)
     if not beats.get("chronicle"):
-        return {"statusCode": 200, "body": json.dumps({"week": week, "skipped": "no chronicle yet"})}
+        return {"statusCode": 200, "body": json.dumps({"week": week, "skipped": "no chronicle yet", "date": post.get("date")})}
 
     # Personal Board asymmetry — hard/sensitive week → human, never auto-publish.
     sens = _sensitivity_hold_reasons(beats)
     if sens:
+        if dry_run:
+            return _dry(week, "HOLD", stage="sensitivity", reasons=sens, date=post.get("date"))
         return _hold_and_alert(week, sens, {"note": "sensitivity routing pre-write"})
 
     guest_id = (beats.get("guest") or {}).get("id") or persona_registry.OPERATIONAL_COACH_IDS[0]
+    guest_name = (beats.get("guest") or {}).get("name", "Coach")
     script = _build_weekly_script(beats, bible)
     turns = script.get("turns") or []
     if len(turns) < 6:
+        if dry_run:
+            return _dry(week, "HOLD", stage="writer", reasons=["too few turns"], turns=len(turns))
         return _hold_and_alert(week, ["writer produced too few turns"], script)
 
     review = _editor_review(turns, bible)
     if review.get("verdict") == "hold":
+        if dry_run:
+            return _dry(week, "HOLD", stage="editor", reasons=review.get("issues", []))
         return _hold_and_alert(week, ["editor: " + "; ".join(review.get("issues", []))[:300]], {"turns": turns, "review": review})
 
     for t in turns:
@@ -810,9 +916,26 @@ def _run_weekly(force: bool) -> dict:
     allowed = er03_gate.numbers_in(beats["chronicle"] + " " + " ".join(c["summary"] for c in beats["coach_reads"]))
     clean, hold = _weekly_gate(turns, allowed, guest_id)
     if hold:
+        if dry_run:
+            return _dry(week, "HOLD", stage="safety-gate", reasons=hold)
         return _hold_and_alert(week, hold, {"turns": turns})
     if len(clean) < 6:
+        if dry_run:
+            return _dry(week, "HOLD", stage="gate-thin", reasons=["too few clean turns after gate"], clean=len(clean))
         return _hold_and_alert(week, ["too few clean turns after gate"], {"turns": turns})
+
+    if dry_run:
+        preview = "\n".join(f"{('Elena' if t['speaker'] == ELENA else guest_name)}: {t['line']}" for t in clean[:6])
+        return _dry(
+            week,
+            "PUBLISH",
+            title=f"Week {week}: {script.get('pull_quote') or review.get('pull_quote') or beats['title']}"[:120],
+            guest=guest_name,
+            clean_turns=len(clean),
+            open_bet=script.get("open_bet"),
+            date=post.get("date"),
+            transcript_preview=preview,
+        )
 
     # PASS → synthesize single-pass, then commit (series_state + RSS LAST).
     label_of = {ELENA: "Elena", guest_id: (beats.get("guest") or {}).get("name", "Coach")}
@@ -867,7 +990,15 @@ def _run_weekly(force: bool) -> dict:
     )
     _write_indexes(existing)
     _emit_published_metric()  # safety-net: a CloudWatch alarm fires if this metric goes absent (no episode > 8d)
-    _notify_new_episode(ep)  # tell subscribers (best-effort; never blocks publish)
+    _notify_new_episode(ep)  # operator SNS ping (best-effort; never blocks publish)
+    # Confirmed-subscriber email blast — OFF by default (PANELCAST_NOTIFY_SUBSCRIBERS).
+    # Flip on only after a {"notify_test": "<addr>"} dry-run looks right, so the very
+    # first real episodes never blind-blast the list. Best-effort; never blocks publish.
+    if os.environ.get("PANELCAST_NOTIFY_SUBSCRIBERS", "false").lower() == "true":
+        try:
+            _email_subscribers(ep)
+        except Exception as e:
+            logger.warning("[panel] subscriber blast failed — %s", e)
     logger.info("[panel] wk%s PUBLISHED — %d turns, %d bytes, guest %s", week, len(clean), len(audio), guest_id)
     return {
         "statusCode": 200,
@@ -878,6 +1009,7 @@ def _run_weekly(force: bool) -> dict:
 def lambda_handler(event, context):
     event = event or {}
     force = bool(event.get("force"))
+    dry_run = bool(event.get("dry_run"))
 
     try:
         from budget_guard import current_tier
@@ -889,6 +1021,20 @@ def lambda_handler(event, context):
     except Exception:
         pass
 
+    # Test-first subscriber notify: email ONLY the given address, using the latest
+    # published episode, without publishing anything. Verify before flipping
+    # PANELCAST_NOTIFY_SUBSCRIBERS=true. Usage: {"notify_test": "you@example.com"}.
+    if event.get("notify_test"):
+        try:
+            eps = json.loads(s3.get_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/episodes.json")["Body"].read()).get("episodes", [])
+            if not eps:
+                return {"statusCode": 200, "body": json.dumps({"notify_test": "no episodes to announce"})}
+            latest = max(eps, key=lambda e: e.get("week", 0))
+            return {"statusCode": 200, "body": json.dumps(_email_subscribers(latest, test_to=str(event["notify_test"])))}
+        except Exception as e:
+            logger.error("[panel] notify_test failed — %s", e)
+            return {"statusCode": 500, "body": json.dumps({"notify_test": "failed", "error": str(e)[:200]})}
+
     # Episode 0 — the full welcome/trailer (all coaches + Elena). One-off / manual.
     if event.get("intro"):
         try:
@@ -899,7 +1045,7 @@ def lambda_handler(event, context):
 
     # Weekly autonomous run (the board-reviewed pipeline). Latest week, publish-or-HOLD.
     try:
-        return _run_weekly(force)
+        return _run_weekly(force, dry_run=dry_run)
     except Exception as e:
         logger.error("[panel] weekly run failed — %s", e)
         return {"statusCode": 500, "body": json.dumps({"weekly": "failed", "error": str(e)[:200]})}

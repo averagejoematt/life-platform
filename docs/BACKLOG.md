@@ -59,7 +59,7 @@
 | **📦 New work surfaced (post-V2)** | 7 | N-01 ✅ closed · N-08 ✅ resolved 2026-06-06 (tier 3→1) |
 | **🌐 v4 website + ops follow-ups** | 5 | S-01 ✅ + S-02 ✅ + S-06 ✅ deployed · B-03 ✅ · S-03/S-04/S-05 open · S-07 deferred |
 | **🚀 Product & Growth (PG)** | 7 | NEW 2026-06-07 summit. PG-00 ✅ · **PG-01/02/03/05/06 ✅ deployed; PG-04 ✅ native-SES (CI-deploy pending); PG-14 ✅ Tier-A productionized 2026-06-09 → CHANGELOG** · PG-04b/PG-13 remain · **PG-07 gate-blocked on D-05 (~2026-06-17)** |
-| **🔬 External-Review rigor (ER)** | 6 | NEW 2026-06-09 external-lens review. **ER-01 ✅ + ER-02 ✅ done → CHANGELOG.** ER-03 remains the objective-gap tier (do next); ER-04..08 = recorded-decision / honesty items. Full spec: `docs/specs/ER_EXTERNAL_REVIEW_RIGOR_2026-06-09.md` |
+| **🔬 External-Review rigor (ER)** | 5 | NEW 2026-06-09 external-lens review. **ER-01 ✅ + ER-02 ✅ + ER-03 Layer 1 ✅ done (the whole objective-gap Tier 1).** Remaining: ER-03 Layer 2 (LLM judge, deferred) + ER-04..08 recorded-decision / honesty items. Full spec: `docs/specs/ER_EXTERNAL_REVIEW_RIGOR_2026-06-09.md` |
 | **TOTAL OPEN** | **~38** | 2026-06-09: ER-01 + ER-02 + PG-14 ✅ closed; +8 ER from external-review lens. 2026-06-07: +14 PG from summit; PG-00/01/02/03/04/05/06 + PG-14-spike closed same day; PG-04b logged |
 
 ---
@@ -207,11 +207,10 @@
 ### ER-02 — Upstream-API contract tests (recorded fixtures) · Tier 1 · ✅ DONE 2026-06-09
 - **Shipped** (tests only, no deploy): `tests/test_upstream_contracts.py` + 9 scrubbed fixtures `tests/fixtures/upstream/**` (whoop/withings/hae priority + strava/garmin) + `deploy/refresh_upstream_fixtures.py` (live re-pull/scrub/diff) + a CI gating step. Offline suite 1630 green; injection-tested (rename fails shape+roundtrip; planted token fails the scrub guard). See CHANGELOG → "ER-02 — 2026-06-09".
 
-### ER-03 — AI-output eval harness (the "is the advice correct" gap) · Tier 1 · Effort M–L
+### ER-03 — AI-output eval harness (the "is the advice correct" gap) · Tier 1 · Layer 1 ✅ DONE 2026-06-14 · Layer 2 deferred
 - **Why:** `visual_ai_qa.py` checks pages *render*; nothing checks the coach/insight *content* is correlative-only, confidence-labelled, fabricates no numbers, does no LLM math. The board can't see this — it's the same kind of AI grading itself. **Truthfulness gate, not a new engine — build-cap does not apply.**
-- **Action:** *Layer 1 (offline, gating, ~zero cost):* feed fixture inputs (fixed day / genesis-empty / sparse / outlier) through `ai_calls`/`ai_summaries`/`coach_computation_engine`, assert no banned causal connectives on correlations, confidence labels when N<30 / "preliminary" <12, **every output number present in the input** (anti-fabrication), no "Matthew"-prefixed output. Pattern = `test_ai_endpoint_hardening.py` applied to *output*. *Layer 2 (optional, budget-gated):* Haiku judge vs an in-repo rubric, self-skips at tier ≥2.
-- **Acceptance:** Layer 1 gates in CI; seeded fabricated-number / causal-claim / unlabelled-N=4 fails it; Layer 2 self-skips tier ≥2, never blocks on 5xx; documented in `docs/TESTING.md`.
-- **Gate:** none for Layer 1; Layer 2 on a tier-0 window + cost check.
+- **Layer 1 — SHIPPED (tests only, no deploy):** `tests/test_ai_output_faithfulness.py` (offline, **gating**) drives `er03_gate.er03_check` over a labelled corpus `tests/fixtures/ai_inputs/faithfulness_cases.json` (11 cases: good must PASS; planted-bad must FAIL across all four classes — fabricated number / causal connective / unhedged small-N / "Matthew" opener) + a wiring-coverage guard that the reader-facing paths (`coach_daily_reflection_lambda`, `coach_panel_podcast_lambda`) still route through `er03_gate`. 14 tests green; load-bearing (seeded fabrication caught); documented in `docs/TESTING.md` §11. See CHANGELOG → "ER-03 Layer 1 — 2026-06-14".
+- **Layer 2 (deferred):** Haiku judge vs an in-repo rubric, self-skips at budget tier ≥2, never blocks on 5xx. Do on a tier-0 window + cost check when appetite allows.
 
 ### ER-04 — MCP tool utilisation audit + prune (the 8% problem) · Tier 3 · Effort M
 - **Why:** 133 tools, ~11 used in 30d (EMF `LifePlatform/MCP ToolInvocations`). Sharpens **B-02** from time-gated (re-eval 2026-07-17) to decision-driven now.

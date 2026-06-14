@@ -1,3 +1,13 @@
+## ER-03 Layer 1 — 2026-06-14 (AI-output faithfulness harness, offline + gating)
+
+Closes the last of the objective-gap Tier-1 ER findings (ER-01/02 already done): the **inverted-testing** gap where QA verified pages *render* but nothing verified the coach/insight AI *content* obeys the platform's own honesty standard.
+
+### Added
+- **`tests/test_ai_output_faithfulness.py`** (offline, **gating**) — drives `er03_gate.er03_check` over a labelled corpus `tests/fixtures/ai_inputs/faithfulness_cases.json` (11 cases). Good outputs must PASS; planted-bad must FAIL across all four classes: a **fabricated number** (any output number not in the input — also catches LLM arithmetic), a **causal connective** on a correlation, an **unhedged small-N** claim (`N<30`), and a **"Matthew"-prefixed** opening. Plus a **wiring-coverage guard**: the reader-facing paths (`coach_daily_reflection_lambda`, `coach_panel_podcast_lambda`) must keep routing through `er03_gate`, so a refactor can't silently drop the truthfulness gate. 14 tests green; verified load-bearing (a seeded fabrication is caught). Documented in `docs/TESTING.md` §11.
+- **Layer 2** (a budget-gated Haiku judge vs an in-repo rubric, self-skipping at tier ≥2) intentionally **deferred** — the deterministic Layer 1 is the high-value, zero-cost half. Spec: `docs/specs/ER_EXTERNAL_REVIEW_RIGOR_2026-06-09.md`.
+
+---
+
 ## Stabilization sweep — 2026-06-13 (CI-green restore · future-genesis 500s · build_html split · Whoop re-auth · DLQ drain)
 
 Nine PRs (#90–#98) merged to `main` (`c256750`); full CI/CD verified green end-to-end. See `handovers/HANDOVER_2026-06-13_StabilizationFutureGenesisSweep.md` for the Deploy Ledger (live vs merged-only).
