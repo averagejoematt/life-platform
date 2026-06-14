@@ -315,6 +315,25 @@ def _team_tensions():
         return []
 
 
+def _lead_block(team_focus):
+    """The Principal Investigator (Dr. Eli Marsh) — the lead above the 8 coaches.
+    A non-operational orchestrator persona; surfaced as the head of the team."""
+    lp = _registry().get("personas", {}).get("eli_marsh")
+    if not lp:
+        return None
+    return {
+        "persona_id": "eli_marsh",
+        "name": lp.get("name"),
+        "emoji": lp.get("emoji"),
+        "color": lp.get("color"),
+        "role": lp.get("board_role"),
+        "short_bio": lp.get("short_bio"),
+        "philosophy": lp.get("philosophy"),
+        "expertise": lp.get("expertise", []),
+        "staff_focus": (team_focus or [])[:3],  # what he's got the staff focused on
+    }
+
+
 def handle_coach_team(event):
     """GET /api/coach_team — the "My Team" view (CC-10): the team's collective read
     on Matthew right now. Stance focus + per-coach huddle + the live tension map.
@@ -353,6 +372,7 @@ def handle_coach_team(event):
         return _ok(
             {
                 "as_of_weight_lbs": weight,
+                "lead": _lead_block(team_focus),
                 "team_focus": team_focus,
                 "huddle": huddle,
                 "tensions": _team_tensions(),

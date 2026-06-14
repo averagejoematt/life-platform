@@ -333,3 +333,13 @@ body { overflow-x: hidden; }
 .coach-stance .label, .coach-progress .label, .coach-report .label, .coach-journey .label,
 .coach-rel .label, .coach-daily .label, .team-focus .label, .team-tension .label,
 .team-huddle .label, .cr-rate, .tf-list li, .th-name, .cj-date { font-family: var(--font-mono); }
+
+/* ── The lead / Principal Investigator card — head of the team (2026-06-13) ──── */
+.team-lead { margin: var(--sp-4) 0; padding: var(--sp-4); border: 1px solid var(--ember-line); border-left: 3px solid #0ea5e9; background: var(--surface-raised); border-radius: var(--radius-sm); }
+.team-lead .label { font-family: var(--font-mono); }
+.tl-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2) var(--sp-3); margin-top: var(--sp-1); }
+.tl-name { font-family: var(--font-serif); font-size: var(--fs-h4, 1.25rem); font-weight: 600; color: var(--ink); }
+.tl-role { color: var(--ink-dim); }
+.tl-bio { margin-top: var(--sp-2); font-family: var(--font-serif); }
+.tl-philosophy { margin: var(--sp-3) 0 0; padding-left: var(--sp-3); border-left: 2px solid var(--ember-line); font-family: var(--font-serif); font-style: italic; color: var(--ink); max-width: var(--measure); }
+.tl-focus { margin-top: var(--sp-3); font-family: var(--font-mono); color: var(--ink-dim); }

@@ -172,7 +172,8 @@ def _gate_turns(turns: list, allowed_numbers, coach_id: str) -> list:
 def _synthesize_dialogue(turns: list) -> bytes:
     audio = b""
     for t in turns:
-        audio += google_tts.synthesize(t["line"], _voice(t["speaker"]))
+        gain = _INTRO_VOLUME_GAIN.get(t["speaker"], 0.0) if "_INTRO_VOLUME_GAIN" in globals() else 0.0
+        audio += google_tts.synthesize(t["line"], _voice(t["speaker"]), volume_gain_db=gain)
     return audio
 
 
@@ -243,31 +244,53 @@ MISSION_BRIEF = (
 )
 
 
-def _intro_roster() -> list:
-    out = [("elena_voss", "Elena Voss", "host — embedded journalist")]
-    for cid in persona_registry.OPERATIONAL_COACH_IDS:
-        p = persona_registry.resolve(cid, s3, S3_BUCKET) or {}
-        out.append((cid, p.get("name") or cid, f"{p.get('board_role') or p.get('domain')}: {p.get('short_bio', '')}"))
-    return out
+INTRO_GUEST_ID = "eli_marsh"  # Dr. Eli Marsh — Principal Investigator (the lead)
+# Per-voice loudness trim (dB) — only used by the legacy Chirp stitch path.
+_INTRO_VOLUME_GAIN = {ELENA: 0.0, INTRO_GUEST_ID: 0.0}
+# Episode 0 is synthesized single-pass via Gemini (genuine conversation). Map the
+# two speakers to Gemini prebuilt voices; Elena = host (breezy), Eli = guest (informative).
+INTRO_GEMINI_VOICES = {"Elena": "Aoede", "Eli": "Charon"}
+INTRO_STYLE = (
+    "Read the following as a warm, lively two-person podcast interview — natural, conversational, "
+    "like two people talking in a studio, with genuine back-and-forth. Elena is the host; Eli is the guest."
+)
+
+
+def _intro_guest() -> dict:
+    p = persona_registry.resolve(INTRO_GUEST_ID, s3, S3_BUCKET) or {}
+    return {
+        "name": p.get("name", "Dr. Eli Marsh"),
+        "role": p.get("board_role", "Principal Investigator"),
+        "bio": p.get("short_bio", ""),
+        "philosophy": p.get("philosophy", ""),
+        "expertise": p.get("expertise", []),
+    }
 
 
 def _build_intro_script(prequel_text: str) -> list:
+    """Episode 0 as a two-person interview: Elena (host) interviews the PI."""
     import bedrock_client
 
-    roster = "\n".join(f"- {cid}: {name} — {desc}" for cid, name, desc in _intro_roster())
+    g = _intro_guest()
     system = (
-        "You write Episode 0 — a warm, lively TRAILER introducing a public health-experiment website and its podcast. "
-        "HOST is Elena Voss. Structure: (1) Elena welcomes listeners and introduces the project and Matthew; (2) she walks "
-        "through the website's three doors — the Cockpit, the Story, the Evidence — and the chronicle + this podcast; "
-        "(3) MEET THE TEAM: each coach gets one short turn, in their own voice, to say who they are and what they watch; "
-        "(4) Elena closes on the overarching goal. "
-        'Output ONLY a JSON array [{"speaker":"<id>","line":"..."}] where <id> is "elena_voss" or a coach id from the roster. '
-        "18–28 turns. Conversational and warm. Rules: correlative only (never causal); use only numbers present in the brief; "
-        "hedge that the journey is just beginning; never open a line with 'Matthew'; no preamble or JSON fences."
+        "You write Episode 0 of a podcast: a warm, intriguing TWO-PERSON interview that introduces a public health-experiment "
+        "website to a complete stranger and makes them want to follow the series. "
+        f"HOST is Elena Voss, the embedded journalist. GUEST is {g['name']}, {g['role']} — he runs the experiment and directs a "
+        "coaching staff of eight specialists. It must feel like a REAL conversation, not narration: Elena asks sharp, curious, "
+        "human questions and reacts to the answers; the guest replies like a person — warm, plain-spoken, the occasional vivid line. "
+        "Follow a natural arc: a hook about who Matthew is and why this is worth watching; the goal and what's at stake; the story "
+        "so far; how the experiment actually works (one experiment at a time, eight specialists pointed at a single goal, the data "
+        "out in the open); and a closing line that makes the listener want to come back. "
+        'Output ONLY a JSON array of turns: [{"speaker":"elena"|"eli","line":"..."}]. 16–24 turns. Vary turn length; let them build '
+        "on each other. Rules: correlative only (never claim causation); use only numbers present in the brief; frame it as early "
+        "days; never open a line with 'Matthew'; no preamble, no stage directions, no JSON fences."
     )
     user = (
-        f"MISSION BRIEF:\n{MISSION_BRIEF}\n\nPREQUEL (Elena's own words):\n{prequel_text[:2500]}\n\n"
-        f"ROSTER (use these exact speaker ids):\n{roster}\n\nWrite the JSON dialogue now."
+        f"MISSION BRIEF:\n{MISSION_BRIEF}\n\n"
+        f"THE GUEST — {g['name']} ({g['role']}):\nBio: {g['bio']}\nPhilosophy: {g['philosophy']}\n"
+        f"Expertise: {', '.join(g['expertise'])}\n\n"
+        f"BACKGROUND for texture (Elena's prequel chronicle):\n{prequel_text[:2000]}\n\n"
+        "Write the JSON interview now."
     )
     body = {"model": MODEL, "max_tokens": 3000, "system": system, "messages": [{"role": "user", "content": user}]}
     resp = bedrock_client.invoke(body, model_name=MODEL)
@@ -282,13 +305,8 @@ def _build_intro_script(prequel_text: str) -> list:
 
 
 def _gate_intro(turns: list, allowed_numbers) -> list:
-    """ER-03 gate + resolve any speaker (elena or any coach) to a persona id."""
-    valid = set(persona_registry.OPERATIONAL_COACH_IDS) | {ELENA}
-    name_to_id = {}
-    for cid in persona_registry.OPERATIONAL_COACH_IDS:
-        nm = persona_registry.display_name(cid, s3, S3_BUCKET)
-        if nm:
-            name_to_id[nm.lower()] = cid
+    """ER-03 gate + resolve the two speakers — Elena (host) and Eli (guest)."""
+    eli_aliases = {"eli", "eli_marsh", "dr. eli marsh", "eli marsh", "marsh", "guest", "principal investigator", "pi"}
     clean = []
     for t in turns:
         if not isinstance(t, dict):
@@ -296,10 +314,8 @@ def _gate_intro(turns: list, allowed_numbers) -> list:
         raw = (t.get("speaker") or "").strip().lower()
         if raw in ("elena", "host", "elena_voss"):
             spk = ELENA
-        elif raw in valid:
-            spk = raw
-        elif raw in name_to_id:
-            spk = name_to_id[raw]
+        elif raw in eli_aliases:
+            spk = INTRO_GUEST_ID
         else:
             continue
         line = (t.get("line") or "").strip()
@@ -319,13 +335,19 @@ def _run_intro() -> dict:
         if md:
             prequel = _strip_md(md)
             break
-    allowed = er03_gate.numbers_in(MISSION_BRIEF + " " + prequel)
+    g = _intro_guest()
+    allowed = er03_gate.numbers_in(" ".join([MISSION_BRIEF, prequel, g["bio"], g["philosophy"]]))
     turns = _gate_intro(_build_intro_script(prequel), allowed)
     if len(turns) < 6:
         logger.warning("[panel] intro: too few clean turns (%d)", len(turns))
         return {"statusCode": 500, "body": json.dumps({"intro": "too few turns", "turns": len(turns)})}
-    audio = _synthesize_dialogue(turns)
-    s3.put_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/wk0.mp3", Body=audio, ContentType="audio/mpeg", CacheControl="max-age=86400, public")
+    # Single-pass conversation via Gemini (Elena + Eli genuinely talking).
+    import gemini_tts
+
+    label_of = {ELENA: "Elena", INTRO_GUEST_ID: "Eli"}
+    label_turns = [{"speaker": label_of.get(t["speaker"], "Elena"), "line": t["line"]} for t in turns]
+    audio = gemini_tts.synthesize_dialogue(label_turns, INTRO_GEMINI_VOICES, INTRO_STYLE)
+    s3.put_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/wk0.wav", Body=audio, ContentType="audio/wav", CacheControl="max-age=86400, public")
     try:
         existing = json.loads(s3.get_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/episodes.json")["Body"].read()).get("episodes", [])
     except Exception:
@@ -334,9 +356,9 @@ def _run_intro() -> dict:
         "week": 0,
         "title": "Episode 0 — Welcome to The Measured Life",
         "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-        "url": "/panelcast/wk0.mp3",
+        "url": "/panelcast/wk0.wav",
         "bytes": len(audio),
-        "excerpt": "Meet Matthew, the mission, and the whole team — a full introduction to the site, the chronicle, and this podcast.",
+        "excerpt": "Elena sits down with Dr. Eli Marsh, the Principal Investigator running the experiment — who Matthew is, the goal, the story, and what his coaching staff is chasing.",
     }
     existing = [e for e in existing if e.get("week") != 0] + [ep]
     existing.sort(key=lambda e: e.get("week", 0), reverse=True)
