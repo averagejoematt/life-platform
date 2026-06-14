@@ -424,6 +424,8 @@ def _run_intro() -> dict:
         "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "url": "/panelcast/wk0.wav",
         "bytes": len(audio),
+        "duration_sec": max(1, (len(audio) - 44) // (gemini_tts.SAMPLE_RATE * 2)),  # WAV: 16-bit mono PCM
+        "byline": "Elena + Dr. Eli Marsh",
         "excerpt": "Meet Elena, meet Matthew, and meet the question this whole experiment is built to answer: can AI and your own data actually make a life better — or is it just over-optimization? The starting line.",
     }
     existing = [e for e in existing if e.get("week") != 0] + [ep]
