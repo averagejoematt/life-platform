@@ -232,7 +232,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 
 /* Left tiles */
 .ev-side { display: grid; gap: var(--sp-2); position: sticky; top: var(--sp-4); }
-@media (max-width: 819px) { .ev-side { position: static; grid-auto-flow: column; grid-auto-columns: 78%; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: var(--sp-2); } .ev-side .ev-tile { scroll-snap-align: start; } }
+@media (max-width: 819px) { .ev-side { position: static; grid-auto-flow: column; grid-auto-columns: min(62vw, 220px); overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: var(--sp-2); } .ev-side .ev-tile { scroll-snap-align: start; } }
 .ev-tile { text-align: left; cursor: pointer; background: var(--surface); border: var(--border-hair); border-left: 2px solid transparent;
   border-radius: var(--radius); padding: var(--sp-3) var(--sp-4); display: grid; gap: 3px; transition: border-color var(--dur-fast), background var(--dur-fast); color: inherit; }
 .ev-tile:hover { border-color: var(--rule-strong); }
