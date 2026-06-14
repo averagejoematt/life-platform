@@ -99,6 +99,7 @@ SOURCE_CLASS: dict[str, str] = {
     "centenarian_progress": EXPERIMENT_SCOPED,
     "nutrition_review": EXPERIMENT_SCOPED,
     "chronicle": EXPERIMENT_SCOPED,  # the Wednesday narrative (curated carry-forward at restart)
+    "panelcast": EXPERIMENT_SCOPED,  # The Panel podcast series_state (open bets, recent topics) — resets with the cycle
     "insights": EXPERIMENT_SCOPED,
     "hypotheses": EXPERIMENT_SCOPED,
     "experiments": EXPERIMENT_SCOPED,

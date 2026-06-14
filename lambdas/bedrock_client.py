@@ -65,7 +65,9 @@ def _client():
             "bedrock-runtime",
             region_name=BEDROCK_REGION,
             config=Config(
-                read_timeout=60,
+                # 60s was too short for long Sonnet narrative passes (4k-token
+                # podcast scripts) → intermittent ReadTimeout. 180s gives headroom.
+                read_timeout=180,
                 connect_timeout=10,
                 retries={"max_attempts": 2, "mode": "adaptive"},
             ),

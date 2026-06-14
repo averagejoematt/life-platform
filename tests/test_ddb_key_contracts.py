@@ -38,6 +38,7 @@ pytestmark = pytest.mark.integration
 # (pk, sk) pairs that may legitimately be absent — reason required.
 KNOWN_OPTIONAL: dict[tuple, str] = {
     ("USER#matthew#ledger", "TOTALS#current"): "zeroed/recreated by restart_ledger_reset (ADR-072)",
+    ("USER#matthew#SOURCE#panelcast", "STATE#current"): "The Panel series_state — seeded on the first published weekly episode; _state_read tolerates absence (returns {})",
 }
 
 # Module-level constant values used to resolve f-strings statically.

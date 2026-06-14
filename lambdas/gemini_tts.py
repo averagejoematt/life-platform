@@ -27,10 +27,11 @@ from secret_cache import get_secret_json
 SECRET_NAME = os.environ.get("GOOGLE_TTS_SECRET", "life-platform/google-tts")
 MODEL = os.environ.get("GEMINI_TTS_MODEL", "gemini-2.5-flash-preview-tts")
 SAMPLE_RATE = 24000
-# Chunk long dialogues so a single call stays well under the model's audio cap;
-# PCM from same model+voices concatenates seamlessly. Each chunk is still a
-# single-pass conversation internally.
-MAX_TURNS_PER_CALL = 8
+# Prefer ONE call so the whole conversation is truly single-pass (no prosody reset
+# at a seam — an 8-turn split produced an audible "handoff" ~2 min in). A full
+# ~20-28 turn / ~7 min episode fits one Gemini call (verified). Only splits if a
+# script is exceptionally long; PCM from same model+voices concatenates cleanly.
+MAX_TURNS_PER_CALL = 40
 
 _sm = boto3.client("secretsmanager", region_name=os.environ.get("AWS_REGION", "us-west-2"))
 

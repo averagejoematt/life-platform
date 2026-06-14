@@ -2505,3 +2505,20 @@ The AWS "account-controls" sub-grade stays below a literal-checklist A on those 
 **Consequences:** the public surfaces are credible *because* they expose failure; the refusal is on the record so a future "just add the projection line, it looks cooler" request is met with the documented reason it stays out. The honesty is the product.
 
 ---
+
+## ADR-087: Podcast audio realism is bounded by a two-stage (script → TTS) pipeline; monitor for a NotebookLM-grade API
+
+**Status:** Accepted (2026-06-14)
+
+**Context:** The podcast ("The Panel" + Episode 0) should feel like a real NotebookLM-style conversation — natural overlaps, interjections, laughter, banter. Our architecture is deliberately two-stage: **Bedrock (Sonnet) writes a script** (a list of `{speaker, line}` turns), then **Gemini 2.5 multi-speaker TTS reads that finished script** single-pass (`lambdas/gemini_tts.py`). NotebookLM, by contrast, uses Google's internal Audio-Overview model that *generates the performance holistically* — it can overlap speakers, improvise backchannel, and laugh because writing and performing are one model.
+
+**Decision — accept the Gemini two-stage approach for now, and name the ceiling explicitly:**
+- **The audio model is a real ceiling.** Gemini TTS performs *exactly* the turns it is given, sequentially. It will not truly overlap speech, interrupt, or laugh unless the script implies it — and even then it renders read text, not improvised performance. This is a property of the public API, not our prompt. We have **pushed the lever we control** — the script + style prompts now instruct genuine back-and-forth (short interjections, reactions, gentle interruptions, varied turn length; no bracketed stage directions) — which is where most of the perceived "podcastiness" comes from.
+- **Why not the better tech:** Google's **Studio MultiSpeaker** voice (closest to NotebookLM's conversational audio) is **allowlist-only** (`403 PERMISSION_DENIED`), and there is no public "Audio Overviews" generation API. Gemini 2.5 multi-speaker is the best generally-available primitive and is what we ship.
+- **Auth/account constraint (related):** the Gemini key lives on a **personal Google account** because the managed `mattsusername.com` Workspace domain blocks AI Studio (admin policy).
+
+**Monitor trigger (revisit this ADR when):** Google ships a public **Audio Overviews / conversational-audio generation API**, OR grants **Studio MultiSpeaker allowlist** access, OR Gemini TTS adds true multi-speaker overlap / non-verbal control. Any of these → swap the synth backend in `gemini_tts.py` (the script stage + the whole QA pipeline stay; only the voicing call changes). Until then the realism gap is a known, accepted limitation, not a bug.
+
+**Consequences:** expectations are set — the show is "two AI voices reading a genuinely conversational script," not generated banter; the upgrade path is a single isolated backend swap; and the gap is tracked rather than re-litigated each time an episode "doesn't feel quite like NotebookLM."
+
+---
