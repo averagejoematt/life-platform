@@ -351,3 +351,26 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .cp-link { display: inline-block; margin-top: var(--sp-2); font-family: var(--font-mono); font-size: var(--fs-label);
   color: var(--ember); text-decoration: none; border-bottom: 1px solid var(--ember-line); }
 .cp-link:hover { border-color: var(--ember); }
+
+/* ── Mobile: the three doors become a fixed, thumb-reachable bottom app-bar
+   (2026-06-14). Replaces the old top-nav shrink-to-9px. tokens.css loads before
+   the per-door CSS, so !important is required to supersede .cockpit-top/.doors. */
+@media (max-width: 600px) {
+  .doors {
+    position: fixed !important; left: 0; right: 0; bottom: 0; z-index: 60;
+    display: flex !important; justify-content: space-around; align-items: stretch;
+    gap: 0 !important;
+    padding: 0 .25rem env(safe-area-inset-bottom) !important;
+    background: var(--surface-raised, #14110b);
+    border-top: 1px solid var(--ember-line, rgba(140,120,90,.28));
+    box-shadow: 0 -2px 14px rgba(0,0,0,.28);
+  }
+  .doors a {
+    flex: 1; display: flex !important; align-items: center; justify-content: center;
+    min-height: 52px; padding: .5rem .25rem !important;
+    font-size: .72rem !important; letter-spacing: .04em !important; text-align: center;
+  }
+  .doors a[aria-current="page"] { border-bottom: 0 !important; color: var(--ember) !important; }
+  /* content clears the fixed bar (incl. iOS home-indicator inset) */
+  body { padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
+}

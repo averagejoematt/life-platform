@@ -119,7 +119,7 @@ body { overflow-x: hidden; }
 
 /* Waveform — honest down-beats in muted ink, never alarm-red */
 .waveform { margin-top: var(--sp-5); }
-.wave { display: flex; align-items: flex-end; gap: 2px; height: 160px; width: 100%; }
+.wave { display: flex; align-items: flex-end; gap: 2px; height: clamp(96px, 38vw, 160px); width: 100%; }
 .wave .bar { flex: 1; min-width: 2px; border-radius: 1px 1px 0 0; background: var(--ink-faint); transition: height var(--dur-slow) var(--ease-out); }
 .wave .bar.up { background: var(--ember); }
 .wave .bar.mid { background: var(--ink-muted); }

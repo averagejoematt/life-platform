@@ -137,7 +137,19 @@ aws s3 sync "$BUILD_DIR/" "s3://$BUCKET/$S3_PREFIX/" \
   --exclude "data/*" \
   --exclude ".git/*" \
   --exclude ".DS_Store" \
+  --exclude "*.webmanifest" \
+  --exclude "sw.js" \
   --cache-control "max-age=3600, public" \
+  --region "$REGION"
+
+# PWA control files MUST NOT be long-cached: a stale manifest = silent install
+# failure, and a service worker must always re-check for updates.
+echo "→ PWA manifest + service worker (max-age=300, must-revalidate)..."
+aws s3 sync "$BUILD_DIR/" "s3://$BUCKET/$S3_PREFIX/" \
+  --exclude "*" \
+  --include "*.webmanifest" \
+  --include "sw.js" \
+  --cache-control "max-age=300, must-revalidate, public" \
   --region "$REGION"
 
 echo ""
