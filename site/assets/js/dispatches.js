@@ -200,12 +200,24 @@ async function renderRead(s, id) {
     const secs = ent.duration_sec || Math.round((ent.bytes || 0) / (isWav ? 48000 : 2097));  // WAV=24kHz·16-bit·mono; else MP3 est
     const mins = Math.max(1, Math.round(secs / 60));
     const byline = ent.byline || "Elena + a coach";
+    // The Panel ledger — the running scoreboard of coach bets + outcomes (proof-of-honesty).
+    const lg = await tryJSON("/api/panel_ledger");
+    let ledgerHTML = "";
+    if (lg && (lg.ledger || []).length) {
+      const r = lg.record || {};
+      ledgerHTML =
+        `<section class="panel-ledger"><p class="dx-kicker label">the bets · ${r.won || 0} won · ${r.lost || 0} lost${r.open ? ` · ${r.open} open` : ""}</p>` +
+        `<ul class="pl-list">${lg.ledger.slice(0, 12).map((b) => `<li class="pl-${esc(b.outcome)}"><span class="pl-tag label">wk${esc(b.week)} · ${esc(b.outcome)}</span> ${esc(b.bet)}</li>`).join("")}</ul>` +
+        (lg.disclosure ? `<p class="correlative">${esc(lg.disclosure)}</p>` : "") +
+        `</section>`;
+    }
     read.innerHTML =
       `<p class="dx-kicker label">the panel · weekly review · two AI voices</p>` +
       `<h3 class="dx-title">${esc(ent.title)}</h3>` +
       (ent.date ? `<p class="dx-stats label">${esc(ent.date)}</p>` : "") +
       `<div class="dx-listen"><audio controls preload="none" src="${esc(ent.url)}"></audio><span class="label">listen · ${esc(byline)} (~${mins} min)</span></div>` +
-      (ent.excerpt ? `<p class="dx-prose">${esc(ent.excerpt)}</p>` : "");
+      (ent.excerpt ? `<p class="dx-prose">${esc(ent.excerpt)}</p>` : "") +
+      ledgerHTML;
     return;
   }
   if (s.kind === "timeline") {
