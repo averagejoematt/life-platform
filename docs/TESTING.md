@@ -106,6 +106,28 @@ python3 -m pytest tests/ -m integration -v
 - Every route in `_SIMPLE_ROUTES` and `ROUTES` is dispatched
 - No-growth rule on `site_api_lambda.py` LOC count (catches lazy adds without refactor)
 
+### 11. AI-output faithfulness harness (`test_ai_output_faithfulness.py`) — ER-03 Layer 1
+The **inverted-testing** fix: `visual_ai_qa.py` checks that pages *render*; this
+checks that the coach/insight AI *content* obeys the honesty standard the platform
+sells. Offline + **gating** in CI (no AWS, no inference). The deterministic engine
+is `lambdas/er03_gate.py` (`er03_check`) — the same gate the coach daily-reflection
+batch and The Panel enforce at publish time. Two parts:
+- **Labelled corpus** (`tests/fixtures/ai_inputs/faithfulness_cases.json`) of
+  `(input → output)` pairs — good outputs must PASS; planted-bad outputs must FAIL
+  with the expected reason. Asserts the four failure classes: a **fabricated
+  number** (any output number not in the input — also catches LLM arithmetic), a
+  **causal connective** on a correlation, an **unhedged small-N** claim (`N<30`
+  needs confidence framing), and a **"Matthew"-prefixed** opening.
+- **Wiring-coverage guard** — the reader-facing paths that are supposed to be
+  gated (`coach_daily_reflection_lambda`, `coach_panel_podcast_lambda`) must still
+  route through `er03_gate`, so a refactor can't silently drop the truthfulness gate.
+
+The rubric lives in the gate module + the corpus README, not in a buried prompt
+string. **Layer 2** (a budget-gated Haiku judge vs an in-repo rubric, self-skipping
+at budget tier ≥2) is intentionally deferred — see
+`docs/specs/ER_EXTERNAL_REVIEW_RIGOR_2026-06-09.md`. Refresh good cases from real
+outputs deliberately; never weaken a planted-bad case to make CI green.
+
 ---
 
 ## What's NOT tested

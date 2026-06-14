@@ -1,0 +1,100 @@
+{
+  "_README": "ER-03 Layer 1 faithfulness corpus. Each case is a labelled (input -> AI output) pair exercised offline against er03_gate.er03_check. 'input_numbers' = numeric values present in the model's INPUT (any output number not here is a fabrication); 'n' = sample size behind the claim (null if N/A). 'expect_ok' is the required verdict; when false, 'expect_reason' is a substring that MUST appear in the gate's reasons. Cover the four failure classes (fabricated number, causal connective, unhedged small-N, 'Matthew' opener) across the reader-facing output styles. Refresh good cases from real outputs deliberately; never weaken a planted-bad case to make CI pass.",
+  "cases": [
+    {
+      "id": "coach_reflection_good_hedged",
+      "style": "coach_reflection",
+      "input_numbers": [7.2, 62, 3],
+      "n": 3,
+      "output": "Over the last 3 nights your sleep has trended toward 7.2 hours, and recovery has hovered near 62. Early days — this looks like a gentle upward drift, not yet a pattern. Tentative, but worth watching.",
+      "expect_ok": true
+    },
+    {
+      "id": "daily_insight_good_correlative",
+      "style": "daily_insight",
+      "input_numbers": [118, 92],
+      "n": 41,
+      "output": "Higher-step days tend to be associated with steadier glucose; on the 118-step-active days your average sat near 92. Correlative for now, but the association is consistent.",
+      "expect_ok": true
+    },
+    {
+      "id": "character_narrative_good_nonum",
+      "style": "character_narrative",
+      "input_numbers": [],
+      "n": null,
+      "output": "The discipline stat is holding. Showing up on the quiet days appears to be the throughline that keeps the streak alive.",
+      "expect_ok": true
+    },
+    {
+      "id": "panel_turn_good",
+      "style": "panel_turn",
+      "input_numbers": [5, 8000],
+      "n": null,
+      "output": "Five lifts logged, and the step target of 8000 held most days. Seems like the foundation is steadier than last cycle, though it's early.",
+      "expect_ok": true
+    },
+    {
+      "id": "fabricated_number_in_reflection",
+      "style": "coach_reflection",
+      "input_numbers": [7.2, 62],
+      "n": 30,
+      "output": "Your HRV climbed 14 points this week while sleep held near 7.2 hours and recovery near 62.",
+      "expect_ok": false,
+      "expect_reason": "fabricated number"
+    },
+    {
+      "id": "fabricated_percent_in_insight",
+      "style": "daily_insight",
+      "input_numbers": [92, 118],
+      "n": 40,
+      "output": "Glucose was 23% lower on active days versus rest days, averaging 92 against 118.",
+      "expect_ok": false,
+      "expect_reason": "fabricated number"
+    },
+    {
+      "id": "causal_because",
+      "style": "coach_reflection",
+      "input_numbers": [62, 7.2],
+      "n": 35,
+      "output": "Recovery sat near 62 this week because your sleep averaged 7.2 hours.",
+      "expect_ok": false,
+      "expect_reason": "causal connective"
+    },
+    {
+      "id": "causal_leads_to",
+      "style": "daily_insight",
+      "input_numbers": [8000, 92],
+      "n": 50,
+      "output": "Hitting 8000 steps leads to a glucose average near 92 on those days.",
+      "expect_ok": false,
+      "expect_reason": "causal connective"
+    },
+    {
+      "id": "unhedged_small_n",
+      "style": "daily_insight",
+      "input_numbers": [92, 4],
+      "n": 4,
+      "output": "Across 4 days your glucose average is 92. The active-day pattern is established and reliable.",
+      "expect_ok": false,
+      "expect_reason": "unhedged claim"
+    },
+    {
+      "id": "matthew_opener",
+      "style": "coach_reflection",
+      "input_numbers": [7.2],
+      "n": 40,
+      "output": "Matthew, your sleep trended toward 7.2 hours and that appears to be holding.",
+      "expect_ok": false,
+      "expect_reason": "Matthew"
+    },
+    {
+      "id": "compound_causal_plus_fabrication",
+      "style": "daily_insight",
+      "input_numbers": [62],
+      "n": 6,
+      "output": "Your recovery of 62 is due to the 9 hours of sleep you banked.",
+      "expect_ok": false,
+      "expect_reason": "fabricated number"
+    }
+  ]
+}
