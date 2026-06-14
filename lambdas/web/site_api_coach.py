@@ -278,6 +278,87 @@ def handle_coaches(event):
         return _ok({"coaches": [], "count": 0}, cache_seconds=60)
 
 
+def _team_tensions():
+    """Live cross-coach disagreements from the integrator digest (CC-10).
+    Same source as get_coach_disagreements; honest empty pre-data."""
+    try:
+        item = table.get_item(Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": "EXPERT#integrator"}).get("Item")
+        if not item:
+            return []
+        item = _decimal_to_float(item)
+        raw = item.get("disagreements") or item.get("active_disagreements") or []
+        out = []
+        for d in raw if isinstance(raw, list) else []:
+            if not isinstance(d, dict):
+                continue
+            coaches = d.get("coaches_involved") or d.get("coaches") or []
+            out.append(
+                {
+                    "topic": d.get("topic") or d.get("domain") or "",
+                    "coaches": coaches,
+                    "summary": d.get("resolution_suggested") or d.get("tension") or d.get("summary") or "",
+                    "position_a": d.get("coach_a_position"),
+                    "position_b": d.get("coach_b_position"),
+                }
+            )
+        return out
+    except Exception as _e:
+        logger.warning(f"[coach_team] tensions: {_e}")
+        return []
+
+
+def handle_coach_team(event):
+    """GET /api/coach_team — the "My Team" view (CC-10): the team's collective read
+    on Matthew right now. Stance focus + per-coach huddle + the live tension map.
+    All from CC-09 stance + the integrator digest; no new inference. Shaped-empty 200."""
+    if not _COACH_MODULES:
+        return _ok({"huddle": [], "team_focus": [], "tensions": []}, cache_seconds=60)
+    try:
+        ops = {k: v for k, v in _registry().get("personas", {}).items() if v.get("operational")}
+        weight = _latest_weight_lbs() or EXPERIMENT_BASELINE_WEIGHT_LBS
+        huddle, focus, stages = [], [], {}
+        for pid in persona_registry.OPERATIONAL_COACH_IDS:
+            p = ops.get(pid)
+            if not p:
+                continue
+            rung = _stance_block(pid, weight).get("rung") or {}
+            stages[pid] = rung.get("stage_id")
+            cares = rung.get("cares_most") or []
+            if cares:
+                focus.append(cares[0])
+            watches = rung.get("watches") or []
+            huddle.append(
+                {
+                    "persona_id": pid,
+                    "name": p.get("name"),
+                    "emoji": p.get("emoji"),
+                    "stage_id": rung.get("stage_id"),
+                    "headline": rung.get("headline"),
+                    "read_of_him": rung.get("read_of_him"),
+                    "watch": watches[0] if watches else None,
+                    "graduation_gate": rung.get("graduation_gate"),
+                }
+            )
+        seen = set()
+        team_focus = [f for f in focus if not (f in seen or seen.add(f))]
+        all_same = len(set(stages.values())) == 1 and bool(stages)
+        return _ok(
+            {
+                "as_of_weight_lbs": weight,
+                "team_focus": team_focus,
+                "huddle": huddle,
+                "tensions": _team_tensions(),
+                "all_same_stage": all_same,
+                "current_stage": next(iter(stages.values())) if all_same else None,
+                "disclosure": _DISCLOSURE,
+            },
+            cache_seconds=300,
+        )
+    except Exception as _e:
+        logger.warning(f"[/api/coach_team] {_e}")
+        return _ok({"huddle": [], "team_focus": [], "tensions": []}, cache_seconds=60)
+
+
 def handle_coach(event):
     """GET /api/coach/{persona_id} (or ?id=) — one coach page (CC-01 + CC-02)."""
     if not _COACH_MODULES:
