@@ -3,8 +3,8 @@ chronicle_podcast_lambda.py — Elena's chronicle as an auto-published podcast (
 
 Every published chronicle installment becomes an audio episode: the DDB
 record's content_markdown is stripped to narration text, synthesized with
-Amazon Polly (neural, chunked at sentence boundaries under the per-request
-char limit, MP3 frames concatenated), and written to
+Google Cloud Text-to-Speech (Chirp 3: HD — Elena's persistent voice from the
+persona registry; far more natural than the old Polly neural), and written to
 s3://{bucket}/generated/podcast/wk{N}.mp3. The run then rebuilds
 generated/podcast/episodes.json (consumed by the story page player) and
 generated/podcast/feed.xml (a podcast RSS with enclosures).
@@ -12,11 +12,11 @@ generated/podcast/feed.xml (a podcast RSS with enclosures).
 Served publicly at /podcast/* via the S3GeneratedOrigin CloudFront behavior.
 
 Idempotent: weeks that already have an MP3 are skipped (event {"force": true}
-re-renders everything). Scheduled Wed 15:40 UTC — after the chronicle
-publishes (15:00) and the email sends (15:10).
+re-renders everything — use this once after the voice swap to re-render the
+back catalogue). Scheduled Wed 15:40 UTC — after the chronicle publishes (15:00)
+and the email sends (15:10).
 
-Cost: Polly neural ≈ $16/1M chars → a 9k-char installment ≈ $0.15. Not
-Bedrock, so outside the AI budget tiers — but cheap enough not to matter.
+Cost: Chirp 3: HD ≈ $30/1M chars with 1M chars/month free → effectively $0.
 """
 
 import json
@@ -25,6 +25,8 @@ import re
 from datetime import datetime, timezone
 
 import boto3
+import google_tts
+import persona_registry
 
 try:
     from platform_logger import get_logger
@@ -40,14 +42,17 @@ REGION = os.environ.get("AWS_REGION", "us-west-2")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
-VOICE_ID = os.environ.get("PODCAST_VOICE_ID", "Ruth")
 SITE = "https://averagejoematt.com"
 PREFIX = "generated/podcast"
-CHUNK_CHARS = 2700  # Polly synthesize_speech limit is 3000 billed chars
+# Fallback voice if the persona registry can't be read (Elena's assigned voice).
+ELENA_VOICE_FALLBACK = "en-US-Chirp3-HD-Aoede"
 
 s3 = boto3.client("s3", region_name=REGION)
-polly = boto3.client("polly", region_name=REGION)
 table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE_NAME)
+
+
+def _elena_voice() -> str:
+    return persona_registry.tts_voice("elena_voss", s3, S3_BUCKET) or ELENA_VOICE_FALLBACK
 
 
 def _markdown_to_narration(md: str) -> str:
@@ -63,28 +68,10 @@ def _markdown_to_narration(md: str) -> str:
     return t.strip()
 
 
-def _chunks(text: str):
-    """Split at sentence boundaries, each under CHUNK_CHARS."""
-    out, cur = [], ""
-    for sent in re.split(r"(?<=[.!?])\s+", text):
-        if len(cur) + len(sent) + 1 > CHUNK_CHARS and cur:
-            out.append(cur)
-            cur = sent
-        else:
-            cur = f"{cur} {sent}".strip()
-    if cur:
-        out.append(cur)
-    return out
-
-
 def _synthesize(text: str) -> bytes:
-    """Polly neural MP3 — chunked and concatenated (same voice/bitrate, so
-    raw MP3 frame concatenation is valid)."""
-    audio = b""
-    for chunk in _chunks(text):
-        resp = polly.synthesize_speech(Engine="neural", OutputFormat="mp3", VoiceId=VOICE_ID, Text=chunk)
-        audio += resp["AudioStream"].read()
-    return audio
+    """Google Chirp 3: HD MP3 in Elena's persistent voice (chunked + concatenated
+    inside google_tts; same voice/bitrate, so MP3 frame concatenation is valid)."""
+    return google_tts.synthesize(text, _elena_voice())
 
 
 def _published_posts() -> list:

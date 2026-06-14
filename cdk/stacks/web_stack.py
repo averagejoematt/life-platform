@@ -696,6 +696,18 @@ class WebStack(Stack):
                         allowed_methods=["GET", "HEAD"],
                         cached_methods=["GET", "HEAD"],
                     ),
+                    # "The Panel" two-host show — generated/panelcast/* (CC podcast)
+                    cloudfront.CfnDistribution.CacheBehaviorProperty(
+                        path_pattern="/panelcast/*",
+                        target_origin_id="S3GeneratedOrigin",
+                        viewer_protocol_policy="redirect-to-https",
+                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(query_string=False),
+                        default_ttl=3600,
+                        max_ttl=86400,
+                        min_ttl=0,
+                        allowed_methods=["GET", "HEAD"],
+                        cached_methods=["GET", "HEAD"],
+                    ),
                     cloudfront.CfnDistribution.CacheBehaviorProperty(
                         path_pattern="/public_stats.json",
                         target_origin_id="S3GeneratedOrigin",
