@@ -86,6 +86,9 @@
     "lambdas/compute/circadian_compliance_lambda.py": {
       "function": "circadian-compliance"
     },
+    "lambdas/compute/coach_daily_reflection_lambda.py": {
+      "function": "coach-daily-reflection"
+    },
     "lambdas/compute/daily_insight_compute_lambda.py": {
       "function": "daily-insight-compute"
     },
@@ -122,6 +125,9 @@
     "lambdas/emails/chronicle_email_sender_lambda.py": {
       "function": "chronicle-email-sender"
     },
+    "lambdas/emails/chronicle_podcast_lambda.py": {
+      "function": "chronicle-podcast"
+    },
     "lambdas/emails/daily_brief_lambda.py": {
       "function": "daily-brief"
     },
@@ -145,9 +151,6 @@
     },
     "lambdas/emails/wednesday_chronicle_lambda.py": {
       "function": "wednesday-chronicle"
-    },
-    "lambdas/emails/chronicle_podcast_lambda.py": {
-      "function": "chronicle-podcast"
     },
     "lambdas/emails/weekly_digest_lambda.py": {
       "function": "weekly-digest"

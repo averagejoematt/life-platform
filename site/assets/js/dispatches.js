@@ -106,6 +106,42 @@ async function renderTeamView(read) {
   read.querySelectorAll(".th-item").forEach((li) => li.querySelector(".th-btn").addEventListener("click", () => selectEntry(BYKEY["coaches"], li.dataset.coach)));
 }
 
+// CC-07 — the daily journey: each coach's recent outputs as a reverse-chron
+// timeline, grouped Today / This week / Earlier. Honest empty-state when thin.
+function coachJourneyHTML(ro) {
+  if (!(ro && ro.length)) return "";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dayMs = 86400000;
+  const bucket = (d) => {
+    const t = new Date(String(d) + "T00:00:00");
+    const diff = Math.round((today - t) / dayMs);
+    if (diff <= 0) return "Today";
+    if (diff <= 7) return "This week";
+    return "Earlier";
+  };
+  const groups = {};
+  for (const o of ro) {
+    const b = o.date ? bucket(o.date) : "Earlier";
+    (groups[b] = groups[b] || []).push(o);
+  }
+  let h = `<section class="coach-journey"><p class="dx-kicker label">the daily journey</p>`;
+  for (const label of ["Today", "This week", "Earlier"]) {
+    if (!groups[label]) continue;
+    h += `<p class="cj-band label">${label}</p><ol class="cj-list">`;
+    h += groups[label]
+      .map(
+        (o) =>
+          `<li><span class="cj-date label">${esc(o.date || "")}</span><span class="cj-sum">${esc(o.summary || "")}</span>` +
+          (o.themes && o.themes.length ? `<span class="cj-themes label">${o.themes.slice(0, 3).map(esc).join(" · ")}</span>` : "") +
+          `</li>`
+      )
+      .join("");
+    h += `</ol>`;
+  }
+  return h + `</section>`;
+}
+
 async function renderCoachPage(read, id) {
   read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the coach…</span></p>`;
   let d;
@@ -114,11 +150,14 @@ async function renderCoachPage(read, id) {
   let h = `<p class="dx-kicker label">${esc(d.emoji || "")} ${esc(d.board_role || d.domain || "")}</p>`;
   h += `<h3 class="dx-title">${esc(d.name || "")}</h3>`;
   if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
+  if (typeof d.daily === "string" && d.daily.trim()) {
+    h += `<section class="coach-daily"><p class="dx-kicker label">today's reflection</p><p class="cd-text">${esc(d.daily)}</p></section>`;  // CC-08
+  }
   h += coachStanceHTML(d.stance && d.stance.rung);
   const ro = d.recent_outputs || [];
   h += `<section class="coach-progress"><p class="dx-kicker label">how it's going</p>`;
   h += ro.length
-    ? `<ul class="coach-outputs">${ro.map((o) => `<li><span class="label">${esc(o.date || "")}</span> ${esc(o.summary || "")}</li>`).join("")}</ul>`
+    ? `<p class="coach-latest"><span class="label">${esc(ro[0].date || "")}</span> ${esc(ro[0].summary || "")}</p>`
     : `<p class="dx-prose">Tracking begins as data arrives — this coach narrates honest progress against its watches here, down-weeks included.</p>`;
   h += `</section>`;
   h += coachReportHTML(d.report_card);
@@ -134,6 +173,7 @@ async function renderCoachPage(read, id) {
     if ((rel.leaned_on_by || []).length) h += `<p class="cr-edges"><span class="label">leaned on by</span> ${rel.leaned_on_by.map(edge).join(" · ")}</p>`;
     h += `</section>`;
   }
+  h += coachJourneyHTML(ro);  // CC-07: the daily-journey timeline (spec anatomy: last)
   read.innerHTML = h;
 }
 
