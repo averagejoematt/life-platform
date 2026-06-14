@@ -268,6 +268,9 @@ INTRO_GUEST_ID = "eli_marsh"  # Dr. Eli Marsh — Principal Investigator (the le
 _INTRO_VOLUME_GAIN = {ELENA: 0.0, INTRO_GUEST_ID: 0.0}
 # Episode 0 is synthesized single-pass via Gemini (genuine conversation). Map the
 # two speakers to Gemini prebuilt voices; Elena = host (breezy), Eli = guest (informative).
+# Episode 0 is the flagship trailer — use Sonnet (follows the multi-step arc + hard
+# requirements far better than Haiku, which kept dropping Elena's self-intro).
+INTRO_MODEL = os.environ.get("AI_MODEL_SONNET", "claude-sonnet-4-6")
 INTRO_GEMINI_VOICES = {"Elena": "Aoede", "Eli": "Charon"}
 INTRO_STYLE = (
     "Read the following as a warm, lively two-person podcast interview — natural, conversational, "
@@ -308,9 +311,16 @@ def _build_intro_script(bible: dict) -> list:
         f"THE BIG QUESTION (the emotional hook — land it, don't rush past it):\n{bible.get('thesis', '')}\n\n"
         f"WHAT'S ACTUALLY BEING MEASURED:\n{bible.get('what_we_measure', '')}\n\n"
         f"TONE: {bible.get('tone', '')}\n\n"
-        f"FOLLOW THIS ARC:\n{arc}\n\n"
+        f"FOLLOW THIS ARC, IN ORDER:\n{arc}\n\n"
+        "NON-NEGOTIABLE REQUIREMENTS:\n"
+        "  - Elena's VERY FIRST line must include the words \"I'm Elena Voss\" and a sentence on who she is and why she's drawn "
+        "to this — she speaks first, alone, before the guest is introduced or speaks.\n"
+        "  - Matthew's honest story (the coping-mechanism truth, 'can a system catch what willpower can't') MUST appear IN THIS "
+        "episode — do NOT defer it to a future episode.\n"
+        "  - Elena must mention that she writes a WEEKLY chronicle and that this podcast runs alongside it.\n"
+        "  - Work in the platform doors (Cockpit / Story / Evidence / Sources / Character) naturally.\n\n"
         f"HARD GUARDRAILS (breaking any of these ruins the episode):\n{guards}\n\n"
-        'OUTPUT: ONLY a JSON array of turns [{"speaker":"elena"|"eli","line":"..."}], 18–26 turns. '
+        'OUTPUT: ONLY a JSON array of turns [{"speaker":"elena"|"eli","line":"..."}], 20–28 turns. '
         "No preamble, no stage directions, no JSON fences."
     )
     user = (
@@ -320,8 +330,8 @@ def _build_intro_script(bible: dict) -> list:
         f"WHAT A LISTENER CAN EXPLORE (weave these in naturally, do NOT list them robotically):\n{site}\n\n"
         "Write Episode 0 now."
     )
-    body = {"model": MODEL, "max_tokens": 3500, "system": system, "messages": [{"role": "user", "content": user}]}
-    resp = bedrock_client.invoke(body, model_name=MODEL)
+    body = {"model": INTRO_MODEL, "max_tokens": 4000, "system": system, "messages": [{"role": "user", "content": user}]}
+    resp = bedrock_client.invoke(body, model_name=INTRO_MODEL)
     text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()
     text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
     try:
