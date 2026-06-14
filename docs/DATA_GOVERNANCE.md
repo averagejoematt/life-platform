@@ -56,6 +56,8 @@ Per typical health-data definitions, the following fields are **PII** regardless
 
 **No PII is in Tier 0.** Public site exposes aggregates only; never raw values tied to identity at granular timestamp resolution.
 
+**Enforced structurally (ER-06):** `deploy/pii_surface_guard.py` + `tests/test_public_surface_pii_guard.py` scan the published `site/` surface fail-closed (blocked-vice keywords, SSN / 16-digit / non-allowlisted email, and a non-committed personal-literal denylist) — in CI and again inside `sync_site_to_s3.sh` before the S3 sync. This policy is no longer convention-only. See `docs/TESTING.md` §12.
+
 ---
 
 ## Retention Policy

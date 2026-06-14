@@ -1,0 +1,10 @@
+{
+  "_README": "ER-06 personal denylist TEMPLATE. Copy to config/pii_denylist.local.json (gitignored) and fill `terms` with the literal strings that must NEVER reach the public surface — partner's name, employer, role/title, industry, street/city, any other guarded identifier. The repo is PUBLIC, so the real list is never committed: pii_surface_guard.py loads it from config/pii_denylist.local.json OR the env var PII_DENYLIST_JSON (a JSON array — inject as a CI secret to enforce the literal arm in CI). Matching is whole-word, case-insensitive; a hit blocks the publish and the violation never echoes the literal back.",
+  "terms": [
+    "<partner first name>",
+    "<employer name>",
+    "<job title>",
+    "<industry>",
+    "<home city or street>"
+  ]
+}

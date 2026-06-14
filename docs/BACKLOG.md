@@ -59,7 +59,7 @@
 | **📦 New work surfaced (post-V2)** | 7 | N-01 ✅ closed · N-08 ✅ resolved 2026-06-06 (tier 3→1) |
 | **🌐 v4 website + ops follow-ups** | 5 | S-01 ✅ + S-02 ✅ + S-06 ✅ deployed · B-03 ✅ · S-03/S-04/S-05 open · S-07 deferred |
 | **🚀 Product & Growth (PG)** | 7 | NEW 2026-06-07 summit. PG-00 ✅ · **PG-01/02/03/05/06 ✅ deployed; PG-04 ✅ native-SES (CI-deploy pending); PG-14 ✅ Tier-A productionized 2026-06-09 → CHANGELOG** · PG-04b/PG-13 remain · **PG-07 gate-blocked on D-05 (~2026-06-17)** |
-| **🔬 External-Review rigor (ER)** | 5 | NEW 2026-06-09 external-lens review. **ER-01 ✅ + ER-02 ✅ + ER-03 Layer 1 ✅ done (the whole objective-gap Tier 1).** Remaining: ER-03 Layer 2 (LLM judge, deferred) + ER-04..08 recorded-decision / honesty items. Full spec: `docs/specs/ER_EXTERNAL_REVIEW_RIGOR_2026-06-09.md` |
+| **🔬 External-Review rigor (ER)** | 3 | NEW 2026-06-09 external-lens review. **Done: ER-01 ✅ ER-02 ✅ ER-03 Layer 1 ✅ (objective-gap Tier 1) + ER-05 ✅ ER-06 ✅ (cheap-honesty Tier 2).** Remaining: ER-03 Layer 2 (LLM judge, deferred) + ER-04 / ER-07 / ER-08 (recorded-decision items). Full spec: `docs/specs/ER_EXTERNAL_REVIEW_RIGOR_2026-06-09.md` |
 | **TOTAL OPEN** | **~38** | 2026-06-09: ER-01 + ER-02 + PG-14 ✅ closed; +8 ER from external-review lens. 2026-06-07: +14 PG from summit; PG-00/01/02/03/04/05/06 + PG-14-spike closed same day; PG-04b logged |
 
 ---
@@ -218,17 +218,11 @@
 - **Acceptance:** every tool classified; `test_wiring_coverage.py` + registry tests green; catalog/registry reconcile via `sync_doc_metadata.py`; ADR recorded.
 - **Gate:** supersedes B-02's date gate; don't ride a reset.
 
-### ER-05 — De-weight the self-grade + external-review readiness · Tier 2 · Effort S
-- **Why:** the A- is self-assessment vs a self-authored rubric, grades only ratchet up, and nothing in-repo says so.
-- **Action:** prominent caveat in `REVIEW_METHODOLOGY.md` + atop each review (internal self-assessment, not external validation); confirm `generate_review_bundle.py` reads coherently cold; record "one real external senior-engineer review" as the path to a trusted grade.
-- **Acceptance:** caveat unmissable; bundle coherent with no repo access; external-review recommendation recorded.
-- **Gate:** none.
+### ER-05 — De-weight the self-grade + external-review readiness · Tier 2 · ✅ DONE 2026-06-14
+- **Shipped (docs only):** prominent **"What these grades are — and are not"** caveat atop `REVIEW_METHODOLOGY.md` (internal self-assessment vs a self-authored rubric, grades only ratchet up, only a cold external senior-engineer review is a trusted A); recorded that `generate_review_bundle.py` is the single self-contained cold-read bundle (verified: 2,924-line / 212KB single file, runs offline) and is the intended input to that one external review. Caveat to be reproduced atop each review. See CHANGELOG → "ER-05/06 — 2026-06-14".
 
-### ER-06 — PII-to-public-surface guarantee (tested) · Tier 2 · Effort S–M
-- **Why:** editorial guardrails + `DATA_GOVERNANCE.md` are policy with no structural test; the daily-written `generated/` prefix could surface a guarded string with nothing catching it.
-- **Action:** `tests/test_public_surface_pii_guard.py` scans `site/` build + a dry-run of the `generated/` writers (public_stats/character_stats/journal/chronicle/OG alt) against a denylist (employer/role/industry, partner name, vice categories beyond the allowed two, bereavement-unless-opted-in) + DATA_GOVERNANCE PII classes; denylist loaded from secret/gitignored config (repo may be public); gate before `sync_site_to_s3.sh`.
-- **Acceptance:** injecting a guarded string fails the gate; denylist never in cleartext in a public repo; runs before any publish path.
-- **Gate:** none.
+### ER-06 — PII-to-public-surface guarantee (tested) · Tier 2 · ✅ DONE 2026-06-14
+- **Shipped:** `deploy/pii_surface_guard.py` (offline scanner) + `tests/test_public_surface_pii_guard.py` (**gating**) over the committed `site/` tree, three arms — blocked-vice keywords (`seeds/content_filter.json`), structural PII (SSN / 16-digit / non-allowlisted email), and a literal personal denylist loaded from a **non-committed** source (`config/pii_denylist.local.json` gitignored, or env `PII_DENYLIST_JSON`; repo is PUBLIC). Same scanner runs **fail-closed in `sync_site_to_s3.sh` before the S3 sync**. **First run caught a real leak:** the public `challenges_catalog.json` shipped two `public:false` blocked-category templates (stripped, 84→82) + fixed the read-path `_is_blocked_vice(name **or** id)` bug that missed id-only keywords. `config/pii_denylist.example.json` template committed. See CHANGELOG → "ER-05/06 — 2026-06-14".
 
 ### ER-07 — Complexity posture ledger (load-bearing vs scaffolding) · Tier 3 · Effort M
 - **Why:** the "over-provisioned for N=1" verdict splits entirely on *purpose*; today that's implicit, so complexity accretes undecided. **Scope: a technical posture decision, NOT a build-vs-health referendum.**

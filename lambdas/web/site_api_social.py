@@ -1080,7 +1080,9 @@ def handle_challenges() -> dict:
             raw_id = sk_val.replace("CHALLENGE#", "")
             ch["challenge_id"] = raw_id
             ch["id"] = _re.sub(r"_\d{4}-\d{2}-\d{2}$", "", raw_id)
-            if _is_blocked_vice(ch.get("name", "") or ch.get("id", "")):
+            # ER-06: check name AND id — a blocked keyword often lives only in the
+            # entry id while the display name is benign; `name or id` missed it.
+            if _is_blocked_vice(ch.get("name", "")) or _is_blocked_vice(ch.get("id", "")):
                 continue
             ch["origin"] = "live"
             if status == "active":
@@ -1107,7 +1109,7 @@ def handle_challenges() -> dict:
     for c in (_challenges_cache or {}).get("challenges", []):
         if c.get("id") in live_ids:
             continue
-        if _is_blocked_vice(c.get("name", "") or c.get("id", "")):
+        if _is_blocked_vice(c.get("name", "")) or _is_blocked_vice(c.get("id", "")):  # ER-06: check name AND id
             continue
         shelf = "available" if c.get("status") == "available" else "backlog"
         catalog.append(

@@ -4,7 +4,25 @@
 > First review: 2026-03-08 (v2.91.0). Latest: V2 audit (2026-05-17, 76 findings, ~33 shipped, formally closed in ADR-057).
 > Reviews stored in `docs/reviews/`; V2-style audits in `docs/v2-audits/`.
 > Tech Board: invoke as "tech board" or by name. 12 seats across Architecture, Security, Data, AI, Operations, Product, and FinOps.
-> Last updated: 2026-05-19 (v8.0.0)
+> Last updated: 2026-06-14 (v8.6.0)
+
+---
+
+## ⚠️ What these grades are — and are not (ER-05)
+
+**Every grade produced by this process is internal self-assessment by AI personas
+against a rubric the platform authored.** It measures *conformance to the platform's
+own stated values* — not external quality, not market validation, not "an A from the
+industry." The grades have only ever ratcheted upward, which is exactly what a
+self-authored rubric graded by the same kind of model that built the system would
+predict; it is a useful internal QA signal and nothing more.
+
+**The only trustworthy A-grade arbiter is one real senior engineer who has never
+seen this project, reading it cold.** That is the standing recommendation. To make
+it cheap to act on, `deploy/generate_review_bundle.py` produces a single self-contained
+bundle a cold external reviewer can read with **no repo access** — the intended input
+to that one external review. Treat any internal letter grade as "passes our own bar,"
+never as "validated." Reproduce this caveat at the top of every review document.
 
 ---
 

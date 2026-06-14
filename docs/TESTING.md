@@ -128,6 +128,26 @@ at budget tier ≥2) is intentionally deferred — see
 `docs/specs/ER_EXTERNAL_REVIEW_RIGOR_2026-06-09.md`. Refresh good cases from real
 outputs deliberately; never weaken a planted-bad case to make CI green.
 
+### 12. Public-surface PII / guardrail guard (`test_public_surface_pii_guard.py`) — ER-06
+Editorial guardrails + `docs/DATA_GOVERNANCE.md` are *policy*; this is the
+**structural** test that the published static site can't leak them. Offline +
+**gating**, it runs the same scanner the deploy uses (`deploy/pii_surface_guard.py`)
+over the committed `site/` tree. Three arms:
+- **Blocked-vice** (always-on) — no `blocked_vice_keywords` from
+  `seeds/content_filter.json` (the policy-blocked categories) on the public surface.
+- **Structural PII** (always-on) — US SSN, 16-digit card-like numbers, and
+  non-allowlisted email addresses (the PII classes in `DATA_GOVERNANCE.md`).
+- **Literal denylist** (best-effort) — partner name / employer / role / industry
+  from a **non-committed** source (`config/pii_denylist.local.json`, gitignored, or
+  env `PII_DENYLIST_JSON` as a CI secret). The repo is PUBLIC, so these literals
+  never live in git; absent → that arm self-skips, the always-on arms still gate.
+
+The **same scanner runs fail-closed inside `sync_site_to_s3.sh` before the S3 sync**
+— this test is the CI half of the same gate. (Its first run caught a real leak: the
+published `challenges_catalog.json` shipped two `public:false` blocked-category
+templates; those were stripped and the read-path `_is_blocked_vice(name **or** id)`
+bug fixed.)
+
 ---
 
 ## What's NOT tested

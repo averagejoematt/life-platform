@@ -1,3 +1,16 @@
+## ER-05/06 — 2026-06-14 (cheap-honesty tier: self-grade caveat + PII-to-public-surface guard)
+
+The Tier-2 ER pair. **ER-06's guard caught a live privacy leak on its first run.**
+
+### Fixed (real leak)
+- **Two policy-blocked challenge templates were publicly fetchable** — `site/config/challenges_catalog.json` (served at `/config/challenges_catalog.json`) shipped two `public:false` blocked-category templates with descriptions; the raw JSON bypasses API filtering. Stripped them (84→82). Also fixed the read-path bug `_is_blocked_vice(name **or** id)` in `site_api_social.py` — the blocked keyword lives in the entry `id`, not the display name, so `name or id` short-circuited past it; now checks both (defense-in-depth; needs a `site-api` deploy).
+
+### Added
+- **ER-06 — PII-to-public-surface guard** — `deploy/pii_surface_guard.py` (offline scanner) + `tests/test_public_surface_pii_guard.py` (**gating**) scan the committed `site/` tree: blocked-vice keywords (`seeds/content_filter.json`), structural PII (SSN / 16-digit / non-allowlisted email per `DATA_GOVERNANCE.md`), and a **literal personal denylist loaded from a non-committed source** (`config/pii_denylist.local.json` gitignored, or env `PII_DENYLIST_JSON` as a CI secret — the repo is PUBLIC). The **same scanner runs fail-closed inside `sync_site_to_s3.sh` before the S3 sync**. `config/pii_denylist.example.json` template committed; `docs/TESTING.md` §12.
+- **ER-05 — de-weight the self-grade** — a prominent "What these grades are — and are not" caveat atop `docs/REVIEW_METHODOLOGY.md`: every internal grade is self-assessment against a self-authored rubric (only ever ratchets up), and the only trusted A-grade arbiter is one cold external senior-engineer review — for which `generate_review_bundle.py` is the self-contained input (verified: a single 2,924-line / 212KB file, offline). Reproduce atop each review.
+
+---
+
 ## ER-03 Layer 1 — 2026-06-14 (AI-output faithfulness harness, offline + gating)
 
 Closes the last of the objective-gap Tier-1 ER findings (ER-01/02 already done): the **inverted-testing** gap where QA verified pages *render* but nothing verified the coach/insight AI *content* obeys the platform's own honesty standard.

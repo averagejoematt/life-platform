@@ -29,6 +29,16 @@ S3_PREFIX="site"
 REGION="us-west-2"
 DRY_RUN="${1:-}"
 
+# ER-06 — PII / guardrail gate (FAIL-CLOSED, before any publish). Scans the
+# static site for blocked-vice terms, structural PII, and (if a local/CI denylist
+# is present) guarded personal literals. A hit aborts the sync. set -e propagates
+# the non-zero exit; the explicit message makes the block unmissable.
+echo "→ PII surface guard (ER-06)…"
+if ! python3 "$(dirname "$0")/pii_surface_guard.py" "$SITE_DIR"; then
+  echo "❌ PII surface guard FAILED — a guarded string or PII is on the public surface. Publish blocked." >&2
+  exit 1
+fi
+
 # Find CloudFront distribution ID for averagejoematt.com
 CF_DIST_ID=$(aws cloudformation describe-stacks \
   --stack-name LifePlatformWeb \
