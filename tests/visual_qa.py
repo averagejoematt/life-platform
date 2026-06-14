@@ -119,11 +119,12 @@ PAGES = [
     },
     {
         "path": "/story/coaches/",
-        "name": "Story · The Coaches (roster)",
-        "wait_for": ".dx-item",
+        "name": "Story · The Coaches (roster + My Team)",
+        "wait_for": ".team-huddle",
         "checks": [
             {"selector": ".dx-item", "min_count": 1, "desc": "coach roster list rendered"},
-            {"selector": ".dx-read .coach-stance, .dx-read .dx-title", "not_empty": True, "desc": "a coach page renders in the reader"},
+            {"selector": ".team-huddle", "not_empty": True, "desc": "My Team huddle renders as the lead (CC-10)"},
+            {"selector": ".team-tension", "not_empty": True, "desc": "tension map section present"},
         ],
     },
     {

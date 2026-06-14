@@ -46,7 +46,7 @@ const ABOUT = `
 
 function entriesFor(s, data) {
   if (!data) return [];
-  if (s.kind === "coaches") return (data.coaches || []).map((c) => ({ id: c.persona_id, title: `${c.emoji || ""} ${c.name}`.trim(), date: c.headline_stat || c.domain || "" }));
+  if (s.kind === "coaches") return [{ id: "team", title: "🧭 My Team", date: "the team's read on you" }].concat((data.coaches || []).map((c) => ({ id: c.persona_id, title: `${c.emoji || ""} ${c.name}`.trim(), date: c.headline_stat || c.domain || "" })));
   if (s.kind === "fieldnotes") return (data.entries || []).map((e) => ({ id: e.week, title: `Week ${e.week} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "" }));
   if (s.kind === "posts") { const ps = data.posts || data.entries || (Array.isArray(data) ? data : []); return ps.map((p) => ({ id: p.week, title: p.title || `Week ${p.week}`, date: p.date, excerpt: p.excerpt, meta: p.stats_line, word_count: p.word_count, url: p.url })); }
   return [];
@@ -76,6 +76,34 @@ function coachReportHTML(rc) {
   if (tl.length) h += `<details class="cr-tuning"><summary class="label">tuning changelog (${tl.length})</summary><ul>${tl.map((e) => `<li><span class="label">${esc(e.date || "")} · ${esc(e.change_type || "")}</span> ${esc(e.summary || "")}</li>`).join("")}</ul></details>`;
   return h + `</section>`;
 }
+// CC-10 — "My Team": the team's collective read on Matthew right now (lead of /story/coaches/).
+async function renderTeamView(read) {
+  read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the team…</span></p>`;
+  let d;
+  try { d = await getJSON("/api/coach_team"); }
+  catch (e) { read.innerHTML = `<p class="dx-prose">Couldn't load the team just now.</p>`; return; }
+  let h = `<p class="dx-kicker label">your team · the collective read on you right now</p><h3 class="dx-title">My Team</h3>`;
+  if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
+  if ((d.team_focus || []).length) {
+    h += `<section class="team-focus"><p class="dx-kicker label">what the team is focused on for you${d.current_stage ? ` · the ${esc(d.current_stage)} stage` : ""}</p>`;
+    h += `<ul class="tf-list">${d.team_focus.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></section>`;
+  }
+  h += `<section class="team-tension"><p class="dx-kicker label">where the team disagrees</p>`;
+  if ((d.tensions || []).length) {
+    h += `<ul class="tt-list">${d.tensions.map((t) => `<li><span class="label">${esc((t.coaches || []).map((c) => String(c).replace("_coach", "")).join(" ↔ ") || t.topic || "")}</span> ${esc(t.summary || "")}</li>`).join("")}</ul>`;
+  } else {
+    h += `<p class="dx-prose">No live disagreements right now — the team's aligned (or it's early and the threads haven't formed yet). When they pull in different directions, you'll see the tradeoff here.</p>`;
+  }
+  h += `</section>`;
+  h += `<section class="team-huddle"><p class="dx-kicker label">the huddle — each coach's current read</p><ul class="th-list">`;
+  for (const c of d.huddle || []) {
+    h += `<li class="th-item" data-coach="${esc(c.persona_id)}"><button type="button" class="th-btn"><span class="th-name">${esc(c.emoji || "")} ${esc(c.name || "")}</span><span class="th-head">${esc(c.headline || "")}</span>${c.watch ? `<span class="th-watch label">watching: ${esc(c.watch)}</span>` : ""}</button></li>`;
+  }
+  h += `</ul></section>`;
+  read.innerHTML = h;
+  read.querySelectorAll(".th-item").forEach((li) => li.querySelector(".th-btn").addEventListener("click", () => selectEntry(BYKEY["coaches"], li.dataset.coach)));
+}
+
 async function renderCoachPage(read, id) {
   read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the coach…</span></p>`;
   let d;
@@ -110,7 +138,7 @@ async function renderCoachPage(read, id) {
 async function renderRead(s, id) {
   const read = $("[data-dx-read]");
   if (s.kind === "about") { read.innerHTML = ABOUT; return; }
-  if (s.kind === "coaches") { await renderCoachPage(read, id); return; }
+  if (s.kind === "coaches") { if (String(id) === "team") { await renderTeamView(read); } else { await renderCoachPage(read, id); } return; }
   if (s.kind === "timeline") {
     read.innerHTML = `<p class="dx-kicker label">${esc(s.kicker)}</p><h3 class="dx-title">The journey so far</h3><p class="dx-loading shimmer">Loading the timeline…</p>`;
     const d = await secFetch(s); const events = (d && d.events) || [];

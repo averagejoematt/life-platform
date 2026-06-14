@@ -59,6 +59,7 @@ from web.site_api_coach import (
     handle_ai_analysis,
     handle_coach,
     handle_coach_analysis,
+    handle_coach_team,
     handle_coach_timeline,
     handle_coaches,
     handle_field_notes,
@@ -610,9 +611,11 @@ def lambda_handler(event, context):
         return handle_ai_analysis(event)
     if path == "/api/coach_analysis":
         return handle_coach_analysis(event)
-    # CC-01/02: Coaches-as-Characters roster + per-coach page (shaped-empty 200s)
+    # CC-01/02/10: Coaches-as-Characters roster + My Team + per-coach page (shaped-empty 200s)
     if path == "/api/coaches":
         return handle_coaches(event)
+    if path == "/api/coach_team":
+        return handle_coach_team(event)
     if path.startswith("/api/coach/"):
         return handle_coach(event)
     if path == "/api/coaching-dashboard":

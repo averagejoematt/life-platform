@@ -295,3 +295,17 @@ body { overflow-x: hidden; }
 .cr-tuning ul { margin-top: var(--sp-2); padding-left: var(--sp-4); color: var(--ink-muted); }
 .cr-tuning .label { color: var(--ink-faint); }
 .cv-example { margin-top: var(--sp-3); padding-left: var(--sp-3); border-left: 2px solid var(--ember-line); font-family: var(--font-serif); font-size: var(--fs-quote); color: var(--ink); max-width: var(--measure); }
+
+/* ── "My Team" (CC-10) — the collective read on Matthew ───────────────────── */
+.team-focus, .team-tension, .team-huddle { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: var(--border-hair); }
+.tf-list { list-style: none; padding: 0; margin: var(--sp-3) 0 0; display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.tf-list li { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink); padding: var(--sp-1) var(--sp-3); border: var(--border-hair); border-radius: var(--radius-sm); background: var(--surface-raised); }
+.tt-list { list-style: none; padding: 0; margin: var(--sp-3) 0 0; }
+.tt-list li { margin-top: var(--sp-3); color: var(--ink); line-height: var(--lh-relaxed); max-width: var(--measure); }
+.tt-list .label { display: block; color: var(--ember); margin-bottom: 2px; }
+.th-list { list-style: none; padding: 0; margin: var(--sp-3) 0 0; display: grid; gap: var(--sp-2); }
+.th-btn { display: grid; gap: 2px; width: 100%; text-align: left; cursor: pointer; background: var(--surface-raised); border: var(--border-hair); border-radius: var(--radius-sm); padding: var(--sp-3); transition: border-color var(--dur-fast); }
+.th-btn:hover { border-color: var(--ember); }
+.th-name { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink); }
+.th-head { font-family: var(--font-serif); font-size: var(--fs-body); color: var(--ink); }
+.th-watch { color: var(--ink-faint); }

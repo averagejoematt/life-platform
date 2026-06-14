@@ -91,3 +91,27 @@ def test_unknown_coach_404():
     # a board-only persona is not an operational coach
     resp2 = api.handle_coach({"rawPath": "/api/coach/the_chair"})
     assert resp2["statusCode"] == 404
+
+
+# ── My Team (/api/coach_team, CC-10) ─────────────────────────────────────────
+
+
+def test_team_view_shape():
+    data = _body(api.handle_coach_team({}))
+    assert len(data["huddle"]) == 8
+    for c in data["huddle"]:
+        assert c.get("name") and c.get("headline") and c.get("stage_id")
+        assert "watch" in c
+    assert data["team_focus"] and len(data["team_focus"]) == len(set(data["team_focus"]))
+    assert isinstance(data["tensions"], list)  # honest empty pre-data, never an error
+    assert "AI character" in data["disclosure"]
+
+
+def test_team_stage_mix_is_honest():
+    data = _body(api.handle_coach_team({}))
+    stages = {c["persona_id"]: c["stage_id"] for c in data["huddle"]}
+    # weight-banded coaches sit at 'foundation' from the baseline; nutrition
+    # (logging consistency) sits at 'visibility' — so not all on one stage label.
+    assert stages["training_coach"] == "foundation"
+    assert stages["nutrition_coach"] == "visibility"
+    assert data["all_same_stage"] is False

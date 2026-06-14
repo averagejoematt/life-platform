@@ -364,7 +364,9 @@
       "lambdas/adherence_calc.py",
       "lambdas/routine_title.py",
       "lambdas/exercise_history.py",
-      "lambdas/vacation_fund.py"
+      "lambdas/vacation_fund.py",
+      "lambdas/persona_registry.py",
+      "lambdas/coach_stance.py"
     ]
   },
   "skip_deploy": {
