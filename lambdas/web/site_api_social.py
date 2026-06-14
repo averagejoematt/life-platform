@@ -41,6 +41,7 @@ from web.site_api_common import (
     USER_PREFIX,
     _decimal_to_float,
     _error,
+    _is_blocked_vice,
     _load_s3_json,
     _ok,
     logger,
@@ -1048,11 +1049,17 @@ def handle_challenge_catalog() -> dict:
 
 
 def handle_challenges() -> dict:
-    """GET /api/challenges — Return challenges from DynamoDB (primary) with S3 fallback.
+    """GET /api/challenges — live challenges overlaid on the full catalog.
 
-    DynamoDB partition: USER#matthew#SOURCE#challenges
-    Returns active + candidate challenges for the website.
+    Live runs (USER#matthew#SOURCE#challenges, origin='live') are surfaced as
+    "taken on / active". The challenge catalog (config/challenges_catalog.json,
+    84 challenges) is always overlaid as origin='catalog' so the page shows the
+    available + backlog pipeline even right after an experiment reset wipes the
+    live partition. Blocked vices (porn/marijuana/…) are filtered server-side.
     """
+    import re as _re
+
+    live, live_ids = [], set()
     challenges_pk = f"USER#{USER_ID}#SOURCE#challenges"
     try:
         resp = table.query(
@@ -1063,61 +1070,74 @@ def handle_challenges() -> dict:
                 }
             )
         )
-        items = resp.get("Items", [])
-
-        # Build response — website mainly needs active + candidate
-        result = []
-        for item in items:
+        for item in resp.get("Items", []):
             status = item.get("status", "candidate")
-            # Include active, candidate, and recently completed (last 30 days)
-            if status in ("active", "candidate", "completed", "failed"):
-                ch = _decimal_to_float(item)
-                ch.pop("pk", "") or ""
-                sk_val = ch.pop("sk", "") or ""
-                # Derive catalog_id by stripping CHALLENGE# prefix and date suffix
-                # e.g. CHALLENGE#no-doordash-30d_2026-04-01 → no-doordash-30d → match catalog no-doordash-30
-                raw_id = sk_val.replace("CHALLENGE#", "")
-                ch["challenge_id"] = raw_id
-                # Strip date suffix (_YYYY-MM-DD) for catalog matching
-                import re as _re
-
-                ch["id"] = _re.sub(r"_\d{4}-\d{2}-\d{2}$", "", raw_id)
-
-                # Compute progress for active challenges
-                if status == "active":
-                    checkins = ch.get("daily_checkins", [])
-                    duration = int(ch.get("duration_days", 7))
-                    completed_days = sum(1 for c in checkins if c.get("completed"))
-                    ch["progress"] = {
-                        "checkin_days": len(checkins),
-                        "completed_days": completed_days,
-                        "duration_days": duration,
-                        "completion_pct": round(len(checkins) / duration * 100) if duration else 0,
-                        "success_rate": round(completed_days / len(checkins) * 100) if checkins else 0,
-                    }
-
-                result.append(ch)
-
-        # Summary
-        summary = {
-            "total": len(items),
-            "active": sum(1 for i in items if i.get("status") == "active"),
-            "candidate": sum(1 for i in items if i.get("status") == "candidate"),
-            "completed": sum(1 for i in items if i.get("status") == "completed"),
-        }
-
-        if result:
-            return _ok({"challenges": result, "count": len(result), "summary": summary, "source": "dynamodb"}, cache_seconds=300)
-
+            if status not in ("active", "candidate", "completed", "failed"):
+                continue
+            ch = _decimal_to_float(item)
+            ch.pop("pk", None)
+            sk_val = ch.pop("sk", "") or ""
+            raw_id = sk_val.replace("CHALLENGE#", "")
+            ch["challenge_id"] = raw_id
+            ch["id"] = _re.sub(r"_\d{4}-\d{2}-\d{2}$", "", raw_id)
+            if _is_blocked_vice(ch.get("name", "") or ch.get("id", "")):
+                continue
+            ch["origin"] = "live"
+            if status == "active":
+                checkins = ch.get("daily_checkins", [])
+                duration = int(ch.get("duration_days", 7))
+                completed_days = sum(1 for c in checkins if c.get("completed"))
+                ch["progress"] = {
+                    "checkin_days": len(checkins),
+                    "completed_days": completed_days,
+                    "duration_days": duration,
+                    "completion_pct": round(len(checkins) / duration * 100) if duration else 0,
+                    "success_rate": round(completed_days / len(checkins) * 100) if checkins else 0,
+                }
+            live.append(ch)
+            live_ids.add(ch["id"])
     except Exception as e:
-        logger.warning(f"[challenges] DynamoDB query failed, falling back to S3: {e}")
+        logger.warning(f"[challenges] DynamoDB query failed, catalog-only: {e}")
 
-    # Fallback to S3 config if DynamoDB is empty or errors
+    # Overlay the catalog (always) — available + backlog the live partition lacks.
+    catalog = []
     global _challenges_cache
     if _challenges_cache is None:
-        _challenges_cache = _load_s3_json("site/config/challenges.json", "challenges")
-    challenges = _challenges_cache.get("challenges", [])
-    return _ok({"challenges": challenges, "count": len(challenges), "source": "s3_fallback"}, cache_seconds=3600)
+        _challenges_cache = _load_s3_json("config/challenges_catalog.json", "challenges_catalog")
+    for c in (_challenges_cache or {}).get("challenges", []):
+        if c.get("id") in live_ids:
+            continue
+        if _is_blocked_vice(c.get("name", "") or c.get("id", "")):
+            continue
+        shelf = "available" if c.get("status") == "available" else "backlog"
+        catalog.append(
+            {
+                "id": c.get("id"),
+                "challenge_id": c.get("id"),
+                "name": c.get("name", "Challenge"),
+                "status": shelf,
+                "origin": "catalog",
+                "one_liner": c.get("one_liner", ""),
+                "category": c.get("category", ""),
+                "duration_days": c.get("duration_days"),
+                "difficulty": c.get("difficulty"),
+                "evidence_tier": c.get("evidence_tier"),
+                "evidence_summary": c.get("evidence_summary", ""),
+                "board_recommender": c.get("board_recommender", ""),
+                "icon": c.get("icon", ""),
+            }
+        )
+    catalog.sort(key=lambda x: (x["status"] != "available", (x.get("category") or ""), (x.get("name") or "").lower()))
+
+    challenges = live + catalog
+    summary = {
+        "total": len(challenges),
+        "active": sum(1 for c in live if c.get("status") == "active"),
+        "available": sum(1 for c in catalog if c["status"] == "available"),
+        "backlog": sum(1 for c in catalog if c["status"] == "backlog"),
+        "completed": sum(1 for c in live if c.get("status") == "completed"),
+    }
+    return _ok({"challenges": challenges, "count": len(challenges), "summary": summary, "source": "catalog+live"}, cache_seconds=300)
 
 
 def _handle_challenge_checkin(event: dict) -> dict:

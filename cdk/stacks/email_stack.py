@@ -139,7 +139,9 @@ class EmailStack(Stack):
             source_file="lambdas/emails/chronicle_podcast_lambda.py",
             # Wed 15:40 UTC — after the chronicle publishes (15:00) and emails (15:10)
             schedule="cron(40 15 ? * WED *)",
-            timeout_seconds=300,
+            # 900s: a force re-render voices the whole back-catalogue (5+ episodes,
+            # multi-chunk Google TTS each) in one pass — 300s timed out mid-catalogue.
+            timeout_seconds=900,
             memory_mb=512,
             environment=_email_env,
             custom_policies=rp.email_chronicle_podcast(),

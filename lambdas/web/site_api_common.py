@@ -217,14 +217,15 @@ def _get_profile() -> dict:
 
 
 def _load_supp_metadata() -> dict:
-    """Load supplement registry from S3 config/supplement_registry.json. Cached after first call."""
+    """Load supplement registry from the canonical S3 config/ prefix (root, not the
+    site/config mirror — the latter is purged by experiment resets). Cached."""
     global _supp_metadata_cache
     if _supp_metadata_cache is not None:
         return _supp_metadata_cache
     try:
         S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
         s3 = boto3.client("s3", region_name=S3_REGION)
-        resp = s3.get_object(Bucket=S3_BUCKET, Key="site/config/supplement_registry.json")
+        resp = s3.get_object(Bucket=S3_BUCKET, Key="config/supplement_registry.json")
         data = json.loads(resp["Body"].read())
         _supp_metadata_cache = data
         total = sum(len(g.get("items", [])) for g in data.get("groups", {}).values())

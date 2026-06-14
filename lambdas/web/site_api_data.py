@@ -644,11 +644,58 @@ def handle_experiments() -> dict:
                 "duration_tier": item.get("duration_tier"),
                 "experiment_type": item.get("experiment_type"),
                 "iteration": item.get("iteration", 1),
+                "origin": "live",  # an actual run on the ledger (this experiment cycle)
             }
         )
     experiments.sort(key=lambda x: x["start_date"], reverse=True)
 
+    # Overlay the experiment library (the catalog of what's planned / in flight).
+    # Live runs take precedence; library entries already running are not duplicated.
+    live_lib_ids = {x.get("library_id") for x in experiments if x.get("library_id")}
+    live_names = {(x.get("name") or "").strip().lower() for x in experiments}
+    experiments.extend(_experiment_catalog(live_lib_ids, live_names))
+
     return _ok({"experiments": experiments}, cache_seconds=3600)
+
+
+def _experiment_catalog(exclude_ids: set, exclude_names: set) -> list:
+    """experiment_library.json → display items tagged origin='library', so the page
+    shows the pipeline (planned/backlog experiments) even when nothing is running."""
+    S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+    out = []
+    try:
+        s3_client = boto3.client("s3", region_name=S3_REGION)
+        obj = s3_client.get_object(Bucket=S3_BUCKET, Key="config/experiment_library.json")
+        lib = json.loads(obj["Body"].read())
+    except Exception as e:
+        logger.warning("[experiments] library unavailable: %s", e)
+        return out
+    for exp in lib.get("experiments", []):
+        if exp.get("id") in exclude_ids:
+            continue
+        if (exp.get("name") or "").strip().lower() in exclude_names:
+            continue
+        # library status: 'active' = promoted/ready to run → "available"; else backlog.
+        shelf = "available" if exp.get("status") == "active" else "backlog"
+        out.append(
+            {
+                "id": exp.get("id"),
+                "name": exp.get("name", "Unnamed"),
+                "status": shelf,
+                "origin": "library",
+                "hypothesis": exp.get("hypothesis_template", ""),
+                "pillar": exp.get("pillar", ""),
+                "difficulty": exp.get("difficulty"),
+                "evidence_tier": exp.get("evidence_tier"),
+                "result_summary": exp.get("why_it_matters", "") or exp.get("description", ""),
+                "planned_duration_days": exp.get("suggested_duration_days"),
+                "tags": exp.get("tags", []),
+                "votes": exp.get("votes", 0),
+            }
+        )
+    # most-voted backlog first, then alphabetical
+    out.sort(key=lambda x: (-(x.get("votes") or 0), x.get("name", "").lower()))
+    return out
 
 
 def handle_supplements() -> dict:
@@ -1547,30 +1594,72 @@ def handle_domains() -> dict:
 
 
 def handle_habit_registry() -> dict:
-    """GET /api/habit_registry — Return habit registry from DynamoDB PROFILE#v1.
+    """GET /api/habit_registry — the habits being tracked, grouped.
 
-    Stage0 Fix 1 (2026-05-30): blocked vice/habit names are stripped here so
-    the client never sees them. Previously the client filtered, which shipped
-    the keyword list in plaintext JS.
+    Source of truth is Habitify (USER#…#SOURCE#habitify, latest DATE# record):
+    its ``habit_statuses`` map carries every scheduled habit with its area/group
+    and periodicity. We surface that list grouped by area so the public habits
+    page shows "everything I'm trying to do" even right after an experiment reset
+    (when the PROFILE#v1 registry and the phase-scoped habit_scores are empty).
+
+    Blocked vice/habit names (porn, marijuana, …) are stripped server-side via
+    ``_is_blocked_vice`` — content_filter.json's ``habit_data`` rule — so they
+    never reach the client even though Habitify tracks them.
     """
     try:
-        resp = table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"})
-        profile = resp.get("Item", {})
-        registry = profile.get("habit_registry", {})
-        habits = []
-        for name, meta in registry.items():
-            if _is_blocked_vice(name):
-                continue
-            h = {"name": name}
-            for k, v in meta.items():
-                h[k] = float(v) if isinstance(v, Decimal) else v
-            habits.append(h)
-        tier_order = {"T0": 0, "T1": 1, "T2": 2}
-        habits.sort(key=lambda x: (tier_order.get(x.get("tier", "T2"), 9), x.get("name", "")))
-        return _ok({"habits": habits, "count": len(habits)}, cache_seconds=3600)
+        habits = _habits_from_habitify()
+        source = "habitify"
+        if not habits:
+            # Fallback: legacy PROFILE#v1 registry (pre-Habitify-sourcing).
+            resp = table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"})
+            registry = resp.get("Item", {}).get("habit_registry", {})
+            for name, meta in registry.items():
+                if _is_blocked_vice(name):
+                    continue
+                h = {"name": name, "group": meta.get("group") if isinstance(meta, dict) else None}
+                if isinstance(meta, dict):
+                    for k, v in meta.items():
+                        h[k] = float(v) if isinstance(v, Decimal) else v
+                habits.append(h)
+            source = "profile"
+
+        # Stable group ordering: known P40-ish groups first, then alpha, "Other" last.
+        seen, groups = set(), []
+        for h in habits:
+            g = h.get("group") or "Other"
+            if g not in seen:
+                seen.add(g)
+                groups.append(g)
+        groups.sort(key=lambda g: (g == "Other", g.lower()))
+        habits.sort(key=lambda x: ((x.get("group") or "Other") == "Other", (x.get("group") or "Other").lower(), x.get("name", "").lower()))
+        return _ok({"habits": habits, "groups": groups, "count": len(habits), "source": source}, cache_seconds=3600)
     except Exception as e:
         logger.error(f"[habit_registry] Error: {e}")
         return _error(500, "Failed to load habit registry")
+
+
+def _habits_from_habitify() -> list:
+    """Latest Habitify record → [{name, group, frequency, scheduled_today}], filtered."""
+    pk = f"{USER_PREFIX}habitify"
+    resp = table.query(KeyConditionExpression=Key("pk").eq(pk), ScanIndexForward=False, Limit=1)
+    items = _decimal_to_float(resp.get("Items", []))
+    if not items:
+        return []
+    statuses = items[0].get("habit_statuses") or {}
+    out = []
+    for name, st in statuses.items():
+        if _is_blocked_vice(name):
+            continue
+        st = st if isinstance(st, dict) else {}
+        out.append(
+            {
+                "name": name,
+                "group": st.get("group") or "Other",
+                "frequency": st.get("periodicity") or "daily",
+                "scheduled_today": bool(st.get("scheduled_today", True)),
+            }
+        )
+    return out
 
 
 def handle_labs() -> dict:
