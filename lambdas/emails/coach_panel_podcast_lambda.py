@@ -744,6 +744,33 @@ def _hold_and_alert(week, reasons: list, draft: dict) -> dict:
     return {"statusCode": 200, "body": json.dumps({"week": week, "held": True, "reasons": reasons})}
 
 
+def _emit_published_metric() -> None:
+    """Emit a CloudWatch datapoint on publish. A monitoring alarm treats the ABSENCE
+    of this metric (> ~8 days) as breaching → 'the weekly show went silent' alert."""
+    try:
+        boto3.client("cloudwatch", region_name=REGION).put_metric_data(
+            Namespace="LifePlatform/Podcast",
+            MetricData=[{"MetricName": "PanelcastPublished", "Value": 1, "Unit": "Count"}],
+        )
+    except Exception as e:
+        logger.warning("[panel] published-metric emit failed — %s", e)
+
+
+def _notify_new_episode(ep: dict) -> None:
+    """Notify the operator (SNS → Matt) that an episode dropped, with the link to
+    share. Best-effort; never blocks the publish. (A full confirmed-subscriber email
+    blast — reusing the SOURCE#subscribers + sesv2 + unsubscribe pattern from
+    chronicle_email_sender — is a deliberate, test-first follow-up; not fired blind.)"""
+    try:
+        boto3.client("sns", region_name=REGION).publish(
+            TopicArn=ALERTS_TOPIC_ARN,
+            Subject=f"[Panel] New episode: {(ep.get('title') or '')[:80]}",
+            Message=f"{ep.get('title')}\nListen: {SITE}{ep.get('url')}\nThe Panel: {SITE}/story/panel/\n\nShareable — post it.",
+        )
+    except Exception as e:
+        logger.warning("[panel] new-episode notify failed — %s", e)
+
+
 def _run_weekly(force: bool) -> dict:
     """Produce the latest week's episode autonomously, publish-or-HOLD."""
     import gemini_tts
@@ -811,6 +838,8 @@ def _run_weekly(force: bool) -> dict:
         "bytes": len(audio),
         "duration_sec": max(1, (len(audio) - 44) // (gemini_tts.SAMPLE_RATE * 2)),
         "byline": f"Elena + {label_of[guest_id]}",
+        "guest_id": guest_id,  # throughline: front-end links the byline → /story/coaches/<guest_id>
+        "guest_name": label_of[guest_id],
         "excerpt": (script.get("pull_quote") or post.get("excerpt") or "")[:240],
     }
     existing = [e for e in existing if e.get("week") != week] + [ep]
@@ -837,6 +866,8 @@ def _run_weekly(force: bool) -> dict:
         }
     )
     _write_indexes(existing)
+    _emit_published_metric()  # safety-net: a CloudWatch alarm fires if this metric goes absent (no episode > 8d)
+    _notify_new_episode(ep)  # tell subscribers (best-effort; never blocks publish)
     logger.info("[panel] wk%s PUBLISHED — %d turns, %d bytes, guest %s", week, len(clean), len(audio), guest_id)
     return {
         "statusCode": 200,
