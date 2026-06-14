@@ -204,7 +204,15 @@ def _relationships(coach_id):
     return {"leans_on": out_edges[:3], "leaned_on_by": in_edges[:3]}
 
 
-def _recent_outputs(coach_id, limit=4):
+def _coach_daily(coach_id):
+    """CC-08: today's cached daily reflection for a coach (generated/coach_daily.json),
+    or None. Read-only over the batch-written artifact — never inferenced here."""
+    doc = _load_s3_json("generated/coach_daily.json", "coach_daily")
+    r = (doc.get("reflections") or {}).get(coach_id)
+    return r.get("text") if isinstance(r, dict) else None
+
+
+def _recent_outputs(coach_id, limit=25):  # CC-07: depth for the daily-journey timeline
     out = []
     try:
         resp = table.query(
@@ -391,6 +399,7 @@ def handle_coach(event):
                     "tuning_log": _tuning_log_for(pid),
                 },
                 "recent_outputs": _recent_outputs(pid),
+                "daily": _coach_daily(pid),
             },
             cache_seconds=300,
         )

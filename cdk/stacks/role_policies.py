@@ -562,6 +562,18 @@ def compute_daily_metrics() -> list[iam.PolicyStatement]:
     return _compute_base(needs_kms=True)
 
 
+def compute_coach_daily_reflection() -> list[iam.PolicyStatement]:
+    """CC-08 daily reflection batch: reads COACH#/OUTPUT# + S3 voice specs, uses
+    Bedrock (Haiku) for ≤120-word reflections, writes generated/coach_daily.json.
+    Budget-tier SSM read is granted to every CDK role by create_platform_lambda."""
+    return _compute_base(
+        needs_kms=True,
+        needs_ai_keys=True,
+        needs_s3_config=True,
+        needs_s3_write=["generated/coach_daily.json"],
+    )
+
+
 def compute_daily_insight() -> list[iam.PolicyStatement]:
     """Daily insight compute (IC-2): reads DDB metrics, writes insight records, uses ai-keys for Haiku."""
     return _compute_base(
