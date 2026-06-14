@@ -61,6 +61,22 @@ def test_intro_gate_resolves_two_speakers_and_drops_unsafe():
     assert speakers == ["elena_voss", "eli_marsh", "eli_marsh"]
 
 
+def test_intro_hallucination_guard_drops_daycero_violations():
+    # Episode 0 is Day Zero — the guard must drop fabricated elapsed time, results,
+    # a starting weight, and references to a back-catalogue that doesn't exist.
+    turns = [
+        {"speaker": "elena", "line": "Welcome to the show — glad you're here."},  # keep
+        {"speaker": "eli", "line": "We're two weeks into the experiment now."},  # elapsed time -> drop
+        {"speaker": "eli", "line": "The numbers are showing real progress already."},  # results -> drop
+        {"speaker": "elena", "line": "He started at 311 pounds, right?"},  # weight -> drop
+        {"speaker": "eli", "line": "Last episode we dug into sleep."},  # back-catalogue -> drop
+        {"speaker": "elena", "line": "This is the starting line — let's get into it."},  # keep
+    ]
+    out = panel._gate_intro(turns, allowed_numbers=set())
+    assert [t["speaker"] for t in out] == ["elena_voss", "elena_voss"]
+    assert all(not panel._HALLUCINATION_RE.search(t["line"]) for t in out)
+
+
 def test_voice_routing_returns_chirp_voice():
     # Tolerant of S3-vs-local registry state: every speaker resolves to a real
     # Chirp 3: HD voice (the mapped one once personas.json is synced, else a

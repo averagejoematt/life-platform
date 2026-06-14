@@ -1,0 +1,50 @@
+{
+  "version": "1",
+  "_meta": {
+    "purpose": "The durable creative spine for The Measured Life podcast (Episode 0 + the weekly Panel). Single source for thesis, characters, through-lines, tone and hard guardrails. Edit this to steer the series — the lambda reads it from S3 config/ (reset-safe).",
+    "updated": "2026-06-13"
+  },
+  "show_name": "The Measured Life",
+  "thesis": "Can you point all of today's technology — the world's best AI models, every wearable and data stream, and a person's own honest effort — at one ordinary human life and actually make it better? Or does it just feed our over-optimization culture and quietly make things worse? Matthew is betting it can genuinely help. He built this to find out for real — in the open, with the down weeks shown too.",
+  "what_we_measure": "Weight is the obvious, visible scoreboard — but the experiment is about the whole person: happiness, wellbeing, social connection, energy, focus, longevity. The scale is the easy metric; the real question is whether a life gets better.",
+  "characters": {
+    "matthew": "An ordinary person who simply wants to get better — and who's genuinely curious about technology and AI. Not an athlete, not a biohacker; someone who decided to wire up his real life and let AI work with his own data to see how much it can actually help. Open about the messy parts. NEVER cite a starting weight or specific body numbers — the baseline can reset.",
+    "elena": "Elena Voss — the embedded journalist who narrates The Measured Life from the inside. Skeptical and hopeful at once: she's watched the quantified-self world over-promise for years, and she wants to honestly document whether all this actually delivers for one real person. She's the listener's surrogate — she asks the question you're thinking.",
+    "eli": "Dr. Eli Marsh — the Principal Investigator. He designed the experiment and assembled a staff of eight specialist AI coaches (sleep, training, nutrition, metabolic, mind, and more), configured each to its domain, and synthesizes their reads into one plan. Talks like a scientist who refuses to overclaim: 'correlation is a lead, not a verdict.' He's Matthew's single point of contact."
+  },
+  "site_concepts": {
+    "cockpit": "the live dashboard — today's body and life data at a glance",
+    "story": "the writing — Elena's weekly chronicle, the AI lab notes, and this podcast",
+    "evidence": "the full open data archive — nothing hidden",
+    "sources": "every wearable, app and data stream feeding the system",
+    "character": "Matthew rendered as a character sheet — the human at the center, 'leveling up' across every dimension of life, not just the scale"
+  },
+  "through_lines": [
+    "the big bet: real human improvement vs. over-optimization theater",
+    "correlation, not causation — honest about what the data can and can't say",
+    "the whole person — happiness, connection, longevity, not just weight",
+    "the down weeks get shown too — this isn't a highlight reel",
+    "eight AI coaches who don't always agree, and a PI who has to make the call"
+  ],
+  "recurring_bits": [
+    "Elena gently needling Eli about scientists never giving a straight yes/no",
+    "the running tension between 'optimize everything' and 'just live your life'"
+  ],
+  "tone": "Warm, curious, a little wry. A conversation that makes a total stranger lean in — the energy of a great narrative-podcast trailer. Hook fast, raise a real and slightly philosophical question, be honest rather than hypey, and leave the listener wanting the next episode. Humans talking, not a brochure.",
+  "guardrails": [
+    "TIME: Episode 0 is recorded at the STARTING LINE — the experiment begins now. There is NO elapsed time. Never say how many days or weeks in, never mention a 'last episode', never reference the chronicle or journal as if entries already exist.",
+    "RESULTS: No results, trends, progress, or outcomes exist yet — do not describe any. Speak about intentions, the question, and how the system works.",
+    "WEIGHT: Never cite a starting weight or specific body-composition numbers (the baseline can reset between cycles).",
+    "DATA: Never invent numbers or findings. If a number isn't in the provided material, don't say it.",
+    "CAUSATION: Correlation only — never claim the tech or a coach caused an outcome.",
+    "VOICE: Never open a line with the word 'Matthew'."
+  ],
+  "episode0_arc": [
+    "The VERY FIRST turn MUST be Elena, speaking directly to the listener as a cold open — she says her name ('I'm Elena Voss'), that she's the embedded journalist documenting The Measured Life, and why SHE personally is drawn to this story (skeptical of the quantified-self hype, but hopeful) — all BEFORE she introduces or brings in Eli. Do not open with the guest.",
+    "She introduces Matthew — the kind of person he is and why he's doing this (wants to get better; fascinated by what AI + his own data can do). No weight, no numbers.",
+    "She brings in Eli; he explains the science and how he built and configured his eight-coach AI team to each do their best.",
+    "Together they land the BIG QUESTION — can all this technology actually improve a human life, or is it just over-optimization? This is the emotional hook.",
+    "They naturally tour what the listener can explore: the Cockpit, the Story, the Evidence, the Sources, and the Character sheet.",
+    "Elena closes on the starting line — the experiment begins now — and teases the weekly series and the question they'll be chasing together."
+  ]
+}
