@@ -57,8 +57,10 @@ from phase_filter import with_phase_filter  # noqa: F401 — used by handlers be
 # P1.1 Phase B extension (2026-05-27): coach + misc inline blocks extracted.
 from web.site_api_coach import (
     handle_ai_analysis,
+    handle_coach,
     handle_coach_analysis,
     handle_coach_timeline,
+    handle_coaches,
     handle_field_notes,
     handle_predictions,
     handle_weekly_priority,
@@ -608,6 +610,11 @@ def lambda_handler(event, context):
         return handle_ai_analysis(event)
     if path == "/api/coach_analysis":
         return handle_coach_analysis(event)
+    # CC-01/02: Coaches-as-Characters roster + per-coach page (shaped-empty 200s)
+    if path == "/api/coaches":
+        return handle_coaches(event)
+    if path.startswith("/api/coach/"):
+        return handle_coach(event)
     if path == "/api/coaching-dashboard":
         try:
             _cd_coach_display = {

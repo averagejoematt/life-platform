@@ -11,6 +11,7 @@
 const SECTIONS = [
   { key: "chronicle", label: "Chronicle", kicker: "written weekly by Elena Voss", kind: "posts", url: "/chronicle/posts.json" },
   { key: "lab-notes", label: "AI lab notes", kicker: "what the AI saw ↔ how it felt", kind: "fieldnotes", url: "/api/field_notes" },
+  { key: "coaches", label: "The Coaches", kicker: "the AI team reading your data", kind: "coaches", url: "/api/coaches" },
   { key: "journal", label: "In my own words", kicker: "the daily journal", kind: "posts", url: "/journal/posts.json" },
   { key: "timeline", label: "Timeline", kicker: "level-ups & milestones", kind: "timeline", url: "/api/journey_timeline" },
   { key: "about", label: "About", kicker: "the experiment, in context", kind: "about" },
@@ -45,14 +46,71 @@ const ABOUT = `
 
 function entriesFor(s, data) {
   if (!data) return [];
+  if (s.kind === "coaches") return (data.coaches || []).map((c) => ({ id: c.persona_id, title: `${c.emoji || ""} ${c.name}`.trim(), date: c.headline_stat || c.domain || "" }));
   if (s.kind === "fieldnotes") return (data.entries || []).map((e) => ({ id: e.week, title: `Week ${e.week} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "" }));
   if (s.kind === "posts") { const ps = data.posts || data.entries || (Array.isArray(data) ? data : []); return ps.map((p) => ({ id: p.week, title: p.title || `Week ${p.week}`, date: p.date, excerpt: p.excerpt, meta: p.stats_line, word_count: p.word_count, url: p.url })); }
   return [];
 }
 
+// CC-01/02 — a coach's page: stance (lead) · how it's going · report card · voice · relationships.
+// Pure surfacing of /api/coach/{id}; honest empty-states before the data accrues.
+function coachStanceHTML(st) {
+  if (!st) return "";
+  const list = (arr) => (Array.isArray(arr) ? arr.map(esc).join(" · ") : "");
+  let h = `<section class="coach-stance"><p class="dx-kicker label">where I think you are · what I'm focused on</p>`;
+  h += `<h4 class="cs-headline">${esc(st.headline || "")}</h4><p class="dx-prose">${esc(st.read_of_him || "")}</p>`;
+  if ((st.cares_most || []).length) h += `<p class="cs-care"><span class="label">caring most about right now</span> ${list(st.cares_most)}</p>`;
+  if ((st.cares_less_right_now || []).length) h += `<p class="cs-careless"><span class="label">deliberately ignoring for now</span> ${list(st.cares_less_right_now)}</p>`;
+  if (st.plan) h += `<p class="dx-prose"><strong>The plan:</strong> ${esc(st.plan)}</p>`;
+  if (st.graduation_gate) h += `<p class="cs-gate label">graduates when — ${esc(st.graduation_gate)}</p>`;
+  return h + `</section>`;
+}
+function coachReportHTML(rc) {
+  const tr = (rc && rc.track_record) || {};
+  let h = `<section class="coach-report"><p class="dx-kicker label">report card</p>`;
+  h += `<p class="cr-rate">${tr.hit_rate_pct == null ? "Track record accruing" : esc(tr.hit_rate_pct) + "% hit-rate"} <span class="label">${esc(tr.n_note || "")}</span></p>`;
+  if ((tr.recent || []).length) h += `<ul class="cr-calls">${tr.recent.map((r) => `<li class="cr-${esc(r.status)}"><span class="label">${esc(r.status)}</span> ${esc(r.metric || "")}${r.reason ? " — " + esc(r.reason) : ""}</li>`).join("")}</ul>`;
+  else h += `<p class="dx-prose">No decided predictions yet — hits <em>and</em> misses will both show here as they resolve.</p>`;
+  if (tr.caveat) h += `<p class="cr-caveat label">${esc(tr.caveat)}</p>`;
+  const tl = (rc && rc.tuning_log) || [];
+  if (tl.length) h += `<details class="cr-tuning"><summary class="label">tuning changelog (${tl.length})</summary><ul>${tl.map((e) => `<li><span class="label">${esc(e.date || "")} · ${esc(e.change_type || "")}</span> ${esc(e.summary || "")}</li>`).join("")}</ul></details>`;
+  return h + `</section>`;
+}
+async function renderCoachPage(read, id) {
+  read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the coach…</span></p>`;
+  let d;
+  try { d = await getJSON(`/api/coach/${encodeURIComponent(id)}`); }
+  catch (e) { read.innerHTML = `<p class="dx-prose">Couldn't load this coach just now.</p>`; return; }
+  let h = `<p class="dx-kicker label">${esc(d.emoji || "")} ${esc(d.board_role || d.domain || "")}</p>`;
+  h += `<h3 class="dx-title">${esc(d.name || "")}</h3>`;
+  if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
+  h += coachStanceHTML(d.stance && d.stance.rung);
+  const ro = d.recent_outputs || [];
+  h += `<section class="coach-progress"><p class="dx-kicker label">how it's going</p>`;
+  h += ro.length
+    ? `<ul class="coach-outputs">${ro.map((o) => `<li><span class="label">${esc(o.date || "")}</span> ${esc(o.summary || "")}</li>`).join("")}</ul>`
+    : `<p class="dx-prose">Tracking begins as data arrives — this coach narrates honest progress against its watches here, down-weeks included.</p>`;
+  h += `</section>`;
+  h += coachReportHTML(d.report_card);
+  const v = d.voice || {};
+  if (typeof v.few_shot_example === "string" && v.few_shot_example.trim()) {
+    h += `<section class="coach-voice"><p class="dx-kicker label">voice signature</p><blockquote class="cv-example">${esc(v.few_shot_example)}</blockquote></section>`;
+  }
+  const rel = d.relationships || {};
+  const edge = (e) => `${esc(String(e.coach || "").replace("_coach", ""))} (${esc(e.weight)})`;
+  if ((rel.leans_on || []).length || (rel.leaned_on_by || []).length) {
+    h += `<section class="coach-rel"><p class="dx-kicker label">on the team</p>`;
+    if ((rel.leans_on || []).length) h += `<p class="cr-edges"><span class="label">leans on</span> ${rel.leans_on.map(edge).join(" · ")}</p>`;
+    if ((rel.leaned_on_by || []).length) h += `<p class="cr-edges"><span class="label">leaned on by</span> ${rel.leaned_on_by.map(edge).join(" · ")}</p>`;
+    h += `</section>`;
+  }
+  read.innerHTML = h;
+}
+
 async function renderRead(s, id) {
   const read = $("[data-dx-read]");
   if (s.kind === "about") { read.innerHTML = ABOUT; return; }
+  if (s.kind === "coaches") { await renderCoachPage(read, id); return; }
   if (s.kind === "timeline") {
     read.innerHTML = `<p class="dx-kicker label">${esc(s.kicker)}</p><h3 class="dx-title">The journey so far</h3><p class="dx-loading shimmer">Loading the timeline…</p>`;
     const d = await secFetch(s); const events = (d && d.events) || [];

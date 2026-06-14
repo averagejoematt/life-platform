@@ -18,11 +18,27 @@ Endpoints:
   /api/weekly_priority  — integrator synthesis (cross-domain weekly priority)
 """
 
+import os
 from datetime import datetime
 from decimal import Decimal  # noqa: F401
 
+import boto3
 from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # ADR-058
+
+# CC-00/CC-09 shared-layer modules. Imported defensively so a site-api CODE deploy
+# that lands BEFORE the layer (with these modules) is published doesn't break the
+# whole handler — the coaches endpoints just serve shaped-empty 200s until the
+# layer catches up. (CI ships code, not the layer — see handover gotcha #1.)
+try:
+    import coach_stance
+    import persona_registry
+
+    _COACH_MODULES = True
+except Exception:  # pragma: no cover - exercised only during the layer-lag window
+    coach_stance = None
+    persona_registry = None
+    _COACH_MODULES = False
 
 from web.site_api_common import (
     EXPERIMENT_START,
@@ -30,10 +46,276 @@ from web.site_api_common import (
     USER_PREFIX,
     _decimal_to_float,
     _error,
+    _load_s3_json,
     _ok,
     logger,
     table,
 )
+
+try:
+    from constants import EXPERIMENT_BASELINE_WEIGHT_LBS
+except Exception:  # pragma: no cover - constants always present in layer
+    EXPERIMENT_BASELINE_WEIGHT_LBS = 306.87
+
+# ── CC-00/01/02/09 — Coaches-as-Characters surfacing ─────────────────────────
+_S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+_S3 = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2"))
+
+_DISCLOSURE = (
+    "An AI character. Reads Matthew's real data and speaks in its own voice — "
+    "correlative, never causal. The personality is a lens on real numbers, not a real person."
+)
+
+
+def _registry():
+    return persona_registry.load_registry(_S3, _S3_BUCKET)
+
+
+def _latest_weight_lbs():
+    """Most recent Withings weight_lbs, or None (caller falls back to baseline)."""
+    try:
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}withings") & Key("sk").begins_with("DATE#"),
+                    "ScanIndexForward": False,
+                    "Limit": 5,
+                }
+            )
+        )
+        for it in resp.get("Items", []):
+            w = _decimal_to_float(it).get("weight_lbs")
+            if w:
+                return float(w)
+    except Exception as _e:
+        logger.warning(f"[coaches] weight read: {_e}")
+    return None
+
+
+def _track_record(coach_id):
+    """Confirmed/refuted hit-rate from the COACH#<id>/LEARNING# eval trail (CC-02).
+    Honest pre-D-05: empty -> hit_rate None, preliminary True. Always labelled
+    self-assessment, never external validation (ER-05)."""
+    confirmed = refuted = 0
+    recent = []
+    try:
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("LEARNING#"),
+                    "ScanIndexForward": False,
+                    "Limit": 60,
+                }
+            )
+        )
+        for it in resp.get("Items", []):
+            it = _decimal_to_float(it)
+            st = it.get("status")
+            if st == "confirmed":
+                confirmed += 1
+            elif st == "refuted":
+                refuted += 1
+            if st in ("confirmed", "refuted") and len(recent) < 6:
+                recent.append(
+                    {
+                        "date": it.get("date") or it.get("sk", "").replace("LEARNING#", "").split("#")[0],
+                        "status": st,
+                        "metric": it.get("metric"),
+                        "reason": it.get("reason", ""),
+                    }
+                )
+    except Exception as _e:
+        logger.warning(f"[coaches] track_record {coach_id}: {_e}")
+    decided = confirmed + refuted
+    return {
+        "confirmed": confirmed,
+        "refuted": refuted,
+        "decided": decided,
+        "hit_rate_pct": round(confirmed / decided * 100, 1) if decided else None,
+        "preliminary": decided < 12,
+        "n_note": "preliminary — fewer than 12 decided predictions" if decided < 12 else f"n={decided} decided",
+        "recent": recent,
+        "caveat": "Self-assessment of this coach's own calls — not external validation.",
+    }
+
+
+def _quality_trend(coach_id):
+    """Quality-gate score trend if cached at COACH#<id>/QUALITY#, else empty.
+    Always labelled self-assessment (ER-05)."""
+    scores = []
+    try:
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("QUALITY#"),
+                    "ScanIndexForward": False,
+                    "Limit": 14,
+                }
+            )
+        )
+        for it in resp.get("Items", []):
+            it = _decimal_to_float(it)
+            if it.get("score") is not None:
+                scores.append({"date": it.get("sk", "").replace("QUALITY#", ""), "score": it.get("score")})
+    except Exception:
+        pass
+    return {
+        "scores": list(reversed(scores)),
+        "caveat": "Self-assessment, not external validation (ER-05).",
+    }
+
+
+def _tuning_log_for(coach_id):
+    """Tuning-changelog entries relevant to this coach (CC-03), newest first."""
+    log = _load_s3_json("config/coaches/tuning_log.json", "tuning_log")
+    entries = [e for e in log.get("entries", []) if e.get("coach") in (coach_id, "all")]
+    return list(reversed(entries))[:10]
+
+
+def _voice_subset(coach_config_key):
+    """Curated, public-safe slice of a coach's voice spec for the page."""
+    cfg = _load_s3_json(f"config/coaches/{coach_config_key}.json", "coach_cfg")
+    examples = cfg.get("few_shot_examples") or []
+    example = examples[0] if examples else None
+    if isinstance(example, dict):
+        example = example.get("output") or example.get("text") or example.get("example") or next(iter(example.values()), None)
+    return {
+        "decision_style": cfg.get("decision_style"),
+        "structural_voice_rules": cfg.get("structural_voice_rules"),
+        "few_shot_example": example,
+    }
+
+
+def _relationships(coach_id):
+    """In/out influence-graph edges for this coach (top 3 each)."""
+    g = _load_s3_json("config/coaches/influence_graph.json", "influence_graph")
+    weights = g.get("weights", {})
+    out_edges, in_edges = [], []
+    for edge, w in weights.items():
+        if "→" not in edge:
+            continue
+        src, dst = [x.strip() for x in edge.split("→")]
+        if src == coach_id:
+            out_edges.append({"coach": dst, "weight": w})
+        elif dst == coach_id:
+            in_edges.append({"coach": src, "weight": w})
+    out_edges.sort(key=lambda e: -e["weight"])
+    in_edges.sort(key=lambda e: -e["weight"])
+    return {"leans_on": out_edges[:3], "leaned_on_by": in_edges[:3]}
+
+
+def _recent_outputs(coach_id, limit=4):
+    out = []
+    try:
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("OUTPUT#"),
+                    "ScanIndexForward": False,
+                    "Limit": limit,
+                }
+            )
+        )
+        for it in resp.get("Items", []):
+            it = _decimal_to_float(it)
+            out.append(
+                {
+                    "date": it.get("sk", "").replace("OUTPUT#", "").split("#")[0],
+                    "summary": it.get("key_recommendation") or it.get("observatory_summary") or "",
+                    "themes": it.get("themes", []),
+                }
+            )
+    except Exception:
+        pass
+    return out
+
+
+def _stance_block(coach_id, weight_lbs):
+    """Resolve the coach's current stance rung from real data (CC-09).
+    Falls back to the entry rung when the band metric isn't available yet."""
+    stance = coach_stance.load_stance(coach_id, _S3, _S3_BUCKET)
+    ladder = stance.get("stage_ladder", [])
+    metric = stance.get("band_metric")
+    value = weight_lbs if metric == "weight_lbs" else None
+    rung = coach_stance.resolve_stage(ladder, value) or (ladder[0] if ladder else None)
+    return {
+        "band_metric": metric,
+        "current_value": value,
+        "rung": rung,
+        "ladder": [{"stage_id": s.get("stage_id"), "headline": s.get("headline")} for s in ladder],
+    }
+
+
+def handle_coaches(event):
+    """GET /api/coaches — the roster (CC-01). Shaped-empty 200 by design."""
+    if not _COACH_MODULES:
+        return _ok({"coaches": [], "count": 0, "disclosure": _DISCLOSURE}, cache_seconds=60)
+    try:
+        ops = {k: v for k, v in _registry().get("personas", {}).items() if v.get("operational")}
+        order = persona_registry.OPERATIONAL_COACH_IDS
+        coaches = []
+        for pid, p in ops.items():
+            tr = _track_record(pid)
+            headline = (
+                f"{tr['hit_rate_pct']:.0f}% hit-rate · n={tr['decided']}" if tr["hit_rate_pct"] is not None else "track record accruing"
+            )
+            coaches.append(
+                {
+                    "persona_id": pid,
+                    "name": p.get("name"),
+                    "domain": p.get("domain"),
+                    "short_bio": p.get("short_bio"),
+                    "emoji": p.get("emoji"),
+                    "color": p.get("color"),
+                    "board_role": p.get("board_role"),
+                    "headline_stat": headline,
+                }
+            )
+        coaches.sort(key=lambda c: order.index(c["persona_id"]) if c["persona_id"] in order else 99)
+        return _ok({"coaches": coaches, "count": len(coaches), "disclosure": _DISCLOSURE}, cache_seconds=300)
+    except Exception as _e:
+        logger.warning(f"[/api/coaches] {_e}")
+        return _ok({"coaches": [], "count": 0}, cache_seconds=60)
+
+
+def handle_coach(event):
+    """GET /api/coach/{persona_id} (or ?id=) — one coach page (CC-01 + CC-02)."""
+    if not _COACH_MODULES:
+        return _ok({"persona_id": None, "stance": {}, "report_card": {}}, cache_seconds=60)
+    try:
+        path = event.get("rawPath") or (event.get("requestContext", {}).get("http", {}) or {}).get("path") or ""
+        qs = event.get("queryStringParameters") or {}
+        pid = (qs.get("id") or path.rstrip("/").split("/")[-1] or "").strip()
+        p = _registry().get("personas", {}).get(pid)
+        if not p or not p.get("operational"):
+            return _error(404, "Unknown coach")
+        weight = _latest_weight_lbs() or EXPERIMENT_BASELINE_WEIGHT_LBS
+        return _ok(
+            {
+                "persona_id": pid,
+                "name": p.get("name"),
+                "domain": p.get("domain"),
+                "short_bio": p.get("short_bio"),
+                "emoji": p.get("emoji"),
+                "color": p.get("color"),
+                "board_role": p.get("board_role"),
+                "type": p.get("type"),
+                "disclosure": _DISCLOSURE,
+                "stance": _stance_block(pid, weight),
+                "voice": _voice_subset(p["coach_config_key"]),
+                "relationships": _relationships(pid),
+                "report_card": {
+                    "track_record": _track_record(pid),
+                    "quality_trend": _quality_trend(pid),
+                    "tuning_log": _tuning_log_for(pid),
+                },
+                "recent_outputs": _recent_outputs(pid),
+            },
+            cache_seconds=300,
+        )
+    except Exception as _e:
+        logger.warning(f"[/api/coach] {_e}")
+        return _ok({"persona_id": None, "stance": {}, "report_card": {}}, cache_seconds=60)
 
 
 def _current_day_n() -> int:

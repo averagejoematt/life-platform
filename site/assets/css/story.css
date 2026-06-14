@@ -268,3 +268,30 @@ body { overflow-x: hidden; }
 /* Chronicle audio (the AI-voiced podcast) */
 .dx-listen { display: flex; align-items: center; gap: var(--sp-3); margin: var(--sp-3) 0; flex-wrap: wrap; }
 .dx-listen audio { height: 36px; max-width: 100%; }
+
+/* ── The Coaches (CC-01/02) — per-coach page in the reader pane ───────────── */
+.dx-disclosure { display: block; margin-top: var(--sp-2); color: var(--ink-faint); font-style: italic; max-width: var(--measure); }
+.coach-stance, .coach-progress, .coach-report, .coach-voice, .coach-rel {
+  margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: var(--border-hair);
+}
+.cs-headline { font-family: var(--font-serif); font-size: var(--fs-h2); line-height: 1.15; margin-top: var(--sp-2); color: var(--ink); }
+.cs-care, .cs-careless, .cr-edges { margin-top: var(--sp-3); color: var(--ink); font-size: var(--fs-body); line-height: var(--lh-relaxed); max-width: var(--measure); }
+.cs-care .label, .cs-careless .label, .cr-edges .label { display: block; color: var(--ember); margin-bottom: 2px; }
+.cs-careless { color: var(--ink-muted); }   /* the "ignoring for now" candor reads softer */
+.cs-gate { display: block; margin-top: var(--sp-3); color: var(--ink-faint); }
+.coach-outputs { list-style: none; padding: 0; margin: var(--sp-3) 0 0; }
+.coach-outputs li { margin-top: var(--sp-2); color: var(--ink); }
+.coach-outputs .label { color: var(--ink-faint); margin-right: var(--sp-2); }
+.cr-rate { margin-top: var(--sp-3); font-family: var(--font-mono); font-size: var(--fs-data-lg); color: var(--ink); }
+.cr-rate .label { font-size: var(--fs-label); color: var(--ink-faint); }
+.cr-calls { list-style: none; padding: 0; margin: var(--sp-3) 0 0; }
+.cr-calls li { margin-top: var(--sp-2); color: var(--ink); }
+.cr-calls .label { display: inline-block; min-width: 5.5em; text-transform: uppercase; }
+.cr-confirmed .label { color: #22c55e; }
+.cr-refuted .label { color: var(--ember); }
+.cr-caveat { display: block; margin-top: var(--sp-3); color: var(--ink-faint); }
+.cr-tuning { margin-top: var(--sp-3); }
+.cr-tuning summary { color: var(--ember); cursor: pointer; }
+.cr-tuning ul { margin-top: var(--sp-2); padding-left: var(--sp-4); color: var(--ink-muted); }
+.cr-tuning .label { color: var(--ink-faint); }
+.cv-example { margin-top: var(--sp-3); padding-left: var(--sp-3); border-left: 2px solid var(--ember-line); font-family: var(--font-serif); font-size: var(--fs-quote); color: var(--ink); max-width: var(--measure); }
