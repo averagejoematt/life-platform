@@ -118,6 +118,25 @@ PAGES = [
         "checks": [{"selector": "main, article", "not_empty": True, "desc": "about content"}],
     },
     {
+        "path": "/story/coaches/",
+        "name": "Story · The Coaches (roster)",
+        "wait_for": ".dx-item",
+        "checks": [
+            {"selector": ".dx-item", "min_count": 1, "desc": "coach roster list rendered"},
+            {"selector": ".dx-read .coach-stance, .dx-read .dx-title", "not_empty": True, "desc": "a coach page renders in the reader"},
+        ],
+    },
+    {
+        "path": "/story/coaches/#sleep_coach",
+        "name": "Story · coach page (deep-link)",
+        "wait_for": ".coach-report",
+        "checks": [
+            {"selector": ".coach-stance", "not_empty": True, "desc": "stance section (lead)"},
+            {"selector": ".coach-report", "not_empty": True, "desc": "report card present"},
+            {"selector": ".dx-disclosure", "not_empty": True, "desc": "AI-character disclosure present"},
+        ],
+    },
+    {
         "path": "/evidence/",
         "name": "Evidence hub",
         "wait_for": "[data-readout]",

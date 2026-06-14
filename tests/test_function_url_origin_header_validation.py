@@ -69,8 +69,14 @@ def _load_site_api(origin_secret: str = ""):
             },
         ),
     ):
-        if "site_api_lambda" in sys.modules:
-            del sys.modules["site_api_lambda"]
+        # Drop every cached site_api_* module (flat + web.* namespaced) so they
+        # re-execute under the patched env. SITE_API_ORIGIN_SECRET lives in
+        # site_api_common and is imported into site_api_lambda — reloading only
+        # site_api_lambda would pick up a stale secret from whichever test
+        # imported site_api_common first (order-dependent flake). SEC-04 hardening.
+        for _name in list(sys.modules):
+            if "site_api" in _name:
+                del sys.modules[_name]
         mod = importlib.import_module("site_api_lambda")
     return mod
 

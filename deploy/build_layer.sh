@@ -52,6 +52,10 @@ MODULES=(
     exercise_history.py
     # 2026-06-01: vacation fund tracker ($1/workout-mile) — shared by MCP, site-api, daily-brief
     vacation_fund.py
+    # CC-00 (2026-06-13): canonical persona registry — resolved by engine + site-api
+    persona_registry.py
+    # CC-09 (2026-06-13): coach stance / stage-ladder loader + rung resolver
+    coach_stance.py
 )
 
 rm -rf "$PROJ_ROOT/cdk/layer-build"

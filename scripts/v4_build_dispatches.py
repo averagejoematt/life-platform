@@ -24,6 +24,7 @@ OUT = Path("site/story")
 SECTIONS = [
     ("chronicle", "Chronicle", "The weekly chronicle, written by Elena Voss."),
     ("lab-notes", "AI lab notes", "What the AI saw each week, and how it actually felt — the Third Wall, archived."),
+    ("coaches", "The Coaches", "The AI team reading the data — each coach's stance, report card, and voice."),
     ("journal", "In my own words", "The daily journal, first-person."),
     ("timeline", "Timeline", "Level-ups and milestones — the journey so far."),
     ("about", "About", "The experiment, in context."),
@@ -37,8 +38,12 @@ SHELL = """<!DOCTYPE html>
   <title>{title}</title>
   <meta name="description" content="{desc}">
   <link rel="canonical" href="https://averagejoematt.com/story/{canon}">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
   <link rel="icon" href="/favicon.ico">
+  <link rel="manifest" href="/manifest.webmanifest">
   <link rel="alternate" type="application/rss+xml" title="averagejoematt" href="/rss.xml">
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life — read aloud (podcast)" href="/podcast/feed.xml">
   <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/story.css">
