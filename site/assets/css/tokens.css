@@ -337,3 +337,17 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .sf-base { max-width: var(--container); margin: var(--sp-5) auto 0; display: flex; justify-content: space-between; gap: var(--sp-3); color: var(--ink-faint); }
 .sf-base a { color: var(--ink-faint); text-decoration: none; }
 .sf-base a:hover { color: var(--ember); }
+
+/* ── Coach-name popover (CC-04) — progressive disclosure in reader prose ───── */
+.coach-chip { font: inherit; color: var(--ember); background: none; border: none; padding: 0; cursor: pointer;
+  border-bottom: 1px dotted var(--ember-line); }
+.coach-chip:hover, .coach-chip:focus-visible { border-bottom-style: solid; outline: none; }
+.coach-pop { position: absolute; z-index: var(--z-overlay, 60); max-width: 280px; padding: var(--sp-3) var(--sp-4);
+  background: var(--surface-raised); border: var(--border-hair); border-radius: var(--radius-sm);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.18); }
+.cp-name { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink); }
+.cp-role { color: var(--ember); margin-top: 2px; }
+.cp-bio { margin-top: var(--sp-2); font-size: var(--fs-small); color: var(--ink-muted); line-height: var(--lh-relaxed); }
+.cp-link { display: inline-block; margin-top: var(--sp-2); font-family: var(--font-mono); font-size: var(--fs-label);
+  color: var(--ember); text-decoration: none; border-bottom: 1px solid var(--ember-line); }
+.cp-link:hover { border-color: var(--ember); }

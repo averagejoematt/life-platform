@@ -8,6 +8,8 @@
   Chronicle/journal indexes from posts.json (native excerpts); lab notes fully
   native from /api/field_notes; timeline from /api/journey_timeline.
 */
+import { enhanceCoachNames } from "/assets/js/coach_popover.js";
+
 const SECTIONS = [
   { key: "chronicle", label: "Chronicle", kicker: "written weekly by Elena Voss", kind: "posts", url: "/chronicle/posts.json" },
   { key: "lab-notes", label: "AI lab notes", kicker: "what the AI saw ↔ how it felt", kind: "fieldnotes", url: "/api/field_notes" },
@@ -155,6 +157,7 @@ async function renderRead(s, id) {
       read.innerHTML = `<p class="dx-kicker label">field note · week ${esc(id)}${e.ai_tone ? ` · ${esc(e.ai_tone)}` : ""}</p>` +
         (voices.length ? voices.map(([who, txt, cls]) => `<div class="voice ${cls}"><span class="who">${esc(who)}</span><p class="what">${esc(txt)}</p></div>`).join("") : `<p class="dx-prose">No field note recorded for this week yet.</p>`);
     } catch (e) { read.innerHTML = `<p class="dx-prose">Couldn't load this field note just now.</p>`; }
+    enhanceCoachNames(read);  // CC-04: coach-name popovers in lab notes
     return;
   }
   // posts (chronicle / journal)
@@ -175,6 +178,7 @@ async function renderRead(s, id) {
   if (rf) rf.addEventListener("click", () => loadFull(rf, read.querySelector("[data-fulltext]"), read.querySelector(".dx-excerpt")));
   const sf = read.querySelector(".dx-startfirst");
   if (sf) sf.addEventListener("click", () => selectEntry(s, sf.dataset.startid));
+  enhanceCoachNames(read);  // CC-04: coach-name popovers in chronicle/journal prose
 }
 
 // PG-03 — the per-dispatch foot: a subscribe CTA (the chronicle is the only
@@ -209,6 +213,7 @@ async function loadFull(btn, target, excerptEl) {
     prose.querySelectorAll("script,style,iframe,link,noscript,.discord-community-card,.community-card-header,.community-card-body,.community-card-cta,.fp-cross-footer,.signature").forEach((e) => e.remove());
     target.innerHTML = prose.innerHTML;
     target.hidden = false;
+    enhanceCoachNames(target);  // CC-04: popovers in the expanded full piece too
     if (excerptEl) excerptEl.remove();          // the excerpt is now redundant
     btn.closest(".dx-readmore").remove();
     target.scrollIntoView({ behavior: "smooth", block: "nearest" });
