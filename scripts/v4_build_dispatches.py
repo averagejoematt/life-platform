@@ -72,8 +72,19 @@ SHELL = """<!DOCTYPE html>
       <article class="dx-read" data-dx-read></article>
     </div>
   </main>
-  <footer class="dx-foot-bar"><span class="label">averagejoematt · the story</span>
-    <span class="label"><a href="/">← home</a></span></footer>
+  <footer class="site-foot">
+    <nav class="site-foot-cols" aria-label="Site map">
+      <div class="sf-col"><p class="sf-h label">The Story</p>
+        <a href="/story/chronicle/">Chronicle</a><a href="/story/lab-notes/">AI lab notes</a><a href="/story/coaches/">The Coaches</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/about/">About</a></div>
+      <div class="sf-col"><p class="sf-h label">The Evidence</p>
+        <a href="/evidence/">All topics</a><a href="/evidence/board/">The board</a><a href="/evidence/labs/">Labs</a><a href="/evidence/training/">Training</a><a href="/evidence/nutrition/">Nutrition</a></div>
+      <div class="sf-col"><p class="sf-h label">The Cockpit</p>
+        <a href="/now/">Live data</a><a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a></div>
+      <div class="sf-col"><p class="sf-h label">Context</p>
+        <a href="/evidence/methodology/">Methodology</a><a href="/story/about/">About the experiment</a><a href="/privacy/">Privacy</a></div>
+    </nav>
+    <p class="sf-base label"><span>averagejoematt · the story</span><a href="/">← home</a></p>
+  </footer>
   <script>window.__DISPATCH_START__ = "{start}";</script>
   <script type="module" src="/assets/js/dispatches.js"></script>
 </body>
