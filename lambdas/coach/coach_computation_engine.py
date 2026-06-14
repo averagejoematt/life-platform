@@ -94,16 +94,22 @@ METRIC_DOMAIN = {
     "bed_temp_f": "sleep",
 }
 
-# Coach IDs for prediction scanning
+# Coach IDs for prediction scanning. CANONICAL: must equal the operational
+# coaches in config/personas.json / persona_registry.OPERATIONAL_COACH_IDS
+# (enforced by tests/test_persona_registry.py). The previous list
+# (dr_johansson/fitness_coach/body_comp_coach/lifestyle_coach/recovery_coach)
+# was divergent — 5 of its 8 ids had no COACH# partition, so _fetch_predictions
+# silently scanned non-existent keys and missed predictions from training,
+# physical, glucose, labs and explorer coaches (CC-00 fix).
 COACH_IDS = [
-    "dr_johansson",
-    "fitness_coach",
+    "sleep_coach",
+    "training_coach",
     "nutrition_coach",
     "mind_coach",
-    "sleep_coach",
-    "body_comp_coach",
-    "lifestyle_coach",
-    "recovery_coach",
+    "physical_coach",
+    "glucose_coach",
+    "labs_coach",
+    "explorer_coach",
 ]
 
 # Default EWMA decay params — used if S3 config unavailable

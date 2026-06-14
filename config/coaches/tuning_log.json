@@ -1,0 +1,82 @@
+{
+  "_meta": {
+    "purpose": "Append-only, operator-curated changelog of every change to a coach's prompt, voice spec, persona, few-shot set, or model (CC-03). Git history is the audit trail; this file is the human-readable surface rendered in each coach's Report Card (CC-02) — 'here's how this coach changed, when, why, and whether it helped.'",
+    "discipline": "Any diff to a config/coaches/<coach>.json voice block (structural_voice_rules / few_shot_examples / decision_style / anti_pattern_detection / display_name / domain) must be accompanied by a new entry here, with date >= the current tip. Enforced by tests/test_coach_tuning_logged.py. Coach-prompt edits in lambdas/ai_calls.py follow the same convention by hand (not gated automatically — too coarse to diff reliably).",
+    "entry_schema": {
+      "date": "YYYY-MM-DD",
+      "coach": "an operational coach_config_key (persona_registry) or 'all' for cross-coach",
+      "change_type": "prompt | voice | persona | few_shot | model",
+      "summary": "what changed (one line)",
+      "rationale": "why",
+      "ref": "commit sha / ADR / BACKLOG pointer",
+      "observed_effect": "filled in later when measurable, else null"
+    },
+    "ordering": "ascending by date; append new entries at the end",
+    "last_reviewed": "2026-06-13"
+  },
+  "entries": [
+    {
+      "date": "2026-03-14",
+      "coach": "all",
+      "change_type": "prompt",
+      "summary": "Board opening rule + journal-coach tone + TL;DR specificity tightened.",
+      "rationale": "Briefs were opening with generic compliments and vague TL;DRs; added an opening rule and specificity requirement.",
+      "ref": "commit 72c14b8 (v3.7.26)",
+      "observed_effect": null
+    },
+    {
+      "date": "2026-04-07",
+      "coach": "all",
+      "change_type": "persona",
+      "summary": "Initial 8 coach voice configs created (Coach Intelligence Architecture v6.0.0).",
+      "rationale": "Stood up the per-coach persona/voice specs under config/coaches/.",
+      "ref": "commit 65afe91 (v6.0.0)",
+      "observed_effect": null
+    },
+    {
+      "date": "2026-04-07",
+      "coach": "all",
+      "change_type": "voice",
+      "summary": "Cold-start voice validator + structural_voice_rules added.",
+      "rationale": "Needed an automated check that each coach speaks in its own voice from day one (Intelligence Layer V2).",
+      "ref": "commit fcc79f0 (v6.2.0)",
+      "observed_effect": null
+    },
+    {
+      "date": "2026-05-19",
+      "coach": "all",
+      "change_type": "voice",
+      "summary": "Wired coach-quality-gate into the daily pipeline.",
+      "rationale": "Voice/decision-class violations were shipping unchecked; the gate now scores each output before it lands.",
+      "ref": "commit 393b9c4 (layer v51)",
+      "observed_effect": null
+    },
+    {
+      "date": "2026-05-26",
+      "coach": "training_coach",
+      "change_type": "prompt",
+      "summary": "Opening rule: stop outputs opening with 'Matthew' / generic effort compliments.",
+      "rationale": "ai_validator flagged opening drift — the prompt instruction to stay in-voice was being ignored and outputs kept opening with the user's name.",
+      "ref": "commit 6b71212",
+      "observed_effect": null
+    },
+    {
+      "date": "2026-06-08",
+      "coach": "all",
+      "change_type": "voice",
+      "summary": "A-grade quality gates: PASS_SCORE_THRESHOLD=60 + voice-distinctiveness floor=40.",
+      "rationale": "Promoted the quality gate to a hard A-grade standard so cross-coach sameness and weak voice get caught.",
+      "ref": "commit ca250f7 (PR #64)",
+      "observed_effect": null
+    },
+    {
+      "date": "2026-06-13",
+      "coach": "all",
+      "change_type": "prompt",
+      "summary": "Coach memory: each coach's track record is now injected into its prompt.",
+      "rationale": "Coaches were amnesiac about their own prior calls; track-record context lets them reference and learn from past predictions.",
+      "ref": "commit fa9124d",
+      "observed_effect": null
+    }
+  ]
+}
