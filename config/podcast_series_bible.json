@@ -5,19 +5,19 @@
     "updated": "2026-06-13"
   },
   "show_name": "The Measured Life",
-  "thesis": "Can you point all of today's technology — the world's best AI models, every wearable and data stream, and a person's own honest effort — at one ordinary human life and actually make it better? Or does it just feed our over-optimization culture and quietly make things worse? Matthew is betting it can genuinely help. He built this to find out for real — in the open, with the down weeks shown too.",
+  "thesis": "Can you point all of today's technology — the world's best AI models, every wearable and data stream, and a person's own honest effort — at one ordinary human life and actually make it better? Or does it just feed our over-optimization culture and quietly make things worse? Matt is betting it can genuinely help. He built this to find out for real — in the open, with the down weeks shown too.",
   "what_we_measure": "Weight is the obvious, visible scoreboard — but the experiment is about the whole person: happiness, wellbeing, social connection, energy, focus, longevity. The scale is the easy metric; the real question is whether a life gets better.",
   "characters": {
-    "matthew": "Matthew — the person at the center. This is NOT a simple weight-loss story, and he'd be the first to say so. He's done it before — got into the best shape of his life through relentless work, the kind where fitness becomes purpose and quiets all the noise — and he's watched it come back, more than once, when life cracked the structure: grief, a move to a city where he knew no one, a parent's serious illness, all landing at once. The pattern he'll own: he can do the work — that was never the problem; but when something knocks the routine out, a switch flips and the old coping floods back. The weight was never the real problem — it was the symptom. So the real question isn't 'how do I lose it' (he knows how) — it's 'why does it keep coming back, and can a system catch what willpower can't?' He's a systems person who'd been using AI as a thinking partner, and noticed every tracker had its own AI seeing only its slice — sleep, glucose, nutrition — each blind to the others, and none watching the mental-health layer or the whole person. That insight is why this platform exists. NEVER cite a starting weight or any specific body number — the baseline can reset.",
+    "matthew": "Matt — the person at the center. This is NOT a simple weight-loss story, and he'd be the first to say so. He's done it before — got into the best shape of his life through relentless work, the kind where fitness becomes purpose and quiets all the noise — and he's watched it come back, more than once, when life cracked the structure: grief, a move to a city where he knew no one, a parent's serious illness, all landing at once. The pattern he'll own: he can do the work — that was never the problem; but when something knocks the routine out, a switch flips and the old coping floods back. The weight was never the real problem — it was the symptom. So the real question isn't 'how do I lose it' (he knows how) — it's 'why does it keep coming back, and can a system catch what willpower can't?' He's a systems person who'd been using AI as a thinking partner, and noticed every tracker had its own AI seeing only its slice — sleep, glucose, nutrition — each blind to the others, and none watching the mental-health layer or the whole person. That insight is why this platform exists. NEVER cite a starting weight or any specific body number — the baseline can reset.",
     "elena": "Elena Voss — the embedded journalist who narrates The Measured Life from the inside, and the HOST of this podcast. She's spent years watching the quantified-self and optimization world over-promise — radical transparency about the wins, silence about the rest — and she's equal parts skeptical and hopeful. She took this on to document, honestly and up close, whether all this technology actually changes a real person's life. She writes the weekly chronicle — the human story layered on top of the data — and the podcast runs alongside it. She's the listener's surrogate: she asks the question you're thinking.",
-    "eli": "Dr. Eli Marsh — the Principal Investigator. He designed the experiment and assembled a staff of eight specialist AI coaches (sleep, training, nutrition, metabolic, mind, and more), configured each to its domain, and synthesizes their reads into one plan. Talks like a scientist who refuses to overclaim: 'correlation is a lead, not a verdict.' He's Matthew's single point of contact."
+    "eli": "Dr. Eli Marsh — the Principal Investigator. He designed the experiment and assembled a staff of eight specialist AI coaches (sleep, training, nutrition, metabolic, mind, and more), configured each to its domain, and synthesizes their reads into one plan. Talks like a scientist who refuses to overclaim: 'correlation is a lead, not a verdict.' He's Matt's single point of contact."
   },
   "site_concepts": {
     "cockpit": "the live dashboard — today's body and life data at a glance",
     "story": "the writing — Elena's weekly chronicle, the AI lab notes, and this podcast",
     "evidence": "the full open data archive — nothing hidden",
     "sources": "every wearable, app and data stream feeding the system",
-    "character": "Matthew rendered as a character sheet — the human at the center, 'leveling up' across every dimension of life, not just the scale"
+    "character": "Matt rendered as a character sheet — the human at the center, 'leveling up' across every dimension of life, not just the scale"
   },
   "through_lines": [
     "the big bet: real human improvement vs. over-optimization theater",
@@ -37,15 +37,74 @@
     "WEIGHT: Never cite a starting weight or specific body-composition numbers (the baseline can reset between cycles).",
     "DATA: Never invent numbers or findings. If a number isn't in the provided material, don't say it.",
     "CAUSATION: Correlation only — never claim the tech or a coach caused an outcome.",
-    "VOICE: Never open a line with the word 'Matthew'."
+    "VOICE: Never open a line with the word 'Matt'."
   ],
   "episode0_arc": [
     "Open COLD on Elena, directly to the listener: she introduces herself by name ('I'm Elena Voss'), who she is and her background as a journalist, and why SHE is personally drawn to this — years of watching optimization culture over-promise, skeptical but hopeful. Spend real time here; she is the through-line of the whole series. Do NOT open with the guest.",
     "Elena introduces the platform — The Measured Life: the idea of putting one real life fully in the open, and what a listener can walk through — the Cockpit (live data), the Story (the writing), the Evidence (the open archive), the Sources (every wearable feeding it), and the Character sheet (the human, leveling up across every dimension).",
     "Elena explains the SERIES itself — that she writes a weekly chronicle (the human story on top of the numbers) and that this podcast runs alongside it; what a listener gets if they follow along, week to week.",
-    "Elena turns to Matthew — the honest version (NO numbers): he's done this before and watched it come back when life cracked (grief, isolation, a parent's illness); the weight was never the real problem, it was the coping mechanism; the question isn't how to lose it but WHY it keeps coming back — and whether a system can catch what willpower can't.",
+    "Elena sets up WHO Matt is BEFORE any hardship — the listener must meet the person first. Establish the HIGH: an ordinary guy (not an athlete, not a guru) who has actually done this before, more than once — got into the best shape of his life through relentless work, where fitness became purpose and quieted all the noise. ONLY THEN the turn: life cracked (grief, a move to a city where he knew no one, a parent's illness, all at once) and it came back; and the realization that the weight was never the real problem — it was the coping mechanism. Then the question: not how to lose it (he knows how) but WHY it keeps coming back, and whether a system can catch what willpower can't. Do NOT jump straight to the grief.",
     "Elena brings in Dr. Eli Marsh; he explains the experiment and how he built and configured the eight-coach AI team — and the origin insight that every tracker's AI was blind to the others, with nothing watching the whole person.",
     "Together they land the BIG QUESTION — can all this technology genuinely improve a whole human life, or is it just over-optimization theater? The emotional hook.",
     "Elena closes on the starting line — the experiment begins now — and teases next week's episode and the question they'll chase together. Leave a stranger wanting to come back."
-  ]
+  ],
+  "weekly_format": {
+    "premise": "Each weekly episode is built around a BET, not a recap. The spine is the live disagreement between the coaches (or a coach's standing prediction) framed as an explicit, falsifiable wager — then scored honestly against real data the following week. The misses ARE the product.",
+    "segments": [
+      "COLD OPEN (<=20s): the single sharpest line of the week, no preamble.",
+      "WEEK IN ONE BREATH: Elena's fast, honest read of how the week actually went (process and feel, not a scoreboard).",
+      "RECEIPTS: score last week's open bet — WON / LOST / STILL OPEN — against the real data. Be honest when a coach was wrong; that candor is the show.",
+      "THE SPLIT: this week's coach disagreement, both sides steelmanned, then Eli (the PI) is forced to make the call.",
+      "THE HUMAN MOMENT: one beat that is NOT a number — what it felt like, a return, a small honest win, a connection (or its absence).",
+      "SIGN-OFF: name the ONE new open bet for next week (the cliffhanger), then the fixed tagline."
+    ],
+    "sign_off": "This is The Measured Life. We'll see what the data says next week.",
+    "length_target": "6-10 minutes; hard cap enforced.",
+    "hosts": "Elena Voss hosts every week; one rotating coach guests (the one with the most material / the live disagreement). Single-pass two-voice (Gemini)."
+  },
+  "selection_rubric": {
+    "prefer": [
+      "a genuine disagreement between two coaches (the tension map) — the highest-value beat",
+      "scoring/resolving last week's open bet against new data",
+      "a surprising correlation or a behavior change",
+      "an honest human moment from the chronicle (process, return, connection)",
+      "a callback to a running thread"
+    ],
+    "avoid": [
+      "filler / 'nothing happened' padding",
+      "repeating a topic covered in the last 2-3 episodes (reward novelty vs series_state.recent_topics)",
+      "manufacturing a bet that isn't actually in the data"
+    ],
+    "quiet_week": "If little moved, say so honestly and make it a short episode that resolves an old bet — never inflate. A quiet week is data, not a failure.",
+    "always_consider": "Social connection is a first-class beat (per the Personal Board) — weigh it equally with the physical metrics."
+  },
+  "editor_rubric": {
+    "must_pass": [
+      "Opens on a genuine hook (cold open), not a throat-clear.",
+      "A stranger understands the stakes and why to care.",
+      "Carries the throughline + at least one callback to a prior thread.",
+      "On-voice (Elena skeptical-but-hopeful; Eli refuses to overclaim).",
+      "INTERESTINGNESS / quality floor — would a stranger send this to a friend? No bland filler, no synthetic 'great point!' banter.",
+      "Ends on the next open bet (cliffhanger)."
+    ],
+    "must_not": [
+      "No fabricated numbers or numbers absent from the inputs.",
+      "No causal claims (plain-English causation too, not just the word 'causes').",
+      "No statistically bogus 'finding' presented as signal on a tiny sample — hedge small-n.",
+      "No report-card / judgmental / moralizing tone toward Matt.",
+      "A down or hard week handled WITHOUT compassion (must understand, never judge)."
+    ],
+    "output": "Return JSON {verdict: 'pass'|'revise'|'hold', scores:{hook,stakes,throughline,voice,interest}, issues:[...], pull_quote: '<one shareable line>'}. 'hold' = route to a human (do not auto-publish)."
+  },
+  "compassion_safety_rules": {
+    "fail_closed_hold": [
+      "Any blocked vice (porn / marijuana / cannabis / weed / thc / edibles) — never voiced publicly.",
+      "Any specific body weight or body-composition number.",
+      "Causal-claim language.",
+      "Any number not present in the provided inputs.",
+      "Any reference to grief, death, a family member's illness, or a named person (friend/family/partner/doctor) — the autonomous pipeline must NEVER be the first to voice these.",
+      "A report-card / judgmental tone, or a hard week handled without compassion."
+    ],
+    "autonomy_asymmetry": "Autonomy on ordinary weeks; on any hard or sensitive week (grief/family/low-mood, or any fail above) the episode is HELD and a human is alerted — never auto-published. Autonomy on the easy weeks, a human hand on the hard ones."
+  }
 }

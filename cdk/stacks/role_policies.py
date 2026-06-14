@@ -850,10 +850,14 @@ def email_coach_panel_podcast() -> list[iam.PolicyStatement]:
     (life-platform/google-tts), write generated/panelcast/*. Bedrock + budget-tier
     SSM granted by _email_base / create_platform_lambda."""
     return _email_base(
-        needs_s3_write=["generated/panelcast/*"],
+        # generated/panelcast/* = published episodes; panelcast-holds/* = NON-public
+        # human-review drafts when the QA/compassion gate holds an episode.
+        needs_s3_write=["generated/panelcast/*", "panelcast-holds/*"],
         extra_secrets=["life-platform/google-tts"],
         extra_statements=[
             iam.PolicyStatement(sid="ChroniclePostsRead", actions=["s3:GetObject"], resources=[f"{BUCKET_ARN}/site/chronicle/posts.json"]),
+            # Loud HOLD: alert a human when an episode is held (the autonomy asymmetry).
+            iam.PolicyStatement(sid="HoldAlertSNS", actions=["sns:Publish"], resources=[f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"]),
         ],
     )
 

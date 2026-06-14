@@ -157,8 +157,10 @@ class EmailStack(Stack):
             function_name="coach-panel-podcast",
             handler="emails.coach_panel_podcast_lambda.lambda_handler",
             source_file="lambdas/emails/coach_panel_podcast_lambda.py",
-            schedule="cron(20 16 ? * WED *)",
-            timeout_seconds=600,
+            # Fri 17:00 UTC (10am PT) — chronicle drops Wed; the Panel reviews the
+            # settled week on Friday. 900s: Sonnet writer + Haiku judge + Gemini synth.
+            schedule="cron(0 17 ? * FRI *)",
+            timeout_seconds=900,
             memory_mb=512,
             environment=_email_env,
             custom_policies=rp.email_coach_panel_podcast(),
