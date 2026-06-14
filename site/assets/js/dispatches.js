@@ -50,7 +50,7 @@ const ABOUT = `
 function entriesFor(s, data) {
   if (!data) return [];
   if (s.kind === "coaches") return [{ id: "team", title: "🧭 My Team", date: "the team's read on you" }].concat((data.coaches || []).map((c) => ({ id: c.persona_id, title: `${c.emoji || ""} ${c.name}`.trim(), date: c.headline_stat || c.domain || "" })));
-  if (s.kind === "podcast") return (data.episodes || []).map((e) => ({ id: e.week, title: e.title || `Week ${e.week}`, date: e.date, url: e.url, bytes: e.bytes, excerpt: e.excerpt }));
+  if (s.kind === "podcast") return (data.episodes || []).map((e) => ({ id: e.week, title: e.title || `Week ${e.week}`, date: e.date, url: e.url, bytes: e.bytes, duration_sec: e.duration_sec, byline: e.byline, excerpt: e.excerpt }));
   if (s.kind === "fieldnotes") return (data.entries || []).map((e) => ({ id: e.week, title: `Week ${e.week} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "" }));
   if (s.kind === "posts") { const ps = data.posts || data.entries || (Array.isArray(data) ? data : []); return ps.map((p) => ({ id: p.week, title: p.title || `Week ${p.week}`, date: p.date, excerpt: p.excerpt, meta: p.stats_line, word_count: p.word_count, url: p.url })); }
   return [];
@@ -196,12 +196,15 @@ async function renderRead(s, id) {
     const all = entriesFor(s, await secFetch(s));
     const ent = all.find((x) => String(x.id) === String(id)) || all[0];
     if (!ent) { read.innerHTML = `<p class="dx-prose">No episodes yet — the first weekly review drops here once the chronicle's been running a week.</p>`; return; }
-    const mins = Math.max(1, Math.round((ent.bytes || 0) / 1024 / 1024 / 0.12));
+    const isWav = /\.wav$/i.test(ent.url || "");
+    const secs = ent.duration_sec || Math.round((ent.bytes || 0) / (isWav ? 48000 : 2097));  // WAV=24kHz·16-bit·mono; else MP3 est
+    const mins = Math.max(1, Math.round(secs / 60));
+    const byline = ent.byline || "Elena + a coach";
     read.innerHTML =
       `<p class="dx-kicker label">the panel · weekly review · two AI voices</p>` +
       `<h3 class="dx-title">${esc(ent.title)}</h3>` +
       (ent.date ? `<p class="dx-stats label">${esc(ent.date)}</p>` : "") +
-      `<div class="dx-listen"><audio controls preload="none" src="${esc(ent.url)}"></audio><span class="label">listen · Elena + a coach (~${mins} min)</span></div>` +
+      `<div class="dx-listen"><audio controls preload="none" src="${esc(ent.url)}"></audio><span class="label">listen · ${esc(byline)} (~${mins} min)</span></div>` +
       (ent.excerpt ? `<p class="dx-prose">${esc(ent.excerpt)}</p>` : "");
     return;
   }
