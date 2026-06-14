@@ -1,0 +1,51 @@
+{
+  "coach": "mind_coach",
+  "band_metric": "weight_lbs",
+  "_note": "Hand-authored stage ladder (CC-09). Bands tile weight_lbs; current rung resolves from real weight.",
+  "stage_ladder": [
+    {
+      "stage_id": "foundation",
+      "entry": {"metric": "weight_lbs", "min": 270, "max": null},
+      "headline": "Build identity, not willpower.",
+      "read_of_him": "Early on, the story you tell yourself matters more than any metric. The job is to become someone who shows up — and to be kind to him when he doesn't.",
+      "cares_most": ["showing up imperfectly beats not showing up", "self-compassion on missed days", "noticing the wins"],
+      "cares_less_right_now": ["optimizing mood", "deep psychological work", "streak perfectionism"],
+      "plan": "Anchor a simple identity ('I'm someone who moves and logs') and protect it from all-or-nothing thinking.",
+      "graduation_gate": "Recovering from a missed day without spiraling, repeatedly, unlocks the 'momentum' rung.",
+      "watches": ["som_avg_valence", "journal_sentiment"]
+    },
+    {
+      "stage_id": "momentum",
+      "entry": {"metric": "weight_lbs", "min": 240, "max": 270},
+      "headline": "Let the wins compound.",
+      "read_of_him": "The habit is taking. Now we use early results to build belief and steady the emotional ups and downs.",
+      "cares_most": ["connecting effort to results", "smoothing mood volatility", "sustainable motivation"],
+      "cares_less_right_now": ["chasing peak motivation", "comparing to others"],
+      "plan": "Reflect on what's working, name the progress, and build routines that don't depend on feeling motivated.",
+      "graduation_gate": "Stable mood trend alongside a steady streak for a month unlocks 'resilience'.",
+      "watches": ["som_avg_valence", "mood_variability"]
+    },
+    {
+      "stage_id": "resilience",
+      "entry": {"metric": "weight_lbs", "min": 210, "max": 240},
+      "headline": "Handle the hard weeks.",
+      "read_of_him": "Real life will test this. The work now is staying steady through stress, travel, and plateaus.",
+      "cares_most": ["stress regulation", "consistency under disruption", "honest self-reflection"],
+      "cares_less_right_now": ["feeling great every day"],
+      "plan": "Strengthen coping routines and reframe plateaus as part of the process, not failure.",
+      "graduation_gate": "Riding out a genuine setback without losing the habit unlocks 'integration'.",
+      "watches": ["mood_variability", "journal_sentiment"]
+    },
+    {
+      "stage_id": "integration",
+      "entry": {"metric": "weight_lbs", "min": null, "max": 210},
+      "headline": "This is just who you are now.",
+      "read_of_him": "The behaviors are identity, not effort. The job is to keep the inner life healthy for the long haul.",
+      "cares_most": ["sustainable wellbeing", "meaning beyond the metrics", "guarding against burnout"],
+      "cares_less_right_now": ["proving anything"],
+      "plan": "Keep reflection alive, watch for burnout, and let the healthy identity carry the behaviors.",
+      "graduation_gate": "Maintenance rung — stay here.",
+      "watches": ["som_avg_valence", "journal_sentiment"]
+    }
+  ]
+}

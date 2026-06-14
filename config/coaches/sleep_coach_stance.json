@@ -1,0 +1,51 @@
+{
+  "coach": "sleep_coach",
+  "band_metric": "weight_lbs",
+  "_note": "Hand-authored stage ladder (CC-09). Bands tile weight_lbs; current rung resolves from real weight.",
+  "stage_ladder": [
+    {
+      "stage_id": "foundation",
+      "entry": {"metric": "weight_lbs", "min": 270, "max": null},
+      "headline": "Get enough hours, regularly.",
+      "read_of_him": "At this stage the single biggest lever is total sleep and a consistent bedtime. Architecture can wait.",
+      "cares_most": ["time in bed most nights", "a roughly consistent bedtime", "showing up for sleep the way you show up for the gym"],
+      "cares_less_right_now": ["deep/REM percentages", "perfect sleep scores", "advanced protocols"],
+      "plan": "Anchor a bedtime window and protect duration. Volume and regularity first; quality follows.",
+      "graduation_gate": "Hitting your duration target most nights for two weeks unlocks the 'consistency' rung.",
+      "watches": ["sleep_duration_hours", "sleep_consistency"]
+    },
+    {
+      "stage_id": "consistency",
+      "entry": {"metric": "weight_lbs", "min": 240, "max": 270},
+      "headline": "Make the timing tight.",
+      "read_of_him": "Duration is there. Now we steady the rhythm so the body knows when to wind down.",
+      "cares_most": ["bedtime/wake regularity", "sleep score trend", "wind-down routine"],
+      "cares_less_right_now": ["chasing a single great night", "gadget micro-optimizing"],
+      "plan": "Tighten the schedule and the pre-sleep routine; let the score trend, not any one night, be the judge.",
+      "graduation_gate": "A stable schedule with a rising score trend for a month unlocks 'architecture'.",
+      "watches": ["sleep_score", "sleep_consistency"]
+    },
+    {
+      "stage_id": "architecture",
+      "entry": {"metric": "weight_lbs", "min": 210, "max": 240},
+      "headline": "Now we care about the stages.",
+      "read_of_him": "The basics hold, so deep and REM are worth chasing — they're where recovery and the training adaptation get locked in.",
+      "cares_most": ["deep-sleep percentage", "REM percentage", "bedroom temperature"],
+      "cares_less_right_now": ["a perfect bedtime to the minute"],
+      "plan": "Tune environment (temperature, light) and timing to grow deep and REM; coordinate with the training load.",
+      "graduation_gate": "Deep and REM trending toward healthy bands across a block unlocks 'optimize'.",
+      "watches": ["deep_pct", "rem_pct", "bed_temp_f"]
+    },
+    {
+      "stage_id": "optimize",
+      "entry": {"metric": "weight_lbs", "min": null, "max": 210},
+      "headline": "Protect what works.",
+      "read_of_him": "Sleep is a strength now. The job is to keep it that way through life's noise.",
+      "cares_most": ["holding the architecture", "recovering quickly from bad nights", "sleep as performance support"],
+      "cares_less_right_now": ["squeezing out marginal minutes"],
+      "plan": "Maintain the routine, absorb disruptions gracefully, and keep sleep aligned with recovery needs.",
+      "graduation_gate": "Maintenance rung — stay here.",
+      "watches": ["sleep_score", "deep_pct", "sleep_consistency"]
+    }
+  ]
+}

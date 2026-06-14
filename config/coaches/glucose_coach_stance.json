@@ -1,0 +1,51 @@
+{
+  "coach": "glucose_coach",
+  "band_metric": "weight_lbs",
+  "_note": "Hand-authored stage ladder (CC-09). Bands tile weight_lbs; current rung resolves from real weight.",
+  "stage_ladder": [
+    {
+      "stage_id": "foundation",
+      "entry": {"metric": "weight_lbs", "min": 270, "max": null},
+      "headline": "Let's just see your glucose move.",
+      "read_of_him": "Early on I'm establishing your baseline and the obvious patterns. No targets yet — just observing what food does to you.",
+      "cares_most": ["wearing the CGM consistently", "average glucose baseline", "spotting the biggest spikes"],
+      "cares_less_right_now": ["time-in-range targets", "fine-grained meal timing", "variability optimization"],
+      "plan": "Establish a clean baseline and surface the loudest patterns; correlate gently with meals and weight.",
+      "graduation_gate": "A stable CGM baseline with patterns identified unlocks the 'stability' rung.",
+      "watches": ["blood_glucose_avg"]
+    },
+    {
+      "stage_id": "stability",
+      "entry": {"metric": "weight_lbs", "min": 240, "max": 270},
+      "headline": "Smooth out the big swings.",
+      "read_of_him": "I can see your patterns now. Let's blunt the biggest spikes — that's where the easy wins are.",
+      "cares_most": ["reducing the largest post-meal spikes", "glucose variability trend", "meal-order and pairing wins"],
+      "cares_less_right_now": ["chasing a perfect flat line"],
+      "plan": "Target the few foods/behaviors driving the biggest excursions; correlate with weight and energy.",
+      "graduation_gate": "Variability trending down across a month unlocks 'range'.",
+      "watches": ["blood_glucose_std_dev", "glucose_meal_response"]
+    },
+    {
+      "stage_id": "range",
+      "entry": {"metric": "weight_lbs", "min": 210, "max": 240},
+      "headline": "Now let's hold time-in-range.",
+      "read_of_him": "Variability is calmer. We can start caring about how much of the day you spend in a healthy range.",
+      "cares_most": ["time-in-range percentage", "consistent meal responses", "fasting glucose"],
+      "cares_less_right_now": ["one-off spikes from rare meals"],
+      "plan": "Optimize for steady time-in-range; use meal-response data to personalize choices.",
+      "graduation_gate": "Healthy time-in-range sustained for a block unlocks 'metabolic-health'.",
+      "watches": ["time_in_range_pct", "glucose_meal_response"]
+    },
+    {
+      "stage_id": "metabolic-health",
+      "entry": {"metric": "weight_lbs", "min": null, "max": 210},
+      "headline": "Keep the metabolism resilient.",
+      "read_of_him": "Glucose control is strong. The job is to protect metabolic flexibility for the long run.",
+      "cares_most": ["stable fasting glucose", "metabolic flexibility", "resilience to occasional indulgence"],
+      "cares_less_right_now": ["perfection on every meal"],
+      "plan": "Maintain healthy glucose dynamics; let the system handle real life without losing control.",
+      "graduation_gate": "Maintenance rung — stay here.",
+      "watches": ["time_in_range_pct", "blood_glucose_avg"]
+    }
+  ]
+}

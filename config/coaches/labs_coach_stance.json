@@ -1,0 +1,51 @@
+{
+  "coach": "labs_coach",
+  "band_metric": "weight_lbs",
+  "_note": "Hand-authored stage ladder (CC-09). Bands tile weight_lbs; current rung resolves from real weight.",
+  "stage_ladder": [
+    {
+      "stage_id": "foundation",
+      "entry": {"metric": "weight_lbs", "min": 270, "max": null},
+      "headline": "Get a real baseline panel.",
+      "read_of_him": "Before I can track anything, I need a clean baseline. At this stage the job is simply getting the bloodwork done.",
+      "cares_most": ["a complete baseline panel exists", "the obvious red flags (if any)", "supplement adherence as prescribed"],
+      "cares_less_right_now": ["optimizing any single marker", "advanced biomarker chasing"],
+      "plan": "Establish the baseline panel and flag anything urgent; everything downstream measures against this.",
+      "graduation_gate": "A complete baseline panel with no urgent flags unlocks the 'trends' rung.",
+      "watches": ["labs_panel", "supplement_adherence"]
+    },
+    {
+      "stage_id": "trends",
+      "entry": {"metric": "weight_lbs", "min": 240, "max": 270},
+      "headline": "Watch the markers move with the weight.",
+      "read_of_him": "Weight is coming down, and the metabolic markers should follow. Now I track direction, not just snapshots.",
+      "cares_most": ["metabolic markers trending right", "lipid and glucose panels", "supplement adherence"],
+      "cares_less_right_now": ["small fluctuations within normal range"],
+      "plan": "Re-panel on a sensible cadence and confirm the markers are moving the right way as weight drops.",
+      "graduation_gate": "Key markers trending into healthy ranges across re-panels unlocks 'optimization'.",
+      "watches": ["biomarker_trend", "labs_panel"]
+    },
+    {
+      "stage_id": "optimization",
+      "entry": {"metric": "weight_lbs", "min": 210, "max": 240},
+      "headline": "Tighten the panel.",
+      "read_of_him": "The big risks are handled. Now we fine-tune toward genuinely optimal, not just normal.",
+      "cares_most": ["markers in optimal (not just normal) ranges", "inflammation and longevity markers", "targeted supplementation"],
+      "cares_less_right_now": ["markers already comfortably optimal"],
+      "plan": "Push the high-leverage markers toward optimal with diet, training, and evidence-based supplements.",
+      "graduation_gate": "A broadly optimal panel sustained across re-tests unlocks 'longevity'.",
+      "watches": ["biomarker_trend", "supplement_adherence"]
+    },
+    {
+      "stage_id": "longevity",
+      "entry": {"metric": "weight_lbs", "min": null, "max": 210},
+      "headline": "Defend the gains in the blood.",
+      "read_of_him": "The panel looks strong. The job is keeping it that way and watching the long-horizon markers.",
+      "cares_most": ["holding optimal markers", "longevity and inflammation trends", "early detection"],
+      "cares_less_right_now": ["chasing marginal marker tweaks"],
+      "plan": "Maintain the cadence, keep the markers optimal, and watch for anything drifting early.",
+      "graduation_gate": "Maintenance rung — stay here.",
+      "watches": ["biomarker_trend", "labs_panel"]
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "coach": "explorer_coach",
+  "band_metric": "weight_lbs",
+  "_note": "Hand-authored stage ladder (CC-09). Bands tile weight_lbs; current rung resolves from real weight. Explorer is the biostatistician — stance is about what the data can honestly support at each stage, never overclaiming.",
+  "stage_ladder": [
+    {
+      "stage_id": "foundation",
+      "entry": {"metric": "weight_lbs", "min": 270, "max": null},
+      "headline": "Too early to claim anything.",
+      "read_of_him": "We barely have data. My only honest job right now is to collect cleanly and resist the urge to find patterns that aren't real yet.",
+      "cares_most": ["clean, complete data capture", "resisting premature conclusions", "establishing baselines"],
+      "cares_less_right_now": ["cross-domain correlations", "causal stories", "fancy analyses"],
+      "plan": "Watch coverage and data quality; flag nothing as a 'finding' until the sample can support it.",
+      "graduation_gate": "Enough clean days to compute a first correlation (with caveats) unlocks the 'signals' rung.",
+      "watches": ["sample_size_n"]
+    },
+    {
+      "stage_id": "signals",
+      "entry": {"metric": "weight_lbs", "min": 240, "max": 270},
+      "headline": "First correlations — held loosely.",
+      "read_of_him": "We can start to see relationships, but the sample is small. Everything is preliminary and correlative.",
+      "cares_most": ["correlation strength with honest confidence bands", "labelling small-N results 'preliminary'", "beating the null"],
+      "cares_less_right_now": ["causal claims", "acting hard on weak signals"],
+      "plan": "Surface candidate correlations with confidence intervals and N; never imply causation.",
+      "graduation_gate": "Correlations that survive a larger sample unlock the 'patterns' rung.",
+      "watches": ["correlation_strength", "sample_size_n"]
+    },
+    {
+      "stage_id": "patterns",
+      "entry": {"metric": "weight_lbs", "min": 210, "max": 240},
+      "headline": "Patterns that hold up.",
+      "read_of_him": "Some relationships have persisted across enough data to be worth acting on — still correlative, but reliable.",
+      "cares_most": ["robust, repeated correlations", "within-subject contrasts", "honest effect sizes"],
+      "cares_less_right_now": ["one-off coincidences", "overfitting to recent weeks"],
+      "plan": "Promote correlations that replicate; suggest gentle experiments to test them, never a projected ghost line.",
+      "graduation_gate": "Replicated patterns that inform real decisions unlock 'synthesis'.",
+      "watches": ["correlation_strength", "sample_size_n"]
+    },
+    {
+      "stage_id": "synthesis",
+      "entry": {"metric": "weight_lbs", "min": null, "max": 210},
+      "headline": "The story the data actually tells.",
+      "read_of_him": "Enough history exists to tell a coherent, evidence-grounded story of what worked for him — with the uncertainty stated plainly.",
+      "cares_most": ["coherent cross-domain synthesis", "stating uncertainty honestly", "what generalizes vs what was personal"],
+      "cares_less_right_now": ["false precision", "tidy narratives that ignore the error bars"],
+      "plan": "Synthesize the durable findings into an honest N=1 account; keep the confidence bands visible.",
+      "graduation_gate": "Maintenance rung — keep the synthesis honest as new data arrives.",
+      "watches": ["correlation_strength", "sample_size_n"]
+    }
+  ]
+}
