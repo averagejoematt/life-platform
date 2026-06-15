@@ -1923,8 +1923,12 @@ def pipeline_health_check() -> list[iam.PolicyStatement]:
             sid="LambdaInvoke", actions=["lambda:InvokeFunction"], resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:*"]
         ),
         iam.PolicyStatement(
-            sid="SecretsRead",
-            actions=["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"],
+            # ER/elite-review 2026-06-15: the health check only calls describe_secret
+            # (existence/metadata) on a fixed source list — it NEVER reads secret
+            # values. Dropped GetSecretValue so a compromised health-check can't
+            # exfiltrate OAuth tokens / API keys it has no reason to read.
+            sid="SecretsDescribe",
+            actions=["secretsmanager:DescribeSecret"],
             resources=[f"arn:aws:secretsmanager:{REGION}:{ACCT}:secret:life-platform/*"],
         ),
         iam.PolicyStatement(sid="CloudWatchMetrics", actions=["cloudwatch:PutMetricData"], resources=["*"]),
