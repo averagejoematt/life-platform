@@ -214,6 +214,48 @@ class MonitoringStack(Stack):
                 dims={"Source": _src},
             )
 
+        # ── Garmin OAuth auth-health (ER-01 follow-up, 2026-06-14) ──────────────
+        # Garmin's proactive-refresh + 429-breaker fails GRACEFULLY (a clean 200
+        # "skip"), so a dead token never trips ConsecutiveFailures above — that's
+        # how Garmin stayed dead ~2 weeks unnoticed. garmin_lambda now emits
+        # LifePlatform/OAuth GarminAuthHealthy (1 = auth worked this run, 0 =
+        # dead/throttled). BREACHING: a full day with no healthy datapoint (all
+        # runs skipped/failed, OR the cron stopped entirely) → URGENT. A transient
+        # 3h cooldown can't fire it — any healthy run that day makes Max=1.
+        _garmin_auth_dead = cloudwatch.Alarm(
+            self,
+            "GarminAuthUnhealthy",
+            alarm_name="garmin-auth-unhealthy-24h",
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/OAuth",
+                metric_name="GarminAuthHealthy",
+                dimensions_map={"Source": "garmin"},
+                period=Duration.seconds(86400),
+                statistic="Maximum",
+            ),
+            evaluation_periods=1,
+            threshold=1,
+            comparison_operator=LT,
+            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+        )
+        _garmin_auth_dead.add_alarm_action(cw_actions.SnsAction(topic))
+
+        # Pre-warning: alert ~a week before the OAuth2 refresh token's hard expiry
+        # so a browser re-auth is a scheduled 2-min task, not a surprise outage.
+        # NB (best-effort metric) — absence simply doesn't fire.
+        _alarm(
+            "GarminTokenExpiring",
+            "garmin-token-expiring-7d",
+            "LifePlatform/OAuth",
+            "GarminTokenDaysLeft",
+            86400,
+            "Minimum",
+            7,
+            LT,
+            dims={"Source": "garmin"},
+            to_digest=True,
+        )
+
         # ══════════════════════════════════════════════════════════════
         # Panelcast liveness — "the weekly show went silent" (2026-06-14)
         # The Panel publishes every Friday and emits LifePlatform/Podcast
