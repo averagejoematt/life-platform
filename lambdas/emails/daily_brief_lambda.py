@@ -1136,15 +1136,16 @@ def lambda_handler(event, context):
         logger.info(f"Regrade mode: {len(regrade_dates)} dates")
         profile = fetch_profile()
         if not profile:
-            return {"statusCode": 500, "body": "No profile found"}
+            raise RuntimeError("daily-brief regrade: no profile found")
         return _regrade_handler(regrade_dates, profile)
 
     demo_mode = event.get("demo_mode", False)
     logger.info("Daily Brief v2.82.0 starting..." + (" [DEMO MODE]" if demo_mode else ""))
     profile = fetch_profile()
     if not profile:
-        logger.error("No profile found")
-        return {"statusCode": 500, "body": "No profile found"}
+        # RAISE so the daily-brief Errors alarm fires — a returned 500 reads as a
+        # successful invocation and the brief would silently never send. (Elite review 2026-06-15)
+        raise RuntimeError("daily-brief: no profile found")
 
     today = datetime.now(timezone.utc).date()
     yesterday = (today - timedelta(days=1)).isoformat()
