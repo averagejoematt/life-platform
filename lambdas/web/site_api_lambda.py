@@ -88,6 +88,7 @@ from web.site_api_common import (  # config; AWS; CORS; caches; helpers; request
 # P1.1 Phase B step 6 (2026-05-26): data cluster extracted.
 from web.site_api_data import (
     handle_changes_since,
+    handle_circadian,
     handle_correlations,
     handle_cycle_compare,
     handle_discoveries,
@@ -105,6 +106,7 @@ from web.site_api_data import (
     handle_platform_stats,
     handle_protocols,
     handle_sleep_detail,
+    handle_sleep_reconciliation,
     handle_source_freshness,
     handle_supplements,
     handle_survival,
@@ -342,6 +344,10 @@ ROUTES = {
     # Sprint 11: glucose + sleep intelligence pages
     "/api/glucose": handle_glucose,
     "/api/sleep_detail": handle_sleep_detail,
+    # Elite review (2026-06-15): surface two compute outputs that were stored
+    # daily but never exposed — circadian-compliance score + unified sleep.
+    "/api/circadian": handle_circadian,
+    "/api/sleep_reconciliation": handle_sleep_reconciliation,
     # ARCH-03: Achievement badges
     "/api/achievements": handle_achievements,
     # ARCH-02: Combined snapshot — single-call summary for pages that need vitals + journey + character
