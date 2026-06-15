@@ -101,7 +101,11 @@ def _fetch_activity_zones(strava_id: str, secret: dict) -> tuple:
     try:
         result, secret = _strava_get(url, secret)
     except urllib.error.HTTPError as e:
-        if e.code in (404, 422):
+        # Degrade gracefully — a missing/gated enrichment must NOT drop the activity.
+        # 404/422 = no zones; 402 = Strava gates detailed data for this app/activity;
+        # 429 = rate-limited. In all cases keep the summary activity.
+        if e.code in (402, 404, 422, 429):
+            logger.info("Strava zones skipped for %s (HTTP %s) — keeping summary", strava_id, e.code)
             return {}, secret
         raise
     zones = {}
@@ -119,7 +123,10 @@ def _fetch_activity_streams(strava_id: str, secret: dict) -> tuple:
     try:
         result, secret = _strava_get(url, secret)
     except urllib.error.HTTPError as e:
-        if e.code in (404, 422):
+        # Same graceful degradation as zones — 402 (gated detailed data) / 429
+        # (rate limit) / 404 / 422 must not drop the activity; keep the summary.
+        if e.code in (402, 404, 422, 429):
+            logger.info("Strava streams skipped for %s (HTTP %s) — keeping summary", strava_id, e.code)
             return {}, secret
         raise
     hr = result.get("heartrate", {}).get("data") if isinstance(result, dict) else None
