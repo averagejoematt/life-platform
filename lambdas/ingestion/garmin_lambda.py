@@ -149,6 +149,26 @@ def save_secret(secret: dict):
             pass
 
 
+# ── OAuth auth-health observability (ER-01 follow-up) ────────────────────────
+# The proactive-refresh + 429-breaker design fails *gracefully* — a token death
+# returns a clean 200 "skip", which the ConsecutiveFailures heartbeat reads as
+# healthy. That's exactly how Garmin stayed dead ~2 weeks unnoticed. Emit a
+# dedicated auth-health signal (1 = auth worked this run, 0 = dead/throttled) so
+# a sustained dead state alarms within a day, plus days-until the OAuth2 refresh
+# token's hard expiry for a pre-warning before the cliff.
+_token_days_left = None  # set best-effort by get_garmin_client
+
+
+def _emit_auth_metrics(healthy: int, days_left=None) -> None:
+    try:
+        data = [{"MetricName": "GarminAuthHealthy", "Dimensions": [{"Name": "Source", "Value": "garmin"}], "Value": float(healthy)}]
+        if days_left is not None:
+            data.append({"MetricName": "GarminTokenDaysLeft", "Dimensions": [{"Name": "Source", "Value": "garmin"}], "Value": float(days_left)})
+        boto3.client("cloudwatch", region_name=REGION).put_metric_data(Namespace="LifePlatform/OAuth", MetricData=data)
+    except Exception as e:
+        logger.warning(f"Garmin auth-health metric emit failed: {e}")
+
+
 # ── Refresh-429 circuit breaker ──────────────────────────────────────────────
 # Garmin aggressively 429-rate-limits the OAuth2 refresh-exchange endpoint for
 # non-browser clients (their March-2026 crackdown). The OAuth1 refresh token
@@ -291,6 +311,13 @@ def get_garmin_client(secret: dict):
             logger.info(f"OAuth2 token expires at: {oauth2.expires_at}")
         if oauth2 and hasattr(oauth2, "expired"):
             logger.info(f"OAuth2 token expired: {oauth2.expired}")
+        # ER-01 follow-up: capture days until the refresh token's hard expiry so a
+        # pre-warning alarm can fire before it strands us (best-effort).
+        global _token_days_left
+        rexp = getattr(oauth2, "refresh_token_expires_at", None)
+        if rexp:
+            _token_days_left = max(0.0, (float(rexp) - time.time()) / 86400.0)
+            logger.info(f"OAuth2 refresh token days left: {_token_days_left:.1f}")
     except Exception:
         pass
 
@@ -955,14 +982,20 @@ def lambda_handler(event: dict, context) -> dict:
     try:
         if event.get("healthcheck"):
             return {"statusCode": 200, "body": "ok"}
-        return run_ingestion(_config, authenticate, fetch_day, transform, event, context)
+        result = run_ingestion(_config, authenticate, fetch_day, transform, event, context)
+        _emit_auth_metrics(1, _token_days_left)  # auth worked this run
+        return result
     except GarminRefreshRateLimited as e:
         # Clean skip — do NOT raise. Raising marks the async invocation failed,
         # triggering EventBridge retries that re-hit the throttled refresh
         # endpoint and keep us stuck. Returning 200 lets the cooldown clear so a
         # later scheduled run refreshes normally (no manual re-auth needed).
+        # But emit AuthHealthy=0 so a *sustained* dead state alarms loudly — the
+        # graceful skip is precisely what hid the ~2-week outage from the heartbeat.
+        _emit_auth_metrics(0)
         logger.warning(f"garmin run skipped (refresh rate-limited): {e}")
         return {"statusCode": 200, "body": json.dumps({"skipped": "refresh_ratelimited", "detail": str(e)})}
     except Exception as e:
+        _emit_auth_metrics(0)  # auth/ingestion failed → unhealthy
         logger.error("garmin ingestion failed: %s", e, exc_info=True)
         raise
