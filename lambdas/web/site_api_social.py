@@ -381,7 +381,10 @@ def _handle_submit_finding(event: dict) -> dict:
 
     # Build finding record
     timestamp = datetime.now(timezone.utc).isoformat()
-    finding_id = hashlib.sha256(f"{ip_hash}:{timestamp}:{metric_a}:{metric_b}".encode()).hexdigest()[:12]
+    # Content-based id (no timestamp): a same-day network retry of the identical
+    # submission overwrites the same S3 object instead of creating a duplicate
+    # pending finding for Matt to triage.
+    finding_id = hashlib.sha256(f"{ip_hash}:{metric_a}:{metric_b}:{finding}".encode()).hexdigest()[:12]
     record = {
         "id": finding_id,
         "metric_a": metric_a,
@@ -858,6 +861,24 @@ def _handle_experiment_detail(event: dict) -> dict:
     return _ok(lib_exp, cache_seconds=900)
 
 
+def _public_challenge_ids() -> set | None:
+    """Catalog ids a visitor may legitimately vote on — public challenges only
+    (excludes public:false vice entries). Returns None when the catalog can't be
+    loaded so callers fail *closed* (503) rather than accepting arbitrary ids.
+    Shares handle_challenge_catalog's module cache."""
+    global _challenge_catalog_cache
+    if _challenge_catalog_cache is None:
+        _challenge_catalog_cache = _load_s3_json("site/config/challenges_catalog.json", "challenge_catalog")
+    cat = _challenge_catalog_cache
+    if not cat or not cat.get("challenges"):
+        return None
+    return {
+        (ch.get("id") or "").strip().lower()
+        for ch in cat.get("challenges", [])
+        if ch.get("public", True) is not False and ch.get("id")
+    }
+
+
 def _handle_challenge_vote(event: dict) -> dict:
     """POST /api/challenge_vote — Rate-limited vote for challenge catalog entries.
     Body: {"catalog_id": "cold-shower-finish"}
@@ -872,6 +893,14 @@ def _handle_challenge_vote(event: dict) -> dict:
     catalog_id = (body.get("catalog_id") or "").strip().lower()
     if not catalog_id or len(catalog_id) > 80:
         return _error(400, "catalog_id is required (max 80 chars)")
+
+    # Reject votes for ids that aren't real public challenges — without this an
+    # attacker can mint arbitrary VOTES#challenges/CH#<anything> rows.
+    valid_ids = _public_challenge_ids()
+    if valid_ids is None:
+        return _error(503, "Challenge catalog unavailable — try again shortly")
+    if catalog_id not in valid_ids:
+        return _error(404, "Unknown challenge")
 
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
     rate_pk = "VOTES#rate_limit"
@@ -1193,22 +1222,25 @@ def _handle_challenge_checkin(event: dict) -> dict:
     if note:
         checkin["note"] = note
 
-    # Append to daily_checkins list
+    # Idempotent write: replace any existing check-in for the same date instead
+    # of blindly appending. A double-tap or a network retry must not create a
+    # duplicate day — that would inflate completion_pct / success_rate. (Residual:
+    # a truly simultaneous double-tap can still race this read-modify-write; the
+    # common retry/double-tap case — writes seconds apart — is fully covered.)
+    existing = item.get("daily_checkins", []) or []
+    deduped = [c for c in existing if c.get("date") != date_str]
+    deduped.append(checkin)
     try:
         table.update_item(
             Key={"pk": challenges_pk, "sk": sk},
-            UpdateExpression="SET daily_checkins = list_append(if_not_exists(daily_checkins, :empty), :ci)",
-            ExpressionAttributeValues={
-                ":ci": [checkin],
-                ":empty": [],
-            },
+            UpdateExpression="SET daily_checkins = :cl",
+            ExpressionAttributeValues={":cl": deduped},
         )
     except Exception as e:
         logger.error(f"[challenge_checkin] DDB update failed: {e}")
         return _error(500, "Failed to record check-in")
 
-    existing = item.get("daily_checkins", [])
-    total = len(existing) + 1
+    total = len(deduped)
     duration = int(item.get("duration_days", 7) if item.get("duration_days") else 7)
 
     return _ok(
