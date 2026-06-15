@@ -264,17 +264,52 @@ def _load_content_filter():
         }
 
 
+# Zero-width / invisible characters that can smuggle a blocked term past a
+# literal substring scrub (e.g. a zero-width space inside "marijuana").
+_ZERO_WIDTH_CHARS = dict.fromkeys((0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF), None)
+
+
+def _normalize_for_detection(text: str) -> str:
+    """Lowercase + drop everything non-alphanumeric (after stripping zero-width
+    chars) — collapses spaced / punctuated obfuscation ("m a r i j u a n a",
+    "c-a-n-n-a-b-i-s") so a blocked term is detectable even when it slipped past
+    the literal pass."""
+    return re.sub(r"[^a-z0-9]", "", text.translate(_ZERO_WIDTH_CHARS).lower())
+
+
 def _scrub_blocked_terms(text: str) -> str:
-    """Remove any mention of blocked terms from public-facing text."""
+    """Remove any mention of blocked terms from public-facing text.
+
+    Two layers:
+      1. Literal case-insensitive removal — the common case; surgical, with no
+         false-positives on normal text. Zero-width chars are stripped first so
+         "mari<zwsp>juana" can't smuggle a term past it.
+      2. Fail-safe detection on a normalized (de-spaced, de-punctuated) copy: if
+         a LONG, unambiguous blocked term (>=7 normalized chars — "marijuana",
+         "cannabis", "pornography"…) survived the literal pass, it was obfuscated
+         on purpose, so we drop the WHOLE answer rather than surgically excise an
+         obfuscated span (which would mangle legit text). Short terms
+         ("thc"/"weed"/"porn") are too substring-prone to detect this way safely
+         and are left to the literal pass — a documented residual; the realistic
+         trigger (a model coaxed into emitting "w e e d") requires prompt
+         injection, which the history-replay gating closes separately.
+    """
     cf = _load_content_filter()
+    text = text.translate(_ZERO_WIDTH_CHARS)
     result = text
     for term in cf.get("blocked_vice_keywords", []):
         result = re.compile(re.escape(term), re.IGNORECASE).sub("", result)
     for vice in cf.get("blocked_vices", []):
         result = re.compile(re.escape(vice), re.IGNORECASE).sub("", result)
     result = re.sub(r"\[filtered\]", "", result)
-    result = re.sub(r"\s{2,}", " ", result)
-    return result.strip()
+    result = re.sub(r"\s{2,}", " ", result).strip()
+
+    norm = _normalize_for_detection(result)
+    for term in cf.get("blocked_vice_keywords", []) + cf.get("blocked_vices", []):
+        nt = _normalize_for_detection(term)
+        if len(nt) >= 7 and nt in norm:
+            return "I can't share that."
+    return result
 
 
 def _emit_rate_limit_metric(endpoint: str) -> None:
@@ -592,8 +627,15 @@ def _handle_ask(event: dict) -> dict:
                 continue
             q = re.sub(r"<[^>]+>", "", str(turn.get("q", "")))[:500].strip()
             a = re.sub(r"<[^>]+>", "", str(turn.get("a", "")))[:1200].strip()
-            if q and a and _ask_question_safe(q)[0]:
-                history.append((q, a))
+            # History is UNTRUSTED client input — there is no server session
+            # store, so the replayed *assistant* turn `a` is fully attacker-
+            # controlled and would otherwise become a real assistant message in
+            # the prompt (a classic conversation-injection vector). Gate BOTH q
+            # and a through the safety filter, and scrub blocked terms from the
+            # replayed answer, so a crafted turn can't inject unsafe steering or
+            # reintroduce a blocked vice term as a fake prior assistant message.
+            if q and a and _ask_question_safe(q)[0] and _ask_question_safe(a)[0]:
+                history.append((q, _scrub_blocked_terms(a)))
 
         # WR-40: Safety filter
         is_safe, safety_reason = _ask_question_safe(question)
