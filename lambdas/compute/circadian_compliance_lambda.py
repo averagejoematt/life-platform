@@ -29,6 +29,12 @@ import os
 import time
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from zoneinfo import ZoneInfo
+
+# DST-aware Pacific Time. The site + all user-facing times are PT (not UTC), and
+# PT swings between UTC-8 (PST) and UTC-7 (PDT) — a hardcoded offset is wrong for
+# ~8 months of the year.
+_PT = ZoneInfo("America/Los_Angeles")
 
 import boto3
 
@@ -154,8 +160,11 @@ def _parse_time_to_hour(time_str):
     try:
         if "T" in str(time_str):
             dt = datetime.fromisoformat(str(time_str).replace("Z", "+00:00"))
-            # Convert to local (PT) approximation: UTC-8
-            local_dt = dt - timedelta(hours=8)
+            # Convert to Pacific Time, DST-aware (was a hardcoded UTC-8, which is
+            # an hour off during PDT ~8 months/yr — skewing wake/meal-hour scores).
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            local_dt = dt.astimezone(_PT)
             return local_dt.hour + local_dt.minute / 60.0
         elif ":" in str(time_str):
             parts = str(time_str).split(":")
