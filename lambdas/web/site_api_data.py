@@ -1557,6 +1557,74 @@ def handle_sleep_detail() -> dict:
     )
 
 
+def handle_circadian() -> dict:
+    """
+    GET /api/circadian
+    Today's circadian-compliance score — computed daily by
+    circadian_compliance_lambda and stored at SOURCE#circadian | DATE#<today>,
+    but (until now) never surfaced. A *predictive* 0–100 behavioral score across
+    four anchors (wake light, meal timing, screen wind-down, sleep consistency):
+    it estimates what tonight's sleep will look like based on today's behaviors.
+    Cache: 900s — recomputed once daily; refreshing faster gains nothing.
+    """
+    item = _latest_item("circadian")
+    if not item:
+        return _ok({"available": False}, cache_seconds=900)
+
+    comps = item.get("components", {}) or {}
+    components = {
+        name: {
+            "score": c.get("score"),
+            "max": c.get("max"),
+            "note": c.get("note"),
+        }
+        for name, c in comps.items()
+    }
+    return _ok(
+        {
+            "available": True,
+            "date": item.get("date"),
+            "score": item.get("score"),
+            "category": item.get("category"),
+            "prescription": item.get("prescription"),
+            "weakest_component": item.get("weakest_component"),
+            "components": components,
+        },
+        cache_seconds=900,
+    )
+
+
+def handle_sleep_reconciliation() -> dict:
+    """
+    GET /api/sleep_reconciliation
+    The unified sleep record — sleep_reconciler_lambda merges Whoop + Eight Sleep
+    + Apple Health into one canonical view (best source wins per field; duration
+    from Apple, staging/HRV from Whoop, environment from Eight Sleep) and stores
+    it at SOURCE#sleep_unified | DATE#<today>. Computed daily, never surfaced
+    until now. We return the stored record with internal keys stripped and
+    source_map decoded, so the response auto-tracks any future merged fields.
+    Cache: 900s — recomputed once daily.
+    """
+    item = _latest_item("sleep_unified")
+    if not item:
+        return _ok({"available": False}, cache_seconds=900)
+
+    _INTERNAL = {"pk", "sk", "run_id", "computed_at", "phase", "cycle"}
+    data = {k: v for k, v in item.items() if k not in _INTERNAL}
+
+    # source_map is stored JSON-encoded (which field came from which wearable);
+    # decode it back to an object for the front-end "provenance" badges.
+    sm = data.get("source_map")
+    if isinstance(sm, str):
+        try:
+            data["source_map"] = json.loads(sm)
+        except (json.JSONDecodeError, TypeError):
+            data.pop("source_map", None)
+
+    data["available"] = True
+    return _ok(data, cache_seconds=900)
+
+
 def handle_protocols() -> dict:
     """GET /api/protocols — Return protocol definitions from DynamoDB."""
     protocols_pk = f"{USER_PREFIX}protocols"
