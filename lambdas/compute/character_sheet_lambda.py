@@ -458,8 +458,9 @@ def lambda_handler(event, context):
     # ── Load config from S3 ──
     config = character_engine.load_character_config(s3, S3_BUCKET)
     if not config:
-        logger.error("[character] Failed to load config from S3 — aborting")
-        return {"statusCode": 500, "body": "Config load failed"}
+        # RAISE so the async failure is visible (DLQ + Errors metric + alarm) instead
+        # of a returned dict that reads as success. (Elite review 2026-06-15)
+        raise RuntimeError("character-sheet: failed to load config from S3 — aborting")
 
     logger.info(f"[character] Config loaded — {len(config.get('pillars', {}))} pillars")
 
@@ -484,7 +485,7 @@ def lambda_handler(event, context):
         record = character_engine.compute_character_sheet(data, previous_state, raw_score_histories, config)
     except Exception as e:
         logger.error(f"[character] compute_character_sheet failed: {e}")
-        return {"statusCode": 500, "body": f"Computation failed: {e}"}
+        raise  # surface the failure (DLQ + alarm) — a returned 500 reads as success
 
     # ── Food delivery modifier — adjust Nutrition pillar raw_score ──
     fd_modifier = get_food_delivery_modifier()
@@ -609,7 +610,7 @@ def lambda_handler(event, context):
         logger.info(f"[character] Stored: {yesterday_str} — Level {char_level} ({char_emoji} {char_tier}) — {len(events)} events")
     except Exception as e:
         logger.error(f"[character] store_character_sheet failed: {e}")
-        return {"statusCode": 500, "body": f"Store failed: {e}"}
+        raise  # surface the failure (DLQ + alarm) — a returned 500 reads as success
 
     elapsed = time.time() - t0
     logger.info("[character] Done in %.1fs", elapsed)

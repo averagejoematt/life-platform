@@ -229,12 +229,13 @@ def daily_brief_shared_system(
     """Phase 3.8 (2026-05-16): build a stable system block reused across the 4
     daily-brief AI calls (BoD, training+nutrition, journal, TL;DR).
 
-    Anthropic prompt caching reuses cached system content across calls with the
-    same hash. Building this once per invocation and passing to all 4 calls
-    means the system tokens are charged at full price ONCE and 10% (cache hit)
-    on the next 3 calls. Estimated savings: $1.50-2/month.
-
-    Designed to be substantial (>1024 tokens for Haiku caching threshold).
+    NOTE (D-01, 2026-06-05): prompt caching is intentionally DISABLED on the 4
+    daily-brief calls (cache_system=False). Bedrock cross-region inference routes
+    each call to a region-local cache, so a once/day brief never gets a cache HIT
+    — measured 0 reads / 10K writes per 14d, i.e. pure write-premium waste. Do NOT
+    re-enable caching here without re-measuring CacheRead>0. (The high-frequency
+    coach-narrative-orchestrator path DOES hit, and keeps caching on.) This shared
+    block is still built once and reused across the 4 calls for consistency.
     """
     jctx = _build_journey_context(profile, (data or {}).get("date") if data else None)
     journey_block = _format_journey_context(jctx)
