@@ -228,8 +228,32 @@ function renderBoardline(priority) {
   }
 }
 
+/* ── Tonight's forecast: circadian-compliance (predictive) ─────────────────── */
+async function renderCircadian() {
+  const sec = $("[data-circadian]");
+  if (!sec) return;
+  let d = null;
+  try { d = await getJSON(`${API}/circadian`); } catch (e) { d = null; }
+  if (!d || !d.available || d.score == null) { sec.hidden = true; return; }
+  const score = Math.max(0, Math.min(100, Math.round(d.score)));
+  const cat = String(d.category || "").trim();
+  bind("circ-score").textContent = score;
+  bind("circ-fill").style.width = score + "%";
+  bind("circ-cat").textContent = cat ? ` · ${cat}` : "";
+  sec.dataset.cat = cat.toLowerCase();
+  bind("circ-rx").textContent = d.prescription || "";
+  const weak = bind("circ-weak");
+  if (d.weakest_component) {
+    weak.textContent = `weakest anchor — ${String(d.weakest_component).replace(/_/g, " ")}`;
+    weak.hidden = false;
+  } else {
+    weak.hidden = true;
+  }
+  sec.hidden = false;
+}
+
 /* ── Journey scope: level-up timeline + achievements (gamified layer) ──────── */
-const DAILY_SEL = [".dialogue", ".domains", ".band"];
+const DAILY_SEL = [".dialogue", ".domains", ".band", "[data-circadian]"];
 function showJourney(on) {
   DAILY_SEL.forEach((s) => { const el = $(s); if (el) el.style.display = on ? "none" : ""; });
   if (on) bind("boardline").hidden = true;
@@ -263,7 +287,7 @@ const WEEK_DOMAINS = ["sleep", "training", "nutrition", "glucose", "physical", "
 
 function hideDaily() {
   document.querySelector("[data-journey]").hidden = true;
-  [".domains", ".band"].forEach((s) => { const el = $(s); if (el) el.style.display = "none"; });
+  [".domains", ".band", "[data-circadian]"].forEach((s) => { const el = $(s); if (el) el.style.display = "none"; });
   const hr = $(".voice.human"); if (hr) hr.style.display = "none";
   bind("boardline").hidden = true; bind("honest").hidden = true; bind("movement").hidden = true;
 }
@@ -426,6 +450,7 @@ async function load(dateStr) {
     const pri = priority.status === "fulfilled" ? priority.value : null;
     renderVerdict(pri);
     renderBoardline(pri);
+    renderCircadian();  // fire-and-forget; hides itself if no forecast available
 
     if (character.as_of_date) bind("asof").textContent = `as of ${character.as_of_date}`;
     main.dataset.state = "ready";
@@ -440,7 +465,7 @@ async function load(dateStr) {
     bind("tier").textContent = "";
     bind("day").textContent = "";
     gone(bind("movement")); gone(bind("honest")); gone(bind("boardline"));
-    gone(".domains"); gone(".band"); gone(".voice.human");
+    gone(".domains"); gone(".band"); gone(".voice.human"); gone("[data-circadian]");
     bind("verdict").innerHTML = "Today's score hasn't computed yet — the numbers refresh each morning. Check back shortly.";
     $(".panel").setAttribute("aria-busy", "false");
   }
