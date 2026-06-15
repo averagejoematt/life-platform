@@ -57,6 +57,37 @@ _AUTH_FAIL_KEYWORDS = (
 )
 
 
+_METRIC_NAMESPACE = "LifePlatform/OAuth"
+_METRIC_NAME = "IngestAuthHealthy"
+
+
+def _emit_auth_health(healthy: int, source_name: str, logger) -> None:
+    """Emit IngestAuthHealthy (1 = auth working this run, 0 = broken / breaker
+    short-circuited) so a tripped breaker on ANY source is alarmable.
+
+    This closes the same silent-death gap that hid the Garmin/Strava deaths: a
+    tripped breaker returns a healthy-looking 200 "skip", so the freshness /
+    error heartbeat reads green while the source is suppressed for 24h. Emitting
+    a 0 on every mark + short-circuit makes that visible.
+
+    Dimensionless on purpose — one fleet-wide alarm (Min < 1) catches whichever
+    source goes unhealthy; the source name goes to the log for diagnosis.
+    Best-effort: never raises (a metric hiccup must not break ingestion).
+    Ingestion roles already hold cloudwatch:PutMetricData (role_policies
+    _ingestion_base), so no IAM change is required.
+    """
+    try:
+        import boto3
+
+        boto3.client("cloudwatch").put_metric_data(
+            Namespace=_METRIC_NAMESPACE,
+            MetricData=[{"MetricName": _METRIC_NAME, "Value": healthy, "Unit": "None"}],
+        )
+    except Exception as e:  # noqa: BLE001 — observability is best-effort
+        if logger:
+            logger.warning(f"auth_breaker_metric_failed source={source_name}: {e}")
+
+
 def looks_like_auth_failure(exc: Exception) -> bool:
     """Heuristic: does this exception indicate an OAuth/API auth failure?"""
     msg = str(exc).lower()
@@ -96,6 +127,9 @@ def check_breaker(table, source_name: str, user_id: str, logger) -> dict | None:
     age = (datetime.now(timezone.utc) - marked_at).total_seconds()
     if age >= _AUTH_FAIL_TTL_SECONDS:
         return None
+    # Breaker is tripped and this run is being short-circuited (returns a 200
+    # "skip" to EventBridge). Emit 0 so the suppression is visible, not silent.
+    _emit_auth_health(0, source_name, logger)
     return item
 
 
@@ -116,6 +150,8 @@ def mark_failure(table, source_name: str, user_id: str, error_msg, logger) -> No
     except Exception as e:
         if logger:
             logger.warning(f"auth_breaker_mark_failed source={source_name}: {e}")
+    # Auth just broke → unhealthy, regardless of whether the marker write stuck.
+    _emit_auth_health(0, source_name, logger)
 
 
 def clear_failure(table, source_name: str, user_id: str, logger) -> None:
@@ -125,3 +161,6 @@ def clear_failure(table, source_name: str, user_id: str, logger) -> None:
     except Exception as e:
         if logger:
             logger.warning(f"auth_breaker_clear_failed source={source_name}: {e}")
+    # Successful run → auth is healthy. Emitted every success so the alarm has a
+    # steady 1 baseline and self-clears once a previously-broken source recovers.
+    _emit_auth_health(1, source_name, logger)

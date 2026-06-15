@@ -256,6 +256,34 @@ class MonitoringStack(Stack):
             to_digest=True,
         )
 
+        # ── Fleet-wide ingestion auth-liveness (elite review 2026-06-15) ────────
+        # Generalises the Garmin auth-health signal to EVERY breaker-using source
+        # (notion + the SIMP-2 framework sources). auth_breaker.py now emits
+        # LifePlatform/OAuth IngestAuthHealthy = 1 on each successful run and 0 on
+        # every mark + 24h short-circuit. A tripped breaker returns a healthy 200
+        # "skip", so without this a dead credential silently suppresses a source
+        # for 24h — exactly how Garmin/Strava stayed dead for weeks. Dimensionless
+        # + Minimum: if ANY breaker source emits a 0 in the window, Min=0 → fire.
+        # Absence (no breaker source ran at all) is NOT a failure — the freshness
+        # checker covers prolonged data gaps; here we only care about a source
+        # that ran and got auth-suppressed.
+        _ingest_auth_dead = cloudwatch.Alarm(
+            self,
+            "IngestAuthUnhealthy",
+            alarm_name="ingest-auth-unhealthy-24h",
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/OAuth",
+                metric_name="IngestAuthHealthy",
+                period=Duration.seconds(86400),
+                statistic="Minimum",
+            ),
+            evaluation_periods=1,
+            threshold=1,
+            comparison_operator=LT,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        _ingest_auth_dead.add_alarm_action(cw_actions.SnsAction(topic))
+
         # ══════════════════════════════════════════════════════════════
         # Panelcast liveness — "the weekly show went silent" (2026-06-14)
         # The Panel publishes every Friday and emits LifePlatform/Podcast
