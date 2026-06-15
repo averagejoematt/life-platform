@@ -1,3 +1,15 @@
+## Ingestion reliability — 2026-06-14 (Strava 402 + Garmin auth-liveness alarm)
+
+Two wearable pipelines were found silently dead (Strava since 2026-05-09, Garmin since 2026-05-29) when a forgotten-Garmin phone walk wouldn't log.
+
+### Fixed
+- **Strava** (`strava_lambda`, PR #124) — per-activity zone/stream enrichment only caught 404/422 and re-raised; Strava now gates detailed data with **HTTP 402**, which aborted the whole day and dropped the activity. Now treats 402/429 like 404/422 (skip enrichment, keep the summary). Verified: the dropped walk ingested cleanly.
+
+### Added
+- **Garmin auth-liveness alarm (ER-01 follow-up)** — Garmin's proactive-refresh + 429-breaker fails *gracefully* (a clean 200 "skip"), so a dead token never tripped `ConsecutiveFailures` — exactly how it stayed dead ~2 weeks unnoticed. `garmin_lambda` now emits `LifePlatform/OAuth GarminAuthHealthy` (1=auth worked / 0=dead-or-throttled) + `GarminTokenDaysLeft`. Two new alarms in `monitoring_stack`: **`garmin-auth-unhealthy-24h`** (BREACHING — a full day with no healthy datapoint, incl. cron-stopped → URGENT) and **`garmin-token-expiring-7d`** (pre-warning before the refresh-token cliff → digest). Verified live: `GarminAuthHealthy=1`, `GarminTokenDaysLeft≈30`.
+
+---
+
 ## ER-05/06 — 2026-06-14 (cheap-honesty tier: self-grade caveat + PII-to-public-surface guard)
 
 The Tier-2 ER pair. **ER-06's guard caught a live privacy leak on its first run.**
