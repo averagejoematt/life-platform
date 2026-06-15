@@ -1504,7 +1504,8 @@ def _compute_deficit_ceiling_alert(yesterday_str, habit_7d, computed_7d, profile
         sleep_fired = False
         t0_fail_fired = False
 
-        # HRV: compare 7d recent vs 14d baseline (same as slow_drift logic)
+        # HRV: compare recent (last ~8d: yest-7 .. yest) vs the 14d baseline
+        # before it (yest-21 .. yest-8). (same as slow_drift logic)
         hrv_baseline_start = (yest - timedelta(days=21)).isoformat()
         hrv_baseline_end = (yest - timedelta(days=8)).isoformat()
         hrv_recent_start = (yest - timedelta(days=7)).isoformat()
