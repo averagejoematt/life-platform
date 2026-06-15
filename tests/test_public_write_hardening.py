@@ -130,6 +130,9 @@ def test_submit_finding_id_is_content_stable(monkeypatch):
             return {}
 
     monkeypatch.setattr(social.boto3, "client", lambda *a, **k: _FakeS3())
+    # Rate limiting is now DDB-backed; force the in-memory fallback + clear it so
+    # the two retries deterministically pass the limiter (no real DDB / no creds).
+    monkeypatch.setattr(social, "_RATE_LIMITER_READY", False)
     body = {"metric_a": "sleep", "metric_b": "hrv", "finding": "more sleep tracks higher hrv over time"}
 
     social._finding_rate_store.clear()

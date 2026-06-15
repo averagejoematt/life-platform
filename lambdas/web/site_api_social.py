@@ -48,11 +48,22 @@ from web.site_api_common import (
     table,
 )
 
+# DynamoDB-backed rate limiting (survives warm-container distribution + cold
+# starts). The in-memory stores below are now only a fail-open fallback used if
+# the shared rate_limiter module is unavailable. The site_api role already
+# permits UpdateItem on the RATE#* partition (no IAM change needed).
+try:
+    from rate_limiter import check_rate_limit as _ddb_rate_check
+
+    _RATE_LIMITER_READY = True
+except Exception:  # pragma: no cover — import guard
+    _RATE_LIMITER_READY = False
+
 # ── Module-owned globals ──────────────────────────────────
 # These were originally module-level in site_api_lambda; they're only
 # touched by the handlers in this file, so they move with the cluster.
 _token_secret_cache = None
-_nudge_rate_store: dict = {}  # ACCT-2: ip_hash+category -> list of timestamps
+_nudge_rate_store: dict = {}  # ACCT-2: ip_hash+category -> list of timestamps (fallback only)
 
 
 def _extract_client_ip(event: dict) -> str:
@@ -285,9 +296,10 @@ def _handle_nudge(event: dict) -> dict:
     """
     POST /api/nudge
     Body: {"category": "back_on_it" | "watching" | "take_your_time" | "you_got_this"}
-    Rate limit: 1 nudge per category per IP per hour (in-memory).
-    Counts are approximate — reset on Lambda cold start.
-    NOTE: Persisting counts to DynamoDB requires a CDK write-permission change (future work).
+    Rate limit: 1 nudge per category per IP per hour — DynamoDB-backed (survives
+    cold starts / warm-container spread; in-memory fallback only).
+    NOTE: the per-category display *counts* are still approximate/in-memory — a
+    durable counts schema remains future work, separate from this rate limit.
     """
     import time as _time
 
@@ -302,20 +314,26 @@ def _handle_nudge(event: dict) -> dict:
         return _error(400, f"Invalid category. Must be one of: {sorted(NUDGE_CATEGORIES)}")
 
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
-    rate_key = f"{ip_hash}:{category}"
-    now = int(_time.time())
-    hour_ago = now - 3600
-
-    # Rate limit: 1 per IP per category per hour
-    recent = [t for t in _nudge_rate_store.get(rate_key, []) if t > hour_ago]
-    if recent:
+    # Rate limit: 1 per IP per category per hour. Per-category endpoint key so a
+    # nudge in one category doesn't consume another's budget.
+    if _RATE_LIMITER_READY:
+        allowed, _rem, _retry = _ddb_rate_check(
+            table, endpoint=f"nudge:{category}", ip_hash=ip_hash, limit=1, window_seconds=3600, fail_open=True
+        )
+    else:
+        now = int(_time.time())
+        rate_key = f"{ip_hash}:{category}"
+        recent = [t for t in _nudge_rate_store.get(rate_key, []) if t > now - 3600]
+        allowed = not recent
+        if allowed:
+            recent.append(now)
+            _nudge_rate_store[rate_key] = recent[-10:]
+    if not allowed:
         return {
             "statusCode": 429,
             "headers": {**CORS_HEADERS, "Retry-After": "3600", "Cache-Control": "no-store"},
             "body": json.dumps({"error": "Already sent this reaction recently. Come back later.", "category": category}),
         }
-    recent.append(now)
-    _nudge_rate_store[rate_key] = recent[-10:]
 
     # Increment in-memory count
     _nudge_counts[category] = _nudge_counts.get(category, 0) + 1
@@ -346,20 +364,28 @@ def _handle_submit_finding(event: dict) -> dict:
 
     source_ip = _extract_client_ip(event)
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
-    now = int(_time.time())
-    hour_ago = now - 3600
 
-    # Rate limit
-    recent = [t for t in _finding_rate_store.get(ip_hash, []) if t > hour_ago]
-    if len(recent) >= FINDING_RATE_LIMIT:
+    # Rate limit: FINDING_RATE_LIMIT per IP per hour — DynamoDB-backed (survives
+    # cold starts; in-memory fallback only).
+    if _RATE_LIMITER_READY:
+        allowed, remaining, _retry = _ddb_rate_check(
+            table, endpoint="submit_finding", ip_hash=ip_hash, limit=FINDING_RATE_LIMIT, window_seconds=3600, fail_open=True
+        )
+    else:
+        now = int(_time.time())
+        recent = [t for t in _finding_rate_store.get(ip_hash, []) if t > now - 3600]
+        allowed = len(recent) < FINDING_RATE_LIMIT
+        if allowed:
+            recent.append(now)
+            _finding_rate_store[ip_hash] = recent[-10:]
+        remaining = max(0, FINDING_RATE_LIMIT - len(recent))
+    if not allowed:
         _emit_rate_limit_metric("submit_finding")
         return {
             "statusCode": 429,
             "headers": {**CORS_HEADERS, "Retry-After": "3600"},
             "body": json.dumps({"error": "Rate limit reached. 3 submissions per hour."}),
         }
-    recent.append(now)
-    _finding_rate_store[ip_hash] = recent[-10:]
 
     # Parse body
     try:
@@ -412,7 +438,6 @@ def _handle_submit_finding(event: dict) -> dict:
         logger.error(f"[submit_finding] S3 write failed: {e}")
         return _error(503, "Unable to store finding. Try again later.")
 
-    remaining = FINDING_RATE_LIMIT - len(recent)
     return {
         "statusCode": 200,
         "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
