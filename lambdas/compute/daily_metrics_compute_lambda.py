@@ -922,8 +922,10 @@ def lambda_handler(event, context):
 
     profile = fetch_profile()
     if not profile:
-        logger.error("No profile found — aborting")
-        return {"statusCode": 500, "body": "No profile found"}
+        # RAISE (not return 500): this is a scheduled async invocation, so a returned
+        # dict is seen as SUCCESS — the failure would vanish (no Errors metric, no DLQ,
+        # no alarm). Raising surfaces it. (Elite review 2026-06-15, silent-failure class)
+        raise RuntimeError("daily-metrics-compute: no profile found — aborting")
 
     # ── Capture source fingerprints before assembling (same fetches, cached by DDB) ──
     source_fps = get_source_fingerprints(yesterday_str)
