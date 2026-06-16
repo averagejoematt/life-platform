@@ -29,7 +29,7 @@ import calendar
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import boto3
 
@@ -179,6 +179,24 @@ def _ai_active_days(month_start: datetime, now: datetime) -> int:
         return 0
 
 
+def _project_month_end(mtd: float, non_ai: float, elapsed_days: float, days_in_month: int, ai_recent: float, trailing_days: float) -> float:
+    """Month-end projection = already-spent (mtd) + run-rate × days remaining.
+
+    The AI run-rate uses a TRAILING window (`ai_recent / trailing_days`), NOT the
+    month-to-date active-day average. The MTD average is skewed by lumpy one-time
+    AI earlier in the month (experiment resets, podcast generation, dev batches),
+    which over-projected month-end and falsely escalated the tier — observed
+    2026-06-15: a ~$115 projection (and a tier-2 website-AI pause) against a real
+    ~$60 run-rate. A trailing window tracks the CURRENT rate. This can only
+    *reduce* false escalation; a genuine runaway still shows up in actual mtd
+    within a day and trips the actual-spend cap in _decide_tier.
+    """
+    days_remaining = max(days_in_month - elapsed_days, 0.0)
+    non_ai_daily = non_ai / max(elapsed_days, 0.5)
+    ai_daily = ai_recent / max(trailing_days, 0.5)
+    return mtd + (non_ai_daily + ai_daily) * days_remaining
+
+
 def _tier_for(projected: float) -> int:
     for threshold, tier in _TIER_THRESHOLDS:
         if projected >= threshold:
@@ -287,16 +305,16 @@ def lambda_handler(event, context):
         mtd = non_ai + ai
 
         # Month-end = what's ALREADY spent (mtd, captured precisely) + the daily
-        # run-rate × days REMAINING. (The old `daily × days_in_month` ignored that
-        # most of the month already happened, so late in the month it massively
-        # over-projected — e.g. $35 mtd on day 29 projected $121.) Non-AI rate is
-        # uniform (per elapsed day); AI rate is per ACTIVE day since Bedrock only
-        # began mid-month, so it isn't diluted by pre-migration days.
-        days_remaining = max(days_in_month - elapsed_days, 0.0)
-        non_ai_daily = non_ai / elapsed_days
-        ai_active = _ai_active_days(month_start, now)
-        ai_daily = (ai / ai_active) if ai_active > 0 else 0.0
-        projected = mtd + (non_ai_daily + ai_daily) * days_remaining
+        # run-rate × days REMAINING. Non-AI rate is uniform per elapsed day; the
+        # AI rate uses a TRAILING 7-day window (not the MTD active-day average,
+        # which lumpy one-time AI earlier in the month inflates — see
+        # _project_month_end). The trailing window is clamped to month_start so
+        # early in the month it degrades to month-to-date.
+        trailing_start = max(now - timedelta(days=7), month_start)
+        trailing_days = max((now - trailing_start).total_seconds() / 86400.0, 0.5)
+        ai_recent = _ai_cost(trailing_start, now)
+        ai_daily = ai_recent / trailing_days
+        projected = _project_month_end(mtd, non_ai, elapsed_days, days_in_month, ai_recent, trailing_days)
 
         # Projection escalates at most ONE tier above actual mtd spend (and not at
         # all in the early-month window) — see _decide_tier for the two failure
@@ -305,8 +323,8 @@ def lambda_handler(event, context):
         prev = _read_tier()
 
         logger.info(
-            f"Spend: non_ai=${non_ai:.2f} ai=${ai:.2f} (active_days={ai_active}, "
-            f"~${ai_daily:.2f}/day) mtd=${mtd:.2f} projected=${projected:.2f} "
+            f"Spend: non_ai=${non_ai:.2f} ai=${ai:.2f} (trailing_7d=${ai_recent:.2f} over "
+            f"{trailing_days:.1f}d, ~${ai_daily:.2f}/day) mtd=${mtd:.2f} projected=${projected:.2f} "
             f"computed_tier={computed_tier} prev={prev} observe={OBSERVE_MODE}"
         )
         _emit_metrics(mtd, projected, computed_tier)
