@@ -122,6 +122,20 @@
         <!-- A named persona's read, made glanceable -->
         <p class="boardline" data-bind="boardline" hidden></p>
 
+        <!-- Tonight's forecast: the circadian-compliance score — predictive, not
+             retrospective. What today's light / meal / screen / sleep-timing
+             behaviours set tonight's sleep up to be. Present-tense only (hidden
+             in time-travel), like the boardline. -->
+        <section class="circadian" data-circadian hidden aria-label="Tonight's sleep forecast">
+          <p class="cap label">tonight's forecast<span class="circ-cat" data-bind="circ-cat"></span></p>
+          <div class="circ-gauge">
+            <span class="circ-score num" data-bind="circ-score">··</span><span class="circ-max label">/100</span>
+            <span class="circ-meter"><i data-bind="circ-fill" style="width:0%"></i></span>
+          </div>
+          <p class="circ-rx" data-bind="circ-rx"></p>
+          <p class="circ-weak label" data-bind="circ-weak" hidden></p>
+        </section>
+
         <!-- Week scope: six instruments, seven days (S-03) — real /api/observatory_week reads -->
         <section class="weekview" data-weekview hidden aria-label="The week's instruments">
           <p class="cap label">seven days, by instrument</p>
