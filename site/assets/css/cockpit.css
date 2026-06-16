@@ -235,6 +235,29 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
   font-size: var(--fs-quote); line-height: 1.4; color: var(--ink-muted); max-width: var(--measure);
 }
 
+/* Tonight's forecast — circadian-compliance (predictive). Reads forward, not
+   back; honesty vocab — a "poor" forecast is muted, never alarm-red. */
+.circadian {
+  margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: var(--border-hair);
+}
+.circ-cat { color: var(--ember); text-transform: lowercase; letter-spacing: 0.02em; }
+.circ-gauge { display: flex; align-items: baseline; gap: var(--sp-2); margin-top: var(--sp-2); }
+.circ-score { font-family: var(--font-mono); font-size: var(--fs-data-lg); line-height: 1; color: var(--ink); }
+.circ-max { color: var(--ink-faint); }
+.circ-meter {
+  flex: 1; min-width: 120px; height: 3px; align-self: center;
+  background: var(--rule); border-radius: 3px; overflow: hidden;
+}
+.circ-meter i { display: block; height: 100%; background: var(--ember); transition: width var(--dur) var(--ease-out); }
+.circ-rx {
+  margin-top: var(--sp-3); font-family: var(--font-serif); font-style: italic;
+  font-size: var(--fs-quote); line-height: 1.4; color: var(--ink-muted); max-width: var(--measure);
+}
+.circ-weak { margin-top: var(--sp-2); color: var(--ink-faint); }
+/* A weak forecast cools the accent toward neutral — informative, not punitive. */
+.circadian[data-cat="poor"] .circ-meter i { background: color-mix(in oklch, var(--ember) 55%, var(--ink-faint)); }
+.circadian[data-cat="poor"] .circ-cat { color: var(--ink-muted); }
+
 /* Foot + states */
 .cockpit-foot { margin-top: var(--sp-5); display: flex; gap: var(--sp-5); flex-wrap: wrap; align-items: baseline; }
 .cockpit-foot a { color: var(--ink-faint); text-decoration: none; }
