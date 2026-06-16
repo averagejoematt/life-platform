@@ -216,7 +216,7 @@ class OperationalStack(Stack):
             function_name="life-platform-cost-governor",
             source_file="lambdas/operational/cost_governor_lambda.py",
             handler="operational.cost_governor_lambda.lambda_handler",
-            schedule="cron(0 0/4 * * ? *)",  # every 4 hours (CE self-cost reduction)
+            schedule="cron(0 0/8 * * ? *)",  # every 8h (3x/day) — CE self-cost: each run = 1 Cost Explorer call ($0.01). Non-AI spend is slow-moving + Bedrock is tracked via free CloudWatch token metrics, so 3x/day is ample; the actual-mtd cap in _decide_tier still catches a real runaway within a day.
             timeout_seconds=60,
             memory_mb=256,
             # 2026-05-29: enforcement ENABLED — the projection fix makes the
