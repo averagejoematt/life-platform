@@ -77,3 +77,33 @@ def test_post_pause_stuck_projection_de_escalates(gov):
 
 def test_all_quiet_is_tier0(gov):
     assert gov._decide_tier(projected=30.0, mtd=10.0, elapsed_days=10.0) == 0
+
+
+# ── _project_month_end: AI run-rate uses a TRAILING window, not the MTD average ─
+
+
+def test_projection_tracks_trailing_rate_not_lumpy_mtd(gov):
+    """2026-06-15 incident: early-month one-time AI (reset + podcast) inflated the
+    MTD total, but the trailing-7d AI rate is low. The projection must track the
+    recent rate — the old MTD active-day average produced ~$115 and a needless
+    tier-2 website-AI pause against a real ~$60 run-rate."""
+    # mtd $57 (non_ai 16 + ai-mtd 41), trailing 7d AI = $6.72 → ~$0.96/day.
+    projected = gov._project_month_end(
+        mtd=57.0, non_ai=16.0, elapsed_days=15.0, days_in_month=30, ai_recent=6.72, trailing_days=7.0
+    )
+    # non_ai_daily≈1.07 + ai_daily≈0.96, ×15 remaining → ~$87 (honest), not ~$115.
+    assert 80 < projected < 95
+    old_mtd_avg_method = 57.0 + (16.0 / 15.0 + 41.0 / 15.0) * 15.0  # ≈ $114
+    assert projected < old_mtd_avg_method - 20
+
+
+def test_projection_zero_remaining_equals_mtd(gov):
+    """Last day of the month: nothing remaining → projection == already-spent."""
+    assert gov._project_month_end(mtd=62.0, non_ai=30.0, elapsed_days=30.0, days_in_month=30, ai_recent=7.0, trailing_days=7.0) == 62.0
+
+
+def test_projection_short_trailing_window_is_finite(gov):
+    """Early month the trailing window is sub-7d; the 0.5d floor must prevent a
+    divide-by-tiny blow-up."""
+    p = gov._project_month_end(mtd=10.0, non_ai=8.0, elapsed_days=1.5, days_in_month=30, ai_recent=2.0, trailing_days=1.5)
+    assert 0 < p < 1000
