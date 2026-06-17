@@ -127,12 +127,24 @@ def _load_routine_index(start_date: str) -> list[dict[str, Any]]:
 def resolve_archetype(workout: dict[str, Any], index_rows: list[dict[str, Any]]) -> str | None:
     """Resolve a performed workout's session type WITHOUT parsing its title.
 
-    Priority: a stored `archetype` sticker → else the archetype of the nearest
-    pushed routine whose target_date <= the workout date (the routine it most
-    likely came from). Returns None when nothing matches (uncounted)."""
+    Priority:
+      1. a stored `archetype` sticker (if a future ingestion path sets one);
+      2. the EXACT routine the workout was performed from — match the workout's
+         `hevy_routine_id` (preserved by hevy_common.normalize_workout) against the
+         routine-index entry's `hevy_routine_id`. This is unambiguous when present;
+      3. else the nearest pushed routine whose target_date <= the workout date.
+    Returns None when nothing matches (uncounted)."""
     sticker = workout.get("archetype")
     if sticker:
         return str(sticker)
+    # 2. Exact link via the Hevy routine the workout came from.
+    hrid = workout.get("hevy_routine_id")
+    if hrid:
+        for r in index_rows:
+            if str(r.get("hevy_routine_id") or "") == str(hrid):
+                arch = r.get("archetype")
+                return str(arch) if arch else None
+    # 3. Fallback: nearest preceding pushed routine by date.
     wdate = str(workout.get("date") or "")
     if not wdate:
         return None

@@ -52,6 +52,31 @@ def test_resolve_none_when_no_preceding_routine():
     assert rt.resolve_archetype({"date": "2026-06-01"}, INDEX) is None
 
 
+# Exact link: a performed workout carries the Hevy routine_id it came from.
+INDEX_LINKED = [
+    {"archetype": "push", "target_date": "2026-06-15", "variant": "ideal", "hevy_routine_id": "hr-push-1"},
+    {"archetype": "legs", "target_date": "2026-06-16", "variant": "ideal", "hevy_routine_id": "hr-legs-1"},
+]
+
+
+def test_resolve_exact_hevy_routine_link_beats_date():
+    # Performed 2026-06-17, but it was done from the LEGS routine (hr-legs-1).
+    # Nearest-date would also pick legs here, so use a case where they'd differ:
+    w = {"date": "2026-06-20", "hevy_routine_id": "hr-push-1"}
+    # Nearest-date (2026-06-20) → legs (2026-06-16 is latest <= date). Exact link → push.
+    assert rt.resolve_archetype(w, INDEX_LINKED) == "push"
+
+
+def test_resolve_falls_back_to_date_when_link_unknown():
+    # hevy_routine_id not in the index (e.g. ad-hoc/legacy) → nearest-date.
+    w = {"date": "2026-06-20", "hevy_routine_id": "hr-unknown"}
+    assert rt.resolve_archetype(w, INDEX_LINKED) == "legs"
+
+
+def test_resolve_no_hevy_id_uses_date():
+    assert rt.resolve_archetype({"date": "2026-06-20"}, INDEX_LINKED) == "legs"
+
+
 # ── count_performed_of_type (N) ──────────────────────────────────────────────
 
 
