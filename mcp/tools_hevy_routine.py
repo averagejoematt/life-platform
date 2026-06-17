@@ -563,12 +563,20 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
     except Exception:
         pass
 
+    # Title lockdown: the compiler renders Phase - Type - N - Y on commit and
+    # ignores any caller title. force_title=true is the explicit escape hatch —
+    # only then is the caller's title kept (and a warning logged at commit).
+    forced = str(args.get("force_title", "")).lower() in ("true", "1", "yes") or args.get("force_title") is True
+    supplied_title = args.get("title")
+    placeholder = f"{archetype.title()} — {target_date}"  # ignored on the wire unless forced
+    title = ((supplied_title if forced and supplied_title else placeholder) or placeholder)[:60]
+
     ir = RoutineSpec(
         routine_id=_new_routine_id(),
         target_date=target_date,
         archetype=archetype,
         variant="ideal",
-        title=(args.get("title") or f"{archetype.title()} — {target_date}")[:60],
+        title=title,
         notes=(args.get("notes") or ""),
         version=1,
         created_at=_now_iso(),
@@ -577,7 +585,13 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         status="draft",
         exercises=blocks,
         budget_used={},
-        inputs_snapshot={"authored": "custom", "total_sets": total_sets, "exercise_count": len(blocks), "created_exercises": created},
+        inputs_snapshot={
+            "authored": "custom",
+            "total_sets": total_sets,
+            "exercise_count": len(blocks),
+            "created_exercises": created,
+            "force_title": forced,
+        },
         rationale=[
             "custom-authored via chat (action=draft_custom)",
             "loads + sets are user-specified; the generator did NOT compute them",
@@ -597,6 +611,11 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         "note": "Run action=dry_run with this routine_id to preview the exact Hevy "
         "body, then action=commit to push. Commit requires explicit routine_id.",
     }
+    if supplied_title and not forced:
+        resp["warnings"] = warnings + [
+            f"Ignored title {supplied_title!r}: the compiler auto-renders the "
+            "convention (Phase - Type - N - Y). Pass force_title=true to override."
+        ]
     if created:
         resp["created_exercises"] = created
         resp["note"] = (
@@ -610,6 +629,24 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
     return resp
 
 
+def _resolve_title_inputs(ir: Any) -> tuple[dict[str, Any] | None, str]:
+    """Return (title_context, why_note) for the compiler.
+
+    The compiler is the single source of truth for the title: when a
+    title_context is supplied it renders `Phase - Type - N - Y` and IGNORES any
+    caller-supplied ir.title. The ONLY escape hatch is a force_title flag
+    (stored on the IR at draft time) — when set, we return a None context so the
+    compiler keeps the caller's literal title, and we log a warning. force_title
+    is off by default; the rendered convention is always the normal path."""
+    from routine_title import build_title_context, format_why_note
+
+    why = format_why_note(ir)
+    if (getattr(ir, "inputs_snapshot", None) or {}).get("force_title"):
+        print(f"[WARN] force_title set on routine {getattr(ir, 'routine_id', '?')} — " f"using caller title {getattr(ir, 'title', '')!r} instead of the rendered convention")
+        return None, why
+    return build_title_context(ir), why
+
+
 def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
     routine_id = args.get("routine_id")
     if not routine_id:
@@ -620,7 +657,11 @@ def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
     ir = get_current(routine_id)
     if not ir:
         return mcp_error(f"routine_id={routine_id} not found", error_code="NOT_FOUND")
-    body = to_create_body(ir, _make_resolver())
+    # Preview the title the way commit will actually render it (the compiler
+    # convention), not the raw ir.title placeholder — else dry_run lies about
+    # the title (the 2026-06-15 "Push — {date}" false alarm).
+    title_ctx, why = _resolve_title_inputs(ir)
+    body = to_create_body(ir, _make_resolver(), title_context=title_ctx, why_note=why)
     return {
         "status": "preview",
         "routine_id": routine_id,
@@ -639,15 +680,13 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
     import hevy_write_client as wc
     from hevy_compiler import from_hevy_response, to_create_body, to_update_body
     from routine_repo import get_current, put_versioned, upsert_id_map
-    from routine_title import build_title_context, format_why_note
 
     ir = get_current(routine_id)
     if not ir:
         return mcp_error(f"routine_id={routine_id} not found", error_code="NOT_FOUND")
     try:
         resolve = _make_resolver()
-        title_ctx = build_title_context(ir)
-        why = format_why_note(ir)
+        title_ctx, why = _resolve_title_inputs(ir)
         if ir.hevy_routine_id:
             body = to_update_body(ir, resolve, title_context=title_ctx, why_note=why)
             resp = wc.update_routine_with_guard(

@@ -1984,6 +1984,8 @@ Pass `title_context=None` (and omit `why_note`) at every caller site. Compiler f
 
 ### ADR-067 Amendment (2026-05-31): N is all-time-per-type since EXPERIMENT_START_DATE
 
+> **⚠️ Superseded by ADR-088 (2026-06-16).** N is per-phase again (resets at `current_started`) and is now derived from PERFORMED workouts, not pushed routines; Y anchors to a new `reset_epoch_date` rather than `EXPERIMENT_START_DATE`. The amendment below is retained for history.
+
 The original ADR-067 shipped per-phase N. After a same-day review, Matthew flipped to **all-time-per-type-since-experiment-start**:
 
 - N counts pushed routines of this archetype since `EXPERIMENT_START_DATE` (set to 2026-06-01 by the same change).
@@ -2520,5 +2522,31 @@ The AWS "account-controls" sub-grade stays below a literal-checklist A on those 
 **Monitor trigger (revisit this ADR when):** Google ships a public **Audio Overviews / conversational-audio generation API**, OR grants **Studio MultiSpeaker allowlist** access, OR Gemini TTS adds true multi-speaker overlap / non-verbal control. Any of these → swap the synth backend in `gemini_tts.py` (the script stage + the whole QA pipeline stay; only the voicing call changes). Until then the realism gap is a known, accepted limitation, not a bug.
 
 **Consequences:** expectations are set — the show is "two AI voices reading a genuinely conversational script," not generated banter; the upgrade path is a single isolated backend swap; and the gap is tracked rather than re-litigated each time an episode "doesn't feel quite like NotebookLM."
+
+---
+
+## ADR-088: Hevy Title Counters — performed-derived N (per-phase) + reset-epoch Y; force_title lockdown
+
+**Date:** 2026-06-16
+**Status:** Implemented (code shipped + tested; layer rebuild + cdk deploy + S3 config upload + MCP redeploy pending — see RUNBOOK §"Hevy Title Renderer — Deploy Steps (ADR-088)").
+**Supersedes:** the ADR-067 Amendment (2026-05-31). **Related:** ADR-066 (write-loop), ADR-067 (title + WHY-note), ADR-069 (draft_custom), `lambdas/routine_title.py`, `lambdas/hevy_common.py`, `mcp/tools_hevy_routine.py`, `config/training_phases.json`.
+
+**Decision.** The compiler is the single source of truth for a routine's title `<Phase> - <Type> - <N> - <Y>`. The chat model commits with **no title**; the renderer names it. The counters are now honest and performed-derived:
+
+- **N** = PERFORMED workouts of this type since the current phase started (`current_started`), **+1**. Resets when the phase advances. A planned-but-skipped session never inflates it (we count performed, not pushed).
+- **Y** = distinct PERFORMED workouts since `reset_epoch_date`, **+1**. Reset-relative (zeroed by each experiment reset), honest (skips don't inflate). Deduped by `workout_uid` across Hevy + MacroFactor.
+- **Type resolution WITHOUT parsing titles** (work order continuity rule): a stored `archetype` sticker if present, else the archetype of the nearest pushed routine whose `target_date <= the workout date` (the routine index carries `archetype`). Because we count *performed* workouts (each once via `workout_uid`), the routine-index noise — duplicate drafts, future-dated planned routines — cannot inflate the count.
+- **Title lockdown:** `manage_hevy_routine` ignores any caller-supplied `title` unless `force_title=true` (logs a warning). `force_title` defaults off; the rendered convention is the only normal path. The tool description + schema instruct callers: *do not pass a title.*
+
+**Why this reverses the 2026-05-31 amendment.** That amendment made N all-time-per-type-since-experiment-start (no phase reset) and counted *pushed* routines. The 2026-06-16 work order restores per-phase N and makes both counters performed-derived for honesty (the experiment reset + skipped-session cases both demand it). Phase collisions (`Foundation - Push - 3` vs `Build - Push - 3`) are accepted — the phase prefix disambiguates.
+
+**Findings that shaped the design (verified against live data):**
+- The convention *had* shipped, but `_action_dry_run` never passed `title_context`, so it previewed the raw `ir.title` placeholder (`Push — {date}`) — the source of the "regressed" report. Fixed: dry_run now renders the convention (truthful preview); dry_run + commit share `_resolve_title_inputs`.
+- Performed-workout records carry **no archetype field** (only `title`/`exercises`/`workout_uid`), so performed-by-type can't be computed by title-parsing (forbidden) — hence the resolve-by-routine join. `hevy_common.normalize_workout` now also preserves Hevy's `routine_id` as `hevy_routine_id` for a future exact link.
+- `reset_epoch_date` / Foundation `current_started` = **2026-06-16** (the actual first post-reset performed push — the work order assumed 06-15; corrected against the record). Seed consequence (correct, not a bug): the next generated push reads `Foundation - Push - 2 - 2`, the next pull `Foundation - Pull - 1 - 2`.
+
+**Open micro-decision (flagged, default chosen):** N counts *performed* workouts (resolved-to-type). If the resolve-by-date heuristic ever mis-tags a deviated session, the durable fix is to populate the `archetype` sticker at ingestion from the now-preserved `hevy_routine_id`. Deferred — the date heuristic is sufficient for the current one-session-type-per-day cadence.
+
+**Phase advancement (operator):** to advance a phase, edit `config/training_phases.json` — flip `current` and bump `current_started` to that date (resets N per type) — then re-upload to S3 (`config/`). No code deploy. `reset_epoch_date` only changes on an experiment reset.
 
 ---

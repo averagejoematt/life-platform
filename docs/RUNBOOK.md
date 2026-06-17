@@ -1,6 +1,6 @@
 # Life Platform — Runbook
 
-Last updated: 2026-06-15 (v8.6.0 — 133 MCP tools, 38-module package, 80 Lambdas, 20 data sources)
+Last updated: 2026-06-17 (v8.6.0 — 133 MCP tools, 38-module package, 80 Lambdas, 20 data sources)
 
 **Ground truth at last verification:**
 - Lambda functions deployed: 73 (5 power-tuning Lambdas deleted in V2 P4)
@@ -1525,6 +1525,42 @@ aws lambda update-function-configuration --function-name life-platform-mcp \
 Then from claude.ai: `manage_hevy_routine action=draft target_date=2026-06-01` → `action=dry_run routine_id=<id>` to see the new title. Y will start at 1 (no performed workouts since experiment start yet); N starts at 1 for each archetype.
 
 ---
+
+## Hevy Title Renderer — Deploy Steps (ADR-088)
+
+Code is on `main`; **nothing is deployed by the author** (layer module + MCP tool + config). Run in order from the repo root. Changed artifacts: `lambdas/routine_title.py` + `lambdas/hevy_common.py` (shared layer), `mcp/registry.py` + `mcp/tools_hevy_routine.py` (MCP lambda), `config/training_phases.json` (S3).
+
+```bash
+# 1. Sync the phase/counter config to S3 (read by Lambda at runtime).
+#    current_started + reset_epoch_date = 2026-06-16.
+aws s3 cp config/training_phases.json s3://matthew-life-platform/config/ --region us-west-2
+
+# 2. Rebuild the shared layer (routine_title.py + hevy_common.py).
+bash deploy/build_layer.sh
+grep -c "count_performed_of_type" cdk/layer-build/python/routine_title.py   # sanity → 1
+
+# 3. Publish the layer (Core) + propagate to consumers. Bump SHARED_LAYER_VERSION
+#    in cdk/stacks/constants.py to the new version first if the build incremented it.
+cd cdk
+npx cdk deploy LifePlatformCore --require-approval never
+npx cdk deploy \
+  LifePlatformMcp LifePlatformOperational LifePlatformIngestion LifePlatformEmail LifePlatformCompute \
+  --require-approval never --concurrency 3
+cd ..
+
+# 4. Redeploy the MCP server (registry.py + tools_hevy_routine.py changed — these
+#    live in the MCP package, NOT the layer). Special build (see .claude/commands/deploy.md):
+ZIP=/tmp/mcp_deploy.zip; rm -f $ZIP
+zip -j $ZIP mcp_server.py mcp_bridge.py
+zip -r $ZIP mcp/ -x 'mcp/__pycache__/*' 'mcp/*.pyc'
+aws lambda update-function-code --function-name life-platform-mcp --zip-file fileb://$ZIP --region us-west-2
+
+# 5. Verify: draft a custom routine, then dry_run — the wire_body title must read
+#    "Foundation - Push - 2 - 2" (or "... - Pull - 1 - 2"), NOT "Push — <date>".
+#    A title passed without force_title must be ignored (warning in the response).
+```
+
+Phase advancement later is config-only: edit `config/training_phases.json` (flip `current`, bump `current_started`), re-run step 1. No code deploy.
 
 ## Per-Exercise Notes — Deploy Steps (ADR-068)
 
