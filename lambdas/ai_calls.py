@@ -90,45 +90,6 @@ _CW_NAMESPACE = "LifePlatform/AI"
 _BACKOFF_DELAYS = [5, 15, 45]  # attempts 1→2, 2→3, 3→4
 
 
-def _emit_token_metrics(input_tokens, output_tokens, cache_creation_tokens=0, cache_read_tokens=0):
-    """Emit per-Lambda Anthropic token usage to CloudWatch (P1.9)."""
-    try:
-        metric_data = [
-            {
-                "MetricName": "AnthropicInputTokens",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": input_tokens,
-                "Unit": "Count",
-            },
-            {
-                "MetricName": "AnthropicOutputTokens",
-                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                "Value": output_tokens,
-                "Unit": "Count",
-            },
-        ]
-        if cache_creation_tokens or cache_read_tokens:
-            metric_data.append(
-                {
-                    "MetricName": "AnthropicCacheWriteTokens",
-                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                    "Value": cache_creation_tokens,
-                    "Unit": "Count",
-                }
-            )
-            metric_data.append(
-                {
-                    "MetricName": "AnthropicCacheReadTokens",
-                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                    "Value": cache_read_tokens,
-                    "Unit": "Count",
-                }
-            )
-        _cw.put_metric_data(Namespace=_CW_NAMESPACE, MetricData=metric_data)
-    except Exception as e:
-        print(f"[WARN] CloudWatch token metric emit failed (non-fatal): {e}")
-
-
 def _emit_failure_metric():
     """Emit API failure metric to CloudWatch (P1.8)."""
     try:
@@ -335,15 +296,8 @@ def call_anthropic(
     for attempt in range(1, max_attempts + 1):
         try:
             resp = _bedrock_invoke(body, model_name=body["model"])
-            # P1.9: emit token usage metrics
-            usage = resp.get("usage", {})
-            if usage:
-                _emit_token_metrics(
-                    usage.get("input_tokens", 0),
-                    usage.get("output_tokens", 0),
-                    usage.get("cache_creation_input_tokens", 0),
-                    usage.get("cache_read_input_tokens", 0),
-                )
+            # Token usage + estimated spend are now metered centrally at the
+            # bedrock_client.invoke() chokepoint (G1) — no per-caller emit here.
             text = resp["content"][0]["text"].strip()
             # AI-3 middleware: validate output when output_type is specified
             if output_type is not None and _AI_VALIDATOR_AVAILABLE:
