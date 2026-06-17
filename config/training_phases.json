@@ -1,8 +1,9 @@
 {
-  "_comment": "Ordered training phases. `current` is the source of truth for routine titles (consumed by routine_title.format_title). Manually advanced by Matthew — no auto/milestone-driven transitions. Add or rename phases in `phases`; flip `current` to advance. `current_started` is the calendar-date boundary used to count N (per-phase per-type) — bump it whenever current changes.",
-  "_version": 1,
-  "_authors": "ADR-067",
+  "_comment": "Ordered training phases + counter anchors for Hevy routine titles (Phase - Type - N - Y), consumed by routine_title.build_title_context. Manually advanced by Matthew — no auto/milestone-driven transitions. `current` is the active phase; flip it to advance and bump `current_started` to that date (this resets N per type). `current_started` = phase_started_date: N counts PERFORMED workouts of each type on/after it. `reset_epoch_date` = the experiment-reset anchor: Y counts PERFORMED workouts on/after it. Both are inclusive (>=). See ADR-067 (superseded by the 2026-06-16 work order).",
+  "_version": 2,
+  "_authors": "ADR-067 / 2026-06-16 work order",
   "phases": ["Foundation", "Build", "Forge", "Sustain"],
   "current": "Foundation",
-  "current_started": "2026-06-01"
+  "current_started": "2026-06-16",
+  "reset_epoch_date": "2026-06-16"
 }

@@ -1,3 +1,22 @@
+## Hevy title renderer — 2026-06-16 (ADR-088: performed-derived N/Y + force_title lockdown)
+
+The `Phase - Type - N - Y` routine-title convention is now authoritative, honest, and self-naming — the chat model commits with **no title**.
+
+### Fixed
+- **dry_run previewed the wrong title** — `_action_dry_run` never passed `title_context`, so it showed the raw `Push — {date}` placeholder (the 2026-06-15 "regression" was a misleading preview). dry_run now renders the real convention; dry_run + commit share `_resolve_title_inputs`.
+
+### Changed
+- **N is per-phase + performed-derived again** (supersedes the 2026-05-31 ADR-067 amendment). N = performed workouts of this type since `current_started`; Y = distinct performed workouts since `reset_epoch_date` (deduped by `workout_uid` across Hevy + MacroFactor). Both honest — a planned-but-skipped session never inflates either. Type is resolved without parsing titles (stored sticker → nearest pushed routine by date).
+- **`config/training_phases.json`** — added `reset_epoch_date`; `current_started` + `reset_epoch_date` = 2026-06-16 (first post-reset performed push).
+
+### Added
+- **Title lockdown** — `manage_hevy_routine` ignores a caller-supplied `title` unless `force_title=true` (warns). Tool description + schema instruct callers not to pass a title.
+- **`hevy_common.normalize_workout`** preserves Hevy's `routine_id` as `hevy_routine_id` (future exact type-resolution link).
+
+Code-complete + tested (full suite 1884 passed); **deploys pending** — see RUNBOOK §"Hevy Title Renderer — Deploy Steps (ADR-088)".
+
+---
+
 ## Ingestion reliability — 2026-06-14 (Strava 402 + Garmin auth-liveness alarm)
 
 Two wearable pipelines were found silently dead (Strava since 2026-05-09, Garmin since 2026-05-29) when a forgotten-Garmin phone walk wouldn't log.

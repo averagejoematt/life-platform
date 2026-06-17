@@ -3354,9 +3354,12 @@ TOOLS = {
                 "DELETE), 'floor' (≈20-min variant), 're_entry' (deliberately easy after a "
                 "break), 'adherence' (programmed-vs-performed). Typical custom flow: "
                 "draft_custom → dry_run → commit. Subtract-only autoregulation on the 'draft' "
-                "path. Honest framing: 'deterministic volume-landmark programming with red-day "
-                "deload guard' — never describe as 'autoregulated' publicly until the "
-                "readiness signal is validated."
+                "path. TITLES ARE AUTO-RENDERED: the compiler names every routine "
+                "'Phase - Type - N - Y' (e.g. 'Foundation - Push - 2 - 2') from config + "
+                "performed history — DO NOT pass a title; leave it to the compiler. (A title "
+                "you pass is ignored unless you also set force_title=true.) Honest framing: "
+                "'deterministic volume-landmark programming with red-day deload guard' — never "
+                "describe as 'autoregulated' publicly until the readiness signal is validated."
             ),
             "inputSchema": {
                 "type": "object",
@@ -3399,7 +3402,19 @@ TOOLS = {
                     },
                     "title": {
                         "type": "string",
-                        "description": "draft_custom only: optional literal title fallback (commit normally renders the ADR-067 convention from archetype).",
+                        "description": (
+                            "DO NOT pass this. The compiler auto-renders 'Phase - Type - N - Y'. "
+                            "Any title here is IGNORED unless force_title=true is also set."
+                        ),
+                    },
+                    "force_title": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Escape hatch (default false). When true, the literal `title` you pass "
+                            "is used verbatim instead of the auto-rendered convention; a warning is "
+                            "logged. Leave off for normal use."
+                        ),
                     },
                     "notes": {"type": "string", "description": "draft_custom only: one-line session WHY-note shown in Hevy."},
                     "routine_id": {
