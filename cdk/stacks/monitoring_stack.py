@@ -343,6 +343,25 @@ class MonitoringStack(Stack):
             "AiTokensPlatformTotal", "ai-tokens-platform-daily-total", "LifePlatform/AI", "AnthropicOutputTokens", 86400, "Sum", 33333, GTE
         )
 
+        # G2: daily AI-spend ceiling — the anomaly guard. EstimatedCostUSD is
+        # emitted (dimensionless) at the bedrock_client chokepoint (G1), so this
+        # SUM covers EVERY AI call platform-wide, not just the daily brief.
+        # Normal is ~$1.3/day; weekly-digest/podcast days add ~$1-2. $6/day is a
+        # ~4x runaway (≈$180/mo pace) — well clear of legitimate peaks. URGENT
+        # (not digest): a cost runaway should page promptly, not batch overnight.
+        # Future: swap to a CloudWatch anomaly-detection band once this metric
+        # has ~2 weeks of history to train on.
+        _alarm(
+            "AiDailySpendHigh",
+            "ai-daily-spend-high",
+            "LifePlatform/AI",
+            "EstimatedCostUSD",
+            86400,
+            "Sum",
+            6.0,
+            GTE,
+        )
+
         # 2026-05-29: the ~46 per-Lambda ingestion-error-* alarms ($4.60/mo) were
         # removed (error_alarm=False in ingestion_stack). No aggregate replaces them:
         # CloudWatch rejects SEARCH in alarms and caps metric-math alarms at ~10

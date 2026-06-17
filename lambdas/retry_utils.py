@@ -155,14 +155,7 @@ def call_anthropic_api(
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:
             resp = _bedrock_invoke(body, model_name=body["model"])
-            usage = resp.get("usage", {})
-            if usage:
-                _emit_token_metrics(
-                    usage.get("input_tokens", 0),
-                    usage.get("output_tokens", 0),
-                    usage.get("cache_creation_input_tokens", 0),
-                    usage.get("cache_read_input_tokens", 0),
-                )
+            # Token usage + spend metered centrally at bedrock_client.invoke() (G1).
             return resp["content"][0]["text"].strip()
 
         except _bce.ClientError as e:
@@ -219,14 +212,7 @@ def call_anthropic_raw(req: urllib.request.Request, timeout: int = 55) -> dict[s
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:
             resp = _bedrock_invoke(body, model_name=body.get("model"))
-            usage = resp.get("usage", {})
-            if usage:
-                _emit_token_metrics(
-                    usage.get("input_tokens", 0),
-                    usage.get("output_tokens", 0),
-                    usage.get("cache_creation_input_tokens", 0),
-                    usage.get("cache_read_input_tokens", 0),
-                )
+            # Token usage + spend metered centrally at bedrock_client.invoke() (G1).
             return resp
 
         except _bce.ClientError as e:

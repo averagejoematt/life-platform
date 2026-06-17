@@ -55,6 +55,90 @@ BEDROCK_REGION = os.environ.get("BEDROCK_REGION", "us-west-2")
 
 _BEDROCK = None
 
+# ── Cost telemetry (G1) ─────────────────────────────────────────────────────
+# ADR-062 makes invoke() the single chokepoint for every Claude call, so it is
+# the one correct place to meter token usage + spend. Metering here (rather than
+# only in ai_calls / retry_utils, which cover just the daily-brief path) makes
+# per-feature AI cost attributable in one CloudWatch query — site-api-ai,
+# partner, the podcast, coach reflections, the canary etc. were previously
+# invisible — and feeds the daily-spend anomaly alarm (G2). Strictly fail-open:
+# a telemetry error must never surface to an AI caller.
+_CW_NAMESPACE = "LifePlatform/AI"
+_LAMBDA_NAME = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "unknown")
+# $/1M tokens, keyed by a substring of the resolved model id. Mirrors
+# cost_governor._PRICES; an unmapped model prices as the most expensive tier so
+# a new/unknown model can never under-report spend.
+_PRICES = {
+    "fable": {"in": 10.00, "out": 50.00, "cache_read": 1.00, "cache_write": 12.50},
+    "opus": {"in": 5.00, "out": 25.00, "cache_read": 0.50, "cache_write": 6.25},
+    "sonnet": {"in": 3.00, "out": 15.00, "cache_read": 0.30, "cache_write": 3.75},
+    "haiku": {"in": 1.00, "out": 5.00, "cache_read": 0.10, "cache_write": 1.25},
+}
+_DEFAULT_PRICE = _PRICES["fable"]
+_CW = None
+
+
+def _cw():
+    """Lazy-init a CloudWatch client for metric emission (separate from the
+    bedrock-runtime client; only created if/when telemetry actually runs)."""
+    global _CW
+    if _CW is None:
+        _CW = boto3.client("cloudwatch", region_name=BEDROCK_REGION)
+    return _CW
+
+
+def _price_for(model_id: str) -> dict:
+    mid = (model_id or "").lower()
+    for key, price in _PRICES.items():
+        if key in mid:
+            return price
+    return _DEFAULT_PRICE
+
+
+def estimate_cost_usd(usage: dict, model_id: str) -> float:
+    """Estimated USD for one Claude call from its usage dict + resolved model.
+    Pure — no I/O — so it is unit-testable without AWS."""
+    p = _price_for(model_id)
+    return (
+        int(usage.get("input_tokens", 0) or 0) * p["in"]
+        + int(usage.get("output_tokens", 0) or 0) * p["out"]
+        + int(usage.get("cache_read_input_tokens", 0) or 0) * p["cache_read"]
+        + int(usage.get("cache_creation_input_tokens", 0) or 0) * p["cache_write"]
+    ) / 1_000_000.0
+
+
+def _emit_usage_metrics(usage: dict, model_id: str) -> None:
+    """Meter token usage + estimated spend at the inference chokepoint (G1).
+
+    Emits per-LambdaFunction token metrics (per-feature attribution) plus a
+    dimensionless AnthropicOutputTokens (feeds the existing platform-total
+    alarm) and EstimatedCostUSD both per-feature and dimensionless (the latter
+    feeds the daily-spend anomaly alarm, G2). Fully fail-open."""
+    try:
+        in_tok = int(usage.get("input_tokens", 0) or 0)
+        out_tok = int(usage.get("output_tokens", 0) or 0)
+        cache_read = int(usage.get("cache_read_input_tokens", 0) or 0)
+        cache_write = int(usage.get("cache_creation_input_tokens", 0) or 0)
+        if not (in_tok or out_tok or cache_read or cache_write):
+            return
+        cost = estimate_cost_usd(usage, model_id)
+        fn_dim = [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}]
+        md = [
+            {"MetricName": "AnthropicInputTokens", "Dimensions": fn_dim, "Value": in_tok, "Unit": "Count"},
+            {"MetricName": "AnthropicOutputTokens", "Dimensions": fn_dim, "Value": out_tok, "Unit": "Count"},
+            # Dimensionless output-token total — feeds ai-tokens-platform-daily-total.
+            {"MetricName": "AnthropicOutputTokens", "Value": out_tok, "Unit": "Count"},
+            # Estimated spend: per-feature attribution + a dimensionless aggregate (G2 alarm).
+            {"MetricName": "EstimatedCostUSD", "Dimensions": fn_dim, "Value": cost, "Unit": "None"},
+            {"MetricName": "EstimatedCostUSD", "Value": cost, "Unit": "None"},
+        ]
+        if cache_read or cache_write:
+            md.append({"MetricName": "AnthropicCacheReadTokens", "Dimensions": fn_dim, "Value": cache_read, "Unit": "Count"})
+            md.append({"MetricName": "AnthropicCacheWriteTokens", "Dimensions": fn_dim, "Value": cache_write, "Unit": "Count"})
+        _cw().put_metric_data(Namespace=_CW_NAMESPACE, MetricData=md)
+    except Exception as e:  # never break an AI call on telemetry
+        print(f"[WARN] bedrock cost telemetry emit failed (non-fatal): {e}")
+
 
 def _client():
     """Lazy-init bedrock-runtime client. Read timeout generous for long
@@ -132,4 +216,7 @@ def invoke(body: dict, model_name: str | None = None) -> dict:
         contentType="application/json",
         accept="application/json",
     )
-    return json.loads(resp["body"].read())
+    parsed = json.loads(resp["body"].read())
+    # G1: meter token usage + estimated spend at the single chokepoint. Fail-open.
+    _emit_usage_metrics(parsed.get("usage") or {}, model_id)
+    return parsed
