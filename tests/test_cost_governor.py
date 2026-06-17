@@ -88,9 +88,7 @@ def test_projection_tracks_trailing_rate_not_lumpy_mtd(gov):
     recent rate — the old MTD active-day average produced ~$115 and a needless
     tier-2 website-AI pause against a real ~$60 run-rate."""
     # mtd $57, trailing 7d: non_ai $7.5 + ai $6.72 → ~$2.03/day.
-    projected = gov._project_month_end(
-        mtd=57.0, elapsed_days=15.0, days_in_month=30, non_ai_recent=7.5, ai_recent=6.72, trailing_days=7.0
-    )
+    projected = gov._project_month_end(mtd=57.0, elapsed_days=15.0, days_in_month=30, non_ai_recent=7.5, ai_recent=6.72, trailing_days=7.0)
     # ~$2.03/day × 15 remaining → ~$87 (honest), not ~$115.
     assert 80 < projected < 95
 
@@ -110,8 +108,7 @@ def test_projection_nonai_lump_not_extrapolated(gov):
 def test_projection_zero_remaining_equals_mtd(gov):
     """Last day of the month: nothing remaining → projection == already-spent."""
     assert (
-        gov._project_month_end(mtd=62.0, elapsed_days=30.0, days_in_month=30, non_ai_recent=4.0, ai_recent=7.0, trailing_days=7.0)
-        == 62.0
+        gov._project_month_end(mtd=62.0, elapsed_days=30.0, days_in_month=30, non_ai_recent=4.0, ai_recent=7.0, trailing_days=7.0) == 62.0
     )
 
 
