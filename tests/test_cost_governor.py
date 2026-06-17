@@ -88,9 +88,7 @@ def test_projection_tracks_trailing_rate_not_lumpy_mtd(gov):
     recent rate — the old MTD active-day average produced ~$115 and a needless
     tier-2 website-AI pause against a real ~$60 run-rate."""
     # mtd $57 (non_ai 16 + ai-mtd 41), trailing 7d AI = $6.72 → ~$0.96/day.
-    projected = gov._project_month_end(
-        mtd=57.0, non_ai=16.0, elapsed_days=15.0, days_in_month=30, ai_recent=6.72, trailing_days=7.0
-    )
+    projected = gov._project_month_end(mtd=57.0, non_ai=16.0, elapsed_days=15.0, days_in_month=30, ai_recent=6.72, trailing_days=7.0)
     # non_ai_daily≈1.07 + ai_daily≈0.96, ×15 remaining → ~$87 (honest), not ~$115.
     assert 80 < projected < 95
     old_mtd_avg_method = 57.0 + (16.0 / 15.0 + 41.0 / 15.0) * 15.0  # ≈ $114

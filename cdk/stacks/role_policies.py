@@ -857,7 +857,9 @@ def email_coach_panel_podcast() -> list[iam.PolicyStatement]:
         extra_statements=[
             iam.PolicyStatement(sid="ChroniclePostsRead", actions=["s3:GetObject"], resources=[f"{BUCKET_ARN}/site/chronicle/posts.json"]),
             # Loud HOLD + new-episode notify: SNS to life-platform-alerts.
-            iam.PolicyStatement(sid="HoldAlertSNS", actions=["sns:Publish"], resources=[f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"]),
+            iam.PolicyStatement(
+                sid="HoldAlertSNS", actions=["sns:Publish"], resources=[f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"]
+            ),
             # Publish heartbeat metric — the "show went silent" alarm watches for its absence.
             iam.PolicyStatement(sid="PublishedMetric", actions=["cloudwatch:PutMetricData"], resources=["*"]),
         ],

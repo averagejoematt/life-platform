@@ -138,9 +138,13 @@ def test_build_context_n_resets_on_phase_advance():
     # _query_performed(phase_started) returns nothing → N=1. Y uses reset epoch.
     with (
         patch.object(rt, "load_phase_state", return_value=_phase_state(current="Build", started="2026-08-01", reset="2026-06-16")),
-        patch.object(rt, "_query_performed", side_effect=lambda start: [] if start == "2026-08-01" else [{"date": "2026-06-16", "workout_uid": "hevy:a"}]),
+        patch.object(
+            rt,
+            "_query_performed",
+            side_effect=lambda start: [] if start == "2026-08-01" else [{"date": "2026-06-16", "workout_uid": "hevy:a"}],
+        ),
         patch.object(rt, "_load_routine_index", return_value=[]),
     ):
         ctx = rt.build_title_context(_ir(archetype="upper", target_date="2026-08-02"))
     assert ctx["type_count_in_phase"] == 1  # N reset by the new phase window
-    assert ctx["all_time_count"] == 2       # Y still counts the pre-advance workout
+    assert ctx["all_time_count"] == 2  # Y still counts the pre-advance workout
