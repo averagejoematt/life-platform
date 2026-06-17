@@ -642,7 +642,10 @@ def _resolve_title_inputs(ir: Any) -> tuple[dict[str, Any] | None, str]:
 
     why = format_why_note(ir)
     if (getattr(ir, "inputs_snapshot", None) or {}).get("force_title"):
-        print(f"[WARN] force_title set on routine {getattr(ir, 'routine_id', '?')} — " f"using caller title {getattr(ir, 'title', '')!r} instead of the rendered convention")
+        print(
+            f"[WARN] force_title set on routine {getattr(ir, 'routine_id', '?')} — "
+            f"using caller title {getattr(ir, 'title', '')!r} instead of the rendered convention"
+        )
         return None, why
     return build_title_context(ir), why
 

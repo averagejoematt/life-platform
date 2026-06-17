@@ -898,9 +898,7 @@ def _public_challenge_ids() -> set | None:
     if not cat or not cat.get("challenges"):
         return None
     return {
-        (ch.get("id") or "").strip().lower()
-        for ch in cat.get("challenges", [])
-        if ch.get("public", True) is not False and ch.get("id")
+        (ch.get("id") or "").strip().lower() for ch in cat.get("challenges", []) if ch.get("public", True) is not False and ch.get("id")
     }
 
 
