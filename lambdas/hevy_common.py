@@ -287,6 +287,10 @@ def normalize_workout(raw: dict) -> dict:
         "sk": f"DATE#{date_str}#WORKOUT#{workout_id}",
         "source": SOURCE,
         "source_workout_id": workout_id,
+        # Hevy routine the workout was performed from (null for ad-hoc logs).
+        # Preserved so routine_title can resolve a performed workout's session
+        # type via the exact routine link (else it falls back to nearest-date).
+        "hevy_routine_id": str(workout.get("routine_id") or ""),
         "workout_uid": workout_uid,
         "date": date_str,
         "title": workout.get("title") or workout.get("name") or "",

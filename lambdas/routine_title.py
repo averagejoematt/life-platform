@@ -78,72 +78,127 @@ def load_phase_state() -> dict[str, Any]:
     return json.loads(obj["Body"].read())
 
 
-def count_performed_workouts_since(start_date: str) -> int:
-    """Performed Hevy workouts in DDB on or after start_date. Paginates."""
-    pk = f"USER#{USER_ID}#SOURCE#hevy"
-    total = 0
-    last_key = None
-    while True:
-        kwargs: dict[str, Any] = {
-            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").gte(f"DATE#{start_date}"),
-            "Select": "COUNT",
-        }
-        if last_key:
-            kwargs["ExclusiveStartKey"] = last_key
-        resp = _table().query(**kwargs)
-        total += int(resp.get("Count", 0))
-        last_key = resp.get("LastEvaluatedKey")
-        if not last_key:
-            break
-    return total
+# Performed-workout sources to union for the honest counters. workout_uid
+# ("hevy:<id>" / the MacroFactor formula) dedupes the same session arriving via
+# more than one pipe so it isn't counted twice in N or Y (work order §1.5).
+_PERFORMED_SOURCES = ("hevy", "macrofactor_workouts", "macrofactor_export")
+# Variants that are paired with / substitute for a real session — excluded from
+# the routine index used to resolve a performed workout's type.
+_NON_COUNTING_VARIANTS = ("floor", "re_entry")
 
 
-def count_experiment_archetype_routines(archetype: str, target_date_exclusive: str) -> int:
-    """Count ROUTINE_INDEX entries with this archetype since EXPERIMENT_START_DATE,
-    excluding any with target_date >= target_date_exclusive (the routine being
-    committed now). Skips floor/re_entry variants so paired sessions don't
-    double-count. ADR-067 amendment: no longer bounded by phase boundary.
-    """
+def _query_performed(start_date: str) -> list[dict[str, Any]]:
+    """Performed workout records on/after start_date across all strength sources.
+    Returns the raw items (date + workout_uid + archetype sticker if present).
+    Paginates each source. SK form: DATE#YYYY-MM-DD#WORKOUT#<id>."""
+    rows: list[dict[str, Any]] = []
+    for source in _PERFORMED_SOURCES:
+        pk = f"USER#{USER_ID}#SOURCE#{source}"
+        last_key = None
+        while True:
+            kwargs: dict[str, Any] = {
+                "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").gte(f"DATE#{start_date}"),
+                "ProjectionExpression": "#d, workout_uid, archetype, hevy_routine_id",
+                "ExpressionAttributeNames": {"#d": "date"},
+            }
+            if last_key:
+                kwargs["ExclusiveStartKey"] = last_key
+            try:
+                resp = _table().query(**kwargs)
+            except Exception:
+                break  # a missing source partition is not an error
+            rows.extend(resp.get("Items", []))
+            last_key = resp.get("LastEvaluatedKey")
+            if not last_key:
+                break
+    return rows
+
+
+def _load_routine_index(start_date: str) -> list[dict[str, Any]]:
+    """Routine-index rows on/after start_date (archetype + target_date + variant),
+    sorted by target_date. Used to resolve a performed workout's type by the
+    nearest preceding pushed routine."""
     pk = f"USER#{USER_ID}#SOURCE#routine_index"
-    resp = _table().query(
-        KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{EXPERIMENT_START_DATE}", f"DATE#{target_date_exclusive}"),
-    )
-    seen_routine_ids: set[str] = set()
+    resp = _table().query(KeyConditionExpression=Key("pk").eq(pk) & Key("sk").gte(f"DATE#{start_date}"))
+    rows = [it for it in resp.get("Items", []) if (it.get("variant") or "") not in _NON_COUNTING_VARIANTS]
+    return sorted(rows, key=lambda r: str(r.get("target_date") or ""))
+
+
+def resolve_archetype(workout: dict[str, Any], index_rows: list[dict[str, Any]]) -> str | None:
+    """Resolve a performed workout's session type WITHOUT parsing its title.
+
+    Priority: a stored `archetype` sticker → else the archetype of the nearest
+    pushed routine whose target_date <= the workout date (the routine it most
+    likely came from). Returns None when nothing matches (uncounted)."""
+    sticker = workout.get("archetype")
+    if sticker:
+        return str(sticker)
+    wdate = str(workout.get("date") or "")
+    if not wdate:
+        return None
+    best = None
+    for r in index_rows:  # index_rows sorted ascending by target_date
+        td = str(r.get("target_date") or "")
+        if td and td <= wdate:
+            best = r
+        elif td > wdate:
+            break
+    return str(best.get("archetype")) if best else None
+
+
+def count_performed_of_type(archetype: str, performed: list[dict[str, Any]], index_rows: list[dict[str, Any]]) -> int:
+    """Distinct performed workouts whose resolved type == archetype. Dedupes by
+    workout_uid so a cross-source duplicate counts once. Pure — no I/O."""
+    seen: set[str] = set()
     count = 0
-    for it in resp.get("Items", []):
-        if it.get("archetype") != archetype:
+    for w in performed:
+        uid = w.get("workout_uid") or w.get("date")
+        if uid in seen:
             continue
-        if (it.get("variant") or "") in ("floor", "re_entry"):
-            continue
-        td = it.get("target_date") or ""
-        if td >= target_date_exclusive:
-            continue
-        rid = it.get("routine_id")
-        if rid and rid in seen_routine_ids:
-            continue
-        if rid:
-            seen_routine_ids.add(rid)
-        count += 1
+        seen.add(str(uid))
+        if resolve_archetype(w, index_rows) == archetype:
+            count += 1
     return count
 
 
-def build_title_context(ir: RoutineSpec) -> dict[str, Any]:
-    """Compose the title-context dict.
+def count_distinct_performed(performed: list[dict[str, Any]]) -> int:
+    """Distinct performed workouts (deduped by workout_uid). Pure — no I/O."""
+    return len({str(w.get("workout_uid") or w.get("date")) for w in performed})
 
-    Both N and Y are counted since EXPERIMENT_START_DATE (the user's anchor).
-    Phase is decorative — it goes into the title for narrative context but
-    doesn't reset N. Phase advancement leaves N untouched; users see Push
-    sequence continue across Foundation -> Build -> ... .
+
+def build_title_context(ir: RoutineSpec) -> dict[str, Any]:
+    """Compose the title-context dict (work order 2026-06-16 — supersedes the
+    2026-05-31 ADR-067 amendment).
+
+    N — performed workouts of THIS type since the current phase started
+        (phase_started_date), +1. Resets when the phase advances; a
+        planned-but-skipped session never inflates it (we count performed, not
+        pushed). Type is resolved via resolve_archetype (no title parsing).
+    Y — performed workouts since reset_epoch_date, +1. Honest, reset-relative —
+        skipped sessions don't inflate it; the experiment reset zeroes it.
     """
     state = load_phase_state()
     phase = state.get("current") or (state.get("phases") or ["Phase"])[0]
-    in_experiment = count_experiment_archetype_routines(ir.archetype, ir.target_date)
-    total = count_performed_workouts_since(EXPERIMENT_START_DATE)
+    phase_started = state.get("current_started") or EXPERIMENT_START_DATE
+    reset_epoch = state.get("reset_epoch_date") or EXPERIMENT_START_DATE
+
+    # Load the index from the earlier of the two windows so an early performed
+    # workout can still resolve to a routine pushed just before the phase began.
+    index_floor = min(str(phase_started), str(reset_epoch))
+    index_rows = _load_routine_index(index_floor)
+
+    performed_in_phase = _query_performed(str(phase_started))
+    n = count_performed_of_type(ir.archetype, performed_in_phase, index_rows) + 1
+
+    performed_since_reset = performed_in_phase if reset_epoch == phase_started else _query_performed(str(reset_epoch))
+    y = count_distinct_performed(performed_since_reset) + 1
+
     return {
         "phase": phase,
-        "type_count_in_phase": in_experiment + 1,
-        "all_time_count": total + 1,
-        "experiment_started": EXPERIMENT_START_DATE,
+        "type_count_in_phase": n,
+        "all_time_count": y,
+        "phase_started": phase_started,
+        "reset_epoch": reset_epoch,
     }
 
 
