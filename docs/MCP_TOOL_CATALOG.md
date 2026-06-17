@@ -1,6 +1,6 @@
 # Life Platform — MCP Tool Catalog
 
-**Version:** v8.6.0 | **Last updated:** 2026-06-15 | **Total tools:** 133
+**Version:** v8.6.0 | **Last updated:** 2026-06-17 | **Total tools:** 133
 
 > Source of truth: the count of top-level `TOOLS` dict keys in `mcp/registry.py` → **133**, via AST parse (`deploy/sync_doc_metadata.py::_auto_discover_tool_count`). Do NOT count with `grep '"name":'` — it over-counts nested schema `"name"` fields (CLAUDE.md).
 >
@@ -81,7 +81,7 @@
 | `get_exercise_history` | exercise_name, start_date=, end_date=, include_warmups= | Deep dive on a single exercise |
 | `get_muscle_volume` | start_date=, end_date=, period= | Weekly sets per muscle group vs MEV/MAV/MRV |
 | `get_workout_frequency` | start_date=, end_date= | Adherence, streaks, top exercises |
-| `manage_hevy_routine` | action= (draft\|dry_run\|commit\|list\|get\|archive\|floor\|re_entry\|adherence), routine_id=, target_date=, start_date=, end_date=, recovery_tier=, acwr_flag=, volume_7d=, z2_minutes_7d=, days_since_last_workout= | **WRITE TOOL** (ADR-066, title ADR-067, per-exercise notes ADR-068). Author / preview / push / archive Hevy routines, score programmed-vs-performed adherence. `commit` titles routines as `<Phase> - <Type> - <N> - <Y>` (re-entry → `Welcome back · <Type>`), projects a one-line WHY-note into Hevy's notes field, and attaches one factual line per exercise (`Last: 60kg 8/8/7 (24 May)` by default) rendered in pure Python from real workout records — LLM never does math. `commit` and `archive` require explicit `routine_id` — no inferred intent. Subtract-only autoregulation. Honest framing: "deterministic volume-landmark programming with red-day deload guard" — never call this "autoregulated" publicly. |
+| `manage_hevy_routine` | action= (draft\|dry_run\|commit\|list\|get\|archive\|floor\|re_entry\|adherence), routine_id=, target_date=, start_date=, end_date=, recovery_tier=, acwr_flag=, volume_7d=, z2_minutes_7d=, days_since_last_workout= | **WRITE TOOL** (ADR-066, title ADR-067/**ADR-088**, per-exercise notes ADR-068). Author / preview / push / archive Hevy routines, score programmed-vs-performed adherence. **The compiler auto-renders the title `<Phase> - <Type> - <N> - <Y>` — DO NOT pass a `title` (ignored unless `force_title=true`).** N = performed workouts of this type since the phase started (per-phase reset); Y = distinct performed workouts since the reset epoch; both resolved from performed history, never by parsing titles. `dry_run` previews the exact rendered title. (re-entry → `Welcome back · <Type>`). Projects a one-line WHY-note into Hevy's notes field, and attaches one factual line per exercise (`Last: 60kg 8/8/7 (24 May)` by default) rendered in pure Python from real workout records — LLM never does math. `commit` and `archive` require explicit `routine_id` — no inferred intent. Subtract-only autoregulation. Honest framing: "deterministic volume-landmark programming with red-day deload guard" — never call this "autoregulated" publicly. |
 
 ### Workouts (Unified — Hevy + MacroFactor, ADR-060)
 | Tool | Key Params | Description |
