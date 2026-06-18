@@ -57,6 +57,8 @@ def test_circadian_populated_shape(monkeypatch):
     body = __import__("json").loads(resp["body"])
     assert body["available"] is True
     assert body["date"] == "2026-06-15"
+    # temporal frame: circadian is a forward-looking forecast for tonight
+    assert body["frame"] == "tonight"
     assert body["score"] == 78
     assert body["category"] == "good"
     assert body["weakest_component"] == "screen_wind_down"
@@ -100,6 +102,9 @@ def test_sleep_reconciliation_decodes_source_map_and_strips_internals(monkeypatc
     assert body["available"] is True
     assert body["total_duration_hours"] == 7.4
     assert body["sources_present"] == ["whoop", "eightsleep"]
+    # temporal frame: wake-date-keyed record (2026-06-15) describes the night before
+    assert body["frame"] == "last_night"
+    assert body["night_of"] == "2026-06-14"
     # source_map decoded from JSON string → dict
     assert body["source_map"] == {"hrv_ms": "whoop", "room_temp_c": "eightsleep"}
     # internal keys stripped
