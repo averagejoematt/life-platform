@@ -144,25 +144,34 @@ def test_craft_check_passes_clean_dialogue():
     assert panel._craft_check(turns) == []
 
 
-def test_craft_check_flags_consecutive_floor_hog():
-    # Three turns in a row from one speaker → fail (max is 2).
-    turns = [
+def test_craft_check_allows_three_but_flags_four_in_a_row():
+    # Calibrated: 3 short turns reads fine; 4+ is the floor-hog that fails.
+    three = [
         {"speaker": "elena_voss", "line": "One."},
         {"speaker": "eli_marsh", "line": "Two."},
         {"speaker": "eli_marsh", "line": "Three."},
         {"speaker": "eli_marsh", "line": "Four."},
     ]
-    fails = panel._craft_check(turns)
+    assert panel._craft_check(three) == []  # exactly 3 eli in a row — allowed
+    four = three + [{"speaker": "eli_marsh", "line": "Five."}]
+    fails = panel._craft_check(four)
     assert fails and "in a row" in fails[0]
 
 
-def test_craft_check_flags_monologue_dump():
-    turns = [
-        {"speaker": "elena_voss", "line": "word " * (panel._QA_MAX_WORDS_PER_TURN + 5)},
-        {"speaker": "eli_marsh", "line": "Tight reply."},
+def test_craft_check_flags_monologue_but_exempts_hook():
+    long_line = "word " * (panel._QA_MAX_WORDS_PER_TURN + 5)
+    # A long turn mid-conversation (not turn 0) → flagged.
+    mid = [
+        {"speaker": "elena_voss", "line": "Short open."},
+        {"speaker": "eli_marsh", "line": long_line},
     ]
-    fails = panel._craft_check(turns)
-    assert any("monologue" in f for f in fails)
+    assert any("monologue" in f for f in panel._craft_check(mid))
+    # The same length as turn 0 (the cold-open hook) is allowed (under the hook ceiling).
+    hook = [
+        {"speaker": "elena_voss", "line": long_line},
+        {"speaker": "eli_marsh", "line": "Reply."},
+    ]
+    assert panel._craft_check(hook) == []
 
 
 def test_qa_review_fails_open_on_judge_error(monkeypatch):

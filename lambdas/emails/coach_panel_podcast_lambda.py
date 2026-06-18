@@ -514,13 +514,16 @@ def _seed_series_state(bible: dict, ep: dict) -> None:
 # fixes it); the best candidate is kept. See the 2026-06-17 handover.
 _QA_MAX_ATTEMPTS = int(os.environ.get("PANEL_QA_MAX_ATTEMPTS", "3"))
 _QA_MAX_WORDS_PER_TURN = 130  # a turn longer than this reads as a monologue, not dialogue
-_QA_MAX_CONSECUTIVE = 2  # one speaker may hold the floor for at most this many turns in a row
+_QA_HOOK_MAX_WORDS = 180  # turn 0 is the cold-open hook — a solo turn by design, allowed to run longer
+_QA_MAX_CONSECUTIVE = 3  # 4+ turns from one speaker is a floor-hog; 3 short turns reads fine (calibrated 2026-06-17)
 
 
 def _craft_check(turns: list) -> list:
     """Deterministic, zero-cost craft gate. Returns a list of failure reasons (empty = pass).
     Catches exactly the pacing problems an LLM judge is unreliable at: monologue dumps and
-    one speaker holding the floor too long."""
+    one speaker holding the floor too long. Calibrated 2026-06-17: 4+ consecutive turns is the
+    real floor-hog (3 short turns reads fine), and turn 0 is the intentional solo cold-open hook
+    (a longer ceiling, not the dialogue cap)."""
     fails = []
     run = 1
     for i in range(1, len(turns)):
@@ -530,8 +533,10 @@ def _craft_check(turns: list) -> list:
             break
     for i, t in enumerate(turns):
         wc = len((t.get("line") or "").split())
-        if wc > _QA_MAX_WORDS_PER_TURN:
-            fails.append(f"turn {i} is a {wc}-word monologue (max {_QA_MAX_WORDS_PER_TURN}) — make it conversational")
+        cap = _QA_HOOK_MAX_WORDS if i == 0 else _QA_MAX_WORDS_PER_TURN
+        if wc > cap:
+            label = "cold-open hook" if i == 0 else "monologue"
+            fails.append(f"turn {i} is a {wc}-word {label} (max {cap}) — make it conversational")
     return fails
 
 
