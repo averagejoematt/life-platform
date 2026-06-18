@@ -506,23 +506,119 @@ def _seed_series_state(bible: dict, ep: dict) -> None:
     )
 
 
+# ── QA rigor (automates the manual review loop, 2026-06-17) ───────────────────
+# Two layers on top of the ER-03 + Compassion gates, both catching CRAFT/accuracy
+# problems those deterministic safety gates can't see (monologue dumps, no tension,
+# invented biography, abrupt flow). A generator that fails QA is RE-ROLLED up to
+# _QA_MAX_ATTEMPTS times (generation is non-deterministic, so a re-roll usually
+# fixes it); the best candidate is kept. See the 2026-06-17 handover.
+_QA_MAX_ATTEMPTS = int(os.environ.get("PANEL_QA_MAX_ATTEMPTS", "3"))
+_QA_MAX_WORDS_PER_TURN = 130  # a turn longer than this reads as a monologue, not dialogue
+_QA_MAX_CONSECUTIVE = 2  # one speaker may hold the floor for at most this many turns in a row
+
+
+def _craft_check(turns: list) -> list:
+    """Deterministic, zero-cost craft gate. Returns a list of failure reasons (empty = pass).
+    Catches exactly the pacing problems an LLM judge is unreliable at: monologue dumps and
+    one speaker holding the floor too long."""
+    fails = []
+    run = 1
+    for i in range(1, len(turns)):
+        run = run + 1 if turns[i].get("speaker") == turns[i - 1].get("speaker") else 1
+        if run > _QA_MAX_CONSECUTIVE:
+            fails.append(f"{turns[i].get('speaker')} speaks {run} turns in a row (max {_QA_MAX_CONSECUTIVE}) — break it up")
+            break
+    for i, t in enumerate(turns):
+        wc = len((t.get("line") or "").split())
+        if wc > _QA_MAX_WORDS_PER_TURN:
+            fails.append(f"turn {i} is a {wc}-word monologue (max {_QA_MAX_WORDS_PER_TURN}) — make it conversational")
+    return fails
+
+
+def _qa_review(turns: list, rubric: str, ground_truth: str = "") -> tuple:
+    """LLM craft+accuracy judge (Haiku, cheap). Returns (ok, [reasons]). FAIL-OPEN:
+    any judge/infra error returns (True, []) so a flaky judge never blocks a publish —
+    the deterministic safety gates remain the hard floor."""
+    import bedrock_client
+
+    script = "\n".join(f"{t.get('speaker')}: {t.get('line')}" for t in turns)
+    system = (
+        "You are a ruthless podcast script editor doing QA on a draft. Judge ONLY the rubric below. "
+        'Reply with STRICT JSON: {"pass": true|false, "fails": ["short reason", ...]}. No prose, no fences. '
+        "Be strict but fair — flag a rubric item only on a clear miss.\n\nRUBRIC:\n" + rubric
+    )
+    user = (f"GROUND TRUTH (the only facts allowed about the subject):\n{ground_truth}\n\n" if ground_truth else "") + f"SCRIPT:\n{script}"
+    try:
+        body = {"model": MODEL, "max_tokens": 500, "system": system, "messages": [{"role": "user", "content": user}]}
+        resp = bedrock_client.invoke(body, model_name=MODEL)
+        text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()
+        text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
+        verdict = json.loads(text)
+        if verdict.get("pass"):
+            return True, []
+        return False, [str(r) for r in (verdict.get("fails") or ["failed QA rubric"])][:6]
+    except Exception as e:
+        logger.warning("[panel] QA judge unavailable (fail-open): %s", e)
+        return True, []
+
+
+_INTRO_RUBRIC = (
+    "1. Opens on a genuine HOOK in turn 0, not a flat self-introduction.\n"
+    "2. After the opening, it's a real two-person conversation (no long stretch of one person talking).\n"
+    "3. At least one point of GENUINE friction/disagreement — the guest is not just agreeing with the host.\n"
+    "4. The guest names the over-optimization / 'measuring a life instead of living it' RISK himself.\n"
+    "5. No abrupt, unbridged topic jumps.\n"
+    "6. Closes on the series' standing open question (does the tech genuinely make a life better, or theater).\n"
+    "7. ACCURACY: it must NOT assert any specific life event, loss, death, illness, relocation, city, or date about "
+    "the subject that is not in the GROUND TRUTH. Inventing biography is an automatic fail."
+)
+
+
+def _qa_gate(turns: list, rubric: str, ground_truth: str = "") -> list:
+    """Combined craft (deterministic) + LLM-judge gate. Returns all failure reasons (empty = clean)."""
+    return _craft_check(turns) + _qa_review(turns, rubric, ground_truth)[1]
+
+
 def _run_intro(dry_run: bool = False) -> dict:
     bible = _load_bible()
     # Numbers allowed by ER-03 = only those in the bible (it has essentially none →
     # this enforces "no invented numbers"). No elapsed-time/results context is fed.
     allowed = er03_gate.numbers_in(json.dumps(bible))
-    turns = _gate_intro(_build_intro_script(bible), allowed)
-    if len(turns) < 8:
-        logger.warning("[panel] intro: too few clean turns (%d)", len(turns))
-        return {"statusCode": 500, "body": json.dumps({"intro": "too few turns", "turns": len(turns)})}
-    # Launch lock: the LLM won't reliably name Elena in line 1 — prepend a fixed,
-    # warm cold-open so every cut opens with her named self-intro. And enforce "Matt"
-    # (the model occasionally reverts to "Matthew").
-    for t in turns:
-        t["line"] = re.sub(r"\bMatthew\b", "Matt", t["line"])
-    first = (turns[0]["line"] if turns else "").lower()
-    if not ("i'm elena" in first or "i am elena" in first or "elena voss" in first):
-        turns.insert(0, {"speaker": ELENA, "line": INTRO_COLD_OPEN})
+    bio_truth = (bible.get("characters", {}) or {}).get("matthew", "")
+
+    def _candidate():
+        ts = _gate_intro(_build_intro_script(bible), allowed)
+        if len(ts) < 8:
+            return None
+        # Launch lock: enforce "Matt" (the model occasionally reverts to "Matthew") and,
+        # if the LLM didn't name Elena in line 1, prepend the fixed warm cold-open.
+        for t in ts:
+            t["line"] = re.sub(r"\bMatthew\b", "Matt", t["line"])
+        first = ts[0]["line"].lower()
+        if not ("i'm elena" in first or "i am elena" in first or "elena voss" in first):
+            ts.insert(0, {"speaker": ELENA, "line": INTRO_COLD_OPEN})
+        return ts
+
+    # QA retry loop: generate, run the craft + judge gate, re-roll on failure (generation
+    # is non-deterministic, so a re-roll usually clears it). Keep the cleanest candidate.
+    turns, qa_fails = None, ["no candidate generated"]
+    for attempt in range(_QA_MAX_ATTEMPTS):
+        cand = _candidate()
+        if not cand:
+            continue
+        fails = _qa_gate(cand, _INTRO_RUBRIC, bio_truth)
+        if turns is None or len(fails) < len(qa_fails):
+            turns, qa_fails = cand, fails
+        if not fails:
+            logger.info("[panel] intro: clean QA on attempt %d (%d turns)", attempt + 1, len(cand))
+            break
+        logger.info("[panel] intro QA attempt %d/%d failed: %s", attempt + 1, _QA_MAX_ATTEMPTS, fails)
+
+    if turns is None:
+        logger.warning("[panel] intro: no usable candidate after %d attempts", _QA_MAX_ATTEMPTS)
+        return {"statusCode": 500, "body": json.dumps({"intro": "too few turns"})}
+    if qa_fails:
+        logger.warning("[panel] intro: best candidate still has %d QA flag(s): %s", len(qa_fails), qa_fails)
 
     label_of = {ELENA: "Elena", INTRO_GUEST_ID: "Eli"}
     # Dry run: write only the transcript (Bedrock cost only, no Gemini audio) so the
@@ -537,10 +633,18 @@ def _run_intro(dry_run: bool = False) -> dict:
             ContentType="text/plain; charset=utf-8",
             CacheControl="max-age=60, public",
         )
-        logger.info("[panel] intro DRY RUN: %d turns → wk0.draft.transcript.txt (no audio)", len(turns))
+        logger.info("[panel] intro DRY RUN: %d turns → wk0.draft.transcript.txt (no audio); qa_fails=%s", len(turns), qa_fails)
         return {
             "statusCode": 200,
-            "body": json.dumps({"intro": "dry_run", "turns": len(turns), "preview_key": f"{PREFIX}/wk0.draft.transcript.txt"}),
+            "body": json.dumps(
+                {
+                    "intro": "dry_run",
+                    "turns": len(turns),
+                    "qa_pass": not qa_fails,
+                    "qa_fails": qa_fails,
+                    "preview_key": f"{PREFIX}/wk0.draft.transcript.txt",
+                }
+            ),
         }
 
     # Single-pass conversation via Gemini (Elena + Eli genuinely talking).
@@ -959,6 +1063,15 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     guest_name = (beats.get("guest") or {}).get("name", "Coach")
     script = _build_weekly_script(beats, bible)
     turns = script.get("turns") or []
+    # Craft re-roll (cheap, deterministic): if the draft is monologue-y or one speaker
+    # holds the floor too long, re-roll the writer once (generation is non-deterministic).
+    # The editor + safety gate + HOLD below remain the hard floor; this just lifts quality.
+    _cfails = _craft_check(turns)
+    if _cfails:
+        logger.info("[panel] wk%s: craft re-roll — %s", week, _cfails)
+        alt = _build_weekly_script(beats, bible)
+        if (alt.get("turns") or []) and not _craft_check(alt["turns"]):
+            script, turns = alt, alt["turns"]
     if len(turns) < 6:
         if dry_run:
             return _dry(week, "HOLD", stage="writer", reasons=["too few turns"], turns=len(turns))
