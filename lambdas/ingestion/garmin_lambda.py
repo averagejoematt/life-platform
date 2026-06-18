@@ -163,7 +163,9 @@ def _emit_auth_metrics(healthy: int, days_left=None) -> None:
     try:
         data = [{"MetricName": "GarminAuthHealthy", "Dimensions": [{"Name": "Source", "Value": "garmin"}], "Value": float(healthy)}]
         if days_left is not None:
-            data.append({"MetricName": "GarminTokenDaysLeft", "Dimensions": [{"Name": "Source", "Value": "garmin"}], "Value": float(days_left)})
+            data.append(
+                {"MetricName": "GarminTokenDaysLeft", "Dimensions": [{"Name": "Source", "Value": "garmin"}], "Value": float(days_left)}
+            )
         boto3.client("cloudwatch", region_name=REGION).put_metric_data(Namespace="LifePlatform/OAuth", MetricData=data)
     except Exception as e:
         logger.warning(f"Garmin auth-health metric emit failed: {e}")

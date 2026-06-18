@@ -844,7 +844,9 @@ def _email_subscribers(ep: dict, test_to: str = None) -> dict:
             ses.send_email(
                 FromEmailAddress=SENDER,
                 Destination={"ToAddresses": [email]},
-                Content={"Simple": {"Subject": {"Data": subject, "Charset": "UTF-8"}, "Body": {"Html": {"Data": html, "Charset": "UTF-8"}}}},
+                Content={
+                    "Simple": {"Subject": {"Data": subject, "Charset": "UTF-8"}, "Body": {"Html": {"Data": html, "Charset": "UTF-8"}}}
+                },
             )
             sent += 1
         except Exception as e:
@@ -873,9 +875,7 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     # in the CURRENT cycle (dated >= genesis), never the stale pre-reset max-week.
     # ISO dates compare lexically. If none exist yet (before the cycle's first
     # Wednesday chronicle), skip cleanly — the liveness alarm catches a truly silent show.
-    weekly = [
-        p for p in posts if p.get("week") and p.get("week") > 0 and p.get("date") and p["date"] >= EXPERIMENT_START_DATE
-    ]
+    weekly = [p for p in posts if p.get("week") and p.get("week") > 0 and p.get("date") and p["date"] >= EXPERIMENT_START_DATE]
     if not weekly:
         return {"statusCode": 200, "body": json.dumps({"weekly": "no current-cycle weekly chronicle yet"})}
     post = max(weekly, key=lambda x: x["date"])
