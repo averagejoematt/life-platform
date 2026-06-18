@@ -295,6 +295,30 @@ def _write_indexes(episodes: list) -> None:
         ContentType="application/rss+xml; charset=utf-8",
         CacheControl="max-age=3600, public",
     )
+    _invalidate_cdn()
+
+
+# CloudFront distribution serving averagejoematt.com (S3GeneratedOrigin handles /panelcast/*).
+CF_DISTRIBUTION_ID = os.environ.get("CF_DISTRIBUTION_ID", "E3S424OXQZ8NBE")
+
+
+def _invalidate_cdn() -> None:
+    """Invalidate /panelcast/* after publishing so a new episode is live immediately.
+    wk*.wav carries a 24h cache header, so without this the CDN serves the prior cut
+    for up to a day. Fail-open: a publish must never break on a CDN hiccup (the file
+    is already in S3; the cache just expires on its own as a fallback)."""
+    try:
+        cf = boto3.client("cloudfront", region_name=REGION)
+        cf.create_invalidation(
+            DistributionId=CF_DISTRIBUTION_ID,
+            InvalidationBatch={
+                "Paths": {"Quantity": 1, "Items": [f"/{PREFIX}/*"]},
+                "CallerReference": f"panelcast-{datetime.now(timezone.utc).timestamp()}",
+            },
+        )
+        logger.info("[panel] CDN invalidation requested for /%s/*", PREFIX)
+    except Exception as e:
+        logger.warning("[panel] CDN invalidation failed (fail-open, cache expires on its own): %s", e)
 
 
 # ── Episode 0 + series creative spine (event {"intro": true}) ─────────────────
