@@ -411,7 +411,37 @@ REGISTRY = [
     ),
 ]
 
-GROUP_ORDER = ["The body", "Mind & accountability", "Protocol & experiments", "Credibility & the machine"]
+# IA regroup (2026-06-18): the old "Credibility & the machine" held 19 topics (too many
+# for one menu) — split into "How it holds up" (does the science hold up) + "The machine"
+# (how it's built & runs). And the reset-only pages (cycles / post-mortems / survival) move
+# to a footer-tier "The reset log" group — they're for Matt's own record, not readers.
+_REGROUP = {
+    "cycles": "The reset log",
+    "postmortems": "The reset log",
+    "survival": "The reset log",
+    "methodology": "How it holds up",
+    "predictions": "How it holds up",
+    "benchmarks": "How it holds up",
+    "biology": "How it holds up",
+    "wrong": "How it holds up",
+    "results": "How it holds up",
+    "mirror": "How it holds up",
+    "board": "The machine",
+    "build": "The machine",
+    "intelligence": "The machine",
+    "platform": "The machine",
+    "data": "The machine",
+    "pipeline": "The machine",
+    "tools": "The machine",
+    "inference": "The machine",
+    "cost": "The machine",
+    "explorer": "The machine",
+    "ask": "The machine",
+    "kitchen": "The machine",
+}
+REGISTRY = [(s, t, b, _REGROUP.get(s, g), *rest) for (s, t, b, g, *rest) in REGISTRY]
+
+GROUP_ORDER = ["The body", "Mind & accountability", "Protocol & experiments", "How it holds up", "The machine", "The reset log"]
 
 # Authored editorial content (faithful to the preserved legacy + the locked docs).
 EDITORIAL = {
