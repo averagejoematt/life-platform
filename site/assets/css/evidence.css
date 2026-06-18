@@ -125,6 +125,8 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .supp-meter i { display: block; height: 100%; }
 .supp-evpct { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-muted); width: 36px; text-align: right; }
 .supp-meta { margin-top: var(--sp-2); color: var(--ink-faint); text-transform: none; letter-spacing: 0; }
+.supp-ev-link { color: var(--ember); text-decoration: none; border-bottom: 1px solid color-mix(in oklch, var(--ember) 40%, transparent); }
+.supp-ev-link:hover { border-bottom-color: var(--ember); }
 .backed-strong { color: var(--ember); } .backed-strong i, i.backed-strong { background: var(--ember); }
 .backed-some { color: var(--ink-muted); } .backed-some i, i.backed-some { background: var(--ink-muted); }
 .backed-thin { color: var(--ink-faint); } .backed-thin i, i.backed-thin { background: var(--ink-faint); }
