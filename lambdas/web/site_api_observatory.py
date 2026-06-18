@@ -898,9 +898,9 @@ def handle_physical_overview() -> dict:
             "score_360": (
                 {
                     "score": s360.get("score"),
+                    # Privacy: biological_age is fine to publish, but chronological_age and
+                    # biological_age_delta would let a reader back out Matt's true age — omit both.
                     "biological_age": s360.get("biological_age"),
-                    "chronological_age": s360.get("chronological_age"),
-                    "biological_age_delta": s360.get("biological_age_delta"),
                 }
                 if s360
                 else None
