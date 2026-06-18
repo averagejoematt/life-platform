@@ -235,6 +235,29 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
   font-size: var(--fs-quote); line-height: 1.4; color: var(--ink-muted); max-width: var(--measure);
 }
 
+/* Last night → today — readiness from raw vitals (recovery / sleep / HRV /
+   resting-HR). These are wake-date-keyed: they describe last night and set today
+   up — the opposite temporal frame from same-day activity — so the band leads the
+   daily arc, above the "today" pillar domains and below the hub. */
+.readiness { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: var(--border-hair); }
+.rd-night { color: var(--ink-faint); }
+.rd-rows {
+  list-style: none; margin: var(--sp-2) 0 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: var(--sp-4);
+}
+.rd-row { display: flex; flex-direction: column; gap: 2px; }
+.rd-row .label { text-transform: lowercase; color: var(--ink-faint); }
+.rd-val { font-family: var(--font-mono); font-size: var(--fs-data-lg); line-height: 1; color: var(--ink); }
+.rd-val small { color: var(--ink-muted); font-size: var(--fs-label); }
+/* Recovery status colours follow the honesty vocab — low recovery cools toward
+   the ember accent, informative not punitive; never alarm-red. */
+.rd-row.is-yellow .rd-val { color: color-mix(in oklch, var(--ember) 70%, var(--ink)); }
+.rd-row.is-red .rd-val { color: var(--ember); }
+
+/* "today — where you stand" band header, above the pillar domains. */
+.cap-today { margin-top: var(--sp-5); margin-bottom: 0; }
+.cap-today + .domains { margin-top: var(--sp-3); }
+
 /* Tonight's forecast — circadian-compliance (predictive). Reads forward, not
    back; honesty vocab — a "poor" forecast is muted, never alarm-red. */
 .circadian {

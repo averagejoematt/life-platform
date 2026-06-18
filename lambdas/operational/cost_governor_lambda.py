@@ -89,7 +89,18 @@ def _non_ai_daily_series(month_start: datetime, now: datetime) -> list[tuple[str
     Returns [(YYYY-MM-DD, cost), ...]. Both the MTD total (sum all) and the
     trailing-window run-rate (sum the last N days) derive from this single call,
     so adding the trailing projection costs no extra CE request. DAILY end is
-    exclusive, so today's partial day is excluded (same as the prior MTD query)."""
+    exclusive, so today's partial day is excluded (same as the prior MTD query).
+
+    Bedrock is billed under per-MODEL service names — "Claude Haiku 4.5 (Amazon
+    Bedrock Edition)", "Claude Sonnet 4.6 (Amazon Bedrock Edition)" — NOT a service
+    literally named "Amazon Bedrock". The old ``Not Dimensions == "Amazon Bedrock"``
+    filter therefore matched nothing, silently letting Bedrock into the "non-AI"
+    total — which then DOUBLE-COUNTED against the token-based AI estimate added in
+    the handler (observed 2026-06-17: real spend $42.70 MTD, but the governor saw
+    $42.70 non-AI + $25.73 AI = $68.43 → projected $119 → false tier-3 hard cutoff).
+    Fix: group by SERVICE and drop any service whose name contains "bedrock" in code
+    (robust to model-name rotation). AI is metered separately from token metrics
+    because CE Bedrock cost lags 24-48h."""
     start_str = month_start.strftime("%Y-%m-%d")
     end_str = now.strftime("%Y-%m-%d")
     if start_str == end_str:
@@ -99,11 +110,17 @@ def _non_ai_daily_series(month_start: datetime, now: datetime) -> list[tuple[str
             TimePeriod={"Start": start_str, "End": end_str},
             Granularity="DAILY",
             Metrics=["UnblendedCost"],
-            Filter={"Not": {"Dimensions": {"Key": "SERVICE", "Values": ["Amazon Bedrock"]}}},
+            GroupBy=[{"Type": "DIMENSION", "Key": "SERVICE"}],
         )
         out: list[tuple[str, float]] = []
         for r in resp.get("ResultsByTime", []):
-            out.append((r["TimePeriod"]["Start"], float(r["Total"]["UnblendedCost"]["Amount"])))
+            day_total = 0.0
+            for g in r.get("Groups", []):
+                svc = (g.get("Keys") or [""])[0]
+                if "bedrock" in svc.lower():
+                    continue  # AI is metered separately, from token metrics
+                day_total += float(g["Metrics"]["UnblendedCost"]["Amount"])
+            out.append((r["TimePeriod"]["Start"], day_total))
         return out
     except Exception as e:
         logger.warning(f"Cost Explorer daily query failed (non-AI): {e}")

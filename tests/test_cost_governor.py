@@ -117,3 +117,45 @@ def test_projection_short_trailing_window_is_finite(gov):
     divide-by-tiny blow-up."""
     p = gov._project_month_end(mtd=10.0, elapsed_days=1.5, days_in_month=30, non_ai_recent=8.0, ai_recent=2.0, trailing_days=1.5)
     assert 0 < p < 1000
+
+
+# ── _non_ai_daily_series: Bedrock must NOT leak into the non-AI total ─────────
+# Regression for the 2026-06-17 double-count: Bedrock is billed under per-model
+# service names ("Claude Haiku 4.5 (Amazon Bedrock Edition)"), so the old
+# Not==["Amazon Bedrock"] filter matched nothing and Bedrock got counted twice
+# (once in non-AI from CE, once in the token-based AI estimate).
+
+
+class _FakeCE:
+    def __init__(self, payload):
+        self._payload = payload
+        self.last_kwargs = None
+
+    def get_cost_and_usage(self, **kwargs):
+        self.last_kwargs = kwargs
+        return self._payload
+
+
+def test_non_ai_series_excludes_bedrock_edition_services(gov, monkeypatch):
+    from datetime import datetime, timezone
+
+    payload = {
+        "ResultsByTime": [
+            {
+                "TimePeriod": {"Start": "2026-06-10", "End": "2026-06-11"},
+                "Groups": [
+                    {"Keys": ["Claude Haiku 4.5 (Amazon Bedrock Edition)"], "Metrics": {"UnblendedCost": {"Amount": "14.50"}}},
+                    {"Keys": ["Claude Sonnet 4.6 (Amazon Bedrock Edition)"], "Metrics": {"UnblendedCost": {"Amount": "10.11"}}},
+                    {"Keys": ["AmazonCloudWatch"], "Metrics": {"UnblendedCost": {"Amount": "5.68"}}},
+                ],
+            }
+        ]
+    }
+    fake = _FakeCE(payload)
+    monkeypatch.setattr(gov, "_ce", fake)
+    series = gov._non_ai_daily_series(datetime(2026, 6, 1, tzinfo=timezone.utc), datetime(2026, 6, 18, tzinfo=timezone.utc))
+    # Only the non-Bedrock service counts → 5.68, NOT 30.29 (which double-counts AI).
+    assert series == [("2026-06-10", 5.68)]
+    # No brittle exact-name CE filter anymore; we group by SERVICE and drop Bedrock in code.
+    assert "Filter" not in fake.last_kwargs
+    assert fake.last_kwargs.get("GroupBy")

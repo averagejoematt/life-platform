@@ -26,6 +26,22 @@ const isBad = (v) => { if (v == null) return true; const s = String(v).trim(); r
 const has = (v) => v != null && v !== "" && !(Array.isArray(v) && !v.length);
 function fmt(v, d) { if (v == null || v === "") return "—"; const n = Number(v); return Number.isFinite(n) && typeof v !== "boolean" ? (d != null ? n.toFixed(d) : (Number.isInteger(n) ? String(n) : n.toFixed(1))) : esc(v); }
 const ttl = (s) => String(s).replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+// Sleep/recovery are wake-date-keyed: a record dated D describes the night of D-1.
+// Returns a short "Jun 16" label for the night a wake-date reading came from.
+const _MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const fmtShort = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); return m ? `${_MON[+m[2] - 1]} ${+m[3]}` : ""; };
+// Sleep/recovery are wake-date-keyed: a record dated D describes the night of D-1.
+// Returns a short "Jun 16" label for the night a wake-date reading came from.
+function nightOf(wakeIso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(wakeIso || ""));
+  if (!m) return "";
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  d.setUTCDate(d.getUTCDate() - 1);
+  return `${_MON[d.getUTCMonth()]} ${d.getUTCDate()}`;
+}
+// The night a sleep readout came from: the unified record already exposes night_of
+// (the evening date); otherwise derive it from the sleep-detail wake date.
+const lastNightDate = (s, uni) => (uni && uni.night_of) ? fmtShort(uni.night_of) : nightOf(s && s.as_of_date);
 const fig = (v, k, extra) => `<div class="fig"><span class="fig-v num">${esc(v)}</span><span class="fig-k label">${esc(k)}</span>${extra ? `<span class="rd-delta">${esc(extra)}</span>` : ""}</div>`;
 const figs = (a) => `<div class="figs">${a.filter(Boolean).join("")}</div>`;
 const sec = (t, inner) => inner ? `<section class="rd-sec"><h2 class="rd-h">${esc(t)}</h2>${inner}</section>` : "";
@@ -47,8 +63,11 @@ async function renderSleep(d) {
   // circadian-compliance score + the unified cross-wearable sleep record.
   const [circ, uni] = await Promise.all([tryJSON("/api/circadian"), tryJSON("/api/sleep_reconciliation")]);
 
+  // These readings are about LAST NIGHT (wake-date-keyed) and set today up — the
+  // opposite frame from same-day activity. Header it with the night they came from.
+  const lastNightHdr = "Last night" + (lastNightDate(s, uni) ? ` · the night of ${lastNightDate(s, uni)}` : "");
   const detail = Object.values(s).some(has)
-    ? figs([s.sleep_score != null && fig(fmt(s.sleep_score), "sleep score"), s.total_sleep_hours != null && fig(fmt(s.total_sleep_hours, 1), "hours"), s.sleep_efficiency != null && fig(fmt(s.sleep_efficiency) + "%", "efficiency"), s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv), "hrv ms")]) + sec("Stages & physiology", kvtable({ deep_sleep_hours: s.deep_sleep_hours, rem_sleep_hours: s.rem_sleep_hours, whoop_quality: s.whoop_quality, bed_temp_f: s.bed_temp_f })) + sec("Sleep-score trend", lineChart(d.sleep_trend || [], { valueKey: "sleep_score", label: "Sleep score", emptyMsg: "The sleep-score trend fills in nightly." }))
+    ? sec(lastNightHdr, figs([s.sleep_score != null && fig(fmt(s.sleep_score), "sleep score"), s.total_sleep_hours != null && fig(fmt(s.total_sleep_hours, 1), "hours"), s.sleep_efficiency != null && fig(fmt(s.sleep_efficiency) + "%", "efficiency"), s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv), "hrv ms")])) + sec("Stages & physiology", kvtable({ deep_sleep_hours: s.deep_sleep_hours, rem_sleep_hours: s.rem_sleep_hours, whoop_quality: s.whoop_quality, bed_temp_f: s.bed_temp_f })) + sec("Sleep-score trend · latest = last night", lineChart(d.sleep_trend || [], { valueKey: "sleep_score", label: "Sleep score · nightly", emptyMsg: "The sleep-score trend fills in nightly." }))
     : "";
 
   // Circadian compliance — a *forward* score: what tonight's sleep should look
@@ -63,7 +82,7 @@ async function renderSleep(d) {
   let uniSec = "";
   if (uni && uni.available) {
     const srcs = (uni.sources_present || []).map(ttl).join(", ");
-    uniSec = sec("Unified sleep — sources reconciled", figs([uni.total_duration_hours != null && fig(fmt(uni.total_duration_hours, 1), "hours · merged"), uni.recovery_score != null && fig(fmt(uni.recovery_score), "recovery"), uni.hrv_ms != null && fig(fmt(uni.hrv_ms), "hrv ms"), uni.sleep_efficiency_pct != null && fig(fmt(uni.sleep_efficiency_pct) + "%", "efficiency")]) + kvtable({ rem_pct: uni.rem_pct, deep_pct: uni.deep_pct, light_pct: uni.light_pct, awake_pct: uni.awake_pct, respiratory_rate: uni.respiratory_rate, room_temp_c: uni.room_temp_c, bed_temp_c: uni.bed_temp_c }) + (srcs ? `<p class="rd-meta label">merged from ${esc(srcs)} — best source per field</p>` : ""));
+    uniSec = sec("Unified sleep — sources reconciled" + (uni.night_of ? ` · the night of ${fmtShort(uni.night_of)}` : ""), figs([uni.total_duration_hours != null && fig(fmt(uni.total_duration_hours, 1), "hours · merged"), uni.recovery_score != null && fig(fmt(uni.recovery_score), "recovery"), uni.hrv_ms != null && fig(fmt(uni.hrv_ms), "hrv ms"), uni.sleep_efficiency_pct != null && fig(fmt(uni.sleep_efficiency_pct) + "%", "efficiency")]) + kvtable({ rem_pct: uni.rem_pct, deep_pct: uni.deep_pct, light_pct: uni.light_pct, awake_pct: uni.awake_pct, respiratory_rate: uni.respiratory_rate, room_temp_c: uni.room_temp_c, bed_temp_c: uni.bed_temp_c }) + (srcs ? `<p class="rd-meta label">merged from ${esc(srcs)} — best source per field</p>` : ""));
   }
 
   if (!detail && !circSec && !uniSec) return empty("No sleep data yet — score, stages, HRV and recovery appear here nightly.");
@@ -367,9 +386,16 @@ async function renderPulse(d) {
   const ph = await tryJSON("/api/pulse_history"); const hist = (ph && ph.pulse_history) || [];
   const head = `<div class="rd-obs">${p.narrative && !isBad(p.narrative) ? `<p class="rd-primary">${esc(p.narrative)}</p>` : `<p class="rd-primary">Today's pulse is being read.</p>`}<p class="rd-meta label">${[p.date, p.status, p.signals_reporting != null && `${p.signals_reporting}/${p.signals_total} signals reporting`].filter(Boolean).map(esc).join("  ·  ")}</p></div>`;
   const series = (k) => hist.map((h) => ({ date: h.date, value: h[k] })).filter((x) => x.value != null);
-  const trends = [["weight_lbs", "Weight"], ["recovery_pct", "Recovery %"], ["sleep_hours", "Sleep hours"], ["hrv_ms", "HRV ms"], ["steps", "Steps"]]
+  const trendBlock = (defs) => defs
     .map(([k, lbl]) => sec(lbl, lineChart(series(k), { valueKey: "value", label: lbl, emptyMsg: `The ${lbl.toLowerCase()} trend fills in as days accrue.` }))).join("");
-  return head + trends + note("Your live vitals — today's pulse and the daily trend.");
+  // Group by temporal frame: recovery/sleep/HRV are about LAST NIGHT (they set
+  // today up); weight & steps are same-day. Different frames, labelled so a reader
+  // doesn't read last night's recovery as a "today" activity number.
+  const lastNight = trendBlock([["recovery_pct", "Recovery %"], ["sleep_hours", "Sleep hours"], ["hrv_ms", "HRV ms"]]);
+  const today = trendBlock([["weight_lbs", "Weight"], ["steps", "Steps"]]);
+  const frame = (lbl, inner) => `<p class="rd-frame label">${esc(lbl)}</p>${inner}`;
+  return head + frame("Last night → sets up today", lastNight) + frame("Today — measured same-day", today) +
+    note("Your live vitals — recovery/sleep/HRV read last night; weight & steps are today.");
 }
 
 function renderPipeline(d) {
