@@ -126,7 +126,30 @@ async function renderSleep(d) {
   return detail + circSec + uniSec + note("Correlative — last night, the recent trend, and today's behavioural forecast.");
 }
 function renderMind(d) { const m = d.mind || {}; const vices = d.vice_streaks || []; const head = figs([m.journal_entries_30d != null && fig(m.journal_entries_30d, "journal · 30d"), m.mood_entries_count != null && fig(m.mood_entries_count, "mood logs"), m.resist_rate_pct != null && fig(fmt(m.resist_rate_pct) + "%", "temptations resisted"), m.meaningful_pct != null && fig(m.meaningful_pct + "%", "meaningful talk")]); const v = vices.length ? sec("Vice streaks (held)", `<table class="rd-tbl"><tbody>${vices.map((x) => `<tr><td class="rd-name">${esc(ttl(x.name))}</td><td class="num">${fmt(x.current_streak)}d ${x.holding ? "✓" : ""}</td></tr>`).join("")}</tbody></table>`) : ""; if (!head.includes("fig-v") && !v) return empty("No mood / journal / temptation data yet — the inner-life view fills in as you log."); return head + v + note("Correlative — mood, reflection, restraint. Categories kept private."); }
-function renderVices(d) { const v = d.vices || []; if (!v.length) return empty("No vice tracking yet."); return figs([fig(d.total_held ?? 0, "held"), fig(d.total_tracked ?? v.length, "tracked")]) + sec("Streaks", `<table class="rd-tbl"><thead><tr><th>vice</th><th>current</th><th>best</th><th>relapses 90d</th></tr></thead><tbody>${v.map((x) => `<tr class="${x.holding ? "" : "rd-flag"}"><td class="rd-name">${esc(ttl(x.name))}</td><td class="num">${fmt(x.current_streak)}d</td><td class="num rd-range">${fmt(x.best_streak)}d</td><td class="num">${fmt(x.relapses_90d)}</td></tr>`).join("")}</tbody></table>`) + note("Shown honestly — held and broken both. Named privately."); }
+function renderVices(d) {
+  const v = d.vices || [];
+  if (!v.length) return empty("No vice tracking yet.");
+  const MILES = [7, 30, 90, 180, 365];
+  const card = (x) => {
+    const cur = Number(x.current_streak) || 0;
+    const next = MILES.find((m) => m > cur) || cur + 365;
+    const prev = [...MILES].reverse().find((m) => m <= cur) || 0;
+    const pct = Math.max(4, Math.min(100, Math.round(((cur - prev) / (next - prev)) * 100)));
+    return (
+      `<article class="vice-card ${x.holding ? "vice-hold" : "vice-broke"}">` +
+      `<header class="vice-top"><span class="vice-name">${esc(ttl(x.name))}</span><span class="vice-flag label">${x.holding ? "holding" : "reset"}</span></header>` +
+      `<div class="vice-streak"><span class="vice-days num">${cur}</span><span class="vice-unit label">day${cur === 1 ? "" : "s"} clean</span></div>` +
+      `<div class="vice-bar"><i style="width:${pct}%"></i></div>` +
+      `<p class="vice-meta label">${[`next ${next}d`, x.best_streak != null && `best ${fmt(x.best_streak)}d`, x.relapses_90d != null && `${fmt(x.relapses_90d)} resets·90d`].filter(Boolean).join("  ·  ")}</p>` +
+      `</article>`
+    );
+  };
+  return (
+    figs([fig(d.total_held ?? 0, "holding"), fig(d.total_tracked ?? v.length, "tracked")]) +
+    `<div class="vice-grid">${v.map(card).join("")}</div>` +
+    note("Shown honestly — held and broken both. Named privately.")
+  );
+}
 function renderLedger(d) { const t = d.totals || {}; return figs([fig("$" + fmt(t.total_donated_usd), "donated"), fig("$" + fmt(t.total_bounties_usd), "bounties earned"), fig("$" + fmt(t.total_punishments_usd), "punishments"), fig(fmt(t.bounty_count), "bounties")]) + note("Money moved by the accountability rules — skin in the game."); }
 function renderDiscoveries(d) { const hyp = d.active_hypotheses || [], inner = d.inner_life || []; const card = (h, t, b, badge) => `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(t)}</h3>${badge ? `<span class="rd-badge">${esc(badge)}</span>` : ""}</header>${b ? `<p class="rd-why">${esc(b)}</p>` : ""}</article>`; const hs = hyp.length ? sec("Active hypotheses", `<div class="rd-cards">${hyp.map((h) => card(h, h.name, h.hypothesis || h.description, h.evidence_tier)).join("")}</div>`) : ""; const is = inner.length ? sec("Inner-life findings", `<div class="rd-cards">${inner.map((f) => card(f, f.title, f.body, f.confidence)).join("")}</div>`) : ""; if (!hs && !is) return empty("No discoveries logged yet — hypotheses and findings appear here."); return hs + is + note("Correlative leads, not conclusions — each is a hypothesis under test."); }
 function renderGenome(d) { const g = d.genome || d; const rs = g.risk_summary || {}; const cats = g.categories || {}; const head = figs([g.total_snps != null && fig(fmt(g.total_snps), "SNPs analysed"), rs.unfavorable != null && fig(rs.unfavorable, "unfavorable"), rs.favorable != null && fig(rs.favorable, "favorable")]); const cs = Object.keys(cats).length ? sec("Risk by category", kvtable(cats)) : ""; if (!head.includes("fig-v") && !cs) return empty("Genome not yet published."); return head + cs + note("Genotype is predisposition, not destiny — context for the biomarkers."); }
@@ -139,13 +162,15 @@ async function renderChallenges(d) {
   const live = list.filter((c) => c.origin === "live");
   const avail = list.filter((c) => c.origin === "catalog" && c.status === "available");
   const backlog = list.filter((c) => c.origin === "catalog" && c.status === "backlog");
-  const head = figs([fig(sm.active ?? live.length, "active"), fig(avail.length, "available"), fig(backlog.length, "in backlog")]);
+  const head = figs([fig(sm.active ?? live.length, "active"), fig(avail.length + backlog.length, "in the backlog")]);
   const liveCard = (c) => { const done = !!c.completed_at || c.status === "completed"; const active = !done && (c.status === "active" || !!c.activated_at); return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(c.name || ttl(c.challenge_id || "Challenge"))}</h3><span class="rd-badge ${active ? "rd-badge-live" : ""}">${done ? "completed" : active ? "active" : "candidate"}</span></header><p class="rd-meta label">${[c.character_xp_awarded != null && c.character_xp_awarded + " XP", c.badge_earned && "🏅 badge"].filter(Boolean).join("  ·  ")}</p></article>`; };
   const catCard = (c) => `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(c.name)}</h3><span class="rd-badge">${esc(c.status)}</span></header>${c.one_liner ? `<p class="rd-why">${esc(c.one_liner)}</p>` : ""}<p class="rd-meta label">${[c.category, c.difficulty, c.duration_days && c.duration_days + "d"].filter(Boolean).map(esc).join("  ·  ")}</p></article>`;
   const liveSec = sec("Taken on", live.length ? `<div class="rd-cards">${live.map(liveCard).join("")}</div>` : empty("None taken on yet this cycle."));
-  const availSec = avail.length ? sec(`Available now (${avail.length})`, `<div class="rd-cards">${avail.map(catCard).join("")}</div>`) : "";
-  const backSec = backlog.length ? sec(`Backlog (${backlog.length})`, `<div class="rd-cards">${backlog.slice(0, 60).map(catCard).join("")}</div>`) : "";
-  return banner + head + liveSec + availSec + backSec + note("An N=1 instrument — reader participation is deferred.");
+  // "Available now" vs "Backlog" was a distinction without a difference — both are
+  // catalog ideas not yet taken on. One backlog.
+  const candidates = avail.concat(backlog);
+  const backSec = candidates.length ? sec(`Backlog (${candidates.length})`, `<div class="rd-cards">${candidates.slice(0, 80).map(catCard).join("")}</div>`) : "";
+  return banner + head + liveSec + backSec + note("An N=1 instrument — reader participation is deferred.");
 }
 function renderProtocols(d) { const ps = (d.protocols || []).slice().sort((a, b) => (/(active|running|on)/i.test(a.status || "") ? 0 : 1) - (/(active|running|on)/i.test(b.status || "") ? 0 : 1)); if (!ps.length) return empty("No active protocols yet."); return figs([fig(ps.length, "active protocols")]) + `<div class="rd-cards">${ps.map((p) => `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(p.name)}</h3>${p.status ? `<span class="rd-badge">${esc(p.status)}</span>` : ""}</header>${p.why ? `<p class="rd-why">${esc(p.why)}</p>` : ""}${p.mechanism ? `<p class="rd-line"><span class="label">mechanism</span> ${esc(p.mechanism)}</p>` : ""}<p class="rd-meta label">${[p.domain, p.tier && "tier " + esc(p.tier)].filter(Boolean).map(esc).join("  ·  ")}</p></article>`).join("")}</div>` + note("Matthew's deliberate interventions, read-only. Not medical advice."); }
 function renderExperiments(d) {
