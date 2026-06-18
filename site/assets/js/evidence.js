@@ -223,7 +223,22 @@ async function renderHabits(d) {
     const body = order.map((g) => { const hs = habits.filter((h) => (h.group || "Other") === g); if (!hs.length) return ""; return `<h4 class="hb-group label">${esc(g)} <span class="rd-unit">${hs.length}</span></h4><table class="rd-tbl"><tbody>${hs.map((h) => `<tr><td class="rd-name">${esc(h.name)}</td><td class="num rd-range">${esc(h.frequency || "daily")}</td></tr>`).join("")}</tbody></table>`; }).join("");
     list = sec(`Habits I'm tracking (${habits.length})`, body);
   }
-  return head + dow + list + note("Everything I'm trying to do — sourced from Habitify. Private habits are never shown.");
+  // Last 7 days as a day-of-week color grid: green = mostly hit, amber = partial, red = miss.
+  const hist = (d.history || []).slice(-7);
+  const _dl = (ds) => ["S", "M", "T", "W", "T", "F", "S"][new Date(ds + "T00:00:00").getDay()] || "";
+  const _hc = (p) => (p >= 80 ? "hb7-good" : p >= 50 ? "hb7-mid" : "hb7-miss");
+  const grid = hist.length
+    ? sec(
+        "Last 7 days",
+        `<div class="hb7">${hist
+          .map(
+            (h) =>
+              `<div class="hb7-cell ${_hc(h.tier0_pct || 0)}" title="${esc(h.date || "")} · ${fmt(h.tier0_pct)}%"><span class="hb7-dow label">${_dl(h.date || "")}</span><span class="hb7-pct num">${fmt(h.tier0_pct)}</span></div>`,
+          )
+          .join("")}</div>`,
+      )
+    : "";
+  return head + grid + dow + list + note("Everything I'm trying to do — sourced from Habitify. Private habits are never shown.");
 }
 // The board — pick an expert, read their actual per-domain take + track record.
 async function renderBoard(d) {
