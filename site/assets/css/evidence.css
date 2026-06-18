@@ -127,6 +127,18 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .supp-meta { margin-top: var(--sp-2); color: var(--ink-faint); text-transform: none; letter-spacing: 0; }
 .supp-ev-link { color: var(--ember); text-decoration: none; border-bottom: 1px solid color-mix(in oklch, var(--ember) 40%, transparent); }
 .supp-ev-link:hover { border-bottom-color: var(--ember); }
+
+/* Architecture diagram (the "how it's built" page) — hand-authored inline SVG. */
+.arch-fig { margin: var(--sp-4) 0 var(--sp-5); }
+.arch-svg { width: 100%; height: auto; display: block; }
+.arch-svg .ab { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
+.arch-svg .abk { stroke: var(--ember); stroke-width: 1.5; }
+.arch-svg .abg { stroke-dasharray: 3 3; }
+.arch-svg .at { fill: var(--ink); font-size: 13px; font-weight: 600; text-anchor: middle; }
+.arch-svg .as { fill: var(--ink-faint); font-size: 9.5px; text-anchor: middle; }
+.arch-svg .aa { stroke: var(--ink-faint); stroke-width: 1.5; }
+.arch-svg .ad { stroke: var(--ember); stroke-width: 1.2; stroke-dasharray: 4 3; fill: none; }
+.rd-figcap { margin-top: var(--sp-2); color: var(--ink-faint); }
 .backed-strong { color: var(--ember); } .backed-strong i, i.backed-strong { background: var(--ember); }
 .backed-some { color: var(--ink-muted); } .backed-some i, i.backed-some { background: var(--ink-muted); }
 .backed-thin { color: var(--ink-faint); } .backed-thin i, i.backed-thin { background: var(--ink-faint); }
