@@ -222,6 +222,15 @@ class MonitoringStack(Stack):
         # dead/throttled). BREACHING: a full day with no healthy datapoint (all
         # runs skipped/failed, OR the cron stopped entirely) → URGENT. A transient
         # 3h cooldown can't fire it — any healthy run that day makes Max=1.
+        # 2026-06-17: routed URGENT → DIGEST. RCA (logs): Garmin 429-blocks the
+        # server-side OAuth2 refresh-exchange (their 2026 anti-bot crackdown — an
+        # AWS/datacenter-IP block; browser auth from a residential IP still works).
+        # A browser re-auth mints a token good for ~a day, then the Lambda can't
+        # refresh server-side → auth dies again within ~48h. This is a KNOWN,
+        # recurring, Garmin-side condition, not an actionable page — and the core
+        # metrics (sleep, HRV, recovery) are covered by Whoop + Eight Sleep, so
+        # Garmin is a best-effort second source. Keep the signal in the daily
+        # digest; stop urgent-paging on an unfixable expected state.
         _garmin_auth_dead = cloudwatch.Alarm(
             self,
             "GarminAuthUnhealthy",
@@ -238,7 +247,7 @@ class MonitoringStack(Stack):
             comparison_operator=LT,
             treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
         )
-        _garmin_auth_dead.add_alarm_action(cw_actions.SnsAction(topic))
+        _garmin_auth_dead.add_alarm_action(cw_actions.SnsAction(digest))
 
         # Pre-warning: alert ~a week before the OAuth2 refresh token's hard expiry
         # so a browser re-auth is a scheduled 2-min task, not a surprise outage.
