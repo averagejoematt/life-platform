@@ -522,9 +522,8 @@ class OperationalStack(Stack):
         site_api_fn_url_domain = cdk.Fn.select(2, cdk.Fn.split("/", site_api_url.url))
 
         # ADR-036 fix: cap data Lambda concurrency to isolate from AI traffic spikes
-        # NOTE: Account concurrency limit is 10 — too low for reserved concurrency.
-        # Request increase to 50+ via AWS Support, then uncomment:
-        # site_api_fn.node.default_child.add_property_override("ReservedConcurrentExecutions", 5)
+        # 2026-06-17: account concurrency quota raised to 100 (AWS case 177921309700709) — enabled.
+        site_api_fn.node.default_child.add_property_override("ReservedConcurrentExecutions", 5)
 
         # ── 10b. Site API AI Lambda — /api/ask + /api/board_ask (split from site-api for blast radius isolation)
         # Separate Lambda for AI endpoints: sequential Haiku calls can take 3-20s.
@@ -555,9 +554,8 @@ class OperationalStack(Stack):
         )
 
         # Cap AI Lambda concurrency — 2 concurrent is enough for personal site traffic
-        # NOTE: Account concurrency limit is 10 — too low for reserved concurrency.
-        # Request increase to 50+ via AWS Support, then uncomment:
-        # site_api_ai_fn.node.default_child.add_property_override("ReservedConcurrentExecutions", 2)
+        # 2026-06-17: account concurrency quota raised to 100 (AWS case 177921309700709) — enabled.
+        site_api_ai_fn.node.default_child.add_property_override("ReservedConcurrentExecutions", 2)
 
         site_api_ai_url = site_api_ai_fn.add_function_url(
             auth_type=_lambda.FunctionUrlAuthType.NONE,

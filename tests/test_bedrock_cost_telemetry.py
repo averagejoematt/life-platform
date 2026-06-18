@@ -45,7 +45,7 @@ def test_cost_includes_cache_tokens():
     usage = {
         "input_tokens": 0,
         "output_tokens": 0,
-        "cache_read_input_tokens": 1_000_000,   # haiku cache_read $0.10
+        "cache_read_input_tokens": 1_000_000,  # haiku cache_read $0.10
         "cache_creation_input_tokens": 1_000_000,  # haiku cache_write $1.25
     }
     assert abs(bc.estimate_cost_usd(usage, "haiku") - 1.35) < 1e-9

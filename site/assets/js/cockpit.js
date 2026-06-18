@@ -65,19 +65,22 @@ function renderHub(character) {
     }
   }
 
+  // composite_delta_1d is record-over-record (the morning sheet vs the prior
+  // morning sheet), so the honest period label is "since yesterday morning",
+  // not the ambiguous "today".
   const delta = character.composite_delta_1d;
   const mv = bind("movement");
   if (delta != null) {
     const dir = trendOf(delta);
     mv.dataset.dir = dir;
-    mv.textContent = `${MARK[dir]} ${delta > 0 ? "+" : ""}${delta} today`;
+    mv.textContent = `${MARK[dir]} ${delta > 0 ? "+" : ""}${delta} since yesterday morning`;
     mv.hidden = false;
   }
 
   // Honesty: a down/flat composite is shown plainly, never hidden, never red.
   const honest = bind("honest");
   if (delta != null && delta < 0) {
-    honest.textContent = `▼ ${delta} ${state.scope === "week" ? "this week" : "today"} — logged honestly, not hidden.`;
+    honest.textContent = `▼ ${delta} ${state.scope === "week" ? "this week" : "since yesterday morning"} — logged honestly, not hidden.`;
     honest.hidden = false;
   } else {
     honest.hidden = true;
@@ -112,7 +115,9 @@ function rollup(keys) {
 function pillarRow(key) {
   const p = state.pillars[key];
   const score = Math.round(p?.raw_score ?? 0);
-  const dir = trendOf(p?.xp_delta);
+  // score_delta is the day-over-day move (vs yesterday's sheet); prefer it for the
+  // glance arrow so the trend means the same thing the detail spells out.
+  const dir = trendOf(p?.score_delta ?? p?.xp_delta);
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = `row ${dir === "up" ? "up" : dir === "down" ? "dn" : ""}`;
@@ -145,6 +150,45 @@ function renderDomains() {
   }
 }
 
+/* ── Band: last night → today (readiness from raw vitals) ──────────────────────
+   Recovery / sleep / HRV / resting-HR are wake-date-keyed: they describe last
+   night and set today up. Raw readings come straight from snapshot.vitals — no
+   extra fetch. Present-tense (hidden in time-travel, where no raw vitals exist
+   for a past sheet); honest when a reading is absent (the row is just omitted). */
+function fmtNight(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ""));
+  if (!m) return "";
+  const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${MON[+m[2] - 1]} ${+m[3]}`;
+}
+
+function renderReadiness(vitals) {
+  const sec = $("[data-readiness]");
+  if (!sec) return;
+  if (!vitals) { sec.hidden = true; return; }
+
+  const night = fmtNight(vitals.night_of);
+  bind("readiness-night").textContent = night ? ` · the night of ${night}` : "";
+
+  const defs = [
+    { key: "recovery_pct", label: "recovery", unit: "%", status: vitals.recovery_status },
+    { key: "sleep_hours", label: "sleep", unit: "h" },
+    { key: "hrv_ms", label: "HRV", unit: "ms" },
+    { key: "rhr_bpm", label: "resting HR", unit: "bpm" },
+  ];
+  const html = defs
+    .filter((d) => vitals[d.key] != null)
+    .map((d) => {
+      const cls = d.status ? ` is-${escapeHTML(String(d.status))}` : "";
+      return `<li class="rd-row${cls}"><span class="label">${d.label}</span>` +
+        `<span class="rd-val num">${escapeHTML(String(vitals[d.key]))}<small> ${d.unit}</small></span></li>`;
+    })
+    .join("");
+  if (!html) { sec.hidden = true; return; }
+  bind("readinessrows").innerHTML = html;
+  sec.hidden = false;
+}
+
 /* ── in-place pillar disclosure (View Transitions) ───────────────────────── */
 function withTransition(fn) {
   if (document.startViewTransition && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -171,15 +215,17 @@ async function togglePillar(btn, key) {
 
   const read = await loadPillarRead(key);
   const p = state.pillars[key] || {};
-  const dir = trendOf(p.xp_delta);
   const sd = p.score_delta;
-  const sdTxt = (typeof sd === "number" && sd !== 0) ? ` ${sd > 0 ? "▲ +" : "▼ −"}${Math.abs(sd)}` : "";
+  // Day-over-day move, with the period made explicit so the arrow isn't ambiguous.
+  const sdTxt = (typeof sd === "number" && sd !== 0)
+    ? ` · ${sd > 0 ? "▲ +" : "▼ −"}${Math.abs(sd)} since yesterday`
+    : "";
   detail.innerHTML =
     `<p class="pd-read">${read.text}</p>` +
     (read.action ? `<p class="pd-action">→ ${escapeHTML(read.action)}</p>` : "") +
     `<p class="pd-meta">` +
       `<span class="pd-conf">score ${Math.round(p.raw_score ?? 0)}${sdTxt}</span>` +
-      `<span class="pd-conf">trend ${MARK[dir]} ${p.tier || ""}</span>` +
+      `<span class="pd-conf">${p.tier || ""}</span>` +
       `<span class="pd-conf">${read.confidence}</span>` +
     `</p>`;
 }
@@ -253,7 +299,7 @@ async function renderCircadian() {
 }
 
 /* ── Journey scope: level-up timeline + achievements (gamified layer) ──────── */
-const DAILY_SEL = [".dialogue", ".domains", ".band", "[data-circadian]"];
+const DAILY_SEL = [".dialogue", "[data-readiness]", ".cap-today", ".domains", ".band", "[data-circadian]"];
 function showJourney(on) {
   DAILY_SEL.forEach((s) => { const el = $(s); if (el) el.style.display = on ? "none" : ""; });
   if (on) bind("boardline").hidden = true;
@@ -287,7 +333,7 @@ const WEEK_DOMAINS = ["sleep", "training", "nutrition", "glucose", "physical", "
 
 function hideDaily() {
   document.querySelector("[data-journey]").hidden = true;
-  [".domains", ".band", "[data-circadian]"].forEach((s) => { const el = $(s); if (el) el.style.display = "none"; });
+  ["[data-readiness]", ".cap-today", ".domains", ".band", "[data-circadian]"].forEach((s) => { const el = $(s); if (el) el.style.display = "none"; });
   const hr = $(".voice.human"); if (hr) hr.style.display = "none";
   bind("boardline").hidden = true; bind("honest").hidden = true; bind("movement").hidden = true;
 }
@@ -419,6 +465,9 @@ async function load(dateStr) {
       if (!character || !Object.keys(state.pillars).length) throw new Error("no sheet for that date");
       renderHub(character);
       renderDomains();
+      // No raw vitals on the dated /character sheet → the last-night band can't be
+      // honest about a past night, so hide it (like the boardline/forecast).
+      const rd = $("[data-readiness]"); if (rd) rd.hidden = true;
       bind("boardline").hidden = true;
       bind("verdict").innerHTML =
         `<span class="mark">&rsaquo;</span> Time travel — this is the sheet as of <strong>${escapeHTML(character.as_of_date || dateStr)}</strong>. ` +
@@ -446,6 +495,7 @@ async function load(dateStr) {
     if (!character || charBody.error || !pillarList.length) throw new Error("character sheet unavailable");
 
     renderHub(character);
+    renderReadiness(snapV?.vitals?.vitals);  // last night → today; hides itself if no readings
     renderDomains();
     const pri = priority.status === "fulfilled" ? priority.value : null;
     renderVerdict(pri);
@@ -465,6 +515,7 @@ async function load(dateStr) {
     bind("tier").textContent = "";
     bind("day").textContent = "";
     gone(bind("movement")); gone(bind("honest")); gone(bind("boardline"));
+    gone("[data-readiness]"); gone(".cap-today");
     gone(".domains"); gone(".band"); gone(".voice.human"); gone("[data-circadian]");
     bind("verdict").innerHTML = "Today's score hasn't computed yet — the numbers refresh each morning. Check back shortly.";
     $(".panel").setAttribute("aria-busy", "false");

@@ -129,3 +129,59 @@ def test_voice_routing_returns_chirp_voice():
     for spk in ("elena_voss", "training_coach", "labs_coach"):
         v = panel._voice(spk)
         assert v and v.startswith("en-US-Chirp3-HD-")
+
+
+# ── QA rigor: deterministic craft gate (2026-06-17) ──────────────────────────
+
+
+def test_craft_check_passes_clean_dialogue():
+    turns = [
+        {"speaker": "elena_voss", "line": "Here's the hook that got me."},
+        {"speaker": "eli_marsh", "line": "Good place to start."},
+        {"speaker": "elena_voss", "line": "So what is it, plainly?"},
+        {"speaker": "eli_marsh", "line": "One life, fully in the open."},
+    ]
+    assert panel._craft_check(turns) == []
+
+
+def test_craft_check_allows_three_but_flags_four_in_a_row():
+    # Calibrated: 3 short turns reads fine; 4+ is the floor-hog that fails.
+    three = [
+        {"speaker": "elena_voss", "line": "One."},
+        {"speaker": "eli_marsh", "line": "Two."},
+        {"speaker": "eli_marsh", "line": "Three."},
+        {"speaker": "eli_marsh", "line": "Four."},
+    ]
+    assert panel._craft_check(three) == []  # exactly 3 eli in a row — allowed
+    four = three + [{"speaker": "eli_marsh", "line": "Five."}]
+    fails = panel._craft_check(four)
+    assert fails and "in a row" in fails[0]
+
+
+def test_craft_check_flags_monologue_but_exempts_hook():
+    long_line = "word " * (panel._QA_MAX_WORDS_PER_TURN + 5)
+    # A long turn mid-conversation (not turn 0) → flagged.
+    mid = [
+        {"speaker": "elena_voss", "line": "Short open."},
+        {"speaker": "eli_marsh", "line": long_line},
+    ]
+    assert any("monologue" in f for f in panel._craft_check(mid))
+    # The same length as turn 0 (the cold-open hook) is allowed (under the hook ceiling).
+    hook = [
+        {"speaker": "elena_voss", "line": long_line},
+        {"speaker": "eli_marsh", "line": "Reply."},
+    ]
+    assert panel._craft_check(hook) == []
+
+
+def test_qa_review_fails_open_on_judge_error(monkeypatch):
+    # If the judge/Bedrock blows up, QA must NOT block a publish (deterministic
+    # safety gates are the hard floor) — returns (True, []).
+    import bedrock_client
+
+    def _boom(*a, **k):
+        raise RuntimeError("bedrock down")
+
+    monkeypatch.setattr(bedrock_client, "invoke", _boom)
+    ok, fails = panel._qa_review([{"speaker": "elena_voss", "line": "hi"}], "1. anything")
+    assert ok is True and fails == []

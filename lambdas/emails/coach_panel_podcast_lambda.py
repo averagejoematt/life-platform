@@ -354,10 +354,13 @@ CONVO_DIRECTIVE = (
     "hard — some turns are one word, some are a paragraph. No bracketed stage directions (no '[laughs]'); put the warmth in the words."
 )
 # Deterministic cold open — guarantees Episode 0 starts with Elena's named self-intro
-# (the LLM keeps preferring a punchy hook over literally naming herself).
+# (the LLM keeps preferring a punchy hook over literally naming herself). Doubles as
+# the universal hook: a capable person who knows how, has done it, and watches it slip.
 INTRO_COLD_OPEN = (
-    "I'm Elena Voss. I'm the journalist embedded in this experiment — equal parts skeptical and hopeful, "
-    "here to document, honestly and from the inside, whether all this technology can actually change one real life."
+    "Here's the part that got me. This is someone who already knows how to do it — he's been in the best shape of his "
+    "life, more than once. He's not missing the information. And he's watched it slip anyway. I'm Elena Voss, the "
+    "journalist living inside this experiment, and that's the question I couldn't put down: if you know exactly what "
+    "to do, why doesn't that save you — and can a wall of AI and sensors finally catch the thing willpower keeps missing?"
 )
 
 
@@ -397,15 +400,32 @@ def _build_intro_script(bible: dict) -> list:
         f"TONE: {bible.get('tone', '')}\n\n"
         f"FOLLOW THIS ARC, IN ORDER:\n{arc}\n\n"
         "NON-NEGOTIABLE REQUIREMENTS:\n"
-        "  - Elena's VERY FIRST line must include the words \"I'm Elena Voss\" and a sentence on who she is and why she's drawn "
-        "to this — she speaks first, alone, before the guest is introduced or speaks.\n"
-        "  - Before any hardship, Elena must establish WHO Matt is and why a complete STRANGER should care about him — an "
-        "ordinary person who has done this before and genuinely succeeded (the high), so the fall lands. Meet the person and "
-        "the stakes FIRST; do NOT open his section on the grief.\n"
-        "  - THEN his honest story, IN THIS episode: the weight was the symptom not the problem, the coping mechanism, and "
-        "'can a system catch what willpower can't?'. Do NOT defer it to a future episode.\n"
+        "  - OPEN ON A HOOK, not an introduction. Elena's very first line is a genuine grab — the universal tension at the "
+        "heart of this: a capable person who already KNOWS how to do it, has done it, and watches it slip anyway. Land that "
+        'before anything administrative. Her first line must still include "I\'m Elena Voss" and who she is, woven INTO the '
+        "hook (not a flat 'My name is...'). She speaks first, alone, before the guest.\n"
+        "  - REAL TENSION, not mutual agreement. Eli must NAME THE RISK HIMSELF, unprompted, in his own words — say out loud "
+        "that this could curdle into over-optimization theater, quantifying a life instead of living it — BEFORE Elena raises "
+        "it; he's a scientist who states the failure mode plainly, then says why he still thinks it's worth doing. Elena pushes "
+        "harder, not softer ('that's the thing I'm most worried about', 'convince me this isn't just a beautiful dashboard'). "
+        "At least one real point of friction where they don't fully agree. Warm, but no sales pitch and no easy consensus.\n"
+        "  - PACING (this is a trailer, every second earns its place): get into genuine back-and-forth FAST. After Elena's "
+        "opening hook, NO speaker gets more than 2 turns in a row — break long explanations by having the other person cut in, "
+        "react, or ask. Cut filler. Favour short, vivid, QUOTABLE lines someone would screenshot over long paragraphs.\n"
+        "  - Before the harder material, Elena must establish WHO Matt is and why a complete STRANGER should care about him — an "
+        "ordinary, technical, curious person who has done this before and genuinely succeeded (the high). Meet the person and the "
+        "stakes FIRST.\n"
+        "  - THEN his honest story, IN THIS episode, told as a SMOOTH continuation (NEVER an abrupt topic jump — Elena bridges "
+        "into it): he's consistent until something disrupts the routine and the old habits return; the weight was the symptom, "
+        "not the problem; and 'can a system catch what willpower alone misses?'. Do NOT defer it to a future episode. Do NOT "
+        "invent specific events, losses, deaths, illnesses, relocations, or dates — use only the character note and keep it to "
+        "the general pattern.\n"
         "  - Elena must mention that she writes a WEEKLY chronicle and that this podcast runs alongside it.\n"
-        "  - Work in the platform doors (Cockpit / Story / Evidence / Sources / Character) naturally.\n\n"
+        "  - The platform doors (Cockpit / Story / Evidence / Sources / Character) must be WOVEN INTO THE DIALOGUE one at a "
+        "time, each surfacing naturally from something Eli or Elena just said — NEVER delivered as one listed tour or a single "
+        "monologue. If a door doesn't come up organically, drop it rather than force a list.\n"
+        "  - CLOSE on the series' standing open question — the bet this whole show is settling, that every future episode "
+        f"moves the needle on: {bible.get('series_question', bible.get('thesis', ''))} Frame it as the reason to come back.\n\n"
         f"HARD GUARDRAILS (breaking any of these ruins the episode):\n{guards}\n\n"
         'OUTPUT: ONLY a JSON array of turns [{"speaker":"elena"|"eli","line":"..."}], 20–28 turns. '
         "No preamble, no stage directions, no JSON fences."
@@ -486,27 +506,166 @@ def _seed_series_state(bible: dict, ep: dict) -> None:
     )
 
 
-def _run_intro() -> dict:
+# ── QA rigor (automates the manual review loop, 2026-06-17) ───────────────────
+# Two layers on top of the ER-03 + Compassion gates, both catching CRAFT/accuracy
+# problems those deterministic safety gates can't see (monologue dumps, no tension,
+# invented biography, abrupt flow). A generator that fails QA is RE-ROLLED up to
+# _QA_MAX_ATTEMPTS times (generation is non-deterministic, so a re-roll usually
+# fixes it); the best candidate is kept. See the 2026-06-17 handover.
+_QA_MAX_ATTEMPTS = int(os.environ.get("PANEL_QA_MAX_ATTEMPTS", "3"))
+_QA_MAX_WORDS_PER_TURN = 130  # a turn longer than this reads as a monologue, not dialogue
+_QA_HOOK_MAX_WORDS = 180  # turn 0 is the cold-open hook — a solo turn by design, allowed to run longer
+_QA_MAX_CONSECUTIVE = 3  # 4+ turns from one speaker is a floor-hog; 3 short turns reads fine (calibrated 2026-06-17)
+
+
+def _craft_check(turns: list) -> list:
+    """Deterministic, zero-cost craft gate. Returns a list of failure reasons (empty = pass).
+    Catches exactly the pacing problems an LLM judge is unreliable at: monologue dumps and
+    one speaker holding the floor too long. Calibrated 2026-06-17: 4+ consecutive turns is the
+    real floor-hog (3 short turns reads fine), and turn 0 is the intentional solo cold-open hook
+    (a longer ceiling, not the dialogue cap)."""
+    fails = []
+    run = 1
+    for i in range(1, len(turns)):
+        run = run + 1 if turns[i].get("speaker") == turns[i - 1].get("speaker") else 1
+        if run > _QA_MAX_CONSECUTIVE:
+            fails.append(f"{turns[i].get('speaker')} speaks {run} turns in a row (max {_QA_MAX_CONSECUTIVE}) — break it up")
+            break
+    for i, t in enumerate(turns):
+        wc = len((t.get("line") or "").split())
+        cap = _QA_HOOK_MAX_WORDS if i == 0 else _QA_MAX_WORDS_PER_TURN
+        if wc > cap:
+            label = "cold-open hook" if i == 0 else "monologue"
+            fails.append(f"turn {i} is a {wc}-word {label} (max {cap}) — make it conversational")
+    return fails
+
+
+def _qa_review(turns: list, rubric: str, ground_truth: str = "") -> tuple:
+    """LLM craft+accuracy judge (Haiku, cheap). Returns (ok, [reasons]). FAIL-OPEN:
+    any judge/infra error returns (True, []) so a flaky judge never blocks a publish —
+    the deterministic safety gates remain the hard floor."""
+    import bedrock_client
+
+    script = "\n".join(f"{t.get('speaker')}: {t.get('line')}" for t in turns)
+    system = (
+        "You are a ruthless podcast script editor doing QA on a draft. Judge ONLY the rubric below. "
+        'Reply with STRICT JSON: {"pass": true|false, "fails": ["short reason", ...]}. No prose, no fences. '
+        "Be strict but fair — flag a rubric item only on a clear miss.\n\nRUBRIC:\n" + rubric
+    )
+    user = (f"GROUND TRUTH (the only facts allowed about the subject):\n{ground_truth}\n\n" if ground_truth else "") + f"SCRIPT:\n{script}"
+    try:
+        body = {"model": MODEL, "max_tokens": 500, "system": system, "messages": [{"role": "user", "content": user}]}
+        resp = bedrock_client.invoke(body, model_name=MODEL)
+        text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()
+        text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
+        verdict = json.loads(text)
+        if verdict.get("pass"):
+            return True, []
+        return False, [str(r) for r in (verdict.get("fails") or ["failed QA rubric"])][:6]
+    except Exception as e:
+        logger.warning("[panel] QA judge unavailable (fail-open): %s", e)
+        return True, []
+
+
+_INTRO_RUBRIC = (
+    "The two speakers are ELENA VOSS (the host — an embedded journalist) and DR. ELI MARSH (the guest — the "
+    "Principal Investigator who built the platform). MATT is the third-person SUBJECT of the experiment; he is NOT "
+    "in the room and does NOT speak. These three are ESTABLISHED show personas — never treat Elena or Eli as invented.\n"
+    "1. Opens on a genuine HOOK in turn 0, not a flat self-introduction.\n"
+    "2. After the opening, it's a real two-person conversation (no long stretch of one person talking).\n"
+    "3. At least one point of GENUINE friction/disagreement — Eli is not just agreeing with Elena throughout.\n"
+    "4. Dr. Eli Marsh (the PI) names the over-optimization / 'measuring a life instead of living it' RISK himself, in his own words.\n"
+    "5. No abrupt, unbridged topic jumps.\n"
+    "6. Closes on the series' standing open question (does the tech genuinely make a life better, or theater).\n"
+    "7. ACCURACY — applies ONLY to MATT (the subject): the script must not assert any specific life event, loss, "
+    "death, illness, relocation, city, or date about MATT that isn't in the GROUND TRUTH. Do NOT flag the names, "
+    "titles, or roles of Elena Voss or Dr. Eli Marsh — they are real show personas, not inventions. Only invented "
+    "facts about MATT fail this item."
+)
+
+
+def _qa_gate(turns: list, rubric: str, ground_truth: str = "") -> list:
+    """Combined craft (deterministic) + LLM-judge gate. Returns all failure reasons (empty = clean)."""
+    return _craft_check(turns) + _qa_review(turns, rubric, ground_truth)[1]
+
+
+def _run_intro(dry_run: bool = False) -> dict:
     bible = _load_bible()
     # Numbers allowed by ER-03 = only those in the bible (it has essentially none →
     # this enforces "no invented numbers"). No elapsed-time/results context is fed.
     allowed = er03_gate.numbers_in(json.dumps(bible))
-    turns = _gate_intro(_build_intro_script(bible), allowed)
-    if len(turns) < 8:
-        logger.warning("[panel] intro: too few clean turns (%d)", len(turns))
-        return {"statusCode": 500, "body": json.dumps({"intro": "too few turns", "turns": len(turns)})}
-    # Launch lock: the LLM won't reliably name Elena in line 1 — prepend a fixed,
-    # warm cold-open so every cut opens with her named self-intro. And enforce "Matt"
-    # (the model occasionally reverts to "Matthew").
-    for t in turns:
-        t["line"] = re.sub(r"\bMatthew\b", "Matt", t["line"])
-    first = (turns[0]["line"] if turns else "").lower()
-    if not ("i'm elena" in first or "i am elena" in first or "elena voss" in first):
-        turns.insert(0, {"speaker": ELENA, "line": INTRO_COLD_OPEN})
+    _chars = bible.get("characters", {}) or {}
+    bio_truth = (
+        "MATT — the experiment's SUBJECT, the ONLY person whose biographical facts are constrained:\n"
+        + _chars.get("matthew", "")
+        + "\n\nESTABLISHED show personas (NOT Matt, NOT inventions — never flag their names/roles): "
+        "Elena Voss (host, embedded journalist); Dr. Eli Marsh (guest, the Principal Investigator who runs the AI coach team)."
+    )
+
+    def _candidate():
+        ts = _gate_intro(_build_intro_script(bible), allowed)
+        if len(ts) < 8:
+            return None
+        # Launch lock: enforce "Matt" (the model occasionally reverts to "Matthew") and,
+        # if the LLM didn't name Elena in line 1, prepend the fixed warm cold-open.
+        for t in ts:
+            t["line"] = re.sub(r"\bMatthew\b", "Matt", t["line"])
+        first = ts[0]["line"].lower()
+        if not ("i'm elena" in first or "i am elena" in first or "elena voss" in first):
+            ts.insert(0, {"speaker": ELENA, "line": INTRO_COLD_OPEN})
+        return ts
+
+    # QA retry loop: generate, run the craft + judge gate, re-roll on failure (generation
+    # is non-deterministic, so a re-roll usually clears it). Keep the cleanest candidate.
+    turns, qa_fails = None, ["no candidate generated"]
+    for attempt in range(_QA_MAX_ATTEMPTS):
+        cand = _candidate()
+        if not cand:
+            continue
+        fails = _qa_gate(cand, _INTRO_RUBRIC, bio_truth)
+        if turns is None or len(fails) < len(qa_fails):
+            turns, qa_fails = cand, fails
+        if not fails:
+            logger.info("[panel] intro: clean QA on attempt %d (%d turns)", attempt + 1, len(cand))
+            break
+        logger.info("[panel] intro QA attempt %d/%d failed: %s", attempt + 1, _QA_MAX_ATTEMPTS, fails)
+
+    if turns is None:
+        logger.warning("[panel] intro: no usable candidate after %d attempts", _QA_MAX_ATTEMPTS)
+        return {"statusCode": 500, "body": json.dumps({"intro": "too few turns"})}
+    if qa_fails:
+        logger.warning("[panel] intro: best candidate still has %d QA flag(s): %s", len(qa_fails), qa_fails)
+
+    label_of = {ELENA: "Elena", INTRO_GUEST_ID: "Eli"}
+    # Dry run: write only the transcript (Bedrock cost only, no Gemini audio) so the
+    # script can be read and approved BEFORE we spend a voicing pass. The live wk0.*
+    # audio/episode are left untouched.
+    if dry_run:
+        preview = "\n\n".join(f"{label_of.get(t['speaker'], 'Elena')}: {t['line']}" for t in turns)
+        s3.put_object(
+            Bucket=S3_BUCKET,
+            Key=f"{PREFIX}/wk0.draft.transcript.txt",
+            Body=preview.encode("utf-8"),
+            ContentType="text/plain; charset=utf-8",
+            CacheControl="max-age=60, public",
+        )
+        logger.info("[panel] intro DRY RUN: %d turns → wk0.draft.transcript.txt (no audio); qa_fails=%s", len(turns), qa_fails)
+        return {
+            "statusCode": 200,
+            "body": json.dumps(
+                {
+                    "intro": "dry_run",
+                    "turns": len(turns),
+                    "qa_pass": not qa_fails,
+                    "qa_fails": qa_fails,
+                    "preview_key": f"{PREFIX}/wk0.draft.transcript.txt",
+                }
+            ),
+        }
+
     # Single-pass conversation via Gemini (Elena + Eli genuinely talking).
     import gemini_tts
 
-    label_of = {ELENA: "Elena", INTRO_GUEST_ID: "Eli"}
     label_turns = [{"speaker": label_of.get(t["speaker"], "Elena"), "line": t["line"]} for t in turns]
     audio = gemini_tts.synthesize_dialogue(label_turns, INTRO_GEMINI_VOICES, INTRO_STYLE)
     s3.put_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/wk0.wav", Body=audio, ContentType="audio/wav", CacheControl="max-age=86400, public")
@@ -517,6 +676,25 @@ def _run_intro() -> dict:
         Key=f"{PREFIX}/wk0.transcript.txt",
         Body=transcript.encode("utf-8"),
         ContentType="text/plain; charset=utf-8",
+        CacheControl="max-age=300, public",
+    )
+    # Structured transcript for the on-page reader (speaker-attributed turns + the
+    # host's questions as in-page chapter anchors). No audio timestamps exist
+    # (single-pass Gemini), so chapters jump within the transcript, not the audio.
+    _name_of = {ELENA: "Elena", INTRO_GUEST_ID: "Dr. Eli Marsh"}
+    s3.put_object(
+        Bucket=S3_BUCKET,
+        Key=f"{PREFIX}/wk0.transcript.json",
+        Body=json.dumps(
+            {
+                "week": 0,
+                "title": "Episode 0 — Welcome to The Measured Life",
+                "byline": "Elena + Dr. Eli Marsh",
+                "turns": [{"speaker": t["speaker"], "name": _name_of.get(t["speaker"], "Elena"), "line": t["line"]} for t in turns],
+            },
+            ensure_ascii=False,
+        ).encode("utf-8"),
+        ContentType="application/json; charset=utf-8",
         CacheControl="max-age=300, public",
     )
     try:
@@ -532,6 +710,7 @@ def _run_intro() -> dict:
         "duration_sec": max(1, (len(audio) - 44) // (gemini_tts.SAMPLE_RATE * 2)),  # WAV: 16-bit mono PCM
         "byline": "Elena + Dr. Eli Marsh",
         "excerpt": "Meet Elena, meet Matt, and meet the question this whole experiment is built to answer: can AI and your own data actually make a life better — or is it just over-optimization? The starting line.",
+        "transcript_url": "/panelcast/wk0.transcript.json",
     }
     existing = [e for e in existing if e.get("week") != 0] + [ep]
     existing.sort(key=lambda e: e.get("week", 0), reverse=True)
@@ -844,7 +1023,9 @@ def _email_subscribers(ep: dict, test_to: str = None) -> dict:
             ses.send_email(
                 FromEmailAddress=SENDER,
                 Destination={"ToAddresses": [email]},
-                Content={"Simple": {"Subject": {"Data": subject, "Charset": "UTF-8"}, "Body": {"Html": {"Data": html, "Charset": "UTF-8"}}}},
+                Content={
+                    "Simple": {"Subject": {"Data": subject, "Charset": "UTF-8"}, "Body": {"Html": {"Data": html, "Charset": "UTF-8"}}}
+                },
             )
             sent += 1
         except Exception as e:
@@ -873,9 +1054,7 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     # in the CURRENT cycle (dated >= genesis), never the stale pre-reset max-week.
     # ISO dates compare lexically. If none exist yet (before the cycle's first
     # Wednesday chronicle), skip cleanly — the liveness alarm catches a truly silent show.
-    weekly = [
-        p for p in posts if p.get("week") and p.get("week") > 0 and p.get("date") and p["date"] >= EXPERIMENT_START_DATE
-    ]
+    weekly = [p for p in posts if p.get("week") and p.get("week") > 0 and p.get("date") and p["date"] >= EXPERIMENT_START_DATE]
     if not weekly:
         return {"statusCode": 200, "body": json.dumps({"weekly": "no current-cycle weekly chronicle yet"})}
     post = max(weekly, key=lambda x: x["date"])
@@ -900,6 +1079,15 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     guest_name = (beats.get("guest") or {}).get("name", "Coach")
     script = _build_weekly_script(beats, bible)
     turns = script.get("turns") or []
+    # Craft re-roll (cheap, deterministic): if the draft is monologue-y or one speaker
+    # holds the floor too long, re-roll the writer once (generation is non-deterministic).
+    # The editor + safety gate + HOLD below remain the hard floor; this just lifts quality.
+    _cfails = _craft_check(turns)
+    if _cfails:
+        logger.info("[panel] wk%s: craft re-roll — %s", week, _cfails)
+        alt = _build_weekly_script(beats, bible)
+        if (alt.get("turns") or []) and not _craft_check(alt["turns"]):
+            script, turns = alt, alt["turns"]
     if len(turns) < 6:
         if dry_run:
             return _dry(week, "HOLD", stage="writer", reasons=["too few turns"], turns=len(turns))
@@ -1036,9 +1224,10 @@ def lambda_handler(event, context):
             return {"statusCode": 500, "body": json.dumps({"notify_test": "failed", "error": str(e)[:200]})}
 
     # Episode 0 — the full welcome/trailer (all coaches + Elena). One-off / manual.
+    # {"intro": true, "dry_run": true} writes only the draft transcript (no audio) for review.
     if event.get("intro"):
         try:
-            return _run_intro()
+            return _run_intro(dry_run=bool(event.get("dry_run")))
         except Exception as e:
             logger.error("[panel] intro failed — %s", e)
             return {"statusCode": 500, "body": json.dumps({"intro": "failed", "error": str(e)[:200]})}

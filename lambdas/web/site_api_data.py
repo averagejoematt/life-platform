@@ -1584,6 +1584,9 @@ def handle_circadian() -> dict:
         {
             "available": True,
             "date": item.get("date"),
+            # Temporal frame (additive): this is a forward-looking forecast of how
+            # tonight's sleep will turn out given today's behaviours — not a measurement.
+            "frame": "tonight",
             "score": item.get("score"),
             "category": item.get("category"),
             "prescription": item.get("prescription"),
@@ -1620,6 +1623,16 @@ def handle_sleep_reconciliation() -> dict:
             data["source_map"] = json.loads(sm)
         except (json.JSONDecodeError, TypeError):
             data.pop("source_map", None)
+
+    # Temporal frame (additive): the unified record is wake-date-keyed (stored under
+    # the morning it sets up). The sleep it describes happened the night before, so
+    # night_of = the record's date - 1 day. Lets the front-end say "the night of X".
+    data["frame"] = "last_night"
+    _date = item.get("date") or str(item.get("sk", "")).replace("DATE#", "")[:10]
+    try:
+        data["night_of"] = (datetime.strptime(_date[:10], "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+    except Exception:
+        data["night_of"] = None
 
     data["available"] = True
     return _ok(data, cache_seconds=900)

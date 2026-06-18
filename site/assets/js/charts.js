@@ -45,13 +45,18 @@ export function lineChart(data, { valueKey = "value", dateKey = "date", goal = n
   const delta = last.v - pts[0].v;
   const dir = Math.abs(delta) < (max - min) * 0.02 ? "holding flat" : (delta > 0 ? "trending up" : "trending down");
   const _r = (n) => (Math.round(n * 10) / 10);
-  const summary = `${label || "Trend"}: ${pts.length} readings, latest ${_r(last.v)}${unit}, ${dir}${goal != null ? `, goal ${_r(Number(goal))}${unit}` : ""}.`;
+  // Date range, when the points carry dates — gives the trend a time axis in the
+  // caption so a reader can see WHICH days a line covers (the rightmost dot is the
+  // latest reading). Silently omitted for dateless numeric series.
+  const _short = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); if (!m) return ""; return `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][+m[2] - 1]} ${+m[3]}`; };
+  const _span = (pts[0].d && last.d) ? `${_short(pts[0].d)}–${_short(last.d)}` : "";
+  const summary = `${label || "Trend"}: ${pts.length} readings${_span ? `, ${_span}` : ""}, latest ${_r(last.v)}${unit}, ${dir}${goal != null ? `, goal ${_r(Number(goal))}${unit}` : ""}.`;
   const goalLine = goal != null ? `<line class="chart-goal" x1="${P}" y1="${y(Number(goal)).toFixed(1)}" x2="${W - P}" y2="${y(Number(goal)).toFixed(1)}" vector-effect="non-scaling-stroke"/>` : "";
   return `<figure class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}">` +
     `<path class="chart-fill" d="${area}"/>${goalLine}` +
     `<path class="chart-line" d="${line}" vector-effect="non-scaling-stroke"/>` +
     `<circle class="chart-dot" cx="${x(pts.length - 1).toFixed(1)}" cy="${y(last.v).toFixed(1)}" r="3.5"/></svg>` +
-    `<figcaption class="chart-cap label">${escAttr(label)}${goal != null ? ` · goal ${escAttr(goal)}${escAttr(unit)}` : ""} · ${pts.length} pts</figcaption></figure>`;
+    `<figcaption class="chart-cap label">${escAttr(label)}${goal != null ? ` · goal ${escAttr(goal)}${escAttr(unit)}` : ""}${_span ? ` · ${escAttr(_span)}` : ""} · ${pts.length} pts</figcaption></figure>`;
 }
 
 // Tiny inline sparkline (no axes/caption). values: [numbers].

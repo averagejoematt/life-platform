@@ -111,6 +111,16 @@ def handle_vitals() -> dict:
     # DPR-1.20: Page freshness for nav badges
     _today_iso = datetime.now(timezone.utc).isoformat()
     _as_of = latest.get("sk", "").replace("DATE#", "") if latest else today
+    # Temporal frame: sleep/recovery/HRV/RHR are wake-date-keyed (stored under the
+    # morning they set up). The reading came from the night BEFORE that morning, so
+    # night_of = as_of - 1 day. Surfacing this lets the front-end say "the night of
+    # <night_of>" precisely, even when the latest record lags a day or two. (Weight,
+    # by contrast, is same-day "today" — see weight_as_of.)
+    _night_of = None
+    try:
+        _night_of = (datetime.strptime(_as_of[:10], "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+    except Exception:
+        _night_of = None
     page_freshness = {
         "/live": _today_iso,
         "/character": _today_iso,
@@ -138,6 +148,11 @@ def handle_vitals() -> dict:
                 "recovery_status": recovery_status,
                 "sleep_hours": round(float(latest.get("sleep_duration_hours", 0)), 1) if latest.get("sleep_duration_hours") else None,
                 "as_of_date": _as_of,
+                # Temporal frame (additive): recovery/sleep/hrv/rhr are about last
+                # night and set up the as_of_date morning; weight (weight_as_of) is
+                # same-day. night_of is the evening those readings came from.
+                "frame": "last_night",
+                "night_of": _night_of,
             },
             "page_freshness": page_freshness,
         },

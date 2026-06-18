@@ -155,6 +155,8 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .rd-line .label { display: inline; margin-right: var(--sp-2); }
 .rd-line.rd-up .label { color: var(--ember); } .rd-line.rd-down .label { color: var(--ink-muted); }
 .rd-meta { margin-top: var(--sp-3); color: var(--ink-faint); text-transform: none; letter-spacing: 0; }
+/* Temporal-frame header above a group of trends (last-night vs same-day). */
+.rd-frame { margin: var(--sp-5) 0 var(--sp-2); color: var(--ember); text-transform: lowercase; letter-spacing: 0.02em; }
 
 /* Habits day-of-week chart */
 .hb-chart { display: flex; align-items: flex-end; gap: var(--sp-2); height: 120px; }
