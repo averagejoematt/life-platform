@@ -515,6 +515,18 @@ def _compute_base(
         # (ai-keys secret kept for now; vestigial post-migration since Bedrock
         # uses IAM auth, but harmless and eases rollback.)
         stmts.append(_bedrock_statement())
+        # G1 (PR #142): bedrock_client.invoke() now emits per-feature token +
+        # EstimatedCostUSD metrics at the single chokepoint, so EVERY AI-calling
+        # role needs PutMetricData. Without it the emit fails AccessDenied (fail-
+        # open → log spam) and the cost telemetry is silently dropped for that
+        # feature — observed on ai-expert-analyzer. PutMetricData only accepts "*".
+        stmts.append(
+            iam.PolicyStatement(
+                sid="AICostMetrics",
+                actions=["cloudwatch:PutMetricData"],
+                resources=["*"],
+            )
+        )
     if needs_ses:
         stmts.append(
             iam.PolicyStatement(
@@ -857,7 +869,9 @@ def email_coach_panel_podcast() -> list[iam.PolicyStatement]:
         extra_statements=[
             iam.PolicyStatement(sid="ChroniclePostsRead", actions=["s3:GetObject"], resources=[f"{BUCKET_ARN}/site/chronicle/posts.json"]),
             # Loud HOLD + new-episode notify: SNS to life-platform-alerts.
-            iam.PolicyStatement(sid="HoldAlertSNS", actions=["sns:Publish"], resources=[f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"]),
+            iam.PolicyStatement(
+                sid="HoldAlertSNS", actions=["sns:Publish"], resources=[f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"]
+            ),
             # Publish heartbeat metric — the "show went silent" alarm watches for its absence.
             iam.PolicyStatement(sid="PublishedMetric", actions=["cloudwatch:PutMetricData"], resources=["*"]),
         ],

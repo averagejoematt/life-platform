@@ -99,6 +99,10 @@ def put_versioned(ir: RoutineSpec) -> RoutineSpec:
             "archetype": ir.archetype,
             "variant": ir.variant,
             "status": ir.status,
+            # Hevy routine id (set once the routine is pushed) — lets routine_title
+            # resolve a performed workout's type by the EXACT routine it came from
+            # (workout.hevy_routine_id), not just nearest-date. Empty until commit.
+            "hevy_routine_id": ir.hevy_routine_id or "",
         }
     )
     return ir

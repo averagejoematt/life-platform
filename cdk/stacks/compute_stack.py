@@ -94,7 +94,13 @@ class ComputeStack(Stack):
             handler="intelligence.ai_expert_analyzer_lambda.lambda_handler",
             source_file="lambdas/intelligence/ai_expert_analyzer_lambda.py",
             schedule="cron(0 14 * * ? *)",  # 6:00 AM PT daily (Observatory weekly cadence is enforced in-handler)
-            timeout_seconds=120,
+            # 2026-06-17: 120s → 600s. The handler analyzes ~8 experts sequentially,
+            # each a multi-second Bedrock call; 120s timed out mid-run (~15 errors/day),
+            # so the async EventBridge events exhausted retries into the ingestion DLQ
+            # (drove the dlq-messages + ingestion-error + dlq-depth alarms). Peers
+            # (daily-brief, coaches) run at 900s; 600s gives ample headroom (mem fine
+            # at 115/256MB — it needed TIME, not memory).
+            timeout_seconds=600,
             memory_mb=256,
             environment={"AI_SECRET_NAME": "life-platform/ai-keys"},
             custom_policies=rp.intelligence_ai_expert(),
