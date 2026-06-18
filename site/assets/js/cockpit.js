@@ -552,3 +552,18 @@ wireScrub();
 bind("scopeLabel").textContent = "today";
 const _deepDate = new URLSearchParams(location.search).get("date");
 load(_deepDate && /^\d{4}-\d{2}-\d{2}$/.test(_deepDate) ? _deepDate : undefined);
+
+// Build stamp — muted deploy fingerprint in the footer (apples-to-apples in QA). Reads
+// the <meta name="build"> the deploy script injects; no-op locally where it's absent.
+(function () {
+  try {
+    const m = document.querySelector('meta[name="build"]');
+    const foot = document.querySelector(".site-foot") || document.querySelector(".cockpit-foot");
+    if (!m || !m.content || !foot) return;
+    const s = document.createElement("span");
+    s.className = "build-stamp label";
+    s.textContent = "build " + m.content.split(" ")[0];
+    s.title = m.content;
+    foot.appendChild(s);
+  } catch (e) {}
+})();

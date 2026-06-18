@@ -713,3 +713,18 @@ wireTheme();
 buildTabs();
 buildSide();
 renderCenter();
+
+// Build stamp — muted deploy fingerprint in the footer (apples-to-apples in QA). Reads
+// the <meta name="build"> the deploy script injects; no-op locally where it's absent.
+(function () {
+  try {
+    const m = document.querySelector('meta[name="build"]');
+    const foot = document.querySelector(".site-foot");
+    if (!m || !m.content || !foot) return;
+    const s = document.createElement("span");
+    s.className = "build-stamp label";
+    s.textContent = "build " + m.content.split(" ")[0];
+    s.title = m.content;
+    foot.appendChild(s);
+  } catch (e) {}
+})();
