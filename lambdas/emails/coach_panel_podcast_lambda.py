@@ -563,14 +563,19 @@ def _qa_review(turns: list, rubric: str, ground_truth: str = "") -> tuple:
 
 
 _INTRO_RUBRIC = (
+    "The two speakers are ELENA VOSS (the host — an embedded journalist) and DR. ELI MARSH (the guest — the "
+    "Principal Investigator who built the platform). MATT is the third-person SUBJECT of the experiment; he is NOT "
+    "in the room and does NOT speak. These three are ESTABLISHED show personas — never treat Elena or Eli as invented.\n"
     "1. Opens on a genuine HOOK in turn 0, not a flat self-introduction.\n"
     "2. After the opening, it's a real two-person conversation (no long stretch of one person talking).\n"
-    "3. At least one point of GENUINE friction/disagreement — the guest is not just agreeing with the host.\n"
-    "4. The guest names the over-optimization / 'measuring a life instead of living it' RISK himself.\n"
+    "3. At least one point of GENUINE friction/disagreement — Eli is not just agreeing with Elena throughout.\n"
+    "4. Dr. Eli Marsh (the PI) names the over-optimization / 'measuring a life instead of living it' RISK himself, in his own words.\n"
     "5. No abrupt, unbridged topic jumps.\n"
     "6. Closes on the series' standing open question (does the tech genuinely make a life better, or theater).\n"
-    "7. ACCURACY: it must NOT assert any specific life event, loss, death, illness, relocation, city, or date about "
-    "the subject that is not in the GROUND TRUTH. Inventing biography is an automatic fail."
+    "7. ACCURACY — applies ONLY to MATT (the subject): the script must not assert any specific life event, loss, "
+    "death, illness, relocation, city, or date about MATT that isn't in the GROUND TRUTH. Do NOT flag the names, "
+    "titles, or roles of Elena Voss or Dr. Eli Marsh — they are real show personas, not inventions. Only invented "
+    "facts about MATT fail this item."
 )
 
 
@@ -584,7 +589,13 @@ def _run_intro(dry_run: bool = False) -> dict:
     # Numbers allowed by ER-03 = only those in the bible (it has essentially none →
     # this enforces "no invented numbers"). No elapsed-time/results context is fed.
     allowed = er03_gate.numbers_in(json.dumps(bible))
-    bio_truth = (bible.get("characters", {}) or {}).get("matthew", "")
+    _chars = bible.get("characters", {}) or {}
+    bio_truth = (
+        "MATT — the experiment's SUBJECT, the ONLY person whose biographical facts are constrained:\n"
+        + _chars.get("matthew", "")
+        + "\n\nESTABLISHED show personas (NOT Matt, NOT inventions — never flag their names/roles): "
+        "Elena Voss (host, embedded journalist); Dr. Eli Marsh (guest, the Principal Investigator who runs the AI coach team)."
+    )
 
     def _candidate():
         ts = _gate_intro(_build_intro_script(bible), allowed)
