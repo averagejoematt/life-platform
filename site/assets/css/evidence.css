@@ -158,6 +158,25 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 /* Temporal-frame header above a group of trends (last-night vs same-day). */
 .rd-frame { margin: var(--sp-5) 0 var(--sp-2); color: var(--ember); text-transform: lowercase; letter-spacing: 0.02em; }
 
+/* Vice streak cards — a big day-count + a progress bar toward the next milestone. */
+.vice-grid { display: grid; gap: var(--bento-gap); grid-template-columns: 1fr; margin-top: var(--sp-4); }
+@media (min-width: 560px) { .vice-grid { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 920px) { .vice-grid { grid-template-columns: 1fr 1fr 1fr; } }
+.vice-card { border: var(--border-hair); border-radius: var(--radius); background: var(--surface); padding: var(--sp-4); border-left: 3px solid var(--rule); }
+.vice-card.vice-hold { border-left-color: #16a34a; }
+.vice-card.vice-broke { border-left-color: color-mix(in oklch, var(--ember) 60%, var(--ink-faint)); }
+.vice-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
+.vice-name { font-family: var(--font-serif); font-size: var(--fs-h3); text-transform: capitalize; }
+.vice-flag { color: var(--ink-faint); }
+.vice-hold .vice-flag { color: #16a34a; }
+.vice-streak { display: flex; align-items: baseline; gap: var(--sp-2); margin-top: var(--sp-2); }
+.vice-days { font-family: var(--font-mono); font-size: var(--fs-data-lg); line-height: 1; color: var(--ink); }
+.vice-unit { color: var(--ink-muted); }
+.vice-bar { margin-top: var(--sp-2); height: 4px; background: var(--rule); border-radius: 4px; overflow: hidden; }
+.vice-bar i { display: block; height: 100%; background: #16a34a; transition: width var(--dur) var(--ease-out); }
+.vice-broke .vice-bar i { background: color-mix(in oklch, var(--ember) 55%, var(--ink-faint)); }
+.vice-meta { margin-top: var(--sp-2); color: var(--ink-faint); }
+
 /* Habits day-of-week chart */
 .hb-chart { display: flex; align-items: flex-end; gap: var(--sp-2); height: 120px; }
 .hb-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: var(--sp-1); height: 100%; justify-content: flex-end; }
