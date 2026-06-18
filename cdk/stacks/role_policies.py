@@ -874,6 +874,10 @@ def email_coach_panel_podcast() -> list[iam.PolicyStatement]:
             ),
             # Publish heartbeat metric — the "show went silent" alarm watches for its absence.
             iam.PolicyStatement(sid="PublishedMetric", actions=["cloudwatch:PutMetricData"], resources=["*"]),
+            # Auto-invalidate /panelcast/* after publishing so a new episode is live
+            # immediately — wk*.wav carries a 24h cache header, so without this the CDN
+            # serves the prior cut for up to a day (observed 2026-06-17: a stale Ep0).
+            iam.PolicyStatement(sid="PanelcastCdnInvalidate", actions=["cloudfront:CreateInvalidation"], resources=[CF_DIST_ARN]),
         ],
     )
 
