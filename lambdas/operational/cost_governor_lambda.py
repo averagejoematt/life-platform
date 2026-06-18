@@ -83,24 +83,31 @@ def _month_bounds(now: datetime):
     return start, days_in_month
 
 
-def _non_ai_mtd(month_start: datetime, now: datetime) -> float:
-    """Cost Explorer month-to-date for all services EXCEPT Bedrock."""
+def _non_ai_daily_series(month_start: datetime, now: datetime) -> list[tuple[str, float]]:
+    """Per-day non-Bedrock spend this month via ONE Cost Explorer DAILY call.
+
+    Returns [(YYYY-MM-DD, cost), ...]. Both the MTD total (sum all) and the
+    trailing-window run-rate (sum the last N days) derive from this single call,
+    so adding the trailing projection costs no extra CE request. DAILY end is
+    exclusive, so today's partial day is excluded (same as the prior MTD query)."""
     start_str = month_start.strftime("%Y-%m-%d")
     end_str = now.strftime("%Y-%m-%d")
     if start_str == end_str:
-        return 0.0  # 1st of month, no full day yet
+        return []  # 1st of month, no full day yet
     try:
         resp = _ce.get_cost_and_usage(
             TimePeriod={"Start": start_str, "End": end_str},
-            Granularity="MONTHLY",
+            Granularity="DAILY",
             Metrics=["UnblendedCost"],
             Filter={"Not": {"Dimensions": {"Key": "SERVICE", "Values": ["Amazon Bedrock"]}}},
         )
-        rows = resp.get("ResultsByTime", [])
-        return sum(float(r["Total"]["UnblendedCost"]["Amount"]) for r in rows)
+        out: list[tuple[str, float]] = []
+        for r in resp.get("ResultsByTime", []):
+            out.append((r["TimePeriod"]["Start"], float(r["Total"]["UnblendedCost"]["Amount"])))
+        return out
     except Exception as e:
-        logger.warning(f"Cost Explorer query failed (non-AI): {e}")
-        return 0.0
+        logger.warning(f"Cost Explorer daily query failed (non-AI): {e}")
+        return []
 
 
 def _price_for(model_id: str) -> dict:
@@ -179,22 +186,28 @@ def _ai_active_days(month_start: datetime, now: datetime) -> int:
         return 0
 
 
-def _project_month_end(mtd: float, non_ai: float, elapsed_days: float, days_in_month: int, ai_recent: float, trailing_days: float) -> float:
+def _project_month_end(
+    mtd: float, elapsed_days: float, days_in_month: int, non_ai_recent: float, ai_recent: float, trailing_days: float
+) -> float:
     """Month-end projection = already-spent (mtd) + run-rate × days remaining.
 
-    The AI run-rate uses a TRAILING window (`ai_recent / trailing_days`), NOT the
-    month-to-date active-day average. The MTD average is skewed by lumpy one-time
-    AI earlier in the month (experiment resets, podcast generation, dev batches),
-    which over-projected month-end and falsely escalated the tier — observed
-    2026-06-15: a ~$115 projection (and a tier-2 website-AI pause) against a real
-    ~$60 run-rate. A trailing window tracks the CURRENT rate. This can only
-    *reduce* false escalation; a genuine runaway still shows up in actual mtd
-    within a day and trips the actual-spend cap in _decide_tier.
+    BOTH the AI and non-AI run-rates use a TRAILING window (`recent / trailing_days`),
+    not the month-to-date average. The MTD average over-projects two ways:
+      • AI: lumpy one-time AI earlier in the month (resets, podcast generation, dev
+        batches) inflates the per-day rate.
+      • Non-AI: the recurring monthly fixed charges (Secrets Manager, Route53, KMS)
+        all land on day 1, so MTD/elapsed treats a one-time lump as a daily rate.
+        Those charges are already banked in `mtd` and won't recur this month, so the
+        REMAINING days should accrue only the variable daily rate — exactly what the
+        trailing window measures (it excludes the day-1 lump once the window clears it).
+    Observed 2026-06-15: the MTD method projected ~$115 (and forced a tier-2
+    website-AI pause) against a real ~$60-90 run-rate. Trailing tracks the current
+    rate. This can only *reduce* false escalation; a genuine runaway still shows up
+    in actual mtd within a day and trips the actual-spend cap in _decide_tier.
     """
     days_remaining = max(days_in_month - elapsed_days, 0.0)
-    non_ai_daily = non_ai / max(elapsed_days, 0.5)
-    ai_daily = ai_recent / max(trailing_days, 0.5)
-    return mtd + (non_ai_daily + ai_daily) * days_remaining
+    daily_rate = (non_ai_recent + ai_recent) / max(trailing_days, 0.5)
+    return mtd + daily_rate * days_remaining
 
 
 def _tier_for(projected: float) -> int:
@@ -300,21 +313,24 @@ def lambda_handler(event, context):
         month_start, days_in_month = _month_bounds(now)
         elapsed_days = max((now - month_start).total_seconds() / 86400.0, 0.5)
 
-        non_ai = _non_ai_mtd(month_start, now)
+        non_ai_series = _non_ai_daily_series(month_start, now)
+        non_ai = sum(c for _, c in non_ai_series)
         ai = _ai_cost(month_start, now)
         mtd = non_ai + ai
 
         # Month-end = what's ALREADY spent (mtd, captured precisely) + the daily
-        # run-rate × days REMAINING. Non-AI rate is uniform per elapsed day; the
-        # AI rate uses a TRAILING 7-day window (not the MTD active-day average,
-        # which lumpy one-time AI earlier in the month inflates — see
-        # _project_month_end). The trailing window is clamped to month_start so
-        # early in the month it degrades to month-to-date.
+        # run-rate × days REMAINING. BOTH AI and non-AI rates use a TRAILING 7-day
+        # window — the MTD average over-projects (lumpy one-time AI; day-1 monthly
+        # fixed charges already banked in mtd). See _project_month_end. The window
+        # is clamped to month_start so early in the month it degrades to MTD.
         trailing_start = max(now - timedelta(days=7), month_start)
         trailing_days = max((now - trailing_start).total_seconds() / 86400.0, 0.5)
+        trailing_start_str = trailing_start.strftime("%Y-%m-%d")
+        non_ai_recent = sum(c for d, c in non_ai_series if d >= trailing_start_str)
         ai_recent = _ai_cost(trailing_start, now)
         ai_daily = ai_recent / trailing_days
-        projected = _project_month_end(mtd, non_ai, elapsed_days, days_in_month, ai_recent, trailing_days)
+        non_ai_daily = non_ai_recent / trailing_days
+        projected = _project_month_end(mtd, elapsed_days, days_in_month, non_ai_recent, ai_recent, trailing_days)
 
         # Projection escalates at most ONE tier above actual mtd spend (and not at
         # all in the early-month window) — see _decide_tier for the two failure
@@ -323,8 +339,8 @@ def lambda_handler(event, context):
         prev = _read_tier()
 
         logger.info(
-            f"Spend: non_ai=${non_ai:.2f} ai=${ai:.2f} (trailing_7d=${ai_recent:.2f} over "
-            f"{trailing_days:.1f}d, ~${ai_daily:.2f}/day) mtd=${mtd:.2f} projected=${projected:.2f} "
+            f"Spend: non_ai=${non_ai:.2f} ai=${ai:.2f} (trailing_7d over {trailing_days:.1f}d: "
+            f"non_ai ~${non_ai_daily:.2f}/day + ai ~${ai_daily:.2f}/day) mtd=${mtd:.2f} projected=${projected:.2f} "
             f"computed_tier={computed_tier} prev={prev} observe={OBSERVE_MODE}"
         )
         _emit_metrics(mtd, projected, computed_tier)
@@ -341,6 +357,7 @@ def lambda_handler(event, context):
                         "non_ai_mtd": round(non_ai, 2),
                         "ai_mtd": round(ai, 2),
                         "ai_per_day": round(ai_daily, 2),
+                        "non_ai_per_day": round(non_ai_daily, 2),
                         "mtd_total": round(mtd, 2),
                         "projected": round(projected, 2),
                         "computed_tier": computed_tier,
@@ -367,6 +384,7 @@ def lambda_handler(event, context):
                     "non_ai_mtd": round(non_ai, 2),
                     "ai_mtd": round(ai, 2),
                     "ai_per_day": round(ai_daily, 2),
+                    "non_ai_per_day": round(non_ai_daily, 2),
                     "mtd_total": round(mtd, 2),
                     "projected": round(projected, 2),
                     "tier": tier,

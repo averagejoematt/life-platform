@@ -79,7 +79,7 @@ def test_all_quiet_is_tier0(gov):
     assert gov._decide_tier(projected=30.0, mtd=10.0, elapsed_days=10.0) == 0
 
 
-# ── _project_month_end: AI run-rate uses a TRAILING window, not the MTD average ─
+# ── _project_month_end: BOTH AI + non-AI run-rates use a TRAILING window ────────
 
 
 def test_projection_tracks_trailing_rate_not_lumpy_mtd(gov):
@@ -87,23 +87,33 @@ def test_projection_tracks_trailing_rate_not_lumpy_mtd(gov):
     MTD total, but the trailing-7d AI rate is low. The projection must track the
     recent rate — the old MTD active-day average produced ~$115 and a needless
     tier-2 website-AI pause against a real ~$60 run-rate."""
-    # mtd $57 (non_ai 16 + ai-mtd 41), trailing 7d AI = $6.72 → ~$0.96/day.
-    projected = gov._project_month_end(
-        mtd=57.0, non_ai=16.0, elapsed_days=15.0, days_in_month=30, ai_recent=6.72, trailing_days=7.0
-    )
-    # non_ai_daily≈1.07 + ai_daily≈0.96, ×15 remaining → ~$87 (honest), not ~$115.
+    # mtd $57, trailing 7d: non_ai $7.5 + ai $6.72 → ~$2.03/day.
+    projected = gov._project_month_end(mtd=57.0, elapsed_days=15.0, days_in_month=30, non_ai_recent=7.5, ai_recent=6.72, trailing_days=7.0)
+    # ~$2.03/day × 15 remaining → ~$87 (honest), not ~$115.
     assert 80 < projected < 95
-    old_mtd_avg_method = 57.0 + (16.0 / 15.0 + 41.0 / 15.0) * 15.0  # ≈ $114
-    assert projected < old_mtd_avg_method - 20
+
+
+def test_projection_nonai_lump_not_extrapolated(gov):
+    """Day-1 monthly fixed charges (Secrets/Route53/KMS) inflate MTD non-AI but
+    are already banked in mtd. The trailing window has cleared the lump, so the
+    new projection must come in BELOW what the old MTD-linear non-AI method gave."""
+    # Mid-month: mtd $40 (non-AI MTD $25, lump-inflated → $1.67/day; the real
+    # variable rate is ~$0.8/day = $5.6 over 7d). AI ~$1/day ($7 over 7d).
+    new = gov._project_month_end(mtd=40.0, elapsed_days=15.0, days_in_month=30, non_ai_recent=5.6, ai_recent=7.0, trailing_days=7.0)
+    # Old method: non-AI extrapolated from the lump-inflated MTD average.
+    old = 40.0 + (25.0 / 15.0 + 7.0 / 7.0) * 15.0  # ≈ $80
+    assert new < old - 10  # ~$67 vs ~$80 — the lump no longer re-projects
 
 
 def test_projection_zero_remaining_equals_mtd(gov):
     """Last day of the month: nothing remaining → projection == already-spent."""
-    assert gov._project_month_end(mtd=62.0, non_ai=30.0, elapsed_days=30.0, days_in_month=30, ai_recent=7.0, trailing_days=7.0) == 62.0
+    assert (
+        gov._project_month_end(mtd=62.0, elapsed_days=30.0, days_in_month=30, non_ai_recent=4.0, ai_recent=7.0, trailing_days=7.0) == 62.0
+    )
 
 
 def test_projection_short_trailing_window_is_finite(gov):
     """Early month the trailing window is sub-7d; the 0.5d floor must prevent a
     divide-by-tiny blow-up."""
-    p = gov._project_month_end(mtd=10.0, non_ai=8.0, elapsed_days=1.5, days_in_month=30, ai_recent=2.0, trailing_days=1.5)
+    p = gov._project_month_end(mtd=10.0, elapsed_days=1.5, days_in_month=30, non_ai_recent=8.0, ai_recent=2.0, trailing_days=1.5)
     assert 0 < p < 1000
