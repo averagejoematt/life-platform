@@ -93,6 +93,18 @@
           </div>
         </section>
 
+        <!-- Band: last night → today. Recovery / sleep / HRV / resting-HR are
+             wake-date-keyed — they describe LAST NIGHT and set today up (the
+             opposite frame from same-day activity). Raw readings come from
+             snapshot.vitals (already fetched). Present-tense; hidden in time-
+             travel, since the dated /character sheet carries no raw vitals. -->
+        <section class="readiness" data-readiness hidden aria-label="What last night set up">
+          <p class="cap label">last night → today<span class="rd-night" data-bind="readiness-night"></span></p>
+          <ul class="rd-rows" data-bind="readinessrows"></ul>
+        </section>
+
+        <!-- Band: today — where you stand. The morning character sheet. -->
+        <p class="cap label cap-today">today — where you stand</p>
         <!-- Two glance domains; the seven pillars live one drill beneath -->
         <section class="domains" aria-label="Pillar domains">
           <div class="domain" data-domain="body">

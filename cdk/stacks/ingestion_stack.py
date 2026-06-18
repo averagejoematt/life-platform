@@ -87,11 +87,9 @@ class IngestionStack(Stack):
         )
         # Second schedule: recovery refresh at 9:30 AM PT
         # OAuth race prevention: max 1 concurrent invocation per OAuth Lambda (ADR-036 fix)
-        # BLOCKED 2026-05-17: AWS rejects PutFunctionConcurrency because the account quota
-        # is exactly 10 and minimum unreserved is also 10 — reserving any concurrency would
-        # push unreserved below minimum. Service Quotas request L-B99A9384 raise → 50+ filed.
-        # Re-enable this line once the quota increase is approved.
-        # whoop.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
+        # 2026-06-17: account concurrency quota raised to 100 by AWS Support
+        # (case 177921309700709) — reserving 1 here is now safe (unreserved stays ≥ minimum).
+        whoop.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
 
         whoop_recovery = events.Rule(
             self,
@@ -121,7 +119,7 @@ class IngestionStack(Stack):
             alerts_topic=None,
             **{k: v for k, v in shared.items() if k != "alerts_topic"},
         )
-        # garmin.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
+        garmin.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
 
         # ── 3. Notion — 5x daily
         create_platform_lambda(
@@ -153,7 +151,7 @@ class IngestionStack(Stack):
             custom_policies=rp.ingestion_withings(),
             **shared,
         )
-        # withings.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
+        withings.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
 
         # ── 5. Habitify — 5x daily (:05 stagger)
         create_platform_lambda(
@@ -188,7 +186,7 @@ class IngestionStack(Stack):
             custom_policies=rp.ingestion_strava(),
             **shared,
         )
-        # strava.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
+        strava.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
 
         # ── 6b. Hevy webhook (real-time) — FunctionURL, no schedule.
         #        Per SPEC_HEVY_AND_NUTRITION_BRIDGE_2026_05_25 §2.2-A. The URL is
@@ -317,7 +315,7 @@ class IngestionStack(Stack):
             custom_policies=rp.ingestion_eightsleep(),
             **shared,
         )
-        # eightsleep.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
+        eightsleep.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
 
         # ── 10. Activity Enrichment — 7:30 AM PT daily
         create_platform_lambda(

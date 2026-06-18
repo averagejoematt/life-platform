@@ -398,6 +398,11 @@ def build_data_packet(data):
 
     # --- Recovery & physiology ---
     packet.append("=== RECOVERY & PHYSIOLOGY ===")
+    # Temporal frame for the narrator: each dated line is the reading FOR that
+    # morning, produced by the night before — recovery/HRV set that day UP; they
+    # are not something Matthew "did" on it. Reference them as "the night of"/"the
+    # morning of", never as same-day activity.
+    packet.append("(Frame: each line is that morning's reading, reflecting the prior night — it sets the day up.)")
     for d in sorted(data["whoop"].keys()):
         rec = data["whoop"][d]
         hrv = safe_float(rec, "hrv")
@@ -418,6 +423,8 @@ def build_data_packet(data):
 
     # --- Sleep (Whoop — SOT for duration, stages, score — captures all sleep) ---
     packet.append("=== SLEEP (Whoop — source of truth) ===")
+    # Wake-date keyed: a line dated D is the sleep of the night of D-1 → morning D.
+    packet.append("(Frame: a line dated D is the night of D-1 into the morning of D — last night's sleep.)")
     for d in sorted(data["whoop"].keys()):
         rec = data["whoop"][d]
         score = safe_float(rec, "sleep_quality_score")
@@ -837,6 +844,7 @@ When the data packet includes CHARACTER SHEET data, use it as narrative texture:
 - Cross-pillar effects (like Sleep Drag debuffing Movement) are built-in metaphors for how health domains interact.
 - The overall Character Level is the closest thing to a single answer to "is this working?"
 - Don't explain the RPG mechanics — weave the language naturally. "His Sleep score had been climbing for two weeks, the kind of quiet consistency the system rewards" is better than "His Sleep pillar leveled up from 42 to 43."
+- Get the time-frame right: sleep, recovery and HRV are about the NIGHT BEFORE and set the day up ("the night of Tuesday left him at 48% recovery, and Wednesday paid for it"). Workouts, meals and steps are about the day itself. Never describe last night's recovery as if it were something he did during the day.
 - If no level events occurred, that's fine — stability IS the story sometimes. Don't force gamification references.
 
 CONTINUITY:
@@ -926,6 +934,7 @@ When the data packet includes CHARACTER SHEET data, use it as narrative texture:
 - Cross-pillar effects (like Sleep Drag debuffing Movement) are built-in metaphors for how health domains interact.
 - The overall Character Level is the closest thing to a single answer to "is this working?"
 - Don't explain the RPG mechanics — weave the language naturally. "His Sleep score had been climbing for two weeks, the kind of quiet consistency the system rewards" is better than "His Sleep pillar leveled up from 42 to 43."
+- Get the time-frame right: sleep, recovery and HRV are about the NIGHT BEFORE and set the day up ("the night of Tuesday left him at 48% recovery, and Wednesday paid for it"). Workouts, meals and steps are about the day itself. Never describe last night's recovery as if it were something he did during the day.
 - If no level events occurred, that's fine — stability IS the story sometimes. Don't force gamification references.
 
 CONTINUITY:
