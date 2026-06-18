@@ -129,3 +129,50 @@ def test_voice_routing_returns_chirp_voice():
     for spk in ("elena_voss", "training_coach", "labs_coach"):
         v = panel._voice(spk)
         assert v and v.startswith("en-US-Chirp3-HD-")
+
+
+# ── QA rigor: deterministic craft gate (2026-06-17) ──────────────────────────
+
+
+def test_craft_check_passes_clean_dialogue():
+    turns = [
+        {"speaker": "elena_voss", "line": "Here's the hook that got me."},
+        {"speaker": "eli_marsh", "line": "Good place to start."},
+        {"speaker": "elena_voss", "line": "So what is it, plainly?"},
+        {"speaker": "eli_marsh", "line": "One life, fully in the open."},
+    ]
+    assert panel._craft_check(turns) == []
+
+
+def test_craft_check_flags_consecutive_floor_hog():
+    # Three turns in a row from one speaker → fail (max is 2).
+    turns = [
+        {"speaker": "elena_voss", "line": "One."},
+        {"speaker": "eli_marsh", "line": "Two."},
+        {"speaker": "eli_marsh", "line": "Three."},
+        {"speaker": "eli_marsh", "line": "Four."},
+    ]
+    fails = panel._craft_check(turns)
+    assert fails and "in a row" in fails[0]
+
+
+def test_craft_check_flags_monologue_dump():
+    turns = [
+        {"speaker": "elena_voss", "line": "word " * (panel._QA_MAX_WORDS_PER_TURN + 5)},
+        {"speaker": "eli_marsh", "line": "Tight reply."},
+    ]
+    fails = panel._craft_check(turns)
+    assert any("monologue" in f for f in fails)
+
+
+def test_qa_review_fails_open_on_judge_error(monkeypatch):
+    # If the judge/Bedrock blows up, QA must NOT block a publish (deterministic
+    # safety gates are the hard floor) — returns (True, []).
+    import bedrock_client
+
+    def _boom(*a, **k):
+        raise RuntimeError("bedrock down")
+
+    monkeypatch.setattr(bedrock_client, "invoke", _boom)
+    ok, fails = panel._qa_review([{"speaker": "elena_voss", "line": "hi"}], "1. anything")
+    assert ok is True and fails == []
