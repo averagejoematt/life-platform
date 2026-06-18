@@ -365,6 +365,13 @@ INTRO_STYLE = (
     "talking in a studio: relaxed pace, natural rhythm, light interjections and reactions, the occasional small laugh "
     "in the voice, a beat of thought before a big answer. Elena hosts; Eli is the guest. Conversational, not announced."
 )
+# Deterministic Elena sign-off, appended as the FINAL turn. Gemini multi-speaker
+# occasionally bleeds the PRIOR speaker's voice into the last line (ADR-087 ceiling),
+# which once voiced Elena's "I'm Elena Voss" close in Eli's voice. Since the bleed
+# carries the prior voice forward, guaranteeing an Elena→Elena ending means even a
+# bleed lands Elena's voice on her own sign-off.
+INTRO_SIGNOFF = "I'm Elena Voss. This has been The Measured Life. Come back next week — we start for real."
+_SIGNOFF_RE = re.compile(r"\s*(i'?m\s+elena\s+voss\b.*)$", re.IGNORECASE | re.DOTALL)
 WEEKLY_STYLE = (
     "Perform this as a real, warm weekly podcast conversation — NOT a formal reading. Two people riffing in a studio: "
     "natural rhythm, quick reactions, a little wry humor, the occasional small laugh. Conversational, never announced."
@@ -659,6 +666,16 @@ def _run_intro(dry_run: bool = False) -> dict:
         return {"statusCode": 500, "body": json.dumps({"intro": "too few turns"})}
     if qa_fails:
         logger.warning("[panel] intro: best candidate still has %d QA flag(s): %s", len(qa_fails), qa_fails)
+
+    # Deterministic close (ADR-087 voice-bleed mitigation): strip any LLM-baked
+    # "I'm Elena Voss" sign-off from the last turn, then append a fixed Elena sign-off
+    # as the final turn — guaranteeing an Elena→Elena ending so a Gemini voice-bleed
+    # lands Elena's own voice on her sign-off (it carries the PRIOR speaker forward).
+    if turns and turns[-1]["speaker"] == ELENA:
+        stripped = _SIGNOFF_RE.sub("", turns[-1]["line"]).rstrip()
+        if stripped:
+            turns[-1]["line"] = stripped
+    turns.append({"speaker": ELENA, "line": INTRO_SIGNOFF})
 
     label_of = {ELENA: "Elena", INTRO_GUEST_ID: "Eli"}
     # Dry run: write only the transcript (Bedrock cost only, no Gemini audio) so the
