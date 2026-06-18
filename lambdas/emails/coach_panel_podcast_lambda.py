@@ -354,10 +354,13 @@ CONVO_DIRECTIVE = (
     "hard — some turns are one word, some are a paragraph. No bracketed stage directions (no '[laughs]'); put the warmth in the words."
 )
 # Deterministic cold open — guarantees Episode 0 starts with Elena's named self-intro
-# (the LLM keeps preferring a punchy hook over literally naming herself).
+# (the LLM keeps preferring a punchy hook over literally naming herself). Doubles as
+# the universal hook: a capable person who knows how, has done it, and watches it slip.
 INTRO_COLD_OPEN = (
-    "I'm Elena Voss. I'm the journalist embedded in this experiment — equal parts skeptical and hopeful, "
-    "here to document, honestly and from the inside, whether all this technology can actually change one real life."
+    "Here's the part that got me. This is someone who already knows how to do it — he's been in the best shape of his "
+    "life, more than once. He's not missing the information. And he's watched it slip anyway. I'm Elena Voss, the "
+    "journalist living inside this experiment, and that's the question I couldn't put down: if you know exactly what "
+    "to do, why doesn't that save you — and can a wall of AI and sensors finally catch the thing willpower keeps missing?"
 )
 
 
@@ -397,15 +400,25 @@ def _build_intro_script(bible: dict) -> list:
         f"TONE: {bible.get('tone', '')}\n\n"
         f"FOLLOW THIS ARC, IN ORDER:\n{arc}\n\n"
         "NON-NEGOTIABLE REQUIREMENTS:\n"
-        "  - Elena's VERY FIRST line must include the words \"I'm Elena Voss\" and a sentence on who she is and why she's drawn "
-        "to this — she speaks first, alone, before the guest is introduced or speaks.\n"
-        "  - Before any hardship, Elena must establish WHO Matt is and why a complete STRANGER should care about him — an "
-        "ordinary person who has done this before and genuinely succeeded (the high), so the fall lands. Meet the person and "
-        "the stakes FIRST; do NOT open his section on the grief.\n"
-        "  - THEN his honest story, IN THIS episode: the weight was the symptom not the problem, the coping mechanism, and "
-        "'can a system catch what willpower can't?'. Do NOT defer it to a future episode.\n"
+        "  - OPEN ON A HOOK, not an introduction. Elena's very first line is a genuine grab — the universal tension at the "
+        "heart of this: a capable person who already KNOWS how to do it, has done it, and watches it slip anyway. Land that "
+        'before anything administrative. Her first line must still include "I\'m Elena Voss" and who she is, woven INTO the '
+        "hook (not a flat 'My name is...'). She speaks first, alone, before the guest.\n"
+        "  - REAL TENSION, not mutual agreement: Elena is a genuine skeptic and Eli must PUSH BACK at least once — he names "
+        "the honest risk out loud (that this becomes over-optimization theater, quantifying a life instead of living it) and "
+        "says plainly why he thinks this attempt is different; Elena presses him on it. Disagreement, warmly. Never a sales pitch.\n"
+        "  - Before the harder material, Elena must establish WHO Matt is and why a complete STRANGER should care about him — an "
+        "ordinary, technical, curious person who has done this before and genuinely succeeded (the high). Meet the person and the "
+        "stakes FIRST.\n"
+        "  - THEN his honest story, IN THIS episode, told as a SMOOTH continuation (NEVER an abrupt topic jump — Elena bridges "
+        "into it): he's consistent until something disrupts the routine and the old habits return; the weight was the symptom, "
+        "not the problem; and 'can a system catch what willpower alone misses?'. Do NOT defer it to a future episode. Do NOT "
+        "invent specific events, losses, deaths, illnesses, relocations, or dates — use only the character note and keep it to "
+        "the general pattern.\n"
         "  - Elena must mention that she writes a WEEKLY chronicle and that this podcast runs alongside it.\n"
-        "  - Work in the platform doors (Cockpit / Story / Evidence / Sources / Character) naturally.\n\n"
+        "  - Work in the platform doors (Cockpit / Story / Evidence / Sources / Character) naturally.\n"
+        "  - CLOSE on the series' standing open question — the bet this whole show is settling, that every future episode "
+        f"moves the needle on: {bible.get('series_question', bible.get('thesis', ''))} Frame it as the reason to come back.\n\n"
         f"HARD GUARDRAILS (breaking any of these ruins the episode):\n{guards}\n\n"
         'OUTPUT: ONLY a JSON array of turns [{"speaker":"elena"|"eli","line":"..."}], 20–28 turns. '
         "No preamble, no stage directions, no JSON fences."
@@ -486,7 +499,7 @@ def _seed_series_state(bible: dict, ep: dict) -> None:
     )
 
 
-def _run_intro() -> dict:
+def _run_intro(dry_run: bool = False) -> dict:
     bible = _load_bible()
     # Numbers allowed by ER-03 = only those in the bible (it has essentially none →
     # this enforces "no invented numbers"). No elapsed-time/results context is fed.
@@ -503,10 +516,29 @@ def _run_intro() -> dict:
     first = (turns[0]["line"] if turns else "").lower()
     if not ("i'm elena" in first or "i am elena" in first or "elena voss" in first):
         turns.insert(0, {"speaker": ELENA, "line": INTRO_COLD_OPEN})
+
+    label_of = {ELENA: "Elena", INTRO_GUEST_ID: "Eli"}
+    # Dry run: write only the transcript (Bedrock cost only, no Gemini audio) so the
+    # script can be read and approved BEFORE we spend a voicing pass. The live wk0.*
+    # audio/episode are left untouched.
+    if dry_run:
+        preview = "\n\n".join(f"{label_of.get(t['speaker'], 'Elena')}: {t['line']}" for t in turns)
+        s3.put_object(
+            Bucket=S3_BUCKET,
+            Key=f"{PREFIX}/wk0.draft.transcript.txt",
+            Body=preview.encode("utf-8"),
+            ContentType="text/plain; charset=utf-8",
+            CacheControl="max-age=60, public",
+        )
+        logger.info("[panel] intro DRY RUN: %d turns → wk0.draft.transcript.txt (no audio)", len(turns))
+        return {
+            "statusCode": 200,
+            "body": json.dumps({"intro": "dry_run", "turns": len(turns), "preview_key": f"{PREFIX}/wk0.draft.transcript.txt"}),
+        }
+
     # Single-pass conversation via Gemini (Elena + Eli genuinely talking).
     import gemini_tts
 
-    label_of = {ELENA: "Elena", INTRO_GUEST_ID: "Eli"}
     label_turns = [{"speaker": label_of.get(t["speaker"], "Elena"), "line": t["line"]} for t in turns]
     audio = gemini_tts.synthesize_dialogue(label_turns, INTRO_GEMINI_VOICES, INTRO_STYLE)
     s3.put_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/wk0.wav", Body=audio, ContentType="audio/wav", CacheControl="max-age=86400, public")
@@ -517,6 +549,25 @@ def _run_intro() -> dict:
         Key=f"{PREFIX}/wk0.transcript.txt",
         Body=transcript.encode("utf-8"),
         ContentType="text/plain; charset=utf-8",
+        CacheControl="max-age=300, public",
+    )
+    # Structured transcript for the on-page reader (speaker-attributed turns + the
+    # host's questions as in-page chapter anchors). No audio timestamps exist
+    # (single-pass Gemini), so chapters jump within the transcript, not the audio.
+    _name_of = {ELENA: "Elena", INTRO_GUEST_ID: "Dr. Eli Marsh"}
+    s3.put_object(
+        Bucket=S3_BUCKET,
+        Key=f"{PREFIX}/wk0.transcript.json",
+        Body=json.dumps(
+            {
+                "week": 0,
+                "title": "Episode 0 — Welcome to The Measured Life",
+                "byline": "Elena + Dr. Eli Marsh",
+                "turns": [{"speaker": t["speaker"], "name": _name_of.get(t["speaker"], "Elena"), "line": t["line"]} for t in turns],
+            },
+            ensure_ascii=False,
+        ).encode("utf-8"),
+        ContentType="application/json; charset=utf-8",
         CacheControl="max-age=300, public",
     )
     try:
@@ -532,6 +583,7 @@ def _run_intro() -> dict:
         "duration_sec": max(1, (len(audio) - 44) // (gemini_tts.SAMPLE_RATE * 2)),  # WAV: 16-bit mono PCM
         "byline": "Elena + Dr. Eli Marsh",
         "excerpt": "Meet Elena, meet Matt, and meet the question this whole experiment is built to answer: can AI and your own data actually make a life better — or is it just over-optimization? The starting line.",
+        "transcript_url": "/panelcast/wk0.transcript.json",
     }
     existing = [e for e in existing if e.get("week") != 0] + [ep]
     existing.sort(key=lambda e: e.get("week", 0), reverse=True)
@@ -844,7 +896,9 @@ def _email_subscribers(ep: dict, test_to: str = None) -> dict:
             ses.send_email(
                 FromEmailAddress=SENDER,
                 Destination={"ToAddresses": [email]},
-                Content={"Simple": {"Subject": {"Data": subject, "Charset": "UTF-8"}, "Body": {"Html": {"Data": html, "Charset": "UTF-8"}}}},
+                Content={
+                    "Simple": {"Subject": {"Data": subject, "Charset": "UTF-8"}, "Body": {"Html": {"Data": html, "Charset": "UTF-8"}}}
+                },
             )
             sent += 1
         except Exception as e:
@@ -873,9 +927,7 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     # in the CURRENT cycle (dated >= genesis), never the stale pre-reset max-week.
     # ISO dates compare lexically. If none exist yet (before the cycle's first
     # Wednesday chronicle), skip cleanly — the liveness alarm catches a truly silent show.
-    weekly = [
-        p for p in posts if p.get("week") and p.get("week") > 0 and p.get("date") and p["date"] >= EXPERIMENT_START_DATE
-    ]
+    weekly = [p for p in posts if p.get("week") and p.get("week") > 0 and p.get("date") and p["date"] >= EXPERIMENT_START_DATE]
     if not weekly:
         return {"statusCode": 200, "body": json.dumps({"weekly": "no current-cycle weekly chronicle yet"})}
     post = max(weekly, key=lambda x: x["date"])
@@ -1036,9 +1088,10 @@ def lambda_handler(event, context):
             return {"statusCode": 500, "body": json.dumps({"notify_test": "failed", "error": str(e)[:200]})}
 
     # Episode 0 — the full welcome/trailer (all coaches + Elena). One-off / manual.
+    # {"intro": true, "dry_run": true} writes only the draft transcript (no audio) for review.
     if event.get("intro"):
         try:
-            return _run_intro()
+            return _run_intro(dry_run=bool(event.get("dry_run")))
         except Exception as e:
             logger.error("[panel] intro failed — %s", e)
             return {"statusCode": 500, "body": json.dumps({"intro": "failed", "error": str(e)[:200]})}

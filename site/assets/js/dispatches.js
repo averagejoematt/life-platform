@@ -37,6 +37,32 @@ async function podcastEpisode(week) {
 
 async function getJSON(p) { const r = await fetch(p, { headers: { accept: "application/json" } }); if (!r.ok) throw new Error(p + " " + r.status); return r.json(); }
 async function tryJSON(p) { try { return await getJSON(p); } catch (e) { return null; } }
+
+// Episode transcript reader — speaker-attributed turns + a "chapters" contents list
+// built from the host's (Elena's) turns. Chapters jump within the transcript (there
+// are no audio timestamps: the episode is synthesized in one pass). Fails quiet.
+async function renderTranscript(url, mount) {
+  if (!mount) return;
+  const d = await tryJSON(url);
+  const turns = (d && d.turns) || [];
+  if (!turns.length) return;
+  const slug = (i) => `t-${i}`;
+  // Chapters: each Elena turn is a natural section start; label it with its opening words.
+  const chapters = turns
+    .map((t, i) => ({ t, i }))
+    .filter(({ t }) => (t.speaker || "").toLowerCase().includes("elena"))
+    .map(({ t, i }) => ({ i, label: esc(String(t.line).replace(/\s+/g, " ").trim().split(/(?<=[.?!])\s/)[0]).slice(0, 64) }))
+    .slice(0, 8);
+  const toc = chapters.length
+    ? `<details class="tx-toc"><summary class="dx-kicker label">in this episode · ${chapters.length} moments</summary>` +
+      `<ol class="tx-chapters">${chapters.map((c) => `<li><a href="#${slug(c.i)}">${c.label}…</a></li>`).join("")}</ol></details>`
+    : "";
+  const body = turns
+    .map((t, i) => `<div class="tx-turn" id="${slug(i)}"><span class="tx-who label">${esc(t.name || t.speaker)}</span><p class="tx-line">${esc(t.line)}</p></div>`)
+    .join("");
+  mount.innerHTML = `<p class="dx-kicker label">transcript</p>${toc}<div class="tx-body">${body}</div>`;
+  mount.hidden = false;
+}
 const cache = {};
 async function secFetch(s) { if (!s.url) return null; if (cache[s.key]) return cache[s.key]; const d = await tryJSON(s.url); cache[s.key] = d; return d; }
 
@@ -221,7 +247,11 @@ async function renderRead(s, id) {
       (ent.date ? `<p class="dx-stats label">${esc(ent.date)}</p>` : "") +
       `<div class="dx-listen"><audio controls preload="none" src="${esc(ent.url)}"></audio><span class="label">listen · ${byline} (~${mins} min)</span></div>` +
       (ent.excerpt ? `<p class="dx-prose">${esc(ent.excerpt)}</p>` : "") +
-      ledgerHTML;
+      ledgerHTML +
+      (ent.transcript_url ? `<section class="dx-transcript" data-transcript hidden></section>` : "");
+    // Transcript + in-page chapters (the host's questions). No audio timestamps
+    // exist (single-pass synthesis), so chapters jump within the read, not the audio.
+    if (ent.transcript_url) renderTranscript(ent.transcript_url, read.querySelector("[data-transcript]"));
     return;
   }
   if (s.kind === "timeline") {
