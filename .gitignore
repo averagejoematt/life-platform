@@ -28,6 +28,9 @@ output.json
 ingest/ingest.log
 ingest/*.log
 
+# Throwaway analysis scratchpad (may hold personal food/health data — never commit)
+scratch/
+
 
 # Virtual environments
 venv/
