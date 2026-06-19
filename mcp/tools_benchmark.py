@@ -20,7 +20,7 @@ BENCH-1.4 — episodes + maintenance views (next commit).
 
 from datetime import datetime, timedelta, timezone
 
-from mcp.core import query_source
+from mcp.core import get_profile, query_source
 
 # Run gate from PROVEN_BLUEPRINT.md — zero runs logged above ~240 lb in his own history.
 RUN_GATE_LB = 240.0
@@ -175,6 +175,127 @@ def _benchmark_pace(args: dict) -> dict:
     }
 
 
+def _benchmark_episodes(args: dict) -> dict:
+    """BENCH-1.4 — the weight_episodes ledger + loss/regain rate asymmetry. Read-only
+    from the precomputed source; descriptive + correlational, confidence/n surfaced."""
+    episodes = _read_episodes()
+    if not episodes:
+        return {"view": "episodes", "status": "no episodes yet — episode-detect has not run", "_disclaimer": _BENCHMARK_DISCLAIMER}
+
+    losses = [e for e in episodes if e.get("type") == "loss"]
+    regains = [e for e in episodes if e.get("type") == "regain"]
+
+    def _mean_rate(eps):
+        rates = [e["rate_lb_wk"] for e in eps if e.get("rate_lb_wk") is not None]
+        return round(sum(rates) / len(rates), 2) if rates else None
+
+    mean_loss = _mean_rate(losses)
+    mean_regain = _mean_rate(regains)
+    ratio = round(mean_regain / mean_loss, 2) if (mean_loss and mean_regain) else None
+
+    return {
+        "view": "episodes",
+        "episodes": episodes,
+        "summary": {
+            "n_loss": len(losses),
+            "n_regain": len(regains),
+            "mean_loss_rate_lb_wk": mean_loss,
+            "mean_regain_rate_lb_wk": mean_regain,
+            # asymmetry: weight returns ~0.79x as fast as it left — the slow post-cut
+            # drift never happens. Surfaced as a number, not a render string.
+            "regain_to_loss_ratio": ratio,
+            "confidence": "low",
+            "n": len(episodes),
+        },
+        "_disclaimer": _BENCHMARK_DISCLAIMER,
+    }
+
+
+def _gate_signals() -> dict:
+    """Victor's entry gates — consult get_metabolic_adaptation + get_deficit_sustainability.
+    Defensive: thin data returns {'error': ...}; we surface availability, never block hard."""
+    out = {}
+    try:
+        from mcp.tools_nutrition import tool_get_deficit_sustainability, tool_get_metabolic_adaptation
+
+        ds = tool_get_deficit_sustainability({})
+        out["deficit_sustainability"] = {"available": "error" not in ds, "note": ds.get("error")} if isinstance(ds, dict) else {}
+        ma = tool_get_metabolic_adaptation({})
+        out["metabolic_adaptation"] = {"available": "error" not in ma, "note": ma.get("error")} if isinstance(ma, dict) else {}
+    except Exception as e:  # noqa: BLE001 — gates are advisory; never break the firewall view
+        out["gate_error"] = str(e)
+    return out
+
+
+def _benchmark_maintenance(args: dict) -> dict:
+    """BENCH-1.4 — the regain firewall. Only meaningful post-trough / near goal. Compares
+    current rolling walk volume to the proven floor + the post-trough decay signature that
+    preceded past dips. Support, never indictment (Nathan): forward signal, no failure tally."""
+    end_date = args.get("date") or _today()
+    ref = _read_reference()
+    if not ref:
+        return {
+            "view": "maintenance",
+            "status": "no training reference yet — episode-detect has not run",
+            "_disclaimer": _BENCHMARK_DISCLAIMER,
+        }
+
+    current_weight, _rate, _n = _current_weight_and_rate(end_date)
+    profile = get_profile()
+    goal = profile.get("goal_weight_lbs")
+
+    # Gate: the firewall activates near goal / post-trough. In the loss phase it just
+    # points back to the walking engine (forward, supportive).
+    near_goal = goal is not None and current_weight is not None and (current_weight - float(goal)) <= 25.0
+    if not near_goal:
+        return {
+            "view": "maintenance",
+            "applicable": False,
+            "current_weight": round(current_weight, 1) if current_weight is not None else None,
+            "goal_weight": float(goal) if goal is not None else None,
+            "signal": "The maintenance firewall activates near goal weight — right now you're in the proven-loss phase. Keep the easy walking engine on (see view=pace).",
+            "_disclaimer": _BENCHMARK_DISCLAIMER,
+        }
+
+    # Near goal: compare 4-week rolling walk volume to the proven floor + the post-trough
+    # decay signature (the easy-volume level that easy-volume historically dropped toward).
+    walks_current, _ = _recent_walks_wk(end_date, days=28)
+    band = _band_for(current_weight)
+    proven_floor = ((ref.get("bands") or {}).get(band, {}) or {}).get("walks_wk")
+    eps = _read_episodes()
+    pt = [
+        e.get("post_trough_8wk", {}).get("walks_wk")
+        for e in eps
+        if e.get("type") == "loss" and isinstance(e.get("post_trough_8wk"), dict) and e["post_trough_8wk"].get("walks_wk") is not None
+    ]
+    post_trough_signature = round(sum(pt) / len(pt), 2) if pt else None
+    firewall_ok = walks_current is not None and proven_floor is not None and walks_current >= proven_floor * 0.8
+
+    bits = []
+    if proven_floor is not None:
+        bits.append(f"Easy walking is {walks_current}/wk; the proven floor at this weight is ~{proven_floor}/wk.")
+    if post_trough_signature is not None:
+        bits.append(
+            f"The easy-volume dip toward ~{post_trough_signature}/wk is the pattern to stay ahead of — keep the walking on as the scale settles."
+        )
+
+    return {
+        "view": "maintenance",
+        "applicable": True,
+        "date": end_date,
+        "current_weight": round(current_weight, 1) if current_weight is not None else None,
+        "walks_wk_current": walks_current,
+        "proven_floor_walks_wk": proven_floor,
+        "post_trough_signature_walks_wk": post_trough_signature,
+        "firewall_ok": firewall_ok,
+        "gates": _gate_signals(),
+        "signal": " ".join(bits),
+        "confidence": "low",
+        "n": len(eps),
+        "_disclaimer": _BENCHMARK_DISCLAIMER,
+    }
+
+
 # ── dispatcher ──────────────────────────────────────────────────────────────────
 
 
@@ -182,12 +303,14 @@ def tool_get_benchmark(args):
     """View-dispatched cut-benchmarking tool (PRIVATE). Default view: pace."""
     VALID_VIEWS = {
         "pace": _benchmark_pace,
+        "episodes": _benchmark_episodes,
+        "maintenance": _benchmark_maintenance,
     }
     view = (args.get("view") or "pace").lower().strip()
     if view not in VALID_VIEWS:
         return {
             "error": f"Unknown view '{view}'.",
             "valid_views": list(VALID_VIEWS.keys()),
-            "hint": "Default is 'pace' (live pace vs your proven trajectory at the current weight).",
+            "hint": "Default is 'pace' (live pace vs your proven trajectory). Also: 'episodes' (ledger), 'maintenance' (regain firewall).",
         }
     return VALID_VIEWS[view](args)

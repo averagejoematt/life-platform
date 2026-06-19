@@ -664,16 +664,21 @@ TOOLS = {
                 "correlational, n=1 — never causal). Use 'view' to select: "
                 "'pace' (default) = live pace vs the proven trajectory at the current weight — current "
                 "weight/rate + recent walking volume vs the by-band proven volumes, walk gap, and the "
-                "~240 lb run gate. Forward-framed (what works next), never a failure tally. "
-                "Use for: 'how does my pace compare to last time?', 'am I walking enough?', 'can I run yet?'."
+                "~240 lb run gate. "
+                "'episodes' = the detected loss/regain ledger + loss-vs-regain rate asymmetry. "
+                "'maintenance' = the regain firewall (near goal): rolling walk volume vs the proven floor "
+                "and the post-trough decay signature. "
+                "All views forward-framed (what works next), never a failure tally. "
+                "Use for: 'how does my pace compare to last time?', 'am I walking enough?', 'can I run yet?', "
+                "'show my cut history', 'am I holding the loss?'."
             ),
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "view": {
                         "type": "string",
-                        "description": "pace (default) — live pace vs the proven trajectory.",
-                        "enum": ["pace"],
+                        "description": "pace (default), episodes (the cut ledger), or maintenance (the regain firewall).",
+                        "enum": ["pace", "episodes", "maintenance"],
                     },
                     "date": {
                         "type": "string",

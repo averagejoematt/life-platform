@@ -86,3 +86,66 @@ def test_pace_no_reference_yet(monkeypatch):
 def test_unknown_view_lists_valid():
     r = tb.tool_get_benchmark({"view": "bogus"})
     assert "error" in r and "pace" in r["valid_views"]
+
+
+# ── episodes view ──────────────────────────────────────────────────────────────
+
+_EPISODES = [
+    {
+        "sk": "DATE#2025-04-30",
+        "type": "loss",
+        "rate_lb_wk": 3.0,
+        "magnitude_lb": 118.0,
+        "post_trough_8wk": {"walks_wk": 4.4},
+        "outcome": "reversed",
+    },
+    {"sk": "DATE#2026-06-01", "type": "regain", "rate_lb_wk": 2.37, "magnitude_lb": 116.0},
+]
+
+
+def test_episodes_view_summary_and_asymmetry(monkeypatch):
+    def fake(source, start, end, *a, **k):
+        return _EPISODES if source == "weight_episodes" else []
+
+    monkeypatch.setattr(tb, "query_source", fake)
+    r = tb.tool_get_benchmark({"view": "episodes"})
+    s = r["summary"]
+    assert s["n_loss"] == 1 and s["n_regain"] == 1
+    assert s["mean_loss_rate_lb_wk"] == 3.0 and s["mean_regain_rate_lb_wk"] == 2.37
+    assert s["regain_to_loss_ratio"] == 0.79  # the ~0.79x asymmetry
+    assert s["confidence"] == "low" and s["n"] == 2
+
+
+# ── maintenance view (Nathan: forward only, no failure tally) ──────────────────
+
+
+def test_maintenance_not_applicable_far_from_goal(monkeypatch):
+    monkeypatch.setattr(tb, "get_profile", lambda: {"goal_weight_lbs": 185})
+    _mock_query(monkeypatch, withings=[{"date": "2026-06-19", "weight_lbs": 305.0}], strava=[])
+    r = tb.tool_get_benchmark({"view": "maintenance", "date": "2026-06-19"})
+    assert r["applicable"] is False
+    assert not _FAILURE_TALLY.search(r["signal"]), f"failure tally leaked: {r['signal']!r}"
+
+
+def test_maintenance_near_goal_forward_framed_no_failure_tally(monkeypatch):
+    monkeypatch.setattr(tb, "get_profile", lambda: {"goal_weight_lbs": 185})
+    monkeypatch.setattr(tb, "_gate_signals", lambda: {"deficit_sustainability": {"available": False}})
+
+    def fake(source, start, end, *a, **k):
+        if source == "training_reference":
+            return [_REF | {"bands": {"190-199": {"walks_wk": 12.0}}}]
+        if source == "withings":
+            return [{"date": "2026-06-19", "weight_lbs": 196.0}]
+        if source == "weight_episodes":
+            return _EPISODES
+        return []
+
+    monkeypatch.setattr(tb, "query_source", fake)
+    r = tb.tool_get_benchmark({"view": "maintenance", "date": "2026-06-19"})
+    assert r["applicable"] is True
+    assert r["proven_floor_walks_wk"] == 12.0
+    assert r["post_trough_signature_walks_wk"] == 4.4
+    assert r["confidence"] == "low" and "n" in r
+    # Nathan guardrail: the rendered signal must never tally failures/regains.
+    assert not _FAILURE_TALLY.search(r["signal"]), f"failure tally leaked: {r['signal']!r}"
+    assert "walking" in r["signal"].lower()
