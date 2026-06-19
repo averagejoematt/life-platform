@@ -64,8 +64,13 @@ def _band_for(weight: float) -> str:
     return f"{base}-{base + 9}"
 
 
-def _current_weight_and_rate(end_date: str, days: int = 21) -> tuple:
-    """(current_weight, rate_lb_wk [positive=losing], n_weighins) from recent withings."""
+def _current_weight_and_rate(end_date: str, days: int = 28) -> tuple:
+    """(current_weight, rate_lb_wk [positive=losing], n_weighins) from recent withings.
+
+    Rate is a least-squares slope over the window — robust to a single noisy weigh-in,
+    unlike the old endpoint difference (two close-but-divergent readings used to
+    manufacture an absurd rate, e.g. 12.75 lb/wk). Requires ≥3 weigh-ins spanning ≥7
+    days; otherwise returns None (honest "unknown" beats a fabricated number)."""
     start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=days)).strftime("%Y-%m-%d")
     rows = [r for r in query_source("withings", start, end_date) if r.get("weight_lbs") is not None]
     pts = sorted(((r.get("date") or r.get("sk", "").replace("DATE#", ""))[:10], float(r["weight_lbs"])) for r in rows)
@@ -73,11 +78,17 @@ def _current_weight_and_rate(end_date: str, days: int = 21) -> tuple:
         return None, None, 0
     current = pts[-1][1]
     rate = None
-    if len(pts) >= 2:
+    if len(pts) >= 3:
         d0 = datetime.strptime(pts[0][0], "%Y-%m-%d")
-        d1 = datetime.strptime(pts[-1][0], "%Y-%m-%d")
-        span_days = max(1, (d1 - d0).days)
-        rate = (pts[0][1] - pts[-1][1]) / (span_days / 7.0)  # positive when losing
+        xs = [(datetime.strptime(p[0], "%Y-%m-%d") - d0).days for p in pts]
+        ys = [p[1] for p in pts]
+        if (xs[-1] - xs[0]) >= 7:
+            n = len(xs)
+            xbar, ybar = sum(xs) / n, sum(ys) / n
+            denom = sum((x - xbar) ** 2 for x in xs)
+            if denom > 0:
+                slope = sum((x - xbar) * (y - ybar) for x, y in zip(xs, ys)) / denom  # lb/day
+                rate = round(-slope * 7.0, 2)  # positive when losing
     return current, rate, len(pts)
 
 
@@ -96,12 +107,21 @@ def _recent_walks_wk(end_date: str, days: int = 14) -> tuple:
 
 
 def _proven_rate_at(curve: list, weight: float):
-    """Local proven loss rate (lb/wk) at the matched weight, from the proven_curve."""
+    """Local proven loss rate (lb/wk) at the matched weight, from the proven_curve.
+
+    Clamps the lookup into the curve's weight range so a current weight just ABOVE the
+    curve's heaviest sample (the common case at re-entry — the curve is rounded to 1dp,
+    so 305.44 fell just past a 305.4 max and returned None → 'unknown') still resolves
+    to the nearest segment instead of failing."""
     pts = sorted(curve, key=lambda p: p.get("days_from_start", 0))
+    if len(pts) < 2:
+        return None
+    weights = [p.get("weight", 0) for p in pts]
+    w = min(max(weight, min(weights)), max(weights))  # clamp into [curve min, curve max]
     for a, b in zip(pts, pts[1:]):
         lo, hi = sorted([a.get("weight", 0), b.get("weight", 0)])
         dd = b.get("days_from_start", 0) - a.get("days_from_start", 0)
-        if lo <= weight <= hi and dd > 0:
+        if lo <= w <= hi and dd > 0:
             return round((b.get("cum_lost", 0) - a.get("cum_lost", 0)) / dd * 7.0, 2)
     return None
 
