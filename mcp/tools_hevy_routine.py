@@ -61,6 +61,51 @@ def _ts_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# Per-type Hevy folder routing (ADR-067 sibling). Mirrors the repo's
+# docs/coaching/routines/<type>/ layout: the Hevy folder is the session TYPE,
+# the phase lives in the title (Foundation - Push - 1 - 1). Hevy folders are a
+# FLAT list (no nesting) and folder_id is CREATE-ONLY (PUT omits it), so this is
+# applied once, on the create branch of commit. Edit the map to re-name folders.
+_FOLDER_BY_ARCHETYPE = {
+    "push": "Push",
+    "pull": "Pull",
+    "legs": "Legs",
+    "lower": "Legs",
+    "upper": "Upper",
+    "engine": "Engine",
+    "full_body": "Full Body",
+    "conditioning": "Engine",
+}
+
+
+def _folder_title_for(ir: Any) -> str:
+    arch = (getattr(ir, "archetype", "") or "custom").strip().lower()
+    return _FOLDER_BY_ARCHETYPE.get(arch, arch.title() or "Custom")
+
+
+def _ensure_folder(title: str) -> str | None:
+    """Find-or-create a Hevy routine folder by title; return its id (or None on
+    failure, so commit can proceed unfoldered rather than erroring). Hevy folders
+    are a flat list; folder_id is set-on-create only."""
+    import hevy_write_client as wc
+
+    try:
+        folders = wc.list_folders()
+    except Exception as e:  # noqa: BLE001 — never block a commit on folder I/O
+        logger.warning(f"list_folders failed; committing without folder: {e}")
+        return None
+    for f in folders.get("routine_folders") or folders.get("folders") or []:
+        if (f.get("title") or "").strip().lower() == title.strip().lower():
+            return f.get("id")
+    try:
+        created = wc.create_folder(title)
+        new_folder = created.get("routine_folder") or created
+        return new_folder.get("id")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"create_folder({title!r}) failed; committing without folder: {e}")
+        return None
+
+
 def _make_resolver():
     """movement_key -> Hevy template_id resolver with a reconcile-by-title fallback.
 
@@ -665,12 +710,18 @@ def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
     # the title (the 2026-06-15 "Push — {date}" false alarm).
     title_ctx, why = _resolve_title_inputs(ir)
     body = to_create_body(ir, _make_resolver(), title_context=title_ctx, why_note=why)
-    return {
+    out = {
         "status": "preview",
         "routine_id": routine_id,
         "wire_body": body,
         "rationale": ir.rationale,
     }
+    # Preview the per-type folder commit will file a NEW routine into (pure —
+    # the folder is only created/resolved at commit, never in dry_run). Existing
+    # routines keep their folder (create-only in Hevy), so only annotate new ones.
+    if not ir.hevy_routine_id:
+        out["target_folder"] = _folder_title_for(ir)
+    return out
 
 
 def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
@@ -698,6 +749,11 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
                 expected_updated_at=ir.hevy_updated_at,
             )
         else:
+            # File new routines into a per-type folder so the Hevy home page
+            # doesn't accumulate every routine. folder_id is create-only in Hevy
+            # (PUT omits it), so it must be set here, before to_create_body.
+            if not ir.hevy_folder_id:
+                ir.hevy_folder_id = _ensure_folder(_folder_title_for(ir))
             body = to_create_body(ir, resolve, title_context=title_ctx, why_note=why)
             resp = wc.create_routine(body)
         parsed = from_hevy_response(resp)
