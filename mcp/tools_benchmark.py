@@ -70,9 +70,15 @@ def _current_weight_and_rate(end_date: str, days: int = 28) -> tuple:
     Rate is a least-squares slope over the window — robust to a single noisy weigh-in,
     unlike the old endpoint difference (two close-but-divergent readings used to
     manufacture an absurd rate, e.g. 12.75 lb/wk). Requires ≥3 weigh-ins spanning ≥7
-    days; otherwise returns None (honest "unknown" beats a fabricated number)."""
+    days; otherwise returns None (honest "unknown" beats a fabricated number).
+
+    include_pilot=True (cross-phase): weight-change rate is physiological, not
+    experiment-scoped. The default ADR-058 filter hides pre-genesis weigh-ins, which
+    right after a reset leaves only a few post-genesis days of water-weight normalization
+    (a steep transient, not a real rate). Like episode-detect, this reads the true recent
+    trajectory across the phase boundary — the rate compares to LIFETIME proven history."""
     start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=days)).strftime("%Y-%m-%d")
-    rows = [r for r in query_source("withings", start, end_date) if r.get("weight_lbs") is not None]
+    rows = [r for r in query_source("withings", start, end_date, include_pilot=True) if r.get("weight_lbs") is not None]
     pts = sorted(((r.get("date") or r.get("sk", "").replace("DATE#", ""))[:10], float(r["weight_lbs"])) for r in rows)
     if not pts:
         return None, None, 0
