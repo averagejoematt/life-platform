@@ -1,6 +1,6 @@
 # Life Platform — Cost Tracker
 
-Last updated: 2026-06-18 (v8.6.0)
+Last updated: 2026-06-19 (v8.6.0)
 
 > Budget ceiling: **$75/month all-in** (raised from $25 with the Bedrock migration + automated guardrails, 2026-05-29). Design constraint: every feature must justify its cost.
 
@@ -22,6 +22,8 @@ Mar **$20.04** → Apr **$35.01** → May **$48.19** (peak) → Jun MTD ~**$18.6
 - **Secrets (~$6.45) — mostly irreducible** per-service OAuth isolation; the paused `strava` secret is intentionally retained.
 
 **Net:** run-rate is excellent and hard-capped; ~$6–10/mo of micro-savings exist but the high-value wins were already banked.
+
+> **BENCH-1 (2026-06-19, ADR-089):** the new `episode-detect` Lambda runs **weekly** (Sunday) and is **pure-Python (no Bedrock)** over a few thousand DDB rows — **pennies/mo** (Lambda + a handful of Query/PutItem calls). Dana: noted, negligible against the $75 ceiling.
 
 ---
 

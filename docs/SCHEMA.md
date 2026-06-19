@@ -2,7 +2,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs — ADR-005)
-**Last updated:** 2026-06-18 (v8.6.0 — 133 MCP tools, 20 data sources, 80 Lambdas, 12 cached tools)
+**Last updated:** 2026-06-19 (v8.6.0 — 134 MCP tools, 20 data sources, 81 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -105,7 +105,7 @@ Where multiple sources measure the same thing:
 
 ## Sources
 
-Valid source identifiers: `whoop`, `withings`, `strava`, `todoist`, `apple_health`, `hevy`, `eightsleep`, `chronicling`, `macrofactor`, `macrofactor_workouts`, `macrofactor_export`, `garmin`, `habitify`, `notion`, `labs`, `dexa`, `genome`, `supplements`, `weather`, `travel`, `state_of_mind`, `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, `hypotheses`, `chronicle`, `measurements`, `food_delivery`
+Valid source identifiers: `whoop`, `withings`, `strava`, `todoist`, `apple_health`, `hevy`, `eightsleep`, `chronicling`, `macrofactor`, `macrofactor_workouts`, `macrofactor_export`, `garmin`, `habitify`, `notion`, `labs`, `dexa`, `genome`, `supplements`, `weather`, `travel`, `state_of_mind`, `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, `hypotheses`, `chronicle`, `measurements`, `food_delivery`, `weight_episodes`, `training_reference`
 
 Note: `chronicling` is a historical/archived source — not actively ingesting. `hevy` became the **primary** strength-training source on 2026-05-25 (see ADR-060) — actively ingesting via hourly `hevy-backfill` poll of the Hevy events API; older Hevy records exist as legacy daily aggregates that the MCP `_expand_legacy_aggregate` bridge surfaces as virtual per-workout views. `macrofactor_export` is the explicit source label for workouts arriving via the manual MacroFactor Dropbox CSV export path (Tier 2 — see ADR-061). `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, and `hypotheses` are derived/computed partitions, not raw ingested data.
 
@@ -1116,6 +1116,49 @@ Note: S3 raw backup at `raw/weather/YYYY/MM/DD.json` (Lambda path only).
 Note: Idempotent ingestion — deduplicates by timestamp on re-ingestion. Requires a separate HAE automation with Data Type = "State of Mind" (same URL + auth as existing health metrics automation).
 
 Access via `get_state_of_mind_trend` MCP tool.
+
+---
+
+### weight_episodes (BENCH-1 — derived cut/regain ledger)
+
+Computed source written weekly by the `episode-detect` Lambda (ADR-089). One item per
+detected ≥15 lb loss/regain episode over the full Withings history. Cross-phase reference
+data — written **without** a `phase` attribute (survives a reset; passes the ADR-058 filter).
+
+**pk:** `USER#matthew#SOURCE#weight_episodes` · **sk:** `DATE#{end_date}` (trough for loss, peak for regain)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `episode_id` | string | e.g. `2024-09-05_loss` |
+| `type` | string | `loss` \| `regain` |
+| `start_date` / `end_date` | string | episode bounds (YYYY-MM-DD) |
+| `w_start` / `w_end` / `magnitude_lb` | number | smoothed weights + |Δ| |
+| `duration_wk` / `rate_lb_wk` / `peak_rate_lb_wk` | number | duration + mean/peak weekly rate |
+| `covariates_during` | map | `{walks_wk, walk_hr_wk, runs_wk, lift_sessions_wk, lift_sets_wk}` |
+| `covariates_reliable` | bool | false when window start < 2020-01-01 (sparse Strava) |
+| `post_trough_8wk` | map | `{walks_wk, walk_hr_wk}` (loss episodes only) |
+| `regain_180d_lb` / `outcome` | number / string | loss only — `held` (regain < magnitude/3) \| `reversed` |
+| `confidence` | string | `low` while total episode n < 30 |
+
+Access via `get_benchmark(view="episodes")`. PRIVATE.
+
+### training_reference (BENCH-1 — proven by-band prescription, singleton)
+
+Singleton computed source (ADR-089). Readers take the newest in-range record (the
+`computed_metrics` read pattern). Cross-phase; no TTL; no `phase` attribute.
+
+**pk:** `USER#matthew#SOURCE#training_reference` · **sk:** `DATE#{derived_date}`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `bands` | map | by-bodyweight-band proven volumes, e.g. `{"300-309": {walks_wk, walk_hr_wk, runs_wk, lift_sessions_wk}}` |
+| `proven_curve` | list | the 2024-09→2025-04 trajectory: `[{weight, days_from_start, cum_lost, walks_wk}, …]` |
+| `source_window` | string | `2024-09-05..2025-04-30` |
+| `derived_at` | string | ISO timestamp of the compute |
+| `confidence` | string | `low` |
+| `n_episodes_with_covariates` | number | episodes contributing covariates |
+
+Access via `get_benchmark(view="pace"/"maintenance")`. PRIVATE.
 
 ---
 

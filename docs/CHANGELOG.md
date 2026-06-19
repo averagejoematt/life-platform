@@ -1,3 +1,22 @@
+## Cut benchmarking (BENCH-1) — 2026-06-19 (ADR-089: descriptive divergence vs his own proven cut)
+
+PRIVATE cut-benchmarking & regain firewall operationalizing PROVEN_BLUEPRINT.md (16 loss episodes, 0 held; regain ≈ 0.79× loss; walking collapses post-trough).
+
+### Added
+- **Two derived computed sources** — `weight_episodes` (detected loss/regain ledger) + `training_reference` (by-band proven volumes + the 2024-09→2025-04 proven curve), keyed like `computed_metrics`, cross-phase (no `phase` attr → survive a reset).
+- **`episode-detect` Lambda** — weekly (Sun 17:00 UTC) + manual; pure-Python turning-point/episode/outcome/covariate pass over full Withings/Strava/Hevy history (reads pre-genesis too). No Bedrock (pennies/mo).
+- **`get_benchmark` MCP tool** (view-dispatched, PRIVATE): `pace` (live pace vs proven trajectory + ~240 lb run gate), `episodes` (the ledger + 0.79× asymmetry), `maintenance` (regain firewall near goal).
+
+### Guardrails (board)
+- **No predictor** (Henning): descriptive only, `n_held=0`, no classifier. Every numeric block carries `confidence`+`n`; no causal language.
+- **Forward framing** (Nathan): output strings never tally failures; a test asserts the `maintenance` signal has no failure-count string.
+- **Weekly, not nightly** (Viktor); **PRIVATE** — never surfaces to Elena Voss or any public surface.
+
+### Fixed
+- The work order's pasted ZigZag `turning_points` had a `direction=0` bug (records zero pivots); replaced with the standard ZigZag, which reproduces the validated values exactly (16 loss / 15 regain, 2.96 / 2.41 lb/wk, reference cut 116.4 lb / 33.6 wk, walks 11.5→4.38).
+
+---
+
 ## Hevy title renderer — 2026-06-16 (ADR-088: performed-derived N/Y + force_title lockdown)
 
 The `Phase - Type - N - Y` routine-title convention is now authoritative, honest, and self-naming — the chat model commits with **no title**.

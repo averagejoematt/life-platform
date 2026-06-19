@@ -200,6 +200,23 @@ class ComputeStack(Stack):
             schedule=events.Schedule.expression("cron(0 0 * * ? *)"),
         ).add_target(targets.LambdaFunction(daily_metrics_fn))
 
+        # BENCH-1.2: episode-detect — weekly cut/regain benchmarking (Viktor's
+        # weekly-not-nightly cadence). Reads full withings/strava/hevy history, writes
+        # weight_episodes + training_reference. Sun 17:00 UTC (~10 AM PT). Manual-invoke
+        # supported for the one-time backfill. Pure-Python algorithm, no Bedrock.
+        create_platform_lambda(
+            self,
+            "EpisodeDetect",
+            function_name="episode-detect",
+            handler="compute.episode_detect_lambda.lambda_handler",
+            source_file="lambdas/compute/episode_detect_lambda.py",
+            schedule="cron(0 17 ? * SUN *)",  # weekly, Sunday ~10:00 AM PT (fixed UTC, no DST drift)
+            timeout_seconds=120,
+            memory_mb=512,
+            custom_policies=rp.compute_episode_detect(),
+            **shared,
+        )
+
         create_platform_lambda(
             self,
             "DailyInsightCompute",

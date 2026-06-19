@@ -24,6 +24,31 @@ HR across the whole period was **97 bpm** — genuinely conversational. Volume d
 
 ---
 
+## Cross-episode finding (2012–2026) — the holding problem is the whole game
+
+Mining the full 14-year weight history (turning-point detection on smoothed weight, joined to
+Strava/Hevy) surfaces **16 distinct loss episodes ≥15 lb — and 0 that held** (held = regained <⅓ of
+the loss within 6 months). Losses include 36, 40, 69, 74 and 116 lb. **Losing has never been the
+problem; holding has never once been solved.**
+
+- **Regain is nearly as fast as loss.** Loss ≈ 3.0 lb/wk, regain ≈ 2.4 lb/wk (0.79×). The slow
+  post-cut drift that *should* follow doesn't — weight returns almost as fast as it left.
+- **Mechanism = post-trough activity collapse.** Walking volume craters in the ~8 weeks after every
+  low (2024–25: 11.4 → 4.4 walks/wk, still decaying). The loss engine is switched off at the moment
+  of success.
+- **It's seasonal.** 7 of 16 cuts start in December — a New-Year-restart loop that dies by mid-year.
+
+*Rigor:* n is small and training co-variates are only reliable from ~2020 (sparse Strava before —
+zeros there mean "not logged," not "inactive"). Descriptive of his own history, correlational.
+
+**Implication for the program:** the maintenance/defense phase and the post-trough activity-floor
+early-warning (§"Where the science improves", items 1 & 3) are not nice-to-haves — they are the *only*
+thing standing between a 17th successful loss and a 15th regain. Frame forward (compassionate,
+never a failure tally): "loss is the part you've proven; holding is the part we're engineering this
+time."
+
+---
+
 ## What the engine actually was
 
 During the 34-week cut, per week, on average:

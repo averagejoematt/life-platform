@@ -176,6 +176,9 @@ from mcp.tools_training import (
 # Vacation fund tracker ($1/workout-mile since experiment start).
 from mcp.tools_vacation import tool_get_vacation_fund
 
+# BENCH-1: cut-benchmarking & regain firewall (PRIVATE, view-dispatched).
+from mcp.tools_benchmark import tool_get_benchmark
+
 TOOLS = {
     "get_sources": {
         "fn": tool_get_sources,
@@ -646,6 +649,40 @@ TOOLS = {
                     "domain": {
                         "type": "string",
                         "description": "[risk_profile] 'cardiovascular', 'metabolic', 'longevity'. Omit for all. [trajectory] 'all', 'weight', 'biomarkers', 'fitness', 'recovery', 'metabolic'.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    "get_benchmark": {
+        "fn": tool_get_benchmark,
+        "schema": {
+            "name": "get_benchmark",
+            "description": (
+                "PRIVATE cut-benchmarking vs Matthew's own proven weight-loss history (descriptive, "
+                "correlational, n=1 — never causal). Use 'view' to select: "
+                "'pace' (default) = live pace vs the proven trajectory at the current weight — current "
+                "weight/rate + recent walking volume vs the by-band proven volumes, walk gap, and the "
+                "~240 lb run gate. "
+                "'episodes' = the detected loss/regain ledger + loss-vs-regain rate asymmetry. "
+                "'maintenance' = the regain firewall (near goal): rolling walk volume vs the proven floor "
+                "and the post-trough decay signature. "
+                "All views forward-framed (what works next), never a failure tally. "
+                "Use for: 'how does my pace compare to last time?', 'am I walking enough?', 'can I run yet?', "
+                "'show my cut history', 'am I holding the loss?'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "view": {
+                        "type": "string",
+                        "description": "pace (default), episodes (the cut ledger), or maintenance (the regain firewall).",
+                        "enum": ["pace", "episodes", "maintenance"],
+                    },
+                    "date": {
+                        "type": "string",
+                        "description": "Optional YYYY-MM-DD as-of date (default today).",
                     },
                 },
                 "required": [],

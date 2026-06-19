@@ -95,6 +95,9 @@
     "lambdas/compute/daily_metrics_compute_lambda.py": {
       "function": "daily-metrics-compute"
     },
+    "lambdas/compute/episode_detect_lambda.py": {
+      "function": "episode-detect"
+    },
     "lambdas/compute/dashboard_refresh_lambda.py": {
       "function": "dashboard-refresh"
     },

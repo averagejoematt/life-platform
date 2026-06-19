@@ -574,6 +574,12 @@ def compute_daily_metrics() -> list[iam.PolicyStatement]:
     return _compute_base(needs_kms=True)
 
 
+def compute_episode_detect() -> list[iam.PolicyStatement]:
+    """BENCH-1: episode-detect — DDB read (withings/strava/hevy full history) + write
+    (weight_episodes / training_reference computed sources), KMS. No AI, no S3."""
+    return _compute_base(needs_kms=True)
+
+
 def compute_coach_daily_reflection() -> list[iam.PolicyStatement]:
     """CC-08 daily reflection batch: reads COACH#/OUTPUT# + S3 voice specs, uses
     Bedrock (Haiku) for ≤120-word reflections, writes generated/coach_daily.json.

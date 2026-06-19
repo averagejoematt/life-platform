@@ -2550,3 +2550,25 @@ The AWS "account-controls" sub-grade stays below a literal-checklist A on those 
 **Phase advancement (operator):** to advance a phase, edit `config/training_phases.json` — flip `current` and bump `current_started` to that date (resets N per type) — then re-upload to S3 (`config/`). No code deploy. `reset_epoch_date` only changes on an experiment reset.
 
 ---
+
+## ADR-089: Cut benchmarking (BENCH-1) — descriptive divergence vs his own proven cut, weekly-computed, no predictor
+
+**Date:** 2026-06-19
+**Status:** Implemented (code + tests shipped; CDK deploy of `episode-detect` + one-time backfill + MCP redeploy pending — Matthew runs all deploys per the work order). **Related:** `docs/coaching/WORKORDER_BENCH1_benchmarking.md`, `docs/coaching/PROVEN_BLUEPRINT.md`, `lambdas/compute/episode_detect_lambda.py`, `mcp/tools_benchmark.py`. **Privacy:** PRIVATE — nothing in BENCH-1 may surface to Elena Voss or any public surface.
+
+**Context.** PROVEN_BLUEPRINT mined Matthew's 14-year Withings/Strava/Hevy history: 16 distinct ≥15 lb loss episodes, **0 that held** (regain ≈ 0.79× as fast as loss; walking volume collapses ~8 wk post-trough). Losing is proven; holding has never been solved. BENCH-1 operationalizes that finding as a tool the coach can consult.
+
+**Decision.**
+- **New partition (two thin derived computed sources), not a separate store** (Omar). `weight_episodes` (one item per detected episode) + `training_reference` (singleton: by-band proven volumes + the proven trajectory curve). Both keyed + serialized exactly like `computed_metrics` (PK `USER#…#SOURCE#{source}`, SK `DATE#…`, Decimal), read via `query_source`. Written **without** a `phase` attribute = cross-phase reference data: survives an experiment reset and passes the ADR-058 default filter. No TTL.
+- **Weekly compute, not nightly** (Viktor). `episode-detect` Lambda runs Sunday (EventBridge `cron(0 17 ? * SUN *)`) + manual-invoke; reads full history (bypassing the phase filter — detection spans pre-genesis). The live `pace` comparison is computed at tool-call time from the precomputed reference + recent Withings, so the daily value never waits on the weekly job.
+- **One view-dispatched MCP tool** (Anika), `get_benchmark` (`pace` | `episodes` | `maintenance`) — protects the SIMP-1 tool budget.
+- **No predictor** (Henning, hard scope). There is no "will-he-hold" model — `n_held = 0`, no positive class. BENCH-1 is purely *descriptive* divergence (current vs proven). Every numeric block carries `confidence` + `n`; small-n ⇒ `confidence: "low"`; no causal language in any output string.
+- **Forward framing** (Nathan, hard scope). Output strings never tally failures (no "0 of 16 held", no regain count) — they surface the forward signal ("walking is X vs the ~Y/wk that worked at this weight"). A unit test asserts the `maintenance` view's rendered signal contains no failure-count string.
+
+**Implementation note (algorithm correction).** The work order's pasted `turning_points` ZigZag snippet has a `direction=0` initialization bug that locks no extreme → records **zero** pivots (verified: 0 episodes on the real series). It was replaced with the standard ZigZag (running high/low since the last pivot), which reproduces the work order's validated values exactly: 16 loss / 15 regain, mean loss 2.96 / regain 2.41 lb/wk, 0 held, reference cut 116.4 lb / 33.6 wk (2024-09→2025-04), walks_wk 11.5 → 4.38 post-trough. Pinned by a datadrops-gated test (skips in CI; `datadrops/` is gitignored).
+
+**Cost (Dana):** pennies/mo — one weekly pure-Python Lambda (no Bedrock), two thin derived records.
+
+**Out of scope (board-rejected on this work order):** any holding/regain predictor or classifier; any public surface; a separate analytical store; nightly recompute; causal language; rendering the reversal count in a brief/digest. Re-propose separately if ever revisited.
+
+---
