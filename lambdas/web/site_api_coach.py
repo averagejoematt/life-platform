@@ -205,6 +205,61 @@ def _relationships(coach_id):
     return {"leans_on": out_edges[:3], "leaned_on_by": in_edges[:3]}
 
 
+def _character(p):
+    """Public-safe personality slice from board_of_directors.json — the fictional
+    background + traits that shape this coach's prompt. Config-only, no inference."""
+    key = p.get("board_persona_key")
+    if not key:
+        return {}
+    members = (_load_s3_json("config/board_of_directors.json", "board_dir") or {}).get("members", {})
+    m = members.get(key) or {}
+    if not m:
+        return {}
+    persn = m.get("personality") or {}
+    voice = m.get("voice") or {}
+    return {
+        "title": m.get("title"),
+        "principles": (m.get("principles") or [])[:5],
+        "voice": {k: voice.get(k) for k in ("tone", "style", "catchphrase") if voice.get(k)},
+        "tendencies": (persn.get("tendencies") or [])[:4],
+        "signature_behavior": persn.get("signature_behavior"),
+        "arc": persn.get("arc_seed"),
+        "relationship_to_matthew": m.get("relationship_to_matthew"),
+        "focus_areas": (m.get("focus_areas") or [])[:6],
+    }
+
+
+def _working_hypotheses(coach_id, limit=6):
+    """Live working hypotheses: open THREAD# (observation/prediction/concern) + pending
+    PREDICTION# claims. Already-computed by the coach engine; read-only here."""
+    out = []
+    try:
+        tr = table.query(
+            **with_phase_filter(
+                {"KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("THREAD#"), "Limit": 25}
+            )
+        )
+        for it in tr.get("Items", []):
+            d = _decimal_to_float(it)
+            if (d.get("status") or "").lower() in ("open", "active") and d.get("summary"):
+                out.append({"claim": d["summary"], "kind": d.get("type") or "thread", "since": d.get("created_date")})
+    except Exception as _e:
+        logger.warning(f"[coach] threads: {_e}")
+    try:
+        pr = table.query(
+            **with_phase_filter(
+                {"KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("PREDICTION#"), "Limit": 25}
+            )
+        )
+        for it in pr.get("Items", []):
+            d = _decimal_to_float(it)
+            if (d.get("status") or "").lower() in ("pending", "confirming") and d.get("claim_natural"):
+                out.append({"claim": d["claim_natural"], "kind": "prediction", "status": d.get("status"), "since": d.get("created_date")})
+    except Exception as _e:
+        logger.warning(f"[coach] predictions: {_e}")
+    return out[:limit]
+
+
 def _coach_daily(coach_id):
     """CC-08: today's cached daily reflection for a coach (generated/coach_daily.json),
     or None. Read-only over the batch-written artifact — never inferenced here."""
@@ -435,6 +490,8 @@ def handle_coach(event):
                 "board_role": p.get("board_role"),
                 "type": p.get("type"),
                 "disclosure": _DISCLOSURE,
+                "character": _character(p),
+                "working_hypotheses": _working_hypotheses(pid),
                 "stance": _stance_block(pid, weight),
                 "voice": _voice_subset(p["coach_config_key"]),
                 "relationships": _relationships(pid),

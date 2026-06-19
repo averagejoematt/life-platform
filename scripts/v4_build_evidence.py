@@ -411,7 +411,37 @@ REGISTRY = [
     ),
 ]
 
-GROUP_ORDER = ["The body", "Mind & accountability", "Protocol & experiments", "Credibility & the machine"]
+# IA regroup (2026-06-18): the old "Credibility & the machine" held 19 topics (too many
+# for one menu) — split into "How it holds up" (does the science hold up) + "The machine"
+# (how it's built & runs). And the reset-only pages (cycles / post-mortems / survival) move
+# to a footer-tier "The reset log" group — they're for Matt's own record, not readers.
+_REGROUP = {
+    "cycles": "The reset log",
+    "postmortems": "The reset log",
+    "survival": "The reset log",
+    "methodology": "How it holds up",
+    "predictions": "How it holds up",
+    "benchmarks": "How it holds up",
+    "biology": "How it holds up",
+    "wrong": "How it holds up",
+    "results": "How it holds up",
+    "mirror": "How it holds up",
+    "board": "The machine",
+    "build": "The machine",
+    "intelligence": "The machine",
+    "platform": "The machine",
+    "data": "The machine",
+    "pipeline": "The machine",
+    "tools": "The machine",
+    "inference": "The machine",
+    "cost": "The machine",
+    "explorer": "The machine",
+    "ask": "The machine",
+    "kitchen": "The machine",
+}
+REGISTRY = [(s, t, b, _REGROUP.get(s, g), *rest) for (s, t, b, g, *rest) in REGISTRY]
+
+GROUP_ORDER = ["The body", "Mind & accountability", "Protocol & experiments", "How it holds up", "The machine", "The reset log"]
 
 # Authored editorial content (faithful to the preserved legacy + the locked docs).
 EDITORIAL = {
@@ -431,6 +461,41 @@ EDITORIAL = {
     ),
     "build": (
         '<p class="rd-lede">Most of these pages show the data. This one shows the machine that gathers it — built in public, by one person and a model, on a hard $75-a-month ceiling.</p>'
+        # Hand-authored inline-SVG architecture diagram (themes via CSS vars; zero runtime cost).
+        '<figure class="arch-fig" aria-label="System architecture: ingest, store, serve, with one AI chokepoint">'
+        '<svg class="arch-svg" viewBox="0 0 760 250" role="img" preserveAspectRatio="xMidYMid meet">'
+        '<defs><marker id="ahd" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">'
+        '<path d="M0,0 L7,3 L0,6 Z" fill="var(--ink-faint)"/></marker></defs>'
+        # ── Pipeline row: Sources → Ingest → Store → Compute → Serve ──
+        '<g font-family="var(--font-mono)">'
+        '<rect class="ab" x="8" y="22" width="132" height="62" rx="8"/>'
+        '<text class="at" x="74" y="50">Sources</text><text class="as" x="74" y="68">20+ wearables · apps · labs</text>'
+        '<rect class="ab" x="160" y="22" width="120" height="62" rx="8"/>'
+        '<text class="at" x="220" y="50">Ingest</text><text class="as" x="220" y="68">15 λ · EventBridge</text>'
+        '<rect class="ab" x="300" y="22" width="120" height="62" rx="8"/>'
+        '<text class="at" x="360" y="50">Store</text><text class="as" x="360" y="68">S3 raw · DynamoDB</text>'
+        '<rect class="ab" x="440" y="22" width="120" height="62" rx="8"/>'
+        '<text class="at" x="500" y="50">Compute</text><text class="as" x="500" y="68">5 daily λ · Python</text>'
+        '<rect class="ab" x="580" y="22" width="172" height="62" rx="8"/>'
+        '<text class="at" x="666" y="50">Serve</text><text class="as" x="666" y="68">Site · MCP · Email · OG</text>'
+        # arrows between stages
+        '<line class="aa" x1="142" y1="53" x2="158" y2="53" marker-end="url(#ahd)"/>'
+        '<line class="aa" x1="282" y1="53" x2="298" y2="53" marker-end="url(#ahd)"/>'
+        '<line class="aa" x1="422" y1="53" x2="438" y2="53" marker-end="url(#ahd)"/>'
+        '<line class="aa" x1="562" y1="53" x2="578" y2="53" marker-end="url(#ahd)"/>'
+        # ── AI chokepoint band + governor ──
+        '<rect class="ab abk" x="160" y="158" width="400" height="62" rx="8"/>'
+        '<text class="at" x="360" y="184">bedrock_client.py — the one AI chokepoint</text>'
+        '<text class="as" x="360" y="202">narrates pre-computed numbers · never does the math</text>'
+        '<rect class="ab abg" x="580" y="158" width="172" height="62" rx="8"/>'
+        '<text class="at" x="666" y="184">Budget governor</text><text class="as" x="666" y="202">tier 0–3 · caps the bill</text>'
+        # dashed links: chokepoint feeds Compute + Serve; governor gates the chokepoint
+        '<path class="ad" d="M500,158 L500,86" marker-end="url(#ahd)"/>'
+        '<path class="ad" d="M540,158 C540,120 660,120 666,86" marker-end="url(#ahd)"/>'
+        '<line class="ad" x1="580" y1="189" x2="562" y2="189" marker-end="url(#ahd)"/>'
+        "</g></svg>"
+        '<figcaption class="rd-figcap label">Ingest → store → serve. Every number is computed in Python; the model only narrates, through one Bedrock chokepoint, gated by a budget governor.</figcaption>'
+        "</figure>"
         '<section class="rd-sec"><h2 class="rd-h">A board of AI experts that argues</h2>'
         "<p class=\"rd-prose\">The coaching layer isn't one assistant — it's an ensemble of eight named personas (a sports scientist, a metabolic doctor, a behavioural coach, an N=1 statistician, and others) that each read the week from their own discipline. They disagree, and the disagreements are surfaced rather than averaged away — a single confident voice is exactly what an experiment of one should distrust. <em>(ADR-047 / ADR-055; <strong>coach_computation_engine.py</strong>.)</em></p></section>"
         '<section class="rd-sec"><h2 class="rd-h">Keeping a model honest about my own data</h2>'

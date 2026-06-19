@@ -271,9 +271,21 @@ body { overflow-x: hidden; }
 
 /* ── The Coaches (CC-01/02) — per-coach page in the reader pane ───────────── */
 .dx-disclosure { display: block; margin-top: var(--sp-2); color: var(--ink-faint); font-style: italic; max-width: var(--measure); }
-.coach-stance, .coach-progress, .coach-report, .coach-voice, .coach-rel {
+.coach-stance, .coach-progress, .coach-report, .coach-voice, .coach-rel, .coach-char, .coach-hyp {
   margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: var(--border-hair);
 }
+/* The character — personality/background that shapes the coach's prompt. */
+.cc-sig { margin-top: var(--sp-3); }
+.cc-sig .label, .cc-tend, .cc-focus, .cc-voice, .cc-arc { color: var(--ink-faint); }
+.cc-principles { margin: var(--sp-3) 0 0; padding-left: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-1); }
+.cc-principles li { font-family: var(--font-serif); color: var(--ink); line-height: var(--lh-relaxed); }
+.cc-tend, .cc-focus, .cc-voice, .cc-arc { margin-top: var(--sp-2); }
+.cc-catch { margin-top: var(--sp-2); font-family: var(--font-serif); font-style: italic; color: var(--ember); }
+/* Working hypotheses — live bets the coach is making right now. */
+.ch-list { list-style: none; margin: var(--sp-3) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.ch-list li { font-family: var(--font-serif); color: var(--ink); line-height: var(--lh-relaxed); border-left: 2px solid var(--ember-line); padding-left: var(--sp-3); }
+.ch-list .label { color: var(--ember); margin-right: var(--sp-1); }
+.ch-prediction { border-left-color: var(--ember); }
 .cs-headline { font-family: var(--font-serif); font-size: var(--fs-h2); line-height: 1.15; margin-top: var(--sp-2); color: var(--ink); }
 .cs-care, .cs-careless, .cr-edges { margin-top: var(--sp-3); color: var(--ink); font-size: var(--fs-body); line-height: var(--lh-relaxed); max-width: var(--measure); }
 .cs-care .label, .cs-careless .label, .cr-edges .label { display: block; color: var(--ember); margin-bottom: 2px; }

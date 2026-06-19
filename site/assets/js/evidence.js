@@ -51,11 +51,48 @@ function evClass(ev) { const s = String(ev || "").toLowerCase(); if (/strong|hig
 function kvtable(o, f) { const r = Object.entries(o || {}).filter(([k, v]) => !k.startsWith("_") && v != null).map(([k, v]) => `<tr><td class="rd-name">${esc(ttl(k))}</td><td class="num">${esc(f && f[k] ? f[k](v) : (typeof v === "object" ? (v.summary || v.label || v.value || "—") : fmt(v)))}</td></tr>`).join(""); return r ? `<table class="rd-tbl"><tbody>${r}</tbody></table>` : ""; }
 
 /* ── Renderers (bound to real shapes) ─────────────────────────────────────── */
-function renderSupplements(d) { const g = d.groups || {}; const head = figs([fig(d.total_count ?? Object.values(g).reduce((a, x) => a + (x.items || []).length, 0), "compounds"), d.as_of_date && fig(d.as_of_date, "as of")]); const secs = Object.values(g).map((grp) => { const cards = (grp.items || []).map((s) => { const [c, l] = evClass(s.ev); const pct = Math.max(4, Math.min(100, s.evPct ?? 0)); return `<article class="supp"><header class="supp-top"><h3 class="supp-name">${esc(s.name)}</h3>${s.dose ? `<span class="supp-dose num">${esc(s.dose)}</span>` : ""}${s.timing ? `<span class="supp-timing label">${esc(s.timing)}</span>` : ""}</header>${s.why ? `<p class="supp-why">${esc(s.why)}</p>` : ""}<div class="supp-ev"><span class="supp-evlabel ${c}">${l}</span><span class="supp-meter"><i class="${c}" style="width:${pct}%"></i></span><span class="supp-evpct num">${s.evPct != null ? s.evPct + "%" : ""}</span></div><p class="supp-meta label">${[s.board && "src: " + esc(s.board), s.cost_monthly != null && "$" + esc(s.cost_monthly) + "/mo"].filter(Boolean).join("  ·  ")}</p></article>`; }).join(""); return `<section class="rd-sec"><div class="rd-grouphead"><h2 class="rd-h">${esc(grp.name)}</h2>${grp.desc ? `<p class="rd-desc">${esc(grp.desc)}</p>` : ""}</div><div class="supp-grid">${cards}</div></section>`; }).join(""); return head + secs + note("Evidence strength is the published research consensus — not a claim about Matthew."); }
+function renderSupplements(d) { const g = d.groups || {}; const head = figs([fig(d.total_count ?? Object.values(g).reduce((a, x) => a + (x.items || []).length, 0), "compounds"), d.as_of_date && fig(d.as_of_date, "as of")]); const secs = Object.values(g).map((grp) => { const cards = (grp.items || []).map((s) => { const [c, l] = evClass(s.ev); const pct = Math.max(4, Math.min(100, s.evPct ?? 0)); return `<article class="supp"><header class="supp-top"><h3 class="supp-name">${esc(s.name)}</h3>${s.dose ? `<span class="supp-dose num">${esc(s.dose)}</span>` : ""}${s.timing ? `<span class="supp-timing label">${esc(s.timing)}</span>` : ""}</header>${s.why ? `<p class="supp-why">${esc(s.why)}</p>` : ""}<div class="supp-ev"><span class="supp-evlabel ${c}">${l}</span><span class="supp-meter"><i class="${c}" style="width:${pct}%"></i></span><span class="supp-evpct num">${s.evPct != null ? s.evPct + "%" : ""}</span></div><p class="supp-meta label">${[s.board && "src: " + esc(s.board), s.cost_monthly != null && "$" + esc(s.cost_monthly) + "/mo", (s.evidence_url || ((s.sources || []).find((x) => x && x.url) || {}).url) && `<a class="supp-ev-link" href="${esc(s.evidence_url || (s.sources.find((x) => x && x.url) || {}).url)}" target="_blank" rel="noopener">evidence ↗</a>`].filter(Boolean).join("  ·  ")}</p></article>`; }).join(""); return `<section class="rd-sec"><div class="rd-grouphead"><h2 class="rd-h">${esc(grp.name)}</h2>${grp.desc ? `<p class="rd-desc">${esc(grp.desc)}</p>` : ""}</div><div class="supp-grid">${cards}</div></section>`; }).join(""); return head + secs + note("Evidence strength is the published research consensus — not a claim about Matthew."); }
 function renderLabs(d) { const L = d.labs || d; const bm = L.biomarkers || []; if (!bm.length) return empty("No bloodwork drawn yet — panels appear here as they're added."); const by = {}; for (const b of bm) (by[b.category || "Other"] ||= []).push(b); const secs = Object.entries(by).map(([cat, rows]) => sec(cat, `<table class="rd-tbl"><thead><tr><th>biomarker</th><th>value</th><th>reference</th><th>flag</th></tr></thead><tbody>${rows.map((b) => { const f = b.flag && String(b.flag).toLowerCase() !== "null"; return `<tr class="${f ? "rd-flag" : ""}"><td class="rd-name">${esc(b.name)}</td><td class="num">${esc(b.value)}${b.unit ? ` <span class="rd-unit">${esc(b.unit)}</span>` : ""}</td><td class="num rd-range">${esc(b.range || "—")}</td><td>${f ? `<span class="rd-flagmark">${esc(b.flag)}</span>` : ""}</td></tr>`; }).join("")}</tbody></table>`)).join(""); return figs([fig(L.total_draws ?? "—", "draws"), fig(bm.length, "biomarkers"), fig(L.flagged_count ?? 0, "flagged"), L.latest_draw_date && fig(L.latest_draw_date, "latest draw")]) + secs + note("Reference ranges are lab-provided; flags mark out-of-range."); }
-async function renderPhysical(d) { const x = d.latest_dexa; if (!x) return empty("No DEXA scan on file yet — body-composition detail appears here after your next scan."); const bc = x.body_composition || {}, s = x.score_360 || {}, idx = x.indices || {}, bone = x.bone || {}, sf = x.segmental_fat || {}, sl = x.segmental_lean || {}; const wp = await tryJSON("/api/weight_progress"); const wj = await tryJSON("/api/journey"); const chart = sec("Weight trajectory", lineChart((wp && wp.weight_progress) || [], { valueKey: "weight_lbs", goal: wj && wj.journey && wj.journey.goal_weight_lbs, unit: " lb", label: "Weight · recent readings", emptyMsg: "Weight trajectory fills as weigh-ins accrue." })); return chart + figs([bc.body_fat_pct != null && fig(fmt(bc.body_fat_pct, 1) + "%", "body fat"), bc.lean_mass_lb != null && fig(dualWeight(bc.lean_mass_lb, "lb"), "lean mass"), bc.visceral_fat_lb != null && fig(dualWeight(bc.visceral_fat_lb, "lb"), "visceral fat"), s.biological_age != null && fig(fmt(s.biological_age, 1), "biological age", s.biological_age_delta != null ? `${s.biological_age_delta > 0 ? "+" : ""}${fmt(s.biological_age_delta, 1)} vs actual` : "")]) + sec("Composition", kvtable(bc)) + sec("Indices (ALMI / FFMI / FMI)", kvtable(idx)) + sec("Bone density", kvtable(bone)) + (Object.keys(sf).length ? sec("Segmental fat %", kvtable(sf)) : "") + (Object.keys(sl).length ? sec("Segmental lean", kvtable(sl)) : "") + note(`DEXA scan${x.scan_date ? ` · ${esc(x.scan_date)}` : ""}.`); }
-async function renderTraining(d) { const t = d.training || {}; const [str, wk, wo] = await Promise.all([tryJSON("/api/strength_benchmarks"), tryJSON("/api/weekly_physical_summary"), tryJSON("/api/workouts")]); const head = figs([fig(t.workouts_30d ?? "—", "workouts · 30d"), fig(t.weekly_avg ?? "—", "weekly avg"), t.z2_pct != null && fig(t.z2_pct + "%", "zone-2 target"), t.avg_strain != null && fig(fmt(t.avg_strain, 1), "avg strain"), t.strength_sessions_30d != null && fig(t.strength_sessions_30d, "strength · 30d"), d.walking && d.walking.avg_daily_steps != null && fig(fmt(d.walking.avg_daily_steps), "avg daily steps")]); const lifts = (str && str.benchmarks) || []; const strSec = lifts.length ? sec("Strength — estimated 1RM", `<table class="rd-tbl"><thead><tr><th>lift</th><th>current</th><th>target</th><th>progress</th></tr></thead><tbody>${lifts.map((l) => `<tr><td class="rd-name">${esc(ttl(l.lift))}</td><td class="num">${dualWeight(l.current_1rm, "lb")}</td><td class="num rd-range">${dualWeight(l.target, "lb")}</td><td class="num">${l.progress_pct != null ? fmt(l.progress_pct) + "%" : "—"}</td></tr>`).join("")}</tbody></table>`) : ""; const days = (wk && wk.days) || []; const wkSec = days.length ? sec("This week — daily movement", `<table class="rd-tbl"><thead><tr><th>day</th><th>steps</th><th>active min</th></tr></thead><tbody>${days.map((x) => `<tr><td class="rd-name">${esc(x.day_of_week || x.date)}</td><td class="num">${fmt(x.steps)}</td><td class="num">${fmt(x.total_active_minutes)}</td></tr>`).join("")}</tbody></table>`) : ""; const stepsChart = days.length ? sec("Steps this week", barChart(days, { valueKey: "steps", labelKey: "day_of_week", label: "Daily steps" })) : ""; const sessions = d.whoop_workouts || []; const sessSec = sessions.length ? sec("Recent sessions", `<table class="rd-tbl"><thead><tr><th>date</th><th>sport</th><th>strain</th><th>Z2 min</th><th>avg HR</th></tr></thead><tbody>${sessions.slice(0, 30).map((w) => `<tr><td class="rd-name">${esc(String(w.date || "").slice(0, 10))}</td><td>${esc(w.sport_name || "—")}</td><td class="num">${fmt(w.strain, 1)}</td><td class="num">${fmt(w.zone_2_minutes)}</td><td class="num rd-range">${fmt(w.average_heart_rate)}</td></tr>`).join("")}</tbody></table>`) : ""; const log = (wo && wo.workouts) || []; const logSec = log.length ? sec("Strength log — per-exercise sets", log.slice(0, 12).map((w) => `<details class="wlog"><summary class="wlog-sum"><span class="wlog-t">${esc(w.title || w.date)}</span><span class="wlog-m label">${[w.date, w.exercise_count != null && Math.round(w.exercise_count) + " exercises", w.total_volume_kg != null && dualWeight(w.total_volume_kg, "kg")].filter(Boolean).map(esc).join("  ·  ")}</span></summary>${(w.exercises || []).map((e) => `<div class="wlog-ex"><p class="wlog-ex-n">${esc(e.name)}</p><table class="rd-tbl"><tbody>${(e.sets || []).map((s, i) => `<tr><td class="rd-name">${esc(s.type || "set")} ${i + 1}</td><td class="num">${s.reps != null ? fmt(s.reps) + " reps" : "—"}</td><td class="num rd-range">${s.weight_kg != null ? dualWeight(s.weight_kg, "kg") : (s.distance_m != null ? fmt(s.distance_m) + " m" : "—")}</td></tr>`).join("")}</tbody></table></div>`).join("")}</details>`).join("")) : ""; if (!head.includes("fig-v") && !strSec && !wkSec && !sessSec && !logSec) return empty("No training logged yet — workouts, Zone-2, and strength benchmarks appear here as sessions accrue."); return head + logSec + sessSec + stepsChart + strSec + wkSec + note("Correlative — training load vs the body's response. Per-exercise sets from Hevy; per-session strain & zones from Whoop."); }
-async function renderNutrition(d) { const ov = d && !d.error ? d : null; const [fm, ps] = await Promise.all([tryJSON("/api/frequent_meals"), tryJSON("/api/protein_sources")]); const meals = (fm && fm.meals) || []; const prot = (ps && (ps.sources || ps.proteins)) || []; const parts = []; if (ov) parts.push(figs(Object.entries(ov).filter(([k, v]) => ["string", "number"].includes(typeof v) && !k.startsWith("_")).slice(0, 4).map(([k, v]) => fig(fmt(v), ttl(k))))); if (meals.length) parts.push(sec("Most-logged meals", `<table class="rd-tbl"><tbody>${meals.slice(0, 20).map((m) => `<tr><td class="rd-name">${esc(m.name || m.meal)}</td><td class="num">${fmt(m.count ?? m.times)}×</td></tr>`).join("")}</tbody></table>`)); if (prot.length) parts.push(sec("Protein sources", `<table class="rd-tbl"><tbody>${prot.slice(0, 20).map((p) => `<tr><td class="rd-name">${esc(p.name || p.source)}</td><td class="num">${fmt(p.grams ?? p.g)}g</td></tr>`).join("")}</tbody></table>`)); if (!parts.length) return empty("No nutrition logged yet — macros, frequent meals, and protein sources appear here once meals are tracked."); return parts.join("") + note("Correlative — intake vs the deficit."); }
+async function renderPhysical(d) { const x = d.latest_dexa; if (!x) return empty("No DEXA scan on file yet — body-composition detail appears here after your next scan."); const bc = x.body_composition || {}, s = x.score_360 || {}, idx = x.indices || {}, bone = x.bone || {}, sf = x.segmental_fat || {}, sl = x.segmental_lean || {}; const wp = await tryJSON("/api/weight_progress"); const wj = await tryJSON("/api/journey"); const chart = sec("Weight trajectory", lineChart((wp && wp.weight_progress) || [], { valueKey: "weight_lbs", goal: wj && wj.journey && wj.journey.goal_weight_lbs, unit: " lb", label: "Weight · recent readings", emptyMsg: "Weight trajectory fills as weigh-ins accrue." })); return chart + figs([bc.body_fat_pct != null && fig(fmt(bc.body_fat_pct, 1) + "%", "body fat"), bc.lean_mass_lb != null && fig(dualWeight(bc.lean_mass_lb, "lb"), "lean mass"), bc.visceral_fat_lb != null && fig(dualWeight(bc.visceral_fat_lb, "lb"), "visceral fat"), s.biological_age != null && fig(fmt(s.biological_age, 1), "biological age")]) + sec("Composition", kvtable(bc)) + sec("Indices (ALMI / FFMI / FMI)", kvtable(idx)) + sec("Bone density", kvtable(bone)) + (Object.keys(sf).length ? sec("Segmental fat %", kvtable(sf)) : "") + (Object.keys(sl).length ? sec("Segmental lean", kvtable(sl)) : "") + note(`DEXA scan${x.scan_date ? ` · ${esc(x.scan_date)}` : ""}.`); }
+async function renderTraining(d) { const t = d.training || {}; const [str, wk, wo] = await Promise.all([tryJSON("/api/strength_benchmarks"), tryJSON("/api/weekly_physical_summary"), tryJSON("/api/workouts")]); const head = figs([fig(t.workouts_30d ?? "—", "workouts · 30d"), fig(t.weekly_avg ?? "—", "weekly avg"), t.z2_pct != null && fig(t.z2_pct + "%", "zone-2 target"), t.avg_strain != null && fig(fmt(t.avg_strain, 1), "avg strain"), t.strength_sessions_30d != null && fig(t.strength_sessions_30d, "strength · 30d"), d.walking && d.walking.avg_daily_steps != null && fig(fmt(d.walking.avg_daily_steps), "avg daily steps")]); const lifts = (str && str.benchmarks) || []; const strSec = lifts.length ? sec("Strength — estimated 1RM", `<table class="rd-tbl"><thead><tr><th>lift</th><th>current</th><th>target</th><th>progress</th></tr></thead><tbody>${lifts.map((l) => `<tr><td class="rd-name">${esc(ttl(l.lift))}</td><td class="num">${dualWeight(l.current_1rm, "lb")}</td><td class="num rd-range">${dualWeight(l.target, "lb")}</td><td class="num">${l.progress_pct != null ? fmt(l.progress_pct) + "%" : "—"}</td></tr>`).join("")}</tbody></table>`) : ""; const days = (wk && wk.days) || []; const wkSec = days.length ? sec("This week — daily movement", `<table class="rd-tbl"><thead><tr><th>day</th><th>steps</th><th>active min</th></tr></thead><tbody>${days.map((x) => `<tr><td class="rd-name">${esc(x.day_of_week || x.date)}</td><td class="num">${fmt(x.steps)}</td><td class="num">${fmt(x.total_active_minutes)}</td></tr>`).join("")}</tbody></table>`) : ""; const stepsChart = days.length ? sec("Steps this week", barChart(days, { valueKey: "steps", labelKey: "day_of_week", label: "Daily steps" })) : ""; const cardio = d.cardio_sessions || []; const _km = (mi) => (mi != null ? (mi * 1.60934).toFixed(1) : null); const sessSec = cardio.length ? sec("Recent cardio", `<table class="rd-tbl"><thead><tr><th>date</th><th>activity</th><th>distance</th><th>min</th><th>avg HR</th></tr></thead><tbody>${cardio.slice(0, 20).map((w) => `<tr><td class="rd-name">${esc(String(w.date || "").slice(0, 10))}</td><td>${esc(ttl(w.sport || "—"))}</td><td class="num rd-range">${w.distance_mi != null ? `${fmt(w.distance_mi, 1)} mi · ${_km(w.distance_mi)} km` : "—"}</td><td class="num">${fmt(w.minutes)}</td><td class="num">${fmt(w.avg_hr)}</td></tr>`).join("")}</tbody></table>`) : ""; const log = (wo && wo.workouts) || []; const logSec = log.length ? sec("Strength log — per-exercise sets", log.slice(0, 12).map((w) => `<details class="wlog"><summary class="wlog-sum"><span class="wlog-t">${esc(w.title || w.date)}</span><span class="wlog-m label">${[w.date, w.exercise_count != null && Math.round(w.exercise_count) + " exercises", w.total_volume_kg != null && dualWeight(w.total_volume_kg, "kg")].filter(Boolean).map(esc).join("  ·  ")}</span></summary>${(w.exercises || []).map((e) => `<div class="wlog-ex"><p class="wlog-ex-n">${esc(e.name)}</p><table class="rd-tbl"><tbody>${(e.sets || []).map((s, i) => `<tr><td class="rd-name">${esc(s.type && s.type.toLowerCase() !== "normal" ? s.type : "set")} ${i + 1}</td><td class="num">${s.reps != null ? fmt(s.reps) + " reps" : "—"}</td><td class="num rd-range">${s.weight_kg != null ? dualWeight(s.weight_kg, "kg") : (s.distance_m != null ? fmt(s.distance_m) + " m" : "—")}</td></tr>`).join("")}</tbody></table></div>`).join("")}</details>`).join("")) : ""; if (!head.includes("fig-v") && !strSec && !wkSec && !sessSec && !logSec) return empty("No training logged yet — workouts, Zone-2, and strength benchmarks appear here as sessions accrue."); return head + logSec + sessSec + stepsChart + strSec + wkSec + note("Correlative — training load vs the body's response. Per-exercise sets from Hevy; per-session strain & zones from Whoop."); }
+async function renderNutrition(d) {
+  // The API nests macros under d.nutrition (was read flat → blank); meal/protein field
+  // names are frequency/food/avg_daily_g (were count/name/grams → empty tables).
+  const n = (d && d.nutrition) || (d && !d.error ? d : {});
+  const [fm, ps] = await Promise.all([tryJSON("/api/frequent_meals"), tryJSON("/api/protein_sources")]);
+  const meals = (fm && fm.meals) || [];
+  const prot = (ps && (ps.protein_sources || ps.sources || ps.proteins)) || [];
+  const parts = [];
+  const head = figs([
+    n.avg_calories != null && fig(fmt(n.avg_calories), "avg calories"),
+    n.avg_protein_g != null && fig(fmt(n.avg_protein_g) + "g", "avg protein"),
+    n.avg_deficit != null && fig(fmt(n.avg_deficit), "avg deficit"),
+    n.protein_hit_pct != null && fig(fmt(n.protein_hit_pct) + "%", "protein target hit"),
+  ]);
+  if (head.includes("fig-v")) parts.push(head);
+  if (meals.length)
+    parts.push(
+      sec(
+        "Most-logged meals",
+        `<table class="rd-tbl"><tbody>${meals
+          .slice(0, 20)
+          .map((m) => `<tr><td class="rd-name">${esc(m.name || m.meal)}</td><td class="num">${fmt(m.frequency ?? m.count ?? m.times)}×</td></tr>`)
+          .join("")}</tbody></table>`,
+      ),
+    );
+  if (prot.length)
+    parts.push(
+      sec(
+        "Top protein sources",
+        `<table class="rd-tbl"><tbody>${prot
+          .slice(0, 20)
+          .map((p) => `<tr><td class="rd-name">${esc(p.food || p.name || p.source)}</td><td class="num">${fmt(p.avg_daily_g ?? p.grams ?? p.g)}g/day</td></tr>`)
+          .join("")}</tbody></table>`,
+      ),
+    );
+  if (!parts.length) return empty("No nutrition logged yet — macros, frequent meals, and protein sources appear here once meals are tracked.");
+  return parts.join("") + note("Correlative — intake vs the deficit.");
+}
 async function renderGlucose(d) { const [mg, mr] = await Promise.all([tryJSON("/api/meal_glucose"), tryJSON("/api/meal_responses")]); const cur = d && d.glucose; const rows = ((mr && mr.meals) || (mg && mg.meals) || []); const head = figs([cur && cur.avg != null && fig(fmt(cur.avg), "avg mg/dL"), cur && cur.tir != null && fig(cur.tir + "%", "time in range"), (mg && mg.has_cgm != null) && fig(mg.has_cgm ? "yes" : "no", "cgm active")]); const mealSec = rows.length ? sec("Meal glucose response", `<table class="rd-tbl"><thead><tr><th>meal</th><th>peak</th><th>Δ rise</th></tr></thead><tbody>${rows.slice(0, 25).map((m) => `<tr><td class="rd-name">${esc(m.name || m.meal)}</td><td class="num">${fmt(m.peak ?? m.peak_mgdl)}</td><td class="num">${fmt(m.delta ?? m.rise)}</td></tr>`).join("")}</tbody></table>`) : ""; const trendChart = sec("Glucose trend", lineChart(d.glucose_trend || [], { valueKey: "value", label: "Glucose", emptyMsg: "The glucose curve fills once a CGM sensor is active." })); if (!head.includes("fig-v") && !mealSec && !(d.glucose_trend || []).length) return trendChart + empty("No CGM data yet — once a sensor is active, this marries each meal to its glucose response (peak, rise, return-to-baseline)."); return head + trendChart + mealSec + note("Correlative — how specific meals moved glucose. Not diagnostic."); }
 async function renderSleep(d) {
   const s = d.sleep_detail || {};
@@ -89,9 +126,52 @@ async function renderSleep(d) {
   return detail + circSec + uniSec + note("Correlative — last night, the recent trend, and today's behavioural forecast.");
 }
 function renderMind(d) { const m = d.mind || {}; const vices = d.vice_streaks || []; const head = figs([m.journal_entries_30d != null && fig(m.journal_entries_30d, "journal · 30d"), m.mood_entries_count != null && fig(m.mood_entries_count, "mood logs"), m.resist_rate_pct != null && fig(fmt(m.resist_rate_pct) + "%", "temptations resisted"), m.meaningful_pct != null && fig(m.meaningful_pct + "%", "meaningful talk")]); const v = vices.length ? sec("Vice streaks (held)", `<table class="rd-tbl"><tbody>${vices.map((x) => `<tr><td class="rd-name">${esc(ttl(x.name))}</td><td class="num">${fmt(x.current_streak)}d ${x.holding ? "✓" : ""}</td></tr>`).join("")}</tbody></table>`) : ""; if (!head.includes("fig-v") && !v) return empty("No mood / journal / temptation data yet — the inner-life view fills in as you log."); return head + v + note("Correlative — mood, reflection, restraint. Categories kept private."); }
-function renderVices(d) { const v = d.vices || []; if (!v.length) return empty("No vice tracking yet."); return figs([fig(d.total_held ?? 0, "held"), fig(d.total_tracked ?? v.length, "tracked")]) + sec("Streaks", `<table class="rd-tbl"><thead><tr><th>vice</th><th>current</th><th>best</th><th>relapses 90d</th></tr></thead><tbody>${v.map((x) => `<tr class="${x.holding ? "" : "rd-flag"}"><td class="rd-name">${esc(ttl(x.name))}</td><td class="num">${fmt(x.current_streak)}d</td><td class="num rd-range">${fmt(x.best_streak)}d</td><td class="num">${fmt(x.relapses_90d)}</td></tr>`).join("")}</tbody></table>`) + note("Shown honestly — held and broken both. Named privately."); }
+function renderVices(d) {
+  const v = d.vices || [];
+  if (!v.length) return empty("No vice tracking yet.");
+  const MILES = [7, 30, 90, 180, 365];
+  const card = (x) => {
+    const cur = Number(x.current_streak) || 0;
+    const next = MILES.find((m) => m > cur) || cur + 365;
+    const prev = [...MILES].reverse().find((m) => m <= cur) || 0;
+    const pct = Math.max(4, Math.min(100, Math.round(((cur - prev) / (next - prev)) * 100)));
+    return (
+      `<article class="vice-card ${x.holding ? "vice-hold" : "vice-broke"}">` +
+      `<header class="vice-top"><span class="vice-name">${esc(ttl(x.name))}</span><span class="vice-flag label">${x.holding ? "holding" : "reset"}</span></header>` +
+      `<div class="vice-streak"><span class="vice-days num">${cur}</span><span class="vice-unit label">day${cur === 1 ? "" : "s"} clean</span></div>` +
+      `<div class="vice-bar"><i style="width:${pct}%"></i></div>` +
+      `<p class="vice-meta label">${[`next ${next}d`, x.best_streak != null && `best ${fmt(x.best_streak)}d`, x.relapses_90d != null && `${fmt(x.relapses_90d)} resets·90d`].filter(Boolean).join("  ·  ")}</p>` +
+      `</article>`
+    );
+  };
+  return (
+    figs([fig(d.total_held ?? 0, "holding"), fig(d.total_tracked ?? v.length, "tracked")]) +
+    `<div class="vice-grid">${v.map(card).join("")}</div>` +
+    note("Shown honestly — held and broken both. Named privately.")
+  );
+}
 function renderLedger(d) { const t = d.totals || {}; return figs([fig("$" + fmt(t.total_donated_usd), "donated"), fig("$" + fmt(t.total_bounties_usd), "bounties earned"), fig("$" + fmt(t.total_punishments_usd), "punishments"), fig(fmt(t.bounty_count), "bounties")]) + note("Money moved by the accountability rules — skin in the game."); }
-function renderDiscoveries(d) { const hyp = d.active_hypotheses || [], inner = d.inner_life || []; const card = (h, t, b, badge) => `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(t)}</h3>${badge ? `<span class="rd-badge">${esc(badge)}</span>` : ""}</header>${b ? `<p class="rd-why">${esc(b)}</p>` : ""}</article>`; const hs = hyp.length ? sec("Active hypotheses", `<div class="rd-cards">${hyp.map((h) => card(h, h.name, h.hypothesis || h.description, h.evidence_tier)).join("")}</div>`) : ""; const is = inner.length ? sec("Inner-life findings", `<div class="rd-cards">${inner.map((f) => card(f, f.title, f.body, f.confidence)).join("")}</div>`) : ""; if (!hs && !is) return empty("No discoveries logged yet — hypotheses and findings appear here."); return hs + is + note("Correlative leads, not conclusions — each is a hypothesis under test."); }
+function renderDiscoveries(d) {
+  // Real discoveries first: ai_findings = FDR-significant correlations computed from
+  // Matt's own data (the API computed these but the page never rendered them — it showed
+  // only library hypothesis templates, which read as placeholder). Hypotheses now last,
+  // reframed "under test". Empty state names the small-n reality honestly.
+  const findings = d.ai_findings || [],
+    inner = d.inner_life || [],
+    hyp = d.active_hypotheses || [];
+  const card = (t, b, badge) =>
+    `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(t)}</h3>${badge ? `<span class="rd-badge">${esc(badge)}</span>` : ""}</header>${b ? `<p class="rd-why">${esc(b)}</p>` : ""}</article>`;
+  const fs = findings.length
+    ? sec("Correlations found in the data", `<div class="rd-cards">${findings.map((f) => card(f.title, f.body, f.n ? `n=${f.n}` : "")).join("")}</div>`)
+    : "";
+  const is = inner.length ? sec("Inner-life findings", `<div class="rd-cards">${inner.map((f) => card(f.title, f.body, f.confidence)).join("")}</div>`) : "";
+  const hs = hyp.length
+    ? sec("Hypotheses under test", `<div class="rd-cards">${hyp.map((h) => card(h.name, h.hypothesis || h.description, h.evidence_tier)).join("")}</div>`)
+    : "";
+  if (!fs && !is && !hs)
+    return empty("No discoveries yet — real correlations and findings surface here as the data accrues. This cycle is only days old, so it needs more data first.");
+  return fs + is + hs + note("Correlative leads, not conclusions — FDR-corrected, but n is small this early in the cycle.");
+}
 function renderGenome(d) { const g = d.genome || d; const rs = g.risk_summary || {}; const cats = g.categories || {}; const head = figs([g.total_snps != null && fig(fmt(g.total_snps), "SNPs analysed"), rs.unfavorable != null && fig(rs.unfavorable, "unfavorable"), rs.favorable != null && fig(rs.favorable, "favorable")]); const cs = Object.keys(cats).length ? sec("Risk by category", kvtable(cats)) : ""; if (!head.includes("fig-v") && !cs) return empty("Genome not yet published."); return head + cs + note("Genotype is predisposition, not destiny — context for the biomarkers."); }
 async function renderChallenges(d) {
   const cur = await tryJSON("/api/current_challenge");
@@ -102,13 +182,15 @@ async function renderChallenges(d) {
   const live = list.filter((c) => c.origin === "live");
   const avail = list.filter((c) => c.origin === "catalog" && c.status === "available");
   const backlog = list.filter((c) => c.origin === "catalog" && c.status === "backlog");
-  const head = figs([fig(sm.active ?? live.length, "active"), fig(avail.length, "available"), fig(backlog.length, "in backlog")]);
+  const head = figs([fig(sm.active ?? live.length, "active"), fig(avail.length + backlog.length, "in the backlog")]);
   const liveCard = (c) => { const done = !!c.completed_at || c.status === "completed"; const active = !done && (c.status === "active" || !!c.activated_at); return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(c.name || ttl(c.challenge_id || "Challenge"))}</h3><span class="rd-badge ${active ? "rd-badge-live" : ""}">${done ? "completed" : active ? "active" : "candidate"}</span></header><p class="rd-meta label">${[c.character_xp_awarded != null && c.character_xp_awarded + " XP", c.badge_earned && "🏅 badge"].filter(Boolean).join("  ·  ")}</p></article>`; };
   const catCard = (c) => `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(c.name)}</h3><span class="rd-badge">${esc(c.status)}</span></header>${c.one_liner ? `<p class="rd-why">${esc(c.one_liner)}</p>` : ""}<p class="rd-meta label">${[c.category, c.difficulty, c.duration_days && c.duration_days + "d"].filter(Boolean).map(esc).join("  ·  ")}</p></article>`;
   const liveSec = sec("Taken on", live.length ? `<div class="rd-cards">${live.map(liveCard).join("")}</div>` : empty("None taken on yet this cycle."));
-  const availSec = avail.length ? sec(`Available now (${avail.length})`, `<div class="rd-cards">${avail.map(catCard).join("")}</div>`) : "";
-  const backSec = backlog.length ? sec(`Backlog (${backlog.length})`, `<div class="rd-cards">${backlog.slice(0, 60).map(catCard).join("")}</div>`) : "";
-  return banner + head + liveSec + availSec + backSec + note("An N=1 instrument — reader participation is deferred.");
+  // "Available now" vs "Backlog" was a distinction without a difference — both are
+  // catalog ideas not yet taken on. One backlog.
+  const candidates = avail.concat(backlog);
+  const backSec = candidates.length ? sec(`Backlog (${candidates.length})`, `<div class="rd-cards">${candidates.slice(0, 80).map(catCard).join("")}</div>`) : "";
+  return banner + head + liveSec + backSec + note("An N=1 instrument — reader participation is deferred.");
 }
 function renderProtocols(d) { const ps = (d.protocols || []).slice().sort((a, b) => (/(active|running|on)/i.test(a.status || "") ? 0 : 1) - (/(active|running|on)/i.test(b.status || "") ? 0 : 1)); if (!ps.length) return empty("No active protocols yet."); return figs([fig(ps.length, "active protocols")]) + `<div class="rd-cards">${ps.map((p) => `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(p.name)}</h3>${p.status ? `<span class="rd-badge">${esc(p.status)}</span>` : ""}</header>${p.why ? `<p class="rd-why">${esc(p.why)}</p>` : ""}${p.mechanism ? `<p class="rd-line"><span class="label">mechanism</span> ${esc(p.mechanism)}</p>` : ""}<p class="rd-meta label">${[p.domain, p.tier && "tier " + esc(p.tier)].filter(Boolean).map(esc).join("  ·  ")}</p></article>`).join("")}</div>` + note("Matthew's deliberate interventions, read-only. Not medical advice."); }
 function renderExperiments(d) {
@@ -120,7 +202,11 @@ function renderExperiments(d) {
   const backlog = lib.filter((x) => x.status === "backlog");
   const head = figs([fig(running.length, "running"), avail.length ? fig(avail.length, "ready to run") : "", fig(backlog.length, "in backlog")]);
   const runCard = (x) => { const done = /complete|done|ended|closed/i.test(x.status || ""); const verdict = x.hypothesis_confirmed === true ? "confirmed" : x.hypothesis_confirmed === false ? "not confirmed" : (x.outcome || x.status || "running"); return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(x.name)}</h3><span class="rd-badge ${done ? "" : "rd-badge-live"}">${esc(x.status || "")}</span></header>${x.hypothesis ? `<p class="rd-why"><span class="label">hypothesis</span> ${esc(x.hypothesis)}</p>` : ""}${x.result_summary && !isBad(x.result_summary) ? `<p class="rd-line">${esc(x.result_summary)}</p>` : ""}<p class="rd-meta label">${[verdict, x.grade && "grade " + esc(x.grade)].filter(Boolean).map(esc).join("  ·  ")}</p></article>`; };
-  const libCard = (x) => `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(x.name)}</h3><span class="rd-badge">${esc(x.status)}</span></header>${x.hypothesis ? `<p class="rd-why">${esc(x.hypothesis)}</p>` : x.result_summary ? `<p class="rd-why">${esc(x.result_summary)}</p>` : ""}<p class="rd-meta label">${[x.pillar, x.difficulty, x.evidence_tier && "tier " + x.evidence_tier].filter(Boolean).map(esc).join("  ·  ")}</p></article>`;
+  const libCard = (x) => {
+    const meta = [x.pillar, x.difficulty, x.evidence_tier && "tier " + x.evidence_tier, x.evidence_citation && "src: " + x.evidence_citation].filter(Boolean).map(esc).join("  ·  ");
+    const link = x.source_url ? ` · <a class="supp-ev-link" href="${esc(x.source_url)}" target="_blank" rel="noopener">evidence ↗</a>` : "";
+    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(x.name)}</h3><span class="rd-badge">${esc(x.status)}</span></header>${x.hypothesis ? `<p class="rd-why">${esc(x.hypothesis)}</p>` : x.result_summary ? `<p class="rd-why">${esc(x.result_summary)}</p>` : ""}<p class="rd-meta label">${meta}${link}</p></article>`;
+  };
   const runSec = sec("Running now", running.length ? `<div class="rd-cards">${running.map(runCard).join("")}</div>` : empty("Nothing running yet this cycle — the experiment just started."));
   const pipeline = [...avail, ...backlog];
   const pipeSec = pipeline.length ? sec(`In the pipeline (${pipeline.length})`, `<div class="rd-cards">${pipeline.slice(0, 60).map(libCard).join("")}</div>`) : "";
@@ -141,7 +227,22 @@ async function renderHabits(d) {
     const body = order.map((g) => { const hs = habits.filter((h) => (h.group || "Other") === g); if (!hs.length) return ""; return `<h4 class="hb-group label">${esc(g)} <span class="rd-unit">${hs.length}</span></h4><table class="rd-tbl"><tbody>${hs.map((h) => `<tr><td class="rd-name">${esc(h.name)}</td><td class="num rd-range">${esc(h.frequency || "daily")}</td></tr>`).join("")}</tbody></table>`; }).join("");
     list = sec(`Habits I'm tracking (${habits.length})`, body);
   }
-  return head + dow + list + note("Everything I'm trying to do — sourced from Habitify. Private habits are never shown.");
+  // Last 7 days as a day-of-week color grid: green = mostly hit, amber = partial, red = miss.
+  const hist = (d.history || []).slice(-7);
+  const _dl = (ds) => ["S", "M", "T", "W", "T", "F", "S"][new Date(ds + "T00:00:00").getDay()] || "";
+  const _hc = (p) => (p >= 80 ? "hb7-good" : p >= 50 ? "hb7-mid" : "hb7-miss");
+  const grid = hist.length
+    ? sec(
+        "Last 7 days",
+        `<div class="hb7">${hist
+          .map(
+            (h) =>
+              `<div class="hb7-cell ${_hc(h.tier0_pct || 0)}" title="${esc(h.date || "")} · ${fmt(h.tier0_pct)}%"><span class="hb7-dow label">${_dl(h.date || "")}</span><span class="hb7-pct num">${fmt(h.tier0_pct)}</span></div>`,
+          )
+          .join("")}</div>`,
+      )
+    : "";
+  return head + grid + dow + list + note("Everything I'm trying to do — sourced from Habitify. Private habits are never shown.");
 }
 // The board — pick an expert, read their actual per-domain take + track record.
 async function renderBoard(d) {
@@ -588,7 +689,14 @@ async function renderCenter() {
   ro.innerHTML = `<p class="rd-archive"><span class="shimmer">Loading ${esc(t.title)}…</span></p>`;
   try { const data = await getJSON(t.endpoint); const fn = RENDERERS[t.slug] || renderGeneric; const html = await fn(data, t); ro.innerHTML = html && html.trim() ? html : empty("No data published for this section yet."); if (WIRE[t.slug]) WIRE[t.slug](); }
   catch (e) { ro.innerHTML = empty("This readout couldn't load its data just now. The preserved view is linked below."); }
-  main.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  // Only pull the viewport to the readout on MOBILE (the nav stacks above the
+  // content there). On desktop the readout sits beside the sticky nav, so a smooth
+  // scroll-to-top just fights the user's own scrolling — the "freezing / pulling
+  // up" bug. Respect reduced-motion.
+  if (matchMedia("(max-width: 819px)").matches) {
+    const smooth = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+    main.scrollIntoView({ block: "start", behavior: smooth ? "smooth" : "auto" });
+  }
 }
 function select(slug, push = true) {
   if (!BYSLUG[slug]) return;
@@ -605,3 +713,18 @@ wireTheme();
 buildTabs();
 buildSide();
 renderCenter();
+
+// Build stamp — muted deploy fingerprint in the footer (apples-to-apples in QA). Reads
+// the <meta name="build"> the deploy script injects; no-op locally where it's absent.
+(function () {
+  try {
+    const m = document.querySelector('meta[name="build"]');
+    const foot = document.querySelector(".site-foot");
+    if (!m || !m.content || !foot) return;
+    const s = document.createElement("span");
+    s.className = "build-stamp label";
+    s.textContent = "build " + m.content.split(" ")[0];
+    s.title = m.content;
+    foot.appendChild(s);
+  } catch (e) {}
+})();
