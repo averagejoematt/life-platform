@@ -31,5 +31,6 @@ programmed variable, tightened over weeks. Warm-up cues before key lifts.
 | Type | File | Hevy routine_id | Status |
 |------|------|-----------------|--------|
 | legs | `legs/foundation_legs_w1.md` | a98f6295-0e6e-42b5-86da-93df6eb854a8 | committed (2026-06-18) |
+| engine | `engine/foundation_engine_w1.md` | 997d764a-d41d-4b4a-b7c3-7565105b78c1 | committed (2026-06-19) |
 
 *(append as routines are built)*
