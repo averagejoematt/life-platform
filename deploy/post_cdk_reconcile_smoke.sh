@@ -166,6 +166,17 @@ if [[ "$FAILED" -gt 0 ]]; then
   exit 1
 fi
 
+# ── Lambda config drift (timeout/memory deployed != CDK) ──────────────────────
+# Born 2026-06-19: ai-expert-analyzer's timeout fix was committed to CDK but never
+# deployed, so it timed out daily into the DLQ and emailed an alert every day. The
+# handler check above only catches handler drift — this catches timeout/memory drift.
+echo "=== Lambda config drift (deployed vs CDK) ==="
+if python3 "$(dirname "$0")/check_lambda_config_drift.py"; then
+  echo -e "  ${GREEN}✅ No timeout/memory drift${RESET}"
+else
+  echo -e "  ${RED}⚠ Lambda config drift — a CDK timeout/memory change was never deployed (see above). Fix: cdk deploy the owning stack.${RESET}"
+fi
+
 # ── S3 public read check (catches bucket policy wipe after P1 incident pattern) ────────────
 echo "=== S3 public read verification ==="
 S3_HTTP=$(curl -s -o /dev/null -w "%{http_code}" \

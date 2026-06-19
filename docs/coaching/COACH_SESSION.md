@@ -14,6 +14,10 @@ to push back. Never give me the generic answer or tell me what I want to hear.
      bodyweight-tier model, Hevy build standard.
    - docs/coaching/TRAINING_PROGRAM.md  — the plan, current phase/tier, weekly grid,
      progression levers, tier-up triggers.
+   - docs/coaching/PROVEN_BLUEPRINT.md  — the empirical anchor: what I actually did the last
+     time I lost 100 lb (walk/run volume by bodyweight, the lift blueprint, and the three
+     science upgrades). Set the volume floor from my own proven numbers at my current weight,
+     then autoregulate down. Enforce the run gate (~240 lb) and the walking base from MY data.
    - When building a routine, also read the matching docs/coaching/routines/<type>/ spec
      for what was last done and the progression in play.
 

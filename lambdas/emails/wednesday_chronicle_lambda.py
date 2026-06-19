@@ -1982,10 +1982,17 @@ def lambda_handler(event, context):
     # Budget guardrail: at Tier ≥ 1 skip this week's chronicle entirely (weekly,
     # non-essential, subscriber-facing) — no Bedrock spend, clean no-op.
     try:
-        from budget_guard import allow as _budget_allow
+        from budget_guard import current_tier
 
-        if not _budget_allow("chronicle"):
-            logger.info("Budget tier active — Wednesday chronicle paused this week (no Bedrock spend)")
+        # Chronicle is weekly flagship content (~$1/wk of Bedrock) and the Friday Panel
+        # podcast's ONLY input — so it must survive tier 1 and only pause at tier >= 2,
+        # in lockstep with the Panel lambda's SKIP_TIER=2. We read the tier directly
+        # (it equals budget_guard's "chronicle" cutoff, now 2) so this fix ships as a
+        # one-function deploy with no layer rebuild. WAS: allow("chronicle"), whose
+        # cutoff of 1 paused this at the mildest budget state and silently starved the
+        # podcast for weeks (2026-06-19). Revert to allow("chronicle") at the next layer bump.
+        if current_tier() >= 2:
+            logger.info("Budget tier >= 2 — Wednesday chronicle paused this week (no Bedrock spend)")
             return {"statusCode": 200, "body": "skipped: budget tier"}
     except ImportError:
         pass

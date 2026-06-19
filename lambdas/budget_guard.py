@@ -8,8 +8,11 @@ as the Tier-3 hard backstop.
 
 Tiers (cumulative — higher tier disables more):
   0 Normal    everything runs
-  1 Caution   heavy coach AI off (narrative/ensemble/chronicle)
-  2 Restrict  + public website AI off (/api/ask, /api/board_ask)
+  1 Caution   heavy DAILY coach AI off (narrative/ensemble); weekly flagship
+              content (chronicle + the Friday Panel podcast) keeps running —
+              it's ~$1/wk and is the product, so it survives until tier 2.
+  2 Restrict  + public website AI off (/api/ask, /api/board_ask) + chronicle off
+              (matches the Panel's own SKIP_TIER=2, so the two stay in lockstep)
   3 Hard stop + ALL Bedrock off; daily brief is data-only
 
 Fail-open: if SSM is unreadable (transient error, missing grant, param absent)
@@ -32,7 +35,11 @@ _CACHE_TTL_S = 300  # 5 min — matches the governor's hourly cadence well enoug
 _FEATURE_CUTOFF = {
     "coach_narrative": 1,
     "ensemble": 1,
-    "chronicle": 1,
+    # chronicle: was 1 (paused at the mildest budget state, which silently starved
+    # the Friday Panel podcast — its only input is the weekly chronicle). Raised to
+    # 2 so the flagship weekly Story+podcast survives tier 1, in lockstep with the
+    # Panel lambda's own SKIP_TIER=2. Weekly Bedrock cost is ~$1 — negligible vs $75.
+    "chronicle": 2,
     "website_ai": 2,
     "daily_brief_ai": 3,
 }
