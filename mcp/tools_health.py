@@ -182,14 +182,22 @@ def tool_get_readiness_score(args):
     GREEN / YELLOW / RED signal with a 1-line actionable recommendation.
 
     Weights:
-      Whoop recovery score  : 35%
+      Whoop recovery score  : 40%
       Whoop sleep quality    : 25%
       HRV 7-day trend       : 20%
       TSB training form     : 10%
-      Garmin Body Battery   : 10%
+      Garmin Body Battery   : 5%
 
     If a component is unavailable, remaining weights are re-normalised so the
-    score is still meaningful with partial data.
+    score is still meaningful with partial data. Garmin Body Battery is
+    additionally skipped when it is more than 1 day staler than the newest
+    Whoop record (Garmin ingestion is unreliable), to keep stale Garmin data
+    from entering the score.
+
+    The top-level "date" reflects the actual newest data date across components,
+    not the requested date. When the requested date has no data yet (its
+    overnight hasn't happened), "is_forward_dated" is true and a
+    "staleness_warning" explains the score reflects the latest available data.
 
     Device agreement: Whoop vs Garmin HRV and RHR delta is computed and returned
     as a confidence signal — large disagreement flags lower score reliability.
@@ -223,7 +231,7 @@ def tool_get_readiness_score(args):
         rec_score = float(whoop_today["recovery_score"])
         components["whoop_recovery"] = {
             "score": round(rec_score, 1),
-            "weight": 0.35,
+            "weight": 0.40,
             "raw": {
                 "date": whoop_today.get("date"),
                 "recovery_score": whoop_today.get("recovery_score"),
@@ -365,14 +373,23 @@ def tool_get_readiness_score(args):
     garmin_sorted = sorted(garmin_recent, key=lambda x: x.get("date", ""), reverse=True)
     garmin_today = next((g for g in garmin_sorted if g.get("body_battery_end") is not None or g.get("body_battery_high") is not None), None)
 
-    if garmin_today:
+    # Freshness gate: Garmin ingestion is unreliable and Body Battery can be days
+    # stale. Skip it entirely when it's more than 1 day older than the newest Whoop
+    # record so stale Garmin data can't enter the score at full weight. The weight
+    # re-normalisation below redistributes the freed weight onto Whoop automatically.
+    garmin_stale = False
+    if garmin_today and whoop_today and garmin_today.get("date") and whoop_today.get("date"):
+        if date_diff_days(garmin_today["date"], whoop_today["date"]) > 1:
+            garmin_stale = True
+
+    if garmin_today and not garmin_stale:
         # Use end-of-day Body Battery as primary; fall back to high if end is missing
         bb = garmin_today.get("body_battery_end") or garmin_today.get("body_battery_high")
         if bb is not None:
             bb_score = _clamp(float(bb))  # Body Battery is already 0-100
             components["garmin_body_battery"] = {
                 "score": round(bb_score, 1),
-                "weight": 0.10,
+                "weight": 0.05,
                 "raw": {
                     "date": garmin_today.get("date"),
                     "body_battery_end": garmin_today.get("body_battery_end"),
@@ -470,8 +487,24 @@ def tool_get_readiness_score(args):
 
     recommendation = " ".join(rec_parts)
 
+    # ── Honest data date + staleness ──────────────────────────────────────────
+    # Each component pulls a 7-day window and takes the newest available record,
+    # so the components may pre-date the requested end_date (e.g. asking for a
+    # date whose overnight hasn't happened yet). Surface the ACTUAL data date
+    # rather than stamping the request. Only whoop_recovery / sleep_quality /
+    # garmin_body_battery carry a raw.date.
+    _data_dates = [
+        components[k]["raw"].get("date")
+        for k in ("whoop_recovery", "sleep_quality", "garmin_body_battery")
+        if k in components and components[k]["raw"].get("date")
+    ]
+    as_of_date = max(_data_dates) if _data_dates else end_date
+    is_forward_dated = as_of_date < end_date
+
     result = {
-        "date": end_date,
+        "date": as_of_date,
+        "requested_date": end_date,
+        "is_forward_dated": is_forward_dated,
         "readiness_score": readiness_score,
         "label": label,
         "recommendation": recommendation,
@@ -480,12 +513,19 @@ def tool_get_readiness_score(args):
         "data_completeness": "full" if total_weight >= 0.99 else f"partial ({round(total_weight*100)}% weight covered)",
         "missing_components": missing if missing else None,
         "scoring_note": (
-            "Weights: Whoop recovery 35%, Whoop sleep quality 25%, HRV 7d trend 20%, TSB form 10%, "
-            "Garmin Body Battery 10%. Missing components are excluded and remaining weights re-normalised."
+            "Weights: Whoop recovery 40%, Whoop sleep quality 25%, HRV 7d trend 20%, TSB form 10%, "
+            "Garmin Body Battery 5%. Missing components are excluded and remaining weights re-normalised. "
+            "Garmin Body Battery is skipped when >1 day staler than the newest Whoop record."
         ),
         # R13-F09: Medical disclaimer on all health-assessment tool responses
         "_disclaimer": "For personal health tracking only. Not medical advice. Consult a qualified healthcare provider before making health decisions based on this data.",
     }
+    if is_forward_dated:
+        result["staleness_warning"] = (
+            f"No data exists for the requested date ({end_date}) yet — its overnight hasn't been recorded. "
+            f"This score reflects the latest available data ({as_of_date}) and should be treated as a "
+            "current/trend signal, not the requested day's readiness."
+        )
     # Cross-check: show pre-computed readiness if available (computed by daily-metrics-compute
     # with slightly different weights — useful to spot drift between models)
     if _cm.get("readiness_score") is not None:
@@ -493,7 +533,7 @@ def tool_get_readiness_score(args):
             "readiness_score": float(_cm["readiness_score"]),
             "label": _cm.get("readiness_colour", ""),
             "source": "daily-metrics-compute (9:40 AM)",
-            "note": "Pre-computed with Whoop recovery 35% + HRV trend 25% + TSB 20% + Body Battery 15% + sleep debt 5%. Minor weight difference from live tool.",
+            "note": "Pre-computed with Whoop recovery 40% + sleep 30% + HRV trend 20% + TSB 10% (no Body Battery component). Minor weight difference from live tool.",
         }
     return result
 
