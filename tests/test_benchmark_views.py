@@ -210,3 +210,20 @@ def test_thin_window_rate_is_none_not_fabricated(monkeypatch):
     _mock_query(monkeypatch, withings=withings, strava=[])
     r = tb.tool_get_benchmark({"view": "pace", "date": "2026-06-19"})
     assert r["current"]["current_rate_lb_wk"] is None  # <3 pts / <7d span → honest None
+
+
+def test_pace_rate_queries_withings_cross_phase(monkeypatch):
+    # The current-rate window must read withings cross-phase (include_pilot=True) — the
+    # ADR-058 filter would otherwise leave only post-genesis water-weight days.
+    calls = {}
+
+    def fake(source, start, end, *a, **k):
+        if source == "withings":
+            calls["withings_include_pilot"] = k.get("include_pilot", False)
+            return [{"date": "2026-06-19", "weight_lbs": 305.4}]
+        return [] if source == "strava" else [_REF]
+
+    monkeypatch.setattr(tb, "query_source", fake)
+    monkeypatch.setattr(tb, "get_profile", lambda: {"goal_weight_lbs": 185})
+    tb.tool_get_benchmark({"view": "pace", "date": "2026-06-19"})
+    assert calls.get("withings_include_pilot") is True
