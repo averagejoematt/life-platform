@@ -151,6 +151,55 @@ whether he stays "on" (see §2) — training design supports that but does not s
 
 ---
 
+## 4a. Session construction rules — timing, venue, modality, data sources
+
+**Timing — fix the session date before using recovery (plan vs. gate).** Whoop recovery is a
+*morning-of* metric (computed from last night's sleep); a future day's recovery does not exist
+yet. **Verify the data date, not just the label:** `get_readiness_score` echoes the
+*queried* date onto the latest-available data, so a future-date request comes back stamped with
+that date but built from the most recent ACTUAL reading (check the component `raw.date` fields).
+A future-dated readiness is last night's number wearing tomorrow's label — usable as *trend
+context* only, never as the gate. The real gate is the score that lands the morning of the session.
+- *Planning the morning of:* today's recovery IS the session's gate — use it directly.
+- *Planning the night before / ahead:* the target day's recovery is unknowable. Build the plan
+  off the program + cumulative load (ACWR, recent volume, days since that muscle was trained,
+  sleep/fatigue trend) + trajectory; treat the latest recovery as *trend context only*; attach
+  a morning checkpoint — "on waking, check readiness and apply the §4 gates, subtract to floor
+  if compromised." Never phrase a future plan as "this morning do X."
+
+**Verify the reading's provenance — `get_readiness_score` can future-stamp stale data.** Always
+check the component raw dates (`whoop_recovery.raw.date`, `sleep_quality.raw.date`). If a score is
+returned for a date whose overnight sleep hasn't happened yet, the tool composed it from the
+latest-available components and stamped it with the *requested* date — it is NOT that day's real
+readiness. Treat such a reading as the latest actual score (today's / trend) and gate the real
+session on the target morning's fresh number.
+
+**Modality is independent of venue and of the logging tool.** The session's intent — lift /
+cardio / recovery / circuit / mixed — is set by the program + readiness/load, NOT by where he
+trains or what app logs it.
+- Changing venue (home ↔ gym) never converts a recovery/cardio day into a heavy lift day by
+  default. If easy cardio or recovery was the right call, the gym version is gym cardio /
+  recovery / mobility — not a sudden push session.
+- **Hevy is a logger, not a lift-only tool.** It holds cardio, intervals, circuits, carries,
+  mobility. "It's in Hevy" ≠ "it must be weightlifting."
+
+**Equipment constraints are hard at the current tier.** Do NOT recommend the home **Zwift /
+standard saddle bike** at current bodyweight — saddle soreness / chafing make it a non-starter;
+use the **recumbent bike** or other low-friction options. Re-opens as bodyweight drops (§5c).
+
+**Recent-training picture must include Strava — not just Hevy.** He also walks / rucks / runs,
+logged in **Strava**. When reading "what he did," pull Strava activity (search_activities /
+get_weekly_summary) alongside Hevy. Walks/rucks count toward load, NEAT and cardio dose and
+change whether to add or hold cardio. A Hevy-only view undercounts his actual training.
+
+**Recovery signal priority: Whoop primary; Garmin discounted.** Garmin ingestion is unreliable
+(gaps; e.g. Body Battery can be days stale while still feeding the readiness score). Lean on
+**Whoop** recovery / HRV / sleep as the primary readiness signal; treat Garmin components as
+low-confidence and disregard them when stale (>~1–2 days old). Never let a stale Garmin component
+move a call.
+
+---
+
 ## 5. Nutrition note
 
 Fuel for performance and recovery; protein is the priority. **Calibration of intake is
@@ -253,6 +302,18 @@ intent, not just prescribe. Specifically:
 ---
 
 ## 6. Review cadence
+
+**Gate the debrief on the session's *actual* morning-of readiness — never the plan-time forecast.**
+When reviewing a *completed* session, re-pull `get_readiness_score` for the real session date and
+check the component `raw.date` fields to confirm it's that morning's data (not a future-stamped
+carryover from when the plan was built). The plan-time readiness *forecasts the plan*; the
+morning-of readiness *judges the execution* — they are different numbers and must not be swapped.
+A session built off a plan-time YELLOW forecast that actually ran on a GREEN morning was
+**correctly autoregulated up**, not an overreach; critiquing it against the stale forecast
+manufactures a false "you did too much" finding and reopens the aggressive-vs-conservative fight
+this doc exists to end. (Root cause logged 2026-06-19: the live `get_readiness_score` still
+future-stamps stale data with no warning until the date-honesty patch deploys — until then this
+manual re-pull is the guardrail. After deploy, also check `is_forward_dated` / `staleness_warning`.)
 
 **Committed weekly logistics (athlete-stated):** ~2 hr gym each morning (M–F core), 15 min
 home stretch daily, evening 2–3 mi walk/ruck most days → progresses to running as bodyweight
