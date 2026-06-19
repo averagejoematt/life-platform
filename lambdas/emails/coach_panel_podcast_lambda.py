@@ -295,6 +295,36 @@ def _write_indexes(episodes: list) -> None:
         ContentType="application/rss+xml; charset=utf-8",
         CacheControl="max-age=3600, public",
     )
+    _invalidate_cdn()
+
+
+# CloudFront distribution serving averagejoematt.com (S3GeneratedOrigin handles /panelcast/*).
+CF_DISTRIBUTION_ID = os.environ.get("CF_DISTRIBUTION_ID", "E3S424OXQZ8NBE")
+
+
+def _invalidate_cdn() -> None:
+    """Invalidate /panelcast/* after publishing so a new episode is live immediately.
+    wk*.wav carries a 24h cache header, so without this the CDN serves the prior cut
+    for up to a day. Fail-open: a publish must never break on a CDN hiccup (the file
+    is already in S3; the cache just expires on its own as a fallback).
+
+    NB: CloudFront invalidations match the VIEWER path, not the S3 key. The public
+    URL is /panelcast/* — the `generated/` key prefix is stripped at the edge by
+    S3GeneratedOrigin — so we must invalidate the public path. Invalidating
+    /generated/panelcast/* clears a path nobody requests and leaves the cut cached."""
+    public_path = "/" + (PREFIX.split("/", 1)[1] if "/" in PREFIX else PREFIX)  # generated/panelcast -> /panelcast
+    try:
+        cf = boto3.client("cloudfront", region_name=REGION)
+        cf.create_invalidation(
+            DistributionId=CF_DISTRIBUTION_ID,
+            InvalidationBatch={
+                "Paths": {"Quantity": 1, "Items": [f"{public_path}/*"]},
+                "CallerReference": f"panelcast-{datetime.now(timezone.utc).timestamp()}",
+            },
+        )
+        logger.info("[panel] CDN invalidation requested for %s/*", public_path)
+    except Exception as e:
+        logger.warning("[panel] CDN invalidation failed (fail-open, cache expires on its own): %s", e)
 
 
 # ── Episode 0 + series creative spine (event {"intro": true}) ─────────────────
@@ -341,6 +371,13 @@ INTRO_STYLE = (
     "talking in a studio: relaxed pace, natural rhythm, light interjections and reactions, the occasional small laugh "
     "in the voice, a beat of thought before a big answer. Elena hosts; Eli is the guest. Conversational, not announced."
 )
+# Deterministic Elena sign-off, appended as the FINAL turn. Gemini multi-speaker
+# occasionally bleeds the PRIOR speaker's voice into the last line (ADR-087 ceiling),
+# which once voiced Elena's "I'm Elena Voss" close in Eli's voice. Since the bleed
+# carries the prior voice forward, guaranteeing an Elena→Elena ending means even a
+# bleed lands Elena's voice on her own sign-off.
+INTRO_SIGNOFF = "I'm Elena Voss. This has been The Measured Life. Come back next week — we start for real."
+_SIGNOFF_RE = re.compile(r"\s*(i'?m\s+elena\s+voss\b.*)$", re.IGNORECASE | re.DOTALL)
 WEEKLY_STYLE = (
     "Perform this as a real, warm weekly podcast conversation — NOT a formal reading. Two people riffing in a studio: "
     "natural rhythm, quick reactions, a little wry humor, the occasional small laugh. Conversational, never announced."
@@ -635,6 +672,16 @@ def _run_intro(dry_run: bool = False) -> dict:
         return {"statusCode": 500, "body": json.dumps({"intro": "too few turns"})}
     if qa_fails:
         logger.warning("[panel] intro: best candidate still has %d QA flag(s): %s", len(qa_fails), qa_fails)
+
+    # Deterministic close (ADR-087 voice-bleed mitigation): strip any LLM-baked
+    # "I'm Elena Voss" sign-off from the last turn, then append a fixed Elena sign-off
+    # as the final turn — guaranteeing an Elena→Elena ending so a Gemini voice-bleed
+    # lands Elena's own voice on her sign-off (it carries the PRIOR speaker forward).
+    if turns and turns[-1]["speaker"] == ELENA:
+        stripped = _SIGNOFF_RE.sub("", turns[-1]["line"]).rstrip()
+        if stripped:
+            turns[-1]["line"] = stripped
+    turns.append({"speaker": ELENA, "line": INTRO_SIGNOFF})
 
     label_of = {ELENA: "Elena", INTRO_GUEST_ID: "Eli"}
     # Dry run: write only the transcript (Bedrock cost only, no Gemini audio) so the

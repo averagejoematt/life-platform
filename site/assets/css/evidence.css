@@ -125,6 +125,20 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .supp-meter i { display: block; height: 100%; }
 .supp-evpct { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-muted); width: 36px; text-align: right; }
 .supp-meta { margin-top: var(--sp-2); color: var(--ink-faint); text-transform: none; letter-spacing: 0; }
+.supp-ev-link { color: var(--ember); text-decoration: none; border-bottom: 1px solid color-mix(in oklch, var(--ember) 40%, transparent); }
+.supp-ev-link:hover { border-bottom-color: var(--ember); }
+
+/* Architecture diagram (the "how it's built" page) — hand-authored inline SVG. */
+.arch-fig { margin: var(--sp-4) 0 var(--sp-5); }
+.arch-svg { width: 100%; height: auto; display: block; }
+.arch-svg .ab { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
+.arch-svg .abk { stroke: var(--ember); stroke-width: 1.5; }
+.arch-svg .abg { stroke-dasharray: 3 3; }
+.arch-svg .at { fill: var(--ink); font-size: 13px; font-weight: 600; text-anchor: middle; }
+.arch-svg .as { fill: var(--ink-faint); font-size: 9.5px; text-anchor: middle; }
+.arch-svg .aa { stroke: var(--ink-faint); stroke-width: 1.5; }
+.arch-svg .ad { stroke: var(--ember); stroke-width: 1.2; stroke-dasharray: 4 3; fill: none; }
+.rd-figcap { margin-top: var(--sp-2); color: var(--ink-faint); }
 .backed-strong { color: var(--ember); } .backed-strong i, i.backed-strong { background: var(--ember); }
 .backed-some { color: var(--ink-muted); } .backed-some i, i.backed-some { background: var(--ink-muted); }
 .backed-thin { color: var(--ink-faint); } .backed-thin i, i.backed-thin { background: var(--ink-faint); }
@@ -158,10 +172,37 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 /* Temporal-frame header above a group of trends (last-night vs same-day). */
 .rd-frame { margin: var(--sp-5) 0 var(--sp-2); color: var(--ember); text-transform: lowercase; letter-spacing: 0.02em; }
 
+/* Vice streak cards — a big day-count + a progress bar toward the next milestone. */
+.vice-grid { display: grid; gap: var(--bento-gap); grid-template-columns: 1fr; margin-top: var(--sp-4); }
+@media (min-width: 560px) { .vice-grid { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 920px) { .vice-grid { grid-template-columns: 1fr 1fr 1fr; } }
+.vice-card { border: var(--border-hair); border-radius: var(--radius); background: var(--surface); padding: var(--sp-4); border-left: 3px solid var(--rule); }
+.vice-card.vice-hold { border-left-color: #16a34a; }
+.vice-card.vice-broke { border-left-color: color-mix(in oklch, var(--ember) 60%, var(--ink-faint)); }
+.vice-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
+.vice-name { font-family: var(--font-serif); font-size: var(--fs-h3); text-transform: capitalize; }
+.vice-flag { color: var(--ink-faint); }
+.vice-hold .vice-flag { color: #16a34a; }
+.vice-streak { display: flex; align-items: baseline; gap: var(--sp-2); margin-top: var(--sp-2); }
+.vice-days { font-family: var(--font-mono); font-size: var(--fs-data-lg); line-height: 1; color: var(--ink); }
+.vice-unit { color: var(--ink-muted); }
+.vice-bar { margin-top: var(--sp-2); height: 4px; background: var(--rule); border-radius: 4px; overflow: hidden; }
+.vice-bar i { display: block; height: 100%; background: #16a34a; transition: width var(--dur) var(--ease-out); }
+.vice-broke .vice-bar i { background: color-mix(in oklch, var(--ember) 55%, var(--ink-faint)); }
+.vice-meta { margin-top: var(--sp-2); color: var(--ink-faint); }
+
 /* Habits day-of-week chart */
 .hb-chart { display: flex; align-items: flex-end; gap: var(--sp-2); height: 120px; }
 .hb-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: var(--sp-1); height: 100%; justify-content: flex-end; }
 .hb-bar { width: 70%; background: var(--ember); border-radius: 2px 2px 0 0; min-height: 4px; }
+/* Last-7-days adherence grid — one cell per day, coloured by tier-0 hit rate. */
+.hb7 { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--sp-2); margin-top: var(--sp-3); }
+.hb7-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: var(--sp-2) 0; border-radius: var(--radius); border: var(--border-hair); }
+.hb7-dow { color: var(--ink-faint); }
+.hb7-pct { font-family: var(--font-mono); font-size: var(--fs-small); }
+.hb7-good { background: color-mix(in oklch, #16a34a 18%, transparent); border-color: color-mix(in oklch, #16a34a 45%, transparent); }
+.hb7-mid { background: color-mix(in oklch, #d97706 16%, transparent); border-color: color-mix(in oklch, #d97706 42%, transparent); }
+.hb7-miss { background: color-mix(in oklch, var(--ember) 14%, transparent); border-color: color-mix(in oklch, var(--ember) 40%, transparent); }
 .hb-day { color: var(--ink-faint); }
 
 /* Observatory weekly summary */

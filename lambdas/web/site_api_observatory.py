@@ -643,6 +643,47 @@ def handle_training_overview() -> dict:
         -12:
     ]  # last 12 weeks
 
+    # Recent cardio — the merged Strava + Whoop activity list (already flattened & deduped),
+    # newest first: known cardio modalities or anything distance-bearing. Surfaced on the
+    # site with distance in mi + km. (Hevy is strength-only; it's covered by the strength log.)
+    _CARDIO = {
+        "run",
+        "running",
+        "trailrun",
+        "treadmill",
+        "ride",
+        "cycling",
+        "virtualride",
+        "ebikeride",
+        "walk",
+        "hike",
+        "row",
+        "rowing",
+        "swim",
+        "swimming",
+        "elliptical",
+        "stairmaster",
+        "stairstepper",
+    }
+    cardio_sessions = []
+    for a in sorted(all_activities_30d, key=lambda x: x.get("_day_date", "") or "", reverse=True):
+        sport = (a.get("sport_type") or a.get("type") or "").strip()
+        mi = _act_miles(a)
+        if sport.lower() not in _CARDIO and not mi:
+            continue
+        cardio_sessions.append(
+            {
+                "date": a.get("_day_date"),
+                "sport": sport or "Activity",
+                "distance_mi": round(mi, 2) if mi else None,
+                "minutes": round(_act_minutes(a)) or None,
+                "avg_hr": a.get("average_heartrate") or a.get("avg_hr"),
+                "source": "whoop" if a.get("strain") is not None else "strava",
+            }
+        )
+        if len(cardio_sessions) >= 20:
+            break
+
     return _ok(
         {
             "training": {
@@ -678,6 +719,7 @@ def handle_training_overview() -> dict:
                 }
                 for w in whoop_workouts[:20]
             ],
+            "cardio_sessions": cardio_sessions,
         },
         cache_seconds=3600,
     )
@@ -898,9 +940,9 @@ def handle_physical_overview() -> dict:
             "score_360": (
                 {
                     "score": s360.get("score"),
+                    # Privacy: biological_age is fine to publish, but chronological_age and
+                    # biological_age_delta would let a reader back out Matt's true age — omit both.
                     "biological_age": s360.get("biological_age"),
-                    "chronological_age": s360.get("chronological_age"),
-                    "biological_age_delta": s360.get("biological_age_delta"),
                 }
                 if s360
                 else None

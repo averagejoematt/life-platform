@@ -99,6 +99,20 @@ if [[ -n "$SED_EXPR" ]]; then
   echo "  Done."
 fi
 
+# ── Build stamp (apples-to-apples QA) ─────────────────────────────────────────
+# Stamp every deploy with the git short-SHA + UTC time so we always know which build
+# is live: (1) /version.json — the machine-readable source of truth; (2) <meta name=
+# "build"> on every v4 page (View-Source / DevTools); (3) roll the service-worker cache
+# name so a stale page can't survive a reload (the real cause of "v451 vs v452"). The
+# muted visible stamp on the Cockpit + Evidence footers reads the meta tag (cockpit.js /
+# evidence.js).
+BUILD_SHA=$(git -C "$(dirname "$0")/.." rev-parse --short HEAD 2>/dev/null || echo unknown)
+BUILD_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+echo "→ Build stamp: $BUILD_SHA · $BUILD_AT"
+printf '{"build":"%s","deployed":"%s"}\n' "$BUILD_SHA" "$BUILD_AT" > "$BUILD_DIR/version.json"
+find "$BUILD_DIR" -name "*.html" -not -path "*/legacy/*" -exec sed -i '' "s#</head>#<meta name=\"build\" content=\"$BUILD_SHA $BUILD_AT\"></head>#" {} +
+sed -i '' -E "s/const VERSION = \"[^\"]*\";/const VERSION = \"$BUILD_SHA\";/" "$BUILD_DIR/sw.js"
+
 echo ""
 echo "=== Syncing to s3://$BUCKET/$S3_PREFIX/ ==="
 echo ""
@@ -149,6 +163,7 @@ aws s3 sync "$BUILD_DIR/" "s3://$BUCKET/$S3_PREFIX/" \
   --exclude ".DS_Store" \
   --exclude "*.webmanifest" \
   --exclude "sw.js" \
+  --exclude "version.json" \
   --cache-control "max-age=3600, public" \
   --region "$REGION"
 
@@ -160,6 +175,13 @@ aws s3 sync "$BUILD_DIR/" "s3://$BUCKET/$S3_PREFIX/" \
   --include "*.webmanifest" \
   --include "sw.js" \
   --cache-control "max-age=300, must-revalidate, public" \
+  --region "$REGION"
+
+# version.json — the deploy fingerprint; never cache it, so QA is always apples-to-apples.
+echo "→ version.json (no-cache)..."
+aws s3 cp "$BUILD_DIR/version.json" "s3://$BUCKET/$S3_PREFIX/version.json" \
+  --cache-control "no-cache, must-revalidate" \
+  --content-type "application/json" \
   --region "$REGION"
 
 echo ""
