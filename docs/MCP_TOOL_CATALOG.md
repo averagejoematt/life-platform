@@ -1,6 +1,6 @@
 # Life Platform — MCP Tool Catalog
 
-**Version:** v8.6.0 | **Last updated:** 2026-06-18 | **Total tools:** 133
+**Version:** v8.6.0 | **Last updated:** 2026-06-19 | **Total tools:** 133
 
 > Source of truth: the count of top-level `TOOLS` dict keys in `mcp/registry.py` → **133**, via AST parse (`deploy/sync_doc_metadata.py::_auto_discover_tool_count`). Do NOT count with `grep '"name":'` — it over-counts nested schema `"name"` fields (CLAUDE.md).
 >
@@ -51,7 +51,7 @@
 | Tool | Key Params | Description |
 |------|-----------|-------------|
 | `get_health` | view= (dashboard\|risk_profile\|trajectory), domain= | Unified health: morning briefing / CV+metabolic risk / forward projections. risk_profile and trajectory warmed nightly. |
-| `get_readiness_score` | date= | Unified 0-100 readiness from Whoop recovery (35%), sleep (25%), HRV trend (20%), TSB (10%), Body Battery (10%). GREEN/YELLOW/RED signal. |
+| `get_readiness_score` | date= | Unified 0-100 readiness from Whoop recovery (40%), sleep (25%), HRV trend (20%), TSB (10%), Body Battery (5%, skipped when >1d staler than Whoop). Honest data date + staleness flag. GREEN/YELLOW/RED signal. |
 | `get_autonomic_balance` | start_date=, end_date=, days= | BS-MP1: 4-quadrant ANS model (Flow/Stress/Recovery/Burnout). Balance score 0-100, 7d trend, state transitions |
 | `get_daily_metrics` | view= (movement\|energy\|hydration), start_date=, end_date=, step_target= | Daily activity: NEAT/steps / calorie balance / water intake |
 | `get_labs` | view= (results\|trends\|out_of_range), biomarker=, category=, start_date=, end_date= | Lab intelligence: draws / trajectory / chronic flags. Always returns `cadence_trackers` for NfL (180d) + Galleri (365d) sentinel panels. |

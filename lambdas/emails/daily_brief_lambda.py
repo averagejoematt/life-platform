@@ -990,6 +990,8 @@ def compute_habit_streaks(profile, yesterday_str):
 
 
 def compute_readiness(data):
+    # Sleep 25% (not 30%) to stay aligned with daily_metrics_compute.compute_readiness
+    # and the live MCP get_readiness_score model — keep all three in sync.
     components = []
     whoop_today = data.get("whoop_today")
     whoop_yest = data.get("whoop")
@@ -998,7 +1000,7 @@ def compute_readiness(data):
         components.append(("recovery", float(recovery), 0.40))
     sleep_score = safe_float(data.get("sleep"), "sleep_score")
     if sleep_score is not None:
-        components.append(("sleep", float(sleep_score), 0.30))
+        components.append(("sleep", float(sleep_score), 0.25))
     hrv_7d = data["hrv"].get("hrv_7d")
     hrv_30d = data["hrv"].get("hrv_30d")
     if hrv_7d and hrv_30d and hrv_30d > 0:

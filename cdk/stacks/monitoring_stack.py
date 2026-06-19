@@ -201,7 +201,11 @@ class MonitoringStack(Stack):
         # running count per run). Sources that don't emit simply never fire
         # (missing data = not breaching).
         # ══════════════════════════════════════════════════════════════
-        for _src in ("whoop", "withings", "strava", "eightsleep", "garmin", "hevy"):
+        # NB: garmin is intentionally EXCLUDED — its auth death is a known, accepted,
+        # Garmin-side condition (datacenter-IP 429 block; server-side refresh can't
+        # recover) already covered by the digest-routed `garmin-auth-unhealthy-24h`
+        # below. Paging URGENT on it too was pure duplicate noise for an unfixable state.
+        for _src in ("whoop", "withings", "strava", "eightsleep", "hevy"):
             _alarm(
                 f"IngestConsecFail{_src.title()}",
                 f"ingest-consecutive-failures-{_src}",
@@ -214,56 +218,17 @@ class MonitoringStack(Stack):
                 dims={"Source": _src},
             )
 
-        # ── Garmin OAuth auth-health (ER-01 follow-up, 2026-06-14) ──────────────
-        # Garmin's proactive-refresh + 429-breaker fails GRACEFULLY (a clean 200
-        # "skip"), so a dead token never trips ConsecutiveFailures above — that's
-        # how Garmin stayed dead ~2 weeks unnoticed. garmin_lambda now emits
-        # LifePlatform/OAuth GarminAuthHealthy (1 = auth worked this run, 0 =
-        # dead/throttled). BREACHING: a full day with no healthy datapoint (all
-        # runs skipped/failed, OR the cron stopped entirely) → URGENT. A transient
-        # 3h cooldown can't fire it — any healthy run that day makes Max=1.
-        # 2026-06-17: routed URGENT → DIGEST. RCA (logs): Garmin 429-blocks the
-        # server-side OAuth2 refresh-exchange (their 2026 anti-bot crackdown — an
-        # AWS/datacenter-IP block; browser auth from a residential IP still works).
-        # A browser re-auth mints a token good for ~a day, then the Lambda can't
-        # refresh server-side → auth dies again within ~48h. This is a KNOWN,
-        # recurring, Garmin-side condition, not an actionable page — and the core
-        # metrics (sleep, HRV, recovery) are covered by Whoop + Eight Sleep, so
-        # Garmin is a best-effort second source. Keep the signal in the daily
-        # digest; stop urgent-paging on an unfixable expected state.
-        _garmin_auth_dead = cloudwatch.Alarm(
-            self,
-            "GarminAuthUnhealthy",
-            alarm_name="garmin-auth-unhealthy-24h",
-            metric=cloudwatch.Metric(
-                namespace="LifePlatform/OAuth",
-                metric_name="GarminAuthHealthy",
-                dimensions_map={"Source": "garmin"},
-                period=Duration.seconds(86400),
-                statistic="Maximum",
-            ),
-            evaluation_periods=1,
-            threshold=1,
-            comparison_operator=LT,
-            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
-        )
-        _garmin_auth_dead.add_alarm_action(cw_actions.SnsAction(digest))
-
-        # Pre-warning: alert ~a week before the OAuth2 refresh token's hard expiry
-        # so a browser re-auth is a scheduled 2-min task, not a surprise outage.
-        # NB (best-effort metric) — absence simply doesn't fire.
-        _alarm(
-            "GarminTokenExpiring",
-            "garmin-token-expiring-7d",
-            "LifePlatform/OAuth",
-            "GarminTokenDaysLeft",
-            86400,
-            "Minimum",
-            7,
-            LT,
-            dims={"Source": "garmin"},
-            to_digest=True,
-        )
+        # ── Garmin alarms intentionally REMOVED (2026-06-19) ────────────────────
+        # Garmin ingestion is brittle by a KNOWN, accepted Garmin-side cause: their
+        # 2026 datacenter-IP 429 block defeats the server-side OAuth2 refresh, and a
+        # browser re-auth holds only ~48h. Sleep/HRV/recovery are all covered by Whoop
+        # + Eight Sleep, so Garmin is a best-effort second source we deliberately do
+        # NOT alarm on — the auth + token alarms were permanent-red digest noise for an
+        # unfixable, expected state. Garmin is also excluded from the fleet
+        # UnhealthySourceCount (pipeline_health_check_lambda BEST_EFFORT_SOURCES) so it
+        # can't keep `ingest-liveness-unhealthy` red or mask a real source death.
+        # Re-add real alarms here if/when the Garmin API path becomes stable again.
+        # (Was: garmin-auth-unhealthy-24h + garmin-token-expiring-7d.)
 
         # ── Fleet-wide ingestion auth-liveness (elite review 2026-06-15) ────────
         # Generalises the Garmin auth-health signal to EVERY breaker-using source
@@ -321,7 +286,10 @@ class MonitoringStack(Stack):
             comparison_operator=LT,
             treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
         )
-        _panelcast_silent.add_alarm_action(cw_actions.SnsAction(topic))
+        # 2026-06-19: URGENT → DIGEST. A silent show is worth surfacing but is never
+        # an actionable page (a deliberate HOLD trips it identically to a real outage),
+        # so it belongs in the daily digest, not the urgent topic.
+        _panelcast_silent.add_alarm_action(cw_actions.SnsAction(digest))
 
         # AI token budget alarms — consolidated 2026-03-10 (COST-A)
         # Removed 11 per-Lambda alarms ($1.10/mo). Kept: daily-brief

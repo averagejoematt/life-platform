@@ -281,8 +281,11 @@ def compute_tsb(strava_60d, today):
 
 
 def compute_readiness(data):
-    """Composite readiness: recovery (40%), sleep (30%), HRV trend (20%), TSB (10%)."""
-    # Readiness: recovery 40% (most actionable), sleep 30%, HRV trend 20%, TSB 10% (lagging)
+    """Composite readiness: recovery (40%), sleep (25%), HRV trend (20%), TSB (10%)."""
+    # Readiness: recovery 40% (most actionable), sleep 25%, HRV trend 20%, TSB 10% (lagging).
+    # Sleep is 25% (not 30%) to stay aligned with the live MCP get_readiness_score model
+    # so the tool's _precomputed_cross_check is a true drift detector — on the typical day
+    # (Garmin stale → Body Battery gated/re-normalised out) the two models are identical.
     components = []
     whoop_today = data.get("whoop_today")
     whoop_yest = data.get("whoop")
@@ -291,7 +294,7 @@ def compute_readiness(data):
         components.append(("recovery", float(recovery), 0.40))
     sleep_score = safe_float(data.get("sleep"), "sleep_score")
     if sleep_score is not None:
-        components.append(("sleep", float(sleep_score), 0.30))
+        components.append(("sleep", float(sleep_score), 0.25))
     hrv_7d = data["hrv"].get("hrv_7d")
     hrv_30d = data["hrv"].get("hrv_30d")
     if hrv_7d and hrv_30d and hrv_30d > 0:

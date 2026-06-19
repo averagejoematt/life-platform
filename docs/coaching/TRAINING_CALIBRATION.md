@@ -198,6 +198,14 @@ change whether to add or hold cardio. A Hevy-only view undercounts his actual tr
 low-confidence and disregard them when stale (>~1–2 days old). Never let a stale Garmin component
 move a call.
 
+**Empirical anchor — calibrate against his own proven cut, not theory.** `PROVEN_BLUEPRINT.md`
+reverse-engineers his last 100 lb (Sep 2024 → Apr 2025) from Withings + Strava + Hevy. Two rules there
+override generic defaults because they're confirmed from *his* data: (1) the **walking base** is the
+proven engine — ~10–15 easy walks/week from day one of the cut, HR ~97; re-establishing it outranks
+lift programming; (2) the **run gate at ~240 lb** — he logged zero runs above 240, so the bodyweight-tier
+run gate is empirical, not precautionary. Use the by-band table there to set the known-tolerable volume
+floor at his current weight, then autoregulate down.
+
 ---
 
 ## 5. Nutrition note
