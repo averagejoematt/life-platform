@@ -14,11 +14,38 @@ base — all **low-impact** (no running / plyo yet; gated by bodyweight + joints
 
 **Design principles**
 - Lifting is the periodized centerpiece; cardio is structured support (protect muscle in deficit).
+- **The walking base is the proven engine** (see PROVEN_BLUEPRINT.md): his last 100 lb ran on
+  ~10–15 easy walks/week from day one. Re-establishing walking volume outranks lift programming
+  as the first lever. He is currently far below his own proven floor.
 - Each major muscle area trained ~2×/week (retention frequency).
 - Cardio polarized ~80/20: most truly easy (Z2), one harder piece/week.
 - Manage concurrent-training interference: lift fresh, keep hard cardio off lifting-priority slots.
 - Fill the 2-hr block with cardio + mobility, **not** junk lifting volume.
 - Core = standing / anti-movement only (ab-spasm history). No floor compression.
+- **Engineer the cut to be *held*, not just achieved** — his failure mode is regain, not loss.
+  Defensible loss rate, planned diet breaks, an explicit maintenance/defense block, and mood/
+  continuity monitoring are first-class parts of the plan, not afterthoughts.
+
+---
+
+## Empirical anchor (his last 100 lb)
+
+Reverse-engineered in `PROVEN_BLUEPRINT.md`. The proven cut (Sep 2024 → Apr 2025, −118 lb / 34 wk)
+looked like this by bodyweight — use it to set the known-tolerable floor at each weight, then
+autoregulate down:
+
+| Band | Walks/wk | Walk hrs/wk | Runs/wk |
+|---|---|---|---|
+| 300–309 (now) | ~10 | ~8.5 | **0** |
+| 270–299 | ~15 | 17–19 | **0** |
+| 240–269 | ~7–9 | ~7–9 | 0 → 1 |
+| 210–239 | ~11–13 | ~9–11 | 5–6 |
+| 180–209 | ~11–18 | ~9–15 | 5–6 |
+
+Lifting then: 4.5 sessions/wk, ~128 sets/wk, squat/bench/deadlift-centered, ~10-rep, loads ramped
+fast then held flat across the cut. **Run gate confirmed from his own data: no running above ~240 lb.**
+The science upgrades over what he did (defensible rate + diet breaks + maintenance; periodized loads;
+protected easy PM session) are the standing redlines in PROVEN_BLUEPRINT.md §"Where the science improves."
 
 ---
 
