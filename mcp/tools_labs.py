@@ -900,6 +900,43 @@ def tool_get_freshness_status(args):
     stale_sources = [s for s in per_source if s.get("status") in ("stale", "no_data")]
     fresh_sources = [s for s in per_source if s.get("status") == "fresh"]
 
+    # ── MacroFactor format-drift (meal-grouping guard) ──
+    # The diary export carries per-food timestamps (entries_count > 0); the daily-
+    # summary export is one row/day with an empty food_log (entries_count == 0). When
+    # MacroFactor silently reverts to summary format, the meal grouper has no input
+    # and the meal view goes stale without a staleness alert (the date is still fresh).
+    # Flag when the last N records all have entries_count == 0.
+    macro_drift = None
+    if "macrofactor" in keys:
+        from boto3.dynamodb.conditions import Key as _DDBKey
+
+        try:
+            _resp = table.query(
+                KeyConditionExpression=_DDBKey("pk").eq("USER#matthew#SOURCE#macrofactor") & _DDBKey("sk").begins_with("DATE#"),
+                ScanIndexForward=False,
+                Limit=5,
+                ProjectionExpression="#d, entries_count",
+                ExpressionAttributeNames={"#d": "date"},
+            )
+            recs = _resp.get("Items", [])
+            empties = [r for r in recs if int(r.get("entries_count", 0) or 0) == 0]
+            last_with_log = next((r.get("date") for r in recs if int(r.get("entries_count", 0) or 0) > 0), None)
+            drifted = bool(recs) and len(empties) == len(recs)
+            macro_drift = {
+                "drifted": drifted,
+                "records_checked": len(recs),
+                "consecutive_empty": len(empties),
+                "last_food_log_date": last_with_log,
+                "note": (
+                    "MacroFactor diary export appears to have reverted to daily-summary (empty food_log) — "
+                    "the meal grouper is starved. Re-export the diary format."
+                    if drifted
+                    else "Diary export healthy (recent records carry a food_log)."
+                ),
+            }
+        except Exception as _e:  # noqa: BLE001
+            macro_drift = {"drifted": None, "error": str(_e)}
+
     return {
         "status": overall,
         "checked_at": datetime.now(timezone.utc).isoformat(),
@@ -907,6 +944,7 @@ def tool_get_freshness_status(args):
         "fresh_count": len(fresh_sources),
         "stale_sources": stale_sources,
         "fresh_sources": fresh_sources,
+        "macrofactor_format_drift": macro_drift,
         "thresholds_note": (
             f"Default threshold {DEFAULT_STALE_HOURS}h. "
             f"food_delivery={SOURCE_STALE_HOURS['food_delivery']//24}d, "

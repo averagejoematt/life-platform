@@ -44,7 +44,10 @@ SOURCES = {
     "todoist": "Todoist tasks",
     "apple_health": "Apple Health",
     "eightsleep": "Eight Sleep",
-    # "macrofactor":   "MacroFactor nutrition",  # dead since 2026-04-11 (Tier 1 torn down)
+    # Re-enabled 2026-06-19 (meal-grouping): diary export flows again (per-food
+    # timestamps). Staleness threshold is lenient (manual-ish upload); the
+    # format-drift check below is the real guard against a silent summary-format revert.
+    "macrofactor": "MacroFactor nutrition",
     # "garmin":        "Garmin biometrics",  # PAUSED 2026-06-03 — Garmin's 2026 anti-automation
     #   crackdown 429-blocks server-side OAuth2 refresh from datacenter IPs (374 throttles vs 2
     #   successes / 14d). Unwinnable headless; re-auth only buys ~1 run. Revive = uncomment +
@@ -71,6 +74,9 @@ SOURCE_STALE_HOURS = {
     # "yesterday" (today's completions aren't known until the day ends), so a 24h
     # default false-fires every afternoon. 48h still catches a genuine 2-day outage.
     "todoist": 48,
+    # macrofactor is a manual-ish S3 CSV upload (not every day) — lenient threshold
+    # avoids false-stale; the dedicated format-drift check is the real guard.
+    "macrofactor": 96,  # 4 days
 }
 
 # S-06: Sources whose staleness means "no manual entry logged yet" rather than a
@@ -277,6 +283,42 @@ def lambda_handler(event, context):
         except Exception as e:
             logger.error("Partial completeness SNS publish failed: %s", e)
 
+    # ── MacroFactor format-drift guard (meal-grouping, 2026-06-19) ──
+    # The diary export carries per-food timestamps (entries_count > 0). MacroFactor's
+    # default export is a daily-summary (one row/day, empty food_log, entries_count == 0)
+    # — when it silently reverts, the date stays "fresh" but the meal grouper is starved.
+    # Alert when the last N records all have entries_count == 0, and emit a metric.
+    macro_drift = False
+    try:
+        drift_resp = table.query(
+            KeyConditionExpression="pk = :pk AND begins_with(sk, :pfx)",
+            ExpressionAttributeValues={":pk": f"USER#{USER_ID}#SOURCE#macrofactor", ":pfx": "DATE#"},
+            ScanIndexForward=False,
+            Limit=5,
+            ProjectionExpression="entries_count",
+        )
+        drift_recs = drift_resp.get("Items", [])
+        empties = [r for r in drift_recs if int(r.get("entries_count", 0) or 0) == 0]
+        macro_drift = bool(drift_recs) and len(empties) == len(drift_recs)
+        if macro_drift and not _sick_suppress:
+            try:
+                sns.publish(
+                    TopicArn=SNS_ARN,
+                    Subject="⚠️ Life Platform: MacroFactor format drift",
+                    Message=(
+                        "⚠️ MacroFactor diary export appears to have reverted to daily-summary format.\n\n"
+                        f"The last {len(drift_recs)} MacroFactor records all have an empty food_log "
+                        f"(entries_count == 0). The derived meal layer (macrofactor_meals) is starved — "
+                        f"new days won't group.\n\nFix: re-export the *diary* format from MacroFactor.\n\n"
+                        f"Checked at: {now.strftime('%Y-%m-%d %H:%M UTC')}"
+                    ),
+                )
+                logger.info("MacroFactor format-drift alert sent (%d/%d empty)", len(empties), len(drift_recs))
+            except Exception as _de:
+                logger.error("Format-drift SNS publish failed: %s", _de)
+    except Exception as e:
+        logger.warning("MacroFactor format-drift check failed (non-fatal): %s", e)
+
     # OBS-3: Emit SLO metrics to CloudWatch
     try:
         fresh_count = len(SOURCES) - len(stale_sources)
@@ -308,6 +350,13 @@ def lambda_handler(event, context):
                 {
                     "MetricName": "WarningSourceCount",
                     "Value": float(len(warning_sources)),
+                    "Unit": "Count",
+                },
+                # meal-grouping guard: 1 when MacroFactor diary export has reverted to
+                # daily-summary (empty food_log) across the last N records.
+                {
+                    "MetricName": "MacroFactorFormatDrift",
+                    "Value": 1.0 if macro_drift else 0.0,
                     "Unit": "Count",
                 },
             ],

@@ -148,7 +148,7 @@ Determinism holds: identical input ⇒ identical output. `algo_version` enables 
 
 Matthew wants an LLM in the loop; the design bounds its cost to near-zero by *architecture*, not by avoiding it. Full costing + Technical Board sign-off in the companion review.
 
-**Role (narrow):** supply a human-readable name to a **residual novel cluster** — one that no template matches and no `NAMECACHE#` signature already covers. Never on the hot path; never a read-path dependency. Output (name + self-scored confidence) is **frozen as data** and is correctable.
+**Role (narrow):** supply a human-readable name to a **residual novel cluster** — one that no template matches and no `NAMECACHE#` signature already covers. Never on the hot path; never a read-path dependency. Output (name + self-scored confidence) is **frozen as data** and is correctable. The namer receives the **full cluster (all members + attached sides), ordered by caloric contribution** so the dominant food leads — otherwise it re-picks a minor item (the 06-16 tuna lunch must name as "Tuna Lunch", not "Scrambled Eggs").
 
 **Cost levers (all of them):**
 1. **Cheapest capable model — Haiku 4.5** (`claude-haiku-4-5`, $1/$5 per MTok). Naming a food list is a Haiku task; never Sonnet/Opus here. (Biggest lever.)

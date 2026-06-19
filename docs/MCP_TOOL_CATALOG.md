@@ -1,6 +1,6 @@
 # Life Platform — MCP Tool Catalog
 
-**Version:** v8.6.0 | **Last updated:** 2026-06-19 | **Total tools:** 134
+**Version:** v8.6.0 | **Last updated:** 2026-06-19 | **Total tools:** 135
 
 > Source of truth: the count of top-level `TOOLS` dict keys in `mcp/registry.py` → **133**, via AST parse (`deploy/sync_doc_metadata.py::_auto_discover_tool_count`). Do NOT count with `grep '"name":'` — it over-counts nested schema `"name"` fields (CLAUDE.md).
 >
@@ -64,6 +64,7 @@
 | `get_mood` | view= (trend\|state_of_mind), start_date=, end_date=, days= | Mood intelligence: journal-derived scores / Apple Health HWF valence |
 | `get_nutrition` | view= (summary\|macros\|meal_timing\|micronutrients), start_date=, end_date=, days=, calorie_target=, protein_target= | Nutrition intelligence: macro breakdown / adherence / eating window / RDA scoring |
 | `get_food_log` | date= | Individual food entries logged on a specific date with per-item macros and daily totals |
+| `manage_meals` | action= (get_day\|most_eaten\|regroup_day\|list_templates), date=, start_date=, end_date=, limit=, min_n=, dry_run= | **WRITE TOOL** (ADR-090). Derived meal layer over the raw MacroFactor log — best-effort, **inferred** grouping of food entries into meals ("Turkey Tacos"). `get_day` = grouped meals/snacks for a date; `most_eaten` = rank meals by template/signature + snack staples by token (n-floored); `regroup_day` = re-run the deterministic grouper + upsert the projection (`dry_run` previews); `list_templates` = seed library. Raw never mutated; uncategorized excluded from analytics. |
 | `get_deficit_sustainability` | start_date=, end_date=, days= | BS-12: 5-channel deficit early warning (HRV, sleep, recovery, habits, training). 3+ degradations → flag |
 | `get_metabolic_adaptation` | start_date=, end_date=, weeks= | IC-29: TDEE divergence tracker. Expected vs actual weight loss, adaptation ratio, diet break recs |
 

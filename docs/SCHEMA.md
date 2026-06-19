@@ -2,7 +2,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs — ADR-005)
-**Last updated:** 2026-06-19 (v8.6.0 — 134 MCP tools, 20 data sources, 81 Lambdas, 12 cached tools)
+**Last updated:** 2026-06-19 (v8.6.0 — 135 MCP tools, 20 data sources, 81 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -105,9 +105,9 @@ Where multiple sources measure the same thing:
 
 ## Sources
 
-Valid source identifiers: `whoop`, `withings`, `strava`, `todoist`, `apple_health`, `hevy`, `eightsleep`, `chronicling`, `macrofactor`, `macrofactor_workouts`, `macrofactor_export`, `garmin`, `habitify`, `notion`, `labs`, `dexa`, `genome`, `supplements`, `weather`, `travel`, `state_of_mind`, `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, `hypotheses`, `chronicle`, `measurements`, `food_delivery`, `weight_episodes`, `training_reference`
+Valid source identifiers: `whoop`, `withings`, `strava`, `todoist`, `apple_health`, `hevy`, `eightsleep`, `chronicling`, `macrofactor`, `macrofactor_workouts`, `macrofactor_export`, `garmin`, `habitify`, `notion`, `labs`, `dexa`, `genome`, `supplements`, `weather`, `travel`, `state_of_mind`, `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, `hypotheses`, `chronicle`, `measurements`, `food_delivery`, `weight_episodes`, `training_reference`, `macrofactor_meals`
 
-Note: `chronicling` is a historical/archived source — not actively ingesting. `hevy` became the **primary** strength-training source on 2026-05-25 (see ADR-060) — actively ingesting via hourly `hevy-backfill` poll of the Hevy events API; older Hevy records exist as legacy daily aggregates that the MCP `_expand_legacy_aggregate` bridge surfaces as virtual per-workout views. `macrofactor_export` is the explicit source label for workouts arriving via the manual MacroFactor Dropbox CSV export path (Tier 2 — see ADR-061). `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, and `hypotheses` are derived/computed partitions, not raw ingested data.
+Note: `chronicling` is a historical/archived source — not actively ingesting. `hevy` became the **primary** strength-training source on 2026-05-25 (see ADR-060) — actively ingesting via hourly `hevy-backfill` poll of the Hevy events API; older Hevy records exist as legacy daily aggregates that the MCP `_expand_legacy_aggregate` bridge surfaces as virtual per-workout views. `macrofactor_export` is the explicit source label for workouts arriving via the manual MacroFactor Dropbox CSV export path (Tier 2 — see ADR-061). `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, `hypotheses`, `weight_episodes`, `training_reference`, and `macrofactor_meals` are derived/computed partitions, not raw ingested data (the last is a recomputable projection over the raw `macrofactor` food log — see below).
 
 Ingestion methods: API polling (scheduled Lambda), S3 file triggers (manual export), **webhook** (Health Auto Export push — also handles BP and State of Mind), **MCP tool write** (supplements), **on-demand fetch + scheduled Lambda** (weather)
 
@@ -1159,6 +1159,38 @@ Singleton computed source (ADR-089). Readers take the newest in-range record (th
 | `n_episodes_with_covariates` | number | episodes contributing covariates |
 
 Access via `get_benchmark(view="pace"/"maintenance")`. PRIVATE.
+
+### macrofactor_meals (derived meal layer — best-effort meal grouping)
+
+Recomputable projection (ADR-090) over the raw `macrofactor` food log, written by the
+deterministic `meal_grouper` (shared layer). Groups individual food entries into the
+meals they were eaten as. **Raw is never mutated** — `member_refs`/`sides` are pointers
+into the `macrofactor` partition; `rollup` is a cached sum, raw wins on any disagreement.
+Every record is an inference: `inferred:true` + `confidence`. Conservation holds — every
+raw entry lands in exactly one group, so `sum(rollups) == raw daily totals`. Written by
+`deploy/backfill_meals.py` (history) and `manage_meals regroup_day` (one day). No `phase`
+attribute (a recompute artifact, not phase-scoped experiment data).
+
+**pk:** `USER#matthew#SOURCE#macrofactor_meals` · **sk:** `DATE#YYYY-MM-DD#MEAL#<NN>` (ordinal = time order, e.g. `DATE#2026-06-18#MEAL#03`)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ordinal` | number | 1-based position within the day (time-ordered) |
+| `meal_name` | string | display label, e.g. `Turkey Tacos` — **cosmetic; aggregates never key on this** |
+| `template_id` | string \| null | e.g. `tpl_turkey_tacos`; null for snacks/uncategorized |
+| `kind` | string | `meal` \| `snack` \| `uncategorized` (uncategorized = counted in totals, excluded from meal analytics) |
+| `method` | string | `template` \| `content_split+template` \| `singleton` \| `uncategorized` |
+| `confidence` | number | 0–1 coverage score (fraction of the cluster the template explains, by items + calories) |
+| `signature` | string | `<sorted canonical tokens>#<hash>` — stable cluster identity; the analytics key |
+| `time_window` | map | `{start, end}` (HH:MM) |
+| `member_refs` | list | `[{idx, food_name, time, token}]` — pointers into raw |
+| `sides` | list | orphan add-ons attached to the meal (`attached:true`) |
+| `rollup` | map | cached `{calories_kcal, protein_g, carbs_g, fat_g, fiber_g, sugars_g}` |
+| `algo_version` | string | e.g. `meal-grouper@1.1.0` — enables safe full-history recompute |
+
+Locked params: `GAP_MIN=15`, `CONF_MIN=0.7`. Canonical vocabulary: `config/food_vocabulary.json`.
+Access via `manage_meals` (`get_day` / `most_eaten` / `regroup_day` / `list_templates`). The
+LLM namer for residual `uncategorized` clusters is Phase 2 (deferred).
 
 ---
 

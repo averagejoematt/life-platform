@@ -3,7 +3,7 @@
 > Permanent log of significant architectural, design, and operational decisions.
 > Each ADR captures the decision, context, alternatives considered, and outcome.
 > Last updated: 2026-06-03 (v8.3.0 — + Garmin retired & budget-guard/AI-cost trim; ADR-074/075)
-> 75 ADRs total (ADR-001 → ADR-075).
+> 90 ADRs total (ADR-001 → ADR-090). (Index table below covers ADR-001–057; newer ADRs are appended as detail sections in order.)
 
 ---
 
@@ -2570,5 +2570,29 @@ The AWS "account-controls" sub-grade stays below a literal-checklist A on those 
 **Cost (Dana):** pennies/mo — one weekly pure-Python Lambda (no Bedrock), two thin derived records.
 
 **Out of scope (board-rejected on this work order):** any holding/regain predictor or classifier; any public surface; a separate analytical store; nightly recompute; causal language; rendering the reversal count in a brief/digest. Re-propose separately if ever revisited.
+
+---
+
+## ADR-090: Derived meal layer — best-effort meal grouping as a recomputable projection over raw MacroFactor
+
+**Date:** 2026-06-19
+**Status:** Implemented (Phase 0–1 live: layer v86 + MCP + freshness deployed, 780 items / 114 days backfilled 2026-06-19; Phase 2 LLM namer deferred). **Related:** `docs/SPEC_MEAL_GROUPING_2026-06-19.md`, `docs/reviews/REVIEW_MEAL_GROUPING_2026-06-19.md`, `lambdas/meal_grouper.py`, `lambdas/meal_templates_seed.py`, `lambdas/meal_projection.py`, `config/food_vocabulary.json`, `mcp/tools_meals.py`, `deploy/backfill_meals.py`.
+
+**Context.** The raw MacroFactor food log is an ingredient ledger (per-food rows). To support meal-level analytics now and a public "your most-eaten meals" view later, we group entries into the meals they were eaten as. Phase 0 confirmed three ways (ingestion code, raw CSV header, stored DDB item) that **the export carries no Breakfast/Lunch/Dinner/Snack bucket** — so timestamp + content inference is the primary (only) segmenter. A 114-day history scan measured the real same-timestamp collision rate at ~4% (the naive detector's 93% was word-split/anchor-set false positives), validating the anchor-SET design.
+
+**Decision.**
+- **Raw is sovereign; meals are a derived, recomputable projection** in a distinct source `macrofactor_meals` (clean provenance + freshness, not folded into `computed_metrics`) — Omar. Three invariants: raw untouched · every meal `inferred`+`confidence` · conservation-of-food (`sum(rollups) == raw totals`, asserted per day; the backfill halts on any mismatch). `member_refs`/`sides` point into raw; `rollup` is a read cache.
+- **Deterministic-first is the system of record** (Anika/Priya). Normalize → `GAP_MIN=15` time-gap segment (reuses the `get_glucose_meal_response` algorithm — single source of truth) → anchor-SET content-split (known multi-protein dishes = one core; an orphan protein attaches as a `side`, never a phantom meal) → template-centroid match. Confidence is **coverage** (fraction of the cluster the template explains, by items + calories), so a minor seeded anchor under an unseeded-dominant cluster falls below `CONF_MIN=0.7` → `uncategorized` (counted in totals, excluded from analytics) rather than a confidently-wrong name. `algo_version` enables safe full-history recompute.
+- **Aggregates key on `signature`/`template_id`, never the display name** (Henning, hard constraint) — a flaky/regenerated name can never corrupt a count. `most_eaten` is n-floored; snacks aggregate by canonical member token, not the "Snack" occasion.
+- **Canonical vocabulary is a first-class object** (`config/food_vocabulary.json`, staged into the layer alongside the grouper). Spelling-of-the-same-food-only rule: distinct dishes stay distinct (Phase-2 LLM names them); only spelling variants of one food collapse.
+- **One fat MCP tool** `manage_meals` (SIMP-1): `get_day` / `most_eaten` / `regroup_day` / `list_templates`.
+- **Scoped delete on the LLM-facing MCP role** (Yael). `regroup_day` prunes stale meal ordinals, which needs `DeleteItem` — but the single-table store means "the whole table" is every source (raw health data included). So `DeleteItem` is granted via a **dedicated statement conditioned to `dynamodb:LeadingKeys = USER#matthew#SOURCE#macrofactor_meals`**, never table-wide; the no-write-to-raw test is code, this condition is the actual IAM boundary. Mirrors the `site_api_ai` `RATE#*` LeadingKeys pattern.
+- **Format-drift guard** — MacroFactor's default export is a daily-summary (empty `food_log`); when it silently reverts the date stays "fresh" but the grouper starves. `freshness_checker_lambda` re-enables `macrofactor` (format-aware: alert if the last N records have `entries_count==0`) + a `MacroFactorFormatDrift` metric; surfaced in `get_freshness_status`.
+
+**LLM (Phase 2, deferred).** A Haiku namer supplies a cosmetic label to residual `uncategorized` clusters only — signature-cached, promote-to-template (≥3 → `learned`, then $0), Batch-API backfill, monthly cap that fails safe to `uncategorized`. Never on the hot path, never a read-path dependency; frozen-as-data + correctable. Lifetime cost is sub-$0.35 backfill + pennies/mo decaying to zero.
+
+**Out of scope (this build):** editing meals back into MacroFactor (it stays authoritative for what was logged); the public meal view + level-up loop (Phase 3, gated on the level-up loop per the Product board); per-bite timing.
+
+**Known follow-up (pre-existing, surfaced during the IAM scoping):** `delete_platform_memory` and `clear_sick_day` call `table.delete_item` but the MCP role never carried `DeleteItem` before this ADR — those deletes are latently `AccessDenied`. Not fixed here (each needs its own partition-scoped `LeadingKeys` statement); tracked for a follow-up.
 
 ---

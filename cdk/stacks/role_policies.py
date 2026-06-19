@@ -1784,6 +1784,22 @@ def mcp_server() -> list[iam.PolicyStatement]:
             resources=[TABLE_ARN, f"{TABLE_ARN}/index/*"],
         ),
         iam.PolicyStatement(
+            # Scoped delete (2026-06-19, Yael): manage_meals.regroup_day prunes stale
+            # MEAL#NN ordinals from the derived meal projection. DeleteItem is restricted
+            # to the macrofactor_meals partition via dynamodb:LeadingKeys, so this
+            # LLM-facing role can NEVER delete raw health data — even though it's a
+            # single-table store (the no-write-to-raw test is code, not an IAM boundary;
+            # this is the boundary). Mirrors the site_api_ai RATE#* LeadingKeys scoping.
+            sid="DynamoDBMealPrune",
+            actions=["dynamodb:DeleteItem"],
+            resources=[TABLE_ARN],
+            conditions={
+                "ForAllValues:StringEquals": {
+                    "dynamodb:LeadingKeys": ["USER#matthew#SOURCE#macrofactor_meals"],
+                },
+            },
+        ),
+        iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
             resources=[KMS_KEY_ARN],

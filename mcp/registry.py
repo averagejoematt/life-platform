@@ -108,6 +108,7 @@ from mcp.tools_lifestyle import (
     tool_save_insight,
     tool_update_insight_outcome,
 )
+from mcp.tools_meals import tool_manage_meals
 from mcp.tools_measurements import tool_get_measurement_trends, tool_get_measurements
 from mcp.tools_memory import (
     tool_capture_baseline,
@@ -3533,6 +3534,42 @@ TOOLS = {
                     },
                 },
                 "required": [],
+            },
+        },
+    },
+    "manage_meals": {
+        "fn": tool_manage_meals,
+        "schema": {
+            "name": "manage_meals",
+            "description": (
+                "Derived meal layer over the raw MacroFactor food log — a best-effort, INFERRED grouping of "
+                "individual food entries into the meals they were eaten as (e.g. 'Turkey Tacos', 'Yogurt & Oats Bowl'). "
+                "Raw food entries are never mutated; meals are a recomputable projection, each labelled inferred + confidence. "
+                "Actions: 'get_day' (grouped meals/snacks for a date), 'most_eaten' (rank recurring meals by template/signature "
+                "and snack staples by food token over a window, with an n-floor), 'regroup_day' (re-run the deterministic "
+                "grouper on raw data and upsert the projection; pass dry_run to preview), 'list_templates' (the seed library). "
+                "Meals below the confidence floor are 'uncategorized' (counted in totals, excluded from meal analytics)."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": ["get_day", "most_eaten", "regroup_day", "list_templates"],
+                        "description": "Which operation to run.",
+                    },
+                    "date": {"type": "string", "description": "[get_day / regroup_day] Date YYYY-MM-DD."},
+                    "start_date": {"type": "string", "description": "[most_eaten] Window start YYYY-MM-DD."},
+                    "end_date": {"type": "string", "description": "[most_eaten] Window end YYYY-MM-DD."},
+                    "limit": {"type": "integer", "description": "[most_eaten] Max ranked rows (default 10).", "default": 10},
+                    "min_n": {
+                        "type": "integer",
+                        "description": "[most_eaten] n-floor — minimum occurrences before a meal/snack is reported (default 3).",
+                        "default": 3,
+                    },
+                    "dry_run": {"type": "boolean", "description": "[regroup_day] Preview without writing (default false)."},
+                },
+                "required": ["action"],
             },
         },
     },
