@@ -49,17 +49,27 @@ protected easy PM session) are the standing redlines in PROVEN_BLUEPRINT.md §"W
 
 ---
 
-## Weekly grid (Tier 1)
+## Weekly grid (Tier 1) — a default *rhythm*, not a schedule
 
-| Day | Lifting focus | Cardio focus (intent) |
+**Read this as the intended sequence and weekly balance, NOT as "on Thursday do Lower B."** The
+actual next session is chosen from the data per TRAINING_CALIBRATION.md §4a ("Continuity over
+calendar"): what he trained the last few days, what's recovered, and what's coming tomorrow. The
+grid tells you the *shape* to keep continuous (the PPL + engine + intervals sequence, ~2×/muscle,
+80/20 cardio); it does not tell you which weekday is which. If he missed days, resume the sequence
+where it left off — don't jump to today's column. The weekday labels below are illustration only.
+
+| Slot (in sequence) | Lifting focus | Cardio focus (intent) |
 |-----|---------------|------------------------|
-| Mon | Lower A — squat pattern (on-ramp) + standing core | Recovery spin (easy Z2) |
-| Tue | Upper Push — higher-rep (WS4SB hi day) | Steady Z2 bike / incline walk |
-| Wed | **Engine day** — lift-light: landmine complex, carries, mobility | Longer Z2 mixed machines + moderate bag |
-| Thu | Lower B — hinge pattern (on-ramp) + standing core | Recovery spin (easy Z2) |
-| Fri | Upper Pull — lower-rep (WS4SB lo day) | **Bike intervals** (the 20% hard) |
-| Sat | *Optional* free-for-all: KB circuit / accessory / long flat walk | Easy |
-| Daily | 15 min home Pliability stretch | Evening 2–3 mi walk/ruck, easy effort |
+| Lower A | squat pattern (on-ramp) + standing core | Recovery spin (easy Z2) |
+| Upper Push | higher-rep (WS4SB hi day) | Steady Z2 bike / incline walk |
+| **Engine** | lift-light: landmine complex, carries, mobility | Longer Z2 mixed machines + moderate bag |
+| Lower B | hinge pattern (on-ramp) + standing core | Recovery spin (easy Z2) |
+| Upper Pull | lower-rep (WS4SB lo day) | **Bike intervals** (the 20% hard) |
+| *Optional* | free-for-all: KB circuit / accessory / long flat walk | Easy |
+| Daily underlay | 15 min home Pliability stretch | Evening 2–3 mi walk/ruck, easy effort |
+
+Typical cadence is ~5 lifting slots + the engine across a week with the daily walk underneath,
+but sequence-from-reality and the night-before continuity logic decide the actual order.
 
 ## Morning block template (~2 hr)
 

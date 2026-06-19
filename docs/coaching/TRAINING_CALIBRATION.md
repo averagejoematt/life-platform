@@ -153,6 +153,26 @@ whether he stays "on" (see §2) — training design supports that but does not s
 
 ## 4a. Session construction rules — timing, venue, modality, data sources
 
+**Continuity over calendar — the day of the week does NOT pick the session.** The weekly grid
+in TRAINING_PROGRAM.md is a *default rhythm*, not a schedule to obey. He likes a PPL+engine shape
+and wants that **sequence** preserved — but which session comes *tomorrow* is decided by the
+data, not by "it's Wednesday so it's legs." Drive the choice from, in priority order:
+- **What he actually did the last few days** (`get_workouts` + Strava) — pick up the PPL/cardio
+  sequence from where it genuinely left off. If he missed days, resume at the right spot; do not
+  skip a slot just because the calendar moved past it, and do not repeat a slot he just trained.
+- **Muscle readiness / freshness** — days since each pattern was trained, `get_muscle_volume`
+  vs MEV/MAV/MRV, ACWR. The pattern that's most recovered and most owed volume is the candidate.
+- **What's coming** — if he tells you tomorrow holds a big walk/ruck/run or a time constraint,
+  let that reshape the session (e.g. don't stack a heavy axial leg day before a 10-mile walk;
+  put the easy lift or the engine work there instead). Ask-or-honor known plans over the grid.
+- **The proven baselines** — the walking base and the PPL frequency from PROVEN_BLUEPRINT.md are
+  the thing being kept continuous; the weekday label is not.
+
+So: "you trained Push then Pull then Legs over your last three sessions, legs are still sore and
+you've got a long walk tomorrow → tomorrow is an easy upper/engine slot" is the right shape —
+**not** "tomorrow is Thursday so the grid says Lower B." State which prior sessions and which
+signals drove the pick, every time.
+
 **Timing — fix the session date before using recovery (plan vs. gate).** Whoop recovery is a
 *morning-of* metric (computed from last night's sleep); a future day's recovery does not exist
 yet. **Verify the data date, not just the label:** `get_readiness_score` echoes the
@@ -166,6 +186,26 @@ context* only, never as the gate. The real gate is the score that lands the morn
   sleep/fatigue trend) + trajectory; treat the latest recovery as *trend context only*; attach
   a morning checkpoint — "on waking, check readiness and apply the §4 gates, subtract to floor
   if compromised." Never phrase a future plan as "this morning do X."
+
+**His dominant use case: night-before planning for a 5am lift, recovery NOT yet available.** He
+trains at 5am and won't stop to plan first thing, so most sessions are built the evening before
+when tomorrow's recovery does not exist. Treat planning *without* a live recovery score as the
+normal path, not a degraded one:
+- **Do not gate the plan on recovery you don't have.** Build a confident, specific session from
+  the program + cumulative load + the continuity logic above. A night-before plan is allowed to
+  be a real plan, not a hedge.
+- **Never attribute the session to a recovery tier that isn't live.** Do not write "because
+  recovery is YELLOW" using last night's (or an older) number stamped with tomorrow's date — that
+  is the exact failure that mislabeled the Engine cycling note as YELLOW when the morning came up
+  GREEN. If recovery isn't in, say so and justify the session by load/sequence/trajectory instead.
+- **Bias the night-before default toward what makes sense, leaning slightly conservative ONLY on
+  tendon-limited novel patterns** (per §2) — everywhere else, program to his real capacity, not to
+  an absent-and-assumed-yellow recovery. When in doubt between tiers with no data, plan the strong
+  session and carry the subtract-only morning checkpoint, rather than pre-emptively easing.
+- **The morning checkpoint does the gating, not a guessed tier.** Phrase it as: "built off load +
+  sequence; on waking glance at recovery — if GREEN/expected, run it as written; if RED or clearly
+  compromised, subtract to the floor variant." That lets a GREEN morning run the full session
+  instead of being capped by a phantom YELLOW.
 
 **Verify the reading's provenance — `get_readiness_score` can future-stamp stale data.** Always
 check the component raw dates (`whoop_recovery.raw.date`, `sleep_quality.raw.date`). If a score is
