@@ -1,0 +1,88 @@
+"""
+tests/test_benchmark_views.py — BENCH-1.3/1.4 get_benchmark view tests.
+
+Mocks query_source so the views are exercised without AWS. Pins the board guardrails:
+forward-framed strings (Nathan: never a failure tally), run gate above 240 lb (pace),
+and confidence/n on every numeric block.
+"""
+
+import os
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+for k in ("AWS_REGION", "USER_ID", "TABLE_NAME", "DYNAMODB_TABLE", "S3_BUCKET"):
+    os.environ.setdefault(k, "x")
+
+import mcp.tools_benchmark as tb  # noqa: E402
+
+# A failure-tally looks like "0 of 16", "15 regains", "0 held", "reversed N times".
+_FAILURE_TALLY = re.compile(r"\b\d+\s*(?:of|/)\s*\d+\b|\bregain(?:ed|s)?\b|\bheld\b|\breversed\b|\bfail", re.I)
+
+_REF = {
+    "date": "2026-06-19",
+    "sk": "DATE#2026-06-19",
+    "bands": {"300-309": {"walks_wk": 10.0, "walk_hr_wk": 8.5, "runs_wk": 0.0, "lift_sessions_wk": 3.0}},
+    "proven_curve": [
+        {"weight": 307.0, "days_from_start": 0, "cum_lost": 0.0, "walks_wk": 10.0},
+        {"weight": 300.0, "days_from_start": 14, "cum_lost": 7.0, "walks_wk": 11.0},
+    ],
+    "source_window": "2024-09-05..2025-04-30",
+    "n_episodes_with_covariates": 6,
+}
+
+
+def _mock_query(monkeypatch, *, withings, strava, reference=_REF):
+    def fake(source, start, end, *a, **k):
+        if source == "training_reference":
+            return [reference] if reference else []
+        if source == "withings":
+            return withings
+        if source == "strava":
+            return strava
+        return []
+
+    monkeypatch.setattr(tb, "query_source", fake)
+
+
+def test_pace_run_gate_false_above_240_and_forward_framed(monkeypatch):
+    withings = [
+        {"date": "2026-06-05", "weight_lbs": 309.0},
+        {"date": "2026-06-19", "weight_lbs": 305.0},
+    ]
+    strava = [{"date": "2026-06-15", "sport_type": "Walk"}]  # ~0.5 walks/wk over 14d
+    _mock_query(monkeypatch, withings=withings, strava=strava)
+
+    r = tb.tool_get_benchmark({"view": "pace", "date": "2026-06-19"})
+
+    assert r["view"] == "pace"
+    assert r["current"]["current_weight"] == 305.0
+    assert r["run_gate_ok"] is False, "above 240 lb → run gate closed"
+    assert r["proven"]["walks_wk_proven"] == 10.0
+    assert r["walk_gap"] is not None and r["walk_gap"] > 0  # behind the proven walk volume
+    # confidence + n on every numeric block
+    assert r["current"]["confidence"] == "low" and "n" in r["current"]
+    assert r["proven"]["confidence"] == "low" and "n" in r["proven"]
+    # Forward-framed: mentions the lever, never tallies failures.
+    assert "walking is" in r["signal"].lower()
+    assert not _FAILURE_TALLY.search(r["signal"]), f"failure tally leaked: {r['signal']!r}"
+
+
+def test_pace_run_gate_true_under_240(monkeypatch):
+    withings = [{"date": "2026-06-19", "weight_lbs": 232.0}]
+    _mock_query(monkeypatch, withings=withings, strava=[])
+    r = tb.tool_get_benchmark({"view": "pace", "date": "2026-06-19"})
+    assert r["run_gate_ok"] is True
+
+
+def test_pace_no_reference_yet(monkeypatch):
+    _mock_query(monkeypatch, withings=[{"date": "2026-06-19", "weight_lbs": 305.0}], strava=[], reference=None)
+    r = tb.tool_get_benchmark({"view": "pace"})
+    assert "status" in r and "reference" in r["status"].lower()
+
+
+def test_unknown_view_lists_valid():
+    r = tb.tool_get_benchmark({"view": "bogus"})
+    assert "error" in r and "pace" in r["valid_views"]
