@@ -691,6 +691,11 @@ def _experiment_catalog(exclude_ids: set, exclude_names: set) -> list:
                 "planned_duration_days": exp.get("suggested_duration_days"),
                 "tags": exp.get("tags", []),
                 "votes": exp.get("votes", 0),
+                # Source attribution: where the idea came from (published study citation +
+                # first supporting evidence URL). Surfaced on the site so each experiment
+                # shows its provenance rather than appearing to arrive from nowhere.
+                "evidence_citation": exp.get("evidence_citation"),
+                "source_url": ((exp.get("evidence_for") or [{}])[0] or {}).get("url"),
             }
         )
     # most-voted backlog first, then alphabetical

@@ -12,7 +12,11 @@ function _w(n) { const r = Math.round(n * 10) / 10; return Number.isInteger(r) ?
 export function dualWeight(v, unit = "kg") {
   const n = Number(v);
   if (!Number.isFinite(n)) return "—";
-  return unit === "lb" ? `${_w(n)} lb · ${_w(n * 0.453592)} kg` : `${_w(n)} kg · ${_w(n * 2.20462)} lb`;
+  // Always lb-first for a consistent read across the site (body comp / 1RM / workout
+  // weights), regardless of whether the source value is stored in lb or kg.
+  const lb = unit === "lb" ? n : n * 2.20462;
+  const kg = unit === "kg" ? n : n * 0.453592;
+  return `${_w(lb)} lb · ${_w(kg)} kg`;
 }
 
 function _points(data, valueKey, dateKey) {
