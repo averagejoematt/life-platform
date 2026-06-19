@@ -30,6 +30,8 @@ Pulled 4 real days (`get_food_log`, 2026-06-15→18; 06-14 had no data). Two fac
 
 **(a) The rotation is small and repetitive — templates carry the load.** ~8 recurring meals cover almost everything: Turkey Tacos (3 of 4 days), Yogurt Bowl, Protein Yogurt Dessert, Tuna Lunch, Chicken Katsu Curry, Chicken Shawarma, Grilled Chicken Plate, plus a scaffold-snack bucket (Morning Smoothie 11:00, Vanilla Protein Shake, IQ Bar). Deterministic template matching beats an LLM on the recurring 80% — free, reproducible, stable across re-imports.
 
+> **Superseded by Phase 0 (114-day scan, 2026-06-19):** the real rotation is breakfast-bowl- and chicken-plate-heavy; "Turkey Tacos" is only ~2–4× over 114 days, not a hero. Seed from the data-generated list recorded in §13, not this 4-day paragraph.
+
 **(b) MacroFactor timestamps the *batch-logging event*, not eat-time.** 6/16: tacos 19:03, dessert 19:29 (splits on a gap). 6/18: tacos + dessert + grilled chicken **all at 19:46** (one timestamp). Collisions hit ~1 of 4 days in this sample (n=4, low confidence — Phase 0 measures the real rate). Consequence: the segmenter needs a **content-splitter**, not just a gap threshold. The existing `get_glucose_meal_response` default `meal_gap_minutes=30` would *over-merge* the 6/16 case — so we reuse its segmenter but tighten the gap and add content splitting.
 
 ## 3. Phase 0 — measure before building (NEW in v1.1)
@@ -38,6 +40,12 @@ Cheap, no production code. Resolves two things that otherwise bias the whole bui
 
 - **Source-label check.** Confirm what columns the raw MacroFactor export actually carries. If it includes a meal/category bucket (Breakfast/Lunch/Dinner/Snack) and ingestion is dropping it, that bucket becomes the **primary, zero-error segmenter** and timestamp/content inference drops to a *refinement* role (splitting one "Dinner" into taco + dessert). This could halve the build. The `get_food_log` surface shows only `time` today — verify whether that's the source's limit or an ingestion drop.
 - **History frequency + co-occurrence scan.** Over the full MacroFactor history: item cardinality, which foods co-occur, real collision rate. Let the data *propose* the seed templates and right-size the library, instead of hand-seeding 8 from 4 days. Output: a proposed template set + a real collision number + a canonical-vocabulary draft (§4).
+
+**Phase 0 result (resolved 2026-06-19):**
+- **No meal bucket exists** — confirmed three ways (ingestion code, raw CSV header has no Meal/Category column, stored DDB item has no bucket attr). Timestamp + content inference stays the **primary** segmenter; no bucket simplification available. Build the full grouper as specced.
+- **Real collision rate ≈ 4%** (5 of 114 diary days: 2026-02-24, 02-27, 03-02, 04-10, 06-18) — not the 1-in-4 the 4-day sample implied. The 93% the naive detector first reported was false positives from word-split anchors (greek+yogurt, egg+eggs) and the chicken+salmon multi-protein meal — which **validates the anchor-SET rule (§7) directly**. The content-splitter is needed only for a small tail.
+- **Corpus:** 114 diary days (2025-11-24 → 2026-06-18), 1,529 entries, 121 raw → 112 canonical names. Small, repetitive, **breakfast-bowl-heavy** rotation confirmed.
+- **Format-drift guard (NEW build task).** MacroFactor's default export is now `daily_summary` (one row/day, empty `food_log`); only the diary export carries per-food timestamps. The grouper no-ops on summary days — silently. Per the platform's prior "false clean" gaps (food-delivery), add an explicit **freshness/format check that alerts if N consecutive recent days arrive without a `food_log`** so the pipeline going dark is visible, not silent. Hook into `get_freshness_status`.
 
 ## 4. Foundational component — canonical food vocabulary (NEW in v1.1)
 
@@ -181,8 +189,10 @@ Locked by Matthew:
 - **Monthly call cap = 500** (~$0.17 ceiling); breach fails safe to `uncategorized` + alarm to Viktor.
 - **Namer endpoint = Batch API** for the one-time backfill (50% off); single swappable module; Bedrock deferred to the platform-wide migration.
 
-Remaining prereq:
-- [ ] **Phase 0 source-label check** — does the raw MacroFactor export carry a meal bucket (Breakfast/Lunch/Dinner/Snack) that ingestion drops? If yes, buckets become the primary segmenter and timestamps demote to refinement. Run before Phase 1.
+Phase 0 — resolved 2026-06-19:
+- [x] **Source-label check** — no meal bucket exists (confirmed in ingestion code, CSV header, and stored item). Full timestamp+content grouper as specced; no simplification. Real collision rate ≈4% — anchor-SET rule validated. See §3.
+- [x] **Seed templates + vocab — finalized 2026-06-19** (from the 114-day scan; full list in `meal_templates_seed.py`). **~10 seeded templates:** Yogurt & Oats Breakfast Bowl (eggs absorbed as a modifier — merges the old eggs+yogurt candidate; distinct from the protein-yogurt dessert token) · Chicken+Rice+Broccoli · Beef & Quinoa · Salmon & Sweet Potato · Chicken+Salmon (anchor-SET) · Protein Yogurt Dessert · Scrambled Eggs standalone (no-yogurt, distinct from the bowl) · Chicken Katsu Curry (keyed on panko+curry_sauce) · Steak Plate · **Turkey Tacos** (the one below-threshold `seed_manual` exception, ~2×, structurally unmistakable; decay-retires if it stays rare). **Snack class** (counted; shown as "top staples", not meal cards; modifier when co-logged): cottage_cheese, whey_protein, almonds, dark_chocolate, fruit, smoothie, protein_bar. **Beverage/supplement** (counted, never a meal/snack-card): coffee, protein_water, supplements. **avocado+spinach** = small dual-role identity (41×; solo snack, else attaches as a side). **Spelling-vs-dish rule:** canonicalize spellings of the *same* food only — split `chicken_dish` back to Shawarma/Butter Chicken/Pad Thai/Marry Me (novel/LLM), and pull **Mongolian Beef out of `beef_steak`** (dish, not cut). Do NOT seed Chicken Dippin' (orphan/side). Vocab: 121 raw → ~80 tokens.
+- [x] **`daily_summary` format-drift guard** — re-enable the dead `macrofactor` check in `freshness_checker_lambda.py` as format-aware (last N records have `entries_count > 0`); surface `macrofactor_format_drift` in `get_freshness_status` (`mcp/tools_labs.py`). Ships with Session 2.
 
 ---
 
