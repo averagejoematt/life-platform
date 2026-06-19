@@ -179,6 +179,34 @@ function coachJourneyHTML(ro) {
   return h + `</section>`;
 }
 
+// The character: the fictional background + personality that shapes this coach's
+// prompt — who they are, how they show up, what they believe. Config-sourced.
+function coachCharacterHTML(c) {
+  if (!c || (!(c.principles || []).length && !c.signature_behavior && !c.relationship_to_matthew)) return "";
+  let h = `<section class="coach-char"><p class="dx-kicker label">the character</p>`;
+  if (c.relationship_to_matthew) h += `<p class="dx-prose">${esc(c.relationship_to_matthew)}</p>`;
+  if (c.signature_behavior) h += `<p class="cc-sig"><span class="label">how they show up</span> ${esc(c.signature_behavior)}</p>`;
+  if ((c.principles || []).length) h += `<ul class="cc-principles">${c.principles.map((p) => `<li>${esc(p)}</li>`).join("")}</ul>`;
+  if ((c.tendencies || []).length) h += `<p class="cc-tend label">tendencies: ${c.tendencies.map(esc).join(" · ")}</p>`;
+  if ((c.focus_areas || []).length) h += `<p class="cc-focus label">tracks: ${c.focus_areas.map(esc).join(" · ")}</p>`;
+  const vt = c.voice && (c.voice.tone || c.voice.style) ? [c.voice.tone, c.voice.style].filter(Boolean).join(" — ") : "";
+  if (vt) h += `<p class="cc-voice label">voice: ${esc(vt)}</p>`;
+  if (c.voice && c.voice.catchphrase) h += `<p class="cc-catch">“${esc(c.voice.catchphrase)}”</p>`;
+  if (c.arc) h += `<p class="cc-arc label">their arc: ${esc(c.arc)}</p>`;
+  return h + `</section>`;
+}
+// Live working hypotheses — open threads + pending predictions the coach is betting on now.
+function coachHypothesesHTML(hyps) {
+  if (!(hyps && hyps.length)) return "";
+  return (
+    `<section class="coach-hyp"><p class="dx-kicker label">working hypotheses · live bets</p><ul class="ch-list">` +
+    hyps
+      .map((x) => `<li class="ch-${esc(x.kind || "thread")}"><span class="label">${esc(x.kind || "thread")}</span> ${esc(x.claim)}</li>`)
+      .join("") +
+    `</ul></section>`
+  );
+}
+
 async function renderCoachPage(read, id) {
   read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the coach…</span></p>`;
   let d;
@@ -187,10 +215,12 @@ async function renderCoachPage(read, id) {
   let h = `<p class="dx-kicker label">${esc(d.emoji || "")} ${esc(d.board_role || d.domain || "")}</p>`;
   h += `<h3 class="dx-title">${esc(d.name || "")}</h3>`;
   if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
+  h += coachCharacterHTML(d.character);
   if (typeof d.daily === "string" && d.daily.trim()) {
     h += `<section class="coach-daily"><p class="dx-kicker label">today's reflection</p><p class="cd-text">${esc(d.daily)}</p></section>`;  // CC-08
   }
   h += coachStanceHTML(d.stance && d.stance.rung);
+  h += coachHypothesesHTML(d.working_hypotheses);
   const ro = d.recent_outputs || [];
   h += `<section class="coach-progress"><p class="dx-kicker label">how it's going</p>`;
   h += ro.length

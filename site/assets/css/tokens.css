@@ -382,3 +382,6 @@ a { color: inherit; text-underline-offset: 0.18em; }
   /* content clears the fixed bar (incl. iOS home-indicator inset) */
   body { padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
 }
+
+/* Build stamp — muted deploy fingerprint (git SHA), shown on machine-facing footers. */
+.build-stamp { display: block; margin-top: var(--sp-2); font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); opacity: 0.6; }
