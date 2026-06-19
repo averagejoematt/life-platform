@@ -149,3 +149,64 @@ def test_maintenance_near_goal_forward_framed_no_failure_tally(monkeypatch):
     # Nathan guardrail: the rendered signal must never tally failures/regains.
     assert not _FAILURE_TALLY.search(r["signal"]), f"failure tally leaked: {r['signal']!r}"
     assert "walking" in r["signal"].lower()
+
+
+# ── pace hardening (curve-range clamp + regression rate) ───────────────────────
+
+
+def test_proven_rate_at_clamps_above_curve_max():
+    # current weight just above the curve's rounded heaviest sample → must still
+    # resolve (was returning None → "unknown" pace label in the live smoke).
+    curve = [
+        {"weight": 305.4, "days_from_start": 0, "cum_lost": 0.0},
+        {"weight": 303.3, "days_from_start": 7, "cum_lost": 2.1},
+    ]
+    assert tb._proven_rate_at(curve, 305.44) == 2.1
+    assert tb._proven_rate_at(curve, 999.0) == 2.1  # far above → clamp to first segment
+
+
+def test_proven_rate_at_clamps_below_curve_min():
+    curve = [
+        {"weight": 200.0, "days_from_start": 0, "cum_lost": 0.0},
+        {"weight": 190.0, "days_from_start": 7, "cum_lost": 10.0},
+    ]
+    assert tb._proven_rate_at(curve, 150.0) == 10.0  # clamp to min → last segment
+
+
+def test_pace_resolves_label_with_regression_rate(monkeypatch):
+    # 5 weigh-ins over 28 days, ~2 lb/wk loss, current just above the curve max.
+    withings = [
+        {"date": "2026-05-22", "weight_lbs": 313.4},
+        {"date": "2026-05-29", "weight_lbs": 311.4},
+        {"date": "2026-06-05", "weight_lbs": 309.4},
+        {"date": "2026-06-12", "weight_lbs": 307.4},
+        {"date": "2026-06-19", "weight_lbs": 305.44},
+    ]
+    curve = [
+        {"weight": 305.4, "days_from_start": 0, "cum_lost": 0.0, "walks_wk": 10.0},
+        {"weight": 303.3, "days_from_start": 7, "cum_lost": 2.1, "walks_wk": 11.0},
+    ]
+
+    def fake(source, start, end, *a, **k):
+        if source == "training_reference":
+            return [_REF | {"proven_curve": curve, "bands": {"300-309": {"walks_wk": 12.0}}}]
+        if source == "withings":
+            return withings
+        return []
+
+    monkeypatch.setattr(tb, "query_source", fake)
+    r = tb.tool_get_benchmark({"view": "pace", "date": "2026-06-19"})
+    # regression slope ≈ 2 lb/wk (not the old endpoint-noise 12.75)
+    assert r["current"]["current_rate_lb_wk"] is not None
+    assert abs(r["current"]["current_rate_lb_wk"] - 2.0) < 0.6, r["current"]["current_rate_lb_wk"]
+    # label now resolves instead of "unknown"
+    assert r["pace_vs_proven"] in ("ahead", "on", "behind"), r["pace_vs_proven"]
+    assert r["run_gate_ok"] is False
+
+
+def test_thin_window_rate_is_none_not_fabricated(monkeypatch):
+    # Two close-but-divergent readings must NOT manufacture a rate (the 12.75 bug).
+    withings = [{"date": "2026-06-17", "weight_lbs": 305.0}, {"date": "2026-06-19", "weight_lbs": 308.0}]
+    _mock_query(monkeypatch, withings=withings, strava=[])
+    r = tb.tool_get_benchmark({"view": "pace", "date": "2026-06-19"})
+    assert r["current"]["current_rate_lb_wk"] is None  # <3 pts / <7d span → honest None
