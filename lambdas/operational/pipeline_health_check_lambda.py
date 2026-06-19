@@ -79,6 +79,13 @@ ACTIVE_API_SOURCES = [
     "dropbox",
 ]
 
+# Best-effort sources: known-brittle by an accepted, unfixable upstream cause. They are
+# still EVALUATED and logged for visibility, but excluded from UnhealthySourceCount so a
+# permanent expected failure can't keep `ingest-liveness-unhealthy` red or mask a real
+# source death. Garmin (2026-06-19): datacenter-IP 429 defeats server-side OAuth refresh;
+# sleep/HRV/recovery are covered by Whoop + Eight Sleep. Remove from here if it stabilizes.
+BEST_EFFORT_SOURCES = {"garmin"}
+
 # Per-source attempt-gap overrides (minutes). Unlisted sources use the default in
 # ingest_health (~26h). Garmin runs only 4x/day but still attempts daily, so the
 # default holds; this map exists for future sources with sparser-than-daily cadence.
@@ -219,7 +226,9 @@ def _check_ingest_liveness(now: datetime) -> dict:
         if verdict["alert"]:
             logger.warning(f"INGEST UNHEALTHY: {source} — {verdict['status']}: {verdict['reason']}")
 
-    alerting = [v for v in verdicts if v["alert"]]
+    # Best-effort sources (e.g. Garmin) are logged above but excluded from the count/alert
+    # so an accepted, unfixable upstream failure can't mask a real source death.
+    alerting = [v for v in verdicts if v["alert"] and v["source"] not in BEST_EFFORT_SOURCES]
     unhealthy_count = len(alerting)
 
     # Emit the metric the ingest-liveness alarm watches.
