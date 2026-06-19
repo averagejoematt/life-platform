@@ -1,6 +1,6 @@
 # Life Platform — MCP Tool Catalog
 
-**Version:** v8.6.0 | **Last updated:** 2026-06-19 | **Total tools:** 133
+**Version:** v8.6.0 | **Last updated:** 2026-06-19 | **Total tools:** 134
 
 > Source of truth: the count of top-level `TOOLS` dict keys in `mcp/registry.py` → **133**, via AST parse (`deploy/sync_doc_metadata.py::_auto_discover_tool_count`). Do NOT count with `grep '"name":'` — it over-counts nested schema `"name"` fields (CLAUDE.md).
 >
@@ -72,6 +72,7 @@
 |------|-----------|-------------|
 | `get_weight_loss_progress` | start_date=, end_date= | Weekly rate, BMI milestones, plateau detection, goal date |
 | `get_body_composition_trend` | start_date=, end_date= | Fat vs lean mass, 14-day rolling deltas |
+| `get_benchmark` | view= (pace\|episodes\|maintenance), date= | **PRIVATE (BENCH-1, ADR-089).** Descriptive cut-benchmarking vs his own proven history. `pace`=live pace vs proven trajectory + ~240 lb run gate; `episodes`=loss/regain ledger + 0.79× asymmetry; `maintenance`=regain firewall near goal. Forward-framed, correlational, confidence/n on every block. |
 
 ### Strength Training
 | Tool | Key Params | Description |
