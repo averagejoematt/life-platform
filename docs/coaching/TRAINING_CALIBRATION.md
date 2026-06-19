@@ -153,6 +153,67 @@ whether he stays "on" (see §2) — training design supports that but does not s
 
 ## 4a. Session construction rules — timing, venue, modality, data sources
 
+**DATA PULL FIRST — reflect on the WHOLE day across ALL sources, never Hevy alone.** Before
+reflecting on a prior day or proposing a session, assemble the complete activity picture. Hevy is
+only the *lifting* log; a Hevy-only read systematically undercounts what he actually did and is a
+repeat failure mode. "What did I do yesterday" means **everything that moved him**, not just what
+was in the gym app. Mandatory pre-flight pulls (do not skip any that exist for the window):
+- **Hevy** — `get_workouts` + `get_workout_detail` for lifts AND any cardio/intervals logged inside
+  a gym session (his Z2 bike blocks live *inside* Hevy workouts and are invisible to Strava).
+- **Strava** — walks, rucks, runs, rides, hikes, standalone cardio. These are the bulk of his
+  aerobic + NEAT dose and the single most-skipped source. A day with "no Hevy workout" can still be
+  a 5-mile walk. **If you didn't check Strava, you haven't checked the day.**
+- **Whoop strain / day strain** — captures load (incl. activity not logged in either app).
+- **Cross-check coverage:** if Hevy and Strava disagree or one is empty, say so — don't assume the
+  empty one means "rest." Name what each source shows and reconcile (e.g. "Hevy: Legs 17 sets;
+  Strava: one 2.9-mi walk; Whoop strain 11.2 — so the day was a hard lift + a short walk, nothing
+  more"). Reflecting on yesterday without naming the Strava line is the bug this rule exists to kill.
+
+**Strava is authoritative for *what moved*, NOT for *load* — the ruck edge case.** His Garmin watch
+has no ruck mode, so a **weighted ruck records in Strava as a plain `Walk`** with no hint of the
+load on his back. Strava under-describes it by design. Therefore:
+- **Never treat a Strava `Walk` as definitely an unloaded walk.** A walk-tagged activity may have
+  been a ruck; its strain, recovery cost, and training stimulus are materially higher than the GPS
+  track implies. When a `Walk` looks long/hilly or sits next to elevated Whoop strain, it's a
+  candidate ruck — flag the ambiguity rather than silently scoring it as easy NEAT.
+- **The override is a real, persisted tool — offer it proactively.** `log_ruck` tags a Strava
+  `Walk`/`Hike` as a ruck with load: pass `weight_lbs` (+ `date`, and a `time_hint` or `strava_id`
+  if there were several walks that day). It finds the matching activity, computes a load-adjusted
+  calorie/effort estimate (Pandolf-style, scaled by bodyweight × `load_multiplier`), and writes an
+  overlay to the `ruck_log` partition that **persists for all future reads**. `get_ruck_log` reads
+  the history back (miles, weekly frequency, avg/max load). So **any Strava walk can be converted to
+  a ruck at any time** — it's not a per-conversation reinterpretation.
+- **Always honor a logged ruck over Strava's raw `Walk` tag.** When pulling the day, check
+  `ruck_log` (via `get_ruck_log`) — if that walk is logged as a ruck, it's a loaded carry with the
+  recorded weight and the higher effort estimate, full stop. The raw Strava `Walk` is then the
+  *under*-count.
+- **When a notable walk isn't yet tagged, offer to log it.** "Was that a ruck? Tell me the weight
+  and I'll tag it" — then call `log_ruck`. A misclassified ruck under-rates the day's load (skews
+  ACWR / recovery debt low) and under-credits real work; logging it fixes both, permanently.
+
+This is the input to *both* the "what did I do" reflection and the continuity logic below — the
+sequence-from-reality and walking-base reads are only as good as the sources you actually pulled.
+
+**Continuity over calendar — the day of the week does NOT pick the session.** The weekly grid
+in TRAINING_PROGRAM.md is a *default rhythm*, not a schedule to obey. He likes a PPL+engine shape
+and wants that **sequence** preserved — but which session comes *tomorrow* is decided by the
+data, not by "it's Wednesday so it's legs." Drive the choice from, in priority order:
+- **What he actually did the last few days** (`get_workouts` + Strava) — pick up the PPL/cardio
+  sequence from where it genuinely left off. If he missed days, resume at the right spot; do not
+  skip a slot just because the calendar moved past it, and do not repeat a slot he just trained.
+- **Muscle readiness / freshness** — days since each pattern was trained, `get_muscle_volume`
+  vs MEV/MAV/MRV, ACWR. The pattern that's most recovered and most owed volume is the candidate.
+- **What's coming** — if he tells you tomorrow holds a big walk/ruck/run or a time constraint,
+  let that reshape the session (e.g. don't stack a heavy axial leg day before a 10-mile walk;
+  put the easy lift or the engine work there instead). Ask-or-honor known plans over the grid.
+- **The proven baselines** — the walking base and the PPL frequency from PROVEN_BLUEPRINT.md are
+  the thing being kept continuous; the weekday label is not.
+
+So: "you trained Push then Pull then Legs over your last three sessions, legs are still sore and
+you've got a long walk tomorrow → tomorrow is an easy upper/engine slot" is the right shape —
+**not** "tomorrow is Thursday so the grid says Lower B." State which prior sessions and which
+signals drove the pick, every time.
+
 **Timing — fix the session date before using recovery (plan vs. gate).** Whoop recovery is a
 *morning-of* metric (computed from last night's sleep); a future day's recovery does not exist
 yet. **Verify the data date, not just the label:** `get_readiness_score` echoes the
@@ -166,6 +227,26 @@ context* only, never as the gate. The real gate is the score that lands the morn
   sleep/fatigue trend) + trajectory; treat the latest recovery as *trend context only*; attach
   a morning checkpoint — "on waking, check readiness and apply the §4 gates, subtract to floor
   if compromised." Never phrase a future plan as "this morning do X."
+
+**His dominant use case: night-before planning for a 5am lift, recovery NOT yet available.** He
+trains at 5am and won't stop to plan first thing, so most sessions are built the evening before
+when tomorrow's recovery does not exist. Treat planning *without* a live recovery score as the
+normal path, not a degraded one:
+- **Do not gate the plan on recovery you don't have.** Build a confident, specific session from
+  the program + cumulative load + the continuity logic above. A night-before plan is allowed to
+  be a real plan, not a hedge.
+- **Never attribute the session to a recovery tier that isn't live.** Do not write "because
+  recovery is YELLOW" using last night's (or an older) number stamped with tomorrow's date — that
+  is the exact failure that mislabeled the Engine cycling note as YELLOW when the morning came up
+  GREEN. If recovery isn't in, say so and justify the session by load/sequence/trajectory instead.
+- **Bias the night-before default toward what makes sense, leaning slightly conservative ONLY on
+  tendon-limited novel patterns** (per §2) — everywhere else, program to his real capacity, not to
+  an absent-and-assumed-yellow recovery. When in doubt between tiers with no data, plan the strong
+  session and carry the subtract-only morning checkpoint, rather than pre-emptively easing.
+- **The morning checkpoint does the gating, not a guessed tier.** Phrase it as: "built off load +
+  sequence; on waking glance at recovery — if GREEN/expected, run it as written; if RED or clearly
+  compromised, subtract to the floor variant." That lets a GREEN morning run the full session
+  instead of being capped by a phantom YELLOW.
 
 **Verify the reading's provenance — `get_readiness_score` can future-stamp stale data.** Always
 check the component raw dates (`whoop_recovery.raw.date`, `sleep_quality.raw.date`). If a score is
