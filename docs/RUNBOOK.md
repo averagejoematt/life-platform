@@ -1,6 +1,6 @@
 # Life Platform — Runbook
 
-Last updated: 2026-06-19 (v8.6.0 — 134 MCP tools, 39-module package, 81 Lambdas, 20 data sources)
+Last updated: 2026-06-19 (v8.6.0 — 135 MCP tools, 40-module package, 81 Lambdas, 20 data sources)
 
 **Ground truth at last verification:**
 - Lambda functions deployed: 73 (5 power-tuning Lambdas deleted in V2 P4)
@@ -122,6 +122,42 @@ Each OAuth-based ingestion Lambda refreshes its own tokens and writes them back 
 | eightsleep | Password grant | On 401 response | Yes | Low |
 
 **Note:** A concurrent invocation (manual invoke + cron overlap) could race on the token write. `ReservedConcurrentExecutions=1` is ready in CDK but commented out — requires account concurrency limit increase from 10 to 50+ (pending AWS Support request).
+
+---
+
+## Meal Grouping — Backfill & Regroup (ADR-090)
+
+The derived `macrofactor_meals` projection is built by the deterministic `meal_grouper`
+(shared layer). Raw `macrofactor` is never mutated.
+
+**Backfill history** (local script, runs with your admin creds — reads raw directly,
+bypassing the phase filter so it sees full cross-phase history):
+```bash
+# DRY-RUN by default — prints grouped days, writes nothing. Eyeball first.
+S3_BUCKET=matthew-life-platform USER_ID=matthew python3 deploy/backfill_meals.py --limit 14   # sample
+S3_BUCKET=matthew-life-platform USER_ID=matthew python3 deploy/backfill_meals.py               # full dry-run
+S3_BUCKET=matthew-life-platform USER_ID=matthew python3 deploy/backfill_meals.py --apply        # WRITE
+# Resumable: --apply skips already-projected days unless --force. Conservation is checked
+# per day; the job HALTS on any day that fails to reconcile to the cent (no partial write).
+```
+
+**Regroup a single day** (via the MCP tool — re-runs the grouper on raw + upserts):
+`manage_meals regroup_day {date: YYYY-MM-DD}` (add `dry_run:true` to preview). Pruning of
+stale ordinals uses the MCP role's **partition-scoped** `DeleteItem` (LeadingKeys =
+`macrofactor_meals` only — see ADR-090).
+
+**Layer dependency:** the grouper, seed templates, projection writer, and
+`food_vocabulary.json` ship in the shared layer. Changing any of them = rebuild the layer
+(`bash deploy/build_layer.sh`), bump `SHARED_LAYER_VERSION` in `cdk/stacks/constants.py`,
+`cdk deploy LifePlatformCore`, **then** `cdk deploy LifePlatformMcp` (the MCP lambda must
+re-attach the new layer — a code-only push leaves it on the old one; the tell is `cdk diff`
+showing no Layers change). Verify: `aws lambda get-function-configuration
+--function-name life-platform-mcp --query 'Layers[].Arn'` ends in the new version, and
+`manage_meals list_templates` returns 10 templates (not an import error).
+
+**Format-drift:** if `get_freshness_status.macrofactor_format_drift.drifted` is true (or the
+`MacroFactorFormatDrift` alarm fires), the MacroFactor diary export reverted to daily-summary
+(empty `food_log`) and the grouper is starved — re-export the diary format.
 
 ---
 

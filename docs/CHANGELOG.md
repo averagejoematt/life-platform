@@ -1,3 +1,27 @@
+## Derived meal layer (meal grouping) — 2026-06-19 (ADR-090: best-effort meal projection over raw MacroFactor, never mutate raw)
+
+Groups raw MacroFactor food entries into the meals they were eaten as ("Turkey Tacos", "Yogurt & Oats Bowl") as a **derived, recomputable projection** — deterministic-first, raw stays sovereign. Phase 0–1 (grouper + projection + backfill + read tool) shipped; the LLM namer (Phase 2) is deferred.
+
+### Added
+- **New derived source `macrofactor_meals`** — `pk USER#matthew#SOURCE#macrofactor_meals`, `sk DATE#YYYY-MM-DD#MEAL#<ordinal>`. Each meal carries `inferred:true` + `confidence` + `signature` (sorted canonical-token hash) + a cached `rollup`; `member_refs`/`sides` are pointers into the untouched raw partition. Backfilled **780 items / 114 days, 0 conservation halts**.
+- **`lambdas/meal_grouper.py`** (pure, shared layer) — canonical-token normalize → `GAP_MIN=15` time-gap segment (reuses the `get_glucose_meal_response` algorithm) → anchor-SET content-split (chicken+salmon = one core; an orphan protein attaches as a `side`, never a phantom meal) → template-centroid match with **coverage-based confidence** (fraction of the cluster, by items + calories, the template explains) → snack/beverage peel → conservation assert. `CONF_MIN=0.7`; below it a cluster is `uncategorized` (counted in daily totals, excluded from meal analytics).
+- **`config/food_vocabulary.json`** — 121 raw names → 85 canonical tokens with roles. Spelling-of-the-same-food-only rule: distinct dishes (Shawarma / Butter Chicken / Pad Thai / Marry Me / Mongolian Beef) stay separate (Phase-2 LLM territory).
+- **`lambdas/meal_templates_seed.py`** — 10 seed templates from the 114-day history scan (Turkey Tacos = the one below-threshold `seed_manual` exception).
+- **`lambdas/meal_projection.py`** — idempotent upsert by stable ordinal (prunes stale higher ordinals on re-group); writes ONLY the meals partition (guarded by `tests/test_meal_projection.py` + a runtime pk assertion).
+- **`deploy/backfill_meals.py`** — resumable, **dry-run by default**, per-day conservation reconciliation that **halts the whole job** on any mismatch.
+- **`manage_meals` MCP tool (#135)** — `get_day` · `most_eaten` (aggregates on `template_id`/`signature`, never the display name; snacks by canonical member token; n-floor) · `regroup_day` · `list_templates`.
+- **MacroFactor format-drift guard** — `freshness_checker_lambda` re-enables `macrofactor` (format-aware: alert if the last N records have `entries_count==0`, i.e. the diary export reverted to daily-summary) + a `MacroFactorFormatDrift` CloudWatch metric; `macrofactor_format_drift` surfaced in `get_freshness_status`.
+
+### Security
+- **Scoped `DeleteItem` on the MCP role** (Yael, ADR-090) — `regroup_day`'s ordinal-prune needs `DeleteItem`, granted via a dedicated statement conditioned to `dynamodb:LeadingKeys = USER#matthew#SOURCE#macrofactor_meals` — **never table-wide**, so the LLM-facing role cannot delete raw health data in the single-table store. Mirrors the `site_api_ai` `RATE#*` LeadingKeys pattern.
+
+### Deferred (Phase 2)
+- Haiku namer for residual novel clusters (signature-cached → promote-to-template → $0; Batch-API backfill; spend cap fails safe to `uncategorized`). ~4% of clusters land in `uncategorized` today (distinct restaurant dishes + a few staple variants like the pollo-asado/fajita chicken plates) — the live-with-it tuning queue for widening templates / `CONF_MIN`.
+
+Layer **v86**; deployed live (Core + MCP + freshness) + backfilled 2026-06-19.
+
+---
+
 ## Cut benchmarking (BENCH-1) — 2026-06-19 (ADR-089: descriptive divergence vs his own proven cut)
 
 PRIVATE cut-benchmarking & regain firewall operationalizing PROVEN_BLUEPRINT.md (16 loss episodes, 0 held; regain ≈ 0.79× loss; walking collapses post-trough).

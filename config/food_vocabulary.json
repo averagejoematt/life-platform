@@ -1,0 +1,929 @@
+{
+  "version": "1.0.0",
+  "description": "Canonical food vocabulary for the derived meal layer (ADR meal-grouping). Maps raw MacroFactor food names to canonical tokens. RULE: canonicalize spellings of the SAME food only \u2014 never merge distinct dishes (chicken_shawarma/butter_chicken/etc. stay separate; mongolian_beef is not beef_steak).",
+  "roles": {
+    "anchor": "meal core (defines a meal)",
+    "base": "starch/carb base (can anchor a bowl when no protein present: oats)",
+    "veg": "vegetable modifier",
+    "fruit": "fruit modifier/snack",
+    "nut_seed": "nut/seed modifier/snack",
+    "fat": "added fat/oil modifier",
+    "dairy": "milk/cheese modifier",
+    "sauce": "sauce/condiment modifier",
+    "treat": "dessert/treat modifier/snack",
+    "snack_core": "defines a snack occasion (whey/smoothie/bar)",
+    "beverage": "counted in totals, never a meal or snack card",
+    "supplement": "non-food scaffold, counted, never a meal",
+    "other": "unmatched fallback"
+  },
+  "base_can_anchor": [
+    "oats"
+  ],
+  "substring_rules": [
+    [
+      "marry me chicken",
+      "marry_me_chicken"
+    ],
+    [
+      "butter chicken",
+      "butter_chicken"
+    ],
+    [
+      "chicken pad thai",
+      "chicken_pad_thai"
+    ],
+    [
+      "chicken shawarma",
+      "chicken_shawarma"
+    ],
+    [
+      "mongolian beef",
+      "mongolian_beef"
+    ],
+    [
+      "complete vanilla",
+      "protein_yogurt_dessert"
+    ],
+    [
+      "greek yogurt",
+      "greek_yogurt"
+    ],
+    [
+      "cottage cheese",
+      "cottage_cheese"
+    ],
+    [
+      "ground beef",
+      "ground_beef"
+    ],
+    [
+      "turkey ground",
+      "ground_turkey"
+    ],
+    [
+      "flank",
+      "beef_steak"
+    ],
+    [
+      "flat iron",
+      "beef_steak"
+    ],
+    [
+      "beef steak",
+      "beef_steak"
+    ],
+    [
+      "pollo asado",
+      "pollo_asado_sauce"
+    ],
+    [
+      "chicken & sage",
+      "breakfast_sausage"
+    ],
+    [
+      "chicken dippin",
+      "chicken_nuggets"
+    ],
+    [
+      "chicken breast",
+      "chicken_breast"
+    ],
+    [
+      "smoked salmon",
+      "salmon"
+    ],
+    [
+      "salmon",
+      "salmon"
+    ],
+    [
+      "tuna",
+      "tuna"
+    ],
+    [
+      "hard boiled egg",
+      "eggs"
+    ],
+    [
+      "egg bites",
+      "eggs"
+    ],
+    [
+      "eggs, scrambled",
+      "eggs"
+    ],
+    [
+      "egg whole",
+      "eggs"
+    ],
+    [
+      "egg",
+      "eggs"
+    ],
+    [
+      "whey protein",
+      "whey_protein"
+    ],
+    [
+      "vanilla protein shake",
+      "whey_protein"
+    ],
+    [
+      "jocko molk",
+      "whey_protein"
+    ],
+    [
+      "protein isolate",
+      "whey_protein"
+    ],
+    [
+      "morning smoothie",
+      "smoothie"
+    ],
+    [
+      "iq bar",
+      "protein_bar"
+    ],
+    [
+      "blueberry bar",
+      "protein_bar"
+    ],
+    [
+      "chomps",
+      "meat_snack"
+    ],
+    [
+      "oats",
+      "oats"
+    ],
+    [
+      "brown rice",
+      "brown_rice"
+    ],
+    [
+      "spanish rice",
+      "white_rice"
+    ],
+    [
+      "rice white",
+      "white_rice"
+    ],
+    [
+      "quinoa",
+      "quinoa"
+    ],
+    [
+      "sweet potato",
+      "sweet_potato"
+    ],
+    [
+      "taco shell",
+      "taco_shell"
+    ],
+    [
+      "tortilla",
+      "tortilla"
+    ],
+    [
+      "cassava flour",
+      "tortilla"
+    ],
+    [
+      "casava flour",
+      "tortilla"
+    ],
+    [
+      "panko",
+      "panko"
+    ],
+    [
+      "granola",
+      "granola"
+    ],
+    [
+      "ancient grain",
+      "granola"
+    ],
+    [
+      "special k",
+      "cereal"
+    ],
+    [
+      "black beans",
+      "black_beans"
+    ],
+    [
+      "edamame",
+      "edamame"
+    ],
+    [
+      "spinach",
+      "spinach"
+    ],
+    [
+      "broccoli",
+      "broccoli"
+    ],
+    [
+      "onion",
+      "onion"
+    ],
+    [
+      "bell pepper",
+      "bell_pepper"
+    ],
+    [
+      "jalapeno",
+      "jalapeno"
+    ],
+    [
+      "lettuce",
+      "lettuce"
+    ],
+    [
+      "cucumber",
+      "cucumber"
+    ],
+    [
+      "asparagus",
+      "asparagus"
+    ],
+    [
+      "kimchi",
+      "kimchi"
+    ],
+    [
+      "napa cabbage",
+      "kimchi"
+    ],
+    [
+      "thai basil",
+      "herbs"
+    ],
+    [
+      "avocado oil",
+      "avocado_oil"
+    ],
+    [
+      "avocado",
+      "avocado"
+    ],
+    [
+      "blueberries",
+      "blueberries"
+    ],
+    [
+      "blackberries",
+      "blackberries"
+    ],
+    [
+      "strawberries",
+      "strawberries"
+    ],
+    [
+      "strawberry passion",
+      "protein_water"
+    ],
+    [
+      "banana",
+      "banana"
+    ],
+    [
+      "apple",
+      "apple"
+    ],
+    [
+      "almonds",
+      "almonds"
+    ],
+    [
+      "walnuts",
+      "walnuts"
+    ],
+    [
+      "pecans",
+      "pecans"
+    ],
+    [
+      "chia seeds",
+      "chia_seeds"
+    ],
+    [
+      "hemp seeds",
+      "hemp_seeds"
+    ],
+    [
+      "flax seeds",
+      "flax_seeds"
+    ],
+    [
+      "sunflower seeds",
+      "sunflower_seeds"
+    ],
+    [
+      "pumpkin or squash seeds",
+      "pumpkin_seeds"
+    ],
+    [
+      "peanut butter chip",
+      "peanut_butter"
+    ],
+    [
+      "olive oil",
+      "olive_oil"
+    ],
+    [
+      "vegetable oil",
+      "vegetable_oil"
+    ],
+    [
+      "sesame oil",
+      "sesame_oil"
+    ],
+    [
+      "real mayonnaise",
+      "mayo"
+    ],
+    [
+      "almond milk",
+      "almond_milk"
+    ],
+    [
+      "almondmilk",
+      "almond_milk"
+    ],
+    [
+      "whole milk",
+      "milk"
+    ],
+    [
+      "ultra-filtered milk",
+      "milk"
+    ],
+    [
+      "feta cheese",
+      "feta"
+    ],
+    [
+      "feta vinaigrette",
+      "vinaigrette"
+    ],
+    [
+      "mozzarella",
+      "mozzarella"
+    ],
+    [
+      "salsa",
+      "salsa"
+    ],
+    [
+      "golden curry",
+      "curry_sauce"
+    ],
+    [
+      "fajita",
+      "fajita_sauce"
+    ],
+    [
+      "sriracha",
+      "sriracha"
+    ],
+    [
+      "soy sauce",
+      "soy_sauce"
+    ],
+    [
+      "worcestershire",
+      "worcestershire"
+    ],
+    [
+      "brown sauce",
+      "brown_sauce"
+    ],
+    [
+      "horseradish",
+      "horseradish"
+    ],
+    [
+      "enchilada",
+      "salsa"
+    ],
+    [
+      "dark chocolate",
+      "dark_chocolate"
+    ],
+    [
+      "cool whip",
+      "cool_whip"
+    ],
+    [
+      "cherry gels",
+      "cherry_gels"
+    ],
+    [
+      "ice cream",
+      "ice_cream"
+    ],
+    [
+      "chocolate chip cookies",
+      "cookies"
+    ],
+    [
+      "sugar free jello",
+      "jello"
+    ],
+    [
+      "coffee",
+      "coffee"
+    ],
+    [
+      "almond late",
+      "coffee"
+    ],
+    [
+      "infused water",
+      "protein_water"
+    ],
+    [
+      "probiotic",
+      "protein_water"
+    ],
+    [
+      "juice drink",
+      "protein_water"
+    ],
+    [
+      "guava goddess",
+      "protein_water"
+    ],
+    [
+      "supplements",
+      "supplements"
+    ]
+  ],
+  "tokens": {
+    "almond_milk": {
+      "role": "dairy",
+      "display": "Almond Milk"
+    },
+    "almonds": {
+      "role": "nut_seed",
+      "display": "Almonds"
+    },
+    "apple": {
+      "role": "fruit",
+      "display": "Apple"
+    },
+    "asparagus": {
+      "role": "veg",
+      "display": "Asparagus"
+    },
+    "avocado": {
+      "role": "veg",
+      "display": "Avocado"
+    },
+    "avocado_oil": {
+      "role": "fat",
+      "display": "Avocado Oil"
+    },
+    "banana": {
+      "role": "fruit",
+      "display": "Banana"
+    },
+    "beef_steak": {
+      "role": "anchor",
+      "display": "Beef Steak"
+    },
+    "bell_pepper": {
+      "role": "veg",
+      "display": "Bell Pepper"
+    },
+    "black_beans": {
+      "role": "base",
+      "display": "Black Beans"
+    },
+    "blackberries": {
+      "role": "fruit",
+      "display": "Blackberries"
+    },
+    "blueberries": {
+      "role": "fruit",
+      "display": "Blueberries"
+    },
+    "breakfast_sausage": {
+      "role": "anchor",
+      "display": "Breakfast Sausage"
+    },
+    "broccoli": {
+      "role": "veg",
+      "display": "Broccoli"
+    },
+    "brown_rice": {
+      "role": "base",
+      "display": "Brown Rice"
+    },
+    "brown_sauce": {
+      "role": "sauce",
+      "display": "Brown Sauce"
+    },
+    "butter_chicken": {
+      "role": "anchor",
+      "display": "Butter Chicken"
+    },
+    "cereal": {
+      "role": "base",
+      "display": "Cereal"
+    },
+    "cherry_gels": {
+      "role": "treat",
+      "display": "Cherry Gels"
+    },
+    "chia_seeds": {
+      "role": "nut_seed",
+      "display": "Chia Seeds"
+    },
+    "chicken_breast": {
+      "role": "anchor",
+      "display": "Chicken Breast"
+    },
+    "chicken_nuggets": {
+      "role": "anchor",
+      "display": "Chicken Nuggets"
+    },
+    "chicken_pad_thai": {
+      "role": "anchor",
+      "display": "Chicken Pad Thai"
+    },
+    "chicken_shawarma": {
+      "role": "anchor",
+      "display": "Chicken Shawarma"
+    },
+    "coffee": {
+      "role": "beverage",
+      "display": "Coffee"
+    },
+    "cookies": {
+      "role": "treat",
+      "display": "Cookies"
+    },
+    "cool_whip": {
+      "role": "treat",
+      "display": "Cool Whip"
+    },
+    "cottage_cheese": {
+      "role": "anchor",
+      "display": "Cottage Cheese"
+    },
+    "cucumber": {
+      "role": "veg",
+      "display": "Cucumber"
+    },
+    "curry_sauce": {
+      "role": "sauce",
+      "display": "Japanese Curry Sauce"
+    },
+    "dark_chocolate": {
+      "role": "treat",
+      "display": "Dark Chocolate"
+    },
+    "edamame": {
+      "role": "base",
+      "display": "Edamame"
+    },
+    "eggs": {
+      "role": "anchor",
+      "display": "Eggs"
+    },
+    "fajita_sauce": {
+      "role": "sauce",
+      "display": "Fajita Sauce"
+    },
+    "feta": {
+      "role": "dairy",
+      "display": "Feta"
+    },
+    "flax_seeds": {
+      "role": "nut_seed",
+      "display": "Flax Seeds"
+    },
+    "granola": {
+      "role": "base",
+      "display": "Granola"
+    },
+    "greek_yogurt": {
+      "role": "anchor",
+      "display": "Greek Yogurt"
+    },
+    "ground_beef": {
+      "role": "anchor",
+      "display": "Ground Beef"
+    },
+    "ground_turkey": {
+      "role": "anchor",
+      "display": "Ground Turkey"
+    },
+    "hemp_seeds": {
+      "role": "nut_seed",
+      "display": "Hemp Seeds"
+    },
+    "herbs": {
+      "role": "veg",
+      "display": "Herbs"
+    },
+    "horseradish": {
+      "role": "sauce",
+      "display": "Horseradish"
+    },
+    "ice_cream": {
+      "role": "treat",
+      "display": "Ice Cream"
+    },
+    "jalapeno": {
+      "role": "veg",
+      "display": "Jalapeno"
+    },
+    "jello": {
+      "role": "treat",
+      "display": "Jello"
+    },
+    "kimchi": {
+      "role": "veg",
+      "display": "Kimchi"
+    },
+    "lettuce": {
+      "role": "veg",
+      "display": "Lettuce"
+    },
+    "marry_me_chicken": {
+      "role": "anchor",
+      "display": "Marry Me Chicken"
+    },
+    "meat_snack": {
+      "role": "snack_core",
+      "display": "Meat Snack"
+    },
+    "milk": {
+      "role": "dairy",
+      "display": "Milk"
+    },
+    "mongolian_beef": {
+      "role": "anchor",
+      "display": "Mongolian Beef"
+    },
+    "mozzarella": {
+      "role": "dairy",
+      "display": "Mozzarella"
+    },
+    "oats": {
+      "role": "base",
+      "display": "Oats"
+    },
+    "olive_oil": {
+      "role": "fat",
+      "display": "Olive Oil"
+    },
+    "onion": {
+      "role": "veg",
+      "display": "Onion"
+    },
+    "panko": {
+      "role": "base",
+      "display": "Panko"
+    },
+    "peanut_butter": {
+      "role": "nut_seed",
+      "display": "Peanut Butter"
+    },
+    "pecans": {
+      "role": "nut_seed",
+      "display": "Pecans"
+    },
+    "pollo_asado_sauce": {
+      "role": "sauce",
+      "display": "Pollo Asado Sauce"
+    },
+    "protein_bar": {
+      "role": "snack_core",
+      "display": "Protein Bar"
+    },
+    "protein_water": {
+      "role": "beverage",
+      "display": "Protein Water"
+    },
+    "protein_yogurt_dessert": {
+      "role": "anchor",
+      "display": "Protein Yogurt (dessert)"
+    },
+    "pumpkin_seeds": {
+      "role": "nut_seed",
+      "display": "Pumpkin Seeds"
+    },
+    "quinoa": {
+      "role": "base",
+      "display": "Quinoa"
+    },
+    "salmon": {
+      "role": "anchor",
+      "display": "Salmon"
+    },
+    "salsa": {
+      "role": "sauce",
+      "display": "Salsa"
+    },
+    "sesame_oil": {
+      "role": "fat",
+      "display": "Sesame Oil"
+    },
+    "smoothie": {
+      "role": "snack_core",
+      "display": "Smoothie"
+    },
+    "soy_sauce": {
+      "role": "sauce",
+      "display": "Soy Sauce"
+    },
+    "spinach": {
+      "role": "veg",
+      "display": "Spinach"
+    },
+    "sriracha": {
+      "role": "sauce",
+      "display": "Sriracha"
+    },
+    "strawberries": {
+      "role": "fruit",
+      "display": "Strawberries"
+    },
+    "sunflower_seeds": {
+      "role": "nut_seed",
+      "display": "Sunflower Seeds"
+    },
+    "supplements": {
+      "role": "supplement",
+      "display": "Supplements"
+    },
+    "sweet_potato": {
+      "role": "base",
+      "display": "Sweet Potato"
+    },
+    "taco_shell": {
+      "role": "base",
+      "display": "Taco Shell"
+    },
+    "tortilla": {
+      "role": "base",
+      "display": "Tortilla"
+    },
+    "tuna": {
+      "role": "anchor",
+      "display": "Tuna"
+    },
+    "vegetable_oil": {
+      "role": "fat",
+      "display": "Vegetable Oil"
+    },
+    "vinaigrette": {
+      "role": "sauce",
+      "display": "Vinaigrette"
+    },
+    "walnuts": {
+      "role": "nut_seed",
+      "display": "Walnuts"
+    },
+    "whey_protein": {
+      "role": "snack_core",
+      "display": "Whey Protein Shake"
+    },
+    "white_rice": {
+      "role": "base",
+      "display": "White Rice"
+    },
+    "worcestershire": {
+      "role": "sauce",
+      "display": "Worcestershire"
+    }
+  },
+  "aliases": {
+    "Afternoon Supplements": "supplements",
+    "Almond Late": "coffee",
+    "Almond Milk, Plain or Original, Unsweetened, Refrigerated": "almond_milk",
+    "Almondmilk": "almond_milk",
+    "Almonds": "almonds",
+    "Apple": "apple",
+    "Asparagus, Cooked From Fresh": "asparagus",
+    "Avocado": "avocado",
+    "Avocado Oil": "avocado_oil",
+    "Banana": "banana",
+    "Banana, Fresh": "banana",
+    "Beef Flank Steak Lean and Fat Trimmed to 0 Raw\"": "beef_steak",
+    "Beef Flank Steak Lean and Fat Trimmed to 0\" Raw": "beef_steak",
+    "Beef Steak, Flank, Visible Fat Eaten": "beef_steak",
+    "Blackberries, Fresh": "blackberries",
+    "Blackcurrant Juice Drink": "protein_water",
+    "Blueberries": "blueberries",
+    "Blueberries, Fresh": "blueberries",
+    "Blueberry Bar": "protein_bar",
+    "Broccoli (steamed)": "broccoli",
+    "Brown Rice (cooked)": "brown_rice",
+    "Brown Sauce": "brown_sauce",
+    "Butter Chicken": "butter_chicken",
+    "Casava Flour Grain Free Tortillas": "tortilla",
+    "Cassava Flour": "tortilla",
+    "Chia Seeds": "chia_seeds",
+    "Chicken & Sage Breakfast Sausage": "breakfast_sausage",
+    "Chicken Breast (grilled)": "chicken_breast",
+    "Chicken Breast Boneless Skinless Raw": "chicken_breast",
+    "Chicken Breast Grilled Boneless Skinless": "chicken_breast",
+    "Chicken Dippin'": "chicken_nuggets",
+    "Chicken Pad Thai": "chicken_pad_thai",
+    "Chicken Shawarma": "chicken_shawarma",
+    "Chocolate Peanut Butter Whey Protein Isolate": "whey_protein",
+    "Chomps Taco Flavor": "meat_snack",
+    "Classic Fajita Simmer Sauce": "fajita_sauce",
+    "Coffee (black)": "coffee",
+    "Complete Vanilla 20g Protein Greek Yogurt": "protein_yogurt_dessert",
+    "Cool Whip Zero Sugar": "cool_whip",
+    "Cottage Cheese (2%)": "cottage_cheese",
+    "Cucumber, Raw, With Peel": "cucumber",
+    "Dark Chocolate (85%)": "dark_chocolate",
+    "Edamame, Green or Immature, Cooked From Fresh": "edamame",
+    "Egg": "eggs",
+    "Egg Whole Fried": "eggs",
+    "Egg Whole Raw": "eggs",
+    "Egg bites": "eggs",
+    "Eggs, scrambled": "eggs",
+    "Enchilada Black Beans": "black_beans",
+    "Evening Supplements": "supplements",
+    "Feta Cheese, Reduced Fat": "feta",
+    "Flat Iron Steak": "beef_steak",
+    "Flax Seeds": "flax_seeds",
+    "Golden Curry Japanese Curry Mix Hot": "curry_sauce",
+    "Grain Free Taco Shells With Avocado Oil": "taco_shell",
+    "Greek Feta Vinaigrette": "vinaigrette",
+    "Greek Yogurt (0%)": "greek_yogurt",
+    "Greek Yogurt Nonfat Plain": "greek_yogurt",
+    "Guava Goddess": "protein_water",
+    "Hard Boiled Eggs": "eggs",
+    "Hemp Seeds, Hulled": "hemp_seeds",
+    "Homemade Chocolate Chip Cookies": "cookies",
+    "Ice Cream": "ice_cream",
+    "Iq Bar Chocolate Sea Salt": "protein_bar",
+    "Jalapeno Peppers, Raw": "jalapeno",
+    "Jocko Molk Vanilla Gorilla Protein": "whey_protein",
+    "Kimchi Vegan Napa Cabbage Table Cut": "kimchi",
+    "Lean Ground Beef (93%)": "ground_beef",
+    "Lettuce, Iceberg": "lettuce",
+    "Lettuce, Romaine or Cos": "lettuce",
+    "Low Carb Balance Flour Tortillas": "tortilla",
+    "Marry Me Chicken": "marry_me_chicken",
+    "Mild Mexican Pollo Asado Seasoning Sauce": "pollo_asado_sauce",
+    "Mongolian Beef At Home": "mongolian_beef",
+    "Morning Smoothies": "smoothie",
+    "Morning Supplements": "supplements",
+    "Oats (dry)": "oats",
+    "Olive Oil": "olive_oil",
+    "Onion, White, Yellow or Red, Cooked": "onion",
+    "Onion, White, Yellow or Red, Raw": "onion",
+    "Onions Sweet Raw": "onion",
+    "Original Ancient Grain Granola Crunhy Clusters": "granola",
+    "Panko Japanese Style Bread Crumbs": "panko",
+    "Pasture-Raised Hard Boiled Eggs": "eggs",
+    "Peanut Butter Chip": "peanut_butter",
+    "Pecans, Raw": "pecans",
+    "Polly-O Cheese Fresh Mozzarella Balls Bite Size": "mozzarella",
+    "Prepared Horseradish": "horseradish",
+    "Protein Infused Water Blueberry Raspberry": "protein_water",
+    "Pumpkin or Squash Seeds, Unshelled, Salted": "pumpkin_seeds",
+    "Quinoa (cooked)": "quinoa",
+    "Real Mayonnaise Made With Avocado Oil": "avocado_oil",
+    "Red Bell Peppers, Cooked": "bell_pepper",
+    "Red Bell Peppers, Raw": "bell_pepper",
+    "Reduced Fat Ultra-Filtered Milk": "milk",
+    "Rice White Cooked Without Salt": "white_rice",
+    "Salmon (baked)": "salmon",
+    "Sesame Oil": "sesame_oil",
+    "Snack Pack No Sugar Added Cherry Gels": "cherry_gels",
+    "Soy Sauce": "soy_sauce",
+    "Spanish Rice (Mexican Rice), Without Meat": "white_rice",
+    "Special K Fruit & Yogurt Flavour Cereal": "cereal",
+    "Spinach (raw)": "spinach",
+    "Sriracha Sauce": "sriracha",
+    "Strawberries, Fresh": "strawberries",
+    "Strawberry Passion Probiotic + Probiotic Sparkling Drink": "protein_water",
+    "Sugar Free Jello": "jello",
+    "Sunflower Seeds, Raw": "sunflower_seeds",
+    "Sweet Potato (baked)": "sweet_potato",
+    "Thai basil": "herbs",
+    "The Original Worcestershire Sauce": "worcestershire",
+    "Tortilla Soft Taco": "tortilla",
+    "Traditional Salsa": "salsa",
+    "Turkey Ground 93% Lean 7% Fat Raw": "ground_turkey",
+    "Vanilla Protein Shake": "whey_protein",
+    "Vegetable Oil": "vegetable_oil",
+    "Walnuts": "walnuts",
+    "Whey Protein Shake": "whey_protein",
+    "Whole Milk": "milk",
+    "Wild Caught Light Tuna in Water": "tuna",
+    "Wild Coho Smoked Salmon Northwest Style": "salmon"
+  }
+}

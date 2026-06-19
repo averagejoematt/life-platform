@@ -56,6 +56,12 @@ MODULES=(
     persona_registry.py
     # CC-09 (2026-06-13): coach stance / stage-ladder loader + rung resolver
     coach_stance.py
+    # Meal grouping (2026-06-19): deterministic grouper + seed templates + idempotent
+    # projection writer. Imported by backfill_meals.py and the manage_meals MCP tool's
+    # regroup_day. food_vocabulary.json is staged alongside (see below).
+    meal_grouper.py
+    meal_templates_seed.py
+    meal_projection.py
 )
 
 rm -rf "$PROJ_ROOT/cdk/layer-build"
@@ -69,4 +75,13 @@ for mod in "${MODULES[@]}"; do
     fi
 done
 
-echo "✅ Layer built: $(ls "$BUILD_DIR" | wc -l | tr -d ' ') modules in cdk/layer-build/python/"
+# Meal grouping: stage the canonical food vocabulary alongside meal_grouper.py so
+# load_vocab() finds it at /opt/python/food_vocabulary.json inside the layer.
+VOCAB="$PROJ_ROOT/config/food_vocabulary.json"
+if [ -f "$VOCAB" ]; then
+    cp "$VOCAB" "$BUILD_DIR/food_vocabulary.json"
+else
+    echo "⚠️  Missing: config/food_vocabulary.json (meal grouper will fail to load vocab)"
+fi
+
+echo "✅ Layer built: $(ls "$BUILD_DIR" | wc -l | tr -d ' ') files in cdk/layer-build/python/"
