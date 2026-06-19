@@ -136,6 +136,11 @@ v1.1 fixes to the naive v1.0 splitter:
 - **Orphan-attaches-as-side.** A lone protein with no core of its own (the leftover-chicken case) attaches to the dominant adjacent meal as a tagged `side`, low-confidence, with a one-tap "separate meal" correction. Never spawns a phantom meal; never drops the food (Invariant 3).
 - **Resolve toward the fewest, most-confident meals.** Below `CONF_MIN`, a cluster is left **uncategorized** (counted in daily totals, hidden from meal analytics and the public meal view) rather than named — no meaningless "Mixed meal" entries polluting the stats. Higher `CONF_MIN` = pickier = name only when genuinely sure.
 - **Bidirectional gap override.** Template affinity can *merge* adjacent clusters that match one template (meal logged across two events) and *split* same-timestamp clusters with multiple cores — because no single `GAP_MIN` is correct for both.
+- **Coverage-based confidence (Session-1 review refinement, 2026-06-19).** `match_template` confidence = fraction of the cluster (items *and* calories) the template explains, not mere anchor presence. A minor seeded anchor inside an unseeded-dominant cluster (e.g. 2 hard-boiled eggs inside a tuna lunch) scores low → drops to `uncategorized` rather than confidently mislabelling as "Scrambled Eggs". Enforces CONF_MIN's "don't name when unsure".
+- **Snack/beverage items peel out (Session-1 review refinement).** Snack-, beverage-, treat-, supplement-class tokens stay standalone snacks even when co-timestamped with a meal, *unless* they're a listed modifier of the matched template (granola in the yogurt bowl stays). Stops the gap-merge swallowing staples (IQ bar/shake) into a meal and inflating its macros; keeps the "top staples" view accurate.
+- **Naming follows dominance, not seeding.** The most-common meal keeps its specific name ("Chicken, Rice & Broccoli Plate", 49×) — a generic label is never chosen to make a rare edge case read cleanly (bare grilled chicken → `uncategorized`, awaiting Phase-2).
+
+Unifying principle: **proximity and seeding-status never override an item's actual role and caloric dominance.** A meal is named after what it mostly is; snacks stay snacks.
 
 Determinism holds: identical input ⇒ identical output. `algo_version` enables safe full-history recompute.
 
