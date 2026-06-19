@@ -153,6 +153,47 @@ whether he stays "on" (see §2) — training design supports that but does not s
 
 ## 4a. Session construction rules — timing, venue, modality, data sources
 
+**DATA PULL FIRST — reflect on the WHOLE day across ALL sources, never Hevy alone.** Before
+reflecting on a prior day or proposing a session, assemble the complete activity picture. Hevy is
+only the *lifting* log; a Hevy-only read systematically undercounts what he actually did and is a
+repeat failure mode. "What did I do yesterday" means **everything that moved him**, not just what
+was in the gym app. Mandatory pre-flight pulls (do not skip any that exist for the window):
+- **Hevy** — `get_workouts` + `get_workout_detail` for lifts AND any cardio/intervals logged inside
+  a gym session (his Z2 bike blocks live *inside* Hevy workouts and are invisible to Strava).
+- **Strava** — walks, rucks, runs, rides, hikes, standalone cardio. These are the bulk of his
+  aerobic + NEAT dose and the single most-skipped source. A day with "no Hevy workout" can still be
+  a 5-mile walk. **If you didn't check Strava, you haven't checked the day.**
+- **Whoop strain / day strain** — captures load (incl. activity not logged in either app).
+- **Cross-check coverage:** if Hevy and Strava disagree or one is empty, say so — don't assume the
+  empty one means "rest." Name what each source shows and reconcile (e.g. "Hevy: Legs 17 sets;
+  Strava: one 2.9-mi walk; Whoop strain 11.2 — so the day was a hard lift + a short walk, nothing
+  more"). Reflecting on yesterday without naming the Strava line is the bug this rule exists to kill.
+
+**Strava is authoritative for *what moved*, NOT for *load* — the ruck edge case.** His Garmin watch
+has no ruck mode, so a **weighted ruck records in Strava as a plain `Walk`** with no hint of the
+load on his back. Strava under-describes it by design. Therefore:
+- **Never treat a Strava `Walk` as definitely an unloaded walk.** A walk-tagged activity may have
+  been a ruck; its strain, recovery cost, and training stimulus are materially higher than the GPS
+  track implies. When a `Walk` looks long/hilly or sits next to elevated Whoop strain, it's a
+  candidate ruck — flag the ambiguity rather than silently scoring it as easy NEAT.
+- **The override is a real, persisted tool — offer it proactively.** `log_ruck` tags a Strava
+  `Walk`/`Hike` as a ruck with load: pass `weight_lbs` (+ `date`, and a `time_hint` or `strava_id`
+  if there were several walks that day). It finds the matching activity, computes a load-adjusted
+  calorie/effort estimate (Pandolf-style, scaled by bodyweight × `load_multiplier`), and writes an
+  overlay to the `ruck_log` partition that **persists for all future reads**. `get_ruck_log` reads
+  the history back (miles, weekly frequency, avg/max load). So **any Strava walk can be converted to
+  a ruck at any time** — it's not a per-conversation reinterpretation.
+- **Always honor a logged ruck over Strava's raw `Walk` tag.** When pulling the day, check
+  `ruck_log` (via `get_ruck_log`) — if that walk is logged as a ruck, it's a loaded carry with the
+  recorded weight and the higher effort estimate, full stop. The raw Strava `Walk` is then the
+  *under*-count.
+- **When a notable walk isn't yet tagged, offer to log it.** "Was that a ruck? Tell me the weight
+  and I'll tag it" — then call `log_ruck`. A misclassified ruck under-rates the day's load (skews
+  ACWR / recovery debt low) and under-credits real work; logging it fixes both, permanently.
+
+This is the input to *both* the "what did I do" reflection and the continuity logic below — the
+sequence-from-reality and walking-base reads are only as good as the sources you actually pulled.
+
 **Continuity over calendar — the day of the week does NOT pick the session.** The weekly grid
 in TRAINING_PROGRAM.md is a *default rhythm*, not a schedule to obey. He likes a PPL+engine shape
 and wants that **sequence** preserved — but which session comes *tomorrow* is decided by the
