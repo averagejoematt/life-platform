@@ -1,3 +1,14 @@
+## Movement data integrity — DI-1.5 (ADR) + HAE step-undercount RCA — 2026-06-19 (WORKORDER_DI1)
+
+### Added — ADR-091
+- **ADR-091: source-state honesty guard as a cross-coach standard.** Generalizes the DI-1.3 guard + the readiness future-stamp guard into a standard: a coach must gate any deficiency verdict on its primary source's `source_state` and withhold ("not assessable + which source + why") when that source isn't `live`, with a deterministic write-time backstop (not prompt-only). `training_coach` is the reference; the other operational coaches adopt the gate incrementally. (Dr. Chen's corrective thread entry is written out-of-band by Matthew, not Claude Code.)
+
+### Diagnosis — Apple Health step undercount (RCA, fix deferred)
+- The Apple Health **app** shows ~6,500 / ~7,800 steps on 6/15 / 6/18; **DDB stored 402 / 444**. Root cause in `health_auto_export_lambda.py`: (1) `pick_source_or_all` keeps a **single** highest-priority source per day and discards the rest — the code comment (L324) admits the watch-without-phone loss; (2) **no MAX/accumulate guard on the steps write** (unlike water/caffeine's `_rd_` dedup map), so a partial export plain-overwrites. Possible third (config) cause: HAE may not export the Watch step stream — **same HAE export-config surface as the `active_calories`-entirely-None gap**, both folded into the DI-1.6 precondition note.
+- **Recommended fix (separate item — ingestion change + historical backfill, Matthew's domain):** MAX across per-source daily sums + GREATEST(stored,new) on write for additive activity metrics; re-derive history from `raw/matthew/health_auto_export/`. This is why DI-1.4's "low step days" looked phone-only — partly an ingestion artifact.
+
+---
+
 ## Movement data integrity — DI-1.4 — 2026-06-19 (WORKORDER_DI1: step gap + phantom 298 + precedence)
 
 Apple-Health step-field completeness + the resolved step source-of-truth. Prerequisite for the DI-1.6 HAE failsafe (a backstop can't be trusted while its own feed has silent field-level gaps).

@@ -3,7 +3,7 @@
 > Permanent log of significant architectural, design, and operational decisions.
 > Each ADR captures the decision, context, alternatives considered, and outcome.
 > Last updated: 2026-06-03 (v8.3.0 — + Garmin retired & budget-guard/AI-cost trim; ADR-074/075)
-> 90 ADRs total (ADR-001 → ADR-090). (Index table below covers ADR-001–057; newer ADRs are appended as detail sections in order.)
+> 91 ADRs total (ADR-001 → ADR-091). (Index table below covers ADR-001–057; newer ADRs are appended as detail sections in order.)
 
 ---
 
@@ -2594,5 +2594,27 @@ The AWS "account-controls" sub-grade stays below a literal-checklist A on those 
 **Out of scope (this build):** editing meals back into MacroFactor (it stays authoritative for what was logged); the public meal view + level-up loop (Phase 3, gated on the level-up loop per the Product board); per-bite timing.
 
 **Known follow-up (pre-existing, surfaced during the IAM scoping):** `delete_platform_memory` and `clear_sick_day` call `table.delete_item` but the MCP role never carried `DeleteItem` before this ADR — those deletes are latently `AccessDenied`. Not fixed here (each needs its own partition-scoped `LeadingKeys` statement); tracked for a follow-up.
+
+---
+
+## ADR-091: Source-state honesty guard as a cross-coach standard (no confident verdict on data you can't see)
+
+**Date:** 2026-06-19
+**Status:** Standard adopted; reference implementation live for `training_coach` (DI-1.3). **Related:** WORKORDER_DI1, `lambdas/source_state.py`, `lambdas/intelligence_common.py` (`movement_assessability` / `apply_movement_honesty_guard`), `mcp/tools_health.py::tool_get_readiness_score` (the prior-art guard this generalizes).
+
+**Context.** Dr. Chen (`training_coach`) wrote six consecutive days of "you're under-training" — a confident *negative* verdict — while the movement sources that verdict depended on were dark: Strava deliberately paused (402 paywall) and Garmin rate-limited (429). The coach reasoned from the *absence* of data ("0 sessions, all rest days") as if it were *evidence of absence*. The readiness tool already had the right shape (`is_forward_dated` + `staleness_warning`: surface the real data date, don't assert on data that doesn't exist yet) but it lived in one tool. The failure mode is general: any coach can manufacture a false verdict when its primary signal is stale/paused/rate-limited, and the nightly thread's continuity loop then *re-confirms* the artifact. This is the Henning standard — honesty over assertion — written into code.
+
+**Decision.**
+- **A domain verdict must gate on its primary source's state.** Before a coach emits a negative/deficiency verdict ("under-training", "sedentary", "not sleeping enough", "under-eating protein", …), it checks the operational state of the source(s) that verdict rests on via the single resolver `source_state.resolve_source_state` (`live` / `paused` / `rate_limited` / `stale`; freshness wins for `live`). If the authoritative source is not `live`, the coach states **"not assessable + which source + why"** and withholds the verdict — while still reporting what the *available* signals do show.
+- **Two layers, the deterministic one is the guarantee.** (1) a prompt constraint keeps the generated narrative honest; (2) a **deterministic write-time backstop** sanitizes the persisted `position_summary` (an LLM instruction alone is not a guarantee). `movement_assessability` + `apply_movement_honesty_guard` are the reference pair; other domains get an analogous `<domain>_assessability` gate over the same resolver.
+- **Build the verdict on the authoritative signal, not a proxy.** Training stimulus comes from the workout log (Hevy first), never from steps; the guard pattern travels with a "primary-signal-first" pull order (§4a for training; each coach names its own).
+- **`paused` ≠ `stale` ≠ `broken`.** A deliberately-off source is legible as off-by-design (`source_state.DECLARED_PAUSED_SOURCES`), so neither a coach nor an alarm treats an intentional pause as silent failure (DI-1.1; the pipeline health check excludes paused sources from the liveness alarm and from the masking healthcheck "ok").
+- **Correlational only.** No causal language in any guarded output string; the guard withholds, it does not assert the opposite.
+
+**Alternatives rejected.** *Per-coach ad-hoc staleness checks* — drift and silent divergence; the whole point is one resolver + one guard pattern. *Suppress a coach entirely when any source is down* — throws away the assessable signal (Hevy was fresh the whole time); the guard withholds only the part that depends on the dark source. *Prompt-only honesty* — non-deterministic; an LLM told "don't say under-training" still sometimes does, hence the write-time backstop. *Fix it in the readiness tool only* — leaves every other coach exposed to the same artifact.
+
+**Rollout.** `training_coach` is the reference (DI-1.3, live after the next layer deploy). The remaining operational coaches (`sleep`, `nutrition`, `glucose`, `physical`, `mind`, `labs`, `explorer`) adopt the gate incrementally — each wires its primary source(s) into an assessability check before any deficiency verdict. Incremental by design: no big-bang rewrite, and every adoption is a small, independently-testable diff with a regression test mirroring `test_coach_guard_withholds_undertraining_when_strava_paused`.
+
+**Out of scope.** Any new activity/effort/quality scoring model; rewriting coach generators beyond the pull-order + the assessability gate; causal claims; a public surface.
 
 ---
