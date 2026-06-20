@@ -313,6 +313,152 @@ def _navigate_with_fallback(page, url, primary_timeout=15000, fallback_timeout=2
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def capture_page(context, page_def, screenshot_dir, save_screenshots=False):
+    """Drive one page def in an open browser context and return its result dict.
+
+    Pure capture: navigate, scroll/reveal, run element/chart/interaction checks,
+    blank/stale-text scan, optional screenshots (full + chart crops + 390px mobile),
+    HTTP/JS failure collection. No printing, no AI-QA, no report writing — those
+    stay in run_sweep so its CI behaviour is byte-for-byte unchanged. Returns:
+        {"page", "path", "status", "issues", "warnings", "screenshots"}
+
+    Extracted from run_sweep's per-page loop (2026-06-20) so tests/site_review.py
+    can reuse identical capture without forking the gating visual-qa harness.
+    """
+    page = context.new_page()
+    path, name = page_def["path"], page_def["name"]
+    issues, warnings, js_errors, failed_responses, shots = [], [], [], [], []
+
+    _noncrit = ["favicon", "sub_count", "subscriber_count"]
+    page.on("console", lambda m: js_errors.append(m.text) if m.type == "error" and not any(nc in m.text for nc in _noncrit) else None)
+    page.on("pageerror", lambda err: js_errors.append(str(err)))
+    page.on(
+        "response",
+        lambda r: (failed_responses.append((r.status, r.url)) if r.status >= 400 and not any(nc in r.url for nc in _noncrit) else None),
+    )
+
+    try:
+        nav = _navigate_with_fallback(page, f"{SITE_URL}{path}")
+        if nav and nav.startswith("Page load failed"):
+            issues.append(nav)
+            raise RuntimeError("nav_failed")
+        if nav:
+            warnings.append(nav)
+
+        wait_for = page_def.get("wait_for")
+        if wait_for:
+            try:
+                page.wait_for_selector(wait_for, state="visible", timeout=8000)
+            except Exception:
+                issues.append(f"Container '{wait_for}' never became visible")
+
+        _scroll_and_reveal(page)
+
+        # ── element/text checks ──
+        for check in page_def.get("checks", []):
+            els = page.query_selector_all(check["selector"])
+            if "min_count" in check and len(els) < check["min_count"]:
+                issues.append(f"Expected {check['min_count']}+ '{check['selector']}', found {len(els)} — {check['desc']}")
+            if check.get("not_empty"):
+                empties = 0
+                for el in els:
+                    try:
+                        txt = (el.inner_text() or "").strip()
+                    except Exception:
+                        txt = (el.text_content() or "").strip()
+                    if txt in _EMPTY_SENTINELS:
+                        empties += 1
+                if els and empties == len(els):
+                    issues.append(f"All '{check['selector']}' empty/placeholder — {check['desc']}")
+                elif not els:
+                    issues.append(f"'{check['selector']}' not found — {check['desc']}")
+
+        # ── SVG chart geometry (soft: warn, the AI layer judges render quality) ──
+        if page_def.get("charts"):
+            svg = _check_svg_charts(page, page_def["charts"])
+            visible = [c for c in svg if c["visible"]]
+            if not svg:
+                warnings.append(f"No chart SVG matched {page_def['charts']} (may be an honest sparse-data state)")
+            elif visible and all(c["drawn"] == 0 for c in visible):
+                issues.append(f"Chart SVG present but no drawn geometry: {page_def['charts']}")
+
+        # ── interaction (cockpit pillar disclosure) ──
+        if page_def.get("interact"):
+            it = page_def["interact"]
+            target = page.query_selector(it["click"])
+            if not target:
+                warnings.append(f"Interaction skipped — '{it['click']}' not present")
+            else:
+                try:
+                    target.click(timeout=3000)
+                    page.wait_for_selector(it["expect"], state="visible", timeout=4000)
+                    # The cockpit disclosure animates via View Transitions — a
+                    # screenshot mid-crossfade captures both frames overlapped
+                    # ("garbled text" AI-vision false-FAIL, found 2026-06-12).
+                    # Let the transition settle before anything is captured.
+                    page.wait_for_timeout(800)
+                except Exception:
+                    issues.append(f"Interaction failed: clicking '{it['click']}' did not reveal '{it['expect']}' — {it['desc']}")
+
+        # ── blank sections + stale copy ──
+        for bs in _check_sections_for_blank(page)[:2]:
+            issues.append(f"Empty section: .{bs['class'][:40]} (h={bs['height']}px)")
+        for st in _check_stale_text(page):
+            issues.append(f"Stale text: \"{st['text'][:50]}\" — {st['desc']}")
+
+        # ── screenshots (full page + chart crops) ──
+        slug = path.strip("/").replace("/", "-") or "home"
+        if save_screenshots:
+            full = os.path.join(screenshot_dir, f"{slug}.png")
+            page.screenshot(path=full, full_page=True)
+            shots.append({"kind": "page", "path": full})
+            for ci, sel in enumerate(page_def.get("charts", [])):
+                el = page.query_selector(sel)
+                if el:
+                    try:
+                        crop = os.path.join(screenshot_dir, f"{slug}-chart{ci}.png")
+                        el.screenshot(path=crop)
+                        shots.append({"kind": "chart", "path": crop, "selector": sel})
+                    except Exception:
+                        pass
+
+        # ── responsive overflow @ 390px ──
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.wait_for_timeout(400)
+        overflow = _mobile_overflow(page)
+        if overflow and overflow > 4:
+            issues.append(f"Horizontal overflow at 390px — content exceeds viewport by {overflow}px")
+        if save_screenshots:
+            mob = os.path.join(screenshot_dir, f"{slug}-mobile.png")
+            page.screenshot(path=mob, full_page=True)
+            shots.append({"kind": "mobile", "path": mob})
+
+        # ── failed HTTP calls (broken /api/ calls fail; other resources warn) ──
+        api_fails = sorted({f"{s} {u.replace(SITE_URL, '')[:90]}" for s, u in failed_responses if "/api/" in u})
+        other_fails = sorted({f"{s} {u.replace(SITE_URL, '')[:90]}" for s, u in failed_responses if "/api/" not in u})
+        if api_fails:
+            issues.append(f"{len(api_fails)} broken API call(s): {'; '.join(api_fails[:4])}")
+        if other_fails:
+            warnings.append(f"{len(other_fails)} non-API resource issue(s): {'; '.join(other_fails[:3])}")
+        code_errors = [e for e in js_errors if "Failed to load resource" not in e]
+        if code_errors:
+            issues.append(f"{len(code_errors)} JS error(s): {code_errors[0][:160]}")
+
+    except Exception as e:
+        if str(e) not in ("auth_failed", "nav_failed"):
+            issues.append(f"Page load failed: {e}")
+
+    page.close()
+    return {
+        "page": name,
+        "path": path,
+        "status": "PASS" if not issues else "FAIL",
+        "issues": issues,
+        "warnings": warnings,
+        "screenshots": shots,
+    }
+
+
 def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=False):
     """Run the v4 visual QA sweep. Returns True if no page FAILED."""
     from playwright.sync_api import sync_playwright
@@ -331,151 +477,16 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
         context = browser.new_context(viewport={"width": 1440, "height": 900}, color_scheme="dark")
 
         for page_def in pages or PAGES:
-            page = context.new_page()
-            path, name = page_def["path"], page_def["name"]
-            issues, warnings, js_errors, failed_responses, shots = [], [], [], [], []
-
-            _noncrit = ["favicon", "sub_count", "subscriber_count"]
-            page.on(
-                "console", lambda m: js_errors.append(m.text) if m.type == "error" and not any(nc in m.text for nc in _noncrit) else None
-            )
-            page.on("pageerror", lambda err: js_errors.append(str(err)))
-            page.on(
-                "response",
-                lambda r: (
-                    failed_responses.append((r.status, r.url)) if r.status >= 400 and not any(nc in r.url for nc in _noncrit) else None
-                ),
-            )
-
-            try:
-                nav = _navigate_with_fallback(page, f"{SITE_URL}{path}")
-                if nav and nav.startswith("Page load failed"):
-                    issues.append(nav)
-                    raise RuntimeError("nav_failed")
-                if nav:
-                    warnings.append(nav)
-
-                wait_for = page_def.get("wait_for")
-                if wait_for:
-                    try:
-                        page.wait_for_selector(wait_for, state="visible", timeout=8000)
-                    except Exception:
-                        issues.append(f"Container '{wait_for}' never became visible")
-
-                _scroll_and_reveal(page)
-
-                # ── element/text checks ──
-                for check in page_def.get("checks", []):
-                    els = page.query_selector_all(check["selector"])
-                    if "min_count" in check and len(els) < check["min_count"]:
-                        issues.append(f"Expected {check['min_count']}+ '{check['selector']}', found {len(els)} — {check['desc']}")
-                    if check.get("not_empty"):
-                        empties = 0
-                        for el in els:
-                            try:
-                                txt = (el.inner_text() or "").strip()
-                            except Exception:
-                                txt = (el.text_content() or "").strip()
-                            if txt in _EMPTY_SENTINELS:
-                                empties += 1
-                        if els and empties == len(els):
-                            issues.append(f"All '{check['selector']}' empty/placeholder — {check['desc']}")
-                        elif not els:
-                            issues.append(f"'{check['selector']}' not found — {check['desc']}")
-
-                # ── SVG chart geometry (soft: warn, the AI layer judges render quality) ──
-                if page_def.get("charts"):
-                    svg = _check_svg_charts(page, page_def["charts"])
-                    visible = [c for c in svg if c["visible"]]
-                    if not svg:
-                        warnings.append(f"No chart SVG matched {page_def['charts']} (may be an honest sparse-data state)")
-                    elif visible and all(c["drawn"] == 0 for c in visible):
-                        issues.append(f"Chart SVG present but no drawn geometry: {page_def['charts']}")
-
-                # ── interaction (cockpit pillar disclosure) ──
-                if page_def.get("interact"):
-                    it = page_def["interact"]
-                    target = page.query_selector(it["click"])
-                    if not target:
-                        warnings.append(f"Interaction skipped — '{it['click']}' not present")
-                    else:
-                        try:
-                            target.click(timeout=3000)
-                            page.wait_for_selector(it["expect"], state="visible", timeout=4000)
-                            # The cockpit disclosure animates via View Transitions — a
-                            # screenshot mid-crossfade captures both frames overlapped
-                            # ("garbled text" AI-vision false-FAIL, found 2026-06-12).
-                            # Let the transition settle before anything is captured.
-                            page.wait_for_timeout(800)
-                        except Exception:
-                            issues.append(f"Interaction failed: clicking '{it['click']}' did not reveal '{it['expect']}' — {it['desc']}")
-
-                # ── blank sections + stale copy ──
-                for bs in _check_sections_for_blank(page)[:2]:
-                    issues.append(f"Empty section: .{bs['class'][:40]} (h={bs['height']}px)")
-                for st in _check_stale_text(page):
-                    issues.append(f"Stale text: \"{st['text'][:50]}\" — {st['desc']}")
-
-                # ── screenshots (full page + chart crops) ──
-                slug = path.strip("/").replace("/", "-") or "home"
-                if save_screenshots:
-                    full = os.path.join(screenshot_dir, f"{slug}.png")
-                    page.screenshot(path=full, full_page=True)
-                    shots.append({"kind": "page", "path": full})
-                    for ci, sel in enumerate(page_def.get("charts", [])):
-                        el = page.query_selector(sel)
-                        if el:
-                            try:
-                                crop = os.path.join(screenshot_dir, f"{slug}-chart{ci}.png")
-                                el.screenshot(path=crop)
-                                shots.append({"kind": "chart", "path": crop, "selector": sel})
-                            except Exception:
-                                pass
-
-                # ── responsive overflow @ 390px ──
-                page.set_viewport_size({"width": 390, "height": 844})
-                page.wait_for_timeout(400)
-                overflow = _mobile_overflow(page)
-                if overflow and overflow > 4:
-                    issues.append(f"Horizontal overflow at 390px — content exceeds viewport by {overflow}px")
-                if save_screenshots:
-                    mob = os.path.join(screenshot_dir, f"{slug}-mobile.png")
-                    page.screenshot(path=mob, full_page=True)
-                    shots.append({"kind": "mobile", "path": mob})
-
-                # ── failed HTTP calls (broken /api/ calls fail; other resources warn) ──
-                api_fails = sorted({f"{s} {u.replace(SITE_URL, '')[:90]}" for s, u in failed_responses if "/api/" in u})
-                other_fails = sorted({f"{s} {u.replace(SITE_URL, '')[:90]}" for s, u in failed_responses if "/api/" not in u})
-                if api_fails:
-                    issues.append(f"{len(api_fails)} broken API call(s): {'; '.join(api_fails[:4])}")
-                if other_fails:
-                    warnings.append(f"{len(other_fails)} non-API resource issue(s): {'; '.join(other_fails[:3])}")
-                code_errors = [e for e in js_errors if "Failed to load resource" not in e]
-                if code_errors:
-                    issues.append(f"{len(code_errors)} JS error(s): {code_errors[0][:160]}")
-
-            except Exception as e:
-                if str(e) not in ("auth_failed", "nav_failed"):
-                    issues.append(f"Page load failed: {e}")
-
-            results.append(
-                {
-                    "page": name,
-                    "path": path,
-                    "status": "PASS" if not issues else "FAIL",
-                    "issues": issues,
-                    "warnings": warnings,
-                    "screenshots": shots,
-                }
-            )
-            icon = "✅" if not issues else "❌"
-            warn = f" ({len(warnings)} warning{'s' if len(warnings) != 1 else ''})" if warnings else ""
-            print(f"  {icon} {name} ({path}){warn}")
-            for x in issues:
+            result = capture_page(context, page_def, screenshot_dir, save_screenshots)
+            results.append(result)
+            icon = "✅" if not result["issues"] else "❌"
+            n_warn = len(result["warnings"])
+            warn = f" ({n_warn} warning{'s' if n_warn != 1 else ''})" if result["warnings"] else ""
+            print(f"  {icon} {result['page']} ({result['path']}){warn}")
+            for x in result["issues"]:
                 print(f"      → {x}")
-            for w in warnings:
+            for w in result["warnings"]:
                 print(f"      ⚠ {w}")
-            page.close()
 
         browser.close()
 
