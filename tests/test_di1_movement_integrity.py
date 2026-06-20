@@ -235,3 +235,86 @@ def test_coach_guard_noop_when_no_undertraining_assertion():
     assess = ic.movement_assessability({"strava": "paused", "garmin": "stale", "steps": "missing"})
     text = "Hevy shows a clean PPL+Engine block — four sessions, strong set volume."
     assert ic.apply_movement_honesty_guard(text, assess, hevy_present=True) == text
+
+
+# ==============================================================================
+# DI-1.1 — source-state legibility (live / paused / rate_limited / stale)
+# ==============================================================================
+
+_SS_OK = importlib.util.find_spec("source_state") is not None
+if _SS_OK:
+    import source_state as ss  # noqa: E402
+
+TODAY = "2026-06-19"
+
+
+@pytest.mark.skipif(not _SS_OK, reason="source_state (shared layer) unavailable")
+def test_source_state_live_after_strava_reenable():
+    """The flip Matthew wants visible: Strava is declared paused, but the moment it
+    re-ingests fresh data the state resolves to 'live' (freshness wins) — no second edit.
+    """
+    assert ss.is_paused("strava") is True
+    # While off (last record 2026-06-14, today 2026-06-19) → paused, not stale.
+    assert ss.resolve_source_state("strava", "2026-06-14", TODAY) == "paused"
+    # After re-enable, a fresh record lands → live, despite still being declared paused.
+    assert ss.resolve_source_state("strava", TODAY, TODAY) == "live"
+    assert ss.resolve_source_state("strava", "2026-06-18", TODAY) == "live"
+
+
+@pytest.mark.skipif(not _SS_OK, reason="source_state (shared layer) unavailable")
+def test_source_state_distinguishes_paused_rate_limited_stale():
+    """paused ≠ rate_limited ≠ stale — a deliberately-off source is never 'broken'."""
+    # Strava (declared paused) with no fresh data → paused.
+    assert ss.resolve_source_state("strava", "2026-06-14", TODAY) == "paused"
+    # Garmin with a rate-limit marker + stale data → rate_limited (marker outranks stale).
+    assert ss.resolve_source_state("garmin", "2026-06-15", TODAY, rate_limited=True) == "rate_limited"
+    # Garmin fresh → live (freshness beats the marker).
+    assert ss.resolve_source_state("garmin", "2026-06-18", TODAY, rate_limited=True) == "live"
+    # An undeclared source with old data and no marker → plain stale.
+    assert ss.resolve_source_state("whoop", "2026-06-01", TODAY) == "stale"
+    # No data ever, undeclared → stale (not paused).
+    assert ss.resolve_source_state("whoop", None, TODAY) == "stale"
+
+
+@pytest.mark.skipif(not (_SS_OK and _IC_OK), reason="layer modules unavailable")
+def test_guard_reads_resolved_paused_state_end_to_end():
+    """Resolver → guard: a paused Strava resolves to 'paused', which the honesty guard
+    treats as not-assessable and withholds the under-training verdict. This is the wiring
+    the coach uses (resolve_source_state feeds movement_source_state feeds the guard).
+    """
+    state = {
+        "strava": ss.resolve_source_state("strava", "2026-06-14", TODAY),  # → paused
+        "garmin": ss.resolve_source_state("garmin", "2026-06-15", TODAY, rate_limited=True),  # → rate_limited
+        "steps": "missing",
+    }
+    assert state["strava"] == "paused" and state["garmin"] == "rate_limited"
+    assess = ic.movement_assessability(state)
+    assert assess["assessable"] is False
+    guarded = ic.apply_movement_honesty_guard(
+        "You're under-training — mostly rest days.", assess, hevy_present=True, hevy_summary="4 sessions"
+    )
+    assert "under-train" not in guarded.lower() and "rest day" not in guarded.lower(), guarded
+    assert "strava: paused" in guarded.lower() and "rate-limited" in guarded.lower(), guarded
+
+
+@pytest.mark.skipif(not (_SS_OK and _IC_OK), reason="layer modules unavailable")
+def test_guard_stops_withholding_once_strava_live():
+    """After re-enable, strava resolves 'live' → assessable → guard no longer withholds."""
+    state = {"strava": ss.resolve_source_state("strava", TODAY, TODAY), "garmin": "rate_limited", "steps": "live"}
+    assert state["strava"] == "live"
+    assess = ic.movement_assessability(state)
+    assert assess["assessable"] is True
+    text = "Aerobic volume looks light; one more Zone-2 walk would round out the week."
+    assert ic.apply_movement_honesty_guard(text, assess, hevy_present=True) == text
+
+
+@pytest.mark.skipif(not _SS_OK, reason="source_state (shared layer) unavailable")
+def test_pipeline_health_does_not_mask_paused_source():
+    """The liveness-pinger masking is killed: a paused source is legible as paused, so
+    the health check can skip its boot-probe instead of reporting a hollow 'ok'.
+    """
+    # The pipeline health check gates on is_paused() to skip the probe + exclude from
+    # the liveness alarm. Assert the contract it relies on.
+    assert ss.is_paused("strava") is True
+    assert ss.is_paused("whoop") is False
+    assert "strava" in ss.DECLARED_PAUSED_SOURCES

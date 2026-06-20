@@ -122,24 +122,6 @@ def _latest_date(items):
     return max(dates) if dates else None
 
 
-def _freshness_state(items, today, stale_days=2):
-    """DI-1.3: freshness-derived movement-source state for the honesty guard.
-
-    Returns 'live' if the newest record is within stale_days of today, else 'stale'
-    (or 'missing' if there's no data at all). DI-1.1 will later override this with
-    precise 'paused' (Strava) / 'rate_limited' (Garmin) states; the guard renders
-    whatever label it's handed.
-    """
-    latest = _latest_date(items)
-    if not latest:
-        return "missing"
-    try:
-        gap = (datetime.strptime(today, "%Y-%m-%d").date() - datetime.strptime(latest, "%Y-%m-%d").date()).days
-    except ValueError:
-        return "missing"
-    return "live" if gap <= stale_days else "stale"
-
-
 def gather_data_for_expert(expert_key):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     # Clamp lookback to experiment start — data before April 1 is pre-experiment
@@ -240,12 +222,16 @@ def gather_data_for_expert(expert_key):
         training_dates = hevy_dates | strava_dates
         rest_days = max(0, days_in_experiment - len(training_dates))
 
-        # Movement-source state for the honesty guard. Freshness-derived for now;
-        # DI-1.1 will inject precise paused/rate_limited labels once it lands.
+        # Movement-source state for the honesty guard (DI-1.1 source-state resolver):
+        # live / paused / rate_limited / stale. Freshness wins for 'live' — so when Strava
+        # re-ingests, strava flips paused→live and the guard stops withholding.
+        from source_state import has_rate_limit_marker, resolve_source_state
+
+        _garmin_rl = has_rate_limit_marker(table, USER_ID, "garmin")
         source_state = {
-            "hevy": _freshness_state(hevy_items, today),
-            "strava": _freshness_state(activities, today),
-            "garmin": _freshness_state(garmin_items, today),
+            "hevy": resolve_source_state("hevy", _latest_date(hevy_items), today),
+            "strava": resolve_source_state("strava", _latest_date(activities), today),
+            "garmin": resolve_source_state("garmin", _latest_date(garmin_items), today, rate_limited=_garmin_rl),
             "steps": "live" if step_vals else "missing",
         }
         hevy_summary = (

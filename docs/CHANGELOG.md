@@ -1,3 +1,24 @@
+## Movement data integrity — DI-1.1 source-state legibility — 2026-06-19 (WORKORDER_DI1)
+
+Gives every ingest source a real, legible operational state — **`live` / `paused` / `rate_limited` / `stale`** — so a deliberately-off source (Strava, paused at the 402 paywall) or a chronically rate-limited one (Garmin's 429 refresh block) is never mistaken for silent breakage. Replaces DI-1.3's interim freshness-inference with the real field.
+
+### Added
+- **`lambdas/source_state.py`** (new shared-layer module) — `resolve_source_state(source, latest_date, today, *, rate_limited=…)`. **Freshness wins for `live`**: fresh data resolves to `live` even for a source still in `DECLARED_PAUSED_SOURCES`, so re-enabling Strava flips it `paused → live` the moment data flows again — no second edit. A rate-limit marker outranks the paused/stale labels; a declared-paused source with no fresh data is `paused`; everything else is `stale`. `has_rate_limit_marker()` reads Garmin's `REFRESH_RATELIMIT`. Added to `deploy/build_layer.sh`.
+
+### Changed
+- **`get_freshness_status` (MCP)** now returns `source_state` per source — the flip is visible on the freshness tool / status page.
+- **Coach honesty guard (DI-1.3)** now reads `resolve_source_state` instead of inferring from freshness; the training expert's `movement_source_state` carries real `paused`/`rate_limited` labels (so the guard's note reads "strava: paused; garmin: rate-limited" exactly).
+- **Liveness-pinger masking killed (`pipeline_health_check_lambda`)** — a `paused` source's healthcheck "ok" only proves the Lambda boots, masking that its cron is gone. Paused sources now **skip the boot-probe** and report as `paused` (a new bucket — neither healthy-green nor failed-red), and are **excluded from the `ingest-liveness-unhealthy` alarm** (a paused source has no cron to be "stopped", so attempt-staleness would false-fire). `health_check` record + body gain a `paused` count.
+
+### Tests
+- `tests/test_di1_movement_integrity.py` — `test_source_state_live_after_strava_reenable` (the visible flip), paused≠rate_limited≠stale matrix, resolver→guard end-to-end (paused withholds; live stops withholding), and the pipeline non-masking contract.
+
+> **Re-enabling Strava (Matthew):** once the cron is restored and data re-ingests, `source_state` auto-flips to `live` (freshness wins) — **but remove `"strava"` from `DECLARED_PAUSED_SOURCES` in `source_state.py`** so a *future* real Strava outage labels as `stale` (not `paused`) and the health-check resumes probing it. Garmin re-enable work (GARM-1) is deferred.
+
+Correlational only; not deployed. Ships in the same shared-layer rebuild as DI-1.3. Remaining DI-1.1 step is the Strava re-enable itself (CDK un-pause + rule recreate + backfill — Matthew). DI-1.4 next.
+
+---
+
 ## Movement data integrity — DI-1.3 — 2026-06-19 (WORKORDER_DI1: coach Hevy-first pull + honesty guard)
 
 The training coach (`training_coach` / Dr. Chen) assembled its data from **Strava + Garmin + Whoop + steps — no Hevy** — so with Strava paused and Garmin rate-limited it saw "0 sessions, all rest days" and wrote consecutive "you're under-training" verdicts that the thread's continuity loop kept re-confirming. DI-1.3 makes Hevy the primary training-stimulus signal in the coach and adds a deterministic honesty guard.

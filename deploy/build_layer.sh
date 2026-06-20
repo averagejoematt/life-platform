@@ -17,6 +17,9 @@ MODULES=(
     # ER-01 (2026-06-09): infra-liveness decision core (sentinel streak math +
     # health verdict). Imported by ingestion_framework + pipeline_health_check.
     ingest_health.py
+    # DI-1.1 (2026-06-19): source-state resolver (live/paused/rate_limited/stale).
+    # Imported by get_freshness_status (MCP), the coach honesty guard, and pipeline_health_check.
+    source_state.py
     ingestion_validator.py item_size_guard.py digest_utils.py
     sick_day_checker.py site_writer.py secret_cache.py
     intelligence_common.py
