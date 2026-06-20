@@ -1,6 +1,6 @@
 # WORKORDER: DI-1 — Movement Data Integrity & Coach Honesty Guard
 
-> **Status:** OPEN — DI-1.1 diagnosed (read-only) 2026-06-19; **DI-1.2 + DI-1.3 built + tested (not deployed) 2026-06-19**; DI-1.4→1.6 pending. **DI-1.1 Strava decision RESOLVED 2026-06-19: Matthew subscribed to Strava → re-enable ingestion (see DI-1.1).** **DI-1.6 (Apple HAE failsafe) added.** GARM-1 (official Garmin API) deferred — see Deferred decisions.
+> **Status:** OPEN — DI-1.1 diagnosed (read-only) 2026-06-19; **DI-1.2 + DI-1.3 + DI-1.1 source-state legibility built + tested (not deployed) 2026-06-19**; DI-1.4→1.6 pending. (DI-1.1's remaining step is the Strava re-enable CDK deploy — Matthew.) **DI-1.1 Strava decision RESOLVED 2026-06-19: Matthew subscribed to Strava → re-enable ingestion (see DI-1.1).** **DI-1.6 (Apple HAE failsafe) added.** GARM-1 (official Garmin API) deferred — see Deferred decisions.
 > **Author:** coaching session 2026-06-19. **Revised same day** to fold in Claude Code's confirmed
 > DI-1.1 root cause, which **overturned** the original "OAuth refresh-token" hypothesis (see DI-1.1).
 > **Pairs with:** `TRAINING_CALIBRATION.md` §4a (the data-pull mandate this enforces in code), `TRAINING_PROGRAM.md`.
