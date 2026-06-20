@@ -2530,6 +2530,7 @@ def tool_get_movement_score(args):
     neat_vals = []
     step_vals = []
     sedentary_days = []
+    step_incomplete_dates = []  # DI-1.4: AH record present but step field missing (false-clean envelope)
 
     # Union of Apple-Health and Hevy dates: a Hevy-only training day (no Apple sync)
     # must still report has_workout and is never sedentary.
@@ -2552,6 +2553,13 @@ def tool_get_movement_score(args):
         if steps is not None:
             row["steps"] = int(float(steps))
             step_vals.append(float(steps))
+        # DI-1.4: step-field completeness. The apple_health envelope can read "fresh"
+        # while the step field itself is missing for the day — surface that gap rather
+        # than silently treating a missing field as zero movement.
+        if date in ah_by_date:
+            row["step_data_complete"] = steps is not None
+            if steps is None:
+                step_incomplete_dates.append(date)
         if flights is not None:
             row["flights_climbed"] = int(float(flights))
         if distance is not None:
@@ -2567,6 +2575,13 @@ def tool_get_movement_score(args):
         daily.append(row)
 
     summary = {"days_with_data": len(daily)}
+    # DI-1.4: step-field completeness across the Apple-Health envelope days.
+    _ah_days = len(ah_by_date)
+    if _ah_days:
+        summary["step_coverage_pct"] = round((_ah_days - len(step_incomplete_dates)) / _ah_days * 100, 1)
+        if step_incomplete_dates:
+            summary["step_incomplete_dates"] = sorted(step_incomplete_dates)
+            summary["step_incomplete_days"] = len(step_incomplete_dates)
     if step_vals:
         summary["avg_daily_steps"] = round(sum(step_vals) / len(step_vals), 0)
         summary["step_target"] = step_target

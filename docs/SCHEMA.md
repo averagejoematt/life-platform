@@ -48,7 +48,7 @@ Where multiple sources measure the same thing:
 | **Resting Heart Rate** | Whoop | Garmin, Eight Sleep, Apple Health | Same cross-validation pattern |
 | **Sleep Duration** | Whoop | Eight Sleep, Garmin | Whoop captures couch/travel sleep |
 | **Sleep Staging** | Whoop | Eight Sleep | Whoop hours → pct via `normalize_whoop_sleep()` |
-| **Steps** | Apple Health | Garmin | Apple preferred (phone always-on) |
+| **Steps** | Apple Health | Garmin (watch) | Apple preferred (phone always-on). **DI-1.4 step precedence:** the Garmin watch is the better counter only when its source-state is `live`; a rate-limited/stale Garmin emits sparse partial readings (the "phantom 298" — Garmin 6/15=298 steps used as the daily figure while the Apple ~3,415 avg was truer), so consumers fall back to Apple Health unless Garmin is live. A step count never, on its own, drives a sedentary/under-training verdict (Hevy-join, DI-1.2). `get_daily_metrics(view="movement")` carries `step_data_complete`/`step_coverage_pct`/`step_incomplete_dates` — the apple_health envelope can read "fresh" while the step field itself is missing for a day. |
 | **Active Calories** | Apple Health | Garmin | Apple for TDEE; Garmin retained for training metrics |
 | **Body Composition** | Withings (daily) | DEXA (semi-annual) | Withings for trending; DEXA for absolute accuracy |
 

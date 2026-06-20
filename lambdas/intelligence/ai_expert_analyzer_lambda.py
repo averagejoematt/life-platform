@@ -188,16 +188,30 @@ def gather_data_for_expert(expert_key):
         # the training-stimulus read is built off Hevy first, then Strava for aerobic/NEAT,
         # never off steps. Strava is paused (402) and Garmin rate-limited, so a Strava-only
         # read collapses to "all rest days" and produces a false under-training verdict.
+        from source_state import has_rate_limit_marker, resolve_source_state
+
         hevy_items = _query_source("hevy", d30, today)
         activities = _query_source("strava", d30, today)
         garmin_items = _query_source("garmin", d30, today)
         whoop_items = _query_source("whoop", d30, today)
         steps_items = _query_source("apple_health", d30, today)
 
-        step_vals = [float(g["steps"]) for g in garmin_items if g.get("steps")]
-        if not step_vals:
+        _garmin_rl = has_rate_limit_marker(table, USER_ID, "garmin")
+        _garmin_state = resolve_source_state("garmin", _latest_date(garmin_items), today, rate_limited=_garmin_rl)
+
+        # DI-1.4: state-aware step precedence. The watch (via Garmin) is the better step
+        # counter WHEN live, but a rate-limited/stale Garmin emits sparse partial readings
+        # (e.g. 298 steps on 6/15) that misrepresent movement — averaging those was the
+        # "phantom 298" bug. Use Garmin steps only when Garmin is live; else Apple Health.
+        if _garmin_state == "live":
+            step_vals = [float(g["steps"]) for g in garmin_items if g.get("steps")]
+            step_source = "garmin"
+        else:
             step_vals = [float(s["steps"]) for s in steps_items if s.get("steps") and float(s["steps"]) > 0]
+            step_source = "apple_health"
         avg_steps = round(sum(step_vals) / len(step_vals)) if step_vals else 0
+        # Step completeness = days with a usable step value / experiment days (DI-1.4 flag).
+        step_completeness_pct = round(len(step_vals) / max(1, days_in_experiment) * 100)
 
         # Hevy (lifting) — primary training-stimulus signal.
         hevy_dates = set(str(h.get("sk", ""))[5:15] for h in hevy_items if str(h.get("sk", "")).startswith("DATE#"))
@@ -225,13 +239,10 @@ def gather_data_for_expert(expert_key):
         # Movement-source state for the honesty guard (DI-1.1 source-state resolver):
         # live / paused / rate_limited / stale. Freshness wins for 'live' — so when Strava
         # re-ingests, strava flips paused→live and the guard stops withholding.
-        from source_state import has_rate_limit_marker, resolve_source_state
-
-        _garmin_rl = has_rate_limit_marker(table, USER_ID, "garmin")
         source_state = {
             "hevy": resolve_source_state("hevy", _latest_date(hevy_items), today),
             "strava": resolve_source_state("strava", _latest_date(activities), today),
-            "garmin": resolve_source_state("garmin", _latest_date(garmin_items), today, rate_limited=_garmin_rl),
+            "garmin": _garmin_state,
             "steps": "live" if step_vals else "missing",
         }
         hevy_summary = (
@@ -248,6 +259,8 @@ def gather_data_for_expert(expert_key):
             "strava_active_min": round(strava_min),
             "total_active_min": round(hevy_min + strava_min),
             "avg_daily_steps": avg_steps,
+            "step_source": step_source,
+            "step_completeness_pct": step_completeness_pct,
             "avg_recovery": avg_recovery,
             "rest_days": rest_days,
             "modality_breakdown": modalities,
