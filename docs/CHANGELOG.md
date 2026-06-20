@@ -1,3 +1,20 @@
+## HAE ingestion path — deep review + P0 activity-undercount fix — 2026-06-19
+
+Surgical review of the Health Auto Export path (`docs/reviews/HAE_PATH_REVIEW_2026-06-19.md`), triggered by Apple Health showing ~5,700 avg steps/wk vs ~2,960 stored.
+
+### Root cause — HTTP 413 (data never arrives)
+The 7-day step re-sync is rejected at the edge: HAE exports **raw per-sample** steps (`aggregateData=False`); the multi-day payload is **24.8 MB** and the Lambda Function URL caps bodies at **~6 MB** → **HTTP 413**. HAE logs the run `complete` right after the 413, so the phone shows success while nothing lands — the "successful on the app, issues downstream" mechanism. (Activity hits 413 too at 14.2 MB.) Historical undercount is a separate older cause: the Activity automation's `period=Today` + the Watch→iPhone sync lag froze partial iPhone-only counts. **Deferred to 2026-06-20:** aggregate the HAE step export OR a one-time file export/import for history.
+
+### Fixed (P0, code — commit follows)
+- **`health_auto_export_lambda.py`** additive activity metrics (`steps`, `distance_walk_run_miles`, `active_calories`, `basal_calories`, `flights_climbed`) now resolve via **MAX across per-source daily sums** instead of a single fixed-priority source — fixes the undercount (a partial iPhone count no longer discards the fuller Watch count) AND the double-count. `merge_day_to_dynamo` adds a **GREATEST(stored, new)** monotonic guard so a later partial export can't lower a day's total (`monotonic_guard=False` for authoritative backfills). The test that enshrined the bug is corrected. 16 HAE tests green. **Makes data correct once it arrives; orthogonal to the 413 unblock.**
+
+### Surfaced (not fixed — see review)
+- UTC-day partitioning of inherently-local activity metrics (won't match the app's local-day view); `active_calories` never exported by any `includeHealthMetrics=True` automation; the 413 is invisible to us (rejected pre-Lambda, no alarm); no ingestion completeness/plausibility gate.
+
+Not deployed.
+
+---
+
 ## Movement data integrity — DI-1.5 (ADR) + HAE step-undercount RCA — 2026-06-19 (WORKORDER_DI1)
 
 ### Added — ADR-091
