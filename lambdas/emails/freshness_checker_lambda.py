@@ -79,6 +79,116 @@ SOURCE_STALE_HOURS = {
     "macrofactor": 96,  # 4 days
 }
 
+# ── DI-1.6: Apple Health activity-integrity guard ──────────────────────────
+# The HAE silent-413 blind spot: the per-sample steps payload exceeds the HTTP-API
+# body limit and is rejected AT THE GATEWAY, before metering — so it appears in no
+# CloudWatch metric (verified 2026-06-20: 4xx/5xx == 0 on days steps were dropped)
+# and the HAE app reports "complete". Meanwhile the small automations (water/BP/CGM)
+# keep landing in the SAME apple_health partition, so partition-level staleness never
+# fires. The only detectable symptom is data-side: `steps` specifically is absent (or
+# implausibly low) while the partition itself looks fresh. This guard watches exactly
+# that. Thresholds are env-tunable.
+AH_STEPS_LAG_ALERT_DAYS = int(os.environ.get("AH_STEPS_LAG_ALERT_DAYS", "2"))  # steps stale vs partition → alert
+AH_LOW_STEP_FLOOR = int(os.environ.get("AH_LOW_STEP_FLOOR", "1000"))  # a complete day under this is "low"
+AH_LOW_STEP_ALERT_COUNT = int(os.environ.get("AH_LOW_STEP_ALERT_COUNT", "4"))  # low days (of 7) → alert
+AH_ACTIVITY_WINDOW_DAYS = int(os.environ.get("AH_ACTIVITY_WINDOW_DAYS", "7"))
+
+
+def check_apple_health_activity(table, now, sick_suppress):
+    """Detect a silent Apple Health activity-stream failure (the HAE 413 blind spot).
+
+    Reads the most recent apple_health DATE# records and looks at `steps` specifically
+    (not partition freshness, which other HAE automations keep alive). Returns
+    (alert_message_or_None, metrics_dict) where metrics_dict feeds CloudWatch.
+    """
+    pk = f"USER#{USER_ID}#SOURCE#apple_health"
+    metrics = {"steps_lag_days": 0.0, "low_step_days": 0.0, "degraded": 0.0}
+    try:
+        resp = table.query(
+            KeyConditionExpression="pk = :pk AND begins_with(sk, :pfx)",
+            ExpressionAttributeValues={":pk": pk, ":pfx": "DATE#"},
+            ScanIndexForward=False,
+            Limit=AH_ACTIVITY_WINDOW_DAYS + 3,  # a little headroom past the window
+            ProjectionExpression="sk, steps, active_calories",
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("apple_health activity check query failed (non-fatal): %s", e)
+        return None, metrics
+
+    items = resp.get("Items", [])
+    if not items:
+        return None, metrics
+
+    today = now.date().isoformat()
+
+    def _date(it):
+        return it["sk"].replace("DATE#", "")[:10]
+
+    def _steps(it):
+        v = it.get("steps")
+        try:
+            return float(v) if v is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    partition_latest = _date(items[0])
+    # Most recent date with a present, non-zero steps value.
+    steps_present = [_date(it) for it in items if (_steps(it) or 0) > 0]
+    steps_latest = max(steps_present) if steps_present else None
+
+    # Steps lag vs the partition: the classic "partition fresh, steps stale" 413 signature.
+    if steps_latest is None:
+        steps_lag_days = AH_STEPS_LAG_ALERT_DAYS + 1  # no steps at all in window — treat as severe
+    else:
+        steps_lag_days = (datetime.strptime(partition_latest, "%Y-%m-%d") - datetime.strptime(steps_latest, "%Y-%m-%d")).days
+    metrics["steps_lag_days"] = float(steps_lag_days)
+
+    # Low-activity tally over the trailing complete days (exclude today — partial).
+    complete = [it for it in items if _date(it) < today][:AH_ACTIVITY_WINDOW_DAYS]
+    low_days = [_date(it) for it in complete if (_steps(it) or 0) < AH_LOW_STEP_FLOOR]
+    metrics["low_step_days"] = float(len(low_days))
+
+    reasons = []
+    if steps_lag_days >= AH_STEPS_LAG_ALERT_DAYS:
+        if steps_latest is None:
+            reasons.append(
+                f"no `steps` data in the last {AH_ACTIVITY_WINDOW_DAYS} days, " f"yet the partition is fresh (latest {partition_latest})."
+            )
+        else:
+            reasons.append(
+                f"`steps` last landed {steps_latest} ({steps_lag_days}d behind the partition's "
+                f"latest record {partition_latest}) — the step stream stopped while other "
+                f"Apple Health automations keep writing."
+            )
+    if len(low_days) >= AH_LOW_STEP_ALERT_COUNT:
+        reasons.append(
+            f"{len(low_days)} of the last {AH_ACTIVITY_WINDOW_DAYS} complete days have "
+            f"steps < {AH_LOW_STEP_FLOOR} ({', '.join(sorted(low_days))})."
+        )
+
+    if not reasons:
+        return None, metrics
+
+    metrics["degraded"] = 1.0
+    if sick_suppress:
+        logger.info("Apple Health activity degraded but suppressed (sick day): %s", reasons)
+        return None, metrics
+
+    msg = (
+        "⚠️ Life Platform: Apple Health activity-stream gap\n\n"
+        "Apple Health is delivering data (the partition looks fresh), but its ACTIVITY "
+        "stream specifically looks broken — the signature of a silently-dropped Health "
+        "Auto Export payload (oversize 413, rejected at the gateway, invisible to "
+        "CloudWatch; the HAE app still reports success):\n\n" + "\n".join(f"  • {r}" for r in reasons) + "\n\nWhat to do:\n"
+        "  • Confirm the HAE 'Step counts' automation has Aggregate Data ON (daily totals,\n"
+        "    small payload) — raw per-sample exports 413 silently.\n"
+        "  • If it just broke, re-send via a one-time Apple Health file export\n"
+        "    (backfill/onetime_apple_health_import_*.py).\n\n"
+        f"Checked at: {now.strftime('%Y-%m-%d %H:%M UTC')}"
+    )
+    return msg, metrics
+
+
 # S-06: Sources whose staleness means "no manual entry logged yet" rather than a
 # broken pipeline. They still appear in the freshness report/email, but do NOT
 # count toward StaleSourceCount — the metric the slo-source-freshness alarm
@@ -95,7 +205,7 @@ BEHAVIORAL_SOURCES = {"measurements", "food_delivery"}
 FIELD_COMPLETENESS_CHECKS: dict[str, list[str]] = {
     "whoop": ["hrv", "recovery_score", "sleep_duration_hours"],
     "garmin": ["steps", "resting_heart_rate", "body_battery_highest"],
-    "apple_health": ["steps", "active_energy_kcal"],
+    "apple_health": ["steps", "active_calories"],
     # "macrofactor":   [...],  # dead since 2026-04-11 (Tier 1 torn down)
     # "strava":        ["activity_count"],  # PAUSED 2026-05-28
     "eightsleep": ["sleep_efficiency_pct", "sleep_duration_hours"],
@@ -483,8 +593,38 @@ def lambda_handler(event, context):
     except Exception as _oauth_e:
         logger.error("OAuth/manual token health check failed (non-fatal): %s", _oauth_e)
 
+    # ── DI-1.6: Apple Health activity-integrity guard (the silent-413 blind spot) ──
+    ah_degraded = False
+    try:
+        ah_alert, ah_metrics = check_apple_health_activity(table, now, _sick_suppress)
+        ah_degraded = bool(ah_metrics.get("degraded"))
+        if ah_alert:
+            try:
+                sns.publish(
+                    TopicArn=SNS_ARN,
+                    Subject="⚠️ Life Platform: Apple Health activity-stream gap",
+                    Message=ah_alert,
+                )
+                logger.info("Apple Health activity-integrity alert sent")
+            except Exception as _ae:
+                logger.error("Apple Health activity alert SNS publish failed: %s", _ae)
+        try:
+            cw.put_metric_data(
+                Namespace="LifePlatform/Freshness",
+                MetricData=[
+                    {"MetricName": "AppleHealthStepsLagDays", "Value": ah_metrics["steps_lag_days"], "Unit": "Count"},
+                    {"MetricName": "AppleHealthLowStepDays7d", "Value": ah_metrics["low_step_days"], "Unit": "Count"},
+                    {"MetricName": "AppleHealthActivityDegraded", "Value": ah_metrics["degraded"], "Unit": "Count"},
+                ],
+            )
+        except Exception as _me:
+            logger.error("Apple Health activity metric emit failed (non-fatal): %s", _me)
+    except Exception as _ah_e:
+        logger.error("Apple Health activity-integrity check failed (non-fatal): %s", _ah_e)
+
     return {
         "statusCode": 200,
+        "apple_health_activity_degraded": ah_degraded,
         "stale_count": len(stale_sources),
         "stale_sources": [s[0] for s in stale_sources],
         "partial_count": len(partial_sources),
