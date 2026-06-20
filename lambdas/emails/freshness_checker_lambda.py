@@ -40,7 +40,7 @@ cw = boto3.client("cloudwatch", region_name=REGION)
 SOURCES = {
     "whoop": "Whoop recovery/sleep",
     "withings": "Withings weight/body comp",
-    # "strava":        "Strava activities",  # PAUSED 2026-05-28 (API 402; Garmin covers activity)
+    "strava": "Strava activities",  # RE-ENABLED 2026-06-20 (402 cleared; Garmin auto-upload feeds it)
     "todoist": "Todoist tasks",
     "apple_health": "Apple Health",
     "eightsleep": "Eight Sleep",
@@ -207,7 +207,7 @@ FIELD_COMPLETENESS_CHECKS: dict[str, list[str]] = {
     "garmin": ["steps", "resting_heart_rate", "body_battery_highest"],
     "apple_health": ["steps", "active_calories"],
     # "macrofactor":   [...],  # dead since 2026-04-11 (Tier 1 torn down)
-    # "strava":        ["activity_count"],  # PAUSED 2026-05-28
+    "strava": ["activity_count"],  # RE-ENABLED 2026-06-20
     "eightsleep": ["sleep_efficiency_pct", "sleep_duration_hours"],
     "withings": ["weight_lbs"],
     "habitify": ["total_completed"],
@@ -489,7 +489,7 @@ def lambda_handler(event, context):
     OAUTH_SECRETS = [
         "life-platform/whoop",
         "life-platform/withings",
-        # "life-platform/strava",  # PAUSED 2026-05-28 (Strava API 402; Garmin covers activity)
+        "life-platform/strava",  # RE-ENABLED 2026-06-20
         # "life-platform/garmin",  # PAUSED 2026-06-03 — see SOURCES note (server-side refresh 429-blocked)
     ]
     MANUAL_ROTATION_SECRETS = [
