@@ -1,3 +1,19 @@
+## Movement data integrity — DI-1.2 — 2026-06-19 (WORKORDER_DI1: Hevy join + Hevy-aware TSB)
+
+The movement/sedentary read and the TSB training-stress signal were both **Strava-only**. With Strava deliberately paused (402 paywall — DI-1.1) and Garmin rate-limited, real Hevy training days (Push/Pull/Legs/Engine 6/16–6/19) were stamped `has_workout=false` and flagged `sedentary`, and TSB collapsed toward zero. DI-1.2 makes Hevy the primary "did he train" signal everywhere.
+
+### Fixed
+- **`get_daily_metrics(view="movement")` (`mcp/tools_lifestyle.py::tool_get_movement_score`)** now joins Hevy alongside Apple Health + Strava. `has_workout = true if a normalized workout exists from ANY source that day, Hevy first` — a step count can no longer, on its own, produce a sedentary verdict, and a Hevy lifting day is **never** `sedentary` regardless of steps. Rows carry `workout_sources` (`["hevy"]`/`["strava"]`). The day iteration is the **union** of Apple-Health and Hevy dates, so a Hevy-only day (no Apple sync) no longer silently vanishes.
+- **TSB is Hevy-aware (`daily_metrics_compute_lambda.py::compute_tsb`)** — Strava kilojoules stay authoritative, but on days Strava recorded no load the Banister model falls back to a duration-scaled Hevy load proxy (`HEVY_LOAD_KJ_PER_MIN`, a coarse kJ-equivalent — **not** calorimetry and **not** a new scoring model) so training days aren't scored as zero fitness/fatigue. `computed_metrics` now carries `tsb_load_basis` (`strava` / `hevy_fallback` / `mixed` / `none` + day counts). `compute_tsb` keeps its 2-arg contract (back-compat).
+- **Data-aware idempotency** — `get_source_fingerprints` now fingerprints Hevy via a `DATE#…#WORKOUT#` sub-key query (Hevy has no plain `DATE#` item), so a late Hevy sync triggers a recompute.
+
+### Tests
+- `tests/test_di1_movement_integrity.py` — `test_has_workout_true_with_hevy_low_steps`, `test_no_sedentary_on_hevy_days_jun16_19`, `test_tsb_nonzero_from_hevy_when_strava_off` (+ Hevy-only-day and Strava-authoritative guards). `compute_tsb` back-compat suite in `test_business_logic.py` still green.
+
+Correlational framing only; no causal language in output. **Not deployed** — recompute 6/15→present is a post-deploy manual invoke (Matthew runs all deploys). DI-1.3 (coach honesty guard) next.
+
+---
+
 ## Derived meal layer (meal grouping) — 2026-06-19 (ADR-090: best-effort meal projection over raw MacroFactor, never mutate raw)
 
 Groups raw MacroFactor food entries into the meals they were eaten as ("Turkey Tacos", "Yogurt & Oats Bowl") as a **derived, recomputable projection** — deterministic-first, raw stays sovereign. Phase 0–1 (grouper + projection + backfill + read tool) shipped; the LLM namer (Phase 2) is deferred.

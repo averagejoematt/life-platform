@@ -257,22 +257,87 @@ def dedup_activities(activities):
 # ==============================================================================
 
 
-def compute_tsb(strava_60d, today):
-    """Banister model: Training Stress Balance = CTL − ATL over 60-day window."""
-    kj = {}
-    for r in strava_60d:
+# DI-1.2: coarse resistance/conditioning load proxy (kJ-equivalent per active minute).
+# NOT calorimetry and NOT a new scoring model (the work order's explicit scope bar) — a
+# duration-scaled stand-in so TSB stays nonzero when Strava (the kJ source) is paused (402)
+# or stale. Strava kilojoules stay authoritative whenever present; this only fills days
+# Strava recorded no load for. Correlational use only.
+HEVY_LOAD_KJ_PER_MIN = 25.0
+
+
+def _hevy_day_load_kj(hevy_records):
+    """kJ-equivalent load for one day's Hevy workout records (duration-scaled proxy)."""
+    total_min = sum(float(r.get("duration_sec") or 0) for r in hevy_records) / 60.0
+    return round(total_min * HEVY_LOAD_KJ_PER_MIN, 1)
+
+
+def _daily_training_load(strava_60d, hevy_60d, today):
+    """Per-day training load (kJ) for the 60-day Banister window, plus a basis summary.
+
+    Strava kilojoules are authoritative. On days Strava recorded no load (paused /
+    stale / a Hevy-only session), fall back to the Hevy duration proxy so a real
+    training day is never scored as zero load. Returns (load_by_day, basis_dict).
+    """
+    strava_kj = {}
+    for r in strava_60d or []:
         d = str(r.get("date", ""))
         if d:
-            kj[d] = sum(float(a.get("kilojoules") or 0) for a in r.get("activities", []))
+            strava_kj[d] = sum(float(a.get("kilojoules") or 0) for a in r.get("activities", []))
+    hevy_by_day = {}
+    for r in hevy_60d or []:
+        d = str(r.get("date", ""))
+        if d:
+            hevy_by_day.setdefault(d, []).append(r)
+    load = {}
+    strava_days = hevy_fallback_days = 0
+    for d in set(strava_kj) | set(hevy_by_day):
+        s = strava_kj.get(d, 0.0)
+        if s > 0:
+            load[d] = s
+            strava_days += 1
+        elif d in hevy_by_day:
+            load[d] = _hevy_day_load_kj(hevy_by_day[d])
+            hevy_fallback_days += 1
+    if strava_days and hevy_fallback_days:
+        confidence = "mixed"
+    elif hevy_fallback_days:
+        confidence = "hevy_fallback"
+    elif strava_days:
+        confidence = "strava"
+    else:
+        confidence = "none"
+    basis = {
+        "strava_days": strava_days,
+        "hevy_fallback_days": hevy_fallback_days,
+        "confidence": confidence,
+    }
+    return load, basis
+
+
+def compute_tsb(strava_60d, today, hevy_60d=None):
+    """Banister model: Training Stress Balance = CTL − ATL over 60-day window.
+
+    DI-1.2 Hevy-aware: when Strava has no kJ for a day (e.g. Strava paused), a
+    duration-scaled Hevy load proxy fills it so training days aren't scored as zero
+    fitness/fatigue. Back-compat — called with two args (no hevy_60d) it behaves
+    exactly as before.
+    """
+    load_by_day, _ = _daily_training_load(strava_60d, hevy_60d, today)
     ctl = atl = 0.0
     cd = math.exp(-1 / 42)
     ad = math.exp(-1 / 7)
     for i in range(59, -1, -1):
         day = (today - timedelta(days=i)).isoformat()
-        load = kj.get(day, 0)
+        load = load_by_day.get(day, 0)
         ctl = ctl * cd + load * (1 - cd)
         atl = atl * ad + load * (1 - ad)
     return round(ctl - atl, 1)
+
+
+def tsb_load_basis(strava_60d, hevy_60d, today):
+    """Confidence/basis summary for the TSB load inputs (DI-1.2). Pure; no I/O."""
+    _, basis = _daily_training_load(strava_60d, hevy_60d, today)
+    return basis
 
 
 # ==============================================================================
@@ -453,6 +518,7 @@ def store_computed_metrics(
     week_ago_weight,
     avatar_weight,
     source_fingerprints=None,
+    tsb_load_basis=None,
 ):
     """Write computed_metrics record — primary output of this Lambda."""
     item = {
@@ -500,6 +566,10 @@ def store_computed_metrics(
     # Source fingerprints — used for data-aware idempotency on subsequent runs
     if source_fingerprints:
         item["source_fingerprints"] = source_fingerprints
+
+    # DI-1.2: which source(s) backed the TSB load (strava / hevy_fallback / mixed / none)
+    if tsb_load_basis:
+        item["tsb_load_basis"] = _deep_dec(tsb_load_basis)
 
     item = {k: v for k, v in item.items() if v is not None}
     # DATA-2: Use validate_item directly (no S3 client — compute partitions don't archive
@@ -685,14 +755,40 @@ def get_source_fingerprints(yesterday_str, sources=None):
         # source will NOT trigger a recompute — the Daily Brief may silently reflect
         # stale values. Sources should be included only if they materially affect
         # day grade scoring or the AI coaching context.
-        sources = ["whoop", "apple_health", "macrofactor", "strava", "habitify", "withings"]
+        sources = ["whoop", "apple_health", "macrofactor", "strava", "habitify", "withings", "hevy"]
     fps = {}
     for src in sources:
+        if src == "hevy":
+            # DI-1.2: Hevy stores one record per workout under DATE#{date}#WORKOUT#{id},
+            # so there's no plain DATE# item to fetch_date — query the day and take the
+            # newest ingested_at across that day's sessions so a late Hevy sync still
+            # triggers a recompute.
+            ts = _hevy_day_fingerprint(yesterday_str)
+            if ts:
+                fps[src] = ts
+            continue
         rec = fetch_date(src, yesterday_str)
         ts = (rec or {}).get("webhook_ingested_at") or (rec or {}).get("ingested_at")
         if ts:
             fps[src] = str(ts)
     return fps
+
+
+def _hevy_day_fingerprint(date_str):
+    """Newest ingested_at across a day's Hevy workout records (sub-keyed by WORKOUT#)."""
+    try:
+        r = table.query(
+            KeyConditionExpression="pk = :pk AND begins_with(sk, :sk)",
+            ExpressionAttributeValues={
+                ":pk": USER_PREFIX + "hevy",
+                ":sk": "DATE#" + date_str + "#WORKOUT#",
+            },
+        )
+        stamps = [str(i.get("ingested_at")) for i in r.get("Items", []) if i.get("ingested_at")]
+        return max(stamps) if stamps else None
+    except Exception as e:
+        logger.warning(f"_hevy_day_fingerprint({date_str}) failed: {e}")
+        return None
 
 
 def fingerprints_changed(stored_fps, current_fps):
@@ -748,9 +844,13 @@ def assemble_data(yesterday_str, profile):
     hrv_7d_avg = avg(hrv_7d_vals)
     hrv_30d_avg = avg(hrv_30d_vals)
 
-    # TSB (60-day Strava)
+    # TSB (60-day Banister). DI-1.2 Hevy-aware: Strava kJ stays authoritative, but
+    # when Strava is paused/stale the Hevy duration proxy keeps training days nonzero
+    # instead of collapsing fitness/fatigue to zero. tsb_load_basis records which.
     strava_60d = fetch_range("strava", (today - timedelta(days=60)).isoformat(), yesterday_str)
-    tsb = compute_tsb(strava_60d, today)
+    hevy_60d = fetch_range("hevy", (today - timedelta(days=60)).isoformat(), yesterday_str)
+    tsb = compute_tsb(strava_60d, today, hevy_60d)
+    tsb_basis = tsb_load_basis(strava_60d, hevy_60d, today)
 
     # Sleep debt (7-day cumulative vs profile target)
     target_hrs = profile.get("sleep_target_hours_ideal", 7.5)
@@ -815,6 +915,7 @@ def assemble_data(yesterday_str, profile):
             "hrv_yesterday": safe_float(whoop, "hrv"),
         },
         "tsb": tsb,
+        "tsb_load_basis": tsb_basis,
         "sleep_debt_7d_hrs": round(sleep_debt_hrs, 1),
         "latest_weight": latest_weight,
         "week_ago_weight": week_ago_weight,
@@ -975,6 +1076,7 @@ def lambda_handler(event, context):
         data.get("week_ago_weight"),
         data.get("avatar_weight"),
         source_fingerprints=source_fps,
+        tsb_load_basis=data.get("tsb_load_basis"),
     )
 
     if day_grade_score is not None:

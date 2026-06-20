@@ -2511,22 +2511,30 @@ def tool_get_movement_score(args):
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
     step_target = args.get("step_target", 8000)
 
-    sources = parallel_query_sources(["apple_health", "strava"], start_date, end_date)
+    # DI-1.2: Hevy is the primary "did he train" signal. A step count must never, on
+    # its own, drive a sedentary conclusion — has_workout is true if a normalized workout
+    # exists from ANY source (Hevy first, then Strava). Hevy stores one record per workout
+    # under DATE#{date}#WORKOUT#{id}, so a date "has a Hevy workout" if any such record exists.
+    sources = parallel_query_sources(["apple_health", "strava", "hevy"], start_date, end_date)
     ah_items = sources.get("apple_health", [])
     strava_items = sources.get("strava", [])
-    if not ah_items:
-        return {"error": "No Apple Health data in range."}
+    hevy_items = sources.get("hevy", [])
+    if not ah_items and not hevy_items:
+        return {"error": "No Apple Health or Hevy data in range."}
 
     ah_by_date = {i.get("date"): i for i in ah_items if i.get("date")}
     strava_by_date = {i.get("date"): i for i in strava_items if i.get("date")}
+    hevy_dates = {i.get("date") for i in hevy_items if i.get("date")}
 
     daily = []
     neat_vals = []
     step_vals = []
     sedentary_days = []
 
-    for date in sorted(ah_by_date.keys()):
-        ah = ah_by_date[date]
+    # Union of Apple-Health and Hevy dates: a Hevy-only training day (no Apple sync)
+    # must still report has_workout and is never sedentary.
+    for date in sorted(set(ah_by_date.keys()) | hevy_dates):
+        ah = ah_by_date.get(date, {})
         strava = strava_by_date.get(date, {})
         steps = ah.get("steps")
         flights = ah.get("flights_climbed")
@@ -2534,9 +2542,13 @@ def tool_get_movement_score(args):
         active_cal = ah.get("active_calories")
         exercise_kj = strava.get("total_kilojoules")
         exercise_kcal = float(exercise_kj) if exercise_kj else 0
-        has_workout = int(float(strava.get("activity_count", 0))) > 0
+        hevy_workout = date in hevy_dates
+        strava_workout = int(float(strava.get("activity_count", 0))) > 0
+        has_workout = hevy_workout or strava_workout
 
         row = {"date": date, "has_workout": has_workout}
+        if has_workout:
+            row["workout_sources"] = (["hevy"] if hevy_workout else []) + (["strava"] if strava_workout else [])
         if steps is not None:
             row["steps"] = int(float(steps))
             step_vals.append(float(steps))
@@ -2606,7 +2618,11 @@ def tool_get_movement_score(args):
         "summary": summary,
         "sedentary_dates": sedentary_days[-10:] if sedentary_days else None,
         "daily": daily,
-        "note": "NEAT is energy burned outside exercise. Sedentary = <5000 steps + no workout + <200 active cal.",
+        "note": (
+            "NEAT is energy burned outside exercise. Sedentary = <5000 steps + no workout from ANY "
+            "source (Hevy or Strava) + <200 active cal. has_workout reads Hevy first, then Strava — a "
+            "Hevy lifting day is never sedentary regardless of step count."
+        ),
     }
 
 
