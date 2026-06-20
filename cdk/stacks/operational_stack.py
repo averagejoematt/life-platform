@@ -727,6 +727,10 @@ class OperationalStack(Stack):
             timeout_seconds=300,
             memory_mb=256,
             environment={"SNS_ARN": DIGEST_TOPIC_ARN},
+            # DI-1.1 (2026-06-20): needs the shared layer for ingest_health + source_state
+            # (is_paused). Was previously running on an out-of-band v85 that CDK didn't
+            # manage, so source_state silently fell back to the no-op stub.
+            shared_layer=shared_utils_layer,
             custom_policies=rp.pipeline_health_check(),
             table=local_table,
             bucket=local_bucket,
