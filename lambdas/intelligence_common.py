@@ -1219,6 +1219,92 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# MOVEMENT HONESTY GUARD (WORKORDER DI-1.3)
+# ══════════════════════════════════════════════════════════════════════════════
+# Mirrors the readiness future-stamp guard (tools_health.tool_get_readiness_score,
+# is_forward_dated / staleness_warning): when the movement sources can't see the
+# activity, output "not assessable + which source + why" instead of a confident
+# "under-training / sedentary." Hevy is the authoritative training-stimulus signal
+# and is reported regardless; the verdict that's withheld is only the NEAT/aerobic
+# one that depends on the unavailable sources. Correlational framing only.
+
+# Strava is authoritative for *what moved* (TRAINING_CALIBRATION §4a) — it carries the
+# aerobic/NEAT dose. Garmin is a redundant backstop and steps systematically undercount,
+# so aerobic/NEAT volume is "assessable" iff Strava is live. A state not in this set is
+# treated as unavailable (paused / stale / rate_limited / missing).
+_MOVEMENT_LIVE_STATES = {"live", "fresh", "ok", "current", None}
+# Movement sources surfaced in the unavailability note, in priority order.
+_MOVEMENT_NOTE_SOURCES = ("strava", "garmin", "steps")
+# Language the guard withholds when movement isn't assessable.
+_UNDERTRAINING_PATTERN = re.compile(
+    r"under[-\s]?train|over[-\s]?rest|sedentary|too (?:few|little) (?:workouts|training|activity|movement)"
+    r"|not (?:training|moving|active) enough|low (?:training )?(?:stimulus|activity|volume|dose)"
+    r"|lack(?:ing|s)? (?:of )?(?:training|activity|movement|exercise)|insufficient (?:training|activity|stimulus)"
+    r"|barely (?:training|moving|active)|(?:all|mostly) rest days|detrain",
+    re.IGNORECASE,
+)
+
+
+def _movement_state_label(state) -> str:
+    """Human label for a source state ('rate_limited' → 'rate-limited')."""
+    return str(state).replace("_", "-")
+
+
+def movement_assessability(source_states: dict) -> dict:
+    """Is the NEAT/aerobic movement picture assessable, given per-source states?
+
+    source_states: {"strava": "paused"|"stale"|"live", "garmin": "rate_limited"|...,
+    "steps": "missing"|"live", ...}. Returns {assessable, unavailable, note}.
+
+    assessable is False when Strava (the authoritative aerobic/NEAT source, §4a) is
+    not live — steps alone undercount and Garmin is chronically rate-limited, so a
+    Strava outage means aerobic/NEAT volume genuinely can't be read. The note still
+    enumerates every unavailable movement source for transparency. (DI-1.1 will later
+    feed precise 'paused'/'rate_limited' states; until then callers pass freshness-
+    derived 'stale'/'missing' — the guard renders whatever label it's given.)
+    """
+    states = source_states or {}
+    unavailable = []
+    for src in _MOVEMENT_NOTE_SOURCES:
+        st = states.get(src, "live")
+        if st not in _MOVEMENT_LIVE_STATES:
+            unavailable.append((src, _movement_state_label(st)))
+    strava_live = states.get("strava", "live") in _MOVEMENT_LIVE_STATES
+    assessable = strava_live
+    note = ""
+    if unavailable:
+        pretty = "; ".join(f"{s}: {st}" for s, st in unavailable)
+        note = f"movement sources unavailable ({pretty})"
+    return {"assessable": assessable, "unavailable": unavailable, "note": note}
+
+
+def apply_movement_honesty_guard(position_summary: str, assessability: dict, hevy_present: bool = False, hevy_summary: str = "") -> str:
+    """Withhold an under-training/sedentary verdict when movement isn't assessable.
+
+    If the picture IS assessable (Strava live), the text is returned unchanged. If it
+    is NOT assessable and the summary asserts under-training/sedentary, that verdict is
+    replaced with an honest statement that (a) reports the Hevy training that did happen
+    and (b) names the unavailable sources + why, withholding the verdict. A summary that
+    makes no such assertion is returned unchanged (nothing false to withhold).
+    """
+    if not assessability or assessability.get("assessable", True):
+        return position_summary
+    text = position_summary or ""
+    if not _UNDERTRAINING_PATTERN.search(text):
+        return text
+    note = (assessability.get("note") or "movement sources unavailable").rstrip(".")
+    parts = []
+    if hevy_present:
+        parts.append(
+            f"Logged training this period: {hevy_summary}." if hevy_summary else "Strength training was logged this period (Hevy)."
+        )
+    parts.append(
+        f"{note} — so NEAT/aerobic volume is not assessable; I'm not making a training-adequacy call until those sources are live again."
+    )
+    return " ".join(parts)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # COACH THREADS — Persistent Memory (V2.1 Workstream 1)
 # ══════════════════════════════════════════════════════════════════════════════
 

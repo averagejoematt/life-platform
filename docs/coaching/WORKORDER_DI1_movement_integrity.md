@@ -1,6 +1,6 @@
 # WORKORDER: DI-1 — Movement Data Integrity & Coach Honesty Guard
 
-> **Status:** OPEN — DI-1.1 diagnosed (read-only) 2026-06-19; **DI-1.2 built + tested (not deployed) 2026-06-19**; DI-1.3→1.5 in progress. DI-1.1 source-state work held pending Matthew's Strava decision.
+> **Status:** OPEN — DI-1.1 diagnosed (read-only) 2026-06-19; **DI-1.2 + DI-1.3 built + tested (not deployed) 2026-06-19**; DI-1.4→1.6 pending. **DI-1.1 Strava decision RESOLVED 2026-06-19: Matthew subscribed to Strava → re-enable ingestion (see DI-1.1).** **DI-1.6 (Apple HAE failsafe) added.** GARM-1 (official Garmin API) deferred — see Deferred decisions.
 > **Author:** coaching session 2026-06-19. **Revised same day** to fold in Claude Code's confirmed
 > DI-1.1 root cause, which **overturned** the original "OAuth refresh-token" hypothesis (see DI-1.1).
 > **Pairs with:** `TRAINING_CALIBRATION.md` §4a (the data-pull mandate this enforces in code), `TRAINING_PROGRAM.md`.
@@ -32,7 +32,7 @@ continuity loop keeps re-confirming it.
 
 Read first, in order: this file; `TRAINING_CALIBRATION.md` §4a; `lambdas/compute/daily_metrics_compute_lambda.py` (the join bug lives at the source list + TSB calc — anchors in DI-1.2); `mcp/tools_health.py` `tool_get_readiness_score` lines ~490–530 (**copy the `is_forward_dated` + `staleness_warning` block verbatim** — DI-1.3 reuses it); and the training-coach thread generator (grep for where `position_summary` / the `COACH#` partition is written nightly — confirm by reading).
 
-Build DI-1.2 → DI-1.5 **in order**, committing each independently. DI-1.1 is diagnosis-done + one decision pending from Matthew (below). Do **not** register any MCP tool whose implementing function isn't in the same commit; run `pytest tests/test_mcp_registry.py` before any MCP change is done. Tool functions go **before** `TOOLS = {}`. **Do not deploy** — write code + tests, show diffs; Matthew runs all deploys.
+Build DI-1.2 → DI-1.6 **in order**, committing each independently. DI-1.1's Strava decision is now RESOLVED (Matthew subscribed 2026-06-19 → re-enable); DI-1.6 adds the Apple HAE failsafe. Do **not** register any MCP tool whose implementing function isn't in the same commit; run `pytest tests/test_mcp_registry.py` before any MCP change is done. Tool functions go **before** `TOOLS = {}`. **Do not deploy** — write code + tests, show diffs; Matthew runs all deploys.
 
 **Hard scope guardrails (acceptance criteria, not suggestions):**
 - **Hevy is the primary "did he train" signal, everywhere.** Any code answering "did he work out / is this sedentary / what was the training stimulus" reads the normalized workout source (Hevy first, then MacroFactor) **before** steps/Strava/active-cal. A step count must never, alone, produce a sedentary or training-stimulus conclusion. Critically: the **training-stress signal (TSB) must be Hevy-aware**, not Strava-only — with Strava off it must fall back to Hevy-derived load, not emit zero.
@@ -50,18 +50,18 @@ Build DI-1.2 → DI-1.5 **in order**, committing each independently. DI-1.1 is d
 - `cdk/stacks/ingestion_stack.py:182` → `schedule=None  # PAUSED`. The `strava-daily-ingestion` EventBridge rule no longer exists (ResourceNotFound); only a stale Lambda resource-policy permission remains.
 - Pause cause: 6/14 logs show `HTTP 402 Payment Required` on both the activities fetch and the zones call — Strava's app-tier API gate (post-2024 terms), not per-user auth. 6/14 was the last run before the pause deployed.
 - The ~2ms 4-hourly invokes since 6/15 are a **liveness pinger** hitting the `event.get("healthcheck")` fast-path — no business logs, never calls Strava. **This masks the missing cron** (`run_ingestion` would log "Ingestion starting"; absent on every post-6/14 invoke).
-- **Decision required from Matthew (not a code task):** (a) pursue Strava API re-approval / tier upgrade to clear the 402, **or** (b) treat Strava as deliberately-off and rely on the **Garmin→Strava upload backstop** for walking data. Everything downstream must stop assuming Strava is a live ingest path until this is settled.
+- **RESOLVED 2026-06-19 — Matthew subscribed to Strava (clears the 402).** The fix is to **re-enable ingestion**, not re-architect. Verify the subscription is on the same Strava account that owns the API app (Client ID 204637, Standard Tier, 1 athlete — token auth was already healthy/refreshing). Then: restore the cron at `ingestion_stack.py:182` (un-pause `schedule=`), CDK deploy to **recreate the `strava-daily-ingestion` EventBridge rule** (it was deleted) and reconcile the stale Lambda permission. First run backfills 6/15→present (Strava API fetches historical activities). Confirm the 402 is gone in logs.
 
 **Garmin — 429 refresh-ratelimit.** Still scheduled (cron 0,6,14,22) but a `REFRESH_RATELIMIT` marker sits in its partition — the known Garmin 429 OAuth-refresh block (datacenter-IP crackdown, documented in `CLAUDE.md`). Not durably re-auth-fixable here; full mitigation (residential/proxy egress, backoff) is a separate item.
 
-**Hevy — fresh through today.** This is the crux: with Strava off and Garmin rate-limited, **Hevy is the only trustworthy movement/training source right now**, which is exactly why DI-1.2 + DI-1.3 are the load-bearing fixes — not the Strava re-enable.
+**Hevy — fresh through today.** Even with Strava re-enabled, **Hevy stays the primary "did he train" signal** (DI-1.2/1.3) — Strava is the aerobic/NEAT layer, not the training-stimulus source. The whole point of this work order is that no single movement source going dark can blind the platform again; re-enabling Strava is necessary but not sufficient, which is why the Hevy join, the honesty guard, and the HAE failsafe (DI-1.6) all ship.
 
-**What DI-1.1 requires (revised — replaces the original "fix OAuth + add staleness alarm"):**
-1. Matthew's Strava decision (re-approve vs. accept-off).
-2. **Make `paused` legible.** Give Strava an explicit `paused`/`disabled` source-state that `get_freshness_status` and the coach guard read, so off-by-design is distinguishable from silent failure. (The original "add a staleness alarm" would have false-fired on the deliberate pause — this replaces it.) Record Garmin's `rate_limited` state the same way.
-3. If Matthew picks accept-off: document the Garmin→Strava upload backstop as the interim walking-data route.
+**What DI-1.1 requires (revised — Strava decision resolved):**
+1. **Re-enable Strava** per the steps above (un-pause cron, recreate rule, backfill, verify 402 cleared). Matthew runs the CDK deploy.
+2. **Make source-state legible.** Give every ingest source an explicit state — `live` / `paused` / `rate_limited` / `stale` — that `get_freshness_status` and the coach guard read, so an intentional pause (Strava, historically) or a 429 (Garmin) is never mistaken for silent breakage. **Kill the liveness-pinger masking:** a paused source must not emit healthcheck invokes that hide a missing cron. This is the durable anti-recurrence fix and stays even though Strava is back on.
+3. **Garmin biometrics stay degraded for now** (429 `rate_limited`) — out of scope to fix here; the honesty guard (DI-1.3) covers it, and activity/walking data now comes via Strava with the HAE failsafe behind it (DI-1.6).
 
-**Acceptance:** freshness/coach output distinguishes `paused` (Strava) and `rate_limited` (Garmin) from `stale`; no code path treats Strava as live ingest. Test: `test_freshness_distinguishes_paused_from_stale`.
+**Acceptance:** Strava re-ingests 6/15→present; freshness/coach output distinguishes `live`/`paused`/`rate_limited`/`stale`; no healthcheck-pinger masks a dead cron. Tests: `test_freshness_distinguishes_paused_from_stale`, `test_source_state_live_after_strava_reenable`.
 
 ---
 
@@ -95,13 +95,15 @@ Build DI-1.2 → DI-1.5 **in order**, committing each independently. DI-1.1 is d
 - **Phantom 298:** trace which field/window produced it (reconciles with neither the per-day values nor the ~3,415 avg) — likely a wrong-window average or a dedup/field-mapping bug keeping phone steps and dropping the watch contribution.
 - **Fix:** explicit step precedence (watch/Garmin/Strava distance primary; Apple steps fallback only); a step-field completeness flag; ensure a low/blank Apple step day cannot drive a sedentary/under-training verdict (verify DI-1.2's join already closes this).
 
+> **Note:** DI-1.4 is a **prerequisite for the DI-1.6 HAE failsafe** — HAE can't be a trustworthy backstop while its own feed has silent field-level gaps. Fix the completeness/precedence here first.
+
 **Acceptance:** `test_step_completeness_flag_surfaces_jun5_13_gap`; resolved step source-of-truth documented in `DATA_DICTIONARY`.
 
 ---
 
 ## DI-1.5 — Thread correction, tests, governance
 
-- **Thread correction (out-of-band):** the corrective stance for Dr. Chen's thread is written from the coaching session via the insight/decision log — Claude Code does **not** seed it. Content: *prior under-training reads were an artifact of a Hevy-blind sedentary join + a Strava-only training signal with Strava paused; corrected against four verified 100–150m Hevy sessions 6/16–6/19; walking-base vs proven floor is **unmeasurable** until the Strava decision (DI-1.1) lands.*
+- **Thread correction (out-of-band):** the corrective stance for Dr. Chen's thread is written from the coaching session via the insight/decision log — Claude Code does **not** seed it. Content: *prior under-training reads were an artifact of a Hevy-blind sedentary join + a Strava-only training signal with Strava paused; corrected against four verified 100–150m Hevy sessions 6/16–6/19; walking-base vs proven floor is **unmeasurable** until Strava re-ingests (DI-1.1, now in progress) and the HAE failsafe (DI-1.6) is behind it.*
 - **Tests:** all named above, green. Registry test green if any MCP tool is touched.
 - **Doc update matrix (house trigger rules):**
   - `CHANGELOG` + `PROJECT_PLAN` — always.
@@ -114,6 +116,23 @@ Build DI-1.2 → DI-1.5 **in order**, committing each independently. DI-1.1 is d
 
 ---
 
+## DI-1.6 — Apple Health (HAE) activity failsafe + source precedence
+
+**Goal (Matthew, 2026-06-19):** a secondary movement/activity source so a Strava stall can never again blind the platform. HAE is the **failsafe only** — Strava stays primary; HAE is a dormant backstop, explicitly accepted as brittle-but-acceptable for that role (it carries an iOS-app dependency — fine for a backstop, not for the primary path).
+
+**Chain:** Garmin watch → Garmin Connect → Apple Health (workout sync) → Health Auto Export → platform ingestion. Verify two config preconditions before coding: (a) Garmin Connect → Apple Health **workout** sync is on (not just steps); (b) HAE is set to export **workouts/activities** (distance, duration, HR), not only the gapped step field (DI-1.4).
+
+**Build:**
+- Ingest HAE **activity/workout** records (distance, duration, HR, type), not just daily steps. Store alongside the other activity sources.
+- **Source precedence for activities:** Strava primary → HAE fallback for any day Strava is missing/stale/paused. Dedupe so a single walk present in both counts once (match on date + approximate distance/duration; prefer Strava's copy). HAE-sourced days carry `source: "hae"` + `confidence` per the Henning standard.
+- The failsafe is **passive**: inert while Strava is live, silently catching the gap when Strava isn't — gated by the same source-state field from DI-1.1.
+
+**Depends on:** DI-1.4 (HAE feed must be gap-free + precedence-defined first).
+
+**Acceptance:** `test_hae_activity_fallback_when_strava_missing` (Strava empty + HAE walk → walk counted, tagged `hae`); `test_strava_hae_dedupe_single_walk` (same walk in both → counted once, Strava preferred); HAE path stays inert when Strava is live.
+
+---
+
 ## Deploy sequence (Matthew runs — reminders, do not execute)
 
 1. Deploy `daily-metrics-compute` with the Hevy join + Hevy-aware TSB (DI-1.2); manually invoke to recompute 6/15→present.
@@ -122,10 +141,16 @@ Build DI-1.2 → DI-1.5 **in order**, committing each independently. DI-1.1 is d
 4. MCP package deploy **only if** a tool was touched (full `mcp/` dir; `deploy_lambda.sh` rejects `life-platform-mcp` — follow its printed build sequence). New script needs `chmod +x` or `bash deploy/<script>.sh`.
 5. `pytest tests/test_mcp_registry.py` green before any MCP deploy.
 6. Smoke-test: `get_daily_metrics(view="movement")` over 6/16–6/19 → 0 sedentary days, TSB nonzero from Hevy; `get_freshness_status` shows Strava `paused` (not `stale`); regenerated training thread names no "under-training" with Hevy present.
-7. **Separately (your call):** act on the Strava DI-1.1 decision — API re-approval/upgrade, or commit to the Garmin→Strava backstop.
+7. **Re-enable Strava (DI-1.1):** verify the new subscription is on the API-app account, un-pause the cron at `ingestion_stack.py:182`, CDK deploy to recreate the `strava-daily-ingestion` rule, then invoke once to backfill 6/15→present and confirm the 402 is gone.
+8. **HAE failsafe (DI-1.6):** verify Garmin→Apple Health workout sync + HAE workout-export config, deploy the HAE activity ingestion + precedence, then confirm it stays inert while Strava is live.
 
 ---
 
+## Deferred decisions (recorded 2026-06-19 — not building now)
+
+- **GARM-1 — official Garmin Connect Activity API (push/webhook).** The robust long-term direct-Garmin spine (push-based, no polling, no rate-limit, no Strava). **Deferred** per Matthew: not pursuing Garmin B2B developer approval right now. Documented as the future option if Strava-as-router ever becomes unacceptable; re-open as its own work order when revisited.
+- **Unofficial `garminconnect` library as an ingestion path — rejected.** Repeatedly dies on a ~48h cycle (token-refresh throttling + datacenter-IP flagging); unsuitable for set-and-forget automation.
+
 ## Out of scope (explicit — do not build)
 
-Any new activity/effort scoring model or classifier; any public surface; rewriting the coaching generator beyond the pull-order + honesty guard; a separate analytical store; Garmin 429 egress mitigation (separate item); causal language anywhere in output strings. Re-propose separately if revisited.
+Any new activity/effort scoring model or classifier; any public surface; rewriting the coaching generator beyond the pull-order + honesty guard; a separate analytical store; Garmin 429 egress mitigation (separate item); GARM-1 / official Garmin API (deferred, above); causal language anywhere in output strings. Re-propose separately if revisited.

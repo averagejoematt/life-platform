@@ -177,3 +177,61 @@ def test_tsb_strava_authoritative_when_present():
     basis = dmc.tsb_load_basis(strava_60d, hevy_60d, today)
     assert basis["strava_days"] == 1 and basis["hevy_fallback_days"] == 0, basis
     assert basis["confidence"] == "strava", basis
+
+
+# ==============================================================================
+# DI-1.3 — coach honesty guard (withhold under-training when movement unavailable)
+# ==============================================================================
+
+import importlib.util  # noqa: E402
+
+_IC_SPEC = importlib.util.find_spec("intelligence_common")
+_IC_OK = _IC_SPEC is not None
+if _IC_OK:
+    import intelligence_common as ic  # noqa: E402
+
+
+@pytest.mark.skipif(not _IC_OK, reason="intelligence_common (shared layer) unavailable")
+def test_coach_guard_withholds_undertraining_when_strava_paused():
+    """A Hevy day + paused Strava: the position_summary must withhold the under-training
+    verdict, name the unavailable source(s) + reason, and still reflect the Hevy session.
+
+    This is the regression test that keeps Dr. Chen from relapsing into six days of
+    "you're under-training" off a Hevy-blind, Strava-dead read.
+    """
+    state = {"strava": "paused", "garmin": "rate_limited", "steps": "missing"}
+    assess = ic.movement_assessability(state)
+    assert assess["assessable"] is False, assess
+
+    # An LLM-generated summary that wrongly asserts under-training off the dead sources.
+    raw = "Matthew is under-training — mostly rest days this week, very low training stimulus."
+    guarded = ic.apply_movement_honesty_guard(raw, assess, hevy_present=True, hevy_summary="4 Hevy sessions, 96 sets, 469 min")
+
+    low = guarded.lower()
+    # 1. Verdict withheld — no under-training / sedentary / rest-day language survives.
+    assert "under-train" not in low and "undertrain" not in low, guarded
+    assert "sedentary" not in low, guarded
+    assert "rest day" not in low and "low training stimulus" not in low, guarded
+    # 2. Names the unavailable source(s) + reason.
+    assert "strava: paused" in low, guarded
+    assert "rate-limited" in low, guarded
+    assert "not assessable" in low, guarded
+    # 3. Still reflects the Hevy training that happened.
+    assert "hevy" in low and "96 sets" in low, guarded
+
+
+@pytest.mark.skipif(not _IC_OK, reason="intelligence_common (shared layer) unavailable")
+def test_coach_guard_passes_through_when_strava_live():
+    """When Strava is live the picture IS assessable — the guard must not touch the text."""
+    assess = ic.movement_assessability({"strava": "live", "garmin": "rate_limited", "steps": "live"})
+    assert assess["assessable"] is True, assess
+    text = "Aerobic volume is light this week; consider one more Zone-2 session."
+    assert ic.apply_movement_honesty_guard(text, assess, hevy_present=True) == text
+
+
+@pytest.mark.skipif(not _IC_OK, reason="intelligence_common (shared layer) unavailable")
+def test_coach_guard_noop_when_no_undertraining_assertion():
+    """Not assessable, but the summary makes no under-training claim → leave it alone."""
+    assess = ic.movement_assessability({"strava": "paused", "garmin": "stale", "steps": "missing"})
+    text = "Hevy shows a clean PPL+Engine block — four sessions, strong set volume."
+    assert ic.apply_movement_honesty_guard(text, assess, hevy_present=True) == text
