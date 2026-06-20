@@ -1,51 +1,54 @@
-# HANDOVER — 2026-06-19 session close · DI-1 movement integrity + HAE deep dive
+# HANDOVER — 2026-06-20 · DI-1 deploy + HAE 413 remediation + Strava re-enable
 
-> Branch **`di1-movement-integrity`** (off `main`, **not pushed**, **nothing deployed**). Matthew
-> runs all deploys. Two threads this session: **DI-1** (movement data integrity, WORKORDER_DI1) and a
-> **surgical HAE-path review** that found why step data isn't arriving. Picks up **2026-06-20**.
-> Detail docs: `docs/coaching/WORKORDER_DI1_movement_integrity.md`, `docs/reviews/HAE_PATH_REVIEW_2026-06-19.md`,
-> `handovers/HANDOVER_2026-06-19_DI1_movement_integrity.md` (the DI-1-only handover), ADR-091.
+> Branch **`di1-movement-integrity`** — now **pushed**, **PR #160 open** to main, and
+> **fully deployed to production** (we deployed locally off this branch; the PR brings
+> `main` into agreement — it does NOT require a redeploy). Picks up at a **QA session**.
+> Prior session: `handovers/HANDOVER_2026-06-19_session_close.md`.
 
-## Commits on the branch (7), all tested, none deployed
-| Commit | What |
-|---|---|
-| `eea20c64` | **DI-1.2** movement/TSB join Hevy (has_workout=any source, Hevy-first; Hevy day never sedentary; Hevy-aware TSB + `tsb_load_basis`) |
-| `d4eec4ce` | **DI-1.3** coach Hevy-first pull + honesty guard (withholds under-training when Strava not live; prompt + deterministic write-time backstop) |
-| `65ba76af` | **DI-1.1 source-state** `source_state.py` (`live/paused/rate_limited/stale`, freshness-wins-for-live); `get_freshness_status` surfaces it; liveness-pinger masking killed |
-| `2dfb711e` | **DI-1.4** step-completeness flag + state-aware step precedence (phantom-298 = Garmin stale reading) |
-| `8efa6d13` | DI-1 consolidated handover |
-| `ae9a1aae` | **DI-1.5** ADR-091 (cross-coach honesty-guard standard) + HAE step-undercount RCA |
-| `9e98e093` | **HAE P0 fix** MAX-across-sources + GREATEST-on-write for additive activity metrics |
+## What shipped this session (all live)
+1. **One-time native Apple Health import** (`backfill/onetime_apple_health_import_2026-06-20.py`) —
+   streamed the 1.2 GB `export.xml` from disk (the 512 MB / 5-min Lambda OOMs), windowed to
+   the experiment, **max-sum-across-sources dedup** (no iPhone+Garmin double-count), wrote via
+   production `save_day`. Corrected **6/14–6/20**: undercounts fixed (6/15 402→1547, 6/18 444→2720)
+   and **`active_calories` filled** (was `None` every day). Verified in DDB + S3 + the movement view.
+2. **DI-1 fully deployed** — layer **v87** (`source_state.py` + `intelligence_common.py`) published
+   via `cdk deploy LifePlatformCore`; `SHARED_LAYER_VERSION=87` in `constants.py`; redeployed
+   Compute, Operational, MCP, Ingestion. DI-1.1 `is_paused` confirmed live (pipeline-health reports
+   paused sources correctly). **Fixed layer drift:** `PipelineHealthCheck` was on an out-of-band v85
+   (no `shared_layer=` arg) → `source_state` silently no-op'd; added the arg so CDK pins it to v87.
+3. **DI-1.6 HAE silent-413 failsafe** (`freshness_checker_lambda.py`) — the 413 is rejected at the
+   HTTP-API gateway before metering (**verified 4xx/5xx==0** on dropped-payload days → invisible to
+   CloudWatch). Guard watches `steps` vs partition freshness + sustained-low; emits 3 metrics; respects
+   sick-days. Fixed a latent `active_energy_kcal`→`active_calories` completeness-bug. Tests: `test_hae_activity_failsafe.py` (6).
+4. **Capture-everything expansion** — promoted cycling/swimming/snow distance (+max-across-sources),
+   VO₂ max, walking-HR, walking-steadiness, physical effort, cycling FTP to daily fields in the HAE
+   webhook `METRIC_MAP` + batch `QUANTITY_RECORDS` + SCHEMA. Per-sample workout dynamics (power/cadence/
+   ground-contact/stride/oscillation) stay archived in raw S3 (daily-avg is noise). `basal_calories`
+   mapping confirmed already correct (HAE sends `basal_energy_burned`). Tests: `test_health_auto_export.py` (25).
+5. **Strava re-enabled** — live test returned **200** (402 paywall cleared; Garmin→Strava auto-upload
+   feeds it). Restored the hourly EventBridge schedule (`ingestion_stack.py`, was `schedule=None`) and
+   re-added strava to `freshness_checker` (SOURCES + `activity_count` completeness + OAuth). Rule is
+   **ENABLED**. NB: `strava` left in `DECLARED_PAUSED_SOURCES` — behaviorally inert (freshness-wins),
+   drop on next layer rebuild for tidiness (only `pipeline_health_check.is_paused()` reads it directly).
 
-Tests green throughout (15 DI-1 + 16 HAE + business/registry/wiring/coach/persona/ingest_health). black + flake8 clean.
+## HAE — PARKED ✅
+The config is remediated (Matt's changes: `Summarize=Yes` on Feeds 1/4/5/9/10, glucose Feed 6 kept raw,
+de-duped Step Count to Feed 10). Live incremental path **confirmed flowing** — steps/active/gait/basal
+landing, today's record self-updating via webhook GREATEST-on-write (6/20 steps 2,794→10,280).
+- **Caveat:** payloads are still **raw per-sample** (Summarize doesn't appear to collapse them) — fine
+  while hourly syncing keeps each window small; the death-spiral risk only returns on a multi-day stall,
+  which the failsafe catches in ~2 days. Worth confirming the `Summarize=Yes` toggle actually saved.
+- **Insurance:** drop a native `export.xml` into `datadrops/` ~quarterly and re-run the importer →
+  guarantees full-resolution history regardless of feed settings.
 
-## HAE deep dive — the answer (why step data isn't arriving)
-**HTTP 413.** HAE exports raw per-sample steps (`aggregateData=False`); the 7-day payload is **24.8 MB**,
-the Lambda Function URL caps bodies at **~6 MB** → rejected at the edge, our Lambda never runs. HAE logs
-the run `complete` right after the 413, so **the phone shows success while nothing lands**. Activity
-(period=Today) also 413s at 14.2 MB. Historical 402/444 days = a separate older cause (Activity
-`period=Today` + Watch→iPhone sync lag froze partial iPhone-only counts; period=Today never re-sends).
-Full forensics + severity-ranked findings in `docs/reviews/HAE_PATH_REVIEW_2026-06-19.md`.
+## Commits on the branch (13; 10 prior + 3 this session)
+`bc03bcc1` v87 deploy + capture-everything · `c3c6d2ee` DI-1.6 failsafe + one-time import · `e015ae1b` Strava re-enable
+(+ the 10 DI-1.x/HAE-P0 commits from prior sessions). All tested, black + flake8 clean.
 
-**P0 code fix shipped** (`9e98e093`): MAX-across-per-source-sums + GREATEST-on-write for
-`steps/distance/active_calories/basal_calories/flights_climbed`. Makes the data correct *once it
-arrives* — orthogonal to the 413 unblock.
+## NEXT
+1. **Merge PR #160** → reconciles `main` with what's live (already CI-equivalent-checked locally).
+2. **QA session** (the reason we stopped) — `/qa` sweep of averagejoematt.com + movement/HAE data spot-checks.
+3. Spot-check the **6/21 record** — a full day with no import behind it = clean proof the HAE incremental path stands alone.
+4. Minor/deferred: drop `strava` from `DECLARED_PAUSED_SOURCES` on the next layer rebuild; HAE UTC-day vs local-day partitioning decision (open design); Dr. Chen thread correction (out-of-band, Matthew, per ADR-091).
 
-## TOMORROW (2026-06-20) — Matthew's call: aggregate change OR one-time export
-1. **Unblock the data — pick one:**
-   - **(A)** Flip **`Aggregate Data` ON** for the HAE "Step counts" automation → daily totals, payload drops to KB, no 413, gives Apple's deduped daily number. (Remove `Step Count` from "Activity" too.)
-   - **(B)** One-time **file export** from Apple Health (`datadrops/apple_health_export/export.xml` exists) → import path (no size limit) for the 7-day/full history.
-2. **Add `Active Energy`** to an `includeHealthMetrics=True` automation (it's exported by none → `active_calories` is `None` every day, degrading NEAT + the sedentary clause).
-3. Once data lands: verify `get_daily_metrics(view="movement")` 6/13–6/19 matches the app; the monotonic guard lets corrected higher totals overwrite the stored 402/444.
-4. **Then the DI-1 deploys** (ready, pending — were going to do them this session before the HAE pivot):
-   - **Layer rebuild + bump first** (new `source_state.py` + `intelligence_common.py` change): `bash deploy/build_layer.sh` → `cdk deploy LifePlatformCore` (→ v87) → set `SHARED_LAYER_VERSION=87` in `cdk/stacks/constants.py`.
-   - Then `daily-metrics-compute` (DI-1.2, recompute 6/15→today) · `ai-expert-analyzer` (DI-1.3/1.4) · `pipeline-health-check` (DI-1.1) · MCP package (tools_lifestyle + tools_labs) · `health-auto-export-webhook` (HAE P0).
-   - **Strava re-enable** (DI-1.1, separate): un-pause `ingestion_stack.py:182`, `cdk deploy LifePlatformIngestion` to recreate the rule, backfill, confirm 402 gone — then drop `"strava"` from `DECLARED_PAUSED_SOURCES`.
-
-## Open / deferred (not blocking)
-- **DI-1.6 HAE activity failsafe** — depends on the HAE config being clean (above) + DI-1.4.
-- **Dr. Chen thread correction** — out-of-band, Matthew (per ADR-091/DI-1.5).
-- HAE P1s (untouched): UTC-day vs local-day partitioning decision; our-side 413/low-steps anomaly guard (the 413 is invisible to us today — no alarm); ingestion completeness/plausibility gate.
-- Historical undercount days are **unrecoverable from existing raw** (the Watch stream was never exported); only a fresh HAE re-send (A/B above) recovers them.
-
-**Verified:** 2026-06-19 session close. Branch local-only (not pushed per the no-push norm — Matthew pushes + runs CI at deploy). Nothing deployed.
+**Verified:** 2026-06-20. Branch pushed, PR #160 open, production live on this code. Stopping for QA.
