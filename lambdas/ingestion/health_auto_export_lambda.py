@@ -371,6 +371,11 @@ _ACTIVITY_MAX_FIELDS = {
     "active_calories",
     "basal_calories",
     "flights_climbed",
+    # 2026-06-20: additive distances captured by multiple devices (iPhone + Watch +
+    # Strava→HealthKit). Same max-across-sources dedup as steps to avoid double-count.
+    "distance_cycling_miles",
+    "distance_swimming_miles",
+    "distance_snow_miles",
 }
 
 
@@ -424,6 +429,31 @@ _METRIC_DEFS = [
         {"field": "walking_double_support_pct", "agg": "avg", "tier": 1},
     ),
     ({"Walking Asymmetry Percentage", "walking_asymmetry_percentage"}, {"field": "walking_asymmetry_pct", "agg": "avg", "tier": 1}),
+    # ── 2026-06-20: "capture everything Apple-exclusive" expansion ────────────
+    # Daily-meaningful activity/fitness metrics. HAE name variants are snake_case
+    # (confirmed convention: basal_energy_burned, blood_oxygen_saturation, …) plus
+    # the Title-Case the app sometimes sends. Per-sample-only workout dynamics
+    # (cycling/running power, cadence, ground contact, stride, vertical oscillation)
+    # are intentionally NOT mapped — a daily average is noise; they live in the raw
+    # S3 archive + the Workouts feed and are surfaced per-workout if ever needed.
+    # Additive distances (sum) join _ACTIVITY_MAX_FIELDS above for cross-device dedup.
+    ({"Cycling Distance", "cycling_distance"}, {"field": "distance_cycling_miles", "agg": "sum", "tier": 1}),
+    ({"Swimming Distance", "swimming_distance"}, {"field": "distance_swimming_miles", "agg": "sum", "tier": 1}),
+    (
+        {"Distance Downhill Snow Sports", "distance_downhill_snow_sports"},
+        {"field": "distance_snow_miles", "agg": "sum", "tier": 1},
+    ),
+    ({"VO2 Max", "vo2_max", "vo2max"}, {"field": "vo2max", "agg": "avg", "tier": 1}),
+    ({"Walking Heart Rate Average", "walking_heart_rate_average"}, {"field": "walking_heart_rate_avg", "agg": "avg", "tier": 1}),
+    (
+        {"Apple Walking Steadiness", "apple_walking_steadiness", "walking_steadiness"},
+        {"field": "walking_steadiness_pct", "agg": "avg", "tier": 1},
+    ),
+    ({"Physical Effort", "physical_effort"}, {"field": "physical_effort", "agg": "avg", "tier": 1}),
+    (
+        {"Cycling Functional Threshold Power", "cycling_functional_threshold_power"},
+        {"field": "cycling_ftp_watts", "agg": "avg", "tier": 1},
+    ),
     # Audio (iPhone/AirPods exclusive)
     ({"Headphone Audio Exposure", "headphone_audio_exposure"}, {"field": "headphone_audio_exposure_db", "agg": "avg", "tier": 1}),
     # Water intake (dedicated water app → Apple Health)
