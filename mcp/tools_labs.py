@@ -795,6 +795,10 @@ def tool_get_freshness_status(args):
     """
     from datetime import date as _date
 
+    # DI-1.1: legible source-state (live/paused/rate_limited/stale) so a deliberately-off
+    # source (Strava) or a rate-limited one (Garmin) is never mistaken for silent breakage.
+    from source_state import has_rate_limit_marker, resolve_source_state
+
     SOURCES = {
         "whoop": "Whoop recovery/sleep",
         "withings": "Withings weight/body comp",
@@ -849,6 +853,7 @@ def tool_get_freshness_status(args):
                 }
             )
             continue
+        _rl = has_rate_limit_marker(table, "matthew", src)
         items = resp.get("Items", [])
         if not items:
             per_source.append(
@@ -856,6 +861,7 @@ def tool_get_freshness_status(args):
                     "source": src,
                     "label": SOURCES[src],
                     "status": "no_data",
+                    "source_state": resolve_source_state(src, None, today.isoformat(), rate_limited=_rl),
                     "threshold_days": threshold_days,
                 }
             )
@@ -880,6 +886,7 @@ def tool_get_freshness_status(args):
                 "age_days": age_days,
                 "threshold_days": int(threshold_days),
                 "status": "stale" if is_stale else "fresh",
+                "source_state": resolve_source_state(src, d.isoformat(), today.isoformat(), rate_limited=_rl),
             }
         )
 

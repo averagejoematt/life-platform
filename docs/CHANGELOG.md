@@ -1,3 +1,106 @@
+## HAE ingestion path — deep review + P0 activity-undercount fix — 2026-06-19
+
+Surgical review of the Health Auto Export path (`docs/reviews/HAE_PATH_REVIEW_2026-06-19.md`), triggered by Apple Health showing ~5,700 avg steps/wk vs ~2,960 stored.
+
+### Root cause — HTTP 413 (data never arrives)
+The 7-day step re-sync is rejected at the edge: HAE exports **raw per-sample** steps (`aggregateData=False`); the multi-day payload is **24.8 MB** and the Lambda Function URL caps bodies at **~6 MB** → **HTTP 413**. HAE logs the run `complete` right after the 413, so the phone shows success while nothing lands — the "successful on the app, issues downstream" mechanism. (Activity hits 413 too at 14.2 MB.) Historical undercount is a separate older cause: the Activity automation's `period=Today` + the Watch→iPhone sync lag froze partial iPhone-only counts. **Deferred to 2026-06-20:** aggregate the HAE step export OR a one-time file export/import for history.
+
+### Fixed (P0, code — commit follows)
+- **`health_auto_export_lambda.py`** additive activity metrics (`steps`, `distance_walk_run_miles`, `active_calories`, `basal_calories`, `flights_climbed`) now resolve via **MAX across per-source daily sums** instead of a single fixed-priority source — fixes the undercount (a partial iPhone count no longer discards the fuller Watch count) AND the double-count. `merge_day_to_dynamo` adds a **GREATEST(stored, new)** monotonic guard so a later partial export can't lower a day's total (`monotonic_guard=False` for authoritative backfills). The test that enshrined the bug is corrected. 16 HAE tests green. **Makes data correct once it arrives; orthogonal to the 413 unblock.**
+
+### Surfaced (not fixed — see review)
+- UTC-day partitioning of inherently-local activity metrics (won't match the app's local-day view); `active_calories` never exported by any `includeHealthMetrics=True` automation; the 413 is invisible to us (rejected pre-Lambda, no alarm); no ingestion completeness/plausibility gate.
+
+Not deployed.
+
+---
+
+## Movement data integrity — DI-1.5 (ADR) + HAE step-undercount RCA — 2026-06-19 (WORKORDER_DI1)
+
+### Added — ADR-091
+- **ADR-091: source-state honesty guard as a cross-coach standard.** Generalizes the DI-1.3 guard + the readiness future-stamp guard into a standard: a coach must gate any deficiency verdict on its primary source's `source_state` and withhold ("not assessable + which source + why") when that source isn't `live`, with a deterministic write-time backstop (not prompt-only). `training_coach` is the reference; the other operational coaches adopt the gate incrementally. (Dr. Chen's corrective thread entry is written out-of-band by Matthew, not Claude Code.)
+
+### Diagnosis — Apple Health step undercount (RCA, fix deferred)
+- The Apple Health **app** shows ~6,500 / ~7,800 steps on 6/15 / 6/18; **DDB stored 402 / 444**. Root cause in `health_auto_export_lambda.py`: (1) `pick_source_or_all` keeps a **single** highest-priority source per day and discards the rest — the code comment (L324) admits the watch-without-phone loss; (2) **no MAX/accumulate guard on the steps write** (unlike water/caffeine's `_rd_` dedup map), so a partial export plain-overwrites. Possible third (config) cause: HAE may not export the Watch step stream — **same HAE export-config surface as the `active_calories`-entirely-None gap**, both folded into the DI-1.6 precondition note.
+- **Recommended fix (separate item — ingestion change + historical backfill, Matthew's domain):** MAX across per-source daily sums + GREATEST(stored,new) on write for additive activity metrics; re-derive history from `raw/matthew/health_auto_export/`. This is why DI-1.4's "low step days" looked phone-only — partly an ingestion artifact.
+
+---
+
+## Movement data integrity — DI-1.4 — 2026-06-19 (WORKORDER_DI1: step gap + phantom 298 + precedence)
+
+Apple-Health step-field completeness + the resolved step source-of-truth. Prerequisite for the DI-1.6 HAE failsafe (a backstop can't be trusted while its own feed has silent field-level gaps).
+
+### Diagnosis — the "phantom 298", traced
+The coach cited a **298** step avg that reconciled with nothing (~3,415 actual). Root cause: the training expert's step precedence preferred **Garmin steps first**, but Garmin is rate-limited (DI-1.1) and emits sparse partial readings — **Garmin 2026-06-15 = `298` steps** was being used as the step signal while Apple Health's ~3,415 was the truer figure. Fixed by state-aware precedence.
+
+> **Fixture correction (verified against live DDB 2026-06-19):** the work order's "Apple steps blank 6/5–6/13" is **inaccurate** — steps are present every day in that window (low, 254–2487, phone-only days); the field that is *entirely* blank recently is **`active_calories`** (None on every day 6/3–6/19). The 298 was a Garmin reading, not a blank-Apple artifact. The completeness-flag logic below is validated against a constructed gap and handles genuinely-missing step fields whenever they occur.
+
+### Fixed / Added
+- **State-aware step precedence (coach, `gather_data_for_expert("training")`)** — Garmin (watch) steps are used **only when Garmin's source-state is `live`**; otherwise Apple Health. Kills the phantom 298 (a rate-limited Garmin's partial readings no longer masquerade as the step truth). Adds `step_source` + `step_completeness_pct` to the coach data.
+- **Step-completeness flag (`get_daily_metrics(view="movement")`)** — per-day `step_data_complete` + summary `step_coverage_pct` / `step_incomplete_dates` / `step_incomplete_days`. The `apple_health` envelope can read "fresh" while the step field itself is missing for a day; that gap is now surfaced rather than silently read as zero movement.
+- **DI-1.2 cross-check confirmed** — a blank/low Apple step day with a Hevy session is never `sedentary` (the Hevy-join already closes the path a missing step field could use to drive an under-training verdict).
+- **Step source-of-truth documented** in `SCHEMA.md` (the live authoritative field reference; `DATA_DICTIONARY` is archived).
+
+### Tests
+- `tests/test_di1_movement_integrity.py::test_step_completeness_flag_surfaces_jun5_13_gap` (+ blank-Apple-steps-never-sedentary-with-Hevy). registry/wiring/coach/business green.
+
+Correlational only; not deployed. DI-1.5 (governance/ADR) + DI-1.6 (HAE failsafe — needs Matthew to verify Garmin→Apple workout sync + HAE export config) remain.
+
+---
+
+## Movement data integrity — DI-1.1 source-state legibility — 2026-06-19 (WORKORDER_DI1)
+
+Gives every ingest source a real, legible operational state — **`live` / `paused` / `rate_limited` / `stale`** — so a deliberately-off source (Strava, paused at the 402 paywall) or a chronically rate-limited one (Garmin's 429 refresh block) is never mistaken for silent breakage. Replaces DI-1.3's interim freshness-inference with the real field.
+
+### Added
+- **`lambdas/source_state.py`** (new shared-layer module) — `resolve_source_state(source, latest_date, today, *, rate_limited=…)`. **Freshness wins for `live`**: fresh data resolves to `live` even for a source still in `DECLARED_PAUSED_SOURCES`, so re-enabling Strava flips it `paused → live` the moment data flows again — no second edit. A rate-limit marker outranks the paused/stale labels; a declared-paused source with no fresh data is `paused`; everything else is `stale`. `has_rate_limit_marker()` reads Garmin's `REFRESH_RATELIMIT`. Added to `deploy/build_layer.sh`.
+
+### Changed
+- **`get_freshness_status` (MCP)** now returns `source_state` per source — the flip is visible on the freshness tool / status page.
+- **Coach honesty guard (DI-1.3)** now reads `resolve_source_state` instead of inferring from freshness; the training expert's `movement_source_state` carries real `paused`/`rate_limited` labels (so the guard's note reads "strava: paused; garmin: rate-limited" exactly).
+- **Liveness-pinger masking killed (`pipeline_health_check_lambda`)** — a `paused` source's healthcheck "ok" only proves the Lambda boots, masking that its cron is gone. Paused sources now **skip the boot-probe** and report as `paused` (a new bucket — neither healthy-green nor failed-red), and are **excluded from the `ingest-liveness-unhealthy` alarm** (a paused source has no cron to be "stopped", so attempt-staleness would false-fire). `health_check` record + body gain a `paused` count.
+
+### Tests
+- `tests/test_di1_movement_integrity.py` — `test_source_state_live_after_strava_reenable` (the visible flip), paused≠rate_limited≠stale matrix, resolver→guard end-to-end (paused withholds; live stops withholding), and the pipeline non-masking contract.
+
+> **Re-enabling Strava (Matthew):** once the cron is restored and data re-ingests, `source_state` auto-flips to `live` (freshness wins) — **but remove `"strava"` from `DECLARED_PAUSED_SOURCES` in `source_state.py`** so a *future* real Strava outage labels as `stale` (not `paused`) and the health-check resumes probing it. Garmin re-enable work (GARM-1) is deferred.
+
+Correlational only; not deployed. Ships in the same shared-layer rebuild as DI-1.3. Remaining DI-1.1 step is the Strava re-enable itself (CDK un-pause + rule recreate + backfill — Matthew). DI-1.4 next.
+
+---
+
+## Movement data integrity — DI-1.3 — 2026-06-19 (WORKORDER_DI1: coach Hevy-first pull + honesty guard)
+
+The training coach (`training_coach` / Dr. Chen) assembled its data from **Strava + Garmin + Whoop + steps — no Hevy** — so with Strava paused and Garmin rate-limited it saw "0 sessions, all rest days" and wrote consecutive "you're under-training" verdicts that the thread's continuity loop kept re-confirming. DI-1.3 makes Hevy the primary training-stimulus signal in the coach and adds a deterministic honesty guard.
+
+### Fixed
+- **Hevy-first pull (`ai_expert_analyzer_lambda.gather_data_for_expert("training")`)** — now joins Hevy first; the training-day count, session/min totals, and modality breakdown derive from Hevy (lifts) **then** Strava (aerobic/NEAT), never from steps. A training day = any day with a logged workout from either source. New fields: `training_days`, `hevy_sessions/sets/active_min`, `strava_sessions/active_min`, `movement_source_state`, `hevy_summary`.
+- **Honesty guard (`intelligence_common.movement_assessability` + `apply_movement_honesty_guard`)** — mirrors the readiness future-stamp guard (`tools_health.py:490–530`). Aerobic/NEAT volume is "assessable" iff **Strava is live** (§4a: Strava is authoritative for *what moved*; steps undercount, Garmin is chronically rate-limited). When it isn't, the guard withholds any under-training/sedentary verdict that slipped into `position_summary`, replaces it with an honest statement naming the unavailable sources + reason, and still reports the Hevy training that happened. Wired as both a **prompt constraint** (keeps the narrative honest) and a **deterministic write-time backstop** (the guarantee).
+- Source states are freshness-derived for now (`live`/`stale`/`missing`); **DI-1.1 will inject precise `paused`/`rate_limited` labels** once Matthew's Strava call lands — the guard renders whatever label it's handed.
+
+### Tests
+- `tests/test_di1_movement_integrity.py::test_coach_guard_withholds_undertraining_when_strava_paused` (the regression that keeps Dr. Chen from relapsing) + pass-through-when-live and no-op-when-no-assertion guards. `test_coach_intelligence` / `test_persona_registry` still green.
+
+Correlational only; no causal language. **Not deployed.** DI-1.4 (Apple step gap + phantom 298) + DI-1.5 (governance) next.
+
+---
+
+## Movement data integrity — DI-1.2 — 2026-06-19 (WORKORDER_DI1: Hevy join + Hevy-aware TSB)
+
+The movement/sedentary read and the TSB training-stress signal were both **Strava-only**. With Strava deliberately paused (402 paywall — DI-1.1) and Garmin rate-limited, real Hevy training days (Push/Pull/Legs/Engine 6/16–6/19) were stamped `has_workout=false` and flagged `sedentary`, and TSB collapsed toward zero. DI-1.2 makes Hevy the primary "did he train" signal everywhere.
+
+### Fixed
+- **`get_daily_metrics(view="movement")` (`mcp/tools_lifestyle.py::tool_get_movement_score`)** now joins Hevy alongside Apple Health + Strava. `has_workout = true if a normalized workout exists from ANY source that day, Hevy first` — a step count can no longer, on its own, produce a sedentary verdict, and a Hevy lifting day is **never** `sedentary` regardless of steps. Rows carry `workout_sources` (`["hevy"]`/`["strava"]`). The day iteration is the **union** of Apple-Health and Hevy dates, so a Hevy-only day (no Apple sync) no longer silently vanishes.
+- **TSB is Hevy-aware (`daily_metrics_compute_lambda.py::compute_tsb`)** — Strava kilojoules stay authoritative, but on days Strava recorded no load the Banister model falls back to a duration-scaled Hevy load proxy (`HEVY_LOAD_KJ_PER_MIN`, a coarse kJ-equivalent — **not** calorimetry and **not** a new scoring model) so training days aren't scored as zero fitness/fatigue. `computed_metrics` now carries `tsb_load_basis` (`strava` / `hevy_fallback` / `mixed` / `none` + day counts). `compute_tsb` keeps its 2-arg contract (back-compat).
+- **Data-aware idempotency** — `get_source_fingerprints` now fingerprints Hevy via a `DATE#…#WORKOUT#` sub-key query (Hevy has no plain `DATE#` item), so a late Hevy sync triggers a recompute.
+
+### Tests
+- `tests/test_di1_movement_integrity.py` — `test_has_workout_true_with_hevy_low_steps`, `test_no_sedentary_on_hevy_days_jun16_19`, `test_tsb_nonzero_from_hevy_when_strava_off` (+ Hevy-only-day and Strava-authoritative guards). `compute_tsb` back-compat suite in `test_business_logic.py` still green.
+
+Correlational framing only; no causal language in output. **Not deployed** — recompute 6/15→present is a post-deploy manual invoke (Matthew runs all deploys). DI-1.3 (coach honesty guard) next.
+
+---
+
 ## Derived meal layer (meal grouping) — 2026-06-19 (ADR-090: best-effort meal projection over raw MacroFactor, never mutate raw)
 
 Groups raw MacroFactor food entries into the meals they were eaten as ("Turkey Tacos", "Yogurt & Oats Bowl") as a **derived, recomputable projection** — deterministic-first, raw stays sovereign. Phase 0–1 (grouper + projection + backfill + read tool) shipped; the LLM namer (Phase 2) is deferred.
