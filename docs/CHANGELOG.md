@@ -1,3 +1,19 @@
+## Movement data integrity — DI-1.3 — 2026-06-19 (WORKORDER_DI1: coach Hevy-first pull + honesty guard)
+
+The training coach (`training_coach` / Dr. Chen) assembled its data from **Strava + Garmin + Whoop + steps — no Hevy** — so with Strava paused and Garmin rate-limited it saw "0 sessions, all rest days" and wrote consecutive "you're under-training" verdicts that the thread's continuity loop kept re-confirming. DI-1.3 makes Hevy the primary training-stimulus signal in the coach and adds a deterministic honesty guard.
+
+### Fixed
+- **Hevy-first pull (`ai_expert_analyzer_lambda.gather_data_for_expert("training")`)** — now joins Hevy first; the training-day count, session/min totals, and modality breakdown derive from Hevy (lifts) **then** Strava (aerobic/NEAT), never from steps. A training day = any day with a logged workout from either source. New fields: `training_days`, `hevy_sessions/sets/active_min`, `strava_sessions/active_min`, `movement_source_state`, `hevy_summary`.
+- **Honesty guard (`intelligence_common.movement_assessability` + `apply_movement_honesty_guard`)** — mirrors the readiness future-stamp guard (`tools_health.py:490–530`). Aerobic/NEAT volume is "assessable" iff **Strava is live** (§4a: Strava is authoritative for *what moved*; steps undercount, Garmin is chronically rate-limited). When it isn't, the guard withholds any under-training/sedentary verdict that slipped into `position_summary`, replaces it with an honest statement naming the unavailable sources + reason, and still reports the Hevy training that happened. Wired as both a **prompt constraint** (keeps the narrative honest) and a **deterministic write-time backstop** (the guarantee).
+- Source states are freshness-derived for now (`live`/`stale`/`missing`); **DI-1.1 will inject precise `paused`/`rate_limited` labels** once Matthew's Strava call lands — the guard renders whatever label it's handed.
+
+### Tests
+- `tests/test_di1_movement_integrity.py::test_coach_guard_withholds_undertraining_when_strava_paused` (the regression that keeps Dr. Chen from relapsing) + pass-through-when-live and no-op-when-no-assertion guards. `test_coach_intelligence` / `test_persona_registry` still green.
+
+Correlational only; no causal language. **Not deployed.** DI-1.4 (Apple step gap + phantom 298) + DI-1.5 (governance) next.
+
+---
+
 ## Movement data integrity — DI-1.2 — 2026-06-19 (WORKORDER_DI1: Hevy join + Hevy-aware TSB)
 
 The movement/sedentary read and the TSB training-stress signal were both **Strava-only**. With Strava deliberately paused (402 paywall — DI-1.1) and Garmin rate-limited, real Hevy training days (Push/Pull/Legs/Engine 6/16–6/19) were stamped `has_workout=false` and flagged `sedentary`, and TSB collapsed toward zero. DI-1.2 makes Hevy the primary "did he train" signal everywhere.
