@@ -46,12 +46,14 @@ logger.setLevel(logging.INFO)
 # Intelligence Layer V2: shared preamble utilities
 try:
     from intelligence_common import (
+        apply_movement_honesty_guard,
         build_coach_preamble,
         build_data_inventory,
         build_data_maturity,
         build_thread_prompt_block,
         extract_thread_from_narrative,
         load_goals_config,
+        movement_assessability,
         write_coach_thread,
     )
 
@@ -112,6 +114,12 @@ def _latest_item(source):
 
 
 from constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
+
+
+def _latest_date(items):
+    """Newest DATE# present in a list of records (by sk), or None."""
+    dates = [str(i.get("sk", ""))[5:15] for i in items if str(i.get("sk", "")).startswith("DATE#")]
+    return max(dates) if dates else None
 
 
 def gather_data_for_expert(expert_key):
@@ -176,32 +184,88 @@ def gather_data_for_expert(expert_key):
         }
 
     elif expert_key == "training":
+        # DI-1.3: Hevy is the PRIMARY "did he train" signal (TRAINING_CALIBRATION §4a) —
+        # the training-stimulus read is built off Hevy first, then Strava for aerobic/NEAT,
+        # never off steps. Strava is paused (402) and Garmin rate-limited, so a Strava-only
+        # read collapses to "all rest days" and produces a false under-training verdict.
+        from source_state import has_rate_limit_marker, resolve_source_state
+
+        hevy_items = _query_source("hevy", d30, today)
         activities = _query_source("strava", d30, today)
         garmin_items = _query_source("garmin", d30, today)
         whoop_items = _query_source("whoop", d30, today)
-        step_vals = [float(g["steps"]) for g in garmin_items if g.get("steps")]
-        if not step_vals:
-            steps_items = _query_source("apple_health", d30, today)
+        steps_items = _query_source("apple_health", d30, today)
+
+        _garmin_rl = has_rate_limit_marker(table, USER_ID, "garmin")
+        _garmin_state = resolve_source_state("garmin", _latest_date(garmin_items), today, rate_limited=_garmin_rl)
+
+        # DI-1.4: state-aware step precedence. The watch (via Garmin) is the better step
+        # counter WHEN live, but a rate-limited/stale Garmin emits sparse partial readings
+        # (e.g. 298 steps on 6/15) that misrepresent movement — averaging those was the
+        # "phantom 298" bug. Use Garmin steps only when Garmin is live; else Apple Health.
+        if _garmin_state == "live":
+            step_vals = [float(g["steps"]) for g in garmin_items if g.get("steps")]
+            step_source = "garmin"
+        else:
             step_vals = [float(s["steps"]) for s in steps_items if s.get("steps") and float(s["steps"]) > 0]
+            step_source = "apple_health"
         avg_steps = round(sum(step_vals) / len(step_vals)) if step_vals else 0
-        total_min = sum(float(a.get("moving_time_seconds") or a.get("elapsed_time_seconds") or 0) / 60 for a in activities)
+        # Step completeness = days with a usable step value / experiment days (DI-1.4 flag).
+        step_completeness_pct = round(len(step_vals) / max(1, days_in_experiment) * 100)
+
+        # Hevy (lifting) — primary training-stimulus signal.
+        hevy_dates = set(str(h.get("sk", ""))[5:15] for h in hevy_items if str(h.get("sk", "")).startswith("DATE#"))
+        hevy_sessions = len(hevy_items)
+        hevy_sets = sum(int(float(h.get("set_count") or 0)) for h in hevy_items)
+        hevy_min = round(sum(float(h.get("duration_sec") or 0) / 60 for h in hevy_items))
+
+        # Strava (aerobic/NEAT) — secondary; only counted when live.
+        strava_min = sum(float(a.get("moving_time_seconds") or a.get("elapsed_time_seconds") or 0) / 60 for a in activities)
+        strava_dates = set(a.get("sk", "")[:15].replace("DATE#", "") for a in activities if a.get("sk"))
         recovery_vals = [float(w["recovery_score"]) for w in whoop_items if w.get("recovery_score")]
         avg_recovery = round(sum(recovery_vals) / len(recovery_vals), 1) if recovery_vals else None
+
         modalities = {}
+        if hevy_sessions:
+            modalities["strength"] = hevy_sessions
         for a in activities:
             t = a.get("type", "unknown")
             modalities[t] = modalities.get(t, 0) + 1
-        active_dates = set(a.get("sk", "")[:15] for a in activities if a.get("sk"))
-        rest_days = max(0, days_in_experiment - len(active_dates))
+
+        # A training day = a day with ANY logged workout (Hevy OR Strava).
+        training_dates = hevy_dates | strava_dates
+        rest_days = max(0, days_in_experiment - len(training_dates))
+
+        # Movement-source state for the honesty guard (DI-1.1 source-state resolver):
+        # live / paused / rate_limited / stale. Freshness wins for 'live' — so when Strava
+        # re-ingests, strava flips paused→live and the guard stops withholding.
+        source_state = {
+            "hevy": resolve_source_state("hevy", _latest_date(hevy_items), today),
+            "strava": resolve_source_state("strava", _latest_date(activities), today),
+            "garmin": _garmin_state,
+            "steps": "live" if step_vals else "missing",
+        }
+        hevy_summary = (
+            f"{hevy_sessions} Hevy session(s), {hevy_sets} sets, {hevy_min} min over {len(hevy_dates)} day(s)" if hevy_sessions else ""
+        )
         return {
             "expert_key": "training",
             "period": f"experiment days 1-{days_in_experiment}",
-            "sessions_count": len(activities),
-            "total_active_min": round(total_min),
+            "training_days": len(training_dates),
+            "hevy_sessions": hevy_sessions,
+            "hevy_sets": hevy_sets,
+            "hevy_active_min": hevy_min,
+            "strava_sessions": len(activities),
+            "strava_active_min": round(strava_min),
+            "total_active_min": round(hevy_min + strava_min),
             "avg_daily_steps": avg_steps,
+            "step_source": step_source,
+            "step_completeness_pct": step_completeness_pct,
             "avg_recovery": avg_recovery,
             "rest_days": rest_days,
             "modality_breakdown": modalities,
+            "movement_source_state": source_state,
+            "hevy_summary": hevy_summary,
         }
 
     elif expert_key == "physical":
@@ -432,6 +496,26 @@ this week — consistency, efficiency, HRV trend, or a cross-domain connection. 
 has already read your last analysis and will notice repetition immediately.
 """
 
+    # DI-1.3: movement-integrity constraint — when the aerobic/NEAT sources can't see
+    # activity, instruct the coach to withhold the under-training verdict (the deterministic
+    # guard at write-time is the backstop; this keeps the narrative itself honest).
+    movement_context = ""
+    if expert_key == "training" and _HAS_INTELLIGENCE_COMMON:
+        try:
+            _assess = movement_assessability(data.get("movement_source_state"))
+            if not _assess["assessable"]:
+                movement_context = f"""
+MOVEMENT DATA INTEGRITY — READ BEFORE ASSESSING TRAINING:
+{_assess['note']}. These are NOT live ingest paths right now, so NEAT/aerobic volume
+is NOT ASSESSABLE this period. Hevy (strength) IS the authoritative training-stimulus
+signal and is present in the data above — reason about training load from Hevy, never
+from steps or from the absence of Strava/Garmin. Do NOT call this under-training,
+sedentary, or low-stimulus. State plainly that aerobic/NEAT volume can't be assessed
+until those sources are live, and assess what Hevy shows.
+"""
+        except Exception as _me:
+            logger.warning("movement assessability failed: %s", _me)
+
     labs_context = ""
     if expert_key == "labs":
         labs_context = f"""
@@ -512,6 +596,7 @@ what you have to say this week. This is a weekly appointment, not a generic repo
 
 ANALYTICAL LENS FOR THIS WEEK: {lens}
 {labs_context}
+{movement_context}
 
 Here is Matthew's current data:
 {data_json}
@@ -838,6 +923,21 @@ def generate_and_cache(expert_key, shared_system=None):
         try:
             thread_data = extract_thread_from_narrative(expert_key, analysis_text, api_key)
             thread_data["generation_context"] = "observatory"
+            # DI-1.3: deterministic backstop — if movement isn't assessable, withhold any
+            # under-training/sedentary verdict that slipped into the position_summary and
+            # replace it with an honest, Hevy-aware statement naming the unavailable sources.
+            if expert_key == "training":
+                try:
+                    _td = data  # already gathered in generate_and_cache (no re-query)
+                    _assess = movement_assessability(_td.get("movement_source_state"))
+                    thread_data["position_summary"] = apply_movement_honesty_guard(
+                        thread_data.get("position_summary", ""),
+                        _assess,
+                        hevy_present=bool(_td.get("hevy_sessions")),
+                        hevy_summary=_td.get("hevy_summary", ""),
+                    )
+                except Exception as _ge:
+                    logger.warning("movement honesty guard failed for training: %s", _ge)
             write_coach_thread(expert_key, thread_data)
             logger.info(
                 "Thread entry written for %s: investment=%s, %d predictions",

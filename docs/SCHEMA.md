@@ -2,7 +2,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs — ADR-005)
-**Last updated:** 2026-06-19 (v8.6.0 — 135 MCP tools, 20 data sources, 81 Lambdas, 12 cached tools)
+**Last updated:** 2026-06-20 (v8.6.0 — 135 MCP tools, 20 data sources, 81 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -48,7 +48,7 @@ Where multiple sources measure the same thing:
 | **Resting Heart Rate** | Whoop | Garmin, Eight Sleep, Apple Health | Same cross-validation pattern |
 | **Sleep Duration** | Whoop | Eight Sleep, Garmin | Whoop captures couch/travel sleep |
 | **Sleep Staging** | Whoop | Eight Sleep | Whoop hours → pct via `normalize_whoop_sleep()` |
-| **Steps** | Apple Health | Garmin | Apple preferred (phone always-on) |
+| **Steps** | Apple Health | Garmin (watch) | Apple preferred (phone always-on). **DI-1.4 step precedence:** the Garmin watch is the better counter only when its source-state is `live`; a rate-limited/stale Garmin emits sparse partial readings (the "phantom 298" — Garmin 6/15=298 steps used as the daily figure while the Apple ~3,415 avg was truer), so consumers fall back to Apple Health unless Garmin is live. A step count never, on its own, drives a sedentary/under-training verdict (Hevy-join, DI-1.2). `get_daily_metrics(view="movement")` carries `step_data_complete`/`step_coverage_pct`/`step_incomplete_dates` — the apple_health envelope can read "fresh" while the step field itself is missing for a day. |
 | **Active Calories** | Apple Health | Garmin | Apple for TDEE; Garmin retained for training metrics |
 | **Body Composition** | Withings (daily) | DEXA (semi-annual) | Withings for trending; DEXA for absolute accuracy |
 
@@ -272,7 +272,17 @@ Note: the XML import path (`apple_health_lambda.py` `QUANTITY_RECORDS`) writes m
 | `steps` | number | Step count (daily sum) |
 | `flights_climbed` | number | Floors climbed (daily sum) |
 | `distance_walk_run_miles` | number | Walking + running distance (daily sum, miles) |
+| `distance_cycling_miles` | number | Cycling distance (daily sum, miles) — 2026-06-20 capture-everything expansion |
+| `distance_swimming_miles` | number | Swimming distance (daily sum, miles) — 2026-06-20 |
+| `distance_snow_miles` | number | Downhill snow-sports distance (daily sum, miles) — 2026-06-20 |
+| `vo2max` | number | Estimated VO₂ max (daily avg) — Apple/Watch is the only source; 2026-06-20 |
+| `walking_heart_rate_avg` | number | Walking heart-rate average (daily avg) — 2026-06-20 |
+| `walking_steadiness_pct` | number | Apple Walking Steadiness (daily avg, %) — fall-risk proxy; 2026-06-20 |
+| `physical_effort` | number | Physical Effort / estimated MET intensity (daily avg) — 2026-06-20 |
+| `cycling_ftp_watts` | number | Cycling Functional Threshold Power (daily avg, watts) — fitness benchmark; 2026-06-20 |
 | `weight_lbs` | number | Body mass from HAE (Tier 1 fallback since v1.4.2 — Withings remains SOT but its API has sync delays) |
+
+> **2026-06-20 capture-everything note:** the additive distances (`distance_cycling_miles`/`distance_swimming_miles`/`distance_snow_miles`) join `_ACTIVITY_MAX_FIELDS` — max-across-sources dedup (same as `steps`) to avoid iPhone + Watch + Strava double-counting. Per-sample *workout dynamics* (cycling/running power, cadence, ground contact, stride, vertical oscillation) are deliberately NOT promoted to daily fields — a daily average is noise; they are preserved in the raw S3 payload archive (`raw/{user}/health_auto_export/`) and the Workouts feed, surfaced per-workout if ever needed.
 
 **Gait / mobility fields (webhook — Tier 1, Apple Watch exclusive):**
 

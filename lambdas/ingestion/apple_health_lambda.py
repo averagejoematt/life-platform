@@ -51,6 +51,11 @@ QUANTITY_RECORDS = {
     "HKQuantityTypeIdentifierFlightsClimbed": "flights_climbed",
     "HKQuantityTypeIdentifierDistanceWalkingRunning": "distance_walk_run_miles",
     "HKQuantityTypeIdentifierDistanceCycling": "distance_cycling_miles",
+    # 2026-06-20: "capture everything" expansion (parity with HAE webhook METRIC_MAP).
+    "HKQuantityTypeIdentifierDistanceSwimming": "distance_swimming_miles",
+    "HKQuantityTypeIdentifierDistanceDownhillSnowSports": "distance_snow_miles",
+    "HKQuantityTypeIdentifierPhysicalEffort": "physical_effort",
+    "HKQuantityTypeIdentifierCyclingFunctionalThresholdPower": "cycling_ftp_watts",
     "HKQuantityTypeIdentifierHeartRate": "heart_rate",
     "HKQuantityTypeIdentifierRestingHeartRate": "resting_heart_rate",
     "HKQuantityTypeIdentifierHeartRateVariabilitySDNN": "hrv_sdnn",
@@ -110,6 +115,8 @@ SUM_TYPES = {
     "flights_climbed",
     "distance_walk_run_miles",
     "distance_cycling_miles",
+    "distance_swimming_miles",
+    "distance_snow_miles",
     "nutrition_calories",
     "nutrition_protein_g",
     "nutrition_carbs_g",
@@ -163,6 +170,8 @@ AVG_TYPES = {
     "walking_double_support_pct",
     "walking_steadiness_pct",
     "waist_inches",
+    "physical_effort",
+    "cycling_ftp_watts",
 }
 
 

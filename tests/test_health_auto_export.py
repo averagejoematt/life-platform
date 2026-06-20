@@ -121,22 +121,25 @@ def _metric(name, *readings):
 class TestProcessGenericMetrics:
     """End-to-end: HAE payload → daily aggregates with source-priority dedup."""
 
-    def test_iphone_garmin_step_dedup_iphone_wins(self):
-        """TD-15/16: iPhone steps + Garmin steps for same date → only iPhone writes."""
+    def test_iphone_garmin_step_max_source_wins(self):
+        """DI-1 fix: additive activity metrics take the MAX across per-source daily sums,
+        not a fixed-priority source. The OLD behavior kept the iPhone's 5,000 and discarded
+        the Garmin/Watch 7,500 — the "402 steps when the app shows 6,500" undercount (the
+        higher-priority device was left at home). MAX keeps the fuller source (7,500) AND
+        avoids the double-count (not the 12,500 sum)."""
         metrics = [
             _metric(
                 "Step Count",
-                _reading("iPhone (Matt 17)", 5000),
-                _reading("Garmin Connect", 7500),
+                _reading("iPhone (Matt 17)", 5000),  # phone — partial day
+                _reading("Garmin Connect", 7500),  # watch — captured the full day
             )
         ]
         daily, _, audit = hae.process_generic_metrics(metrics)
-        # Only the priority winner's value lands — not the sum (12500)
-        assert daily["2026-05-02"]["steps"] == 5000
-        # Audit records the choice + rejection for diagnostic visibility
-        assert "steps" in audit["2026-05-02"]
-        assert audit["2026-05-02"]["steps"]["chosen"] == "iPhone (Matt 17)"
-        assert "Garmin Connect" in audit["2026-05-02"]["steps"]["rejected"]
+        # The fuller source wins; never the discarded 5000, never the 12500 sum.
+        assert daily["2026-05-02"]["steps"] == 7500
+        assert audit["2026-05-02"]["steps"]["chosen"] == "Garmin Connect"
+        assert audit["2026-05-02"]["steps"]["rule"] == "max_sum"
+        assert "iPhone (Matt 17)" in audit["2026-05-02"]["steps"]["rejected"]
 
     def test_single_source_unchanged(self):
         """TD-15: when only one source is present, behavior is unchanged."""
@@ -222,3 +225,52 @@ class TestWeightBodyMassAlias:
         ]
         daily, _, _ = hae.process_generic_metrics(metrics)
         assert daily["2026-05-02"]["weight_lbs"] == 174.0
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 2026-06-20 — "capture everything Apple-exclusive" expansion
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class TestCaptureEverythingExpansion:
+    """New Apple-exclusive metrics promoted to queryable daily fields."""
+
+    def test_new_metric_names_map_to_fields(self):
+        cases = [
+            ("Cycling Distance", "cycling_distance", "distance_cycling_miles"),
+            ("Swimming Distance", "swimming_distance", "distance_swimming_miles"),
+            ("Distance Downhill Snow Sports", "distance_downhill_snow_sports", "distance_snow_miles"),
+            ("VO2 Max", "vo2_max", "vo2max"),
+            ("Walking Heart Rate Average", "walking_heart_rate_average", "walking_heart_rate_avg"),
+            ("Apple Walking Steadiness", "walking_steadiness", "walking_steadiness_pct"),
+            ("Physical Effort", "physical_effort", "physical_effort"),
+            ("Cycling Functional Threshold Power", "cycling_functional_threshold_power", "cycling_ftp_watts"),
+        ]
+        for title, snake, field in cases:
+            assert hae.METRIC_MAP[title]["field"] == field, f"{title} → {field}"
+            assert hae.METRIC_MAP[snake]["field"] == field, f"{snake} → {field}"
+
+    def test_cycling_distance_uses_max_across_sources(self):
+        """Additive distance must dedup like steps (iPhone + Watch + Strava double-count)."""
+        assert "distance_cycling_miles" in hae._ACTIVITY_MAX_FIELDS
+        metrics = [
+            _metric(
+                "Cycling Distance",
+                _reading("iPhone (Matt 17)", 8.0),
+                _reading("Garmin Connect", 12.0),
+            )
+        ]
+        daily, _, audit = hae.process_generic_metrics(metrics)
+        assert daily["2026-05-02"]["distance_cycling_miles"] == 12.0  # max source, not 20.0 sum
+        assert audit["2026-05-02"]["distance_cycling_miles"]["rule"] == "max_sum"
+
+    def test_vo2max_averages(self):
+        metrics = [
+            _metric(
+                "VO2 Max",
+                _reading("Apple Watch", 42.0, "2026-05-02 08:00:00 -0800"),
+                _reading("Apple Watch", 44.0, "2026-05-02 10:00:00 -0800"),
+            )
+        ]
+        daily, _, _ = hae.process_generic_metrics(metrics)
+        assert daily["2026-05-02"]["vo2max"] == 43.0

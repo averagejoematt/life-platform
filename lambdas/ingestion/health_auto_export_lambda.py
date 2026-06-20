@@ -357,6 +357,28 @@ SOURCE_PRIORITY = {
 }
 
 
+# Additive activity metrics that aggregate across the day and are reported by MULTIPLE
+# overlapping devices (iPhone motion coprocessor + Apple Watch). For these, the correct
+# daily total is the MAX across per-source daily sums — NOT a single priority source.
+# Single-source-priority discarded the fuller source on watch-without-phone days (the
+# "402 steps when the app shows 6,500" bug); summing all sources would double-count the
+# overlap. MAX does both right and matches Apple Health's own dedup for the common
+# single-device-worn day. These bypass SOURCE_PRIORITY (its entries above are now inert
+# for these fields, kept only as documentation of the prior approach).
+_ACTIVITY_MAX_FIELDS = {
+    "steps",
+    "distance_walk_run_miles",
+    "active_calories",
+    "basal_calories",
+    "flights_climbed",
+    # 2026-06-20: additive distances captured by multiple devices (iPhone + Watch +
+    # Strava→HealthKit). Same max-across-sources dedup as steps to avoid double-count.
+    "distance_cycling_miles",
+    "distance_swimming_miles",
+    "distance_snow_miles",
+}
+
+
 def pick_source_or_all(field_name, source_counts):
     """Source-priority resolver for a single (field, date) tuple.
 
@@ -407,6 +429,31 @@ _METRIC_DEFS = [
         {"field": "walking_double_support_pct", "agg": "avg", "tier": 1},
     ),
     ({"Walking Asymmetry Percentage", "walking_asymmetry_percentage"}, {"field": "walking_asymmetry_pct", "agg": "avg", "tier": 1}),
+    # ── 2026-06-20: "capture everything Apple-exclusive" expansion ────────────
+    # Daily-meaningful activity/fitness metrics. HAE name variants are snake_case
+    # (confirmed convention: basal_energy_burned, blood_oxygen_saturation, …) plus
+    # the Title-Case the app sometimes sends. Per-sample-only workout dynamics
+    # (cycling/running power, cadence, ground contact, stride, vertical oscillation)
+    # are intentionally NOT mapped — a daily average is noise; they live in the raw
+    # S3 archive + the Workouts feed and are surfaced per-workout if ever needed.
+    # Additive distances (sum) join _ACTIVITY_MAX_FIELDS above for cross-device dedup.
+    ({"Cycling Distance", "cycling_distance"}, {"field": "distance_cycling_miles", "agg": "sum", "tier": 1}),
+    ({"Swimming Distance", "swimming_distance"}, {"field": "distance_swimming_miles", "agg": "sum", "tier": 1}),
+    (
+        {"Distance Downhill Snow Sports", "distance_downhill_snow_sports"},
+        {"field": "distance_snow_miles", "agg": "sum", "tier": 1},
+    ),
+    ({"VO2 Max", "vo2_max", "vo2max"}, {"field": "vo2max", "agg": "avg", "tier": 1}),
+    ({"Walking Heart Rate Average", "walking_heart_rate_average"}, {"field": "walking_heart_rate_avg", "agg": "avg", "tier": 1}),
+    (
+        {"Apple Walking Steadiness", "apple_walking_steadiness", "walking_steadiness"},
+        {"field": "walking_steadiness_pct", "agg": "avg", "tier": 1},
+    ),
+    ({"Physical Effort", "physical_effort"}, {"field": "physical_effort", "agg": "avg", "tier": 1}),
+    (
+        {"Cycling Functional Threshold Power", "cycling_functional_threshold_power"},
+        {"field": "cycling_ftp_watts", "agg": "avg", "tier": 1},
+    ),
     # Audio (iPhone/AirPods exclusive)
     ({"Headphone Audio Exposure", "headphone_audio_exposure"}, {"field": "headphone_audio_exposure_db", "agg": "avg", "tier": 1}),
     # Water intake (dedicated water app → Apple Health)
@@ -631,21 +678,34 @@ def process_generic_metrics(metrics):
 
         # ── Resolve source priority per date for this metric ──
         for date, src_data in day_per_source.items():
-            chosen = pick_source_or_all(field, day_source_counts[date])
-
-            if chosen is None:
-                # No priority defined — combine across all sources (legacy behavior).
-                # Tier 2 lands here, which is correct: is_apple_device() already
-                # filtered out non-Apple sources, so no double-counting risk.
-                sources_to_use = list(src_data.keys())
-            else:
+            if field in _ACTIVITY_MAX_FIELDS and src_data:
+                # Additive activity metric — keep the source with the LARGEST daily sum
+                # (the device that actually captured the day), discarding the rest. Avoids
+                # both the single-priority undercount and the all-sources double-count.
+                chosen = max(src_data.keys(), key=lambda s: src_data[s]["sum"])
                 sources_to_use = [chosen]
                 rejected = [s for s in src_data.keys() if s != chosen]
                 if rejected:
                     source_audit[date][field] = {
                         "chosen": chosen,
                         "rejected": rejected,
+                        "rule": "max_sum",
                     }
+            else:
+                chosen = pick_source_or_all(field, day_source_counts[date])
+                if chosen is None:
+                    # No priority defined — combine across all sources (legacy behavior).
+                    # Tier 2 lands here, which is correct: is_apple_device() already
+                    # filtered out non-Apple sources, so no double-counting risk.
+                    sources_to_use = list(src_data.keys())
+                else:
+                    sources_to_use = [chosen]
+                    rejected = [s for s in src_data.keys() if s != chosen]
+                    if rejected:
+                        source_audit[date][field] = {
+                            "chosen": chosen,
+                            "rejected": rejected,
+                        }
 
             # Aggregate from chosen source(s)
             total_sum = 0.0
@@ -712,7 +772,7 @@ def process_generic_metrics(metrics):
 # ── DynamoDB Write ─────────────────────────────────────────────────────────────
 
 
-def merge_day_to_dynamo(date_str, fields, reading_timestamps=None):
+def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_guard=True):
     """
     Merge fields into existing DynamoDB record using update_item.
     Only updates specified fields — does NOT overwrite unrelated fields.
@@ -720,9 +780,32 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None):
     reading_timestamps: optional dict of {field_name: set_of_timestamp_strings}
       for dedup-able fields (water, caffeine). Each reading's timestamp is tracked
       in a DynamoDB String Set so re-sends of the same readings are not double-counted.
+    monotonic_guard: when True (live path), additive activity totals (steps/distance/
+      energy/flights) are written with GREATEST(stored, new) — a day's count only
+      increases, so a later PARTIAL export must never LOWER a fuller stored value. The
+      backfill passes False to SET the recomputed-from-raw value authoritatively.
     """
     if not fields:
         return
+
+    # ── GREATEST-on-write for monotonic activity totals ──
+    if monotonic_guard:
+        _guard = [f for f in _ACTIVITY_MAX_FIELDS if f in fields and fields[f] is not None]
+        if _guard:
+            try:
+                _gn = {f"#g{i}": f for i, f in enumerate(_guard)}
+                _existing = table.get_item(
+                    Key={"pk": PK, "sk": f"DATE#{date_str}"},
+                    ProjectionExpression=", ".join(_gn.keys()),
+                    ExpressionAttributeNames=_gn,
+                ).get("Item", {})
+                for f in _guard:
+                    cur = _existing.get(f)
+                    if cur is not None and float(cur) > float(fields[f]):
+                        logger.info(f"[MONOTONIC] {date_str} {f}: kept stored {float(cur):.0f} > new {float(fields[f]):.0f}")
+                        fields[f] = float(cur)
+            except Exception as e:
+                logger.info(f"[MONOTONIC] guard read failed (proceeding with new value): {e}")
 
     # ── Dedup cumulative fields by reading timestamp ──
     # Stores a map of {timestamp: quantity} in DynamoDB (_rd_{field}).

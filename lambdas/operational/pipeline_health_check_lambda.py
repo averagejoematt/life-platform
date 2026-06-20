@@ -98,6 +98,19 @@ try:
 except ImportError:  # pragma: no cover - layer-module fallback
     _INGEST_HEALTH_AVAILABLE = False
 
+# DI-1.1: source-state legibility. A deliberately-paused source's healthcheck "ok"
+# must NOT be reported as healthy (that masks a missing cron) nor alarmed as broken.
+try:
+    from source_state import is_paused
+
+    _SOURCE_STATE_AVAILABLE = True
+except ImportError:  # pragma: no cover - layer not yet rebuilt → old behaviour
+
+    def is_paused(_source):
+        return False
+
+    _SOURCE_STATE_AVAILABLE = False
+
 
 def _probe_lambda(fn_name: str) -> dict:
     """Invoke a Lambda and check if it crashes. Returns result dict."""
@@ -227,8 +240,12 @@ def _check_ingest_liveness(now: datetime) -> dict:
             logger.warning(f"INGEST UNHEALTHY: {source} — {verdict['status']}: {verdict['reason']}")
 
     # Best-effort sources (e.g. Garmin) are logged above but excluded from the count/alert
-    # so an accepted, unfixable upstream failure can't mask a real source death.
-    alerting = [v for v in verdicts if v["alert"] and v["source"] not in BEST_EFFORT_SOURCES]
+    # so an accepted, unfixable upstream failure can't mask a real source death. DI-1.1:
+    # declared-paused sources (Strava, off-by-design) are likewise excluded — a paused
+    # source has no cron to be "stopped", so the attempt-staleness arm would false-fire.
+    for v in verdicts:
+        v["paused"] = is_paused(v["source"])
+    alerting = [v for v in verdicts if v["alert"] and v["source"] not in BEST_EFFORT_SOURCES and not v["paused"]]
     unhealthy_count = len(alerting)
 
     # Emit the metric the ingest-liveness alarm watches.
@@ -326,8 +343,24 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
     # Run probes in parallel (was sequential — caused 480s+ worst case)
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
+    paused_count = 0
+
     def _run_probe(pipeline):
         fn_name, display_name, source_id = pipeline
+        # DI-1.1: a paused source has no live cron — a healthcheck "ok" would only prove
+        # the Lambda boots, masking that ingestion is off-by-design. Skip the probe and
+        # report it as `paused` (neither healthy-green nor failed-red).
+        if is_paused(source_id):
+            logger.info(f"{display_name} ({source_id}) is paused (off-by-design) — skipping boot probe")
+            return {
+                "function_name": fn_name,
+                "display_name": display_name,
+                "source_id": source_id,
+                "healthy": True,
+                "paused": True,
+                "state": "paused",
+                "note": "deliberately paused (no cron); boot-probe skipped — not 'healthy', not 'failed'",
+            }
         logger.info(f"Probing {display_name} ({fn_name})...")
         result = _probe_lambda(fn_name)
         result["function_name"] = fn_name
@@ -340,7 +373,9 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
         for future in as_completed(futures):
             result = future.result()
             results.append(result)
-            if result["healthy"]:
+            if result.get("paused"):
+                paused_count += 1
+            elif result["healthy"]:
                 pass_count += 1
             else:
                 fail_count += 1
@@ -403,11 +438,12 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
                 "total": len(PIPELINES),
                 "passed": pass_count,
                 "failed": fail_count,
+                "paused": paused_count,
                 "results": json.dumps(results),
-                "failures": json.dumps([r for r in results if not r["healthy"]]),
+                "failures": json.dumps([r for r in results if not r.get("paused") and not r["healthy"]]),
             }
         )
-        logger.info(f"Health check stored: {pass_count} pass, {fail_count} fail")
+        logger.info(f"Health check stored: {pass_count} pass, {fail_count} fail, {paused_count} paused")
     except Exception as e:
         logger.error(f"Failed to store health check: {e}")
 
@@ -417,8 +453,13 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
             {
                 "passed": pass_count,
                 "failed": fail_count,
+                "paused": paused_count,
                 "total": len(PIPELINES),
-                "failures": [{"name": r["display_name"], "error": r.get("error_message", "")} for r in results if not r["healthy"]],
+                "failures": [
+                    {"name": r["display_name"], "error": r.get("error_message", "")}
+                    for r in results
+                    if not r.get("paused") and not r["healthy"]
+                ],
             }
         ),
     }

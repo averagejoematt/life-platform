@@ -169,17 +169,20 @@ class IngestionStack(Stack):
             **{k: v for k, v in shared.items() if k != "alerts_topic"},
         )
 
-        # ── 6. Strava — PAUSED 2026-05-28 (Strava API returns HTTP 402 since ~05-18;
-        # Garmin already covers daily activity). To re-enable: restore the schedule
-        # arg below to `schedule=f"cron(10 {INGEST_HOURLY} * * ? *)"` and re-deploy,
-        # and un-comment strava in freshness_checker_lambda.py (SOURCES/OAUTH/COMPLETENESS).
+        # ── 6. Strava — RE-ENABLED 2026-06-20. Paused 2026-05-28 on a persistent HTTP 402
+        # (API paywall) since ~05-18; the Garmin→Strava auto-upload backstop now feeds
+        # activities and a live test returned 200 (gap-filled 6/16–6/20, 0 errors). Schedule
+        # restored. NB: `strava` is still listed in source_state.DECLARED_PAUSED_SOURCES, but
+        # that is now behaviorally inert — resolve_source_state() returns `live` whenever the
+        # data is fresh (freshness-wins). Drop it from that set on the next layer rebuild for
+        # tidiness (pipeline_health_check.is_paused() still reads it directly — cosmetic only).
         strava = create_platform_lambda(
             self,
             "StravaIngestion",
             function_name="strava-data-ingestion",
             source_file="lambdas/ingestion/strava_lambda.py",
             handler="ingestion.strava_lambda.lambda_handler",
-            schedule=None,  # PAUSED — was cron(10 {INGEST_HOURLY} * * ? *)
+            schedule=f"cron(10 {INGEST_HOURLY} * * ? *)",  # RE-ENABLED 2026-06-20
             timeout_seconds=300,
             alarm_name="ingestion-error-strava",
             shared_layer=shared_utils_layer,
