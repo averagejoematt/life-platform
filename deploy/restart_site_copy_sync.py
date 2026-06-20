@@ -263,26 +263,19 @@ def tombstone_orphan_s3_files(apply: bool, now_iso: str) -> list[str]:
     ).encode()
     for key in ORPHAN_S3_FILES:
         if apply:
-            subprocess.run(
-                [
-                    "aws",
-                    "s3api",
-                    "put-object",
-                    "--bucket",
-                    S3_BUCKET,
-                    "--key",
-                    key,
-                    "--body",
-                    "-",
-                    "--content-type",
-                    "application/json",
-                    "--region",
-                    REGION,
-                ],
+            # `aws s3 cp - s3://...` reads the body from stdin. NB: the prior
+            # `s3api put-object --body -` form does NOT read stdin (it looks for a
+            # file literally named "-"), so with check=False it silently wrote
+            # nothing — the tombstone was a no-op for years (only dead dashboard/
+            # paths were listed, so it went unnoticed). Found 2026-06-20.
+            r = subprocess.run(
+                ["aws", "s3", "cp", "-", f"s3://{S3_BUCKET}/{key}", "--content-type", "application/json", "--region", REGION],
                 input=payload,
                 check=False,
                 capture_output=True,
             )
+            if r.returncode != 0:
+                print(f"    ⚠️  tombstone FAILED for {key}: {r.stderr.decode('utf-8', 'replace').strip()[:160]}")
         tombstoned.append(key)
     return tombstoned
 
