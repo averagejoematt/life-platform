@@ -1,3 +1,25 @@
+## Movement data integrity — DI-1.4 — 2026-06-19 (WORKORDER_DI1: step gap + phantom 298 + precedence)
+
+Apple-Health step-field completeness + the resolved step source-of-truth. Prerequisite for the DI-1.6 HAE failsafe (a backstop can't be trusted while its own feed has silent field-level gaps).
+
+### Diagnosis — the "phantom 298", traced
+The coach cited a **298** step avg that reconciled with nothing (~3,415 actual). Root cause: the training expert's step precedence preferred **Garmin steps first**, but Garmin is rate-limited (DI-1.1) and emits sparse partial readings — **Garmin 2026-06-15 = `298` steps** was being used as the step signal while Apple Health's ~3,415 was the truer figure. Fixed by state-aware precedence.
+
+> **Fixture correction (verified against live DDB 2026-06-19):** the work order's "Apple steps blank 6/5–6/13" is **inaccurate** — steps are present every day in that window (low, 254–2487, phone-only days); the field that is *entirely* blank recently is **`active_calories`** (None on every day 6/3–6/19). The 298 was a Garmin reading, not a blank-Apple artifact. The completeness-flag logic below is validated against a constructed gap and handles genuinely-missing step fields whenever they occur.
+
+### Fixed / Added
+- **State-aware step precedence (coach, `gather_data_for_expert("training")`)** — Garmin (watch) steps are used **only when Garmin's source-state is `live`**; otherwise Apple Health. Kills the phantom 298 (a rate-limited Garmin's partial readings no longer masquerade as the step truth). Adds `step_source` + `step_completeness_pct` to the coach data.
+- **Step-completeness flag (`get_daily_metrics(view="movement")`)** — per-day `step_data_complete` + summary `step_coverage_pct` / `step_incomplete_dates` / `step_incomplete_days`. The `apple_health` envelope can read "fresh" while the step field itself is missing for a day; that gap is now surfaced rather than silently read as zero movement.
+- **DI-1.2 cross-check confirmed** — a blank/low Apple step day with a Hevy session is never `sedentary` (the Hevy-join already closes the path a missing step field could use to drive an under-training verdict).
+- **Step source-of-truth documented** in `SCHEMA.md` (the live authoritative field reference; `DATA_DICTIONARY` is archived).
+
+### Tests
+- `tests/test_di1_movement_integrity.py::test_step_completeness_flag_surfaces_jun5_13_gap` (+ blank-Apple-steps-never-sedentary-with-Hevy). registry/wiring/coach/business green.
+
+Correlational only; not deployed. DI-1.5 (governance/ADR) + DI-1.6 (HAE failsafe — needs Matthew to verify Garmin→Apple workout sync + HAE export config) remain.
+
+---
+
 ## Movement data integrity — DI-1.1 source-state legibility — 2026-06-19 (WORKORDER_DI1)
 
 Gives every ingest source a real, legible operational state — **`live` / `paused` / `rate_limited` / `stale`** — so a deliberately-off source (Strava, paused at the 402 paywall) or a chronically rate-limited one (Garmin's 429 refresh block) is never mistaken for silent breakage. Replaces DI-1.3's interim freshness-inference with the real field.

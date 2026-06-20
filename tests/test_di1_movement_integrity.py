@@ -318,3 +318,59 @@ def test_pipeline_health_does_not_mask_paused_source():
     assert ss.is_paused("strava") is True
     assert ss.is_paused("whoop") is False
     assert "strava" in ss.DECLARED_PAUSED_SOURCES
+
+
+# ==============================================================================
+# DI-1.4 — Apple-Health step-field completeness (false-clean envelope)
+# ==============================================================================
+
+
+def test_step_completeness_flag_surfaces_jun5_13_gap(monkeypatch):
+    """The apple_health envelope can read 'fresh' while the step field is missing for a
+    window — surface that gap (do not treat a missing field as zero movement).
+    """
+    gap_dates = [f"2026-06-{d:02d}" for d in range(5, 14)]  # 6/5–6/13
+
+    def fake_sources(sources, start, end, *a, **k):
+        ah = []
+        # The 6/5–6/13 window: AH record present (envelope fresh) but step field MISSING.
+        for d in gap_dates:
+            ah.append({"date": d, "active_calories": 110, "distance_walk_run_miles": 0.5})
+        # Bracketing days WITH steps so coverage isn't trivially zero.
+        ah.append({"date": "2026-06-04", "steps": 4254})
+        ah.append({"date": "2026-06-14", "steps": 7123})
+        return {"apple_health": ah, "strava": [], "hevy": []}
+
+    monkeypatch.setattr(tl, "parallel_query_sources", fake_sources)
+    out = tl.tool_get_movement_score({"start_date": "2026-06-01", "end_date": "2026-06-14"})
+
+    summary = out["summary"]
+    # All nine 6/5–6/13 days surface as step-incomplete.
+    assert set(summary.get("step_incomplete_dates", [])) == set(gap_dates), summary
+    assert summary["step_incomplete_days"] == 9, summary
+    # Coverage = 2 of 11 AH-envelope days have steps.
+    assert summary["step_coverage_pct"] == round(2 / 11 * 100, 1), summary
+    # Per-row flag is explicit on the gap days, not silently absent.
+    gap_row = next(r for r in out["daily"] if r["date"] == "2026-06-08")
+    assert gap_row["step_data_complete"] is False, gap_row
+    good_row = next(r for r in out["daily"] if r["date"] == "2026-06-14")
+    assert good_row["step_data_complete"] is True, good_row
+
+
+def test_missing_apple_steps_never_sedentary_with_hevy(monkeypatch):
+    """DI-1.2 cross-check (DI-1.4 acceptance): a blank Apple step day with a Hevy session
+    is never sedentary — a missing/low step field cannot drive an under-training verdict.
+    """
+
+    def fake_sources(sources, start, end, *a, **k):
+        return {
+            "apple_health": [{"date": "2026-06-18", "active_calories": 90}],  # steps missing
+            "strava": [],
+            "hevy": [_hevy("2026-06-18", 17, 108)],
+        }
+
+    monkeypatch.setattr(tl, "parallel_query_sources", fake_sources)
+    out = tl.tool_get_movement_score({"start_date": "2026-06-01", "end_date": "2026-06-18"})
+    row = next(r for r in out["daily"] if r["date"] == "2026-06-18")
+    assert row["has_workout"] is True and row.get("sedentary_flag") is not True, row
+    assert row["step_data_complete"] is False, row
