@@ -121,22 +121,25 @@ def _metric(name, *readings):
 class TestProcessGenericMetrics:
     """End-to-end: HAE payload → daily aggregates with source-priority dedup."""
 
-    def test_iphone_garmin_step_dedup_iphone_wins(self):
-        """TD-15/16: iPhone steps + Garmin steps for same date → only iPhone writes."""
+    def test_iphone_garmin_step_max_source_wins(self):
+        """DI-1 fix: additive activity metrics take the MAX across per-source daily sums,
+        not a fixed-priority source. The OLD behavior kept the iPhone's 5,000 and discarded
+        the Garmin/Watch 7,500 — the "402 steps when the app shows 6,500" undercount (the
+        higher-priority device was left at home). MAX keeps the fuller source (7,500) AND
+        avoids the double-count (not the 12,500 sum)."""
         metrics = [
             _metric(
                 "Step Count",
-                _reading("iPhone (Matt 17)", 5000),
-                _reading("Garmin Connect", 7500),
+                _reading("iPhone (Matt 17)", 5000),  # phone — partial day
+                _reading("Garmin Connect", 7500),  # watch — captured the full day
             )
         ]
         daily, _, audit = hae.process_generic_metrics(metrics)
-        # Only the priority winner's value lands — not the sum (12500)
-        assert daily["2026-05-02"]["steps"] == 5000
-        # Audit records the choice + rejection for diagnostic visibility
-        assert "steps" in audit["2026-05-02"]
-        assert audit["2026-05-02"]["steps"]["chosen"] == "iPhone (Matt 17)"
-        assert "Garmin Connect" in audit["2026-05-02"]["steps"]["rejected"]
+        # The fuller source wins; never the discarded 5000, never the 12500 sum.
+        assert daily["2026-05-02"]["steps"] == 7500
+        assert audit["2026-05-02"]["steps"]["chosen"] == "Garmin Connect"
+        assert audit["2026-05-02"]["steps"]["rule"] == "max_sum"
+        assert "iPhone (Matt 17)" in audit["2026-05-02"]["steps"]["rejected"]
 
     def test_single_source_unchanged(self):
         """TD-15: when only one source is present, behavior is unchanged."""
