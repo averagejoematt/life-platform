@@ -143,6 +143,25 @@ class MonitoringStack(Stack):
             to_digest=True,
         )
 
+        # DI-2: source-of-truth reconciliation. Unlike liveness/freshness (which
+        # read only DDB and so see only the high-water mark), the strava reconcile
+        # job diffs the trailing-14d Strava API activity set against the store and
+        # emits the count of activities the API has but we never stored. Catches a
+        # *silent drop* (the Jun 2026 evening-walk class) that every DDB-only check
+        # is blind to. Fires the day after a gap appears.
+        _alarm(
+            "IngestReconciliationStrava",
+            "ingest-reconciliation-strava",
+            "LifePlatform/IngestReconciliation",
+            "MissingActivityCount",
+            86400,
+            "Maximum",
+            1,
+            GTE,
+            dims={"Source": "strava"},
+            to_digest=True,
+        )
+
         # ══════════════════════════════════════════════════════════════
         # Daily-brief operational alarms (not in EmailStack)
         # ══════════════════════════════════════════════════════════════
