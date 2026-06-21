@@ -126,7 +126,8 @@ def fetch_api(pages, run_dir):
     out = {}
     for ep in wanted:
         url = ep["url"]
-        fname = _slug_for_endpoint(url) + ".json"
+        stem = _slug_for_endpoint(url)
+        fname = stem if stem.endswith(".json") else stem + ".json"
         fpath = os.path.join(api_dir, fname)
         status, ok = None, False
         try:
