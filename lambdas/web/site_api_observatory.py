@@ -452,29 +452,33 @@ def handle_training_overview() -> dict:
     z2_weekly_avg = round(z2_minutes_30d / 4.3)
     z2_pct = round(z2_weekly_avg / z2_target * 100) if z2_target else 0
 
-    # ── Walking stats (Garmin steps + Apple Health fallback + Strava walks) ──
+    # ── Walking stats — per-day step merge, Apple-Health-first ──
+    # Garmin is rate-limited/dead and emits a phantom ~298-step record that used to block
+    # the Apple-Health fallback (it only fired when Garmin was *empty*). Now merge both
+    # sources per day, prefer Apple Health, and only accept a Garmin-only day if it's
+    # plausible (>=1000 steps) — which drops the phantom 298. (#8)
     garmin_30d = _query_source("garmin", d30, today)
-    step_vals = [float(g["steps"]) for g in garmin_30d if g.get("steps")]
-    # Fallback: use Apple Health step data if Garmin has none
-    if not step_vals:
-        ah_step_data = _query_source("apple_health", d30, today)
-        step_vals = [float(h["steps"]) for h in ah_step_data if h.get("steps") and float(h["steps"]) > 0]
-    avg_daily_steps = round(sum(step_vals) / len(step_vals)) if step_vals else None
+    ah_30d = _query_source("apple_health", d30, today)
+    _PHANTOM_STEP_FLOOR = 1000
+    steps_by_date: dict = {}
+    for h in ah_30d:
+        if h.get("steps") and float(h["steps"]) > 0:
+            _d = h.get("date") or h.get("sk", "").replace("DATE#", "")
+            steps_by_date[_d] = max(steps_by_date.get(_d, 0), int(float(h["steps"])))
+    for g in garmin_30d:
+        if g.get("steps") and float(g["steps"]) > 0:
+            _d = g.get("date") or g.get("sk", "").replace("DATE#", "")
+            gs = int(float(g["steps"]))
+            if _d not in steps_by_date and gs >= _PHANTOM_STEP_FLOOR:
+                steps_by_date[_d] = gs  # Garmin only when Apple Health absent AND plausible
+    avg_daily_steps = round(sum(steps_by_date.values()) / len(steps_by_date)) if steps_by_date else None
     daily_steps_trend = []
-    for g in sorted(garmin_30d, key=lambda x: x.get("date") or x.get("sk", "")):
-        if g.get("steps"):
-            _step_date = g.get("date") or g.get("sk", "").replace("DATE#", "")
-            try:
-                _step_dow = datetime.strptime(_step_date, "%Y-%m-%d").weekday()
-            except Exception:
-                _step_dow = 0
-            daily_steps_trend.append(
-                {
-                    "date": _step_date,
-                    "steps": int(float(g["steps"])),
-                    "is_weekend": _step_dow >= 5,
-                }
-            )
+    for _step_date in sorted(steps_by_date):
+        try:
+            _step_dow = datetime.strptime(_step_date, "%Y-%m-%d").weekday()
+        except Exception:
+            _step_dow = 0
+        daily_steps_trend.append({"date": _step_date, "steps": steps_by_date[_step_date], "is_weekend": _step_dow >= 5})
 
     walk_activities = [a for a in all_activities_30d if (a.get("sport_type") or "").lower() in ("walk", "hike")]
     ruck_activities = [
@@ -643,9 +647,10 @@ def handle_training_overview() -> dict:
         -12:
     ]  # last 12 weeks
 
-    # Recent cardio — the merged Strava + Whoop activity list (already flattened & deduped),
-    # newest first: known cardio modalities or anything distance-bearing. Surfaced on the
-    # site with distance in mi + km. (Hevy is strength-only; it's covered by the strength log.)
+    # Recent cardio — the merged Strava + Whoop activity list, PLUS cardio/mobility logged
+    # as Hevy exercises (Matthew logs Cycling/Elliptical/Stretching inside his Hevy sessions,
+    # carrying distance/duration). Hevy was previously treated as strength-only, so cycling +
+    # stretching never surfaced here (#5/#6). Newest first; distance in mi + km.
     _CARDIO = {
         "run",
         "running",
@@ -683,6 +688,37 @@ def handle_training_overview() -> dict:
         )
         if len(cardio_sessions) >= 20:
             break
+
+    # Fold in cardio/mobility-bearing Hevy exercises (#5/#6). Each exercise's sets carry
+    # distance_m / duration_sec; sum per exercise per workout. Mobility (Stretching/Yoga)
+    # shows as a session even with no distance.
+    _HEVY_CARDIO = {"cycling", "elliptical", "rowing", "treadmill", "stair", "ski erg", "ski-erg", "assault", "echo bike", "air bike"}
+    _HEVY_MOBILITY = {"stretching", "stretch", "mobility", "yoga", "foam roll"}
+    hevy_cardio_30d = _query_source("hevy", d30, today)
+    for w in sorted(hevy_cardio_30d, key=lambda x: x.get("date") or x.get("sk", ""), reverse=True):
+        wdate = w.get("date") or w.get("sk", "").replace("DATE#", "")[:10]
+        for ex in w.get("exercises") or []:
+            nm = (ex.get("name") or ex.get("exercise_name") or "").strip()
+            nl = nm.lower()
+            is_cardio = any(k in nl for k in _HEVY_CARDIO)
+            is_mob = any(k in nl for k in _HEVY_MOBILITY)
+            if not (is_cardio or is_mob):
+                continue
+            sets = ex.get("sets") or []
+            dist_m = sum(float(s.get("distance_m") or 0) for s in sets)
+            secs = sum(float(s.get("duration_sec") or 0) for s in sets)
+            cardio_sessions.append(
+                {
+                    "date": wdate,
+                    "sport": nm or ("Mobility" if is_mob else "Cardio"),
+                    "distance_mi": round(dist_m * 0.000621371, 2) if dist_m else None,
+                    "minutes": round(secs / 60) or None,
+                    "avg_hr": None,
+                    "modality": "mobility" if is_mob else "cardio",
+                    "source": "hevy",
+                }
+            )
+    cardio_sessions = sorted(cardio_sessions, key=lambda x: x.get("date") or "", reverse=True)[:20]
 
     return _ok(
         {
@@ -778,11 +814,15 @@ def handle_weekly_physical_summary() -> dict:
         if bw_min > 0:
             activities.append({"type": "Breathwork", "minutes": round(bw_min)})
             total_active_min += bw_min
+        # Steps: Apple Health first; Garmin only if AH absent AND plausible (drops the
+        # phantom ~298 Garmin record — same fix as handle_training_overview, #8).
+        _ah_steps = int(float(ah["steps"])) if ah.get("steps") and float(ah["steps"]) > 0 else None
+        _gm_steps = int(float(garmin["steps"])) if garmin.get("steps") and float(garmin["steps"]) >= 1000 else None
         days.append(
             {
                 "date": d,
                 "day_of_week": dow,
-                "steps": int(float(garmin.get("steps", 0))) if garmin.get("steps") else None,
+                "steps": _ah_steps if _ah_steps is not None else _gm_steps,
                 "activities": activities,
                 "total_active_minutes": round(total_active_min),
             }
@@ -1621,9 +1661,17 @@ def handle_strength_benchmarks() -> dict:
                     if target_name.lower() in name.lower():
                         sets = ex.get("sets") or []
                         for s in sets:
-                            w = float(s.get("weight_lbs") or s.get("weight") or 0)
-                            if w > best.get(target_name, 0):
-                                best[target_name] = w
+                            # Hevy stores set weight in weight_kg (native unit); the old
+                            # weight_lbs/weight read was always 0 → every 1RM read 0. Convert,
+                            # then estimate 1RM via Epley (the column promises "estimated 1RM").
+                            w_kg = s.get("weight_kg")
+                            w = float(w_kg) * 2.2046226 if w_kg not in (None, "") else float(s.get("weight_lbs") or s.get("weight") or 0)
+                            reps = int(s.get("reps") or 0)
+                            if w <= 0 or reps < 1 or reps > 12:
+                                continue
+                            e1rm = w * (1 + reps / 30.0)  # Epley estimated 1RM
+                            if e1rm > best.get(target_name, 0):
+                                best[target_name] = e1rm
 
         benchmarks = []
         for lift, target in targets.items():

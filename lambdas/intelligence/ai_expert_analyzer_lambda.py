@@ -1012,40 +1012,70 @@ Produce EXACTLY this JSON structure (no markdown, no explanation):
 For disagreements: only flag GENUINE conflicts where two coaches would give Matthew contradictory advice. Do not invent disagreements. Empty list is fine if all coaches are aligned."""
 
     api_key = _get_api_key()
-    req_body = json.dumps(
-        {
-            "model": AI_MODEL,
-            "max_tokens": 1200,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-    )
 
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=req_body.encode(),
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-        },
-    )
+    def _build_req():
+        # max_tokens 1200 truncated the JSON mid-string → json.loads threw and the whole
+        # synthesis fail-closed to the previous day's (stale) record (the /now/ "collapsed
+        # to one session/week" bug). Raised to 2048 to fit the full structured response.
+        body = json.dumps({"model": AI_MODEL, "max_tokens": 2048, "messages": [{"role": "user", "content": prompt}]})
+        return urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=body.encode(),
+            headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
+        )
+
+    # Phase 3.4: retry via retry_utils. B4: the model emits subtly-malformed JSON (e.g. a
+    # trailing comma / empty value in the nested disagreements array) that threw on json.loads
+    # and fail-closed to yesterday's stale record (the /now/ "collapsed to one session/week"
+    # bug). Parse LENIENTLY (strip fences, extract the outermost object, drop trailing commas),
+    # and if even that fails, regex-extract weekly_priority so a FRESH record always lands.
+    from retry_utils import call_anthropic_raw
+
+    def _parse_synthesis(text):
+        import re
+
+        s = (text or "").strip()
+        if s.startswith("```"):
+            s = s.split("\n", 1)[1] if "\n" in s else s[3:]
+        if s.endswith("```"):
+            s = s[:-3]
+        a, b = s.find("{"), s.rfind("}")
+        core = s[a : b + 1] if (a != -1 and b > a) else s  # noqa: E203
+        for cand in (core, re.sub(r",(\s*[}\]])", r"\1", core)):
+            try:
+                return json.loads(cand)
+            except Exception:  # noqa: BLE001
+                pass
+        m = re.search(r'"weekly_priority"\s*:\s*"((?:[^"\\]|\\.)*)"', core, re.DOTALL)
+        if m:
+            wp = m.group(1)
+            try:
+                wp = json.loads(f'"{wp}"')  # unescape
+            except Exception:  # noqa: BLE001
+                pass
+            logger.warning("Synthesis full-JSON parse failed — used weekly_priority regex fallback")
+            return {"weekly_priority": wp, "cross_domain_notes": {}, "disagreements": [], "_partial": True}
+        return None
+
+    synthesis = None
+    last_err = None
+    for attempt in (1, 2):
+        try:
+            result = call_anthropic_raw(_build_req(), timeout=60)
+            text = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
+            synthesis = _parse_synthesis(text)
+            if synthesis and synthesis.get("weekly_priority"):
+                break
+            last_err = f"no weekly_priority parsed (attempt {attempt})"
+            logger.warning("Synthesis parse yielded no weekly_priority (attempt %d/2)", attempt)
+        except Exception as e:  # noqa: BLE001
+            last_err = e
+            logger.error("Synthesis call failed (attempt %d/2): %s", attempt, e)
+    if not synthesis or not synthesis.get("weekly_priority"):
+        logger.error("Synthesis generation failed after retries: %s", last_err)
+        return None
 
     try:
-        # Phase 3.4 (2026-05-16): retry via retry_utils.
-        from retry_utils import call_anthropic_raw
-
-        result = call_anthropic_raw(req, timeout=60)
-
-        text = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
-
-        # Parse JSON from response (strip markdown fencing if present)
-        cleaned = text.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3]
-        synthesis = json.loads(cleaned.strip())
-
         # Cache synthesis to DDB
         now = datetime.now(timezone.utc)
         ttl = int((now + timedelta(days=8)).timestamp())
