@@ -3,7 +3,7 @@
 > Permanent log of significant architectural, design, and operational decisions.
 > Each ADR captures the decision, context, alternatives considered, and outcome.
 > Last updated: 2026-06-03 (v8.3.0 — + Garmin retired & budget-guard/AI-cost trim; ADR-074/075)
-> 91 ADRs total (ADR-001 → ADR-091). (Index table below covers ADR-001–057; newer ADRs are appended as detail sections in order.)
+> 92 ADRs total (ADR-001 → ADR-092). (Index table below covers ADR-001–057; newer ADRs are appended as detail sections in order.)
 
 ---
 
@@ -2616,5 +2616,24 @@ The AWS "account-controls" sub-grade stays below a literal-checklist A on those 
 **Rollout.** `training_coach` is the reference (DI-1.3, live after the next layer deploy). The remaining operational coaches (`sleep`, `nutrition`, `glucose`, `physical`, `mind`, `labs`, `explorer`) adopt the gate incrementally — each wires its primary source(s) into an assessability check before any deficiency verdict. Incremental by design: no big-bang rewrite, and every adoption is a small, independently-testable diff with a regression test mirroring `test_coach_guard_withholds_undertraining_when_strava_paused`.
 
 **Out of scope.** Any new activity/effort/quality scoring model; rewriting coach generators beyond the pull-order + the assessability gate; causal claims; a public surface.
+
+---
+
+## ADR-092: Detect silent ingestion gaps — source-of-truth reconciliation + interior-gap scan (DI-2)
+
+**Status:** ✅ Active — 2026-06-21
+
+**Context.** A Strava `Walk` ingestion bug (the UTC-fetch-window vs. local-date-filter mismatch fixed in #180) silently dropped four evening-PT walks. It went unnoticed for days because **every freshness/health check in the platform reads only DynamoDB** — `freshness_checker`, the `get_freshness_status` MCP tool, `qa_smoke`, and ingest-liveness all compare against the latest `DATE#` record per source. They see only the **high-water mark**, so a gap *behind* it is structurally invisible: same-day Hevy `WeightTraining` kept the latest date advancing while the walks were missing, and the source read green the whole time. Two distinct blind spots: (a) a *silent drop* — an activity the upstream API has that never landed in the store; (b) an *interior hole* — a daily source going dead mid-window then resuming.
+
+**Decision.** Add two complementary detectors, each emitting a CloudWatch metric with a digest alarm.
+
+- **(A) Source-of-truth reconciliation** (the only thing that catches a silent drop): a daily `{"reconcile": true}` path **inside the existing Strava ingestion lambda** (reuses its auth/client/DDB — no new secret-access surface, preserving the one-lambda-holds-Strava-creds boundary) pulls a trailing 14-day activity set from the Strava API and diffs it against the store. Gaps → `LifePlatform/IngestReconciliation::MissingActivityCount{Source=strava}` → alarm `ingest-reconciliation-strava`. EventBridge `cron(20 17 * * ? *)` (10:20 AM PT, UTC-fixed). The diff is **dedup-aware** — an API activity counts as present if the store has the same `strava_id` *or* an activity within 120s (mirrors the ingestion `_dedup`), so a collapsed GPS-drop twin is not a false gap. Reconcile failures return 200 (never trip the unrelated `ingestion-error-strava` alarm); a rotated `refresh_token` is persisted.
+- **(B) Interior-gap detection** (the daily-source hole): `freshness_checker` scans each **daily** source's trailing 14d of `DATE#` records and flags any date missing *inside* the present `[first, last]` span (trailing/leading absence is recency, left to the staleness check). Only sources expected every day are judged (`DAILY_SOURCES = whoop, apple_health, eightsleep, habitify`); sparse sources (strava activities, withings weigh-ins, food_delivery) have legitimate empty days and are excluded so rest days don't false-fire. → `LifePlatform/Freshness::InteriorGapCount` (suppressed on sick days) → alarm `freshness-interior-gap`.
+
+**Why both, and why reconciliation can't be skipped.** A trailing-refresh / re-ingest would only heal *late-arriving* data; it would NOT have caught the #180 bug, because that drop was deterministic — the activity was never returned by any `fetch_day` pass, so re-running the fetch drops it again. Only a diff against the upstream source reveals a deterministic logic drop. Interior-gap detection (DDB-only) is cheaper and broader but is blind to sparse-source drops like Strava (a missing day there is usually just a rest day) — hence it covers the *other* blind spot, not this one.
+
+**Alternatives rejected.** *Generic "missing calendar date" alerting for all sources* — false-positives on every sparse source's rest day. *A separate reconciliation lambda* — would need its own copy of the Strava client + a second holder of `life-platform/strava`, widening the credential surface for no benefit; the ingestion lambda already has everything. *A CLI-created EventBridge rule* — would orphan the rule from CDK (violates ADR-081's "all infra in CDK"); the rule lives in `ingestion_stack`. *Self-healing on reconcile (auto re-ingest the missing IDs)* — a logic bug would just re-drop them and churn; the alarm (human signal) is the durable value, and #180 already fixed this class at the source.
+
+**Out of scope.** Reconciliation for other activity sources (Whoop/Garmin) — the pattern generalizes but each is a separate opt-in; fixing the freshness/liveness checks to be completeness-aware beyond the interior-gap heuristic; any change to the `get_freshness_status` MCP tool (still high-water-mark only — a noted follow-up).
 
 ---
