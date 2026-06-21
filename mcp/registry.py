@@ -179,8 +179,36 @@ from mcp.tools_vacation import tool_get_vacation_fund
 
 # BENCH-1: cut-benchmarking & regain firewall (PRIVATE, view-dispatched).
 from mcp.tools_benchmark import tool_get_benchmark
+from mcp.tools_training_notes import tool_get_exercise_notes
 
 TOOLS = {
+    "get_exercise_notes": {
+        "fn": tool_get_exercise_notes,
+        "schema": {
+            "name": "get_exercise_notes",
+            "description": (
+                "The per-exercise TRAINING-NOTE timeline (the arc Matthew wrote on a lift across sessions), "
+                "derived from his freeform Hevy notes — progression/form/equipment/limiter/sentiment signals + "
+                "a prominent pain_flag. Use for: 'what did I note on calf raises lately?', 'how's the cycling "
+                "progression going?', 'any pain flags on squats?', and as a standard pre-flight pull alongside "
+                "get_exercise_history. Pass a human exercise name OR a Hevy template_id. Signals are inferred + "
+                "confidence-tagged; raw notes are sovereign. pain_flag is over-inclusive by design — confirm or "
+                "dismiss before loading that movement."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "exercise": {
+                        "type": "string",
+                        "description": "Exercise name (e.g. 'calf raise', 'cycling') — resolved to its Hevy template via recent workouts.",
+                    },
+                    "template_id": {"type": "string", "description": "Hevy exercise template id (hex or uuid). Alternative to 'exercise'."},
+                    "lookback_days": {"type": "integer", "description": "Days of history to include (default 180)."},
+                },
+                "required": [],
+            },
+        },
+    },
     "get_sources": {
         "fn": tool_get_sources,
         "schema": {

@@ -3,7 +3,7 @@
 > Permanent log of significant architectural, design, and operational decisions.
 > Each ADR captures the decision, context, alternatives considered, and outcome.
 > Last updated: 2026-06-03 (v8.3.0 — + Garmin retired & budget-guard/AI-cost trim; ADR-074/075)
-> 93 ADRs total (ADR-001 → ADR-093). (Index table below covers ADR-001–057; newer ADRs are appended as detail sections in order.)
+> 94 ADRs total (ADR-001 → ADR-094). (Index table below covers ADR-001–057; newer ADRs are appended as detail sections in order.)
 
 ---
 
@@ -2657,5 +2657,25 @@ The AWS "account-controls" sub-grade stays below a literal-checklist A on those 
 **Rejected / deferred.** *Overnight re-stamp Lambda* (pre-highlight the matching branch post-Whoop-sync) — deferred for v1 (Matthew's §8 lock: self-selection only); it must fail-open to the always-present branches if built. *Composite readiness as the branch signal* — rejected; branches key to the simple wrist band he can actually see at 5am, not a compute he can't. *Gate as Claude's discipline* — rejected; the gate belongs in the tool (Priya/Jin).
 
 **Out of scope.** The autonomous cron authoring path (`hevy_routine_cron_lambda`) still emits the legacy ideal/floor pair — v1 targets the chat/MCP night-before authoring Matthew actually does; bringing the cron onto the branch model is the layer-bump follow-up above.
+
+---
+
+## ADR-094: Derived training-note signal layer — never mutate raw Hevy notes; notes overlay numbers, never overwrite
+
+**Status:** ✅ Active — 2026-06-21 (Phase 1; private)
+
+**Context.** Matthew writes freeform notes on individual Hevy exercises (first session 2026-06-20). Raw, the signal evaporates after one read — there's no structured, queryable, *progressive* view. The value a raw read can't serve cheaply: the **per-exercise arc across sessions** (cycling L10 → L18 → intervals) and **pain that must never be lost in a distill**. Mirrors the meal-grouping derived-projection pattern (derived projection, raw sovereign, deterministic-first, bounded LLM tail).
+
+**Decision.** A derived **note-signal projection** over the untouched raw Hevy notes, keyed by exercise so the timeline is one Query, written on-ingest.
+
+- **Extractor (deterministic-first, bounded Haiku tail).** `lambdas/training_notes.py` (pure core: rule-pass for numeric progression / equipment / logging-quirk / sentiment / form / limiter + the pain net) + `lambdas/training_notes_llm.py` (the semantic tail — Haiku, constrained JSON, **hash-cache** so an unchanged note never re-extracts, **monthly cap ~300** with fail-safe to deterministic-only). Both are layer modules — the on-ingest hook lives in `hevy_backfill_lambda` and the read tool + backfill in MCP.
+- **Projection.** `pk = USER#matthew#SOURCE#training_notes#EXERCISE#<template_id>`, `sk = DATE#…#WORKOUT#<id>`; source label `training_feedback_loop`. Idempotent upsert by the stable sk. Correction overlay at `…#WORKOUT#<id>#CORRECTION` wins on read.
+- **Read.** `get_exercise_notes(exercise|template_id, lookback_days)` MCP tool (#136) → the date-sorted arc + a prominent `pain_flag`.
+
+**Invariants (tests enforce).** (1) Raw untouched — writes ONLY `SOURCE#training_notes`, a provenance assert refuses the raw Hevy pk. (2) Inferred + labelled — `confidence` + `extracted_by` on every signal. (3) **Notes overlay numbers, never overwrite** — `rpe_caveat` is a coach-read overlay; the extractor emits no raw RPE/load and never touches the workout. (4) Conservation — every non-empty note → exactly one record; on LLM failure keep `note_raw` + deterministic signals + `degraded:true`, never drop. (5) **Pain never missed** — a deterministic lexicon is authoritative for `pain_flag` (the LLM can add but never clear it) and elevates (insight + training-coach thread + the prominent read-tool flag). `burn`/`sore`/`tight` are excluded from auto-pain (Phase-0 red-team: "forearm burn" is muscular) → coach review path.
+
+**Rest adherence (Phase-0 finding).** Hevy's performed-workout API records **no actual rest** (no per-set rest/timestamps) — confirmed at the raw payload. **Prescribed** rest is on the routine (`rest_seconds`, round-trips via `get_routine`) and tracked as data, but prescribing rest is a multi-factor coach judgment, never auto-set from recovery (see the rest/params-multi-factor guidance). Actual-rest changes are captured qualitatively via the note (`rest_adherence` signal).
+
+**Out of scope (Phase 1 is private instrumentation).** Phase 2 — the loop-back into routine descriptions + cross-exercise pattern detection (n-floored ≥3, correlative) — is what justifies the build (Viktor's gate) but ships only after Phase 1 is eyeballed against real notes for ~1–2 weeks. `deviation` (pushed-vs-performed diff) ships as a tested pure function but its ingest wiring waits on a template_id↔movement_key map (the pushed IR keys by internal `movement_key`, the performed workout by Hevy `template_id`). No public/website surface.
 
 ---
