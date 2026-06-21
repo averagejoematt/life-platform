@@ -162,6 +162,22 @@ class MonitoringStack(Stack):
             to_digest=True,
         )
 
+        # DI-2b: interior-gap detection. Freshness/liveness see only the latest
+        # date per source; this catches a DAILY source going dead mid-window then
+        # resuming (a hole behind the high-water mark). Emitted by freshness_checker
+        # from a per-source DATE# scan over the trailing window. Digest, not urgent.
+        _alarm(
+            "FreshnessInteriorGap",
+            "freshness-interior-gap",
+            "LifePlatform/Freshness",
+            "InteriorGapCount",
+            86400,
+            "Maximum",
+            1,
+            GTE,
+            to_digest=True,
+        )
+
         # ══════════════════════════════════════════════════════════════
         # Daily-brief operational alarms (not in EmailStack)
         # ══════════════════════════════════════════════════════════════

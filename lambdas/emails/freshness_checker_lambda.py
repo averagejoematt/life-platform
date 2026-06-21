@@ -198,6 +198,39 @@ def check_apple_health_activity(table, now, sick_suppress):
 # existing StaleSourceCount counts.
 BEHAVIORAL_SOURCES = {"measurements", "food_delivery"}
 
+# DI-2b: interior-gap detection. The staleness check above only sees the latest
+# date per source (the high-water mark), so a hole *behind* it is invisible — a
+# daily source can go dead for a few days mid-window and then resume, and nothing
+# flags the missing middle. We only judge sources expected to produce a record
+# EVERY day; sparse sources (strava activities, withings weigh-ins, food_delivery)
+# have legitimate empty days and would false-positive, so they are excluded.
+DAILY_SOURCES = {"whoop", "apple_health", "eightsleep", "habitify"}
+INTERIOR_GAP_WINDOW_DAYS = 14
+
+
+def find_interior_gaps(present_dates, window_start: str, window_end: str) -> list:
+    """Missing dates strictly inside the [first, last] present span in the window.
+
+    Only the span between the earliest and latest present date is judged — a
+    trailing or leading absence is recency (handled by the staleness check), not
+    an interior hole. Returns a sorted list of 'YYYY-MM-DD'. Needs >=2 present
+    dates to define an interior at all.
+    """
+    present = sorted(d for d in present_dates if window_start <= d <= window_end)
+    if len(present) < 2:
+        return []
+    pset = set(present)
+    cur = datetime.strptime(present[0], "%Y-%m-%d").date()
+    hi = datetime.strptime(present[-1], "%Y-%m-%d").date()
+    gaps = []
+    while cur <= hi:
+        s = cur.isoformat()
+        if s not in pset:  # lo/hi are present, so anything missing here is interior
+            gaps.append(s)
+        cur += timedelta(days=1)
+    return gaps
+
+
 # Field-level completeness checks — key fields that should be non-null in a healthy record.
 # A source can be "fresh" (recent date) but have partial data (missing key metrics).
 # Missing fields here emit a PartialCompletenessCount metric and include source in alert.
@@ -429,6 +462,40 @@ def lambda_handler(event, context):
     except Exception as e:
         logger.warning("MacroFactor format-drift check failed (non-fatal): %s", e)
 
+    # ── DI-2b: interior-gap scan (daily sources only) ──
+    # For each daily source, pull the window's DATE# records and flag any missing
+    # date INSIDE the present span — a hole that means the source went dead mid-
+    # window then resumed, which the high-water-mark staleness check above cannot
+    # see. Sparse sources are excluded (see DAILY_SOURCES) so rest days don't fire.
+    interior_gaps = {}  # source_key -> [missing interior dates]
+    _gap_window_start = (now - timedelta(days=INTERIOR_GAP_WINDOW_DAYS)).strftime("%Y-%m-%d")
+    _gap_window_end = now.strftime("%Y-%m-%d")
+    for source_key in DAILY_SOURCES:
+        if source_key not in SOURCES:
+            continue
+        try:
+            gap_resp = table.query(
+                KeyConditionExpression="pk = :pk AND sk BETWEEN :a AND :b",
+                ExpressionAttributeValues={
+                    ":pk": f"USER#{USER_ID}#SOURCE#{source_key}",
+                    ":a": f"DATE#{_gap_window_start}",
+                    ":b": f"DATE#{_gap_window_end}~",  # '~' > '#': include same-day sub-record SKs
+                },
+                ProjectionExpression="sk",
+            )
+            present = {it["sk"].replace("DATE#", "")[:10] for it in gap_resp.get("Items", [])}
+            gaps = find_interior_gaps(present, _gap_window_start, _gap_window_end)
+            if gaps:
+                interior_gaps[source_key] = gaps
+        except Exception as _ge:
+            logger.warning("Interior-gap scan failed for %s (non-fatal): %s", source_key, _ge)
+    interior_gap_count = sum(len(v) for v in interior_gaps.values())
+    if interior_gap_count and not _sick_suppress:
+        logger.warning(
+            "Interior gaps detected behind high-water mark: %s",
+            {SOURCES.get(k, k): v for k, v in interior_gaps.items()},
+        )
+
     # OBS-3: Emit SLO metrics to CloudWatch
     try:
         fresh_count = len(SOURCES) - len(stale_sources)
@@ -467,6 +534,13 @@ def lambda_handler(event, context):
                 {
                     "MetricName": "MacroFactorFormatDrift",
                     "Value": 1.0 if macro_drift else 0.0,
+                    "Unit": "Count",
+                },
+                # DI-2b: count of missing dates behind the high-water mark across
+                # daily sources. Suppressed on sick days (expected gaps).
+                {
+                    "MetricName": "InteriorGapCount",
+                    "Value": 0.0 if _sick_suppress else float(interior_gap_count),
                     "Unit": "Count",
                 },
             ],
