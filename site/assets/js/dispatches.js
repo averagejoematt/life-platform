@@ -8,7 +8,7 @@
   Chronicle/journal indexes from posts.json (native excerpts); lab notes fully
   native from /api/field_notes; timeline from /api/journey_timeline.
 */
-import { enhanceCoachNames } from "/assets/js/coach_popover.js";
+import { enhanceCoachNames, stampGenesis } from "/assets/js/coach_popover.js";
 
 // NB (2026-06-20): "The Coaches" + "AI lab notes" moved OUT to their own top-level
 // door, /coaching/ (assets/js/coaching.js). The coach/fieldnotes renderer functions
@@ -430,3 +430,4 @@ function wireTheme() {
 }
 wireTheme();
 build();
+stampGenesis();  // cross-site Day-N/Week-N anchor (matches the Home hero)

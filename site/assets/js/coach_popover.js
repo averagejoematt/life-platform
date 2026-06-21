@@ -9,6 +9,20 @@
   Keyboard-accessible: chips are real <button>s; Esc closes.
 */
 
+// Shared genesis anchor — stamps "Day N · Week N since June 14 2026" into any
+// [data-bind="genesisStamp"] element, so the Story + Coaching doors carry the same
+// "it's week one, watch it happen" throughline as the Home hero (cross-site consistency).
+export function stampGenesis(root = document) {
+  const el = root.querySelector('[data-bind="genesisStamp"]');
+  if (!el) return;
+  const genesis = new Date("2026-06-14T00:00:00");
+  const dayN = Math.floor((Date.now() - genesis.getTime()) / 86400000) + 1;
+  if (dayN < 1) return;
+  const weekN = Math.floor((dayN - 1) / 7) + 1;
+  el.textContent = `Day ${dayN} · Week ${weekN}, since June 14 2026`;
+  el.hidden = false;
+}
+
 let _map = null; // display name -> persona dict
 
 const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");

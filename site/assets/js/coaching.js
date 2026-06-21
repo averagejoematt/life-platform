@@ -12,7 +12,7 @@
   the rest (character, voice, relationships, journey) so it's no longer one long
   scroll — and one type system (coaches speak serif; labels/data mono).
 */
-import { enhanceCoachNames } from "/assets/js/coach_popover.js";
+import { enhanceCoachNames, stampGenesis } from "/assets/js/coach_popover.js";
 
 const SECTIONS = [
   { key: "coaches", label: "The Team", kicker: "the AI team reading your data", kind: "coaches", url: "/api/coaches" },
@@ -235,3 +235,4 @@ function wireTheme() {
 }
 wireTheme();
 build();
+stampGenesis();  // cross-site Day-N/Week-N anchor (matches the Home hero)
