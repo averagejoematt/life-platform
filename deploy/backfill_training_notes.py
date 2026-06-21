@@ -38,9 +38,7 @@ def main():
     llm_fn = make_llm_fn(table) if args.apply else None  # dry-run: deterministic-only, no model spend
 
     resp = table.query(
-        KeyConditionExpression=Key("pk").eq("USER#matthew#SOURCE#hevy") & Key("sk").begins_with("DATE#"),
-        FilterExpression="sk >= :s",
-        ExpressionAttributeValues={":s": f"DATE#{args.since}"},
+        KeyConditionExpression=Key("pk").eq("USER#matthew#SOURCE#hevy") & Key("sk").between(f"DATE#{args.since}", "DATE#9999~"),
     )
     workouts = [it for it in resp.get("Items", []) if "#WORKOUT#" in it.get("sk", "")]
     total_records = total_pain = total_workouts = 0
