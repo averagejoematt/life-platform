@@ -371,13 +371,28 @@ def build_data_packet(data):
         week_num = max(1, ((end_date - js).days // 7) + 1)
     except Exception:
         week_num = 1
-    # Continuation-aware (2026-06-21): never re-open as "Week 1" when prior installments
-    # already exist (e.g. carried-forward origin lead-ins). The series number is at least
-    # (#prior + 1) — this is what makes today's issue Part 3, a continuation, instead of
-    # yet another from-scratch "Week 1" intro (the dormant-period failure mode).
-    week_num = max(week_num, len(data.get("prev_installments", [])) + 1)
+
+    # Week number is anchored to the experiment GENESIS (journey_start) — never the count of
+    # installments. Pre-genesis "prologue" lead-ins (dated before genesis) are backstory and must
+    # NOT inflate the experiment week or imply the weight loss / training spans more weeks than the
+    # experiment has actually run (this caused the "9 lbs in three weeks" error on 2026-06-21, when
+    # the experiment was one week old). Continuity (don't re-open cold) is handled by feeding Elena
+    # the prior installments as context — not by bumping the week number.
+    def _inst_date(p):
+        return str(p.get("date") or p.get("sk", "")).replace("DATE#", "")
+
+    prologue = [p for p in data.get("prev_installments", []) if _inst_date(p) and _inst_date(p) < journey_start]
     packet.append(f"Week number: {week_num}")
-    packet.append(f"Journey start: {journey_start}")
+    packet.append(f"Journey start (experiment genesis): {journey_start}")
+    if prologue:
+        packet.append(
+            f"TIMELINE — CRITICAL: {len(prologue)} earlier installment(s) are PRE-GENESIS PROLOGUE "
+            f"(backstory dated before the {journey_start} genesis). They are NOT experiment weeks. "
+            f"This is experiment WEEK {week_num}; the measured experiment is {week_num} week(s) old. "
+            f"NEVER describe the experiment, the weight loss, the training load, or any streak as "
+            f"spanning more weeks than that. Draw on the prologue for continuity and backstory, but "
+            f"the measured clock — and any 'in N weeks' framing — starts at genesis."
+        )
     # Matthew-specific fallback defaults; only used if profile fetch fails
     packet.append(f"Journey start weight: {profile.get('journey_start_weight_lbs', EXPERIMENT_BASELINE_WEIGHT_LBS)} lbs")
     packet.append(f"Goal weight: {profile.get('goal_weight_lbs', 185)} lbs")
@@ -859,7 +874,7 @@ CONTINUITY:
 If you have previous installments, USE THEM. Pick up threads. Make callbacks. Track character development across weeks. If you wrote about his fear of rest days previously, and this week he voluntarily took two, SAY THAT. The longitudinal view is your superpower as the embedded journalist. If this is the first installment, establish the story from the beginning.
 
 FIRST INSTALLMENT — SPECIAL RULE:
-If this is Week 1 (no previous installments exist, or week_number == 1), open with one mundane sensory detail — the temperature in the kitchen at 5 AM, the texture of a protein shake, what Matthew was wearing on Tuesday. Not a polished insight. Not an analytical thesis. Something small, specific, and slightly awkward — the way a real journalist notices small things before they figure out what story they're telling. Earn the reader's trust through specificity, then earn it again through honesty. Save the analytical voice for Week 2.
+This special rule applies ONLY to the very first installment — when NO previous installments exist at all (not merely when week_number == 1). A Week 1 that follows a PROLOGUE is NOT a cold open: you already have backstory, so pick up its threads, do not re-introduce Matthew from scratch. When it genuinely is the first installment, open with one mundane sensory detail — the temperature in the kitchen at 5 AM, the texture of a protein shake, what Matthew was wearing on Tuesday. Not a polished insight. Not an analytical thesis. Something small, specific, and slightly awkward — the way a real journalist notices small things before they figure out what story they're telling. Earn the reader's trust through specificity, then earn it again through honesty.
 
 METRICS AS TEXTURE, NOT STRUCTURE:
 When you reference numbers (and you should — they're concrete and vivid), weave them into the narrative naturally. "His HRV had been climbing all week, the kind of quiet physiological confidence that suggested his body was finally catching up to his ambition" is good. "On Monday his HRV was 45, on Tuesday it was 48, on Wednesday it was 51" is bad. Use numbers to ILLUMINATE, not to catalogue.
@@ -956,7 +971,7 @@ CONTINUITY:
 If you have previous installments, USE THEM. Pick up threads. Make callbacks. Track character development across weeks. If you wrote about his fear of rest days previously, and this week he voluntarily took two, SAY THAT. The longitudinal view is your superpower as the embedded journalist. If this is the first installment, establish the story from the beginning.
 
 FIRST INSTALLMENT — SPECIAL RULE:
-If this is Week 1 (no previous installments exist, or week_number == 1), open with one mundane sensory detail — the temperature in the kitchen at 5 AM, the texture of a protein shake, what Matthew was wearing on Tuesday. Not a polished insight. Not an analytical thesis. Something small, specific, and slightly awkward — the way a real journalist notices small things before they figure out what story they're telling. Earn the reader's trust through specificity, then earn it again through honesty. Save the analytical voice for Week 2.
+This special rule applies ONLY to the very first installment — when NO previous installments exist at all (not merely when week_number == 1). A Week 1 that follows a PROLOGUE is NOT a cold open: you already have backstory, so pick up its threads, do not re-introduce Matthew from scratch. When it genuinely is the first installment, open with one mundane sensory detail — the temperature in the kitchen at 5 AM, the texture of a protein shake, what Matthew was wearing on Tuesday. Not a polished insight. Not an analytical thesis. Something small, specific, and slightly awkward — the way a real journalist notices small things before they figure out what story they're telling. Earn the reader's trust through specificity, then earn it again through honesty.
 
 METRICS AS TEXTURE, NOT STRUCTURE:
 When you reference numbers (and you should — they're concrete and vivid), weave them into the narrative naturally. "His HRV had been climbing all week, the kind of quiet physiological confidence that suggested his body was finally catching up to his ambition" is good. "On Monday his HRV was 45, on Tuesday it was 48, on Wednesday it was 51" is bad. Use numbers to ILLUMINATE, not to catalogue.
@@ -1211,6 +1226,34 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     except Exception:
         date_display = date_str
 
+    # Series label is anchored to the experiment GENESIS, not the installment count: posts dated
+    # before genesis are the PROLOGUE (backstory), and the experiment week count starts at 1 on
+    # the genesis week. URLs stay sequential (week-NN, prologue-inclusive) so existing links never
+    # break; the visible label is what carries the truth. (Fixes the "Week 3 / three weeks" error
+    # where pre-genesis lead-ins were numbered as experiment weeks — 2026-06-21.)
+    _ROMAN = {1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI", 7: "VII", 8: "VIII"}
+    _genesis = EXPERIMENT_START_DATE
+    _all_dates = sorted(x.get("date", "") for x in all_installments if x.get("date", ""))
+    _pre = [d for d in _all_dates if d < _genesis]
+
+    def _series_label(d):
+        if not d:
+            return f"Week {int(week_num)}"
+        if d < _genesis:
+            n = _pre.index(d) + 1 if d in _pre else 1
+            return f"Prologue · Part {_ROMAN.get(n, n)}"
+        try:
+            wk = max(1, ((datetime.strptime(d, "%Y-%m-%d").date() - datetime.strptime(_genesis, "%Y-%m-%d").date()).days // 7) + 1)
+        except Exception:
+            wk = int(week_num)
+        return f"Week {wk}"
+
+    def _seq_for(d):
+        return (_all_dates.index(d) + 1) if d in _all_dates else int(week_num)
+
+    cur_label = _series_label(date_str)
+    cur_seq = _seq_for(date_str)
+
     # Extract read time (~250 words/min)
     word_count = len(body_html.split())
     read_min = max(4, round(word_count / 250))
@@ -1222,7 +1265,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="{title} — Week {week_num} of The Measured Life by Elena Voss">
+  <meta name="description" content="{title} — {cur_label} of The Measured Life by Elena Voss">
   <meta property="og:title" content="{title} — The Measured Life">
   <meta property="og:description" content="{stats_line}">
   <meta property="og:type" content="article">
@@ -1232,7 +1275,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     "@context": "https://schema.org",
     "@type": "BlogPosting",
     "headline": "{title}",
-    "description": "Week {week_num} of The Measured Life by Elena Voss",
+    "description": "{cur_label} of The Measured Life by Elena Voss",
     "datePublished": "{datetime.now(timezone.utc).date().isoformat()}",
     "author": {{"@type": "Person", "name": "Elena Voss"}},
     "publisher": {{
@@ -1246,7 +1289,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     }},
     "mainEntityOfPage": {{
       "@type": "WebPage",
-      "@id": "https://averagejoematt.com/chronicle/posts/week-{week_num:02d}/"
+      "@id": "https://averagejoematt.com/chronicle/posts/week-{cur_seq:02d}/"
     }},
     "articleSection": "Health Transformation",
     "isPartOf": {{
@@ -1300,7 +1343,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
   <div class="nav__status"><div class="pulse" style="background:var(--accent)"></div><span>The Measured Life</span></div>
 </nav>
 <div class="post-header">
-  <div class="post-header__series">The Measured Life &middot; Week {week_num} &middot; By Elena Voss</div>
+  <div class="post-header__series">The Measured Life &middot; {cur_label} &middot; By Elena Voss</div>
   <h1 class="post-header__title">&ldquo;{title}&rdquo;</h1>
   <div class="post-header__meta">
     <span>{date_display}</span>
@@ -1336,20 +1379,23 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
 </body>
 </html>"""
 
-    week_num = int(week_num)  # guard: DynamoDB Decimal → float after d2f
-    post_key = f"generated/journal/posts/week-{week_num:02d}/index.html"
+    post_key = f"generated/journal/posts/week-{cur_seq:02d}/index.html"
 
-    # Update posts.json manifest
+    # Update posts.json manifest — ordered newest-first by DATE (not by a week number, which now
+    # collides: a pre-genesis prologue and the genesis Week 1 can share a raw number). URLs are the
+    # stable sequential index; "label" carries the genesis-anchored truth (Prologue vs Week N).
     posts_manifest = []
-    for inst in sorted(all_installments, key=lambda x: int(x.get("week_number", 0)), reverse=True):
-        wn = int(inst.get("week_number", 0))
+    for inst in sorted(all_installments, key=lambda x: x.get("date", ""), reverse=True):
+        idate = inst.get("date", "")
+        seq = _seq_for(idate)
         posts_manifest.append(
             {
-                "week": wn,
+                "week": int(inst.get("week_number", 0) or 0),
+                "label": _series_label(idate),
                 "title": inst.get("title", ""),
-                "date": inst.get("date", ""),
+                "date": idate,
                 "stats_line": inst.get("stats_line", ""),
-                "url": f"/journal/posts/week-{wn:02d}/",
+                "url": f"/journal/posts/week-{seq:02d}/",
                 "excerpt": (inst.get("content_markdown") or "")[:300].strip(),
                 "word_count": inst.get("word_count", 0),
                 "has_board_interview": inst.get("has_board_interview", False),
