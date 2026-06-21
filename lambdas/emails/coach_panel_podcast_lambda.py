@@ -1074,12 +1074,13 @@ def _weekly_gate(turns: list, allowed_numbers, guest_id: str):
         if sg:
             hold.extend(sg)  # fail CLOSED — a safety hit holds the whole episode
             continue
-        # Hard checks only (no fabricated numbers, no causal, no Matt-prefix). The
-        # small-n hedge can't be a per-line rule — it over-drops conversational lines;
-        # the editor (LLM judge) enforces hedging-on-findings with full context.
-        ok, _r = er03_gate.er03_check(line, allowed_numbers=allowed_numbers, n=None)
-        if ok:
-            clean.append({"speaker": spk, "line": line})
+        # Deliberately NOT dropping on an ER-03 number mismatch here: ER-03 string-matches digits,
+        # but a believable spoken podcast says numbers in words ("eight thousand") and restates a
+        # bet's derived figures, so the matcher over-drops — and a silently dropped turn leaves a
+        # hole (e.g. an unanswered question, the Episode-1 bug). Safety violations above still HOLD
+        # the whole episode; number FABRICATION is caught by the weekly read-aloud QA gate's GROUNDED
+        # rubric (an LLM judge that understands paraphrase), with human-in-the-loop review behind it.
+        clean.append({"speaker": spk, "line": line})
     return clean, sorted(set(hold))
 
 
