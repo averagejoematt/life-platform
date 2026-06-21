@@ -66,6 +66,17 @@
 
 ---
 
+### Website QA + elite elevation (2026-06-21, PR #190 — plan `zazzy-yawning-quiche.md`)
+
+**Shipped + live-verified (Matthew's 10-item QA pass):** all 8 data-correctness bugs (#1/#3 homepage chronicle feed + genesis labels, #2 lab-notes week_label, #4 `/now/` stale-synthesis hardening + re-run, #5/#6 Hevy cardio/stretching in cardio panel, #7 1RM via weight_kg+Epley, #8 Apple-Health-first steps) + #9 nutrition elevation (calorie-vs-TDEE / protein-vs-target trends, macro stacked bar, periodization/eating-window) + #10 habits elevation (keystone-correlation panel, adherence trend, per-group bars). New `charts.js` primitives `stackedBar`/`correlationChip`.
+
+**Open follow-ups (WQA-series — additive elevation, not bugs):**
+- [ ] **WQA-01 — Evidence long-tail sweep.** Audit the remaining ~35 Evidence topics (vitals/labs/glucose/sleep/mind/vices/ledger/body-comp/…) for rich endpoint data computed-but-not-visualized; elevate each with the chart toolkit. **Verify-before-building** — much post-genesis data is legitimately thin (an honest "not enough yet" is on-brand, not a gap).
+- [ ] **WQA-02 — Nav legibility.** Shared `doors.js` active-door state (`aria-current` + ember tick) + a what-lives-where caption per door across the 5 doors (kills the 6× hand-duplicated nav drift). Keeps all 5 doors (Matthew's call), just makes the hierarchy legible.
+- [ ] **WQA-03 — visual QA pass.** Run `tests/visual_qa.py --screenshot --ai-qa` on the elevated pages; Matthew eyeballs `/evidence/nutrition/` + `/evidence/habits/` + `/` + `/now/`.
+
+---
+
 ## 📋 By status
 
 | Bucket | Count | Action mode |
