@@ -28,6 +28,7 @@ Run directly for the drift self-check:  python3 tests/site_review_bindings.py
 from __future__ import annotations
 
 import os
+import re
 import sys
 
 # ── Per-metric agreement tolerance for the cross-page consistency check ───────
@@ -179,24 +180,34 @@ PAGE_BINDINGS = [
         "story_intent": "who this is and why — the premise and the promise",
         "endpoints": [],  # editorial
     },
+    # Door 4 "The Coaching" (/coaching/) — promoted out of Story (2026-06-20). narrative_order
+    # keeps it story-adjacent (7.x via 71-73 to avoid renumbering the evidence block at 10-22).
     {
-        "path": "/story/coaches/",
-        "name": "Story · The Coaches (roster + My Team)",
-        "door": "story",
-        "narrative_order": 7,
-        "story_intent": "meet the AI team reading the data — and how they disagree",
+        "path": "/coaching/",
+        "name": "Coaching hub (My Team)",
+        "door": "coaching",
+        "narrative_order": 71,
+        "story_intent": "meet the AI team reading the data — the collective read + how they disagree",
         "endpoints": [
             {"url": "/api/coaches", "role": "primary", "metrics": []},
             {"url": "/api/coach_team", "role": "primary", "metrics": []},
         ],
     },
     {
-        "path": "/story/coaches/#sleep_coach",
-        "name": "Story · coach page (deep-link)",
-        "door": "story",
-        "narrative_order": 8,
+        "path": "/coaching/coaches/#sleep_coach",
+        "name": "Coaching · coach page (deep-link)",
+        "door": "coaching",
+        "narrative_order": 72,
         "story_intent": "one coach in depth — stance, track record, the calls they made",
         "endpoints": [{"url": "/api/coach/sleep_coach", "role": "primary", "metrics": []}],
+    },
+    {
+        "path": "/coaching/lab-notes/",
+        "name": "Coaching · AI lab notes",
+        "door": "coaching",
+        "narrative_order": 73,
+        "story_intent": "the Third Wall — the AI's weekly read against Matthew's response",
+        "endpoints": [{"url": "/api/field_notes", "role": "primary", "metrics": []}],
     },
     {
         "path": "/evidence/",
@@ -279,6 +290,43 @@ def metric_observations():
     return obs
 
 
+# ── Coverage guard: new doors must not silently escape the review ────────────────
+# First path segment of a public route → its door.
+_SEGMENT_TO_DOOR = {"": "home", "now": "cockpit", "story": "story", "coaching": "coaching", "evidence": "evidence"}
+
+
+def _sitemap_routes():
+    """Public route paths from the generated sitemap — the authoritative indexable-page list."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    sm = os.path.join(here, "..", "site", "sitemap.xml")
+    if not os.path.exists(sm):
+        return []
+    with open(sm, encoding="utf-8") as f:
+        txt = f.read()
+    routes = []
+    for loc in re.findall(r"<loc>([^<]+)</loc>", txt):
+        m = re.match(r"https?://[^/]+(/.*)?$", loc.strip())
+        routes.append(m.group(1) if (m and m.group(1)) else "/")
+    return routes
+
+
+def coverage_gaps():
+    """Top-level doors that have public pages in the sitemap but NO PAGE_BINDINGS coverage.
+
+    The door-level safety net: catches a whole new section/door shipped without QA
+    registration (the /coaching/ blind spot, 2026-06-20). Per-page gaps inside the
+    curated Evidence-topic subset are intentional and NOT flagged here.
+    """
+    bound_doors = {b["door"] for b in PAGE_BINDINGS}
+    seen = set()
+    for r in _sitemap_routes():
+        seg = r.strip("/").split("/")[0] if r.strip("/") else ""
+        door = _SEGMENT_TO_DOOR.get(seg)
+        if door:
+            seen.add(door)
+    return sorted(seen - bound_doors)
+
+
 # ── Drift self-check ────────────────────────────────────────────────────────────
 def selfcheck():
     """Assert the binding map stays in sync with visual_qa.PAGES and REGISTRY.
@@ -310,6 +358,12 @@ def selfcheck():
     orders = [b["narrative_order"] for b in PAGE_BINDINGS]
     if len(orders) != len(set(orders)):
         problems.append("narrative_order values are not unique")
+
+    # coverage: a new top-level door in the sitemap with no bindings is a blind spot
+    for door in coverage_gaps():
+        problems.append(
+            f"sitemap has '{door}'-door pages but no PAGE_BINDINGS cover that door — " f"register them in visual_qa.PAGES + PAGE_BINDINGS"
+        )
 
     return (not problems, problems)
 
