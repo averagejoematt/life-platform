@@ -14,7 +14,7 @@ const SECTIONS = [
   { key: "chronicle", label: "Chronicle", kicker: "written weekly by Elena Voss", kind: "posts", url: "/chronicle/posts.json" },
   { key: "lab-notes", label: "AI lab notes", kicker: "what the AI saw ↔ how it felt", kind: "fieldnotes", url: "/api/field_notes" },
   { key: "coaches", label: "The Coaches", kicker: "the AI team reading your data", kind: "coaches", url: "/api/coaches" },
-  { key: "panel", label: "The Panel", kicker: "Elena + a coach review the week", kind: "podcast", url: "/panelcast/episodes.json" },
+  { key: "panel", label: "Podcast", kicker: "Elena + a coach review the week", kind: "podcast", url: "/panelcast/episodes.json" },
   { key: "journal", label: "In my own words", kicker: "the daily journal", kind: "posts", url: "/journal/posts.json" },
   { key: "timeline", label: "Timeline", kicker: "level-ups & milestones", kind: "timeline", url: "/api/journey_timeline" },
   { key: "about", label: "About", kicker: "the experiment, in context", kind: "about" },
@@ -66,12 +66,17 @@ async function renderTranscript(url, mount) {
 const cache = {};
 async function secFetch(s) { if (!s.url) return null; if (cache[s.key]) return cache[s.key]; const d = await tryJSON(s.url); cache[s.key] = d; return d; }
 
+// NOTE (2026-06-20): personable rewrite drawn from Matt's prior /legacy/about copy,
+// kept within the §11 editorial guardrails (no employer/industry/role specifics) and
+// free of hard tool/lambda counts (those live in Evidence, to avoid drift). Pending
+// Matt's review of the voice before deploy.
 const ABOUT = `
   <p class="dx-kicker label">the experiment, in context</p>
-  <h3 class="dx-title">An honest documentary of an ordinary life, rebuilt with AI.</h3>
-  <p class="dx-prose">No million-dollar lab and no guru — just the wearables already on the body, a model that reads the numbers back every morning, and the willingness to publish the down weeks too. The bet is simple: numbers <em>and</em> meaning, kept honest and personal. The anti-Blueprint.</p>
-  <p class="dx-prose">Everything here is correlative, never causal — patterns, flagged when thin, never dressed up as proof. The board of named AI experts argues about the data; Elena writes the weekly chronicle; the Third Wall is where the machine's read meets how it actually felt. This is the overlay — the story on top of the instrument.</p>
-  <p class="dx-prose">The throughline: <strong>you could do this too</strong>. The cockpit and the evidence hold the live data; these dispatches hold the why.</p>`;
+  <h3 class="dx-title">An ordinary person, rebuilt in public — with AI.</h3>
+  <p class="dx-prose">I've spent two decades making complicated systems reliable and getting people to actually use them. In early 2026 I turned that same thinking on myself — not a challenge, not a 30-day hack, but a proper system: the wearables already on my body, an AI that reads the numbers back to me every morning, and the discipline to publish the down weeks too.</p>
+  <p class="dx-prose">This isn't Blueprint. No million-dollar lab, no team of doctors, no superhuman protocol — just consumer devices, Claude, and a commitment to keep it honest. Every number here is real; every failure is included. The bet is simple: <strong>numbers <em>and</em> meaning, kept personal.</strong> The anti-Blueprint.</p>
+  <p class="dx-prose">A board of named AI experts argues about my data; Elena Voss writes the weekly chronicle; the Third Wall is where the machine's read meets how it actually felt. Everything here is correlative, never causal — patterns, flagged when thin, never dressed up as proof.</p>
+  <p class="dx-prose">The throughline I keep coming back to: <strong>you could do this too</strong>. The cockpit and the evidence hold the live data; this is the why. If something here resonates — you're going through something similar, or just curious — I'd genuinely love to hear from you: <a href="mailto:matt@averagejoematt.com">matt@averagejoematt.com</a>.</p>`;
 
 function entriesFor(s, data) {
   if (!data) return [];
@@ -249,9 +254,15 @@ async function renderRead(s, id) {
   if (s.kind === "about") { read.innerHTML = ABOUT; return; }
   if (s.kind === "coaches") { if (String(id) === "team") { await renderTeamView(read); } else { await renderCoachPage(read, id); } return; }
   if (s.kind === "podcast") {
-    const all = entriesFor(s, await secFetch(s));
+    const data = await secFetch(s);
+    const all = entriesFor(s, data);
+    // The pipeline can skip a week (e.g. the chronicle isn't written yet); it records
+    // a `pending` marker so we say WHY instead of going silent (matches the show's honesty).
+    const pendingHTML = data && data.pending && data.pending.display
+      ? `<aside class="panel-pending"><p class="dx-kicker label">next episode</p><p class="dx-prose">${esc(data.pending.display)}</p></aside>`
+      : "";
     const ent = all.find((x) => String(x.id) === String(id)) || all[0];
-    if (!ent) { read.innerHTML = `<p class="dx-prose">No episodes yet — the first weekly review drops here once the chronicle's been running a week.</p>`; return; }
+    if (!ent) { read.innerHTML = pendingHTML + `<p class="dx-prose">No episodes yet — the first weekly review drops here once the chronicle's been running a week.</p>`; return; }
     const isWav = /\.wav$/i.test(ent.url || "");
     const secs = ent.duration_sec || Math.round((ent.bytes || 0) / (isWav ? 48000 : 2097));  // WAV=24kHz·16-bit·mono; else MP3 est
     const mins = Math.max(1, Math.round(secs / 60));
@@ -272,7 +283,8 @@ async function renderRead(s, id) {
         `</section>`;
     }
     read.innerHTML =
-      `<p class="dx-kicker label">the panel · weekly review · two AI voices</p>` +
+      pendingHTML +
+      `<p class="dx-kicker label">the podcast · weekly review · two AI voices</p>` +
       `<h3 class="dx-title">${esc(ent.title)}</h3>` +
       (ent.date ? `<p class="dx-stats label">${esc(ent.date)}</p>` : "") +
       `<div class="dx-listen"><audio controls preload="none" src="${esc(ent.url)}"></audio><span class="label">listen · ${byline} (~${mins} min)</span></div>` +
@@ -296,9 +308,17 @@ async function renderRead(s, id) {
     read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the field note…</span></p>`;
     try {
       const d = await getJSON(`/api/field_notes?week=${encodeURIComponent(id)}`); const e = d.entry || {};
-      const voices = [["The AI", e.ai_present, "machine"], ["Worth watching", e.ai_cautionary, "machine"], ["Worth celebrating", e.ai_affirming, "machine"], ["Matthew", e.matthew_agreement, "human"]].filter((v) => v[1]);
-      read.innerHTML = `<p class="dx-kicker label">field note · week ${esc(id)}${e.ai_tone ? ` · ${esc(e.ai_tone)}` : ""}</p>` +
-        (voices.length ? voices.map(([who, txt, cls]) => `<div class="voice ${cls}"><span class="who">${esc(who)}</span><p class="what">${esc(txt)}</p></div>`).join("") : `<p class="dx-prose">No field note recorded for this week yet.</p>`);
+      // The Third Wall, explicit: the AI's read (them) → Matthew's response (me).
+      const ai = [["The AI's read", e.ai_present, "machine"], ["Worth watching", e.ai_cautionary, "machine"], ["Worth celebrating", e.ai_affirming, "machine"]].filter((v) => v[1]);
+      const mattText = e.matthew_notes || e.matthew_agreement;
+      const mattVoice = mattText
+        ? `<div class="voice human"><span class="who">Matthew</span><p class="what">${esc(mattText)}</p></div>`
+        : `<div class="voice human voice-pending"><span class="who">Matthew</span><p class="what">Pending Matthew's response — he hasn't weighed in on the AI's read of this week yet.</p></div>`;
+      const hasAny = ai.length || mattText;
+      read.innerHTML = `<p class="dx-kicker label">field note · week ${esc(id)} · the AI's read ↔ Matthew's response${e.ai_tone ? ` · ${esc(e.ai_tone)}` : ""}</p>` +
+        (hasAny
+          ? ai.map(([who, txt, cls]) => `<div class="voice ${cls}"><span class="who">${esc(who)}</span><p class="what">${esc(txt)}</p></div>`).join("") + mattVoice
+          : `<p class="dx-prose">No field note recorded for this week yet.</p>`);
     } catch (e) { read.innerHTML = `<p class="dx-prose">Couldn't load this field note just now.</p>`; }
     enhanceCoachNames(read);  // CC-04: coach-name popovers in lab notes
     return;
