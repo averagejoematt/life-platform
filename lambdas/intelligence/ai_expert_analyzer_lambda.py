@@ -1012,40 +1012,46 @@ Produce EXACTLY this JSON structure (no markdown, no explanation):
 For disagreements: only flag GENUINE conflicts where two coaches would give Matthew contradictory advice. Do not invent disagreements. Empty list is fine if all coaches are aligned."""
 
     api_key = _get_api_key()
-    req_body = json.dumps(
-        {
-            "model": AI_MODEL,
-            "max_tokens": 1200,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-    )
 
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=req_body.encode(),
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-        },
-    )
+    def _build_req():
+        # max_tokens 1200 truncated the JSON mid-string → json.loads threw and the whole
+        # synthesis fail-closed to the previous day's (stale) record (the /now/ "collapsed
+        # to one session/week" bug). Raised to 2048 to fit the full structured response.
+        body = json.dumps({"model": AI_MODEL, "max_tokens": 2048, "messages": [{"role": "user", "content": prompt}]})
+        return urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=body.encode(),
+            headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
+        )
+
+    # Phase 3.4: retry via retry_utils. B4: also retry on a JSON-PARSE failure (a truncated/
+    # malformed reply must not silently leave yesterday's stale record live) — up to 2 tries.
+    from retry_utils import call_anthropic_raw
+
+    synthesis = None
+    last_err = None
+    for attempt in (1, 2):
+        try:
+            result = call_anthropic_raw(_build_req(), timeout=60)
+            text = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
+            cleaned = text.strip()
+            if cleaned.startswith("```"):
+                cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
+            if cleaned.endswith("```"):
+                cleaned = cleaned[:-3]
+            synthesis = json.loads(cleaned.strip())
+            break
+        except json.JSONDecodeError as e:
+            last_err = e
+            logger.warning("Synthesis JSON parse failed (attempt %d/2): %s", attempt, e)
+        except Exception as e:  # noqa: BLE001
+            last_err = e
+            logger.error("Synthesis call failed (attempt %d/2): %s", attempt, e)
+    if synthesis is None:
+        logger.error("Synthesis generation failed after retries: %s", last_err)
+        return None
 
     try:
-        # Phase 3.4 (2026-05-16): retry via retry_utils.
-        from retry_utils import call_anthropic_raw
-
-        result = call_anthropic_raw(req, timeout=60)
-
-        text = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
-
-        # Parse JSON from response (strip markdown fencing if present)
-        cleaned = text.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3]
-        synthesis = json.loads(cleaned.strip())
-
         # Cache synthesis to DDB
         now = datetime.now(timezone.utc)
         ttl = int((now + timedelta(days=8)).timestamp())
