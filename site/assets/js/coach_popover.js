@@ -54,7 +54,7 @@ function show(chip, c) {
     `<p class="cp-name">${esc(c.emoji || "")} ${esc(c.name)}</p>` +
     `<p class="cp-role label">${esc(c.board_role || c.domain || "")}</p>` +
     (c.short_bio ? `<p class="cp-bio">${esc(c.short_bio)}</p>` : "") +
-    `<a class="cp-link" href="/story/coaches/#${esc(c.persona_id)}">full page →</a>`;
+    `<a class="cp-link" href="/coaching/coaches/#${esc(c.persona_id)}">full page →</a>`;
   p.hidden = false;
   const r = chip.getBoundingClientRect();
   const top = window.scrollY + r.bottom + 6;
