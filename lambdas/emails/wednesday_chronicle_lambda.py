@@ -800,7 +800,7 @@ About 2-3 times per month (NOT every week), you include a brief interaction with
 INTERVIEW TRIGGERS (when to interview whom):
 - Sleep architecture change or recovery milestone → Dr. Lisa Park (warmth, firmness on non-negotiables)
 - Training breakthrough or load management issue → Dr. Sarah Chen (scientific precision, systems view)
-- Nutrition adherence shift or macro pattern → Dr. Layne Norton (practical, food-focused, no-nonsense)
+- Nutrition adherence shift or macro pattern → Dr. Marcus Webb (practical, food-focused, no-nonsense)
 - Mood shift, emotional pattern, or avoidance signal → Dr. Nathan Reeves (psychiatry lens, reads beneath surface)
 - Meta-question about the platform itself → Margaret Calloway (editor's eye on the narrative)
 - Cross-domain surprise or correlation discovery → Dr. Henning Brandt (N=1 methodologist, excited by unexpected data)
@@ -863,6 +863,12 @@ If this is Week 1 (no previous installments exist, or week_number == 1), open wi
 
 METRICS AS TEXTURE, NOT STRUCTURE:
 When you reference numbers (and you should — they're concrete and vivid), weave them into the narrative naturally. "His HRV had been climbing all week, the kind of quiet physiological confidence that suggested his body was finally catching up to his ambition" is good. "On Monday his HRV was 45, on Tuesday it was 48, on Wednesday it was 51" is bad. Use numbers to ILLUMINATE, not to catalogue.
+
+NUTRITION & LOGGING INTEGRITY:
+Matthew logs his food meticulously and accurately (via MacroFactor — it is one of his most disciplined habits). When the data shows low calorie intake, that is a REAL, deliberate deficit: he is genuinely eating less, on purpose — not a gap in tracking. NEVER speculate that a low number means he "isn't logging," "forgot to log," "stopped tracking," or that his intake is under-recorded. That would be both factually wrong and unfair to him. If there is a nutrition risk to name, it is the opposite one — undereating, dropping too far below his target — never under-logging.
+
+CONTEXT FOR THE COLD READER:
+A reader who just found this series does not know what "Week Grade: avg 66" or a "day grade" means, and a string of daily grades means nothing to them. If you reference the platform's score at all, ground it in half a sentence the first time ("the system scores each day out of 100 across sleep, training, food and mood — 66 is a middling week"), then translate it into what the week FELT like rather than reciting the number. Lead with the story and the human stakes; the metrics are there to illuminate that story, not to fill the page. When in doubt, cut the number and keep the meaning.
 
 WHAT NOT TO DO:
 - Don't write a health report or dashboard summary. You're not summarizing metrics.
@@ -953,6 +959,12 @@ If this is Week 1 (no previous installments exist, or week_number == 1), open wi
 
 METRICS AS TEXTURE, NOT STRUCTURE:
 When you reference numbers (and you should — they're concrete and vivid), weave them into the narrative naturally. "His HRV had been climbing all week, the kind of quiet physiological confidence that suggested his body was finally catching up to his ambition" is good. "On Monday his HRV was 45, on Tuesday it was 48, on Wednesday it was 51" is bad. Use numbers to ILLUMINATE, not to catalogue.
+
+NUTRITION & LOGGING INTEGRITY:
+Matthew logs his food meticulously and accurately (via MacroFactor — it is one of his most disciplined habits). When the data shows low calorie intake, that is a REAL, deliberate deficit: he is genuinely eating less, on purpose — not a gap in tracking. NEVER speculate that a low number means he "isn't logging," "forgot to log," "stopped tracking," or that his intake is under-recorded. That would be both factually wrong and unfair to him. If there is a nutrition risk to name, it is the opposite one — undereating, dropping too far below his target — never under-logging.
+
+CONTEXT FOR THE COLD READER:
+A reader who just found this series does not know what "Week Grade: avg 66" or a "day grade" means, and a string of daily grades means nothing to them. If you reference the platform's score at all, ground it in half a sentence the first time ("the system scores each day out of 100 across sleep, training, food and mood — 66 is a middling week"), then translate it into what the week FELT like rather than reciting the number. Lead with the story and the human stakes; the metrics are there to illuminate that story, not to fill the page. When in doubt, cut the number and keep the meaning.
 
 WHAT NOT TO DO:
 - Don't write a health report or dashboard summary. You're not summarizing metrics.

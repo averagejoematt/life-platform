@@ -1,8 +1,8 @@
-chronicle handler report — mode=APPLY — genesis=2026-06-14
-generated=2026-06-13T16:44:28.640257+00:00
+chronicle handler report — mode=DRY-RUN — genesis=2026-06-14
+generated=2026-06-21T02:02:26.757750+00:00
 
 html_files_total       = 18
 html_files_archived    = 0
 html_files_already_archived = 18
 index_pages_rewritten  = 3
-chronicles_resurrected = 0
+chronicles_resurrected = 2
