@@ -13,10 +13,16 @@ import { enhanceCoachNames } from "/assets/js/coach_popover.js";
 // NB (2026-06-20): "The Coaches" + "AI lab notes" moved OUT to their own top-level
 // door, /coaching/ (assets/js/coaching.js). The coach/fieldnotes renderer functions
 // below are retained-but-unused here (they now live in coaching.js) — pending cleanup.
+// Feed wiring (2026-06-21, PR D — untangle): the chronicle Lambda writes Elena's
+// weekly installments to generated/journal/posts.json (served at /journal/posts.json,
+// phase-filtered → current-cycle only). That IS the Chronicle feed — point Chronicle
+// at it so cycle-4 issues appear and pre-genesis ones don't. "In my own words" is
+// Matt's OWN blog: a separate, Matt-authored source (/journal/blog.json), honestly
+// empty until he writes one — never the AI-written chronicle content.
 const SECTIONS = [
-  { key: "chronicle", label: "Chronicle", kicker: "written weekly by Elena Voss", kind: "posts", url: "/chronicle/posts.json" },
+  { key: "chronicle", label: "Chronicle", kicker: "written weekly by Elena Voss", kind: "posts", url: "/journal/posts.json" },
   { key: "panel", label: "Podcast", kicker: "Elena + a coach review the week", kind: "podcast", url: "/panelcast/episodes.json" },
-  { key: "journal", label: "In my own words", kicker: "the daily journal", kind: "posts", url: "/journal/posts.json" },
+  { key: "journal", label: "In my own words", kicker: "Matt's own blog", kind: "posts", url: "/journal/blog.json" },
   { key: "timeline", label: "Timeline", kicker: "level-ups & milestones", kind: "timeline", url: "/api/journey_timeline" },
   { key: "about", label: "About", kicker: "the experiment, in context", kind: "about" },
 ];
