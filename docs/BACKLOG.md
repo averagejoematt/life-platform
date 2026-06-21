@@ -48,6 +48,24 @@
 
 ---
 
+### Training & coaching workstream — Stages 1–3 (2026-06-21, PRs #186/#187/#188)
+
+**Shipped + deployed + live-verified:**
+- ✅ **Stage 1 — data integrity** (#186): `get_muscle_volume` completeness signal (B2a), Pallof/carries→Core classifier fix (B2b), `get_freshness_status` MCP interior-gap scan (B3, closed the ADR-092 follow-up). B1 (Strava walk gap) was already fixed by DI-2 #180.
+- ✅ **Stage 2 — recovery-adaptive authoring** (#186, ADR-093): freshness gate + tier-agnostic GREEN/YELLOW/RED branches (subtract-only) + `training_context` ceiling/floor modulation, in `manage_hevy_routine`. MCP-only deploy (no layer bump).
+- ✅ **Stage 3 Phase 1 — training-notes feedback loop** (#187, ADR-094): derived note-signal projection + bounded Haiku tail + `get_exercise_notes` (#136) + pain elevation + freshness extractor-dark guard. Layer **v88** (#188), backfilled, live.
+
+**Open follow-ups (TR-series):**
+- [ ] **TR-01 — Stage 3 Phase 2** (the loop-back, GATED): feed `get_exercise_notes` into the pre-flight + description generator; cross-exercise pattern detection (n-floored ≥3, correlative). **Gate (Viktor):** Phase 1 must be eyeballed against real notes for ~1–2 weeks first — Phase 1 alone is instrumentation, Phase 2 is what justifies the build. Matthew confirms accuracy → build.
+- [ ] **TR-02 — `deviation` ingest wiring**: the pure pushed-vs-performed diff (`compute_deviation`) is built + tested but not wired on-ingest — needs a `template_id`↔`movement_key` map (pushed IR keys internally, performed workout keys by Hevy `template_id`). ADR-094.
+- [ ] **TR-03 — promote `branches` to a first-class IR field + compiler rendering** (Stage 2): so the autonomous Phase-3 cron authoring path and a future overnight re-stamp inherit the adaptive block. Requires a **layer bump** (routine_ir/hevy_compiler are layer-resident) — deferred from v1 which renders into exercise notes + inputs_snapshot. ADR-093.
+- [ ] **TR-04 — overnight re-stamp Lambda** (Stage 2, §8 deferred): post-Whoop-sync, pre-highlight the matching branch. v1 is self-selection only (Matthew's lock); must fail-open to the always-present branches if built.
+- [ ] **TR-05 — bring the cron authoring path onto the branch model** (`hevy_routine_cron_lambda` still emits the legacy ideal/floor pair). Pairs with TR-03.
+- [ ] **TR-06 — rest as a coach lever (NOT auto)**: prescribed `rest_seconds` round-trips via `get_routine` and is tracked; changing it is a multi-factor coach judgment (bodyweight/goals/phase), never auto-set from recovery. No build — a coaching-discipline note (see memory `feedback_rest_and_params_multifactor`).
+- [ ] **TR-07 — reconcile other activity sources** (ADR-092 out-of-scope): source-of-truth reconciliation for Whoop/Garmin (the pattern generalizes; each is a separate opt-in).
+
+---
+
 ## 📋 By status
 
 | Bucket | Count | Action mode |
