@@ -1,54 +1,128 @@
-# HANDOVER — 2026-06-20 · DI-1 deploy + HAE 413 remediation + Strava re-enable
+# Handover — 2026-06-21 (Chronicle truthfulness + Podcast quality pipeline)
 
-> Branch **`di1-movement-integrity`** — now **pushed**, **PR #160 open** to main, and
-> **fully deployed to production** (we deployed locally off this branch; the PR brings
-> `main` into agreement — it does NOT require a redeploy). Picks up at a **QA session**.
-> Prior session: `handovers/HANDOVER_2026-06-19_session_close.md`.
+A long single-thread session driven by Matt's review of the Story door and the new weekly
+podcast. Two workstreams: (1) make the chronicle tell the truth about the timeline + privacy,
+(2) rebuild the podcast to a "would a real human believe this" bar with a QA gate that can
+eventually run hands-off. **PRs #166–#182 merged + deployed; `origin/main` reconciled.**
 
-## What shipped this session (all live)
-1. **One-time native Apple Health import** (`backfill/onetime_apple_health_import_2026-06-20.py`) —
-   streamed the 1.2 GB `export.xml` from disk (the 512 MB / 5-min Lambda OOMs), windowed to
-   the experiment, **max-sum-across-sources dedup** (no iPhone+Garmin double-count), wrote via
-   production `save_day`. Corrected **6/14–6/20**: undercounts fixed (6/15 402→1547, 6/18 444→2720)
-   and **`active_calories` filled** (was `None` every day). Verified in DDB + S3 + the movement view.
-2. **DI-1 fully deployed** — layer **v87** (`source_state.py` + `intelligence_common.py`) published
-   via `cdk deploy LifePlatformCore`; `SHARED_LAYER_VERSION=87` in `constants.py`; redeployed
-   Compute, Operational, MCP, Ingestion. DI-1.1 `is_paused` confirmed live (pipeline-health reports
-   paused sources correctly). **Fixed layer drift:** `PipelineHealthCheck` was on an out-of-band v85
-   (no `shared_layer=` arg) → `source_state` silently no-op'd; added the arg so CDK pins it to v87.
-3. **DI-1.6 HAE silent-413 failsafe** (`freshness_checker_lambda.py`) — the 413 is rejected at the
-   HTTP-API gateway before metering (**verified 4xx/5xx==0** on dropped-payload days → invisible to
-   CloudWatch). Guard watches `steps` vs partition freshness + sustained-low; emits 3 metrics; respects
-   sick-days. Fixed a latent `active_energy_kcal`→`active_calories` completeness-bug. Tests: `test_hae_activity_failsafe.py` (6).
-4. **Capture-everything expansion** — promoted cycling/swimming/snow distance (+max-across-sources),
-   VO₂ max, walking-HR, walking-steadiness, physical effort, cycling FTP to daily fields in the HAE
-   webhook `METRIC_MAP` + batch `QUANTITY_RECORDS` + SCHEMA. Per-sample workout dynamics (power/cadence/
-   ground-contact/stride/oscillation) stay archived in raw S3 (daily-avg is noise). `basal_calories`
-   mapping confirmed already correct (HAE sends `basal_energy_burned`). Tests: `test_health_auto_export.py` (25).
-5. **Strava re-enabled** — live test returned **200** (402 paywall cleared; Garmin→Strava auto-upload
-   feeds it). Restored the hourly EventBridge schedule (`ingestion_stack.py`, was `schedule=None`) and
-   re-added strava to `freshness_checker` (SOURCES + `activity_count` completeness + OAuth). Rule is
-   **ENABLED**. NB: `strava` left in `DECLARED_PAUSED_SOURCES` — behaviorally inert (freshness-wins),
-   drop on next layer rebuild for tidiness (only `pipeline_health_check.is_paused()` reads it directly).
+---
 
-## HAE — PARKED ✅
-The config is remediated (Matt's changes: `Summarize=Yes` on Feeds 1/4/5/9/10, glucose Feed 6 kept raw,
-de-duped Step Count to Feed 10). Live incremental path **confirmed flowing** — steps/active/gait/basal
-landing, today's record self-updating via webhook GREATEST-on-write (6/20 steps 2,794→10,280).
-- **Caveat:** payloads are still **raw per-sample** (Summarize doesn't appear to collapse them) — fine
-  while hourly syncing keeps each window small; the death-spiral risk only returns on a multi-day stall,
-  which the failsafe catches in ~2 days. Worth confirming the `Summarize=Yes` toggle actually saved.
-- **Insurance:** drop a native `export.xml` into `datadrops/` ~quarterly and re-run the importer →
-  guarantees full-resolution history regardless of feed settings.
+## 1. Chronicle — now coherent + honest end-to-end
 
-## Commits on the branch (13; 10 prior + 3 this session)
-`bc03bcc1` v87 deploy + capture-everything · `c3c6d2ee` DI-1.6 failsafe + one-time import · `e015ae1b` Strava re-enable
-(+ the 10 DI-1.x/HAE-P0 commits from prior sessions). All tested, black + flake8 clean.
+The public chronicle reads as one arc:
 
-## NEXT
-1. **Merge PR #160** → reconciles `main` with what's live (already CI-equivalent-checked locally).
-2. **QA session** (the reason we stopped) — `/qa` sweep of averagejoematt.com + movement/HAE data spot-checks.
-3. Spot-check the **6/21 record** — a full day with no import behind it = clean proof the HAE incremental path stands alone.
-4. Minor/deferred: drop `strava` from `DECLARED_PAUSED_SOURCES` on the next layer rebuild; HAE UTC-day vs local-day partitioning decision (open design); Dr. Chen thread correction (out-of-band, Matthew, per ADR-091).
+| | Title | Date | State |
+|---|---|---|---|
+| **Prologue · Part I** | The Body Votes First | June 7 (pre-genesis) | live |
+| **Prologue · Part II** | The Empty Journal | June 11 (pre-genesis) | live |
+| **Week 1** | The Week That Decided to Begin | June 20 | live |
 
-**Verified:** 2026-06-20. Branch pushed, PR #160 open, production live on this code. Stopping for QA.
+- **Re-dated origin chapters → Prologue.** They were labelled "Week 1/Week 2" and their bodies
+  narrated "the platform went live this week / 302→301 / Week 1 data" — stale recycled content that
+  contradicted the June-14 genesis (314.52). Rewrote both as genuine pre-genesis backstory (Elena's
+  run-up portrait, "before the machine turned on"), **preserving ~95% of the prose Matt liked** (the
+  lag, the one perfect day, the empty journal, the watch in the drawer). Only the timeline framing
+  changed.
+- **Genesis-anchored week numbering** (`lambdas/emails/wednesday_chronicle_lambda.py`): week_num is
+  the date math from genesis, NOT the installment count. Pre-genesis lead-ins are Prologue and never
+  inflate the experiment week. Fixed the **"nine pounds in three weeks"** error (it was one week; the
+  prior continuation-numbering counted the 2 prologue chapters as experiment weeks).
+  `publish_to_journal` labels by date-vs-genesis ("Prologue · Part N" / "Week N"); **URLs stay
+  sequential** (`/journal/posts/week-NN/`) so links don't break. `posts.json` gained a `label` field.
+- **Vice/substance privacy guard (ABSOLUTE)** in both chronicle prompts — never name marijuana/porn
+  even from journal data or when tied to grief; non-specific only or omit. (A regenerated draft had
+  named marijuana explicitly → deleted out-of-band, guard added, regenerated clean.)
+- **Nutrition-logging integrity** + **cold-reader grade-context** prompt rules (low cals = a real
+  deliberate deficit, never "not logging"; ground or cut the platform grade for a new reader).
+- **Layne Norton (a real person) → fictional Dr. Marcus Webb** everywhere it leaked: S3 board config
+  (section_header + prose), both `web/` board-ask lambdas (`site_api_lambda` + `site_api_ai_lambda`),
+  the measurements MCP tool, and the chronicle interview-routing prompt. Live draft + S3 config fixed.
+
+### ⚠️ Chronicle follow-ups
+- **`_FALLBACK_ELENA_PROMPT`** (only fires if the S3 board config fails to load) still carries the
+  legacy real surnames Attia/Huberman/Walker/Norton — an all-or-nothing fictionalization cleanup,
+  tracked but not done. The active config-driven path is clean.
+- DDB chronicle source records were tangled (the public artifacts were hand-built + decoupled from
+  DDB at Feb-22/May-04). Synced DDB records at `DATE#2026-06-07` / `2026-06-11` (phase=experiment,
+  published, prologue) + retired the stale Feb-22 duplicate. **Verify the next Wednesday-chronicle
+  publish rebuilds `posts.json` from DDB with the prologue still labelled correctly.**
+
+---
+
+## 2. Podcast (panelcast) — refit to the read-aloud Turing bar
+
+**Matt's bar:** the *transcript* must pass for a real, human-made podcast (read aloud, no AI tells) —
+real hook, dry humour, something learned, recommendable. Voices aside, the writing is the test.
+
+Bugs he found in the first Episode 1 (all fixed): wrong-gender voice (Marcus Webb sounded female),
+it said "week 2", a hallucinated "5 AM protein shake", no guest introduction, didn't feel like a
+conversation.
+
+- **A — Voice.** `_gemini_voice()` derives from the persona registry (`config/personas.json`
+  `tts_voice`) — single source of truth, gender-correct. Killed the scrambled hardcoded table.
+  Guard: `tests/test_panelcast_voice_gender.py`.
+- **B — Grounding.** Script uses ONLY real coach-reads + week data; never invents scenes/times/sensory
+  color. Chronicle is background, never quoted/lifted.
+- **C — Intro + continuity + conversational.** Always introduce a guest the audience hasn't met
+  (name + what they work on); carry the bet/thread; Turing-bar "no AI tells" directive; body-weight
+  banned numeric AND spelled-out.
+- **D — Read-aloud QA gate + self-correcting revision loop.** `_WEEKLY_RUBRIC` (Turing-pass, guest
+  intro, no dangling thread, real hook, genuine friction, grounded, no body weight, humour) →
+  `_qa_gate`. On fail, `_revise_weekly_script()` feeds the judge's exact failures back to the writer
+  and re-judges, **≤2 revisions**, then HOLD. *This loop turned a HOLD into a publishable episode and
+  is the path to hands-off.*
+- **Sensitivity gate** now `_is_current_crisis()` AI-adjudicates a regex hit: a genuine current-week
+  crisis (HOLD, fail-closed) vs. backstory grief reference (proceed). It had been auto-holding strong
+  weeks that merely referenced his mother's death.
+- **Editor judge** retries once then **fails OPEN** on unparseable JSON (infra hiccup ≠ content
+  verdict) — it had been hard-HOLDing every episode.
+- **ER-03 digit-matching removed from the weekly gate** — it silently dropped turns whose numbers were
+  spoken in words ("eight thousand"), leaving holes (an unanswered question). Grounding is the LLM
+  judge's job now; safety hits still hard-HOLD.
+- **`_published_posts()` reads the live `generated/journal/posts.json`** (was the dead
+  `site/chronicle/posts.json`) — fixed the week-drift that made the panelcast think it was "week 2".
+
+**Live:** Episode 0 (intro, Eli Marsh) + **Episode 1 — "Week 1 — Monday was a 49…"** (4:28, Elena +
+Dr. Sarah Chen) at `/panelcast/wk1.wav`. Verified: proper guest intro, grounded, no body weight, no
+vice, gender-correct voices.
+
+### ⚠️ Podcast follow-ups / open
+- **Human-in-the-loop (E) is still on** by Matt's call: review the next 2–3 weekly episodes; if each
+  clears the QA gate AND matches his ear with no edits, graduate to autonomous. The Friday cron
+  generates + HOLD-on-fail; Matt should still listen before each goes wide.
+- **Matt to listen to Episode 1** and say if it matches the bar — his ear is the final calibration on
+  the QA judge's rubric.
+- Orphan `s3://…/generated/panelcast/wk2.wav` (a relabel leftover) can't be deleted (S3 policy blocks
+  DeleteObject on `generated/*`) — unreferenced, harmless.
+
+---
+
+## 3. Service worker — JSON feeds were going stale
+
+`site/sw.js` cached everything except `/api/*` + navigations **cache-first**, so `posts.json` /
+`episodes.json` went stale and a new chronicle/podcast stayed hidden until the SW VERSION rolled.
+Now any `.json` path is **fresh-first** (#178). Version rolled `db1d3dbd → 88b99f29`. This is why
+"the chronicle showed 2 not 3" — pure cache; the data was always correct.
+
+---
+
+## State / housekeeping
+- **PRs merged this session:** #166 feed-untangle · #167 QA-coverage · #168 lede · #169 June-budget ·
+  #170 panelcast-decouple · #171 reset-lead-ins · #172 chronicle-continuation · #173 chronicle-prompt
+  + Norton · #174 vice-guard · #175 genesis-weeks · #176 sensitivity-adjudication + voiced-guards ·
+  #177 panelcast-chronicle-source · #178 SW-fresh-first · #179 voice + Turing-prompt · #181 QA-gate +
+  re-roll + always-introduce · #182 reconcile (editor-robust + weekly-gate-keep-turns + revision loop).
+  All deployed; `origin/main` aligned. (#180 was an unrelated Strava window fix that landed on main.)
+- **Deploys live:** `LifePlatformEmail` (chronicle + panelcast), `LifePlatformWeb` (site-api Norton),
+  `LifePlatformMcp` (measurements Norton), site sync (SW + prologue pages + posts.json).
+- **Docs:** auto-synced via the pre-commit hook (Tools 135, Lambdas 81). Memory: new
+  `project_panelcast_quality_bar`; updated `marijuana-and-porn-content-must-never-be-public` (added the
+  AI-generator leak path).
+- **Untracked local one-offs (records, not committed):** `deploy/_prologue_rewrite.py`,
+  `deploy/_publish_week1.py`.
+
+## Suggested next session
+1. Matt listens to Episode 1 → tune `_WEEKLY_RUBRIC` / the writer prompt if his ear disagrees.
+2. Watch the next 1–2 Friday episodes through the QA gate; decide on podcast autonomy.
+3. Fictionalize the `_FALLBACK_ELENA_PROMPT` real names (low priority — fallback only).
+4. Confirm the next Wednesday-chronicle publish rebuilds `posts.json` with the prologue labels intact.
