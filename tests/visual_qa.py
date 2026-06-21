@@ -118,26 +118,8 @@ PAGES = [
         "name": "Story · about",
         "checks": [{"selector": "main, article", "not_empty": True, "desc": "about content"}],
     },
-    {
-        "path": "/story/coaches/",
-        "name": "Story · The Coaches (roster + My Team)",
-        "wait_for": ".team-huddle",
-        "checks": [
-            {"selector": ".dx-item", "min_count": 1, "desc": "coach roster list rendered"},
-            {"selector": ".team-huddle", "not_empty": True, "desc": "My Team huddle renders as the lead (CC-10)"},
-            {"selector": ".team-tension", "not_empty": True, "desc": "tension map section present"},
-        ],
-    },
-    {
-        "path": "/story/coaches/#sleep_coach",
-        "name": "Story · coach page (deep-link)",
-        "wait_for": ".coach-report",
-        "checks": [
-            {"selector": ".coach-stance", "not_empty": True, "desc": "stance section (lead)"},
-            {"selector": ".coach-report", "not_empty": True, "desc": "report card present"},
-            {"selector": ".dx-disclosure", "not_empty": True, "desc": "AI-character disclosure present"},
-        ],
-    },
+    # NB: "The Coaches" + "AI lab notes" moved to their own door /coaching/ (2026-06-20);
+    # their page defs now live in the PAGES.extend([...]) Coaching block below.
     {
         "path": "/evidence/",
         "name": "Evidence hub",
@@ -156,6 +138,35 @@ for _slug in EVIDENCE_TOPICS:
             "charts": ["[data-readout] svg"] if _slug in CHART_TOPICS else [],
         }
     )
+
+# Door 4 "The Coaching" (/coaching/) — promoted out of Story (2026-06-20). Master-detail
+# like the Story door, over /api/coaches · /api/coach_team · /api/coach/<id> · /api/field_notes.
+# Checks stay lenient (reader not-empty) so honest empty-states before data accrues don't FAIL.
+PAGES.extend(
+    [
+        {
+            "path": "/coaching/",
+            "name": "Coaching hub (My Team)",
+            "wait_for": "[data-dx-tabs]",
+            "checks": [
+                {"selector": "[data-dx-tabs], [data-dx-list]", "min_count": 1, "desc": "coaching tabs + roster rendered"},
+                {"selector": "[data-dx-read]", "not_empty": True, "desc": "team/coach readout rendered"},
+            ],
+        },
+        {
+            "path": "/coaching/coaches/#sleep_coach",
+            "name": "Coaching · coach page (deep-link)",
+            "wait_for": "[data-dx-read]",
+            "checks": [{"selector": "[data-dx-read]", "not_empty": True, "desc": "coach page (stance + report) rendered"}],
+        },
+        {
+            "path": "/coaching/lab-notes/",
+            "name": "Coaching · AI lab notes",
+            "wait_for": "[data-dx-read]",
+            "checks": [{"selector": "[data-dx-read]", "not_empty": True, "desc": "lab-notes readout rendered"}],
+        },
+    ]
+)
 
 # Text that should never be visible (stuck/placeholder states).
 _EMPTY_SENTINELS = ("", "—", "...", "··", "•", "Loading", "LOADING", "Loading…")
