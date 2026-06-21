@@ -62,6 +62,28 @@ MAX_PAGES_PER_RUN = int(os.environ.get("HEVY_BACKFILL_MAX_PAGES", "30"))
 PAGE_SIZE = int(os.environ.get("HEVY_BACKFILL_PAGE_SIZE", "10"))
 
 
+def _derive_training_notes(rec: dict) -> None:
+    """On-ingest hook (training-notes feedback loop): derive the note-signal projection
+    right after the raw workout persists. Fully guarded — a derive failure NEVER breaks
+    ingestion (the raw workout is already the source of truth). Skips workouts with no
+    non-empty notes ($0, no model call). Pain flags elevate (insight + coach thread)."""
+    try:
+        exercises = rec.get("exercises") or []
+        if not any((e.get("notes") or "").strip() for e in exercises):
+            return
+        import training_notes as tn
+        from training_notes_llm import make_llm_fn
+
+        llm_fn = make_llm_fn(_table)
+        res = tn.write_workout_notes(_table, rec["date"], rec.get("workout_uid", ""), exercises, llm_fn=llm_fn)
+        for it in res.get("items", []):
+            if it.get("pain_flag"):
+                tn.elevate_pain(_table, it)
+        logger.info("training-notes derived %s: %d records, %d pain", rec.get("workout_uid"), res["records"], res["pain"])
+    except Exception as e:  # noqa: BLE001
+        logger.warning("training-notes derive failed (non-fatal) %s: %s", rec.get("workout_uid"), e)
+
+
 def _tombstone_deleted(workout_id: str) -> None:
     """Best-effort tombstone for a deleted-event. We don't have the date
     without the full record, so this records a delete marker that the next
@@ -128,6 +150,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
                         archive_raw(wid, ev)
                         rec = normalize_workout(ev)  # accepts {workout:{...}} wrapper
                         write_normalized(rec)
+                        _derive_training_notes(rec)  # on-ingest note-signal projection (guarded)
                         ingested += 1
                         logger.info(
                             "hevy backfill ingest %s date=%s phase=%s sets=%d volume=%.2fkg",
