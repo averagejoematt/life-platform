@@ -43,6 +43,32 @@ class TestBindingMap:
             urls = {url for _p, url, _path in obs[metric]}
             assert len(urls) >= 2, f"{metric} only seen from {urls}"
 
+    def test_coaching_door_registered(self):
+        """The /coaching/ door (PR C) is in the registry — both PAGES and bindings."""
+        import visual_qa  # noqa: E402
+
+        assert "/coaching/" in {b["path"] for b in B.PAGE_BINDINGS}
+        assert "coaching" in {b["door"] for b in B.PAGE_BINDINGS}
+        assert any(p["path"].startswith("/coaching/") for p in visual_qa.PAGES)
+        # the moved-away Story coach paths must NOT linger in the registry
+        assert "/story/coaches/" not in {b["path"] for b in B.PAGE_BINDINGS}
+
+
+class TestCoverageGuard:
+    """The sitemap-vs-doors guard: a new top-level door with no bindings is a blind spot."""
+
+    def test_no_gaps_currently(self):
+        assert B.coverage_gaps() == [], "a door has sitemap pages but no QA bindings"
+
+    def test_guard_detects_an_unregistered_door(self, monkeypatch):
+        """If the sitemap gains a door with no binding, coverage_gaps must flag it."""
+        monkeypatch.setitem(B._SEGMENT_TO_DOOR, "newthing", "newthing")
+        monkeypatch.setattr(B, "_sitemap_routes", lambda: ["/", "/newthing/foo/"])
+        assert "newthing" in B.coverage_gaps()
+        # and selfcheck surfaces it as a failure
+        ok, problems = B.selfcheck()
+        assert not ok and any("newthing" in p for p in problems)
+
     def test_snapshot_uses_double_nested_paths(self):
         """Guards the verified /api/snapshot shape (journey.journey.* / character.character.*)."""
         obs = B.metric_observations()
