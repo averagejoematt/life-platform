@@ -779,6 +779,39 @@ def tool_get_lab_deltas(args):
     }
 
 
+# ── DI-2b parity: interior-gap detection (B3) ──
+# The staleness check below only sees the newest DATE# per source (the high-water
+# mark), so a hole *behind* it — a daily source going dead mid-window then resuming
+# — reads green. This mirrors find_interior_gaps in emails/freshness_checker_lambda.py
+# (TD-14 parity discipline: keep the two in sync). Sparse sources (strava, withings,
+# food_delivery, measurements) have legitimate empty days → excluded here.
+DAILY_SOURCES_INTERIOR = {"whoop", "apple_health", "eightsleep", "habitify"}
+INTERIOR_GAP_WINDOW_DAYS = 14
+
+
+def find_interior_gaps(present_dates, window_start: str, window_end: str) -> list:
+    """Missing dates strictly inside the [first, last] present span in the window.
+
+    Only the span between the earliest and latest present date is judged — a
+    trailing or leading absence is recency (handled by the staleness check), not
+    an interior hole. Returns a sorted list of 'YYYY-MM-DD'. Needs >=2 present
+    dates to define an interior at all. Pure function — no AWS, no network.
+    """
+    present = sorted(d for d in present_dates if window_start <= d <= window_end)
+    if len(present) < 2:
+        return []
+    pset = set(present)
+    cur = datetime.strptime(present[0], "%Y-%m-%d").date()
+    hi = datetime.strptime(present[-1], "%Y-%m-%d").date()
+    gaps = []
+    while cur <= hi:
+        s = cur.isoformat()
+        if s not in pset:  # lo/hi are present, so anything missing here is interior
+            gaps.append(s)
+        cur += timedelta(days=1)
+    return gaps
+
+
 def tool_get_freshness_status(args):
     """Per-source data freshness summary (WR-48 Enhancement 4, PR-reentry-4).
 
@@ -944,6 +977,38 @@ def tool_get_freshness_status(args):
         except Exception as _e:  # noqa: BLE001
             macro_drift = {"drifted": None, "error": str(_e)}
 
+    # ── B3: interior-gap scan (daily sources only) ──
+    # A daily source can read "fresh" (newest record present) while a mid-window day
+    # is silently missing behind the high-water mark — the exact blindness that hid
+    # the Strava walks. Scan the trailing window for each daily source and surface
+    # holes inside its present span.
+    from boto3.dynamodb.conditions import Key as _GapKey
+
+    _gap_end = today.isoformat()
+    _gap_start = (today - timedelta(days=INTERIOR_GAP_WINDOW_DAYS)).isoformat()
+    interior_gaps: dict[str, list] = {}
+    for _src in keys:
+        if _src not in DAILY_SOURCES_INTERIOR:
+            continue
+        try:
+            _gresp = table.query(
+                KeyConditionExpression=(
+                    _GapKey("pk").eq(f"USER#matthew#SOURCE#{_src}") & _GapKey("sk").between(f"DATE#{_gap_start}", f"DATE#{_gap_end}~")
+                ),
+                ProjectionExpression="sk",
+            )
+            _present = []
+            for _it in _gresp.get("Items", []):
+                _sk = _it.get("sk", "")
+                if _sk.startswith("DATE#"):
+                    _present.append(_sk.split("DATE#", 1)[1][:10])
+            _gaps = find_interior_gaps(_present, _gap_start, _gap_end)
+            if _gaps:
+                interior_gaps[_src] = _gaps
+        except Exception as _e:  # noqa: BLE001
+            logger.warning("interior-gap scan failed for %s: %s", _src, _e)
+    interior_gap_count = sum(len(v) for v in interior_gaps.values())
+
     return {
         "status": overall,
         "checked_at": datetime.now(timezone.utc).isoformat(),
@@ -951,6 +1016,8 @@ def tool_get_freshness_status(args):
         "fresh_count": len(fresh_sources),
         "stale_sources": stale_sources,
         "fresh_sources": fresh_sources,
+        "interior_gaps": interior_gaps,
+        "interior_gap_count": interior_gap_count,
         "macrofactor_format_drift": macro_drift,
         "thresholds_note": (
             f"Default threshold {DEFAULT_STALE_HOURS}h. "

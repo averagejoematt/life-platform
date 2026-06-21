@@ -53,6 +53,7 @@ from mcp.strength_helpers import (
     _STANDARD_LEVELS,
     _STRENGTH_STANDARDS,
     _VOLUME_LANDMARKS,
+    assess_volume_completeness,
     attia_benchmark_status,
     classify_exercise,
     classify_standard,
@@ -216,9 +217,13 @@ def tool_get_muscle_volume(args):
     muscle_sets: dict[str, int] = {}
     muscle_volume: dict[str, float] = {}
     push_sets = pull_sets = leg_sets = core_sets = 0
+    aggregated_dates: list[str] = []  # B2a: workout dates actually folded in
 
     # #110: normalize_hevy_items handles both schemas.
     for workout in normalize_hevy_items(items):
+        wd = (workout.get("date") or "")[:10]
+        if wd:
+            aggregated_dates.append(wd)
         for ex in workout["exercises"]:
             name = ex["name"]
             cls = classify_exercise(name)
@@ -259,10 +264,30 @@ def tool_get_muscle_volume(args):
 
     push_pull_ratio = round(push_sets / pull_sets, 2) if pull_sets > 0 else None
 
+    # B2a: completeness — did we fold in the latest ingested Hevy session? A read
+    # that silently trails the high-water mark poisons night-before authoring.
+    latest_ingested = None
+    try:
+        from boto3.dynamodb.conditions import Key as _HWKey
+
+        _hw = table.query(
+            KeyConditionExpression=_HWKey("pk").eq("USER#matthew#SOURCE#hevy") & _HWKey("sk").begins_with("DATE#"),
+            Limit=1,
+            ScanIndexForward=False,
+            ProjectionExpression="sk",
+        )
+        _hw_items = _hw.get("Items", [])
+        if _hw_items:
+            latest_ingested = _hw_items[0]["sk"].split("DATE#", 1)[1][:10]
+    except Exception as _e:  # noqa: BLE001
+        logger.warning("muscle_volume completeness high-water query failed: %s", _e)
+    completeness = assess_volume_completeness(aggregated_dates, latest_ingested, end_date)
+
     return {
         "date_range": {"start": start_date, "end": end_date},
         "analysis_period": period_label,
         "num_periods_analyzed": round(num_periods, 1),
+        "completeness": completeness,
         "muscle_volume": volume_report,
         "movement_balance": {
             "push_sets": push_sets,
