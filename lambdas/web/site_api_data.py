@@ -691,7 +691,9 @@ def _experiment_catalog(exclude_ids: set, exclude_names: set) -> list:
                 "origin": "library",
                 # Substitute the {duration} token in the library hypothesis_template (was
                 # rendering literally: "16:8 fasting for {duration} days will reduce...").
-                "hypothesis": (exp.get("hypothesis_template", "") or "").replace("{duration}", str(exp.get("suggested_duration_days") or "several")),
+                "hypothesis": (exp.get("hypothesis_template", "") or "").replace(
+                    "{duration}", str(exp.get("suggested_duration_days") or "several")
+                ),
                 "pillar": exp.get("pillar", ""),
                 "difficulty": exp.get("difficulty"),
                 "evidence_tier": exp.get("evidence_tier"),
@@ -1386,6 +1388,24 @@ def handle_glucose() -> dict:
     )
 
 
+def _sane_sleep_score(raw, hours, whoop_quality):
+    """Gate an implausible nightly sleep score. A score <40 next to >=6h slept AND/OR a healthy
+    Whoop quality (>=70) is a scoring/attribution glitch (the live '12' next to 8.2h + 84%
+    quality), not a real terrible night — fall back to Whoop quality so one bad number doesn't
+    make the whole sleep page look broken. Returns a rounded score or None."""
+    if raw is None:
+        return None
+    try:
+        raw = round(float(raw), 0)
+    except (TypeError, ValueError):
+        return None
+    hrs = float(hours) if hours else 0
+    wq = float(whoop_quality) if whoop_quality else 0
+    if raw < 40 and (hrs >= 6 or wq >= 70):
+        return round(wq, 0) if wq else None
+    return raw
+
+
 def handle_sleep_detail() -> dict:
     """
     GET /api/sleep_detail
@@ -1456,7 +1476,7 @@ def handle_sleep_detail() -> dict:
         trend.append(
             {
                 "date": date,
-                "sleep_score": round(float(r["sleep_score"]), 0) if r.get("sleep_score") else None,
+                "sleep_score": _sane_sleep_score(r.get("sleep_score"), w.get("sleep_duration_hours"), w.get("sleep_quality_score")),
                 "efficiency": round(float(r["sleep_efficiency_pct"]), 1) if r.get("sleep_efficiency_pct") else None,
                 "bed_temp_f": round(float(r["bed_temp_f"]), 1) if r.get("bed_temp_f") else None,
                 "hours": round(float(w["sleep_duration_hours"]), 1) if w.get("sleep_duration_hours") else None,
@@ -1473,7 +1493,8 @@ def handle_sleep_detail() -> dict:
             }
         )
 
-    score_today = float(latest.get("sleep_score", 0))
+    # Use the gated latest trend score so a glitch score (the '12') doesn't drive the headline.
+    score_today = float(trend[-1]["sleep_score"]) if trend and trend[-1].get("sleep_score") else float(latest.get("sleep_score", 0) or 0)
     score_status = "excellent" if score_today >= 85 else ("good" if score_today >= 70 else "needs_attention")
 
     # Compute bed time / wake time averages and social jet lag from Whoop sleep_start/end

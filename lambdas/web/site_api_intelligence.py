@@ -1331,6 +1331,7 @@ def handle_pulse_history() -> dict:
     whoop_items = _query_source("whoop", EXPERIMENT_START, today)
     withings_items = _query_source("withings", EXPERIMENT_START, today)
     garmin_items = _query_source("garmin", EXPERIMENT_START, today)
+    ah_items = _query_source("apple_health", EXPERIMENT_START, today)  # real steps (Garmin is dead/phantom)
 
     # Index by date
     whoop_by_date = {}
@@ -1343,11 +1344,17 @@ def handle_pulse_history() -> dict:
         d = w.get("sk", "").replace("DATE#", "")[:10]
         if d and w.get("weight_lbs"):
             withings_by_date[d] = w
-    garmin_by_date = {}
+    # Steps: Apple Health first; Garmin only if AH-absent AND plausible (>=1000) — drops the
+    # phantom ~298 Garmin record that left steps null on 7/8 days (Vitals + Mirror depend on this).
+    steps_by_date = {}
+    for h in ah_items:
+        d = h.get("sk", "").replace("DATE#", "")[:10]
+        if d and h.get("steps") and float(h["steps"]) > 0:
+            steps_by_date[d] = max(steps_by_date.get(d, 0), int(float(h["steps"])))
     for g in garmin_items:
         d = g.get("sk", "").replace("DATE#", "")[:10]
-        if d and g.get("steps"):
-            garmin_by_date[d] = g
+        if d and g.get("steps") and float(g["steps"]) >= 1000 and d not in steps_by_date:
+            steps_by_date[d] = int(float(g["steps"]))
 
     # Build daily summaries
     days = []
@@ -1361,13 +1368,12 @@ def handle_pulse_history() -> dict:
         d = current.strftime("%Y-%m-%d")
         w = whoop_by_date.get(d, {})
         wi = withings_by_date.get(d, {})
-        g = garmin_by_date.get(d, {})
 
         weight = float(wi["weight_lbs"]) if wi.get("weight_lbs") else None
         recovery = float(w["recovery_score"]) if w.get("recovery_score") else None
         sleep_hrs = float(w["sleep_duration_hours"]) if w.get("sleep_duration_hours") else None
         hrv = float(w["hrv"]) if w.get("hrv") else None
-        steps = int(float(str(g["steps"]))) if g.get("steps") else None
+        steps = steps_by_date.get(d)
 
         headline_parts = []
         if weight:
