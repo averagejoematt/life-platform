@@ -429,11 +429,13 @@ def handle_discoveries() -> dict:
                 }
             )
 
-        # Dedupe by title, keep most recent
+        # Dedupe by title, keep most recent. Drop empty-body entries — a card titled
+        # "Journal Breakthrough" with a "high confidence" badge and NO text reads as broken
+        # and implies a finding that isn't shown. No body → no card.
         seen_titles = set()
         deduped = []
         for il in inner_life:
-            if il["title"] not in seen_titles:
+            if il["title"] not in seen_titles and (il.get("body") or "").strip():
                 seen_titles.add(il["title"])
                 deduped.append(il)
         inner_life = deduped[:12]  # Cap at 12 cards
@@ -618,7 +620,9 @@ def handle_experiments() -> dict:
                 "status": status,
                 "start_date": start,
                 "end_date": end,
-                "hypothesis": item.get("hypothesis", ""),
+                # Substitute the {duration} template token (was leaking literally into the
+                # rendered hypothesis: "...for {duration} days will reduce...").
+                "hypothesis": (item.get("hypothesis", "") or "").replace("{duration}", str(planned_duration or duration_days or "several")),
                 "tags": item.get("tags", []),
                 # Phase 2 additions
                 "outcome": item.get("outcome") or item.get("result_summary"),
