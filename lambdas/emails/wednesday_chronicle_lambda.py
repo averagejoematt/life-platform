@@ -286,7 +286,10 @@ def gather_chronicle_data():
                         ":prefix": "DATE#",
                     },
                     "ScanIndexForward": False,
-                    "Limit": 4,
+                    # Read past the phase=pilot dormant records (which with_phase_filter drops)
+                    # to reach the low-SK re-dated origin lead-ins, so the genuine prior
+                    # installments feed continuity instead of being missed (2026-06-21).
+                    "Limit": 25,
                 }
             )
         )
@@ -368,6 +371,11 @@ def build_data_packet(data):
         week_num = max(1, ((end_date - js).days // 7) + 1)
     except Exception:
         week_num = 1
+    # Continuation-aware (2026-06-21): never re-open as "Week 1" when prior installments
+    # already exist (e.g. carried-forward origin lead-ins). The series number is at least
+    # (#prior + 1) — this is what makes today's issue Part 3, a continuation, instead of
+    # yet another from-scratch "Week 1" intro (the dormant-period failure mode).
+    week_num = max(week_num, len(data.get("prev_installments", [])) + 1)
     packet.append(f"Week number: {week_num}")
     packet.append(f"Journey start: {journey_start}")
     # Matthew-specific fallback defaults; only used if profile fetch fails
