@@ -62,7 +62,13 @@ ses = boto3.client("sesv2", region_name=REGION)
 
 
 def _published_posts() -> list:
-    obj = s3.get_object(Bucket=S3_BUCKET, Key="site/chronicle/posts.json")
+    # Read the LIVE chronicle feed the Wednesday chronicle actually writes (generated/journal/
+    # posts.json) — NOT the dead site/chronicle/posts.json, which left the Panel blind to the
+    # current chronicle and drifting a week ahead off a genesis-from-today calc (2026-06-21).
+    try:
+        obj = s3.get_object(Bucket=S3_BUCKET, Key="generated/journal/posts.json")
+    except Exception:
+        obj = s3.get_object(Bucket=S3_BUCKET, Key="site/chronicle/posts.json")
     return json.loads(obj["Body"].read()).get("posts", [])
 
 
