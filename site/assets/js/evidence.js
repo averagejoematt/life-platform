@@ -143,7 +143,7 @@ async function renderSleep(d) {
   // opposite frame from same-day activity. Header it with the night they came from.
   const lastNightHdr = "Last night" + (lastNightDate(s, uni) ? ` · the night of ${lastNightDate(s, uni)}` : "");
   const detail = Object.values(s).some(has)
-    ? sec(lastNightHdr, figs([s.sleep_score != null && fig(fmt(s.sleep_score), "sleep score"), s.total_sleep_hours != null && fig(fmt(s.total_sleep_hours, 1), "hours"), s.sleep_efficiency != null && fig(fmt(s.sleep_efficiency) + "%", "efficiency"), s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv), "hrv ms")])) + sec("Stages & physiology", kvtable({ deep_sleep_hours: s.deep_sleep_hours, rem_sleep_hours: s.rem_sleep_hours, whoop_quality: s.whoop_quality, bed_temp_f: s.bed_temp_f })) + sec("Sleep-score trend · latest = last night", lineChart(d.sleep_trend || [], { valueKey: "sleep_score", label: "Sleep score · nightly", emptyMsg: "The sleep-score trend fills in nightly." }))
+    ? sec(lastNightHdr, figs([s.sleep_score != null && fig(fmt(s.sleep_score), "sleep score"), s.total_sleep_hours != null && fig(fmt(s.total_sleep_hours, 1), "hours"), s.sleep_efficiency != null && fig(fmt(s.sleep_efficiency) + "%", "efficiency"), s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv), "hrv ms")])) + ((s.deep_sleep_hours != null && s.rem_sleep_hours != null) ? sec("Last night's stages", stackedBar([{ label: "Deep", value: s.deep_sleep_hours, tone: "ember" }, { label: "REM", value: s.rem_sleep_hours, tone: "ink" }, { label: "Light", value: Math.max(0, (s.total_sleep_hours || 0) - (s.deep_sleep_hours || 0) - (s.rem_sleep_hours || 0)), tone: "faint" }], { label: "Hours by stage", unit: "h" })) : "") + sec("Stages & physiology", kvtable({ whoop_quality: s.whoop_quality, bed_temp_f: s.bed_temp_f })) + sec("Sleep-score trend · latest = last night", lineChart(d.sleep_trend || [], { valueKey: "sleep_score", label: "Sleep score · nightly", emptyMsg: "The sleep-score trend fills in nightly." }))
     : "";
 
   // Circadian compliance — a *forward* score: what tonight's sleep should look
@@ -551,8 +551,8 @@ async function renderPulse(d) {
   // Group by temporal frame: recovery/sleep/HRV are about LAST NIGHT (they set
   // today up); weight & steps are same-day. Different frames, labelled so a reader
   // doesn't read last night's recovery as a "today" activity number.
-  const lastNight = trendBlock([["recovery_pct", "Recovery %"], ["sleep_hours", "Sleep hours"], ["hrv_ms", "HRV ms"]]);
-  const today = trendBlock([["weight_lbs", "Weight"], ["steps", "Steps"]]);
+  const lastNight = trendBlock([["recovery_pct", "Recovery %"], ["hrv_ms", "HRV ms"], ["rhr_bpm", "Resting HR"], ["sleep_hours", "Sleep hours"]]);
+  const today = trendBlock([["weight_lbs", "Weight"], ["strain", "Day strain"], ["steps", "Steps"]]);
   const frame = (lbl, inner) => `<p class="rd-frame label">${esc(lbl)}</p>${inner}`;
   return head + frame("Last night → sets up today", lastNight) + frame("Today — measured same-day", today) +
     note("Your live vitals — recovery/sleep/HRV read last night; weight & steps are today.");

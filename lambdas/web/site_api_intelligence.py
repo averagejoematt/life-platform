@@ -1373,6 +1373,8 @@ def handle_pulse_history() -> dict:
         recovery = float(w["recovery_score"]) if w.get("recovery_score") else None
         sleep_hrs = float(w["sleep_duration_hours"]) if w.get("sleep_duration_hours") else None
         hrv = float(w["hrv"]) if w.get("hrv") else None
+        rhr = float(w["resting_heart_rate"]) if w.get("resting_heart_rate") else None  # falls during a cut = body responding
+        strain = float(w["strain"]) if w.get("strain") else None
         steps = steps_by_date.get(d)
 
         headline_parts = []
@@ -1393,6 +1395,8 @@ def handle_pulse_history() -> dict:
                 "recovery_pct": round(recovery) if recovery is not None else None,
                 "sleep_hours": round(sleep_hrs, 1) if sleep_hrs else None,
                 "hrv_ms": round(hrv, 1) if hrv else None,
+                "rhr_bpm": round(rhr) if rhr is not None else None,
+                "strain": round(strain, 1) if strain is not None else None,
                 "steps": steps,
                 "headline": " · ".join(headline_parts) if headline_parts else "No data recorded",
             }
