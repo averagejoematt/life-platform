@@ -86,7 +86,7 @@ def tool_get_measurements(args):
             )
         if bicep_sym and bicep_sym > 1.0:
             board_note += (
-                f' Dr. Layne Norton: Bicep asymmetry of {bicep_sym:.1f}" detected — ' f"consider unilateral training to address imbalance."
+                f' Dr. Marcus Webb: Bicep asymmetry of {bicep_sym:.1f}" detected — ' f"consider unilateral training to address imbalance."
             )
 
     return {
