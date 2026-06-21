@@ -245,14 +245,34 @@ def authenticate(secret_data: dict) -> dict:
 
 
 def fetch_day(credentials: dict, date_str: str) -> dict | None:
-    """Fetch one day of Strava activities. Per-day API call window."""
+    """Fetch one local day of Strava activities, keyed by the activity's local date.
+
+    A record is keyed by the activity's local calendar date (``start_date_local``)
+    so the day matches how the platform reports it (Pacific). But Strava's
+    ``/athlete/activities`` window is expressed in UTC *instants*, and the two
+    clocks disagree at the day boundary: an evening-PT activity (e.g. a 17:00
+    walk) has a UTC start on the *next* calendar day. A naive same-day UTC window
+    therefore loses it both ways — it falls just past the end of its own local
+    day's window, and is rejected by the local-date filter on the next day's
+    window. (This silently dropped every post-17:00-PT activity; see the Jun 2026
+    Walk-ingestion gap.)
+
+    Fix: bracket the UTC window by ±1 day so it is a strict superset of every
+    instant that can map to ``date_str`` in any timezone (offsets span UTC-12..+14,
+    well within ±24h). The ``start_date_local`` filter below then assigns each
+    activity to exactly one local date — no gap, no double-count, and correct even
+    when traveling (we trust the activity's own local clock, not a fixed offset).
+    Over-fetching the activity *list* is cheap; per-activity HR enrichment stays
+    gated by the filter, so it is not multiplied.
+    """
     secret = _secret_cache["secret"] or credentials
-    start_dt = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-    end_dt = start_dt + timedelta(days=1)
+    day = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    window_start = day - timedelta(days=1)
+    window_end = day + timedelta(days=2)
     activities, secret = _fetch_activities_in_range(
         secret,
-        start_dt.timestamp(),
-        end_dt.timestamp(),
+        window_start.timestamp(),
+        window_end.timestamp(),
     )
     _secret_cache["secret"] = secret
     if not activities:
@@ -261,7 +281,7 @@ def fetch_day(credentials: dict, date_str: str) -> dict | None:
     enriched = []
     for a in activities:
         if a.get("start_date_local", "")[:10] != date_str:
-            continue  # API window can return adjacent-day activities; filter
+            continue  # ±1-day window over-fetches by design; keep only this local date
         zone_data, hr_recovery = {}, {}
         if a.get("has_heartrate") and a.get("id"):
             zone_data, secret = _fetch_activity_zones(str(a["id"]), secret)
