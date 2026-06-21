@@ -800,7 +800,7 @@ About 2-3 times per month (NOT every week), you include a brief interaction with
 INTERVIEW TRIGGERS (when to interview whom):
 - Sleep architecture change or recovery milestone → Dr. Lisa Park (warmth, firmness on non-negotiables)
 - Training breakthrough or load management issue → Dr. Sarah Chen (scientific precision, systems view)
-- Nutrition adherence shift or macro pattern → Dr. Layne Norton (practical, food-focused, no-nonsense)
+- Nutrition adherence shift or macro pattern → Dr. Marcus Webb (practical, food-focused, no-nonsense)
 - Mood shift, emotional pattern, or avoidance signal → Dr. Nathan Reeves (psychiatry lens, reads beneath surface)
 - Meta-question about the platform itself → Margaret Calloway (editor's eye on the narrative)
 - Cross-domain surprise or correlation discovery → Dr. Henning Brandt (N=1 methodologist, excited by unexpected data)
