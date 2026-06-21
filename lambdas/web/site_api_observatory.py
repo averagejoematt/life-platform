@@ -1676,12 +1676,18 @@ def handle_strength_benchmarks() -> dict:
         benchmarks = []
         for lift, target in targets.items():
             current = best.get(lift, 0)
+            logged = current > 0  # a lift not performed in the window isn't "0 / 0%" — it's no-data
+            exceeded = logged and current > target  # already past the goal → "exceeded", not "129%"
             benchmarks.append(
                 {
                     "lift": lift,
-                    "current_1rm": round(current),
+                    "current_1rm": round(current) if logged else None,
                     "target": target,
-                    "progress_pct": round((current / target) * 100) if target > 0 else 0,
+                    # Clamp progress at 100 (a goal already beaten isn't "129% of progress");
+                    # None when the lift wasn't logged this window so the UI shows "—" not 0%.
+                    "progress_pct": (min(100, round((current / target) * 100)) if target > 0 else 0) if logged else None,
+                    "exceeded": exceeded,
+                    "logged": logged,
                 }
             )
 

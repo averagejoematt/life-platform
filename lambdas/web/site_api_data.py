@@ -135,10 +135,12 @@ _FRESHNESS_SOURCES = {
 _FRESHNESS_STALE_HOURS = {"withings": 7 * 24, "todoist": 48, "measurements": 60 * 24, "food_delivery": 90 * 24}
 _FRESHNESS_DEFAULT_STALE_HOURS = 48
 # Intentionally paused — reported as status "paused", never counted stale (ADR-074 etc.).
+# Only Garmin is genuinely paused. Strava came back (DI-2 walk-ingestion fix, 2026-06-21)
+# and MacroFactor flows via the Dropbox export path (Tier 2) — both were stale-"paused" here
+# and contradicted the data page, which a skeptic catches immediately. They now report live
+# freshness from their real latest DATE# like any other source.
 _FRESHNESS_PAUSED = {
     "garmin": {"label": "Garmin", "desc": "Biometrics — paused (vendor anti-automation, ADR-074)", "category": "Wearables"},
-    "strava": {"label": "Strava", "desc": "Activities — paused (API 402)", "category": "Wearables"},
-    "macrofactor": {"label": "MacroFactor", "desc": "Nutrition — retired (Firebase App Check)", "category": "Manual logs"},
 }
 
 
@@ -838,7 +840,9 @@ def handle_vice_streaks() -> dict:
     # Sort: holding first, then by streak descending
     vices.sort(key=lambda v: (-int(v["holding"]), -v["current_streak"]))
 
-    total_held = int(latest.get("vices_held", 0) or 0)
+    # Count actual holding vices, not the stored `vices_held` aggregate — that field read 7
+    # against 6 tracked (more held than exist), a visible lie on the marquee stat. Derive it.
+    total_held = sum(1 for v in vices if v["holding"])
     total_tracked = len(vices)
 
     return _ok(
