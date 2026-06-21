@@ -417,8 +417,11 @@ REGISTRY = [
 # to a footer-tier "The reset log" group — they're for Matt's own record, not readers.
 _REGROUP = {
     "cycles": "The reset log",
-    "postmortems": "The reset log",
-    "survival": "The reset log",
+    # Promoted out of the footer tier (2026-06-21): survival + post-mortems are the honesty
+    # moat made literal — they show the collapses and handicap the attempt with small-n humility,
+    # which is exactly the credibility a skeptic/clinician comes for. They belong in "How it holds up".
+    "postmortems": "How it holds up",
+    "survival": "How it holds up",
     "methodology": "How it holds up",
     "predictions": "How it holds up",
     "benchmarks": "How it holds up",
