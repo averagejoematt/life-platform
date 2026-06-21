@@ -17,6 +17,7 @@ pure extraction/normalization core, which is where the schema mapping lives.)
 """
 
 import os
+from datetime import datetime, timezone
 from decimal import Decimal
 
 # The ingestion modules build an IngestionConfig at import time, which reads
@@ -31,6 +32,7 @@ for _k, _v in {
     os.environ.setdefault(_k, _v)
 
 from ingestion.garmin_lambda import transform as garmin_transform  # noqa: E402
+from ingestion import strava_lambda as strava  # noqa: E402
 from ingestion.strava_lambda import _normalize as strava_normalize  # noqa: E402
 from ingestion.whoop_lambda import (  # noqa: E402
     _extract_cycle,
@@ -241,6 +243,77 @@ def test_strava_merges_zone_and_hr_recovery():
     out = strava_normalize({"id": 1}, zone_data={"zone2_minutes": 30}, hr_recovery={"bpm_drop_60s": 22})
     assert out["zone2_minutes"] == 30
     assert out["hr_recovery"] == {"bpm_drop_60s": 22}
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Strava — fetch_day local-date windowing (the Jun 2026 evening-walk gap)
+# ══════════════════════════════════════════════════════════════════════════
+#
+# Records are keyed by the activity's LOCAL date, but the Strava /athlete/
+# activities window is expressed in UTC instants. An evening-PT activity has a
+# UTC start on the *next* calendar day, so a naive same-day UTC window dropped
+# it both ways (past its own day's window; wrong local date on the next). The
+# fix brackets the window by ±1 day and lets the start_date_local filter assign
+# each activity to exactly one local date. These tests pin that contract — with
+# the old single-day window the first test fetches None and fails.
+
+# Evening-PT walk: 17:07 LOCAL on Jun 15 → 00:07 UTC on Jun 16.
+_EVENING_WALK = {
+    "id": 18936960658,
+    "type": "Walk",
+    "sport_type": "Walk",
+    "start_date": "2026-06-16T00:07:44Z",
+    "start_date_local": "2026-06-15T17:07:44Z",
+    "distance": 4023.0,
+    "has_heartrate": False,
+}
+# Midday lift the next local day: 05:02 LOCAL Jun 16 → 12:02 UTC Jun 16.
+_MIDDAY_LIFT = {
+    "id": 18943560629,
+    "type": "WeightTraining",
+    "sport_type": "WeightTraining",
+    "start_date": "2026-06-16T12:02:25Z",
+    "start_date_local": "2026-06-16T05:02:25Z",
+    "distance": 0.0,
+    "has_heartrate": False,
+}
+_FIXTURE = [_EVENING_WALK, _MIDDAY_LIFT]
+
+
+def _patch_strava_api(monkeypatch):
+    """Mock the Strava list endpoint with a UTC-window-accurate fixture (returns
+    only activities whose UTC start falls in [after, before), matching the real
+    API), and no-op the per-activity HR enrichment so the test needs no network."""
+
+    def _window_aware(secret, after_ts, before_ts):
+        out = [
+            a
+            for a in _FIXTURE
+            if after_ts <= datetime.strptime(a["start_date"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp() < before_ts
+        ]
+        return out, secret
+
+    monkeypatch.setattr(strava, "_fetch_activities_in_range", _window_aware)
+    monkeypatch.setattr(strava, "_fetch_activity_zones", lambda sid, secret: ({}, secret))
+    monkeypatch.setattr(strava, "_fetch_activity_streams", lambda sid, secret: ({}, secret))
+    strava._secret_cache["secret"] = {"access_token": "x", "expires_at": 9_999_999_999}
+
+
+def test_strava_fetch_day_captures_evening_pt_activity(monkeypatch):
+    _patch_strava_api(monkeypatch)
+    # The walk's LOCAL date is Jun 15 even though its UTC start is Jun 16.
+    day = strava.fetch_day({}, "2026-06-15")
+    assert day is not None, "evening-PT walk dropped — UTC window did not bracket the local day"
+    assert [a["strava_id"] for a in day["activities"]] == ["18936960658"]
+
+
+def test_strava_fetch_day_assigns_each_activity_to_one_local_date(monkeypatch):
+    _patch_strava_api(monkeypatch)
+    # Jun 16 holds the midday lift but NOT the Jun-15-local walk (no double-count).
+    day = strava.fetch_day({}, "2026-06-16")
+    assert day is not None
+    ids = sorted(a["strava_id"] for a in day["activities"])
+    assert ids == ["18943560629"]
 
 
 # ══════════════════════════════════════════════════════════════════════════
