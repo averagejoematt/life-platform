@@ -116,8 +116,8 @@ def new_url(url: str, dest: str) -> str:
             "chronicle": "/story/chronicle/",
             "elena": "/story/chronicle/",
             "journal": "/story/journal/",
-            "field-notes": "/story/lab-notes/",
-            "first-person": "/story/lab-notes/",
+            "field-notes": "/coaching/lab-notes/",  # moved to /coaching/ (2026-06-20)
+            "first-person": "/coaching/lab-notes/",
             "recap": "/story/timeline/",
             "progress": "/story/timeline/",
             "about": "/story/about/",
@@ -164,8 +164,15 @@ def main() -> int:
 
     # Non-legacy 301s: /dispatches/* briefly shipped before "the story" rename — keep them alive.
     redirects.append(("/dispatches/", "/story/"))
-    for seg in ("chronicle", "lab-notes", "journal", "timeline", "about"):
+    for seg in ("chronicle", "journal", "timeline", "about"):
         redirects.append((f"/dispatches/{seg}/", f"/story/{seg}/"))
+
+    # 2026-06-20 (Option A): "The Coaches" + "AI lab notes" moved out of /story/ to
+    # their own top-level door /coaching/. 301 the old v4 paths + /dispatches/ aliases.
+    for old in ("/story/coaches/", "/dispatches/coaches/"):
+        redirects.append((old, "/coaching/coaches/"))
+    for old in ("/story/lab-notes/", "/dispatches/lab-notes/"):
+        redirects.append((old, "/coaching/lab-notes/"))
 
     print(f"\nv4 migration inventory - {len(pages)} preserved page(s) under {LEGACY_DIR}/\n")
     for d in DEST_ORDER:

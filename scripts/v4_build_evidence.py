@@ -518,7 +518,7 @@ THEME = (
 TOPBAR = (
     '<header class="ev-top"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span>'
     '<span class="brand-name">averagejoematt</span> <span class="brand-door label">evidence</span></a>'
-    '<nav class="doors" aria-label="Doors"><a href="/now/">the cockpit</a><a href="/story/">the story</a><a href="/evidence/" aria-current="page">the evidence</a>'
+    '<nav class="doors" aria-label="Doors"><a href="/now/">the cockpit</a><a href="/story/">the story</a><a href="/coaching/">the coaching</a><a href="/evidence/" aria-current="page">the evidence</a>'
     '<button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button></nav></header>'
 )
 
@@ -585,7 +585,9 @@ def shell(start_slug: str, canonical: str, title: str, desc: str) -> str:
   <footer class="site-foot">
     <nav class="site-foot-cols" aria-label="Site map">
       <div class="sf-col"><p class="sf-h label">The Story</p>
-        <a href="/story/chronicle/">Chronicle</a><a href="/story/lab-notes/">AI lab notes</a><a href="/story/coaches/">The Coaches</a><a href="/story/panel/">The Panel</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/about/">About</a></div>
+        <a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/about/">About</a></div>
+      <div class="sf-col"><p class="sf-h label">The Coaching</p>
+        <a href="/coaching/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div>
       <div class="sf-col"><p class="sf-h label">The Evidence</p>
         <a href="/evidence/">All topics</a><a href="/evidence/board/">The board</a><a href="/evidence/labs/">Labs</a><a href="/evidence/training/">Training</a><a href="/evidence/nutrition/">Nutrition</a></div>
       <div class="sf-col"><p class="sf-h label">The Cockpit</p>

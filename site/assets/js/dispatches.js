@@ -10,10 +10,11 @@
 */
 import { enhanceCoachNames } from "/assets/js/coach_popover.js";
 
+// NB (2026-06-20): "The Coaches" + "AI lab notes" moved OUT to their own top-level
+// door, /coaching/ (assets/js/coaching.js). The coach/fieldnotes renderer functions
+// below are retained-but-unused here (they now live in coaching.js) — pending cleanup.
 const SECTIONS = [
   { key: "chronicle", label: "Chronicle", kicker: "written weekly by Elena Voss", kind: "posts", url: "/chronicle/posts.json" },
-  { key: "lab-notes", label: "AI lab notes", kicker: "what the AI saw ↔ how it felt", kind: "fieldnotes", url: "/api/field_notes" },
-  { key: "coaches", label: "The Coaches", kicker: "the AI team reading your data", kind: "coaches", url: "/api/coaches" },
   { key: "panel", label: "Podcast", kicker: "Elena + a coach review the week", kind: "podcast", url: "/panelcast/episodes.json" },
   { key: "journal", label: "In my own words", kicker: "the daily journal", kind: "posts", url: "/journal/posts.json" },
   { key: "timeline", label: "Timeline", kicker: "level-ups & milestones", kind: "timeline", url: "/api/journey_timeline" },
@@ -269,7 +270,7 @@ async function renderRead(s, id) {
     // Throughline: when the episode names its guest coach, link the byline to that
     // coach's page (/story/coaches/#<id>) so the show ties back into the team.
     const byline = (ent.guest_id && ent.guest_name)
-      ? `Elena + <a href="/story/coaches/#${esc(ent.guest_id)}">${esc(ent.guest_name)}</a>`
+      ? `Elena + <a href="/coaching/coaches/#${esc(ent.guest_id)}">${esc(ent.guest_name)}</a>`
       : esc(ent.byline || "Elena + a coach");
     // The Panel ledger — the running scoreboard of coach bets + outcomes (proof-of-honesty).
     const lg = await tryJSON("/api/panel_ledger");
