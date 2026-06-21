@@ -344,6 +344,15 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .corr-fill { display: block; height: 100%; }
 .corr-r { color: var(--ink-faint); font-size: var(--fs-label, 0.78rem); white-space: nowrap; }
 
+/* Accountability ledger — cause cards (shown even at $0 so the rules + personality read). */
+.cause-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--sp-3); margin-top: var(--sp-3); }
+.cause-card { border: var(--honest-border); border-radius: var(--radius-sm); padding: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-1); }
+.cause-name { font-weight: 600; color: var(--ink); text-decoration: none; }
+.cause-name:hover { color: var(--ember); }
+.cause-desc { color: var(--ink-faint); }
+.cause-why { color: var(--ink-muted); font-style: italic; margin: var(--sp-1) 0 0; font-size: 0.95em; }
+.cause-amt { color: var(--ink-faint); margin-top: var(--sp-1); }
+
 /* ── Shared footer mega-menu (CC-05) — on all three doors ─────────────────── */
 .site-foot { border-top: var(--border-hair); margin-top: var(--sp-7); padding: var(--sp-6) var(--gutter) var(--sp-5); }
 .site-foot-cols { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-5); max-width: var(--container); margin-inline: auto; }

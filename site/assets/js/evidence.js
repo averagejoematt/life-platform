@@ -164,7 +164,7 @@ async function renderSleep(d) {
   if (!detail && !circSec && !uniSec) return empty("No sleep data yet — score, stages, HRV and recovery appear here nightly.");
   return detail + circSec + uniSec + note("Correlative — last night, the recent trend, and today's behavioural forecast.");
 }
-function renderMind(d) { const m = d.mind || {}; const vices = d.vice_streaks || []; const head = figs([m.journal_entries_30d != null && fig(m.journal_entries_30d, "journal · 30d"), m.mood_entries_count != null && fig(m.mood_entries_count, "mood logs"), m.resist_rate_pct != null && fig(fmt(m.resist_rate_pct) + "%", "temptations resisted"), m.meaningful_pct != null && fig(m.meaningful_pct + "%", "meaningful talk")]); const v = vices.length ? sec("Vice streaks (held)", `<table class="rd-tbl"><tbody>${vices.map((x) => `<tr><td class="rd-name">${esc(ttl(x.name))}</td><td class="num">${fmt(x.current_streak)}d ${x.holding ? "✓" : ""}</td></tr>`).join("")}</tbody></table>`) : ""; if (!head.includes("fig-v") && !v) return empty("No mood / journal / temptation data yet — the inner-life view fills in as you log."); return head + v + note("Correlative — mood, reflection, restraint. Categories kept private."); }
+function renderMind(d) { const m = d.mind || {}; const mp = d.mind_pillar; const vices = d.vice_streaks || []; const head = figs([mp && mp.level != null && fig(`L${fmt(mp.level)} · ${esc(mp.tier || "")}`, "mind pillar"), m.journal_entries_30d != null && fig(m.journal_entries_30d, "journal · 30d"), m.mood_entries_count != null && fig(m.mood_entries_count, "mood logs"), m.resist_rate_pct != null && fig(fmt(m.resist_rate_pct) + "%", "temptations resisted"), m.meaningful_pct != null && fig(m.meaningful_pct + "%", "meaningful talk")]); const v = vices.length ? sec("Vice streaks (held)", `<table class="rd-tbl"><tbody>${vices.map((x) => `<tr><td class="rd-name">${esc(ttl(x.name))}</td><td class="num">${fmt(x.current_streak)}d ${x.holding ? "✓" : ""}</td></tr>`).join("")}</tbody></table>`) : ""; const noLog = (m.journal_entries_30d || 0) === 0 && (m.mood_entries_count || 0) === 0; const honest = noLog ? note("No journal or mood logged this cycle yet — that part of the inner-life view fills in as you write. Below is what's tracked so far.") : ""; if (!head.includes("fig-v") && !v) return empty("No mood / journal / temptation data yet — the inner-life view fills in as you log."); return head + honest + v + note("Correlative — mood, reflection, restraint. Categories kept private."); }
 function renderVices(d) {
   const v = d.vices || [];
   if (!v.length) return empty("No vice tracking yet.");
@@ -189,7 +189,19 @@ function renderVices(d) {
     note("Shown honestly — held and broken both. Named privately.")
   );
 }
-function renderLedger(d) { const t = d.totals || {}; return figs([fig("$" + fmt(t.total_donated_usd), "donated"), fig("$" + fmt(t.total_bounties_usd), "bounties earned"), fig("$" + fmt(t.total_punishments_usd), "punishments"), fig(fmt(t.bounty_count), "bounties")]) + note("Money moved by the accountability rules — skin in the game."); }
+function renderLedger(d) {
+  const t = d.totals || {};
+  const bc = d.by_cause || {};
+  const head = figs([fig("$" + fmt(t.total_donated_usd), "donated"), fig("$" + fmt(t.total_bounties_usd), "bounties earned"), fig("$" + fmt(t.total_punishments_usd), "punishments"), fig(fmt(t.bounty_count), "bounties")]);
+  // Surface the causes the money is routed to — present even at $0 so the page has the
+  // human rules + personality (incl. the snake-rescue joke) instead of four bare zeros.
+  const causeCard = (c, why) => `<div class="cause-card"><a class="cause-name" href="${esc(c.url || "#")}" target="_blank" rel="noopener">${esc(c.name)}</a>${c.short_description ? `<span class="cause-desc label">${esc(c.short_description)}</span>` : ""}${why && c[why] ? `<p class="cause-why">${esc(c[why])}</p>` : ""}<span class="cause-amt mono">$${fmt(c.total_usd || 0)} · ${fmt(c.count || 0)}×</span></div>`;
+  const earned = (bc.earned_causes || []).filter((c) => c && c.name);
+  const reluctant = (bc.reluctant_causes || []).filter((c) => c && c.name);
+  const earnedSec = earned.length ? sec("Where winnings go", `<div class="cause-grid">${earned.map((c) => causeCard(c, "why_i_care")).join("")}</div>`) : "";
+  const reluctantSec = reluctant.length ? sec("Where forfeits go (the ones that sting)", `<div class="cause-grid">${reluctant.map((c) => causeCard(c, "joke_note")).join("")}</div>`) : "";
+  return head + earnedSec + reluctantSec + note("Money moved by the accountability rules — skin in the game. Causes shown whether or not money has moved yet.");
+}
 function renderDiscoveries(d) {
   // Real discoveries first: ai_findings = FDR-significant correlations computed from
   // Matt's own data (the API computed these but the page never rendered them — it showed
