@@ -173,7 +173,7 @@ PLATFORM_FACTS = {
     "tool_count": 88,  # fallback: auto-discovery requires registry.py parseable
     "module_count": 31,  # fallback: all mcp/*.py except __init__.py
     "secret_count": 9,  # active secrets (webhook-key deleted 2026-03-14, google-calendar deleted 2026-03-15)
-    "alarm_count": 49,
+    "alarm_count": 51,  # +2 DI-2 (2026-06-21): ingest-reconciliation-strava, freshness-interior-gap
     "data_sources": 20,  # google_calendar retired (ADR-030); hevy active (ADR-060)
     "cdk_stacks": 8,
     "iam_roles": 43,
