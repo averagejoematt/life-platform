@@ -324,3 +324,44 @@ def test_garmin_transform_passthrough_and_empty():
     assert out == [{"source": "garmin", "date": "2026-06-09", "steps": 5000, "body_battery": 60}]
     assert garmin_transform({}, "2026-06-09") == []
     assert garmin_transform(None, "2026-06-09") == []
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Strava — reconciliation diff (DI-2: catch a silent drop vs the source of truth)
+# ══════════════════════════════════════════════════════════════════════════
+#
+# _activities_missing_from_store(api, stored) returns the API activities with no
+# stored counterpart. It is the one check that compares against Strava itself, so
+# it must (a) flag a genuinely-dropped activity and (b) NOT false-positive on a
+# deduped GPS-drop twin (collapsed by the ingestion _dedup into its sibling).
+
+
+# API shape (raw Strava): uses "id" + "start_date".
+def _api(id_, start_utc, type_="Walk"):
+    return {"id": id_, "type": type_, "start_date": start_utc, "start_date_local": start_utc}
+
+
+# Stored shape (DDB record): uses "strava_id" + "start_date".
+def _stored(sid, start_utc):
+    return {"strava_id": str(sid), "start_date": start_utc}
+
+
+def test_reconcile_flags_dropped_activity():
+    api = [_api(111, "2026-06-16T00:07:44Z"), _api(222, "2026-06-16T12:02:25Z", "WeightTraining")]
+    stored = [_stored(222, "2026-06-16T12:02:25Z")]  # the walk (111) was dropped
+    missing = strava._activities_missing_from_store(api, stored)
+    assert [str(a["id"]) for a in missing] == ["111"]
+
+
+def test_reconcile_clean_when_all_present_by_id():
+    api = [_api(111, "2026-06-16T00:07:44Z"), _api(222, "2026-06-16T12:02:25Z")]
+    stored = [_stored(111, "2026-06-16T00:07:44Z"), _stored(222, "2026-06-16T12:02:25Z")]
+    assert strava._activities_missing_from_store(api, stored) == []
+
+
+def test_reconcile_does_not_flag_deduped_gps_drop_twin():
+    # The real 3mi walk (id 111) is stored; the 0-mi GPS-drop twin (id 999) is 17s
+    # later and was intentionally collapsed by _dedup. It must NOT read as missing.
+    api = [_api(111, "2026-06-17T00:05:43Z"), _api(999, "2026-06-17T00:06:00Z")]
+    stored = [_stored(111, "2026-06-17T00:05:43Z")]
+    assert strava._activities_missing_from_store(api, stored) == []

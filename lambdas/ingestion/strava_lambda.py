@@ -327,10 +327,167 @@ _config = IngestionConfig(
 )
 
 
+# ── Reconciliation (DI-2) ─────────────────────────────────────────────────────
+# Every other freshness check in the platform reads only DynamoDB, so it can
+# only see the high-water mark — it is blind to a *silent drop* where an activity
+# the API has never makes it into the store (exactly the Jun 2026 evening-walk
+# bug). Reconciliation is the one check that compares against the source of
+# truth: pull a trailing window of activity IDs from the Strava API and diff it
+# against what we stored. Any API activity with no stored counterpart is a gap.
+# Emitted as LifePlatform/IngestReconciliation::MissingActivityCount{Source=strava}
+# and alarmed in monitoring_stack — so the next silent drop pages us instead of
+# hiding behind a green high-water mark.
+
+RECONCILE_WINDOW_DAYS = int(os.environ.get("RECONCILE_WINDOW_DAYS", "14"))
+
+
+def _parse_start(s) -> datetime | None:
+    """Parse an ISO start_date (UTC 'Z') to an aware datetime; None if unparseable.
+
+    Stored and API records use the same UTC basis, so a [:19] slice + UTC tz is a
+    valid common clock for the tolerance comparison below.
+    """
+    if not s or not isinstance(s, str):
+        return None
+    try:
+        return datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def _activities_missing_from_store(api_activities: list, stored_activities: list, tolerance_seconds: int = 120) -> list:
+    """Return the API activities that have no counterpart in the store.
+
+    An API activity counts as present if the store holds either (a) the same
+    ``strava_id`` or (b) an activity that started within ``tolerance_seconds`` of
+    it. The time-window match mirrors the ingestion ``_dedup`` (which collapses
+    near-simultaneous multi-device / GPS-drop twins into one record), so a
+    legitimately-deduped activity is NOT reported as a false gap.
+    """
+    stored_ids = {str(s.get("strava_id")) for s in stored_activities if s.get("strava_id")}
+    stored_starts = [t for t in (_parse_start(s.get("start_date")) for s in stored_activities) if t is not None]
+    missing = []
+    for a in api_activities:
+        sid = str(a.get("id", ""))
+        if sid and sid in stored_ids:
+            continue
+        t = _parse_start(a.get("start_date"))
+        if t is not None and any(abs((t - ts).total_seconds()) <= tolerance_seconds for ts in stored_starts):
+            continue  # near-duplicate of a stored activity (e.g. a deduped GPS-drop twin)
+        missing.append(a)
+    return missing
+
+
+def _fetch_stored_activities(table, start_date: str, end_date: str) -> list:
+    """Flatten the stored Strava activities across [start_date, end_date] (inclusive)."""
+    from boto3.dynamodb.conditions import Key
+
+    pk = f"USER#{USER_ID}#SOURCE#strava"
+    out: list = []
+    kwargs = {
+        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}"),
+        "ProjectionExpression": "activities",
+    }
+    while True:
+        resp = table.query(**kwargs)
+        for item in resp.get("Items", []):
+            out.extend(item.get("activities", []) or [])
+        lek = resp.get("LastEvaluatedKey")
+        if not lek:
+            break
+        kwargs["ExclusiveStartKey"] = lek
+    return out
+
+
+def _emit_reconciliation_metric(missing_count: int) -> None:
+    try:
+        _cw.put_metric_data(
+            Namespace="LifePlatform/IngestReconciliation",
+            MetricData=[
+                {
+                    "MetricName": "MissingActivityCount",
+                    "Dimensions": [{"Name": "Source", "Value": "strava"}],
+                    "Value": float(missing_count),
+                    "Unit": "Count",
+                }
+            ],
+        )
+    except Exception as e:  # metric emission must never fail the run
+        logger.warning("reconcile metric emit failed (non-fatal): %s", e)
+
+
+def _reconcile(event: dict, context) -> dict:
+    """Diff the trailing-window Strava API activity set against the store."""
+    try:
+        dynamodb = boto3.resource("dynamodb", region_name=REGION)
+        table = dynamodb.Table(os.environ.get("TABLE_NAME", "life-platform"))
+        secrets_client = boto3.client("secretsmanager", region_name=REGION)
+        try:
+            from secret_cache import get_secret_json
+
+            secret_data = get_secret_json(SECRET_NAME, secrets_client)
+        except ImportError:
+            secret_data = json.loads(secrets_client.get_secret_value(SecretId=SECRET_NAME)["SecretString"])
+
+        secret = authenticate(secret_data)
+        # Strava rotates the refresh_token on refresh — persist it or the next
+        # ingestion run's refresh fails on a stale token.
+        if secret.get("access_token") != secret_data.get("access_token"):
+            try:
+                secrets_client.update_secret(SecretId=SECRET_NAME, SecretString=json.dumps(secret))
+            except Exception as e:
+                logger.warning("reconcile secret writeback failed (non-fatal): %s", e)
+
+        today = datetime.now(timezone.utc).date()
+        start = today - timedelta(days=RECONCILE_WINDOW_DAYS)
+        after_ts = datetime(start.year, start.month, start.day, tzinfo=timezone.utc).timestamp()
+        before_ts = datetime(today.year, today.month, today.day, tzinfo=timezone.utc).timestamp() + 86400
+        api_activities, secret = _fetch_activities_in_range(secret, after_ts, before_ts)
+        _secret_cache["secret"] = secret
+
+        stored = _fetch_stored_activities(table, start.isoformat(), today.isoformat())
+        missing = _activities_missing_from_store(api_activities, stored)
+
+        _emit_reconciliation_metric(len(missing))
+        if missing:
+            logger.warning(
+                "[RECONCILE] %d Strava activities missing from store: %s",
+                len(missing),
+                [(str(a.get("id")), a.get("type"), a.get("start_date_local")) for a in missing],
+            )
+        else:
+            logger.info(
+                "[RECONCILE] clean — %d API activities all present in store (window=%dd)",
+                len(api_activities),
+                RECONCILE_WINDOW_DAYS,
+            )
+        return {
+            "statusCode": 200,
+            "body": json.dumps(
+                {
+                    "mode": "reconcile",
+                    "window_days": RECONCILE_WINDOW_DAYS,
+                    "api_activity_count": len(api_activities),
+                    "stored_activity_count": len(stored),
+                    "missing_count": len(missing),
+                    "missing_ids": [str(a.get("id")) for a in missing],
+                }
+            ),
+        }
+    except Exception as e:
+        # A reconcile failure (e.g. transient Strava outage) must NOT raise — that
+        # would trip the ingestion-error-strava alarm on an unrelated cause. Skip
+        # the metric for the day (alarm treats missing data as not-breaching).
+        logger.error("[RECONCILE] failed (non-fatal): %s", e, exc_info=True)
+        return {"statusCode": 200, "body": json.dumps({"mode": "reconcile", "error": str(e)})}
+
+
 def lambda_handler(event: dict, context) -> dict:
     try:
         if event.get("healthcheck"):
             return {"statusCode": 200, "body": "ok"}
+        if event.get("reconcile"):
+            return _reconcile(event, context)
         return run_ingestion(_config, authenticate, fetch_day, transform, event, context)
     except Exception as e:
         logger.error("strava ingestion failed: %s", e, exc_info=True)
