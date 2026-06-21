@@ -20,7 +20,43 @@ _EXERCISE_MUSCLE_MAP = [
     (["leg extension", "leg curl", "hamstring curl", "nordic"], ["Quads", "Hamstrings"], "Legs"),
     (["hip thrust", "glute bridge", "hip abduct", "hip adduct"], ["Glutes", "Hamstrings"], "Legs"),
     (["calf", "calves", "standing calf", "seated calf"], ["Calves"], "Legs"),
-    (["plank", "crunch", "ab ", "abs ", "core", "oblique", "sit up", "situp", "hanging leg", "windshield"], ["Core"], "Core"),
+    # Core: direct flexion/oblique work PLUS anti-rotation & loaded carries. Without the
+    # latter, Pallof presses and farmer/suitcase carries fell through to "Other" and
+    # core_sets read 0 even on a day they were trained (B2b, 2026-06-21).
+    (
+        [
+            "plank",
+            "crunch",
+            "ab ",
+            "abs ",
+            "core",
+            "oblique",
+            "sit up",
+            "situp",
+            "hanging leg",
+            "windshield",
+            "leg raise",
+            "knee raise",
+            "russian twist",
+            "hollow",
+            "rollout",
+            "ab wheel",
+            "pallof",
+            "anti-rotation",
+            "anti rotation",
+            "dead bug",
+            "deadbug",
+            "bird dog",
+            "carry",
+            "carries",
+            "farmer",
+            "suitcase",
+            "woodchop",
+            "wood chop",
+        ],
+        ["Core"],
+        "Core",
+    ),
 ]
 
 _BODYWEIGHT_EXERCISES = [
@@ -50,6 +86,68 @@ def classify_exercise(name: str) -> dict:
 def is_bodyweight(name: str) -> bool:
     nl = name.lower()
     return any(kw in nl for kw in _BODYWEIGHT_EXERCISES)
+
+
+def assess_volume_completeness(aggregated_dates, latest_ingested_date, end_date):
+    """Did the volume aggregation include the latest ingested Hevy session?
+
+    The night-before authoring bug (B2a, 2026-06-21): get_muscle_volume read a
+    high-water-mark that hadn't caught the latest session, so it undercounted
+    (calves 10/'lagging' when they were 14/'optimal'). This is the same
+    completeness-vs-recency class as the Strava high-water-mark blindness.
+
+    Pure function — no AWS. Inputs are 'YYYY-MM-DD' strings (or None):
+      aggregated_dates      — workout dates actually folded into the volume math
+      latest_ingested_date  — newest DATE# in the Hevy partition (high-water mark)
+      end_date              — the analysis window end
+
+    Returns a dict the tool surfaces as `completeness`. `includes_latest` is True
+    when the aggregation reached the newest in-window ingested session; when False,
+    a session exists that the analysis didn't fold in → `stale` True, and the
+    authoring gate (Stage 2) must block or flag rather than prescribe off it.
+    """
+    dates = sorted(d for d in (aggregated_dates or []) if d)
+    data_current_through = dates[-1] if dates else None
+
+    if not latest_ingested_date:
+        return {
+            "data_current_through": data_current_through,
+            "latest_ingested": None,
+            "includes_latest": data_current_through is None,
+            "stale": False,
+            "note": "No Hevy sessions ingested.",
+        }
+
+    # Only the high-water mark *inside* the requested window is a completeness signal.
+    # A session newer than end_date is simply out of scope (not a gap), and rest days
+    # at the tail of the window are legitimate — never flag those as stale. The genuine
+    # bug is: the partition's newest session falls in-window yet the aggregation missed
+    # it (the night-before undercount).
+    within_window = end_date is None or latest_ingested_date <= end_date
+    if within_window:
+        includes_latest = data_current_through is not None and data_current_through >= latest_ingested_date
+    else:
+        includes_latest = data_current_through is not None
+    stale = not includes_latest
+
+    if stale and within_window:
+        note = (
+            f"Aggregation current through {data_current_through or 'none'} but a more recent "
+            f"in-window session is ingested ({latest_ingested_date}). Volume may undercount the "
+            "latest training — do not author off this read until it clears."
+        )
+    elif stale:
+        note = "No in-window sessions aggregated."
+    else:
+        note = f"Includes the latest in-window session ({data_current_through})."
+
+    return {
+        "data_current_through": data_current_through,
+        "latest_ingested": latest_ingested_date,
+        "includes_latest": includes_latest,
+        "stale": stale,
+        "note": note,
+    }
 
 
 def estimate_1rm(weight: float, reps: int) -> float | None:

@@ -2634,6 +2634,8 @@ The AWS "account-controls" sub-grade stays below a literal-checklist A on those 
 
 **Alternatives rejected.** *Generic "missing calendar date" alerting for all sources* — false-positives on every sparse source's rest day. *A separate reconciliation lambda* — would need its own copy of the Strava client + a second holder of `life-platform/strava`, widening the credential surface for no benefit; the ingestion lambda already has everything. *A CLI-created EventBridge rule* — would orphan the rule from CDK (violates ADR-081's "all infra in CDK"); the rule lives in `ingestion_stack`. *Self-healing on reconcile (auto re-ingest the missing IDs)* — a logic bug would just re-drop them and churn; the alarm (human signal) is the durable value, and #180 already fixed this class at the source.
 
-**Out of scope.** Reconciliation for other activity sources (Whoop/Garmin) — the pattern generalizes but each is a separate opt-in; fixing the freshness/liveness checks to be completeness-aware beyond the interior-gap heuristic; any change to the `get_freshness_status` MCP tool (still high-water-mark only — a noted follow-up).
+**Out of scope.** Reconciliation for other activity sources (Whoop/Garmin) — the pattern generalizes but each is a separate opt-in; fixing the freshness/liveness checks to be completeness-aware beyond the interior-gap heuristic.
+
+**Follow-up closed (2026-06-21, B3).** The `get_freshness_status` MCP tool — originally out of scope above as high-water-mark only — now carries the same interior-gap scan (`find_interior_gaps` + `DAILY_SOURCES_INTERIOR`, TD-14 parity with `freshness_checker_lambda`), surfacing `interior_gaps` / `interior_gap_count` so an interactive freshness read can no longer report a mid-window hole as green. Lands with the Stage-1 data-integrity batch alongside the `get_muscle_volume` completeness signal (B2a) and the anti-rotation/carry → Core classifier fix (B2b).
 
 ---
