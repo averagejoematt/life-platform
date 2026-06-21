@@ -58,9 +58,17 @@ ORPHAN_S3_FILES = [
     "dashboard/data.json",  # 2026-03-08, no writer
     "dashboard/clinical.json",  # 2026-03-08, no writer
     "dashboard/data/character_stats.json",  # 2026-04-04, pre-pivot
-    "dashboard/journal/posts.json",  # 2026-03-30, weekly refresh
-    "dashboard/chronicle/posts.json",  # 2026-03-31, weekly refresh
+    "dashboard/journal/posts.json",  # 2026-03-30, weekly refresh (legacy dashboard path)
+    "dashboard/chronicle/posts.json",  # 2026-03-31, weekly refresh (legacy dashboard path)
     "site/data/data_sources.json",  # 15-day stale
+    # v4 Story-door feeds (2026-06-20): the reset tombstoned only the legacy
+    # dashboard/ paths above, leaving these v4-served keys stale across the
+    # cycle-4 reset — the site served pre-genesis chronicle/journal posts whose
+    # DDB records were already phase=pilot+tombstoned. Clear them too so a feed
+    # only carries current-cycle posts (empty → honest "Nothing published yet").
+    "site/chronicle/posts.json",  # /chronicle/posts.json — Story chronicle feed
+    "generated/journal/posts.json",  # /journal/posts.json — Story journal feed
+    "site/journal/posts.json",  # sibling journal index (same vintage)
 ]
 
 # Lambdas to invoke after sync to regenerate the JSON files they own.
@@ -255,26 +263,19 @@ def tombstone_orphan_s3_files(apply: bool, now_iso: str) -> list[str]:
     ).encode()
     for key in ORPHAN_S3_FILES:
         if apply:
-            subprocess.run(
-                [
-                    "aws",
-                    "s3api",
-                    "put-object",
-                    "--bucket",
-                    S3_BUCKET,
-                    "--key",
-                    key,
-                    "--body",
-                    "-",
-                    "--content-type",
-                    "application/json",
-                    "--region",
-                    REGION,
-                ],
+            # `aws s3 cp - s3://...` reads the body from stdin. NB: the prior
+            # `s3api put-object --body -` form does NOT read stdin (it looks for a
+            # file literally named "-"), so with check=False it silently wrote
+            # nothing — the tombstone was a no-op for years (only dead dashboard/
+            # paths were listed, so it went unnoticed). Found 2026-06-20.
+            r = subprocess.run(
+                ["aws", "s3", "cp", "-", f"s3://{S3_BUCKET}/{key}", "--content-type", "application/json", "--region", REGION],
                 input=payload,
                 check=False,
                 capture_output=True,
             )
+            if r.returncode != 0:
+                print(f"    ⚠️  tombstone FAILED for {key}: {r.stderr.decode('utf-8', 'replace').strip()[:160]}")
         tombstoned.append(key)
     return tombstoned
 
@@ -347,8 +348,19 @@ def sync_to_s3(apply: bool, touched_html: list[str]):
     return keys_to_sync
 
 
+def _viewer_path(key: str) -> str:
+    """Map an S3 key to its CloudFront VIEWER path. Both `site/` and `generated/`
+    (ADR-046) are stripped at the edge, so an invalidation must target the public
+    path, not the S3 key — busting `/generated/...` never clears `/...` (the
+    CloudFront-path bug, 2026-06-18)."""
+    for prefix in ("site/", "generated/"):
+        if key.startswith(prefix):
+            return "/" + key[len(prefix) :]
+    return "/" + key
+
+
 def invalidate_cloudfront(apply: bool, paths: list[str]):
-    cf_paths = ["/" + p[len("site/") :] if p.startswith("site/") else "/" + p for p in paths]
+    cf_paths = [_viewer_path(p) for p in paths]
     cf_paths.append("/")  # invalidate root for safety
     if apply:
         subprocess.run(
@@ -363,10 +375,28 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--apply", action="store_true", help="Commit writes (default: dry-run)")
     parser.add_argument("--skip-cloudfront", action="store_true", help="Skip CloudFront invalidation step")
+    parser.add_argument(
+        "--orphans-only",
+        action="store_true",
+        help="Run ONLY the orphan-S3 tombstone step (+ CloudFront invalidation) — for a targeted stale-feed cleanup outside a full reset",
+    )
     args = parser.parse_args()
 
     mode = "APPLY" if args.apply else "DRY-RUN"
     print(f"[{mode}] site copy sync. genesis={EXPERIMENT_START_DATE} baseline={EXPERIMENT_BASELINE_WEIGHT_LBS}")
+
+    if args.orphans_only:
+        from datetime import datetime, timezone
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        orphans = tombstone_orphan_s3_files(args.apply, now_iso)
+        print(f"[orphans-only] Orphan S3 files tombstoned: {len(orphans)}")
+        for o in orphans:
+            print(f"    - s3://{S3_BUCKET}/{o}")
+        if not args.skip_cloudfront:
+            paths = invalidate_cloudfront(args.apply, orphans)
+            print(f"               CloudFront invalidation: {len(paths)} path(s){' (would invalidate)' if not args.apply else ''}")
+        return
 
     # 1. site_constants.js
     js_before, js_after = rewrite_site_constants(args.apply)

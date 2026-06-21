@@ -298,6 +298,36 @@ def _write_indexes(episodes: list) -> None:
     _invalidate_cdn()
 
 
+def _set_pending(week, reason: str, display: str, expected_date=None) -> None:
+    """Record a non-blocking 'pending episode' marker in episodes.json so the Panel
+    tab can show WHY no new episode dropped instead of going silent (the silent-skip
+    gap, 2026-06-20). Preserves the episodes list; a successful publish rewrites
+    episodes.json via _write_indexes (no `pending` key) → the marker clears itself.
+    Fail-open: surfacing a pending state must never break the run."""
+    try:
+        try:
+            doc = json.loads(s3.get_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/episodes.json")["Body"].read())
+        except Exception:
+            doc = {"episodes": []}
+        doc["pending"] = {
+            "week": week,
+            "reason": reason,
+            "display": display,
+            "expected_date": expected_date,
+            "noted_at": datetime.now(timezone.utc).isoformat(),
+        }
+        s3.put_object(
+            Bucket=S3_BUCKET,
+            Key=f"{PREFIX}/episodes.json",
+            Body=json.dumps(doc, indent=1),
+            ContentType="application/json",
+            CacheControl="max-age=3600, public",
+        )
+        _invalidate_cdn()
+    except Exception as e:  # noqa: BLE001
+        print(f"[panel] _set_pending failed (non-fatal): {e}")
+
+
 # CloudFront distribution serving averagejoematt.com (S3GeneratedOrigin handles /panelcast/*).
 CF_DISTRIBUTION_ID = os.environ.get("CF_DISTRIBUTION_ID", "E3S424OXQZ8NBE")
 
@@ -1103,6 +1133,8 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     # Wednesday chronicle), skip cleanly — the liveness alarm catches a truly silent show.
     weekly = [p for p in posts if p.get("week") and p.get("week") > 0 and p.get("date") and p["date"] >= EXPERIMENT_START_DATE]
     if not weekly:
+        if not dry_run:
+            _set_pending(None, "awaiting_chronicle", "Next episode is pending — waiting for this week's chronicle to publish.")
         return {"statusCode": 200, "body": json.dumps({"weekly": "no current-cycle weekly chronicle yet"})}
     post = max(weekly, key=lambda x: x["date"])
     week = post["week"]
@@ -1113,6 +1145,13 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     state = _state_read()
     beats = _gather_week(post, state)
     if not beats.get("chronicle"):
+        if not dry_run:
+            _set_pending(
+                week,
+                "awaiting_chronicle",
+                f"Episode for week {week} is pending — the week's chronicle isn't written yet.",
+                post.get("date"),
+            )
         return {"statusCode": 200, "body": json.dumps({"week": week, "skipped": "no chronicle yet", "date": post.get("date")})}
 
     # Personal Board asymmetry — hard/sensitive week → human, never auto-publish.
