@@ -183,7 +183,9 @@ async function renderWall() {
     Lab notes render fully native from /api/field_notes; chronicle/journal render
     their real excerpts + metadata from posts.json. Master-detail, deep-linkable. */
 const DX = [
-  { key: "chronicle", label: "Chronicle", url: "/chronicle/posts.json" },
+  // Chronicle reads the live genesis-anchored feed (/journal/posts.json) — the old
+  // /chronicle/posts.json was a dead season-1 snapshot with Feb–May dates + wrong weeks (#1/#3).
+  { key: "chronicle", label: "Chronicle", url: "/journal/posts.json" },
   { key: "labnotes", label: "Lab notes", url: "/api/field_notes" },
   { key: "journal", label: "Journal", url: "/journal/posts.json" },
 ];
@@ -196,9 +198,9 @@ async function dxFetch(src) {
 }
 function dxEntries(src, data) {
   if (!data) return [];
-  if (src === "labnotes") return (data.entries || []).map((e) => ({ id: e.week, title: `Week ${e.week} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "", meta: e.ai_tone }));
+  if (src === "labnotes") return (data.entries || []).map((e) => { const lbl = e.week_label || `Week ${e.week}`; return ({ id: e.week, label: lbl, title: `${lbl} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "", meta: e.ai_tone }); });
   const posts = data.posts || data.entries || (Array.isArray(data) ? data : []);
-  return posts.map((p) => ({ id: p.week, title: p.title || `Week ${p.week}`, date: p.date, meta: p.stats_line, excerpt: p.excerpt, word_count: p.word_count }));
+  return posts.map((p) => { const lbl = p.label || `Week ${p.week}`; return ({ id: p.week, label: lbl, title: p.title || lbl, date: p.date, meta: p.stats_line, excerpt: p.excerpt, word_count: p.word_count }); });
 }
 
 async function dxRenderRead(src, id) {
@@ -209,7 +211,7 @@ async function dxRenderRead(src, id) {
       const d = await getJSON(`/api/field_notes?week=${encodeURIComponent(id)}`);
       const e = d.entry || {};
       const voices = [["The AI", e.ai_present, "machine"], ["Worth watching", e.ai_cautionary, "machine"], ["Worth celebrating", e.ai_affirming, "machine"], ["Matthew", e.matthew_agreement, "human"]].filter((v) => v[1]);
-      read.innerHTML = `<p class="dx-kicker label">field note · week ${esc(id)}${e.ai_tone ? ` · ${esc(e.ai_tone)}` : ""}</p>` +
+      read.innerHTML = `<p class="dx-kicker label">field note · ${esc(e.week_label || `week ${id}`)}${e.ai_tone ? ` · ${esc(e.ai_tone)}` : ""}</p>` +
         (voices.length ? voices.map(([who, txt, cls]) => `<div class="voice ${cls}"><span class="who">${esc(who)}</span><p class="what">${esc(txt)}</p></div>`).join("")
           : `<p class="beat-note">No field note recorded for this week yet.</p>`);
     } catch (e) { read.innerHTML = `<p class="beat-note">Couldn't load this field note just now.</p>`; }
@@ -219,7 +221,7 @@ async function dxRenderRead(src, id) {
   const ent = dxEntries(src, data).find((x) => String(x.id) === String(id));
   if (!ent) { read.innerHTML = `<p class="beat-note">Pick an entry to read it here.</p>`; return; }
   read.innerHTML =
-    `<p class="dx-kicker label">${src === "chronicle" ? "chronicle · Elena Voss" : "journal"} · week ${esc(ent.id)}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
+    `<p class="dx-kicker label">${src === "chronicle" ? "chronicle · Elena Voss" : "journal"} · ${esc(ent.label || `week ${ent.id}`)}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
     `<h3 class="dx-title">${esc(ent.title)}</h3>` +
     (ent.meta ? `<p class="dx-stats label">${esc(ent.meta)}</p>` : "") +
     `<p class="dx-prose">${esc(ent.excerpt || "")}</p>` +
