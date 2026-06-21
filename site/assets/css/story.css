@@ -212,6 +212,11 @@ body { overflow-x: hidden; }
 .dx-read .voice.machine .what { font-family: var(--voice-machine-font); font-size: 1rem; line-height: 1.6; color: var(--ink); }
 .dx-read .voice.human { border-top: var(--honest-border); }
 .dx-read .voice.human .what { font-family: var(--voice-human-font); font-style: italic; font-size: var(--fs-quote); line-height: 1.45; color: var(--ink); }
+/* Pending Matthew-response placeholder — honest "not yet" state, visually de-emphasised. */
+.dx-read .voice.voice-pending .what { color: var(--ink-faint); font-style: italic; }
+/* Podcast "next episode pending" notice — surfaces a skipped/held week instead of silence. */
+.dx-read .panel-pending { border: var(--border-hair); border-radius: var(--radius-2, 8px); padding: var(--sp-3); margin-bottom: var(--sp-4); background: var(--surface-2, rgba(255,255,255,0.02)); }
+.dx-read .panel-pending .dx-prose { margin: var(--sp-1) 0 0; color: var(--ink-muted); }
 
 /* Close */
 .beat-close { text-align: center; border-top: var(--border-hair); }
