@@ -835,7 +835,14 @@ _SENSITIVE_WEEK_RE = re.compile(
 
 
 def _gemini_voice(persona_id: str) -> str:
-    return GEMINI_VOICE.get(persona_id, "Charon")
+    """Gender-correct Gemini voice, sourced from the persona registry (config/personas.json
+    tts_voice) — the single source of truth. The old hardcoded GEMINI_VOICE table had drifted
+    out of sync with persona genders (Dr. Marcus Webb → a female voice, Dr. Sarah Chen → a male
+    one). The registry's tts_voice ("en-US-Chirp3-HD-Charon") shares the voice name with Gemini,
+    so the suffix IS the Gemini voice. Falls back to the legacy table only if the registry lacks one."""
+    tts = persona_registry.tts_voice(persona_id, s3, S3_BUCKET) or ""
+    name = tts.rsplit("-", 1)[-1] if tts else ""
+    return name or GEMINI_VOICE.get(persona_id, "Charon")
 
 
 def _state_read() -> dict:
@@ -894,6 +901,7 @@ def _gather_week(post: dict, state: dict) -> dict:
         "guest": guest,
         "last_open_bet": state.get("open_bet"),
         "recent_topics": state.get("recent_topics", []),
+        "prev_guest": (state.get("last_episode") or {}).get("guest_name") or "",
     }
 
 
@@ -954,6 +962,17 @@ def _build_weekly_script(beats: dict, bible: dict) -> dict:
         "a death, grief, a funeral, cancer, or any named family member (mother/father/sister/brother/girlfriend/wife/etc.); any specific "
         "vice or substance (marijuana, alcohol, nicotine, pornography — not even non-specifically as 'his vices' or 'private habits'); "
         "or any body weight in pounds or kilograms. Stay on training, sleep, recovery, habits, the deficit's effects, the bet, and the week's effort. "
+        "THE BAR (this is the whole point): the TRANSCRIPT must pass for a real, human-made podcast — if a person read it aloud, "
+        "nobody could tell it was AI-written. Earn a real hook in the first two lines, real human interest, genuine dry humor, and "
+        "something a listener actually learns and would text to a friend. NO AI TELLS: never say 'in this episode' or 'today we're "
+        "diving into'; never narrate the format or name the segments; no tidy three-item lists; no 'not just X, it's Y' symmetry; no "
+        "over-explaining or throat-clearing; no neat bow at the end. Think a sharp, warm two-person show people actually subscribe to. "
+        "GROUNDING (non-negotiable): every line must come from the real material below — the coaches' reads and the week's data. Do NOT "
+        "invent scenes, settings, times of day, anecdotes, or sensory detail (no '5 AM protein shake', no 'lukewarm shake', nothing that "
+        "isn't in the material). If it isn't in the data, it didn't happen. The chronicle is background only — never quote it or lift its "
+        "literary scene-setting as fact. GUEST INTRO & CONTINUITY: if the guest changed from last week (noted below), open like a real host "
+        "would — a quick nod to last week, then genuinely introduce this week's guest (name + what they actually work on) before the meat; "
+        "if it's a returning guest, acknowledge the thread instead. "
         f"{CONVO_DIRECTIVE} "
         'OUTPUT ONLY JSON: {"turns":[{"speaker":"elena"|"coach","line":"..."}], "open_bet":"<the one new falsifiable bet for next week>", '
         '"last_bet_result":{"outcome":"won"|"lost"|"open"|"none"}, '
@@ -970,6 +989,9 @@ def _build_weekly_script(beats: dict, bible: dict) -> dict:
         f"GUEST COACH {guest.get('name')} — recent read: {guest.get('summary', '')}\nThemes: {', '.join(guest.get('themes', []))}\n\n"
         f"OTHER COACHES (for THE SPLIT — find a genuine disagreement):\n{split_material}\n\n"
         f"LAST WEEK'S OPEN BET (score it in RECEIPTS, honestly): {beats.get('last_open_bet') or '(none — this is the first weekly)'}\n\n"
+        f"GUEST CONTINUITY: last week's guest was {beats.get('prev_guest') or '(none — first weekly with a coach guest; the only prior episode was the intro)'}. "
+        f"THIS week's guest is {guest.get('name')}. If that's a change, introduce {guest.get('name')} properly for the audience "
+        f"(who they are + what they work on, drawn from their read/themes above) before getting into it.\n\n"
         f"RECENT TOPICS (avoid repeating): {beats.get('recent_topics')}\n\nWrite the JSON now."
     )
     body = {"model": WRITER_MODEL, "max_tokens": 3500, "system": system, "messages": [{"role": "user", "content": user}]}
