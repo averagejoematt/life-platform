@@ -191,6 +191,29 @@ class IngestionStack(Stack):
         )
         strava.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
 
+        # ── 6a. Strava reconciliation (DI-2) — daily source-of-truth diff.
+        # Every other freshness check reads only DDB and so is blind to a silent
+        # drop (an activity the API has that never landed in the store — the Jun
+        # 2026 evening-walk bug). This rule invokes the SAME lambda with
+        # {"reconcile": true}: it pulls a trailing 14-day activity set from the
+        # Strava API and diffs it against the store, emitting
+        # LifePlatform/IngestReconciliation::MissingActivityCount{Source=strava}
+        # (alarmed in monitoring_stack). 17:20 UTC = 10:20 AM PT — after the
+        # morning ingestion crons have run, so the comparison is against a settled
+        # store. UTC-fixed, no DST drift.
+        strava_reconcile_rule = events.Rule(
+            self,
+            "StravaReconciliation",
+            schedule=events.Schedule.cron(hour="17", minute="20"),
+            description="DI-2: diff stored Strava activities vs the Strava API (trailing 14d) — emits MissingActivityCount",
+        )
+        strava_reconcile_rule.add_target(
+            targets.LambdaFunction(
+                strava,
+                event=events.RuleTargetInput.from_object({"reconcile": True}),
+            )
+        )
+
         # ── 6b. Hevy webhook (real-time) — FunctionURL, no schedule.
         #        Per SPEC_HEVY_AND_NUTRITION_BRIDGE_2026_05_25 §2.2-A. The URL is
         #        registered with Hevy's webhook subscription endpoint after deploy.
