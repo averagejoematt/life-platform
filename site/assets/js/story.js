@@ -121,16 +121,24 @@ function renderNumbers(journey) {
   if (journey.progress_pct != null) bind("progress").textContent = `${journey.progress_pct}%`;
   if (journey.projected_goal_date) {
     bind("projected").textContent = `At the current rate, goal lands around ${journey.projected_goal_date}. Correlative projection — not a promise.`;
-  } else if (journey.weekly_rate != null) {
-    bind("projected").textContent = "No reliable projection yet — too few weigh-ins in the recent window to draw a line.";
+  } else if (journey.rate_provisional) {
+    // Lean into the truth instead of projecting off early water-weight: it's week one.
+    bind("projected").textContent = "Too early to project — this is week one, and an early cut's rate is mostly water weight that will slow. No fake finish line; watch it happen in real time.";
+  } else if (journey.weekly_rate_lbs != null) {
+    bind("projected").textContent = "No reliable projection yet — too few weigh-ins to draw a line.";
   }
 }
 
 /* ── the waveform (honest down-beats) ────────────────────────────────────── */
-function tierOf(score) {
-  if (score == null || score === 0) return "none";
-  if (score >= 250) return "up";
-  if (score >= 150) return "mid";
+// Tier by RELATIVE position within the window, not a fixed 250/150 cut. The real
+// daily scores cluster in a narrow band (~250–320), so an absolute threshold painted
+// every day "up" (green) — a down day was structurally impossible, which silently broke
+// the page's own "down weeks shown, not hidden" promise. Relative tiers make the shape
+// of the week honest: the lower days read as holding/down, the best days as up.
+function tierOfRel(pos) {
+  if (pos == null) return "none";
+  if (pos >= 0.62) return "up";
+  if (pos >= 0.3) return "mid";
   return "down";
 }
 function renderWave(days) {
@@ -139,17 +147,17 @@ function renderWave(days) {
     if (wrap) wrap.textContent = "The waveform fills in as the daily scores accrue.";
     return;
   }
-  // Normalize to the window's own range, not a fixed 0–700 scale: real scores
-  // cluster in a narrow band, and against 700 every bar rendered near-identical —
-  // the arc read as a flat strip instead of "every day, including the dips".
-  // A 14%-floor + 86%-span keeps small days visible without faking zeros.
+  // Normalize bar HEIGHT and COLOR to the window's own range (14%-floor + 86%-span keeps
+  // small days visible). When every day is ~equal (span≈0) nothing is faked as a dip.
   const scores = days.map((d) => d.score || 0).filter(Boolean);
   const lo = scores.length ? Math.min(...scores) : 0;
   const span = Math.max(1, (scores.length ? Math.max(...scores) : 1) - lo);
+  const meaningfulSpread = scores.length >= 4 && (Math.max(...scores) - lo) >= 8;
   wrap.replaceChildren(...days.map((d) => {
+    const pos = d.score ? (d.score - lo) / span : null;
     const bar = document.createElement("span");
-    bar.className = `bar ${tierOf(d.score)}`;
-    const h = d.score ? 14 + ((d.score - lo) / span) * 86 : 6;
+    bar.className = `bar ${d.score == null ? "none" : meaningfulSpread ? tierOfRel(pos) : "up"}`;
+    const h = d.score ? 14 + (pos || 0) * 86 : 6;
     bar.style.height = `${h}%`;
     bar.title = `${d.date || ""}: ${d.score ?? "no data"}`;
     return bar;

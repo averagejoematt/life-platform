@@ -208,10 +208,17 @@ def handle_journey() -> dict:
         slope_per_day = (n * sxy - sx * sy) / denom if denom else 0
         weekly_rate = round(slope_per_day * 7, 2)
 
-    # Projected goal date
+    # Projected goal date — SUPPRESSED until the weigh-in record spans ≥21 days. Early-cut
+    # water weight makes the rate ~-11 lb/wk, which would project "goal by September" — exactly
+    # the transformation-theater over-promise the site is built against. The rate is flagged
+    # provisional until there's enough time for it to mean anything.
+    weighin_span_days = (
+        (datetime.strptime(recent[-1][0], "%Y-%m-%d") - datetime.strptime(recent[0][0], "%Y-%m-%d")).days if len(recent) >= 2 else 0
+    )
+    rate_provisional = weighin_span_days < 21
     projected_goal_date = None
     days_to_goal = None
-    if weekly_rate < 0 and current_weight > goal_weight:
+    if weekly_rate < 0 and current_weight > goal_weight and not rate_provisional:
         days = (current_weight - goal_weight) / abs(slope_per_day) if abs(slope_per_day) > 0 else 0
         projected_goal_date = (datetime.now(timezone.utc) + timedelta(days=days)).strftime("%Y-%m-%d")
         days_to_goal = int(days)
@@ -226,6 +233,8 @@ def handle_journey() -> dict:
                 "remaining_lbs": remaining,
                 "progress_pct": progress_pct,
                 "weekly_rate_lbs": weekly_rate,
+                "rate_provisional": rate_provisional,
+                "weighin_span_days": weighin_span_days,
                 "projected_goal_date": projected_goal_date,
                 "days_to_goal": days_to_goal,
                 "started_date": EXPERIMENT_START,
