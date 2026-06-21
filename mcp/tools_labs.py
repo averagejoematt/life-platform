@@ -977,6 +977,16 @@ def tool_get_freshness_status(args):
         except Exception as _e:  # noqa: BLE001
             macro_drift = {"drifted": None, "error": str(_e)}
 
+    # ── Training-notes extractor silent-failure guard (notes feedback loop §8) ──
+    # Notes present but no derived records (or all degraded) = the extractor went dark.
+    training_notes_health = None
+    try:
+        from training_notes import training_notes_health as _tnh
+
+        training_notes_health = _tnh(table)
+    except Exception as _e:  # noqa: BLE001
+        training_notes_health = {"checked": False, "error": str(_e)}
+
     # ── B3: interior-gap scan (daily sources only) ──
     # A daily source can read "fresh" (newest record present) while a mid-window day
     # is silently missing behind the high-water mark — the exact blindness that hid
@@ -1019,6 +1029,7 @@ def tool_get_freshness_status(args):
         "interior_gaps": interior_gaps,
         "interior_gap_count": interior_gap_count,
         "macrofactor_format_drift": macro_drift,
+        "training_notes_health": training_notes_health,
         "thresholds_note": (
             f"Default threshold {DEFAULT_STALE_HOURS}h. "
             f"food_delivery={SOURCE_STALE_HOURS['food_delivery']//24}d, "

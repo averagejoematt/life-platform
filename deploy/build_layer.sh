@@ -65,6 +65,11 @@ MODULES=(
     meal_grouper.py
     meal_templates_seed.py
     meal_projection.py
+    # Training-notes feedback loop (2026-06-21): derived note-signal projection over raw
+    # Hevy notes + bounded Haiku tail. Imported by hevy_backfill_lambda (on-ingest hook),
+    # the get_exercise_notes MCP tool, and backfill_training_notes.py.
+    training_notes.py
+    training_notes_llm.py
 )
 
 rm -rf "$PROJ_ROOT/cdk/layer-build"

@@ -375,7 +375,13 @@
       "lambdas/exercise_history.py",
       "lambdas/vacation_fund.py",
       "lambdas/persona_registry.py",
-      "lambdas/coach_stance.py"
+      "lambdas/coach_stance.py",
+      "lambdas/meal_grouper.py",
+      "lambdas/meal_templates_seed.py",
+      "lambdas/meal_projection.py",
+      "lambdas/source_state.py",
+      "lambdas/training_notes.py",
+      "lambdas/training_notes_llm.py"
     ]
   },
   "skip_deploy": {
