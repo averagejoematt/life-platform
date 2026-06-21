@@ -48,7 +48,25 @@ const sec = (t, inner) => inner ? `<section class="rd-sec"><h2 class="rd-h">${es
 const empty = (m) => `<p class="rd-archive">${esc(m)}</p>`;
 const note = (t) => `<p class="correlative">${t} <span class="confidence conf-low">N=1</span></p>`;
 function evClass(ev) { const s = String(ev || "").toLowerCase(); if (/strong|high|robust/.test(s)) return ["backed-strong", "well supported"]; if (/mod|some|emerg|mixed/.test(s)) return ["backed-some", "moderate support"]; return ["backed-thin", "preliminary"]; }
-function kvtable(o, f) { const r = Object.entries(o || {}).filter(([k, v]) => !k.startsWith("_") && v != null).map(([k, v]) => `<tr><td class="rd-name">${esc(ttl(k))}</td><td class="num">${esc(f && f[k] ? f[k](v) : (typeof v === "object" ? (v.summary || v.label || v.value || "—") : fmt(v)))}</td></tr>`).join(""); return r ? `<table class="rd-tbl"><tbody>${r}</tbody></table>` : ""; }
+// Render one value for a kv row. Handles nested objects (compact "k v · k v" of their
+// scalar children) + arrays (count) — previously these fell through to "—", which turned
+// nutrition periodization / eating-window and the genome category tables into walls of dashes.
+function kvval(v, f, k) {
+  if (v == null) return "—";
+  if (f && f[k]) return f[k](v);
+  if (Array.isArray(v)) return v.length ? `${v.length} item${v.length > 1 ? "s" : ""}` : "—";
+  if (typeof v === "object") {
+    if (v.summary || v.label || v.value) return v.summary || v.label || v.value;
+    const inner = Object.entries(v).filter(([ik, iv]) => !ik.startsWith("_") && iv != null && typeof iv !== "object").map(([ik, iv]) => `${ttl(ik)} ${fmt(iv)}`);
+    return inner.length ? inner.join(" · ") : "—";
+  }
+  return fmt(v);
+}
+function kvtable(o, f) {
+  // Drop rows whose value renders empty ("—") so nested-null objects don't leave dash rows.
+  const r = Object.entries(o || {}).filter(([k, v]) => !k.startsWith("_") && v != null).map(([k, v]) => [k, kvval(v, f, k)]).filter(([, val]) => val !== "—").map(([k, val]) => `<tr><td class="rd-name">${esc(ttl(k))}</td><td class="num">${esc(val)}</td></tr>`).join("");
+  return r ? `<table class="rd-tbl"><tbody>${r}</tbody></table>` : "";
+}
 
 /* ── Renderers (bound to real shapes) ─────────────────────────────────────── */
 function renderSupplements(d) { const g = d.groups || {}; const head = figs([fig(d.total_count ?? Object.values(g).reduce((a, x) => a + (x.items || []).length, 0), "compounds"), d.as_of_date && fig(d.as_of_date, "as of")]); const secs = Object.values(g).map((grp) => { const cards = (grp.items || []).map((s) => { const [c, l] = evClass(s.ev); const pct = Math.max(4, Math.min(100, s.evPct ?? 0)); return `<article class="supp"><header class="supp-top"><h3 class="supp-name">${esc(s.name)}</h3>${s.dose ? `<span class="supp-dose num">${esc(s.dose)}</span>` : ""}${s.timing ? `<span class="supp-timing label">${esc(s.timing)}</span>` : ""}</header>${s.why ? `<p class="supp-why">${esc(s.why)}</p>` : ""}<div class="supp-ev"><span class="supp-evlabel ${c}">${l}</span><span class="supp-meter"><i class="${c}" style="width:${pct}%"></i></span><span class="supp-evpct num">${s.evPct != null ? s.evPct + "%" : ""}</span></div><p class="supp-meta label">${[s.board && "src: " + esc(s.board), s.cost_monthly != null && "$" + esc(s.cost_monthly) + "/mo", (s.evidence_url || ((s.sources || []).find((x) => x && x.url) || {}).url) && `<a class="supp-ev-link" href="${esc(s.evidence_url || (s.sources.find((x) => x && x.url) || {}).url)}" target="_blank" rel="noopener">evidence ↗</a>`].filter(Boolean).join("  ·  ")}</p></article>`; }).join(""); return `<section class="rd-sec"><div class="rd-grouphead"><h2 class="rd-h">${esc(grp.name)}</h2>${grp.desc ? `<p class="rd-desc">${esc(grp.desc)}</p>` : ""}</div><div class="supp-grid">${cards}</div></section>`; }).join(""); return head + secs + note("Evidence strength is the published research consensus — not a claim about Matthew."); }

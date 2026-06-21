@@ -126,19 +126,9 @@ def handle_current_challenge() -> dict:
         return _ok({"current_challenge": data}, cache_seconds=3600)
     except Exception as e:
         logger.warning(f"[site_api] current_challenge S3 fetch failed: {e}")
-        # Fallback: static placeholder so ticker degrades gracefully
-        return _ok(
-            {
-                "current_challenge": {
-                    "week_num": None,
-                    "challenge": "Check back soon",
-                    "detail": "",
-                    "days_complete": 0,
-                    "days_total": 7,
-                }
-            },
-            cache_seconds=60,
-        )
+        # No active challenge → return null so the banner simply doesn't render. The old
+        # "Check back soon" placeholder leaked to the UI as a fake day-0-of-7 challenge.
+        return _ok({"current_challenge": None}, cache_seconds=60)
 
 
 _SUBSCRIBER_TOKEN_SECRET_NAME = os.environ.get("SUBSCRIBER_TOKEN_SECRET_NAME", "life-platform/subscriber-token-secret")
