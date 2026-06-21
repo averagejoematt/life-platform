@@ -39,8 +39,11 @@ self.addEventListener("fetch", (e) => {
   if (url.origin !== location.origin) return; // leave cross-origin (audio CDNs, etc.) alone
   if (/\.(wav|mp3|m4a)$/i.test(url.pathname)) return; // never cache large media
 
-  // Fresh-first for live data + page navigations.
-  if (url.pathname.startsWith("/api/") || req.mode === "navigate") {
+  // Fresh-first for live data + page navigations. JSON feeds (posts.json, episodes.json,
+  // blog.json, version.json, …) are DATA, not immutable hashed assets — they must revalidate
+  // every load, or a new chronicle/podcast silently stays hidden until the SW version rolls
+  // (the "chronicle shows 2 not 3" bug, 2026-06-21). Static hashed JS/CSS stay cache-first below.
+  if (url.pathname.startsWith("/api/") || req.mode === "navigate" || url.pathname.endsWith(".json")) {
     e.respondWith(
       fetch(req)
         .then((res) => {
