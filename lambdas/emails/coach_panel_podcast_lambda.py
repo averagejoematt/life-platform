@@ -891,14 +891,41 @@ def _gather_week(post: dict, state: dict) -> dict:
     }
 
 
+def _is_current_crisis(text: str) -> bool:
+    """Adjudicate a sensitivity-regex hit: a genuine ACUTE crisis THIS week (hold) vs. the
+    narrative merely REFERENCING past hardship/grief as backstory (safe to proceed). The pre-write
+    regex trips on both, so a strong week was being held just for naming the backstory (e.g. a
+    mother who died years ago). Fail-CLOSED: any error or non-CONTEXT answer → treat as crisis."""
+    import bedrock_client
+
+    try:
+        system = (
+            "You screen a weekly health-podcast's source material for a safety gate. Decide whether THIS WEEK "
+            "contains an ACUTE crisis an upbeat automated episode could mishandle — a death, a relapse, a breakdown, "
+            "or acute low mood / self-harm that HAPPENED THIS WEEK — versus material that merely REFERENCES past "
+            "hardship or grief as backstory while the week itself was ordinary or positive. "
+            "Reply with exactly one word: CRISIS or CONTEXT."
+        )
+        body = {"model": MODEL, "max_tokens": 5, "system": system, "messages": [{"role": "user", "content": text[:6000]}]}
+        resp = bedrock_client.invoke(body, model_name=MODEL)
+        verdict = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip().upper()
+        logger.info("sensitivity adjudication: %s", verdict or "(empty)")
+        return not verdict.startswith("CONTEXT")  # only an explicit CONTEXT proceeds; anything else holds
+    except Exception as e:
+        logger.warning("sensitivity adjudication failed (%s) — holding fail-closed", e)
+        return True
+
+
 def _sensitivity_hold_reasons(beats: dict) -> list:
     """Personal Board asymmetry: hard/sensitive weeks route to a human, never auto-publish.
-    Scans the chronicle AND the coach reads — the Panel can now run from coach reads alone
-    (chronicle decoupled, 2026-06-21), so the sensitivity check must cover them too."""
+    Scans the chronicle AND the coach reads (the Panel can run from coach reads alone). The regex
+    is a broad TRIGGER that also fires on BACKSTORY references to past grief; an AI adjudication
+    then holds only on a genuine CURRENT-WEEK crisis (fail-closed). The post-write _safety_gate
+    remains the final backstop on the actual voiced lines."""
     reasons = []
     text = beats.get("chronicle", "") + " " + " ".join(c.get("summary", "") for c in beats.get("coach_reads", []))
-    if _SENSITIVE_WEEK_RE.search(text):
-        reasons.append("sensitive-week (grief/low-mood/relapse signal) — human review")
+    if _SENSITIVE_WEEK_RE.search(text) and _is_current_crisis(text):
+        reasons.append("sensitive-week (current-week crisis) — human review")
     return reasons
 
 
@@ -917,6 +944,10 @@ def _build_weekly_script(beats: dict, bible: dict) -> dict:
         f"SELECTION/TONE: {json.dumps(bible.get('selection_rubric', {}))}\nTONE: {bible.get('tone', '')}\n\n"
         "HARD RULES: correlative only (never causal); use ONLY numbers present in the material; hedge anything on a small sample; "
         "process over outcome — never a report-card or judgmental tone; handle a hard week with compassion; never open a line with 'Matt'. "
+        "This is a forward-looking PERFORMANCE & HEALTH review, NOT a grief or personal-history piece. NEVER mention or allude to: "
+        "a death, grief, a funeral, cancer, or any named family member (mother/father/sister/brother/girlfriend/wife/etc.); any specific "
+        "vice or substance (marijuana, alcohol, nicotine, pornography — not even non-specifically as 'his vices' or 'private habits'); "
+        "or any body weight in pounds or kilograms. Stay on training, sleep, recovery, habits, the deficit's effects, the bet, and the week's effort. "
         f"{CONVO_DIRECTIVE} "
         'OUTPUT ONLY JSON: {"turns":[{"speaker":"elena"|"coach","line":"..."}], "open_bet":"<the one new falsifiable bet for next week>", '
         '"last_bet_result":{"outcome":"won"|"lost"|"open"|"none"}, '
