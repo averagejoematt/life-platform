@@ -70,10 +70,16 @@
 
 **Shipped + live-verified (Matthew's 10-item QA pass):** all 8 data-correctness bugs (#1/#3 homepage chronicle feed + genesis labels, #2 lab-notes week_label, #4 `/now/` stale-synthesis hardening + re-run, #5/#6 Hevy cardio/stretching in cardio panel, #7 1RM via weight_kg+Epley, #8 Apple-Health-first steps) + #9 nutrition elevation (calorie-vs-TDEE / protein-vs-target trends, macro stacked bar, periodization/eating-window) + #10 habits elevation (keystone-correlation panel, adherence trend, per-group bars). New `charts.js` primitives `stackedBar`/`correlationChip`.
 
-**Open follow-ups (WQA-series — additive elevation, not bugs):**
-- [ ] **WQA-01 — Evidence long-tail sweep.** Audit the remaining ~35 Evidence topics (vitals/labs/glucose/sleep/mind/vices/ledger/body-comp/…) for rich endpoint data computed-but-not-visualized; elevate each with the chart toolkit. **Verify-before-building** — much post-genesis data is legitimately thin (an honest "not enough yet" is on-brand, not a gap).
-- [ ] **WQA-02 — Nav legibility.** Shared `doors.js` active-door state (`aria-current` + ember tick) + a what-lives-where caption per door across the 5 doors (kills the 6× hand-duplicated nav drift). Keeps all 5 doors (Matthew's call), just makes the hierarchy legible.
-- [ ] **WQA-03 — visual QA pass.** Run `tests/visual_qa.py --screenshot --ai-qa` on the elevated pages; Matthew eyeballs `/evidence/nutrition/` + `/evidence/habits/` + `/` + `/now/`.
+**Deep-dive elevation SHIPPED (2026-06-21, 4-persona audit → P0–P3, all on main + edge-verified):**
+- ✅ **WQA-01 (done)** — audited all ~37 Evidence pages + 5 doors as 4 readers. P0 credibility-breakers (waveform relative tiers · projection suppressed · vices 5-of-6 · 1RM clamp/✓-met · sleep-score sanity gate · null-steps single-source · cost ~$60 · Strava/MF un-paused). P1 dead-panels/placeholders (kvtable nested-render · empty discovery cards dropped · "Check back soon" gone · {duration}→"30 days" · ledger cause-cards incl. snake-rescue · mind_pillar + honest empty). P2 (Day-N/Week-1 home anchor · vanity-count trim · distinct 26/19/11 source labels). P3 (survival/postmortems promoted into "How it holds up").
+
+**Open follow-ups (WQA-series):**
+- [ ] **WQA-02 — Nav legibility.** Shared `doors.js` active-door state + what-lives-where captions across the 5 doors.
+- [ ] **WQA-03 — visual QA pass.** `tests/visual_qa.py --screenshot --ai-qa` + Matthew eyeballs the elevated pages.
+- [ ] **WQA-04 — Third Wall reply (NEEDS MATT'S WORDS).** `matthew_agreement` empty on every field note → AI↔Matthew dialogue one-sided. The platform correctly refuses an AI-fabricated first-person reply (impersonation); Matthew pastes/approves his own to wire it.
+- [ ] **WQA-05 — DEXA T-score +3.9 (NEEDS SOURCE VERIFICATION).** Implausible bone T-score on /physical — verify the scan value vs a parse error before touching; don't silently "correct" a real medical number.
+- [ ] **WQA-06 — Surface coach disagreements.** `/api/coach_disagreements` exists but the board shows 8 parallel monologues, not the argument (the stated moat).
+- [ ] **WQA-07 — Day-N anchor on Story + Coaching** (Home done) — extend the genesis stamp for full cross-site consistency.
 
 ---
 
