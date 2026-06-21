@@ -3,7 +3,7 @@
 > Permanent log of significant architectural, design, and operational decisions.
 > Each ADR captures the decision, context, alternatives considered, and outcome.
 > Last updated: 2026-06-03 (v8.3.0 — + Garmin retired & budget-guard/AI-cost trim; ADR-074/075)
-> 92 ADRs total (ADR-001 → ADR-092). (Index table below covers ADR-001–057; newer ADRs are appended as detail sections in order.)
+> 93 ADRs total (ADR-001 → ADR-093). (Index table below covers ADR-001–057; newer ADRs are appended as detail sections in order.)
 
 ---
 
@@ -2634,6 +2634,28 @@ The AWS "account-controls" sub-grade stays below a literal-checklist A on those 
 
 **Alternatives rejected.** *Generic "missing calendar date" alerting for all sources* — false-positives on every sparse source's rest day. *A separate reconciliation lambda* — would need its own copy of the Strava client + a second holder of `life-platform/strava`, widening the credential surface for no benefit; the ingestion lambda already has everything. *A CLI-created EventBridge rule* — would orphan the rule from CDK (violates ADR-081's "all infra in CDK"); the rule lives in `ingestion_stack`. *Self-healing on reconcile (auto re-ingest the missing IDs)* — a logic bug would just re-drop them and churn; the alarm (human signal) is the durable value, and #180 already fixed this class at the source.
 
-**Out of scope.** Reconciliation for other activity sources (Whoop/Garmin) — the pattern generalizes but each is a separate opt-in; fixing the freshness/liveness checks to be completeness-aware beyond the interior-gap heuristic; any change to the `get_freshness_status` MCP tool (still high-water-mark only — a noted follow-up).
+**Out of scope.** Reconciliation for other activity sources (Whoop/Garmin) — the pattern generalizes but each is a separate opt-in; fixing the freshness/liveness checks to be completeness-aware beyond the interior-gap heuristic.
+
+**Follow-up closed (2026-06-21, B3).** The `get_freshness_status` MCP tool — originally out of scope above as high-water-mark only — now carries the same interior-gap scan (`find_interior_gaps` + `DAILY_SOURCES_INTERIOR`, TD-14 parity with `freshness_checker_lambda`), surfacing `interior_gaps` / `interior_gap_count` so an interactive freshness read can no longer report a mid-window hole as green. Lands with the Stage-1 data-integrity batch alongside the `get_muscle_volume` completeness signal (B2a) and the anti-rotation/carry → Core classifier fix (B2b).
+
+---
+
+## ADR-093: Recovery-adaptive night-before authoring — tier-agnostic branches + freshness gate
+
+**Status:** ✅ Active — 2026-06-21
+
+**Context.** Routines are authored the night before but trained the next morning (Matthew's routine is wake → car → gym — **zero platform interaction possible** before training, and he won't invent on-the-fly audibles). Two failures on 2026-06-21: (1) a routine authored on a **stale/incomplete** `get_muscle_volume` read (it hadn't aggregated the latest session → called calves "lagging" when optimal, core "zero" when mis-mapped) — a wrong baseline before recovery even mattered; (2) the routine was **hard-stamped one night's `recovery_tier`**, so it couldn't adapt when he woke GREEN 95%, and he had no way to fix it in the car. Two axes miscalibrated on a sunk-cost session.
+
+**Decision.** Author **tier-agnostic** and **freshness-gated**. The routine carries all three recovery branches; the morning selects one off the wrist.
+
+- **Freshness/completeness gate (the headline).** `manage_hevy_routine action=draft` runs an authoring gate *first* and refuses to compile (`status=blocked_stale_inputs` + structured `gaps`) when an input lags the latest ingested session. It reuses the Stage-1 `get_muscle_volume` `completeness.stale` signal (ADR-092 class — completeness, not max-date recency) + the Whoop recovery high-water mark. `override_freshness_gate=true` is an explicit, discouraged escape hatch. *"Author on incomplete data and the branches are just well-dressed garbage. Gate first, branch second"* (Henning).
+- **Tier-agnostic branches keyed to the Whoop band (67/34).** The `ideal` routine becomes the self-adapting carrier: an always-present session block (the safe default + the rubric + "use the lower of band/feel — feel only downgrades") leads the first exercise's notes, and per-lift top-set RPE branches (🟢/🟡/🔴) render on the primary compounds. **YELLOW is the default** when the morning signal is absent/ambiguous (E1/E2). **Subtract-only preserved:** GREEN is the authored ceiling, YELLOW/RED are defined subtractions, and `green ≥ yellow ≥ red` is invariant-tested.
+- **Week-position / fuel / tissue context.** `training_context(target_date)` (consecutive-day streak, deficit state from `get_deficit_sustainability`, tissue ramp) **collapses the GREEN ceiling to "quality, not load"** late-week (≥5-day streak), on a deep deficit, or early in a novel-pattern ramp (Marcus + Iris) — so a motivated morning can't ego-add.
+
+**Deploy footprint (deliberate).** The logic lives in the MCP package (`mcp/recovery_authoring.py`, pure/testable; wired into `mcp/tools_hevy_routine.py`) and renders into the **existing** exercise `notes` field with structured branches stashed in the **existing** `inputs_snapshot` — so v1 ships via `deploy_mcp_split.sh` with **no shared-layer rebuild**. The routine-IR / `hevy_compiler` modules are layer-resident; promoting `branches` to a first-class IR field + compiler rendering (so the autonomous Phase-3 cron path and a future overnight re-stamp inherit it) is a noted follow-up requiring a layer bump.
+
+**Rejected / deferred.** *Overnight re-stamp Lambda* (pre-highlight the matching branch post-Whoop-sync) — deferred for v1 (Matthew's §8 lock: self-selection only); it must fail-open to the always-present branches if built. *Composite readiness as the branch signal* — rejected; branches key to the simple wrist band he can actually see at 5am, not a compute he can't. *Gate as Claude's discipline* — rejected; the gate belongs in the tool (Priya/Jin).
+
+**Out of scope.** The autonomous cron authoring path (`hevy_routine_cron_lambda`) still emits the legacy ideal/floor pair — v1 targets the chat/MCP night-before authoring Matthew actually does; bringing the cron onto the branch model is the layer-bump follow-up above.
 
 ---

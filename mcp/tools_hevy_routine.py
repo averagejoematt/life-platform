@@ -148,14 +148,160 @@ def _generator_inputs(args: dict[str, Any]):
     )
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Stage 2: recovery-adaptive authoring I/O (pure logic in mcp/recovery_authoring.py)
+# ──────────────────────────────────────────────────────────────────────────────
+def _authoring_freshness_gate(target_date: str) -> dict[str, Any]:
+    """Gather volume-completeness + recovery freshness and decide if authoring may proceed.
+
+    Structural enforcement (brief §6 / E3): the tool — not Claude's discipline — refuses
+    to author when an input lags the latest ingested session. Reuses the Stage-1
+    get_muscle_volume `completeness` signal and the Whoop recovery high-water mark.
+    """
+    from datetime import datetime as _dt, timedelta as _td
+
+    from mcp.recovery_authoring import assess_authoring_freshness
+
+    vol_completeness = None
+    data_current_through = None
+    try:
+        from mcp.tools_strength import tool_get_muscle_volume
+
+        start = (_dt.strptime(target_date, "%Y-%m-%d").date() - _td(days=30)).isoformat()
+        mv = tool_get_muscle_volume({"start_date": start, "end_date": target_date})
+        vol_completeness = mv.get("completeness")
+        if vol_completeness:
+            data_current_through = vol_completeness.get("data_current_through")
+    except Exception as e:  # noqa: BLE001
+        logger.warning("freshness gate: muscle-volume read failed: %s", e)
+
+    latest_recovery = None
+    try:
+        from boto3.dynamodb.conditions import Key as _K
+
+        from mcp.config import table
+
+        r = table.query(
+            KeyConditionExpression=_K("pk").eq("USER#matthew#SOURCE#whoop") & _K("sk").begins_with("DATE#"),
+            Limit=1,
+            ScanIndexForward=False,
+            ProjectionExpression="sk",
+        )
+        items = r.get("Items", [])
+        if items:
+            latest_recovery = items[0]["sk"].split("DATE#", 1)[1][:10]
+    except Exception as e:  # noqa: BLE001
+        logger.warning("freshness gate: recovery read failed: %s", e)
+
+    gate = assess_authoring_freshness(vol_completeness, latest_recovery, target_date)
+    gate["data_current_through"] = data_current_through
+    gate["latest_recovery"] = latest_recovery
+    return gate
+
+
+def _gather_training_context(target_date: str) -> dict[str, Any]:
+    """Recent-streak / deficit / tissue context → ceiling+floor modulation (brief §4)."""
+    from datetime import datetime as _dt, timedelta as _td
+
+    from mcp.recovery_authoring import derive_training_context
+
+    workout_dates: list[str] = []
+    try:
+        from boto3.dynamodb.conditions import Key as _K
+
+        from mcp.config import table
+
+        start = (_dt.strptime(target_date, "%Y-%m-%d").date() - _td(days=14)).isoformat()
+        r = table.query(
+            KeyConditionExpression=_K("pk").eq("USER#matthew#SOURCE#hevy") & _K("sk").between(f"DATE#{start}", f"DATE#{target_date}~"),
+            ProjectionExpression="sk",
+        )
+        for it in r.get("Items", []):
+            sk = it.get("sk", "")
+            if sk.startswith("DATE#"):
+                workout_dates.append(sk.split("DATE#", 1)[1][:10])
+        workout_dates = sorted(set(workout_dates))
+    except Exception as e:  # noqa: BLE001
+        logger.warning("training context: workout history read failed: %s", e)
+
+    deficit_state = "moderate"
+    try:
+        from mcp.tools_nutrition import tool_get_deficit_sustainability
+
+        ds = tool_get_deficit_sustainability({})
+        label = ((ds or {}).get("deficit") or {}).get("deficit_label")
+        deficit_state = {"aggressive": "deep", "moderate": "moderate", "mild": "maintenance", "maintenance": "maintenance"}.get(
+            label, "moderate"
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("training context: deficit read failed: %s", e)
+
+    return derive_training_context(workout_dates, deficit_state, target_date)
+
+
+def _apply_recovery_adaptation(ir: Any, ctx: dict[str, Any], inputs_current_through: str | None) -> dict[str, Any]:
+    """Write the always-present session block + per-lift top-set branches into the IR.
+
+    Tier-agnostic (brief §2.1): the routine carries GREEN/YELLOW/RED in its notes; the
+    morning selects one. Renders into EXERCISE notes (the routine-level notes is reserved
+    for the WHY line, which the compiler overrides). Stashes structured branches in the
+    existing inputs_snapshot so no layer-resident IR schema bump is needed for v1.
+    """
+    from mcp.recovery_authoring import RPE_BASE_YELLOW, build_top_set_branches, render_branch_block, render_session_block
+
+    if not getattr(ir, "exercises", None):
+        return {}
+
+    session_block = render_session_block(ctx, inputs_current_through)
+    first = ir.exercises[0]
+    first.notes = (session_block + ("\n\n" + first.notes if first.notes else "")).strip()
+
+    structured: dict[str, Any] = {"session": ctx, "exercises": {}}
+    primaries = [ex for ex in ir.exercises if getattr(ex, "skill_tier", 1) >= 2][:2]
+    for ex in primaries:
+        branches = build_top_set_branches(RPE_BASE_YELLOW, ctx)
+        line = render_branch_block(branches)
+        ex.notes = ((ex.notes + "\n") if ex.notes else "") + line
+        structured["exercises"][ex.movement_key] = branches
+
+    ir.inputs_snapshot = {
+        **(getattr(ir, "inputs_snapshot", None) or {}),
+        "recovery_branches": structured,
+        "inputs_current_through": inputs_current_through,
+        "adaptive": True,
+    }
+    return structured
+
+
 def _action_draft(args: dict[str, Any]) -> dict[str, Any]:
     from routine_generator import generate_routines
     from routine_repo import put_versioned
+
+    target_date = args.get("target_date") or datetime.now(timezone.utc).date().isoformat()
+
+    # Freshness/completeness gate (brief §6/E3) — refuse to author on stale inputs.
+    gate = _authoring_freshness_gate(target_date)
+    if not gate.get("ok") and not args.get("override_freshness_gate"):
+        return {
+            "status": "blocked_stale_inputs",
+            "target_date": target_date,
+            "gaps": gate.get("gaps", []),
+            "note": (
+                "Authoring refused: an input lags the latest ingested session — refresh ingestion and retry, "
+                "or pass override_freshness_gate=true to author anyway (NOT recommended for a session you'll train on)."
+            ),
+        }
 
     inputs = _generator_inputs(args)
     routines = generate_routines(inputs)
     ideal = next((r for r in routines if r.variant == "ideal"), None)
     floor = next((r for r in routines if r.variant == "floor"), None)
+
+    # Tier-agnostic adaptation: the ideal routine becomes the self-adapting carrier.
+    ctx = _gather_training_context(target_date)
+    inputs_current_through = gate.get("data_current_through")
+    adaptation = _apply_recovery_adaptation(ideal, ctx, inputs_current_through) if ideal else {}
+
     for ir in routines:
         put_versioned(ir)
     return {
@@ -165,6 +311,14 @@ def _action_draft(args: dict[str, Any]) -> dict[str, Any]:
         "floor_routine_id": getattr(floor, "routine_id", None),
         "variants_persisted": [r.variant for r in routines],
         "rationale": (ideal.rationale if ideal else []),
+        "freshness_gate": {"ok": gate.get("ok"), "gaps": gate.get("gaps", []), "inputs_current_through": inputs_current_through},
+        "recovery_adaptation": {
+            "applied": bool(adaptation),
+            "consecutive_days": ctx.get("consecutive_days"),
+            "deficit_state": ctx.get("deficit_state"),
+            "green_ceiling_quality": ctx.get("green_ceiling_quality"),
+            "branched_lifts": list(adaptation.get("exercises", {}).keys()),
+        },
         "note": "Use action=dry_run before action=commit. Commit requires explicit routine_id.",
     }
 
@@ -716,6 +870,18 @@ def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
         "wire_body": body,
         "rationale": ir.rationale,
     }
+    # Recovery-adaptive preflight (brief §6.5): show the inputs_current_through line +
+    # the per-lift branch blocks Matthew eyeballs in 30s, so he sleeps trusting it.
+    snap = getattr(ir, "inputs_snapshot", None) or {}
+    if snap.get("adaptive"):
+        from mcp.recovery_authoring import render_branch_block
+
+        rb = snap.get("recovery_branches", {}) or {}
+        out["adaptive_preflight"] = {
+            "inputs_current_through": snap.get("inputs_current_through"),
+            "session_branch_block": (ir.exercises[0].notes if ir.exercises else ""),
+            "branched_lifts": {k: render_branch_block(v) for k, v in (rb.get("exercises") or {}).items()},
+        }
     # Preview the per-type folder commit will file a NEW routine into (pure —
     # the folder is only created/resolved at commit, never in dry_run). Existing
     # routines keep their folder (create-only in Hevy), so only annotate new ones.
