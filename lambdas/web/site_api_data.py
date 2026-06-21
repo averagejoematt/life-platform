@@ -689,7 +689,9 @@ def _experiment_catalog(exclude_ids: set, exclude_names: set) -> list:
                 "name": exp.get("name", "Unnamed"),
                 "status": shelf,
                 "origin": "library",
-                "hypothesis": exp.get("hypothesis_template", ""),
+                # Substitute the {duration} token in the library hypothesis_template (was
+                # rendering literally: "16:8 fasting for {duration} days will reduce...").
+                "hypothesis": (exp.get("hypothesis_template", "") or "").replace("{duration}", str(exp.get("suggested_duration_days") or "several")),
                 "pillar": exp.get("pillar", ""),
                 "difficulty": exp.get("difficulty"),
                 "evidence_tier": exp.get("evidence_tier"),
