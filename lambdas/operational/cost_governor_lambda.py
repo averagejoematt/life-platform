@@ -65,6 +65,22 @@ _AI_SAFETY_BUFFER = 1.15  # bias the AI estimate high so we degrade early, never
 # Tier thresholds on PROJECTED month-end total (USD).
 _TIER_THRESHOLDS = [(73, 3), (65, 2), (55, 1)]  # checked high→low; else tier 0
 
+# June 2026 ONLY (auto-reverts 2026-07-01): the Coaching-door launch + a heavy
+# multi-day QA/deploy session inflated the trailing-7d AI rate, projecting ~$77 and
+# parking the guard at tier 1 (coach narratives + ensemble paused) even though ACTUAL
+# MTD spend is only ~$50. Per Matt's call, raise the headroom for this month so coach
+# AI stays on; the $75 hard cap (ADR-063) returns automatically next month — no manual
+# revert. Tier 3 (hard stop) still fires at $95, well below any runaway.
+_JUNE_2026_THRESHOLDS = [(95, 3), (88, 2), (80, 1)]
+
+
+def _active_thresholds():
+    now = datetime.now(timezone.utc)
+    if now.year == 2026 and now.month == 6:
+        return _JUNE_2026_THRESHOLDS
+    return _TIER_THRESHOLDS
+
+
 # Days at the start of the month during which the month-end projection is too
 # noisy to trust (fixed monthly charges are front-loaded onto day 1). Inside this
 # window we escalate on ACTUAL mtd vs ceiling instead of the projection.
@@ -228,7 +244,7 @@ def _project_month_end(
 
 
 def _tier_for(projected: float) -> int:
-    for threshold, tier in _TIER_THRESHOLDS:
+    for threshold, tier in _active_thresholds():
         if projected >= threshold:
             return tier
     return 0
