@@ -892,10 +892,13 @@ def _gather_week(post: dict, state: dict) -> dict:
 
 
 def _sensitivity_hold_reasons(beats: dict) -> list:
-    """Personal Board asymmetry: hard/sensitive weeks route to a human, never auto-publish."""
+    """Personal Board asymmetry: hard/sensitive weeks route to a human, never auto-publish.
+    Scans the chronicle AND the coach reads — the Panel can now run from coach reads alone
+    (chronicle decoupled, 2026-06-21), so the sensitivity check must cover them too."""
     reasons = []
-    if _SENSITIVE_WEEK_RE.search(beats.get("chronicle", "")):
-        reasons.append("sensitive-week (grief/low-mood/relapse signal in chronicle) — human review")
+    text = beats.get("chronicle", "") + " " + " ".join(c.get("summary", "") for c in beats.get("coach_reads", []))
+    if _SENSITIVE_WEEK_RE.search(text):
+        reasons.append("sensitive-week (grief/low-mood/relapse signal) — human review")
     return reasons
 
 
@@ -919,8 +922,14 @@ def _build_weekly_script(beats: dict, bible: dict) -> dict:
         '"last_bet_result":{"outcome":"won"|"lost"|"open"|"none"}, '
         '"pull_quote":"<one shareable line>"}. 14–22 turns. No fences.'
     )
+    _chron = beats.get("chronicle", "")
+    _chron_block = (
+        f"CHRONICLE (the human week):\n{_chron[:3500]}\n\n"
+        if _chron
+        else "NO CHRONICLE THIS WEEK — review the week from the coaches' reads below and the week's data; do not reference or imply a chronicle exists.\n\n"
+    )
     user = (
-        f"WEEK {beats.get('week')}: {beats.get('title')}.\n\nCHRONICLE (the human week):\n{beats.get('chronicle', '')[:3500]}\n\n"
+        f"WEEK {beats.get('week')}: {beats.get('title')}.\n\n{_chron_block}"
         f"GUEST COACH {guest.get('name')} — recent read: {guest.get('summary', '')}\nThemes: {', '.join(guest.get('themes', []))}\n\n"
         f"OTHER COACHES (for THE SPLIT — find a genuine disagreement):\n{split_material}\n\n"
         f"LAST WEEK'S OPEN BET (score it in RECEIPTS, honestly): {beats.get('last_open_bet') or '(none — this is the first weekly)'}\n\n"
@@ -1132,11 +1141,17 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     # ISO dates compare lexically. If none exist yet (before the cycle's first
     # Wednesday chronicle), skip cleanly — the liveness alarm catches a truly silent show.
     weekly = [p for p in posts if p.get("week") and p.get("week") > 0 and p.get("date") and p["date"] >= EXPERIMENT_START_DATE]
-    if not weekly:
-        if not dry_run:
-            _set_pending(None, "awaiting_chronicle", "Next episode is pending — waiting for this week's chronicle to publish.")
-        return {"statusCode": 200, "body": json.dumps({"weekly": "no current-cycle weekly chronicle yet"})}
-    post = max(weekly, key=lambda x: x["date"])
+    if weekly:
+        post = max(weekly, key=lambda x: x["date"])
+    else:
+        # Chronicle decoupled (2026-06-21): a published chronicle is no longer required
+        # to pick the week. Derive the current week from genesis so the Panel can review
+        # the week from the coaches' reads + data; the chronicle is optional flavor.
+        from datetime import date as _date
+
+        genesis = _date.fromisoformat(EXPERIMENT_START_DATE)
+        wk = max(1, ((_date.today() - genesis).days // 7) + 1)
+        post = {"week": wk, "date": _date.today().isoformat(), "title": f"Week {wk}"}
     week = post["week"]
     if not force and not dry_run and _episode_exists(week):
         return {"statusCode": 200, "body": json.dumps({"week": week, "already_published": True})}
@@ -1144,15 +1159,21 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     bible = _load_bible()
     state = _state_read()
     beats = _gather_week(post, state)
-    if not beats.get("chronicle"):
+    # Chronicle decoupled (2026-06-21): the Panel reviews the week from the coaches' reads
+    # + data, with the chronicle as optional context. Only skip when there's genuinely
+    # nothing to review — no chronicle AND no coach reads — not merely a missing chronicle.
+    if not beats.get("chronicle") and not beats.get("coach_reads"):
         if not dry_run:
             _set_pending(
                 week,
-                "awaiting_chronicle",
-                f"Episode for week {week} is pending — the week's chronicle isn't written yet.",
+                "awaiting_material",
+                f"Episode for week {week} is pending — no chronicle or coach reads to review yet.",
                 post.get("date"),
             )
-        return {"statusCode": 200, "body": json.dumps({"week": week, "skipped": "no chronicle yet", "date": post.get("date")})}
+        return {
+            "statusCode": 200,
+            "body": json.dumps({"week": week, "skipped": "no material (no chronicle or coach reads)", "date": post.get("date")}),
+        }
 
     # Personal Board asymmetry — hard/sensitive week → human, never auto-publish.
     sens = _sensitivity_hold_reasons(beats)
