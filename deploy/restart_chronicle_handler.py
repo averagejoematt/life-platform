@@ -45,6 +45,22 @@ CHRONICLE_PREFIXES = [
     ("site/chronicle/", "site/chronicle/archive/pilot/", "site/chronicle/index.html"),
 ]
 
+# ── Genesis lead-in chronicles (ADR-077, decided 2026-06-21) ──────────────────
+# The hand-written ORIGIN chapters that depict Matthew's actual arc. They are kept
+# across EVERY reset as re-dated pre-genesis lead-ins (genesis − N days), so the
+# Chronicle door opens on the genuine origin story rather than a blank slate. The
+# dormant-period auto-generated drafts are NOT kept — only this curated list.
+#
+# CRITICAL: each lead-in here MUST be DATE-AGNOSTIC in its prose — no specific
+# calendar dates, holidays (e.g. Valentine's Day), or season-specific weather —
+# because the reset re-dates them every cycle. (Week 1/2 were edited to this rule
+# on 2026-06-21; re-dating chapters that still named February/March surfaced wrong
+# timing references.) The reset auto-resurrects these unless --no-default-leadins.
+ORIGIN_LEAD_INS = [
+    "DATE#2026-02-22",  # "The Body Votes First" — Week 1 (20% recovery, the body's grammar, grief)
+    "DATE#2026-03-03",  # "The Empty Journal" — Week 2 (27 programs, the blank page, the real arc)
+]
+
 
 def list_chronicle_html(s3, prefix: str, archive_prefix: str, index_key: str) -> list[str]:
     """List all *.html under prefix excluding archive subtree and the index page."""
@@ -257,10 +273,21 @@ def main():
         help="Chronicle DDB sk to keep + re-date as a pre-genesis lead-in (repeatable, max 2)",
     )
     parser.add_argument("--keep-days", type=int, default=5, help="Days before genesis to date the first kept chronicle (default 5)")
+    parser.add_argument(
+        "--no-default-leadins",
+        action="store_true",
+        help="Do NOT auto-carry the curated ORIGIN_LEAD_INS chapters (default: carry them)",
+    )
     args = parser.parse_args()
 
-    if len(args.resurrect_sk) > 2:
-        print("ERROR: at most 2 chronicles can be resurrected per spec §7b.")
+    # Default behaviour (ADR-077, 2026-06-21): carry the curated origin chapters as
+    # re-dated pre-genesis lead-ins, so every reset opens on the genuine origin story.
+    # Explicit --resurrect-sk overrides the default set; --no-default-leadins opts out.
+    if not args.resurrect_sk and not args.no_default_leadins:
+        args.resurrect_sk = list(ORIGIN_LEAD_INS)
+
+    if len(args.resurrect_sk) > len(ORIGIN_LEAD_INS) + 2:
+        print(f"ERROR: at most {len(ORIGIN_LEAD_INS) + 2} chronicles can be kept as lead-ins.")
         sys.exit(1)
 
     mode = "APPLY" if args.apply else "DRY-RUN"
