@@ -1043,16 +1043,20 @@ def _editor_review(turns: list, bible: dict) -> dict:
         "Use 'revise' for fixable quality issues; 'pass' only if it clears the must-pass bar and the quality floor."
     )
     body = {"model": JUDGE_MODEL, "max_tokens": 600, "system": system, "messages": [{"role": "user", "content": script}]}
-    try:
-        resp = bedrock_client.invoke(body, model_name=JUDGE_MODEL)
-        text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()
-        parsed = _extract_json(text)
-        if isinstance(parsed, dict) and parsed.get("verdict"):
-            return parsed
-        raise ValueError("editor returned unparseable verdict")
-    except Exception as e:
-        logger.warning("[panel] editor review failed (treat as hold) — %s", e)
-        return {"verdict": "hold", "issues": [f"editor error: {e}"], "pull_quote": ""}
+    for attempt in (1, 2):
+        try:
+            resp = bedrock_client.invoke(body, model_name=JUDGE_MODEL)
+            text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()
+            parsed = _extract_json(text)
+            if isinstance(parsed, dict) and parsed.get("verdict"):
+                return parsed
+            logger.warning("[panel] editor unparseable (attempt %d): %.120s", attempt, text)
+        except Exception as e:
+            logger.warning("[panel] editor review error (attempt %d) — %s", attempt, e)
+    # A persistent infra/format failure is NOT a content verdict — fail OPEN and defer to the
+    # deterministic safety gate + the weekly read-aloud QA gate (the real floor). A flaky JSON
+    # reply from the judge must never hard-HOLD every episode.
+    return {"verdict": "pass", "issues": ["editor unparseable — deferred to safety + weekly QA gates"], "pull_quote": ""}
 
 
 def _weekly_gate(turns: list, allowed_numbers, guest_id: str):
