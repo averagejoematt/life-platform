@@ -76,6 +76,36 @@ export function sparkline(values, { height = 34 } = {}) {
   return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path class="chart-line" d="${line}" vector-effect="non-scaling-stroke"/></svg>`;
 }
 
+// Horizontal 100%-stacked bar — for a composition (e.g. macro split P/C/F). segments:
+// [{label, value, tone}] where tone ∈ {ember, ink, faint} (no new hues — ember = the
+// tracked/primary segment, muted inks for the rest). Renders the % split + a legend.
+export function stackedBar(segments, { label = "", unit = "g" } = {}) {
+  const segs = (segments || []).map((s) => ({ l: s.label, v: Number(s.value) || 0, t: s.tone || "ink" })).filter((s) => s.v > 0);
+  const total = segs.reduce((a, s) => a + s.v, 0);
+  if (!total) return `<figure class="chart chart--empty"><figcaption class="chart-cap label">No data yet.</figcaption></figure>`;
+  const bar = segs.map((s) => `<span class="sbar-seg sbar-${escAttr(s.t)}" style="width:${((s.v / total) * 100).toFixed(1)}%" title="${escAttr(s.l)} ${Math.round(s.v)}${escAttr(unit)}"></span>`).join("");
+  const legend = segs.map((s) => `<span class="sbar-key"><i class="sbar-dot sbar-${escAttr(s.t)}"></i>${escAttr(s.l)} ${Math.round(s.v)}${escAttr(unit)} · ${Math.round((s.v / total) * 100)}%</span>`).join("");
+  return `<figure class="chart"><div class="sbar" role="img" aria-label="${escAttr(label)}">${bar}</div><figcaption class="chart-cap label sbar-legend">${legend}</figcaption></figure>`;
+}
+
+// Correlation chips — top habit/factor ↔ outcome Pearson r, correlative-framed (never
+// causal, N=1). items: [{label, r, n}]. Strength shown by bar width; sign by direction
+// word. Reuses the honesty vocabulary; ember for positive pull, muted ink for inverse.
+export function correlationChip(items, { label = "", outcome = "the score" } = {}) {
+  const rows = (items || []).map((c) => ({ l: c.label, r: Number(c.r), n: c.n })).filter((c) => Number.isFinite(c.r));
+  if (!rows.length) return `<figure class="chart chart--empty"><figcaption class="chart-cap label">Correlations fill in as days accrue.</figcaption></figure>`;
+  const chips = rows.map((c) => {
+    const mag = Math.min(1, Math.abs(c.r));
+    const dir = c.r >= 0 ? "moves with" : "moves against";
+    const tone = c.r >= 0 ? "ember" : "ink";
+    return `<div class="corr-row"><span class="corr-l">${escAttr(c.l)}</span>` +
+      `<span class="corr-bar"><span class="corr-fill sbar-${tone}" style="width:${(mag * 100).toFixed(0)}%"></span></span>` +
+      `<span class="corr-r mono">r=${c.r.toFixed(2)}${c.n ? ` · n=${c.n}` : ""} · ${dir} ${escAttr(outcome)}</span></div>`;
+  }).join("");
+  return `<figure class="chart corr"><div class="corr-rows">${chips}</div>` +
+    `<figcaption class="chart-cap label">${escAttr(label)} — correlation, not cause (N=1).</figcaption></figure>`;
+}
+
 // Vertical bars. items: [{<labelKey>,<valueKey>}]. Down bars (below 0 or flagged) muted.
 export function barChart(items, { valueKey = "value", labelKey = "label", height = 130, label = "" } = {}) {
   const rows = (items || []).map((it) => ({ l: it[labelKey], v: Number(it[valueKey]) })).filter((r) => Number.isFinite(r.v));

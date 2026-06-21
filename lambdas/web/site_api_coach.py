@@ -538,6 +538,7 @@ def handle_field_notes(event):
             {
                 "entry": {
                     "week": item.get("week", week_param),
+                    "week_label": item.get("week_label"),
                     "ai_present": item.get("ai_present", ""),
                     "ai_cautionary": item.get("ai_cautionary"),
                     "ai_affirming": item.get("ai_affirming"),
@@ -564,6 +565,10 @@ def handle_field_notes(event):
         entries = [
             {
                 "week": i.get("week", i.get("sk", "").replace("WEEK#", "")),
+                # Genesis-anchored display label (Week N / Prologue) — the raw `week` is an
+                # ISO calendar week (2026-W25) that read "w24/w25" on the site (#2). Producer
+                # writes week_label; falls back to the ISO week until the backfill lands.
+                "week_label": i.get("week_label"),
                 "ai_tone": i.get("ai_tone", "mixed"),
                 "ai_generated_at": i.get("ai_generated_at"),
                 "has_matthew_response": bool(i.get("matthew_agreement")),

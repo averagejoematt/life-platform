@@ -326,6 +326,24 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .cbar-fill { width: 76%; background: var(--ember); border-radius: 2px 2px 0 0; min-height: 3px; }
 .cbar-l { color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
+/* Stacked composition bar (macro split, etc.) — ember = primary/tracked, muted inks for rest. */
+.sbar { display: flex; width: 100%; height: 14px; border-radius: var(--radius-xs); overflow: hidden; margin-top: var(--sp-3); background: var(--surface-2, var(--surface)); }
+.sbar-seg { height: 100%; display: block; }
+.sbar-ember { background: var(--ember); }
+.sbar-ink { background: var(--ink-muted); }
+.sbar-faint { background: var(--ink-faint); }
+.sbar-legend { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); }
+.sbar-key { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.sbar-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+
+/* Correlation chips — strength by bar width, sign by direction word (correlative, N=1). */
+.corr-rows { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-3); }
+.corr-row { display: grid; grid-template-columns: minmax(0,1fr) 90px auto; align-items: center; gap: var(--sp-2); }
+.corr-l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.corr-bar { height: 6px; border-radius: 3px; background: var(--surface-2, var(--surface)); overflow: hidden; }
+.corr-fill { display: block; height: 100%; }
+.corr-r { color: var(--ink-faint); font-size: var(--fs-label, 0.78rem); white-space: nowrap; }
+
 /* ── Shared footer mega-menu (CC-05) — on all three doors ─────────────────── */
 .site-foot { border-top: var(--border-hair); margin-top: var(--sp-7); padding: var(--sp-6) var(--gutter) var(--sp-5); }
 .site-foot-cols { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-5); max-width: var(--container); margin-inline: auto; }

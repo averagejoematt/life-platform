@@ -72,6 +72,25 @@ def week_bounds(iso_week):
     return monday.strftime("%Y-%m-%d"), sunday.strftime("%Y-%m-%d")
 
 
+def genesis_week_label(iso_week):
+    """Genesis-anchored display label ('Week N' / 'Prologue') for an ISO week.
+
+    The raw ISO calendar week (e.g. 2026-W25) rendered on the site as "w24/w25" — wrong:
+    the experiment is genesis-anchored. Week 1 = the week containing EXPERIMENT_START_DATE;
+    anything before is Prologue. Mirrors the chronicle's genesis week numbering.
+    """
+    try:
+        from constants import EXPERIMENT_START_DATE
+
+        genesis = datetime.strptime(EXPERIMENT_START_DATE, "%Y-%m-%d")
+        monday = datetime.fromisocalendar(int(iso_week[:4]), int(iso_week[6:]), 1)
+        g_monday = genesis - timedelta(days=genesis.weekday())  # Monday of the genesis week
+        n = (monday - g_monday).days // 7 + 1
+        return f"Week {n}" if n >= 1 else "Prologue"
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _query_source(source, start_date, end_date):
     pk = f"{USER_PREFIX}{source}"
     resp = table.query(KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}"))
@@ -292,6 +311,7 @@ def generate_field_notes(iso_week):
         "pk": FN_PK,
         "sk": f"WEEK#{iso_week}",
         "week": iso_week,
+        "week_label": genesis_week_label(iso_week),  # genesis-anchored display label (#2)
         "ai_present": analysis.get("ai_present", ""),
         "ai_tone": analysis.get("ai_tone", "mixed"),
         "ai_generated_at": now,

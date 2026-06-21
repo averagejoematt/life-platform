@@ -13,7 +13,7 @@
     window.__START_SLUG__ = "<slug>"
 */
 
-import { lineChart, barChart, dualWeight } from "/assets/js/charts.js";
+import { lineChart, barChart, dualWeight, stackedBar, correlationChip } from "/assets/js/charts.js";
 
 const REG = window.__EVIDENCE_REGISTRY__ || [];
 const BYSLUG = Object.fromEntries(REG.map((t) => [t.slug, t]));
@@ -66,10 +66,31 @@ async function renderNutrition(d) {
   const head = figs([
     n.avg_calories != null && fig(fmt(n.avg_calories), "avg calories"),
     n.avg_protein_g != null && fig(fmt(n.avg_protein_g) + "g", "avg protein"),
+    n.avg_carbs_g != null && fig(fmt(n.avg_carbs_g) + "g", "avg carbs"),
+    n.avg_fat_g != null && fig(fmt(n.avg_fat_g) + "g", "avg fat"),
     n.avg_deficit != null && fig(fmt(n.avg_deficit), "avg deficit"),
+    n.tdee != null && fig(fmt(n.tdee), "est. TDEE"),
     n.protein_hit_pct != null && fig(fmt(n.protein_hit_pct) + "%", "protein target hit"),
   ]);
   if (head.includes("fig-v")) parts.push(head);
+  // Hero trends — the daily macro time series the API always returned but the page never drew.
+  const trend = (d && d.nutrition_trend) || [];
+  if (trend.length) {
+    parts.push(sec("Daily intake vs TDEE", lineChart(trend, { valueKey: "calories", goal: n.tdee || null, unit: " kcal", label: "Calories vs maintenance", emptyMsg: "The calorie trend fills as days are logged." })));
+    parts.push(sec("Protein vs target", lineChart(trend, { valueKey: "protein_g", goal: n.protein_target_g || null, unit: "g", label: "Protein per day vs target" })));
+  }
+  // Average macro split (the carbs/fat the page computed but never showed).
+  if (n.avg_protein_g != null || n.avg_carbs_g != null || n.avg_fat_g != null) {
+    parts.push(sec("Average macro split", stackedBar([
+      { label: "Protein", value: n.avg_protein_g, tone: "ember" },
+      { label: "Carbs", value: n.avg_carbs_g, tone: "ink" },
+      { label: "Fat", value: n.avg_fat_g, tone: "faint" },
+    ], { label: "Average grams/day", unit: "g" })));
+  }
+  // Calorie cycling (training vs rest day) + eating window — single-value reads, high signal.
+  if (d && d.periodization && Object.keys(d.periodization).length) parts.push(sec("Training-day vs rest-day", kvtable(d.periodization)));
+  if (d && d.eating_window && Object.keys(d.eating_window).length) parts.push(sec("Eating window", kvtable(d.eating_window)));
+  if (d && d.weekday_vs_weekend && Object.keys(d.weekday_vs_weekend).length) parts.push(sec("Weekday vs weekend", kvtable(d.weekday_vs_weekend)));
   if (meals.length)
     parts.push(
       sec(
@@ -219,7 +240,7 @@ async function renderHabits(d) {
   const reg = await tryJSON("/api/habit_registry");
   const habits = (reg && reg.habits) || [];
   const groups = (reg && reg.groups) || [];
-  const head = figs([fig(d.current_streak ?? 0, "day streak"), fig(d.days_tracked ?? 0, "days tracked"), habits.length ? fig(habits.length, "habits tracked") : ""]);
+  const head = figs([fig(d.current_streak ?? 0, "day streak"), fig(d.days_tracked ?? 0, "days tracked"), habits.length ? fig(habits.length, "habits tracked") : "", d.keystone_group ? fig(`${esc(d.keystone_group)} ${d.keystone_group_pct ?? ""}%`, "most-held group") : ""]);
   const dow = a.length ? sec("Adherence by day of week", `<div class="hb-chart">${a.map((v, i) => `<div class="hb-col"><span class="hb-bar" style="height:${Math.max(4, (v / mx) * 100)}%"></span><span class="hb-day label">${dows[i] || ""}</span></div>`).join("")}</div>`) : "";
   let list = empty("Habit list loading from Habitify.");
   if (habits.length) {
@@ -242,7 +263,15 @@ async function renderHabits(d) {
           .join("")}</div>`,
       )
     : "";
-  return head + grid + dow + list + note("Everything I'm trying to do — sourced from Habitify. Private habits are never shown.");
+  // Adherence trend (the long-run consistency story the 7-cell grid only hinted at).
+  const trend = (d.history || []).length ? sec("Adherence trend", lineChart(d.history, { valueKey: "tier0_pct", unit: "%", label: "Daily Tier-0 adherence", emptyMsg: "The adherence curve fills as days accrue." })) : "";
+  // The signature panel: which habit groups actually track with the day grade (correlative, N=1).
+  const kc = (d.keystone_correlations || []).map((c) => ({ label: c.group, r: c.correlation_r, n: c.n_days }));
+  const corr = kc.length ? sec("Which habits move the needle", correlationChip(kc, { label: "Habit group ↔ day grade", outcome: "the day grade" })) : "";
+  // Completion by group (the per-group averages the page computed but never showed).
+  const ga = Object.entries(d.group_90d_avgs || {}).map(([g, p]) => ({ label: g, value: p })).sort((x, y) => y.value - x.value);
+  const groupBars = ga.length ? sec("Completion by group", barChart(ga, { valueKey: "value", labelKey: "label", label: "Avg completion %" })) : "";
+  return head + corr + trend + grid + dow + groupBars + list + note("Everything I'm trying to do — sourced from Habitify. Correlations are N=1, not cause. Private habits are never shown.");
 }
 // The board — pick an expert, read their actual per-domain take + track record.
 async function renderBoard(d) {
