@@ -71,7 +71,7 @@ SHELL = """<!DOCTYPE html>
     <div class="dx-head">
       <p class="beat-kicker label">the story · the writing &amp; the context</p>
       <h1 class="dx-h1">The Story</h1>
-      <p class="dx-lede">The chronicle, the AI's weekly lab notes, the journal, the timeline, and what this whole experiment is for. The live data lives in <a href="/now/">the cockpit</a> and <a href="/evidence/">the evidence</a>; this is the why.</p>
+      <p class="dx-lede">The chronicle, the journal, the timeline, and what this whole experiment is for. The live data lives in <a href="/now/">the cockpit</a> and <a href="/evidence/">the evidence</a>, the AI team in <a href="/coaching/">the coaching</a>; this is the why.</p>
     </div>
     <nav class="dx-tabs" data-dx-tabs aria-label="Story sections"></nav>
     <div class="dx-layout">
@@ -112,7 +112,7 @@ def main() -> None:
         OUT / "index.html",
         SHELL.format(
             title="The Story — averagejoematt",
-            desc="The chronicle, the AI's weekly lab notes, the journal, the timeline, and the context behind the experiment.",
+            desc="The chronicle, the journal, the timeline, and the context behind the experiment.",
             canon="",
             start="chronicle",
         ),
