@@ -670,13 +670,16 @@ _WEEKLY_RUBRIC = (
     "hedge throat-clearing, or a neat summary bow at the end.\n"
     "2. GUEST INTRODUCTION: the guest is introduced for the audience early (who they are + what they work on), UNLESS "
     "they were the guest in the immediately previous episode. A guest who just starts talking with no introduction FAILS.\n"
-    "3. NO DANGLING THREAD: every question Elena asks is actually answered in the next turn; no topic is raised then "
-    "dropped; no abrupt unbridged jump; never two turns by the same speaker where a reply is clearly missing.\n"
+    "3. NO DANGLING THREAD: every question Elena asks is actually answered in the next turn; no topic the SCRIPT itself "
+    "raises is then dropped; no abrupt unbridged jump; never two same-speaker turns where a reply is clearly missing. "
+    "(Coverage is NOT required — do NOT flag a ground-truth fact that simply goes unmentioned; only flag a thread the "
+    "script opens and abandons.)\n"
     "4. REAL HOOK: turn 0 earns attention — not a flat 'welcome to the show'.\n"
     "5. GENUINE FRICTION: at least one real disagreement or tension, not constant agreement.\n"
     "6. GROUNDED: every specific claim, number, or event about MATT traces to the GROUND TRUTH. No invented scenes, "
     "times of day, or sensory detail (e.g. a '5 AM protein shake'). Flag anything not in the ground truth.\n"
-    "7. NO BODY WEIGHT: no body-weight figure, numeric OR spelled-out (e.g. 'nine pounds').\n"
+    "7. NO BODY WEIGHT IN THE SCRIPT: no body-weight figure appears in the spoken lines, numeric or spelled-out "
+    "(e.g. 'nine pounds'). Body weight in the GROUND TRUTH is fine and expected — only flag it if it is SPOKEN in the script.\n"
     "8. HUMOUR & HUMAN INTEREST: at least one genuinely warm or dryly funny human beat — not dry data recitation."
 )
 
@@ -1029,6 +1032,39 @@ def _build_weekly_script(beats: dict, bible: dict) -> dict:
     return parsed
 
 
+def _revise_weekly_script(turns: list, fails: list, beats: dict, bible: dict) -> dict:
+    """Self-correction: hand the writer its own draft + the QA judge's exact failures and ask for
+    a fixed full script (same JSON shape). This is the loop that lets the show reach the read-aloud
+    bar on its own before falling back to a human HOLD."""
+    import bedrock_client
+
+    guest = beats.get("guest") or {}
+    script_text = "\n".join(f"{t.get('speaker')}: {t.get('line')}" for t in turns)
+    system = (
+        f'You are the head writer revising a draft of "{bible.get("show_name", "The Measured Life")}". Fix EVERY issue '
+        "listed below and keep everything that already works. THE BAR: the transcript must read as a real, human-made "
+        "podcast — no AI tells. Stay grounded (invent nothing — no facts, scenes, times of day, or numbers not already "
+        f"present); keep the guest as {guest.get('name')}; introduce a guest the audience hasn't met; every question gets "
+        "an answer in the next turn; no body weight (numeric or spelled-out). Return ONLY the same JSON shape: "
+        '{"turns":[{"speaker":"elena"|"coach","line":"..."}],"open_bet":"...","last_bet_result":{"outcome":"won"|"lost"|"open"|"none"},'
+        '"pull_quote":"..."}. 14–22 turns. No fences.'
+    )
+    user = (
+        "ISSUES TO FIX (every one):\n- "
+        + "\n- ".join(str(f) for f in fails)
+        + f"\n\nDRAFT TO REVISE:\n{script_text}\n\nReturn the fixed JSON now."
+    )
+    try:
+        body = {"model": WRITER_MODEL, "max_tokens": 3500, "system": system, "messages": [{"role": "user", "content": user}]}
+        resp = bedrock_client.invoke(body, model_name=WRITER_MODEL)
+        text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()
+        parsed = _extract_json(text)
+        return parsed if isinstance(parsed, dict) and parsed.get("turns") else {}
+    except Exception as e:
+        logger.warning("[panel] weekly revision failed — %s", e)
+        return {}
+
+
 def _editor_review(turns: list, bible: dict) -> dict:
     """Haiku judge — semantic quality + safety floor the lexical gate can't see."""
     import bedrock_client
@@ -1327,13 +1363,28 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
         return _hold_and_alert(week, ["too few clean turns after gate"], {"turns": turns})
 
     # Weekly read-aloud QA (the Turing bar): guest introduced, no dangling thread, grounded,
-    # humour, no AI tells. Fail → HOLD for a human (never auto-publish a draft that fails the bar).
+    # humour, no AI tells. Self-correcting loop — feed the judge's exact failures back to the
+    # writer and re-judge (up to 2 revisions). Only a draft that still fails after that HOLDs for
+    # a human. This is the mechanism that moves the show toward running hands-off.
     _gt = (beats.get("chronicle", "")[:1500] + "\n" + "\n".join(f"{c['name']}: {c['summary']}" for c in beats.get("coach_reads", [])))[
         :4000
     ]
     qa_fails = _qa_gate(clean, _WEEKLY_RUBRIC, _gt)
+    for _rev in range(2):
+        if not qa_fails:
+            break
+        logger.info("[panel] wk%s: QA fails (revision %d) — %s", week, _rev + 1, qa_fails)
+        revised = _revise_weekly_script(clean, qa_fails, beats, bible)
+        rturns = revised.get("turns") or []
+        for t in rturns:
+            t["line"] = re.sub(r"\bMatthew\b", "Matt", t.get("line", ""))
+        rclean, rhold = _weekly_gate(rturns, allowed, guest_id)
+        if rhold or len(rclean) < 6:
+            continue  # revision broke something — keep the prior draft, re-judge, likely HOLD
+        clean, script = rclean, revised
+        qa_fails = _qa_gate(clean, _WEEKLY_RUBRIC, _gt)
     if qa_fails:
-        logger.info("[panel] wk%s: weekly QA HOLD — %s", week, qa_fails)
+        logger.info("[panel] wk%s: weekly QA HOLD after revisions — %s", week, qa_fails)
         if dry_run:
             return _dry(week, "HOLD", stage="weekly-qa", reasons=qa_fails)
         return _hold_and_alert(week, ["weekly-qa: " + "; ".join(str(f) for f in qa_fails)[:300]], {"turns": clean})
