@@ -657,6 +657,30 @@ _INTRO_RUBRIC = (
 )
 
 
+# The weekly read-aloud bar: a real listener should believe this is a human-made podcast and
+# recommend it. Encodes Matt's acceptance test (2026-06-21) — Turing-pass transcript, guest
+# introduced, no dangling thread, grounded, with humour and human interest.
+_WEEKLY_RUBRIC = (
+    "Two speakers: ELENA VOSS (host, embedded journalist) and the GUEST COACH (an AI coach, named in the script). "
+    "MATT is the third-person SUBJECT of the experiment — he is NOT in the room and does NOT speak. Elena and the "
+    "coaches are ESTABLISHED show personas (never flag them as invented). Judge it as a real podcast a human would "
+    "believe is human-made and would recommend to a friend:\n"
+    "1. READ-ALOUD TURING TEST: read aloud, it must sound human-written. Flag any AI tell — 'in this episode', "
+    "narrating the format or naming segments, tidy three-item lists, 'not just X, it's Y' symmetry, over-explaining, "
+    "hedge throat-clearing, or a neat summary bow at the end.\n"
+    "2. GUEST INTRODUCTION: the guest is introduced for the audience early (who they are + what they work on), UNLESS "
+    "they were the guest in the immediately previous episode. A guest who just starts talking with no introduction FAILS.\n"
+    "3. NO DANGLING THREAD: every question Elena asks is actually answered in the next turn; no topic is raised then "
+    "dropped; no abrupt unbridged jump; never two turns by the same speaker where a reply is clearly missing.\n"
+    "4. REAL HOOK: turn 0 earns attention — not a flat 'welcome to the show'.\n"
+    "5. GENUINE FRICTION: at least one real disagreement or tension, not constant agreement.\n"
+    "6. GROUNDED: every specific claim, number, or event about MATT traces to the GROUND TRUTH. No invented scenes, "
+    "times of day, or sensory detail (e.g. a '5 AM protein shake'). Flag anything not in the ground truth.\n"
+    "7. NO BODY WEIGHT: no body-weight figure, numeric OR spelled-out (e.g. 'nine pounds').\n"
+    "8. HUMOUR & HUMAN INTEREST: at least one genuinely warm or dryly funny human beat — not dry data recitation."
+)
+
+
 def _qa_gate(turns: list, rubric: str, ground_truth: str = "") -> list:
     """Combined craft (deterministic) + LLM-judge gate. Returns all failure reasons (empty = clean)."""
     return _craft_check(turns) + _qa_review(turns, rubric, ground_truth)[1]
@@ -961,7 +985,7 @@ def _build_weekly_script(beats: dict, bible: dict) -> dict:
         "This is a forward-looking PERFORMANCE & HEALTH review, NOT a grief or personal-history piece. NEVER mention or allude to: "
         "a death, grief, a funeral, cancer, or any named family member (mother/father/sister/brother/girlfriend/wife/etc.); any specific "
         "vice or substance (marijuana, alcohol, nicotine, pornography — not even non-specifically as 'his vices' or 'private habits'); "
-        "or any body weight in pounds or kilograms. Stay on training, sleep, recovery, habits, the deficit's effects, the bet, and the week's effort. "
+        "or any body weight at all — numeric OR spelled-out ('nine pounds' is just as forbidden as '305 lbs'). Stay on training, sleep, recovery, habits, the deficit's effects, the bet, and the week's effort. "
         "THE BAR (this is the whole point): the TRANSCRIPT must pass for a real, human-made podcast — if a person read it aloud, "
         "nobody could tell it was AI-written. Earn a real hook in the first two lines, real human interest, genuine dry humor, and "
         "something a listener actually learns and would text to a friend. NO AI TELLS: never say 'in this episode' or 'today we're "
@@ -970,9 +994,10 @@ def _build_weekly_script(beats: dict, bible: dict) -> dict:
         "GROUNDING (non-negotiable): every line must come from the real material below — the coaches' reads and the week's data. Do NOT "
         "invent scenes, settings, times of day, anecdotes, or sensory detail (no '5 AM protein shake', no 'lukewarm shake', nothing that "
         "isn't in the material). If it isn't in the data, it didn't happen. The chronicle is background only — never quote it or lift its "
-        "literary scene-setting as fact. GUEST INTRO & CONTINUITY: if the guest changed from last week (noted below), open like a real host "
-        "would — a quick nod to last week, then genuinely introduce this week's guest (name + what they actually work on) before the meat; "
-        "if it's a returning guest, acknowledge the thread instead. "
+        "literary scene-setting as fact. GUEST INTRO & CONTINUITY: ALWAYS introduce this week's guest for the audience early — their name and "
+        "what they actually work on — UNLESS they were the guest in the immediately previous episode (then acknowledge the returning thread "
+        "instead). Listeners may have never met this coach; a new voice must never just start talking with no introduction. EVERY question "
+        "Elena asks must get a real answer in the very next turn — never raise a question and move on, never leave a thread dangling. "
         f"{CONVO_DIRECTIVE} "
         'OUTPUT ONLY JSON: {"turns":[{"speaker":"elena"|"coach","line":"..."}], "open_bet":"<the one new falsifiable bet for next week>", '
         '"last_bet_result":{"outcome":"won"|"lost"|"open"|"none"}, '
@@ -1268,7 +1293,25 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     for t in turns:
         t["line"] = re.sub(r"\bMatthew\b", "Matt", t.get("line", ""))
     allowed = er03_gate.numbers_in(beats["chronicle"] + " " + " ".join(c["summary"] for c in beats["coach_reads"]))
+
+    def _valid(ts):
+        return [t for t in ts if isinstance(t, dict) and (t.get("line") or "").strip()]
+
     clean, hold = _weekly_gate(turns, allowed, guest_id)
+    # A turn DROPPED by the ER-03 gate (a number not in the source) mid-conversation leaves a hole —
+    # e.g. Elena asks a question and the guest's dropped answer leaves it dangling. Don't voice a
+    # holey transcript: re-roll the writer once for a gap-free pass, else HOLD for a human.
+    if not hold and len(clean) < len(_valid(turns)):
+        logger.info("[panel] wk%s: gate dropped %d turn(s) — re-roll for a gap-free script", week, len(_valid(turns)) - len(clean))
+        alt = _build_weekly_script(beats, bible)
+        aturns = alt.get("turns") or []
+        aclean, ahold = _weekly_gate(aturns, allowed, guest_id)
+        if not ahold and len(aclean) == len(_valid(aturns)) and len(aclean) >= 6:
+            script, turns, clean, hold = alt, aturns, aclean, ahold
+        else:
+            if dry_run:
+                return _dry(week, "HOLD", stage="gate-drop", reasons=["gate dropped turns; re-roll did not produce a gap-free script"])
+            return _hold_and_alert(week, ["gate dropped turns (holey transcript); re-roll failed"], {"turns": turns})
     if hold:
         if dry_run:
             return _dry(week, "HOLD", stage="safety-gate", reasons=hold)
@@ -1277,6 +1320,18 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
         if dry_run:
             return _dry(week, "HOLD", stage="gate-thin", reasons=["too few clean turns after gate"], clean=len(clean))
         return _hold_and_alert(week, ["too few clean turns after gate"], {"turns": turns})
+
+    # Weekly read-aloud QA (the Turing bar): guest introduced, no dangling thread, grounded,
+    # humour, no AI tells. Fail → HOLD for a human (never auto-publish a draft that fails the bar).
+    _gt = (beats.get("chronicle", "")[:1500] + "\n" + "\n".join(f"{c['name']}: {c['summary']}" for c in beats.get("coach_reads", [])))[
+        :4000
+    ]
+    qa_fails = _qa_gate(clean, _WEEKLY_RUBRIC, _gt)
+    if qa_fails:
+        logger.info("[panel] wk%s: weekly QA HOLD — %s", week, qa_fails)
+        if dry_run:
+            return _dry(week, "HOLD", stage="weekly-qa", reasons=qa_fails)
+        return _hold_and_alert(week, ["weekly-qa: " + "; ".join(str(f) for f in qa_fails)[:300]], {"turns": clean})
 
     if dry_run:
         preview = "\n".join(f"{('Elena' if t['speaker'] == ELENA else guest_name)}: {t['line']}" for t in clean[:6])
