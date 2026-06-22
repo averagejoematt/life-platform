@@ -13,7 +13,7 @@
     window.__START_SLUG__ = "<slug>"
 */
 
-import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine } from "/assets/js/charts.js";
+import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars } from "/assets/js/charts.js";
 
 const REG = window.__EVIDENCE_REGISTRY__ || [];
 const BYSLUG = Object.fromEntries(REG.map((t) => [t.slug, t]));
@@ -190,10 +190,15 @@ async function renderNutrition(d) {
   // hit congratulated the spacing of a thing he isn't eating enough of. Relabel as not-yet-
   // measured (P1.1 revives a real one once per-meal timestamps land).
   if (Object.keys(suf).length || mn.avg_pct != null) {
-    const bars = Object.entries(suf).map(([k, v]) => ({ label: ttl(k.replace(/_(mg|mcg|ug|g)$/i, "")), value: Math.round((v && v.pct) || 0) })).sort((a, b) => b.value - a.value);
-    parts.push(sec("Micronutrients",
+    // P0.4 — horizontal sufficiency bars 0→100%, worst-first, value-labelled, ember
+    // reserved for the worst offenders (a deficiency is what to look at, not a win).
+    const items = Object.entries(suf).map(([k, v]) => {
+      const m = /_(mg|mcg|ug|g)$/i.exec(k);
+      return { label: ttl(k.replace(/_(mg|mcg|ug|g)$/i, "")), pct: v && v.pct, actual: v && v.actual, target: v && v.target, unit: m ? m[1] : "" };
+    });
+    parts.push(sec("Micronutrients — what the food is short on",
       figs([mn.avg_pct != null && fig(fmt(mn.avg_pct) + "%", "micronutrient avg")]) +
-      (bars.length ? barChart(bars, { valueKey: "value", labelKey: "label", label: "% of daily target" }) : "") +
+      (items.length ? sufficiencyBars(items, { label: "Sufficiency vs daily target" }) : "") +
       `<p class="rd-meta label">Protein timing — not yet measured (needs per-meal timestamps).</p>`));
   }
   if (meals.length)

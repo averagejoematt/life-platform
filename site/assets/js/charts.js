@@ -88,6 +88,36 @@ export function stackedBar(segments, { label = "", unit = "g" } = {}) {
   return `<figure class="chart"><div class="sbar" role="img" aria-label="${escAttr(label)}">${bar}</div><figcaption class="chart-cap label sbar-legend">${legend}</figcaption></figure>`;
 }
 
+// Horizontal sufficiency bars 0→100% (intake vs target). Sorted ascending — worst
+// first — each labelled with its %, the track's right edge IS the 100% target rule.
+// Ember is reserved for the worst offenders that are short of the floor (a deficiency is
+// the thing to LOOK at) — never a "win" colour for an adequate bar (HARD RULE 3); full /
+// adequate bars are muted ink. The value sits in its own grid column so nothing clips the
+// right edge. items: [{label, pct, actual, target, unit}].
+export function sufficiencyBars(items, { label = "", emberWorst = 2, warnBelow = 70, caveat = "" } = {}) {
+  const rows = (items || []).map((it) => ({
+    l: it.label,
+    pct: Math.max(0, Math.min(100, Number(it.pct))),
+    actual: it.actual, target: it.target, unit: it.unit || "",
+  })).filter((r) => Number.isFinite(r.pct));
+  if (!rows.length) return `<figure class="chart chart--empty"><figcaption class="chart-cap label">Micronutrient sufficiency fills in from logged food.</figcaption></figure>`;
+  rows.sort((a, b) => a.pct - b.pct);
+  const ember = new Set();
+  for (const r of rows) { if (ember.size >= emberWorst) break; if (r.pct < warnBelow) ember.add(r); }
+  const row = (r) => {
+    const tone = ember.has(r) ? "suf-ember" : "suf-ink";
+    const amt = (r.actual != null && r.target != null) ? `<span class="suf-amt">${escAttr(_w(r.actual))}/${escAttr(_w(r.target))}${escAttr(r.unit)}</span>` : "";
+    const aria = `${r.l}: ${Math.round(r.pct)} percent of target${ember.has(r) ? " — short of the floor" : ""}`;
+    return `<div class="suf-row" role="img" aria-label="${escAttr(aria)}"><span class="suf-l">${escAttr(r.l)}</span>` +
+      `<span class="suf-track"><span class="suf-fill ${tone}" style="width:${r.pct.toFixed(1)}%"></span></span>` +
+      `<span class="suf-v mono">${Math.round(r.pct)}%${amt}</span></div>`;
+  };
+  const cap = caveat || "100% = daily target · worst first · intake vs target from logged food, not blood levels.";
+  return `<figure class="chart suf">${label ? `<p class="suf-head label">${escAttr(label)}</p>` : ""}` +
+    `<div class="suf-rows">${rows.map(row).join("")}</div>` +
+    `<figcaption class="chart-cap label">${escAttr(cap)}</figcaption></figure>`;
+}
+
 // Measuring-rule energy spine (SIGNATURE 1) — a horizontal 0→maintenance rule with
 // the intake tick and the maintenance tick, the gap between them shaded = the deficit.
 // The page's central claim drawn once. Ember marks intake ("on protocol"); muted ink is
