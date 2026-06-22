@@ -1,7 +1,34 @@
 # WORKORDER — Hevy commit hardening + notes-fetch gap
 
-**Status:** OPEN · **Priority:** P1 (commit path silently blocks authored routines)
+**Status:** ✅ RESOLVED 2026-06-21 · **Priority:** P1 (commit path silently blocks authored routines)
 **Filed:** 2026-06-21 · **Owner:** Claude Code
+
+## RESOLUTION (2026-06-21)
+**Problem A — commit 400 — FIXED + live-verified.** Root cause was the `drop` set type
+(not a valid Hevy enum; Hevy wants `dropset`) — confirmed by instrumenting the real 400 body
+(A1) and a 765-live-set audit that **ruled out** rep_range (`{start,end}` is accepted) and
+emoji (valid UTF-8, preserved). Fixes shipped (layer v89 + LifePlatformMcp):
+- **A1** `_action_commit` surfaces Hevy's response body (`HEVY_BAD_REQUEST`) instead of a bare 400.
+- **A2** `hevy_compiler.normalize_set_type` maps `drop`→`dropset` (+ aliases); unmappable→`normal`.
+- **A3** rep_range verified correct — no change.
+- **A4** `hevy_compiler.sanitize_note` strips control chars/surrogates, preserves emoji.
+- **A5** `_validate_ir_for_hevy` — dry_run surfaces corrections/warnings; commit hard-fails
+  (`HEVY_PRECHECK_FAILED`) naming the field before the POST.
+- **A6** `_create_template_for` adds backoff + GET-by-id confirmation (same-session template lag).
+- **Verified:** routine `d49c0dc68…` (rep_range + dropset + emoji) — which 400'd 5× — now commits
+  cleanly → hevy id `432f4342-e59c-42d8-9637-34370b69db92`. dry_run shows `'drop' → 'dropset'`.
+
+**Problem B — notes-fetch gap — NO BUG.** End-to-end trace (raw S3 == DDB == get_workout_detail,
+byte-for-byte, across the 14-day window) found no drop. `noted_exercise_sessions: 8` is a
+*per-exercise* count (verified = exactly 8: 06-19 ×1, 06-20 ×5, 06-21 ×2), not per-workout;
+06-16 (ca3e7725) genuinely carries zero notes/RPE in Hevy's own source. The extractor is healthy.
+Optional cosmetic follow-up: rename the field to `noted_exercises_in_window`.
+
+⚠️ The 5 pre-fix 400 attempts may have left orphan "Foundation - Push - 2 - 7" routines in Hevy —
+check the app and archive duplicates (`manage_hevy_routine action=archive`).
+
+---
+**Original work order below.**
 
 ## Context
 Night-before authoring is the dominant use case (5am lift, no morning adjust).
