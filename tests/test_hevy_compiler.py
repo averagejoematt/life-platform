@@ -3,7 +3,15 @@
 from __future__ import annotations
 
 import pytest
-from hevy_compiler import MovementUnmappable, from_hevy_response, to_create_body, to_update_body
+from hevy_compiler import (
+    HEVY_SET_TYPES,
+    MovementUnmappable,
+    from_hevy_response,
+    normalize_set_type,
+    sanitize_note,
+    to_create_body,
+    to_update_body,
+)
 from routine_ir import ExerciseBlock, RoutineSpec, Set
 
 
@@ -92,6 +100,60 @@ def test_update_body_also_takes_title_context():
     assert body["routine"]["title"] == "Build - Upper - 2 - 99"
     assert body["routine"]["notes"] == "x"
     assert "folder_id" not in body["routine"]
+
+
+def test_drop_set_type_maps_to_dropset_on_wire():
+    """A2: 'drop' is not a Hevy enum value (it 400'd 2026-06-21) — normalize to 'dropset'."""
+    ir = _ir()
+    ir.exercises[0].sets[0].type = "drop"
+    body = to_create_body(ir, _resolver_fn)
+    assert body["routine"]["exercises"][0]["sets"][0]["type"] == "dropset"
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("drop", "dropset"),
+        ("Drop-Set", "dropset"),
+        ("warm", "warmup"),
+        ("WARMUP", "warmup"),
+        ("fail", "failure"),
+        ("normal", "normal"),
+        (None, "normal"),
+        ("", "normal"),
+        ("nonsense", None),
+    ],
+)
+def test_normalize_set_type(raw, expected):
+    assert normalize_set_type(raw) == expected
+
+
+def test_unmappable_set_type_coerces_to_normal_on_wire():
+    """Defense in depth: even if the validator is skipped, an unknown type can't 400."""
+    ir = _ir()
+    ir.exercises[0].sets[0].type = "nonsense"
+    body = to_create_body(ir, _resolver_fn)
+    assert body["routine"]["exercises"][0]["sets"][0]["type"] == "normal"
+
+
+def test_hevy_set_types_constant():
+    assert HEVY_SET_TYPES == ("normal", "warmup", "failure", "dropset")
+
+
+def test_sanitize_note_strips_control_chars_preserves_emoji():
+    """A4: control chars (the JSON-breakers) are stripped; emoji are preserved."""
+    assert sanitize_note("good\x00\x07note") == "goodnote"
+    assert sanitize_note("line1\nline2\ttab") == "line1\nline2\ttab"
+    assert sanitize_note("heavy 💪 day") == "heavy 💪 day"
+    assert sanitize_note(None) == ""
+
+
+def test_sanitize_note_applied_to_exercise_and_routine_notes():
+    ir = _ir()
+    ir.exercises[0].notes = "felt\x07strong"
+    body = to_create_body(ir, _resolver_fn, why_note="why\x00note")
+    assert body["routine"]["exercises"][0]["notes"] == "feltstrong"
+    assert body["routine"]["notes"] == "whynote"
 
 
 def test_round_trip_response_to_diff():

@@ -31,6 +31,13 @@ to push back. Never give me the generic answer or tell me what I want to hear.
      counted before you act on it.
    - Known caveats until fixed: get_muscle_volume cores (Pallof/carries) map to "Other", so
      core may falsely read 0 — don't prescribe core "because it's zero" without checking.
+   - NOTES-COMPLETENESS CROSS-CHECK: if get_workout_detail returns blank notes for a session
+     while get_freshness_status reports the note-extractor healthy / N noted sessions, that's a
+     fetch discrepancy — NOT a clean session. Flag it and RE-PULL; never report "no pain flags /
+     clean" off empty notes. (2026-06-21: reported the 06-16 Push "clean" off empty notes that
+     contradicted the extractor — see WORKORDER_HEVY_COMMIT_HARDENING.md Problem B.) The general
+     rule: a tool's empty / "no matches" / green result is a HYPOTHESIS — verify by direct read
+     (list the dir, pull the detail) before asserting it as fact.
 
 2. CONTINUITY — read the fitness coach thread (get_coach_thread) to pick up prior positions,
    what we said we'd try, open predictions. TREAT THE THREAD'S NARRATIVE FLAGS AS HYPOTHESES
@@ -66,6 +73,11 @@ to push back. Never give me the generic answer or tell me what I want to hear.
    recovery, aerobic load, notes and progress. If readiness or my deficit say back off, say
    so. Progression stays honest and conservative (prescribed load still respects subtract-only
    autoreg); correlative framing; flag thin data as preliminary.
+   - NO REFLEXIVE "FLUSH": never assign cardio/recovery as a default. Name what each easy session
+     BUILDS (Z2 base, etc.); legs get a periodized progression slot, not perpetual recovery.
+     "Flush the legs" with no progression is the conservative-default tell TRAINING_CALIBRATION §0
+     exists to prevent. (2026-06-21: athlete flagged that legs were told to "flush" every day and
+     never progressed.)
 
 5. BUILD IT RIGHT FOR THE NIGHT BEFORE. I author at night and train the next morning
    (wake → car → gym) with ZERO chance to adjust. So:
@@ -80,6 +92,10 @@ to push back. Never give me the generic answer or tell me what I want to hear.
    - Lower the GREEN ceiling / raise floors for week-position (consecutive days) and deep
      deficit and novel-pattern tendons (Iris) — green recovery does NOT clear a 3-sessions-in
      tendon.
+   - FINISHER-FREQUENCY DRILL-DOWN: before programming any core / carry / finisher, read the
+     ACTUAL exercise list of the last 2–3 sessions via get_workout_detail — NOT get_muscle_volume
+     (Pallof/carries hide in "Other"; Core misleads). Don't repeat the same anti-movement pattern
+     on consecutive days; vary it. (2026-06-21: nearly programmed a 4th straight day of Pallof.)
    - When I'm happy: manage_hevy_routine draft -> dry_run (show me, with an "inputs current
      through X" line so I can trust it) -> commit. Then log the decision to the thread, SAVE
      the routine spec to docs/coaching/routines/<type>/ (README convention + annotation
