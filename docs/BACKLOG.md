@@ -79,7 +79,27 @@
 - [ ] **WQA-04 — Third Wall reply (NEEDS MATT'S WORDS).** `matthew_agreement` empty on every field note → AI↔Matthew dialogue one-sided. The platform correctly refuses an AI-fabricated first-person reply (impersonation); Matthew pastes/approves his own to wire it.
 - [ ] **WQA-05 — DEXA T-score +3.9 (NEEDS SOURCE VERIFICATION).** Implausible bone T-score on /physical — verify the scan value vs a parse error before touching; don't silently "correct" a real medical number.
 - [ ] **WQA-06 — Surface coach disagreements.** `/api/coach_disagreements` exists but the board shows 8 parallel monologues, not the argument (the stated moat).
-- [ ] **WQA-07 — Day-N anchor on Story + Coaching** (Home done) — extend the genesis stamp for full cross-site consistency.
+- [ ] **WQA-07 — Day-N anchor on Story + Coaching** (Home done) — extend the genesis stamp for full cross-site consistency. ✅ DONE (e3f8677b — shared stampGenesis on all 3 reader doors).
+
+---
+
+### Reverse-QA — data-coverage audit (2026-06-21, week-one of data; 2 agents mapped DDB reality vs site coverage)
+
+**Premise:** not "is what we show correct" (the WQA forward pass) but "what's in the data that we're NOT showing, and what trends are now worth surfacing with ~7 days."
+
+**Shipped + live (the cheap high-signal wins):**
+- ✅ **RQA-01 — RHR + strain trends** — `pulse_history` now carries `rhr_bpm` + `strain`; charted in Evidence vitals. RHR falling 65→55 during the cut = "body responding," shown nowhere before.
+- ✅ **RQA-02 — last-night sleep-stage bar** (Deep/REM/Light stackedBar) — was only single %s.
+- ✅ **RQA-03 — MacroFactor micronutrient sufficiency + protein-timing score** — `/api/nutrition_overview` + a panel (sufficiency bars + score figures). Beyond-macros depth.
+
+**Open (each = a new compute endpoint porting an MCP tool's logic + a panel — port carefully + verify vs the MCP output, don't rush):**
+- [ ] **RQA-04 — Readiness components on the Cockpit.** `computed_metrics.readiness_score` (73) + `component_scores` {recovery/sleep/movement/habits/hydration} are computed + stored but the Cockpit's readiness band is derived from raw vitals, not these. Surface the stored score + component breakdown (cheap — no reimplementation, just a new read).
+- [ ] **RQA-05 — Deficit-sustainability panel** (`get_deficit_sustainability`) — the multi-signal "is the cut eating your sleep/HRV" thesis-fit piece. Highest narrative value; needs the channel-degradation logic ported.
+- [ ] **RQA-06 — Autonomic balance** (`get_autonomic_balance`, FLOW/STRESS quadrant) + **RQA-07 — Zone-2 breakdown** (`get_zone2_breakdown`, Z2 vs 150-min). New compute endpoints.
+- [ ] **RQA-08 — Recovery-vs-prior-day-deficit overlay** — dual-line (NO Pearson r at n=7; overlay + "too few points for a coefficient" caption).
+- [ ] **RQA-09 — verify glucose/mood panels degrade honestly** (lineChart `<4-pt` rule likely already handles the empty axis) + **suppress `computed_metrics.tsb = −726.8`** garbage if it surfaces.
+
+**Held as premature at week one** (per the audit): metabolic adaptation, ACWR (needs the chronic window), gait trends, HR-recovery, body-comp velocity (1 DEXA), and any Pearson-r correlation chip on the new pairings.
 
 ---
 
