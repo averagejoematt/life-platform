@@ -11,6 +11,7 @@ are imported from site_api_common — no circular references.
 """
 
 import json
+import os
 import time  # noqa: F401 — used by some handlers
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401 — kept for handlers that convert types
@@ -31,6 +32,14 @@ from web.site_api_common import (
     logger,
     table,
 )
+
+# ── Privacy flags (Phase 2): private-by-default behavioural / blueprint signals are gated
+# at the SERVER — with the flag OFF (the default, env var unset) the private data is never
+# even computed into the public API response. Flip only by setting the env var, after Matthew
+# confirms. P2.3 = food-delivery off-protocol tell; P2.5 = present-vs-PROVEN_BLUEPRINT (never
+# public — kept dark behind a flag that stays off).
+_DELIVERY_PUBLIC = os.environ.get("NUTRITION_DELIVERY_PUBLIC", "").strip().lower() in ("1", "true", "yes")
+_BLUEPRINT_PUBLIC = os.environ.get("NUTRITION_BLUEPRINT_PUBLIC", "").strip().lower() in ("1", "true", "yes")
 
 
 def handle_nutrition_overview() -> dict:
@@ -434,6 +443,27 @@ def handle_nutrition_overview() -> dict:
         reconciliation["actual_loss_lbs"] = _last["actual_loss_lbs"]
         reconciliation["gap_lbs"] = round(_last["projected_loss_lbs"] - _last["actual_loss_lbs"], 2)
 
+    # ── Food-delivery off-protocol tell (P2.3, PRIVATE-by-default — flag OFF). With the flag
+    # off, the delivery source is never queried and nothing private enters the response.
+    food_delivery = None
+    if _DELIVERY_PUBLIC:
+        fd_items = _query_source("food_delivery", d30, today)
+        delivery_dates = {(fd.get("date") or fd.get("sk", "").replace("DATE#", "")) for fd in fd_items}
+        deliv_def, home_def = [], []
+        for i in items:
+            cal = _mf(i, "calories")
+            if cal is None or not tdee:
+                continue
+            dd = i.get("date") or i.get("sk", "").replace("DATE#", "")
+            (deliv_def if dd in delivery_dates else home_def).append(tdee - cal)
+        food_delivery = {
+            "public": True,
+            "delivery_days": len(deliv_def),
+            "home_days": len(home_def),
+            "avg_deficit_delivery": round(sum(deliv_def) / len(deliv_def)) if deliv_def else None,
+            "avg_deficit_home": round(sum(home_def) / len(home_def)) if home_def else None,
+        }
+
     return _ok(
         {
             "nutrition": {
@@ -463,6 +493,7 @@ def handle_nutrition_overview() -> dict:
             "lean_mass": lean_mass,
             "projection": projection,
             "reconciliation": reconciliation,
+            "food_delivery": food_delivery,
             "weekday_vs_weekend": weekday_vs_weekend,
             "eating_window": eating_window,
             "periodization": periodization,

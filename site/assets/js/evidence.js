@@ -273,6 +273,17 @@ async function renderNutrition(d) {
   // §3.2 — scale-vs-log reconciliation (P2.2), gated on ≥2 weeks overlap.
   const recon = nutritionReconciliation(d && d.reconciliation);
   if (recon) parts.push(recon);
+  // §3.3 — food-delivery off-protocol tell (P2.3, PRIVATE-by-default). Only renders when the
+  // server opts it in (env flag OFF by default → field absent → nothing shows publicly).
+  const fd = d && d.food_delivery;
+  if (fd && fd.public && (fd.delivery_days || fd.home_days)) {
+    parts.push(sec("Home-cooked vs delivery — off-protocol tell",
+      figs([
+        fd.avg_deficit_home != null && fig(fmt(fd.avg_deficit_home), `home-cooked deficit · ${fmt(fd.home_days)}d`),
+        fd.avg_deficit_delivery != null && fig(fmt(fd.avg_deficit_delivery), `delivery-day deficit · ${fmt(fd.delivery_days)}d`),
+      ]) +
+      `<p class="rd-meta label">Delivery days vs home-cooked days, by average deficit — data, not a verdict. <span class="confidence conf-low">private signal</span></p>`));
+  }
   // Average macro split — by ENERGY (P0.5): protein·4 / carbs·4 / fat·9, not gram mass.
   // Gram-fraction badly understates fat (16% by mass ≈ 30% by calories).
   const _kcal = (g, mult) => (g != null ? Math.round(Number(g) * mult) : 0);
