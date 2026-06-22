@@ -283,6 +283,14 @@ def handle_nutrition_overview() -> dict:
             "weekday_vs_weekend": weekday_vs_weekend,
             "eating_window": eating_window,
             "periodization": periodization,
+            # Micronutrient sufficiency + protein-distribution score — rich in the MacroFactor
+            # record, surfaced nowhere before (reverse-QA). Genuinely novel + anti-Blueprint.
+            "micronutrients": {
+                "sufficiency": (latest or {}).get("micronutrient_sufficiency") or {},
+                "avg_pct": (latest or {}).get("micronutrient_avg_pct"),
+                "protein_distribution_score": (latest or {}).get("protein_distribution_score"),
+                "as_of": latest_date,
+            },
         },
         cache_seconds=3600,
     )
