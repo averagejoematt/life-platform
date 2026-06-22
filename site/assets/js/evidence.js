@@ -109,6 +109,16 @@ async function renderNutrition(d) {
   if (d && d.periodization && Object.keys(d.periodization).length) parts.push(sec("Training-day vs rest-day", kvtable(d.periodization)));
   if (d && d.eating_window && Object.keys(d.eating_window).length) parts.push(sec("Eating window", kvtable(d.eating_window)));
   if (d && d.weekday_vs_weekend && Object.keys(d.weekday_vs_weekend).length) parts.push(sec("Weekday vs weekend", kvtable(d.weekday_vs_weekend)));
+  // Micronutrient sufficiency + protein-distribution score — beyond macros, the part almost
+  // no transformation site shows (reverse-QA: rich in the data, surfaced nowhere).
+  const mn = (d && d.micronutrients) || {};
+  const suf = mn.sufficiency || {};
+  if (mn.protein_distribution_score != null || Object.keys(suf).length) {
+    const bars = Object.entries(suf).map(([k, v]) => ({ label: ttl(k.replace(/_(mg|mcg|ug|g)$/i, "")), value: Math.round((v && v.pct) || 0) })).sort((a, b) => b.value - a.value);
+    parts.push(sec("Micronutrients & protein timing",
+      figs([mn.protein_distribution_score != null && fig(fmt(mn.protein_distribution_score), "protein-timing score"), mn.avg_pct != null && fig(fmt(mn.avg_pct) + "%", "micronutrient avg")]) +
+      (bars.length ? barChart(bars, { valueKey: "value", labelKey: "label", label: "% of daily target" }) : "")));
+  }
   if (meals.length)
     parts.push(
       sec(
