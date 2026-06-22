@@ -13,7 +13,7 @@
     window.__START_SLUG__ = "<slug>"
 */
 
-import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon } from "/assets/js/charts.js";
+import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart } from "/assets/js/charts.js";
 
 const REG = window.__EVIDENCE_REGISTRY__ || [];
 const BYSLUG = Object.fromEntries(REG.map((t) => [t.slug, t]));
@@ -200,6 +200,22 @@ function nutritionProjection(pj) {
   return sec("The standing bet — self-grading",
     `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(chain)} <span class="nut-flag ${vClass}">${vLabel}</span></p><p class="tv-human">${serif}</p></div>`);
 }
+// §3.2 reconciliation (P2.2) — projected loss from energy balance vs the actual scale.
+// Gated on ≥2 weeks overlap (honesty rule); NO Pearson/correlation chip ever.
+function nutritionReconciliation(rc) {
+  if (!rc) return "";
+  if (!rc.ready) {
+    return sec("Scale vs the log — reconciliation",
+      empty(`The scale-vs-log reconciliation draws in at ${rc.min_days || 14}+ overlapping days — ${rc.overlap_days || 0} so far. Under two weeks the gap is noise, not the logging-accuracy story, so it waits.`));
+  }
+  const days = rc.days || [];
+  const projSeries = days.filter((r) => r.projected_loss_lbs != null).map((r) => ({ date: r.date, value: r.projected_loss_lbs }));
+  const actSeries = days.filter((r) => r.actual_loss_lbs != null).map((r) => ({ date: r.date, value: r.actual_loss_lbs }));
+  const gap = rc.gap_lbs;
+  const gapTxt = gap == null ? "" : `<p class="tv-human nut-anno">Energy balance projected about ${fmt(rc.projected_loss_lbs)} lb off; the scale shows ${fmt(rc.actual_loss_lbs)} lb. The ${fmt(Math.abs(gap))} lb ${gap > 0 ? "shortfall" : "overshoot"} is the honest logging-accuracy / TDEE-drift gap — a reconciliation, not a verdict. Correlative, N=1 — no coefficient drawn here.</p>`;
+  return sec("Scale vs the log — reconciliation",
+    dualLineChart(projSeries, actSeries, { aLabel: "projected (energy balance)", bLabel: "actual (scale)", unit: " lb", label: "cumulative loss" }) + gapTxt);
+}
 async function renderNutrition(d) {
   // The API nests macros under d.nutrition (was read flat → blank); meal/protein field
   // names are frequency/food/avg_daily_g (were count/name/grams → empty tables).
@@ -242,6 +258,9 @@ async function renderNutrition(d) {
   // §3.1 — the standing self-grading bet (P2.1).
   const proj = nutritionProjection(d && d.projection);
   if (proj) parts.push(proj);
+  // §3.2 — scale-vs-log reconciliation (P2.2), gated on ≥2 weeks overlap.
+  const recon = nutritionReconciliation(d && d.reconciliation);
+  if (recon) parts.push(recon);
   // Average macro split — by ENERGY (P0.5): protein·4 / carbs·4 / fat·9, not gram mass.
   // Gram-fraction badly understates fat (16% by mass ≈ 30% by calories).
   const _kcal = (g, mult) => (g != null ? Math.round(Number(g) * mult) : 0);

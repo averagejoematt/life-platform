@@ -399,6 +399,41 @@ def handle_nutrition_overview() -> dict:
             "resolves_on": _proj(implied),
         }
 
+    # ── Reconciliation (P2.2): projected loss from energy balance vs the actual Withings
+    # trend. Two trajectories; the gap is the honest logging-accuracy / TDEE-drift story.
+    # Gated on ≥2 weeks of overlapping days (NEVER a Pearson/correlation chip — honesty rule).
+    w_series = {}
+    for w in wt_items:
+        dd = w.get("date") or w.get("sk", "").replace("DATE#", "")
+        if w.get("weight_lbs") is not None:
+            w_series[dd] = float(w["weight_lbs"])
+    recon_days = []
+    start_actual = None
+    if tdee:
+        cum_def = 0.0
+        for t in trend:
+            cal = t.get("calories")
+            if cal is None:
+                continue
+            cum_def += tdee - cal
+            aw = w_series.get(t["date"])
+            if start_actual is None and aw is not None:
+                start_actual = aw
+            recon_days.append(
+                {
+                    "date": t["date"],
+                    "projected_loss_lbs": round(cum_def / KCAL_PER_LB, 2),
+                    "actual_loss_lbs": (round(start_actual - aw, 2) if (aw is not None and start_actual is not None) else None),
+                }
+            )
+    overlap = sum(1 for r in recon_days if r["actual_loss_lbs"] is not None)
+    reconciliation = {"days": recon_days, "overlap_days": overlap, "min_days": 14, "ready": overlap >= 14}
+    if reconciliation["ready"]:
+        _last = [r for r in recon_days if r["actual_loss_lbs"] is not None][-1]
+        reconciliation["projected_loss_lbs"] = _last["projected_loss_lbs"]
+        reconciliation["actual_loss_lbs"] = _last["actual_loss_lbs"]
+        reconciliation["gap_lbs"] = round(_last["projected_loss_lbs"] - _last["actual_loss_lbs"], 2)
+
     return _ok(
         {
             "nutrition": {
@@ -427,6 +462,7 @@ def handle_nutrition_overview() -> dict:
             "electrolytes": electrolytes,
             "lean_mass": lean_mass,
             "projection": projection,
+            "reconciliation": reconciliation,
             "weekday_vs_weekend": weekday_vs_weekend,
             "eating_window": eating_window,
             "periodization": periodization,

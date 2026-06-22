@@ -71,6 +71,30 @@ export function lineChart(data, { valueKey = "value", dateKey = "date", goal = n
     `<figcaption class="chart-cap label">${escAttr(label)}${goal != null ? ` · goal ${escAttr(goal)}${escAttr(unit)}` : ""}${_span ? ` · ${escAttr(_span)}` : ""} · ${pts.length} pts</figcaption></figure>`;
 }
 
+// Two overlaid trajectories on a shared scale — ember = primary (A), muted = reference (B).
+// For the reconciliation view (projected loss vs actual). Refuses if either series < 4 pts.
+// No correlation/Pearson — that's gated elsewhere by the ≥2-week rule. seriesA/B: [{date,value}].
+export function dualLineChart(seriesA, seriesB, { aLabel = "A", bLabel = "B", unit = "", height = 140, label = "", emptyMsg = "" } = {}) {
+  const A = _points(seriesA || [], "value", "date"), B = _points(seriesB || [], "value", "date");
+  if (A.length < 4 || B.length < 4) {
+    return `<figure class="chart chart--empty"><figcaption class="chart-cap label">${escAttr(emptyMsg || "Two trajectories draw in once each has 4+ points.")}</figcaption></figure>`;
+  }
+  const W = 600, H = height, P = 8;
+  const all = A.concat(B).map((p) => p.v);
+  let min = Math.min(...all), max = Math.max(...all);
+  if (min === max) { min -= 1; max += 1; }
+  const xf = (arr) => (i) => P + (i / (arr.length - 1)) * (W - 2 * P);
+  const y = (v) => P + (1 - (v - min) / (max - min)) * (H - 2 * P);
+  const path = (arr) => { const x = xf(arr); return arr.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" "); };
+  const _r = (n) => Math.round(n * 10) / 10;
+  const aLast = A[A.length - 1].v, bLast = B[B.length - 1].v, gap = _r(aLast - bLast);
+  const summary = `${aLabel} ${_r(aLast)}${unit} vs ${bLabel} ${_r(bLast)}${unit}, gap ${gap}${unit}.`;
+  return `<figure class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}">` +
+    `<path class="chart-down" d="${path(B)}" fill="none" vector-effect="non-scaling-stroke"/>` +
+    `<path class="chart-line" d="${path(A)}" vector-effect="non-scaling-stroke"/></svg>` +
+    `<figcaption class="chart-cap label sbar-legend"><span class="sbar-key"><i class="sbar-dot sbar-ember"></i>${escAttr(aLabel)}</span><span class="sbar-key"><i class="sbar-dot sbar-ink"></i>${escAttr(bLabel)}</span> · gap ${escAttr(String(gap))}${escAttr(unit)}${label ? ` · ${escAttr(label)}` : ""}</figcaption></figure>`;
+}
+
 // Tiny inline sparkline (no axes/caption). values: [numbers].
 export function sparkline(values, { height = 34 } = {}) {
   const pts = _points(values || [], "v", "d");
