@@ -141,11 +141,19 @@ export function intakeSpine(intake, tdee, { label = "" } = {}) {
   const lo = Math.min(inK, td), hi = Math.max(inK, td);
   const gapCls = inK <= td ? "hspine-gap-deficit" : "hspine-gap-surplus";
   const aria = `Average intake ${Math.round(inK)} kcal against an estimated maintenance of ${Math.round(td)} kcal — a ${Math.abs(deficit)} kcal ${deficit >= 0 ? "deficit" : "surplus"} a day.`;
+  // Edge-aware marks: the tick stays at the true position; the LABEL anchors inward near
+  // the edges (right-aligned at the high end, left-aligned at the low end) so a value at
+  // the far-right tick never clips off the viewport at 390px.
+  const mark = (val, key, emberMark) => {
+    const p = pos(val);
+    const align = p >= 80 ? "hspine-r" : (p <= 15 ? "hspine-l" : "hspine-c");
+    return `<div class="hspine-mark ${align} ${emberMark ? "hspine-intake" : "hspine-tdee"}" style="left:${p.toFixed(1)}%">` +
+      `<span class="hspine-lab"><span class="hspine-v mono">${Math.round(val)}</span><span class="hspine-k label">${key}</span></span></div>`;
+  };
   return `<figure class="chart spine-fig"><div class="hspine" role="img" aria-label="${escAttr(aria)}">` +
     `<div class="hspine-rule"></div>` +
     `<div class="hspine-gap ${gapCls}" style="left:${pos(lo).toFixed(1)}%;width:${(pos(hi) - pos(lo)).toFixed(1)}%"></div>` +
-    `<div class="hspine-mark hspine-intake" style="left:${pos(inK).toFixed(1)}%"><span class="hspine-v mono">${Math.round(inK)}</span><span class="hspine-k label">intake</span></div>` +
-    `<div class="hspine-mark hspine-tdee" style="left:${pos(td).toFixed(1)}%"><span class="hspine-v mono">${Math.round(td)}</span><span class="hspine-k label">maintenance</span></div>` +
+    mark(inK, "intake", true) + mark(td, "maintenance", false) +
     `</div><figcaption class="chart-cap label">${escAttr(label)}${deficit >= 0 ? ` · ${Math.abs(deficit)} kcal/day deficit (shaded)` : ` · ${Math.abs(deficit)} kcal/day surplus`}</figcaption></figure>`;
 }
 

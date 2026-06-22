@@ -366,11 +366,18 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .hspine-gap { position: absolute; top: 30px; height: 15px; background: var(--ember-wash);
   border-left: 1px solid var(--ember); border-right: 1px dashed var(--ink-faint); }
 .hspine-gap-surplus { background: var(--surface-2, var(--surface)); border-left: 1px dashed var(--ink-faint); }
-.hspine-mark { position: absolute; top: 0; transform: translateX(-50%); display: flex;
-  flex-direction: column; align-items: center; gap: 2px; max-width: 6.5rem; }
-.hspine-mark::after { content: ""; width: 1px; height: 16px; background: var(--ink-muted); margin-top: 3px; }
+/* Zero-width anchor at the value's true position; the tick (::after) stays centered on
+   it, the label anchors inward near the edges so a far-right value never clips at 390px. */
+.hspine-mark { position: absolute; top: 0; bottom: 0; width: 0; }
+.hspine-mark::after { content: ""; position: absolute; top: 30px; left: 0; transform: translateX(-50%);
+  width: 1px; height: 20px; background: var(--ink-muted); }
+.hspine-lab { position: absolute; bottom: 26px; display: flex; flex-direction: column; gap: 2px;
+  white-space: nowrap; max-width: 9rem; }
+.hspine-c .hspine-lab { left: 0; transform: translateX(-50%); align-items: center; }
+.hspine-l .hspine-lab { left: 0; align-items: flex-start; }
+.hspine-r .hspine-lab { right: 0; align-items: flex-end; }
 .hspine-intake { color: var(--ember); }
-.hspine-intake::after { background: var(--ember); height: 20px; }
+.hspine-intake::after { background: var(--ember); }
 .hspine-v { font-size: var(--fs-data-lg); line-height: 1; }
 .hspine-k { color: var(--ink-faint); }
 
