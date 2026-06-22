@@ -330,6 +330,9 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .chart-spine-v { color: var(--ink-faint); font-size: 0.6rem; line-height: 1; }
 /* Serif "what this means" annotation under a chart (SIGNATURE 2 human voice). */
 .nut-anno { margin-top: var(--sp-3); }
+/* Designed "coming online" empty state (P1.3 hunger/energy, §8 CGM) — honest, flagged. */
+.nut-coming { border: var(--honest-border); border-radius: var(--radius-sm); padding: var(--sp-4); margin-top: var(--sp-3); }
+.nut-coming .rd-archive { margin: 0; }
 /* Loss-rate readout (nutrition §1, P0.9) — rate chain + deficit-intensity flag. Ember on
    "aggressive" = attention, not alarm (never red); moderate/mild are muted ink. */
 .nut-lossrate { margin-top: var(--sp-3); }

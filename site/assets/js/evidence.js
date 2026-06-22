@@ -305,6 +305,13 @@ async function renderNutrition(d) {
       figs([fig(fmt(sod), "avg sodium mg"), el.potassium_pct != null && fig(fmt(el.potassium_pct) + "%", "potassium vs target")]) +
       `<p class="rd-meta label">Sodium ${esc(sodNote)}. Potassium sufficiency is in Micronutrients above.</p>` + wk1));
   }
+  // §"Can I hold this?" (P1.3) — daily hunger/energy 1–5 is NOT captured anywhere yet.
+  // Honest designed empty state + flag (never stubbed). Gated on real nutrition data so a
+  // truly empty page still shows the clean top-level empty state, not this placeholder.
+  if ((n.days_logged || 0) > 0) {
+    parts.push(sec("Can I hold this? — hunger & energy",
+      `<div class="nut-coming"><p class="rd-archive">A daily 1–5 hunger and energy check-in isn't being captured yet. Once it is, this becomes a sparkline of how holdable the deficit actually feels day to day — the subjective side of "sustainable" that HRV and recovery can't see. <span class="confidence conf-low">needs capture</span></p></div>`));
+  }
   if (meals.length)
     parts.push(
       sec(
