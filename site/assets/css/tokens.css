@@ -340,6 +340,10 @@ a { color: inherit; text-underline-offset: 0.18em; }
   text-transform: uppercase; letter-spacing: var(--tracking-label); padding: 1px 6px;
   border-radius: var(--radius-xs); border: 1px solid var(--rule); color: var(--ink-muted); white-space: nowrap; }
 .nut-flag-aggressive { border-color: var(--ember); color: var(--ember); }
+/* Standing-bet verdict chips (P2.1) — pending/confirmed/refuted. Refuted = muted, never red. */
+.nut-flag.pj-pending { border-color: var(--rule); color: var(--ink-muted); }
+.nut-flag.pj-ok { border-color: var(--ember); color: var(--ember); }
+.nut-flag.pj-warn { border-color: var(--ink-muted); color: var(--ink-muted); }
 .spark { width: 96px; height: 28px; vertical-align: middle; }
 .spark .chart-line { stroke-width: 1.5; }
 .spark--empty { display: inline-block; width: 96px; height: 1px; background: var(--rule); }

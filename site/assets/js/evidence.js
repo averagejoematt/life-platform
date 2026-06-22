@@ -187,6 +187,19 @@ function nutritionProteinFloor(lm, target) {
   }
   return bits.length ? `<p class="rd-meta label">${esc(bits.join(" "))}</p>` : "";
 }
+// §3.1 standing self-grading prediction (P2.1) — the bet + its confidence band + the
+// verdict. A prediction you don't grade is a horoscope, so the resolution date + criteria
+// are stated up front; the verdict reads pending until the date, then confirmed/refuted/drifted.
+function nutritionProjection(pj) {
+  if (!pj || pj.current_weight_lbs == null || pj.target_weight_lbs == null) return "";
+  const vClass = pj.verdict === "confirmed" ? "pj-ok" : pj.verdict === "refuted" ? "pj-warn" : "pj-pending";
+  const vLabel = pj.verdict === "pending" ? `pending — resolves ${esc(pj.resolves_on || pj.projected_date)}` : esc(pj.verdict);
+  const band = (pj.band_earliest && pj.band_latest) ? ` (band ${esc(pj.band_earliest)} → ${esc(pj.band_latest)})` : "";
+  const chain = `the platform bets ${fmt(pj.current_weight_lbs)} lb → ${fmt(pj.target_weight_lbs)} lb by ${esc(pj.projected_date)}${band} · at the implied ${fmt(pj.implied_rate_lb_wk)} lb/wk`;
+  const serif = `This is the standing bet, stated in the open: where the current pace puts the scale, by when, with the honest spread. It grades itself when the date arrives — ${pj.verdict === "pending" ? "pending until then" : `called <strong>${esc(pj.verdict)}</strong>`}.`;
+  return sec("The standing bet — self-grading",
+    `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(chain)} <span class="nut-flag ${vClass}">${vLabel}</span></p><p class="tv-human">${serif}</p></div>`);
+}
 async function renderNutrition(d) {
   // The API nests macros under d.nutrition (was read flat → blank); meal/protein field
   // names are frequency/food/avg_daily_g (were count/name/grams → empty tables).
@@ -226,6 +239,9 @@ async function renderNutrition(d) {
       nutritionProteinAnnotation(n) +
       nutritionProteinFloor(d && d.lean_mass, n.protein_target_g)));
   }
+  // §3.1 — the standing self-grading bet (P2.1).
+  const proj = nutritionProjection(d && d.projection);
+  if (proj) parts.push(proj);
   // Average macro split — by ENERGY (P0.5): protein·4 / carbs·4 / fat·9, not gram mass.
   // Gram-fraction badly understates fat (16% by mass ≈ 30% by calories).
   const _kcal = (g, mult) => (g != null ? Math.round(Number(g) * mult) : 0);

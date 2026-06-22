@@ -366,6 +366,39 @@ def handle_nutrition_overview() -> dict:
             "floor_protein_g": round(lean_kg * floor_gkg),
         }
 
+    # Latest weight (for the projection + reconciliation), from the same Withings query.
+    cur_weight = None
+    for w in sorted(wt_items, key=lambda x: x.get("sk", ""), reverse=True):
+        if w.get("weight_lbs") is not None:
+            cur_weight = float(w["weight_lbs"])
+            break
+
+    # ── Standing self-grading prediction (P2.1): project the next weight crossing from the
+    # current implied rate (intake vs maintenance), with a confidence band (rate ±25%). The
+    # bet + band are stated now; the verdict resolves over weeks (pending until the date).
+    projection = None
+    implied = loss_rate.get("implied_rate_lb_wk")
+    if cur_weight is not None and implied and implied > 0:
+        target_w = int((cur_weight - 0.1) // 5) * 5  # next 5-lb mark below current
+        to_go = cur_weight - target_w
+        now = datetime.now(timezone.utc)
+
+        def _proj(rate):
+            return (now + timedelta(weeks=to_go / rate)).strftime("%Y-%m-%d")
+
+        projection = {
+            "metric": "weight",
+            "current_weight_lbs": round(cur_weight, 1),
+            "target_weight_lbs": target_w,
+            "implied_rate_lb_wk": implied,
+            "projected_date": _proj(implied),
+            "band_earliest": _proj(implied * 1.25),
+            "band_latest": _proj(implied * 0.75),
+            "basis": "current intake vs estimated maintenance over the logged window",
+            "verdict": "pending",  # resolves confirmed/refuted/drifted as the date arrives
+            "resolves_on": _proj(implied),
+        }
+
     return _ok(
         {
             "nutrition": {
@@ -393,6 +426,7 @@ def handle_nutrition_overview() -> dict:
             "meal_rhythm": meal_rhythm,
             "electrolytes": electrolytes,
             "lean_mass": lean_mass,
+            "projection": projection,
             "weekday_vs_weekend": weekday_vs_weekend,
             "eating_window": eating_window,
             "periodization": periodization,
