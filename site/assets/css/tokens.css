@@ -334,6 +334,11 @@ a { color: inherit; text-underline-offset: 0.18em; }
 /* Designed "coming online" empty state (P1.3 hunger/energy, §8 CGM) — honest, flagged. */
 .nut-coming { border: var(--honest-border); border-radius: var(--radius-sm); padding: var(--sp-4); margin-top: var(--sp-3); }
 .nut-coming .rd-archive { margin: 0; }
+/* Ghosted CGM curve placeholder (§8) — muted, dashed, no live data. */
+.cgm-ghost .cgm-svg { width: 100%; height: 110px; display: block; opacity: 0.45; margin-bottom: var(--sp-3); }
+.cgm-curve { fill: none; stroke: var(--ink-muted); stroke-width: 2; stroke-dasharray: 5 4; }
+.cgm-meal { stroke: var(--ember); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.55; }
+.cgm-meal-dot { fill: var(--ember); opacity: 0.55; }
 /* Loss-rate readout (nutrition §1, P0.9) — rate chain + deficit-intensity flag. Ember on
    "aggressive" = attention, not alarm (never red); moderate/mild are muted ink. */
 .nut-lossrate { margin-top: var(--sp-3); }

@@ -216,6 +216,18 @@ function nutritionReconciliation(rc) {
   return sec("Scale vs the log — reconciliation",
     dualLineChart(projSeries, actSeries, { aLabel: "projected (energy balance)", bLabel: "actual (scale)", unit: " lb", label: "cumulative loss" }) + gapTxt);
 }
+// §8 CGM × meals — a designed empty state (no live binding): a ghosted glucose curve with
+// meal markers + "sensor not active — fills in when you wear one." The glucose page owns
+// the live view; this is the nutrition-page placeholder for the eventual overlay.
+function cgmEmptyState() {
+  const W = 600, H = 130;
+  const curve = "M8 92 C 60 90, 95 48, 145 60 S 225 98, 272 72 C 320 52, 352 96, 402 86 S 505 56, 560 80";
+  const meals = [72, 252, 432];
+  const markers = meals.map((x) => `<line class="cgm-meal" x1="${x}" y1="16" x2="${x}" y2="120"/><circle class="cgm-meal-dot" cx="${x}" cy="16" r="3"/>`).join("");
+  return sec("Glucose × meals — coming online",
+    `<div class="nut-coming cgm-ghost"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="cgm-svg" aria-hidden="true">${markers}<path class="cgm-curve" d="${curve}" vector-effect="non-scaling-stroke"/></svg>` +
+    `<p class="rd-archive">When a CGM sensor is active, this marries each meal to its glucose response — the peak, the rise, the return to baseline, with the meal markers above. <strong>Sensor not active — fills in when you wear one.</strong> <span class="confidence conf-low">no sensor yet</span></p></div>`);
+}
 async function renderNutrition(d) {
   // The API nests macros under d.nutrition (was read flat → blank); meal/protein field
   // names are frequency/food/avg_daily_g (were count/name/grams → empty tables).
@@ -360,6 +372,8 @@ async function renderNutrition(d) {
   if ((n.days_logged || 0) > 0) {
     parts.push(sec("Can I hold this? — hunger & energy",
       `<div class="nut-coming"><p class="rd-archive">A daily 1–5 hunger and energy check-in isn't being captured yet. Once it is, this becomes a sparkline of how holdable the deficit actually feels day to day — the subjective side of "sustainable" that HRV and recovery can't see. <span class="confidence conf-low">needs capture</span></p></div>`));
+    // §8 CGM × meals — designed empty state (no live binding).
+    parts.push(cgmEmptyState());
   }
   if (meals.length)
     parts.push(
