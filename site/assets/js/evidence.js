@@ -13,7 +13,7 @@
     window.__START_SLUG__ = "<slug>"
 */
 
-import { lineChart, barChart, dualWeight, stackedBar, correlationChip } from "/assets/js/charts.js";
+import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart } from "/assets/js/charts.js";
 
 const REG = window.__EVIDENCE_REGISTRY__ || [];
 const BYSLUG = Object.fromEntries(REG.map((t) => [t.slug, t]));
@@ -73,6 +73,161 @@ function renderSupplements(d) { const g = d.groups || {}; const head = figs([fig
 function renderLabs(d) { const L = d.labs || d; const bm = L.biomarkers || []; if (!bm.length) return empty("No bloodwork drawn yet — panels appear here as they're added."); const by = {}; for (const b of bm) (by[b.category || "Other"] ||= []).push(b); const secs = Object.entries(by).map(([cat, rows]) => sec(cat, `<table class="rd-tbl"><thead><tr><th>biomarker</th><th>value</th><th>reference</th><th>flag</th></tr></thead><tbody>${rows.map((b) => { const f = b.flag && String(b.flag).toLowerCase() !== "null"; return `<tr class="${f ? "rd-flag" : ""}"><td class="rd-name">${esc(b.name)}</td><td class="num">${esc(b.value)}${b.unit ? ` <span class="rd-unit">${esc(b.unit)}</span>` : ""}</td><td class="num rd-range">${esc(b.range || "—")}</td><td>${f ? `<span class="rd-flagmark">${esc(b.flag)}</span>` : ""}</td></tr>`; }).join("")}</tbody></table>`)).join(""); return figs([fig(L.total_draws ?? "—", "draws"), fig(bm.length, "biomarkers"), fig(L.flagged_count ?? 0, "flagged"), L.latest_draw_date && fig(L.latest_draw_date, "latest draw")]) + secs + note("Reference ranges are lab-provided; flags mark out-of-range."); }
 async function renderPhysical(d) { const x = d.latest_dexa; if (!x) return empty("No DEXA scan on file yet — body-composition detail appears here after your next scan."); const bc = x.body_composition || {}, s = x.score_360 || {}, idx = x.indices || {}, bone = x.bone || {}, sf = x.segmental_fat || {}, sl = x.segmental_lean || {}; const wp = await tryJSON("/api/weight_progress"); const wj = await tryJSON("/api/journey"); const chart = sec("Weight trajectory", lineChart((wp && wp.weight_progress) || [], { valueKey: "weight_lbs", goal: wj && wj.journey && wj.journey.goal_weight_lbs, unit: " lb", label: "Weight · recent readings", emptyMsg: "Weight trajectory fills as weigh-ins accrue." })); return chart + figs([bc.body_fat_pct != null && fig(fmt(bc.body_fat_pct, 1) + "%", "body fat"), bc.lean_mass_lb != null && fig(dualWeight(bc.lean_mass_lb, "lb"), "lean mass"), bc.visceral_fat_lb != null && fig(dualWeight(bc.visceral_fat_lb, "lb"), "visceral fat"), s.biological_age != null && fig(fmt(s.biological_age, 1), "biological age")]) + sec("Composition", kvtable(bc)) + sec("Indices (ALMI / FFMI / FMI)", kvtable(idx)) + sec("Bone density", kvtable(bone)) + (Object.keys(sf).length ? sec("Segmental fat %", kvtable(sf)) : "") + (Object.keys(sl).length ? sec("Segmental lean", kvtable(sl)) : "") + note(`DEXA scan${x.scan_date ? ` · ${esc(x.scan_date)}` : ""}.`); }
 async function renderTraining(d) { const t = d.training || {}; const [str, wk, wo] = await Promise.all([tryJSON("/api/strength_benchmarks"), tryJSON("/api/weekly_physical_summary"), tryJSON("/api/workouts")]); const head = figs([fig(t.workouts_30d ?? "—", "workouts · 30d"), fig(t.weekly_avg ?? "—", "weekly avg"), t.z2_pct != null && fig(t.z2_pct + "%", "zone-2 target"), t.avg_strain != null && fig(fmt(t.avg_strain, 1), "avg strain"), t.strength_sessions_30d != null && fig(t.strength_sessions_30d, "strength · 30d"), d.walking && d.walking.avg_daily_steps != null && fig(fmt(d.walking.avg_daily_steps), "avg daily steps")]); const lifts = (str && str.benchmarks) || []; const strSec = lifts.length ? sec("Strength — estimated 1RM", `<table class="rd-tbl"><thead><tr><th>lift</th><th>current</th><th>target</th><th>progress</th></tr></thead><tbody>${lifts.map((l) => `<tr><td class="rd-name">${esc(ttl(l.lift))}</td><td class="num">${dualWeight(l.current_1rm, "lb")}</td><td class="num rd-range">${dualWeight(l.target, "lb")}</td><td class="num">${l.exceeded ? "✓ goal met" : l.progress_pct != null ? fmt(l.progress_pct) + "%" : "—"}</td></tr>`).join("")}</tbody></table>`) : ""; const days = (wk && wk.days) || []; const wkSec = days.length ? sec("This week — daily movement", `<table class="rd-tbl"><thead><tr><th>day</th><th>steps</th><th>active min</th></tr></thead><tbody>${days.map((x) => `<tr><td class="rd-name">${esc(x.day_of_week || x.date)}</td><td class="num">${fmt(x.steps)}</td><td class="num">${fmt(x.total_active_minutes)}</td></tr>`).join("")}</tbody></table>`) : ""; const stepsChart = days.length ? sec("Steps this week", barChart(days, { valueKey: "steps", labelKey: "day_of_week", label: "Daily steps" })) : ""; const cardio = d.cardio_sessions || []; const _km = (mi) => (mi != null ? (mi * 1.60934).toFixed(1) : null); const sessSec = cardio.length ? sec("Recent cardio", `<table class="rd-tbl"><thead><tr><th>date</th><th>activity</th><th>distance</th><th>min</th><th>avg HR</th></tr></thead><tbody>${cardio.slice(0, 20).map((w) => `<tr><td class="rd-name">${esc(String(w.date || "").slice(0, 10))}</td><td>${esc(ttl(w.sport || "—"))}</td><td class="num rd-range">${w.distance_mi != null ? `${fmt(w.distance_mi, 1)} mi · ${_km(w.distance_mi)} km` : "—"}</td><td class="num">${fmt(w.minutes)}</td><td class="num">${fmt(w.avg_hr)}</td></tr>`).join("")}</tbody></table>`) : ""; const log = (wo && wo.workouts) || []; const logSec = log.length ? sec("Strength log — per-exercise sets", log.slice(0, 12).map((w) => `<details class="wlog"><summary class="wlog-sum"><span class="wlog-t">${esc(w.title || w.date)}</span><span class="wlog-m label">${[w.date, w.exercise_count != null && Math.round(w.exercise_count) + " exercises", w.total_volume_kg != null && dualWeight(w.total_volume_kg, "kg")].filter(Boolean).map(esc).join("  ·  ")}</span></summary>${(w.exercises || []).map((e) => `<div class="wlog-ex"><p class="wlog-ex-n">${esc(e.name)}</p><table class="rd-tbl"><tbody>${(e.sets || []).map((s, i) => `<tr><td class="rd-name">${esc(s.type && s.type.toLowerCase() !== "normal" ? s.type : "set")} ${i + 1}</td><td class="num">${s.reps != null ? fmt(s.reps) + " reps" : "—"}</td><td class="num rd-range">${s.weight_kg != null ? dualWeight(s.weight_kg, "kg") : (s.distance_m != null ? fmt(s.distance_m) + " m" : "—")}</td></tr>`).join("")}</tbody></table></div>`).join("")}</details>`).join("")) : ""; if (!head.includes("fig-v") && !strSec && !wkSec && !sessSec && !logSec) return empty("No training logged yet — workouts, Zone-2, and strength benchmarks appear here as sessions accrue."); return head + logSec + sessSec + stepsChart + strSec + wkSec + note("Correlative — training load vs the body's response. Per-exercise sets from Hevy; per-session strain & zones from Whoop."); }
+// The §0 verdict (P0.1): mono states the figures, serif judges the trade. Computed
+// only from protein_hit_pct + avg_deficit — no fabricated mechanism, just the honest read.
+function nutritionVerdict(n) {
+  const hasDef = n.avg_deficit != null && Number.isFinite(Number(n.avg_deficit));
+  const hasHit = n.protein_hit_pct != null && Number.isFinite(Number(n.protein_hit_pct));
+  if (!hasDef && !hasHit) return null;
+  const d = Number(n.avg_deficit), h = Number(n.protein_hit_pct);
+  const machine = [
+    n.avg_calories != null ? `${fmt(n.avg_calories)} in` : null,
+    n.tdee != null ? `${fmt(n.tdee)} maintenance` : null,
+    hasDef ? `${d >= 0 ? "−" : "+"}${fmt(Math.abs(Math.round(d)))} kcal/day` : null,
+    hasHit ? `protein hit ${fmt(h)}%` : null,
+  ].filter(Boolean).join(" · ");
+  const realDeficit = hasDef && d >= 250;
+  let human;
+  if (!hasDef) {
+    human = h === 0 ? "Protein's under target every logged day — the floor isn't being cleared yet."
+      : `Protein clears the floor about ${fmt(h)}% of days. An expenditure read is needed before the deficit half of the story lands.`;
+  } else if (!realDeficit) {
+    human = "No real deficit on the logged days — this reads closer to maintenance than a cut right now.";
+  } else if (!hasHit || h === 0) {
+    human = "The deficit's real. The protein's missing every logged day — that's the trade you're making.";
+  } else if (h < 50) {
+    human = "The deficit's real, but the protein lands under target most days — some of the cut is coming out of muscle, not just fat.";
+  } else if (h < 100) {
+    human = "The deficit's real and the protein mostly holds — the days it slips are the ones to watch.";
+  } else {
+    human = "The deficit's real and the protein clears the floor every day — the cut's coming off the right places.";
+  }
+  return { machine, human };
+}
+// §0 Hero — one measuring-rule spine (0→maintenance, intake + maintenance ticks,
+// deficit gap shaded) + the two-voice verdict. Replaces the old neutral big-number tiles;
+// calories / TDEE / deficit fold in here.
+function nutritionHero(n) {
+  if (n.avg_calories == null && n.tdee == null && n.avg_deficit == null && n.protein_hit_pct == null) return "";
+  const spine = (n.avg_calories != null && n.tdee != null)
+    ? intakeSpine(n.avg_calories, n.tdee, { label: "30-day average intake vs estimated maintenance" })
+    : "";
+  const v = nutritionVerdict(n);
+  const voice = v ? `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(v.machine)}</p><p class="tv-human">${esc(v.human)}</p></div>` : "";
+  if (!spine && !voice) return "";
+  return `<section class="rd-sec nut-hero">${spine}${voice}</section>`;
+}
+// §2 lead (P0.2) — promote protein_hit_pct to THE weighted signal. Ember-as-warning
+// when the floor isn't cleared (giant figure + ▼ + "under floor" — never an ember "win"
+// block, honouring HARD RULE 3). avg protein demotes into the subline.
+function nutritionProteinLead(n) {
+  if (n.protein_hit_pct == null) return "";
+  const h = Number(n.protein_hit_pct);
+  const low = h < 100; // target is a daily floor — anything under 100% missed days
+  const days = n.days_logged, hitDays = n.protein_hit_days;
+  const sub = [
+    n.avg_protein_g != null ? `${fmt(n.avg_protein_g)} g avg` : null,
+    n.protein_target_g != null ? `${fmt(n.protein_target_g)} g target` : null,
+    (days != null && hitDays != null)
+      ? (hitDays === 0 ? `missed every logged day · 0/${fmt(days)}` : `cleared ${fmt(hitDays)}/${fmt(days)} days`)
+      : null,
+  ].filter(Boolean).join(" · ");
+  return `<section class="rd-sec nut-lead ${low ? "lead-warn" : "lead-ok"}">` +
+    `<div class="lead-fig"><span class="lead-v mono">${fmt(h)}%</span>` +
+    `<span class="lead-k label">protein target hit${low ? " — under floor" : " — floor cleared"}</span></div>` +
+    `<p class="lead-sub mono">${esc(sub)}</p></section>`;
+}
+// §1 loss-rate readout (P0.9) — target rate → required deficit → actual deficit → gap,
+// with the deficit-intensity flag, the rate and the protein status on ONE sightline.
+// Two-voice: mono states the chain, serif surfaces the (contested) read honestly.
+function nutritionLossRate(lr) {
+  if (!lr || lr.target_rate_lb_wk == null) return "";
+  const chain = [
+    `target ${fmt(lr.target_rate_lb_wk)} lb/wk`,
+    lr.required_deficit_kcal != null ? `needs −${fmt(lr.required_deficit_kcal)} kcal/day` : null,
+    lr.actual_deficit_kcal != null ? `running ${lr.actual_deficit_kcal >= 0 ? "−" : "+"}${fmt(Math.abs(lr.actual_deficit_kcal))}` : "running — (needs an expenditure read)",
+    lr.gap_kcal != null ? `gap ${lr.gap_kcal >= 0 ? "+" : "−"}${fmt(Math.abs(lr.gap_kcal))}` : null,
+    lr.protein_hit_pct != null ? `protein ${fmt(lr.protein_hit_pct)}%` : null,
+  ].filter(Boolean).join(" → ");
+  const flag = lr.deficit_label ? `<span class="nut-flag nut-flag-${esc(lr.deficit_label)}">${esc(lr.deficit_label)} cut</span>` : "";
+  let floorClause;
+  if (lr.protein_hit_pct === 0) floorClause = ", and that floor's being missed every logged day";
+  else if (lr.protein_hit_pct != null && lr.protein_hit_pct < 100) floorClause = ", and right now that floor's missed most days";
+  else if (lr.protein_hit_pct != null && lr.protein_hit_pct >= 100) floorClause = ", and right now that floor's holding";
+  else floorClause = "";
+  const serif = `Three pounds a week is an aggressive rate. The bench is split on it — defensible early at this size if it's monitored, but only while the protein floor holds${floorClause}. That's why the rate and the protein sit on the same line here.`;
+  return `<div class="two-voice nut-lossrate"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(chain)} ${flag}</p><p class="tv-human">${esc(serif)}</p></div>`;
+}
+// §2 serif "what this means" annotation under the protein-vs-target chart (P0.8,
+// SIGNATURE 2 human voice). Data-derived, correlative, no causal claim.
+function nutritionProteinAnnotation(n) {
+  const avg = n.avg_protein_g, tgt = n.protein_target_g, hit = n.protein_hit_pct;
+  if (avg == null || tgt == null) return "";
+  const gap = Math.round(Number(tgt) - Number(avg));
+  let txt;
+  if (hit === 0) {
+    txt = `The ember line stays the whole way under the dotted ${fmt(tgt)} g goal — every logged day landed below the floor, about ${fmt(gap)} g short on average. On a cut, that's the line that decides how much muscle the deficit costs.`;
+  } else if (gap > 0) {
+    txt = `The line sits mostly under the dotted ${fmt(tgt)} g goal — about ${fmt(gap)} g short on average. The days it crosses the line are the ones holding muscle.`;
+  } else {
+    txt = `The line rides at or above the dotted ${fmt(tgt)} g goal most days — the protein floor is holding through the cut.`;
+  }
+  return `<p class="tv-human nut-anno">${esc(txt)}</p>`;
+}
+// §2 lean-mass protein floor (P1.4) — grounds the abstract 190 g target in the real
+// g/kg-lean muscle-retention floor (needs Withings lean mass for the exact value).
+function nutritionProteinFloor(lm, target) {
+  if (!lm || lm.lean_mass_lb == null) return "";
+  const bits = [];
+  if (lm.target_g_per_kg_lean != null && target != null) {
+    bits.push(`The ${fmt(target)} g target is ${fmt(lm.target_g_per_kg_lean)} g per kg of ${fmt(lm.lean_mass_lb)} lb lean mass.`);
+  }
+  if (lm.floor_protein_g != null) {
+    bits.push(`The muscle-retention floor on a cut is ~${fmt(lm.floor_g_per_kg_lean)} g/kg lean — about ${fmt(lm.floor_protein_g)} g a day (Helms et al.).`);
+  }
+  return bits.length ? `<p class="rd-meta label">${esc(bits.join(" "))}</p>` : "";
+}
+// §3.1 standing self-grading prediction (P2.1) — the bet + its confidence band + the
+// verdict. A prediction you don't grade is a horoscope, so the resolution date + criteria
+// are stated up front; the verdict reads pending until the date, then confirmed/refuted/drifted.
+function nutritionProjection(pj) {
+  if (!pj || pj.current_weight_lbs == null || pj.target_weight_lbs == null) return "";
+  const vClass = pj.verdict === "confirmed" ? "pj-ok" : pj.verdict === "refuted" ? "pj-warn" : "pj-pending";
+  const vLabel = pj.verdict === "pending" ? `pending — resolves ${esc(pj.resolves_on || pj.projected_date)}` : esc(pj.verdict);
+  const band = (pj.band_earliest && pj.band_latest) ? ` (band ${esc(pj.band_earliest)} → ${esc(pj.band_latest)})` : "";
+  const chain = `the platform bets ${fmt(pj.current_weight_lbs)} lb → ${fmt(pj.target_weight_lbs)} lb by ${esc(pj.projected_date)}${band} · at the implied ${fmt(pj.implied_rate_lb_wk)} lb/wk`;
+  const serif = `This is the standing bet, stated in the open: where the current pace puts the scale, by when, with the honest spread. It grades itself when the date arrives — ${pj.verdict === "pending" ? "pending until then" : `called <strong>${esc(pj.verdict)}</strong>`}.`;
+  return sec("The standing bet — self-grading",
+    `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(chain)} <span class="nut-flag ${vClass}">${vLabel}</span></p><p class="tv-human">${serif}</p></div>`);
+}
+// §3.2 reconciliation (P2.2) — projected loss from energy balance vs the actual scale.
+// Gated on ≥2 weeks overlap (honesty rule); NO Pearson/correlation chip ever.
+function nutritionReconciliation(rc) {
+  if (!rc) return "";
+  if (!rc.ready) {
+    return sec("Scale vs the log — reconciliation",
+      empty(`The scale-vs-log reconciliation draws in at ${rc.min_days || 14}+ overlapping days — ${rc.overlap_days || 0} so far. Under two weeks the gap is noise, not the logging-accuracy story, so it waits.`));
+  }
+  const days = rc.days || [];
+  const projSeries = days.filter((r) => r.projected_loss_lbs != null).map((r) => ({ date: r.date, value: r.projected_loss_lbs }));
+  const actSeries = days.filter((r) => r.actual_loss_lbs != null).map((r) => ({ date: r.date, value: r.actual_loss_lbs }));
+  const gap = rc.gap_lbs;
+  const gapTxt = gap == null ? "" : `<p class="tv-human nut-anno">Energy balance projected about ${fmt(rc.projected_loss_lbs)} lb off; the scale shows ${fmt(rc.actual_loss_lbs)} lb. The ${fmt(Math.abs(gap))} lb ${gap > 0 ? "shortfall" : "overshoot"} is the honest logging-accuracy / TDEE-drift gap — a reconciliation, not a verdict. Correlative, N=1 — no coefficient drawn here.</p>`;
+  return sec("Scale vs the log — reconciliation",
+    dualLineChart(projSeries, actSeries, { aLabel: "projected (energy balance)", bLabel: "actual (scale)", unit: " lb", label: "cumulative loss" }) + gapTxt);
+}
+// §8 CGM × meals — a designed empty state (no live binding): a ghosted glucose curve with
+// meal markers + "sensor not active — fills in when you wear one." The glucose page owns
+// the live view; this is the nutrition-page placeholder for the eventual overlay.
+function cgmEmptyState() {
+  const W = 600, H = 130;
+  const curve = "M8 92 C 60 90, 95 48, 145 60 S 225 98, 272 72 C 320 52, 352 96, 402 86 S 505 56, 560 80";
+  const meals = [72, 252, 432];
+  const markers = meals.map((x) => `<line class="cgm-meal" x1="${x}" y1="16" x2="${x}" y2="120"/><circle class="cgm-meal-dot" cx="${x}" cy="16" r="3"/>`).join("");
+  return sec("Glucose × meals — coming online",
+    `<div class="nut-coming cgm-ghost"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="cgm-svg" aria-hidden="true">${markers}<path class="cgm-curve" d="${curve}" vector-effect="non-scaling-stroke"/></svg>` +
+    `<p class="rd-archive">When a CGM sensor is active, this marries each meal to its glucose response — the peak, the rise, the return to baseline, with the meal markers above. <strong>Sensor not active — fills in when you wear one.</strong> <span class="confidence conf-low">no sensor yet</span></p></div>`);
+}
 async function renderNutrition(d) {
   // The API nests macros under d.nutrition (was read flat → blank); meal/protein field
   // names are frequency/food/avg_daily_g (were count/name/grams → empty tables).
@@ -81,43 +236,163 @@ async function renderNutrition(d) {
   const meals = (fm && fm.meals) || [];
   const prot = (ps && (ps.protein_sources || ps.sources || ps.proteins)) || [];
   const parts = [];
+  // ── §0 Hero — the verdict (P0.1). Folds calories/TDEE/deficit out of the tile row.
+  const hero = nutritionHero(n);
+  if (hero) parts.push(hero);
+  // ── §2 lead — the protein miss as THE weighted signal (P0.2).
+  const lead = nutritionProteinLead(n);
+  if (lead) parts.push(lead);
+  // The one latest-day figure kept as "news".
+  const news = figs([
+    n.latest_calories != null && fig(fmt(n.latest_calories), `latest logged${n.latest_date ? " · " + fmtShort(n.latest_date) : ""}`),
+    n.latest_protein_g != null && fig(fmt(n.latest_protein_g) + "g", "protein that day"),
+  ]);
+  if (news.includes("fig-v")) parts.push(news);
+  // avg protein folds into the protein lead's subline; carbs/fat stay as light context.
   const head = figs([
-    n.avg_calories != null && fig(fmt(n.avg_calories), "avg calories"),
-    n.avg_protein_g != null && fig(fmt(n.avg_protein_g) + "g", "avg protein"),
     n.avg_carbs_g != null && fig(fmt(n.avg_carbs_g) + "g", "avg carbs"),
     n.avg_fat_g != null && fig(fmt(n.avg_fat_g) + "g", "avg fat"),
-    n.avg_deficit != null && fig(fmt(n.avg_deficit), "avg deficit"),
-    n.tdee != null && fig(fmt(n.tdee), "est. TDEE"),
-    n.protein_hit_pct != null && fig(fmt(n.protein_hit_pct) + "%", "protein target hit"),
   ]);
   if (head.includes("fig-v")) parts.push(head);
-  // Hero trends — the daily macro time series the API always returned but the page never drew.
+  // Hero trends — the daily macro time series the API always returned but the page never
+  // drew. P0.8 deploys SIGNATURE 1 (the measuring-rule tick spine) on both, and a serif
+  // "what this means" annotation (SIGNATURE 2, the human voice) under the protein chart.
   const trend = (d && d.nutrition_trend) || [];
   if (trend.length) {
-    parts.push(sec("Daily intake vs TDEE", lineChart(trend, { valueKey: "calories", goal: n.tdee || null, unit: " kcal", label: "Calories vs maintenance", emptyMsg: "The calorie trend fills as days are logged." })));
-    parts.push(sec("Protein vs target", lineChart(trend, { valueKey: "protein_g", goal: n.protein_target_g || null, unit: "g", label: "Protein per day vs target" })));
+    parts.push(sec("Energy — the deficit story",
+      lineChart(trend, { valueKey: "calories", goal: n.tdee || null, unit: " kcal", label: "Calories vs maintenance", spine: true, emptyMsg: "The calorie trend fills as days are logged." }) +
+      nutritionLossRate(d && d.loss_rate)));
+    parts.push(sec("Protein vs target",
+      lineChart(trend, { valueKey: "protein_g", goal: n.protein_target_g || null, unit: "g", label: "Protein per day vs target", spine: true }) +
+      nutritionProteinAnnotation(n) +
+      nutritionProteinFloor(d && d.lean_mass, n.protein_target_g)));
   }
-  // Average macro split (the carbs/fat the page computed but never showed).
-  if (n.avg_protein_g != null || n.avg_carbs_g != null || n.avg_fat_g != null) {
-    parts.push(sec("Average macro split", stackedBar([
-      { label: "Protein", value: n.avg_protein_g, tone: "ember" },
-      { label: "Carbs", value: n.avg_carbs_g, tone: "ink" },
-      { label: "Fat", value: n.avg_fat_g, tone: "faint" },
-    ], { label: "Average grams/day", unit: "g" })));
+  // §3.1 — the standing self-grading bet (P2.1).
+  const proj = nutritionProjection(d && d.projection);
+  if (proj) parts.push(proj);
+  // §3.2 — scale-vs-log reconciliation (P2.2), gated on ≥2 weeks overlap.
+  const recon = nutritionReconciliation(d && d.reconciliation);
+  if (recon) parts.push(recon);
+  // §3.3 — food-delivery off-protocol tell (P2.3, PRIVATE-by-default). Only renders when the
+  // server opts it in (env flag OFF by default → field absent → nothing shows publicly).
+  const fd = d && d.food_delivery;
+  if (fd && fd.public && (fd.delivery_days || fd.home_days)) {
+    parts.push(sec("Home-cooked vs delivery — off-protocol tell",
+      figs([
+        fd.avg_deficit_home != null && fig(fmt(fd.avg_deficit_home), `home-cooked deficit · ${fmt(fd.home_days)}d`),
+        fd.avg_deficit_delivery != null && fig(fmt(fd.avg_deficit_delivery), `delivery-day deficit · ${fmt(fd.delivery_days)}d`),
+      ]) +
+      `<p class="rd-meta label">Delivery days vs home-cooked days, by average deficit — data, not a verdict. <span class="confidence conf-low">private signal</span></p>`));
   }
-  // Calorie cycling (training vs rest day) + eating window — single-value reads, high signal.
-  if (d && d.periodization && Object.keys(d.periodization).length) parts.push(sec("Training-day vs rest-day", kvtable(d.periodization)));
-  if (d && d.eating_window && Object.keys(d.eating_window).length) parts.push(sec("Eating window", kvtable(d.eating_window)));
-  if (d && d.weekday_vs_weekend && Object.keys(d.weekday_vs_weekend).length) parts.push(sec("Weekday vs weekend", kvtable(d.weekday_vs_weekend)));
+  // §3.4 — present-vs-PROVEN_BLUEPRINT (P2.5, NEVER public). Only renders if the server opts
+  // it in (blueprint flag stays OFF → field absent → never shows on the public page).
+  const bp = d && d.blueprint_benchmark;
+  if (bp && bp.public) {
+    parts.push(sec("Present vs the proven blueprint",
+      figs([bp.current_avg_protein_g != null && fig(fmt(bp.current_avg_protein_g) + "g", "protein now"), bp.protein_target_g != null && fig(fmt(bp.protein_target_g) + "g", "target")]) +
+      `<p class="rd-meta label">Present protocol vs the proven loss-period blueprint. <span class="confidence conf-low">private — blueprint</span></p>`));
+  }
+  // Average macro split — by ENERGY (P0.5): protein·4 / carbs·4 / fat·9, not gram mass.
+  // Gram-fraction badly understates fat (16% by mass ≈ 30% by calories).
+  const _kcal = (g, mult) => (g != null ? Math.round(Number(g) * mult) : 0);
+  const pK = _kcal(n.avg_protein_g, 4), cK = _kcal(n.avg_carbs_g, 4), fK = _kcal(n.avg_fat_g, 9);
+  if (pK || cK || fK) {
+    parts.push(sec("Average macro split — by energy", stackedBar([
+      { label: `Protein ${fmt(n.avg_protein_g)}g`, value: pK, tone: "ember" },
+      { label: `Carbs ${fmt(n.avg_carbs_g)}g`, value: cK, tone: "ink" },
+      { label: `Fat ${fmt(n.avg_fat_g)}g`, value: fK, tone: "faint" },
+    ], { label: "Share of calories (protein·4 / carbs·4 / fat·9)", unit: " kcal" })));
+  }
+  // §3 — per-day macro composition by ENERGY (P0.7): reveals whether the cut comes out of
+  // carbs/fat while protein holds. Refuses < 4 points via the chart kit.
+  const trendDays = (d && d.nutrition_trend) || [];
+  if (trendDays.length) {
+    parts.push(sec("Where the cut comes from — per-day macros by energy",
+      stackedColumns(trendDays, { emptyMsg: `Per-day macro composition draws in at 4+ logged days — ${trendDays.length} so far.` })));
+  }
+  // P0.6 — suppress empty scaffold. These comparisons render honest "needs more days"
+  // states instead of zero-rows (no "Rest Day — Count 0" / "Weekend — Days 0").
+  const DAYS = Number(n.days_logged) || 0;
+  const TWO_WEEKS = 14;
+  // Calorie cycling — only when BOTH training and rest days have logged data.
+  const pz = (d && d.periodization) || {};
+  const tdN = (pz.training_day && pz.training_day.count) || 0;
+  const rdN = (pz.rest_day && pz.rest_day.count) || 0;
+  if (tdN > 0 && rdN > 0) {
+    parts.push(sec("Training-day vs rest-day", kvtable({ training_day: pz.training_day, rest_day: pz.rest_day })));
+  } else if (tdN > 0 || rdN > 0) {
+    parts.push(sec("Training-day vs rest-day", empty("Calorie cycling fills in once there are both training days and rest days logged — only one kind has data so far.")));
+  }
+  // §4 Rhythm — fasting & meal timing (P1.1). Average window + real avg-protein/meal +
+  // the (now legitimate) per-meal distribution score + the per-day eating-window ribbon +
+  // meal-time-of-day distribution. All from food_log per-entry time + protein.
+  const ew = (d && d.eating_window) || {};
+  const mr = (d && d.meal_rhythm) || {};
+  const hourLbl = (h) => { const ap = h < 12 ? "a" : "p"; const hh = h % 12 === 0 ? 12 : h % 12; return `${hh}${ap}`; };
+  const tdist = (mr.time_distribution || []).map((t) => ({ label: hourLbl(t.hour), value: t.protein_g }));
+  const rhythmFigs = figs([
+    ew.avg_hours != null && fig(fmt(ew.avg_hours) + "h", `avg window${ew.avg_first_meal ? ` · ${ew.avg_first_meal}–${ew.avg_last_meal}` : ""}`),
+    mr.avg_protein_per_meal != null && fig(fmt(mr.avg_protein_per_meal) + "g", "avg protein / meal"),
+    mr.protein_distribution_score != null && fig(fmt(mr.protein_distribution_score) + "%", "meals ≥30g protein"),
+  ]);
+  const ribbon = (mr.per_day_window && mr.per_day_window.length) ? mealWindowRibbon(mr.per_day_window, { refHours: mr.reference_window_hrs || 8, label: "Eating window · per day vs 16:8" }) : "";
+  const tdistChart = tdist.length ? sec("When protein lands across the day", barChart(tdist, { valueKey: "value", labelKey: "label", label: "Protein by time of day (g · 2h buckets)" })) : "";
+  if (rhythmFigs.includes("fig-v") || ribbon || tdistChart) {
+    parts.push(sec("Rhythm — fasting & meal timing", (rhythmFigs.includes("fig-v") ? rhythmFigs : "") + ribbon + tdistChart));
+  }
+  // Weekday vs weekend — a real split needs ~2 weeks; below that it's noise, not signal.
+  const ww = (d && d.weekday_vs_weekend) || {};
+  const wdN = (ww.weekday && ww.weekday.days) || 0;
+  const weN = (ww.weekend && ww.weekend.days) || 0;
+  if (DAYS >= TWO_WEEKS && wdN > 0 && weN > 0) {
+    parts.push(sec("Weekday vs weekend", kvtable(ww)));
+  } else if (wdN > 0 || weN > 0) {
+    parts.push(sec("Weekday vs weekend", empty(`The weekday/weekend split fills in at 2+ weeks of logging — ${DAYS} day${DAYS === 1 ? "" : "s"} so far.`)));
+  }
   // Micronutrient sufficiency + protein-distribution score — beyond macros, the part almost
   // no transformation site shows (reverse-QA: rich in the data, surfaced nowhere).
   const mn = (d && d.micronutrients) || {};
   const suf = mn.sufficiency || {};
-  if (mn.protein_distribution_score != null || Object.keys(suf).length) {
-    const bars = Object.entries(suf).map(([k, v]) => ({ label: ttl(k.replace(/_(mg|mcg|ug|g)$/i, "")), value: Math.round((v && v.pct) || 0) })).sort((a, b) => b.value - a.value);
-    parts.push(sec("Micronutrients & protein timing",
-      figs([mn.protein_distribution_score != null && fig(fmt(mn.protein_distribution_score), "protein-timing score"), mn.avg_pct != null && fig(fmt(mn.avg_pct) + "%", "micronutrient avg")]) +
-      (bars.length ? barChart(bars, { valueKey: "value", labelKey: "label", label: "% of daily target" }) : "")));
+  // P0.3 — the protein-"timing" score is killed: it's a distribution score with no
+  // per-meal timestamps behind it, it can't fall, and a "100" sitting over a 0% protein
+  // hit congratulated the spacing of a thing he isn't eating enough of. Relabel as not-yet-
+  // measured (P1.1 revives a real one once per-meal timestamps land).
+  if (Object.keys(suf).length || mn.avg_pct != null) {
+    // P0.4 — horizontal sufficiency bars 0→100%, worst-first, value-labelled, ember
+    // reserved for the worst offenders (a deficiency is what to look at, not a win).
+    const items = Object.entries(suf).map(([k, v]) => {
+      const m = /_(mg|mcg|ug|g)$/i.exec(k);
+      return { label: ttl(k.replace(/_(mg|mcg|ug|g)$/i, "")), pct: v && v.pct, actual: v && v.actual, target: v && v.target, unit: m ? m[1] : "" };
+    });
+    parts.push(sec("Micronutrients — what the food is short on",
+      figs([mn.avg_pct != null && fig(fmt(mn.avg_pct) + "%", "micronutrient avg")]) +
+      (items.length ? sufficiencyBars(items, { label: "Sufficiency vs daily target" }) : "")));
+  }
+  // §5 — Hydration & electrolytes (P1.2): sodium + potassium framed as the water-weight
+  // honesty check on a cut (NOT a bare hydration ring). Week-one "the drop is water" caveat.
+  const el = (d && d.electrolytes) || {};
+  if (el.avg_sodium_mg != null) {
+    const sod = el.avg_sodium_mg;
+    const sodNote = sod < el.sodium_ref_low
+      ? "below the 1.5–2.3 g range — low sodium on a cut can worsen cramps and lightheadedness"
+      : sod > el.sodium_ref_high
+        ? "above the 1.5–2.3 g range — more water retention, a higher scale reading"
+        : "inside the 1.5–2.3 g range";
+    const wk1 = (el.days_logged != null && el.days_logged < 14)
+      ? `<p class="tv-human nut-anno">It's week one — the early scale drop is mostly water, not fat: sodium and glycogen swings move the number by pounds. Sodium here is the honesty check on that, not a hydration vanity score.</p>`
+      : "";
+    parts.push(sec("Hydration & electrolytes — the water-weight honesty check",
+      figs([fig(fmt(sod), "avg sodium mg"), el.potassium_pct != null && fig(fmt(el.potassium_pct) + "%", "potassium vs target")]) +
+      `<p class="rd-meta label">Sodium ${esc(sodNote)}. Potassium sufficiency is in Micronutrients above.</p>` + wk1));
+  }
+  // §"Can I hold this?" (P1.3) — daily hunger/energy 1–5 is NOT captured anywhere yet.
+  // Honest designed empty state + flag (never stubbed). Gated on real nutrition data so a
+  // truly empty page still shows the clean top-level empty state, not this placeholder.
+  if ((n.days_logged || 0) > 0) {
+    parts.push(sec("Can I hold this? — hunger & energy",
+      `<div class="nut-coming"><p class="rd-archive">A daily 1–5 hunger and energy check-in isn't being captured yet. Once it is, this becomes a sparkline of how holdable the deficit actually feels day to day — the subjective side of "sustainable" that HRV and recovery can't see. <span class="confidence conf-low">needs capture</span></p></div>`));
+    // §8 CGM × meals — designed empty state (no live binding).
+    parts.push(cgmEmptyState());
   }
   if (meals.length)
     parts.push(

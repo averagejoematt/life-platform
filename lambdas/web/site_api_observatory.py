@@ -11,6 +11,7 @@ are imported from site_api_common — no circular references.
 """
 
 import json
+import os
 import time  # noqa: F401 — used by some handlers
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401 — kept for handlers that convert types
@@ -31,6 +32,14 @@ from web.site_api_common import (
     logger,
     table,
 )
+
+# ── Privacy flags (Phase 2): private-by-default behavioural / blueprint signals are gated
+# at the SERVER — with the flag OFF (the default, env var unset) the private data is never
+# even computed into the public API response. Flip only by setting the env var, after Matthew
+# confirms. P2.3 = food-delivery off-protocol tell; P2.5 = present-vs-PROVEN_BLUEPRINT (never
+# public — kept dark behind a flag that stays off).
+_DELIVERY_PUBLIC = os.environ.get("NUTRITION_DELIVERY_PUBLIC", "").strip().lower() in ("1", "true", "yes")
+_BLUEPRINT_PUBLIC = os.environ.get("NUTRITION_BLUEPRINT_PUBLIC", "").strip().lower() in ("1", "true", "yes")
 
 
 def handle_nutrition_overview() -> dict:
@@ -257,6 +266,220 @@ def handle_nutrition_overview() -> dict:
             avg = periodization[key]["avg_calories"]
             periodization[key]["avg_deficit"] = round(tdee - avg) if avg else None
 
+    # ── Loss-rate readout (P0.9): the deficit chain + sustainability flag ──
+    # Phase-1 "Ignition" target: 3 lb/week ≈ 1,500 kcal/day deficit (matches the profile /
+    # ai_calls Phase-1 target). The full multi-channel sustainability early-warning (HRV,
+    # sleep, recovery, habits, training) lives in the get_deficit_sustainability MCP tool;
+    # here we surface only the rate chain + the deficit-intensity label (same BS-12 rubric).
+    TARGET_RATE_LB_WK = 3
+    KCAL_PER_LB = 3500
+    required_deficit = round(TARGET_RATE_LB_WK * KCAL_PER_LB / 7)  # 1500
+    deficit_pct = round(deficit / tdee * 100, 1) if (deficit is not None and tdee) else None
+    if deficit_pct is None:
+        deficit_label = None
+    elif deficit_pct > 25:
+        deficit_label = "aggressive"
+    elif deficit_pct > 15:
+        deficit_label = "moderate"
+    elif deficit_pct > 5:
+        deficit_label = "mild"
+    else:
+        deficit_label = "maintenance"
+    loss_rate = {
+        "target_rate_lb_wk": TARGET_RATE_LB_WK,
+        "required_deficit_kcal": required_deficit,
+        "actual_deficit_kcal": deficit,
+        "gap_kcal": (required_deficit - deficit) if deficit is not None else None,
+        "implied_rate_lb_wk": round(deficit * 7 / KCAL_PER_LB, 1) if deficit is not None else None,
+        "deficit_pct": deficit_pct,
+        "deficit_label": deficit_label,
+        "protein_hit_pct": protein_hit_pct,
+    }
+
+    # ── Meal rhythm (P1.1): per-meal timing + protein, from food_log entries (each entry
+    # carries time + protein_g + calories_kcal). Powers §4 (eating-window ribbon + meal-
+    # time-of-day distribution) and §2 (real avg-protein/meal + the legitimate distribution
+    # score the ingestion already computes occasion-aware, reviving the P0.3 placeholder).
+    def _tmin(t):
+        try:
+            p = str(t).split(":")
+            return int(p[0]) * 60 + int(p[1])
+        except (ValueError, IndexError, AttributeError):
+            return None
+
+    per_day_window = []
+    bucket_protein, bucket_cal = {}, {}
+    total_meals_sum = 0
+    pds_vals = []
+    for i in items:
+        d = i.get("date") or i.get("sk", "").replace("DATE#", "")
+        times = []
+        for e in i.get("food_log") or []:
+            mins = _tmin(e.get("time"))
+            if mins is None:
+                continue
+            times.append(mins)
+            b = (mins // 120) * 2  # 2-hour bucket start hour
+            bucket_protein[b] = bucket_protein.get(b, 0.0) + float(e.get("protein_g") or 0)
+            bucket_cal[b] = bucket_cal.get(b, 0.0) + float(e.get("calories_kcal") or 0)
+        if len(times) >= 2:
+            per_day_window.append({"date": d, "first_min": min(times), "last_min": max(times)})
+        if i.get("total_meals"):
+            total_meals_sum += int(i["total_meals"])
+        if i.get("protein_distribution_score") is not None:
+            pds_vals.append(float(i["protein_distribution_score"]))
+
+    total_protein_window = sum(pro_vals) if pro_vals else 0
+    meal_rhythm = {
+        "avg_protein_per_meal": round(total_protein_window / total_meals_sum, 1) if total_meals_sum else None,
+        "protein_distribution_score": round(sum(pds_vals) / len(pds_vals)) if pds_vals else None,
+        "per_day_window": per_day_window[-14:],  # last 2 weeks for the ribbon
+        "time_distribution": [
+            {"hour": h, "protein_g": round(bucket_protein[h], 1), "calories": round(bucket_cal.get(h, 0))}
+            for h in sorted(bucket_protein)
+        ],
+        "reference_window_hrs": 8,  # the 16:8 reference (8h eating window)
+        "days_with_meal_times": len(per_day_window),
+    }
+
+    # ── Electrolytes (P1.2): sodium (raw total — ingested but NOT in the sufficiency map,
+    # since it's a range not a "more is better" nutrient) + potassium, framed as the
+    # water-weight honesty check on a cut. NOT a bare hydration ring (off-brand, out of scope).
+    sodium_vals = [float(i["total_sodium_mg"]) for i in items if i.get("total_sodium_mg") is not None]
+    _pot = ((latest or {}).get("micronutrient_sufficiency") or {}).get("potassium_mg") or {}
+    electrolytes = {
+        "avg_sodium_mg": round(sum(sodium_vals) / len(sodium_vals)) if sodium_vals else None,
+        "sodium_ref_low": 1500,
+        "sodium_ref_high": 2300,
+        "potassium_pct": _pot.get("pct"),
+        "days_logged": len(items),
+    }
+
+    # ── Lean mass (P1.4): from Withings body-comp → grounds the protein target as a
+    # g/kg-lean muscle-retention floor in §2 (Helms: ~2.3 g/kg FFM to retain muscle on a cut).
+    lean_mass = None
+    wt_items = _query_source("withings", _experiment_date(60), today)
+    lean_lb = None
+    for w in sorted(wt_items, key=lambda x: x.get("sk", ""), reverse=True):
+        if w.get("fat_free_mass_lbs") is not None:
+            lean_lb = float(w["fat_free_mass_lbs"])
+            break
+    if lean_lb is not None:
+        lean_kg = lean_lb * 0.453592
+        floor_gkg = 2.3
+        lean_mass = {
+            "lean_mass_lb": round(lean_lb, 1),
+            "lean_mass_kg": round(lean_kg, 1),
+            "target_g_per_kg_lean": round(protein_target / lean_kg, 2) if lean_kg else None,
+            "floor_g_per_kg_lean": floor_gkg,
+            "floor_protein_g": round(lean_kg * floor_gkg),
+        }
+
+    # Latest weight (for the projection + reconciliation), from the same Withings query.
+    cur_weight = None
+    for w in sorted(wt_items, key=lambda x: x.get("sk", ""), reverse=True):
+        if w.get("weight_lbs") is not None:
+            cur_weight = float(w["weight_lbs"])
+            break
+
+    # ── Standing self-grading prediction (P2.1): project the next weight crossing from the
+    # current implied rate (intake vs maintenance), with a confidence band (rate ±25%). The
+    # bet + band are stated now; the verdict resolves over weeks (pending until the date).
+    projection = None
+    implied = loss_rate.get("implied_rate_lb_wk")
+    if cur_weight is not None and implied and implied > 0:
+        target_w = int((cur_weight - 0.1) // 5) * 5  # next 5-lb mark below current
+        to_go = cur_weight - target_w
+        now = datetime.now(timezone.utc)
+
+        def _proj(rate):
+            return (now + timedelta(weeks=to_go / rate)).strftime("%Y-%m-%d")
+
+        projection = {
+            "metric": "weight",
+            "current_weight_lbs": round(cur_weight, 1),
+            "target_weight_lbs": target_w,
+            "implied_rate_lb_wk": implied,
+            "projected_date": _proj(implied),
+            "band_earliest": _proj(implied * 1.25),
+            "band_latest": _proj(implied * 0.75),
+            "basis": "current intake vs estimated maintenance over the logged window",
+            "verdict": "pending",  # resolves confirmed/refuted/drifted as the date arrives
+            "resolves_on": _proj(implied),
+        }
+
+    # ── Reconciliation (P2.2): projected loss from energy balance vs the actual Withings
+    # trend. Two trajectories; the gap is the honest logging-accuracy / TDEE-drift story.
+    # Gated on ≥2 weeks of overlapping days (NEVER a Pearson/correlation chip — honesty rule).
+    w_series = {}
+    for w in wt_items:
+        dd = w.get("date") or w.get("sk", "").replace("DATE#", "")
+        if w.get("weight_lbs") is not None:
+            w_series[dd] = float(w["weight_lbs"])
+    recon_days = []
+    start_actual = None
+    if tdee:
+        cum_def = 0.0
+        for t in trend:
+            cal = t.get("calories")
+            if cal is None:
+                continue
+            cum_def += tdee - cal
+            aw = w_series.get(t["date"])
+            if start_actual is None and aw is not None:
+                start_actual = aw
+            recon_days.append(
+                {
+                    "date": t["date"],
+                    "projected_loss_lbs": round(cum_def / KCAL_PER_LB, 2),
+                    "actual_loss_lbs": (round(start_actual - aw, 2) if (aw is not None and start_actual is not None) else None),
+                }
+            )
+    overlap = sum(1 for r in recon_days if r["actual_loss_lbs"] is not None)
+    reconciliation = {"days": recon_days, "overlap_days": overlap, "min_days": 14, "ready": overlap >= 14}
+    if reconciliation["ready"]:
+        _last = [r for r in recon_days if r["actual_loss_lbs"] is not None][-1]
+        reconciliation["projected_loss_lbs"] = _last["projected_loss_lbs"]
+        reconciliation["actual_loss_lbs"] = _last["actual_loss_lbs"]
+        reconciliation["gap_lbs"] = round(_last["projected_loss_lbs"] - _last["actual_loss_lbs"], 2)
+
+    # ── Food-delivery off-protocol tell (P2.3, PRIVATE-by-default — flag OFF). With the flag
+    # off, the delivery source is never queried and nothing private enters the response.
+    food_delivery = None
+    if _DELIVERY_PUBLIC:
+        fd_items = _query_source("food_delivery", d30, today)
+        delivery_dates = {(fd.get("date") or fd.get("sk", "").replace("DATE#", "")) for fd in fd_items}
+        deliv_def, home_def = [], []
+        for i in items:
+            cal = _mf(i, "calories")
+            if cal is None or not tdee:
+                continue
+            dd = i.get("date") or i.get("sk", "").replace("DATE#", "")
+            (deliv_def if dd in delivery_dates else home_def).append(tdee - cal)
+        food_delivery = {
+            "public": True,
+            "delivery_days": len(deliv_def),
+            "home_days": len(home_def),
+            "avg_deficit_delivery": round(sum(deliv_def) / len(deliv_def)) if deliv_def else None,
+            "avg_deficit_home": round(sum(home_def) / len(home_def)) if home_def else None,
+        }
+
+    # ── Present-vs-PROVEN_BLUEPRINT benchmark (P2.5, NEVER public — flag stays OFF). The
+    # blueprint (BENCH-1 training_reference) is hard-private per ADR-089; with the flag off
+    # (default) it is never queried and nothing blueprint-derived enters the response.
+    blueprint_benchmark = None
+    if _BLUEPRINT_PUBLIC:
+        tr = _query_source("training_reference", "2010-01-01", today)
+        latest_tr = sorted(tr, key=lambda x: x.get("sk", ""))[-1] if tr else None
+        if latest_tr:
+            blueprint_benchmark = {
+                "public": True,
+                "confidence": latest_tr.get("confidence"),
+                "current_avg_protein_g": round(sum(pro_vals) / len(pro_vals), 1) if pro_vals else None,
+                "protein_target_g": protein_target,
+                "note": "present protein vs the proven loss-period blueprint",
+            }
+
     return _ok(
         {
             "nutrition": {
@@ -280,6 +503,14 @@ def handle_nutrition_overview() -> dict:
                 ),
             },
             "nutrition_trend": trend,
+            "loss_rate": loss_rate,
+            "meal_rhythm": meal_rhythm,
+            "electrolytes": electrolytes,
+            "lean_mass": lean_mass,
+            "projection": projection,
+            "reconciliation": reconciliation,
+            "food_delivery": food_delivery,
+            "blueprint_benchmark": blueprint_benchmark,
             "weekday_vs_weekend": weekday_vs_weekend,
             "eating_window": eating_window,
             "periodization": periodization,
