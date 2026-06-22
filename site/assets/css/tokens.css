@@ -355,6 +355,21 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .hspine-v { font-size: var(--fs-data-lg); line-height: 1; }
 .hspine-k { color: var(--ink-faint); }
 
+/* Protein lead (nutrition §2, P0.2) — the failing metric weighted as the headline.
+   Ember = attention/warning when under floor (giant figure + ▼ + "under floor"),
+   NEVER an ember "win" block for a miss (HARD RULE 3). */
+.nut-lead { margin-top: var(--sp-5); display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: var(--sp-1) var(--sp-4); }
+.nut-lead .lead-fig { display: flex; flex-direction: column; gap: var(--sp-1); }
+.nut-lead .lead-v { font-family: var(--font-mono); font-weight: var(--weight-med);
+  font-size: clamp(2.4rem, 1.4rem + 5vw, 3.6rem); line-height: 1; }
+.nut-lead .lead-k { color: var(--ink-faint); }
+.nut-lead .lead-sub { color: var(--ink-muted); }
+.nut-lead.lead-warn .lead-v { color: var(--ember); }
+.nut-lead.lead-warn .lead-k { color: var(--ember); }
+.nut-lead.lead-warn .lead-k::before { content: "▼ "; }
+.nut-lead.lead-ok .lead-v { color: var(--ink); }
+
 /* Two-voice verdict (SIGNATURE 2) — mono states, serif judges. */
 .two-voice { margin-top: var(--sp-4); display: grid; gap: var(--sp-2);
   border-left: 2px solid var(--ember); padding-left: var(--sp-4); }

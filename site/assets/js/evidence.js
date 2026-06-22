@@ -117,6 +117,26 @@ function nutritionHero(n) {
   if (!spine && !voice) return "";
   return `<section class="rd-sec nut-hero">${spine}${voice}</section>`;
 }
+// §2 lead (P0.2) — promote protein_hit_pct to THE weighted signal. Ember-as-warning
+// when the floor isn't cleared (giant figure + ▼ + "under floor" — never an ember "win"
+// block, honouring HARD RULE 3). avg protein demotes into the subline.
+function nutritionProteinLead(n) {
+  if (n.protein_hit_pct == null) return "";
+  const h = Number(n.protein_hit_pct);
+  const low = h < 100; // target is a daily floor — anything under 100% missed days
+  const days = n.days_logged, hitDays = n.protein_hit_days;
+  const sub = [
+    n.avg_protein_g != null ? `${fmt(n.avg_protein_g)} g avg` : null,
+    n.protein_target_g != null ? `${fmt(n.protein_target_g)} g target` : null,
+    (days != null && hitDays != null)
+      ? (hitDays === 0 ? `missed every logged day · 0/${fmt(days)}` : `cleared ${fmt(hitDays)}/${fmt(days)} days`)
+      : null,
+  ].filter(Boolean).join(" · ");
+  return `<section class="rd-sec nut-lead ${low ? "lead-warn" : "lead-ok"}">` +
+    `<div class="lead-fig"><span class="lead-v mono">${fmt(h)}%</span>` +
+    `<span class="lead-k label">protein target hit${low ? " — under floor" : " — floor cleared"}</span></div>` +
+    `<p class="lead-sub mono">${esc(sub)}</p></section>`;
+}
 async function renderNutrition(d) {
   // The API nests macros under d.nutrition (was read flat → blank); meal/protein field
   // names are frequency/food/avg_daily_g (were count/name/grams → empty tables).
@@ -128,17 +148,19 @@ async function renderNutrition(d) {
   // ── §0 Hero — the verdict (P0.1). Folds calories/TDEE/deficit out of the tile row.
   const hero = nutritionHero(n);
   if (hero) parts.push(hero);
+  // ── §2 lead — the protein miss as THE weighted signal (P0.2).
+  const lead = nutritionProteinLead(n);
+  if (lead) parts.push(lead);
   // The one latest-day figure kept as "news".
   const news = figs([
     n.latest_calories != null && fig(fmt(n.latest_calories), `latest logged${n.latest_date ? " · " + fmtShort(n.latest_date) : ""}`),
     n.latest_protein_g != null && fig(fmt(n.latest_protein_g) + "g", "protein that day"),
   ]);
   if (news.includes("fig-v")) parts.push(news);
+  // avg protein folds into the protein lead's subline; carbs/fat stay as light context.
   const head = figs([
-    n.avg_protein_g != null && fig(fmt(n.avg_protein_g) + "g", "avg protein"),
     n.avg_carbs_g != null && fig(fmt(n.avg_carbs_g) + "g", "avg carbs"),
     n.avg_fat_g != null && fig(fmt(n.avg_fat_g) + "g", "avg fat"),
-    n.protein_hit_pct != null && fig(fmt(n.protein_hit_pct) + "%", "protein target hit"),
   ]);
   if (head.includes("fig-v")) parts.push(head);
   // Hero trends — the daily macro time series the API always returned but the page never drew.
