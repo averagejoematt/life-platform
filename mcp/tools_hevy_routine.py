@@ -34,6 +34,7 @@ programming with red-day deload guard."
 from __future__ import annotations
 
 import logging
+import urllib.error
 from datetime import datetime, timezone
 from typing import Any
 
@@ -971,6 +972,20 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
         return mcp_error(f"Hevy auth failed (rotate life-platform/hevy-write?): {e}", error_code="HEVY_AUTH")
     except wc.HevyRetryable as e:
         return mcp_error(f"Hevy transient error after retries: {e}", error_code="HEVY_RETRYABLE")
+    except urllib.error.HTTPError as e:
+        # A1 (WORKORDER_HEVY_COMMIT_HARDENING): a non-orphan 4xx (e.g. a bad set-type enum or
+        # rejected notes) previously bubbled up as a bare "HTTP Error 400" with no detail. The
+        # body is still UNREAD here — _maybe_recover_orphan only consumes it on a title match —
+        # so read it and surface Hevy's actual rejection instead of guessing.
+        try:
+            body_text = (e.read() or b"").decode("utf-8", errors="replace")
+        except Exception:  # noqa: BLE001
+            body_text = ""
+        logger.warning("[hevy commit] %s rejected routine %s — body: %s", e.code, routine_id, body_text[:1000])
+        return mcp_error(
+            f"Hevy rejected the routine — HTTP {e.code}. Response body: {body_text[:1000] or '(empty)'}",
+            error_code="HEVY_BAD_REQUEST",
+        )
 
 
 def _action_list(args: dict[str, Any]) -> dict[str, Any]:
