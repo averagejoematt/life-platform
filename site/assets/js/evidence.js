@@ -174,6 +174,19 @@ function nutritionProteinAnnotation(n) {
   }
   return `<p class="tv-human nut-anno">${esc(txt)}</p>`;
 }
+// §2 lean-mass protein floor (P1.4) — grounds the abstract 190 g target in the real
+// g/kg-lean muscle-retention floor (needs Withings lean mass for the exact value).
+function nutritionProteinFloor(lm, target) {
+  if (!lm || lm.lean_mass_lb == null) return "";
+  const bits = [];
+  if (lm.target_g_per_kg_lean != null && target != null) {
+    bits.push(`The ${fmt(target)} g target is ${fmt(lm.target_g_per_kg_lean)} g per kg of ${fmt(lm.lean_mass_lb)} lb lean mass.`);
+  }
+  if (lm.floor_protein_g != null) {
+    bits.push(`The muscle-retention floor on a cut is ~${fmt(lm.floor_g_per_kg_lean)} g/kg lean — about ${fmt(lm.floor_protein_g)} g a day (Helms et al.).`);
+  }
+  return bits.length ? `<p class="rd-meta label">${esc(bits.join(" "))}</p>` : "";
+}
 async function renderNutrition(d) {
   // The API nests macros under d.nutrition (was read flat → blank); meal/protein field
   // names are frequency/food/avg_daily_g (were count/name/grams → empty tables).
@@ -210,7 +223,8 @@ async function renderNutrition(d) {
       nutritionLossRate(d && d.loss_rate)));
     parts.push(sec("Protein vs target",
       lineChart(trend, { valueKey: "protein_g", goal: n.protein_target_g || null, unit: "g", label: "Protein per day vs target", spine: true }) +
-      nutritionProteinAnnotation(n)));
+      nutritionProteinAnnotation(n) +
+      nutritionProteinFloor(d && d.lean_mass, n.protein_target_g)));
   }
   // Average macro split — by ENERGY (P0.5): protein·4 / carbs·4 / fat·9, not gram mass.
   // Gram-fraction badly understates fat (16% by mass ≈ 30% by calories).

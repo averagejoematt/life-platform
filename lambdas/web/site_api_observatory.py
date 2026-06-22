@@ -346,6 +346,26 @@ def handle_nutrition_overview() -> dict:
         "days_logged": len(items),
     }
 
+    # ── Lean mass (P1.4): from Withings body-comp → grounds the protein target as a
+    # g/kg-lean muscle-retention floor in §2 (Helms: ~2.3 g/kg FFM to retain muscle on a cut).
+    lean_mass = None
+    wt_items = _query_source("withings", _experiment_date(60), today)
+    lean_lb = None
+    for w in sorted(wt_items, key=lambda x: x.get("sk", ""), reverse=True):
+        if w.get("fat_free_mass_lbs") is not None:
+            lean_lb = float(w["fat_free_mass_lbs"])
+            break
+    if lean_lb is not None:
+        lean_kg = lean_lb * 0.453592
+        floor_gkg = 2.3
+        lean_mass = {
+            "lean_mass_lb": round(lean_lb, 1),
+            "lean_mass_kg": round(lean_kg, 1),
+            "target_g_per_kg_lean": round(protein_target / lean_kg, 2) if lean_kg else None,
+            "floor_g_per_kg_lean": floor_gkg,
+            "floor_protein_g": round(lean_kg * floor_gkg),
+        }
+
     return _ok(
         {
             "nutrition": {
@@ -372,6 +392,7 @@ def handle_nutrition_overview() -> dict:
             "loss_rate": loss_rate,
             "meal_rhythm": meal_rhythm,
             "electrolytes": electrolytes,
+            "lean_mass": lean_mass,
             "weekday_vs_weekend": weekday_vs_weekend,
             "eating_window": eating_window,
             "periodization": periodization,
