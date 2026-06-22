@@ -1,3 +1,21 @@
+## Nutrition evidence page redesign (P0→P2 + CGM) — 2026-06-21
+
+Rebuilt `/evidence/nutrition/` from a flat tile-board into one argued trajectory — "a deficit I can hold, hitting the protein to keep muscle, without quietly costing me anything." Per `docs/SPEC_NUTRITION_PAGE_REDESIGN_2026-06-21.md`; 20 commits, one per P-item. **Deployed live (build `8d342e15`); PR #193.**
+
+### Phase 0 — fixes + the spine (front-end + one API readout)
+§0 hero verdict (measuring-rule energy spine + two-voice) · lead with the 0% protein miss (ember-as-warning, never a "win" block) · kill the frozen protein-timing score · worst-first horizontal micronutrient **sufficiency bars** (value-labelled, no desktop/mobile clip, ember reserved for the worst offenders) · macro split recomputed on a **kcal basis** (fat ~30%, not 16% by mass) · honest empty states (no `Rest Day — Count 0` zero-rows) · per-day macro composition **stacked by energy** (refuses <4 pts) · the two signatures deployed (measuring-rule tick spine on both trend charts + a serif "what this means" annotation) · §1 loss-rate readout (target 3 lb/wk → required −1500 → actual → gap) with a deficit-intensity flag, rate + protein on one sightline.
+
+### Phase 1 — new-capture unlocks (API fields first)
+Per-meal timing+protein → §4 rhythm: eating-window ribbon (vs 16:8), protein time-of-day, avg protein/meal, and the **real** occasion-aware distribution score (revives the P0.3 placeholder) · sodium → §5 electrolyte honesty + the week-one "the drop is water" caveat (not a hydration ring) · daily hunger/energy not captured anywhere → honest "needs capture" empty state · Withings lean mass → the g/kg-lean muscle-retention protein floor in §2.
+
+### Phase 2 — cross-source layer (honesty + privacy gated)
+Standing self-grading weight prediction (bet + confidence band + verdict) · scale-vs-log **reconciliation** (projected-from-energy-balance vs actual Withings trend, two trajectories, gap annotated, **no Pearson**, gated ≥2 weeks overlap) · CGM × meals designed empty state. **Private-by-default, server-gated, flags OFF:** food-delivery off-protocol tell (`NUTRITION_DELIVERY_PUBLIC`, flip after confirm) + present-vs-PROVEN_BLUEPRINT (`NUTRITION_BLUEPRINT_PUBLIC`, never on — ADR-089). P2.4 deferred.
+
+### Server / data
+`lambdas/web/site_api_observatory.py::handle_nutrition_overview` emits the new computed objects (`loss_rate`, `meal_rhythm`, `electrolytes`, `lean_mass`, `projection`, `reconciliation`, `food_delivery`, `blueprint_benchmark`). **No DynamoDB schema change** — all derived from existing partitions. New chart-kit primitives in `site/assets/js/charts.js`. Verified via a local Playwright render harness (route-mocked API) before deploy.
+
+---
+
 ## HAE ingestion path — deep review + P0 activity-undercount fix — 2026-06-19
 
 Surgical review of the Health Auto Export path (`docs/reviews/HAE_PATH_REVIEW_2026-06-19.md`), triggered by Apple Health showing ~5,700 avg steps/wk vs ~2,960 stored.
