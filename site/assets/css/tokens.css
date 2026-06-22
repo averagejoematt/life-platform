@@ -336,6 +336,35 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .sbar-key { display: inline-flex; align-items: center; gap: var(--sp-1); }
 .sbar-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
 
+/* Hero energy spine (nutrition §0) — a horizontal measuring-rule 0→maintenance with
+   the intake + maintenance ticks and the deficit gap shaded. Reuses SIGNATURE 1. */
+.nut-hero { margin-top: var(--sp-4); }
+.spine-fig { margin-top: var(--sp-2); }
+.hspine { position: relative; height: 58px; margin: var(--sp-6) 0 var(--sp-3); }
+.hspine-rule { position: absolute; left: 0; right: 0; top: 34px; height: 7px;
+  background: repeating-linear-gradient(to right, var(--tick) 0 1px, transparent 1px var(--spine-tick-gap));
+  border-bottom: var(--spine-border); }
+.hspine-gap { position: absolute; top: 30px; height: 15px; background: var(--ember-wash);
+  border-left: 1px solid var(--ember); border-right: 1px dashed var(--ink-faint); }
+.hspine-gap-surplus { background: var(--surface-2, var(--surface)); border-left: 1px dashed var(--ink-faint); }
+.hspine-mark { position: absolute; top: 0; transform: translateX(-50%); display: flex;
+  flex-direction: column; align-items: center; gap: 2px; max-width: 6.5rem; }
+.hspine-mark::after { content: ""; width: 1px; height: 16px; background: var(--ink-muted); margin-top: 3px; }
+.hspine-intake { color: var(--ember); }
+.hspine-intake::after { background: var(--ember); height: 20px; }
+.hspine-v { font-size: var(--fs-data-lg); line-height: 1; }
+.hspine-k { color: var(--ink-faint); }
+
+/* Two-voice verdict (SIGNATURE 2) — mono states, serif judges. */
+.two-voice { margin-top: var(--sp-4); display: grid; gap: var(--sp-2);
+  border-left: 2px solid var(--ember); padding-left: var(--sp-4); }
+.tv-machine { font-family: var(--voice-machine-font); font-size: var(--voice-machine-size);
+  line-height: var(--voice-machine-lh); color: var(--voice-machine-ink); }
+.tv-mark { color: var(--voice-machine-mark); }
+.tv-human { font-family: var(--voice-human-font); font-style: var(--voice-human-style);
+  font-size: var(--voice-human-size); line-height: var(--voice-human-lh); color: var(--voice-human-ink);
+  max-width: var(--measure); }
+
 /* Correlation chips — strength by bar width, sign by direction word (correlative, N=1). */
 .corr-rows { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-3); }
 .corr-row { display: grid; grid-template-columns: minmax(0,1fr) 90px auto; align-items: center; gap: var(--sp-2); }

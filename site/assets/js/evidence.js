@@ -13,7 +13,7 @@
     window.__START_SLUG__ = "<slug>"
 */
 
-import { lineChart, barChart, dualWeight, stackedBar, correlationChip } from "/assets/js/charts.js";
+import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine } from "/assets/js/charts.js";
 
 const REG = window.__EVIDENCE_REGISTRY__ || [];
 const BYSLUG = Object.fromEntries(REG.map((t) => [t.slug, t]));
@@ -73,6 +73,50 @@ function renderSupplements(d) { const g = d.groups || {}; const head = figs([fig
 function renderLabs(d) { const L = d.labs || d; const bm = L.biomarkers || []; if (!bm.length) return empty("No bloodwork drawn yet — panels appear here as they're added."); const by = {}; for (const b of bm) (by[b.category || "Other"] ||= []).push(b); const secs = Object.entries(by).map(([cat, rows]) => sec(cat, `<table class="rd-tbl"><thead><tr><th>biomarker</th><th>value</th><th>reference</th><th>flag</th></tr></thead><tbody>${rows.map((b) => { const f = b.flag && String(b.flag).toLowerCase() !== "null"; return `<tr class="${f ? "rd-flag" : ""}"><td class="rd-name">${esc(b.name)}</td><td class="num">${esc(b.value)}${b.unit ? ` <span class="rd-unit">${esc(b.unit)}</span>` : ""}</td><td class="num rd-range">${esc(b.range || "—")}</td><td>${f ? `<span class="rd-flagmark">${esc(b.flag)}</span>` : ""}</td></tr>`; }).join("")}</tbody></table>`)).join(""); return figs([fig(L.total_draws ?? "—", "draws"), fig(bm.length, "biomarkers"), fig(L.flagged_count ?? 0, "flagged"), L.latest_draw_date && fig(L.latest_draw_date, "latest draw")]) + secs + note("Reference ranges are lab-provided; flags mark out-of-range."); }
 async function renderPhysical(d) { const x = d.latest_dexa; if (!x) return empty("No DEXA scan on file yet — body-composition detail appears here after your next scan."); const bc = x.body_composition || {}, s = x.score_360 || {}, idx = x.indices || {}, bone = x.bone || {}, sf = x.segmental_fat || {}, sl = x.segmental_lean || {}; const wp = await tryJSON("/api/weight_progress"); const wj = await tryJSON("/api/journey"); const chart = sec("Weight trajectory", lineChart((wp && wp.weight_progress) || [], { valueKey: "weight_lbs", goal: wj && wj.journey && wj.journey.goal_weight_lbs, unit: " lb", label: "Weight · recent readings", emptyMsg: "Weight trajectory fills as weigh-ins accrue." })); return chart + figs([bc.body_fat_pct != null && fig(fmt(bc.body_fat_pct, 1) + "%", "body fat"), bc.lean_mass_lb != null && fig(dualWeight(bc.lean_mass_lb, "lb"), "lean mass"), bc.visceral_fat_lb != null && fig(dualWeight(bc.visceral_fat_lb, "lb"), "visceral fat"), s.biological_age != null && fig(fmt(s.biological_age, 1), "biological age")]) + sec("Composition", kvtable(bc)) + sec("Indices (ALMI / FFMI / FMI)", kvtable(idx)) + sec("Bone density", kvtable(bone)) + (Object.keys(sf).length ? sec("Segmental fat %", kvtable(sf)) : "") + (Object.keys(sl).length ? sec("Segmental lean", kvtable(sl)) : "") + note(`DEXA scan${x.scan_date ? ` · ${esc(x.scan_date)}` : ""}.`); }
 async function renderTraining(d) { const t = d.training || {}; const [str, wk, wo] = await Promise.all([tryJSON("/api/strength_benchmarks"), tryJSON("/api/weekly_physical_summary"), tryJSON("/api/workouts")]); const head = figs([fig(t.workouts_30d ?? "—", "workouts · 30d"), fig(t.weekly_avg ?? "—", "weekly avg"), t.z2_pct != null && fig(t.z2_pct + "%", "zone-2 target"), t.avg_strain != null && fig(fmt(t.avg_strain, 1), "avg strain"), t.strength_sessions_30d != null && fig(t.strength_sessions_30d, "strength · 30d"), d.walking && d.walking.avg_daily_steps != null && fig(fmt(d.walking.avg_daily_steps), "avg daily steps")]); const lifts = (str && str.benchmarks) || []; const strSec = lifts.length ? sec("Strength — estimated 1RM", `<table class="rd-tbl"><thead><tr><th>lift</th><th>current</th><th>target</th><th>progress</th></tr></thead><tbody>${lifts.map((l) => `<tr><td class="rd-name">${esc(ttl(l.lift))}</td><td class="num">${dualWeight(l.current_1rm, "lb")}</td><td class="num rd-range">${dualWeight(l.target, "lb")}</td><td class="num">${l.exceeded ? "✓ goal met" : l.progress_pct != null ? fmt(l.progress_pct) + "%" : "—"}</td></tr>`).join("")}</tbody></table>`) : ""; const days = (wk && wk.days) || []; const wkSec = days.length ? sec("This week — daily movement", `<table class="rd-tbl"><thead><tr><th>day</th><th>steps</th><th>active min</th></tr></thead><tbody>${days.map((x) => `<tr><td class="rd-name">${esc(x.day_of_week || x.date)}</td><td class="num">${fmt(x.steps)}</td><td class="num">${fmt(x.total_active_minutes)}</td></tr>`).join("")}</tbody></table>`) : ""; const stepsChart = days.length ? sec("Steps this week", barChart(days, { valueKey: "steps", labelKey: "day_of_week", label: "Daily steps" })) : ""; const cardio = d.cardio_sessions || []; const _km = (mi) => (mi != null ? (mi * 1.60934).toFixed(1) : null); const sessSec = cardio.length ? sec("Recent cardio", `<table class="rd-tbl"><thead><tr><th>date</th><th>activity</th><th>distance</th><th>min</th><th>avg HR</th></tr></thead><tbody>${cardio.slice(0, 20).map((w) => `<tr><td class="rd-name">${esc(String(w.date || "").slice(0, 10))}</td><td>${esc(ttl(w.sport || "—"))}</td><td class="num rd-range">${w.distance_mi != null ? `${fmt(w.distance_mi, 1)} mi · ${_km(w.distance_mi)} km` : "—"}</td><td class="num">${fmt(w.minutes)}</td><td class="num">${fmt(w.avg_hr)}</td></tr>`).join("")}</tbody></table>`) : ""; const log = (wo && wo.workouts) || []; const logSec = log.length ? sec("Strength log — per-exercise sets", log.slice(0, 12).map((w) => `<details class="wlog"><summary class="wlog-sum"><span class="wlog-t">${esc(w.title || w.date)}</span><span class="wlog-m label">${[w.date, w.exercise_count != null && Math.round(w.exercise_count) + " exercises", w.total_volume_kg != null && dualWeight(w.total_volume_kg, "kg")].filter(Boolean).map(esc).join("  ·  ")}</span></summary>${(w.exercises || []).map((e) => `<div class="wlog-ex"><p class="wlog-ex-n">${esc(e.name)}</p><table class="rd-tbl"><tbody>${(e.sets || []).map((s, i) => `<tr><td class="rd-name">${esc(s.type && s.type.toLowerCase() !== "normal" ? s.type : "set")} ${i + 1}</td><td class="num">${s.reps != null ? fmt(s.reps) + " reps" : "—"}</td><td class="num rd-range">${s.weight_kg != null ? dualWeight(s.weight_kg, "kg") : (s.distance_m != null ? fmt(s.distance_m) + " m" : "—")}</td></tr>`).join("")}</tbody></table></div>`).join("")}</details>`).join("")) : ""; if (!head.includes("fig-v") && !strSec && !wkSec && !sessSec && !logSec) return empty("No training logged yet — workouts, Zone-2, and strength benchmarks appear here as sessions accrue."); return head + logSec + sessSec + stepsChart + strSec + wkSec + note("Correlative — training load vs the body's response. Per-exercise sets from Hevy; per-session strain & zones from Whoop."); }
+// The §0 verdict (P0.1): mono states the figures, serif judges the trade. Computed
+// only from protein_hit_pct + avg_deficit — no fabricated mechanism, just the honest read.
+function nutritionVerdict(n) {
+  const hasDef = n.avg_deficit != null && Number.isFinite(Number(n.avg_deficit));
+  const hasHit = n.protein_hit_pct != null && Number.isFinite(Number(n.protein_hit_pct));
+  if (!hasDef && !hasHit) return null;
+  const d = Number(n.avg_deficit), h = Number(n.protein_hit_pct);
+  const machine = [
+    n.avg_calories != null ? `${fmt(n.avg_calories)} in` : null,
+    n.tdee != null ? `${fmt(n.tdee)} maintenance` : null,
+    hasDef ? `${d >= 0 ? "−" : "+"}${fmt(Math.abs(Math.round(d)))} kcal/day` : null,
+    hasHit ? `protein hit ${fmt(h)}%` : null,
+  ].filter(Boolean).join(" · ");
+  const realDeficit = hasDef && d >= 250;
+  let human;
+  if (!hasDef) {
+    human = h === 0 ? "Protein's under target every logged day — the floor isn't being cleared yet."
+      : `Protein clears the floor about ${fmt(h)}% of days. An expenditure read is needed before the deficit half of the story lands.`;
+  } else if (!realDeficit) {
+    human = "No real deficit on the logged days — this reads closer to maintenance than a cut right now.";
+  } else if (!hasHit || h === 0) {
+    human = "The deficit's real. The protein's missing every logged day — that's the trade you're making.";
+  } else if (h < 50) {
+    human = "The deficit's real, but the protein lands under target most days — some of the cut is coming out of muscle, not just fat.";
+  } else if (h < 100) {
+    human = "The deficit's real and the protein mostly holds — the days it slips are the ones to watch.";
+  } else {
+    human = "The deficit's real and the protein clears the floor every day — the cut's coming off the right places.";
+  }
+  return { machine, human };
+}
+// §0 Hero — one measuring-rule spine (0→maintenance, intake + maintenance ticks,
+// deficit gap shaded) + the two-voice verdict. Replaces the old neutral big-number tiles;
+// calories / TDEE / deficit fold in here.
+function nutritionHero(n) {
+  if (n.avg_calories == null && n.tdee == null && n.avg_deficit == null && n.protein_hit_pct == null) return "";
+  const spine = (n.avg_calories != null && n.tdee != null)
+    ? intakeSpine(n.avg_calories, n.tdee, { label: "30-day average intake vs estimated maintenance" })
+    : "";
+  const v = nutritionVerdict(n);
+  const voice = v ? `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(v.machine)}</p><p class="tv-human">${esc(v.human)}</p></div>` : "";
+  if (!spine && !voice) return "";
+  return `<section class="rd-sec nut-hero">${spine}${voice}</section>`;
+}
 async function renderNutrition(d) {
   // The API nests macros under d.nutrition (was read flat → blank); meal/protein field
   // names are frequency/food/avg_daily_g (were count/name/grams → empty tables).
@@ -81,13 +125,19 @@ async function renderNutrition(d) {
   const meals = (fm && fm.meals) || [];
   const prot = (ps && (ps.protein_sources || ps.sources || ps.proteins)) || [];
   const parts = [];
+  // ── §0 Hero — the verdict (P0.1). Folds calories/TDEE/deficit out of the tile row.
+  const hero = nutritionHero(n);
+  if (hero) parts.push(hero);
+  // The one latest-day figure kept as "news".
+  const news = figs([
+    n.latest_calories != null && fig(fmt(n.latest_calories), `latest logged${n.latest_date ? " · " + fmtShort(n.latest_date) : ""}`),
+    n.latest_protein_g != null && fig(fmt(n.latest_protein_g) + "g", "protein that day"),
+  ]);
+  if (news.includes("fig-v")) parts.push(news);
   const head = figs([
-    n.avg_calories != null && fig(fmt(n.avg_calories), "avg calories"),
     n.avg_protein_g != null && fig(fmt(n.avg_protein_g) + "g", "avg protein"),
     n.avg_carbs_g != null && fig(fmt(n.avg_carbs_g) + "g", "avg carbs"),
     n.avg_fat_g != null && fig(fmt(n.avg_fat_g) + "g", "avg fat"),
-    n.avg_deficit != null && fig(fmt(n.avg_deficit), "avg deficit"),
-    n.tdee != null && fig(fmt(n.tdee), "est. TDEE"),
     n.protein_hit_pct != null && fig(fmt(n.protein_hit_pct) + "%", "protein target hit"),
   ]);
   if (head.includes("fig-v")) parts.push(head);

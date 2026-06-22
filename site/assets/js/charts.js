@@ -88,6 +88,29 @@ export function stackedBar(segments, { label = "", unit = "g" } = {}) {
   return `<figure class="chart"><div class="sbar" role="img" aria-label="${escAttr(label)}">${bar}</div><figcaption class="chart-cap label sbar-legend">${legend}</figcaption></figure>`;
 }
 
+// Measuring-rule energy spine (SIGNATURE 1) — a horizontal 0→maintenance rule with
+// the intake tick and the maintenance tick, the gap between them shaded = the deficit.
+// The page's central claim drawn once. Ember marks intake ("on protocol"); muted ink is
+// the maintenance reference. Never red. Honest empty when either figure is missing.
+export function intakeSpine(intake, tdee, { label = "" } = {}) {
+  const inK = Number(intake), td = Number(tdee);
+  if (!Number.isFinite(inK) || !Number.isFinite(td) || td <= 0) {
+    return `<figure class="chart chart--empty"><figcaption class="chart-cap label">The energy spine fills in once both intake and an expenditure estimate are logged.</figcaption></figure>`;
+  }
+  const max = Math.max(td, inK) * 1.04;
+  const pos = (v) => Math.max(0, Math.min(100, (v / max) * 100));
+  const deficit = Math.round(td - inK);
+  const lo = Math.min(inK, td), hi = Math.max(inK, td);
+  const gapCls = inK <= td ? "hspine-gap-deficit" : "hspine-gap-surplus";
+  const aria = `Average intake ${Math.round(inK)} kcal against an estimated maintenance of ${Math.round(td)} kcal — a ${Math.abs(deficit)} kcal ${deficit >= 0 ? "deficit" : "surplus"} a day.`;
+  return `<figure class="chart spine-fig"><div class="hspine" role="img" aria-label="${escAttr(aria)}">` +
+    `<div class="hspine-rule"></div>` +
+    `<div class="hspine-gap ${gapCls}" style="left:${pos(lo).toFixed(1)}%;width:${(pos(hi) - pos(lo)).toFixed(1)}%"></div>` +
+    `<div class="hspine-mark hspine-intake" style="left:${pos(inK).toFixed(1)}%"><span class="hspine-v mono">${Math.round(inK)}</span><span class="hspine-k label">intake</span></div>` +
+    `<div class="hspine-mark hspine-tdee" style="left:${pos(td).toFixed(1)}%"><span class="hspine-v mono">${Math.round(td)}</span><span class="hspine-k label">maintenance</span></div>` +
+    `</div><figcaption class="chart-cap label">${escAttr(label)}${deficit >= 0 ? ` · ${Math.abs(deficit)} kcal/day deficit (shaded)` : ` · ${Math.abs(deficit)} kcal/day surplus`}</figcaption></figure>`;
+}
+
 // Correlation chips — top habit/factor ↔ outcome Pearson r, correlative-framed (never
 // causal, N=1). items: [{label, r, n}]. Strength shown by bar width; sign by direction
 // word. Reuses the honesty vocabulary; ember for positive pull, muted ink for inverse.
