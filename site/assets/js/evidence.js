@@ -288,6 +288,23 @@ async function renderNutrition(d) {
       figs([mn.avg_pct != null && fig(fmt(mn.avg_pct) + "%", "micronutrient avg")]) +
       (items.length ? sufficiencyBars(items, { label: "Sufficiency vs daily target" }) : "")));
   }
+  // §5 — Hydration & electrolytes (P1.2): sodium + potassium framed as the water-weight
+  // honesty check on a cut (NOT a bare hydration ring). Week-one "the drop is water" caveat.
+  const el = (d && d.electrolytes) || {};
+  if (el.avg_sodium_mg != null) {
+    const sod = el.avg_sodium_mg;
+    const sodNote = sod < el.sodium_ref_low
+      ? "below the 1.5–2.3 g range — low sodium on a cut can worsen cramps and lightheadedness"
+      : sod > el.sodium_ref_high
+        ? "above the 1.5–2.3 g range — more water retention, a higher scale reading"
+        : "inside the 1.5–2.3 g range";
+    const wk1 = (el.days_logged != null && el.days_logged < 14)
+      ? `<p class="tv-human nut-anno">It's week one — the early scale drop is mostly water, not fat: sodium and glycogen swings move the number by pounds. Sodium here is the honesty check on that, not a hydration vanity score.</p>`
+      : "";
+    parts.push(sec("Hydration & electrolytes — the water-weight honesty check",
+      figs([fig(fmt(sod), "avg sodium mg"), el.potassium_pct != null && fig(fmt(el.potassium_pct) + "%", "potassium vs target")]) +
+      `<p class="rd-meta label">Sodium ${esc(sodNote)}. Potassium sufficiency is in Micronutrients above.</p>` + wk1));
+  }
   if (meals.length)
     parts.push(
       sec(

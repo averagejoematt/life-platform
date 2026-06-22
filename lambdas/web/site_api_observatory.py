@@ -333,6 +333,19 @@ def handle_nutrition_overview() -> dict:
         "days_with_meal_times": len(per_day_window),
     }
 
+    # ── Electrolytes (P1.2): sodium (raw total — ingested but NOT in the sufficiency map,
+    # since it's a range not a "more is better" nutrient) + potassium, framed as the
+    # water-weight honesty check on a cut. NOT a bare hydration ring (off-brand, out of scope).
+    sodium_vals = [float(i["total_sodium_mg"]) for i in items if i.get("total_sodium_mg") is not None]
+    _pot = ((latest or {}).get("micronutrient_sufficiency") or {}).get("potassium_mg") or {}
+    electrolytes = {
+        "avg_sodium_mg": round(sum(sodium_vals) / len(sodium_vals)) if sodium_vals else None,
+        "sodium_ref_low": 1500,
+        "sodium_ref_high": 2300,
+        "potassium_pct": _pot.get("pct"),
+        "days_logged": len(items),
+    }
+
     return _ok(
         {
             "nutrition": {
@@ -358,6 +371,7 @@ def handle_nutrition_overview() -> dict:
             "nutrition_trend": trend,
             "loss_rate": loss_rate,
             "meal_rhythm": meal_rhythm,
+            "electrolytes": electrolytes,
             "weekday_vs_weekend": weekday_vs_weekend,
             "eating_window": eating_window,
             "periodization": periodization,
