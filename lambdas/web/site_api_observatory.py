@@ -464,6 +464,22 @@ def handle_nutrition_overview() -> dict:
             "avg_deficit_home": round(sum(home_def) / len(home_def)) if home_def else None,
         }
 
+    # ── Present-vs-PROVEN_BLUEPRINT benchmark (P2.5, NEVER public — flag stays OFF). The
+    # blueprint (BENCH-1 training_reference) is hard-private per ADR-089; with the flag off
+    # (default) it is never queried and nothing blueprint-derived enters the response.
+    blueprint_benchmark = None
+    if _BLUEPRINT_PUBLIC:
+        tr = _query_source("training_reference", "2010-01-01", today)
+        latest_tr = sorted(tr, key=lambda x: x.get("sk", ""))[-1] if tr else None
+        if latest_tr:
+            blueprint_benchmark = {
+                "public": True,
+                "confidence": latest_tr.get("confidence"),
+                "current_avg_protein_g": round(sum(pro_vals) / len(pro_vals), 1) if pro_vals else None,
+                "protein_target_g": protein_target,
+                "note": "present protein vs the proven loss-period blueprint",
+            }
+
     return _ok(
         {
             "nutrition": {
@@ -494,6 +510,7 @@ def handle_nutrition_overview() -> dict:
             "projection": projection,
             "reconciliation": reconciliation,
             "food_delivery": food_delivery,
+            "blueprint_benchmark": blueprint_benchmark,
             "weekday_vs_weekend": weekday_vs_weekend,
             "eating_window": eating_window,
             "periodization": periodization,

@@ -284,6 +284,14 @@ async function renderNutrition(d) {
       ]) +
       `<p class="rd-meta label">Delivery days vs home-cooked days, by average deficit — data, not a verdict. <span class="confidence conf-low">private signal</span></p>`));
   }
+  // §3.4 — present-vs-PROVEN_BLUEPRINT (P2.5, NEVER public). Only renders if the server opts
+  // it in (blueprint flag stays OFF → field absent → never shows on the public page).
+  const bp = d && d.blueprint_benchmark;
+  if (bp && bp.public) {
+    parts.push(sec("Present vs the proven blueprint",
+      figs([bp.current_avg_protein_g != null && fig(fmt(bp.current_avg_protein_g) + "g", "protein now"), bp.protein_target_g != null && fig(fmt(bp.protein_target_g) + "g", "target")]) +
+      `<p class="rd-meta label">Present protocol vs the proven loss-period blueprint. <span class="confidence conf-low">private — blueprint</span></p>`));
+  }
   // Average macro split — by ENERGY (P0.5): protein·4 / carbs·4 / fat·9, not gram mass.
   // Gram-fraction badly understates fat (16% by mass ≈ 30% by calories).
   const _kcal = (g, mult) => (g != null ? Math.round(Number(g) * mult) : 0);
