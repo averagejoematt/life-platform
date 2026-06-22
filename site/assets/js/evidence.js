@@ -180,10 +180,30 @@ async function renderNutrition(d) {
       { label: `Fat ${fmt(n.avg_fat_g)}g`, value: fK, tone: "faint" },
     ], { label: "Share of calories (protein·4 / carbs·4 / fat·9)", unit: " kcal" })));
   }
-  // Calorie cycling (training vs rest day) + eating window — single-value reads, high signal.
-  if (d && d.periodization && Object.keys(d.periodization).length) parts.push(sec("Training-day vs rest-day", kvtable(d.periodization)));
+  // P0.6 — suppress empty scaffold. These comparisons render honest "needs more days"
+  // states instead of zero-rows (no "Rest Day — Count 0" / "Weekend — Days 0").
+  const DAYS = Number(n.days_logged) || 0;
+  const TWO_WEEKS = 14;
+  // Calorie cycling — only when BOTH training and rest days have logged data.
+  const pz = (d && d.periodization) || {};
+  const tdN = (pz.training_day && pz.training_day.count) || 0;
+  const rdN = (pz.rest_day && pz.rest_day.count) || 0;
+  if (tdN > 0 && rdN > 0) {
+    parts.push(sec("Training-day vs rest-day", kvtable({ training_day: pz.training_day, rest_day: pz.rest_day })));
+  } else if (tdN > 0 || rdN > 0) {
+    parts.push(sec("Training-day vs rest-day", empty("Calorie cycling fills in once there are both training days and rest days logged — only one kind has data so far.")));
+  }
+  // Eating window — the average window is a real single-value read even early.
   if (d && d.eating_window && Object.keys(d.eating_window).length) parts.push(sec("Eating window", kvtable(d.eating_window)));
-  if (d && d.weekday_vs_weekend && Object.keys(d.weekday_vs_weekend).length) parts.push(sec("Weekday vs weekend", kvtable(d.weekday_vs_weekend)));
+  // Weekday vs weekend — a real split needs ~2 weeks; below that it's noise, not signal.
+  const ww = (d && d.weekday_vs_weekend) || {};
+  const wdN = (ww.weekday && ww.weekday.days) || 0;
+  const weN = (ww.weekend && ww.weekend.days) || 0;
+  if (DAYS >= TWO_WEEKS && wdN > 0 && weN > 0) {
+    parts.push(sec("Weekday vs weekend", kvtable(ww)));
+  } else if (wdN > 0 || weN > 0) {
+    parts.push(sec("Weekday vs weekend", empty(`The weekday/weekend split fills in at 2+ weeks of logging — ${DAYS} day${DAYS === 1 ? "" : "s"} so far.`)));
+  }
   // Micronutrient sufficiency + protein-distribution score — beyond macros, the part almost
   // no transformation site shows (reverse-QA: rich in the data, surfaced nowhere).
   const mn = (d && d.micronutrients) || {};
