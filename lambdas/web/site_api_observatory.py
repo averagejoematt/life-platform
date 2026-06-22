@@ -287,6 +287,52 @@ def handle_nutrition_overview() -> dict:
         "protein_hit_pct": protein_hit_pct,
     }
 
+    # ── Meal rhythm (P1.1): per-meal timing + protein, from food_log entries (each entry
+    # carries time + protein_g + calories_kcal). Powers §4 (eating-window ribbon + meal-
+    # time-of-day distribution) and §2 (real avg-protein/meal + the legitimate distribution
+    # score the ingestion already computes occasion-aware, reviving the P0.3 placeholder).
+    def _tmin(t):
+        try:
+            p = str(t).split(":")
+            return int(p[0]) * 60 + int(p[1])
+        except (ValueError, IndexError, AttributeError):
+            return None
+
+    per_day_window = []
+    bucket_protein, bucket_cal = {}, {}
+    total_meals_sum = 0
+    pds_vals = []
+    for i in items:
+        d = i.get("date") or i.get("sk", "").replace("DATE#", "")
+        times = []
+        for e in i.get("food_log") or []:
+            mins = _tmin(e.get("time"))
+            if mins is None:
+                continue
+            times.append(mins)
+            b = (mins // 120) * 2  # 2-hour bucket start hour
+            bucket_protein[b] = bucket_protein.get(b, 0.0) + float(e.get("protein_g") or 0)
+            bucket_cal[b] = bucket_cal.get(b, 0.0) + float(e.get("calories_kcal") or 0)
+        if len(times) >= 2:
+            per_day_window.append({"date": d, "first_min": min(times), "last_min": max(times)})
+        if i.get("total_meals"):
+            total_meals_sum += int(i["total_meals"])
+        if i.get("protein_distribution_score") is not None:
+            pds_vals.append(float(i["protein_distribution_score"]))
+
+    total_protein_window = sum(pro_vals) if pro_vals else 0
+    meal_rhythm = {
+        "avg_protein_per_meal": round(total_protein_window / total_meals_sum, 1) if total_meals_sum else None,
+        "protein_distribution_score": round(sum(pds_vals) / len(pds_vals)) if pds_vals else None,
+        "per_day_window": per_day_window[-14:],  # last 2 weeks for the ribbon
+        "time_distribution": [
+            {"hour": h, "protein_g": round(bucket_protein[h], 1), "calories": round(bucket_cal.get(h, 0))}
+            for h in sorted(bucket_protein)
+        ],
+        "reference_window_hrs": 8,  # the 16:8 reference (8h eating window)
+        "days_with_meal_times": len(per_day_window),
+    }
+
     return _ok(
         {
             "nutrition": {
@@ -311,6 +357,7 @@ def handle_nutrition_overview() -> dict:
             },
             "nutrition_trend": trend,
             "loss_rate": loss_rate,
+            "meal_rhythm": meal_rhythm,
             "weekday_vs_weekend": weekday_vs_weekend,
             "eating_window": eating_window,
             "periodization": periodization,

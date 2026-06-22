@@ -422,6 +422,16 @@ a { color: inherit; text-underline-offset: 0.18em; }
   font-size: var(--voice-human-size); line-height: var(--voice-human-lh); color: var(--voice-human-ink);
   max-width: var(--measure); }
 
+/* Eating-window ribbon (nutrition §4, P1.1) — ember = actual window, faint = 16:8 ref. */
+.ewin-rows { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-2); }
+.ewin-row { display: grid; grid-template-columns: minmax(3rem, 4rem) 1fr auto; align-items: center; gap: var(--sp-2) var(--sp-3); }
+.ewin-day { color: var(--ink-muted); white-space: nowrap; }
+.ewin-track { position: relative; height: 12px; border-radius: 3px; background: var(--surface-2, var(--surface)); }
+.ewin-ref { position: absolute; top: 0; height: 100%; background: var(--ink-faint); opacity: 0.35; border-radius: 3px; }
+.ewin-bar { position: absolute; top: 0; height: 100%; background: var(--ember); border-radius: 3px; }
+.ewin-v { color: var(--ink-faint); white-space: nowrap; font-size: var(--fs-label, 0.78rem); }
+@media (max-width: 560px) { .ewin-v { font-size: 0.6rem; } .ewin-row { grid-template-columns: minmax(2.5rem, 3.5rem) 1fr auto; } }
+
 /* Per-day macro composition columns by energy (nutrition §3, P0.7) — ember = protein
    (the floor), muted inks for carbs/fat. Refuses < 4 points in the chart kit. */
 .scols { display: flex; align-items: flex-end; gap: 4px; height: 150px; margin-top: var(--sp-3); }

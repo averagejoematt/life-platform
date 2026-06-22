@@ -13,7 +13,7 @@
     window.__START_SLUG__ = "<slug>"
 */
 
-import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns } from "/assets/js/charts.js";
+import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon } from "/assets/js/charts.js";
 
 const REG = window.__EVIDENCE_REGISTRY__ || [];
 const BYSLUG = Object.fromEntries(REG.map((t) => [t.slug, t]));
@@ -243,8 +243,23 @@ async function renderNutrition(d) {
   } else if (tdN > 0 || rdN > 0) {
     parts.push(sec("Training-day vs rest-day", empty("Calorie cycling fills in once there are both training days and rest days logged — only one kind has data so far.")));
   }
-  // Eating window — the average window is a real single-value read even early.
-  if (d && d.eating_window && Object.keys(d.eating_window).length) parts.push(sec("Eating window", kvtable(d.eating_window)));
+  // §4 Rhythm — fasting & meal timing (P1.1). Average window + real avg-protein/meal +
+  // the (now legitimate) per-meal distribution score + the per-day eating-window ribbon +
+  // meal-time-of-day distribution. All from food_log per-entry time + protein.
+  const ew = (d && d.eating_window) || {};
+  const mr = (d && d.meal_rhythm) || {};
+  const hourLbl = (h) => { const ap = h < 12 ? "a" : "p"; const hh = h % 12 === 0 ? 12 : h % 12; return `${hh}${ap}`; };
+  const tdist = (mr.time_distribution || []).map((t) => ({ label: hourLbl(t.hour), value: t.protein_g }));
+  const rhythmFigs = figs([
+    ew.avg_hours != null && fig(fmt(ew.avg_hours) + "h", `avg window${ew.avg_first_meal ? ` · ${ew.avg_first_meal}–${ew.avg_last_meal}` : ""}`),
+    mr.avg_protein_per_meal != null && fig(fmt(mr.avg_protein_per_meal) + "g", "avg protein / meal"),
+    mr.protein_distribution_score != null && fig(fmt(mr.protein_distribution_score) + "%", "meals ≥30g protein"),
+  ]);
+  const ribbon = (mr.per_day_window && mr.per_day_window.length) ? mealWindowRibbon(mr.per_day_window, { refHours: mr.reference_window_hrs || 8, label: "Eating window · per day vs 16:8" }) : "";
+  const tdistChart = tdist.length ? sec("When protein lands across the day", barChart(tdist, { valueKey: "value", labelKey: "label", label: "Protein by time of day (g · 2h buckets)" })) : "";
+  if (rhythmFigs.includes("fig-v") || ribbon || tdistChart) {
+    parts.push(sec("Rhythm — fasting & meal timing", (rhythmFigs.includes("fig-v") ? rhythmFigs : "") + ribbon + tdistChart));
+  }
   // Weekday vs weekend — a real split needs ~2 weeks; below that it's noise, not signal.
   const ww = (d && d.weekday_vs_weekend) || {};
   const wdN = (ww.weekday && ww.weekday.days) || 0;
@@ -271,8 +286,7 @@ async function renderNutrition(d) {
     });
     parts.push(sec("Micronutrients — what the food is short on",
       figs([mn.avg_pct != null && fig(fmt(mn.avg_pct) + "%", "micronutrient avg")]) +
-      (items.length ? sufficiencyBars(items, { label: "Sufficiency vs daily target" }) : "") +
-      `<p class="rd-meta label">Protein timing — not yet measured (needs per-meal timestamps).</p>`));
+      (items.length ? sufficiencyBars(items, { label: "Sufficiency vs daily target" }) : "")));
   }
   if (meals.length)
     parts.push(

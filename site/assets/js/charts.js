@@ -157,6 +157,30 @@ export function intakeSpine(intake, tdee, { label = "" } = {}) {
     `</div><figcaption class="chart-cap label">${escAttr(label)}${deficit >= 0 ? ` · ${Math.abs(deficit)} kcal/day deficit (shaded)` : ` · ${Math.abs(deficit)} kcal/day surplus`}</figcaption></figure>`;
 }
 
+// Eating-window ribbon (nutrition §4) — per-day first→last meal on a 5am→midnight axis,
+// ember = the actual window, a faint bar = the 16:8 reference (an 8h window from the first
+// meal). Reveals at a glance whether the day runs tighter or wider than 16:8. days:
+// [{date, first_min, last_min}] (minutes from midnight).
+export function mealWindowRibbon(days, { refHours = 8, label = "" } = {}) {
+  const rows = (days || []).filter((d) => Number.isFinite(Number(d.first_min)) && Number.isFinite(Number(d.last_min)));
+  if (!rows.length) return `<figure class="chart chart--empty"><figcaption class="chart-cap label">The eating-window ribbon fills in once meals are logged with times.</figcaption></figure>`;
+  const AX_START = 5 * 60, AX_END = 24 * 60, SPAN = AX_END - AX_START;
+  const pos = (m) => Math.max(0, Math.min(100, ((m - AX_START) / SPAN) * 100));
+  const fmtT = (m) => `${Math.floor(m / 60)}:${String(Math.round(m % 60)).padStart(2, "0")}`;
+  const refW = Math.min(100, (refHours * 60 / SPAN) * 100);
+  const row = (d) => {
+    const l = pos(d.first_min), w = Math.max(1.5, pos(d.last_min) - pos(d.first_min));
+    const hrs = ((d.last_min - d.first_min) / 60).toFixed(1);
+    return `<div class="ewin-row"><span class="ewin-day label">${escAttr(_shortDate(d.date))}</span>` +
+      `<span class="ewin-track"><span class="ewin-ref" style="left:${l.toFixed(1)}%;width:${refW.toFixed(1)}%"></span>` +
+      `<span class="ewin-bar" style="left:${l.toFixed(1)}%;width:${w.toFixed(1)}%"></span></span>` +
+      `<span class="ewin-v mono">${fmtT(d.first_min)}–${fmtT(d.last_min)} · ${hrs}h</span></div>`;
+  };
+  return `<figure class="chart ewin">${label ? `<p class="suf-head label">${escAttr(label)}</p>` : ""}` +
+    `<div class="ewin-rows">${rows.map(row).join("")}</div>` +
+    `<figcaption class="chart-cap label">5am → midnight · ember = your window · faint = an ${refHours}h (16:8) reference from the first meal.</figcaption></figure>`;
+}
+
 // Per-day stacked composition columns BY ENERGY (protein·4 / carbs·4 / fat·9). Each
 // column = one day's calories segmented by macro — reveals whether the cut comes out of
 // carbs/fat while protein holds. Refuses < 4 points (honest, like lineChart). Ember =
