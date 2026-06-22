@@ -169,13 +169,16 @@ async function renderNutrition(d) {
     parts.push(sec("Daily intake vs TDEE", lineChart(trend, { valueKey: "calories", goal: n.tdee || null, unit: " kcal", label: "Calories vs maintenance", emptyMsg: "The calorie trend fills as days are logged." })));
     parts.push(sec("Protein vs target", lineChart(trend, { valueKey: "protein_g", goal: n.protein_target_g || null, unit: "g", label: "Protein per day vs target" })));
   }
-  // Average macro split (the carbs/fat the page computed but never showed).
-  if (n.avg_protein_g != null || n.avg_carbs_g != null || n.avg_fat_g != null) {
-    parts.push(sec("Average macro split", stackedBar([
-      { label: "Protein", value: n.avg_protein_g, tone: "ember" },
-      { label: "Carbs", value: n.avg_carbs_g, tone: "ink" },
-      { label: "Fat", value: n.avg_fat_g, tone: "faint" },
-    ], { label: "Average grams/day", unit: "g" })));
+  // Average macro split — by ENERGY (P0.5): protein·4 / carbs·4 / fat·9, not gram mass.
+  // Gram-fraction badly understates fat (16% by mass ≈ 30% by calories).
+  const _kcal = (g, mult) => (g != null ? Math.round(Number(g) * mult) : 0);
+  const pK = _kcal(n.avg_protein_g, 4), cK = _kcal(n.avg_carbs_g, 4), fK = _kcal(n.avg_fat_g, 9);
+  if (pK || cK || fK) {
+    parts.push(sec("Average macro split — by energy", stackedBar([
+      { label: `Protein ${fmt(n.avg_protein_g)}g`, value: pK, tone: "ember" },
+      { label: `Carbs ${fmt(n.avg_carbs_g)}g`, value: cK, tone: "ink" },
+      { label: `Fat ${fmt(n.avg_fat_g)}g`, value: fK, tone: "faint" },
+    ], { label: "Share of calories (protein·4 / carbs·4 / fat·9)", unit: " kcal" })));
   }
   // Calorie cycling (training vs rest day) + eating window — single-value reads, high signal.
   if (d && d.periodization && Object.keys(d.periodization).length) parts.push(sec("Training-day vs rest-day", kvtable(d.periodization)));
