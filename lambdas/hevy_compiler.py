@@ -29,8 +29,67 @@ class MovementUnmappable(Exception):
     """Raised when a movement_key has no Hevy template_id and no resolver path."""
 
 
+# Hevy's accepted set-type enum. Verified against 765 live sets (only normal/
+# warmup ever observed) + the API docs. We historically authored "drop" — which
+# Hevy 400-rejects (WORKORDER_HEVY_COMMIT_HARDENING, 2026-06-21) — and other
+# aliases, so the wire boundary is the single place that normalizes them.
+HEVY_SET_TYPES = ("normal", "warmup", "failure", "dropset")
+_SET_TYPE_ALIASES = {
+    "normal": "normal",
+    "working": "normal",
+    "work": "normal",
+    "straight": "normal",
+    "warmup": "warmup",
+    "warm": "warmup",
+    "warm-up": "warmup",
+    "warm_up": "warmup",
+    "failure": "failure",
+    "fail": "failure",
+    "amrap": "failure",
+    "dropset": "dropset",
+    "drop": "dropset",
+    "drop-set": "dropset",
+    "drop_set": "dropset",
+}
+
+
+def normalize_set_type(t: str | None) -> str | None:
+    """Map an authored set type to Hevy's enum, or None if unmappable.
+
+    None is the signal the dry_run validator uses to fail loudly naming the
+    field. The compiler itself coerces an unmappable value to 'normal' so a
+    skipped validation can never produce a silent 400 at commit.
+    """
+    if not t:
+        return "normal"
+    return _SET_TYPE_ALIASES.get(str(t).strip().lower())
+
+
+def sanitize_note(note: str | None) -> str:
+    """Strip characters that break the Hevy JSON write surface: C0/C1 control
+    chars (except tab/newline) and lone surrogates. Emoji and ordinary unicode
+    are PRESERVED — they are valid UTF-8 JSON and the 765-set live audit found
+    no evidence Hevy rejects them; the dry_run validator surfaces (does not
+    drop) non-ASCII so Matthew can decide. Lossless for real note content.
+    """
+    if not note:
+        return ""
+    out: list[str] = []
+    for ch in note:
+        o = ord(ch)
+        if ch in ("\n", "\t"):
+            out.append(ch)
+        elif o < 0x20 or 0x7F <= o <= 0x9F:
+            continue  # C0/C1 control
+        elif 0xD800 <= o <= 0xDFFF:
+            continue  # lone surrogate
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
 def _set_to_wire(s: Set) -> dict[str, Any]:
-    out: dict[str, Any] = {"type": s.type}
+    out: dict[str, Any] = {"type": normalize_set_type(s.type) or "normal"}
     if s.weight_kg is not None:
         out["weight_kg"] = s.weight_kg
     if s.reps is not None:
@@ -54,7 +113,7 @@ def _exercise_to_wire(ex: ExerciseBlock, template_resolver: Callable[[str], str]
         "exercise_template_id": template_id,
         "superset_id": ex.superset_id,
         "rest_seconds": ex.rest_seconds,
-        "notes": ex.notes or "",
+        "notes": sanitize_note(ex.notes),
         "sets": [_set_to_wire(s) for s in ex.sets],
     }
 
@@ -90,7 +149,7 @@ def to_create_body(
         "routine": {
             "title": _resolve_title(ir, title_context),
             "folder_id": ir.hevy_folder_id,
-            "notes": why_note if why_note is not None else (ir.notes or ""),
+            "notes": sanitize_note(why_note if why_note is not None else ir.notes),
             "exercises": [_exercise_to_wire(ex, template_resolver) for ex in ir.exercises],
         },
     }
@@ -108,7 +167,7 @@ def to_update_body(
     return {
         "routine": {
             "title": _resolve_title(ir, title_context),
-            "notes": why_note if why_note is not None else (ir.notes or ""),
+            "notes": sanitize_note(why_note if why_note is not None else ir.notes),
             "exercises": [_exercise_to_wire(ex, template_resolver) for ex in ir.exercises],
         },
     }
