@@ -318,6 +318,18 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .chart-cap { display: block; margin-top: var(--sp-2); color: var(--ink-faint); }
 .chart--empty { border: var(--honest-border); border-radius: var(--radius-xs); padding: var(--sp-4); text-align: center; }
 .chart--empty .chart-cap { margin: 0; }
+/* Measuring-rule tick spine on a trend chart (SIGNATURE 1, P0.8) — a ticked y-axis rail
+   with the max (top) / min (bottom) value. Token-driven ticks; muted ink, never red. */
+.chart--spined { display: grid; grid-template-columns: auto 1fr; gap: var(--sp-2); align-items: stretch; }
+.chart--spined > svg { grid-column: 2; }
+.chart--spined > .chart-cap { grid-column: 1 / -1; }
+.chart-spine { grid-column: 1; align-self: stretch; min-height: clamp(110px, 8vw + 80px, 150px);
+  width: var(--spine-width); border-right: var(--spine-border); background: var(--spine-ticks);
+  display: flex; flex-direction: column; justify-content: space-between; padding: 2px 5px 2px 0;
+  text-align: right; }
+.chart-spine-v { color: var(--ink-faint); font-size: 0.6rem; line-height: 1; }
+/* Serif "what this means" annotation under a chart (SIGNATURE 2 human voice). */
+.nut-anno { margin-top: var(--sp-3); }
 .spark { width: 96px; height: 28px; vertical-align: middle; }
 .spark .chart-line { stroke-width: 1.5; }
 .spark--empty { display: inline-block; width: 96px; height: 1px; background: var(--rule); }

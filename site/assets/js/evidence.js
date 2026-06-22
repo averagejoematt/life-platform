@@ -137,6 +137,22 @@ function nutritionProteinLead(n) {
     `<span class="lead-k label">protein target hit${low ? " — under floor" : " — floor cleared"}</span></div>` +
     `<p class="lead-sub mono">${esc(sub)}</p></section>`;
 }
+// §2 serif "what this means" annotation under the protein-vs-target chart (P0.8,
+// SIGNATURE 2 human voice). Data-derived, correlative, no causal claim.
+function nutritionProteinAnnotation(n) {
+  const avg = n.avg_protein_g, tgt = n.protein_target_g, hit = n.protein_hit_pct;
+  if (avg == null || tgt == null) return "";
+  const gap = Math.round(Number(tgt) - Number(avg));
+  let txt;
+  if (hit === 0) {
+    txt = `The ember line stays the whole way under the dotted ${fmt(tgt)} g goal — every logged day landed below the floor, about ${fmt(gap)} g short on average. On a cut, that's the line that decides how much muscle the deficit costs.`;
+  } else if (gap > 0) {
+    txt = `The line sits mostly under the dotted ${fmt(tgt)} g goal — about ${fmt(gap)} g short on average. The days it crosses the line are the ones holding muscle.`;
+  } else {
+    txt = `The line rides at or above the dotted ${fmt(tgt)} g goal most days — the protein floor is holding through the cut.`;
+  }
+  return `<p class="tv-human nut-anno">${esc(txt)}</p>`;
+}
 async function renderNutrition(d) {
   // The API nests macros under d.nutrition (was read flat → blank); meal/protein field
   // names are frequency/food/avg_daily_g (were count/name/grams → empty tables).
@@ -163,11 +179,15 @@ async function renderNutrition(d) {
     n.avg_fat_g != null && fig(fmt(n.avg_fat_g) + "g", "avg fat"),
   ]);
   if (head.includes("fig-v")) parts.push(head);
-  // Hero trends — the daily macro time series the API always returned but the page never drew.
+  // Hero trends — the daily macro time series the API always returned but the page never
+  // drew. P0.8 deploys SIGNATURE 1 (the measuring-rule tick spine) on both, and a serif
+  // "what this means" annotation (SIGNATURE 2, the human voice) under the protein chart.
   const trend = (d && d.nutrition_trend) || [];
   if (trend.length) {
-    parts.push(sec("Daily intake vs TDEE", lineChart(trend, { valueKey: "calories", goal: n.tdee || null, unit: " kcal", label: "Calories vs maintenance", emptyMsg: "The calorie trend fills as days are logged." })));
-    parts.push(sec("Protein vs target", lineChart(trend, { valueKey: "protein_g", goal: n.protein_target_g || null, unit: "g", label: "Protein per day vs target" })));
+    parts.push(sec("Daily intake vs TDEE", lineChart(trend, { valueKey: "calories", goal: n.tdee || null, unit: " kcal", label: "Calories vs maintenance", spine: true, emptyMsg: "The calorie trend fills as days are logged." })));
+    parts.push(sec("Protein vs target",
+      lineChart(trend, { valueKey: "protein_g", goal: n.protein_target_g || null, unit: "g", label: "Protein per day vs target", spine: true }) +
+      nutritionProteinAnnotation(n)));
   }
   // Average macro split — by ENERGY (P0.5): protein·4 / carbs·4 / fat·9, not gram mass.
   // Gram-fraction badly understates fat (16% by mass ≈ 30% by calories).

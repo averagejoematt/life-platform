@@ -29,7 +29,7 @@ function _points(data, valueKey, dateKey) {
 }
 
 // A trend line with optional goal line + filled area. data: [{<dateKey>,<valueKey>}] or [numbers].
-export function lineChart(data, { valueKey = "value", dateKey = "date", goal = null, height = 130, unit = "", label = "", emptyMsg = "" } = {}) {
+export function lineChart(data, { valueKey = "value", dateKey = "date", goal = null, height = 130, unit = "", label = "", emptyMsg = "", spine = false } = {}) {
   const pts = _points(data || [], valueKey, dateKey);
   // Fewer than 4 points can't show a real trend — two points draw a straight diagonal that
   // reads as broken/misleading. Show an honest count + latest value instead of a fake line.
@@ -59,7 +59,12 @@ export function lineChart(data, { valueKey = "value", dateKey = "date", goal = n
   const _span = (pts[0].d && last.d) ? `${_short(pts[0].d)}–${_short(last.d)}` : "";
   const summary = `${label || "Trend"}: ${pts.length} readings${_span ? `, ${_span}` : ""}, latest ${_r(last.v)}${unit}, ${dir}${goal != null ? `, goal ${_r(Number(goal))}${unit}` : ""}.`;
   const goalLine = goal != null ? `<line class="chart-goal" x1="${P}" y1="${y(Number(goal)).toFixed(1)}" x2="${W - P}" y2="${y(Number(goal)).toFixed(1)}" vector-effect="non-scaling-stroke"/>` : "";
-  return `<figure class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}">` +
+  // SIGNATURE 1 — a measuring-rule tick spine on the y-axis: a ticked rail with the
+  // max (top) and min (bottom) value, giving the trend a real scale. Token-driven ticks.
+  const spineEl = spine
+    ? `<div class="chart-spine" aria-hidden="true"><span class="chart-spine-v mono">${_r(max)}${escAttr(unit)}</span><span class="chart-spine-v mono">${_r(min)}${escAttr(unit)}</span></div>`
+    : "";
+  return `<figure class="chart${spine ? " chart--spined" : ""}">${spineEl}<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}">` +
     `<path class="chart-fill" d="${area}"/>${goalLine}` +
     `<path class="chart-line" d="${line}" vector-effect="non-scaling-stroke"/>` +
     `<circle class="chart-dot" cx="${x(pts.length - 1).toFixed(1)}" cy="${y(last.v).toFixed(1)}" r="3.5"/></svg>` +
