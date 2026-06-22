@@ -19,6 +19,9 @@ export function dualWeight(v, unit = "kg") {
   return `${_w(lb)} lb · ${_w(kg)} kg`;
 }
 
+const _MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const _shortDate = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); return m ? `${_MON[+m[2] - 1]} ${+m[3]}` : ""; };
+
 function _points(data, valueKey, dateKey) {
   return data
     .map((d) => (typeof d === "number" ? { v: d } : { v: Number(d[valueKey]), d: d[dateKey] }))
@@ -139,6 +142,35 @@ export function intakeSpine(intake, tdee, { label = "" } = {}) {
     `<div class="hspine-mark hspine-intake" style="left:${pos(inK).toFixed(1)}%"><span class="hspine-v mono">${Math.round(inK)}</span><span class="hspine-k label">intake</span></div>` +
     `<div class="hspine-mark hspine-tdee" style="left:${pos(td).toFixed(1)}%"><span class="hspine-v mono">${Math.round(td)}</span><span class="hspine-k label">maintenance</span></div>` +
     `</div><figcaption class="chart-cap label">${escAttr(label)}${deficit >= 0 ? ` · ${Math.abs(deficit)} kcal/day deficit (shaded)` : ` · ${Math.abs(deficit)} kcal/day surplus`}</figcaption></figure>`;
+}
+
+// Per-day stacked composition columns BY ENERGY (protein·4 / carbs·4 / fat·9). Each
+// column = one day's calories segmented by macro — reveals whether the cut comes out of
+// carbs/fat while protein holds. Refuses < 4 points (honest, like lineChart). Ember =
+// protein (the floor to hold); muted inks for carbs/fat. days: [{date, protein_g, carbs_g, fat_g}].
+export function stackedColumns(days, { label = "", emptyMsg = "" } = {}) {
+  const rows = (days || []).map((d) => {
+    const p = Number(d.protein_g) * 4, c = Number(d.carbs_g) * 4, f = Number(d.fat_g) * 9;
+    return { d: d.date, p: Number.isFinite(p) ? p : 0, c: Number.isFinite(c) ? c : 0, f: Number.isFinite(f) ? f : 0 };
+  }).filter((r) => (r.p + r.c + r.f) > 0);
+  if (rows.length < 4) {
+    const n = rows.length;
+    return `<figure class="chart chart--empty"><figcaption class="chart-cap label">${escAttr(emptyMsg || `Per-day macro composition draws in at 4+ logged days — ${n} so far.`)}</figcaption></figure>`;
+  }
+  const max = Math.max(...rows.map((r) => r.p + r.c + r.f));
+  const h = (v) => `${((v / max) * 100).toFixed(1)}%`;
+  const col = (r) => {
+    const day = _shortDate(r.d);
+    return `<div class="scol" title="${escAttr(`${day}: protein ${Math.round(r.p)} · carbs ${Math.round(r.c)} · fat ${Math.round(r.f)} kcal`)}">` +
+      `<div class="scol-stack">` +
+      `<span class="scol-seg sbar-faint" style="height:${h(r.f)}"></span>` +
+      `<span class="scol-seg sbar-ink" style="height:${h(r.c)}"></span>` +
+      `<span class="scol-seg sbar-ember" style="height:${h(r.p)}"></span>` +
+      `</div><span class="scol-l label">${escAttr(day)}</span></div>`;
+  };
+  const legend = `<span class="sbar-key"><i class="sbar-dot sbar-ember"></i>protein</span><span class="sbar-key"><i class="sbar-dot sbar-ink"></i>carbs</span><span class="sbar-key"><i class="sbar-dot sbar-faint"></i>fat</span>`;
+  return `<figure class="chart"><div class="scols" role="img" aria-label="${escAttr(`Per-day macro composition by energy across ${rows.length} days. ${label}`)}">${rows.map(col).join("")}</div>` +
+    `<figcaption class="chart-cap label sbar-legend">${legend} · by energy (kcal)${label ? ` · ${escAttr(label)}` : ""}</figcaption></figure>`;
 }
 
 // Correlation chips — top habit/factor ↔ outcome Pearson r, correlative-framed (never

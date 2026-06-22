@@ -13,7 +13,7 @@
     window.__START_SLUG__ = "<slug>"
 */
 
-import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars } from "/assets/js/charts.js";
+import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns } from "/assets/js/charts.js";
 
 const REG = window.__EVIDENCE_REGISTRY__ || [];
 const BYSLUG = Object.fromEntries(REG.map((t) => [t.slug, t]));
@@ -179,6 +179,13 @@ async function renderNutrition(d) {
       { label: `Carbs ${fmt(n.avg_carbs_g)}g`, value: cK, tone: "ink" },
       { label: `Fat ${fmt(n.avg_fat_g)}g`, value: fK, tone: "faint" },
     ], { label: "Share of calories (protein·4 / carbs·4 / fat·9)", unit: " kcal" })));
+  }
+  // §3 — per-day macro composition by ENERGY (P0.7): reveals whether the cut comes out of
+  // carbs/fat while protein holds. Refuses < 4 points via the chart kit.
+  const trendDays = (d && d.nutrition_trend) || [];
+  if (trendDays.length) {
+    parts.push(sec("Where the cut comes from — per-day macros by energy",
+      stackedColumns(trendDays, { emptyMsg: `Per-day macro composition draws in at 4+ logged days — ${trendDays.length} so far.` })));
   }
   // P0.6 — suppress empty scaffold. These comparisons render honest "needs more days"
   // states instead of zero-rows (no "Rest Day — Count 0" / "Weekend — Days 0").

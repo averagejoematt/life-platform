@@ -396,6 +396,17 @@ a { color: inherit; text-underline-offset: 0.18em; }
   font-size: var(--voice-human-size); line-height: var(--voice-human-lh); color: var(--voice-human-ink);
   max-width: var(--measure); }
 
+/* Per-day macro composition columns by energy (nutrition §3, P0.7) — ember = protein
+   (the floor), muted inks for carbs/fat. Refuses < 4 points in the chart kit. */
+.scols { display: flex; align-items: flex-end; gap: 4px; height: 150px; margin-top: var(--sp-3); }
+.scol { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column;
+  align-items: center; gap: var(--sp-1); justify-content: flex-end; }
+.scol-stack { width: 72%; height: 100%; display: flex; flex-direction: column;
+  justify-content: flex-end; border-radius: 2px 2px 0 0; overflow: hidden; }
+.scol-seg { width: 100%; display: block; }
+.scol-l { color: var(--ink-faint); font-size: 0.6rem; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+
 /* Correlation chips — strength by bar width, sign by direction word (correlative, N=1). */
 .corr-rows { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-3); }
 .corr-row { display: grid; grid-template-columns: minmax(0,1fr) 90px auto; align-items: center; gap: var(--sp-2); }
