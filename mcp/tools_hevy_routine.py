@@ -34,6 +34,7 @@ programming with red-day deload guard."
 from __future__ import annotations
 
 import logging
+import time
 import urllib.error
 from datetime import datetime, timezone
 from typing import Any
@@ -601,13 +602,30 @@ def _create_template_for(ex: dict[str, Any], title: str) -> tuple[str, dict[str,
         wc.create_template({"exercise": meta})
     except Exception as e:  # noqa: BLE001 — response may be a bare-string body
         create_exc = e
+    # A6 (WORKORDER_HEVY_COMMIT_HARDENING): a just-created custom template is not
+    # instantly usable in a routine POST — Hevy needs a beat to propagate. The old
+    # reconcile loop polled the LIST with no backoff and fired all 3 tries in <1ms,
+    # so a 1–2s lag slipped through and the next commit 400'd with "invalid exercise
+    # template id" (the f2e0a92d failure). Add backoff, AND confirm the id is GET-able
+    # by id (a stronger propagation signal than appearing in the list) before handing
+    # it to a routine POST. Done here at creation — duplicate-safe — not in the commit
+    # error path, where a retry could mint an orphan twin.
     tid = None
-    for _ in range(3):
+    for attempt in range(4):
         tid = _live_template_id_by_title(title)
         if tid:
             break
+        time.sleep(min(0.5 * (attempt + 1), 1.5))
     if not tid:
         raise RuntimeError(f"could not create/resolve Hevy exercise {title!r}" + (f" (create error: {create_exc})" if create_exc else ""))
+    # Confirm GET-by-id resolves before the template is referenced in a commit.
+    for attempt in range(3):
+        try:
+            if wc.get_template(tid):
+                break
+        except Exception:  # noqa: BLE001 — not yet propagated; back off and retry
+            pass
+        time.sleep(min(0.5 * (attempt + 1), 1.5))
     return tid, {**meta, "id": tid}
 
 
@@ -850,6 +868,38 @@ def _resolve_title_inputs(ir: Any) -> tuple[dict[str, Any] | None, str]:
     return build_title_context(ir), why
 
 
+def _validate_ir_for_hevy(ir: Any) -> dict[str, Any]:
+    """A5 (WORKORDER_HEVY_COMMIT_HARDENING): pre-commit validation that fails
+    loudly naming the offending field, so a bad routine never reaches a silent
+    Hevy 400. Returns {errors, corrections, warnings}:
+      - errors      → block commit (e.g. an unmappable set type).
+      - corrections → auto-fixed at the wire boundary (e.g. drop→dropset); shown
+                      so Matthew sees what will actually be sent.
+      - warnings    → non-blocking (e.g. control chars stripped from a note).
+    """
+    from hevy_compiler import HEVY_SET_TYPES, normalize_set_type, sanitize_note
+
+    errors: list[str] = []
+    corrections: list[str] = []
+    warnings: list[str] = []
+    for ei, ex in enumerate(getattr(ir, "exercises", []) or []):
+        loc = f"exercises[{ei}] ({getattr(ex, 'movement_key', '?')})"
+        for si, s in enumerate(getattr(ex, "sets", []) or []):
+            raw_type = getattr(s, "type", None)
+            mapped = normalize_set_type(raw_type)
+            if mapped is None:
+                errors.append(f"{loc}.sets[{si}].type={raw_type!r} is not a valid Hevy set type " f"(allowed: {', '.join(HEVY_SET_TYPES)})")
+            elif raw_type and str(raw_type).strip().lower() != mapped:
+                corrections.append(f"{loc}.sets[{si}].type {raw_type!r} → {mapped!r}")
+        note = getattr(ex, "notes", "") or ""
+        cleaned = sanitize_note(note)
+        if cleaned != note:
+            warnings.append(f"{loc}.notes: stripped {len(note) - len(cleaned)} unsupported control char(s)")
+        elif note and any(ord(c) > 0x7F for c in note):
+            warnings.append(f"{loc}.notes contains non-ASCII (emoji/unicode) — preserved; will be sent as-is")
+    return {"errors": errors, "corrections": corrections, "warnings": warnings}
+
+
 def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
     routine_id = args.get("routine_id")
     if not routine_id:
@@ -870,6 +920,7 @@ def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
         "routine_id": routine_id,
         "wire_body": body,
         "rationale": ir.rationale,
+        "validation": _validate_ir_for_hevy(ir),
     }
     # Recovery-adaptive preflight (brief §6.5): show the inputs_current_through line +
     # the per-lift branch blocks Matthew eyeballs in 30s, so he sleeps trusting it.
@@ -905,6 +956,14 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
     ir = get_current(routine_id)
     if not ir:
         return mcp_error(f"routine_id={routine_id} not found", error_code="NOT_FOUND")
+    # A5: fail loud BEFORE the POST if the IR carries a field Hevy will reject,
+    # naming it — so a bad routine never reaches a silent 400 at commit.
+    _v = _validate_ir_for_hevy(ir)
+    if _v["errors"]:
+        return mcp_error(
+            "Refusing to commit — Hevy would reject these fields: " + "; ".join(_v["errors"]),
+            error_code="HEVY_PRECHECK_FAILED",
+        )
     try:
         resolve = _make_resolver()
         title_ctx, why = _resolve_title_inputs(ir)
