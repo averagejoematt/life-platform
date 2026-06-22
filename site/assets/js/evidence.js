@@ -185,11 +185,16 @@ async function renderNutrition(d) {
   // no transformation site shows (reverse-QA: rich in the data, surfaced nowhere).
   const mn = (d && d.micronutrients) || {};
   const suf = mn.sufficiency || {};
-  if (mn.protein_distribution_score != null || Object.keys(suf).length) {
+  // P0.3 — the protein-"timing" score is killed: it's a distribution score with no
+  // per-meal timestamps behind it, it can't fall, and a "100" sitting over a 0% protein
+  // hit congratulated the spacing of a thing he isn't eating enough of. Relabel as not-yet-
+  // measured (P1.1 revives a real one once per-meal timestamps land).
+  if (Object.keys(suf).length || mn.avg_pct != null) {
     const bars = Object.entries(suf).map(([k, v]) => ({ label: ttl(k.replace(/_(mg|mcg|ug|g)$/i, "")), value: Math.round((v && v.pct) || 0) })).sort((a, b) => b.value - a.value);
-    parts.push(sec("Micronutrients & protein timing",
-      figs([mn.protein_distribution_score != null && fig(fmt(mn.protein_distribution_score), "protein-timing score"), mn.avg_pct != null && fig(fmt(mn.avg_pct) + "%", "micronutrient avg")]) +
-      (bars.length ? barChart(bars, { valueKey: "value", labelKey: "label", label: "% of daily target" }) : "")));
+    parts.push(sec("Micronutrients",
+      figs([mn.avg_pct != null && fig(fmt(mn.avg_pct) + "%", "micronutrient avg")]) +
+      (bars.length ? barChart(bars, { valueKey: "value", labelKey: "label", label: "% of daily target" }) : "") +
+      `<p class="rd-meta label">Protein timing — not yet measured (needs per-meal timestamps).</p>`));
   }
   if (meals.length)
     parts.push(
