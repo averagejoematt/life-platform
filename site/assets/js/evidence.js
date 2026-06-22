@@ -137,6 +137,27 @@ function nutritionProteinLead(n) {
     `<span class="lead-k label">protein target hit${low ? " — under floor" : " — floor cleared"}</span></div>` +
     `<p class="lead-sub mono">${esc(sub)}</p></section>`;
 }
+// §1 loss-rate readout (P0.9) — target rate → required deficit → actual deficit → gap,
+// with the deficit-intensity flag, the rate and the protein status on ONE sightline.
+// Two-voice: mono states the chain, serif surfaces the (contested) read honestly.
+function nutritionLossRate(lr) {
+  if (!lr || lr.target_rate_lb_wk == null) return "";
+  const chain = [
+    `target ${fmt(lr.target_rate_lb_wk)} lb/wk`,
+    lr.required_deficit_kcal != null ? `needs −${fmt(lr.required_deficit_kcal)} kcal/day` : null,
+    lr.actual_deficit_kcal != null ? `running ${lr.actual_deficit_kcal >= 0 ? "−" : "+"}${fmt(Math.abs(lr.actual_deficit_kcal))}` : "running — (needs an expenditure read)",
+    lr.gap_kcal != null ? `gap ${lr.gap_kcal >= 0 ? "+" : "−"}${fmt(Math.abs(lr.gap_kcal))}` : null,
+    lr.protein_hit_pct != null ? `protein ${fmt(lr.protein_hit_pct)}%` : null,
+  ].filter(Boolean).join(" → ");
+  const flag = lr.deficit_label ? `<span class="nut-flag nut-flag-${esc(lr.deficit_label)}">${esc(lr.deficit_label)} cut</span>` : "";
+  let floorClause;
+  if (lr.protein_hit_pct === 0) floorClause = ", and that floor's being missed every logged day";
+  else if (lr.protein_hit_pct != null && lr.protein_hit_pct < 100) floorClause = ", and right now that floor's missed most days";
+  else if (lr.protein_hit_pct != null && lr.protein_hit_pct >= 100) floorClause = ", and right now that floor's holding";
+  else floorClause = "";
+  const serif = `Three pounds a week is an aggressive rate. The bench is split on it — defensible early at this size if it's monitored, but only while the protein floor holds${floorClause}. That's why the rate and the protein sit on the same line here.`;
+  return `<div class="two-voice nut-lossrate"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(chain)} ${flag}</p><p class="tv-human">${esc(serif)}</p></div>`;
+}
 // §2 serif "what this means" annotation under the protein-vs-target chart (P0.8,
 // SIGNATURE 2 human voice). Data-derived, correlative, no causal claim.
 function nutritionProteinAnnotation(n) {
@@ -184,7 +205,9 @@ async function renderNutrition(d) {
   // "what this means" annotation (SIGNATURE 2, the human voice) under the protein chart.
   const trend = (d && d.nutrition_trend) || [];
   if (trend.length) {
-    parts.push(sec("Daily intake vs TDEE", lineChart(trend, { valueKey: "calories", goal: n.tdee || null, unit: " kcal", label: "Calories vs maintenance", spine: true, emptyMsg: "The calorie trend fills as days are logged." })));
+    parts.push(sec("Energy — the deficit story",
+      lineChart(trend, { valueKey: "calories", goal: n.tdee || null, unit: " kcal", label: "Calories vs maintenance", spine: true, emptyMsg: "The calorie trend fills as days are logged." }) +
+      nutritionLossRate(d && d.loss_rate)));
     parts.push(sec("Protein vs target",
       lineChart(trend, { valueKey: "protein_g", goal: n.protein_target_g || null, unit: "g", label: "Protein per day vs target", spine: true }) +
       nutritionProteinAnnotation(n)));

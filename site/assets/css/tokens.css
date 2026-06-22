@@ -330,6 +330,13 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .chart-spine-v { color: var(--ink-faint); font-size: 0.6rem; line-height: 1; }
 /* Serif "what this means" annotation under a chart (SIGNATURE 2 human voice). */
 .nut-anno { margin-top: var(--sp-3); }
+/* Loss-rate readout (nutrition §1, P0.9) — rate chain + deficit-intensity flag. Ember on
+   "aggressive" = attention, not alarm (never red); moderate/mild are muted ink. */
+.nut-lossrate { margin-top: var(--sp-3); }
+.nut-flag { display: inline-block; font-family: var(--font-mono); font-size: 0.6rem;
+  text-transform: uppercase; letter-spacing: var(--tracking-label); padding: 1px 6px;
+  border-radius: var(--radius-xs); border: 1px solid var(--rule); color: var(--ink-muted); white-space: nowrap; }
+.nut-flag-aggressive { border-color: var(--ember); color: var(--ember); }
 .spark { width: 96px; height: 28px; vertical-align: middle; }
 .spark .chart-line { stroke-width: 1.5; }
 .spark--empty { display: inline-block; width: 96px; height: 1px; background: var(--rule); }

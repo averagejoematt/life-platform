@@ -257,6 +257,36 @@ def handle_nutrition_overview() -> dict:
             avg = periodization[key]["avg_calories"]
             periodization[key]["avg_deficit"] = round(tdee - avg) if avg else None
 
+    # ── Loss-rate readout (P0.9): the deficit chain + sustainability flag ──
+    # Phase-1 "Ignition" target: 3 lb/week ≈ 1,500 kcal/day deficit (matches the profile /
+    # ai_calls Phase-1 target). The full multi-channel sustainability early-warning (HRV,
+    # sleep, recovery, habits, training) lives in the get_deficit_sustainability MCP tool;
+    # here we surface only the rate chain + the deficit-intensity label (same BS-12 rubric).
+    TARGET_RATE_LB_WK = 3
+    KCAL_PER_LB = 3500
+    required_deficit = round(TARGET_RATE_LB_WK * KCAL_PER_LB / 7)  # 1500
+    deficit_pct = round(deficit / tdee * 100, 1) if (deficit is not None and tdee) else None
+    if deficit_pct is None:
+        deficit_label = None
+    elif deficit_pct > 25:
+        deficit_label = "aggressive"
+    elif deficit_pct > 15:
+        deficit_label = "moderate"
+    elif deficit_pct > 5:
+        deficit_label = "mild"
+    else:
+        deficit_label = "maintenance"
+    loss_rate = {
+        "target_rate_lb_wk": TARGET_RATE_LB_WK,
+        "required_deficit_kcal": required_deficit,
+        "actual_deficit_kcal": deficit,
+        "gap_kcal": (required_deficit - deficit) if deficit is not None else None,
+        "implied_rate_lb_wk": round(deficit * 7 / KCAL_PER_LB, 1) if deficit is not None else None,
+        "deficit_pct": deficit_pct,
+        "deficit_label": deficit_label,
+        "protein_hit_pct": protein_hit_pct,
+    }
+
     return _ok(
         {
             "nutrition": {
@@ -280,6 +310,7 @@ def handle_nutrition_overview() -> dict:
                 ),
             },
             "nutrition_trend": trend,
+            "loss_rate": loss_rate,
             "weekday_vs_weekend": weekday_vs_weekend,
             "eating_window": eating_window,
             "periodization": periodization,
