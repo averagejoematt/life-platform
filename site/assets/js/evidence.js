@@ -199,6 +199,24 @@ function physicalBMI(readings, j) {
     `<p class="rd-bmi"><span class="rd-bmi-v mono">${fmt(bmi)}</span> <span class="label">BMI</span></p>` +
     `<p class="rd-meta label">BMI is here only because people look for it — it's near-meaningless on a heavy frame carrying real muscle. It can't tell fat from lean, so it reads "obese" for a lineman and a couch alike. The DEXA composition below is the honest version; this is the number to distrust.</p>`);
 }
+// P1.1 — next-DEXA countdown: the Tier-2 arc anchor. Turns a single scan from a stale tile
+// into anticipation ("the next chapter lands in ~X days"). Cut-aware target: ~10 weeks past
+// genesis, when fat-vs-lean change finally clears the DEXA error bar — NOT the API's generic
+// last+90 cadence (which would fall 2 weeks into the cut, too soon to mean anything). Honest
+// that it isn't booked — scheduling it is the P2.1 capture step this countdown waits on.
+function physicalDexaCountdown(d) {
+  const x = d.latest_dexa; if (!x || !x.scan_date) return "";
+  const genesisMs = Date.parse(PHYS_GENESIS);
+  const apiMs = x.next_dexa_recommended ? Date.parse(x.next_dexa_recommended) : 0;
+  const targetMs = Math.max(genesisMs + 70 * 86400000, apiMs || 0);
+  const today = new Date(); const todayMs = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const days = Math.round((targetMs - todayMs) / 86400000);
+  const td = new Date(targetMs), tStr = `${_PHYS_MON[td.getUTCMonth()]} ${td.getUTCFullYear()}`;
+  const sinceLast = Math.round((todayMs - Date.parse(x.scan_date)) / 86400000);
+  return sec("The composition arc — scan two is the next chapter",
+    `<div class="dx-count"><span class="dx-days mono">${days > 0 ? "~" + days : "due"}</span><span class="dx-unit label">${days > 0 ? "days to the recommended scan two" : "scan two is due"}</span></div>` +
+    `<p class="rd-meta label">The last DEXA was ${sinceLast} days ago, <strong>pre-cut</strong>. A second scan around <strong>${tStr}</strong> — roughly ten weeks into the cut — is when fat-vs-lean change finally clears the scan's own error bar and composition <em>velocity</em> becomes real. It isn't booked yet; scheduling it is the next data-capture step, and it's what this countdown is waiting on. Everything below is that one pre-cut scan — a dated snapshot, not a trend.</p>`);
+}
 // (temporary — restructured into the dated Tier-2 composition arc across P1.x)
 function physicalLegacyComposition(d) {
   const x = d.latest_dexa; if (!x) return "";
@@ -232,6 +250,7 @@ async function renderPhysical(d) {
   }
   parts.push(physicalBMI(readings, j)); // P0.7 — BMI (de-emphasized, last in Tier 1)
   // ── TIER 2 — the composition arc (episodic) — restructured across P1.x ──
+  parts.push(physicalDexaCountdown(d)); // P1.1 — next-DEXA countdown (arc anchor)
   parts.push(physicalLegacyComposition(d));
   return parts.join("");
 }

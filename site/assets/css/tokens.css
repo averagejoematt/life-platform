@@ -502,6 +502,10 @@ a { color: inherit; text-underline-offset: 0.18em; }
 /* P0.7 — BMI, de-emphasized: muted, small, never ember. The caption does the talking. */
 .rd-bmi { margin: var(--sp-2) 0 0; display: flex; align-items: baseline; gap: var(--sp-2); }
 .rd-bmi-v { font-size: var(--fs-h3, 1.5rem); color: var(--ink-muted); }
+/* P1.1 — next-DEXA countdown: the arc anchor. Ember number = anticipation, not alarm. */
+.dx-count { display: flex; align-items: baseline; gap: var(--sp-3); margin: var(--sp-2) 0; }
+.dx-days { font-size: var(--fs-display, 2.4rem); color: var(--ember); line-height: 1; }
+.dx-unit { color: var(--ink-muted); }
 .chart-cap { display: block; margin-top: var(--sp-2); color: var(--ink-faint); }
 .chart--empty { border: var(--honest-border); border-radius: var(--radius-xs); padding: var(--sp-4); text-align: center; }
 .chart--empty .chart-cap { margin: 0; }
