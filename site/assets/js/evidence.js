@@ -835,9 +835,16 @@ async function renderHabits(d) {
   const trend = (d.history || []).length ? sec("Adherence trend", lineChart(d.history, { valueKey: "tier0_pct", unit: "%", label: "Daily Tier-0 adherence", emptyMsg: "The adherence curve fills as days accrue." })) : "";
   // §0 — keystone hero, honesty-rebuilt (P0.1): leads the page, n-forward, coefficient withheld.
   const keystone = habitsKeystone(d.keystone_correlations);
-  // Completion by group (the per-group averages the page computed but never showed).
-  const ga = Object.entries(d.group_90d_avgs || {}).map(([g, p]) => ({ label: g, value: p })).sort((x, y) => y.value - x.value);
-  const groupBars = ga.length ? sec("Completion by group", barChart(ga, { valueKey: "value", labelKey: "label", label: "Avg completion %" })) : "";
+  // §3 — group grades from adherence RATE (P0.4). Real completion rate → grade (never a
+  // correlation). Ember = load-bearing/solid; the floor groups (e.g. Recovery) muted, not red.
+  const _gradeOf = (p) => (p >= 90 ? "A" : p >= 80 ? "B" : p >= 70 ? "C" : p >= 50 ? "D" : "F");
+  const ga = Object.entries(d.group_90d_avgs || {}).map(([g, p]) => ({ group: g, pct: p })).sort((x, y) => y.pct - x.pct);
+  const groupBars = ga.length ? sec("Group grades — what's load-bearing (from adherence rate)",
+    `<div class="suf-rows">${ga.map((x) => {
+      const tone = x.pct >= 70 ? "suf-ember" : "suf-ink";
+      return `<div class="suf-row"><span class="suf-l">${esc(ttl(x.group))}</span><span class="suf-track"><span class="suf-fill ${tone}" style="width:${Math.round(Math.max(0, Math.min(100, x.pct)))}%"></span></span><span class="suf-v mono">${fmt(x.pct)}% · ${_gradeOf(x.pct)}</span></div>`;
+    }).join("")}</div>` +
+    `<p class="rd-meta label">Each grade is the group's real adherence RATE over the window — never a correlation. Higher = load-bearing; the low ones (the floor, like Recovery) read muted, not as failure. Tier-0 non-negotiables drive the heatmap above.</p>`) : "";
   return keystone + head + trend + grid + dow + groupBars + list + note("Everything I'm trying to do — sourced from Habitify. Correlations are N=1, not cause. Private habits are never shown.");
 }
 // The board — pick an expert, read their actual per-domain take + track record.
