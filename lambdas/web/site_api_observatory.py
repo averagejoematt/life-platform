@@ -40,6 +40,7 @@ from web.site_api_common import (
 # public — kept dark behind a flag that stays off).
 _DELIVERY_PUBLIC = os.environ.get("NUTRITION_DELIVERY_PUBLIC", "").strip().lower() in ("1", "true", "yes")
 _BLUEPRINT_PUBLIC = os.environ.get("NUTRITION_BLUEPRINT_PUBLIC", "").strip().lower() in ("1", "true", "yes")
+_TRAIN_BLUEPRINT_PUBLIC = os.environ.get("TRAINING_BLUEPRINT_PUBLIC", "").strip().lower() in ("1", "true", "yes")
 
 # ── Per-muscle volume vs landmarks (training P1.3) — compact port of the MCP classifier
 # (mcp/strength_helpers.classify_exercise + _VOLUME_LANDMARKS, core-mapping fix #186) since
@@ -935,6 +936,17 @@ def handle_training_overview() -> dict:
     _mv_weeks = max(1.0, min(30, _days_since_exp) / 7.0)
     muscle_volume = _compute_muscle_volume(hevy_items, _mv_weeks)
 
+    # P2.3 — present-vs-PROVEN_BLUEPRINT training benchmark (NEVER public — flag stays OFF).
+    # With the flag off (default) training_reference is never queried; nothing blueprint-derived
+    # enters the public response (ADR-089: the blueprint may not surface to any public surface).
+    training_blueprint = None
+    if _TRAIN_BLUEPRINT_PUBLIC:
+        _tr = _query_source("training_reference", "2010-01-01", today)
+        _latest_tr = sorted(_tr, key=lambda x: x.get("sk", ""))[-1] if _tr else None
+        if _latest_tr:
+            training_blueprint = {"public": True, "confidence": _latest_tr.get("confidence"),
+                                  "note": "present training vs the proven loss-period blueprint"}
+
     # Weekly trend (for chart) — use flattened activities
     from collections import defaultdict as _dd
 
@@ -1066,6 +1078,7 @@ def handle_training_overview() -> dict:
             },
             "modality_breakdown": modality_breakdown,
             "muscle_volume": muscle_volume,
+            "training_blueprint": training_blueprint,
             "daily_modality_minutes_30d": daily_modality_minutes_30d,
             "walking": walking_data,
             "breathwork": breathwork_data,
