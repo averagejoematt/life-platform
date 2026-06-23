@@ -38,8 +38,8 @@ REGISTRY = [
     ),
     (
         "physical",
-        "Body composition",
-        "DEXA: body fat, lean mass, visceral fat, bone density, biological age.",
+        "Weight & composition",
+        "The daily weight cockpit — trend, milestones, projection — plus the episodic DEXA & bio-age arc.",
         "The body",
         "data",
         "/api/physical_overview",
