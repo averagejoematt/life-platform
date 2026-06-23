@@ -1,3 +1,17 @@
+## Training evidence page redesign (P0→P2) — 2026-06-23
+
+Rebuilt `/evidence/training/` on the twin spine "building the engine — and managing the load." Per `docs/SPEC_TRAINING_PAGE_REDESIGN_2026-06-21.md`; 20 commits, one per P-item. Built + locally verified; PR off `origin/main`.
+
+**Phase 0:** Lift Index (load-trend sparklines, killed the 1RM "✓ goal met" table; <3-session tiles = fills-in) · session-volume ramp hero with a signed-off load-management caution · RHR-decline hero (RHR-down reads ember-POSITIVE — the Training inversion) · Zone-2 vs 150 now cross-source (Hevy bike/elliptical folded into Z2, server) · HR-of-the-engine (cardio HR; lifting HR an honest gap, never a 0 bar) · walking-as-engine + ember-intensity steps heatmap (low days muted, not hidden) · modality composition (ember ramp, mobility out of the cardio list) · Push/Pull/Legs balance · daily strain bar (replaced the naked avg-strain headline) · measuring-rule spine + two-voice signatures.
+
+**Phase 1:** RPE per set (autoregulation) · session sRPE (internal load) · per-muscle volume vs MEV/MAV/MRV landmark bars (the `get_muscle_volume` core-mapping blocker was verified already fixed via #186) · anatomical body-map (stylized front+back, ember-intensity by volume — built per explicit sign-off) · HR-strap + rucking honest empty states.
+
+**Phase 2:** strain-vs-recovery overlay (no Pearson, refuses <4) · ACWR placeholder (unlocks ~4 weeks) · present-vs-PROVEN_BLUEPRINT (private, server-gated `TRAINING_BLUEPRINT_PUBLIC`, OFF — never public).
+
+**Server:** training_overview emits `muscle_volume` (compact in-package port of the MCP classifier + Israetel landmarks) and folds Hevy cardio minutes into Z2; strength_benchmarks emits per-lift `history`. New chart-kit primitives: targetSpine, heatStrip, stackedDayColumns, landmarkBars; dualLineChart gained showGap. No DDB schema change.
+
+---
+
 ## Nutrition evidence page redesign (P0→P2 + CGM) — 2026-06-21
 
 Rebuilt `/evidence/nutrition/` from a flat tile-board into one argued trajectory — "a deficit I can hold, hitting the protein to keep muscle, without quietly costing me anything." Per `docs/SPEC_NUTRITION_PAGE_REDESIGN_2026-06-21.md`; 20 commits, one per P-item. **Deployed live (build `8d342e15`); PR #193.**

@@ -40,6 +40,81 @@ from web.site_api_common import (
 # public — kept dark behind a flag that stays off).
 _DELIVERY_PUBLIC = os.environ.get("NUTRITION_DELIVERY_PUBLIC", "").strip().lower() in ("1", "true", "yes")
 _BLUEPRINT_PUBLIC = os.environ.get("NUTRITION_BLUEPRINT_PUBLIC", "").strip().lower() in ("1", "true", "yes")
+_TRAIN_BLUEPRINT_PUBLIC = os.environ.get("TRAINING_BLUEPRINT_PUBLIC", "").strip().lower() in ("1", "true", "yes")
+
+# ── Per-muscle volume vs landmarks (training P1.3) — compact port of the MCP classifier
+# (mcp/strength_helpers.classify_exercise + _VOLUME_LANDMARKS, core-mapping fix #186) since
+# the site-api package can't import mcp/. Keep in sync if the MCP map changes.
+_MUSCLE_MAP = [
+    (["bench press", "chest press", "pec deck", "fly", "flye", "push up", "pushup"], ["Chest", "Triceps", "Shoulders"]),
+    (["overhead press", "ohp", "shoulder press", "military press", "arnold"], ["Shoulders", "Triceps"]),
+    (["tricep", "skull crusher", "pushdown", "push down", "close grip", "dip"], ["Triceps", "Chest"]),
+    (["pull up", "pullup", "chin up", "chinup", "lat pulldown", "pull-up", "pull-down"], ["Back", "Biceps"]),
+    (["row", "cable row", "t-bar", "seated row"], ["Back", "Biceps"]),
+    (["deadlift"], ["Back", "Hamstrings", "Glutes", "Quads"]),
+    (["back extension", "hyperextension", "good morning"], ["Back", "Hamstrings", "Glutes"]),
+    (["bicep", "curl", "hammer curl"], ["Biceps"]),
+    (["squat", "goblet"], ["Quads", "Glutes", "Hamstrings"]),
+    (["leg press"], ["Quads", "Glutes", "Hamstrings"]),
+    (["lunge", "step up", "bulgarian"], ["Quads", "Glutes", "Hamstrings"]),
+    (["leg extension", "leg curl", "hamstring curl", "nordic"], ["Quads", "Hamstrings"]),
+    (["hip thrust", "glute bridge", "hip abduct", "hip adduct"], ["Glutes", "Hamstrings"]),
+    (["calf", "calves"], ["Calves"]),
+    (["plank", "crunch", "ab ", "abs ", "core", "oblique", "sit up", "situp", "hanging leg", "windshield",
+      "leg raise", "knee raise", "russian twist", "hollow", "rollout", "ab wheel", "pallof", "anti-rotation",
+      "anti rotation", "dead bug", "deadbug", "bird dog", "carry", "carries", "farmer", "suitcase", "woodchop", "wood chop"], ["Core"]),
+]
+_LANDMARKS = {
+    "Chest": {"MEV": 8, "MAV_lo": 12, "MAV_hi": 16, "MRV": 20},
+    "Back": {"MEV": 10, "MAV_lo": 14, "MAV_hi": 20, "MRV": 25},
+    "Shoulders": {"MEV": 8, "MAV_lo": 12, "MAV_hi": 20, "MRV": 25},
+    "Quads": {"MEV": 8, "MAV_lo": 12, "MAV_hi": 16, "MRV": 20},
+    "Hamstrings": {"MEV": 6, "MAV_lo": 10, "MAV_hi": 14, "MRV": 18},
+    "Glutes": {"MEV": 6, "MAV_lo": 10, "MAV_hi": 14, "MRV": 18},
+    "Biceps": {"MEV": 6, "MAV_lo": 10, "MAV_hi": 14, "MRV": 20},
+    "Triceps": {"MEV": 6, "MAV_lo": 10, "MAV_hi": 14, "MRV": 20},
+    "Calves": {"MEV": 8, "MAV_lo": 12, "MAV_hi": 16, "MRV": 20},
+    "Core": {"MEV": 4, "MAV_lo": 6, "MAV_hi": 16, "MRV": 25},
+}
+
+
+def _classify_muscles(name):
+    nl = (name or "").lower()
+    for kws, muscles in _MUSCLE_MAP:
+        if any(k in nl for k in kws):
+            return muscles
+    return ["Other"]
+
+
+def _compute_muscle_volume(hevy_items, num_weeks):
+    """Per-muscle working-set volume vs MEV/MAV/MRV landmarks (sets/week)."""
+    sets_by_muscle = {}
+    for day in hevy_items:
+        for ex in day.get("exercises") or day.get("workout_exercises") or []:
+            nm = ex.get("name") or ex.get("exercise_name") or ""
+            working = [s for s in (ex.get("sets") or []) if str(s.get("type") or s.get("set_type") or "normal").lower() != "warmup"]
+            n = len(working)
+            if not n:
+                continue
+            for m in _classify_muscles(nm):
+                if m == "Other":
+                    continue
+                sets_by_muscle[m] = sets_by_muscle.get(m, 0) + n
+    out = []
+    for m in sorted(sets_by_muscle, key=lambda x: sets_by_muscle[x], reverse=True):
+        spw = round(sets_by_muscle[m] / num_weeks, 1) if num_weeks else sets_by_muscle[m]
+        lm = _LANDMARKS.get(m, {"MEV": 0, "MAV_lo": 0, "MAV_hi": 0, "MRV": 99})
+        if spw < lm["MEV"]:
+            status = "under"
+        elif spw <= lm["MAV_hi"]:
+            status = "optimal"
+        elif spw <= lm["MRV"]:
+            status = "high"
+        else:
+            status = "over"
+        out.append({"muscle": m, "sets_per_week": spw, "total_sets": sets_by_muscle[m],
+                    "MEV": lm["MEV"], "MAV_lo": lm["MAV_lo"], "MAV_hi": lm["MAV_hi"], "MRV": lm["MRV"], "status": status})
+    return out
 
 
 def handle_nutrition_overview() -> dict:
@@ -857,6 +932,20 @@ def handle_training_overview() -> dict:
     # Hevy — latest strength session info
     hevy_items = _query_source("hevy", d30, today)
     strength_sessions_30d = len(hevy_items)
+    # P1.3 — per-muscle weekly volume vs MEV/MAV/MRV (core-mapping bug fixed upstream, #186).
+    _mv_weeks = max(1.0, min(30, _days_since_exp) / 7.0)
+    muscle_volume = _compute_muscle_volume(hevy_items, _mv_weeks)
+
+    # P2.3 — present-vs-PROVEN_BLUEPRINT training benchmark (NEVER public — flag stays OFF).
+    # With the flag off (default) training_reference is never queried; nothing blueprint-derived
+    # enters the public response (ADR-089: the blueprint may not surface to any public surface).
+    training_blueprint = None
+    if _TRAIN_BLUEPRINT_PUBLIC:
+        _tr = _query_source("training_reference", "2010-01-01", today)
+        _latest_tr = sorted(_tr, key=lambda x: x.get("sk", ""))[-1] if _tr else None
+        if _latest_tr:
+            training_blueprint = {"public": True, "confidence": _latest_tr.get("confidence"),
+                                  "note": "present training vs the proven loss-period blueprint"}
 
     # Weekly trend (for chart) — use flattened activities
     from collections import defaultdict as _dd
@@ -934,6 +1023,7 @@ def handle_training_overview() -> dict:
     _HEVY_CARDIO = {"cycling", "elliptical", "rowing", "treadmill", "stair", "ski erg", "ski-erg", "assault", "echo bike", "air bike"}
     _HEVY_MOBILITY = {"stretching", "stretch", "mobility", "yoga", "foam roll"}
     hevy_cardio_30d = _query_source("hevy", d30, today)
+    _hevy_cardio_min = 0.0  # P0.4: Hevy bike/elliptical steady-cardio minutes → Zone-2 base
     for w in sorted(hevy_cardio_30d, key=lambda x: x.get("date") or x.get("sk", ""), reverse=True):
         wdate = w.get("date") or w.get("sk", "").replace("DATE#", "")[:10]
         for ex in w.get("exercises") or []:
@@ -946,6 +1036,8 @@ def handle_training_overview() -> dict:
             sets = ex.get("sets") or []
             dist_m = sum(float(s.get("distance_m") or 0) for s in sets)
             secs = sum(float(s.get("duration_sec") or 0) for s in sets)
+            if is_cardio and secs:
+                _hevy_cardio_min += secs / 60.0
             cardio_sessions.append(
                 {
                     "date": wdate,
@@ -958,6 +1050,13 @@ def handle_training_overview() -> dict:
                 }
             )
     cardio_sessions = sorted(cardio_sessions, key=lambda x: x.get("date") or "", reverse=True)[:20]
+
+    # P0.4 — Zone-2 is cross-source: fold Hevy bike/elliptical minutes (logged steady
+    # cardio, no HR stream) into the Z2 base alongside Strava + Whoop. Never Strava-only.
+    if _hevy_cardio_min:
+        z2_minutes_30d += _hevy_cardio_min
+        z2_weekly_avg = round(z2_minutes_30d / 4.3)
+        z2_pct = round(z2_weekly_avg / z2_target * 100) if z2_target else 0
 
     return _ok(
         {
@@ -978,6 +1077,8 @@ def handle_training_overview() -> dict:
                 "avg_daily_steps": walking_data["avg_daily_steps"],
             },
             "modality_breakdown": modality_breakdown,
+            "muscle_volume": muscle_volume,
+            "training_blueprint": training_blueprint,
             "daily_modality_minutes_30d": daily_modality_minutes_30d,
             "walking": walking_data,
             "breathwork": breathwork_data,
@@ -1890,9 +1991,13 @@ def handle_strength_benchmarks() -> dict:
 
     try:
         items = _query_source("hevy", start_date, end_date)
-        # Find max weight for each target lift
+        # Find max weight for each target lift, AND a per-session (per-day) estimated-1RM
+        # history so the front-end can render the Lift Index trend (P0.1) — load moving up
+        # over weeks, never a 1RM target/goal.
         best = {}
+        history = {t: {} for t in targets}  # lift -> {date: best_e1rm_that_day}
         for day in items:
+            d = day.get("date") or day.get("sk", "").replace("DATE#", "")[:10]
             exercises = day.get("exercises") or day.get("workout_exercises") or []
             for ex in exercises:
                 name = ex.get("exercise_name") or ex.get("name") or ""
@@ -1908,15 +2013,18 @@ def handle_strength_benchmarks() -> dict:
                             reps = int(s.get("reps") or 0)
                             if w <= 0 or reps < 1 or reps > 12:
                                 continue
-                            e1rm = w * (1 + reps / 30.0)  # Epley estimated 1RM
+                            e1rm = w * (1 + reps / 30.0)  # Epley estimated 1RM (lb)
                             if e1rm > best.get(target_name, 0):
                                 best[target_name] = e1rm
+                            if d and e1rm > history[target_name].get(d, 0):
+                                history[target_name][d] = e1rm
 
         benchmarks = []
         for lift, target in targets.items():
             current = best.get(lift, 0)
             logged = current > 0  # a lift not performed in the window isn't "0 / 0%" — it's no-data
             exceeded = logged and current > target  # already past the goal → "exceeded", not "129%"
+            hist = [{"date": dd, "e1rm": round(history[lift][dd])} for dd in sorted(history[lift])]
             benchmarks.append(
                 {
                     "lift": lift,
@@ -1927,6 +2035,9 @@ def handle_strength_benchmarks() -> dict:
                     "progress_pct": (min(100, round((current / target) * 100)) if target > 0 else 0) if logged else None,
                     "exceeded": exceeded,
                     "logged": logged,
+                    # P0.1 Lift Index: per-session estimated-1RM trend (lb) + the count gate.
+                    "history": hist,
+                    "sessions": len(hist),
                 }
             )
 
