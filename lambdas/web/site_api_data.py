@@ -1081,8 +1081,9 @@ def handle_habits() -> dict:
             state = "holding"
         else:
             state = "needs_attention"
-        per_habit.append({"name": hname, "group": a["group"], "scheduled_days": sched,
-                          "completed_days": comp, "adherence_pct": pct, "state": state})
+        per_habit.append(
+            {"name": hname, "group": a["group"], "scheduled_days": sched, "completed_days": comp, "adherence_pct": pct, "state": state}
+        )
 
     return _ok(
         {
@@ -1461,10 +1462,19 @@ def _corr_card(cid, label, predictor, outcome, pred_series, outc_series, lag=0, 
             ys.append(float(outc_series[d2]))
     n = len(xs)
     card = {
-        "id": cid, "label": label, "predictor": predictor, "outcome": outcome,
-        "n": n, "overlap_weeks": round(n / 7, 1), "lag_days": lag,
-        "direction": "insufficient", "coefficient": None, "withheld": bool(withhold),
-        "confidence": "watching — too early", "noise": False, "note": note,
+        "id": cid,
+        "label": label,
+        "predictor": predictor,
+        "outcome": outcome,
+        "n": n,
+        "overlap_weeks": round(n / 7, 1),
+        "lag_days": lag,
+        "direction": "insufficient",
+        "coefficient": None,
+        "withheld": bool(withhold),
+        "confidence": "watching — too early",
+        "noise": False,
+        "note": note,
     }
     if n >= _CORR_MIN_DIR_DAYS:
         mx, my = sum(xs) / n, sum(ys) / n
@@ -1494,8 +1504,10 @@ def _whoop_daily(d30, today):
         if not dt:
             continue
         out[dt] = {
-            "recovery": _f(w.get("recovery_score")), "strain": _f(w.get("strain")),
-            "deep": _f(w.get("slow_wave_sleep_hours")), "hours": _f(w.get("sleep_duration_hours")),
+            "recovery": _f(w.get("recovery_score")),
+            "strain": _f(w.get("strain")),
+            "deep": _f(w.get("slow_wave_sleep_hours")),
+            "hours": _f(w.get("sleep_duration_hours")),
             "hrv": _f(w.get("hrv")),
         }
     return out
@@ -1524,17 +1536,32 @@ def handle_sleep_correlations() -> dict:
     cards = []
     # A1 (LEAD) — last night's recovery → today's training capacity (same-day; the only
     # arrow that changes tomorrow morning). Outcome proxy: the day's Whoop strain.
-    cards.append(_corr_card(
-        "A1", "Last night's recovery → today's training capacity", "sleep recovery", "day strain",
-        recovery, strain, lag=0,
-        note="The only arrow that changes tomorrow morning — high recovery should let the day carry more strain.",
-    ))
+    cards.append(
+        _corr_card(
+            "A1",
+            "Last night's recovery → today's training capacity",
+            "sleep recovery",
+            "day strain",
+            recovery,
+            strain,
+            lag=0,
+            note="The only arrow that changes tomorrow morning — high recovery should let the day carry more strain.",
+        )
+    )
     # A2 — day strain → next-night deep sleep (day-lagged: "did I earn it?").
     deep = {d: v["deep"] for d, v in wd.items() if v["deep"] is not None}
-    cards.append(_corr_card(
-        "A2", "Day strain → next-night deep sleep", "day strain", "deep sleep", strain, deep, lag=1,
-        note="Did I earn it? — yesterday's training load against tonight's deep sleep.",
-    ))
+    cards.append(
+        _corr_card(
+            "A2",
+            "Day strain → next-night deep sleep",
+            "day strain",
+            "deep sleep",
+            strain,
+            deep,
+            lag=1,
+            note="Did I earn it? — yesterday's training load against tonight's deep sleep.",
+        )
+    )
     # A3 — bed temp → deep sleep (mechanistic). Eight Sleep temp + score series.
     eight = {}
     for e in _query_source("eightsleep", d30, today):
@@ -1543,10 +1570,18 @@ def handle_sleep_correlations() -> dict:
             eight[dt] = {"temp": _f(e.get("bed_temp_f")), "score": _f(e.get("sleep_score"))}
     bed_temp = {d: v["temp"] for d, v in eight.items() if v["temp"] is not None}
     sleep_score = {d: v["score"] for d, v in eight.items() if v["score"] is not None}
-    cards.append(_corr_card(
-        "A3", "Bed temp → deep sleep", "bed temp", "deep sleep", bed_temp, deep, lag=0,
-        note="Mechanistic — cooler often means more deep sleep, within an optimal band (not monotonic).",
-    ))
+    cards.append(
+        _corr_card(
+            "A3",
+            "Bed temp → deep sleep",
+            "bed temp",
+            "deep sleep",
+            bed_temp,
+            deep,
+            lag=0,
+            note="Mechanistic — cooler often means more deep sleep, within an optimal band (not monotonic).",
+        )
+    )
     # A4 — last meal time → sleep score. MacroFactor food_log latest time per day.
     last_meal = {}
     for m in _query_source("macrofactor", d30, today):
@@ -1560,10 +1595,18 @@ def handle_sleep_correlations() -> dict:
                 pass
         if times and dt:
             last_meal[dt] = max(times)
-    cards.append(_corr_card(
-        "A4", "Last meal time → sleep score", "last meal", "sleep score", last_meal, sleep_score, lag=0,
-        note="Eating late can blunt the night — last-meal minutes against how the night scored.",
-    ))
+    cards.append(
+        _corr_card(
+            "A4",
+            "Last meal time → sleep score",
+            "last meal",
+            "sleep score",
+            last_meal,
+            sleep_score,
+            lag=0,
+            note="Eating late can blunt the night — last-meal minutes against how the night scored.",
+        )
+    )
     # B1 — decision fatigue (Todoist completed-task load) → sleep score. No app tracks this.
     todoist = {}
     for t in _query_source("todoist", d30, today):
@@ -1571,10 +1614,18 @@ def handle_sleep_correlations() -> dict:
         v = _f(t.get("completed_count") or t.get("tasks_completed") or t.get("completed") or t.get("completed_today"))
         if v is not None and dt:
             todoist[dt] = v
-    cards.append(_corr_card(
-        "B1", "Decision load (Todoist) → sleep score", "Todoist load", "sleep score", todoist, sleep_score, lag=0,
-        note="A heavy decision day against how the night scored — the cross-source signal no sleep app has.",
-    ))
+    cards.append(
+        _corr_card(
+            "B1",
+            "Decision load (Todoist) → sleep score",
+            "Todoist load",
+            "sleep score",
+            todoist,
+            sleep_score,
+            lag=0,
+            note="A heavy decision day against how the night scored — the cross-source signal no sleep app has.",
+        )
+    )
     # B2 — mood/journal → sleep (bidirectional). State-of-Mind valence as the mood proxy;
     # empty (n=0 → watching) when mood/journal logging is stale.
     mood = {}
@@ -1583,10 +1634,18 @@ def handle_sleep_correlations() -> dict:
         v = _f(sm.get("valence") or sm.get("mood") or sm.get("mood_valence"))
         if v is not None and dt:
             mood[dt] = v
-    cards.append(_corr_card(
-        "B2", "Mood → sleep score", "mood / valence", "sleep score", mood, sleep_score, lag=0,
-        note="Mood and sleep move together both ways — gated on active mood/journal logging; empty until entries accrue.",
-    ))
+    cards.append(
+        _corr_card(
+            "B2",
+            "Mood → sleep score",
+            "mood / valence",
+            "sleep score",
+            mood,
+            sleep_score,
+            lag=0,
+            note="Mood and sleep move together both ways — gated on active mood/journal logging; empty until entries accrue.",
+        )
+    )
     # B3 — day-of-week best duration. Not a Pearson pair; n=1/day at week one = noise.
     durations = {d: v["hours"] for d, v in wd.items() if v["hours"] is not None}
     dow = {}
@@ -1597,16 +1656,30 @@ def handle_sleep_correlations() -> dict:
             pass
     _wk = round(len(durations) / 7, 1)
     b3 = {
-        "id": "B3", "label": "Day-of-week → best sleep duration", "predictor": "day of week", "outcome": "sleep duration",
-        "n": len(durations), "overlap_weeks": _wk, "lag_days": 0, "coefficient": None, "withheld": False,
-        "direction": "fills in ~4 weeks", "confidence": "watching — needs ~4 weeks", "noise": True,
+        "id": "B3",
+        "label": "Day-of-week → best sleep duration",
+        "predictor": "day of week",
+        "outcome": "sleep duration",
+        "n": len(durations),
+        "overlap_weeks": _wk,
+        "lag_days": 0,
+        "coefficient": None,
+        "withheld": False,
+        "direction": "fills in ~4 weeks",
+        "confidence": "watching — needs ~4 weeks",
+        "noise": True,
         "note": "Which weekday sleeps best needs ~4 weeks — one Tuesday is not a pattern.",
     }
     if _wk >= 4 and dow:
         _best = max(dow, key=lambda k: sum(dow[k]) / len(dow[k]))
         _names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-        b3.update({"direction": f"best on {_names[_best]} ({round(sum(dow[_best]) / len(dow[_best]), 1)}h avg)",
-                   "confidence": "low confidence", "noise": False})
+        b3.update(
+            {
+                "direction": f"best on {_names[_best]} ({round(sum(dow[_best]) / len(dow[_best]), 1)}h avg)",
+                "confidence": "low confidence",
+                "noise": False,
+            }
+        )
     cards.append(b3)
     # C1 (shown LAST, labelled loudest) — sleep vs weight. HIGHEST false-positive risk in a
     # water-weight cut; the coefficient is HARD-WITHHELD until well past the early water phase
@@ -1617,10 +1690,19 @@ def handle_sleep_correlations() -> dict:
         v = _f(w.get("weight_lbs"))
         if v is not None and dt:
             weight[dt] = v
-    cards.append(_corr_card(
-        "C1", "Sleep → weight", "sleep score", "weight", sleep_score, weight, lag=0, withhold=True,
-        note="Highest false-positive risk in a water-weight cut — the coefficient stays withheld until well past the early water phase.",
-    ))
+    cards.append(
+        _corr_card(
+            "C1",
+            "Sleep → weight",
+            "sleep score",
+            "weight",
+            sleep_score,
+            weight,
+            lag=0,
+            withhold=True,
+            note="Highest false-positive risk in a water-weight cut — the coefficient stays withheld until well past the early water phase.",
+        )
+    )
 
     return _ok({"cards": cards, "min_coef_days": _CORR_MIN_COEF_DAYS, "as_of": today}, cache_seconds=3600)
 
@@ -1968,10 +2050,59 @@ def handle_habit_registry() -> dict:
                 groups.append(g)
         groups.sort(key=lambda g: (g == "Other", g.lower()))
         habits.sort(key=lambda x: ((x.get("group") or "Other") == "Other", (x.get("group") or "Other").lower(), x.get("name", "").lower()))
-        return _ok({"habits": habits, "groups": groups, "count": len(habits), "source": source}, cache_seconds=3600)
+        # P1.1 — auto-derived taxonomy (time-of-day / type / logical group), labeled derived.
+        for h in habits:
+            h["taxonomy"] = _derive_habit_taxonomy(h.get("name", ""))
+        return _ok(
+            {"habits": habits, "groups": groups, "count": len(habits), "source": source, "taxonomy_derived": True},
+            cache_seconds=3600,
+        )
     except Exception as e:
         logger.error(f"[habit_registry] Error: {e}")
         return _error(500, "Failed to load habit registry")
+
+
+_TAX_TIME = [
+    ("morning", ("morning", "wake", "wakeup", "wake-up", "am ", "breakfast", "sunrise", "first thing", "dawn")),
+    ("evening", ("evening", "night", "bed", "bedtime", "pm ", "dinner", "sunset", "wind down", "wind-down", "before sleep")),
+    ("midday", ("lunch", "midday", "afternoon", "noon")),
+]
+_TAX_AVOID = ("no ", "avoid", "quit", "limit", "less ", "skip", "cut ", "abstain", "stop ", "zero ")
+_TAX_MAINTAIN = ("track", "log ", "logging", "weigh", "measure", "record", "review", "check ", "plan ")
+_TAX_GROUP_HINTS = [
+    ("Nutrition", ("eat", "protein", "hydrate", "water", "meal", "calorie", "macro", "veg", "food", "supplement", "creatine", "fiber")),
+    ("Training", ("walk", "run", "lift", "workout", "train", "gym", "steps", "stretch", "mobility", "cardio", "zone", "ruck")),
+    ("Recovery", ("sleep", "bed", "meditat", "breath", "sauna", "cold", "plunge", "rest", "recovery", "nap", "sunlight")),
+    ("Mind", ("read", "journal", "write", "learn", "study", "gratitude", "reflect", "focus", "deep work")),
+]
+
+
+def _derive_habit_taxonomy(name: str) -> dict:
+    """P1.1 — deterministic, name-only inference of a habit's context.
+
+    Re-derives time-of-day, type (do/avoid/maintain) and a logical group from the
+    habit *name* (Habitify's stored area is storage, not logic). Heuristic + n=1:
+    always returned under ``derived: True`` and labeled "auto-derived" on the surface,
+    never presented as fact. No causal claims — this only classifies, it does not score.
+    """
+    n = f" {(name or '').lower().strip()} "
+    time_of_day = "anytime"
+    for label, keys in _TAX_TIME:
+        if any(k in n for k in keys):
+            time_of_day = label
+            break
+    if any(k in n for k in _TAX_AVOID):
+        htype = "avoid"
+    elif any(k in n for k in _TAX_MAINTAIN):
+        htype = "maintain"
+    else:
+        htype = "do"
+    group = None
+    for g, keys in _TAX_GROUP_HINTS:
+        if any(k in n for k in keys):
+            group = g
+            break
+    return {"time_of_day": time_of_day, "type": htype, "group": group, "derived": True}
 
 
 def _habits_from_habitify() -> list:
