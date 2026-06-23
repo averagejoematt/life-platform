@@ -71,6 +71,58 @@ export function lineChart(data, { valueKey = "value", dateKey = "date", goal = n
     `<figcaption class="chart-cap label">${escAttr(label)}${goal != null ? ` · goal ${escAttr(goal)}${escAttr(unit)}` : ""}${_span ? ` · ${escAttr(_span)}` : ""} · ${pts.length} pts</figcaption></figure>`;
 }
 
+// P0.1 — the trend-weight hero. Dual-layer: faint TRUE daily dots (scale noise) + a
+// confident ember TREND line (centered moving average, down-weights water/food noise).
+// HARD RULE 4: the goal NEVER anchors the y-axis (that flattens the real slope) — the axis
+// comes from the weight data alone; the goal is a caption annotation only. Genesis is marked
+// as a vertical rule. x is positioned by real DATE so an irregular weigh-in cadence and the
+// genesis line both land truthfully. Refuses <4 points. readings: [{date, weight_lbs}].
+export function weightTrendChart(readings, { goal = null, genesis = null, valueKey = "weight_lbs", height = 170, label = "" } = {}) {
+  const pts = (readings || [])
+    .map((r) => ({ v: Number(r[valueKey]), d: String(r.date || "") }))
+    .filter((p) => Number.isFinite(p.v) && /^\d{4}-\d{2}-\d{2}/.test(p.d))
+    .sort((a, b) => a.d.localeCompare(b.d));
+  if (pts.length < 4) {
+    const n = pts.length, latest = n ? `Latest ${_w(pts[n - 1].v)} lb` : "";
+    const msg = n < 1 ? "The weight trend draws in as weigh-ins accrue."
+      : `${latest} · ${n} weigh-in${n === 1 ? "" : "s"} so far — the trend line draws in at 4+.`;
+    return `<figure class="chart chart--empty"><figcaption class="chart-cap label">${escAttr(msg)}</figcaption></figure>`;
+  }
+  const W = 600, H = height, P = 10;
+  const t0 = Date.parse(pts[0].d), t1 = Date.parse(pts[pts.length - 1].d);
+  const span = Math.max(1, t1 - t0);
+  // y-domain from the RAW WEIGHTS ONLY — goal deliberately excluded (HARD RULE 4).
+  let min = Math.min(...pts.map((p) => p.v)), max = Math.max(...pts.map((p) => p.v));
+  const pad = Math.max(1, (max - min) * 0.12); min -= pad; max += pad;
+  const x = (iso) => P + ((Date.parse(iso) - t0) / span) * (W - 2 * P);
+  const y = (v) => P + (1 - (v - min) / (max - min)) * (H - 2 * P);
+  // Centered moving average — symmetric window, edge-clamped (no lag, honest smoothing).
+  const k = Math.min(3, Math.floor((pts.length - 1) / 2));
+  const trend = pts.map((_, i) => {
+    let s = 0, c = 0;
+    for (let j = Math.max(0, i - k); j <= Math.min(pts.length - 1, i + k); j++) { s += pts[j].v; c++; }
+    return { v: s / c, d: pts[i].d };
+  });
+  const dots = pts.map((p) => `<circle class="wt-raw" cx="${x(p.d).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="2.2"/>`).join("");
+  const trendLine = trend.map((p, i) => `${i ? "L" : "M"}${x(p.d).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ");
+  const last = trend[trend.length - 1], lastRaw = pts[pts.length - 1];
+  const gMark = (genesis && Date.parse(genesis) >= t0 && Date.parse(genesis) <= t1)
+    ? `<line class="wt-genesis" x1="${x(genesis).toFixed(1)}" y1="${P}" x2="${x(genesis).toFixed(1)}" y2="${(H - P).toFixed(1)}" vector-effect="non-scaling-stroke"/>`
+    : "";
+  const _r = (n) => Math.round(n * 10) / 10;
+  const gap = goal != null ? _r(lastRaw.v - Number(goal)) : null;
+  const summary = `Weight trend: ${pts.length} weigh-ins ${_shortDate(pts[0].d)}–${_shortDate(lastRaw.d)}, smoothed trend now ${_r(last.v)} lb${goal != null ? `, goal ${_r(Number(goal))} lb (${gap} lb away)` : ""}.`;
+  return `<figure class="chart wt-chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}">` +
+    gMark +
+    `<path class="wt-trend" d="${trendLine}" fill="none" vector-effect="non-scaling-stroke"/>` +
+    `${dots}` +
+    `<circle class="chart-dot" cx="${x(lastRaw.d).toFixed(1)}" cy="${y(last.v).toFixed(1)}" r="3.5"/></svg>` +
+    `<figcaption class="chart-cap label">${escAttr(label || "Weight")}` +
+    ` · <span class="wt-key"><i class="wt-swatch wt-swatch-raw"></i>faint dots = daily scale (water/food noise)</span>` +
+    ` <span class="wt-key"><i class="wt-swatch wt-swatch-trend"></i>line = smoothed trend</span>` +
+    `${genesis ? " · genesis marked" : ""}${goal != null ? ` · goal ${_r(Number(goal))} lb, ${gap} lb away (annotation, not the axis floor)` : ""}</figcaption></figure>`;
+}
+
 // Two overlaid trajectories on a shared scale — ember = primary (A), muted = reference (B).
 // For the reconciliation view (projected loss vs actual). Refuses if either series < 4 pts.
 // No correlation/Pearson — that's gated elsewhere by the ≥2-week rule. seriesA/B: [{date,value}].

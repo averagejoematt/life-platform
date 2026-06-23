@@ -454,6 +454,15 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .chart-goal { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 3 4; }
 .chart-down { stroke: var(--ink-muted); stroke-width: 1.5; stroke-dasharray: 4 3; }
 .chart-dot { fill: var(--ember); }
+/* P0.1 — trend-weight hero: faint raw daily dots (scale noise) + confident ember trend +
+   a muted genesis rule. Ember = the smoothed signal; dots are deliberately faint. */
+.wt-trend { stroke: var(--ember); stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; }
+.wt-raw { fill: var(--ink-faint); opacity: 0.45; }
+.wt-genesis { stroke: var(--ink-muted); stroke-width: 1; stroke-dasharray: 2 4; }
+.wt-key { white-space: nowrap; }
+.wt-swatch { display: inline-block; width: 0.7em; height: 0.7em; vertical-align: baseline; margin-right: 0.25em; border-radius: 2px; }
+.wt-swatch-raw { background: var(--ink-faint); opacity: 0.5; border-radius: 50%; }
+.wt-swatch-trend { background: var(--ember); height: 0.22em; border-radius: 1px; }
 .chart-cap { display: block; margin-top: var(--sp-2); color: var(--ink-faint); }
 .chart--empty { border: var(--honest-border); border-radius: var(--radius-xs); padding: var(--sp-4); text-align: center; }
 .chart--empty .chart-cap { margin: 0; }
