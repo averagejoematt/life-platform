@@ -782,6 +782,24 @@ function renderExperiments(d) {
   const pipeSec = pipeline.length ? sec(`In the pipeline (${pipeline.length})`, `<div class="rd-cards">${pipeline.slice(0, 60).map(libCard).join("")}</div>`) : "";
   return head + runSec + pipeSec + note("N=1 instrument. “Running now” are live on the ledger; the pipeline is the experiment library — candidates not yet run.");
 }
+// §0 keystone hero (P0.1) — THE honesty fix. The old panel showed a bare Pearson (r=0.88,
+// n=7) as if proven. Rebuild: lead with the group + direction + STRENGTH word; n is the
+// loudest element, stamped "early signal, not proven"; coefficient/chip WITHHELD until >=2
+// weeks overlap. Two-voice. Binds keystone_correlations.
+function habitsKeystone(corrs) {
+  if (!corrs || !corrs.length) return "";
+  const k = corrs[0]; // strongest by |r|
+  const n = k.n_days;
+  const ready = n >= 14;
+  const dir = k.correlation_r >= 0 ? "moves up with" : "moves against";
+  const strength = Math.abs(k.correlation_r) >= 0.6 ? "strong" : Math.abs(k.correlation_r) >= 0.3 ? "moderate" : "faint";
+  const machine = `${ttl(k.group)} ${dir} the day grade · ${strength} direction · n=${fmt(n)} days — early signal, not proven${ready ? "" : " · coefficient withheld until 2 weeks"}`;
+  const serif = `Of everything tracked, ${ttl(k.group)} is the group most pulling the day up so far. On ~${fmt(n)} days that's a lead, not a law — the number to trust here is n, not a coefficient. ${ready ? "It now has the overlap to carry a real correlation, below." : "It earns a real coefficient once there are two weeks of overlap."}`;
+  const chip = ready ? correlationChip([{ label: k.group, r: k.correlation_r, n }], { outcome: "the day grade" }) : "";
+  return sec("The keystone — one early signal, not a law",
+    `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(machine)}</p><p class="tv-human">${esc(serif)}</p></div>` + chip +
+    `<p class="rd-meta label">What would sharpen this: more overlapping days. At ~1 week it's direction-only; the magnitude is withheld until the n is honest.</p>`);
+}
 async function renderHabits(d) {
   const dows = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const a = d.day_of_week_avgs || [];
@@ -814,13 +832,12 @@ async function renderHabits(d) {
     : "";
   // Adherence trend (the long-run consistency story the 7-cell grid only hinted at).
   const trend = (d.history || []).length ? sec("Adherence trend", lineChart(d.history, { valueKey: "tier0_pct", unit: "%", label: "Daily Tier-0 adherence", emptyMsg: "The adherence curve fills as days accrue." })) : "";
-  // The signature panel: which habit groups actually track with the day grade (correlative, N=1).
-  const kc = (d.keystone_correlations || []).map((c) => ({ label: c.group, r: c.correlation_r, n: c.n_days }));
-  const corr = kc.length ? sec("Which habits move the needle", correlationChip(kc, { label: "Habit group ↔ day grade", outcome: "the day grade" })) : "";
+  // §0 — keystone hero, honesty-rebuilt (P0.1): leads the page, n-forward, coefficient withheld.
+  const keystone = habitsKeystone(d.keystone_correlations);
   // Completion by group (the per-group averages the page computed but never showed).
   const ga = Object.entries(d.group_90d_avgs || {}).map(([g, p]) => ({ label: g, value: p })).sort((x, y) => y.value - x.value);
   const groupBars = ga.length ? sec("Completion by group", barChart(ga, { valueKey: "value", labelKey: "label", label: "Avg completion %" })) : "";
-  return head + corr + trend + grid + dow + groupBars + list + note("Everything I'm trying to do — sourced from Habitify. Correlations are N=1, not cause. Private habits are never shown.");
+  return keystone + head + trend + grid + dow + groupBars + list + note("Everything I'm trying to do — sourced from Habitify. Correlations are N=1, not cause. Private habits are never shown.");
 }
 // The board — pick an expert, read their actual per-domain take + track record.
 async function renderBoard(d) {
