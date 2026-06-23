@@ -1536,6 +1536,17 @@ def handle_sleep_correlations() -> dict:
         "A4", "Last meal time → sleep score", "last meal", "sleep score", last_meal, sleep_score, lag=0,
         note="Eating late can blunt the night — last-meal minutes against how the night scored.",
     ))
+    # B1 — decision fatigue (Todoist completed-task load) → sleep score. No app tracks this.
+    todoist = {}
+    for t in _query_source("todoist", d30, today):
+        dt = t.get("date") or t.get("sk", "").replace("DATE#", "")[:10]
+        v = _f(t.get("completed_count") or t.get("tasks_completed") or t.get("completed") or t.get("completed_today"))
+        if v is not None and dt:
+            todoist[dt] = v
+    cards.append(_corr_card(
+        "B1", "Decision load (Todoist) → sleep score", "Todoist load", "sleep score", todoist, sleep_score, lag=0,
+        note="A heavy decision day against how the night scored — the cross-source signal no sleep app has.",
+    ))
 
     return _ok({"cards": cards, "min_coef_days": _CORR_MIN_COEF_DAYS, "as_of": today}, cache_seconds=3600)
 
