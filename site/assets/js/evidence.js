@@ -598,6 +598,13 @@ async function renderSleep(d) {
         : `<p class="rd-meta label">Social jet-lag — the weekday-vs-weekend bedtime drift — fills in once there's a weekend in the window. Regularity predicts more than single-night architecture.</p>`;
       parts.push(sec("Regularity — when, not just how long", figs([s.avg_bedtime && fig(s.avg_bedtime, "avg bedtime"), s.avg_waketime && fig(s.avg_waketime, "avg wake")]) + _sjl));
     }
+    // §4 — stage composition over the week (P0.5): stacked hours/night, refuses <4.
+    const _stageNights = (d.sleep_trend || []).map((n) => {
+      if (n.deep_sleep_hours == null || n.rem_sleep_hours == null) return null;
+      const light = n.hours != null ? Math.max(0, n.hours - n.deep_sleep_hours - n.rem_sleep_hours) : 0;
+      return { date: n.date, deep: n.deep_sleep_hours, rem: n.rem_sleep_hours, light };
+    }).filter(Boolean);
+    if (_stageNights.length) parts.push(sec("Stage composition over the week", stackedDayColumns(_stageNights, [{ key: "deep", label: "deep", tone: "lift" }, { key: "rem", label: "REM", tone: "cardio" }, { key: "light", label: "light", tone: "mob" }], { label: "hours by stage · per night", legendUnit: "h", minPoints: 4, emptyMsg: "Stage composition draws in at 4+ nights." })));
     parts.push(sec("Stages & physiology", kvtable({ whoop_quality: s.whoop_quality, bed_temp_f: s.bed_temp_f })));
     parts.push(sec("Sleep-score trend · latest = last night", lineChart(d.sleep_trend || [], { valueKey: "sleep_score", label: "Sleep score · nightly", emptyMsg: "The sleep-score trend fills in nightly." })));
   }

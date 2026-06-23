@@ -266,12 +266,12 @@ export function landmarkBars(items, { label = "" } = {}) {
 // Generic per-day stacked-category columns — segments are an ember-derived ramp (tone keys
 // map to seg-<tone> CSS, e.g. lift=ember / cardio=ember-tint / mob=muted ink). NO second hue.
 // days: [{date, [seg.key]: minutes}]; segments: [{key, label, tone}].
-export function stackedDayColumns(days, segments, { label = "", legendUnit = "min", emptyMsg = "" } = {}) {
+export function stackedDayColumns(days, segments, { label = "", legendUnit = "min", emptyMsg = "", minPoints = 1 } = {}) {
   const rows = (days || []).map((d) => {
     const segs = segments.map((s) => ({ ...s, v: Number(d[s.key]) || 0 }));
     return { d: d.date, segs, total: segs.reduce((a, s) => a + s.v, 0) };
   }).filter((r) => r.total > 0);
-  if (!rows.length) return `<figure class="chart chart--empty"><figcaption class="chart-cap label">${escAttr(emptyMsg || "Fills in as sessions accrue.")}</figcaption></figure>`;
+  if (rows.length < minPoints) return `<figure class="chart chart--empty"><figcaption class="chart-cap label">${escAttr(emptyMsg || `Fills in at ${minPoints}+ points — ${rows.length} so far.`)}</figcaption></figure>`;
   const max = Math.max(...rows.map((r) => r.total));
   const h = (v) => `${((v / max) * 100).toFixed(1)}%`;
   const col = (r) => {
