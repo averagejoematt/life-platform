@@ -623,7 +623,7 @@ async function renderSleep(d) {
         figs([_rec != null && fig(fmt(_rec), "recovery"), s.hrv != null && fig(fmt(s.hrv) + "ms", "HRV"), s.rhr != null && fig(fmt(s.rhr), "resting HR")]) +
         `<p class="rd-meta label">Tonight's autonomic state: <strong>${esc(state)}</strong>. HRV up + RHR down = the body downshifting into recovery. A one-night state snapshot — honest at n=1, not a claimed relationship.</p>`));
     }
-    parts.push(sec("Sleep-score trend · latest = last night", lineChart(d.sleep_trend || [], { valueKey: "sleep_score", label: "Sleep score · nightly", emptyMsg: "The sleep-score trend fills in nightly." })));
+    parts.push(sec("Sleep-score trend · latest = last night", lineChart(d.sleep_trend || [], { valueKey: "sleep_score", label: "Sleep score · nightly", spine: true, emptyMsg: "The sleep-score trend fills in nightly." })));
   }
   // Unified sleep — Whoop + Eight Sleep + Apple merged, best source per field.
   if (uni && uni.available) {
