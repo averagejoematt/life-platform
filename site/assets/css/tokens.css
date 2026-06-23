@@ -308,6 +308,16 @@ a { color: inherit; text-underline-offset: 0.18em; }
   }
 }
 
+/* Per-muscle volume landmark bars (training §5, P1.3) — MEV–MAV band shaded, MRV tick;
+   ember in the optimal band, muted ink under/over (never red). Reuses the .suf-row grid. */
+.lmk-track { position: relative; height: 10px; border-radius: 5px; background: var(--surface-2, var(--surface)); }
+.lmk-band { position: absolute; top: 0; height: 100%; background: var(--ember-wash);
+  border-left: 1px dashed var(--ink-faint); border-right: 1px dashed var(--ink-faint); }
+.lmk-fill { position: absolute; top: 0; height: 100%; border-radius: 5px; }
+.lmk-fill.suf-ember { background: var(--ember); }
+.lmk-fill.suf-ink { background: var(--ink-muted); }
+.lmk-mrv { position: absolute; top: -2px; width: 1px; height: 14px; background: var(--ink-faint); }
+
 /* The Lift Index (training §2, P0.1) — per-lift load TREND tiles (sparkline + ▲/▼/flat).
    Ember = load up; down = muted ink, NEVER red; under 3 sessions = honest fills-in tile. */
 .li-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--sp-3); margin-top: var(--sp-3); }

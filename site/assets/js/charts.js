@@ -222,6 +222,27 @@ export function heatStrip(days, { valueKey = "value", label = "", unit = "", div
     `<figcaption class="chart-cap label">${escAttr(label)} — ember intensity = volume; low days shown muted, not hidden.</figcaption></figure>`;
 }
 
+// Per-muscle volume vs MEV/MAV/MRV landmark bars (training §5). Track 0→max; the MEV–MAV
+// optimal band shaded; value bar ember when in the optimal band, muted ink otherwise (under/
+// over — never red); an MRV tick. items: [{muscle, sets_per_week, MEV, MAV_lo, MAV_hi, MRV, status}].
+export function landmarkBars(items, { label = "" } = {}) {
+  const rows = (items || []).filter((m) => Number.isFinite(Number(m.sets_per_week)));
+  if (!rows.length) return `<figure class="chart chart--empty"><figcaption class="chart-cap label">Per-muscle volume fills in as sessions accrue.</figcaption></figure>`;
+  const max = Math.max(...rows.map((m) => Math.max(Number(m.MRV) || 0, Number(m.sets_per_week)))) || 1;
+  const pos = (x) => Math.max(0, Math.min(100, (Number(x) / max) * 100));
+  const row = (m) => {
+    const tone = m.status === "optimal" ? "suf-ember" : "suf-ink";
+    const bandL = pos(m.MEV), bandW = pos(m.MAV_hi) - pos(m.MEV);
+    return `<div class="suf-row" role="img" aria-label="${escAttr(`${m.muscle}: ${m.sets_per_week} sets per week — ${m.status}`)}"><span class="suf-l">${escAttr(m.muscle)}</span>` +
+      `<span class="lmk-track"><span class="lmk-band" style="left:${bandL.toFixed(1)}%;width:${Math.max(0, bandW).toFixed(1)}%"></span>` +
+      `<span class="lmk-fill ${tone}" style="width:${pos(m.sets_per_week).toFixed(1)}%"></span>` +
+      `<span class="lmk-mrv" style="left:${pos(m.MRV).toFixed(1)}%"></span></span>` +
+      `<span class="suf-v mono">${m.sets_per_week}/wk<span class="suf-amt">${escAttr(m.status)}</span></span></div>`;
+  };
+  return `<figure class="chart"><div class="suf-rows">${rows.map(row).join("")}</div>` +
+    `<figcaption class="chart-cap label">Sets/week vs the MEV–MAV optimal band (shaded) · MRV tick. ${escAttr(label)}</figcaption></figure>`;
+}
+
 // Generic per-day stacked-category columns — segments are an ember-derived ramp (tone keys
 // map to seg-<tone> CSS, e.g. lift=ember / cardio=ember-tint / mob=muted ink). NO second hue.
 // days: [{date, [seg.key]: minutes}]; segments: [{key, label, tone}].

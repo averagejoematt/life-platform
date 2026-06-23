@@ -41,6 +41,80 @@ from web.site_api_common import (
 _DELIVERY_PUBLIC = os.environ.get("NUTRITION_DELIVERY_PUBLIC", "").strip().lower() in ("1", "true", "yes")
 _BLUEPRINT_PUBLIC = os.environ.get("NUTRITION_BLUEPRINT_PUBLIC", "").strip().lower() in ("1", "true", "yes")
 
+# ── Per-muscle volume vs landmarks (training P1.3) — compact port of the MCP classifier
+# (mcp/strength_helpers.classify_exercise + _VOLUME_LANDMARKS, core-mapping fix #186) since
+# the site-api package can't import mcp/. Keep in sync if the MCP map changes.
+_MUSCLE_MAP = [
+    (["bench press", "chest press", "pec deck", "fly", "flye", "push up", "pushup"], ["Chest", "Triceps", "Shoulders"]),
+    (["overhead press", "ohp", "shoulder press", "military press", "arnold"], ["Shoulders", "Triceps"]),
+    (["tricep", "skull crusher", "pushdown", "push down", "close grip", "dip"], ["Triceps", "Chest"]),
+    (["pull up", "pullup", "chin up", "chinup", "lat pulldown", "pull-up", "pull-down"], ["Back", "Biceps"]),
+    (["row", "cable row", "t-bar", "seated row"], ["Back", "Biceps"]),
+    (["deadlift"], ["Back", "Hamstrings", "Glutes", "Quads"]),
+    (["back extension", "hyperextension", "good morning"], ["Back", "Hamstrings", "Glutes"]),
+    (["bicep", "curl", "hammer curl"], ["Biceps"]),
+    (["squat", "goblet"], ["Quads", "Glutes", "Hamstrings"]),
+    (["leg press"], ["Quads", "Glutes", "Hamstrings"]),
+    (["lunge", "step up", "bulgarian"], ["Quads", "Glutes", "Hamstrings"]),
+    (["leg extension", "leg curl", "hamstring curl", "nordic"], ["Quads", "Hamstrings"]),
+    (["hip thrust", "glute bridge", "hip abduct", "hip adduct"], ["Glutes", "Hamstrings"]),
+    (["calf", "calves"], ["Calves"]),
+    (["plank", "crunch", "ab ", "abs ", "core", "oblique", "sit up", "situp", "hanging leg", "windshield",
+      "leg raise", "knee raise", "russian twist", "hollow", "rollout", "ab wheel", "pallof", "anti-rotation",
+      "anti rotation", "dead bug", "deadbug", "bird dog", "carry", "carries", "farmer", "suitcase", "woodchop", "wood chop"], ["Core"]),
+]
+_LANDMARKS = {
+    "Chest": {"MEV": 8, "MAV_lo": 12, "MAV_hi": 16, "MRV": 20},
+    "Back": {"MEV": 10, "MAV_lo": 14, "MAV_hi": 20, "MRV": 25},
+    "Shoulders": {"MEV": 8, "MAV_lo": 12, "MAV_hi": 20, "MRV": 25},
+    "Quads": {"MEV": 8, "MAV_lo": 12, "MAV_hi": 16, "MRV": 20},
+    "Hamstrings": {"MEV": 6, "MAV_lo": 10, "MAV_hi": 14, "MRV": 18},
+    "Glutes": {"MEV": 6, "MAV_lo": 10, "MAV_hi": 14, "MRV": 18},
+    "Biceps": {"MEV": 6, "MAV_lo": 10, "MAV_hi": 14, "MRV": 20},
+    "Triceps": {"MEV": 6, "MAV_lo": 10, "MAV_hi": 14, "MRV": 20},
+    "Calves": {"MEV": 8, "MAV_lo": 12, "MAV_hi": 16, "MRV": 20},
+    "Core": {"MEV": 4, "MAV_lo": 6, "MAV_hi": 16, "MRV": 25},
+}
+
+
+def _classify_muscles(name):
+    nl = (name or "").lower()
+    for kws, muscles in _MUSCLE_MAP:
+        if any(k in nl for k in kws):
+            return muscles
+    return ["Other"]
+
+
+def _compute_muscle_volume(hevy_items, num_weeks):
+    """Per-muscle working-set volume vs MEV/MAV/MRV landmarks (sets/week)."""
+    sets_by_muscle = {}
+    for day in hevy_items:
+        for ex in day.get("exercises") or day.get("workout_exercises") or []:
+            nm = ex.get("name") or ex.get("exercise_name") or ""
+            working = [s for s in (ex.get("sets") or []) if str(s.get("type") or s.get("set_type") or "normal").lower() != "warmup"]
+            n = len(working)
+            if not n:
+                continue
+            for m in _classify_muscles(nm):
+                if m == "Other":
+                    continue
+                sets_by_muscle[m] = sets_by_muscle.get(m, 0) + n
+    out = []
+    for m in sorted(sets_by_muscle, key=lambda x: sets_by_muscle[x], reverse=True):
+        spw = round(sets_by_muscle[m] / num_weeks, 1) if num_weeks else sets_by_muscle[m]
+        lm = _LANDMARKS.get(m, {"MEV": 0, "MAV_lo": 0, "MAV_hi": 0, "MRV": 99})
+        if spw < lm["MEV"]:
+            status = "under"
+        elif spw <= lm["MAV_hi"]:
+            status = "optimal"
+        elif spw <= lm["MRV"]:
+            status = "high"
+        else:
+            status = "over"
+        out.append({"muscle": m, "sets_per_week": spw, "total_sets": sets_by_muscle[m],
+                    "MEV": lm["MEV"], "MAV_lo": lm["MAV_lo"], "MAV_hi": lm["MAV_hi"], "MRV": lm["MRV"], "status": status})
+    return out
+
 
 def handle_nutrition_overview() -> dict:
     """
@@ -857,6 +931,9 @@ def handle_training_overview() -> dict:
     # Hevy — latest strength session info
     hevy_items = _query_source("hevy", d30, today)
     strength_sessions_30d = len(hevy_items)
+    # P1.3 — per-muscle weekly volume vs MEV/MAV/MRV (core-mapping bug fixed upstream, #186).
+    _mv_weeks = max(1.0, min(30, _days_since_exp) / 7.0)
+    muscle_volume = _compute_muscle_volume(hevy_items, _mv_weeks)
 
     # Weekly trend (for chart) — use flattened activities
     from collections import defaultdict as _dd
@@ -988,6 +1065,7 @@ def handle_training_overview() -> dict:
                 "avg_daily_steps": walking_data["avg_daily_steps"],
             },
             "modality_breakdown": modality_breakdown,
+            "muscle_volume": muscle_volume,
             "daily_modality_minutes_30d": daily_modality_minutes_30d,
             "walking": walking_data,
             "breathwork": breathwork_data,
