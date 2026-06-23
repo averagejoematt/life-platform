@@ -591,6 +591,13 @@ async function renderSleep(d) {
       if (s.light_pct != null && s.deep_sleep_hours != null && s.rem_sleep_hours != null) _dev.push({ label: "Light", a: s.light_pct, b: Math.max(0, 100 - (s.deep_sleep_hours / _wh) * 100 - (s.rem_sleep_hours / _wh) * 100) });
     }
     if (_dev.length) parts.push(sec("Two devices, one night — agreement, not truth", dumbbell(_dev, { label: "% of night per stage", aLabel: "Eight Sleep", bLabel: "Whoop", unit: "%" }) + `<p class="rd-meta label">Wearable staging is an estimate, not a sleep-lab PSG. The gap between two devices is the honest uncertainty — agreement, not truth.</p>`));
+    // §3 — regularity / consistency + social jet-lag (P0.4). Empty state until a weekend.
+    if (s.avg_bedtime || s.avg_waketime) {
+      const _sjl = (s.social_jet_lag_hrs != null && s.avg_bedtime_weekday && s.avg_bedtime_weekend)
+        ? `<p class="rd-meta label">Social jet-lag <strong>${fmt(s.social_jet_lag_hrs)}h</strong> — the drift between weekday (${esc(s.avg_bedtime_weekday)}) and weekend (${esc(s.avg_bedtime_weekend)}) bedtime. Regularity predicts more than any single night's architecture.</p>`
+        : `<p class="rd-meta label">Social jet-lag — the weekday-vs-weekend bedtime drift — fills in once there's a weekend in the window. Regularity predicts more than single-night architecture.</p>`;
+      parts.push(sec("Regularity — when, not just how long", figs([s.avg_bedtime && fig(s.avg_bedtime, "avg bedtime"), s.avg_waketime && fig(s.avg_waketime, "avg wake")]) + _sjl));
+    }
     parts.push(sec("Stages & physiology", kvtable({ whoop_quality: s.whoop_quality, bed_temp_f: s.bed_temp_f })));
     parts.push(sec("Sleep-score trend · latest = last night", lineChart(d.sleep_trend || [], { valueKey: "sleep_score", label: "Sleep score · nightly", emptyMsg: "The sleep-score trend fills in nightly." })));
   }
