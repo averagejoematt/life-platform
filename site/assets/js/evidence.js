@@ -217,11 +217,29 @@ function physicalDexaCountdown(d) {
     `<div class="dx-count"><span class="dx-days mono">${days > 0 ? "~" + days : "due"}</span><span class="dx-unit label">${days > 0 ? "days to the recommended scan two" : "scan two is due"}</span></div>` +
     `<p class="rd-meta label">The last DEXA was ${sinceLast} days ago, <strong>pre-cut</strong>. A second scan around <strong>${tStr}</strong> — roughly ten weeks into the cut — is when fat-vs-lean change finally clears the scan's own error bar and composition <em>velocity</em> becomes real. It isn't booked yet; scheduling it is the next data-capture step, and it's what this countdown is waiting on. Everything below is that one pre-cut scan — a dated snapshot, not a trend.</p>`);
 }
-// (temporary — restructured into the dated Tier-2 composition arc across P1.x)
+// P1.2 — DEXA baseline as ONE dated stacked bar (lean vs fat). A snapshot, never a trend:
+// lean is ember (the asset the cut protects), fat muted ink. Dated + pre-cut-labeled, with
+// the honest line that this is where the cut STARTED — the scale above shows where it is now.
+function _physDexaAgeDays(scanDate) {
+  const t = Date.parse(scanDate); if (!Number.isFinite(t)) return null;
+  const today = new Date(); return Math.round((Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()) - t) / 86400000);
+}
+function physicalDexaBaseline(d) {
+  const x = d.latest_dexa; if (!x) return "";
+  const bc = x.body_composition || {};
+  const lean = Number(bc.lean_mass_lb), fat = Number(bc.fat_mass_lb);
+  if (!Number.isFinite(lean) || !Number.isFinite(fat)) return "";
+  const age = _physDexaAgeDays(x.scan_date);
+  const bfp = bc.body_fat_pct != null ? `${fmt(bc.body_fat_pct, 1)}% body fat` : "";
+  const bar = stackedBar([{ label: "lean mass", value: lean, tone: "ember" }, { label: "fat mass", value: fat, tone: "ink" }], { label: `Lean vs fat · ${esc(x.scan_date)}`, unit: " lb" });
+  return sec("DEXA baseline — lean vs fat (one scan, dated)",
+    bar + `<p class="rd-meta label"><strong>${esc(x.scan_date)}${age != null ? ` · ~${age} days ago` : ""} · pre-cut baseline.</strong> A snapshot, not a trend${bfp ? ` — ${esc(bfp)}` : ""}. This is where the cut <em>started</em>; the weight cockpit above shows where it is now. Lean (ember) is the asset the cut is trying to keep while the fat comes off — proven only when scan two lands.</p>`);
+}
+// (temporary — indices / bone / segmental restructured across P1.3 / P1.4 / P1.6)
 function physicalLegacyComposition(d) {
   const x = d.latest_dexa; if (!x) return "";
-  const bc = x.body_composition || {}, idx = x.indices || {}, bone = x.bone || {}, sf = x.segmental_fat || {}, sl = x.segmental_lean || {};
-  return sec("Composition", kvtable(bc)) + sec("Indices (ALMI / FFMI / FMI)", kvtable(idx)) + sec("Bone density", kvtable(bone)) +
+  const idx = x.indices || {}, bone = x.bone || {}, sf = x.segmental_fat || {}, sl = x.segmental_lean || {};
+  return sec("Indices (ALMI / FFMI / FMI)", kvtable(idx)) + sec("Bone density", kvtable(bone)) +
     (Object.keys(sf).length ? sec("Segmental fat %", kvtable(sf)) : "") + (Object.keys(sl).length ? sec("Segmental lean", kvtable(sl)) : "") +
     note(`DEXA scan${x.scan_date ? ` · ${esc(x.scan_date)}` : ""}.`);
 }
@@ -251,6 +269,7 @@ async function renderPhysical(d) {
   parts.push(physicalBMI(readings, j)); // P0.7 — BMI (de-emphasized, last in Tier 1)
   // ── TIER 2 — the composition arc (episodic) — restructured across P1.x ──
   parts.push(physicalDexaCountdown(d)); // P1.1 — next-DEXA countdown (arc anchor)
+  parts.push(physicalDexaBaseline(d)); // P1.2 — dated lean-vs-fat baseline (one scan, not a trend)
   parts.push(physicalLegacyComposition(d));
   return parts.join("");
 }
