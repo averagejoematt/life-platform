@@ -1,6 +1,6 @@
 # Life Platform — Open Backlog
 
-**Last updated:** 2026-06-22 (Evidence-page redesign series complete — Nutrition/Training/Sleep/Habits all shipped + deployed; EVR-01..06 follow-ups added, all needs-data capture; prior: 2026-06-09 ER-02 upstream-API contract tests DONE → CHANGELOG; ER external-review-lens rigor series ER-01..08; 2026-06-07 v8.4.0 PG product/growth summit, ADR-077 phase taxonomy + restart tooling)
+**Last updated:** 2026-06-23 (Physical page shipped — weight cockpit + composition arc + transparent PhenoAge, PR #201; PHY-01..06 follow-ups added incl. the PhenoAge age-inversion residual decision; prior: Nutrition/Training/Sleep/Habits all shipped + deployed, EVR-01..06 follow-ups; 2026-06-09 ER-02 upstream-API contract tests DONE → CHANGELOG; ER external-review-lens rigor series ER-01..08; 2026-06-07 v8.4.0 PG product/growth summit, ADR-077 phase taxonomy + restart tooling)
 **Source:** Synthesis of V1 audit (2026-05-17, ADR-057), V2 audit (2026-05-17, `docs/V2_AUDIT_PLAN.md`), V2 follow-up sessions (2026-05-18/19), the 2026-05-29 marathon (Bedrock cutover, budget guard, remediation agent, May-30 restart), the 2026-06-01/02 v4 website launch + QA sweep, and the 2026-06-03 operations/cost session (ADR-074/075). Data-blocked items D-01/D-03/D-04 + N-01/L-11 re-checked against live AWS on 2026-06-03.
 
 > Single source of truth for everything **not done**. Items closed-with-rationale (ADR-057) and items shipped are not listed — see `docs/CHANGELOG.md` for what landed and `docs/DECISIONS.md` for what was formally closed.
@@ -114,6 +114,20 @@
 - [ ] **EVR-04 — ship inferred taxonomy *groupings* public (DECISION).** P1.1 derives a logical group per habit (`taxonomy.group`) server-side but the public surface still groups by Habitify's stored group — only the time-of-day/type *context tags* ship (labeled auto-derived). Promoting the derived regrouping to the visible surface was held as a STOP-AND-ASK; revisit if the stored groups prove noisy.
 - [ ] **EVR-05 — upgrade taxonomy classifier from name-only heuristic.** `_derive_habit_taxonomy` is deterministic keyword matching on the habit name. A richer pass (habit metadata, or a cheap classification call) would catch cases the keyword map misses. Low priority — the heuristic + "auto-derived, not fact" label is honest as-is.
 - [ ] **EVR-06 — keystone coefficient auto-surfaces at ≥14d overlap** (NO build — a windowed watch). Genesis+8d as of ship, so the keystone renders *withheld* live; the P2.1 gate flips the noise-guarded coefficient on automatically at 2 weeks (~2026-06-28). Matthew authorized auto-surface; eyeball it once the window opens.
+
+---
+
+### Physical-page redesign series (2026-06-23, PR #201 — weight cockpit + composition arc + PhenoAge)
+
+**Premise:** fifth turnkey design-review page. Reframed `/evidence/physical/` to "weight is the metronome; composition is the arc" — daily weight cockpit (Tier 1) over an episodic composition arc (Tier 2); replaced the DEXA black-box bio-age with a transparent, privacy-preserving Levine PhenoAge. All P0/P1/P2 shipped + deployed + live-verified. New `charts.js` primitives `weightTrendChart` + `projectionCone`; new `/api/phenoage` endpoint.
+
+**Open follow-ups (PHY-series):**
+- [ ] **PHY-01 — PhenoAge age-inversion residual (DECISION).** Option A removes the obvious leak (no chronological age, no gap returned — verified live). But the 9 Levine markers are public on the labs page, so a determined reader applying the formula could approximate chronological age from the precise published phenotypic number (the marker→pheno relationship is ~1:1 in age). Mitigation available if Matthew wants zero-deducibility: band the published PhenoAge (e.g., nearest 5) and/or show drivers as direction-only. Low urgency (sophisticated attack); flagged for owner call.
+- [ ] **PHY-02 — schedule DEXA scan two (drives the countdown; unlocks velocity).** ~10 weeks post-genesis (~late Aug 2026). The single highest-value capture step — turns every composition figure from a dated snapshot into a real trajectory. The P1.1 countdown is waiting on it.
+- [ ] **PHY-03 — tape measurements capture.** 0 sessions. Cheap, frequent between-DEXA proxy that feeds the silhouette + segmental; the P2.2 card is an honest empty state until the first session.
+- [ ] **PHY-04 — progress-photo capture + privacy stance (STOP-AND-ASK before any public/blurred render).** Private-by-default; the faceless silhouette is the public-safe proxy. No public photo render without explicit opt-in.
+- [ ] **PHY-05 — composition velocity (GATED).** Lean/fat/visceral change per week — build ONLY once a 2nd valid DEXA exists AND the delta clears the scan's least-significant-change. Placeholder until then (never off one scan).
+- [ ] **PHY-06 — complementary ages (optional).** Vascular age (Withings PWV, type 91) + VO₂max fitness age as secondary lenses beside PhenoAge (the anchor). WHOOP Age is NOT in the official API — do not build on the unofficial password-auth scrape without explicit sign-off + a "fragile source" label.
 
 ---
 
