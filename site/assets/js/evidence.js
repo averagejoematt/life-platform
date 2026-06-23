@@ -881,6 +881,18 @@ function habitsGoalLinkage(groupAvgs) {
   return sec("What it's all for — groups → goals",
     `<table class="rd-tbl"><thead><tr><th>habit group</th><th>the goal it serves</th><th>see</th></tr></thead><tbody>${rows}</tbody></table>`);
 }
+// §8 identity / compliance reflection (P0.9) — atomic-habits framing PINNED to real data
+// (the most-automatic habit + its rate), never a mantra. Two-voice.
+function habitsIdentity(perHabit, rate, daysTracked) {
+  const auto = (perHabit || []).filter((h) => h.adherence_pct != null).sort((a, b) => b.adherence_pct - a.adherence_pct)[0];
+  if (!auto && rate == null) return "";
+  const machine = [daysTracked != null && `${fmt(daysTracked)} days tracked`, rate != null && `consistency ${fmt(rate)}%`, auto && `top: ${ttl(auto.name)} ${fmt(auto.adherence_pct)}%`].filter(Boolean).join(" · ");
+  const serif = auto
+    ? `${fmt(daysTracked)} days in, the most automatic habit is ${ttl(auto.name)} — firing ${fmt(auto.adherence_pct)}% of the days it's due. That one isn't willpower anymore; it's just who shows up. Identity is the set of habits that fire without a decision, and the data says which have crossed over.`
+    : `${fmt(daysTracked)} days in at ${fmt(rate)}% consistency — the identity is whatever the heatmap keeps proving, not a slogan.`;
+  return sec("Identity — who the data says you are",
+    `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(machine)}</p><p class="tv-human">${esc(serif)}</p></div>`);
+}
 async function renderHabits(d) {
   const dows = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const a = d.day_of_week_avgs || [];
@@ -930,7 +942,8 @@ async function renderHabits(d) {
   const effort = habitsEffortMap(d.group_90d_avgs || {}, habits);
   const gtrends = habitsGroupTrends(d.history, d.group_90d_avgs || {});
   const goals = habitsGoalLinkage(d.group_90d_avgs || {});
-  return keystone + head + grid + groupBars + states + effort + gtrends + goals + trend + dow + list + note("Everything I'm trying to do — sourced from Habitify. Correlations are N=1, not cause. Private habits are never shown.");
+  const identity = habitsIdentity(d.per_habit, _rate, d.days_tracked);
+  return keystone + head + grid + identity + groupBars + states + effort + gtrends + goals + trend + dow + list + note("Everything I'm trying to do — sourced from Habitify. Correlations are N=1, not cause. Private habits are never shown.");
 }
 // The board — pick an expert, read their actual per-domain take + track record.
 async function renderBoard(d) {
