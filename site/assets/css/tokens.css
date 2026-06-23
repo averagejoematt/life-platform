@@ -308,6 +308,13 @@ a { color: inherit; text-underline-offset: 0.18em; }
   }
 }
 
+/* Anatomical body-map (training, P1.4) — muscle zones shaded by ember intensity (--o set
+   per zone) = weekly volume vs optimal. ONE hue, never red. */
+.bodymap svg { width: 100%; height: clamp(180px, 26vw, 240px); }
+.bm-head { fill: var(--ink-faint); opacity: 0.28; }
+.bm-m { fill: var(--ember); fill-opacity: var(--o, 0.1); stroke: var(--rule); stroke-width: 0.5; }
+.bm-cap { fill: var(--ink-faint); font-family: var(--font-mono); font-size: 8px; text-anchor: middle; letter-spacing: 0.12em; text-transform: uppercase; }
+
 /* Per-muscle volume landmark bars (training §5, P1.3) — MEV–MAV band shaded, MRV tick;
    ember in the optimal band, muted ink under/over (never red). Reuses the .suf-row grid. */
 .lmk-track { position: relative; height: 10px; border-radius: 5px; background: var(--surface-2, var(--surface)); }
