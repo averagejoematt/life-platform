@@ -820,6 +820,18 @@ function habitFrictionChip(pct) {
   const t = pct >= 85 ? ["automatic", "fr-auto"] : pct >= 60 ? ["takes effort", "fr-mid"] : ["high friction", "fr-hard"];
   return `<span class="hb-fr ${t[1]}">${t[0]}</span>`;
 }
+// P1.3 — the three drivers behind a habit: trigger → friction → reward. Only friction is
+// measured today (it's the inverse of adherence, P1.2). Trigger and reward need a capture
+// step that doesn't exist yet — so they're shown as honestly empty, with the mechanism named,
+// not faked. An honest empty state IS the build here; a fabricated drivers table would not be.
+function habitsDrivers(perHabit) {
+  const ranked = (perHabit || []).filter((h) => h.adherence_pct != null).sort((a, b) => (a.adherence_pct || 0) - (b.adherence_pct || 0)).slice(0, 5);
+  const rows = ranked.length
+    ? `<table class="rd-tbl rd-drv"><thead><tr><th>habit</th><th>trigger</th><th>friction</th><th>reward</th></tr></thead><tbody>${ranked.map((h) => `<tr><td class="rd-name">${esc(ttl(h.name))}</td><td class="drv-empty">— not captured</td><td>${habitFrictionChip(h.adherence_pct) || "—"}</td><td class="drv-empty">— not captured</td></tr>`).join("")}</tbody></table>`
+    : empty("Drivers populate once habits have adherence history.");
+  return sec("Drivers — trigger · friction · reward",
+    rows + `<p class="rd-meta label">Friction is real — it's the inverse of how often the habit actually gets kept. Trigger (what cues it) and reward (what it pays back) aren't logged yet; they need a per-habit capture step, so they're shown honestly empty rather than guessed. The lowest-adherence habits are listed first — those are where a trigger or reward would move the needle most.</p>`);
+}
 function habitStateTaxonomy(perHabit, registryHabits) {
   const byName = {}; for (const h of perHabit || []) byName[h.name] = h;
   const all = (perHabit || []).slice();
@@ -959,10 +971,11 @@ async function renderHabits(d) {
     `<p class="rd-meta label">Each grade is the group's real adherence RATE over the window — never a correlation. Higher = load-bearing; the low ones (the floor, like Recovery) read muted, not as failure. Tier-0 non-negotiables drive the heatmap above.</p>`) : "";
   const states = habitStateTaxonomy(d.per_habit, habits);
   const effort = habitsEffortMap(d.group_90d_avgs || {}, habits);
+  const drivers = habitsDrivers(d.per_habit);
   const gtrends = habitsGroupTrends(d.history, d.group_90d_avgs || {});
   const goals = habitsGoalLinkage(d.group_90d_avgs || {});
   const identity = habitsIdentity(d.per_habit, _rate, d.days_tracked);
-  return keystone + head + grid + identity + groupBars + states + effort + gtrends + goals + trend + dow + list + note("Everything I'm trying to do — sourced from Habitify. Correlations are N=1, not cause. Private habits are never shown.");
+  return keystone + head + grid + identity + groupBars + states + effort + drivers + gtrends + goals + trend + dow + list + note("Everything I'm trying to do — sourced from Habitify. Correlations are N=1, not cause. Private habits are never shown.");
 }
 // The board — pick an expert, read their actual per-domain take + track record.
 async function renderBoard(d) {
