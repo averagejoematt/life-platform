@@ -1519,6 +1519,23 @@ def handle_sleep_correlations() -> dict:
         "A3", "Bed temp → deep sleep", "bed temp", "deep sleep", bed_temp, deep, lag=0,
         note="Mechanistic — cooler often means more deep sleep, within an optimal band (not monotonic).",
     ))
+    # A4 — last meal time → sleep score. MacroFactor food_log latest time per day.
+    last_meal = {}
+    for m in _query_source("macrofactor", d30, today):
+        dt = m.get("date") or m.get("sk", "").replace("DATE#", "")[:10]
+        times = []
+        for ent in m.get("food_log") or []:
+            try:
+                p = str(ent.get("time")).split(":")
+                times.append(int(p[0]) * 60 + int(p[1]))
+            except (ValueError, IndexError, AttributeError):
+                pass
+        if times and dt:
+            last_meal[dt] = max(times)
+    cards.append(_corr_card(
+        "A4", "Last meal time → sleep score", "last meal", "sleep score", last_meal, sleep_score, lag=0,
+        note="Eating late can blunt the night — last-meal minutes against how the night scored.",
+    ))
 
     return _ok({"cards": cards, "min_coef_days": _CORR_MIN_COEF_DAYS, "as_of": today}, cache_seconds=3600)
 
