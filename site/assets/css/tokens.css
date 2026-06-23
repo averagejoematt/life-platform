@@ -356,6 +356,14 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .st-chip.st-backlog { background: transparent; border: 1px dashed var(--rule); color: var(--ink-faint); }
 .st-marker.st-backlog { background: transparent; border: 1px dashed var(--ink-faint); }
 
+/* P1.1 — auto-derived per-habit context tags in the registry list. One ink+ember
+   ramp, muted: these are heuristic reads, not loud signals. */
+.hb-tax-row { display: inline-flex; gap: var(--sp-1); margin-left: var(--sp-2); vertical-align: middle; }
+.hb-tax { font-family: var(--font-mono); font-size: 0.58rem; text-transform: uppercase; letter-spacing: var(--tracking-label);
+  border-radius: var(--radius-xs); padding: 1px 6px; border: 1px solid var(--rule); color: var(--ink-faint); white-space: nowrap; }
+.hb-tax-time { color: var(--ink-muted); }
+.hb-tax-type { border-color: color-mix(in oklch, var(--ember) 40%, var(--rule)); color: var(--ember); }
+
 /* Cross-source signal board (sleep §8, Phase 2) — self-policing cards: n + overlap +
    confidence; direction-only under 2 weeks. Muted/honest, never alarm. */
 .cb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--sp-3); margin-top: var(--sp-3); }

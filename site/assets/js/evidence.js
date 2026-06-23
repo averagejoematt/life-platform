@@ -802,6 +802,16 @@ function habitsKeystone(corrs) {
 }
 // §4 habit state taxonomy (P0.5) — every habit tagged by STATE on ONE ember+ink ramp +
 // position/marker (NOT a rainbow). Backlog/never-started SHOWN (most apps hide it). No red.
+// P1.1 — auto-derived per-habit context (time-of-day + do/avoid/maintain), rendered as
+// small mono tags. Heuristic, name-only inference → always shown under an "auto-derived"
+// label, never as fact. "anytime"/"do" are the silent defaults (no tag = no false signal).
+function habitTaxonomyChips(tax) {
+  if (!tax) return "";
+  const out = [];
+  if (tax.time_of_day && tax.time_of_day !== "anytime") out.push(`<span class="hb-tax hb-tax-time">${esc(tax.time_of_day)}</span>`);
+  if (tax.type && tax.type !== "do") out.push(`<span class="hb-tax hb-tax-type">${esc(tax.type)}</span>`);
+  return out.length ? `<span class="hb-tax-row">${out.join("")}</span>` : "";
+}
 function habitStateTaxonomy(perHabit, registryHabits) {
   const byName = {}; for (const h of perHabit || []) byName[h.name] = h;
   const all = (perHabit || []).slice();
@@ -915,8 +925,8 @@ async function renderHabits(d) {
   let list = empty("Habit list loading from Habitify.");
   if (habits.length) {
     const order = groups.length ? groups : [...new Set(habits.map((h) => h.group || "Other"))];
-    const body = order.map((g) => { const hs = habits.filter((h) => (h.group || "Other") === g); if (!hs.length) return ""; return `<h4 class="hb-group label">${esc(g)} <span class="rd-unit">${hs.length}</span></h4><table class="rd-tbl"><tbody>${hs.map((h) => `<tr><td class="rd-name">${esc(h.name)}</td><td class="num rd-range">${esc(h.frequency || "daily")}</td></tr>`).join("")}</tbody></table>`; }).join("");
-    list = sec(`Habits I'm tracking (${habits.length})`, body);
+    const body = order.map((g) => { const hs = habits.filter((h) => (h.group || "Other") === g); if (!hs.length) return ""; return `<h4 class="hb-group label">${esc(g)} <span class="rd-unit">${hs.length}</span></h4><table class="rd-tbl"><tbody>${hs.map((h) => `<tr><td class="rd-name">${esc(h.name)}${habitTaxonomyChips(h.taxonomy)}</td><td class="num rd-range">${esc(h.frequency || "daily")}</td></tr>`).join("")}</tbody></table>`; }).join("");
+    list = sec(`Habits I'm tracking (${habits.length})`, body + `<p class="rd-meta label">The time-of-day and do/avoid/maintain tags are <em>auto-derived</em> from each habit's name — a heuristic read of context, not how Habitify stores them, and not fact.</p>`);
   }
   // §2 — 90-day adherence heatmap (P0.3). GitHub-style calendar, ember-saturation = the day's
   // Tier-0 %, cut-start (Jun 14) ringed. Replaces the old green/amber/red 7-day grid (rainbow +
