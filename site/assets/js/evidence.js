@@ -296,13 +296,31 @@ function physicalPhenoAge(pa) {
     `<details class="pa-details"><summary class="pa-sum label">The 9 markers driving it — show the inputs</summary><div class="pa-drivers">${driverRows}</div>` +
     `<p class="rd-meta label">Ember = the marker is pushing the number <em>younger</em> vs a healthy reference; muted = older; faint = neutral. Lymphocyte % is derived from absolute lymphocytes ÷ WBC.</p></details>`);
 }
-// (temporary — bone / segmental restructured across P1.6)
-function physicalLegacyComposition(d) {
+// P1.6 — full-scan expander (dated). The remaining indices / segmental / bone numbers tucked
+// behind a "full scan" disclosure, all dated. The +3.9 bone T-score is SUPPRESSED as an
+// artifact (a T-score that high is physiologically implausible — almost certainly a parse
+// error), shown as a flag, never as fact. The DEXA "Body Score" is already gone (never
+// surfaced in the redesign — replaced by transparent PhenoAge above).
+function physicalFullScanExpander(d) {
   const x = d.latest_dexa; if (!x) return "";
-  const bone = x.bone || {}, sf = x.segmental_fat || {}, sl = x.segmental_lean || {};
-  return sec("Bone density", kvtable(bone)) +
-    (Object.keys(sf).length ? sec("Segmental fat %", kvtable(sf)) : "") + (Object.keys(sl).length ? sec("Segmental lean", kvtable(sl)) : "") +
-    note(`DEXA scan${x.scan_date ? ` · ${esc(x.scan_date)}` : ""}.`);
+  const idx = x.indices || {}, bone = x.bone || {}, sf = x.segmental_fat || {}, sl = x.segmental_lean || {};
+  const tval = Number(bone.t_score);
+  const tImplausible = Number.isFinite(tval) && tval >= 3;
+  const boneBlock = `<h4 class="hb-group label">Bone density</h4>` + (
+    tImplausible
+      ? `<p class="rd-flag-note label">⚑ Bone T-score reported <strong>+${esc(fmt(tval, 1))}</strong> — suppressed as a likely scan artifact: a T-score that high is physiologically implausible (it would mean bone density ~4 SD above the young-adult peak). Treated as a parse/scan error pending a re-read, not shown as a result.</p>`
+      : kvtable(bone)
+  );
+  const idxSlim = {};
+  for (const k of ["ffmi_kg_m2", "fmi_kg_m2", "ffmi_rating", "fmi_rating"]) if (idx[k] != null) idxSlim[k] = idx[k];
+  const inner =
+    (Object.keys(idxSlim).length ? `<h4 class="hb-group label">Indices (FFMI / FMI)</h4>${kvtable(idxSlim)}` : "") +
+    boneBlock +
+    (Object.keys(sf).length ? `<h4 class="hb-group label">Segmental fat %</h4>${kvtable(sf)}` : "") +
+    (Object.keys(sl).length ? `<h4 class="hb-group label">Segmental lean</h4>${kvtable(sl)}` : "");
+  return sec("The full scan — everything else, dated",
+    `<details class="fs-exp"><summary class="pa-sum label">Open the full ${esc(x.scan_date || "DEXA")} scan — indices, segmental, bone</summary><div class="fs-body">${inner}</div></details>` +
+    note(`Every figure here is from the single ${esc(x.scan_date || "")} pre-cut scan — a dated snapshot, not a trend. Composition velocity unlocks at scan two.`));
 }
 async function renderPhysical(d) {
   const [wp, wj, pa] = await Promise.all([tryJSON("/api/weight_progress"), tryJSON("/api/journey"), tryJSON("/api/phenoage")]);
@@ -334,7 +352,7 @@ async function renderPhysical(d) {
   parts.push(physicalVisceralCallout(d)); // P1.3 — visceral fat callout + risk band (dated)
   parts.push(physicalLeanLongevity(d)); // P1.4 — lean/ALMI longevity context (dated, demoted)
   parts.push(physicalPhenoAge(pa)); // P1.5 — transparent PhenoAge (Option A: no chronological/gap)
-  parts.push(physicalLegacyComposition(d));
+  parts.push(physicalFullScanExpander(d)); // P1.6 — full-scan expander, dated; +3.9 T-score suppressed
   return parts.join("");
 }
 // P0.1 — The Lift Index: per-lift estimated-1RM TREND (sparkline + ▲/▼/flat tag), never a

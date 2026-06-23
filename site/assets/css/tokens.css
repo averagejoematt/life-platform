@@ -538,6 +538,11 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .pa-older .pa-d-dir { color: var(--ink-muted); }
 .pa-neutral .pa-d-dir { color: var(--ink-faint); }
 .pa-derived { font-family: var(--font-mono); font-size: 0.58rem; text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--ink-faint); border: 1px solid var(--rule); border-radius: var(--radius-xs); padding: 0 5px; }
+/* P1.6 — full-scan expander + the suppressed-artifact flag (muted ember, never red). */
+.fs-exp { margin: var(--sp-2) 0; }
+.fs-body { margin-top: var(--sp-3); }
+.fs-body .hb-group { margin-top: var(--sp-4); }
+.rd-flag-note { color: var(--ember); border: 1px dashed var(--ember-line); border-radius: var(--radius-xs); padding: var(--sp-2) var(--sp-3); background: var(--ember-wash); }
 .chart-cap { display: block; margin-top: var(--sp-2); color: var(--ink-faint); }
 .chart--empty { border: var(--honest-border); border-radius: var(--radius-xs); padding: var(--sp-4); text-align: center; }
 .chart--empty .chart-cap { margin: 0; }
