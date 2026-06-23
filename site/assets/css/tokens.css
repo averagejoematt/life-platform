@@ -364,6 +364,14 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .hb-tax-time { color: var(--ink-muted); }
 .hb-tax-type { border-color: color-mix(in oklch, var(--ember) 40%, var(--rule)); color: var(--ember); }
 
+/* P1.2 — friction tag from real adherence. Ember=automatic (earned), fading to a muted
+   outline as friction rises. Never red — high friction is information, not failure. */
+.hb-fr { font-family: var(--font-mono); font-size: 0.58rem; text-transform: uppercase; letter-spacing: var(--tracking-label);
+  border-radius: var(--radius-xs); padding: 1px 6px; margin-left: var(--sp-2); white-space: nowrap; vertical-align: middle; border: 1px solid var(--rule); }
+.hb-fr.fr-auto { background: var(--ember-wash); border-color: var(--ember); color: var(--ember); }
+.hb-fr.fr-mid { color: var(--ink-muted); }
+.hb-fr.fr-hard { border-style: dashed; border-color: var(--ink-muted); color: var(--ink-faint); }
+
 /* Cross-source signal board (sleep §8, Phase 2) — self-policing cards: n + overlap +
    confidence; direction-only under 2 weeks. Muted/honest, never alarm. */
 .cb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--sp-3); margin-top: var(--sp-3); }
