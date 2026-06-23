@@ -825,20 +825,11 @@ async function renderHabits(d) {
     const body = order.map((g) => { const hs = habits.filter((h) => (h.group || "Other") === g); if (!hs.length) return ""; return `<h4 class="hb-group label">${esc(g)} <span class="rd-unit">${hs.length}</span></h4><table class="rd-tbl"><tbody>${hs.map((h) => `<tr><td class="rd-name">${esc(h.name)}</td><td class="num rd-range">${esc(h.frequency || "daily")}</td></tr>`).join("")}</tbody></table>`; }).join("");
     list = sec(`Habits I'm tracking (${habits.length})`, body);
   }
-  // Last 7 days as a day-of-week color grid: green = mostly hit, amber = partial, red = miss.
-  const hist = (d.history || []).slice(-7);
-  const _dl = (ds) => ["S", "M", "T", "W", "T", "F", "S"][new Date(ds + "T00:00:00").getDay()] || "";
-  const _hc = (p) => (p >= 80 ? "hb7-good" : p >= 50 ? "hb7-mid" : "hb7-miss");
-  const grid = hist.length
-    ? sec(
-        "Last 7 days",
-        `<div class="hb7">${hist
-          .map(
-            (h) =>
-              `<div class="hb7-cell ${_hc(h.tier0_pct || 0)}" title="${esc(h.date || "")} · ${fmt(h.tier0_pct)}%"><span class="hb7-dow label">${_dl(h.date || "")}</span><span class="hb7-pct num">${fmt(h.tier0_pct)}</span></div>`,
-          )
-          .join("")}</div>`,
-      )
+  // §2 — 90-day adherence heatmap (P0.3). GitHub-style calendar, ember-saturation = the day's
+  // Tier-0 %, cut-start (Jun 14) ringed. Replaces the old green/amber/red 7-day grid (rainbow +
+  // red, both off-brand) with the ONE-ember heat scale. Reuses heatStrip (compact mode).
+  const grid = _histAll.length
+    ? sec("90-day adherence heatmap", heatStrip(_histAll, { valueKey: "tier0_pct", unit: "%", max: 100, compact: true, cutDate: "2026-06-14", label: "Daily Tier-0 adherence", caption: "Each square is a day · ember intensity = the non-negotiables held · the ringed square is the cut starting Jun 14 · 90-day history predates the cut." }))
     : "";
   // Adherence trend (the long-run consistency story the 7-cell grid only hinted at).
   const trend = (d.history || []).length ? sec("Adherence trend", lineChart(d.history, { valueKey: "tier0_pct", unit: "%", label: "Daily Tier-0 adherence", emptyMsg: "The adherence curve fills as days accrue." })) : "";

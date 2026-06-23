@@ -377,6 +377,10 @@ a { color: inherit; text-underline-offset: 0.18em; }
   border: 1px solid var(--rule); }
 .heat-v { font-size: 0.6rem; line-height: 1; color: var(--ink); }
 .heat-d { font-size: 0.5rem; color: var(--ink-faint); }
+/* Dense GitHub-style calendar (habits §2, P0.3) — saturation only; cut-start ringed ember. */
+.heat-strip-compact { gap: 3px; }
+.heat-cell.heat-compact { flex: 0 0 auto; width: 13px; min-width: 13px; aspect-ratio: 1 / 1; border-radius: 2px; }
+.heat-cell.heat-cut { outline: 1.5px solid var(--ember); outline-offset: 1px; }
 
 /* ── Charts (shared, token-driven — see assets/js/charts.js) ──────────────── */
 .chart { margin-top: var(--sp-4); }
