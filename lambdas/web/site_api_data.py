@@ -1559,6 +1559,27 @@ def handle_sleep_correlations() -> dict:
         "B2", "Mood → sleep score", "mood / valence", "sleep score", mood, sleep_score, lag=0,
         note="Mood and sleep move together both ways — gated on active mood/journal logging; empty until entries accrue.",
     ))
+    # B3 — day-of-week best duration. Not a Pearson pair; n=1/day at week one = noise.
+    durations = {d: v["hours"] for d, v in wd.items() if v["hours"] is not None}
+    dow = {}
+    for d, h in durations.items():
+        try:
+            dow.setdefault(datetime.strptime(d, "%Y-%m-%d").weekday(), []).append(h)
+        except ValueError:
+            pass
+    _wk = round(len(durations) / 7, 1)
+    b3 = {
+        "id": "B3", "label": "Day-of-week → best sleep duration", "predictor": "day of week", "outcome": "sleep duration",
+        "n": len(durations), "overlap_weeks": _wk, "lag_days": 0, "coefficient": None, "withheld": False,
+        "direction": "fills in ~4 weeks", "confidence": "watching — needs ~4 weeks", "noise": True,
+        "note": "Which weekday sleeps best needs ~4 weeks — one Tuesday is not a pattern.",
+    }
+    if _wk >= 4 and dow:
+        _best = max(dow, key=lambda k: sum(dow[k]) / len(dow[k]))
+        _names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        b3.update({"direction": f"best on {_names[_best]} ({round(sum(dow[_best]) / len(dow[_best]), 1)}h avg)",
+                   "confidence": "low confidence", "noise": False})
+    cards.append(b3)
 
     return _ok({"cards": cards, "min_coef_days": _CORR_MIN_COEF_DAYS, "as_of": today}, cache_seconds=3600)
 
