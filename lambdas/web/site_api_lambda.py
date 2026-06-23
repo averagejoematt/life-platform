@@ -102,6 +102,7 @@ from web.site_api_data import (
     handle_inference_receipt,
     handle_labs,
     handle_ledger,
+    handle_phenoage,
     handle_observatory_week,
     handle_platform_stats,
     handle_protocols,
@@ -393,6 +394,7 @@ ROUTES = {
     "/api/field_notes": None,  # GET with optional ?week= query param, handled in lambda_handler
     # BL-02: Bloodwork/Labs
     "/api/labs": handle_labs,
+    "/api/phenoage": handle_phenoage,  # P1.5 — transparent Levine PhenoAge (Option A privacy)
     "/api/frequent_meals": handle_frequent_meals,
     "/api/protein_sources": handle_protein_sources,
     "/api/weekly_physical_summary": handle_weekly_physical_summary,

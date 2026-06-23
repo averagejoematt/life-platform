@@ -238,6 +238,10 @@ def handle_journey() -> dict:
                 "projected_goal_date": projected_goal_date,
                 "days_to_goal": days_to_goal,
                 "started_date": EXPERIMENT_START,
+                # Height (profile, authoritative) so the page can show a de-emphasized BMI
+                # without deriving height from DEXA indices (which disagree ~1.5 in). Not
+                # sensitive — already used in the waist-height ratio. P0.7.
+                "height_inches": _p.get("height_inches"),
             }
         },
         cache_seconds=3600,
