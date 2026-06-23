@@ -13,7 +13,7 @@
     window.__START_SLUG__ = "<slug>"
 */
 
-import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars } from "/assets/js/charts.js";
+import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars, dumbbell } from "/assets/js/charts.js";
 
 const REG = window.__EVIDENCE_REGISTRY__ || [];
 const BYSLUG = Object.fromEntries(REG.map((t) => [t.slug, t]));
@@ -546,36 +546,142 @@ async function renderNutrition(d) {
   return parts.join("") + note("Correlative — intake vs the deficit.");
 }
 async function renderGlucose(d) { const [mg, mr] = await Promise.all([tryJSON("/api/meal_glucose"), tryJSON("/api/meal_responses")]); const cur = d && d.glucose; const rows = ((mr && mr.meals) || (mg && mg.meals) || []); const head = figs([cur && cur.avg != null && fig(fmt(cur.avg), "avg mg/dL"), cur && cur.tir != null && fig(cur.tir + "%", "time in range"), (mg && mg.has_cgm != null) && fig(mg.has_cgm ? "yes" : "no", "cgm active")]); const mealSec = rows.length ? sec("Meal glucose response", `<table class="rd-tbl"><thead><tr><th>meal</th><th>peak</th><th>Δ rise</th></tr></thead><tbody>${rows.slice(0, 25).map((m) => `<tr><td class="rd-name">${esc(m.name || m.meal)}</td><td class="num">${fmt(m.peak ?? m.peak_mgdl)}</td><td class="num">${fmt(m.delta ?? m.rise)}</td></tr>`).join("")}</tbody></table>`) : ""; const trendChart = sec("Glucose trend", lineChart(d.glucose_trend || [], { valueKey: "value", label: "Glucose", emptyMsg: "The glucose curve fills once a CGM sensor is active." })); if (!head.includes("fig-v") && !mealSec && !(d.glucose_trend || []).length) return trendChart + empty("No CGM data yet — once a sensor is active, this marries each meal to its glucose response (peak, rise, return-to-baseline)."); return head + trendChart + mealSec + note("Correlative — how specific meals moved glucose. Not diagnostic."); }
+// §0 Forecast hero (P0.1) — the circadian-compliance forecast, PROMOTED to lead. A 0→100
+// "tonight's odds" gauge + the four anchors (each with the lever to pull now) + two-voice.
+// At-risk reads MUTED ink, never red/alarm (HARD RULE 5). Binds /api/circadian.
+function circadianForecast(circ) {
+  if (!circ || !circ.available) return "";
+  const comps = Object.entries(circ.components || {});
+  const anchors = comps.map(([name, c]) => {
+    const pct = c.max ? Math.max(0, Math.min(1, c.score / c.max)) : 0;
+    const tone = pct >= 0.7 ? "suf-ember" : "suf-ink"; // ember on-track, muted at-risk — never red
+    const weak = name === circ.weakest_component;
+    return `<div class="suf-row${weak ? " fc-lever" : ""}"><span class="suf-l">${esc(ttl(name))}${weak ? " · lever" : ""}</span>` +
+      `<span class="suf-track"><span class="suf-fill ${tone}" style="width:${Math.round(pct * 100)}%"></span></span>` +
+      `<span class="suf-v mono">${fmt(c.score)}/${fmt(c.max)}</span></div>`;
+  }).join("");
+  const score = circ.score;
+  const atRisk = score != null && score < 60;
+  const machine = [score != null ? `tonight ${fmt(score)}/100` : null, circ.category && ttl(circ.category),
+    circ.weakest_component && `lever: ${ttl(circ.weakest_component)}`].filter(Boolean).join(" · ");
+  const serif = (circ.prescription && !isBad(circ.prescription)) ? circ.prescription
+    : (atRisk ? "Tonight's set-up is soft — the lever above is the one to pull before bed." : "Today's behaviours have tonight pointed the right way. The night below is the evidence, not the verdict.");
+  const gauge = (score != null) ? targetSpine(score, 100, { valueLabel: "tonight", targetLabel: "100", unit: "", label: "Circadian compliance — what today's behaviours set up for tonight" }) : "";
+  return sec("Tonight's odds — the forecast",
+    gauge + (anchors ? `<div class="suf-rows fc-anchors">${anchors}</div>` : "") +
+    `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(machine)}</p><p class="tv-human">${esc(serif)}</p></div>`);
+}
+// §8 cross-source signal board (Phase 2) — the self-policing correlation surface. Each card:
+// pair + n + overlap-weeks + confidence; DIRECTION ONLY under 2 weeks (no coefficient/chip);
+// Pearson + chip at >=2 weeks; "likely noise" flags; sleep-vs-weight coefficient withheld.
+function sleepCorrelationBoard(cards) {
+  if (!cards || !cards.length) return "";
+  const card = (c) => {
+    const meta = `n=${fmt(c.n)} · ${fmt(c.overlap_weeks)} wk overlap${c.lag_days ? ` · ${fmt(c.lag_days)}d lag` : ""}`;
+    let read;
+    if (c.withheld) {
+      read = `<p class="cb-dir cb-withheld">coefficient withheld — too noisy to trust in the water-weight phase</p>`;
+    } else if (c.coefficient != null) {
+      read = `<p class="cb-dir mono">r = ${fmt(c.coefficient)}</p>` + correlationChip([{ label: c.predictor, r: c.coefficient, n: c.n }], { outcome: c.outcome });
+    } else {
+      read = `<p class="cb-dir">${c.direction === "insufficient" ? "too early to call a direction" : esc(c.direction) + " — direction only, no coefficient yet"}</p>`;
+    }
+    const noise = c.noise && !c.withheld ? `<span class="cb-noise">⚠ likely noise at this n</span>` : "";
+    return `<article class="cb-card"><header class="cb-head"><h3 class="cb-pair">${esc(c.predictor)} <span class="cb-arrow">→</span> ${esc(c.outcome)}</h3>` +
+      `<span class="cb-tag">${esc(c.confidence)}</span></header>${c.note ? `<p class="cb-note">${esc(c.note)}</p>` : ""}` +
+      `<div class="cb-read">${read}${noise}</div><p class="cb-meta label">${esc(meta)}</p></article>`;
+  };
+  return sec("Cross-source signal board — the correlation that tells you when NOT to trust it",
+    `<div class="cb-grid">${cards.map(card).join("")}</div>` +
+    `<p class="rd-meta label">Every card shows its n, the overlapping weeks, and a confidence tag. Under 2 weeks of overlap it's <strong>direction only</strong> — no Pearson, no chip. Thin pairs are flagged likely-noise. The self-skepticism is the feature, not a bug.</p>`);
+}
 async function renderSleep(d) {
   const s = d.sleep_detail || {};
-  // Two compute outputs surfaced 2026-06-15 (elite review): the predictive
-  // circadian-compliance score + the unified cross-wearable sleep record.
-  const [circ, uni] = await Promise.all([tryJSON("/api/circadian"), tryJSON("/api/sleep_reconciliation")]);
-
-  // These readings are about LAST NIGHT (wake-date-keyed) and set today up — the
-  // opposite frame from same-day activity. Header it with the night they came from.
-  const lastNightHdr = "Last night" + (lastNightDate(s, uni) ? ` · the night of ${lastNightDate(s, uni)}` : "");
-  const detail = Object.values(s).some(has)
-    ? sec(lastNightHdr, figs([s.sleep_score != null && fig(fmt(s.sleep_score), "sleep score"), s.total_sleep_hours != null && fig(fmt(s.total_sleep_hours, 1), "hours"), s.sleep_efficiency != null && fig(fmt(s.sleep_efficiency) + "%", "efficiency"), s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv), "hrv ms")])) + ((s.deep_sleep_hours != null && s.rem_sleep_hours != null) ? sec("Last night's stages", stackedBar([{ label: "Deep", value: s.deep_sleep_hours, tone: "ember" }, { label: "REM", value: s.rem_sleep_hours, tone: "ink" }, { label: "Light", value: Math.max(0, (s.total_sleep_hours || 0) - (s.deep_sleep_hours || 0) - (s.rem_sleep_hours || 0)), tone: "faint" }], { label: "Hours by stage", unit: "h" })) : "") + sec("Stages & physiology", kvtable({ whoop_quality: s.whoop_quality, bed_temp_f: s.bed_temp_f })) + sec("Sleep-score trend · latest = last night", lineChart(d.sleep_trend || [], { valueKey: "sleep_score", label: "Sleep score · nightly", emptyMsg: "The sleep-score trend fills in nightly." }))
-    : "";
-
-  // Circadian compliance — a *forward* score: what tonight's sleep should look
-  // like based on today's behaviours across four anchors.
-  let circSec = "";
-  if (circ && circ.available) {
-    const rows = Object.entries(circ.components || {}).map(([name, c]) => `<tr><td class="rd-name">${esc(ttl(name))}</td><td class="num">${fmt(c.score)}/${fmt(c.max)}</td><td class="rd-range">${esc(c.note || "")}</td></tr>`).join("");
-    circSec = sec("Circadian compliance — tonight's forecast", figs([circ.score != null && fig(fmt(circ.score), "score · /100"), circ.category && fig(ttl(circ.category), "category"), circ.weakest_component && fig(ttl(circ.weakest_component), "weakest anchor")]) + (rows ? `<table class="rd-tbl"><thead><tr><th>anchor</th><th>score</th><th>note</th></tr></thead><tbody>${rows}</tbody></table>` : "") + (circ.prescription ? `<p class="rd-why">${esc(circ.prescription)}</p>` : ""));
+  const [circ, uni, nut, corr] = await Promise.all([tryJSON("/api/circadian"), tryJSON("/api/sleep_reconciliation"), tryJSON("/api/nutrition_overview"), tryJSON("/api/sleep_correlations")]);
+  const parts = [];
+  // §0 — the forecast LEADS (prospective, not retrospective).
+  const fcHero = circadianForecast(circ);
+  if (fcHero) parts.push(fcHero);
+  // §1 — last night, demoted to EVIDENCE beneath the forecast.
+  const lastNightHdr = "Last night — the evidence" + (lastNightDate(s, uni) ? ` · the night of ${lastNightDate(s, uni)}` : "");
+  if (Object.values(s).some(has)) {
+    parts.push(sec(lastNightHdr, figs([s.total_sleep_hours != null && fig(fmt(s.total_sleep_hours, 1), "hours"), s.sleep_efficiency != null && fig(fmt(s.sleep_efficiency) + "%", "efficiency"), s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv), "hrv ms"), s.sleep_score != null && fig(fmt(s.sleep_score), "composite score")]) + `<p class="rd-meta label">One night is noise, not a verdict — it's evidence the forecast above gets graded against. The composite "score" is Eight Sleep's black box; the hours, efficiency and stages are what actually move it.</p>`));
+    if (s.deep_sleep_hours != null && s.rem_sleep_hours != null) parts.push(sec("Last night's stages", stackedBar([{ label: "Deep", value: s.deep_sleep_hours, tone: "ember" }, { label: "REM", value: s.rem_sleep_hours, tone: "ink" }, { label: "Light", value: Math.max(0, (s.total_sleep_hours || 0) - (s.deep_sleep_hours || 0) - (s.rem_sleep_hours || 0)), tone: "faint" }], { label: "Hours by stage", unit: "h" })));
+    // §2 — dual-device stage agreement (P0.3): Eight Sleep % vs Whoop % per stage.
+    const _wh = s.whoop_hours; const _dev = [];
+    if (_wh) {
+      if (s.deep_pct != null && s.deep_sleep_hours != null) _dev.push({ label: "Deep", a: s.deep_pct, b: (s.deep_sleep_hours / _wh) * 100 });
+      if (s.rem_pct != null && s.rem_sleep_hours != null) _dev.push({ label: "REM", a: s.rem_pct, b: (s.rem_sleep_hours / _wh) * 100 });
+      if (s.light_pct != null && s.deep_sleep_hours != null && s.rem_sleep_hours != null) _dev.push({ label: "Light", a: s.light_pct, b: Math.max(0, 100 - (s.deep_sleep_hours / _wh) * 100 - (s.rem_sleep_hours / _wh) * 100) });
+    }
+    if (_dev.length) parts.push(sec("Two devices, one night — agreement, not truth", dumbbell(_dev, { label: "% of night per stage", aLabel: "Eight Sleep", bLabel: "Whoop", unit: "%" }) + `<p class="rd-meta label">Wearable staging is an estimate, not a sleep-lab PSG. The gap between two devices is the honest uncertainty — agreement, not truth.</p>`));
+    // §3 — regularity / consistency + social jet-lag (P0.4). Empty state until a weekend.
+    if (s.avg_bedtime || s.avg_waketime) {
+      const _sjl = (s.social_jet_lag_hrs != null && s.avg_bedtime_weekday && s.avg_bedtime_weekend)
+        ? `<p class="rd-meta label">Social jet-lag <strong>${fmt(s.social_jet_lag_hrs)}h</strong> — the drift between weekday (${esc(s.avg_bedtime_weekday)}) and weekend (${esc(s.avg_bedtime_weekend)}) bedtime. Regularity predicts more than any single night's architecture.</p>`
+        : `<p class="rd-meta label">Social jet-lag — the weekday-vs-weekend bedtime drift — fills in once there's a weekend in the window. Regularity predicts more than single-night architecture.</p>`;
+      parts.push(sec("Regularity — when, not just how long", figs([s.avg_bedtime && fig(s.avg_bedtime, "avg bedtime"), s.avg_waketime && fig(s.avg_waketime, "avg wake")]) + _sjl));
+    }
+    // §4 — stage composition over the week (P0.5): stacked hours/night, refuses <4.
+    const _stageNights = (d.sleep_trend || []).map((n) => {
+      if (n.deep_sleep_hours == null || n.rem_sleep_hours == null) return null;
+      const light = n.hours != null ? Math.max(0, n.hours - n.deep_sleep_hours - n.rem_sleep_hours) : 0;
+      return { date: n.date, deep: n.deep_sleep_hours, rem: n.rem_sleep_hours, light };
+    }).filter(Boolean);
+    if (_stageNights.length) parts.push(sec("Stage composition over the week", stackedDayColumns(_stageNights, [{ key: "deep", label: "deep", tone: "lift" }, { key: "rem", label: "REM", tone: "cardio" }, { key: "light", label: "light", tone: "mob" }], { label: "hours by stage · per night", legendUnit: "h", minPoints: 4, emptyMsg: "Stage composition draws in at 4+ nights." })));
+    // §5 — environment: bed temp vs deep sleep (P0.6), observation-only (bed temp = a band).
+    const _env = (d.sleep_trend || []).filter((n) => n.bed_temp_f != null && n.deep_sleep_hours != null);
+    const _norm = (series) => { const vs = series.map((p) => p.value).filter(Number.isFinite); if (vs.length < 2) return series; const mn = Math.min(...vs), mx = Math.max(...vs); return series.map((p) => ({ date: p.date, value: mx > mn ? Math.round((p.value - mn) / (mx - mn) * 100) : 50 })); };
+    if (_env.length >= 4) {
+      const _t = _env.map((n) => ({ date: n.date, value: n.bed_temp_f })), _dp = _env.map((n) => ({ date: n.date, value: n.deep_sleep_hours }));
+      parts.push(sec("Environment — bed temp vs deep sleep", dualLineChart(_norm(_t), _norm(_dp), { aLabel: "bed temp", bLabel: "deep sleep", showGap: false, label: "both normalized 0–100 — co-movement only" }) + figs([s["30d_avg_temp"] != null && fig(fmt(s["30d_avg_temp"]) + "°F", "avg bed temp"), s.optimal_temp_f != null && fig(fmt(s.optimal_temp_f) + "°F", "best-scoring temp")]) + `<p class="rd-meta label">Bed temperature against deep-sleep hours, both normalized so the shapes compare. Observation only — bed temp is an optimal band, not monotonic; no coefficient at this n.</p>`));
+    } else if (_env.length) {
+      parts.push(sec("Environment — bed temp vs deep sleep", empty("The temp-vs-deep overlay draws in at 4+ nights with both readings.")));
+    }
+    // §7 — autonomic downshift readout (P0.7): a STATE snapshot (HRV + RHR + recovery), honest
+    // at n=1 because it's a state, not a claimed relationship. Low ≠ red — just muted framing.
+    if (s.recovery_score != null || s.hrv != null || s.rhr != null) {
+      const _rec = s.recovery_score;
+      const state = _rec == null ? "not assessable" : (_rec >= 67 ? "downshifted — parasympathetic" : _rec >= 34 ? "partial downshift" : "stayed elevated — sympathetic");
+      parts.push(sec("Autonomic downshift — did the body let go?",
+        figs([_rec != null && fig(fmt(_rec), "recovery"), s.hrv != null && fig(fmt(s.hrv) + "ms", "HRV"), s.rhr != null && fig(fmt(s.rhr), "resting HR")]) +
+        `<p class="rd-meta label">Tonight's autonomic state: <strong>${esc(state)}</strong>. HRV up + RHR down = the body downshifting into recovery. A one-night state snapshot — honest at n=1, not a claimed relationship.</p>`));
+    }
+    parts.push(sec("Sleep-score trend · latest = last night", lineChart(d.sleep_trend || [], { valueKey: "sleep_score", label: "Sleep score · nightly", spine: true, emptyMsg: "The sleep-score trend fills in nightly." })));
   }
-
+  // §6 — recovery readout (P1.1): HRV / RHR / recovery framed as what sleep DEFENDS in a
+  // deficit (cross-link to training). RHR-down = good (ember-positive); never red.
+  if (s.recovery_score != null || s.hrv != null || s.rhr != null) {
+    parts.push(sec("Recovery — what the sleep defends",
+      figs([s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv) + "ms", "HRV"), s.rhr != null && fig(fmt(s.rhr), "resting HR"), s["30d_avg_recovery"] != null && fig(fmt(s["30d_avg_recovery"]), "30d avg recovery")]) +
+      `<p class="rd-meta label">In a calorie deficit, sleep is what protects recovery, HRV and a low resting heart rate — the buffer that lets the training still land. RHR drifting down is the win here. See <a href="/evidence/training/">Training</a> for what it buys.</p>`));
+  }
+  // §6b — last-meal-time cross-link (P1.2): reuse the nutrition eating window, observation-only.
+  const _ew = nut && nut.eating_window;
+  if (_ew && _ew.avg_last_meal) {
+    parts.push(sec("Last meal → sleep — the cross-link",
+      figs([fig(esc(_ew.avg_last_meal), "avg last meal"), _ew.avg_hours != null && fig(fmt(_ew.avg_hours) + "h", "eating window")]) +
+      `<p class="rd-meta label">Eating late can blunt deep sleep. Average last meal lands at ${esc(_ew.avg_last_meal)}, pulled from the <a href="/evidence/nutrition/">nutrition</a> log — observation only; the day-lagged version lives in the board below once the overlap is deep enough.</p>`));
+  }
+  // §8 — the cross-source signal board (P2.1+).
+  const board = sleepCorrelationBoard(corr && corr.cards);
+  if (board) parts.push(board);
+  const _hasSleep = !!fcHero || Object.values(s).some(has);
+  // P1.3 — subjective "how rested" 1–5 (not captured) → honest empty state.
+  if (_hasSleep) parts.push(sec("How rested — coming online", `<div class="nut-coming"><p class="rd-archive">A morning 1–5 "how rested do you feel" check-in isn't captured yet. It's the ground truth the wearables miss — the night a tracker calls great that still felt like garbage. Once logged, it grades the forecast and the score against how the body actually felt. <span class="confidence conf-low">needs capture</span></p></div>`));
+  // P1.4 — caffeine + alcohol timing (not captured; PRIVACY-tiered) → honest empty state.
+  if (_hasSleep) parts.push(sec("Caffeine & alcohol timing — coming online", `<div class="nut-coming"><p class="rd-archive">The two biggest modifiable levers on sleep — caffeine and alcohol timing — aren't captured yet. Once logged they'd feed the forecast's wind-down and consistency anchors directly, and the board below. <strong>Privacy-tiered:</strong> these behavioural inputs stay private by default and won't render publicly without an explicit opt-in. <span class="confidence conf-low">needs capture · private</span></p></div>`));
+  // P1.5 — light exposure AM/PM (not captured; screen-time proxy) → honest empty state.
+  if (_hasSleep) parts.push(sec("Light exposure (AM/PM) — coming online", `<div class="nut-coming"><p class="rd-archive">Morning and evening light is the master circadian anchor, but it isn't measured directly. An evening screen-time proxy could stand in — flagged honestly as a proxy, not lux. Until then the forecast's wind-down anchor leans on behaviour, not measured light. <span class="confidence conf-low">needs capture · proxy</span></p></div>`));
+  // §9 — forecast self-grading (P2.9): does the forecast earn its lead? Placeholder until ~2 weeks.
+  if (_hasSleep) parts.push(sec("Forecast self-grading — coming online", `<div class="nut-coming"><p class="rd-archive">The forecast earns the top of the page only if it's right. Did the nights it called high-risk actually score lower? That check needs ~2 weeks of paired forecasts and outcomes before it means anything — until then the forecast leads on its mechanism, not yet its track record. A prediction you don't grade is a horoscope. <span class="confidence conf-low">grades in ~2 weeks</span></p></div>`));
   // Unified sleep — Whoop + Eight Sleep + Apple merged, best source per field.
-  let uniSec = "";
   if (uni && uni.available) {
     const srcs = (uni.sources_present || []).map(ttl).join(", ");
-    uniSec = sec("Unified sleep — sources reconciled" + (uni.night_of ? ` · the night of ${fmtShort(uni.night_of)}` : ""), figs([uni.total_duration_hours != null && fig(fmt(uni.total_duration_hours, 1), "hours · merged"), uni.recovery_score != null && fig(fmt(uni.recovery_score), "recovery"), uni.hrv_ms != null && fig(fmt(uni.hrv_ms), "hrv ms"), uni.sleep_efficiency_pct != null && fig(fmt(uni.sleep_efficiency_pct) + "%", "efficiency")]) + kvtable({ rem_pct: uni.rem_pct, deep_pct: uni.deep_pct, light_pct: uni.light_pct, awake_pct: uni.awake_pct, respiratory_rate: uni.respiratory_rate, room_temp_c: uni.room_temp_c, bed_temp_c: uni.bed_temp_c }) + (srcs ? `<p class="rd-meta label">merged from ${esc(srcs)} — best source per field</p>` : ""));
+    parts.push(sec("Unified sleep — sources reconciled" + (uni.night_of ? ` · the night of ${fmtShort(uni.night_of)}` : ""), figs([uni.total_duration_hours != null && fig(fmt(uni.total_duration_hours, 1), "hours · merged"), uni.recovery_score != null && fig(fmt(uni.recovery_score), "recovery"), uni.hrv_ms != null && fig(fmt(uni.hrv_ms), "hrv ms"), uni.sleep_efficiency_pct != null && fig(fmt(uni.sleep_efficiency_pct) + "%", "efficiency")]) + kvtable({ rem_pct: uni.rem_pct, deep_pct: uni.deep_pct, light_pct: uni.light_pct, awake_pct: uni.awake_pct, respiratory_rate: uni.respiratory_rate, room_temp_c: uni.room_temp_c, bed_temp_c: uni.bed_temp_c }) + (srcs ? `<p class="rd-meta label">merged from ${esc(srcs)} — best source per field</p>` : "")));
   }
-
-  if (!detail && !circSec && !uniSec) return empty("No sleep data yet — score, stages, HRV and recovery appear here nightly.");
-  return detail + circSec + uniSec + note("Correlative — last night, the recent trend, and today's behavioural forecast.");
+  if (!parts.length) return empty("No sleep data yet — score, stages, HRV and recovery appear here nightly.");
+  return parts.join("") + note("Correlative — tonight's forecast leads; last night and the trend are the evidence it earns its place against.");
 }
 function renderMind(d) { const m = d.mind || {}; const mp = d.mind_pillar; const vices = d.vice_streaks || []; const head = figs([mp && mp.level != null && fig(`L${fmt(mp.level)} · ${esc(mp.tier || "")}`, "mind pillar"), m.journal_entries_30d != null && fig(m.journal_entries_30d, "journal · 30d"), m.mood_entries_count != null && fig(m.mood_entries_count, "mood logs"), m.resist_rate_pct != null && fig(fmt(m.resist_rate_pct) + "%", "temptations resisted"), m.meaningful_pct != null && fig(m.meaningful_pct + "%", "meaningful talk")]); const v = vices.length ? sec("Vice streaks (held)", `<table class="rd-tbl"><tbody>${vices.map((x) => `<tr><td class="rd-name">${esc(ttl(x.name))}</td><td class="num">${fmt(x.current_streak)}d ${x.holding ? "✓" : ""}</td></tr>`).join("")}</tbody></table>`) : ""; const noLog = (m.journal_entries_30d || 0) === 0 && (m.mood_entries_count || 0) === 0; const honest = noLog ? note("No journal or mood logged this cycle yet — that part of the inner-life view fills in as you write. Below is what's tracked so far.") : ""; if (!head.includes("fig-v") && !v) return empty("No mood / journal / temptation data yet — the inner-life view fills in as you log."); return head + honest + v + note("Correlative — mood, reflection, restraint. Categories kept private."); }
 function renderVices(d) {
