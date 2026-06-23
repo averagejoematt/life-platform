@@ -317,6 +317,16 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .db-dot.db-a, .sbar-dot.db-a { background: var(--ember); }
 .db-dot.db-b, .sbar-dot.db-b { background: var(--ink-muted); }
 
+/* Per-group trend small-multiples (habits §6, P0.7) — low/floor groups muted, never red. */
+.gt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--sp-3); margin-top: var(--sp-3); }
+.gt-card { border: 1px solid var(--rule); border-radius: var(--radius-sm); padding: var(--sp-3); }
+.gt-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-2); }
+.gt-name { font-weight: var(--weight-med); font-size: var(--fs-small); }
+.gt-pct { color: var(--ink-faint); }
+.gt-thin { color: var(--ink-faint); }
+.gt-low { opacity: 0.85; }
+.gt-low .chart-line { stroke: var(--ink-muted); }
+
 /* Effort map (habits §5, P0.6) — ranked dot-strip: size = habit count, ember = adherence. */
 .em-strip { display: flex; flex-direction: column; gap: var(--sp-3); margin-top: var(--sp-3); }
 .em-row { display: flex; align-items: center; gap: var(--sp-3); }

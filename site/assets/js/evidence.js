@@ -840,6 +840,24 @@ function habitsEffortMap(groupAvgs, registryHabits) {
     `<div class="em-strip">${rows}</div>` +
     `<p class="rd-meta label">Each group: dot size = how many habits it carries, ember intensity = how reliably they're held. One ember scale + size — deliberately a ranked strip, not a radar (misleading geometry) and not a rainbow.</p>`);
 }
+// §6 per-group trend small-multiples (P0.7) — each group's adherence sparkline. The floor
+// groups (Recovery ~14%) render muted (sparkline + label), never red — a not-yet, not a fail.
+function habitsGroupTrends(history, groupAvgs) {
+  const series = {};
+  for (const day of history || []) {
+    for (const [g, p] of Object.entries(day.groups || {})) { if (Number.isFinite(Number(p))) (series[g] = series[g] || []).push(Number(p)); }
+  }
+  const groups = Object.keys(series).sort((a, b) => (groupAvgs[b] || 0) - (groupAvgs[a] || 0));
+  if (!groups.length) return "";
+  const cards = groups.map((g) => {
+    const vals = series[g], avg = groupAvgs[g];
+    const low = avg != null && avg < 40;
+    return `<div class="gt-card${low ? " gt-low" : ""}"><div class="gt-head"><span class="gt-name">${esc(ttl(g))}</span><span class="gt-pct mono">${fmt(avg)}%</span></div>${vals.length >= 2 ? sparkline(vals) : `<span class="gt-thin label">fills in</span>`}</div>`;
+  }).join("");
+  return sec("Per-group trends — the floor and the load-bearing",
+    `<div class="gt-grid">${cards}</div>` +
+    `<p class="rd-meta label">Each group's adherence over the window. The low ones (Recovery — the floor not yet built) read muted, never red — a not-yet, not a failure.</p>`);
+}
 async function renderHabits(d) {
   const dows = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const a = d.day_of_week_avgs || [];
@@ -887,7 +905,8 @@ async function renderHabits(d) {
     `<p class="rd-meta label">Each grade is the group's real adherence RATE over the window — never a correlation. Higher = load-bearing; the low ones (the floor, like Recovery) read muted, not as failure. Tier-0 non-negotiables drive the heatmap above.</p>`) : "";
   const states = habitStateTaxonomy(d.per_habit, habits);
   const effort = habitsEffortMap(d.group_90d_avgs || {}, habits);
-  return keystone + head + grid + groupBars + states + effort + trend + dow + list + note("Everything I'm trying to do — sourced from Habitify. Correlations are N=1, not cause. Private habits are never shown.");
+  const gtrends = habitsGroupTrends(d.history, d.group_90d_avgs || {});
+  return keystone + head + grid + groupBars + states + effort + gtrends + trend + dow + list + note("Everything I'm trying to do — sourced from Habitify. Correlations are N=1, not cause. Private habits are never shown.");
 }
 // The board — pick an expert, read their actual per-domain take + track record.
 async function renderBoard(d) {
