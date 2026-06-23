@@ -235,7 +235,28 @@ function physicalDexaBaseline(d) {
   return sec("DEXA baseline — lean vs fat (one scan, dated)",
     bar + `<p class="rd-meta label"><strong>${esc(x.scan_date)}${age != null ? ` · ~${age} days ago` : ""} · pre-cut baseline.</strong> A snapshot, not a trend${bfp ? ` — ${esc(bfp)}` : ""}. This is where the cut <em>started</em>; the weight cockpit above shows where it is now. Lean (ember) is the asset the cut is trying to keep while the fat comes off — proven only when scan two lands.</p>`);
 }
-// (temporary — indices / bone / segmental restructured across P1.3 / P1.4 / P1.6)
+// P1.3 — visceral fat callout (dated). The fat around the organs — a better predictor of
+// metabolic risk than total body-fat %. One figure + a risk-band gauge where ember INTENSITY
+// (never red) rises with risk; thresholds are DEXA-system-dependent, so the band is explicitly
+// directional, not a diagnosis.
+function physicalVisceralCallout(d) {
+  const x = d.latest_dexa; if (!x) return "";
+  const bc = x.body_composition || {};
+  const vlb = Number(bc.visceral_fat_lb), vg = Number(bc.visceral_fat_g);
+  if (!Number.isFinite(vlb) && !Number.isFinite(vg)) return "";
+  const lb = Number.isFinite(vlb) ? vlb : vg / 453.592;
+  const maxS = 3; // lb full-scale
+  const pos = Math.max(0, Math.min(100, (lb / maxS) * 100));
+  const band = lb < 1 ? "low" : lb < 2 ? "moderate" : "elevated";
+  const age = _physDexaAgeDays(x.scan_date);
+  const fig6 = `${fmt(Math.round(lb * 100) / 100)} lb${Number.isFinite(vg) ? ` · ${fmt(Math.round(vg))} g` : ""}`;
+  return sec("Visceral fat — the number under the number",
+    `<div class="vf-wrap"><div class="vf-fig"><span class="vf-v mono">${esc(fig6)}</span><span class="vf-band label vf-${band}">${esc(band)}</span></div>` +
+    `<div class="vf-gauge" role="img" aria-label="Visceral fat ${esc(fig6)} — ${band} band on a directional 0–3 lb scale"><span class="vf-zone vf-z1"></span><span class="vf-zone vf-z2"></span><span class="vf-zone vf-z3"></span><span class="vf-mark" style="left:${pos.toFixed(1)}%"></span></div>` +
+    `<div class="vf-scale label"><span>0</span><span>low · moderate · elevated</span><span>${maxS} lb</span></div></div>` +
+    `<p class="rd-meta label">Visceral fat wraps the organs and drives metabolic risk more than total body-fat % does — it's the number to actually watch, and the one a cut moves early. Dated <strong>${esc(x.scan_date)}${age != null ? ` · ~${age} days ago` : ""}</strong>, pre-cut. The bands are directional only — DEXA systems disagree on exact cutoffs, so this reads the zone, never a diagnosis.</p>`);
+}
+// (temporary — indices / bone / segmental restructured across P1.4 / P1.6)
 function physicalLegacyComposition(d) {
   const x = d.latest_dexa; if (!x) return "";
   const idx = x.indices || {}, bone = x.bone || {}, sf = x.segmental_fat || {}, sl = x.segmental_lean || {};
@@ -270,6 +291,7 @@ async function renderPhysical(d) {
   // ── TIER 2 — the composition arc (episodic) — restructured across P1.x ──
   parts.push(physicalDexaCountdown(d)); // P1.1 — next-DEXA countdown (arc anchor)
   parts.push(physicalDexaBaseline(d)); // P1.2 — dated lean-vs-fat baseline (one scan, not a trend)
+  parts.push(physicalVisceralCallout(d)); // P1.3 — visceral fat callout + risk band (dated)
   parts.push(physicalLegacyComposition(d));
   return parts.join("");
 }

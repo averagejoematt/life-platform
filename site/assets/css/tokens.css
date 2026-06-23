@@ -506,6 +506,22 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .dx-count { display: flex; align-items: baseline; gap: var(--sp-3); margin: var(--sp-2) 0; }
 .dx-days { font-size: var(--fs-display, 2.4rem); color: var(--ember); line-height: 1; }
 .dx-unit { color: var(--ink-muted); }
+/* P1.3 — visceral fat: a directional risk gauge. Ember intensity (never red) rises with the
+   zone; the marker is an ink tick. Bands are subtle background, the caption does the judging. */
+.vf-wrap { margin: var(--sp-3) 0; }
+.vf-fig { display: flex; align-items: baseline; gap: var(--sp-3); }
+.vf-v { font-size: var(--fs-h3, 1.5rem); color: var(--ink); }
+.vf-band { text-transform: uppercase; letter-spacing: var(--tracking-label); padding: 1px 8px; border-radius: var(--radius-xs); }
+.vf-band.vf-low { color: var(--ink-muted); border: 1px solid var(--rule); }
+.vf-band.vf-moderate { color: var(--ember); border: 1px solid var(--ember-line); }
+.vf-band.vf-elevated { color: var(--ember); border: 1px solid var(--ember); background: var(--ember-wash); }
+.vf-gauge { position: relative; display: flex; height: 12px; margin-top: var(--sp-2); border-radius: 6px; overflow: hidden; border: 1px solid var(--rule); }
+.vf-zone { height: 100%; }
+.vf-z1 { width: 33.33%; background: var(--ember-wash); }
+.vf-z2 { width: 33.33%; background: var(--ember-soft); }
+.vf-z3 { width: 33.34%; background: var(--ember-line); }
+.vf-mark { position: absolute; top: -2px; width: 2px; height: 16px; background: var(--ink); transform: translateX(-50%); }
+.vf-scale { display: flex; justify-content: space-between; margin-top: var(--sp-1); color: var(--ink-faint); }
 .chart-cap { display: block; margin-top: var(--sp-2); color: var(--ink-faint); }
 .chart--empty { border: var(--honest-border); border-radius: var(--radius-xs); padding: var(--sp-4); text-align: center; }
 .chart--empty .chart-cap { margin: 0; }
