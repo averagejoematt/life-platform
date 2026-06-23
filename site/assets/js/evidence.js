@@ -571,9 +571,33 @@ function circadianForecast(circ) {
     gauge + (anchors ? `<div class="suf-rows fc-anchors">${anchors}</div>` : "") +
     `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(machine)}</p><p class="tv-human">${esc(serif)}</p></div>`);
 }
+// §8 cross-source signal board (Phase 2) — the self-policing correlation surface. Each card:
+// pair + n + overlap-weeks + confidence; DIRECTION ONLY under 2 weeks (no coefficient/chip);
+// Pearson + chip at >=2 weeks; "likely noise" flags; sleep-vs-weight coefficient withheld.
+function sleepCorrelationBoard(cards) {
+  if (!cards || !cards.length) return "";
+  const card = (c) => {
+    const meta = `n=${fmt(c.n)} · ${fmt(c.overlap_weeks)} wk overlap${c.lag_days ? ` · ${fmt(c.lag_days)}d lag` : ""}`;
+    let read;
+    if (c.withheld) {
+      read = `<p class="cb-dir cb-withheld">coefficient withheld — too noisy to trust in the water-weight phase</p>`;
+    } else if (c.coefficient != null) {
+      read = `<p class="cb-dir mono">r = ${fmt(c.coefficient)}</p>` + correlationChip([{ label: c.predictor, r: c.coefficient, n: c.n }], { outcome: c.outcome });
+    } else {
+      read = `<p class="cb-dir">${c.direction === "insufficient" ? "too early to call a direction" : esc(c.direction) + " — direction only, no coefficient yet"}</p>`;
+    }
+    const noise = c.noise && !c.withheld ? `<span class="cb-noise">⚠ likely noise at this n</span>` : "";
+    return `<article class="cb-card"><header class="cb-head"><h3 class="cb-pair">${esc(c.predictor)} <span class="cb-arrow">→</span> ${esc(c.outcome)}</h3>` +
+      `<span class="cb-tag">${esc(c.confidence)}</span></header>${c.note ? `<p class="cb-note">${esc(c.note)}</p>` : ""}` +
+      `<div class="cb-read">${read}${noise}</div><p class="cb-meta label">${esc(meta)}</p></article>`;
+  };
+  return sec("Cross-source signal board — the correlation that tells you when NOT to trust it",
+    `<div class="cb-grid">${cards.map(card).join("")}</div>` +
+    `<p class="rd-meta label">Every card shows its n, the overlapping weeks, and a confidence tag. Under 2 weeks of overlap it's <strong>direction only</strong> — no Pearson, no chip. Thin pairs are flagged likely-noise. The self-skepticism is the feature, not a bug.</p>`);
+}
 async function renderSleep(d) {
   const s = d.sleep_detail || {};
-  const [circ, uni, nut] = await Promise.all([tryJSON("/api/circadian"), tryJSON("/api/sleep_reconciliation"), tryJSON("/api/nutrition_overview")]);
+  const [circ, uni, nut, corr] = await Promise.all([tryJSON("/api/circadian"), tryJSON("/api/sleep_reconciliation"), tryJSON("/api/nutrition_overview"), tryJSON("/api/sleep_correlations")]);
   const parts = [];
   // §0 — the forecast LEADS (prospective, not retrospective).
   const fcHero = circadianForecast(circ);
@@ -639,6 +663,9 @@ async function renderSleep(d) {
       figs([fig(esc(_ew.avg_last_meal), "avg last meal"), _ew.avg_hours != null && fig(fmt(_ew.avg_hours) + "h", "eating window")]) +
       `<p class="rd-meta label">Eating late can blunt deep sleep. Average last meal lands at ${esc(_ew.avg_last_meal)}, pulled from the <a href="/evidence/nutrition/">nutrition</a> log — observation only; the day-lagged version lives in the board below once the overlap is deep enough.</p>`));
   }
+  // §8 — the cross-source signal board (P2.1+).
+  const board = sleepCorrelationBoard(corr && corr.cards);
+  if (board) parts.push(board);
   const _hasSleep = !!fcHero || Object.values(s).some(has);
   // P1.3 — subjective "how rested" 1–5 (not captured) → honest empty state.
   if (_hasSleep) parts.push(sec("How rested — coming online", `<div class="nut-coming"><p class="rd-archive">A morning 1–5 "how rested do you feel" check-in isn't captured yet. It's the ground truth the wearables miss — the night a tracker calls great that still felt like garbage. Once logged, it grades the forecast and the score against how the body actually felt. <span class="confidence conf-low">needs capture</span></p></div>`));

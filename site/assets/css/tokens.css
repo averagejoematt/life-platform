@@ -317,6 +317,21 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .db-dot.db-a, .sbar-dot.db-a { background: var(--ember); }
 .db-dot.db-b, .sbar-dot.db-b { background: var(--ink-muted); }
 
+/* Cross-source signal board (sleep §8, Phase 2) — self-policing cards: n + overlap +
+   confidence; direction-only under 2 weeks. Muted/honest, never alarm. */
+.cb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--sp-3); margin-top: var(--sp-3); }
+.cb-card { border: var(--honest-border); border-radius: var(--radius-sm); padding: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-2); }
+.cb-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-2); flex-wrap: wrap; }
+.cb-pair { font-size: var(--fs-small); font-weight: var(--weight-med); margin: 0; }
+.cb-arrow { color: var(--ember); }
+.cb-tag { font-family: var(--font-mono); font-size: 0.6rem; text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--ink-faint); white-space: nowrap; }
+.cb-note { color: var(--ink-muted); font-size: var(--fs-small); margin: 0; }
+.cb-read { display: flex; flex-direction: column; gap: var(--sp-1); }
+.cb-dir { margin: 0; color: var(--ink); font-size: var(--fs-small); }
+.cb-withheld { color: var(--ink-muted); font-style: italic; }
+.cb-noise { color: var(--ink-muted); font-size: 0.7rem; font-family: var(--font-mono); }
+.cb-meta { color: var(--ink-faint); }
+
 /* Circadian forecast hero (sleep §0, P0.1) — anchors as suf-rows; the lever (weakest
    anchor) labelled ember; at-risk anchors muted ink, NEVER red. */
 .fc-anchors { margin-top: var(--sp-3); }

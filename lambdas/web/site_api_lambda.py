@@ -105,6 +105,7 @@ from web.site_api_data import (
     handle_observatory_week,
     handle_platform_stats,
     handle_protocols,
+    handle_sleep_correlations,
     handle_sleep_detail,
     handle_sleep_reconciliation,
     handle_source_freshness,
@@ -343,6 +344,7 @@ ROUTES = {
     "/api/journey_waveform": handle_journey_waveform,
     # Sprint 11: glucose + sleep intelligence pages
     "/api/glucose": handle_glucose,
+    "/api/sleep_correlations": handle_sleep_correlations,
     "/api/sleep_detail": handle_sleep_detail,
     # Elite review (2026-06-15): surface two compute outputs that were stored
     # daily but never exposed — circadian-compliance score + unified sleep.

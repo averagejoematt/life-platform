@@ -1406,6 +1406,105 @@ def _sane_sleep_score(raw, hours, whoop_quality):
     return raw
 
 
+# ── Cross-source correlation board (sleep §8, Phase 2) ───────────────────────
+# Self-policing: every card carries n + overlap_weeks + a confidence tag. The Pearson
+# coefficient is computed ONLY at >=14 overlapping days (>=2 weeks); below that it's
+# direction-only ("watching — too early"). Sleep-vs-weight (C1) is hard-WITHHELD through
+# the water-weight phase. Powered by the same raw sources the platform tools read; the
+# Pearson + day-lag logic is replicated compactly here (site-api can't import mcp/).
+_CORR_MIN_COEF_DAYS = 14  # >=2 weeks of overlap before any coefficient
+_CORR_MIN_DIR_DAYS = 4  # below this, not even a direction
+
+
+def _shift_date(d, lag):
+    try:
+        return (datetime.strptime(d, "%Y-%m-%d") + timedelta(days=lag)).strftime("%Y-%m-%d")
+    except (ValueError, TypeError):
+        return None
+
+
+def _corr_card(cid, label, predictor, outcome, pred_series, outc_series, lag=0, withhold=False, note=""):
+    """Build one self-policing correlation card from two {date: value} maps."""
+    xs, ys = [], []
+    for d, x in (pred_series or {}).items():
+        d2 = _shift_date(d, lag)
+        if d2 and d2 in (outc_series or {}) and x is not None and outc_series[d2] is not None:
+            xs.append(float(x))
+            ys.append(float(outc_series[d2]))
+    n = len(xs)
+    card = {
+        "id": cid, "label": label, "predictor": predictor, "outcome": outcome,
+        "n": n, "overlap_weeks": round(n / 7, 1), "lag_days": lag,
+        "direction": "insufficient", "coefficient": None, "withheld": bool(withhold),
+        "confidence": "watching — too early", "noise": False, "note": note,
+    }
+    if n >= _CORR_MIN_DIR_DAYS:
+        mx, my = sum(xs) / n, sum(ys) / n
+        cov = sum((a - mx) * (b - my) for a, b in zip(xs, ys))
+        card["direction"] = "moves together" if cov > 0 else ("moves opposite" if cov < 0 else "flat")
+        card["noise"] = n < 7  # thin pairs are likely noise
+    if withhold:
+        card["confidence"] = "withheld — water-weight phase"
+        card["coefficient"] = None
+    elif n >= _CORR_MIN_COEF_DAYS:
+        mx, my = sum(xs) / n, sum(ys) / n
+        cov = sum((a - mx) * (b - my) for a, b in zip(xs, ys))
+        sx = sum((a - mx) ** 2 for a in xs) ** 0.5
+        sy = sum((b - my) ** 2 for b in ys) ** 0.5
+        card["coefficient"] = round(cov / (sx * sy), 2) if sx > 0 and sy > 0 else None
+        card["confidence"] = "low confidence" if n < 30 else "moderate"
+    return card
+
+
+def _whoop_daily(d30, today):
+    """Whoop daily metrics keyed by date: recovery, strain, deep hours, sleep hours."""
+    out = {}
+    for w in _query_source("whoop", d30, today):
+        if "#WORKOUT#" in w.get("sk", ""):
+            continue
+        dt = w.get("sk", "").replace("DATE#", "")[:10]
+        if not dt:
+            continue
+        out[dt] = {
+            "recovery": _f(w.get("recovery_score")), "strain": _f(w.get("strain")),
+            "deep": _f(w.get("slow_wave_sleep_hours")), "hours": _f(w.get("sleep_duration_hours")),
+            "hrv": _f(w.get("hrv")),
+        }
+    return out
+
+
+def _f(v):
+    try:
+        return float(v) if v is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def handle_sleep_correlations() -> dict:
+    """
+    GET /api/sleep_correlations
+    The self-policing cross-source signal board. Each card: n + overlap-weeks + confidence;
+    direction-only under 2 weeks (no coefficient); Pearson only at >=2 weeks. Sleep-vs-weight
+    withheld through the water-weight phase. Cache: 3600s.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d30 = _experiment_date(30)
+    wd = _whoop_daily(d30, today)
+    recovery = {d: v["recovery"] for d, v in wd.items() if v["recovery"] is not None}
+    strain = {d: v["strain"] for d, v in wd.items() if v["strain"] is not None}
+
+    cards = []
+    # A1 (LEAD) — last night's recovery → today's training capacity (same-day; the only
+    # arrow that changes tomorrow morning). Outcome proxy: the day's Whoop strain.
+    cards.append(_corr_card(
+        "A1", "Last night's recovery → today's training capacity", "sleep recovery", "day strain",
+        recovery, strain, lag=0,
+        note="The only arrow that changes tomorrow morning — high recovery should let the day carry more strain.",
+    ))
+
+    return _ok({"cards": cards, "min_coef_days": _CORR_MIN_COEF_DAYS, "as_of": today}, cache_seconds=3600)
+
+
 def handle_sleep_detail() -> dict:
     """
     GET /api/sleep_detail
