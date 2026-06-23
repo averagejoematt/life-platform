@@ -112,10 +112,15 @@ export function weightTrendChart(readings, { goal = null, genesis = null, valueK
   const _r = (n) => Math.round(n * 10) / 10;
   const gap = goal != null ? _r(lastRaw.v - Number(goal)) : null;
   const summary = `Weight trend: ${pts.length} weigh-ins ${_shortDate(pts[0].d)}–${_shortDate(lastRaw.d)}, smoothed trend now ${_r(last.v)} lb${goal != null ? `, goal ${_r(Number(goal))} lb (${gap} lb away)` : ""}.`;
-  return `<figure class="chart wt-chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}">` +
+  // P0.2 — a horizontal scrub marker the silhouette drives in lockstep. Hidden until the
+  // silhouette scrubber moves it; data-* expose the y-scale so the link math stays in JS.
+  const markerY = y(lastRaw.v).toFixed(1);
+  return `<figure class="chart wt-chart" data-wt-min="${min.toFixed(2)}" data-wt-max="${max.toFixed(2)}" data-wt-h="${H}" data-wt-p="${P}">` +
+    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}">` +
     gMark +
     `<path class="wt-trend" d="${trendLine}" fill="none" vector-effect="non-scaling-stroke"/>` +
     `${dots}` +
+    `<line class="wt-marker" data-wt-marker x1="${P}" x2="${W - P}" y1="${markerY}" y2="${markerY}" vector-effect="non-scaling-stroke" style="opacity:0"/>` +
     `<circle class="chart-dot" cx="${x(lastRaw.d).toFixed(1)}" cy="${y(last.v).toFixed(1)}" r="3.5"/></svg>` +
     `<figcaption class="chart-cap label">${escAttr(label || "Weight")}` +
     ` · <span class="wt-key"><i class="wt-swatch wt-swatch-raw"></i>faint dots = daily scale (water/food noise)</span>` +

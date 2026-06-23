@@ -107,6 +107,7 @@ async function renderPhysical(d) {
   const parts = [];
   // ── TIER 1 — the weight cockpit (daily) ──
   parts.push(physicalTrendHero(readings, j, goal)); // P0.1
+  if (j.start_weight_lbs != null && j.current_weight_lbs != null) parts.push(dataFigure(j)); // P0.2 — silhouette scrubber (links to the trend marker)
   // ── TIER 2 — the composition arc (episodic) — restructured across P1.x ──
   parts.push(physicalLegacyComposition(d));
   return parts.join("");
@@ -1416,51 +1417,73 @@ const WIRE = {
     const start = picks.find((p) => p.dataset.coach === "training") || picks[0]; // open the lifting coach first
     if (start) load(start);
   },
-  results: () => {
-    const stage = document.querySelector("[data-df]");
-    if (!stage) return;
-    const START = parseFloat(stage.dataset.start), GOAL = parseFloat(stage.dataset.goal), NOW = parseFloat(stage.dataset.now);
-    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const bodyEl = stage.querySelector("[data-df-body]"), headEl = stage.querySelector("[data-df-head]");
-    const wEl = stage.querySelector("[data-df-w]"), tgEl = stage.querySelector("[data-df-tg]"), scrub = stage.querySelector("[data-df-scrub]");
-    const heaviness = (w) => Math.max(0, Math.min(1, (w - GOAL) / (START - GOAL)));
-    function render(w) {
-      const g = heaviness(w);
-      bodyEl.setAttribute("d", dfBody(g));
-      headEl.setAttribute("r", (29 + 6 * g).toFixed(1));
-      wEl.textContent = Math.round(w);
-      const toGo = Math.max(0, w - GOAL);
-      tgEl.textContent = toGo <= 0 ? "reached" : "-" + Math.round(toGo) + " lb";
-      scrub.value = (1 - g).toFixed(3);
-    }
-    scrub.addEventListener("input", () => render(START + (GOAL - START) * parseFloat(scrub.value)));
-    let raf = null;
-    function animateTo(target) {
-      cancelAnimationFrame(raf);
-      const from = START + (GOAL - START) * parseFloat(scrub.value);
-      if (reduce) { render(target); return; }
-      const t0 = performance.now(), dur = 900;
-      (function step(t) {
-        const k = Math.min(1, (t - t0) / dur), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
-        render(from + (target - from) * e);
-        if (k < 1) raf = requestAnimationFrame(step);
-      })(t0);
-    }
-    stage.querySelectorAll("[data-df-to]").forEach((b) => b.addEventListener("click", () => animateTo(parseFloat(b.dataset.to))));
-    const playBtn = stage.querySelector("[data-df-play]");
-    if (reduce) { playBtn.remove(); } else {
-      let playing = false, ploop = null;
-      playBtn.addEventListener("click", (e) => {
-        playing = !playing; e.target.textContent = playing ? "❚❚ pause" : "▶ morph";
-        if (playing) {
-          let dir = -1, w = START; cancelAnimationFrame(raf);
-          (function loop() { w += dir * 1.4; if (w <= GOAL) { w = GOAL; dir = 1; } if (w >= START) { w = START; dir = -1; } render(w); if (playing) ploop = requestAnimationFrame(loop); })();
-        } else { cancelAnimationFrame(ploop); }
-      });
-    }
-    render(NOW);   // open on the honest current state
-  },
+  results: () => wireDataFigure(),
+  physical: () => wireDataFigure(moveTrendMarker),  // P0.2 — silhouette scrubs the trend marker in lockstep
 };
+
+// P0.2 — silhouette scrubber wiring, reusable. `onWeight(w)` fires on every render so a
+// caller can link another element (the physical page passes the trend-chart marker).
+function wireDataFigure(onWeight) {
+  const stage = document.querySelector("[data-df]");
+  if (!stage) return;
+  const START = parseFloat(stage.dataset.start), GOAL = parseFloat(stage.dataset.goal), NOW = parseFloat(stage.dataset.now);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const bodyEl = stage.querySelector("[data-df-body]"), headEl = stage.querySelector("[data-df-head]");
+  const wEl = stage.querySelector("[data-df-w]"), tgEl = stage.querySelector("[data-df-tg]"), scrub = stage.querySelector("[data-df-scrub]");
+  const heaviness = (w) => Math.max(0, Math.min(1, (w - GOAL) / (START - GOAL)));
+  function render(w) {
+    const g = heaviness(w);
+    bodyEl.setAttribute("d", dfBody(g));
+    headEl.setAttribute("r", (29 + 6 * g).toFixed(1));
+    wEl.textContent = Math.round(w);
+    const toGo = Math.max(0, w - GOAL);
+    tgEl.textContent = toGo <= 0 ? "reached" : "-" + Math.round(toGo) + " lb";
+    scrub.value = (1 - g).toFixed(3);
+    if (onWeight) try { onWeight(w); } catch (e) { /* link is decorative — never break the scrub */ }
+  }
+  scrub.addEventListener("input", () => render(START + (GOAL - START) * parseFloat(scrub.value)));
+  let raf = null;
+  function animateTo(target) {
+    cancelAnimationFrame(raf);
+    const from = START + (GOAL - START) * parseFloat(scrub.value);
+    if (reduce) { render(target); return; }
+    const t0 = performance.now(), dur = 900;
+    (function step(t) {
+      const k = Math.min(1, (t - t0) / dur), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      render(from + (target - from) * e);
+      if (k < 1) raf = requestAnimationFrame(step);
+    })(t0);
+  }
+  stage.querySelectorAll("[data-df-to]").forEach((b) => b.addEventListener("click", () => animateTo(parseFloat(b.dataset.to))));
+  const playBtn = stage.querySelector("[data-df-play]");
+  if (reduce) { playBtn.remove(); } else {
+    let playing = false, ploop = null;
+    playBtn.addEventListener("click", (e) => {
+      playing = !playing; e.target.textContent = playing ? "❚❚ pause" : "▶ morph";
+      if (playing) {
+        let dir = -1, w = START; cancelAnimationFrame(raf);
+        (function loop() { w += dir * 1.4; if (w <= GOAL) { w = GOAL; dir = 1; } if (w >= START) { w = START; dir = -1; } render(w); if (playing) ploop = requestAnimationFrame(loop); })();
+      } else { cancelAnimationFrame(ploop); }
+    });
+  }
+  render(NOW);   // open on the honest current state
+}
+
+// P0.2 — move the trend-chart's horizontal scrub marker to weight `w` (lockstep with the
+// silhouette). Below the chart's data floor (toward goal) → pin to the axis bottom + flag.
+function moveTrendMarker(w) {
+  const fig = document.querySelector(".wt-chart");
+  if (!fig) return;
+  const m = fig.querySelector("[data-wt-marker]");
+  if (!m) return;
+  const min = parseFloat(fig.dataset.wtMin), max = parseFloat(fig.dataset.wtMax), H = parseFloat(fig.dataset.wtH), P = parseFloat(fig.dataset.wtP);
+  if (![min, max, H, P].every(Number.isFinite) || max === min) return;
+  const below = w < min;
+  const y = below ? (H - P) : (P + (1 - (w - min) / (max - min)) * (H - 2 * P));
+  m.setAttribute("y1", y.toFixed(1)); m.setAttribute("y2", y.toFixed(1));
+  m.style.opacity = "1";
+  m.classList.toggle("wt-marker-below", below);
+}
 
 /* ── App shell: tabs + sidebar + center ───────────────────────────────────── */
 const $ = (s) => document.querySelector(s);

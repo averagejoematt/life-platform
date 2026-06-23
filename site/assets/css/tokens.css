@@ -463,6 +463,10 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .wt-swatch { display: inline-block; width: 0.7em; height: 0.7em; vertical-align: baseline; margin-right: 0.25em; border-radius: 2px; }
 .wt-swatch-raw { background: var(--ink-faint); opacity: 0.5; border-radius: 50%; }
 .wt-swatch-trend { background: var(--ember); height: 0.22em; border-radius: 1px; }
+/* P0.2 — the scrub marker the silhouette drives in lockstep; ember dashed, pins to the
+   floor (muted) when the scrubbed weight is below the chart's data range (toward goal). */
+.wt-marker { stroke: var(--ember); stroke-width: 1.25; stroke-dasharray: 5 4; transition: opacity 0.15s; }
+.wt-marker-below { stroke: var(--ink-muted); }
 .chart-cap { display: block; margin-top: var(--sp-2); color: var(--ink-faint); }
 .chart--empty { border: var(--honest-border); border-radius: var(--radius-xs); padding: var(--sp-4); text-align: center; }
 .chart--empty .chart-cap { margin: 0; }
