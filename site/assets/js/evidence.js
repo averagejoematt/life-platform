@@ -625,6 +625,13 @@ async function renderSleep(d) {
     }
     parts.push(sec("Sleep-score trend · latest = last night", lineChart(d.sleep_trend || [], { valueKey: "sleep_score", label: "Sleep score · nightly", spine: true, emptyMsg: "The sleep-score trend fills in nightly." })));
   }
+  // §6 — recovery readout (P1.1): HRV / RHR / recovery framed as what sleep DEFENDS in a
+  // deficit (cross-link to training). RHR-down = good (ember-positive); never red.
+  if (s.recovery_score != null || s.hrv != null || s.rhr != null) {
+    parts.push(sec("Recovery — what the sleep defends",
+      figs([s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv) + "ms", "HRV"), s.rhr != null && fig(fmt(s.rhr), "resting HR"), s["30d_avg_recovery"] != null && fig(fmt(s["30d_avg_recovery"]), "30d avg recovery")]) +
+      `<p class="rd-meta label">In a calorie deficit, sleep is what protects recovery, HRV and a low resting heart rate — the buffer that lets the training still land. RHR drifting down is the win here. See <a href="/evidence/training/">Training</a> for what it buys.</p>`));
+  }
   // Unified sleep — Whoop + Eight Sleep + Apple merged, best source per field.
   if (uni && uni.available) {
     const srcs = (uni.sources_present || []).map(ttl).join(", ");
