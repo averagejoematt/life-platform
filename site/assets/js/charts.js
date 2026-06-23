@@ -181,6 +181,30 @@ export function intakeSpine(intake, tdee, { label = "" } = {}) {
     `</div><figcaption class="chart-cap label">${escAttr(label)}${deficit >= 0 ? ` · ${Math.abs(deficit)} kcal/day deficit (shaded)` : ` · ${Math.abs(deficit)} kcal/day surplus`}</figcaption></figure>`;
 }
 
+// Generic measuring-rule gauge 0→target (SIGNATURE 1) — the achieved portion (0→value) is
+// shaded ember (work done toward the target), value tick ember, target tick muted ink. For
+// "more is the goal" metrics (Zone-2 minutes vs 150/week). Edge-aware labels (no 390px clip).
+export function targetSpine(value, target, { valueLabel = "now", targetLabel = "target", unit = "", label = "" } = {}) {
+  const v = Number(value), tg = Number(target);
+  if (!Number.isFinite(v) || !Number.isFinite(tg) || tg <= 0) {
+    return `<figure class="chart chart--empty"><figcaption class="chart-cap label">Fills in as the work accrues.</figcaption></figure>`;
+  }
+  const max = Math.max(tg, v) * 1.06;
+  const pos = (x) => Math.max(0, Math.min(100, (x / max) * 100));
+  const pct = Math.round((v / tg) * 100);
+  const mark = (val, key, ember) => {
+    const p = pos(val);
+    const align = p >= 80 ? "hspine-r" : (p <= 15 ? "hspine-l" : "hspine-c");
+    return `<div class="hspine-mark ${align} ${ember ? "hspine-intake" : "hspine-tdee"}" style="left:${p.toFixed(1)}%">` +
+      `<span class="hspine-lab"><span class="hspine-v mono">${Math.round(val)}${escAttr(unit)}</span><span class="hspine-k label">${escAttr(key)}</span></span></div>`;
+  };
+  return `<figure class="chart spine-fig"><div class="hspine" role="img" aria-label="${escAttr(`${Math.round(v)} of ${Math.round(tg)} ${unit} — ${pct} percent of target.`)}">` +
+    `<div class="hspine-rule"></div>` +
+    `<div class="hspine-gap hspine-gap-deficit" style="left:0;width:${pos(v).toFixed(1)}%"></div>` +
+    mark(v, valueLabel, true) + mark(tg, targetLabel, false) +
+    `</div><figcaption class="chart-cap label">${escAttr(label)} · ${pct}% of ${Math.round(tg)}${escAttr(unit)}</figcaption></figure>`;
+}
+
 // Eating-window ribbon (nutrition §4) — per-day first→last meal on a 5am→midnight axis,
 // ember = the actual window, a faint bar = the 16:8 reference (an 8h window from the first
 // meal). Reveals at a glance whether the day runs tighter or wider than 16:8. days:

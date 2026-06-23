@@ -934,6 +934,7 @@ def handle_training_overview() -> dict:
     _HEVY_CARDIO = {"cycling", "elliptical", "rowing", "treadmill", "stair", "ski erg", "ski-erg", "assault", "echo bike", "air bike"}
     _HEVY_MOBILITY = {"stretching", "stretch", "mobility", "yoga", "foam roll"}
     hevy_cardio_30d = _query_source("hevy", d30, today)
+    _hevy_cardio_min = 0.0  # P0.4: Hevy bike/elliptical steady-cardio minutes → Zone-2 base
     for w in sorted(hevy_cardio_30d, key=lambda x: x.get("date") or x.get("sk", ""), reverse=True):
         wdate = w.get("date") or w.get("sk", "").replace("DATE#", "")[:10]
         for ex in w.get("exercises") or []:
@@ -946,6 +947,8 @@ def handle_training_overview() -> dict:
             sets = ex.get("sets") or []
             dist_m = sum(float(s.get("distance_m") or 0) for s in sets)
             secs = sum(float(s.get("duration_sec") or 0) for s in sets)
+            if is_cardio and secs:
+                _hevy_cardio_min += secs / 60.0
             cardio_sessions.append(
                 {
                     "date": wdate,
@@ -958,6 +961,13 @@ def handle_training_overview() -> dict:
                 }
             )
     cardio_sessions = sorted(cardio_sessions, key=lambda x: x.get("date") or "", reverse=True)[:20]
+
+    # P0.4 — Zone-2 is cross-source: fold Hevy bike/elliptical minutes (logged steady
+    # cardio, no HR stream) into the Z2 base alongside Strava + Whoop. Never Strava-only.
+    if _hevy_cardio_min:
+        z2_minutes_30d += _hevy_cardio_min
+        z2_weekly_avg = round(z2_minutes_30d / 4.3)
+        z2_pct = round(z2_weekly_avg / z2_target * 100) if z2_target else 0
 
     return _ok(
         {
