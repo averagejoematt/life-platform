@@ -256,11 +256,29 @@ function physicalVisceralCallout(d) {
     `<div class="vf-scale label"><span>0</span><span>low · moderate · elevated</span><span>${maxS} lb</span></div></div>` +
     `<p class="rd-meta label">Visceral fat wraps the organs and drives metabolic risk more than total body-fat % does — it's the number to actually watch, and the one a cut moves early. Dated <strong>${esc(x.scan_date)}${age != null ? ` · ~${age} days ago` : ""}</strong>, pre-cut. The bands are directional only — DEXA systems disagree on exact cutoffs, so this reads the zone, never a diagnosis.</p>`);
 }
-// (temporary — indices / bone / segmental restructured across P1.4 / P1.6)
+// P1.4 — lean / ALMI longevity context, demoted. Appendicular lean mass index is the
+// body-comp number that best predicts healthy aging (sarcopenia/frailty). Small: a few figs,
+// a one-line reference floor, plain language — out of the raw index table. Dated.
+function physicalLeanLongevity(d) {
+  const x = d.latest_dexa; if (!x) return "";
+  const idx = x.indices || {}, bc = x.body_composition || {};
+  const almi = Number(idx.almi_kg_m2), pct = Number(idx.almi_percentile), lean = Number(bc.lean_mass_lb);
+  if (!Number.isFinite(almi) && !Number.isFinite(lean)) return "";
+  const FLOOR = 7.0; // commonly-cited male sarcopenia ALMI floor (kg/m²); cutoffs vary
+  const clear = Number.isFinite(almi) ? Math.round((almi - FLOOR) * 10) / 10 : null;
+  return sec("Lean mass & longevity — the aging number",
+    figs([
+      Number.isFinite(almi) && fig(fmt(almi, 1), "ALMI · kg/m²"),
+      Number.isFinite(pct) && fig(fmt(pct) + "th", "percentile"),
+      Number.isFinite(lean) && fig(dualWeight(lean, "lb"), "appendicular + trunk lean"),
+    ]) +
+    `<p class="rd-meta label">Appendicular lean mass — the muscle on the arms and legs — is the body-comp figure that best predicts how well you age: it's the buffer against sarcopenia and frailty. ${Number.isFinite(almi) ? `At ${fmt(almi, 1)} kg/m²${Number.isFinite(pct) ? `, ${fmt(pct)}th percentile,` : ""} that's ${clear != null && clear > 0 ? `~${fmt(clear)} clear of` : "near"} the ~${FLOOR} sarcopenia floor.` : ""} The cut's whole job is to keep this while the fat comes off — confirmed only when scan two lands. Dated <strong>${esc(x.scan_date)}</strong>, pre-cut.</p>`);
+}
+// (temporary — bone / segmental restructured across P1.6)
 function physicalLegacyComposition(d) {
   const x = d.latest_dexa; if (!x) return "";
-  const idx = x.indices || {}, bone = x.bone || {}, sf = x.segmental_fat || {}, sl = x.segmental_lean || {};
-  return sec("Indices (ALMI / FFMI / FMI)", kvtable(idx)) + sec("Bone density", kvtable(bone)) +
+  const bone = x.bone || {}, sf = x.segmental_fat || {}, sl = x.segmental_lean || {};
+  return sec("Bone density", kvtable(bone)) +
     (Object.keys(sf).length ? sec("Segmental fat %", kvtable(sf)) : "") + (Object.keys(sl).length ? sec("Segmental lean", kvtable(sl)) : "") +
     note(`DEXA scan${x.scan_date ? ` · ${esc(x.scan_date)}` : ""}.`);
 }
@@ -292,6 +310,7 @@ async function renderPhysical(d) {
   parts.push(physicalDexaCountdown(d)); // P1.1 — next-DEXA countdown (arc anchor)
   parts.push(physicalDexaBaseline(d)); // P1.2 — dated lean-vs-fat baseline (one scan, not a trend)
   parts.push(physicalVisceralCallout(d)); // P1.3 — visceral fat callout + risk band (dated)
+  parts.push(physicalLeanLongevity(d)); // P1.4 — lean/ALMI longevity context (dated, demoted)
   parts.push(physicalLegacyComposition(d));
   return parts.join("");
 }
