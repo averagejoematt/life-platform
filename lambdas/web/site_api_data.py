@@ -1501,6 +1501,12 @@ def handle_sleep_correlations() -> dict:
         recovery, strain, lag=0,
         note="The only arrow that changes tomorrow morning — high recovery should let the day carry more strain.",
     ))
+    # A2 — day strain → next-night deep sleep (day-lagged: "did I earn it?").
+    deep = {d: v["deep"] for d, v in wd.items() if v["deep"] is not None}
+    cards.append(_corr_card(
+        "A2", "Day strain → next-night deep sleep", "day strain", "deep sleep", strain, deep, lag=1,
+        note="Did I earn it? — yesterday's training load against tonight's deep sleep.",
+    ))
 
     return _ok({"cards": cards, "min_coef_days": _CORR_MIN_COEF_DAYS, "as_of": today}, cache_seconds=3600)
 
