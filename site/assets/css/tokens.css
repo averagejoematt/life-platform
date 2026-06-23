@@ -543,6 +543,12 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .fs-body { margin-top: var(--sp-3); }
 .fs-body .hb-group { margin-top: var(--sp-4); }
 .rd-flag-note { color: var(--ember); border: 1px dashed var(--ember-line); border-radius: var(--radius-xs); padding: var(--sp-2) var(--sp-3); background: var(--ember-wash); }
+/* P2.1–P2.5 — capture backlog cards: honest pending states, never alarmist. */
+.cap-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--sp-3); margin: var(--sp-3) 0; }
+.cap-card { border: var(--honest-border); border-radius: var(--radius-sm); padding: var(--sp-3); }
+.cap-h { margin: 0 0 var(--sp-2); display: flex; align-items: baseline; gap: var(--sp-2); flex-wrap: wrap; font-size: var(--fs-small); }
+.cap-tag { font-family: var(--font-mono); font-size: 0.58rem; text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--ink-faint); border: 1px solid var(--rule); border-radius: var(--radius-xs); padding: 0 6px; white-space: nowrap; }
+.cap-tag.cap-private { color: var(--ember); border-color: var(--ember-line); }
 .chart-cap { display: block; margin-top: var(--sp-2); color: var(--ink-faint); }
 .chart--empty { border: var(--honest-border); border-radius: var(--radius-xs); padding: var(--sp-4); text-align: center; }
 .chart--empty .chart-cap { margin: 0; }

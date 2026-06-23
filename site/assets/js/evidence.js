@@ -296,6 +296,28 @@ function physicalPhenoAge(pa) {
     `<details class="pa-details"><summary class="pa-sum label">The 9 markers driving it — show the inputs</summary><div class="pa-drivers">${driverRows}</div>` +
     `<p class="rd-meta label">Ember = the marker is pushing the number <em>younger</em> vs a healthy reference; muted = older; faint = neutral. Lymphocyte % is derived from absolute lymphocytes ÷ WBC.</p></details>`);
 }
+// P2.1–P2.5 — new-capture + velocity, honestly gated. Each is a real capability with an
+// honest empty/pending state until the data exists; none fabricate or surface a gated metric.
+// P2.4 (composition velocity) STAYS a placeholder until a SECOND valid DEXA exists and the
+// delta clears least-significant-change — never built off one scan.
+function physicalCaptureBacklog(d, pa) {
+  const x = d.latest_dexa || {};
+  const haveTape = d.tape_measurements && Object.keys(d.tape_measurements).length;
+  const cards = [];
+  // P2.1 — DEXA cadence / scan-two scheduling (drives the countdown; unlocks velocity).
+  cards.push(`<div class="cap-card"><h4 class="cap-h">Scan two — scheduling <span class="cap-tag">unlocks velocity</span></h4><p class="rd-meta label">A second DEXA ~10 weeks into the cut turns every composition figure above from a dated snapshot into a real fat-vs-lean <em>trajectory</em>. Booking it is the single highest-value capture step — it's what the countdown at the top of the arc is waiting on. Not yet scheduled.</p></div>`);
+  // P2.2 — tape measurements (between-DEXA proxy).
+  cards.push(`<div class="cap-card"><h4 class="cap-h">Tape measurements <span class="cap-tag">${haveTape ? "flowing" : "needs capture"}</span></h4><p class="rd-meta label">${haveTape ? "Tape sessions are logging — a cheap, frequent proxy for the silhouette and segmental change between scans." : "Zero sessions yet. A monthly tape (waist, hips, limbs) is the cheap, frequent proxy that keeps the silhouette honest between the expensive scans. Awaiting the first measurement."}</p></div>`);
+  // P2.3 — progress photos (PRIVATE by default; explicit opt-in before any public render).
+  cards.push(`<div class="cap-card"><h4 class="cap-h">Progress photos <span class="cap-tag cap-private">private by default</span></h4><p class="rd-meta label">The most powerful change signal and the most sensitive — so they're private by default, never rendered here without an explicit opt-in. The faceless silhouette above is the public-safe stand-in. No photo is shown.</p></div>`);
+  // P2.4 — composition velocity (GATED on scan two + LSC).
+  cards.push(`<div class="cap-card"><h4 class="cap-h">Composition velocity <span class="cap-tag">awaits scan two</span></h4><p class="rd-meta label">Lean/fat/visceral change per week — the number everyone wants — stays blank on purpose. One DEXA is a point; velocity needs a second valid scan AND a delta that clears the scan's least-significant-change, or it's noise dressed as progress. Until then, weight is the only honest "change." Placeholder, not hidden.</p></div>`);
+  // P2.5 — complementary ages (optional; PhenoAge stays the anchor; WHOOP Age NOT built).
+  cards.push(`<div class="cap-card"><h4 class="cap-h">Complementary ages <span class="cap-tag">secondary lenses</span></h4><p class="rd-meta label">Vascular age (Withings pulse-wave velocity) and a VO₂max fitness age could sit beside PhenoAge as secondary lenses — PhenoAge stays the anchor. WHOOP's "age" isn't in their official API (only a fragile unofficial scrape), so it's deliberately not built. Awaiting the source wiring.</p></div>`);
+  return sec("What unlocks the arc — the capture backlog",
+    `<div class="cap-grid">${cards.join("")}</div>` +
+    `<p class="rd-meta label">Each of these is a real capability waiting on data, not a stub — honest empty states, ranked by what would move the picture most. Composition velocity is gated hardest: it does not get built off a single scan.</p>`);
+}
 // P1.6 — full-scan expander (dated). The remaining indices / segmental / bone numbers tucked
 // behind a "full scan" disclosure, all dated. The +3.9 bone T-score is SUPPRESSED as an
 // artifact (a T-score that high is physiologically implausible — almost certainly a parse
@@ -353,6 +375,7 @@ async function renderPhysical(d) {
   parts.push(physicalLeanLongevity(d)); // P1.4 — lean/ALMI longevity context (dated, demoted)
   parts.push(physicalPhenoAge(pa)); // P1.5 — transparent PhenoAge (Option A: no chronological/gap)
   parts.push(physicalFullScanExpander(d)); // P1.6 — full-scan expander, dated; +3.9 T-score suppressed
+  parts.push(physicalCaptureBacklog(d, pa)); // P2.1–P2.5 — capture backlog, honestly gated
   return parts.join("");
 }
 // P0.1 — The Lift Index: per-lift estimated-1RM TREND (sparkline + ▲/▼/flat tag), never a
