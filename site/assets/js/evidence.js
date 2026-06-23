@@ -13,7 +13,7 @@
     window.__START_SLUG__ = "<slug>"
 */
 
-import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars } from "/assets/js/charts.js";
+import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars, dumbbell } from "/assets/js/charts.js";
 
 const REG = window.__EVIDENCE_REGISTRY__ || [];
 const BYSLUG = Object.fromEntries(REG.map((t) => [t.slug, t]));
@@ -583,6 +583,14 @@ async function renderSleep(d) {
   if (Object.values(s).some(has)) {
     parts.push(sec(lastNightHdr, figs([s.total_sleep_hours != null && fig(fmt(s.total_sleep_hours, 1), "hours"), s.sleep_efficiency != null && fig(fmt(s.sleep_efficiency) + "%", "efficiency"), s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv), "hrv ms"), s.sleep_score != null && fig(fmt(s.sleep_score), "composite score")]) + `<p class="rd-meta label">One night is noise, not a verdict — it's evidence the forecast above gets graded against. The composite "score" is Eight Sleep's black box; the hours, efficiency and stages are what actually move it.</p>`));
     if (s.deep_sleep_hours != null && s.rem_sleep_hours != null) parts.push(sec("Last night's stages", stackedBar([{ label: "Deep", value: s.deep_sleep_hours, tone: "ember" }, { label: "REM", value: s.rem_sleep_hours, tone: "ink" }, { label: "Light", value: Math.max(0, (s.total_sleep_hours || 0) - (s.deep_sleep_hours || 0) - (s.rem_sleep_hours || 0)), tone: "faint" }], { label: "Hours by stage", unit: "h" })));
+    // §2 — dual-device stage agreement (P0.3): Eight Sleep % vs Whoop % per stage.
+    const _wh = s.whoop_hours; const _dev = [];
+    if (_wh) {
+      if (s.deep_pct != null && s.deep_sleep_hours != null) _dev.push({ label: "Deep", a: s.deep_pct, b: (s.deep_sleep_hours / _wh) * 100 });
+      if (s.rem_pct != null && s.rem_sleep_hours != null) _dev.push({ label: "REM", a: s.rem_pct, b: (s.rem_sleep_hours / _wh) * 100 });
+      if (s.light_pct != null && s.deep_sleep_hours != null && s.rem_sleep_hours != null) _dev.push({ label: "Light", a: s.light_pct, b: Math.max(0, 100 - (s.deep_sleep_hours / _wh) * 100 - (s.rem_sleep_hours / _wh) * 100) });
+    }
+    if (_dev.length) parts.push(sec("Two devices, one night — agreement, not truth", dumbbell(_dev, { label: "% of night per stage", aLabel: "Eight Sleep", bLabel: "Whoop", unit: "%" }) + `<p class="rd-meta label">Wearable staging is an estimate, not a sleep-lab PSG. The gap between two devices is the honest uncertainty — agreement, not truth.</p>`));
     parts.push(sec("Stages & physiology", kvtable({ whoop_quality: s.whoop_quality, bed_temp_f: s.bed_temp_f })));
     parts.push(sec("Sleep-score trend · latest = last night", lineChart(d.sleep_trend || [], { valueKey: "sleep_score", label: "Sleep score · nightly", emptyMsg: "The sleep-score trend fills in nightly." })));
   }

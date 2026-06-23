@@ -222,6 +222,26 @@ export function heatStrip(days, { valueKey = "value", label = "", unit = "", div
     `<figcaption class="chart-cap label">${escAttr(label)} — ember intensity = volume; low days shown muted, not hidden.</figcaption></figure>`;
 }
 
+// Dumbbell / paired-marker rows — two devices' estimate per category, connected; the gap
+// is the honest spread (sleep stage agreement: Eight Sleep vs Whoop). A = ember, B = muted
+// ink. "Agreement, not truth" — wearable stages are estimates, not PSG. items: [{label,a,b}].
+export function dumbbell(items, { label = "", aLabel = "A", bLabel = "B", unit = "%" } = {}) {
+  const rows = (items || []).filter((r) => Number.isFinite(Number(r.a)) && Number.isFinite(Number(r.b)));
+  if (!rows.length) return `<figure class="chart chart--empty"><figcaption class="chart-cap label">Fills in once both devices report a night.</figcaption></figure>`;
+  const max = Math.max(100, ...rows.flatMap((r) => [Number(r.a), Number(r.b)]));
+  const pos = (v) => Math.max(0, Math.min(100, (Number(v) / max) * 100));
+  const row = (r) => {
+    const lo = Math.min(r.a, r.b), hi = Math.max(r.a, r.b), gap = Math.abs(r.a - r.b);
+    return `<div class="suf-row"><span class="suf-l">${escAttr(r.label)}</span>` +
+      `<span class="db-track"><span class="db-bar" style="left:${pos(lo).toFixed(1)}%;width:${(pos(hi) - pos(lo)).toFixed(1)}%"></span>` +
+      `<span class="db-dot db-a" style="left:${pos(r.a).toFixed(1)}%"></span><span class="db-dot db-b" style="left:${pos(r.b).toFixed(1)}%"></span></span>` +
+      `<span class="suf-v mono">${Math.round(r.a)}/${Math.round(r.b)}${escAttr(unit)}<span class="suf-amt">±${Math.round(gap)}</span></span></div>`;
+  };
+  const legend = `<span class="sbar-key"><i class="sbar-dot db-a"></i>${escAttr(aLabel)}</span><span class="sbar-key"><i class="sbar-dot db-b"></i>${escAttr(bLabel)}</span>`;
+  return `<figure class="chart"><div class="suf-rows">${rows.map(row).join("")}</div>` +
+    `<figcaption class="chart-cap label sbar-legend">${legend}${label ? ` · ${escAttr(label)}` : ""}</figcaption></figure>`;
+}
+
 // Per-muscle volume vs MEV/MAV/MRV landmark bars (training §5). Track 0→max; the MEV–MAV
 // optimal band shaded; value bar ember when in the optimal band, muted ink otherwise (under/
 // over — never red); an MRV tick. items: [{muscle, sets_per_week, MEV, MAV_lo, MAV_hi, MRV, status}].
