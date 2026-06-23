@@ -74,7 +74,7 @@ export function lineChart(data, { valueKey = "value", dateKey = "date", goal = n
 // Two overlaid trajectories on a shared scale — ember = primary (A), muted = reference (B).
 // For the reconciliation view (projected loss vs actual). Refuses if either series < 4 pts.
 // No correlation/Pearson — that's gated elsewhere by the ≥2-week rule. seriesA/B: [{date,value}].
-export function dualLineChart(seriesA, seriesB, { aLabel = "A", bLabel = "B", unit = "", height = 140, label = "", emptyMsg = "" } = {}) {
+export function dualLineChart(seriesA, seriesB, { aLabel = "A", bLabel = "B", unit = "", height = 140, label = "", emptyMsg = "", showGap = true } = {}) {
   const A = _points(seriesA || [], "value", "date"), B = _points(seriesB || [], "value", "date");
   if (A.length < 4 || B.length < 4) {
     return `<figure class="chart chart--empty"><figcaption class="chart-cap label">${escAttr(emptyMsg || "Two trajectories draw in once each has 4+ points.")}</figcaption></figure>`;
@@ -92,7 +92,7 @@ export function dualLineChart(seriesA, seriesB, { aLabel = "A", bLabel = "B", un
   return `<figure class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}">` +
     `<path class="chart-down" d="${path(B)}" fill="none" vector-effect="non-scaling-stroke"/>` +
     `<path class="chart-line" d="${path(A)}" vector-effect="non-scaling-stroke"/></svg>` +
-    `<figcaption class="chart-cap label sbar-legend"><span class="sbar-key"><i class="sbar-dot sbar-ember"></i>${escAttr(aLabel)}</span><span class="sbar-key"><i class="sbar-dot sbar-ink"></i>${escAttr(bLabel)}</span> · gap ${escAttr(String(gap))}${escAttr(unit)}${label ? ` · ${escAttr(label)}` : ""}</figcaption></figure>`;
+    `<figcaption class="chart-cap label sbar-legend"><span class="sbar-key"><i class="sbar-dot sbar-ember"></i>${escAttr(aLabel)}</span><span class="sbar-key"><i class="sbar-dot sbar-ink"></i>${escAttr(bLabel)}</span>${showGap ? ` · gap ${escAttr(String(gap))}${escAttr(unit)}` : ""}${label ? ` · ${escAttr(label)}` : ""}</figcaption></figure>`;
 }
 
 // Tiny inline sparkline (no axes/caption). values: [numbers].
@@ -179,6 +179,90 @@ export function intakeSpine(intake, tdee, { label = "" } = {}) {
     `<div class="hspine-gap ${gapCls}" style="left:${pos(lo).toFixed(1)}%;width:${(pos(hi) - pos(lo)).toFixed(1)}%"></div>` +
     mark(inK, "intake", true) + mark(td, "maintenance", false) +
     `</div><figcaption class="chart-cap label">${escAttr(label)}${deficit >= 0 ? ` · ${Math.abs(deficit)} kcal/day deficit (shaded)` : ` · ${Math.abs(deficit)} kcal/day surplus`}</figcaption></figure>`;
+}
+
+// Generic measuring-rule gauge 0→target (SIGNATURE 1) — the achieved portion (0→value) is
+// shaded ember (work done toward the target), value tick ember, target tick muted ink. For
+// "more is the goal" metrics (Zone-2 minutes vs 150/week). Edge-aware labels (no 390px clip).
+export function targetSpine(value, target, { valueLabel = "now", targetLabel = "target", unit = "", label = "" } = {}) {
+  const v = Number(value), tg = Number(target);
+  if (!Number.isFinite(v) || !Number.isFinite(tg) || tg <= 0) {
+    return `<figure class="chart chart--empty"><figcaption class="chart-cap label">Fills in as the work accrues.</figcaption></figure>`;
+  }
+  const max = Math.max(tg, v) * 1.06;
+  const pos = (x) => Math.max(0, Math.min(100, (x / max) * 100));
+  const pct = Math.round((v / tg) * 100);
+  const mark = (val, key, ember) => {
+    const p = pos(val);
+    const align = p >= 80 ? "hspine-r" : (p <= 15 ? "hspine-l" : "hspine-c");
+    return `<div class="hspine-mark ${align} ${ember ? "hspine-intake" : "hspine-tdee"}" style="left:${p.toFixed(1)}%">` +
+      `<span class="hspine-lab"><span class="hspine-v mono">${Math.round(val)}${escAttr(unit)}</span><span class="hspine-k label">${escAttr(key)}</span></span></div>`;
+  };
+  return `<figure class="chart spine-fig"><div class="hspine" role="img" aria-label="${escAttr(`${Math.round(v)} of ${Math.round(tg)} ${unit} — ${pct} percent of target.`)}">` +
+    `<div class="hspine-rule"></div>` +
+    `<div class="hspine-gap hspine-gap-deficit" style="left:0;width:${pos(v).toFixed(1)}%"></div>` +
+    mark(v, valueLabel, true) + mark(tg, targetLabel, false) +
+    `</div><figcaption class="chart-cap label">${escAttr(label)} · ${pct}% of ${Math.round(tg)}${escAttr(unit)}</figcaption></figure>`;
+}
+
+// Ember-intensity heat strip — saturation = volume (steps/day). Low days render MUTED
+// (faint ember), never hidden. "More colorful" = more ember intensity, NOT a second hue.
+export function heatStrip(days, { valueKey = "value", label = "", unit = "", divisor = 1000, suffix = "k" } = {}) {
+  const rows = (days || []).map((d) => ({ d: d.date, v: Number(d[valueKey]) })).filter((r) => Number.isFinite(r.v));
+  if (!rows.length) return `<figure class="chart chart--empty"><figcaption class="chart-cap label">Fills in as days accrue.</figcaption></figure>`;
+  const max = Math.max(...rows.map((r) => r.v)) || 1;
+  const cell = (r) => {
+    const sat = Math.max(0.1, r.v / max);  // muted-not-hidden floor
+    const dl = _shortDate(r.d);
+    const dayNum = dl.split(" ")[1] || "";
+    return `<div class="heat-cell" style="--heat:${sat.toFixed(3)}" title="${escAttr(`${dl}: ${Math.round(r.v)}${unit}`)}">` +
+      `<span class="heat-v mono">${(r.v / divisor).toFixed(1)}${escAttr(suffix)}</span><span class="heat-d label">${escAttr(dayNum)}</span></div>`;
+  };
+  return `<figure class="chart heat"><div class="heat-strip" role="img" aria-label="${escAttr(label)}">${rows.map(cell).join("")}</div>` +
+    `<figcaption class="chart-cap label">${escAttr(label)} — ember intensity = volume; low days shown muted, not hidden.</figcaption></figure>`;
+}
+
+// Per-muscle volume vs MEV/MAV/MRV landmark bars (training §5). Track 0→max; the MEV–MAV
+// optimal band shaded; value bar ember when in the optimal band, muted ink otherwise (under/
+// over — never red); an MRV tick. items: [{muscle, sets_per_week, MEV, MAV_lo, MAV_hi, MRV, status}].
+export function landmarkBars(items, { label = "" } = {}) {
+  const rows = (items || []).filter((m) => Number.isFinite(Number(m.sets_per_week)));
+  if (!rows.length) return `<figure class="chart chart--empty"><figcaption class="chart-cap label">Per-muscle volume fills in as sessions accrue.</figcaption></figure>`;
+  const max = Math.max(...rows.map((m) => Math.max(Number(m.MRV) || 0, Number(m.sets_per_week)))) || 1;
+  const pos = (x) => Math.max(0, Math.min(100, (Number(x) / max) * 100));
+  const row = (m) => {
+    const tone = m.status === "optimal" ? "suf-ember" : "suf-ink";
+    const bandL = pos(m.MEV), bandW = pos(m.MAV_hi) - pos(m.MEV);
+    return `<div class="suf-row" role="img" aria-label="${escAttr(`${m.muscle}: ${m.sets_per_week} sets per week — ${m.status}`)}"><span class="suf-l">${escAttr(m.muscle)}</span>` +
+      `<span class="lmk-track"><span class="lmk-band" style="left:${bandL.toFixed(1)}%;width:${Math.max(0, bandW).toFixed(1)}%"></span>` +
+      `<span class="lmk-fill ${tone}" style="width:${pos(m.sets_per_week).toFixed(1)}%"></span>` +
+      `<span class="lmk-mrv" style="left:${pos(m.MRV).toFixed(1)}%"></span></span>` +
+      `<span class="suf-v mono">${m.sets_per_week}/wk<span class="suf-amt">${escAttr(m.status)}</span></span></div>`;
+  };
+  return `<figure class="chart"><div class="suf-rows">${rows.map(row).join("")}</div>` +
+    `<figcaption class="chart-cap label">Sets/week vs the MEV–MAV optimal band (shaded) · MRV tick. ${escAttr(label)}</figcaption></figure>`;
+}
+
+// Generic per-day stacked-category columns — segments are an ember-derived ramp (tone keys
+// map to seg-<tone> CSS, e.g. lift=ember / cardio=ember-tint / mob=muted ink). NO second hue.
+// days: [{date, [seg.key]: minutes}]; segments: [{key, label, tone}].
+export function stackedDayColumns(days, segments, { label = "", legendUnit = "min", emptyMsg = "" } = {}) {
+  const rows = (days || []).map((d) => {
+    const segs = segments.map((s) => ({ ...s, v: Number(d[s.key]) || 0 }));
+    return { d: d.date, segs, total: segs.reduce((a, s) => a + s.v, 0) };
+  }).filter((r) => r.total > 0);
+  if (!rows.length) return `<figure class="chart chart--empty"><figcaption class="chart-cap label">${escAttr(emptyMsg || "Fills in as sessions accrue.")}</figcaption></figure>`;
+  const max = Math.max(...rows.map((r) => r.total));
+  const h = (v) => `${((v / max) * 100).toFixed(1)}%`;
+  const col = (r) => {
+    const segHtml = r.segs.slice().reverse().map((s) => (s.v > 0 ? `<span class="scol-seg seg-${escAttr(s.tone)}" style="height:${h(s.v)}"></span>` : "")).join("");
+    const tip = r.segs.filter((s) => s.v > 0).map((s) => `${s.label} ${Math.round(s.v)}`).join(" · ");
+    return `<div class="scol" title="${escAttr(`${_shortDate(r.d)}: ${tip} ${legendUnit}`)}"><div class="scol-stack">${segHtml}</div>` +
+      `<span class="scol-l label">${escAttr(_shortDate(r.d).split(" ")[1] || "")}</span></div>`;
+  };
+  const legend = segments.map((s) => `<span class="sbar-key"><i class="sbar-dot seg-${escAttr(s.tone)}"></i>${escAttr(s.label)}</span>`).join("");
+  return `<figure class="chart"><div class="scols" role="img" aria-label="${escAttr(label)}">${rows.map(col).join("")}</div>` +
+    `<figcaption class="chart-cap label sbar-legend">${legend}${label ? ` · ${escAttr(label)}` : ""}</figcaption></figure>`;
 }
 
 // Eating-window ribbon (nutrition §4) — per-day first→last meal on a 5am→midnight axis,

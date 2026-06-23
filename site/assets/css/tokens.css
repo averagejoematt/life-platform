@@ -308,6 +308,47 @@ a { color: inherit; text-underline-offset: 0.18em; }
   }
 }
 
+/* Anatomical body-map (training, P1.4) — muscle zones shaded by ember intensity (--o set
+   per zone) = weekly volume vs optimal. ONE hue, never red. */
+.bodymap svg { width: 100%; height: clamp(180px, 26vw, 240px); }
+.bm-head { fill: var(--ink-faint); opacity: 0.28; }
+.bm-m { fill: var(--ember); fill-opacity: var(--o, 0.1); stroke: var(--rule); stroke-width: 0.5; }
+.bm-cap { fill: var(--ink-faint); font-family: var(--font-mono); font-size: 8px; text-anchor: middle; letter-spacing: 0.12em; text-transform: uppercase; }
+
+/* Per-muscle volume landmark bars (training §5, P1.3) — MEV–MAV band shaded, MRV tick;
+   ember in the optimal band, muted ink under/over (never red). Reuses the .suf-row grid. */
+.lmk-track { position: relative; height: 10px; border-radius: 5px; background: var(--surface-2, var(--surface)); }
+.lmk-band { position: absolute; top: 0; height: 100%; background: var(--ember-wash);
+  border-left: 1px dashed var(--ink-faint); border-right: 1px dashed var(--ink-faint); }
+.lmk-fill { position: absolute; top: 0; height: 100%; border-radius: 5px; }
+.lmk-fill.suf-ember { background: var(--ember); }
+.lmk-fill.suf-ink { background: var(--ink-muted); }
+.lmk-mrv { position: absolute; top: -2px; width: 1px; height: 14px; background: var(--ink-faint); }
+
+/* The Lift Index (training §2, P0.1) — per-lift load TREND tiles (sparkline + ▲/▼/flat).
+   Ember = load up; down = muted ink, NEVER red; under 3 sessions = honest fills-in tile. */
+.li-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--sp-3); margin-top: var(--sp-3); }
+.li-tile { border: 1px solid var(--rule); border-radius: var(--radius-sm); padding: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
+.li-top { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-2); }
+.li-name { font-weight: var(--weight-med); }
+.li-tag { font-family: var(--font-mono); font-size: 0.6rem; white-space: nowrap; }
+.li-up { color: var(--ember); }
+.li-down { color: var(--ink-muted); }
+.li-flat { color: var(--ink-faint); }
+.li-meta { color: var(--ink-faint); }
+.li-thin { opacity: 0.9; justify-content: center; min-height: 4.5rem; }
+.li-fill { color: var(--ink-faint); }
+
+/* Ember-intensity steps heat strip (training §1c, P0.6) — saturation = volume; low days
+   muted (faint ember), never hidden. ONE hue — intensity, not a second colour. */
+.heat-strip { display: flex; flex-wrap: wrap; gap: 4px; margin-top: var(--sp-3); }
+.heat-cell { flex: 1 1 2.2rem; min-width: 2.2rem; aspect-ratio: 1 / 1; border-radius: var(--radius-xs);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  background: color-mix(in oklch, var(--ember) calc(var(--heat, 0.1) * 100%), var(--surface-2, var(--surface)));
+  border: 1px solid var(--rule); }
+.heat-v { font-size: 0.6rem; line-height: 1; color: var(--ink); }
+.heat-d { font-size: 0.5rem; color: var(--ink-faint); }
+
 /* ── Charts (shared, token-driven — see assets/js/charts.js) ──────────────── */
 .chart { margin-top: var(--sp-4); }
 .chart svg { width: 100%; height: clamp(110px, 8vw + 80px, 150px); display: block; overflow: visible; }
@@ -453,6 +494,12 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .scol-stack { width: 72%; height: 100%; display: flex; flex-direction: column;
   justify-content: flex-end; border-radius: 2px 2px 0 0; overflow: hidden; }
 .scol-seg { width: 100%; display: block; }
+/* Modality ramp (training §3, P0.7) — ONE hue: lift = ember, walk/cardio = ember tint,
+   mobility = muted ink. seg-<tone> for stackedDayColumns + the legend dots. */
+.seg-lift { background: var(--ember); }
+.seg-cardio { background: color-mix(in oklch, var(--ember) 52%, var(--surface)); }
+.seg-mob { background: var(--ink-muted); }
+.sbar-dot.seg-lift, .sbar-dot.seg-cardio, .sbar-dot.seg-mob { border-radius: 2px; }
 .scol-l { color: var(--ink-faint); font-size: 0.6rem; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
