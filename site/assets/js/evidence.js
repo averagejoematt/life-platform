@@ -113,6 +113,40 @@ function physicalStatCluster(readings, j, goal) {
     pct != null && fig(fmt(pct) + "%", `to goal · ${fmt(j.start_weight_lbs ?? 314.5)}→${fmt(goal)}`),
   ]) + `<p class="rd-meta label">The weight figures lead the page now — the body-composition percentages move to the dated scan arc below. % complete is against the full ${fmt(j.start_weight_lbs ?? 314.5)} → ${fmt(goal)} lb span.</p>`;
 }
+// P0.4 — the milestone ladder: the measuring-rule tick-spine made vertical, 315 → 185 in
+// 10-lb rungs. Each crossed rung clicks ember + stamps the day it fell and the days since the
+// previous rung (widening gaps = the honest pace arc). The current weight marks the live edge.
+const _PHYS_MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function _physShortDate(iso) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); return m ? `${_PHYS_MON[+m[2] - 1]} ${+m[3]}` : ""; }
+function physicalMilestoneLadder(readings, j, goal) {
+  const ws = readings.map((r) => ({ d: r.date, w: Number(r.weight_lbs) })).filter((p) => Number.isFinite(p.w));
+  if (ws.length < 2) return "";
+  const start = j.start_weight_lbs != null ? Number(j.start_weight_lbs) : 314.5;
+  const latest = ws[ws.length - 1].w;
+  const top = Math.floor(start / 10) * 10;
+  const rungs = [{ w: start, cap: "start" }];
+  for (let w = top; w > goal + 0.5; w -= 10) if (w < start - 0.5) rungs.push({ w });
+  rungs.push({ w: goal, cap: "goal" });
+  const crossDate = (rung) => { for (const p of ws) if (p.w <= rung + 1e-9) return p.d; return null; };
+  let prevDate = null, nowPlaced = false;
+  const rows = rungs.map((r) => {
+    const crossed = latest <= r.w + 1e-9;
+    const date = crossed ? crossDate(r.w) : null;
+    let days = "";
+    if (crossed && date && prevDate) { const dd = Math.round((Date.parse(date) - Date.parse(prevDate)) / 86400000); if (dd > 0) days = ` · ${dd}d`; }
+    if (crossed && date) prevDate = date;
+    // The "now" edge: the first uncrossed rung gets the live marker.
+    let nowMark = "";
+    if (!crossed && !nowPlaced) { nowPlaced = true; nowMark = `<span class="ml-now">now ${fmt(latest)} lb · ${fmt(Math.round((latest - goal) * 10) / 10)} to goal</span>`; }
+    const cls = crossed ? "ml-crossed" : (nowMark ? "ml-next" : "ml-future");
+    const cap = r.cap ? `<span class="ml-cap label">${esc(r.cap)}</span>` : "";
+    const meta = crossed && date ? `<span class="ml-meta label">crossed ${esc(_physShortDate(date))}${esc(days)}</span>` : "";
+    return `<div class="ml-rung ${cls}"><span class="ml-tick"></span><span class="ml-w mono">${fmt(r.w)}</span>${cap}${meta}${nowMark}</div>`;
+  }).join("");
+  return sec("Milestone ladder — 315 to 185, ten pounds at a time",
+    `<div class="ml-ladder">${rows}</div>` +
+    `<p class="rd-meta label">Each rung is a 10-lb mark on the way down; it clicks ember the day the trend crosses it, stamped with how long that rung took. The gaps widen as the cut matures — that's the real pace, not a straight line to the goal.</p>`);
+}
 // (temporary — restructured into the dated Tier-2 composition arc across P1.x)
 function physicalLegacyComposition(d) {
   const x = d.latest_dexa; if (!x) return "";
@@ -131,6 +165,7 @@ async function renderPhysical(d) {
   parts.push(physicalTrendHero(readings, j, goal)); // P0.1
   if (j.start_weight_lbs != null && j.current_weight_lbs != null) parts.push(dataFigure(j)); // P0.2 — silhouette scrubber (links to the trend marker)
   parts.push(physicalStatCluster(readings, j, goal)); // P0.3 — stat cluster (replaces DEXA % as top figures)
+  parts.push(physicalMilestoneLadder(readings, j, goal)); // P0.4 — milestone ladder (the vertical measuring-rule signature)
   // ── TIER 2 — the composition arc (episodic) — restructured across P1.x ──
   parts.push(physicalLegacyComposition(d));
   return parts.join("");

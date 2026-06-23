@@ -467,6 +467,19 @@ a { color: inherit; text-underline-offset: 0.18em; }
    floor (muted) when the scrubbed weight is below the chart's data range (toward goal). */
 .wt-marker { stroke: var(--ember); stroke-width: 1.25; stroke-dasharray: 5 4; transition: opacity 0.15s; }
 .wt-marker-below { stroke: var(--ink-muted); }
+/* P0.4 — milestone ladder: a vertical measuring-rule. A rail (border) with a tick per
+   10-lb rung; crossed rungs ember, the live edge marked, future rungs muted. Never red. */
+.ml-ladder { display: flex; flex-direction: column; margin: var(--sp-3) 0; border-left: 2px solid var(--rule); padding-left: 0; }
+.ml-rung { position: relative; display: flex; align-items: baseline; gap: var(--sp-3); padding: var(--sp-2) 0 var(--sp-2) var(--sp-4); min-height: 1.4em; }
+.ml-tick { position: absolute; left: -2px; top: 0.7em; width: 14px; height: 2px; background: var(--rule); transform: translateX(-50%); }
+.ml-w { font-size: var(--fs-h4, 1.05rem); min-width: 3.4em; }
+.ml-cap { text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--ink-faint); }
+.ml-meta { color: var(--ink-faint); }
+.ml-crossed .ml-tick { background: var(--ember); width: 20px; height: 3px; top: 0.66em; }
+.ml-crossed .ml-w { color: var(--ember); }
+.ml-future .ml-w, .ml-next .ml-w { color: var(--ink-muted); }
+.ml-next .ml-tick { background: var(--ink-muted); width: 16px; }
+.ml-now { margin-left: auto; font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ember); border: 1px solid var(--ember); border-radius: var(--radius-xs); padding: 1px 8px; white-space: nowrap; }
 .chart-cap { display: block; margin-top: var(--sp-2); color: var(--ink-faint); }
 .chart--empty { border: var(--honest-border); border-radius: var(--radius-xs); padding: var(--sp-4); text-align: center; }
 .chart--empty .chart-cap { margin: 0; }
