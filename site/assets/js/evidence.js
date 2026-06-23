@@ -642,6 +642,8 @@ async function renderSleep(d) {
   const _hasSleep = !!fcHero || Object.values(s).some(has);
   // P1.3 — subjective "how rested" 1–5 (not captured) → honest empty state.
   if (_hasSleep) parts.push(sec("How rested — coming online", `<div class="nut-coming"><p class="rd-archive">A morning 1–5 "how rested do you feel" check-in isn't captured yet. It's the ground truth the wearables miss — the night a tracker calls great that still felt like garbage. Once logged, it grades the forecast and the score against how the body actually felt. <span class="confidence conf-low">needs capture</span></p></div>`));
+  // P1.4 — caffeine + alcohol timing (not captured; PRIVACY-tiered) → honest empty state.
+  if (_hasSleep) parts.push(sec("Caffeine & alcohol timing — coming online", `<div class="nut-coming"><p class="rd-archive">The two biggest modifiable levers on sleep — caffeine and alcohol timing — aren't captured yet. Once logged they'd feed the forecast's wind-down and consistency anchors directly, and the board below. <strong>Privacy-tiered:</strong> these behavioural inputs stay private by default and won't render publicly without an explicit opt-in. <span class="confidence conf-low">needs capture · private</span></p></div>`));
   // Unified sleep — Whoop + Eight Sleep + Apple merged, best source per field.
   if (uni && uni.available) {
     const srcs = (uni.sources_present || []).map(ttl).join(", ");
