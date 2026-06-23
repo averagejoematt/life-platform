@@ -858,6 +858,29 @@ function habitsGroupTrends(history, groupAvgs) {
     `<div class="gt-grid">${cards}</div>` +
     `<p class="rd-meta label">Each group's adherence over the window. The low ones (Recovery — the floor not yet built) read muted, never red — a not-yet, not a failure.</p>`);
 }
+// §7 goal linkage (P0.8) — each habit group links UP to the goal/pillar it serves + a
+// cross-link to the Evidence page that measures it. Copy-driven.
+const _HABIT_GOAL_LINKS = {
+  recovery: { goal: "hold the cut without breaking", link: "/evidence/sleep/", label: "Sleep" },
+  nutrition: { goal: "a deficit you can hold", link: "/evidence/nutrition/", label: "Nutrition" },
+  movement: { goal: "build the engine", link: "/evidence/training/", label: "Training" },
+  fitness: { goal: "build the engine", link: "/evidence/training/", label: "Training" },
+  training: { goal: "build the engine", link: "/evidence/training/", label: "Training" },
+  discipline: { goal: "the consistency pillar — skin in the game", link: "/evidence/vices/", label: "Vice streaks" },
+  mind: { goal: "the inner-life pillar", link: "/evidence/mind/", label: "Mind" },
+  hydration: { goal: "a deficit you can hold", link: "/evidence/nutrition/", label: "Nutrition" },
+  sleep: { goal: "the recovery that protects the cut", link: "/evidence/sleep/", label: "Sleep" },
+};
+function habitsGoalLinkage(groupAvgs) {
+  const groups = Object.keys(groupAvgs || {});
+  if (!groups.length) return "";
+  const rows = groups.map((g) => {
+    const m = _HABIT_GOAL_LINKS[g.toLowerCase()];
+    return `<tr><td class="rd-name">${esc(ttl(g))}</td><td>${m ? esc(m.goal) : "—"}</td><td>${m ? `<a href="${m.link}">${esc(m.label)} →</a>` : ""}</td></tr>`;
+  }).join("");
+  return sec("What it's all for — groups → goals",
+    `<table class="rd-tbl"><thead><tr><th>habit group</th><th>the goal it serves</th><th>see</th></tr></thead><tbody>${rows}</tbody></table>`);
+}
 async function renderHabits(d) {
   const dows = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const a = d.day_of_week_avgs || [];
@@ -906,7 +929,8 @@ async function renderHabits(d) {
   const states = habitStateTaxonomy(d.per_habit, habits);
   const effort = habitsEffortMap(d.group_90d_avgs || {}, habits);
   const gtrends = habitsGroupTrends(d.history, d.group_90d_avgs || {});
-  return keystone + head + grid + groupBars + states + effort + gtrends + trend + dow + list + note("Everything I'm trying to do — sourced from Habitify. Correlations are N=1, not cause. Private habits are never shown.");
+  const goals = habitsGoalLinkage(d.group_90d_avgs || {});
+  return keystone + head + grid + groupBars + states + effort + gtrends + goals + trend + dow + list + note("Everything I'm trying to do — sourced from Habitify. Correlations are N=1, not cause. Private habits are never shown.");
 }
 // The board — pick an expert, read their actual per-domain take + track record.
 async function renderBoard(d) {
