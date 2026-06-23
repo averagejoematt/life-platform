@@ -205,6 +205,23 @@ export function targetSpine(value, target, { valueLabel = "now", targetLabel = "
     `</div><figcaption class="chart-cap label">${escAttr(label)} · ${pct}% of ${Math.round(tg)}${escAttr(unit)}</figcaption></figure>`;
 }
 
+// Ember-intensity heat strip — saturation = volume (steps/day). Low days render MUTED
+// (faint ember), never hidden. "More colorful" = more ember intensity, NOT a second hue.
+export function heatStrip(days, { valueKey = "value", label = "", unit = "", divisor = 1000, suffix = "k" } = {}) {
+  const rows = (days || []).map((d) => ({ d: d.date, v: Number(d[valueKey]) })).filter((r) => Number.isFinite(r.v));
+  if (!rows.length) return `<figure class="chart chart--empty"><figcaption class="chart-cap label">Fills in as days accrue.</figcaption></figure>`;
+  const max = Math.max(...rows.map((r) => r.v)) || 1;
+  const cell = (r) => {
+    const sat = Math.max(0.1, r.v / max);  // muted-not-hidden floor
+    const dl = _shortDate(r.d);
+    const dayNum = dl.split(" ")[1] || "";
+    return `<div class="heat-cell" style="--heat:${sat.toFixed(3)}" title="${escAttr(`${dl}: ${Math.round(r.v)}${unit}`)}">` +
+      `<span class="heat-v mono">${(r.v / divisor).toFixed(1)}${escAttr(suffix)}</span><span class="heat-d label">${escAttr(dayNum)}</span></div>`;
+  };
+  return `<figure class="chart heat"><div class="heat-strip" role="img" aria-label="${escAttr(label)}">${rows.map(cell).join("")}</div>` +
+    `<figcaption class="chart-cap label">${escAttr(label)} — ember intensity = volume; low days shown muted, not hidden.</figcaption></figure>`;
+}
+
 // Eating-window ribbon (nutrition §4) — per-day first→last meal on a 5am→midnight axis,
 // ember = the actual window, a faint bar = the 16:8 reference (an 8h window from the first
 // meal). Reveals at a glance whether the day runs tighter or wider than 16:8. days:

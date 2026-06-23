@@ -322,6 +322,16 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .li-thin { opacity: 0.9; justify-content: center; min-height: 4.5rem; }
 .li-fill { color: var(--ink-faint); }
 
+/* Ember-intensity steps heat strip (training §1c, P0.6) — saturation = volume; low days
+   muted (faint ember), never hidden. ONE hue — intensity, not a second colour. */
+.heat-strip { display: flex; flex-wrap: wrap; gap: 4px; margin-top: var(--sp-3); }
+.heat-cell { flex: 1 1 2.2rem; min-width: 2.2rem; aspect-ratio: 1 / 1; border-radius: var(--radius-xs);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  background: color-mix(in oklch, var(--ember) calc(var(--heat, 0.1) * 100%), var(--surface-2, var(--surface)));
+  border: 1px solid var(--rule); }
+.heat-v { font-size: 0.6rem; line-height: 1; color: var(--ink); }
+.heat-d { font-size: 0.5rem; color: var(--ink-faint); }
+
 /* ── Charts (shared, token-driven — see assets/js/charts.js) ──────────────── */
 .chart { margin-top: var(--sp-4); }
 .chart svg { width: 100%; height: clamp(110px, 8vw + 80px, 150px); display: block; overflow: visible; }
