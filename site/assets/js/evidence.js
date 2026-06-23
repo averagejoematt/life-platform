@@ -614,6 +614,15 @@ async function renderSleep(d) {
     } else if (_env.length) {
       parts.push(sec("Environment — bed temp vs deep sleep", empty("The temp-vs-deep overlay draws in at 4+ nights with both readings.")));
     }
+    // §7 — autonomic downshift readout (P0.7): a STATE snapshot (HRV + RHR + recovery), honest
+    // at n=1 because it's a state, not a claimed relationship. Low ≠ red — just muted framing.
+    if (s.recovery_score != null || s.hrv != null || s.rhr != null) {
+      const _rec = s.recovery_score;
+      const state = _rec == null ? "not assessable" : (_rec >= 67 ? "downshifted — parasympathetic" : _rec >= 34 ? "partial downshift" : "stayed elevated — sympathetic");
+      parts.push(sec("Autonomic downshift — did the body let go?",
+        figs([_rec != null && fig(fmt(_rec), "recovery"), s.hrv != null && fig(fmt(s.hrv) + "ms", "HRV"), s.rhr != null && fig(fmt(s.rhr), "resting HR")]) +
+        `<p class="rd-meta label">Tonight's autonomic state: <strong>${esc(state)}</strong>. HRV up + RHR down = the body downshifting into recovery. A one-night state snapshot — honest at n=1, not a claimed relationship.</p>`));
+    }
     parts.push(sec("Stages & physiology", kvtable({ whoop_quality: s.whoop_quality, bed_temp_f: s.bed_temp_f })));
     parts.push(sec("Sleep-score trend · latest = last night", lineChart(d.sleep_trend || [], { valueKey: "sleep_score", label: "Sleep score · nightly", emptyMsg: "The sleep-score trend fills in nightly." })));
   }
