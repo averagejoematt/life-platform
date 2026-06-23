@@ -274,6 +274,28 @@ function physicalLeanLongevity(d) {
     ]) +
     `<p class="rd-meta label">Appendicular lean mass — the muscle on the arms and legs — is the body-comp figure that best predicts how well you age: it's the buffer against sarcopenia and frailty. ${Number.isFinite(almi) ? `At ${fmt(almi, 1)} kg/m²${Number.isFinite(pct) ? `, ${fmt(pct)}th percentile,` : ""} that's ${clear != null && clear > 0 ? `~${fmt(clear)} clear of` : "near"} the ~${FLOOR} sarcopenia floor.` : ""} The cut's whole job is to keep this while the fat comes off — confirmed only when scan two lands. Dated <strong>${esc(x.scan_date)}</strong>, pre-cut.</p>`);
 }
+// P1.5 — PhenoAge (transparent), Option A privacy. Shows the phenotypic ("biological") age +
+// the 9 markers driving it — NO chronological age, NO gap, so the page can't reveal real age.
+// Replaces the DEXA black-box "biological age". Honest "needs marker X" if any input missing.
+function physicalPhenoAge(pa) {
+  if (!pa) return "";
+  if (pa.phenoage == null) {
+    const miss = (pa.missing || []).join(", ");
+    return sec("Biological age — PhenoAge (transparent)",
+      `<p class="rd-meta label">Phenotypic Age needs all 9 blood markers and is never approximated from partial data${miss ? ` — waiting on: <strong>${esc(miss)}</strong>` : ""}. It fills in at the next complete draw.</p>`);
+  }
+  const drivers = pa.drivers || [];
+  const driverRows = drivers.map((dv) => {
+    const tone = dv.direction === "younger" ? "pa-younger" : dv.direction === "older" ? "pa-older" : "pa-neutral";
+    const val = dv.value != null ? `${fmt(dv.value)}${dv.unit ? " " + dv.unit : ""}` : "—";
+    return `<div class="pa-driver ${tone}"><span class="pa-d-name">${esc(dv.name)}${dv.derived ? ` <span class="pa-derived">derived</span>` : ""}</span><span class="pa-d-val mono">${esc(val)}</span><span class="pa-d-dir label">${esc(dv.direction || "")}</span></div>`;
+  }).join("");
+  return sec("Biological age — PhenoAge (transparent, replaces the black box)",
+    `<div class="pa-dial"><span class="pa-v mono">${esc(String(pa.phenoage))}</span><span class="pa-unit label">phenotypic age · years</span></div>` +
+    `<p class="rd-meta label">Levine Phenotypic Age (2018), computed from 9 standard blood markers — the transparent replacement for the DEXA "biological age" black box; every input is shown below. ${pa.as_of ? `Recomputed per blood draw · <strong>${esc(pa.as_of)}</strong>.` : ""} <strong>Chronological age isn't shown, by design</strong> — this can't be used to back out a real age. <strong>Caveats:</strong> population-level, not a diagnosis; this is blood-based <em>Phenotypic</em> Age, NOT the DNAm epigenetic clock; it's volatile to single markers (a CRP spike from a cold can swing it). <a href="/evidence/labs/">See the full bloodwork →</a></p>` +
+    `<details class="pa-details"><summary class="pa-sum label">The 9 markers driving it — show the inputs</summary><div class="pa-drivers">${driverRows}</div>` +
+    `<p class="rd-meta label">Ember = the marker is pushing the number <em>younger</em> vs a healthy reference; muted = older; faint = neutral. Lymphocyte % is derived from absolute lymphocytes ÷ WBC.</p></details>`);
+}
 // (temporary — bone / segmental restructured across P1.6)
 function physicalLegacyComposition(d) {
   const x = d.latest_dexa; if (!x) return "";
@@ -283,7 +305,7 @@ function physicalLegacyComposition(d) {
     note(`DEXA scan${x.scan_date ? ` · ${esc(x.scan_date)}` : ""}.`);
 }
 async function renderPhysical(d) {
-  const [wp, wj] = await Promise.all([tryJSON("/api/weight_progress"), tryJSON("/api/journey")]);
+  const [wp, wj, pa] = await Promise.all([tryJSON("/api/weight_progress"), tryJSON("/api/journey"), tryJSON("/api/phenoage")]);
   const readings = (wp && wp.weight_progress) || [];
   const j = (wj && wj.journey) || {};
   const goal = j.goal_weight_lbs ?? 185;
@@ -311,6 +333,7 @@ async function renderPhysical(d) {
   parts.push(physicalDexaBaseline(d)); // P1.2 — dated lean-vs-fat baseline (one scan, not a trend)
   parts.push(physicalVisceralCallout(d)); // P1.3 — visceral fat callout + risk band (dated)
   parts.push(physicalLeanLongevity(d)); // P1.4 — lean/ALMI longevity context (dated, demoted)
+  parts.push(physicalPhenoAge(pa)); // P1.5 — transparent PhenoAge (Option A: no chronological/gap)
   parts.push(physicalLegacyComposition(d));
   return parts.join("");
 }
