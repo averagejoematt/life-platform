@@ -573,7 +573,7 @@ function circadianForecast(circ) {
 }
 async function renderSleep(d) {
   const s = d.sleep_detail || {};
-  const [circ, uni] = await Promise.all([tryJSON("/api/circadian"), tryJSON("/api/sleep_reconciliation")]);
+  const [circ, uni, nut] = await Promise.all([tryJSON("/api/circadian"), tryJSON("/api/sleep_reconciliation"), tryJSON("/api/nutrition_overview")]);
   const parts = [];
   // §0 — the forecast LEADS (prospective, not retrospective).
   const fcHero = circadianForecast(circ);
@@ -631,6 +631,13 @@ async function renderSleep(d) {
     parts.push(sec("Recovery — what the sleep defends",
       figs([s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv) + "ms", "HRV"), s.rhr != null && fig(fmt(s.rhr), "resting HR"), s["30d_avg_recovery"] != null && fig(fmt(s["30d_avg_recovery"]), "30d avg recovery")]) +
       `<p class="rd-meta label">In a calorie deficit, sleep is what protects recovery, HRV and a low resting heart rate — the buffer that lets the training still land. RHR drifting down is the win here. See <a href="/evidence/training/">Training</a> for what it buys.</p>`));
+  }
+  // §6b — last-meal-time cross-link (P1.2): reuse the nutrition eating window, observation-only.
+  const _ew = nut && nut.eating_window;
+  if (_ew && _ew.avg_last_meal) {
+    parts.push(sec("Last meal → sleep — the cross-link",
+      figs([fig(esc(_ew.avg_last_meal), "avg last meal"), _ew.avg_hours != null && fig(fmt(_ew.avg_hours) + "h", "eating window")]) +
+      `<p class="rd-meta label">Eating late can blunt deep sleep. Average last meal lands at ${esc(_ew.avg_last_meal)}, pulled from the <a href="/evidence/nutrition/">nutrition</a> log — observation only; the day-lagged version lives in the board below once the overlap is deep enough.</p>`));
   }
   // Unified sleep — Whoop + Eight Sleep + Apple merged, best source per field.
   if (uni && uni.available) {
