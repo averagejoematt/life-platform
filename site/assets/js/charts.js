@@ -74,7 +74,7 @@ export function lineChart(data, { valueKey = "value", dateKey = "date", goal = n
 // Two overlaid trajectories on a shared scale — ember = primary (A), muted = reference (B).
 // For the reconciliation view (projected loss vs actual). Refuses if either series < 4 pts.
 // No correlation/Pearson — that's gated elsewhere by the ≥2-week rule. seriesA/B: [{date,value}].
-export function dualLineChart(seriesA, seriesB, { aLabel = "A", bLabel = "B", unit = "", height = 140, label = "", emptyMsg = "" } = {}) {
+export function dualLineChart(seriesA, seriesB, { aLabel = "A", bLabel = "B", unit = "", height = 140, label = "", emptyMsg = "", showGap = true } = {}) {
   const A = _points(seriesA || [], "value", "date"), B = _points(seriesB || [], "value", "date");
   if (A.length < 4 || B.length < 4) {
     return `<figure class="chart chart--empty"><figcaption class="chart-cap label">${escAttr(emptyMsg || "Two trajectories draw in once each has 4+ points.")}</figcaption></figure>`;
@@ -92,7 +92,7 @@ export function dualLineChart(seriesA, seriesB, { aLabel = "A", bLabel = "B", un
   return `<figure class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}">` +
     `<path class="chart-down" d="${path(B)}" fill="none" vector-effect="non-scaling-stroke"/>` +
     `<path class="chart-line" d="${path(A)}" vector-effect="non-scaling-stroke"/></svg>` +
-    `<figcaption class="chart-cap label sbar-legend"><span class="sbar-key"><i class="sbar-dot sbar-ember"></i>${escAttr(aLabel)}</span><span class="sbar-key"><i class="sbar-dot sbar-ink"></i>${escAttr(bLabel)}</span> · gap ${escAttr(String(gap))}${escAttr(unit)}${label ? ` · ${escAttr(label)}` : ""}</figcaption></figure>`;
+    `<figcaption class="chart-cap label sbar-legend"><span class="sbar-key"><i class="sbar-dot sbar-ember"></i>${escAttr(aLabel)}</span><span class="sbar-key"><i class="sbar-dot sbar-ink"></i>${escAttr(bLabel)}</span>${showGap ? ` · gap ${escAttr(String(gap))}${escAttr(unit)}` : ""}${label ? ` · ${escAttr(label)}` : ""}</figcaption></figure>`;
 }
 
 // Tiny inline sparkline (no axes/caption). values: [numbers].
