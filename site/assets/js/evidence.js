@@ -822,6 +822,24 @@ function habitStateTaxonomy(perHabit, registryHabits) {
   return sec("Habit states — every habit tagged (backlog shown, not hidden)",
     lanes + `<p class="rd-meta label">State is encoded by ember intensity + position, not a rainbow: Automatic = full ember · Holding = ember tint · Needs-attention = muted + marker · Backlog/never-started = outline, honestly empty (most apps hide these). No red, no shame.</p>`);
 }
+// §5 effort map (P0.6) — ranked dot-strip: dot size = habits the group carries, ember
+// saturation = adherence. ONE ember scale + size, NOT a radar (misleading geometry) or rainbow.
+function habitsEffortMap(groupAvgs, registryHabits) {
+  const counts = {}; for (const h of registryHabits || []) { const g = h.group || "Other"; counts[g] = (counts[g] || 0) + 1; }
+  const items = Object.keys(counts).map((g) => ({ group: g, count: counts[g], pct: groupAvgs[g] != null ? groupAvgs[g] : null }));
+  if (!items.length) return "";
+  items.sort((a, b) => b.count - a.count);
+  const maxCount = Math.max(...items.map((i) => i.count));
+  const rows = items.map((i) => {
+    const sat = i.pct != null ? Math.max(0.12, i.pct / 100) : 0.12;
+    const sz = (12 + (i.count / maxCount) * 24).toFixed(0);
+    return `<div class="em-row"><span class="em-dot" style="width:${sz}px;height:${sz}px;--heat:${sat.toFixed(2)}"></span>` +
+      `<span class="em-l">${esc(ttl(i.group))}</span><span class="em-meta label">${i.count} habit${i.count > 1 ? "s" : ""}${i.pct != null ? ` · ${fmt(i.pct)}%` : ""}</span></div>`;
+  }).join("");
+  return sec("Where the effort is",
+    `<div class="em-strip">${rows}</div>` +
+    `<p class="rd-meta label">Each group: dot size = how many habits it carries, ember intensity = how reliably they're held. One ember scale + size — deliberately a ranked strip, not a radar (misleading geometry) and not a rainbow.</p>`);
+}
 async function renderHabits(d) {
   const dows = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const a = d.day_of_week_avgs || [];
@@ -868,7 +886,8 @@ async function renderHabits(d) {
     }).join("")}</div>` +
     `<p class="rd-meta label">Each grade is the group's real adherence RATE over the window — never a correlation. Higher = load-bearing; the low ones (the floor, like Recovery) read muted, not as failure. Tier-0 non-negotiables drive the heatmap above.</p>`) : "";
   const states = habitStateTaxonomy(d.per_habit, habits);
-  return keystone + head + grid + groupBars + states + trend + dow + list + note("Everything I'm trying to do — sourced from Habitify. Correlations are N=1, not cause. Private habits are never shown.");
+  const effort = habitsEffortMap(d.group_90d_avgs || {}, habits);
+  return keystone + head + grid + groupBars + states + effort + trend + dow + list + note("Everything I'm trying to do — sourced from Habitify. Correlations are N=1, not cause. Private habits are never shown.");
 }
 // The board — pick an expert, read their actual per-domain take + track record.
 async function renderBoard(d) {

@@ -317,6 +317,14 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .db-dot.db-a, .sbar-dot.db-a { background: var(--ember); }
 .db-dot.db-b, .sbar-dot.db-b { background: var(--ink-muted); }
 
+/* Effort map (habits §5, P0.6) — ranked dot-strip: size = habit count, ember = adherence. */
+.em-strip { display: flex; flex-direction: column; gap: var(--sp-3); margin-top: var(--sp-3); }
+.em-row { display: flex; align-items: center; gap: var(--sp-3); }
+.em-dot { border-radius: 50%; flex: 0 0 auto; border: 1px solid var(--rule);
+  background: color-mix(in oklch, var(--ember) calc(var(--heat, 0.12) * 100%), var(--surface-2, var(--surface))); }
+.em-l { font-weight: var(--weight-med); }
+.em-meta { color: var(--ink-faint); margin-left: auto; white-space: nowrap; }
+
 /* Habit state taxonomy (habits §4, P0.5) — ONE ember+ink ramp + markers, NO rainbow, no red.
    Automatic = full ember · Holding = ember tint · Needs-attention = muted + marker ·
    Backlog = dashed outline (shown, honestly empty). */
