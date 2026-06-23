@@ -1,6 +1,6 @@
 # Life Platform — Open Backlog
 
-**Last updated:** 2026-06-09 (ER-02 upstream-API contract tests DONE → CHANGELOG; ER external-review-lens rigor series added — ER-01..08; prior: 2026-06-07 v8.4.0 PG product/growth summit, ADR-077 phase taxonomy + restart tooling, Monday reset staged)
+**Last updated:** 2026-06-22 (Evidence-page redesign series complete — Nutrition/Training/Sleep/Habits all shipped + deployed; EVR-01..06 follow-ups added, all needs-data capture; prior: 2026-06-09 ER-02 upstream-API contract tests DONE → CHANGELOG; ER external-review-lens rigor series ER-01..08; 2026-06-07 v8.4.0 PG product/growth summit, ADR-077 phase taxonomy + restart tooling)
 **Source:** Synthesis of V1 audit (2026-05-17, ADR-057), V2 audit (2026-05-17, `docs/V2_AUDIT_PLAN.md`), V2 follow-up sessions (2026-05-18/19), the 2026-05-29 marathon (Bedrock cutover, budget guard, remediation agent, May-30 restart), the 2026-06-01/02 v4 website launch + QA sweep, and the 2026-06-03 operations/cost session (ADR-074/075). Data-blocked items D-01/D-03/D-04 + N-01/L-11 re-checked against live AWS on 2026-06-03.
 
 > Single source of truth for everything **not done**. Items closed-with-rationale (ADR-057) and items shipped are not listed — see `docs/CHANGELOG.md` for what landed and `docs/DECISIONS.md` for what was formally closed.
@@ -100,6 +100,20 @@
 - [ ] **RQA-09 — verify glucose/mood panels degrade honestly** (lineChart `<4-pt` rule likely already handles the empty axis) + **suppress `computed_metrics.tsb = −726.8`** garbage if it surfaces.
 
 **Held as premature at week one** (per the audit): metabolic adaptation, ACWR (needs the chronic window), gait trends, HR-recovery, body-comp velocity (1 DEXA), and any Pearson-r correlation chip on the new pairings.
+
+---
+
+### Evidence-page redesign series (2026-06-22, PRs #193/#194 Nutrition · #195 Training · #196 Sleep · #197 Habits)
+
+**Premise:** four turnkey design-review-panel specs (`docs/specs/CLAUDE_CODE_PROMPT_<PAGE>_v1.md` + `docs/SPEC_<PAGE>_REDESIGN_*.md`) → per-P-item implementation, honesty-gated, local-render QA (desktop / mobile-390px / light). All four pages **shipped + deployed + live-verified** (build fingerprint == HEAD each time). New `charts.js` primitives across the series: `intakeSpine`, `sufficiencyBars`, `stackedColumns`, `mealWindowRibbon`, `dualLineChart`, `targetSpine`, `heatStrip` (compact/cutDate), `stackedDayColumns`, `landmarkBars`, `dumbbell` + `lineChart` spine option.
+
+**Habits (#197) — open follow-ups (EVR-series), all genuine needs-data (the honest empty states ARE the build; these wire the capture):**
+- [ ] **EVR-01 — per-habit driver capture (trigger + reward).** P1.3 surfaces friction (real, = inverse adherence) but trigger/reward render "— not captured." Needs a per-habit capture step (a one-tap trigger/reward tag in Habitify or a side store) → fills the drivers table. Until then the honest-empty cells stand.
+- [ ] **EVR-02 — "why missed" reason capture.** P1.4 shows real miss *counts* but "reason not captured." A one-tap why-on-a-missed-day (travel / illness / low day) turns counts into narrative. No fabricated causes until the capture exists.
+- [ ] **EVR-03 — cross-page completion-feed.** P1.5 cross-links each habit group → its evidence page, but the *reverse* feed (a Nutrition/Sleep/Training day's own completion folding into the group score) needs each evidence page to expose a single daily-completion signal, then fold it in without double-counting Habitify. Honest-pending today.
+- [ ] **EVR-04 — ship inferred taxonomy *groupings* public (DECISION).** P1.1 derives a logical group per habit (`taxonomy.group`) server-side but the public surface still groups by Habitify's stored group — only the time-of-day/type *context tags* ship (labeled auto-derived). Promoting the derived regrouping to the visible surface was held as a STOP-AND-ASK; revisit if the stored groups prove noisy.
+- [ ] **EVR-05 — upgrade taxonomy classifier from name-only heuristic.** `_derive_habit_taxonomy` is deterministic keyword matching on the habit name. A richer pass (habit metadata, or a cheap classification call) would catch cases the keyword map misses. Low priority — the heuristic + "auto-derived, not fact" label is honest as-is.
+- [ ] **EVR-06 — keystone coefficient auto-surfaces at ≥14d overlap** (NO build — a windowed watch). Genesis+8d as of ship, so the keystone renders *withheld* live; the P2.1 gate flips the noise-guarded coefficient on automatically at 2 weeks (~2026-06-28). Matthew authorized auto-surface; eyeball it once the window opens.
 
 ---
 
