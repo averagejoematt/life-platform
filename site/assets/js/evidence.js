@@ -91,6 +91,28 @@ function physicalTrendHero(readings, j, goal) {
   return sec("Weight — the daily metronome",
     chart + `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(machine)}</p><p class="tv-human">${esc(serif)}</p></div>`);
 }
+// P0.3 — HappyScale-style stat cluster: High / Latest / Low · Yesterday (day-over-day) ·
+// % complete (314.5 → 185 denominator). These REPLACE the DEXA percentages as the page's
+// top figures. Ember reads positive on a down day; never red.
+function physicalStatCluster(readings, j, goal) {
+  const ws = readings.map((r) => Number(r.weight_lbs)).filter(Number.isFinite);
+  if (ws.length < 1) return "";
+  // Latest comes from the SAME raw series as high/low so they reconcile (journey's
+  // current_weight is pre-rounded, which can read below the raw min — confusing).
+  const latest = ws[ws.length - 1];
+  const high = Math.max(...ws), low = Math.min(...ws);
+  const prev = ws.length >= 2 ? ws[ws.length - 2] : null;
+  const dayDelta = prev != null ? Math.round((ws[ws.length - 1] - prev) * 10) / 10 : null;
+  const ydayCap = dayDelta == null ? "yesterday" : `yesterday · ${dayDelta > 0 ? "+" : ""}${fmt(dayDelta)} lb`;
+  const pct = j.progress_pct != null ? j.progress_pct : Math.round((j.start_weight_lbs - latest) / (j.start_weight_lbs - goal) * 1000) / 10;
+  return figs([
+    fig(fmt(high) + " lb", "high"),
+    fig(fmt(latest) + " lb", "latest"),
+    fig(fmt(low) + " lb", "low"),
+    prev != null && fig(fmt(prev) + " lb", ydayCap),
+    pct != null && fig(fmt(pct) + "%", `to goal · ${fmt(j.start_weight_lbs ?? 314.5)}→${fmt(goal)}`),
+  ]) + `<p class="rd-meta label">The weight figures lead the page now — the body-composition percentages move to the dated scan arc below. % complete is against the full ${fmt(j.start_weight_lbs ?? 314.5)} → ${fmt(goal)} lb span.</p>`;
+}
 // (temporary — restructured into the dated Tier-2 composition arc across P1.x)
 function physicalLegacyComposition(d) {
   const x = d.latest_dexa; if (!x) return "";
@@ -108,6 +130,7 @@ async function renderPhysical(d) {
   // ── TIER 1 — the weight cockpit (daily) ──
   parts.push(physicalTrendHero(readings, j, goal)); // P0.1
   if (j.start_weight_lbs != null && j.current_weight_lbs != null) parts.push(dataFigure(j)); // P0.2 — silhouette scrubber (links to the trend marker)
+  parts.push(physicalStatCluster(readings, j, goal)); // P0.3 — stat cluster (replaces DEXA % as top figures)
   // ── TIER 2 — the composition arc (episodic) — restructured across P1.x ──
   parts.push(physicalLegacyComposition(d));
   return parts.join("");
