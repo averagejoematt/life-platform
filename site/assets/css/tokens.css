@@ -308,6 +308,11 @@ a { color: inherit; text-underline-offset: 0.18em; }
   }
 }
 
+/* Circadian forecast hero (sleep §0, P0.1) — anchors as suf-rows; the lever (weakest
+   anchor) labelled ember; at-risk anchors muted ink, NEVER red. */
+.fc-anchors { margin-top: var(--sp-3); }
+.fc-lever .suf-l { color: var(--ember); }
+
 /* Anatomical body-map (training, P1.4) — muscle zones shaded by ember intensity (--o set
    per zone) = weekly volume vs optimal. ONE hue, never red. */
 .bodymap svg { width: 100%; height: clamp(180px, 26vw, 240px); }
