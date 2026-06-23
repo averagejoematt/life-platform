@@ -924,7 +924,8 @@ function habitsGoalLinkage(groupAvgs) {
     return `<tr><td class="rd-name">${esc(ttl(g))}</td><td>${m ? esc(m.goal) : "—"}</td><td>${m ? `<a href="${m.link}">${esc(m.label)} →</a>` : ""}</td></tr>`;
   }).join("");
   return sec("What it's all for — groups → goals",
-    `<table class="rd-tbl"><thead><tr><th>habit group</th><th>the goal it serves</th><th>see</th></tr></thead><tbody>${rows}</tbody></table>`);
+    `<table class="rd-tbl"><thead><tr><th>habit group</th><th>the goal it serves</th><th>see</th></tr></thead><tbody>${rows}</tbody></table>` +
+    `<p class="rd-meta label">P1.5 — each group links out to the page that proves it. The reverse feed (a Nutrition/Sleep/Training day's <em>own</em> completion folding back into this group's score) isn't wired yet — those pages don't expose a single daily-completion signal, so the group rate here stays sourced purely from Habitify rather than double-counting. The cross-link is live; the completion-feed is honestly pending.</p>`);
 }
 // §8 identity / compliance reflection (P0.9) — atomic-habits framing PINNED to real data
 // (the most-automatic habit + its rate), never a mantra. Two-voice.
