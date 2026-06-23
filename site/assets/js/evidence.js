@@ -13,7 +13,7 @@
     window.__START_SLUG__ = "<slug>"
 */
 
-import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars, dumbbell } from "/assets/js/charts.js";
+import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars, dumbbell, weightTrendChart, projectionCone } from "/assets/js/charts.js";
 
 const REG = window.__EVIDENCE_REGISTRY__ || [];
 const BYSLUG = Object.fromEntries(REG.map((t) => [t.slug, t]));
@@ -71,7 +71,313 @@ function kvtable(o, f) {
 /* ── Renderers (bound to real shapes) ─────────────────────────────────────── */
 function renderSupplements(d) { const g = d.groups || {}; const head = figs([fig(d.total_count ?? Object.values(g).reduce((a, x) => a + (x.items || []).length, 0), "compounds"), d.as_of_date && fig(d.as_of_date, "as of")]); const secs = Object.values(g).map((grp) => { const cards = (grp.items || []).map((s) => { const [c, l] = evClass(s.ev); const pct = Math.max(4, Math.min(100, s.evPct ?? 0)); return `<article class="supp"><header class="supp-top"><h3 class="supp-name">${esc(s.name)}</h3>${s.dose ? `<span class="supp-dose num">${esc(s.dose)}</span>` : ""}${s.timing ? `<span class="supp-timing label">${esc(s.timing)}</span>` : ""}</header>${s.why ? `<p class="supp-why">${esc(s.why)}</p>` : ""}<div class="supp-ev"><span class="supp-evlabel ${c}">${l}</span><span class="supp-meter"><i class="${c}" style="width:${pct}%"></i></span><span class="supp-evpct num">${s.evPct != null ? s.evPct + "%" : ""}</span></div><p class="supp-meta label">${[s.board && "src: " + esc(s.board), s.cost_monthly != null && "$" + esc(s.cost_monthly) + "/mo", (s.evidence_url || ((s.sources || []).find((x) => x && x.url) || {}).url) && `<a class="supp-ev-link" href="${esc(s.evidence_url || (s.sources.find((x) => x && x.url) || {}).url)}" target="_blank" rel="noopener">evidence ↗</a>`].filter(Boolean).join("  ·  ")}</p></article>`; }).join(""); return `<section class="rd-sec"><div class="rd-grouphead"><h2 class="rd-h">${esc(grp.name)}</h2>${grp.desc ? `<p class="rd-desc">${esc(grp.desc)}</p>` : ""}</div><div class="supp-grid">${cards}</div></section>`; }).join(""); return head + secs + note("Evidence strength is the published research consensus — not a claim about Matthew."); }
 function renderLabs(d) { const L = d.labs || d; const bm = L.biomarkers || []; if (!bm.length) return empty("No bloodwork drawn yet — panels appear here as they're added."); const by = {}; for (const b of bm) (by[b.category || "Other"] ||= []).push(b); const secs = Object.entries(by).map(([cat, rows]) => sec(cat, `<table class="rd-tbl"><thead><tr><th>biomarker</th><th>value</th><th>reference</th><th>flag</th></tr></thead><tbody>${rows.map((b) => { const f = b.flag && String(b.flag).toLowerCase() !== "null"; return `<tr class="${f ? "rd-flag" : ""}"><td class="rd-name">${esc(b.name)}</td><td class="num">${esc(b.value)}${b.unit ? ` <span class="rd-unit">${esc(b.unit)}</span>` : ""}</td><td class="num rd-range">${esc(b.range || "—")}</td><td>${f ? `<span class="rd-flagmark">${esc(b.flag)}</span>` : ""}</td></tr>`; }).join("")}</tbody></table>`)).join(""); return figs([fig(L.total_draws ?? "—", "draws"), fig(bm.length, "biomarkers"), fig(L.flagged_count ?? 0, "flagged"), L.latest_draw_date && fig(L.latest_draw_date, "latest draw")]) + secs + note("Reference ranges are lab-provided; flags mark out-of-range."); }
-async function renderPhysical(d) { const x = d.latest_dexa; if (!x) return empty("No DEXA scan on file yet — body-composition detail appears here after your next scan."); const bc = x.body_composition || {}, s = x.score_360 || {}, idx = x.indices || {}, bone = x.bone || {}, sf = x.segmental_fat || {}, sl = x.segmental_lean || {}; const wp = await tryJSON("/api/weight_progress"); const wj = await tryJSON("/api/journey"); const chart = sec("Weight trajectory", lineChart((wp && wp.weight_progress) || [], { valueKey: "weight_lbs", goal: wj && wj.journey && wj.journey.goal_weight_lbs, unit: " lb", label: "Weight · recent readings", emptyMsg: "Weight trajectory fills as weigh-ins accrue." })); return chart + figs([bc.body_fat_pct != null && fig(fmt(bc.body_fat_pct, 1) + "%", "body fat"), bc.lean_mass_lb != null && fig(dualWeight(bc.lean_mass_lb, "lb"), "lean mass"), bc.visceral_fat_lb != null && fig(dualWeight(bc.visceral_fat_lb, "lb"), "visceral fat"), s.biological_age != null && fig(fmt(s.biological_age, 1), "biological age")]) + sec("Composition", kvtable(bc)) + sec("Indices (ALMI / FFMI / FMI)", kvtable(idx)) + sec("Bone density", kvtable(bone)) + (Object.keys(sf).length ? sec("Segmental fat %", kvtable(sf)) : "") + (Object.keys(sl).length ? sec("Segmental lean", kvtable(sl)) : "") + note(`DEXA scan${x.scan_date ? ` · ${esc(x.scan_date)}` : ""}.`); }
+// ── /evidence/physical/ — two tiers: the weight cockpit (daily) + the composition arc
+// (episodic). "Weight is the metronome; composition is the arc." `d` = physical_overview.
+const PHYS_GENESIS = "2026-06-14";
+// P0.1 — trend-weight hero (dual-layer). Faint raw daily dots + a confident ember smoothed
+// trend; goal is an annotation NOT an axis anchor (HARD RULE 4); genesis marked; two-voice.
+function physicalTrendHero(readings, j, goal) {
+  const now = j.current_weight_lbs, start = j.start_weight_lbs, lost = j.lost_lbs, rate = j.weekly_rate_lbs, prov = j.rate_provisional;
+  const chart = weightTrendChart(readings, { goal, genesis: PHYS_GENESIS, label: "Weight · daily scale vs smoothed trend" });
+  const down = lost != null && lost > 0;
+  const machine = [
+    now != null && `now ${fmt(now)} lb`,
+    lost != null && `${down ? "down" : "up"} ${fmt(Math.abs(lost))} lb from ${fmt(start)}`,
+    (rate != null && rate !== 0) ? `trend ${fmt(rate)} lb/wk${prov ? " · early = water" : ""}` : "",
+  ].filter(Boolean).join(" · ");
+  const serif = rate != null && rate < 0
+    ? `The scale is moving. ${prov ? "Most of an early cut is water — this rate will slow, and the line knows it; trust the smoothed trend over any single morning's dot." : "The smoothed trend is the signal; the daily dots are scale noise — water, food, the time of the weigh-in."} Goal ${fmt(goal)} sits off the bottom of this axis on purpose: anchoring to it would flatten the slope you're actually walking.`
+    : `Weight is the daily metronome — the thing that moves every morning. The faint dots are the raw scale; the line is the trend underneath the noise.`;
+  return sec("Weight — the daily metronome",
+    chart + `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(machine)}</p><p class="tv-human">${esc(serif)}</p></div>`);
+}
+// P0.3 — HappyScale-style stat cluster: High / Latest / Low · Yesterday (day-over-day) ·
+// % complete (314.5 → 185 denominator). These REPLACE the DEXA percentages as the page's
+// top figures. Ember reads positive on a down day; never red.
+function physicalStatCluster(readings, j, goal) {
+  const ws = readings.map((r) => Number(r.weight_lbs)).filter(Number.isFinite);
+  if (ws.length < 1) return "";
+  // Latest comes from the SAME raw series as high/low so they reconcile (journey's
+  // current_weight is pre-rounded, which can read below the raw min — confusing).
+  const latest = ws[ws.length - 1];
+  const high = Math.max(...ws), low = Math.min(...ws);
+  const prev = ws.length >= 2 ? ws[ws.length - 2] : null;
+  const dayDelta = prev != null ? Math.round((ws[ws.length - 1] - prev) * 10) / 10 : null;
+  const ydayCap = dayDelta == null ? "yesterday" : `yesterday · ${dayDelta > 0 ? "+" : ""}${fmt(dayDelta)} lb`;
+  const pct = j.progress_pct != null ? j.progress_pct : Math.round((j.start_weight_lbs - latest) / (j.start_weight_lbs - goal) * 1000) / 10;
+  return figs([
+    fig(fmt(high) + " lb", "high"),
+    fig(fmt(latest) + " lb", "latest"),
+    fig(fmt(low) + " lb", "low"),
+    prev != null && fig(fmt(prev) + " lb", ydayCap),
+    pct != null && fig(fmt(pct) + "%", `to goal · ${fmt(j.start_weight_lbs ?? 314.5)}→${fmt(goal)}`),
+  ]) + `<p class="rd-meta label">The weight figures lead the page now — the body-composition percentages move to the dated scan arc below. % complete is against the full ${fmt(j.start_weight_lbs ?? 314.5)} → ${fmt(goal)} lb span.</p>`;
+}
+// P0.4 — the milestone ladder: the measuring-rule tick-spine made vertical, 315 → 185 in
+// 10-lb rungs. Each crossed rung clicks ember + stamps the day it fell and the days since the
+// previous rung (widening gaps = the honest pace arc). The current weight marks the live edge.
+const _PHYS_MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function _physShortDate(iso) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); return m ? `${_PHYS_MON[+m[2] - 1]} ${+m[3]}` : ""; }
+function physicalMilestoneLadder(readings, j, goal) {
+  const ws = readings.map((r) => ({ d: r.date, w: Number(r.weight_lbs) })).filter((p) => Number.isFinite(p.w));
+  if (ws.length < 2) return "";
+  const start = j.start_weight_lbs != null ? Number(j.start_weight_lbs) : 314.5;
+  const latest = ws[ws.length - 1].w;
+  const top = Math.floor(start / 10) * 10;
+  const rungs = [{ w: start, cap: "start" }];
+  for (let w = top; w > goal + 0.5; w -= 10) if (w < start - 0.5) rungs.push({ w });
+  rungs.push({ w: goal, cap: "goal" });
+  const crossDate = (rung) => { for (const p of ws) if (p.w <= rung + 1e-9) return p.d; return null; };
+  let prevDate = null, nowPlaced = false;
+  const rows = rungs.map((r) => {
+    const crossed = latest <= r.w + 1e-9;
+    const date = crossed ? crossDate(r.w) : null;
+    let days = "";
+    if (crossed && date && prevDate) { const dd = Math.round((Date.parse(date) - Date.parse(prevDate)) / 86400000); if (dd > 0) days = ` · ${dd}d`; }
+    if (crossed && date) prevDate = date;
+    // The "now" edge: the first uncrossed rung gets the live marker.
+    let nowMark = "";
+    if (!crossed && !nowPlaced) { nowPlaced = true; nowMark = `<span class="ml-now">now ${fmt(latest)} lb · ${fmt(Math.round((latest - goal) * 10) / 10)} to goal</span>`; }
+    const cls = crossed ? "ml-crossed" : (nowMark ? "ml-next" : "ml-future");
+    const cap = r.cap ? `<span class="ml-cap label">${esc(r.cap)}</span>` : "";
+    const meta = crossed && date ? `<span class="ml-meta label">crossed ${esc(_physShortDate(date))}${esc(days)}</span>` : "";
+    return `<div class="ml-rung ${cls}"><span class="ml-tick"></span><span class="ml-w mono">${fmt(r.w)}</span>${cap}${meta}${nowMark}</div>`;
+  }).join("");
+  return sec("Milestone ladder — 315 to 185, ten pounds at a time",
+    `<div class="ml-ladder">${rows}</div>` +
+    `<p class="rd-meta label">Each rung is a 10-lb mark on the way down; it clicks ember the day the trend crosses it, stamped with how long that rung took. The gaps widen as the cut matures — that's the real pace, not a straight line to the goal.</p>`);
+}
+// P0.5 — rate tempo strip. The pace over 7d / 30d / 90d / since-genesis as ember-intensity
+// slope-gauges (not four naked numbers): faster loss = longer, more-saturated ember bar.
+// A GAIN window reads muted ink, never red. The 7-day carries the "early = water" flag.
+function _slopePerDay(pts) {
+  if (pts.length < 3) return null;
+  const t0 = Date.parse(pts[0].d);
+  const x = pts.map((p) => (Date.parse(p.d) - t0) / 86400000), y = pts.map((p) => p.w);
+  const n = x.length, sx = x.reduce((a, b) => a + b, 0), sy = y.reduce((a, b) => a + b, 0);
+  const sxy = x.reduce((a, b, i) => a + b * y[i], 0), sxx = x.reduce((a, b) => a + b * b, 0);
+  const denom = n * sxx - sx * sx;
+  return denom ? (n * sxy - sx * sy) / denom : null;
+}
+function physicalRateTempo(readings, j) {
+  const ws = readings.map((r) => ({ d: r.date, w: Number(r.weight_lbs) })).filter((p) => Number.isFinite(p.w) && /^\d{4}/.test(p.d));
+  if (ws.length < 3) return "";
+  const today = ws[ws.length - 1].d;
+  const since = (days) => { const cut = new Date(Date.parse(today) - days * 86400000).toISOString().slice(0, 10); return ws.filter((p) => p.d >= cut); };
+  const genDays = Math.max(1, Math.round((Date.parse(today) - Date.parse(PHYS_GENESIS)) / 86400000));
+  const windows = [
+    { k: "7-day", pts: since(7), flag: "early = water" },
+    { k: "30-day", pts: since(30) },
+    { k: "90-day", pts: since(90) },
+    { k: "since genesis", pts: ws.filter((p) => p.d >= PHYS_GENESIS), sub: `${genDays}d` },
+  ];
+  const rates = windows.map((w) => { const s = _slopePerDay(w.pts); return { ...w, wk: s == null ? null : Math.round(s * 7 * 10) / 10 }; });
+  const maxMag = Math.max(0.5, ...rates.map((r) => (r.wk == null ? 0 : Math.abs(r.wk))));
+  const row = (r) => {
+    if (r.wk == null) return `<div class="rt-row"><span class="rt-label">${esc(r.k)}</span><span class="rt-gauge"></span><span class="rt-v mono rt-na">—  too few weigh-ins</span></div>`;
+    const losing = r.wk < 0;
+    const width = Math.min(100, (Math.abs(r.wk) / maxMag) * 100);
+    const op = (0.4 + 0.6 * Math.min(1, Math.abs(r.wk) / maxMag)).toFixed(2);
+    const tone = losing ? "rt-ember" : "rt-ink";
+    return `<div class="rt-row"><span class="rt-label">${esc(r.k)}${r.sub ? ` <span class="rt-sub">${esc(r.sub)}</span>` : ""}</span>` +
+      `<span class="rt-gauge"><span class="rt-fill ${tone}" style="width:${width.toFixed(0)}%;opacity:${op}"></span></span>` +
+      `<span class="rt-v mono">${r.wk > 0 ? "+" : ""}${fmt(r.wk)} lb/wk</span>${r.flag ? `<span class="rt-flag label">${esc(r.flag)}</span>` : ""}</div>`;
+  };
+  return sec("Rate tempo — the pace, four ways",
+    `<div class="rt-strip">${rates.map(row).join("")}</div>` +
+    `<p class="rd-meta label">Each bar is a loss rate; the longer and more saturated, the faster. The 7-day runs hot early because a new cut sheds water — it isn't fat coming off that fast, and it will slow. A gain window would read muted ink, never an alarm.</p>`);
+}
+// P0.7 — BMI, deliberately de-emphasized. Included because HappyScale-literate readers
+// expect it, but small, last in Tier 1, and captioned with its own limitation (near-
+// meaningless on a heavy frame rebuilding lean mass). Height from the profile, never a hero.
+function physicalBMI(readings, j) {
+  const hIn = Number(j.height_inches);
+  const latest = readings.length ? Number(readings[readings.length - 1].weight_lbs) : Number(j.current_weight_lbs);
+  if (!Number.isFinite(hIn) || hIn <= 0 || !Number.isFinite(latest)) return "";
+  const bmi = Math.round((703 * latest / (hIn * hIn)) * 10) / 10;
+  return sec("BMI — included, but kept in its place",
+    `<p class="rd-bmi"><span class="rd-bmi-v mono">${fmt(bmi)}</span> <span class="label">BMI</span></p>` +
+    `<p class="rd-meta label">BMI is here only because people look for it — it's near-meaningless on a heavy frame carrying real muscle. It can't tell fat from lean, so it reads "obese" for a lineman and a couch alike. The DEXA composition below is the honest version; this is the number to distrust.</p>`);
+}
+// P1.1 — next-DEXA countdown: the Tier-2 arc anchor. Turns a single scan from a stale tile
+// into anticipation ("the next chapter lands in ~X days"). Cut-aware target: ~10 weeks past
+// genesis, when fat-vs-lean change finally clears the DEXA error bar — NOT the API's generic
+// last+90 cadence (which would fall 2 weeks into the cut, too soon to mean anything). Honest
+// that it isn't booked — scheduling it is the P2.1 capture step this countdown waits on.
+function physicalDexaCountdown(d) {
+  const x = d.latest_dexa; if (!x || !x.scan_date) return "";
+  const genesisMs = Date.parse(PHYS_GENESIS);
+  const apiMs = x.next_dexa_recommended ? Date.parse(x.next_dexa_recommended) : 0;
+  const targetMs = Math.max(genesisMs + 70 * 86400000, apiMs || 0);
+  const today = new Date(); const todayMs = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const days = Math.round((targetMs - todayMs) / 86400000);
+  const td = new Date(targetMs), tStr = `${_PHYS_MON[td.getUTCMonth()]} ${td.getUTCFullYear()}`;
+  const sinceLast = Math.round((todayMs - Date.parse(x.scan_date)) / 86400000);
+  return sec("The composition arc — scan two is the next chapter",
+    `<div class="dx-count"><span class="dx-days mono">${days > 0 ? "~" + days : "due"}</span><span class="dx-unit label">${days > 0 ? "days to the recommended scan two" : "scan two is due"}</span></div>` +
+    `<p class="rd-meta label">The last DEXA was ${sinceLast} days ago, <strong>pre-cut</strong>. A second scan around <strong>${tStr}</strong> — roughly ten weeks into the cut — is when fat-vs-lean change finally clears the scan's own error bar and composition <em>velocity</em> becomes real. It isn't booked yet; scheduling it is the next data-capture step, and it's what this countdown is waiting on. Everything below is that one pre-cut scan — a dated snapshot, not a trend.</p>`);
+}
+// P1.2 — DEXA baseline as ONE dated stacked bar (lean vs fat). A snapshot, never a trend:
+// lean is ember (the asset the cut protects), fat muted ink. Dated + pre-cut-labeled, with
+// the honest line that this is where the cut STARTED — the scale above shows where it is now.
+function _physDexaAgeDays(scanDate) {
+  const t = Date.parse(scanDate); if (!Number.isFinite(t)) return null;
+  const today = new Date(); return Math.round((Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()) - t) / 86400000);
+}
+function physicalDexaBaseline(d) {
+  const x = d.latest_dexa; if (!x) return "";
+  const bc = x.body_composition || {};
+  const lean = Number(bc.lean_mass_lb), fat = Number(bc.fat_mass_lb);
+  if (!Number.isFinite(lean) || !Number.isFinite(fat)) return "";
+  const age = _physDexaAgeDays(x.scan_date);
+  const bfp = bc.body_fat_pct != null ? `${fmt(bc.body_fat_pct, 1)}% body fat` : "";
+  const bar = stackedBar([{ label: "lean mass", value: lean, tone: "ember" }, { label: "fat mass", value: fat, tone: "ink" }], { label: `Lean vs fat · ${esc(x.scan_date)}`, unit: " lb" });
+  return sec("DEXA baseline — lean vs fat (one scan, dated)",
+    bar + `<p class="rd-meta label"><strong>${esc(x.scan_date)}${age != null ? ` · ~${age} days ago` : ""} · pre-cut baseline.</strong> A snapshot, not a trend${bfp ? ` — ${esc(bfp)}` : ""}. This is where the cut <em>started</em>; the weight cockpit above shows where it is now. Lean (ember) is the asset the cut is trying to keep while the fat comes off — proven only when scan two lands.</p>`);
+}
+// P1.3 — visceral fat callout (dated). The fat around the organs — a better predictor of
+// metabolic risk than total body-fat %. One figure + a risk-band gauge where ember INTENSITY
+// (never red) rises with risk; thresholds are DEXA-system-dependent, so the band is explicitly
+// directional, not a diagnosis.
+function physicalVisceralCallout(d) {
+  const x = d.latest_dexa; if (!x) return "";
+  const bc = x.body_composition || {};
+  const vlb = Number(bc.visceral_fat_lb), vg = Number(bc.visceral_fat_g);
+  if (!Number.isFinite(vlb) && !Number.isFinite(vg)) return "";
+  const lb = Number.isFinite(vlb) ? vlb : vg / 453.592;
+  const maxS = 3; // lb full-scale
+  const pos = Math.max(0, Math.min(100, (lb / maxS) * 100));
+  const band = lb < 1 ? "low" : lb < 2 ? "moderate" : "elevated";
+  const age = _physDexaAgeDays(x.scan_date);
+  const fig6 = `${fmt(Math.round(lb * 100) / 100)} lb${Number.isFinite(vg) ? ` · ${fmt(Math.round(vg))} g` : ""}`;
+  return sec("Visceral fat — the number under the number",
+    `<div class="vf-wrap"><div class="vf-fig"><span class="vf-v mono">${esc(fig6)}</span><span class="vf-band label vf-${band}">${esc(band)}</span></div>` +
+    `<div class="vf-gauge" role="img" aria-label="Visceral fat ${esc(fig6)} — ${band} band on a directional 0–3 lb scale"><span class="vf-zone vf-z1"></span><span class="vf-zone vf-z2"></span><span class="vf-zone vf-z3"></span><span class="vf-mark" style="left:${pos.toFixed(1)}%"></span></div>` +
+    `<div class="vf-scale label"><span>0</span><span>low · moderate · elevated</span><span>${maxS} lb</span></div></div>` +
+    `<p class="rd-meta label">Visceral fat wraps the organs and drives metabolic risk more than total body-fat % does — it's the number to actually watch, and the one a cut moves early. Dated <strong>${esc(x.scan_date)}${age != null ? ` · ~${age} days ago` : ""}</strong>, pre-cut. The bands are directional only — DEXA systems disagree on exact cutoffs, so this reads the zone, never a diagnosis.</p>`);
+}
+// P1.4 — lean / ALMI longevity context, demoted. Appendicular lean mass index is the
+// body-comp number that best predicts healthy aging (sarcopenia/frailty). Small: a few figs,
+// a one-line reference floor, plain language — out of the raw index table. Dated.
+function physicalLeanLongevity(d) {
+  const x = d.latest_dexa; if (!x) return "";
+  const idx = x.indices || {}, bc = x.body_composition || {};
+  const almi = Number(idx.almi_kg_m2), pct = Number(idx.almi_percentile), lean = Number(bc.lean_mass_lb);
+  if (!Number.isFinite(almi) && !Number.isFinite(lean)) return "";
+  const FLOOR = 7.0; // commonly-cited male sarcopenia ALMI floor (kg/m²); cutoffs vary
+  const clear = Number.isFinite(almi) ? Math.round((almi - FLOOR) * 10) / 10 : null;
+  return sec("Lean mass & longevity — the aging number",
+    figs([
+      Number.isFinite(almi) && fig(fmt(almi, 1), "ALMI · kg/m²"),
+      Number.isFinite(pct) && fig(fmt(pct) + "th", "percentile"),
+      Number.isFinite(lean) && fig(dualWeight(lean, "lb"), "appendicular + trunk lean"),
+    ]) +
+    `<p class="rd-meta label">Appendicular lean mass — the muscle on the arms and legs — is the body-comp figure that best predicts how well you age: it's the buffer against sarcopenia and frailty. ${Number.isFinite(almi) ? `At ${fmt(almi, 1)} kg/m²${Number.isFinite(pct) ? `, ${fmt(pct)}th percentile,` : ""} that's ${clear != null && clear > 0 ? `~${fmt(clear)} clear of` : "near"} the ~${FLOOR} sarcopenia floor.` : ""} The cut's whole job is to keep this while the fat comes off — confirmed only when scan two lands. Dated <strong>${esc(x.scan_date)}</strong>, pre-cut.</p>`);
+}
+// P1.5 — PhenoAge (transparent), Option A privacy. Shows the phenotypic ("biological") age +
+// the 9 markers driving it — NO chronological age, NO gap, so the page can't reveal real age.
+// Replaces the DEXA black-box "biological age". Honest "needs marker X" if any input missing.
+function physicalPhenoAge(pa) {
+  if (!pa) return "";
+  if (pa.phenoage == null) {
+    const miss = (pa.missing || []).join(", ");
+    return sec("Biological age — PhenoAge (transparent)",
+      `<p class="rd-meta label">Phenotypic Age needs all 9 blood markers and is never approximated from partial data${miss ? ` — waiting on: <strong>${esc(miss)}</strong>` : ""}. It fills in at the next complete draw.</p>`);
+  }
+  const drivers = pa.drivers || [];
+  const driverRows = drivers.map((dv) => {
+    const tone = dv.direction === "younger" ? "pa-younger" : dv.direction === "older" ? "pa-older" : "pa-neutral";
+    const val = dv.value != null ? `${fmt(dv.value)}${dv.unit ? " " + dv.unit : ""}` : "—";
+    return `<div class="pa-driver ${tone}"><span class="pa-d-name">${esc(dv.name)}${dv.derived ? ` <span class="pa-derived">derived</span>` : ""}</span><span class="pa-d-val mono">${esc(val)}</span><span class="pa-d-dir label">${esc(dv.direction || "")}</span></div>`;
+  }).join("");
+  return sec("Biological age — PhenoAge (transparent, replaces the black box)",
+    `<div class="pa-dial"><span class="pa-v mono">${esc(String(pa.phenoage))}</span><span class="pa-unit label">phenotypic age · years</span></div>` +
+    `<p class="rd-meta label">Levine Phenotypic Age (2018), computed from 9 standard blood markers — the transparent replacement for the DEXA "biological age" black box; every input is shown below. ${pa.as_of ? `Recomputed per blood draw · <strong>${esc(pa.as_of)}</strong>.` : ""} <strong>Chronological age isn't shown, by design</strong> — this can't be used to back out a real age. <strong>Caveats:</strong> population-level, not a diagnosis; this is blood-based <em>Phenotypic</em> Age, NOT the DNAm epigenetic clock; it's volatile to single markers (a CRP spike from a cold can swing it). <a href="/evidence/labs/">See the full bloodwork →</a></p>` +
+    `<details class="pa-details"><summary class="pa-sum label">The 9 markers driving it — show the inputs</summary><div class="pa-drivers">${driverRows}</div>` +
+    `<p class="rd-meta label">Ember = the marker is pushing the number <em>younger</em> vs a healthy reference; muted = older; faint = neutral. Lymphocyte % is derived from absolute lymphocytes ÷ WBC.</p></details>`);
+}
+// P2.1–P2.5 — new-capture + velocity, honestly gated. Each is a real capability with an
+// honest empty/pending state until the data exists; none fabricate or surface a gated metric.
+// P2.4 (composition velocity) STAYS a placeholder until a SECOND valid DEXA exists and the
+// delta clears least-significant-change — never built off one scan.
+function physicalCaptureBacklog(d, pa) {
+  const x = d.latest_dexa || {};
+  const haveTape = d.tape_measurements && Object.keys(d.tape_measurements).length;
+  const cards = [];
+  // P2.1 — DEXA cadence / scan-two scheduling (drives the countdown; unlocks velocity).
+  cards.push(`<div class="cap-card"><h4 class="cap-h">Scan two — scheduling <span class="cap-tag">unlocks velocity</span></h4><p class="rd-meta label">A second DEXA ~10 weeks into the cut turns every composition figure above from a dated snapshot into a real fat-vs-lean <em>trajectory</em>. Booking it is the single highest-value capture step — it's what the countdown at the top of the arc is waiting on. Not yet scheduled.</p></div>`);
+  // P2.2 — tape measurements (between-DEXA proxy).
+  cards.push(`<div class="cap-card"><h4 class="cap-h">Tape measurements <span class="cap-tag">${haveTape ? "flowing" : "needs capture"}</span></h4><p class="rd-meta label">${haveTape ? "Tape sessions are logging — a cheap, frequent proxy for the silhouette and segmental change between scans." : "Zero sessions yet. A monthly tape (waist, hips, limbs) is the cheap, frequent proxy that keeps the silhouette honest between the expensive scans. Awaiting the first measurement."}</p></div>`);
+  // P2.3 — progress photos (PRIVATE by default; explicit opt-in before any public render).
+  cards.push(`<div class="cap-card"><h4 class="cap-h">Progress photos <span class="cap-tag cap-private">private by default</span></h4><p class="rd-meta label">The most powerful change signal and the most sensitive — so they're private by default, never rendered here without an explicit opt-in. The faceless silhouette above is the public-safe stand-in. No photo is shown.</p></div>`);
+  // P2.4 — composition velocity (GATED on scan two + LSC).
+  cards.push(`<div class="cap-card"><h4 class="cap-h">Composition velocity <span class="cap-tag">awaits scan two</span></h4><p class="rd-meta label">Lean/fat/visceral change per week — the number everyone wants — stays blank on purpose. One DEXA is a point; velocity needs a second valid scan AND a delta that clears the scan's least-significant-change, or it's noise dressed as progress. Until then, weight is the only honest "change." Placeholder, not hidden.</p></div>`);
+  // P2.5 — complementary ages (optional; PhenoAge stays the anchor; WHOOP Age NOT built).
+  cards.push(`<div class="cap-card"><h4 class="cap-h">Complementary ages <span class="cap-tag">secondary lenses</span></h4><p class="rd-meta label">Vascular age (Withings pulse-wave velocity) and a VO₂max fitness age could sit beside PhenoAge as secondary lenses — PhenoAge stays the anchor. WHOOP's "age" isn't in their official API (only a fragile unofficial scrape), so it's deliberately not built. Awaiting the source wiring.</p></div>`);
+  return sec("What unlocks the arc — the capture backlog",
+    `<div class="cap-grid">${cards.join("")}</div>` +
+    `<p class="rd-meta label">Each of these is a real capability waiting on data, not a stub — honest empty states, ranked by what would move the picture most. Composition velocity is gated hardest: it does not get built off a single scan.</p>`);
+}
+// P1.6 — full-scan expander (dated). The remaining indices / segmental / bone numbers tucked
+// behind a "full scan" disclosure, all dated. The +3.9 bone T-score is SUPPRESSED as an
+// artifact (a T-score that high is physiologically implausible — almost certainly a parse
+// error), shown as a flag, never as fact. The DEXA "Body Score" is already gone (never
+// surfaced in the redesign — replaced by transparent PhenoAge above).
+function physicalFullScanExpander(d) {
+  const x = d.latest_dexa; if (!x) return "";
+  const idx = x.indices || {}, bone = x.bone || {}, sf = x.segmental_fat || {}, sl = x.segmental_lean || {};
+  const tval = Number(bone.t_score);
+  const tImplausible = Number.isFinite(tval) && tval >= 3;
+  const boneBlock = `<h4 class="hb-group label">Bone density</h4>` + (
+    tImplausible
+      ? `<p class="rd-flag-note label">⚑ Bone T-score reported <strong>+${esc(fmt(tval, 1))}</strong> — suppressed as a likely scan artifact: a T-score that high is physiologically implausible (it would mean bone density ~4 SD above the young-adult peak). Treated as a parse/scan error pending a re-read, not shown as a result.</p>`
+      : kvtable(bone)
+  );
+  const idxSlim = {};
+  for (const k of ["ffmi_kg_m2", "fmi_kg_m2", "ffmi_rating", "fmi_rating"]) if (idx[k] != null) idxSlim[k] = idx[k];
+  const inner =
+    (Object.keys(idxSlim).length ? `<h4 class="hb-group label">Indices (FFMI / FMI)</h4>${kvtable(idxSlim)}` : "") +
+    boneBlock +
+    (Object.keys(sf).length ? `<h4 class="hb-group label">Segmental fat %</h4>${kvtable(sf)}` : "") +
+    (Object.keys(sl).length ? `<h4 class="hb-group label">Segmental lean</h4>${kvtable(sl)}` : "");
+  return sec("The full scan — everything else, dated",
+    `<details class="fs-exp"><summary class="pa-sum label">Open the full ${esc(x.scan_date || "DEXA")} scan — indices, segmental, bone</summary><div class="fs-body">${inner}</div></details>` +
+    note(`Every figure here is from the single ${esc(x.scan_date || "")} pre-cut scan — a dated snapshot, not a trend. Composition velocity unlocks at scan two.`));
+}
+async function renderPhysical(d) {
+  const [wp, wj, pa] = await Promise.all([tryJSON("/api/weight_progress"), tryJSON("/api/journey"), tryJSON("/api/phenoage")]);
+  const readings = (wp && wp.weight_progress) || [];
+  const j = (wj && wj.journey) || {};
+  const goal = j.goal_weight_lbs ?? 185;
+  const parts = [];
+  // ── TIER 1 — the weight cockpit (daily) ──
+  parts.push(physicalTrendHero(readings, j, goal)); // P0.1
+  if (j.start_weight_lbs != null && j.current_weight_lbs != null) parts.push(dataFigure(j)); // P0.2 — silhouette scrubber (links to the trend marker)
+  parts.push(physicalStatCluster(readings, j, goal)); // P0.3 — stat cluster (replaces DEXA % as top figures)
+  parts.push(physicalMilestoneLadder(readings, j, goal)); // P0.4 — milestone ladder (the vertical measuring-rule signature)
+  parts.push(physicalRateTempo(readings, j)); // P0.5 — rate tempo strip (ember-intensity slope-gauges)
+  // P0.6 — projection cone (widening; rate from the readings, rungs date-marked; the bet, gradeable).
+  if (readings.length >= 3) {
+    const ws6 = readings.map((r) => ({ d: r.date, w: Number(r.weight_lbs) })).filter((p) => Number.isFinite(p.w));
+    const slope = _slopePerDay(ws6.slice(-30));
+    const ratePerWeek = slope != null ? Math.round(slope * 7 * 100) / 100 : (j.weekly_rate_lbs ?? null);
+    const last6 = ws6[ws6.length - 1];
+    const rungList = []; for (let w = Math.floor((last6.w - 5) / 10) * 10; w > goal; w -= 10) rungList.push(w);
+    parts.push(sec("Projection to 185 — the cone, not a line",
+      projectionCone({ date: last6.d, w: last6.w }, goal, ratePerWeek, { provisional: !!j.rate_provisional, rungs: rungList, label: "Projected weight → 185" }) +
+      `<p class="rd-meta label">A forecast is a cone, never a line. It's wide because the rate is young and water-heavy; it tightens as real weigh-ins accrue. The dated bet above is held honestly — and checked against what actually happens.</p>`));
+  }
+  parts.push(physicalBMI(readings, j)); // P0.7 — BMI (de-emphasized, last in Tier 1)
+  // ── TIER 2 — the composition arc (episodic) — restructured across P1.x ──
+  parts.push(physicalDexaCountdown(d)); // P1.1 — next-DEXA countdown (arc anchor)
+  parts.push(physicalDexaBaseline(d)); // P1.2 — dated lean-vs-fat baseline (one scan, not a trend)
+  parts.push(physicalVisceralCallout(d)); // P1.3 — visceral fat callout + risk band (dated)
+  parts.push(physicalLeanLongevity(d)); // P1.4 — lean/ALMI longevity context (dated, demoted)
+  parts.push(physicalPhenoAge(pa)); // P1.5 — transparent PhenoAge (Option A: no chronological/gap)
+  parts.push(physicalFullScanExpander(d)); // P1.6 — full-scan expander, dated; +3.9 T-score suppressed
+  parts.push(physicalCaptureBacklog(d, pa)); // P2.1–P2.5 — capture backlog, honestly gated
+  return parts.join("");
+}
 // P0.1 — The Lift Index: per-lift estimated-1RM TREND (sparkline + ▲/▼/flat tag), never a
 // 1RM target/"goal met". Frame = building the engine, not PRs. Ember = load up; down = muted
 // ink (never red); honesty gate: no arrow/slope until ~3+ sessions of that lift.
@@ -1377,51 +1683,73 @@ const WIRE = {
     const start = picks.find((p) => p.dataset.coach === "training") || picks[0]; // open the lifting coach first
     if (start) load(start);
   },
-  results: () => {
-    const stage = document.querySelector("[data-df]");
-    if (!stage) return;
-    const START = parseFloat(stage.dataset.start), GOAL = parseFloat(stage.dataset.goal), NOW = parseFloat(stage.dataset.now);
-    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const bodyEl = stage.querySelector("[data-df-body]"), headEl = stage.querySelector("[data-df-head]");
-    const wEl = stage.querySelector("[data-df-w]"), tgEl = stage.querySelector("[data-df-tg]"), scrub = stage.querySelector("[data-df-scrub]");
-    const heaviness = (w) => Math.max(0, Math.min(1, (w - GOAL) / (START - GOAL)));
-    function render(w) {
-      const g = heaviness(w);
-      bodyEl.setAttribute("d", dfBody(g));
-      headEl.setAttribute("r", (29 + 6 * g).toFixed(1));
-      wEl.textContent = Math.round(w);
-      const toGo = Math.max(0, w - GOAL);
-      tgEl.textContent = toGo <= 0 ? "reached" : "-" + Math.round(toGo) + " lb";
-      scrub.value = (1 - g).toFixed(3);
-    }
-    scrub.addEventListener("input", () => render(START + (GOAL - START) * parseFloat(scrub.value)));
-    let raf = null;
-    function animateTo(target) {
-      cancelAnimationFrame(raf);
-      const from = START + (GOAL - START) * parseFloat(scrub.value);
-      if (reduce) { render(target); return; }
-      const t0 = performance.now(), dur = 900;
-      (function step(t) {
-        const k = Math.min(1, (t - t0) / dur), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
-        render(from + (target - from) * e);
-        if (k < 1) raf = requestAnimationFrame(step);
-      })(t0);
-    }
-    stage.querySelectorAll("[data-df-to]").forEach((b) => b.addEventListener("click", () => animateTo(parseFloat(b.dataset.to))));
-    const playBtn = stage.querySelector("[data-df-play]");
-    if (reduce) { playBtn.remove(); } else {
-      let playing = false, ploop = null;
-      playBtn.addEventListener("click", (e) => {
-        playing = !playing; e.target.textContent = playing ? "❚❚ pause" : "▶ morph";
-        if (playing) {
-          let dir = -1, w = START; cancelAnimationFrame(raf);
-          (function loop() { w += dir * 1.4; if (w <= GOAL) { w = GOAL; dir = 1; } if (w >= START) { w = START; dir = -1; } render(w); if (playing) ploop = requestAnimationFrame(loop); })();
-        } else { cancelAnimationFrame(ploop); }
-      });
-    }
-    render(NOW);   // open on the honest current state
-  },
+  results: () => wireDataFigure(),
+  physical: () => wireDataFigure(moveTrendMarker),  // P0.2 — silhouette scrubs the trend marker in lockstep
 };
+
+// P0.2 — silhouette scrubber wiring, reusable. `onWeight(w)` fires on every render so a
+// caller can link another element (the physical page passes the trend-chart marker).
+function wireDataFigure(onWeight) {
+  const stage = document.querySelector("[data-df]");
+  if (!stage) return;
+  const START = parseFloat(stage.dataset.start), GOAL = parseFloat(stage.dataset.goal), NOW = parseFloat(stage.dataset.now);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const bodyEl = stage.querySelector("[data-df-body]"), headEl = stage.querySelector("[data-df-head]");
+  const wEl = stage.querySelector("[data-df-w]"), tgEl = stage.querySelector("[data-df-tg]"), scrub = stage.querySelector("[data-df-scrub]");
+  const heaviness = (w) => Math.max(0, Math.min(1, (w - GOAL) / (START - GOAL)));
+  function render(w) {
+    const g = heaviness(w);
+    bodyEl.setAttribute("d", dfBody(g));
+    headEl.setAttribute("r", (29 + 6 * g).toFixed(1));
+    wEl.textContent = Math.round(w);
+    const toGo = Math.max(0, w - GOAL);
+    tgEl.textContent = toGo <= 0 ? "reached" : "-" + Math.round(toGo) + " lb";
+    scrub.value = (1 - g).toFixed(3);
+    if (onWeight) try { onWeight(w); } catch (e) { /* link is decorative — never break the scrub */ }
+  }
+  scrub.addEventListener("input", () => render(START + (GOAL - START) * parseFloat(scrub.value)));
+  let raf = null;
+  function animateTo(target) {
+    cancelAnimationFrame(raf);
+    const from = START + (GOAL - START) * parseFloat(scrub.value);
+    if (reduce) { render(target); return; }
+    const t0 = performance.now(), dur = 900;
+    (function step(t) {
+      const k = Math.min(1, (t - t0) / dur), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      render(from + (target - from) * e);
+      if (k < 1) raf = requestAnimationFrame(step);
+    })(t0);
+  }
+  stage.querySelectorAll("[data-df-to]").forEach((b) => b.addEventListener("click", () => animateTo(parseFloat(b.dataset.to))));
+  const playBtn = stage.querySelector("[data-df-play]");
+  if (reduce) { playBtn.remove(); } else {
+    let playing = false, ploop = null;
+    playBtn.addEventListener("click", (e) => {
+      playing = !playing; e.target.textContent = playing ? "❚❚ pause" : "▶ morph";
+      if (playing) {
+        let dir = -1, w = START; cancelAnimationFrame(raf);
+        (function loop() { w += dir * 1.4; if (w <= GOAL) { w = GOAL; dir = 1; } if (w >= START) { w = START; dir = -1; } render(w); if (playing) ploop = requestAnimationFrame(loop); })();
+      } else { cancelAnimationFrame(ploop); }
+    });
+  }
+  render(NOW);   // open on the honest current state
+}
+
+// P0.2 — move the trend-chart's horizontal scrub marker to weight `w` (lockstep with the
+// silhouette). Below the chart's data floor (toward goal) → pin to the axis bottom + flag.
+function moveTrendMarker(w) {
+  const fig = document.querySelector(".wt-chart");
+  if (!fig) return;
+  const m = fig.querySelector("[data-wt-marker]");
+  if (!m) return;
+  const min = parseFloat(fig.dataset.wtMin), max = parseFloat(fig.dataset.wtMax), H = parseFloat(fig.dataset.wtH), P = parseFloat(fig.dataset.wtP);
+  if (![min, max, H, P].every(Number.isFinite) || max === min) return;
+  const below = w < min;
+  const y = below ? (H - P) : (P + (1 - (w - min) / (max - min)) * (H - 2 * P));
+  m.setAttribute("y1", y.toFixed(1)); m.setAttribute("y2", y.toFixed(1));
+  m.style.opacity = "1";
+  m.classList.toggle("wt-marker-below", below);
+}
 
 /* ── App shell: tabs + sidebar + center ───────────────────────────────────── */
 const $ = (s) => document.querySelector(s);

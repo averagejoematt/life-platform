@@ -454,6 +454,101 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .chart-goal { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 3 4; }
 .chart-down { stroke: var(--ink-muted); stroke-width: 1.5; stroke-dasharray: 4 3; }
 .chart-dot { fill: var(--ember); }
+/* P0.1 — trend-weight hero: faint raw daily dots (scale noise) + confident ember trend +
+   a muted genesis rule. Ember = the smoothed signal; dots are deliberately faint. */
+.wt-trend { stroke: var(--ember); stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; }
+.wt-raw { fill: var(--ink-faint); opacity: 0.45; }
+.wt-genesis { stroke: var(--ink-muted); stroke-width: 1; stroke-dasharray: 2 4; }
+.wt-key { white-space: nowrap; }
+.wt-swatch { display: inline-block; width: 0.7em; height: 0.7em; vertical-align: baseline; margin-right: 0.25em; border-radius: 2px; }
+.wt-swatch-raw { background: var(--ink-faint); opacity: 0.5; border-radius: 50%; }
+.wt-swatch-trend { background: var(--ember); height: 0.22em; border-radius: 1px; }
+/* P0.2 — the scrub marker the silhouette drives in lockstep; ember dashed, pins to the
+   floor (muted) when the scrubbed weight is below the chart's data range (toward goal). */
+.wt-marker { stroke: var(--ember); stroke-width: 1.25; stroke-dasharray: 5 4; transition: opacity 0.15s; }
+.wt-marker-below { stroke: var(--ink-muted); }
+/* P0.4 — milestone ladder: a vertical measuring-rule. A rail (border) with a tick per
+   10-lb rung; crossed rungs ember, the live edge marked, future rungs muted. Never red. */
+.ml-ladder { display: flex; flex-direction: column; margin: var(--sp-3) 0; border-left: 2px solid var(--rule); padding-left: 0; }
+.ml-rung { position: relative; display: flex; align-items: baseline; gap: var(--sp-3); padding: var(--sp-2) 0 var(--sp-2) var(--sp-4); min-height: 1.4em; }
+.ml-tick { position: absolute; left: -2px; top: 0.7em; width: 14px; height: 2px; background: var(--rule); transform: translateX(-50%); }
+.ml-w { font-size: var(--fs-h4, 1.05rem); min-width: 3.4em; }
+.ml-cap { text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--ink-faint); }
+.ml-meta { color: var(--ink-faint); }
+.ml-crossed .ml-tick { background: var(--ember); width: 20px; height: 3px; top: 0.66em; }
+.ml-crossed .ml-w { color: var(--ember); }
+.ml-future .ml-w, .ml-next .ml-w { color: var(--ink-muted); }
+.ml-next .ml-tick { background: var(--ink-muted); width: 16px; }
+.ml-now { margin-left: auto; font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ember); border: 1px solid var(--ember); border-radius: var(--radius-xs); padding: 1px 8px; white-space: nowrap; }
+/* P0.5 — rate tempo: slope-gauges, ember intensity (width + opacity) = pace. Gain = ink. */
+.rt-strip { display: flex; flex-direction: column; gap: var(--sp-3); margin: var(--sp-3) 0; }
+.rt-row { display: grid; grid-template-columns: 7.5em 1fr auto; align-items: center; gap: var(--sp-3); }
+.rt-label { color: var(--ink); font-weight: var(--weight-med); }
+.rt-sub { color: var(--ink-faint); font-family: var(--font-mono); font-size: 0.7rem; }
+.rt-gauge { height: 10px; background: var(--surface-2, var(--surface)); border: 1px solid var(--rule); border-radius: 5px; overflow: hidden; }
+.rt-fill { display: block; height: 100%; }
+.rt-fill.rt-ember { background: var(--ember); }
+.rt-fill.rt-ink { background: var(--ink-muted); }
+.rt-v { white-space: nowrap; color: var(--ember); }
+.rt-v.rt-na { color: var(--ink-faint); }
+.rt-flag { grid-column: 3; color: var(--ink-faint); font-size: 0.66rem; text-transform: uppercase; letter-spacing: var(--tracking-label); }
+/* P0.6 — projection cone: ember-wash widening band, ember mid-line, muted goal + rung marks. */
+.pc-cone { fill: var(--ember-wash); stroke: var(--ember-line); stroke-width: 0.5; }
+.pc-mid { stroke: var(--ember); stroke-width: 2; stroke-linejoin: round; }
+.pc-goal { stroke: var(--ink-muted); stroke-width: 1; stroke-dasharray: 4 4; }
+.pc-rung { stroke: var(--rule); stroke-width: 1; stroke-dasharray: 2 4; }
+.pc-bet { display: block; margin-top: var(--sp-2); color: var(--ink-muted); font-style: italic; line-height: 1.5; }
+.pc-bet strong { color: var(--ember); font-style: normal; }
+/* P0.7 — BMI, de-emphasized: muted, small, never ember. The caption does the talking. */
+.rd-bmi { margin: var(--sp-2) 0 0; display: flex; align-items: baseline; gap: var(--sp-2); }
+.rd-bmi-v { font-size: var(--fs-h3, 1.5rem); color: var(--ink-muted); }
+/* P1.1 — next-DEXA countdown: the arc anchor. Ember number = anticipation, not alarm. */
+.dx-count { display: flex; align-items: baseline; gap: var(--sp-3); margin: var(--sp-2) 0; }
+.dx-days { font-size: var(--fs-display, 2.4rem); color: var(--ember); line-height: 1; }
+.dx-unit { color: var(--ink-muted); }
+/* P1.3 — visceral fat: a directional risk gauge. Ember intensity (never red) rises with the
+   zone; the marker is an ink tick. Bands are subtle background, the caption does the judging. */
+.vf-wrap { margin: var(--sp-3) 0; }
+.vf-fig { display: flex; align-items: baseline; gap: var(--sp-3); }
+.vf-v { font-size: var(--fs-h3, 1.5rem); color: var(--ink); }
+.vf-band { text-transform: uppercase; letter-spacing: var(--tracking-label); padding: 1px 8px; border-radius: var(--radius-xs); }
+.vf-band.vf-low { color: var(--ink-muted); border: 1px solid var(--rule); }
+.vf-band.vf-moderate { color: var(--ember); border: 1px solid var(--ember-line); }
+.vf-band.vf-elevated { color: var(--ember); border: 1px solid var(--ember); background: var(--ember-wash); }
+.vf-gauge { position: relative; display: flex; height: 12px; margin-top: var(--sp-2); border-radius: 6px; overflow: hidden; border: 1px solid var(--rule); }
+.vf-zone { height: 100%; }
+.vf-z1 { width: 33.33%; background: var(--ember-wash); }
+.vf-z2 { width: 33.33%; background: var(--ember-soft); }
+.vf-z3 { width: 33.34%; background: var(--ember-line); }
+.vf-mark { position: absolute; top: -2px; width: 2px; height: 16px; background: var(--ink); transform: translateX(-50%); }
+.vf-scale { display: flex; justify-content: space-between; margin-top: var(--sp-1); color: var(--ink-faint); }
+/* P1.5 — PhenoAge: a single transparent biological-age figure (Option A — no chronological).
+   Drivers expand; ember = pushing younger, muted = older. Younger-bio-age reads ember-positive. */
+.pa-dial { display: flex; align-items: baseline; gap: var(--sp-3); margin: var(--sp-2) 0; }
+.pa-v { font-size: var(--fs-display, 2.6rem); color: var(--ember); line-height: 1; }
+.pa-unit { color: var(--ink-muted); }
+.pa-details { margin-top: var(--sp-3); border-top: 1px solid var(--rule); padding-top: var(--sp-2); }
+.pa-sum { cursor: pointer; color: var(--ink-muted); }
+.pa-drivers { display: flex; flex-direction: column; gap: 1px; margin-top: var(--sp-3); }
+.pa-driver { display: grid; grid-template-columns: 1fr auto 5.5em; align-items: baseline; gap: var(--sp-3); padding: var(--sp-2) 0; border-bottom: 1px solid var(--rule); }
+.pa-d-name { font-weight: var(--weight-med); }
+.pa-d-val { color: var(--ink-muted); white-space: nowrap; }
+.pa-d-dir { text-transform: uppercase; letter-spacing: var(--tracking-label); text-align: right; }
+.pa-younger .pa-d-dir { color: var(--ember); }
+.pa-older .pa-d-dir { color: var(--ink-muted); }
+.pa-neutral .pa-d-dir { color: var(--ink-faint); }
+.pa-derived { font-family: var(--font-mono); font-size: 0.58rem; text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--ink-faint); border: 1px solid var(--rule); border-radius: var(--radius-xs); padding: 0 5px; }
+/* P1.6 — full-scan expander + the suppressed-artifact flag (muted ember, never red). */
+.fs-exp { margin: var(--sp-2) 0; }
+.fs-body { margin-top: var(--sp-3); }
+.fs-body .hb-group { margin-top: var(--sp-4); }
+.rd-flag-note { color: var(--ember); border: 1px dashed var(--ember-line); border-radius: var(--radius-xs); padding: var(--sp-2) var(--sp-3); background: var(--ember-wash); }
+/* P2.1–P2.5 — capture backlog cards: honest pending states, never alarmist. */
+.cap-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--sp-3); margin: var(--sp-3) 0; }
+.cap-card { border: var(--honest-border); border-radius: var(--radius-sm); padding: var(--sp-3); }
+.cap-h { margin: 0 0 var(--sp-2); display: flex; align-items: baseline; gap: var(--sp-2); flex-wrap: wrap; font-size: var(--fs-small); }
+.cap-tag { font-family: var(--font-mono); font-size: 0.58rem; text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--ink-faint); border: 1px solid var(--rule); border-radius: var(--radius-xs); padding: 0 6px; white-space: nowrap; }
+.cap-tag.cap-private { color: var(--ember); border-color: var(--ember-line); }
 .chart-cap { display: block; margin-top: var(--sp-2); color: var(--ink-faint); }
 .chart--empty { border: var(--honest-border); border-radius: var(--radius-xs); padding: var(--sp-4); text-align: center; }
 .chart--empty .chart-cap { margin: 0; }

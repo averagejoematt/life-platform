@@ -2129,6 +2129,210 @@ def _habits_from_habitify() -> list:
     return out
 
 
+# ── PhenoAge (Levine et al. 2018) — transparent biological age (P1.5) ──────────────
+# Replaces the DEXA black-box "biological age" with a published formula over 9 standard blood
+# markers + chronological age. PRIVACY (owner decision, Option A): chronological age is used
+# ONLY to compute — it is NEVER returned, and neither is the chrono−pheno gap, so the page
+# can't be used to back out the owner's real age. (Residual: the 9 markers are public on the
+# labs page, so a determined reader applying this formula could approximate age from a precise
+# phenotypic number — flagged for review.) Population-level, correlative, NOT the DNAm clock.
+_PHENOAGE_COEF = {  # (coefficient, reference value in formula units) — ref = healthy midpoint
+    "albumin_gL": (-0.0336, 45.0),
+    "creatinine_umolL": (0.0095, 80.0),
+    "glucose_mmolL": (0.1953, 5.0),
+    "lncrp": (0.0954, None),  # ln(CRP mg/dL); handled separately
+    "lymphocyte_pct": (-0.0120, 32.0),
+    "mcv_fL": (0.0268, 90.0),
+    "rdw_pct": (0.3306, 13.0),
+    "alp_UL": (0.00188, 65.0),
+    "wbc_1000": (0.0554, 6.0),
+}
+_PHENOAGE_LABELS = {
+    "albumin_gL": "Albumin",
+    "creatinine_umolL": "Creatinine",
+    "glucose_mmolL": "Glucose",
+    "lncrp": "hs-CRP",
+    "lymphocyte_pct": "Lymphocyte %",
+    "mcv_fL": "MCV",
+    "rdw_pct": "RDW",
+    "alp_UL": "Alkaline phosphatase",
+    "wbc_1000": "WBC",
+}
+
+
+def _compute_phenoage(vals: dict, age_years: float):
+    """Levine Phenotypic Age from the 9 converted markers (formula units) + chronological age.
+    Returns the exact phenotypic age in years, or None on bad inputs. Age is an INPUT only."""
+    import math
+
+    try:
+        g = 0.0076927
+        xb = (
+            -19.9067
+            - 0.0336 * vals["albumin_gL"]
+            + 0.0095 * vals["creatinine_umolL"]
+            + 0.1953 * vals["glucose_mmolL"]
+            + 0.0954 * math.log(max(0.01, vals["crp_mgdL"]))
+            - 0.0120 * vals["lymphocyte_pct"]
+            + 0.0268 * vals["mcv_fL"]
+            + 0.3306 * vals["rdw_pct"]
+            + 0.00188 * vals["alp_UL"]
+            + 0.0554 * vals["wbc_1000"]
+            + 0.0804 * age_years
+        )
+        mort = 1.0 - math.exp(-math.exp(xb) * (math.exp(120.0 * g) - 1.0) / g)
+        if mort <= 0 or mort >= 1:
+            return None
+        pheno = 141.50225 + math.log(-0.00553 * math.log(1.0 - mort)) / 0.090165
+        return pheno
+    except (ValueError, KeyError, ZeroDivisionError, OverflowError):
+        return None
+
+
+def handle_phenoage() -> dict:
+    """GET /api/phenoage — transparent Levine Phenotypic Age. Option A privacy: returns the
+    phenotypic age + the 9 driver markers ONLY; never chronological age or the gap."""
+    try:
+        S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+        s3 = boto3.client("s3", region_name=S3_REGION)
+        resp = s3.get_object(Bucket=S3_BUCKET, Key=f"dashboard/{USER_ID}/clinical.json")
+        data = json.loads(resp["Body"].read())
+        labs = data.get("labs", {})
+        markers = labs.get("biomarkers", []) or []
+        by = {}
+        for m in markers:
+            nm = str(m.get("name", "")).strip().lower()
+            if nm and nm not in by:
+                by[nm] = m
+
+        def _num(name):
+            m = by.get(name)
+            if not m:
+                return None
+            try:
+                return float(str(m.get("value")).replace("<", "").replace(">", "").strip())
+            except (TypeError, ValueError):
+                return None
+
+        raw = {
+            "albumin": _num("albumin"),
+            "creatinine": _num("creatinine"),
+            "glucose": _num("glucose"),
+            "crp": _num("crp hs"),
+            "mcv": _num("mcv"),
+            "rdw": _num("rdw"),
+            "alp": _num("alkaline phosphatase"),
+            "wbc": _num("wbc"),
+            "abs_lymph": _num("absolute lymphocytes"),
+        }
+        # Lymphocyte % derived from absolute lymphocytes ÷ WBC (2a — exact, labeled).
+        lymph_pct = None
+        lymph_derived = False
+        if raw["abs_lymph"] is not None and raw["wbc"]:
+            lymph_pct = round(raw["abs_lymph"] / (raw["wbc"] * 1000.0) * 100.0, 1)
+            lymph_derived = True
+
+        required = {
+            "Albumin": raw["albumin"],
+            "Creatinine": raw["creatinine"],
+            "Glucose": raw["glucose"],
+            "hs-CRP": raw["crp"],
+            "Lymphocyte %": lymph_pct,
+            "MCV": raw["mcv"],
+            "RDW": raw["rdw"],
+            "Alkaline phosphatase": raw["alp"],
+            "WBC": raw["wbc"],
+        }
+        missing = [k for k, v in required.items() if v is None]
+        # Chronological age (compute-only; never returned). From profile DOB.
+        prof = _get_profile() or {}
+        dob = prof.get("date_of_birth")
+        age_years = None
+        if dob:
+            try:
+                d = datetime.strptime(str(dob)[:10], "%Y-%m-%d")
+                age_years = (datetime.now(timezone.utc).replace(tzinfo=None) - d).days / 365.25
+            except (ValueError, TypeError):
+                age_years = None
+
+        if missing or age_years is None:
+            return _ok(
+                {
+                    "phenoage": None,
+                    "missing": missing or (["chronological age (profile)"] if age_years is None else []),
+                    "as_of": labs.get("latest_draw_date"),
+                    "lymphocyte_derived": lymph_derived,
+                },
+                cache_seconds=3600,
+            )
+
+        # Convert to formula units.
+        vals = {
+            "albumin_gL": raw["albumin"] * 10.0,  # g/dL → g/L
+            "creatinine_umolL": raw["creatinine"] * 88.42,  # mg/dL → µmol/L
+            "glucose_mmolL": raw["glucose"] / 18.0182,  # mg/dL → mmol/L
+            "crp_mgdL": raw["crp"] / 10.0,  # mg/L → mg/dL
+            "lymphocyte_pct": lymph_pct,
+            "mcv_fL": raw["mcv"],
+            "rdw_pct": raw["rdw"],
+            "alp_UL": raw["alp"],
+            "wbc_1000": raw["wbc"],
+        }
+        pheno = _compute_phenoage(vals, age_years)
+        if pheno is None:
+            return _ok({"phenoage": None, "missing": ["computation failed"], "as_of": labs.get("latest_draw_date")}, cache_seconds=3600)
+
+        # Per-marker driver direction (younger/older) vs healthy reference — transparent, but
+        # NOT the raw contribution (keeps the published surface from adding inversion precision).
+        import math
+
+        drivers = []
+        for key, (coef, ref) in _PHENOAGE_COEF.items():
+            if key == "lncrp":
+                val_f = math.log(max(0.01, vals["crp_mgdL"]))
+                ref_f = math.log(0.1)
+                disp_val, disp_unit = raw["crp"], "mg/L"
+            else:
+                val_f = vals[key]
+                ref_f = ref
+                disp_val, disp_unit = {
+                    "albumin_gL": (raw["albumin"], "g/dL"),
+                    "creatinine_umolL": (raw["creatinine"], "mg/dL"),
+                    "glucose_mmolL": (raw["glucose"], "mg/dL"),
+                    "lymphocyte_pct": (lymph_pct, "%"),
+                    "mcv_fL": (raw["mcv"], "fL"),
+                    "rdw_pct": (raw["rdw"], "%"),
+                    "alp_UL": (raw["alp"], "U/L"),
+                    "wbc_1000": (raw["wbc"], "K/µL"),
+                }[key]
+            push = coef * (val_f - ref_f)  # >0 raises pheno (older), <0 lowers (younger)
+            direction = "older" if push > 0.02 else ("younger" if push < -0.02 else "neutral")
+            drivers.append(
+                {
+                    "name": _PHENOAGE_LABELS[key],
+                    "value": disp_val,
+                    "unit": disp_unit,
+                    "direction": direction,
+                    "derived": (key == "lymphocyte_pct" and lymph_derived),
+                }
+            )
+
+        # Round to the nearest year for display; chronological age and the gap are NOT returned.
+        return _ok(
+            {
+                "phenoage": round(pheno),
+                "as_of": labs.get("latest_draw_date"),
+                "drivers": drivers,
+                "lymphocyte_derived": lymph_derived,
+                "missing": [],
+            },
+            cache_seconds=3600,
+        )
+    except Exception as e:
+        logger.warning(f"[phenoage] failed: {e}")
+        return _error(503, "Phenotypic age temporarily unavailable.")
+
+
 def handle_labs() -> dict:
     """GET /api/labs — Returns lab biomarkers from clinical.json in S3."""
     try:
