@@ -795,10 +795,23 @@ function habitsKeystone(corrs) {
   const strength = Math.abs(k.correlation_r) >= 0.6 ? "strong" : Math.abs(k.correlation_r) >= 0.3 ? "moderate" : "faint";
   const machine = `${ttl(k.group)} ${dir} the day grade · ${strength} direction · n=${fmt(n)} days — early signal, not proven${ready ? "" : " · coefficient withheld until 2 weeks"}`;
   const serif = `Of everything tracked, ${ttl(k.group)} is the group most pulling the day up so far. On ~${fmt(n)} days that's a lead, not a law — the number to trust here is n, not a coefficient. ${ready ? "It now has the overlap to carry a real correlation, below." : "It earns a real coefficient once there are two weeks of overlap."}`;
-  const chip = ready ? correlationChip([{ label: k.group, r: k.correlation_r, n }], { outcome: "the day grade" }) : "";
+  // P2.1 — keystone calibration, honesty-gated. Below 2 weeks of overlap: direction only,
+  // no Pearson, no chip (P0.1). At n>=14 the coefficient surfaces inside the sleep board's
+  // own confidence-card DNA — n + overlap weeks + a confidence tier + a "likely noise" guard
+  // when |r| is small even with the overlap — so the magnitude never reads louder than its n.
+  let card = "";
+  if (ready) {
+    const absr = Math.abs(k.correlation_r);
+    const confidence = absr >= 0.6 ? "suggestive · strong" : absr >= 0.3 ? "suggestive · moderate" : "weak — treat as noise";
+    const noise = absr < 0.3 ? `<span class="cb-noise">⚠ likely noise at this n — direction only</span>` : "";
+    const read = absr < 0.3
+      ? `<p class="cb-dir">${esc(dir)} the day grade — direction only, coefficient too weak to trust</p>`
+      : `<p class="cb-dir mono">r = ${(Math.round(k.correlation_r * 100) / 100).toFixed(2)}</p>` + correlationChip([{ label: k.group, r: k.correlation_r, n }], { outcome: "the day grade" });
+    card = `<div class="cb-grid"><article class="cb-card"><header class="cb-head"><h3 class="cb-pair">${esc(ttl(k.group))} <span class="cb-arrow">→</span> the day grade</h3><span class="cb-tag">${esc(confidence)}</span></header><div class="cb-read">${read}${noise}</div><p class="cb-meta label">n=${fmt(n)} · ${fmt(Math.round((n / 7) * 10) / 10)} wk overlap · N=1, correlative</p></article></div>`;
+  }
   return sec("The keystone — one early signal, not a law",
-    `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(machine)}</p><p class="tv-human">${esc(serif)}</p></div>` + chip +
-    `<p class="rd-meta label">What would sharpen this: more overlapping days. At ~1 week it's direction-only; the magnitude is withheld until the n is honest.</p>`);
+    `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(machine)}</p><p class="tv-human">${esc(serif)}</p></div>` + card +
+    `<p class="rd-meta label">What would sharpen this: more overlapping days. At ~1 week it's direction-only; the magnitude is withheld until the n is honest. Even past two weeks it stays N=1 and correlative — a card that flags itself as noise when the coefficient is thin.</p>`);
 }
 // §4 habit state taxonomy (P0.5) — every habit tagged by STATE on ONE ember+ink ramp +
 // position/marker (NOT a rainbow). Backlog/never-started SHOWN (most apps hide it). No red.
