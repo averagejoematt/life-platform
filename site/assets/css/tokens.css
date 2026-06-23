@@ -308,6 +308,35 @@ a { color: inherit; text-underline-offset: 0.18em; }
   }
 }
 
+/* Dual-device dumbbell (sleep §2, P0.3) — A=ember dot, B=muted dot, connector = the spread.
+   "Agreement, not truth." Reuses the .suf-row grid. */
+.db-track { position: relative; height: 10px; }
+.db-track::before { content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 2px; background: var(--surface-2, var(--surface)); border-radius: 2px; }
+.db-bar { position: absolute; top: 4px; height: 2px; background: var(--ink-faint); border-radius: 2px; }
+.db-dot { position: absolute; top: 0; width: 9px; height: 9px; border-radius: 50%; transform: translateX(-50%); top: 1px; }
+.db-dot.db-a, .sbar-dot.db-a { background: var(--ember); }
+.db-dot.db-b, .sbar-dot.db-b { background: var(--ink-muted); }
+
+/* Cross-source signal board (sleep §8, Phase 2) — self-policing cards: n + overlap +
+   confidence; direction-only under 2 weeks. Muted/honest, never alarm. */
+.cb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--sp-3); margin-top: var(--sp-3); }
+.cb-card { border: var(--honest-border); border-radius: var(--radius-sm); padding: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-2); }
+.cb-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-2); flex-wrap: wrap; }
+.cb-pair { font-size: var(--fs-small); font-weight: var(--weight-med); margin: 0; }
+.cb-arrow { color: var(--ember); }
+.cb-tag { font-family: var(--font-mono); font-size: 0.6rem; text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--ink-faint); white-space: nowrap; }
+.cb-note { color: var(--ink-muted); font-size: var(--fs-small); margin: 0; }
+.cb-read { display: flex; flex-direction: column; gap: var(--sp-1); }
+.cb-dir { margin: 0; color: var(--ink); font-size: var(--fs-small); }
+.cb-withheld { color: var(--ink-muted); font-style: italic; }
+.cb-noise { color: var(--ink-muted); font-size: 0.7rem; font-family: var(--font-mono); }
+.cb-meta { color: var(--ink-faint); }
+
+/* Circadian forecast hero (sleep §0, P0.1) — anchors as suf-rows; the lever (weakest
+   anchor) labelled ember; at-risk anchors muted ink, NEVER red. */
+.fc-anchors { margin-top: var(--sp-3); }
+.fc-lever .suf-l { color: var(--ember); }
+
 /* Anatomical body-map (training, P1.4) — muscle zones shaded by ember intensity (--o set
    per zone) = weekly volume vs optimal. ONE hue, never red. */
 .bodymap svg { width: 100%; height: clamp(180px, 26vw, 240px); }

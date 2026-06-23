@@ -1406,6 +1406,197 @@ def _sane_sleep_score(raw, hours, whoop_quality):
     return raw
 
 
+# ── Cross-source correlation board (sleep §8, Phase 2) ───────────────────────
+# Self-policing: every card carries n + overlap_weeks + a confidence tag. The Pearson
+# coefficient is computed ONLY at >=14 overlapping days (>=2 weeks); below that it's
+# direction-only ("watching — too early"). Sleep-vs-weight (C1) is hard-WITHHELD through
+# the water-weight phase. Powered by the same raw sources the platform tools read; the
+# Pearson + day-lag logic is replicated compactly here (site-api can't import mcp/).
+_CORR_MIN_COEF_DAYS = 14  # >=2 weeks of overlap before any coefficient
+_CORR_MIN_DIR_DAYS = 4  # below this, not even a direction
+
+
+def _shift_date(d, lag):
+    try:
+        return (datetime.strptime(d, "%Y-%m-%d") + timedelta(days=lag)).strftime("%Y-%m-%d")
+    except (ValueError, TypeError):
+        return None
+
+
+def _corr_card(cid, label, predictor, outcome, pred_series, outc_series, lag=0, withhold=False, note=""):
+    """Build one self-policing correlation card from two {date: value} maps."""
+    xs, ys = [], []
+    for d, x in (pred_series or {}).items():
+        d2 = _shift_date(d, lag)
+        if d2 and d2 in (outc_series or {}) and x is not None and outc_series[d2] is not None:
+            xs.append(float(x))
+            ys.append(float(outc_series[d2]))
+    n = len(xs)
+    card = {
+        "id": cid, "label": label, "predictor": predictor, "outcome": outcome,
+        "n": n, "overlap_weeks": round(n / 7, 1), "lag_days": lag,
+        "direction": "insufficient", "coefficient": None, "withheld": bool(withhold),
+        "confidence": "watching — too early", "noise": False, "note": note,
+    }
+    if n >= _CORR_MIN_DIR_DAYS:
+        mx, my = sum(xs) / n, sum(ys) / n
+        cov = sum((a - mx) * (b - my) for a, b in zip(xs, ys))
+        card["direction"] = "moves together" if cov > 0 else ("moves opposite" if cov < 0 else "flat")
+        card["noise"] = n < 7  # thin pairs are likely noise
+    if withhold:
+        card["confidence"] = "withheld — water-weight phase"
+        card["coefficient"] = None
+    elif n >= _CORR_MIN_COEF_DAYS:
+        mx, my = sum(xs) / n, sum(ys) / n
+        cov = sum((a - mx) * (b - my) for a, b in zip(xs, ys))
+        sx = sum((a - mx) ** 2 for a in xs) ** 0.5
+        sy = sum((b - my) ** 2 for b in ys) ** 0.5
+        card["coefficient"] = round(cov / (sx * sy), 2) if sx > 0 and sy > 0 else None
+        card["confidence"] = "low confidence" if n < 30 else "moderate"
+    return card
+
+
+def _whoop_daily(d30, today):
+    """Whoop daily metrics keyed by date: recovery, strain, deep hours, sleep hours."""
+    out = {}
+    for w in _query_source("whoop", d30, today):
+        if "#WORKOUT#" in w.get("sk", ""):
+            continue
+        dt = w.get("sk", "").replace("DATE#", "")[:10]
+        if not dt:
+            continue
+        out[dt] = {
+            "recovery": _f(w.get("recovery_score")), "strain": _f(w.get("strain")),
+            "deep": _f(w.get("slow_wave_sleep_hours")), "hours": _f(w.get("sleep_duration_hours")),
+            "hrv": _f(w.get("hrv")),
+        }
+    return out
+
+
+def _f(v):
+    try:
+        return float(v) if v is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def handle_sleep_correlations() -> dict:
+    """
+    GET /api/sleep_correlations
+    The self-policing cross-source signal board. Each card: n + overlap-weeks + confidence;
+    direction-only under 2 weeks (no coefficient); Pearson only at >=2 weeks. Sleep-vs-weight
+    withheld through the water-weight phase. Cache: 3600s.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d30 = _experiment_date(30)
+    wd = _whoop_daily(d30, today)
+    recovery = {d: v["recovery"] for d, v in wd.items() if v["recovery"] is not None}
+    strain = {d: v["strain"] for d, v in wd.items() if v["strain"] is not None}
+
+    cards = []
+    # A1 (LEAD) — last night's recovery → today's training capacity (same-day; the only
+    # arrow that changes tomorrow morning). Outcome proxy: the day's Whoop strain.
+    cards.append(_corr_card(
+        "A1", "Last night's recovery → today's training capacity", "sleep recovery", "day strain",
+        recovery, strain, lag=0,
+        note="The only arrow that changes tomorrow morning — high recovery should let the day carry more strain.",
+    ))
+    # A2 — day strain → next-night deep sleep (day-lagged: "did I earn it?").
+    deep = {d: v["deep"] for d, v in wd.items() if v["deep"] is not None}
+    cards.append(_corr_card(
+        "A2", "Day strain → next-night deep sleep", "day strain", "deep sleep", strain, deep, lag=1,
+        note="Did I earn it? — yesterday's training load against tonight's deep sleep.",
+    ))
+    # A3 — bed temp → deep sleep (mechanistic). Eight Sleep temp + score series.
+    eight = {}
+    for e in _query_source("eightsleep", d30, today):
+        dt = e.get("sk", "").replace("DATE#", "")[:10]
+        if dt:
+            eight[dt] = {"temp": _f(e.get("bed_temp_f")), "score": _f(e.get("sleep_score"))}
+    bed_temp = {d: v["temp"] for d, v in eight.items() if v["temp"] is not None}
+    sleep_score = {d: v["score"] for d, v in eight.items() if v["score"] is not None}
+    cards.append(_corr_card(
+        "A3", "Bed temp → deep sleep", "bed temp", "deep sleep", bed_temp, deep, lag=0,
+        note="Mechanistic — cooler often means more deep sleep, within an optimal band (not monotonic).",
+    ))
+    # A4 — last meal time → sleep score. MacroFactor food_log latest time per day.
+    last_meal = {}
+    for m in _query_source("macrofactor", d30, today):
+        dt = m.get("date") or m.get("sk", "").replace("DATE#", "")[:10]
+        times = []
+        for ent in m.get("food_log") or []:
+            try:
+                p = str(ent.get("time")).split(":")
+                times.append(int(p[0]) * 60 + int(p[1]))
+            except (ValueError, IndexError, AttributeError):
+                pass
+        if times and dt:
+            last_meal[dt] = max(times)
+    cards.append(_corr_card(
+        "A4", "Last meal time → sleep score", "last meal", "sleep score", last_meal, sleep_score, lag=0,
+        note="Eating late can blunt the night — last-meal minutes against how the night scored.",
+    ))
+    # B1 — decision fatigue (Todoist completed-task load) → sleep score. No app tracks this.
+    todoist = {}
+    for t in _query_source("todoist", d30, today):
+        dt = t.get("date") or t.get("sk", "").replace("DATE#", "")[:10]
+        v = _f(t.get("completed_count") or t.get("tasks_completed") or t.get("completed") or t.get("completed_today"))
+        if v is not None and dt:
+            todoist[dt] = v
+    cards.append(_corr_card(
+        "B1", "Decision load (Todoist) → sleep score", "Todoist load", "sleep score", todoist, sleep_score, lag=0,
+        note="A heavy decision day against how the night scored — the cross-source signal no sleep app has.",
+    ))
+    # B2 — mood/journal → sleep (bidirectional). State-of-Mind valence as the mood proxy;
+    # empty (n=0 → watching) when mood/journal logging is stale.
+    mood = {}
+    for sm in _query_source("state_of_mind", d30, today):
+        dt = sm.get("date") or sm.get("sk", "").replace("DATE#", "")[:10]
+        v = _f(sm.get("valence") or sm.get("mood") or sm.get("mood_valence"))
+        if v is not None and dt:
+            mood[dt] = v
+    cards.append(_corr_card(
+        "B2", "Mood → sleep score", "mood / valence", "sleep score", mood, sleep_score, lag=0,
+        note="Mood and sleep move together both ways — gated on active mood/journal logging; empty until entries accrue.",
+    ))
+    # B3 — day-of-week best duration. Not a Pearson pair; n=1/day at week one = noise.
+    durations = {d: v["hours"] for d, v in wd.items() if v["hours"] is not None}
+    dow = {}
+    for d, h in durations.items():
+        try:
+            dow.setdefault(datetime.strptime(d, "%Y-%m-%d").weekday(), []).append(h)
+        except ValueError:
+            pass
+    _wk = round(len(durations) / 7, 1)
+    b3 = {
+        "id": "B3", "label": "Day-of-week → best sleep duration", "predictor": "day of week", "outcome": "sleep duration",
+        "n": len(durations), "overlap_weeks": _wk, "lag_days": 0, "coefficient": None, "withheld": False,
+        "direction": "fills in ~4 weeks", "confidence": "watching — needs ~4 weeks", "noise": True,
+        "note": "Which weekday sleeps best needs ~4 weeks — one Tuesday is not a pattern.",
+    }
+    if _wk >= 4 and dow:
+        _best = max(dow, key=lambda k: sum(dow[k]) / len(dow[k]))
+        _names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        b3.update({"direction": f"best on {_names[_best]} ({round(sum(dow[_best]) / len(dow[_best]), 1)}h avg)",
+                   "confidence": "low confidence", "noise": False})
+    cards.append(b3)
+    # C1 (shown LAST, labelled loudest) — sleep vs weight. HIGHEST false-positive risk in a
+    # water-weight cut; the coefficient is HARD-WITHHELD until well past the early water phase
+    # AND explicit sign-off (the STOP-AND-ASK gate). Direction is still shown honestly.
+    weight = {}
+    for w in _query_source("withings", d30, today):
+        dt = w.get("date") or w.get("sk", "").replace("DATE#", "")[:10]
+        v = _f(w.get("weight_lbs"))
+        if v is not None and dt:
+            weight[dt] = v
+    cards.append(_corr_card(
+        "C1", "Sleep → weight", "sleep score", "weight", sleep_score, weight, lag=0, withhold=True,
+        note="Highest false-positive risk in a water-weight cut — the coefficient stays withheld until well past the early water phase.",
+    ))
+
+    return _ok({"cards": cards, "min_coef_days": _CORR_MIN_COEF_DAYS, "as_of": today}, cache_seconds=3600)
+
+
 def handle_sleep_detail() -> dict:
     """
     GET /api/sleep_detail

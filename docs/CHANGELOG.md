@@ -1,3 +1,7 @@
+## Sleep evidence page redesign (P0→P2 + self-policing correlation board) — 2026-06-23
+
+Flipped `/evidence/sleep/` retrospective → prospective: the circadian forecast LEADS as a "tonight's odds" hero (0→100 gauge + four anchors + the lever, two-voice, at-risk muted never red); last night demotes to evidence ("one night is noise"). Added dual-device stage agreement ("agreement, not truth"), regularity + social-jet-lag (empty until a weekend), stage composition (refuses <4), bed-temp-vs-deep environment overlay (observation-only), an autonomic-downshift state, a recovery cross-link, and the headline feature: a **self-policing cross-source correlation board** (new `/api/sleep_correlations`) where every card carries n + overlap-weeks + a confidence tag, shows direction-only under 2 weeks (no Pearson/chip), flags thin pairs "likely noise", and HARD-WITHHOLDS the sleep-vs-weight coefficient through the water-weight phase. Verified dark + mobile + the first light capture. 23 commits.
+
 ## Training evidence page redesign (P0→P2) — 2026-06-23
 
 Rebuilt `/evidence/training/` on the twin spine "building the engine — and managing the load." Per `docs/SPEC_TRAINING_PAGE_REDESIGN_2026-06-21.md`; 20 commits, one per P-item. Built + locally verified; PR off `origin/main`.
