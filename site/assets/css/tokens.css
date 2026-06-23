@@ -492,6 +492,13 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .rt-v { white-space: nowrap; color: var(--ember); }
 .rt-v.rt-na { color: var(--ink-faint); }
 .rt-flag { grid-column: 3; color: var(--ink-faint); font-size: 0.66rem; text-transform: uppercase; letter-spacing: var(--tracking-label); }
+/* P0.6 — projection cone: ember-wash widening band, ember mid-line, muted goal + rung marks. */
+.pc-cone { fill: var(--ember-wash); stroke: var(--ember-line); stroke-width: 0.5; }
+.pc-mid { stroke: var(--ember); stroke-width: 2; stroke-linejoin: round; }
+.pc-goal { stroke: var(--ink-muted); stroke-width: 1; stroke-dasharray: 4 4; }
+.pc-rung { stroke: var(--rule); stroke-width: 1; stroke-dasharray: 2 4; }
+.pc-bet { display: block; margin-top: var(--sp-2); color: var(--ink-muted); font-style: italic; line-height: 1.5; }
+.pc-bet strong { color: var(--ember); font-style: normal; }
 .chart-cap { display: block; margin-top: var(--sp-2); color: var(--ink-faint); }
 .chart--empty { border: var(--honest-border); border-radius: var(--radius-xs); padding: var(--sp-4); text-align: center; }
 .chart--empty .chart-cap { margin: 0; }

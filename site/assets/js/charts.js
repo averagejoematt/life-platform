@@ -128,6 +128,54 @@ export function weightTrendChart(readings, { goal = null, genesis = null, valueK
     `${genesis ? " · genesis marked" : ""}${goal != null ? ` · goal ${_r(Number(goal))} lb, ${gap} lb away (annotation, not the axis floor)` : ""}</figcaption></figure>`;
 }
 
+// P0.6 — projection cone. A WIDENING confidence band from the current weigh-in to ~goal,
+// modelled as an exponential approach (weight = goal + (cur−goal)·e^(−t/τ)): it starts at the
+// measured rate and SLOWS as it nears goal — the honest shape of a cut, not a straight line.
+// Three τ (fast = current rate sustained, mid, slow) give the cone; rung date-markers come off
+// the mid path. The cone is wide because the early rate is water-inflated and unproven. The
+// "bet" (fast goal-date) is stated AND flagged for grading as real weigh-ins resolve it.
+// current: {date, w}. ratePerWeek: negative (lb/wk). rungs: [weights] to date-mark.
+export function projectionCone(current, goal, ratePerWeek, { provisional = false, height = 210, rungs = [], label = "" } = {}) {
+  const cur = Number(current && current.w), g = Number(goal), rWk = Number(ratePerWeek);
+  const t0 = current && current.date ? Date.parse(current.date) : NaN;
+  if (!Number.isFinite(cur) || !Number.isFinite(g) || !Number.isFinite(rWk) || !Number.isFinite(t0) || rWk >= 0 || cur <= g) {
+    return `<figure class="chart chart--empty"><figcaption class="chart-cap label">The projection cone draws once there's a sustained downward rate to extend — right now the loss is too new (and too watery) to forecast.</figcaption></figure>`;
+  }
+  // Linear bounds from the same apex: fast = current rate (water-inflated), mid ~72%, slow
+  // 50%. Their divergence over time IS the uncertainty cone — wide because the rate is young.
+  const rDay = Math.abs(rWk) / 7;
+  const rFast = rDay, rMid = rDay * 0.72, rSlow = rDay * 0.5;
+  const reach = (r) => (cur - g) / r; // days to goal at that rate
+  const horizon = Math.min(900, reach(rSlow));
+  const W = 600, H = height, P = 10;
+  const x = (t) => P + (t / horizon) * (W - 2 * P);
+  const ymin = g - 3, ymax = cur + 3;
+  const y = (w) => P + (1 - (w - ymin) / (ymax - ymin)) * (H - 2 * P);
+  const wAt = (r, t) => Math.max(g, cur - r * t);
+  const curvePts = (r) => { const a = []; const step = horizon / 64; for (let t = 0; t <= horizon + 1e-6; t += step) a.push([t, wAt(r, t)]); return a; };
+  const toPath = (a) => a.map((p, i) => `${i ? "L" : "M"}${x(p[0]).toFixed(1)} ${y(p[1]).toFixed(1)}`).join(" ");
+  const fast = curvePts(rFast), slow = curvePts(rSlow), mid = curvePts(rMid);
+  const cone = `${toPath(slow)} ${fast.slice().reverse().map((p) => `L${x(p[0]).toFixed(1)} ${y(p[1]).toFixed(1)}`).join(" ")} Z`;
+  const goalLine = `<line class="pc-goal" x1="${P}" y1="${y(g).toFixed(1)}" x2="${W - P}" y2="${y(g).toFixed(1)}" vector-effect="non-scaling-stroke"/>`;
+  const dateAt = (r, w) => t0 + ((cur - w) / r) * 86400000;
+  // Rung date-markers from the MID path (only rungs strictly between goal and current).
+  const marks = (rungs || []).filter((r) => r > g + 0.5 && r < cur - 0.5).map((r) => {
+    const t = (cur - r) / rMid;
+    return `<line class="pc-rung" x1="${x(t).toFixed(1)}" y1="${y(r).toFixed(1)}" x2="${x(t).toFixed(1)}" y2="${(H - P).toFixed(1)}" vector-effect="non-scaling-stroke"/>`;
+  }).join("");
+  const _d = (ms) => { const d = new Date(ms); return `${_MON[d.getUTCMonth()]} ${d.getUTCFullYear()}`; };
+  const betFast = _d(dateAt(rFast, g)), betMid = _d(dateAt(rMid, g)), betSlow = _d(dateAt(rSlow, g));
+  const summary = `Projection cone from ${Math.round(cur)} lb toward ${g} lb: at the current rate ~${betFast}, realistically ${betMid}–${betSlow} as the loss slows.`;
+  return `<figure class="chart pc-chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}">` +
+    `<path class="pc-cone" d="${cone}"/>${marks}${goalLine}` +
+    `<path class="pc-mid" d="${toPath(mid)}" fill="none" vector-effect="non-scaling-stroke"/>` +
+    `<circle class="chart-dot" cx="${x(0).toFixed(1)}" cy="${y(cur).toFixed(1)}" r="3.5"/></svg>` +
+    `<figcaption class="chart-cap label">${escAttr(label || "Projected weight → goal")} · the band widens with uncertainty; the goal line is ${g} lb` +
+    `<span class="pc-bet">The bet: hold ${_r1(rWk)} lb/wk and 185 lands ~${escAttr(betFast)} — but a cut slows as it goes, so realistically <strong>${escAttr(betMid)}–${escAttr(betSlow)}</strong>.${provisional ? " Early rate is mostly water; this will slow." : ""} Graded against each new weigh-in as it resolves.</span>` +
+    `</figcaption></figure>`;
+}
+const _r1 = (n) => { const r = Math.round(Number(n) * 10) / 10; return Number.isInteger(r) ? String(r) : r.toFixed(1); };
+
 // Two overlaid trajectories on a shared scale — ember = primary (A), muted = reference (B).
 // For the reconciliation view (projected loss vs actual). Refuses if either series < 4 pts.
 // No correlation/Pearson — that's gated elsewhere by the ≥2-week rule. seriesA/B: [{date,value}].

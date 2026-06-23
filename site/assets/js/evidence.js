@@ -13,7 +13,7 @@
     window.__START_SLUG__ = "<slug>"
 */
 
-import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars, dumbbell, weightTrendChart } from "/assets/js/charts.js";
+import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars, dumbbell, weightTrendChart, projectionCone } from "/assets/js/charts.js";
 
 const REG = window.__EVIDENCE_REGISTRY__ || [];
 const BYSLUG = Object.fromEntries(REG.map((t) => [t.slug, t]));
@@ -207,6 +207,17 @@ async function renderPhysical(d) {
   parts.push(physicalStatCluster(readings, j, goal)); // P0.3 — stat cluster (replaces DEXA % as top figures)
   parts.push(physicalMilestoneLadder(readings, j, goal)); // P0.4 — milestone ladder (the vertical measuring-rule signature)
   parts.push(physicalRateTempo(readings, j)); // P0.5 — rate tempo strip (ember-intensity slope-gauges)
+  // P0.6 — projection cone (widening; rate from the readings, rungs date-marked; the bet, gradeable).
+  if (readings.length >= 3) {
+    const ws6 = readings.map((r) => ({ d: r.date, w: Number(r.weight_lbs) })).filter((p) => Number.isFinite(p.w));
+    const slope = _slopePerDay(ws6.slice(-30));
+    const ratePerWeek = slope != null ? Math.round(slope * 7 * 100) / 100 : (j.weekly_rate_lbs ?? null);
+    const last6 = ws6[ws6.length - 1];
+    const rungList = []; for (let w = Math.floor((last6.w - 5) / 10) * 10; w > goal; w -= 10) rungList.push(w);
+    parts.push(sec("Projection to 185 — the cone, not a line",
+      projectionCone({ date: last6.d, w: last6.w }, goal, ratePerWeek, { provisional: !!j.rate_provisional, rungs: rungList, label: "Projected weight → 185" }) +
+      `<p class="rd-meta label">A forecast is a cone, never a line. It's wide because the rate is young and water-heavy; it tightens as real weigh-ins accrue. The dated bet above is held honestly — and checked against what actually happens.</p>`));
+  }
   // ── TIER 2 — the composition arc (episodic) — restructured across P1.x ──
   parts.push(physicalLegacyComposition(d));
   return parts.join("");
