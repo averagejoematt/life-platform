@@ -207,19 +207,26 @@ export function targetSpine(value, target, { valueLabel = "now", targetLabel = "
 
 // Ember-intensity heat strip — saturation = volume (steps/day). Low days render MUTED
 // (faint ember), never hidden. "More colorful" = more ember intensity, NOT a second hue.
-export function heatStrip(days, { valueKey = "value", label = "", unit = "", divisor = 1000, suffix = "k" } = {}) {
+export function heatStrip(days, { valueKey = "value", label = "", unit = "", divisor = 1000, suffix = "k", max = null, compact = false, cutDate = null, caption = "" } = {}) {
   const rows = (days || []).map((d) => ({ d: d.date, v: Number(d[valueKey]) })).filter((r) => Number.isFinite(r.v));
   if (!rows.length) return `<figure class="chart chart--empty"><figcaption class="chart-cap label">Fills in as days accrue.</figcaption></figure>`;
-  const max = Math.max(...rows.map((r) => r.v)) || 1;
+  const mx = max != null ? max : (Math.max(...rows.map((r) => r.v)) || 1);
   const cell = (r) => {
-    const sat = Math.max(0.1, r.v / max);  // muted-not-hidden floor
+    const sat = Math.max(0.08, r.v / mx);  // muted-not-hidden floor
     const dl = _shortDate(r.d);
+    const cut = cutDate && r.d === cutDate ? " heat-cut" : "";
+    const tip = escAttr(`${dl}: ${Math.round(r.v)}${unit}`);
+    if (compact) {
+      // Dense GitHub-style calendar: saturation only, no per-cell text (tooltip carries it).
+      return `<div class="heat-cell heat-compact${cut}" style="--heat:${sat.toFixed(3)}" title="${tip}"></div>`;
+    }
     const dayNum = dl.split(" ")[1] || "";
-    return `<div class="heat-cell" style="--heat:${sat.toFixed(3)}" title="${escAttr(`${dl}: ${Math.round(r.v)}${unit}`)}">` +
+    return `<div class="heat-cell${cut}" style="--heat:${sat.toFixed(3)}" title="${tip}">` +
       `<span class="heat-v mono">${(r.v / divisor).toFixed(1)}${escAttr(suffix)}</span><span class="heat-d label">${escAttr(dayNum)}</span></div>`;
   };
-  return `<figure class="chart heat"><div class="heat-strip" role="img" aria-label="${escAttr(label)}">${rows.map(cell).join("")}</div>` +
-    `<figcaption class="chart-cap label">${escAttr(label)} — ember intensity = volume; low days shown muted, not hidden.</figcaption></figure>`;
+  const cap = caption || `${label} — ember intensity = volume; low days shown muted, not hidden.`;
+  return `<figure class="chart heat"><div class="heat-strip${compact ? " heat-strip-compact" : ""}" role="img" aria-label="${escAttr(label)}">${rows.map(cell).join("")}</div>` +
+    `<figcaption class="chart-cap label">${escAttr(cap)}</figcaption></figure>`;
 }
 
 // Dumbbell / paired-marker rows — two devices' estimate per category, connected; the gap
