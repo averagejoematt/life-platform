@@ -925,7 +925,7 @@ async function renderHabits(d) {
     ? sec("90-day adherence heatmap", heatStrip(_histAll, { valueKey: "tier0_pct", unit: "%", max: 100, compact: true, cutDate: "2026-06-14", label: "Daily Tier-0 adherence", caption: "Each square is a day · ember intensity = the non-negotiables held · the ringed square is the cut starting Jun 14 · 90-day history predates the cut." }))
     : "";
   // Adherence trend (the long-run consistency story the 7-cell grid only hinted at).
-  const trend = (d.history || []).length ? sec("Adherence trend", lineChart(d.history, { valueKey: "tier0_pct", unit: "%", label: "Daily Tier-0 adherence", emptyMsg: "The adherence curve fills as days accrue." })) : "";
+  const trend = (d.history || []).length ? sec("Adherence trend", lineChart(d.history, { valueKey: "tier0_pct", unit: "%", label: "Daily Tier-0 adherence", spine: true, emptyMsg: "The adherence curve fills as days accrue." })) : "";
   // §0 — keystone hero, honesty-rebuilt (P0.1): leads the page, n-forward, coefficient withheld.
   const keystone = habitsKeystone(d.keystone_correlations);
   // §3 — group grades from adherence RATE (P0.4). Real completion rate → grade (never a
