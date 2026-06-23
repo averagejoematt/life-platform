@@ -896,6 +896,7 @@ def handle_habits() -> dict:
         )
     )
     habitify_by_date = {}
+    _habit_agg = {}  # P0.5: per-habit window adherence for the state taxonomy
     for hi in _decimal_to_float(hab_resp.get("Items", [])):
         date_key = hi.get("date") or hi.get("sk", "").replace("DATE#", "")
         by_group = hi.get("by_group", {})
@@ -903,6 +904,16 @@ def handle_habits() -> dict:
             # by_group[Group] = {completed, possible, pct, habits_done}
             # pct is 0.0–1.0, convert to 0–100
             habitify_by_date[date_key] = {g: round(float(v.get("pct", 0) or 0) * 100) for g, v in by_group.items() if isinstance(v, dict)}
+        # Aggregate per-habit completed/scheduled across the window (state taxonomy).
+        for hname, st in (hi.get("habit_statuses") or {}).items():
+            if _is_blocked_vice(hname):
+                continue
+            st = st if isinstance(st, dict) else {}
+            a = _habit_agg.setdefault(hname, {"scheduled": 0, "completed": 0, "group": st.get("group") or "Other"})
+            if st.get("scheduled_today", True):
+                a["scheduled"] += 1
+                if st.get("status") == "completed":
+                    a["completed"] += 1
 
     history = []
     for item in items:
@@ -1057,11 +1068,28 @@ def handle_habits() -> dict:
     except Exception as _hc_e:
         logger.warning("[handle_habits] keystone_correlations failed (non-fatal): %s", _hc_e)
 
+    # P0.5 — per-habit state taxonomy inputs: window adherence + a state label.
+    per_habit = []
+    for hname, a in sorted(_habit_agg.items(), key=lambda kv: -(kv[1]["completed"] / kv[1]["scheduled"] if kv[1]["scheduled"] else -1)):
+        sched, comp = a["scheduled"], a["completed"]
+        pct = round(comp / sched * 100) if sched else None
+        if comp == 0:
+            state = "backlog"
+        elif pct >= 85:
+            state = "automatic"
+        elif pct >= 60:
+            state = "holding"
+        else:
+            state = "needs_attention"
+        per_habit.append({"name": hname, "group": a["group"], "scheduled_days": sched,
+                          "completed_days": comp, "adherence_pct": pct, "state": state})
+
     return _ok(
         {
             "as_of_date": today,
             "days_tracked": len(history),
             "current_streak": latest_streak,
+            "per_habit": per_habit,
             "history": history,
             "day_of_week_avgs": dow_avgs,
             "best_day": best_dow,

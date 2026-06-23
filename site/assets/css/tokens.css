@@ -317,6 +317,27 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .db-dot.db-a, .sbar-dot.db-a { background: var(--ember); }
 .db-dot.db-b, .sbar-dot.db-b { background: var(--ink-muted); }
 
+/* Habit state taxonomy (habits §4, P0.5) — ONE ember+ink ramp + markers, NO rainbow, no red.
+   Automatic = full ember · Holding = ember tint · Needs-attention = muted + marker ·
+   Backlog = dashed outline (shown, honestly empty). */
+.st-lane { margin-top: var(--sp-3); }
+.st-lanehead { display: flex; align-items: baseline; gap: var(--sp-2); }
+.st-marker { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: 0 0 auto; }
+.st-name { font-weight: var(--weight-med); }
+.st-desc { color: var(--ink-faint); }
+.st-chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-2); }
+.st-chip { display: inline-flex; align-items: center; gap: var(--sp-1); border-radius: var(--radius-xs); padding: 2px 8px; font-size: var(--fs-small); border: 1px solid var(--rule); }
+.st-pct { font-family: var(--font-mono); font-size: 0.65rem; color: var(--ink-faint); }
+.st-chip.st-auto { background: var(--ember); border-color: var(--ember); color: var(--page); }
+.st-chip.st-auto .st-pct { color: var(--page); }
+.st-marker.st-auto { background: var(--ember); }
+.st-chip.st-hold { background: var(--ember-wash); border-color: var(--ember); }
+.st-marker.st-hold { background: color-mix(in oklch, var(--ember) 55%, var(--surface)); }
+.st-chip.st-need { background: var(--surface-2, var(--surface)); border-color: var(--ink-muted); }
+.st-marker.st-need { background: var(--ink-muted); }
+.st-chip.st-backlog { background: transparent; border: 1px dashed var(--rule); color: var(--ink-faint); }
+.st-marker.st-backlog { background: transparent; border: 1px dashed var(--ink-faint); }
+
 /* Cross-source signal board (sleep §8, Phase 2) — self-policing cards: n + overlap +
    confidence; direction-only under 2 weeks. Muted/honest, never alarm. */
 .cb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--sp-3); margin-top: var(--sp-3); }

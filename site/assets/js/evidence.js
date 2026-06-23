@@ -800,6 +800,28 @@ function habitsKeystone(corrs) {
     `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(machine)}</p><p class="tv-human">${esc(serif)}</p></div>` + chip +
     `<p class="rd-meta label">What would sharpen this: more overlapping days. At ~1 week it's direction-only; the magnitude is withheld until the n is honest.</p>`);
 }
+// §4 habit state taxonomy (P0.5) — every habit tagged by STATE on ONE ember+ink ramp +
+// position/marker (NOT a rainbow). Backlog/never-started SHOWN (most apps hide it). No red.
+function habitStateTaxonomy(perHabit, registryHabits) {
+  const byName = {}; for (const h of perHabit || []) byName[h.name] = h;
+  const all = (perHabit || []).slice();
+  for (const r of registryHabits || []) { if (!byName[r.name]) all.push({ name: r.name, group: r.group || "Other", adherence_pct: null, state: "backlog" }); }
+  if (!all.length) return "";
+  const STATES = [
+    { key: "automatic", label: "Automatic", desc: "high & stable", tone: "st-auto" },
+    { key: "holding", label: "Holding", desc: "consistent, lower", tone: "st-hold" },
+    { key: "needs_attention", label: "Needs attention", desc: "slipping", tone: "st-need" },
+    { key: "backlog", label: "Backlog / never started", desc: "shown, not hidden", tone: "st-backlog" },
+  ];
+  const lanes = STATES.map((s) => {
+    const hs = all.filter((h) => h.state === s.key);
+    if (!hs.length) return "";
+    const chips = hs.map((h) => `<span class="st-chip ${s.tone}">${esc(ttl(h.name))}${h.adherence_pct != null ? ` <span class="st-pct">${fmt(h.adherence_pct)}%</span>` : ""}</span>`).join("");
+    return `<div class="st-lane"><div class="st-lanehead"><span class="st-marker ${s.tone}"></span><span class="st-name">${esc(s.label)}</span><span class="st-desc label">${esc(s.desc)} · ${hs.length}</span></div><div class="st-chips">${chips}</div></div>`;
+  }).join("");
+  return sec("Habit states — every habit tagged (backlog shown, not hidden)",
+    lanes + `<p class="rd-meta label">State is encoded by ember intensity + position, not a rainbow: Automatic = full ember · Holding = ember tint · Needs-attention = muted + marker · Backlog/never-started = outline, honestly empty (most apps hide these). No red, no shame.</p>`);
+}
 async function renderHabits(d) {
   const dows = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const a = d.day_of_week_avgs || [];
@@ -845,7 +867,8 @@ async function renderHabits(d) {
       return `<div class="suf-row"><span class="suf-l">${esc(ttl(x.group))}</span><span class="suf-track"><span class="suf-fill ${tone}" style="width:${Math.round(Math.max(0, Math.min(100, x.pct)))}%"></span></span><span class="suf-v mono">${fmt(x.pct)}% · ${_gradeOf(x.pct)}</span></div>`;
     }).join("")}</div>` +
     `<p class="rd-meta label">Each grade is the group's real adherence RATE over the window — never a correlation. Higher = load-bearing; the low ones (the floor, like Recovery) read muted, not as failure. Tier-0 non-negotiables drive the heatmap above.</p>`) : "";
-  return keystone + head + trend + grid + dow + groupBars + list + note("Everything I'm trying to do — sourced from Habitify. Correlations are N=1, not cause. Private habits are never shown.");
+  const states = habitStateTaxonomy(d.per_habit, habits);
+  return keystone + head + grid + groupBars + states + trend + dow + list + note("Everything I'm trying to do — sourced from Habitify. Correlations are N=1, not cause. Private habits are never shown.");
 }
 // The board — pick an expert, read their actual per-domain take + track record.
 async function renderBoard(d) {
