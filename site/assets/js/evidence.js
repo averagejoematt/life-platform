@@ -639,6 +639,9 @@ async function renderSleep(d) {
       figs([fig(esc(_ew.avg_last_meal), "avg last meal"), _ew.avg_hours != null && fig(fmt(_ew.avg_hours) + "h", "eating window")]) +
       `<p class="rd-meta label">Eating late can blunt deep sleep. Average last meal lands at ${esc(_ew.avg_last_meal)}, pulled from the <a href="/evidence/nutrition/">nutrition</a> log — observation only; the day-lagged version lives in the board below once the overlap is deep enough.</p>`));
   }
+  const _hasSleep = !!fcHero || Object.values(s).some(has);
+  // P1.3 — subjective "how rested" 1–5 (not captured) → honest empty state.
+  if (_hasSleep) parts.push(sec("How rested — coming online", `<div class="nut-coming"><p class="rd-archive">A morning 1–5 "how rested do you feel" check-in isn't captured yet. It's the ground truth the wearables miss — the night a tracker calls great that still felt like garbage. Once logged, it grades the forecast and the score against how the body actually felt. <span class="confidence conf-low">needs capture</span></p></div>`));
   // Unified sleep — Whoop + Eight Sleep + Apple merged, best source per field.
   if (uni && uni.available) {
     const srcs = (uni.sources_present || []).map(ttl).join(", ");
