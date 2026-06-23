@@ -605,6 +605,15 @@ async function renderSleep(d) {
       return { date: n.date, deep: n.deep_sleep_hours, rem: n.rem_sleep_hours, light };
     }).filter(Boolean);
     if (_stageNights.length) parts.push(sec("Stage composition over the week", stackedDayColumns(_stageNights, [{ key: "deep", label: "deep", tone: "lift" }, { key: "rem", label: "REM", tone: "cardio" }, { key: "light", label: "light", tone: "mob" }], { label: "hours by stage · per night", legendUnit: "h", minPoints: 4, emptyMsg: "Stage composition draws in at 4+ nights." })));
+    // §5 — environment: bed temp vs deep sleep (P0.6), observation-only (bed temp = a band).
+    const _env = (d.sleep_trend || []).filter((n) => n.bed_temp_f != null && n.deep_sleep_hours != null);
+    const _norm = (series) => { const vs = series.map((p) => p.value).filter(Number.isFinite); if (vs.length < 2) return series; const mn = Math.min(...vs), mx = Math.max(...vs); return series.map((p) => ({ date: p.date, value: mx > mn ? Math.round((p.value - mn) / (mx - mn) * 100) : 50 })); };
+    if (_env.length >= 4) {
+      const _t = _env.map((n) => ({ date: n.date, value: n.bed_temp_f })), _dp = _env.map((n) => ({ date: n.date, value: n.deep_sleep_hours }));
+      parts.push(sec("Environment — bed temp vs deep sleep", dualLineChart(_norm(_t), _norm(_dp), { aLabel: "bed temp", bLabel: "deep sleep", showGap: false, label: "both normalized 0–100 — co-movement only" }) + figs([s["30d_avg_temp"] != null && fig(fmt(s["30d_avg_temp"]) + "°F", "avg bed temp"), s.optimal_temp_f != null && fig(fmt(s.optimal_temp_f) + "°F", "best-scoring temp")]) + `<p class="rd-meta label">Bed temperature against deep-sleep hours, both normalized so the shapes compare. Observation only — bed temp is an optimal band, not monotonic; no coefficient at this n.</p>`));
+    } else if (_env.length) {
+      parts.push(sec("Environment — bed temp vs deep sleep", empty("The temp-vs-deep overlay draws in at 4+ nights with both readings.")));
+    }
     parts.push(sec("Stages & physiology", kvtable({ whoop_quality: s.whoop_quality, bed_temp_f: s.bed_temp_f })));
     parts.push(sec("Sleep-score trend · latest = last night", lineChart(d.sleep_trend || [], { valueKey: "sleep_score", label: "Sleep score · nightly", emptyMsg: "The sleep-score trend fills in nightly." })));
   }
