@@ -222,6 +222,28 @@ export function heatStrip(days, { valueKey = "value", label = "", unit = "", div
     `<figcaption class="chart-cap label">${escAttr(label)} — ember intensity = volume; low days shown muted, not hidden.</figcaption></figure>`;
 }
 
+// Generic per-day stacked-category columns — segments are an ember-derived ramp (tone keys
+// map to seg-<tone> CSS, e.g. lift=ember / cardio=ember-tint / mob=muted ink). NO second hue.
+// days: [{date, [seg.key]: minutes}]; segments: [{key, label, tone}].
+export function stackedDayColumns(days, segments, { label = "", legendUnit = "min", emptyMsg = "" } = {}) {
+  const rows = (days || []).map((d) => {
+    const segs = segments.map((s) => ({ ...s, v: Number(d[s.key]) || 0 }));
+    return { d: d.date, segs, total: segs.reduce((a, s) => a + s.v, 0) };
+  }).filter((r) => r.total > 0);
+  if (!rows.length) return `<figure class="chart chart--empty"><figcaption class="chart-cap label">${escAttr(emptyMsg || "Fills in as sessions accrue.")}</figcaption></figure>`;
+  const max = Math.max(...rows.map((r) => r.total));
+  const h = (v) => `${((v / max) * 100).toFixed(1)}%`;
+  const col = (r) => {
+    const segHtml = r.segs.slice().reverse().map((s) => (s.v > 0 ? `<span class="scol-seg seg-${escAttr(s.tone)}" style="height:${h(s.v)}"></span>` : "")).join("");
+    const tip = r.segs.filter((s) => s.v > 0).map((s) => `${s.label} ${Math.round(s.v)}`).join(" · ");
+    return `<div class="scol" title="${escAttr(`${_shortDate(r.d)}: ${tip} ${legendUnit}`)}"><div class="scol-stack">${segHtml}</div>` +
+      `<span class="scol-l label">${escAttr(_shortDate(r.d).split(" ")[1] || "")}</span></div>`;
+  };
+  const legend = segments.map((s) => `<span class="sbar-key"><i class="sbar-dot seg-${escAttr(s.tone)}"></i>${escAttr(s.label)}</span>`).join("");
+  return `<figure class="chart"><div class="scols" role="img" aria-label="${escAttr(label)}">${rows.map(col).join("")}</div>` +
+    `<figcaption class="chart-cap label sbar-legend">${legend}${label ? ` · ${escAttr(label)}` : ""}</figcaption></figure>`;
+}
+
 // Eating-window ribbon (nutrition §4) — per-day first→last meal on a 5am→midnight axis,
 // ember = the actual window, a faint bar = the 16:8 reference (an 8h window from the first
 // meal). Reveals at a glance whether the day runs tighter or wider than 16:8. days:
