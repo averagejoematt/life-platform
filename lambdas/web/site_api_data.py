@@ -1547,6 +1547,18 @@ def handle_sleep_correlations() -> dict:
         "B1", "Decision load (Todoist) → sleep score", "Todoist load", "sleep score", todoist, sleep_score, lag=0,
         note="A heavy decision day against how the night scored — the cross-source signal no sleep app has.",
     ))
+    # B2 — mood/journal → sleep (bidirectional). State-of-Mind valence as the mood proxy;
+    # empty (n=0 → watching) when mood/journal logging is stale.
+    mood = {}
+    for sm in _query_source("state_of_mind", d30, today):
+        dt = sm.get("date") or sm.get("sk", "").replace("DATE#", "")[:10]
+        v = _f(sm.get("valence") or sm.get("mood") or sm.get("mood_valence"))
+        if v is not None and dt:
+            mood[dt] = v
+    cards.append(_corr_card(
+        "B2", "Mood → sleep score", "mood / valence", "sleep score", mood, sleep_score, lag=0,
+        note="Mood and sleep move together both ways — gated on active mood/journal logging; empty until entries accrue.",
+    ))
 
     return _ok({"cards": cards, "min_coef_days": _CORR_MIN_COEF_DAYS, "as_of": today}, cache_seconds=3600)
 
