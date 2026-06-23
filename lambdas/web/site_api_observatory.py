@@ -1890,9 +1890,13 @@ def handle_strength_benchmarks() -> dict:
 
     try:
         items = _query_source("hevy", start_date, end_date)
-        # Find max weight for each target lift
+        # Find max weight for each target lift, AND a per-session (per-day) estimated-1RM
+        # history so the front-end can render the Lift Index trend (P0.1) — load moving up
+        # over weeks, never a 1RM target/goal.
         best = {}
+        history = {t: {} for t in targets}  # lift -> {date: best_e1rm_that_day}
         for day in items:
+            d = day.get("date") or day.get("sk", "").replace("DATE#", "")[:10]
             exercises = day.get("exercises") or day.get("workout_exercises") or []
             for ex in exercises:
                 name = ex.get("exercise_name") or ex.get("name") or ""
@@ -1908,15 +1912,18 @@ def handle_strength_benchmarks() -> dict:
                             reps = int(s.get("reps") or 0)
                             if w <= 0 or reps < 1 or reps > 12:
                                 continue
-                            e1rm = w * (1 + reps / 30.0)  # Epley estimated 1RM
+                            e1rm = w * (1 + reps / 30.0)  # Epley estimated 1RM (lb)
                             if e1rm > best.get(target_name, 0):
                                 best[target_name] = e1rm
+                            if d and e1rm > history[target_name].get(d, 0):
+                                history[target_name][d] = e1rm
 
         benchmarks = []
         for lift, target in targets.items():
             current = best.get(lift, 0)
             logged = current > 0  # a lift not performed in the window isn't "0 / 0%" — it's no-data
             exceeded = logged and current > target  # already past the goal → "exceeded", not "129%"
+            hist = [{"date": dd, "e1rm": round(history[lift][dd])} for dd in sorted(history[lift])]
             benchmarks.append(
                 {
                     "lift": lift,
@@ -1927,6 +1934,9 @@ def handle_strength_benchmarks() -> dict:
                     "progress_pct": (min(100, round((current / target) * 100)) if target > 0 else 0) if logged else None,
                     "exceeded": exceeded,
                     "logged": logged,
+                    # P0.1 Lift Index: per-session estimated-1RM trend (lb) + the count gate.
+                    "history": hist,
+                    "sessions": len(hist),
                 }
             )
 

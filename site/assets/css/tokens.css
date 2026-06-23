@@ -308,6 +308,20 @@ a { color: inherit; text-underline-offset: 0.18em; }
   }
 }
 
+/* The Lift Index (training §2, P0.1) — per-lift load TREND tiles (sparkline + ▲/▼/flat).
+   Ember = load up; down = muted ink, NEVER red; under 3 sessions = honest fills-in tile. */
+.li-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--sp-3); margin-top: var(--sp-3); }
+.li-tile { border: 1px solid var(--rule); border-radius: var(--radius-sm); padding: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
+.li-top { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-2); }
+.li-name { font-weight: var(--weight-med); }
+.li-tag { font-family: var(--font-mono); font-size: 0.6rem; white-space: nowrap; }
+.li-up { color: var(--ember); }
+.li-down { color: var(--ink-muted); }
+.li-flat { color: var(--ink-faint); }
+.li-meta { color: var(--ink-faint); }
+.li-thin { opacity: 0.9; justify-content: center; min-height: 4.5rem; }
+.li-fill { color: var(--ink-faint); }
+
 /* ── Charts (shared, token-driven — see assets/js/charts.js) ──────────────── */
 .chart { margin-top: var(--sp-4); }
 .chart svg { width: 100%; height: clamp(110px, 8vw + 80px, 150px); display: block; overflow: visible; }
