@@ -807,7 +807,17 @@ async function renderHabits(d) {
   const reg = await tryJSON("/api/habit_registry");
   const habits = (reg && reg.habits) || [];
   const groups = (reg && reg.groups) || [];
-  const head = figs([fig(d.current_streak ?? 0, "day streak"), fig(d.days_tracked ?? 0, "days tracked"), habits.length ? fig(habits.length, "habits tracked") : "", d.keystone_group ? fig(`${esc(d.keystone_group)} ${d.keystone_group_pct ?? ""}%`, "most-held group") : ""]);
+  // P0.2 — consistency RATE is the north-star; the fragile single streak demotes (honest at 0).
+  const _histAll = d.history || [];
+  const _held = _histAll.filter((h) => (h.tier0_pct || 0) >= 80).length;
+  const _total = _histAll.length;
+  const _rate = _total ? Math.round((_held / _total) * 100) : null;
+  const head = figs([
+    _rate != null && fig(_rate + "%", `consistency · held ${_held}/${_total} days`),
+    fig(d.days_tracked ?? 0, "days tracked"),
+    habits.length ? fig(habits.length, "habits tracked") : "",
+    fig(d.current_streak ?? 0, "current streak"),
+  ]) + `<p class="rd-meta label">Consistency rate — how often the non-negotiables get held — is the north-star. The single streak is fragile (one missed day zeroes it), so it's shown honestly but not led with.</p>`;
   const dow = a.length ? sec("Adherence by day of week", `<div class="hb-chart">${a.map((v, i) => `<div class="hb-col"><span class="hb-bar" style="height:${Math.max(4, (v / mx) * 100)}%"></span><span class="hb-day label">${dows[i] || ""}</span></div>`).join("")}</div>`) : "";
   let list = empty("Habit list loading from Habitify.");
   if (habits.length) {
