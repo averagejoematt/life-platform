@@ -832,6 +832,21 @@ function habitsDrivers(perHabit) {
   return sec("Drivers — trigger · friction · reward",
     rows + `<p class="rd-meta label">Friction is real — it's the inverse of how often the habit actually gets kept. Trigger (what cues it) and reward (what it pays back) aren't logged yet; they need a per-habit capture step, so they're shown honestly empty rather than guessed. The lowest-adherence habits are listed first — those are where a trigger or reward would move the needle most.</p>`);
 }
+// P1.4 — misses become narrative. The miss COUNT is real (scheduled − completed); the WHY
+// isn't captured, so each miss reason reads honestly empty. Surfacing the count without the
+// reason is the honest half-step — it shows where the narrative would attach once a reason
+// prompt exists, instead of inventing causes.
+function habitsWhyMissed(perHabit) {
+  const missed = (perHabit || [])
+    .map((h) => ({ name: h.name, n: Math.max(0, (h.scheduled_days || 0) - (h.completed_days || 0)) }))
+    .filter((h) => h.n > 0)
+    .sort((a, b) => b.n - a.n)
+    .slice(0, 6);
+  if (!missed.length) return "";
+  const rows = missed.map((h) => `<div class="wm-row"><span class="wm-name">${esc(ttl(h.name))}</span><span class="wm-n mono">${h.n} missed</span><span class="wm-why drv-empty">reason not captured</span></div>`).join("");
+  return sec("When a habit slips — the misses, honestly",
+    `<div class="wm-list">${rows}</div><p class="rd-meta label">The miss count is real. The <em>reason</em> isn't logged yet — a one-tap "why" on a missed day would turn these counts into narrative (travel, illness, low day). Until that capture exists, the why stays blank rather than guessed. No red, no streak-shaming.</p>`);
+}
 function habitStateTaxonomy(perHabit, registryHabits) {
   const byName = {}; for (const h of perHabit || []) byName[h.name] = h;
   const all = (perHabit || []).slice();
@@ -972,10 +987,11 @@ async function renderHabits(d) {
   const states = habitStateTaxonomy(d.per_habit, habits);
   const effort = habitsEffortMap(d.group_90d_avgs || {}, habits);
   const drivers = habitsDrivers(d.per_habit);
+  const whymiss = habitsWhyMissed(d.per_habit);
   const gtrends = habitsGroupTrends(d.history, d.group_90d_avgs || {});
   const goals = habitsGoalLinkage(d.group_90d_avgs || {});
   const identity = habitsIdentity(d.per_habit, _rate, d.days_tracked);
-  return keystone + head + grid + identity + groupBars + states + effort + drivers + gtrends + goals + trend + dow + list + note("Everything I'm trying to do — sourced from Habitify. Correlations are N=1, not cause. Private habits are never shown.");
+  return keystone + head + grid + identity + groupBars + states + effort + drivers + whymiss + gtrends + goals + trend + dow + list + note("Everything I'm trying to do — sourced from Habitify. Correlations are N=1, not cause. Private habits are never shown.");
 }
 // The board — pick an expert, read their actual per-domain take + track record.
 async function renderBoard(d) {

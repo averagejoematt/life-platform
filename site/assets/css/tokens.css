@@ -375,6 +375,11 @@ a { color: inherit; text-underline-offset: 0.18em; }
 /* P1.3 drivers table + P1.4 misses — honest-empty cells read faint/italic, never alarming. */
 .rd-drv th { font-family: var(--font-mono); font-size: 0.6rem; text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--ink-faint); text-align: left; font-weight: var(--weight-reg); padding-bottom: var(--sp-1); }
 .drv-empty { color: var(--ink-faint); font-style: italic; font-size: var(--fs-small); }
+.wm-list { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-3); }
+.wm-row { display: flex; align-items: baseline; gap: var(--sp-3); flex-wrap: wrap; padding-bottom: var(--sp-2); border-bottom: 1px solid var(--rule); }
+.wm-name { font-weight: var(--weight-med); }
+.wm-n { color: var(--ink-muted); font-size: var(--fs-small); }
+.wm-why { margin-left: auto; }
 
 /* Cross-source signal board (sleep §8, Phase 2) — self-policing cards: n + overlap +
    confidence; direction-only under 2 weeks. Muted/honest, never alarm. */
