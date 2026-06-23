@@ -187,6 +187,18 @@ function physicalRateTempo(readings, j) {
     `<div class="rt-strip">${rates.map(row).join("")}</div>` +
     `<p class="rd-meta label">Each bar is a loss rate; the longer and more saturated, the faster. The 7-day runs hot early because a new cut sheds water — it isn't fat coming off that fast, and it will slow. A gain window would read muted ink, never an alarm.</p>`);
 }
+// P0.7 — BMI, deliberately de-emphasized. Included because HappyScale-literate readers
+// expect it, but small, last in Tier 1, and captioned with its own limitation (near-
+// meaningless on a heavy frame rebuilding lean mass). Height from the profile, never a hero.
+function physicalBMI(readings, j) {
+  const hIn = Number(j.height_inches);
+  const latest = readings.length ? Number(readings[readings.length - 1].weight_lbs) : Number(j.current_weight_lbs);
+  if (!Number.isFinite(hIn) || hIn <= 0 || !Number.isFinite(latest)) return "";
+  const bmi = Math.round((703 * latest / (hIn * hIn)) * 10) / 10;
+  return sec("BMI — included, but kept in its place",
+    `<p class="rd-bmi"><span class="rd-bmi-v mono">${fmt(bmi)}</span> <span class="label">BMI</span></p>` +
+    `<p class="rd-meta label">BMI is here only because people look for it — it's near-meaningless on a heavy frame carrying real muscle. It can't tell fat from lean, so it reads "obese" for a lineman and a couch alike. The DEXA composition below is the honest version; this is the number to distrust.</p>`);
+}
 // (temporary — restructured into the dated Tier-2 composition arc across P1.x)
 function physicalLegacyComposition(d) {
   const x = d.latest_dexa; if (!x) return "";
@@ -218,6 +230,7 @@ async function renderPhysical(d) {
       projectionCone({ date: last6.d, w: last6.w }, goal, ratePerWeek, { provisional: !!j.rate_provisional, rungs: rungList, label: "Projected weight → 185" }) +
       `<p class="rd-meta label">A forecast is a cone, never a line. It's wide because the rate is young and water-heavy; it tightens as real weigh-ins accrue. The dated bet above is held honestly — and checked against what actually happens.</p>`));
   }
+  parts.push(physicalBMI(readings, j)); // P0.7 — BMI (de-emphasized, last in Tier 1)
   // ── TIER 2 — the composition arc (episodic) — restructured across P1.x ──
   parts.push(physicalLegacyComposition(d));
   return parts.join("");
