@@ -480,6 +480,18 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .ml-future .ml-w, .ml-next .ml-w { color: var(--ink-muted); }
 .ml-next .ml-tick { background: var(--ink-muted); width: 16px; }
 .ml-now { margin-left: auto; font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ember); border: 1px solid var(--ember); border-radius: var(--radius-xs); padding: 1px 8px; white-space: nowrap; }
+/* P0.5 — rate tempo: slope-gauges, ember intensity (width + opacity) = pace. Gain = ink. */
+.rt-strip { display: flex; flex-direction: column; gap: var(--sp-3); margin: var(--sp-3) 0; }
+.rt-row { display: grid; grid-template-columns: 7.5em 1fr auto; align-items: center; gap: var(--sp-3); }
+.rt-label { color: var(--ink); font-weight: var(--weight-med); }
+.rt-sub { color: var(--ink-faint); font-family: var(--font-mono); font-size: 0.7rem; }
+.rt-gauge { height: 10px; background: var(--surface-2, var(--surface)); border: 1px solid var(--rule); border-radius: 5px; overflow: hidden; }
+.rt-fill { display: block; height: 100%; }
+.rt-fill.rt-ember { background: var(--ember); }
+.rt-fill.rt-ink { background: var(--ink-muted); }
+.rt-v { white-space: nowrap; color: var(--ember); }
+.rt-v.rt-na { color: var(--ink-faint); }
+.rt-flag { grid-column: 3; color: var(--ink-faint); font-size: 0.66rem; text-transform: uppercase; letter-spacing: var(--tracking-label); }
 .chart-cap { display: block; margin-top: var(--sp-2); color: var(--ink-faint); }
 .chart--empty { border: var(--honest-border); border-radius: var(--radius-xs); padding: var(--sp-4); text-align: center; }
 .chart--empty .chart-cap { margin: 0; }

@@ -147,6 +147,46 @@ function physicalMilestoneLadder(readings, j, goal) {
     `<div class="ml-ladder">${rows}</div>` +
     `<p class="rd-meta label">Each rung is a 10-lb mark on the way down; it clicks ember the day the trend crosses it, stamped with how long that rung took. The gaps widen as the cut matures — that's the real pace, not a straight line to the goal.</p>`);
 }
+// P0.5 — rate tempo strip. The pace over 7d / 30d / 90d / since-genesis as ember-intensity
+// slope-gauges (not four naked numbers): faster loss = longer, more-saturated ember bar.
+// A GAIN window reads muted ink, never red. The 7-day carries the "early = water" flag.
+function _slopePerDay(pts) {
+  if (pts.length < 3) return null;
+  const t0 = Date.parse(pts[0].d);
+  const x = pts.map((p) => (Date.parse(p.d) - t0) / 86400000), y = pts.map((p) => p.w);
+  const n = x.length, sx = x.reduce((a, b) => a + b, 0), sy = y.reduce((a, b) => a + b, 0);
+  const sxy = x.reduce((a, b, i) => a + b * y[i], 0), sxx = x.reduce((a, b) => a + b * b, 0);
+  const denom = n * sxx - sx * sx;
+  return denom ? (n * sxy - sx * sy) / denom : null;
+}
+function physicalRateTempo(readings, j) {
+  const ws = readings.map((r) => ({ d: r.date, w: Number(r.weight_lbs) })).filter((p) => Number.isFinite(p.w) && /^\d{4}/.test(p.d));
+  if (ws.length < 3) return "";
+  const today = ws[ws.length - 1].d;
+  const since = (days) => { const cut = new Date(Date.parse(today) - days * 86400000).toISOString().slice(0, 10); return ws.filter((p) => p.d >= cut); };
+  const genDays = Math.max(1, Math.round((Date.parse(today) - Date.parse(PHYS_GENESIS)) / 86400000));
+  const windows = [
+    { k: "7-day", pts: since(7), flag: "early = water" },
+    { k: "30-day", pts: since(30) },
+    { k: "90-day", pts: since(90) },
+    { k: "since genesis", pts: ws.filter((p) => p.d >= PHYS_GENESIS), sub: `${genDays}d` },
+  ];
+  const rates = windows.map((w) => { const s = _slopePerDay(w.pts); return { ...w, wk: s == null ? null : Math.round(s * 7 * 10) / 10 }; });
+  const maxMag = Math.max(0.5, ...rates.map((r) => (r.wk == null ? 0 : Math.abs(r.wk))));
+  const row = (r) => {
+    if (r.wk == null) return `<div class="rt-row"><span class="rt-label">${esc(r.k)}</span><span class="rt-gauge"></span><span class="rt-v mono rt-na">—  too few weigh-ins</span></div>`;
+    const losing = r.wk < 0;
+    const width = Math.min(100, (Math.abs(r.wk) / maxMag) * 100);
+    const op = (0.4 + 0.6 * Math.min(1, Math.abs(r.wk) / maxMag)).toFixed(2);
+    const tone = losing ? "rt-ember" : "rt-ink";
+    return `<div class="rt-row"><span class="rt-label">${esc(r.k)}${r.sub ? ` <span class="rt-sub">${esc(r.sub)}</span>` : ""}</span>` +
+      `<span class="rt-gauge"><span class="rt-fill ${tone}" style="width:${width.toFixed(0)}%;opacity:${op}"></span></span>` +
+      `<span class="rt-v mono">${r.wk > 0 ? "+" : ""}${fmt(r.wk)} lb/wk</span>${r.flag ? `<span class="rt-flag label">${esc(r.flag)}</span>` : ""}</div>`;
+  };
+  return sec("Rate tempo — the pace, four ways",
+    `<div class="rt-strip">${rates.map(row).join("")}</div>` +
+    `<p class="rd-meta label">Each bar is a loss rate; the longer and more saturated, the faster. The 7-day runs hot early because a new cut sheds water — it isn't fat coming off that fast, and it will slow. A gain window would read muted ink, never an alarm.</p>`);
+}
 // (temporary — restructured into the dated Tier-2 composition arc across P1.x)
 function physicalLegacyComposition(d) {
   const x = d.latest_dexa; if (!x) return "";
@@ -166,6 +206,7 @@ async function renderPhysical(d) {
   if (j.start_weight_lbs != null && j.current_weight_lbs != null) parts.push(dataFigure(j)); // P0.2 — silhouette scrubber (links to the trend marker)
   parts.push(physicalStatCluster(readings, j, goal)); // P0.3 — stat cluster (replaces DEXA % as top figures)
   parts.push(physicalMilestoneLadder(readings, j, goal)); // P0.4 — milestone ladder (the vertical measuring-rule signature)
+  parts.push(physicalRateTempo(readings, j)); // P0.5 — rate tempo strip (ember-intensity slope-gauges)
   // ── TIER 2 — the composition arc (episodic) — restructured across P1.x ──
   parts.push(physicalLegacyComposition(d));
   return parts.join("");
