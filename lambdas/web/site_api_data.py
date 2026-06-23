@@ -1580,6 +1580,19 @@ def handle_sleep_correlations() -> dict:
         b3.update({"direction": f"best on {_names[_best]} ({round(sum(dow[_best]) / len(dow[_best]), 1)}h avg)",
                    "confidence": "low confidence", "noise": False})
     cards.append(b3)
+    # C1 (shown LAST, labelled loudest) — sleep vs weight. HIGHEST false-positive risk in a
+    # water-weight cut; the coefficient is HARD-WITHHELD until well past the early water phase
+    # AND explicit sign-off (the STOP-AND-ASK gate). Direction is still shown honestly.
+    weight = {}
+    for w in _query_source("withings", d30, today):
+        dt = w.get("date") or w.get("sk", "").replace("DATE#", "")[:10]
+        v = _f(w.get("weight_lbs"))
+        if v is not None and dt:
+            weight[dt] = v
+    cards.append(_corr_card(
+        "C1", "Sleep → weight", "sleep score", "weight", sleep_score, weight, lag=0, withhold=True,
+        note="Highest false-positive risk in a water-weight cut — the coefficient stays withheld until well past the early water phase.",
+    ))
 
     return _ok({"cards": cards, "min_coef_days": _CORR_MIN_COEF_DAYS, "as_of": today}, cache_seconds=3600)
 
