@@ -1507,6 +1507,18 @@ def handle_sleep_correlations() -> dict:
         "A2", "Day strain → next-night deep sleep", "day strain", "deep sleep", strain, deep, lag=1,
         note="Did I earn it? — yesterday's training load against tonight's deep sleep.",
     ))
+    # A3 — bed temp → deep sleep (mechanistic). Eight Sleep temp + score series.
+    eight = {}
+    for e in _query_source("eightsleep", d30, today):
+        dt = e.get("sk", "").replace("DATE#", "")[:10]
+        if dt:
+            eight[dt] = {"temp": _f(e.get("bed_temp_f")), "score": _f(e.get("sleep_score"))}
+    bed_temp = {d: v["temp"] for d, v in eight.items() if v["temp"] is not None}
+    sleep_score = {d: v["score"] for d, v in eight.items() if v["score"] is not None}
+    cards.append(_corr_card(
+        "A3", "Bed temp → deep sleep", "bed temp", "deep sleep", bed_temp, deep, lag=0,
+        note="Mechanistic — cooler often means more deep sleep, within an optimal band (not monotonic).",
+    ))
 
     return _ok({"cards": cards, "min_coef_days": _CORR_MIN_COEF_DAYS, "as_of": today}, cache_seconds=3600)
 
