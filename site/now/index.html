@@ -101,6 +101,11 @@
              travel, since the dated /character sheet carries no raw vitals. -->
         <section class="readiness" data-readiness hidden aria-label="What last night set up">
           <p class="cap label">last night → today<span class="rd-night" data-bind="readiness-night"></span></p>
+          <div class="rd-score" data-bind="readiness-score-wrap" hidden>
+            <span class="rd-score-v num" data-bind="readiness-score"></span>
+            <span class="rd-score-band label" data-bind="readiness-band"></span>
+          </div>
+          <ul class="rd-comp" data-bind="readiness-components"></ul>
           <ul class="rd-rows" data-bind="readinessrows"></ul>
         </section>
 
