@@ -549,6 +549,20 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .cap-h { margin: 0 0 var(--sp-2); display: flex; align-items: baseline; gap: var(--sp-2); flex-wrap: wrap; font-size: var(--fs-small); }
 .cap-tag { font-family: var(--font-mono); font-size: 0.58rem; text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--ink-faint); border: 1px solid var(--rule); border-radius: var(--radius-xs); padding: 0 6px; white-space: nowrap; }
 .cap-tag.cap-private { color: var(--ember); border-color: var(--ember-line); }
+/* RQA-05 — deficit-sustainability five-channel read. Strain = ember (look here), holding =
+   muted ink, too-few = faint. Verdict header ember-toned on attention, calm otherwise. No red. */
+.dsx-verdict { display: flex; align-items: baseline; gap: var(--sp-3); margin: var(--sp-3) 0; padding: var(--sp-3); border: var(--honest-border); border-radius: var(--radius-sm); }
+.dsx-verdict.dsx-sev-attn { border-color: var(--ember-line); background: var(--ember-wash); }
+.dsx-count { font-size: var(--fs-h3, 1.4rem); color: var(--ember); white-space: nowrap; }
+.dsx-vtext { color: var(--ink); }
+.dsx-rows { display: flex; flex-direction: column; gap: 1px; margin: var(--sp-3) 0; }
+.dsx-row { display: grid; grid-template-columns: 1fr auto 7em; align-items: baseline; gap: var(--sp-3); padding: var(--sp-2) 0; border-bottom: 1px solid var(--rule); }
+.dsx-name { font-weight: var(--weight-med); }
+.dsx-dir { color: var(--ink-muted); white-space: nowrap; }
+.dsx-status { text-align: right; text-transform: uppercase; letter-spacing: var(--tracking-label); }
+.dsx-strain .dsx-status, .dsx-strain .dsx-dir { color: var(--ember); }
+.dsx-hold .dsx-status { color: var(--ink-muted); }
+.dsx-none .dsx-status, .dsx-none .dsx-dir { color: var(--ink-faint); }
 .chart-cap { display: block; margin-top: var(--sp-2); color: var(--ink-faint); }
 .chart--empty { border: var(--honest-border); border-radius: var(--radius-xs); padding: var(--sp-4); text-align: center; }
 .chart--empty .chart-cap { margin: 0; }

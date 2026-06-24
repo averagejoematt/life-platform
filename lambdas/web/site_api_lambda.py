@@ -137,6 +137,7 @@ from web.site_api_observatory import (
     handle_meal_responses,
     handle_mind_overview,
     handle_nutrition_overview,
+    handle_deficit_sustainability,
     handle_physical_overview,
     handle_protein_sources,
     handle_strength_benchmarks,
@@ -380,6 +381,7 @@ ROUTES = {
     "/api/sub_count": handle_subscriber_count,
     # Observatory pages
     "/api/nutrition_overview": handle_nutrition_overview,
+    "/api/deficit_sustainability": handle_deficit_sustainability,  # RQA-05
     "/api/training_overview": handle_training_overview,
     "/api/workouts": handle_workouts,
     "/api/mind_overview": handle_mind_overview,
