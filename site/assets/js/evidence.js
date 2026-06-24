@@ -1347,15 +1347,40 @@ async function renderHabits(d) {
   return keystone + head + grid + identity + groupBars + states + effort + drivers + whymiss + gtrends + goals + trend + dow + list + note("Everything I'm trying to do — sourced from Habitify. Correlations are N=1, not cause. Private habits are never shown.");
 }
 // The board — pick an expert, read their actual per-domain take + track record.
+// WQA-06 — surface the cross-coach DISAGREEMENTS (the moat), not eight parallel monologues.
+// Reads /api/coach_team tensions: topic + the two coaches' positions head-to-head + the
+// integrator's (Coach Nakamura's) call. Interpretation, never alarm; ember on the verdict.
+function boardDisagreements(tensions) {
+  const ts = (tensions || []).filter((t) => t && (t.position_a || t.position_b));
+  if (!ts.length) return "";
+  const pretty = (id) => ttl(String(id || "").replace(/_coach$/, "").replace(/_/g, " ")) || "Coach";
+  const strip = (txt) => String(txt || "").replace(/^[A-Za-z'’ .]{1,40}:\s*/, "");
+  const cards = ts.map((t) => {
+    const [a, b] = t.coaches || [];
+    return `<article class="dis-card"><h4 class="dis-topic">${esc(t.topic || "An open disagreement")}</h4>` +
+      `<div class="dis-cols">` +
+      `<div class="dis-pos"><span class="dis-who label">${esc(pretty(a))}</span><p class="dis-text">${esc(strip(t.position_a))}</p></div>` +
+      `<div class="dis-vs" aria-hidden="true">vs</div>` +
+      `<div class="dis-pos"><span class="dis-who label">${esc(pretty(b))}</span><p class="dis-text">${esc(strip(t.position_b))}</p></div>` +
+      `</div>` +
+      (t.resolution ? `<div class="dis-call"><span class="dis-call-k label">the integrator's call</span><p class="dis-text">${esc(t.resolution)}</p></div>` : "") +
+      `</article>`;
+  }).join("");
+  return sec("Where the coaches disagree — the argument, not the consensus",
+    `<div class="dis-grid">${cards}</div>` +
+    `<p class="rd-meta label">The moat isn't eight assistants nodding along — it's that they don't, and the disagreement is surfaced instead of averaged away. Each is an AI persona arguing from its own discipline; the integrator (Coach Nakamura) adjudicates, but the tension is the point. Interpretation of the data, never an instruction.</p>`);
+}
 async function renderBoard(d) {
   const coaches = d.coaches || []; const wp = d.weekly_priority || {};
+  const team = await tryJSON("/api/coach_team");
+  const disagreements = boardDisagreements(team && team.tensions);
   const chair = wp.text && !isBad(wp.text)
     ? `<div class="rd-obs"><p class="board-kicker label">the integrator's weekly read · ${esc(wp.coach_name || "")}</p><p class="rd-primary">${esc(wp.text)}</p></div>`
     : `<div class="rd-obs"><p class="rd-primary">The board's weekly read posts after the next briefing.</p></div>`;
   const roster = coaches.length
     ? `<div class="coach-grid">${coaches.map((c) => `<button class="coach coach-pick" data-coach="${esc(c.coach_id)}" data-name="${esc(c.name)}" data-title="${esc(c.title || "")}" style="--coach:${/^#|rgb/.test(c.color || "") ? c.color : "var(--ember)"}"><span class="coach-badge">${esc(c.initials || (c.name || "?").slice(0, 2))}</span><div><h3 class="coach-name">${esc(c.name)}</h3><p class="coach-title label">${esc(c.title || "")}</p></div></button>`).join("")}</div>`
     : empty("The expert board is being assembled.");
-  return chair + sec("The experts — pick one to read their take", roster) +
+  return chair + disagreements + sec("The experts — pick one to read their take", roster) +
     `<div class="coach-read" data-board-read></div>` +
     note("A board of named AI characters who argue about the data. Interpretation, not instruction.");
 }
