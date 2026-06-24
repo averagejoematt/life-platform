@@ -13,7 +13,7 @@
     window.__START_SLUG__ = "<slug>"
 */
 
-import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars, dumbbell, weightTrendChart, projectionCone } from "/assets/js/charts.js";
+import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars, dumbbell, weightTrendChart, projectionCone, ring } from "/assets/js/charts.js";
 
 const REG = window.__EVIDENCE_REGISTRY__ || [];
 const BYSLUG = Object.fromEntries(REG.map((t) => [t.slug, t]));
@@ -1609,21 +1609,78 @@ function renderAsk() {
 function renderExplorer(d) { const v = (d.vitals && d.vitals.vitals) || d.vitals || {}; const ch = (d.character && d.character.character) || {}; const j = (d.journey && d.journey.journey) || d.journey || {}; const rows = { weight_lbs: j.current_weight_lbs, character_level: ch.level, ...Object.fromEntries(Object.entries(v).filter(([k, x]) => ["string", "number"].includes(typeof x)).slice(0, 12)) }; return `<p class="rd-archive">Today's raw record, straight from the pipeline. For the full historical day-by-day browser, open the preserved Explorer below.</p>` + sec("Today", kvtable(rows)) + note("The unfiltered daily record."); }
 
 // Live Pulse — current status narrative + daily vitals trends (the old /live).
+// ── /evidence/vitals/ — the landing page, glance-first, three altitudes. "An instant, honest
+// tell at the top; the full documentary as you scroll." `d` = /api/pulse.
+// P0.1 — decompose the day into 4 component reads (recovery / HRV / RHR / sleep). Each becomes
+// a ring whose fill is the metric's own value or its position in the recent range. tone: ember
+// = good, muted = neutral/forming, alert = reserved RED STATE (run-down) — NEVER for direction
+// (RHR-down / HRV-up read ember-positive even as the line falls).
+function _vitalsComponents(p, hist) {
+  const g = (p && p.glyphs) || {};
+  const last = hist.length ? hist[hist.length - 1] : {};
+  const num = (x) => (Number.isFinite(Number(x)) ? Number(x) : null);
+  const recPct = num((g.recovery || {}).recovery_pct) ?? num(last.recovery_pct);
+  const hrv = num((g.recovery || {}).hrv_ms) ?? num(last.hrv_ms);
+  const rhr = num((g.recovery || {}).rhr_bpm) ?? num(last.rhr_bpm);
+  const sleep = num((g.sleep || {}).hours) ?? num(last.sleep_hours);
+  const col = (k) => hist.map((h) => num(h[k])).filter((v) => v != null);
+  const rangePos = (val, arr, invert) => {
+    if (val == null || arr.length < 2) return 0.5;
+    const lo = Math.min(...arr), hi = Math.max(...arr);
+    if (hi === lo) return 0.5;
+    const pos = (val - lo) / (hi - lo);
+    return invert ? 1 - pos : pos;
+  };
+  const avg = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
+  const hrvA = avg(col("hrv_ms")), rhrA = avg(col("rhr_bpm"));
+  return [
+    { key: "recovery", label: "recovery", value: recPct != null ? recPct + "%" : "—", raw: recPct, fill: recPct != null ? recPct / 100 : 0,
+      tone: recPct == null ? "muted" : recPct >= 67 ? "ember" : recPct >= 34 ? "muted" : "alert", frame: "last night" },
+    { key: "hrv", label: "HRV", value: hrv != null ? Math.round(hrv) : "—", sub: "ms", raw: hrv, fill: rangePos(hrv, col("hrv_ms"), false),
+      tone: hrv == null ? "muted" : (hrvA != null && hrv >= hrvA ? "ember" : "muted"), frame: "last night" },
+    { key: "rhr", label: "resting HR", value: rhr != null ? Math.round(rhr) : "—", sub: "bpm", raw: rhr, fill: rangePos(rhr, col("rhr_bpm"), true),
+      tone: rhr == null ? "muted" : (rhrA != null && rhr <= rhrA ? "ember" : "muted"), frame: "last night" },
+    { key: "sleep", label: "sleep", value: sleep != null ? fmt(sleep, 1) : "—", sub: "h", raw: sleep, fill: sleep != null ? Math.min(1, sleep / 8) : 0,
+      tone: sleep == null ? "muted" : sleep >= 7 ? "ember" : sleep >= 5.5 ? "muted" : "alert", frame: "last night" },
+  ];
+}
+// P0.1 — the status WORD is synthesised from the component tones (anti-black-box: it's the sum
+// of the visible rings, never a lone grade). RED only for a genuine run-down STATE.
+function vitalsStatusRead(comps, p, dayNum) {
+  const rated = comps.filter((c) => c.raw != null);
+  const ember = rated.filter((c) => c.tone === "ember").length;
+  const alert = rated.filter((c) => c.tone === "alert").length;
+  const rec = comps.find((c) => c.key === "recovery");
+  let word, line, tone;
+  if (!rated.length) { word = "READING…"; line = "today's signals are still coming in."; tone = "muted"; }
+  else if (alert >= 2 || (rec && rec.tone === "alert")) { word = "RUN DOWN"; line = "the body's asking for an easier day."; tone = "alert"; }
+  else if (ember >= 3) { word = "RECOVERED"; line = "the body's ready — push if you've got it."; tone = "ember"; }
+  else { word = "MIXED"; line = "a split signal — read the parts, not a single verdict."; tone = "muted"; }
+  const thin = (dayNum != null && dayNum < 14);
+  const stamp = thin ? `<span class="vs-stamp label">${dayNum} days in — baseline still forming</span>` : "";
+  const rings = `<div class="vr-row">${comps.map((c) => ring({ value: c.value, sub: c.sub || "", label: c.label, fill: c.fill, tone: c.tone, thin })).join("")}</div>`;
+  return sec("Today's read",
+    `<div class="vs-band vs-${tone}"><div class="vs-word"><span class="vs-w">${esc(word)}</span><span class="vs-line">${esc(line)}</span></div>${stamp}</div>` +
+    rings +
+    `<p class="rd-meta label">The status is the sum of the rings below it — recovery, HRV, resting HR, sleep — not a black-box grade. Each is <strong>last night's</strong> read, setting up today. Ember = good, muted = neutral or still forming${thin ? "; on day " + dayNum + " of a fresh cut the baseline is thin, so the rings show their state without overclaiming." : "."}</p>`);
+}
 async function renderPulse(d) {
   const p = d.pulse || d;
   const ph = await tryJSON("/api/pulse_history"); const hist = (ph && ph.pulse_history) || [];
+  const comps = _vitalsComponents(p, hist);
+  const parts = [];
+  parts.push(vitalsStatusRead(comps, p, p.day_number)); // P0.1 — Altitude 1: status word + component rings
+  // (temporary — narrative + the 8 equal charts; restructured into Altitudes 2 & 3 across P1.x/P2.x)
   const head = `<div class="rd-obs">${p.narrative && !isBad(p.narrative) ? `<p class="rd-primary">${esc(p.narrative)}</p>` : `<p class="rd-primary">Today's pulse is being read.</p>`}<p class="rd-meta label">${[p.date, p.status, p.signals_reporting != null && `${p.signals_reporting}/${p.signals_total} signals reporting`].filter(Boolean).map(esc).join("  ·  ")}</p></div>`;
   const series = (k) => hist.map((h) => ({ date: h.date, value: h[k] })).filter((x) => x.value != null);
   const trendBlock = (defs) => defs
     .map(([k, lbl]) => sec(lbl, lineChart(series(k), { valueKey: "value", label: lbl, emptyMsg: `The ${lbl.toLowerCase()} trend fills in as days accrue.` }))).join("");
-  // Group by temporal frame: recovery/sleep/HRV are about LAST NIGHT (they set
-  // today up); weight & steps are same-day. Different frames, labelled so a reader
-  // doesn't read last night's recovery as a "today" activity number.
   const lastNight = trendBlock([["recovery_pct", "Recovery %"], ["hrv_ms", "HRV ms"], ["rhr_bpm", "Resting HR"], ["sleep_hours", "Sleep hours"]]);
   const today = trendBlock([["weight_lbs", "Weight"], ["strain", "Day strain"], ["steps", "Steps"]]);
   const frame = (lbl, inner) => `<p class="rd-frame label">${esc(lbl)}</p>${inner}`;
-  return head + frame("Last night → sets up today", lastNight) + frame("Today — measured same-day", today) +
-    note("Your live vitals — recovery/sleep/HRV read last night; weight & steps are today.");
+  parts.push(head + frame("Last night → sets up today", lastNight) + frame("Today — measured same-day", today) +
+    note("Your live vitals — recovery/sleep/HRV read last night; weight & steps are today."));
+  return parts.join("");
 }
 
 function renderPipeline(d) {

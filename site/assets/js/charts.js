@@ -201,6 +201,23 @@ export function dualLineChart(seriesA, seriesB, { aLabel = "A", bLabel = "B", un
 }
 
 // Tiny inline sparkline (no axes/caption). values: [numbers].
+// Vitals component ring (P0.1) — a 0→1 arc with a centred value + label. tone ∈ {ember,
+// muted, alert}: ember = good/recovered, muted = neutral/forming, alert = reserved RED STATE
+// (run-down / out-of-range) — never used to encode a falling direction. The ring IS a
+// component (recovery / HRV / RHR / sleep) so the glance is decomposed, not a black-box grade.
+export function ring({ value = "", sub = "", label = "", fill = 0, tone = "ember", thin = false } = {}) {
+  const r = 42, c = 2 * Math.PI * r, f = Math.max(0, Math.min(1, Number(fill) || 0));
+  const dash = `${(f * c).toFixed(1)} ${(c - f * c).toFixed(1)}`;
+  const aria = `${label}: ${value}${sub ? " " + sub : ""}`;
+  return `<div class="vr vr-${escAttr(tone)}${thin ? " vr-thin" : ""}">` +
+    `<svg class="vr-svg" viewBox="0 0 100 100" role="img" aria-label="${escAttr(aria)}">` +
+    `<circle class="vr-track" cx="50" cy="50" r="${r}" fill="none"/>` +
+    `<circle class="vr-arc" cx="50" cy="50" r="${r}" fill="none" stroke-dasharray="${dash}" transform="rotate(-90 50 50)" stroke-linecap="round"/>` +
+    `</svg>` +
+    `<div class="vr-c"><span class="vr-v num">${escAttr(value)}</span>${sub ? `<span class="vr-sub label">${escAttr(sub)}</span>` : ""}</div>` +
+    `<span class="vr-l label">${escAttr(label)}</span></div>`;
+}
+
 export function sparkline(values, { height = 34 } = {}) {
   const pts = _points(values || [], "v", "d");
   if (pts.length < 2) return `<span class="spark spark--empty"></span>`;

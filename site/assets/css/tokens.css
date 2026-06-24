@@ -51,6 +51,10 @@
   --ink-muted:   #A99F8C;   /* oklch(.69 .020 84)  — secondary         */
   --ink-faint:   #857B68;   /* oklch(.55 .018 82)  — labels, ticks · 4.7:1 on --page (WCAG AA) */
   --ember:       #DD7A37;   /* oklch(.69 .145 52)  — the one live accent */
+  --alert:       #B14A33;   /* restrained oxblood — RESERVED state alert (vitals run-down /
+                               out-of-range only). NEVER encodes a falling direction. */
+  --alert-wash:  color-mix(in oklch, var(--alert) 11%, transparent);
+  --alert-line:  color-mix(in oklch, var(--alert) 45%, transparent);
 
   /* Derived tints (OKLCH mixing keeps the ramp even). */
   --surface-raised: color-mix(in oklch, var(--surface) 88%, var(--ink) 12%);
@@ -577,6 +581,34 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .dis-call-k { text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--ember); display: block; margin-bottom: var(--sp-1); }
 .dis-call .dis-text { color: var(--ink); }
 @media (max-width: 640px) { .dis-cols { grid-template-columns: 1fr; } .dis-vs { justify-self: start; } }
+/* ── /evidence/vitals/ — glance-first instrument panel (P0.1+) ───────────────────
+   Component rings + status band. tone: ember=good, muted=neutral/forming, alert=RED STATE
+   (reserved). Red never encodes a direction. */
+.vs-band { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); flex-wrap: wrap; margin: var(--sp-2) 0 var(--sp-3); padding: var(--sp-3); border-radius: var(--radius-sm); border: var(--honest-border); }
+.vs-band.vs-ember { border-color: var(--ember-line); background: var(--ember-wash); }
+.vs-band.vs-alert { border-color: var(--alert-line); background: var(--alert-wash); }
+.vs-word { display: flex; align-items: baseline; gap: var(--sp-3); flex-wrap: wrap; }
+.vs-w { font-family: var(--font-serif, Fraunces), serif; font-size: var(--fs-h2, 1.8rem); line-height: 1; }
+.vs-ember .vs-w { color: var(--ember); }
+.vs-alert .vs-w { color: var(--alert); }
+.vs-muted .vs-w { color: var(--ink); }
+.vs-line { color: var(--ink-muted); }
+.vs-stamp { color: var(--ink-faint); font-family: var(--font-mono); font-size: var(--fs-small); white-space: nowrap; }
+.vr-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-3); margin: var(--sp-3) 0; }
+.vr { display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); position: relative; }
+.vr-svg { width: 100%; max-width: 92px; aspect-ratio: 1; }
+.vr-track { stroke: var(--rule); stroke-width: 7; }
+.vr-arc { stroke: var(--ember); stroke-width: 7; transition: stroke-dasharray 0.4s; }
+.vr-muted .vr-arc { stroke: var(--ink-muted); }
+.vr-alert .vr-arc { stroke: var(--alert); }
+.vr-thin .vr-arc { opacity: 0.72; }
+.vr-c { position: absolute; top: calc(50% - 0.7em); left: 0; right: 0; display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.vr-v { font-size: var(--fs-h4, 1.05rem); }
+.vr-ember .vr-v { color: var(--ember); }
+.vr-alert .vr-v { color: var(--alert); }
+.vr-sub { color: var(--ink-faint); font-size: 0.6rem; }
+.vr-l { text-transform: lowercase; color: var(--ink-muted); }
+@media (max-width: 520px) { .vr-row { grid-template-columns: repeat(2, 1fr); } }
 .chart-cap { display: block; margin-top: var(--sp-2); color: var(--ink-faint); }
 .chart--empty { border: var(--honest-border); border-radius: var(--radius-xs); padding: var(--sp-4); text-align: center; }
 .chart--empty .chart-cap { margin: 0; }
