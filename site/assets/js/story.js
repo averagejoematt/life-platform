@@ -172,6 +172,9 @@ function renderWave(days) {
 }
 
 /* ── the Third Wall ──────────────────────────────────────────────────────── */
+// P1.2 — the Third Wall's one home is Coaching. Home shows a TEASER: the latest field note's
+// AI line (trimmed) + a clear pointer that the full exchange — the AI's notes and Matthew's
+// replies — lives in Coaching. No full AI↔Matthew duplicate here.
 async function renderWall() {
   const wall = bind("wall");
   try {
@@ -182,14 +185,14 @@ async function renderWall() {
     const full = await getJSON(`/api/field_notes?week=${encodeURIComponent(week)}`);
     const e = full.entry || {};
     const aiText = e.ai_present || e.ai_affirming || e.ai_cautionary || "";
-    const human = e.matthew_agreement || "";
+    const trimmed = aiText.length > 240 ? esc(aiText.slice(0, 240)) + "…" : esc(aiText);
+    const replied = !!e.matthew_agreement;
     wall.innerHTML =
-      `<div class="voice machine"><span class="who">The AI</span><p class="what">${esc(aiText)}</p></div>` +
-      (human ? `<div class="voice human"><span class="who">Matthew</span><p class="what">${esc(human)}</p></div>`
-             : `<div class="voice human"><span class="who">Matthew</span><p class="what">— hasn't replied to this one yet. (That's allowed; the wall is honest both ways.)</p></div>`);
+      `<div class="voice machine"><span class="who">The AI</span><p class="what">${trimmed}</p></div>` +
+      `<p class="wall-teaser">${replied ? "Matthew answered this one back" : "Matthew hasn't replied to this one yet — and that's allowed; the wall is honest both ways"}. The full exchange — the AI's weekly notes and Matthew's replies — lives in <a href="/coaching/">Coaching</a>.</p>`;
     bind("wall-week").textContent = e.ai_generated_at ? `field note · week ${esc(week)} · ${esc(e.ai_tone || "mixed")}` : `field note · week ${esc(week)}`;
   } catch (_e) {
-    wall.innerHTML = `<div class="voice machine"><span class="who">The AI</span><p class="what">The field notes — where the model says its piece and Matthew answers back — appear here each week.</p></div>`;
+    wall.innerHTML = `<div class="voice machine"><span class="who">The AI</span><p class="what">The field notes — where the model says its piece and Matthew answers back — appear each week in <a href="/coaching/">Coaching</a>.</p></div>`;
   }
 }
 

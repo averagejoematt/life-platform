@@ -140,6 +140,11 @@ body { overflow-x: hidden; }
 .wall .voice.human { border-top: var(--honest-border); padding-top: var(--sp-3); margin-top: var(--sp-1); }
 .wall .voice.human .what { font-family: var(--voice-human-font); font-style: italic; font-size: var(--fs-quote); line-height: 1.45; color: var(--ink); }
 .wall-foot { margin-top: var(--sp-3); color: var(--ink-faint); }
+/* P1.2 — Third Wall teaser line on Home (full exchange lives in Coaching). */
+.wall-teaser { margin: var(--sp-3) 0 0; color: var(--ink-muted); font-size: var(--fs-small); line-height: 1.5; }
+.wall-teaser a, .dx-teaser .dx-foot a, .dx-read.dx-teaser a { color: var(--ember); }
+/* P1.1/P1.3 — dispatches teaser on Home (full reader lives in Story). */
+.dx-read.dx-teaser { border-left: 2px solid var(--ember-line); padding-left: var(--sp-5); }
 
 /* Dispatches reader — chronicle · lab notes · journal (master-detail) */
 .dx-tabs { display: flex; gap: var(--sp-1); margin-top: var(--sp-5); border-bottom: var(--border-hair); }
