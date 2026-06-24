@@ -10,6 +10,19 @@ from routine_ir import ExerciseBlock, RoutineSpec, Set
 # path. Importing the tool module is enough.
 from mcp import tools_hevy_routine as t
 
+# The dry_run/commit paths render the routine title via routine_title.build_title_context,
+# which reads DynamoDB (phase state + routine index + performed history). Unit tests must
+# stub it so they stay offline — otherwise they only pass where ambient AWS creds exist
+# (green locally, NoCredentialsError in CI). Title rendering has its own tests
+# (test_routine_title.py); here we just need a valid context shape.
+_TITLE_CTX = {
+    "phase": "Phase",
+    "type_count_in_phase": 1,
+    "all_time_count": 1,
+    "phase_started": "2026-06-01",
+    "reset_epoch": "2026-06-01",
+}
+
 
 def test_invalid_action_returns_error():
     out = t.tool_manage_hevy_routine({"action": "nuke"})
@@ -37,6 +50,7 @@ def test_dry_run_does_not_call_write_client():
     with (
         patch("routine_repo.get_current", return_value=ir),
         patch("hevy_template_cache.resolve_movement", return_value="55E6546B"),
+        patch("routine_title.build_title_context", return_value=_TITLE_CTX),
         patch("hevy_write_client.create_routine") as create_mock,
         patch("hevy_write_client.update_routine_with_guard") as update_mock,
     ):
@@ -333,6 +347,7 @@ def test_dry_run_falls_back_to_reconcile_by_title():
         patch("routine_repo.get_current", return_value=ir),
         patch("hevy_template_cache.resolve_movement", side_effect=MovementUnmappable("no hint")),
         patch("hevy_template_cache.reconcile_custom", return_value="79D0BB3A") as rec,
+        patch("routine_title.build_title_context", return_value=_TITLE_CTX),
         patch("hevy_write_client.list_templates"),
     ):
         out = t.tool_manage_hevy_routine({"action": "dry_run", "routine_id": "r-custom"})
