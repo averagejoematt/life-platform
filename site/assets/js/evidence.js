@@ -1664,12 +1664,32 @@ function vitalsStatusRead(comps, p, dayNum) {
     rings +
     `<p class="rd-meta label">The status is the sum of the rings below it — recovery, HRV, resting HR, sleep — not a black-box grade. Each is <strong>last night's</strong> read, setting up today. Ember = good, muted = neutral or still forming${thin ? "; on day " + dayNum + " of a fresh cut the baseline is thin, so the rings show their state without overclaiming." : "."}</p>`);
 }
+// P0.2 — now vs 7-day vs 30-day ladder under each ring: "am I above/below my own normal?"
+// The 30-day baseline honestly reads "fills in" until 30 days exist. Aligns with the ring grid.
+function vitalsLadder(comps, hist) {
+  const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+  const col = (k) => hist.map((h) => num(h[k])).filter((v) => v != null);
+  const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+  const map = { recovery: "recovery_pct", hrv: "hrv_ms", rhr: "rhr_bpm", sleep: "sleep_hours" };
+  const fmtv = (v, key) => (v == null ? "—" : key === "sleep" ? fmt(v, 1) : String(Math.round(v)));
+  const cells = comps.map((c) => {
+    const arr = col(map[c.key]);
+    const a7 = avg(arr.slice(-7));
+    const has30 = arr.length >= 30;
+    return `<div class="vl-cell"><span class="vl-pair"><span class="vl-k label">now</span><span class="vl-v mono">${esc(fmtv(c.raw, c.key))}</span></span>` +
+      `<span class="vl-pair"><span class="vl-k label">7d</span><span class="vl-v mono vl-base">${esc(fmtv(a7, c.key))}</span></span>` +
+      `<span class="vl-pair"><span class="vl-k label">30d</span><span class="vl-v mono vl-base">${has30 ? esc(fmtv(avg(arr.slice(-30)), c.key)) : "fills in"}</span></span></div>`;
+  }).join("");
+  return `<div class="vl-row">${cells}</div>` +
+    `<p class="rd-meta label">Each ring read against your <em>own</em> normal — today vs the trailing 7-day average, with a 30-day baseline that fills in as the days accrue (${hist.length} so far). The baseline is the honest "is this a good day for me," not a population chart.</p>`;
+}
 async function renderPulse(d) {
   const p = d.pulse || d;
   const ph = await tryJSON("/api/pulse_history"); const hist = (ph && ph.pulse_history) || [];
   const comps = _vitalsComponents(p, hist);
   const parts = [];
   parts.push(vitalsStatusRead(comps, p, p.day_number)); // P0.1 — Altitude 1: status word + component rings
+  parts.push(vitalsLadder(comps, hist)); // P0.2 — now / 7d / 30d ladder under the rings
   // (temporary — narrative + the 8 equal charts; restructured into Altitudes 2 & 3 across P1.x/P2.x)
   const head = `<div class="rd-obs">${p.narrative && !isBad(p.narrative) ? `<p class="rd-primary">${esc(p.narrative)}</p>` : `<p class="rd-primary">Today's pulse is being read.</p>`}<p class="rd-meta label">${[p.date, p.status, p.signals_reporting != null && `${p.signals_reporting}/${p.signals_total} signals reporting`].filter(Boolean).map(esc).join("  ·  ")}</p></div>`;
   const series = (k) => hist.map((h) => ({ date: h.date, value: h[k] })).filter((x) => x.value != null);

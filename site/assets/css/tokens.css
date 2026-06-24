@@ -609,6 +609,14 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .vr-sub { color: var(--ink-faint); font-size: 0.6rem; }
 .vr-l { text-transform: lowercase; color: var(--ink-muted); }
 @media (max-width: 520px) { .vr-row { grid-template-columns: repeat(2, 1fr); } }
+/* P0.2 — now/7d/30d ladder, aligned under the ring grid. */
+.vl-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-3); margin-top: calc(-1 * var(--sp-2)); }
+.vl-cell { display: flex; justify-content: center; gap: var(--sp-3); }
+.vl-pair { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.vl-k { color: var(--ink-faint); font-size: 0.58rem; text-transform: uppercase; letter-spacing: var(--tracking-label); }
+.vl-v { font-size: var(--fs-small); }
+.vl-v.vl-base { color: var(--ink-muted); }
+@media (max-width: 520px) { .vl-row { grid-template-columns: repeat(2, 1fr); } }
 .chart-cap { display: block; margin-top: var(--sp-2); color: var(--ink-faint); }
 .chart--empty { border: var(--honest-border); border-radius: var(--radius-xs); padding: var(--sp-4); text-align: center; }
 .chart--empty .chart-cap { margin: 0; }
