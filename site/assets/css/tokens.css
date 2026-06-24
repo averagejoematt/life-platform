@@ -613,6 +613,30 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .ah-sw-rhr { opacity: 0.7; height: 0; border-top: 2px dashed var(--ember); }
 /* P1.3 — readiness driver bars reuse the sufficiency kit; alert tone for a run-down driver. */
 .suf-fill.vd-alert { background: var(--alert); }
+/* P2.1 — autonomic 2x2 */
+.aq-wrap { max-width: 340px; margin: var(--sp-3) auto 0; }
+.aq-chart svg { width: 100%; height: auto; }
+.aq-div { stroke: var(--rule); stroke-width: 1; stroke-dasharray: 2 4; }
+.aq-lab { fill: var(--ink-faint); font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.08em; }
+.aq-ax { fill: var(--ink-faint); font-family: var(--font-mono); font-size: 8px; }
+.aq-dot { fill: var(--ink-muted); opacity: 0.6; }
+.aq-dot.aq-today { fill: var(--ember); opacity: 1; }
+/* P2.2 — small-multiples grid */
+.sm-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3); margin: var(--sp-3) 0; }
+.sm-cell { border: 1px solid var(--rule); border-radius: var(--radius-xs); padding: var(--sp-2) var(--sp-3); }
+.sm-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-2); }
+.sm-lbl { font-weight: var(--weight-med); text-transform: lowercase; font-size: var(--fs-small); }
+.sm-frame { color: var(--ink-faint); font-size: 0.56rem; text-transform: uppercase; letter-spacing: var(--tracking-label); }
+.sm-cell .spark { width: 100%; height: 30px; margin: var(--sp-1) 0; }
+.sm-foot { display: flex; justify-content: space-between; align-items: baseline; }
+.sm-v { font-size: var(--fs-small); }
+.sm-trend { color: var(--ink-muted); }
+.sm-empty { color: var(--ink-faint); padding: var(--sp-3) 0; text-align: center; }
+@media (max-width: 640px) { .sm-grid { grid-template-columns: repeat(2, 1fr); } }
+/* P2.4 — hub links */
+.vh-row { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin: var(--sp-3) 0; }
+.vh-link { display: inline-block; padding: var(--sp-2) var(--sp-3); border: 1px solid var(--rule); border-radius: var(--radius-xs); text-decoration: none; color: var(--ink); font-size: var(--fs-small); }
+.vh-link:hover { border-color: var(--ember-line); color: var(--ember); }
 .vr-c { position: absolute; top: calc(50% - 0.7em); left: 0; right: 0; display: flex; flex-direction: column; align-items: center; line-height: 1; }
 .vr-v { font-size: var(--fs-h4, 1.05rem); }
 .vr-ember .vr-v { color: var(--ember); }

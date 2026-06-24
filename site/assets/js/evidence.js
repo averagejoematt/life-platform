@@ -13,7 +13,7 @@
     window.__START_SLUG__ = "<slug>"
 */
 
-import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars, dumbbell, weightTrendChart, projectionCone, ring, autonomicHero } from "/assets/js/charts.js";
+import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars, dumbbell, weightTrendChart, projectionCone, ring, autonomicHero, autonomicQuadrant } from "/assets/js/charts.js";
 
 const REG = window.__EVIDENCE_REGISTRY__ || [];
 const BYSLUG = Object.fromEntries(REG.map((t) => [t.slug, t]));
@@ -1752,16 +1752,56 @@ async function renderPulse(d) {
     autonomicHero(hist, { label: "Resting HR (inverted) + HRV" }) +
     `<p class="rd-meta label">Resting heart rate and HRV are the two halves of one autonomic signal. RHR's axis is <strong>inverted</strong> so a falling resting HR reads as a rising line — because down is good. Both climbing together = the parasympathetic "rest &amp; repair" side taking over: the body downshifting. Last night's read; n=1, early moves partly water/novelty.</p>`));
   parts.push(vitalsReadinessDecomposed(comps)); // P1.3 — recovery broken into its drivers
-  // (temporary — the 8 equal charts; restructured into Altitude 3 across P2.x)
-  const series = (k) => hist.map((h) => ({ date: h.date, value: h[k] })).filter((x) => x.value != null);
-  const trendBlock = (defs) => defs
-    .map(([k, lbl]) => sec(lbl, lineChart(series(k), { valueKey: "value", label: lbl, emptyMsg: `The ${lbl.toLowerCase()} trend fills in as days accrue.` }))).join("");
-  const lastNight = trendBlock([["recovery_pct", "Recovery %"], ["hrv_ms", "HRV ms"], ["rhr_bpm", "Resting HR"], ["sleep_hours", "Sleep hours"]]);
-  const today = trendBlock([["weight_lbs", "Weight"], ["strain", "Day strain"], ["steps", "Steps"]]);
-  const frame = (lbl, inner) => `<p class="rd-frame label">${esc(lbl)}</p>${inner}`;
-  parts.push(frame("Last night → sets up today", lastNight) + frame("Today — measured same-day", today) +
-    note("Your live vitals — recovery/sleep/HRV read last night; weight & steps are today."));
+  // ── ALTITUDE 3 — the analysis ──
+  const qpts = hist.slice(-8).map((h, i, a) => ({ strain: Number(h.strain), recovery: Number(h.recovery_pct), date: h.date, today: i === a.length - 1 }));
+  parts.push(sec("Autonomic balance — where the body's sat lately", // P2.1 — 2x2 snapshot
+    `<div class="aq-wrap">${autonomicQuadrant(qpts)}</div>` +
+    `<p class="rd-meta label">Day strain against recovery, the last ${qpts.length} days — recovered <em>and</em> training hard is flow; depleted and still pushing is stress. A snapshot of the spread, not a trajectory; no arrow drawn at this n.</p>`));
+  parts.push(vitalsSmallMultiples(hist)); // P2.2 — small-multiples grid (replaces the 8 equal charts) + P2.5 remove
+  parts.push(vitalsBackgroundStrip(p)); // P2.3 — background vitals (honest empty until captured)
+  parts.push(vitalsHubLinks()); // P2.4 — hub links out to the domain pages
   return parts.join("");
+}
+// P2.2 — small-multiples grid: every signal as a labelled sparkline (latest value + trend +
+// temporal frame), replacing the eight big equal charts. P2.5: this IS the removal of the old
+// charts. Refuses a sparkline under 2 points (shows "fills in").
+function vitalsSmallMultiples(hist) {
+  const SM = [
+    { k: "recovery_pct", lbl: "recovery", unit: "%", frame: "last night", dp: 0 },
+    { k: "hrv_ms", lbl: "HRV", unit: " ms", frame: "last night", dp: 0 },
+    { k: "rhr_bpm", lbl: "resting HR", unit: " bpm", frame: "last night", dp: 0 },
+    { k: "strain", lbl: "day strain", unit: "", frame: "same-day", dp: 1 },
+    { k: "weight_lbs", lbl: "weight", unit: " lb", frame: "same-day", dp: 1 },
+    { k: "steps", lbl: "steps", unit: "", frame: "same-day", dp: 0 },
+  ];
+  const cells = SM.map((m) => {
+    const vals = hist.map((h) => Number(h[m.k])).filter((v) => Number.isFinite(v));
+    if (vals.length < 2) return `<div class="sm-cell"><div class="sm-head"><span class="sm-lbl">${esc(m.lbl)}</span><span class="sm-frame label">${esc(m.frame)}</span></div><p class="sm-empty label">fills in</p></div>`;
+    const latest = vals[vals.length - 1], first = vals[0];
+    const arrow = latest > first ? "↑" : latest < first ? "↓" : "→";
+    return `<div class="sm-cell"><div class="sm-head"><span class="sm-lbl">${esc(m.lbl)}</span><span class="sm-frame label">${esc(m.frame)}</span></div>` +
+      `${sparkline(vals)}<div class="sm-foot"><span class="sm-v mono">${esc(fmt(latest, m.dp))}${esc(m.unit)}</span><span class="sm-trend mono">${arrow}</span></div></div>`;
+  }).join("");
+  return sec("Every signal, small — the full grid",
+    `<div class="sm-grid">${cells}</div>` +
+    `<p class="rd-meta label">All eight trends, demoted from equal hero charts to a glanceable grid — each stamped with its temporal frame (last-night vs same-day) and trend direction. The autonomic pair has its own hero above; these are the supporting cast.</p>`);
+}
+// P2.3 — background vitals (SpO2 / skin temp / resp rate) — anomaly detectors, not daily dials.
+// Not captured by the current wearables, so an honest empty state, never a fake "all in range".
+function vitalsBackgroundStrip(p) {
+  return sec("Background vitals — the quiet anomaly detectors",
+    `<div class="nut-coming"><p class="rd-archive">SpO₂, skin temperature, and respiratory rate are background vitals — they should sit silent and only speak up on a deviation (the one place a reserved red would be earned). They're not in the current data feed yet, so rather than draw a fake "all in range" strip, this waits on the capture. <span class="confidence conf-low">needs capture</span></p></div>`);
+}
+// P2.4 — hub links: the landing page is the front door; each domain links out to its page.
+function vitalsHubLinks() {
+  const links = [
+    ["recovery & sleep", "/evidence/sleep/"], ["strain & training", "/evidence/training/"],
+    ["weight & composition", "/evidence/physical/"], ["nutrition & the deficit", "/evidence/nutrition/"],
+    ["habits", "/evidence/habits/"], ["bloodwork", "/evidence/labs/"],
+  ];
+  return sec("From here — the full documentary",
+    `<div class="vh-row">${links.map(([t, h]) => `<a class="vh-link" href="${h}">${esc(t)} →</a>`).join("")}</div>` +
+    `<p class="rd-meta label">This is the front door. The glance lives here; each signal opens into its own page for the deep read.</p>`);
 }
 
 function renderPipeline(d) {

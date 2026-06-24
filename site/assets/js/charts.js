@@ -248,6 +248,35 @@ export function autonomicHero(hist, { height = 190, label = "" } = {}) {
     `<figcaption class="chart-cap label">${escAttr(label || "Autonomic recovery")} · <span class="ah-key"><i class="ah-sw ah-sw-hrv"></i>HRV ${escAttr(hrvDir)} (${_r(hrv[hrv.length - 1].v)} ms)</span> <span class="ah-key"><i class="ah-sw ah-sw-rhr"></i>resting HR ${escAttr(rhrDir)} (${_r(rhr[rhr.length - 1].v)} bpm, axis inverted)</span> · both lines rising = the body downshifting into recovery — early moves are partly water & novelty.</figcaption></figure>`;
 }
 
+// P2.1 — autonomic-balance 2×2: recovery (y) vs day strain (x), last 7-8 days as dots. Four
+// states — FLOW (recovered + working), RECOVERY (recovered + easy), STRESS (depleted + working),
+// LOW (depleted + easy). Today's dot is ember; the rest muted ink. A SNAPSHOT — no trajectory
+// arrows at n≈8. No red (a low day isn't an alarm). points: [{strain, recovery, date, today}].
+export function autonomicQuadrant(points, { size = 300 } = {}) {
+  const pts = (points || []).filter((p) => Number.isFinite(p.strain) && Number.isFinite(p.recovery));
+  if (pts.length < 3) {
+    return `<figure class="chart chart--empty"><figcaption class="chart-cap label">The autonomic 2×2 fills once there are a few days of strain + recovery.</figcaption></figure>`;
+  }
+  const W = 320, H = 320, P = 26, xmax = 21, ymax = 100;
+  const x = (s) => P + (Math.max(0, Math.min(xmax, s)) / xmax) * (W - 2 * P);
+  const y = (r) => P + (1 - Math.max(0, Math.min(ymax, r)) / ymax) * (H - 2 * P);
+  const xMid = x(10), yMid = y(50);
+  const labels = [
+    { t: "FLOW", x: (xMid + (W - P)) / 2, y: P + 12 },
+    { t: "RECOVERY", x: (P + xMid) / 2, y: P + 12 },
+    { t: "STRESS", x: (xMid + (W - P)) / 2, y: H - P - 6 },
+    { t: "LOW", x: (P + xMid) / 2, y: H - P - 6 },
+  ].map((l) => `<text class="aq-lab" x="${l.x.toFixed(0)}" y="${l.y.toFixed(0)}" text-anchor="middle">${l.t}</text>`).join("");
+  const dots = pts.map((p) => `<circle class="aq-dot${p.today ? " aq-today" : ""}" cx="${x(p.strain).toFixed(1)}" cy="${y(p.recovery).toFixed(1)}" r="${p.today ? 5 : 3.5}"><title>${escAttr((p.date || "") + " · recovery " + Math.round(p.recovery) + "% · strain " + (Math.round(p.strain * 10) / 10))}</title></circle>`).join("");
+  return `<figure class="chart aq-chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Autonomic 2x2: recovery vs strain, last ${pts.length} days, today highlighted.">` +
+    `<line class="aq-div" x1="${xMid.toFixed(0)}" y1="${P}" x2="${xMid.toFixed(0)}" y2="${H - P}"/>` +
+    `<line class="aq-div" x1="${P}" y1="${yMid.toFixed(0)}" x2="${W - P}" y2="${yMid.toFixed(0)}"/>` +
+    labels + dots +
+    `<text class="aq-ax" x="${W / 2}" y="${H - 4}" text-anchor="middle">day strain →</text>` +
+    `<text class="aq-ax" x="8" y="${H / 2}" text-anchor="middle" transform="rotate(-90 8 ${H / 2})">recovery →</text>` +
+    `</svg><figcaption class="chart-cap label">Each dot a day; today is ember. A snapshot of where the body's sat lately — no trend arrow drawn at this n. Recovered + working = flow; depleted + working = stress; a low day is just low, not an alarm.</figcaption></figure>`;
+}
+
 export function sparkline(values, { height = 34 } = {}) {
   const pts = _points(values || [], "v", "d");
   if (pts.length < 2) return `<span class="spark spark--empty"></span>`;
