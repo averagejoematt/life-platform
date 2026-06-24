@@ -260,13 +260,32 @@ async function dxSelectSrc(src, preId) {
   const initId = preId && entries.some((e) => String(e.id) === String(preId)) ? preId : entries[0].id;
   dxSelectEntry(src, initId, true);
 }
-function dxBuild() {
+// P1.1 + P1.3 — Home no longer hosts the full master-detail dispatches reader (that lives in
+// Story now, one canonical home). Home shows a one-line TEASER of the latest chronicle entry +
+// the existing "read the full story in Story" link. The reader machinery (dxSelectSrc etc.)
+// stays in this file but is only used by the teaser fetch — no duplicate reader is built.
+async function dxTeaser() {
   const tabsEl = document.querySelector("[data-dx-tabs]");
-  if (!tabsEl) return;
-  tabsEl.innerHTML = DX.map((d) => `<button class="dx-tab" data-src="${d.key}" aria-pressed="false">${d.label}</button>`).join("");
-  tabsEl.querySelectorAll(".dx-tab").forEach((b) => b.addEventListener("click", () => dxSelectSrc(b.dataset.src)));
-  const m = location.hash.match(/#dispatches\/([a-z]+)(?:\/([\w-]+))?/) || [];
-  dxSelectSrc(m[1] && DX.some((d) => d.key === m[1]) ? m[1] : "chronicle", m[2]);
+  const layout = document.querySelector(".beat-dispatches .dx-layout");
+  if (tabsEl) tabsEl.hidden = true;
+  if (layout) layout.hidden = true;
+  const read = document.querySelector("[data-dx-read]");
+  if (!read) return;
+  read.hidden = false;
+  read.classList.add("dx-teaser");
+  try {
+    const data = await dxFetch("chronicle");
+    const latest = dxEntries("chronicle", data)[0];
+    if (latest) {
+      read.innerHTML =
+        `<p class="dx-kicker label">latest from the chronicle · Elena Voss${latest.date ? ` · ${esc(latest.date)}` : ""}</p>` +
+        `<h3 class="dx-title">${esc(latest.title || latest.label || "")}</h3>` +
+        (latest.excerpt ? `<p class="dx-prose">${esc(String(latest.excerpt).slice(0, 240))}…</p>` : "") +
+        `<p class="dx-foot label">The chronicle, journal, podcast &amp; the AI lab notes all read in full in <a href="/story/">Story</a> — this is just the latest beat.</p>`;
+      return;
+    }
+  } catch (e) { /* fall through to the quiet placeholder */ }
+  read.innerHTML = `<p class="beat-note">The chronicle fills in as the experiment runs — read it in <a href="/story/">Story</a>.</p>`;
 }
 
 /* ── theme ───────────────────────────────────────────────────────────────── */
@@ -305,7 +324,7 @@ async function load() {
     if (statsV._meta && statsV._meta.generated_at) bind("asof").textContent = `updated ${String(statsV._meta.generated_at).slice(0, 10)}`;
   }
   stampGenesis(document, STORY_GENESIS_SUFFIX);  // P0.1 — shared genesis source; per-door suffix
-  dxBuild();   // the native Dispatches reader (chronicle · lab notes · journal)
+  dxTeaser();  // P1.1/P1.3 — Home teases the latest chronicle; the full reader lives in Story
 
   const journeyV = journey.status === "fulfilled" ? (journey.value.journey || journey.value) : null;
   renderNumbers(journeyV);
