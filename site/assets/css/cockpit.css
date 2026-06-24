@@ -254,6 +254,21 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .rd-row.is-yellow .rd-val { color: color-mix(in oklch, var(--ember) 70%, var(--ink)); }
 .rd-row.is-red .rd-val { color: var(--ember); }
 
+/* RQA-04 — stored readiness score + component breakdown. Band worded + ember-toned, never
+   alarm-red; component bars are ember on an ink track. */
+.rd-score { display: flex; align-items: baseline; gap: var(--sp-3); margin-top: var(--sp-3); }
+.rd-score-v { font-family: var(--font-mono); font-size: var(--fs-data-xl, 2.2rem); line-height: 1; color: var(--ember); }
+.rd-score-band { text-transform: lowercase; }
+.rd-score-band.rd-band-high { color: var(--ember); }
+.rd-score-band.rd-band-mid { color: color-mix(in oklch, var(--ember) 70%, var(--ink)); }
+.rd-score-band.rd-band-low { color: var(--ink-muted); }
+.rd-comp { list-style: none; margin: var(--sp-3) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.rd-comp-row { display: grid; grid-template-columns: 5.5em 1fr 2em; align-items: center; gap: var(--sp-3); }
+.rd-comp-row .label { text-transform: lowercase; color: var(--ink-faint); }
+.rd-comp-track { height: 6px; background: var(--surface-2, color-mix(in oklch, var(--ink) 10%, transparent)); border-radius: 3px; overflow: hidden; }
+.rd-comp-fill { display: block; height: 100%; background: var(--ember); }
+.rd-comp-v { font-family: var(--font-mono); font-size: var(--fs-label); color: var(--ink-muted); text-align: right; }
+
 /* "today — where you stand" band header, above the pillar domains. */
 .cap-today { margin-top: var(--sp-5); margin-bottom: 0; }
 .cap-today + .domains { margin-top: var(--sp-3); }

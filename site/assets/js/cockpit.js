@@ -162,10 +162,32 @@ function fmtNight(iso) {
   return `${MON[+m[2] - 1]} ${+m[3]}`;
 }
 
+// RQA-04 — the STORED readiness score + component breakdown (computed by daily-metrics-compute,
+// surfaced via snapshot.readiness), not a band re-derived from raw vitals. Band worded, never red.
+const RD_BAND = { green: ["primed", "rd-band-high"], yellow: ["moderate", "rd-band-mid"], red: ["go easy", "rd-band-low"] };
+function renderReadinessScore(readiness) {
+  const wrap = $("[data-bind=readiness-score-wrap]"), comp = $("[data-bind=readiness-components]");
+  if (!wrap || !comp) return;
+  if (!readiness || readiness.score == null) { wrap.hidden = true; comp.innerHTML = ""; return; }
+  const [word, cls] = RD_BAND[String(readiness.band || "").toLowerCase()] || ["", ""];
+  bind("readiness-score").textContent = Math.round(readiness.score);
+  const bandEl = $("[data-bind=readiness-band]");
+  bandEl.textContent = word; bandEl.className = "rd-score-band label " + cls;
+  comp.innerHTML = (readiness.components || []).map((c) => {
+    const pct = Math.max(0, Math.min(100, Number(c.score) || 0));
+    return `<li class="rd-comp-row"><span class="label">${escapeHTML(c.label)}</span>` +
+      `<span class="rd-comp-track"><span class="rd-comp-fill" style="width:${pct}%"></span></span>` +
+      `<span class="rd-comp-v num">${Math.round(pct)}</span></li>`;
+  }).join("");
+  wrap.hidden = false;
+}
 function renderReadiness(vitals) {
   const sec = $("[data-readiness]");
   if (!sec) return;
-  if (!vitals) { sec.hidden = true; return; }
+  // Keep the section if the stored readiness score is showing, even with no raw vitals.
+  const scoreShown = () => { const w = $("[data-bind=readiness-score-wrap]"); return w && !w.hidden; };
+  const rows = $("[data-bind=readinessrows]");
+  if (!vitals) { if (rows) rows.innerHTML = ""; sec.hidden = !scoreShown(); return; }
 
   const night = fmtNight(vitals.night_of);
   bind("readiness-night").textContent = night ? ` · the night of ${night}` : "";
@@ -184,7 +206,7 @@ function renderReadiness(vitals) {
         `<span class="rd-val num">${escapeHTML(String(vitals[d.key]))}<small> ${d.unit}</small></span></li>`;
     })
     .join("");
-  if (!html) { sec.hidden = true; return; }
+  if (!html) { bind("readinessrows").innerHTML = ""; sec.hidden = !scoreShown(); return; }
   bind("readinessrows").innerHTML = html;
   sec.hidden = false;
 }
@@ -495,6 +517,7 @@ async function load(dateStr) {
     if (!character || charBody.error || !pillarList.length) throw new Error("character sheet unavailable");
 
     renderHub(character);
+    renderReadinessScore(snapV?.readiness);  // RQA-04 — stored readiness score + components
     renderReadiness(snapV?.vitals?.vitals);  // last night → today; hides itself if no readings
     renderDomains();
     const pri = priority.status === "fulfilled" ? priority.value : null;
