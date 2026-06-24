@@ -1048,10 +1048,61 @@ function mindRestraint(vices, timeline) {
     resetLine +
     `<p class="rd-meta label">These are private restraints — kept off the record by name, by design. The point is resilience over a perfect streak: the days already held are real, whether or not today is one of them.</p>`);
 }
+// P0.2 — the inviting absence: at week one the subjective layer is empty (mood 0, journal 0).
+// That emptiness is the POINT — the machine's blind spot — so it reads as a dignified invitation,
+// never a hollow "no data" axis. A one-tap entry affordance is present (the mechanic itself is
+// P1, gated). No nag, no guilt, no streak to keep.
+function mindInvitingAbsence(m) {
+  const moodN = Number(m.mood_entries_count) || 0;
+  if (moodN >= 4) return ""; // once mood accrues, the sparkline (P1/P2) takes over
+  return sec("How it felt — the layer the machine can't see",
+    `<div class="mi-absence"><p class="mi-lead">This is where how-it-felt goes. The machine has every number about the body this week — recovery, sleep, strain, the scale — and <em>nothing</em> about what any of it actually felt like.</p>` +
+    `<p class="mi-sub label">Nothing's logged this cycle yet, and that emptiness is the honest part of this page, not an error or a gap to scold. When there's a moment, one tap starts it — no streak to keep, no guilt for the days you don't.</p>` +
+    `<div class="mi-entry"><button class="mi-cta" type="button" data-mind-entry>＋ note how today felt</button><span class="mi-entry-note label">the one-tap capture is being wired — this space is held for it</span></div></div>`);
+}
+// P0.3 — the Mind pillar, decomposed (anti-black-box): it's not a single handed-down score, it's
+// the sum of reflection / mood / restraint / conversation depth. Most await input at week one, so
+// the pillar reads as honestly FORMING — shown with its inputs, never hidden behind a number.
+function mindPillarDecomposed(m) {
+  const inputs = [
+    { label: "reflection — journal entries", val: m.journal_entries_30d, has: (m.journal_entries_30d || 0) > 0 },
+    { label: "mood — daily check-ins", val: m.mood_entries_count, has: (m.mood_entries_count || 0) > 0 },
+    { label: "restraint — temptations resisted", val: m.resist_rate_pct != null ? m.resist_rate_pct + "%" : null, has: m.resist_rate_pct != null },
+    { label: "depth — meaningful conversation", val: m.meaningful_pct ? m.meaningful_pct + "%" : null, has: (m.meaningful_pct || 0) > 0 },
+  ];
+  const rows = inputs.map((i) => `<div class="mp-row"><span class="mp-l">${esc(i.label)}</span><span class="mp-v mono ${i.has ? "" : "mp-await"}">${i.has ? esc(String(i.val)) : "awaiting input"}</span></div>`).join("");
+  return sec("The Mind pillar — what it's built from",
+    `<div class="mp-rows">${rows}</div>` +
+    `<p class="rd-meta label">The Mind pillar isn't a single score handed down — it's the sum of reflection, mood, restraint, and the depth of the week's conversations. Most of those still await their human at week one, so the pillar is honestly <em>forming</em>, not hidden behind a number.</p>`);
+}
+// P0.4 — the Third Wall, centrepiece: the machine sees the body; it can't see the meaning. The
+// AI's weekly read vs Matthew's response slot, invitingly EMPTY (held, not absent — the human
+// gets the last word). Reuses the two-voice + held-space pattern. No reply mechanic (gated).
+async function mindThirdWall() {
+  let e = null;
+  try {
+    const list = await tryJSON("/api/field_notes");
+    const wk = list && list.entries && list.entries[0] && list.entries[0].week;
+    if (wk != null) { const full = await tryJSON(`/api/field_notes?week=${encodeURIComponent(wk)}`); e = full && full.entry; }
+  } catch (_e) { /* honest placeholder below */ }
+  const aiText = e && (e.ai_present || e.ai_affirming || e.ai_cautionary);
+  const mattText = e && (e.matthew_notes || e.matthew_agreement);
+  const aiBlock = `<p class="tv-machine"><span class="tv-mark">›</span> The AI's read of the week: ${esc(aiText || "the machine writes its weekly read here — what the body's numbers say the week was.")}</p>`;
+  const mattBlock = mattText
+    ? `<p class="tv-human">${esc(mattText)}</p>`
+    : `<div class="mw-pending"><span class="mw-who label">Matthew — the last word</span><p class="mw-lead">Held for Matthew's reply.</p><p class="mw-sub label">The machine sees the body; it can't see what it meant. This space waits for his answer — invitation, not obligation. When he writes back, it lands right here, beside the read.</p></div>`;
+  return sec("The Third Wall — the machine's read, and the last word",
+    `<div class="two-voice mind-wall">${aiBlock}${mattText ? mattBlock : ""}</div>${mattText ? "" : mattBlock}` +
+    `<p class="rd-meta label">Every other page is the machine watching — automatic, all week. This is the one place the human gets the final say over what the numbers actually meant.</p>`);
+}
 async function renderMind(d) {
+  const m = d.mind || {};
   const vices = d.vice_streaks || [];
   const parts = [];
   parts.push(mindRestraint(vices, d.vice_timeline)); // P0.1 — unnamed, cumulative-first restraint
+  parts.push(await mindThirdWall()); // P0.4 — Third Wall centrepiece (the last word, held)
+  parts.push(mindInvitingAbsence(m)); // P0.2 — the inviting absence (not a hollow axis)
+  parts.push(mindPillarDecomposed(m)); // P0.3 — Mind pillar decomposed to its inputs
   return parts.join("") || empty("The inner-life view fills in as restraint, mood, and reflection accrue.");
 }
 function renderVices(d) {
