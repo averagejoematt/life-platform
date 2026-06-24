@@ -17,6 +17,20 @@ def gov():
     return importlib.import_module("operational.cost_governor_lambda")
 
 
+@pytest.fixture(autouse=True)
+def _pin_normal_thresholds(gov, monkeypatch):
+    """Pin the production tier boundaries regardless of any temporary, calendar-
+    based headroom (e.g. the June-2026 override in _active_thresholds, #169) so
+    these tests validate the boundary POLICY deterministically year-round — not
+    whichever month the suite happens to run in. The override itself is config,
+    exercised live; here we lock the mapping the assertions below are written for.
+    Without this the whole module false-fails during the override window and
+    silently passes again afterward — exactly the kind of date-flaky test the
+    black gate was masking until 2026-06-24.
+    """
+    monkeypatch.setattr(gov, "_active_thresholds", lambda: gov._TIER_THRESHOLDS)
+
+
 # ── _tier_for: threshold mapping ─────────────────────────────────────────────
 
 
