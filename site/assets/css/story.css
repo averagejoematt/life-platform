@@ -42,6 +42,8 @@ body { overflow-x: hidden; }
 
 .kicker { color: var(--ember); }
 .hero-day { color: var(--ink-muted); margin: var(--sp-2) 0 0; padding-left: var(--sp-2); border-left: 2px solid var(--ember); }
+/* P2.1 — the live proof line paired with genesis, up in the hero. */
+.hero-proof { color: var(--ember); font-family: var(--font-mono); font-size: var(--fs-small); margin: var(--sp-1) 0 0; padding-left: var(--sp-2); border-left: 2px solid var(--ember); }
 .hero-h {
   font-family: var(--font-serif); font-weight: var(--weight-med);
   font-size: var(--fs-display); line-height: 1.02; letter-spacing: -0.015em;

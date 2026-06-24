@@ -12,7 +12,7 @@
 */
 
 import { lineChart } from "/assets/js/charts.js";
-import { stampGenesis } from "/assets/js/coach_popover.js"; // P0.1 — the one genesis source of truth
+import { stampGenesis, genesisCount } from "/assets/js/coach_popover.js"; // P0.1 — the one genesis source of truth
 
 const $ = (s, r = document) => r.querySelector(s);
 const bind = (n, r = document) => r.querySelector(`[data-bind="${n}"]`);
@@ -126,6 +126,18 @@ function renderNumbers(journey) {
   }
   if (journey.current_weight_lbs != null) bind("current").textContent = journey.current_weight_lbs;
   if (journey.progress_pct != null) bind("progress").textContent = `${journey.progress_pct}%`;
+  // P2.1 — pair the live weight delta with the genesis timeframe up in the hero, so the claim
+  // meets its proof on the opening screen (down-beat waveform leads just below).
+  if (journey.lost_lbs != null) {
+    const lost = Number(journey.lost_lbs);
+    const { dayN } = genesisCount();
+    const hp = bind("hero-proof");
+    if (hp) {
+      const dir = lost > 0.05 ? `down ${Math.round(Math.abs(lost) * 10) / 10} lb` : lost < -0.05 ? `up ${Math.round(Math.abs(lost) * 10) / 10} lb` : "even";
+      hp.textContent = `${dir} in ${dayN} days — the shape of it, every day, just below.`;
+      hp.hidden = false;
+    }
+  }
   if (journey.projected_goal_date) {
     bind("projected").textContent = `At the current rate, goal lands around ${journey.projected_goal_date}. Correlative projection — not a promise.`;
   } else if (journey.rate_provisional) {
