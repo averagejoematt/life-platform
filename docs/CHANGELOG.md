@@ -1,3 +1,15 @@
+## Doors / cross-site IA redesign — one documentary, five doors (P0→P3) — 2026-06-23
+
+Cross-site IA/editorial pass over the five doors (Home/Cockpit/Story/Coaching/Evidence). 5-door model + me-first LOCKED (untouched). Per `docs/SPEC_DOORS_EXPERIENCE_REDESIGN_2026-06-21.md`; 11 P-item commits; **front-end only, no server change.** Deployed + live-verified (all doors "Day 10 · Week 2", zero console errors).
+
+**P0 — one genesis source of truth:** `genesisCount()` in `coach_popover.js` is now the single source; removed `story.js`'s duplicate day/week math (the drift that had Home on Week 1 vs Story/Coaching Week 2 — already live-fixed by WQA-07, this removes the risk).
+
+**P1 — one artifact, one home:** Home no longer hosts the full chronicle reader (→ teaser + link to Story) or the full Third Wall (→ teaser + "the full exchange lives in Coaching"); reader ownership routed correctly (chronicle/journal/podcast → Story, lab notes → Coaching; Coaching keeps its own team+lab-notes reader, no dup).
+
+**P2 — per-door uplevels:** Home pulls proof up to the promise (live weight-delta + genesis paired in the hero, the down-beat waveform now LEADS the arc — me-first + constellation intact) · Cockpit "sum of seven pillars" link wires the big level to its pillars (anti-black-box) + Month/Journey quieted as deeper scopes · Story promotes "In my own words" + the growing timeline to first-class cards · Coaching frames track record as "score unlocks as predictions resolve" + expands the cryptic disagreement lines into readable head-to-head arguments with the integrator's call (WQA-06 fields) · one-line descriptor per nav door across all 55 nav files.
+
+**P3 — the moat:** the Third-Wall reply slot is now first-class held space (waiting, not absent; dashed-ember frame) — **the reply mechanic is intentionally NOT wired** (held per its STOP-AND-ASK + the no-fabricated-reply rule); track records auto-activate as predictions resolve. PR #206.
+
 ## Vitals page redesign (P0→P3 — glance-first landing page, three altitudes) — 2026-06-23
 
 Reframed `/evidence/vitals/` — THE landing page — as a glance-first instrument panel that bleeds into the analysis: **"an instant, honest tell at the top; the full documentary as you scroll."** Per `docs/SPEC_VITALS_PAGE_REDESIGN_2026-06-21.md`; 7 P-item commits; **front-end only, no server change.** Deployed + live-verified (10 sections, zero console errors). Sixth Evidence page.
