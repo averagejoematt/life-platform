@@ -275,7 +275,9 @@ def classify_singleton(cluster, vocab=None):
 # ── orchestration ────────────────────────────────────────────────────────────
 def _signature(member_entries):
     toks = sorted(e["token"] for e in member_entries)
-    h = hashlib.sha1("|".join(toks).encode()).hexdigest()[:12]
+    # Non-cryptographic: sha1 is only a short, stable grouping signature for meal
+    # dedup (not security). usedforsecurity=False documents that and satisfies S324.
+    h = hashlib.sha1("|".join(toks).encode(), usedforsecurity=False).hexdigest()[:12]
     return f"{'+'.join(toks)}#{h}" if toks else f"empty#{h}"
 
 

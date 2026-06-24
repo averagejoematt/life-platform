@@ -17,8 +17,8 @@ TESTS = os.path.join(ROOT, "tests")
 if TESTS not in sys.path:
     sys.path.insert(0, TESTS)
 
-import site_review_bindings as B  # noqa: E402
 import site_review as sr  # noqa: E402
+import site_review_bindings as B  # noqa: E402
 
 
 class TestBindingMap:

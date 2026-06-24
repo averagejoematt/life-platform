@@ -24,11 +24,10 @@ intentionally deferred — see docs/specs/ER_EXTERNAL_REVIEW_RIGOR_2026-06-09.md
 import json
 import os
 
-import pytest
-
 # er03_gate lives in lambdas/ (shipped in the layer). The test runner puts lambdas/
 # on sys.path via conftest; import directly.
 import er03_gate
+import pytest
 
 _FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "ai_inputs", "faithfulness_cases.json")
 _LAMBDAS = os.path.join(os.path.dirname(__file__), os.pardir, "lambdas")

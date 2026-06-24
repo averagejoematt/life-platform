@@ -9,9 +9,8 @@ import copy
 import json
 import os
 
-import pytest
-
 import meal_grouper as mg  # conftest puts lambdas/ on sys.path
+import pytest
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "food_log_2026-06-15_18.json")
 

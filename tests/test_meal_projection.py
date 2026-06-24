@@ -9,9 +9,8 @@ No AWS — a fake table records every write/delete/query.
 import json
 import os
 
-import pytest
-
 import meal_projection as mp  # conftest puts lambdas/ on sys.path
+import pytest
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "food_log_2026-06-15_18.json")
 USER = "matthew"
@@ -37,10 +36,9 @@ class FakeTable:
 
     def query(self, **kwargs):
         # only used for _existing_meal_sks: pk == MEALS_PK, sk begins_with DATE#<date>#MEAL#
-        # emulate by returning stored meal sks for the queried pk/date prefix
-        prefix = kwargs.get("_test_prefix")
-        # derive prefix from the KeyConditionExpression is awkward; instead match all
-        # meal-partition rows (the writer only ever queries the meals pk for one date)
+        # emulate by returning stored meal sks for the queried pk/date prefix.
+        # Deriving the prefix from the KeyConditionExpression is awkward; instead match
+        # all meal-partition rows (the writer only ever queries the meals pk for one date)
         items = [{"sk": sk} for (pk, sk) in self.store if pk == MEALS_PK]
         return {"Items": items}
 
