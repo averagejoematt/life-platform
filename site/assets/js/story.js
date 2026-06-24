@@ -12,6 +12,7 @@
 */
 
 import { lineChart } from "/assets/js/charts.js";
+import { stampGenesis } from "/assets/js/coach_popover.js"; // P0.1 — the one genesis source of truth
 
 const $ = (s, r = document) => r.querySelector(s);
 const bind = (n, r = document) => r.querySelector(`[data-bind="${n}"]`);
@@ -103,16 +104,10 @@ function drawConstellation(pillars) {
 /* ── the numbers beat ────────────────────────────────────────────────────── */
 // The throughline anchor: stamp "Day N · Week N since genesis" so the site's youth is the
 // headline, not an inconsistency. Genesis = the current experiment start (2026-06-14).
-function stampGenesis() {
-  const el = bind("genesisStamp");
-  if (!el) return;
-  const genesis = new Date("2026-06-14T00:00:00");
-  const dayN = Math.floor((Date.now() - genesis.getTime()) / 86400000) + 1;
-  if (dayN < 1) return;
-  const weekN = Math.floor((dayN - 1) / 7) + 1;
-  el.textContent = `Day ${dayN} · Week ${weekN}, since June 14 2026 — a transformation you can watch happen in real time.`;
-  el.hidden = false;
-}
+// P0.1 — genesis math now lives in coach_popover.js (one source of truth). Home/Story keep
+// their "watch it happen" suffix; the day/week numbers come from the shared util so no door
+// can drift (the bug that had Home on Week 1 while Story/Coaching were on Week 2).
+const STORY_GENESIS_SUFFIX = " — a transformation you can watch happen in real time.";
 function renderNumbers(journey) {
   if (!journey) return;
   if (journey.lost_lbs != null) {
@@ -309,7 +304,7 @@ async function load() {
     if (statsV.elena_hero_line) bind("elena").textContent = statsV.elena_hero_line;
     if (statsV._meta && statsV._meta.generated_at) bind("asof").textContent = `updated ${String(statsV._meta.generated_at).slice(0, 10)}`;
   }
-  stampGenesis();  // "Day N · Week N since June 14" — the honest throughline anchor
+  stampGenesis(document, STORY_GENESIS_SUFFIX);  // P0.1 — shared genesis source; per-door suffix
   dxBuild();   // the native Dispatches reader (chronicle · lab notes · journal)
 
   const journeyV = journey.status === "fulfilled" ? (journey.value.journey || journey.value) : null;
