@@ -284,7 +284,7 @@ async function dxTeaser() {
         `<p class="dx-kicker label">latest from the chronicle · Elena Voss${latest.date ? ` · ${esc(latest.date)}` : ""}</p>` +
         `<h3 class="dx-title">${esc(latest.title || latest.label || "")}</h3>` +
         (latest.excerpt ? `<p class="dx-prose">${esc(String(latest.excerpt).slice(0, 240))}…</p>` : "") +
-        `<p class="dx-foot label">The chronicle, journal, podcast &amp; the AI lab notes all read in full in <a href="/story/">Story</a> — this is just the latest beat.</p>`;
+        `<p class="dx-foot label">The chronicle, journal &amp; podcast read in full in <a href="/story/">Story</a>; the AI lab notes live in <a href="/coaching/">Coaching</a>. This is just the latest beat.</p>`;
       return;
     }
   } catch (e) { /* fall through to the quiet placeholder */ }
