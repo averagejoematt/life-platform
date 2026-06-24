@@ -1330,10 +1330,35 @@ def handle_achievements() -> dict:
     )
 
 
+def _latest_readiness() -> dict | None:
+    """RQA-04 — the pre-computed readiness score + component breakdown from computed_metrics
+    (written by daily-metrics-compute). Surfaced read-only so the Cockpit shows the STORED
+    score + its components, not just a band re-derived from raw vitals. None if not computed."""
+    rec = _latest_item("computed_metrics")
+    if not rec or rec.get("readiness_score") is None:
+        return None
+    comp = rec.get("component_scores") or {}
+    # Normalise the stored component keys to display labels (stable order).
+    label_map = [
+        ("recovery", "recovery"),
+        ("sleep_quality", "sleep"),
+        ("movement", "movement"),
+        ("habits_mvp", "habits"),
+        ("hydration", "hydration"),
+    ]
+    components = [{"key": k, "label": lbl, "score": round(float(comp[k]), 1)} for k, lbl in label_map if comp.get(k) is not None]
+    return {
+        "score": round(float(rec["readiness_score"]), 1),
+        "band": rec.get("readiness_colour"),  # green / yellow / red
+        "components": components,
+        "as_of": (rec.get("sk", "") or "").replace("DATE#", "") or rec.get("date"),
+    }
+
+
 def handle_snapshot() -> dict:
     """
     GET /api/snapshot
-    Combined response: vitals + journey + character in one call.
+    Combined response: vitals + journey + character (+ readiness) in one call.
     Reduces client-side roundtrips for pages that need all three (e.g. /live/, homepage).
     On partial failure any sub-object is null; callers must handle gracefully.
     """
@@ -1359,10 +1384,17 @@ def handle_snapshot() -> dict:
         logger.warning("[snapshot] character failed: %s", _e)
         character_body = None
 
+    try:
+        readiness_body = _latest_readiness()
+    except Exception as _e:
+        logger.warning("[snapshot] readiness failed: %s", _e)
+        readiness_body = None
+
     payload = {
         "vitals": vitals_body,
         "journey": journey_body,
         "character": character_body,
+        "readiness": readiness_body,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
     return {
