@@ -365,3 +365,69 @@ def test_reconcile_does_not_flag_deduped_gps_drop_twin():
     api = [_api(111, "2026-06-17T00:05:43Z"), _api(999, "2026-06-17T00:06:00Z")]
     stored = [_stored(111, "2026-06-17T00:05:43Z")]
     assert strava._activities_missing_from_store(api, stored) == []
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Gap detection — trailing-day re-fetch (late-arriving Strava activities)
+# ══════════════════════════════════════════════════════════════════════════
+#
+# Gap detection is presence-based: once a date has ANY record it is never
+# re-fetched. Strava activities sync late (a walk uploaded after its local day
+# rolled past "today"), so they land on a past, already-present date and were
+# silently dropped. refresh_trailing_days=N forces the last N days to re-fetch
+# regardless of presence; this pins that behaviour.
+
+from types import SimpleNamespace  # noqa: E402
+
+import ingestion_framework as framework  # noqa: E402
+
+
+class _FakeTable:
+    """Minimal DDB stand-in: query() returns a fixed set of present dates."""
+
+    def __init__(self, present_dates):
+        self._present = present_dates
+
+    def query(self, **_kwargs):
+        return {"Items": [{"sk": f"DATE#{d}"} for d in self._present]}
+
+
+class _NullLogger:
+    def info(self, *_a, **_k):
+        pass
+
+
+def _cfg(**over):
+    base = dict(user_id="matthew", source_name="strava", lookback_days=7, refresh_today=True, refresh_trailing_days=0)
+    base.update(over)
+    return SimpleNamespace(**base)
+
+
+def _days_ago(n):
+    return (datetime.now(timezone.utc).date() - __import__("datetime").timedelta(days=n)).strftime("%Y-%m-%d")
+
+
+def test_gapfill_trailing_days_refetch_even_when_present():
+    # Every day of the lookback window already has a record. With trailing=3 the
+    # last 3 days (plus today via refresh_today) must STILL be re-fetched.
+    present = [_days_ago(i) for i in range(0, 8)]  # today .. 7 days ago, all stored
+    cfg = _cfg(refresh_trailing_days=3)
+    missing = framework._find_missing_dates(_FakeTable(present), cfg, _NullLogger())
+    assert missing == sorted({_days_ago(0), _days_ago(1), _days_ago(2), _days_ago(3)})
+
+
+def test_gapfill_trailing_zero_keeps_today_only_when_all_present():
+    # Control: with trailing=0, only today is forced (refresh_today); a fully
+    # populated window yields no past-day re-fetches.
+    present = [_days_ago(i) for i in range(0, 8)]
+    cfg = _cfg(refresh_trailing_days=0)
+    missing = framework._find_missing_dates(_FakeTable(present), cfg, _NullLogger())
+    assert missing == [_days_ago(0)]
+
+
+def test_gapfill_trailing_still_reports_genuine_older_gap():
+    # A real gap 5 days back (outside the trailing window) is still caught.
+    present = [d for i in range(0, 8) if (d := _days_ago(i)) != _days_ago(5)]
+    cfg = _cfg(refresh_trailing_days=3)
+    missing = framework._find_missing_dates(_FakeTable(present), cfg, _NullLogger())
+    assert _days_ago(5) in missing

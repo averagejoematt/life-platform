@@ -245,6 +245,7 @@ class IngestionConfig:
         enable_secret_writeback: bool = False,
         gap_rate_limit_seconds: float = 1.0,
         refresh_today: bool = False,
+        refresh_trailing_days: int = 0,
     ):
         self.source_name = source_name
         self.secret_id = secret_id
@@ -260,6 +261,16 @@ class IngestionConfig:
         # today's record overwritten on every run, not just when missing. Setting
         # refresh_today=True adds today to the gap-fill check set unconditionally.
         self.refresh_today = refresh_today
+        # Late-arriving data (2026-06-24): gap detection is presence-based — once a
+        # date has *any* record it is never re-fetched. But some sources (Strava:
+        # activities sync from a watch/phone hours-to-days after they happen, often
+        # after their local day has already rolled past "today") gain new entries
+        # for a *past* date that the store already considers "present", so those
+        # entries are silently dropped (the Jun 2026 afternoon-walk gap that the
+        # DI-2 reconciler caught). refresh_trailing_days=N forces the last N days to
+        # be re-fetched every run, regardless of presence — transform() rebuilds the
+        # whole day from all API activities, so a re-fetch merges in late arrivals.
+        self.refresh_trailing_days = refresh_trailing_days
 
         # Environment
         self.region = os.environ.get("AWS_REGION", "us-west-2")
@@ -323,6 +334,11 @@ def _find_missing_dates(table, config, logger):
     Phase 4.1 / Habitify: if config.refresh_today is True, today is always
     included regardless of whether the record exists — sources like Habitify
     update throughout the day and need overwrites on every hourly run.
+
+    Late-arriving data: if config.refresh_trailing_days is N (>0), the last N
+    days are likewise always re-fetched regardless of presence, so activities
+    that sync to the source after their local day has rolled (Strava walks) are
+    picked up instead of being stranded behind an already-present record.
     """
     from boto3.dynamodb.conditions import Key
 
@@ -343,6 +359,8 @@ def _find_missing_dates(table, config, logger):
     existing = {item["sk"][5:] for item in resp.get("Items", [])}
     if config.refresh_today:
         existing.discard(today_str)  # force today to be considered "missing"
+    for i in range(1, getattr(config, "refresh_trailing_days", 0) + 1):
+        existing.discard((today - timedelta(days=i)).strftime("%Y-%m-%d"))  # force trailing days to re-fetch
     missing = sorted(check_dates - existing)
 
     if missing:

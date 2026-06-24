@@ -324,6 +324,12 @@ _config = IngestionConfig(
     enable_secret_writeback=True,
     enable_item_size_guard=True,
     refresh_today=True,
+    # Strava activities frequently sync from a watch/phone hours-to-days after
+    # they happen — often after their local day has rolled past "today" — so they
+    # land on a past date the store already considers present and were silently
+    # dropped (the Jun 2026 afternoon-walk gap the DI-2 reconciler flagged).
+    # Re-fetch the trailing 3 days every run so late arrivals are merged in.
+    refresh_trailing_days=3,
 )
 
 
