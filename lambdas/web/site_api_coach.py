@@ -356,13 +356,16 @@ def _team_tensions():
             if not isinstance(d, dict):
                 continue
             coaches = d.get("coaches_involved") or d.get("coaches") or []
+            # WQA-06: the integrator digest stores the argument as position_a/position_b
+            # + nakamura_call (the integrator's adjudication). Earlier code read the wrong
+            # field names, so the head-to-head came back empty. Read the real names first.
             out.append(
                 {
                     "topic": d.get("topic") or d.get("domain") or "",
                     "coaches": coaches,
-                    "summary": d.get("resolution_suggested") or d.get("tension") or d.get("summary") or "",
-                    "position_a": d.get("coach_a_position"),
-                    "position_b": d.get("coach_b_position"),
+                    "position_a": d.get("position_a") or d.get("coach_a_position"),
+                    "position_b": d.get("position_b") or d.get("coach_b_position"),
+                    "resolution": (d.get("nakamura_call") or d.get("resolution_suggested") or d.get("tension") or d.get("summary") or ""),
                 }
             )
         return out
