@@ -48,6 +48,14 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 }
 .scope-btn:hover { color: var(--ink-muted); }
 .scope-btn.is-active { color: var(--ink); background: color-mix(in oklch, var(--ink) 8%, transparent); }
+/* P2.2 — Month/Journey are deeper scopes: quieter by default so the cockpit opens calm. */
+.scope-sep { width: 1px; align-self: stretch; margin: 0 var(--sp-1); background: var(--rule); }
+.scope-btn.scope-deep { opacity: 0.6; font-size: 0.9em; }
+.scope-btn.scope-deep.is-active { opacity: 1; }
+/* P2.2 — the composite level decomposes to its pillars (anti-black-box). */
+.hub-decomp { text-align: center; margin: var(--sp-2) 0 0; }
+.hub-decomp a { color: var(--ink-muted); text-decoration: none; }
+.hub-decomp a:hover { color: var(--ember); }
 
 .theme-toggle {
   appearance: none; cursor: pointer; background: transparent;
