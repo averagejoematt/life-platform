@@ -1,3 +1,17 @@
+## Vitals page redesign (P0→P3 — glance-first landing page, three altitudes) — 2026-06-23
+
+Reframed `/evidence/vitals/` — THE landing page — as a glance-first instrument panel that bleeds into the analysis: **"an instant, honest tell at the top; the full documentary as you scroll."** Per `docs/SPEC_VITALS_PAGE_REDESIGN_2026-06-21.md`; 7 P-item commits; **front-end only, no server change.** Deployed + live-verified (10 sections, zero console errors). Sixth Evidence page.
+
+**Introduces a reserved alert RED** (`--alert`, restrained oxblood) — the first page to use red, scoped strictly to a genuine STATE (run-down / out-of-range), **never to encode a falling direction** (RHR-down / HRV-up / weight-down stay ember-positive). Zero red renders on a recovered day.
+
+**Altitude 1 — the glance (P0.1–P0.4):** status word **synthesised from 4 component rings** (recovery/HRV/RHR/sleep — anti-black-box, never a lone grade; new `ring` primitive) · now/7d/30d ladder (30d "fills in" at week one) · earned glyph row that lights ember **only on a real daily signal** (habits "X of N today" honest fallback, no fabricated hourly baseline; cross-links Habits) · thin-data stamp ("10 days in — baseline forming") + dashed ring tracks.
+
+**Altitude 2 — the synthesis (P1.1–P1.3):** two-voice autonomic narrative · autonomic hero (RHR + HRV in one frame, **RHR axis inverted so down reads ember-positive**, "the body downshifting" annotation; new `autonomicHero`) · readiness decomposed into HRV/RHR/sleep driver bars.
+
+**Altitude 3 — the analysis (P2.1–P2.5):** autonomic 2×2 (recovery vs strain, today ember, **no trajectory arrows** at n≈8; new `autonomicQuadrant`) · small-multiples grid **replacing the 8 equal hero charts** · background-vitals honest empty (SpO₂/skin-temp/resp not captured — no fake "all in range") · hub links out to each domain page.
+
+**Phase 3 (P3.1–P3.6, gated):** honest capture cards (BP cuff / hourly habits / walking HR / VO₂max / subjective mood); **cross-metric correlations WITHHELD until ≥2 weeks** (no coefficient at ~day 10; reuses the Sleep correlation board when the window opens). PR #205.
+
 ## WQA-06 — coach disagreements surfaced on the board — 2026-06-23
 
 The board page showed eight parallel coach monologues but never the *argument* — the stated moat. Two fixes: (1) `_team_tensions` was reading the wrong field names (`coach_a_position`/`resolution_suggested`) so positions came back empty — the integrator digest actually stores `position_a`/`position_b`/`nakamura_call`; fixed the mapping. (2) `renderBoard` gained a "where the coaches disagree — the argument, not the consensus" section above the roster: each card shows the topic, the two coaches' positions **head-to-head**, and **the integrator's (Coach Nakamura's) call**. Live, two real disagreements surface — Nutrition vs Labs on protein/meal architecture, Training vs Mind on rest-day philosophy — each adjudicated. Ember on the coach labels + verdict, positions muted, never red. Deployed + live-verified. PR #204.
