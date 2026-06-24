@@ -155,6 +155,15 @@ body { overflow-x: hidden; }
 .sf-title { font-family: var(--font-serif, Fraunces), serif; font-size: var(--fs-h4, 1.1rem); color: var(--ink); line-height: 1.25; }
 .story-feat .sf-sub { color: var(--ink-muted); }
 @media (max-width: 640px) { .story-features { grid-template-columns: 1fr; } }
+/* P2.4 — Coaching: readable disagreement cards (positions head-to-head + the integrator's call). */
+.tt-card { list-style: none; border: var(--honest-border); border-radius: var(--radius-sm); padding: var(--sp-4); margin-bottom: var(--sp-3); }
+.tt-topic { margin: 0 0 var(--sp-3); font-family: var(--font-serif, Fraunces), serif; font-size: var(--fs-h4, 1.05rem); }
+.tt-cols { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
+.tt-who { color: var(--ember); text-transform: uppercase; letter-spacing: var(--tracking-label); display: block; margin-bottom: var(--sp-1); }
+.tt-text { margin: 0; color: var(--ink-muted); font-size: var(--fs-small); line-height: 1.5; }
+.tt-call { margin: var(--sp-3) 0 0; padding-top: var(--sp-3); border-top: 1px solid var(--rule); font-size: var(--fs-small); line-height: 1.5; }
+.tt-call-k { color: var(--ember); text-transform: uppercase; letter-spacing: var(--tracking-label); display: block; margin-bottom: var(--sp-1); }
+@media (max-width: 640px) { .tt-cols { grid-template-columns: 1fr; } }
 
 /* Dispatches reader — chronicle · lab notes · journal (master-detail) */
 .dx-tabs { display: flex; gap: var(--sp-1); margin-top: var(--sp-5); border-bottom: var(--border-hair); }
