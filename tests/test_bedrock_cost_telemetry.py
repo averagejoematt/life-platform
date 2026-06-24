@@ -25,7 +25,6 @@ sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
 import bedrock_client as bc  # noqa: E402
 
-
 # ── estimate_cost_usd (pure) ─────────────────────────────────────────────────
 
 

@@ -4,6 +4,9 @@ Tool registry: maps tool names to their functions and JSON schemas.
 
 from mcp.config import P40_GROUPS, RAW_DAY_LIMIT, SOURCES
 from mcp.tools_adaptive import get_adaptive_mode
+
+# BENCH-1: cut-benchmarking & regain firewall (PRIVATE, view-dispatched).
+from mcp.tools_benchmark import tool_get_benchmark
 from mcp.tools_board import tool_get_board_of_directors
 from mcp.tools_cgm import tool_get_cgm, tool_get_glucose_meal_response
 from mcp.tools_challenges import (
@@ -173,13 +176,10 @@ from mcp.tools_training import (
     tool_get_lactate_threshold_estimate,
     tool_get_training,
 )
+from mcp.tools_training_notes import tool_get_exercise_notes
 
 # Vacation fund tracker ($1/workout-mile since experiment start).
 from mcp.tools_vacation import tool_get_vacation_fund
-
-# BENCH-1: cut-benchmarking & regain firewall (PRIVATE, view-dispatched).
-from mcp.tools_benchmark import tool_get_benchmark
-from mcp.tools_training_notes import tool_get_exercise_notes
 
 TOOLS = {
     "get_exercise_notes": {

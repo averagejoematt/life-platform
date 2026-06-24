@@ -102,8 +102,8 @@ from web.site_api_data import (
     handle_inference_receipt,
     handle_labs,
     handle_ledger,
-    handle_phenoage,
     handle_observatory_week,
+    handle_phenoage,
     handle_platform_stats,
     handle_protocols,
     handle_sleep_correlations,
@@ -130,6 +130,7 @@ from web.site_api_intelligence import (
 # P1.1 Phase B step 2 (2026-05-26): observatory handlers extracted to sibling module.
 from web.site_api_observatory import (
     handle_benchmark_trends,
+    handle_deficit_sustainability,
     handle_food_delivery_overview,
     handle_frequent_meals,
     handle_journal_analysis,
@@ -137,7 +138,6 @@ from web.site_api_observatory import (
     handle_meal_responses,
     handle_mind_overview,
     handle_nutrition_overview,
-    handle_deficit_sustainability,
     handle_physical_overview,
     handle_protein_sources,
     handle_strength_benchmarks,

@@ -19,9 +19,8 @@ from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-import boto3  # noqa: E402
-
 import auth_breaker as ab  # noqa: E402
+import boto3  # noqa: E402
 
 
 class _CW:

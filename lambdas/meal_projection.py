@@ -15,7 +15,6 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from boto3.dynamodb.conditions import Key
-
 from meal_grouper import group_day
 from meal_templates_seed import ALGO_VERSION
 

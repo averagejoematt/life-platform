@@ -135,8 +135,10 @@ def build_episode_record(ep: dict) -> dict:
 # datadrop CSVs (the real-validation test).
 # ==============================================================================
 
-from datetime import date as _date  # noqa: E402
-from datetime import timedelta as _timedelta  # noqa: E402
+from datetime import (
+    date as _date,  # noqa: E402
+    timedelta as _timedelta,  # noqa: E402
+)
 
 MIN_SWING_LB = 12.0
 MIN_EPISODE_LB = 15.0

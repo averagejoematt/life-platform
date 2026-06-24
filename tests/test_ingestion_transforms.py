@@ -31,8 +31,8 @@ for _k, _v in {
 }.items():
     os.environ.setdefault(_k, _v)
 
-from ingestion.garmin_lambda import transform as garmin_transform  # noqa: E402
 from ingestion import strava_lambda as strava  # noqa: E402
+from ingestion.garmin_lambda import transform as garmin_transform  # noqa: E402
 from ingestion.strava_lambda import _normalize as strava_normalize  # noqa: E402
 from ingestion.whoop_lambda import (  # noqa: E402
     _extract_cycle,
