@@ -1,6 +1,6 @@
 # Life Platform — Open Backlog
 
-**Last updated:** 2026-06-23 (Physical page shipped — weight cockpit + composition arc + transparent PhenoAge, PR #201; PHY-01..06 follow-ups added incl. the PhenoAge age-inversion residual decision; prior: Nutrition/Training/Sleep/Habits all shipped + deployed, EVR-01..06 follow-ups; 2026-06-09 ER-02 upstream-API contract tests DONE → CHANGELOG; ER external-review-lens rigor series ER-01..08; 2026-06-07 v8.4.0 PG product/growth summit, ADR-077 phase taxonomy + restart tooling)
+**Last updated:** 2026-06-23 (redesign marathon — Physical/Vitals/Mind pages + Doors IA + RQA-04/05 + WQA-06 all shipped; follow-ups added: PHY-01..06, VIT-01..06, DOORS-01, MIND-01..05 (Mind capture DEFERRED pending invitation-UX sign-off). Prior: Nutrition/Training/Sleep/Habits shipped, EVR-01..06; 2026-06-09 ER-02 upstream-API contract tests DONE → CHANGELOG; ER external-review-lens rigor series ER-01..08; 2026-06-07 v8.4.0 PG product/growth summit, ADR-077 phase taxonomy + restart tooling)
 **Source:** Synthesis of V1 audit (2026-05-17, ADR-057), V2 audit (2026-05-17, `docs/V2_AUDIT_PLAN.md`), V2 follow-up sessions (2026-05-18/19), the 2026-05-29 marathon (Bedrock cutover, budget guard, remediation agent, May-30 restart), the 2026-06-01/02 v4 website launch + QA sweep, and the 2026-06-03 operations/cost session (ADR-074/075). Data-blocked items D-01/D-03/D-04 + N-01/L-11 re-checked against live AWS on 2026-06-03.
 
 > Single source of truth for everything **not done**. Items closed-with-rationale (ADR-057) and items shipped are not listed — see `docs/CHANGELOG.md` for what landed and `docs/DECISIONS.md` for what was formally closed.
@@ -128,6 +128,29 @@
 - [ ] **PHY-04 — progress-photo capture + privacy stance (STOP-AND-ASK before any public/blurred render).** Private-by-default; the faceless silhouette is the public-safe proxy. No public photo render without explicit opt-in.
 - [ ] **PHY-05 — composition velocity (GATED).** Lean/fat/visceral change per week — build ONLY once a 2nd valid DEXA exists AND the delta clears the scan's least-significant-change. Placeholder until then (never off one scan).
 - [ ] **PHY-06 — complementary ages (optional).** Vascular age (Withings PWV, type 91) + VO₂max fitness age as secondary lenses beside PhenoAge (the anchor). WHOOP Age is NOT in the official API — do not build on the unofficial password-auth scrape without explicit sign-off + a "fragile source" label.
+
+---
+
+### Vitals-page redesign follow-ups (2026-06-23, PR #205 — glance-first, three altitudes)
+
+Front-end-only redesign shipped (status rings, autonomic hero, 2×2, small-multiples). Introduced the reserved `--alert` RED token (state-alerts only, never direction). Phase-3 cards are honest gated states; follow-ups (VIT-series):
+- [ ] **VIT-01 — blood-pressure cuff capture** → a BP trend on the vitals page (highest-value missing daily vital).
+- [ ] **VIT-02 — hourly habit-completion history** → upgrades the glyph row from "X of N today" to "vs your average by this hour" (no fabricated baseline until then).
+- [ ] **VIT-03 — continuous/walking HR · VIT-04 VO₂max trend · VIT-05 subjective energy/mood 1–5** (needs capture).
+- [ ] **VIT-06 — cross-metric vitals correlations** (WATCH): withheld until ≥2 weeks overlap; auto-opens reusing the Sleep correlation board. No coefficient drawn before the window.
+
+### Doors / cross-site IA follow-up (2026-06-23, PR #206)
+
+- [ ] **DOORS-01 — Third-Wall reply MECHANIC (STOP-AND-ASK, shared with MIND-04).** The empty reply slot is first-class held-space on Home/Coaching/Mind; the actual reply path (input → store → render Matthew's words) is intentionally unbuilt. Needs the invitation-not-obligation reply UX confirmed + a write path. The platform must never fabricate a first-person reply ([[feedback_sensitive_content]] / WQA-04). One mechanic serves all three surfaces.
+
+### Mind-page redesign series (2026-06-23, PR #207 — Phase 0 shipped; capture DEFERRED)
+
+**Premise:** the most sensitive page. Phase 0 shipped (unnamed restraint cumulative-first, inviting absence, Third Wall, decomposed pillar; ZERO red; fixed a live vice-name privacy leak). Phase 1 (the friction-killer capture) is DEFERRED pending Matthew's sign-off on the invitation-not-obligation UX (its explicit STOP-AND-ASK) + a write path. **No mood/temptation capture coercion, ever; no nags/guilt/gamified streaks on mood; relapse logging must feel safe or it won't happen.**
+- [ ] **MIND-01 — 1-tap daily mood (the friction-killer).** ~5 faces/dots + optional note, logged instantly; NO streak counter on mood, no "you missed yesterday." Capturable from Mind / Cockpit / Vitals glyph row / email reply. Accrues into a quiet sparkline. **Confirm UX + build the write path first (site-api is near-read-only).** Highest leverage — likely the one to ship first.
+- [ ] **MIND-02 — weekly reflection prompt** → one gentle rotating question as a journal seed; skippable, no guilt.
+- [ ] **MIND-03 — temptation quick-log + private resist-rate ledger** (`log_temptation`/`get_temptation_trend` exist as MCP tools — needs a web write path); judgment-free both ways.
+- [ ] **MIND-04 — Third-Wall reply mechanic** (= DOORS-01; the held slot is built, the mechanic is gated).
+- [ ] **MIND-05 — mood-vs-recovery overlay** (needs ~2 weeks of mood logs): "did I feel as good as my body said?" Observation-only, no Pearson/chip under the window. Placeholder until then.
 
 ---
 

@@ -1,3 +1,16 @@
+## Mind page redesign — Phase 0 (the layer the machine can't see); capture deferred — 2026-06-23
+
+Reframed `/evidence/mind/` (the most sensitive page) on the spine **"the layer the machine can't see — awaiting its human."** Per `docs/SPEC_MIND_PAGE_REDESIGN_2026-06-21.md`; **Phase 0 only** (P0.1–P0.4, front-end); the Phase-1 capture mechanics are DEFERRED pending the invitation-not-obligation UX sign-off (its explicit STOP-AND-ASK) — tracked as MIND-01..05. Deployed + live-verified. Seventh page redesign.
+
+**Fixed a live privacy leak:** the previous page rendered vice streaks by NAME ("No alcohol", "No sweets"…); Phase 0 renders them **unnamed** per the hard privacy rule — verified live (zero vice names on the page).
+
+- **P0.1** vice restraint, reset-honest: leads with **cumulative days held** (resilience across resets, never erased) over a fragile streak; streaks **unnamed** (counts only); resets read muted as restarts — **zero red, no shame**.
+- **P0.2** the inviting absence: empty mood/journal is a dignified invitation, never a hollow axis; a held one-tap affordance (mechanic is P1, gated).
+- **P0.3** Mind pillar decomposed to its inputs (reflection/mood/restraint/depth), honestly "awaiting input" at week one.
+- **P0.4** Third Wall centrepiece: the machine's weekly read + Matthew's **held last word** (invitingly empty, not absent).
+
+**Sensitivity honored:** zero red anywhere (the site-wide reserved-red is explicitly excluded here — verified live), vices never named, relapse = muted reset/no shame, non-clinical self-compassionate tone, capture mechanics NOT built (deferred). Single ember; dark + light (new light capture). PR #207.
+
 ## Doors / cross-site IA redesign — one documentary, five doors (P0→P3) — 2026-06-23
 
 Cross-site IA/editorial pass over the five doors (Home/Cockpit/Story/Coaching/Evidence). 5-door model + me-first LOCKED (untouched). Per `docs/SPEC_DOORS_EXPERIENCE_REDESIGN_2026-06-21.md`; 11 P-item commits; **front-end only, no server change.** Deployed + live-verified (all doors "Day 10 · Week 2", zero console errors).
