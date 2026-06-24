@@ -82,10 +82,24 @@ def test_safety_gate_fails_closed_on_every_banned_class():
     assert panel._safety_gate("You showed up on the two days you said would be hardest — that's the work.") == []
 
 
-def test_sensitivity_routing_holds_hard_weeks():
-    # Personal Board asymmetry: a grief/low-mood week routes to a human (hold), not auto-publish.
-    assert panel._sensitivity_hold_reasons({"chronicle": "This week was heavy — grief has a way of resurfacing."})
+def test_sensitivity_routing_holds_only_on_current_crisis(monkeypatch):
+    # Personal Board asymmetry, post-refit (#166–182): the regex is a broad TRIGGER
+    # that also fires on BACKSTORY references to past grief; an AI adjudication
+    # (_is_current_crisis) then HOLDS only on a genuine CURRENT-WEEK crisis (fail-
+    # closed). We mock the adjudication so the gate is deterministic and offline —
+    # the old assertion both expected the pre-refit auto-hold AND called live Bedrock.
+
+    # 1) Sensitive text adjudicated as a CURRENT crisis → HOLD (route to a human).
+    monkeypatch.setattr(panel, "_is_current_crisis", lambda text: True)
     assert panel._sensitivity_hold_reasons({"chronicle": "A relapse week; felt hopeless for a stretch."})
+
+    # 2) Same broad trigger, but adjudicated as BACKSTORY (not current) → NO hold.
+    #    This is the regression the refit fixed: a strong week that merely references
+    #    past grief must not be auto-held.
+    monkeypatch.setattr(panel, "_is_current_crisis", lambda text: False)
+    assert panel._sensitivity_hold_reasons({"chronicle": "This week was heavy — grief has a way of resurfacing."}) == []
+
+    # 3) A clean week never trips the trigger regex → no hold (adjudication never runs).
     assert panel._sensitivity_hold_reasons({"chronicle": "Solid week — three workouts, slept well, saw friends."}) == []
 
 
