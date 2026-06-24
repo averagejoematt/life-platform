@@ -19,9 +19,8 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
 import boto3  # noqa: E402
-from boto3.dynamodb.conditions import Key  # noqa: E402
-
 import training_notes as tn  # noqa: E402
+from boto3.dynamodb.conditions import Key  # noqa: E402
 from training_notes_llm import make_llm_fn  # noqa: E402
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
