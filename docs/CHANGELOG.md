@@ -1,3 +1,21 @@
+## CI-health excavation + Strava late-sync fix + ai-tokens alarm recalibration — 2026-06-24
+
+Inbox-noise triage that root-caused the "Run failed: CI/CD" email stream to **one red gate masking three more.** CI's Lint job runs its gates sequentially (flake8 → black → ruff → mypy) and `Unit Tests` `needs` Lint, so a single unformatted file stopped the pipeline before ruff/mypy/tests ever ran — and weeks of debt accumulated invisibly behind it. Fixing each layer exposed the next. `main` @ `317aa865`; **Lint + Unit Tests green; one deploy pending Matthew.**
+
+**CI-health chain (4 PRs):**
+- **#208** — removed 2 dead one-off scripts (`deploy/_publish_week1.py`, `_prologue_rewrite.py`, accidental #186 commits) that failed the **black** gate on every push = the entire email source.
+- **#211** — 9 latent **test** failures unmasked once Unit Tests could run: `cost_governor` ×7 (test wasn't aware of the June-2026 tier headroom #169, auto-reverts Jul 1 → autouse fixture pins the normal thresholds); `coach_panel_podcast` sensitivity (refit #166-182 made the gate AI-adjudicate crisis-vs-backstory; test expected the pre-refit auto-hold AND called live Bedrock → rewritten to the new contract with the adjudication mocked); `hevy_common` (`BUCKET` binds `$S3_BUCKET` at import time, other modules set `test-bucket` → suite-order-dependent → pinned).
+- **#212** — 14 **ruff** violations: 12 I001 import-sort (`ruff --fix`, sys.path/`# noqa: E402` guards preserved), F841 dead var, S324 `sha1` → `usedforsecurity=False` (grouping signature, not security).
+- **#213** — 2 hevy `dry_run` tests hit `routine_title.build_title_context` → DynamoDB → `NoCredentialsError` in CI (passed locally on ambient creds; found by running the suite **creds-blanked**); stubbed `build_title_context`.
+
+Full suite creds-blanked: **2045 passed, 0 failed**; live CI Lint + Unit Tests both **success**.
+
+**Two real platform bugs (2 PRs):**
+- **#209 — Strava late-sync drop.** The ADR-092 reconciler caught 5 afternoon walks (Jun 22-23) that never reached DDB — every stored activity those days was a morning workout. Gap detection (`ingestion_framework._find_missing_dates`) is **presence-based**; `refresh_today` only re-pulls today, so walks that **sync late** (after their local day rolled) land on an already-present date and are stranded. New `refresh_trailing_days=N` re-fetches the trailing window regardless of presence; `transform()` rebuilds the day from all API activities, so a re-fetch merges late arrivals and **auto-heals the 5 gaps on the next run.** Strava = 3. Distinct from the #180 tz-window fix.
+- **#210 — ai-tokens alarm** 33333 → 150000. It fired daily because the threshold sat below the real autonomous baseline (~59k output tokens/day). Not a cost issue — the $75 budget guard and `ai-daily-spend-high` $ alarm are the real protection and untouched.
+
+**⚠️ One deploy pending (Matthew's boundary):** merging #209 surfaced a pre-existing blocker — layer **v89** was published Jun 22 (hevy-commit-hardening) + `constants.py` bumped to 89, but the **15 consumer Lambdas were never redeployed to attach it** (on v87/v88). The `Plan deployments` layer-consistency gate (also masked) now fails → blocks #209's deploy and is the new "Run failed" email source. Fix: `cd cdk && JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION=1 npx cdk deploy --all` (`cdk diff` verified: layer v87/88→89 fleet-wide + #209 code + #210 threshold; **no IAM changes**) — NOT `build_layer.sh` (v89 already published). After deploy: Plan gate passes → CI fully green; `ingest-reconciliation-strava` clears + walks backfill; `ai-tokens` clears.
+
 ## Mind page redesign — Phase 0 (the layer the machine can't see); capture deferred — 2026-06-23
 
 Reframed `/evidence/mind/` (the most sensitive page) on the spine **"the layer the machine can't see — awaiting its human."** Per `docs/SPEC_MIND_PAGE_REDESIGN_2026-06-21.md`; **Phase 0 only** (P0.1–P0.4, front-end); the Phase-1 capture mechanics are DEFERRED pending the invitation-not-obligation UX sign-off (its explicit STOP-AND-ASK) — tracked as MIND-01..05. Deployed + live-verified. Seventh page redesign.
