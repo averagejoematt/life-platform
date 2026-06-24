@@ -218,6 +218,36 @@ export function ring({ value = "", sub = "", label = "", fill = 0, tone = "ember
     `<span class="vr-l label">${escAttr(label)}</span></div>`;
 }
 
+// P1.2 — autonomic-recovery hero: RHR + HRV on ONE shared time frame. Each is normalised to
+// its own range; RHR is INVERTED (low RHR plots high) so that BOTH lines rising = the body
+// downshifting into recovery — direction reads ember-positive even though RHR falls. Never red.
+// Tick-spine signature. Refuses <4 points. hist items: {date, rhr_bpm, hrv_ms}.
+export function autonomicHero(hist, { height = 190, label = "" } = {}) {
+  const rhr = (hist || []).map((h) => ({ d: String(h.date || ""), v: Number(h.rhr_bpm) })).filter((p) => Number.isFinite(p.v) && /^\d{4}-\d{2}-\d{2}/.test(p.d)).sort((a, b) => a.d.localeCompare(b.d));
+  const hrv = (hist || []).map((h) => ({ d: String(h.date || ""), v: Number(h.hrv_ms) })).filter((p) => Number.isFinite(p.v) && /^\d{4}-\d{2}-\d{2}/.test(p.d)).sort((a, b) => a.d.localeCompare(b.d));
+  if (rhr.length < 4 || hrv.length < 4) {
+    return `<figure class="chart chart--empty"><figcaption class="chart-cap label">The autonomic hero draws once there are 4+ nights of resting-HR and HRV.</figcaption></figure>`;
+  }
+  const W = 600, H = height, P = 12;
+  const allD = [...rhr, ...hrv].map((p) => Date.parse(p.d));
+  const t0 = Math.min(...allD), t1 = Math.max(...allD), span = Math.max(1, t1 - t0);
+  const x = (d) => P + ((Date.parse(d) - t0) / span) * (W - 2 * P);
+  const norm = (arr, invert) => { const vs = arr.map((p) => p.v); const lo = Math.min(...vs), hi = Math.max(...vs); return arr.map((p) => ({ d: p.d, n: hi === lo ? 0.5 : (invert ? 1 - (p.v - lo) / (hi - lo) : (p.v - lo) / (hi - lo)) })); };
+  const y = (n) => P + (1 - n) * (H - 2 * P);
+  const path = (arr) => arr.map((p, i) => `${i ? "L" : "M"}${x(p.d).toFixed(1)} ${y(p.n).toFixed(1)}`).join(" ");
+  const rhrN = norm(rhr, true), hrvN = norm(hrv, false);
+  const _r = (n) => Math.round(n * 10) / 10;
+  const rhrDir = rhr[rhr.length - 1].v <= rhr[0].v ? "down" : "up";
+  const hrvDir = hrv[hrv.length - 1].v >= hrv[0].v ? "up" : "down";
+  const summary = `Autonomic hero: resting HR ${rhrDir} (${_r(rhr[0].v)}→${_r(rhr[rhr.length - 1].v)} bpm), HRV ${hrvDir} (${_r(hrv[0].v)}→${_r(hrv[hrv.length - 1].v)} ms). Both toward recovery read ember-positive.`;
+  return `<figure class="chart ah-chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}">` +
+    `<path class="ah-hrv" d="${path(hrvN)}" fill="none" vector-effect="non-scaling-stroke"/>` +
+    `<path class="ah-rhr" d="${path(rhrN)}" fill="none" vector-effect="non-scaling-stroke"/>` +
+    `<circle class="chart-dot" cx="${x(hrvN[hrvN.length - 1].d).toFixed(1)}" cy="${y(hrvN[hrvN.length - 1].n).toFixed(1)}" r="3.2"/>` +
+    `<circle class="chart-dot" cx="${x(rhrN[rhrN.length - 1].d).toFixed(1)}" cy="${y(rhrN[rhrN.length - 1].n).toFixed(1)}" r="3.2"/></svg>` +
+    `<figcaption class="chart-cap label">${escAttr(label || "Autonomic recovery")} · <span class="ah-key"><i class="ah-sw ah-sw-hrv"></i>HRV ${escAttr(hrvDir)} (${_r(hrv[hrv.length - 1].v)} ms)</span> <span class="ah-key"><i class="ah-sw ah-sw-rhr"></i>resting HR ${escAttr(rhrDir)} (${_r(rhr[rhr.length - 1].v)} bpm, axis inverted)</span> · both lines rising = the body downshifting into recovery — early moves are partly water & novelty.</figcaption></figure>`;
+}
+
 export function sparkline(values, { height = 34 } = {}) {
   const pts = _points(values || [], "v", "d");
   if (pts.length < 2) return `<span class="spark spark--empty"></span>`;

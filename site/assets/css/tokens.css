@@ -605,6 +605,14 @@ a { color: inherit; text-underline-offset: 0.18em; }
 /* P0.4 — thin-data ring state: a dashed track signals the baseline is still forming, so a
    10-day fill never reads as a settled normal. Pairs with the "N days in" band stamp. */
 .vr-thin .vr-track { stroke-dasharray: 3 5; opacity: 0.8; }
+/* P1.2 — autonomic hero: two ember lines (HRV solid, RHR inverted dashed). Both up = recovery. */
+.ah-hrv { stroke: var(--ember); stroke-width: 2.25; stroke-linejoin: round; }
+.ah-rhr { stroke: var(--ember); stroke-width: 2; stroke-dasharray: 5 4; opacity: 0.8; stroke-linejoin: round; }
+.ah-key { white-space: nowrap; }
+.ah-sw { display: inline-block; width: 0.8em; height: 0.18em; vertical-align: middle; margin-right: 0.3em; background: var(--ember); }
+.ah-sw-rhr { opacity: 0.7; height: 0; border-top: 2px dashed var(--ember); }
+/* P1.3 — readiness driver bars reuse the sufficiency kit; alert tone for a run-down driver. */
+.suf-fill.vd-alert { background: var(--alert); }
 .vr-c { position: absolute; top: calc(50% - 0.7em); left: 0; right: 0; display: flex; flex-direction: column; align-items: center; line-height: 1; }
 .vr-v { font-size: var(--fs-h4, 1.05rem); }
 .vr-ember .vr-v { color: var(--ember); }

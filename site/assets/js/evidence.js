@@ -13,7 +13,7 @@
     window.__START_SLUG__ = "<slug>"
 */
 
-import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars, dumbbell, weightTrendChart, projectionCone, ring } from "/assets/js/charts.js";
+import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars, dumbbell, weightTrendChart, projectionCone, ring, autonomicHero } from "/assets/js/charts.js";
 
 const REG = window.__EVIDENCE_REGISTRY__ || [];
 const BYSLUG = Object.fromEntries(REG.map((t) => [t.slug, t]));
@@ -1704,6 +1704,37 @@ function vitalsGlyphs(p, habitsToday) {
     `<div class="vg-row">${chips.join("")}</div>` +
     `<p class="rd-meta label">A glyph lights only when its signal actually fires today — the unlit ones simply haven't yet (no decorative always-on tiles). Habits show <strong>${habitsToday ? habitsToday.done + " of " + habitsToday.total : "—"} done today</strong>; an "average by this hour" benchmark waits on hourly habit history rather than being faked.</p>`);
 }
+// P1.3 — readiness decomposed: the recovery number broken into its drivers (HRV, RHR, sleep) —
+// the Altitude-1 rings expanded into bars. Each bar = where the driver sits in its recent range
+// (RHR inverted: lower = fuller). Anti-black-box, same decomposition as the glance.
+function vitalsReadinessDecomposed(comps) {
+  const rec = comps.find((c) => c.key === "recovery");
+  const drivers = comps.filter((c) => c.key !== "recovery");
+  if (!rec || rec.raw == null) return "";
+  const rows = drivers.map((c) => {
+    const pct = Math.round((c.fill || 0) * 100);
+    const tone = c.tone === "ember" ? "suf-ember" : c.tone === "alert" ? "vd-alert" : "suf-ink";
+    return `<div class="suf-row"><span class="suf-l">${esc(c.label)}</span><span class="suf-track"><span class="suf-fill ${tone}" style="width:${pct}%"></span></span><span class="suf-v mono">${esc(c.value)}${c.sub ? " " + esc(c.sub) : ""}</span></div>`;
+  }).join("");
+  return sec("Readiness, decomposed — what's under the recovery number",
+    figs([fig(rec.value, "recovery · last night")]) +
+    `<div class="suf-rows">${rows}</div>` +
+    `<p class="rd-meta label">Recovery isn't a single black-box score — it's mostly HRV, resting heart rate, and sleep. Each bar is where that driver sits in its own recent range (resting HR inverted: lower = fuller). It's the Altitude-1 rings, expanded — last night's read, setting up today.</p>`);
+}
+// P1.1 — today's pulse narrative, kept + elevated: two-voice (mono numbers, serif meaning),
+// retied to the autonomic story (the system downshifting into recovery).
+function vitalsNarrative(p, comps) {
+  const get = (k) => (comps.find((c) => c.key === k) || {});
+  const rec = get("recovery"), hrv = get("hrv"), rhr = get("rhr");
+  const machine = (p.narrative && !isBad(p.narrative)) ? p.narrative
+    : [p.date, p.status, p.signals_reporting != null && `${p.signals_reporting}/${p.signals_total} signals`].filter(Boolean).join(" · ");
+  const recovered = rec.tone === "ember";
+  const serif = recovered
+    ? `The autonomic read is the story under the numbers: recovery sitting at ${rec.value}, with resting heart rate and HRV holding their ground. That's the parasympathetic side doing its job — the body downshifting into repair overnight, which is exactly what a cut leans on to keep the work absorbable.`
+    : `The autonomic system is the story under the numbers — recovery at ${rec.value}, HRV ${hrv.value}${hrv.sub || ""}, resting HR ${rhr.value}${rhr.sub || ""}. Read the direction of the pair over the next days, not any single morning: recovery is the body's nightly accounting of how much it could repair.`;
+  return sec("Today's pulse — the autonomic read",
+    `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(machine)}</p><p class="tv-human">${esc(serif)}</p></div>`);
+}
 async function renderPulse(d) {
   const p = d.pulse || d;
   const [ph, hb] = await Promise.all([tryJSON("/api/pulse_history"), tryJSON("/api/habits")]);
@@ -1715,15 +1746,20 @@ async function renderPulse(d) {
   parts.push(vitalsStatusRead(comps, p, p.day_number)); // P0.1 — Altitude 1: status word + component rings
   parts.push(vitalsLadder(comps, hist)); // P0.2 — now / 7d / 30d ladder under the rings
   parts.push(vitalsGlyphs(p, habitsToday)); // P0.3 — earned glyph row (light on real signal only)
-  // (temporary — narrative + the 8 equal charts; restructured into Altitudes 2 & 3 across P1.x/P2.x)
-  const head = `<div class="rd-obs">${p.narrative && !isBad(p.narrative) ? `<p class="rd-primary">${esc(p.narrative)}</p>` : `<p class="rd-primary">Today's pulse is being read.</p>`}<p class="rd-meta label">${[p.date, p.status, p.signals_reporting != null && `${p.signals_reporting}/${p.signals_total} signals reporting`].filter(Boolean).map(esc).join("  ·  ")}</p></div>`;
+  // ── ALTITUDE 2 — the synthesis ──
+  parts.push(vitalsNarrative(p, comps)); // P1.1 — today's pulse, two-voice, tied to the autonomic story
+  if (hist.length >= 4) parts.push(sec("Autonomic recovery — RHR + HRV, one frame", // P1.2 — autonomic hero
+    autonomicHero(hist, { label: "Resting HR (inverted) + HRV" }) +
+    `<p class="rd-meta label">Resting heart rate and HRV are the two halves of one autonomic signal. RHR's axis is <strong>inverted</strong> so a falling resting HR reads as a rising line — because down is good. Both climbing together = the parasympathetic "rest &amp; repair" side taking over: the body downshifting. Last night's read; n=1, early moves partly water/novelty.</p>`));
+  parts.push(vitalsReadinessDecomposed(comps)); // P1.3 — recovery broken into its drivers
+  // (temporary — the 8 equal charts; restructured into Altitude 3 across P2.x)
   const series = (k) => hist.map((h) => ({ date: h.date, value: h[k] })).filter((x) => x.value != null);
   const trendBlock = (defs) => defs
     .map(([k, lbl]) => sec(lbl, lineChart(series(k), { valueKey: "value", label: lbl, emptyMsg: `The ${lbl.toLowerCase()} trend fills in as days accrue.` }))).join("");
   const lastNight = trendBlock([["recovery_pct", "Recovery %"], ["hrv_ms", "HRV ms"], ["rhr_bpm", "Resting HR"], ["sleep_hours", "Sleep hours"]]);
   const today = trendBlock([["weight_lbs", "Weight"], ["strain", "Day strain"], ["steps", "Steps"]]);
   const frame = (lbl, inner) => `<p class="rd-frame label">${esc(lbl)}</p>${inner}`;
-  parts.push(head + frame("Last night → sets up today", lastNight) + frame("Today — measured same-day", today) +
+  parts.push(frame("Last night → sets up today", lastNight) + frame("Today — measured same-day", today) +
     note("Your live vitals — recovery/sleep/HRV read last night; weight & steps are today."));
   return parts.join("");
 }
