@@ -1022,7 +1022,38 @@ async function renderSleep(d) {
   if (!parts.length) return empty("No sleep data yet — score, stages, HRV and recovery appear here nightly.");
   return parts.join("") + note("Correlative — tonight's forecast leads; last night and the trend are the evidence it earns its place against.");
 }
-function renderMind(d) { const m = d.mind || {}; const mp = d.mind_pillar; const vices = d.vice_streaks || []; const head = figs([mp && mp.level != null && fig(`L${fmt(mp.level)} · ${esc(mp.tier || "")}`, "mind pillar"), m.journal_entries_30d != null && fig(m.journal_entries_30d, "journal · 30d"), m.mood_entries_count != null && fig(m.mood_entries_count, "mood logs"), m.resist_rate_pct != null && fig(fmt(m.resist_rate_pct) + "%", "temptations resisted"), m.meaningful_pct != null && fig(m.meaningful_pct + "%", "meaningful talk")]); const v = vices.length ? sec("Vice streaks (held)", `<table class="rd-tbl"><tbody>${vices.map((x) => `<tr><td class="rd-name">${esc(ttl(x.name))}</td><td class="num">${fmt(x.current_streak)}d ${x.holding ? "✓" : ""}</td></tr>`).join("")}</tbody></table>`) : ""; const noLog = (m.journal_entries_30d || 0) === 0 && (m.mood_entries_count || 0) === 0; const honest = noLog ? note("No journal or mood logged this cycle yet — that part of the inner-life view fills in as you write. Below is what's tracked so far.") : ""; if (!head.includes("fig-v") && !v) return empty("No mood / journal / temptation data yet — the inner-life view fills in as you log."); return head + honest + v + note("Correlative — mood, reflection, restraint. Categories kept private."); }
+// ── /evidence/mind/ — "the layer the machine can't see, awaiting its human." The MOST
+// sensitive page: vices NEVER named (private unnamed streaks); a relapse is a muted RESET, never
+// red, never shame (the site-wide reserved-red is EXCLUDED here); capture is invitation, never
+// obligation. `d` = /api/mind_overview.
+// P0.1 — vice restraint, reset-honest: lead with CUMULATIVE days held (resilience across resets,
+// never erased) over a fragile streak. Streaks are UNNAMED (only counts + held/reset, never the
+// name). Resets read muted, framed as a restart — no red, no alarm, no shame.
+function mindRestraint(vices, timeline) {
+  if (!vices.length) return "";
+  const held = vices.filter((v) => v.holding);
+  const reset = vices.filter((v) => !v.holding);
+  const cumulative = (timeline || []).reduce((s, day) => s + (Number(day.held) || 0), 0);
+  const longest = vices.reduce((mx, v) => Math.max(mx, Number(v.current_streak) || 0), 0);
+  const RUNGS = [1, 3, 7, 14, 30, 60, 90];
+  const ladder = RUNGS.map((r) => `<span class="mr-rung ${longest >= r ? "mr-crossed" : "mr-future"}">${r}d</span>`).join("");
+  const heldChips = held.map((v) => `<span class="mr-chip">held ${fmt(v.current_streak)}d</span>`).join("");
+  const resetLine = reset.length
+    ? `<p class="mr-reset label">${reset.length} restarting now — a reset isn't a failure shown in red, it's a restart; the cumulative days above still count.</p>` : "";
+  return sec("Restraint — held, and held before",
+    `<div class="mr-cum"><span class="mr-cum-v num">${cumulative}</span><span class="mr-cum-k label">cumulative days of restraint held this cycle — a reset never erases them</span></div>` +
+    `<p class="rd-meta label">Across ${vices.length} private commitments (kept unnamed, on purpose), <strong>${held.length} held right now</strong>${longest ? `, the longest running ${longest} day${longest === 1 ? "" : "s"}` : ""}.</p>` +
+    (heldChips ? `<div class="mr-chips">${heldChips}</div>` : "") +
+    `<div class="mr-ladder" aria-label="restraint milestones">${ladder}</div>` +
+    resetLine +
+    `<p class="rd-meta label">These are private restraints — kept off the record by name, by design. The point is resilience over a perfect streak: the days already held are real, whether or not today is one of them.</p>`);
+}
+async function renderMind(d) {
+  const vices = d.vice_streaks || [];
+  const parts = [];
+  parts.push(mindRestraint(vices, d.vice_timeline)); // P0.1 — unnamed, cumulative-first restraint
+  return parts.join("") || empty("The inner-life view fills in as restraint, mood, and reflection accrue.");
+}
 function renderVices(d) {
   const v = d.vices || [];
   if (!v.length) return empty("No vice tracking yet.");
