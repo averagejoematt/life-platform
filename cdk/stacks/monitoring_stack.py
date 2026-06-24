@@ -15,7 +15,7 @@ Covers:
 
   AI token budget alarms (13):
     ai-tokens-<lambda>-daily  AnthropicOutputTokens Sum, 86400s
-    Per-Lambda threshold: 1818 (most); 13333 (daily-brief); 33333 (platform total)
+    Per-Lambda threshold: 1818 (most); 30000 (daily-brief); 150000 (platform total)
 
   DynamoDB item-size warning (1):
     life-platform-ddb-item-size-warning  LifePlatform/DynamoDB ItemSizeBytes Max >= 307200, 300s
@@ -351,8 +351,17 @@ class MonitoringStack(Stack):
         )
 
         # Platform-level total (no dims)
+        # 2026-06-24: bumped threshold 33333 → 150000. The platform's autonomous
+        # AI baseline crept to ~59k output tokens/day (Jun 22/23/24 all ~58-59k:
+        # daily brief + 8 coach narratives + the panelcast revision loop + compute),
+        # so 33333 sat far *below* normal operation and fired into the alarm digest
+        # every single day — pure noise, not a cost signal (the $75 budget guard +
+        # the ai-daily-spend-high $ alarm are the real cost protection, both intact).
+        # Legitimate content-heavy days (weekly podcast/chronicle generation) peak
+        # ~121k. 150000 clears those peaks and alerts only on a genuine ~2.5x runaway.
+        # Future: swap to a CloudWatch anomaly-detection band (per ai-daily-spend-high).
         _alarm(
-            "AiTokensPlatformTotal", "ai-tokens-platform-daily-total", "LifePlatform/AI", "AnthropicOutputTokens", 86400, "Sum", 33333, GTE
+            "AiTokensPlatformTotal", "ai-tokens-platform-daily-total", "LifePlatform/AI", "AnthropicOutputTokens", 86400, "Sum", 150000, GTE
         )
 
         # G2: daily AI-spend ceiling — the anomaly guard. EstimatedCostUSD is
