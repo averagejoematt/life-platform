@@ -47,8 +47,9 @@
       <nav class="scope" aria-label="Time scope">
         <button class="scope-btn is-active" data-scope="today" aria-pressed="true">Today</button>
         <button class="scope-btn" data-scope="week" aria-pressed="false">Week</button>
-        <button class="scope-btn" data-scope="month" aria-pressed="false">Month</button>
-        <button class="scope-btn" data-scope="journey" aria-pressed="false">Journey</button>
+        <span class="scope-sep" aria-hidden="true"></span>
+        <button class="scope-btn scope-deep" data-scope="month" aria-pressed="false">Month</button>
+        <button class="scope-btn scope-deep" data-scope="journey" aria-pressed="false">Journey</button>
       </nav>
       <nav class="doors" aria-label="Doors">
         <a href="/now/" aria-current="page">the cockpit</a>
@@ -78,6 +79,8 @@
           <span class="tier" data-bind="tier">&nbsp;</span>
           <span class="movement" data-bind="movement" hidden></span>
         </div>
+        <!-- P2.2 — anti-black-box: the level is the SUM of the seven pillars, decomposed below. -->
+        <p class="hub-decomp label"><a href="#domains">the sum of seven pillars — see what builds it ↓</a></p>
 
         <!-- Honesty vocabulary: down/flat states, muted, never red, never hidden -->
         <p class="honest" data-bind="honest" hidden></p>
@@ -112,7 +115,7 @@
         <!-- Band: today — where you stand. The morning character sheet. -->
         <p class="cap label cap-today">today — where you stand</p>
         <!-- Two glance domains; the seven pillars live one drill beneath -->
-        <section class="domains" aria-label="Pillar domains">
+        <section class="domains" id="domains" aria-label="Pillar domains">
           <div class="domain" data-domain="body">
             <header class="domain-head">
               <span class="label">Body</span>
