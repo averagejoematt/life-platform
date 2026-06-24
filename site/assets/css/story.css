@@ -147,6 +147,14 @@ body { overflow-x: hidden; }
 .wall-teaser a, .dx-teaser .dx-foot a, .dx-read.dx-teaser a { color: var(--ember); }
 /* P1.1/P1.3 — dispatches teaser on Home (full reader lives in Story). */
 .dx-read.dx-teaser { border-left: 2px solid var(--ember-line); padding-left: var(--sp-5); }
+/* P2.3 — Story promotes Matthew's voice + the timeline as first-class cards. */
+.story-features { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); margin-top: var(--sp-5); }
+.story-feat { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-4); border: var(--honest-border); border-radius: var(--radius-sm); text-decoration: none; transition: border-color 0.15s; }
+.story-feat:hover { border-color: var(--ember-line); }
+.sf-kick { color: var(--ember); text-transform: uppercase; letter-spacing: var(--tracking-label); }
+.sf-title { font-family: var(--font-serif, Fraunces), serif; font-size: var(--fs-h4, 1.1rem); color: var(--ink); line-height: 1.25; }
+.story-feat .sf-sub { color: var(--ink-muted); }
+@media (max-width: 640px) { .story-features { grid-template-columns: 1fr; } }
 
 /* Dispatches reader — chronicle · lab notes · journal (master-detail) */
 .dx-tabs { display: flex; gap: var(--sp-1); margin-top: var(--sp-5); border-bottom: var(--border-hair); }
