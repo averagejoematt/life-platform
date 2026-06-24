@@ -9,17 +9,23 @@
   Keyboard-accessible: chips are real <button>s; Esc closes.
 */
 
-// Shared genesis anchor — stamps "Day N · Week N since June 14 2026" into any
-// [data-bind="genesisStamp"] element, so the Story + Coaching doors carry the same
-// "it's week one, watch it happen" throughline as the Home hero (cross-site consistency).
-export function stampGenesis(root = document) {
+// THE single genesis source of truth (P0.1). Genesis = 2026-06-14; Day N = whole days since,
+// +1 so genesis day is Day 1; Week N = floor((dayN-1)/7)+1 (Day 8 = Week 2). EVERY door's
+// Day-N/Week stamp consumes this one function — no door re-implements the math (that drift was
+// the original cross-door bug). `genesisCount()` is the pure calc; `stampGenesis()` writes it
+// into any [data-bind="genesisStamp"] element, with an optional per-door suffix.
+const GENESIS = new Date("2026-06-14T00:00:00");
+export function genesisCount() {
+  const dayN = Math.floor((Date.now() - GENESIS.getTime()) / 86400000) + 1;
+  const weekN = Math.floor((Math.max(1, dayN) - 1) / 7) + 1;
+  return { dayN, weekN, base: `Day ${dayN} · Week ${weekN}, since June 14 2026` };
+}
+export function stampGenesis(root = document, suffix = "") {
   const el = root.querySelector('[data-bind="genesisStamp"]');
   if (!el) return;
-  const genesis = new Date("2026-06-14T00:00:00");
-  const dayN = Math.floor((Date.now() - genesis.getTime()) / 86400000) + 1;
+  const { dayN, base } = genesisCount();
   if (dayN < 1) return;
-  const weekN = Math.floor((dayN - 1) / 7) + 1;
-  el.textContent = `Day ${dayN} · Week ${weekN}, since June 14 2026`;
+  el.textContent = base + (suffix || "");
   el.hidden = false;
 }
 

@@ -49,7 +49,9 @@ function coachStanceHTML(st) {
 function coachReportHTML(rc) {
   const tr = (rc && rc.track_record) || {};
   let h = `<section class="coach-report"><p class="dx-kicker label">report card</p>`;
-  h += `<p class="cr-rate">${tr.hit_rate_pct == null ? "Track record accruing" : esc(tr.hit_rate_pct) + "% hit-rate"} <span class="label">${esc(tr.n_note || "")}</span></p>`;
+  // P2.4 — frame the empty track record as anticipation, not a placeholder: the score is a
+  // clock the reader watches start, not a missing number.
+  h += `<p class="cr-rate">${tr.hit_rate_pct == null ? `Score unlocks as predictions resolve <span class="label">— week one of N; first calls land in the coming weeks</span>` : esc(tr.hit_rate_pct) + "% hit-rate" + ` <span class="label">${esc(tr.n_note || "")}</span>`}</p>`;
   if ((tr.recent || []).length) h += `<ul class="cr-calls">${tr.recent.map((r) => `<li class="cr-${esc(r.status)}"><span class="label">${esc(r.status)}</span> ${esc(r.metric || "")}${r.reason ? " — " + esc(r.reason) : ""}</li>`).join("")}</ul>`;
   else h += `<p class="dx-prose">No decided predictions yet — hits <em>and</em> misses will both show here as they resolve.</p>`;
   if (tr.caveat) h += `<p class="cr-caveat label">${esc(tr.caveat)}</p>`;
@@ -120,9 +122,21 @@ async function renderTeamView(read) {
     h += `<section class="team-focus"><p class="dx-kicker label">what the team is focused on for you${d.current_stage ? ` · the ${esc(d.current_stage)} stage` : ""}</p>`;
     h += `<ul class="tf-list">${d.team_focus.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></section>`;
   }
-  h += `<section class="team-tension"><p class="dx-kicker label">where the team disagrees</p>`;
-  if ((d.tensions || []).length) {
-    h += `<ul class="tt-list">${d.tensions.map((t) => `<li><span class="label">${esc((t.coaches || []).map((c) => String(c).replace("_coach", "")).join(" ↔ ") || t.topic || "")}</span> ${esc(t.summary || "")}</li>`).join("")}</ul>`;
+  h += `<section class="team-tension"><p class="dx-kicker label">where the team disagrees — the argument, not just the headline</p>`;
+  // P2.4 — expand the cryptic "Coach ↔ Coach" lines into readable arguments: the two positions
+  // head-to-head + the integrator's call (the same fields WQA-06 surfaced on the board).
+  const _tt = (d.tensions || []).filter((t) => t && (t.position_a || t.position_b || t.summary));
+  if (_tt.length) {
+    const _pretty = (id) => String(id || "").replace(/_coach$/, "").replace(/_/g, " ") || "a coach";
+    const _strip = (s) => String(s || "").replace(/^[A-Za-z'’ .]{1,40}:\s*/, "");
+    h += `<ul class="tt-list">${_tt.map((t) => {
+      const [a, b] = t.coaches || [];
+      const call = t.resolution || t.summary || "";
+      return `<li class="tt-card"><p class="tt-topic">${esc(t.topic || "An open disagreement")}</p>` +
+        (t.position_a || t.position_b ? `<div class="tt-cols"><div class="tt-pos"><span class="tt-who label">${esc(_pretty(a))}</span><p class="tt-text">${esc(_strip(t.position_a))}</p></div><div class="tt-pos"><span class="tt-who label">${esc(_pretty(b))}</span><p class="tt-text">${esc(_strip(t.position_b))}</p></div></div>` : "") +
+        (call ? `<p class="tt-call"><span class="tt-call-k label">the integrator's call</span> ${esc(call)}</p>` : "") +
+        `</li>`;
+    }).join("")}</ul>`;
   } else {
     h += `<p class="dx-prose">No live disagreements right now — the team's aligned (or it's early and the threads haven't formed yet). When they pull in different directions, you'll see the tradeoff here.</p>`;
   }
@@ -186,9 +200,14 @@ async function renderRead(s, id) {
       // The Third Wall, explicit: the AI's read (them) → Matthew's response (me).
       const ai = [["The AI's read", e.ai_present, "machine"], ["Worth watching", e.ai_cautionary, "machine"], ["Worth celebrating", e.ai_affirming, "machine"]].filter((v) => v[1]);
       const mattText = e.matthew_notes || e.matthew_agreement;
+      // P3.1 — the reply SLOT is first-class even while empty: the wall is a dialogue, and
+      // Matthew's half is HELD SPACE that's waiting, not absent. Inviting, never a nag; the
+      // reply mechanic itself is intentionally not wired here (his words, his hand).
       const mattVoice = mattText
         ? `<div class="voice human"><span class="who">Matthew</span><p class="what">${esc(mattText)}</p></div>`
-        : `<div class="voice human voice-pending"><span class="who">Matthew</span><p class="what">Pending Matthew's response — he hasn't weighed in on the AI's read of this week yet.</p></div>`;
+        : `<div class="voice human voice-pending"><span class="who">Matthew</span>` +
+          `<p class="what pending-lead">The other half of the wall — Matthew's reply — is held open for this week.</p>` +
+          `<p class="pending-sub label">He answers the AI on his own time; an empty slot is honest, not a gap. When he writes back, it lands right here, beside the machine's read.</p></div>`;
       const hasAny = ai.length || mattText;
       read.innerHTML = `<p class="dx-kicker label">field note · week ${esc(id)} · the AI's read ↔ Matthew's response${e.ai_tone ? ` · ${esc(e.ai_tone)}` : ""}</p>` +
         (hasAny ? ai.map(([who, txt, cls]) => `<div class="voice ${cls}"><span class="who">${esc(who)}</span><p class="what">${esc(txt)}</p></div>`).join("") + mattVoice

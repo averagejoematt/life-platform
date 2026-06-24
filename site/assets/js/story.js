@@ -12,6 +12,7 @@
 */
 
 import { lineChart } from "/assets/js/charts.js";
+import { stampGenesis, genesisCount } from "/assets/js/coach_popover.js"; // P0.1 — the one genesis source of truth
 
 const $ = (s, r = document) => r.querySelector(s);
 const bind = (n, r = document) => r.querySelector(`[data-bind="${n}"]`);
@@ -103,16 +104,10 @@ function drawConstellation(pillars) {
 /* ── the numbers beat ────────────────────────────────────────────────────── */
 // The throughline anchor: stamp "Day N · Week N since genesis" so the site's youth is the
 // headline, not an inconsistency. Genesis = the current experiment start (2026-06-14).
-function stampGenesis() {
-  const el = bind("genesisStamp");
-  if (!el) return;
-  const genesis = new Date("2026-06-14T00:00:00");
-  const dayN = Math.floor((Date.now() - genesis.getTime()) / 86400000) + 1;
-  if (dayN < 1) return;
-  const weekN = Math.floor((dayN - 1) / 7) + 1;
-  el.textContent = `Day ${dayN} · Week ${weekN}, since June 14 2026 — a transformation you can watch happen in real time.`;
-  el.hidden = false;
-}
+// P0.1 — genesis math now lives in coach_popover.js (one source of truth). Home/Story keep
+// their "watch it happen" suffix; the day/week numbers come from the shared util so no door
+// can drift (the bug that had Home on Week 1 while Story/Coaching were on Week 2).
+const STORY_GENESIS_SUFFIX = " — a transformation you can watch happen in real time.";
 function renderNumbers(journey) {
   if (!journey) return;
   if (journey.lost_lbs != null) {
@@ -131,6 +126,18 @@ function renderNumbers(journey) {
   }
   if (journey.current_weight_lbs != null) bind("current").textContent = journey.current_weight_lbs;
   if (journey.progress_pct != null) bind("progress").textContent = `${journey.progress_pct}%`;
+  // P2.1 — pair the live weight delta with the genesis timeframe up in the hero, so the claim
+  // meets its proof on the opening screen (down-beat waveform leads just below).
+  if (journey.lost_lbs != null) {
+    const lost = Number(journey.lost_lbs);
+    const { dayN } = genesisCount();
+    const hp = bind("hero-proof");
+    if (hp) {
+      const dir = lost > 0.05 ? `down ${Math.round(Math.abs(lost) * 10) / 10} lb` : lost < -0.05 ? `up ${Math.round(Math.abs(lost) * 10) / 10} lb` : "even";
+      hp.textContent = `${dir} in ${dayN} days — the shape of it, every day, just below.`;
+      hp.hidden = false;
+    }
+  }
   if (journey.projected_goal_date) {
     bind("projected").textContent = `At the current rate, goal lands around ${journey.projected_goal_date}. Correlative projection — not a promise.`;
   } else if (journey.rate_provisional) {
@@ -177,6 +184,9 @@ function renderWave(days) {
 }
 
 /* ── the Third Wall ──────────────────────────────────────────────────────── */
+// P1.2 — the Third Wall's one home is Coaching. Home shows a TEASER: the latest field note's
+// AI line (trimmed) + a clear pointer that the full exchange — the AI's notes and Matthew's
+// replies — lives in Coaching. No full AI↔Matthew duplicate here.
 async function renderWall() {
   const wall = bind("wall");
   try {
@@ -187,14 +197,14 @@ async function renderWall() {
     const full = await getJSON(`/api/field_notes?week=${encodeURIComponent(week)}`);
     const e = full.entry || {};
     const aiText = e.ai_present || e.ai_affirming || e.ai_cautionary || "";
-    const human = e.matthew_agreement || "";
+    const trimmed = aiText.length > 240 ? esc(aiText.slice(0, 240)) + "…" : esc(aiText);
+    const replied = !!e.matthew_agreement;
     wall.innerHTML =
-      `<div class="voice machine"><span class="who">The AI</span><p class="what">${esc(aiText)}</p></div>` +
-      (human ? `<div class="voice human"><span class="who">Matthew</span><p class="what">${esc(human)}</p></div>`
-             : `<div class="voice human"><span class="who">Matthew</span><p class="what">— hasn't replied to this one yet. (That's allowed; the wall is honest both ways.)</p></div>`);
+      `<div class="voice machine"><span class="who">The AI</span><p class="what">${trimmed}</p></div>` +
+      `<p class="wall-teaser">${replied ? "Matthew answered this one back" : "Matthew hasn't replied to this one yet — and that's allowed; the wall is honest both ways"}. The full exchange — the AI's weekly notes and Matthew's replies — lives in <a href="/coaching/">Coaching</a>.</p>`;
     bind("wall-week").textContent = e.ai_generated_at ? `field note · week ${esc(week)} · ${esc(e.ai_tone || "mixed")}` : `field note · week ${esc(week)}`;
   } catch (_e) {
-    wall.innerHTML = `<div class="voice machine"><span class="who">The AI</span><p class="what">The field notes — where the model says its piece and Matthew answers back — appear here each week.</p></div>`;
+    wall.innerHTML = `<div class="voice machine"><span class="who">The AI</span><p class="what">The field notes — where the model says its piece and Matthew answers back — appear each week in <a href="/coaching/">Coaching</a>.</p></div>`;
   }
 }
 
@@ -265,13 +275,32 @@ async function dxSelectSrc(src, preId) {
   const initId = preId && entries.some((e) => String(e.id) === String(preId)) ? preId : entries[0].id;
   dxSelectEntry(src, initId, true);
 }
-function dxBuild() {
+// P1.1 + P1.3 — Home no longer hosts the full master-detail dispatches reader (that lives in
+// Story now, one canonical home). Home shows a one-line TEASER of the latest chronicle entry +
+// the existing "read the full story in Story" link. The reader machinery (dxSelectSrc etc.)
+// stays in this file but is only used by the teaser fetch — no duplicate reader is built.
+async function dxTeaser() {
   const tabsEl = document.querySelector("[data-dx-tabs]");
-  if (!tabsEl) return;
-  tabsEl.innerHTML = DX.map((d) => `<button class="dx-tab" data-src="${d.key}" aria-pressed="false">${d.label}</button>`).join("");
-  tabsEl.querySelectorAll(".dx-tab").forEach((b) => b.addEventListener("click", () => dxSelectSrc(b.dataset.src)));
-  const m = location.hash.match(/#dispatches\/([a-z]+)(?:\/([\w-]+))?/) || [];
-  dxSelectSrc(m[1] && DX.some((d) => d.key === m[1]) ? m[1] : "chronicle", m[2]);
+  const layout = document.querySelector(".beat-dispatches .dx-layout");
+  if (tabsEl) tabsEl.hidden = true;
+  if (layout) layout.hidden = true;
+  const read = document.querySelector("[data-dx-read]");
+  if (!read) return;
+  read.hidden = false;
+  read.classList.add("dx-teaser");
+  try {
+    const data = await dxFetch("chronicle");
+    const latest = dxEntries("chronicle", data)[0];
+    if (latest) {
+      read.innerHTML =
+        `<p class="dx-kicker label">latest from the chronicle · Elena Voss${latest.date ? ` · ${esc(latest.date)}` : ""}</p>` +
+        `<h3 class="dx-title">${esc(latest.title || latest.label || "")}</h3>` +
+        (latest.excerpt ? `<p class="dx-prose">${esc(String(latest.excerpt).slice(0, 240))}…</p>` : "") +
+        `<p class="dx-foot label">The chronicle, journal &amp; podcast read in full in <a href="/story/">Story</a>; the AI lab notes live in <a href="/coaching/">Coaching</a>. This is just the latest beat.</p>`;
+      return;
+    }
+  } catch (e) { /* fall through to the quiet placeholder */ }
+  read.innerHTML = `<p class="beat-note">The chronicle fills in as the experiment runs — read it in <a href="/story/">Story</a>.</p>`;
 }
 
 /* ── theme ───────────────────────────────────────────────────────────────── */
@@ -309,8 +338,8 @@ async function load() {
     if (statsV.elena_hero_line) bind("elena").textContent = statsV.elena_hero_line;
     if (statsV._meta && statsV._meta.generated_at) bind("asof").textContent = `updated ${String(statsV._meta.generated_at).slice(0, 10)}`;
   }
-  stampGenesis();  // "Day N · Week N since June 14" — the honest throughline anchor
-  dxBuild();   // the native Dispatches reader (chronicle · lab notes · journal)
+  stampGenesis(document, STORY_GENESIS_SUFFIX);  // P0.1 — shared genesis source; per-door suffix
+  dxTeaser();  // P1.1/P1.3 — Home teases the latest chronicle; the full reader lives in Story
 
   const journeyV = journey.status === "fulfilled" ? (journey.value.journey || journey.value) : null;
   renderNumbers(journeyV);
